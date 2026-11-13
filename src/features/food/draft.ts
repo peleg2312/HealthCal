@@ -1,6 +1,6 @@
-import { create } from "zustand";
+import { create } from 'zustand';
 
-import type { Food } from "@/types";
+import type { Food } from '@/types';
 
 /**
  * Hand-off slot for the food a user just picked (from search, a barcode scan
@@ -12,10 +12,7 @@ interface DraftState {
   set: (food: Food | null) => void;
 }
 
-export const useFoodDraft = create<DraftState>((set) => ({
-  food: null,
-  set: (food) => set({ food }),
-}));
+export const useFoodDraft = create<DraftState>((set) => ({ food: null, set: (food) => set({ food }) }));
 
 export function setFoodDraft(food: Food | null): void {
   useFoodDraft.getState().set(food);

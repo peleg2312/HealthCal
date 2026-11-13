@@ -55,6 +55,21 @@ begin
 exception when check_violation then null;
 end $$;
 
+-- Every collection the app syncs is accepted (the list mirrors COLLECTIONS in src/store/index.ts).
+-- The probe rows are rolled back so later counts are unaffected.
+do $$
+declare c text;
+begin
+  begin
+    foreach c in array array['foodEntries','customFoods','savedMeals','activities','water','weights','sleep','fasting','favorites','days','routines'] loop
+      perform public.push_records(jsonb_build_array(jsonb_build_object(
+        'collection', c, 'id', gen_random_uuid(), 'date', null, 'data', '{}'::jsonb, 'deleted', false, 'updated_at', '2026-01-05T08:00:00Z')));
+    end loop;
+    raise exception using errcode = 'HC001', message = 'undo probe rows';
+  exception when sqlstate 'HC001' then null;
+  end;
+end $$;
+
 -- User B sees nothing of A's, cannot update or delete A's rows, and cannot insert rows as A.
 select pg_temp.act_as('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
 do $$
