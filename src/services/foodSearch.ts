@@ -270,11 +270,11 @@ export function rankOnline(query: string, products: Food[], exclude: Iterable<st
 export async function searchOnlineWithStatus(
   query: string,
   opts: { limit?: number; exclude?: Iterable<string> } = {},
-): Promise<{ items: Food[]; failed: boolean }> {
+): Promise<{ items: Food[]; failed: boolean; unavailable: boolean }> {
   const q = query.trim();
-  if (q.length < 2) return { items: [], failed: false };
-  const { foods, failed } = await searchProductsWithStatus(q, opts.limit ?? 24);
-  return { items: rankOnline(q, foods, opts.exclude), failed };
+  if (q.length < 2) return { items: [], failed: false, unavailable: false };
+  const { foods, failed, unavailable } = await searchProductsWithStatus(q, opts.limit ?? 24);
+  return { items: rankOnline(q, foods, opts.exclude), failed, unavailable };
 }
 
 export async function searchOnline(query: string, opts: { limit?: number; exclude?: Iterable<string> } = {}): Promise<Food[]> {

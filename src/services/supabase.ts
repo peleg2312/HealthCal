@@ -32,3 +32,6 @@ if (supabase && Platform.OS !== 'web') {
 }
 
 export const FUNCTIONS_URL = isBackendConfigured ? `${url.replace(/\/$/, '')}/functions/v1` : '';
+
+/** Public anon key, sent with calls to edge functions that are not tied to a signed-in user. */
+export const SUPABASE_ANON_KEY = isBackendConfigured ? anonKey : '';

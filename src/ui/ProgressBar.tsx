@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Animated, Easing, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useTheme } from '@/theme';
@@ -18,7 +18,7 @@ export function ProgressBar({
 }) {
   const { colors } = useTheme();
   const target = Number.isFinite(progress) ? Math.min(1, Math.max(0, progress)) : 0;
-  const value = useRef(new Animated.Value(0)).current;
+  const [value] = useState(() => new Animated.Value(0));
   useEffect(() => {
     Animated.timing(value, { toValue: target, duration: 600, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
   }, [target, value]);

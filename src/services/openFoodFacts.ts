@@ -3,11 +3,15 @@
  * lookups and as the online fallback for search. Entries are crowd-sourced, so
  * they are marked unverified and sanity-checked before being shown.
  */
+import { Platform } from 'react-native';
+
 import { atwaterKcal } from '@/lib/nutrition';
 import type { Food, Nutrients, Serving } from '@/types';
 
+import { FUNCTIONS_URL, SUPABASE_ANON_KEY } from './supabase';
+
 const BASE = 'https://world.openfoodfacts.org';
-/** Full-text search service. The older search endpoint on the main site is often unavailable. */
+/** Full-text search service (the search endpoints on the main site answer 503 since full-text search moved here). */
 const SEARCH = 'https://search.openfoodfacts.org/search';
 const FIELDS = 'code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity';
 
@@ -72,11 +76,11 @@ export function offToFood(p: OffProduct): Food | null {
   };
 }
 
-async function getJson(url: string, timeoutMs: number): Promise<unknown> {
+async function getJson(url: string, timeoutMs: number, headers: Record<string, string> = {}): Promise<unknown> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: controller.signal, headers: { Accept: 'application/json' } });
+    const res = await fetch(url, { signal: controller.signal, headers: { Accept: 'application/json', ...headers } });
     if (!res.ok) throw new Error(`Open Food Facts responded ${res.status}`);
     return await res.json();
   } finally {
@@ -111,26 +115,38 @@ function toFoods(products: OffProduct[]): Food[] {
   return out;
 }
 
+export interface ProductSearchResult {
+  foods: Food[];
+  /** The service could not be reached, as opposed to finding nothing. */
+  failed: boolean;
+  /** Online search cannot run here at all (a browser without the backend proxy). */
+  unavailable: boolean;
+}
+
 /**
- * Full-text product search. Never throws: `failed` is true when the service
- * could not be reached at all, so the screen can tell "offline" from "no matches".
+ * Where online search can run. The search service sends no cross-origin
+ * headers, so a browser has to go through the `food-search` edge function;
+ * phones call the service directly.
  */
-export async function searchProductsWithStatus(query: string, limit = 20): Promise<{ foods: Food[]; failed: boolean }> {
+export const onlineSearchAvailable = Platform.OS !== 'web' || FUNCTIONS_URL !== '';
+
+/**
+ * Full-text product search. Never throws: `failed` tells "offline" apart from
+ * "no matches", and `unavailable` covers the browser-without-backend case.
+ */
+export async function searchProductsWithStatus(query: string, limit = 20): Promise<ProductSearchResult> {
   const q = query.trim();
-  if (q.length < 2) return { foods: [], failed: false };
+  if (q.length < 2) return { foods: [], failed: false, unavailable: false };
+  if (!onlineSearchAvailable) return { foods: [], failed: false, unavailable: true };
   const term = encodeURIComponent(q);
   try {
-    const data = (await getJson(`${SEARCH}?q=${term}&page_size=${limit}&fields=${FIELDS}`, 10_000)) as { hits?: OffProduct[] };
-    return { foods: toFoods(data.hits ?? []), failed: false };
+    const data =
+      Platform.OS === 'web'
+        ? await getJson(`${FUNCTIONS_URL}/food-search?q=${term}&limit=${limit}`, 12_000, { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` })
+        : await getJson(`${SEARCH}?q=${term}&page_size=${limit}&fields=${FIELDS}`, 10_000);
+    return { foods: toFoods((data as { hits?: OffProduct[] }).hits ?? []), failed: false, unavailable: false };
   } catch {
-    // Fall back to the classic endpoint before giving up.
-    try {
-      const url = `${BASE}/cgi/search.pl?search_terms=${term}&search_simple=1&action=process&json=1&page_size=${limit}&fields=${FIELDS}`;
-      const data = (await getJson(url, 10_000)) as { products?: OffProduct[] };
-      return { foods: toFoods(data.products ?? []), failed: false };
-    } catch {
-      return { foods: [], failed: true };
-    }
+    return { foods: [], failed: true, unavailable: false };
   }
 }
 

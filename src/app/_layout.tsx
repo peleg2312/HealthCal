@@ -9,7 +9,7 @@ import {
 import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useSyncExternalStore } from 'react';
 import { AppState, Pressable, Text as RNText, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -24,13 +24,11 @@ import { ToastHost } from '@/ui';
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function useStoreHydrated(): boolean {
-  const [hydrated, setHydrated] = useState(() => useStore.persist.hasHydrated());
-  useEffect(() => {
-    const unsub = useStore.persist.onFinishHydration(() => setHydrated(true));
-    if (useStore.persist.hasHydrated()) setHydrated(true);
-    return unsub;
-  }, []);
-  return hydrated;
+  return useSyncExternalStore(
+    (onChange) => useStore.persist.onFinishHydration(onChange),
+    () => useStore.persist.hasHydrated(),
+    () => false,
+  );
 }
 
 function Navigation() {

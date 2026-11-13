@@ -405,14 +405,14 @@ function FastingTile() {
   const { colors } = useTheme();
   const sessions = useLive('fasting');
   const active = sessions.find((f) => !f.end);
-  // Re-render once a minute while a fast is running so the elapsed time stays current.
-  const [, tick] = useState(0);
+  // The clock lives in state so rendering stays pure; it ticks while a fast is running.
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!active) return;
-    const t = setInterval(() => tick((n) => n + 1), 30_000);
+    const t = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(t);
   }, [active]);
-  const elapsedMin = active ? Math.max(0, (Date.now() - new Date(active.start).getTime()) / 60_000) : 0;
+  const elapsedMin = active ? Math.max(0, (now - new Date(active.start).getTime()) / 60_000) : 0;
   return (
     <Tile testID="today-fasting" title="Fasting" icon={<Timer size={16} color={colors.fat} />} onPress={() => router.push('/fasting')}>
       {active ? (

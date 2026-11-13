@@ -5,3 +5,7 @@ project_id = "healthcal"
 [functions.analyze-food]
 # The function verifies the user's token itself so it can return friendly errors.
 verify_jwt = false
+
+[functions.food-search]
+# Public product data only, but still limited to callers that hold the project's anon key.
+verify_jwt = true

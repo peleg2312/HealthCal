@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useState } from 'react';
 import { Animated, Platform, Pressable as RNPressable, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 
 import { haptic } from './haptics';
@@ -27,7 +27,8 @@ export interface PressableScaleProps extends Omit<PressableProps, 'style' | 'chi
  * margins) passed in `style` behave exactly as on a View.
  */
 export function PressableScale({ style, scaleTo = 0.97, feedback = 'tap', onPressIn, onPressOut, onPress, disabled, children, ...rest }: PressableScaleProps) {
-  const scale = useRef(new Animated.Value(1)).current;
+  // Held in state, not a ref: the value is read while rendering.
+  const [scale] = useState(() => new Animated.Value(1));
   const to = (v: number) => Animated.spring(scale, { toValue: v, useNativeDriver: true, speed: 40, bounciness: 4 }).start();
   return (
     <AnimatedPressable

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Animated, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { create } from 'zustand';
@@ -33,7 +33,7 @@ export function ToastHost() {
   const { colors, radius } = useTheme();
   const insets = useSafeAreaInsets();
   const { id, message, actionLabel, onAction, hide } = useToast();
-  const anim = useRef(new Animated.Value(0)).current;
+  const [anim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     if (!message) return;

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Animated, Easing, Platform, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Stop, type CircleProps } from 'react-native-svg';
 
@@ -36,9 +36,9 @@ export function Ring({ size, stroke = 12, progress, color, colorEnd, overColor, 
   const clamped = Number.isFinite(progress) ? Math.max(0, progress) : 0;
   const first = Math.min(1, clamped);
   const over = Math.min(1, Math.max(0, clamped - 1));
-  const value = useRef(new Animated.Value(animate ? 0 : first)).current;
-  const overValue = useRef(new Animated.Value(animate ? 0 : over)).current;
-  const gradId = useRef(`ring-${gradientSeq++}`).current;
+  const [value] = useState(() => new Animated.Value(animate ? 0 : first));
+  const [overValue] = useState(() => new Animated.Value(animate ? 0 : over));
+  const [gradId] = useState(() => `ring-${gradientSeq++}`);
 
   useEffect(() => {
     if (!animate) {

@@ -36,7 +36,7 @@ export default function FoodSearchScreen() {
   const [meal, setMeal] = useState<MealType>(() => parseMeal(params.meal));
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState<Tab>('recent');
-  const [onlineResult, setOnlineResult] = useState<{ query: string; items: Food[]; failed: boolean }>({ query: '', items: [], failed: false });
+  const [onlineResult, setOnlineResult] = useState<{ query: string; items: Food[]; failed: boolean; unavailable: boolean }>({ query: '', items: [], failed: false, unavailable: false });
   const [openedAt] = useState(() => nowISO());
 
   const recentFoods = useStore((s) => s.recentFoods);
@@ -72,8 +72,8 @@ export default function FoodSearchScreen() {
     latest.current = q;
     if (q.length < 2) return;
     const t = setTimeout(async () => {
-      const { items, failed } = await searchOnlineWithStatus(q);
-      if (latest.current === q) setOnlineResult({ query: q, items, failed });
+      const result = await searchOnlineWithStatus(q);
+      if (latest.current === q) setOnlineResult({ query: q, ...result });
     }, 450);
     return () => clearTimeout(t);
   }, [q]);
@@ -291,9 +291,11 @@ export default function FoodSearchScreen() {
                 <List>{onlineItems.map((f, i) => row(f, `online-${i}`))}</List>
               ) : online.status === 'done' ? (
                 <Text variant="body" color="textTertiary" testID="search-online-empty" style={{ paddingVertical: spacing.sm }}>
-                  {onlineResult.failed
-                    ? 'Could not reach the online product database. Your own and bundled foods still work, and you can try again in a moment.'
-                    : 'No online products match that search.'}
+                  {onlineResult.unavailable
+                    ? 'Searching packaged products by name works in the phone app. Here in the browser you can still scan or type a barcode, or create the food yourself.'
+                    : onlineResult.failed
+                      ? 'Could not reach the online product database. Your own and bundled foods still work, and you can try again in a moment.'
+                      : 'No online products match that search.'}
                 </Text>
               ) : (
                 <Text variant="body" color="textTertiary" style={{ paddingVertical: spacing.sm }}>
