@@ -65,7 +65,8 @@ src/theme/          tokens (colours, spacing, radius, type) and useTheme().
 src/types/          all domain types.
 src/lib/            pure maths and helpers (no React, no storage): energy, exercise,
                     hydration, trend, body, nutrition, dates, units, id.
-src/store/          zustand store (index.ts) and derived data (selectors.ts).
+src/store/          zustand store (index.ts), derived data (selectors.ts), on-device saving
+                    (persistence.ts) and the clock hooks (clock.ts).
 src/data/           bundled foods.ts (341 foods) and activities.ts (108 activities with MET values).
 src/services/       supabase, auth, sync, openFoodFacts, notifications, ...
 src/features/<x>/   components and helpers private to one feature area.
@@ -81,6 +82,9 @@ scripts/dev/        seed.mjs (demo data) and shot.mjs (browser screenshots).
 - Read with hooks from `@/store/selectors`: `useProfile()`, `useDay(date)`, `useDays(n)`, `useEnergyModel()`, `useWeightSeries()`, `useConsistency()`, `useLive('activities')`. They already filter soft-deleted records.
 - Write with `useStore.getState().upsert(collection, record)`, `.remove(collection, id)` (soft delete), `.restore(collection, id)`, `.setProfile(patch)`, `.setSettings(patch)`, `.setReminders(patch)`. `upsert` fills `id` and `updatedAt`.
 - Food goes to the diary only through `@/features/food/log` (`logFood`, `logQuickAdd`, `logAiItems`, `logItems`, `deleteEntry`), which handle recents, haptics and Undo.
+- Never read the clock while rendering (`today()`, `new Date()`, `Date.now()`, `mealForTime()`): the React Compiler caches a render's results, and tab screens stay mounted for the whole session, so the value would be hours or days old. Use `useToday()` and `useNow()` from `@/store/clock`; the plain functions are fine inside event handlers and effects. `useEnergyModel(date)`, `useDays(count, end)` and `useConsistency(end)` take the date explicitly for the same reason.
+- One record per day for weights and sleep: `upsert` gives them an id derived from the date, so saving a second value for a date replaces the first on every device.
+- Favourites are the synced `favorites` collection (each record holds the food); `favoriteFoodIds` is derived from it.
 - Zustand v5: a selector must return a stable reference. Select raw slices (`useStore((s) => s.settings)`) and derive with `useMemo`; never return a fresh object or array from the selector itself.
 - React Compiler is on. Write plain components; do not add manual `useMemo`/`useCallback` for render performance (memoising expensive derived data is still fine).
 
@@ -131,6 +135,7 @@ Read the component source in `src/ui/` for exact props before using one. If the 
 /activity/pick?date=          /activity/log?activityId=&entryId=&date=      /activity/strength?entryId=&date=
 /water  /weight  /body  /sleep  /fasting
 /profile  /settings/goals  /settings/reminders  /settings/account  /settings/data  /settings/about
+/recap?week=           weekly check-in                /consistency   logging calendar
 ```
 
 ## Working on this project
@@ -138,5 +143,7 @@ Read the component source in `src/ui/` for exact props before using one. If the 
 - A web dev server is already running at http://localhost:8081 with hot reload. Do not start another one and do not stop it.
 - Look at your screens in a real browser: `node scripts/dev/shot.mjs <route> <out.png>` loads demo data, opens the route at phone size and saves a screenshot, printing any runtime errors. Flags: `--empty` (profile but no data), `--fresh` (no profile), `--light`, `--theme=blossom`, `--imperial`, `--full`, `--2x`, `--tap=testIdA,testIdB`, `--type=testId:text`, `--wait=ms`, `--desktop`. Open the PNG with the Read tool and judge it critically: alignment, spacing, truncation, contrast, both themes, empty and filled states.
 - Type-check with `npx tsc --noEmit`. Other people are editing other files at the same time, so errors in files you do not own are not yours to fix; if the bundle is broken by someone else's file, wait a minute and retry.
-- Unit tests: `npx vitest run` (pure logic only, files named `*.test.ts`).
+- Unit tests: `npx vitest run` (pure logic only, files named `*.test.ts`). `react-native`, AsyncStorage and `expo-crypto` are stubbed for tests (see `test/stubs/`).
+- Browser tests read the app's live state with `await page.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())))`. Do not parse `localStorage` yourself: the store is saved as many small values (`src/store/persistence.ts`), not one.
+- `node scripts/dev/e2e.cjs` runs a new user's first day end to end; keep it passing.
 - Do not run git commands, do not install or remove packages, do not edit `package.json` or `app.json`. If you need a package or a change to a shared file, say so in your report.

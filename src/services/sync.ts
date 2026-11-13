@@ -192,9 +192,12 @@ export function startAutoSync(): () => void {
  *  - Data created without an account is adopted and uploaded.
  *  - Data that belongs to a different account is cleared before pulling.
  */
-export async function attachUser(userId: string): Promise<'ok' | 'failed'> {
+export async function attachUser(userId: string, options: { discardOtherAccount?: boolean } = {}): Promise<'ok' | 'failed' | 'blocked'> {
   const s = useStore.getState();
   if (s.ownerId !== userId) {
+    // Entries of another account that never reached the server would be erased by
+    // switching. Stop and let the user decide instead of losing them silently.
+    if (s.ownerId !== null && pendingChanges(s) > 0 && !options.discardOtherAccount) return 'blocked';
     if (s.ownerId === null) {
       s.setOwner(userId);
       s.markAllDirty();

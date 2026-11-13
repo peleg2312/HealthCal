@@ -95,6 +95,14 @@ export interface CalorieTarget {
   /** Weekly change the target actually implies, kg (signed). */
   impliedWeeklyKg: number;
   source: 'override' | 'calculated';
+  /**
+   * The lowest intake this plan may go to: the recommended minimum, or the
+   * person's own expenditure when that is already lower (a deficit is then not
+   * possible and the plan is maintenance).
+   */
+  floor: number;
+  /** Estimated expenditure is at or below the recommended minimum, so no deficit is planned. */
+  belowFloor: boolean;
 }
 
 export function calorieTarget(p: Profile, tdee: number = formulaTdee(p)): CalorieTarget {
@@ -107,6 +115,8 @@ export function calorieTarget(p: Profile, tdee: number = formulaTdee(p)): Calori
       limitedByFloor: false,
       impliedWeeklyKg: (delta * 7) / KCAL_PER_KG,
       source: 'override',
+      floor: Math.min(calorieFloor(p.sex), Math.round(tdee / 10) * 10),
+      belowFloor: tdee <= calorieFloor(p.sex),
     };
   }
   const direction = p.goal === 'lose' ? -1 : p.goal === 'gain' ? 1 : 0;
@@ -123,6 +133,8 @@ export function calorieTarget(p: Profile, tdee: number = formulaTdee(p)): Calori
     limitedByFloor: raw < target - 1,
     impliedWeeklyKg: (delta * 7) / KCAL_PER_KG,
     source: 'calculated',
+    floor: Math.min(floor, Math.round(tdee / 10) * 10),
+    belowFloor: tdee <= floor,
   };
 }
 

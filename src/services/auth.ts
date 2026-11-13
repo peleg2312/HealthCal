@@ -21,9 +21,15 @@ interface AuthState {
   sessionLost: boolean;
   /** The user arrived from a password-reset link and should choose a new password. */
   recovery: boolean;
+  /**
+   * Signing in was paused: this device holds this many changes from a different
+   * account that were never backed up, and switching accounts would erase them.
+   * Resolve with `confirmAccountSwitch()` or `cancelAccountSwitch()`.
+   */
+  switchBlocked: number | null;
 }
 
-export const useAuth = create<AuthState>(() => ({ ready: !isBackendConfigured, session: null, restoring: false, restoreFailed: false, sessionLost: false, recovery: false }));
+export const useAuth = create<AuthState>(() => ({ ready: !isBackendConfigured, session: null, restoring: false, restoreFailed: false, sessionLost: false, recovery: false, switchBlocked: null }));
 
 export type AuthResult = { ok: true; needsEmailConfirmation?: boolean } | { ok: false; message: string };
 
@@ -43,10 +49,33 @@ let initialized = false;
 /** Set while this device is signing out on purpose, to tell that apart from a session that simply ended. */
 let signingOut = false;
 
-async function restore(userId: string): Promise<void> {
-  useAuth.setState({ restoring: true, restoreFailed: false });
-  const outcome = await attachUser(userId).catch(() => 'failed' as const);
-  useAuth.setState({ restoring: false, restoreFailed: outcome === 'failed' });
+async function restore(userId: string, options: { discardOtherAccount?: boolean } = {}): Promise<void> {
+  useAuth.setState({ restoring: true, restoreFailed: false, switchBlocked: null });
+  const outcome = await attachUser(userId, options).catch(() => 'failed' as const);
+  useAuth.setState({
+    restoring: false,
+    restoreFailed: outcome === 'failed',
+    switchBlocked: outcome === 'blocked' ? pendingChanges(useStore.getState()) : null,
+  });
+}
+
+/** The user chose to discard the other account's unsynced changes and continue signing in. */
+export function confirmAccountSwitch(): Promise<void> {
+  const userId = useAuth.getState().session?.user.id;
+  return userId ? restore(userId, { discardOtherAccount: true }) : Promise.resolve();
+}
+
+/** The user chose to keep what is on the device: end the new session and leave the data untouched. */
+export async function cancelAccountSwitch(): Promise<void> {
+  if (supabase) {
+    signingOut = true;
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } finally {
+      signingOut = false;
+    }
+  }
+  useAuth.setState({ session: null, switchBlocked: null, sessionLost: true });
 }
 
 /** Run the first sync again after it failed (offered on the sign-in screen). */
@@ -61,7 +90,7 @@ export function initAuth(): void {
   initialized = true;
   supabase.auth.getSession().then(({ data }) => {
     useAuth.setState({ session: data.session, ready: true });
-    if (data.session) void attachUser(data.session.user.id);
+    if (data.session) void restore(data.session.user.id);
     // Local data belongs to an account but no session came back: it ended while the app was closed.
     else if (useStore.getState().ownerId) useAuth.setState({ sessionLost: true });
   });
@@ -123,12 +152,12 @@ export async function updatePassword(password: string): Promise<AuthResult> {
  * recovery link and the session was set.
  */
 export async function handleAuthLink(url: string | null): Promise<boolean> {
-  if (!supabase || !url || !/type=recovery/.test(url)) return false;
-  const params = new URLSearchParams(url.split('#')[1] ?? url.split('?')[1] ?? '');
-  const access_token = params.get('access_token');
-  const refresh_token = params.get('refresh_token');
-  if (!access_token || !refresh_token) return false;
-  const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+  if (!supabase || !url || !/mode=reset/.test(url)) return false;
+  const code = new URLSearchParams(url.split('?')[1]?.split('#')[0] ?? '').get('code');
+  if (!code) return false;
+  // The code only works together with the secret this device stored when it asked
+  // for the reset, so a link opened anywhere else cannot sign anyone in.
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) return false;
   useAuth.setState({ recovery: true });
   return true;
@@ -155,7 +184,7 @@ export async function signOut(options: { discardPending?: boolean } = {}): Promi
       signingOut = false;
     }
   }
-  useAuth.setState({ session: null, sessionLost: false, restoreFailed: false, recovery: false });
+  useAuth.setState({ session: null, sessionLost: false, restoreFailed: false, recovery: false, switchBlocked: null });
   useStore.getState().resetAll();
   await flushPersistence();
   return { ok: true };

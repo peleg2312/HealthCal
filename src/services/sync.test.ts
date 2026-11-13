@@ -166,27 +166,51 @@ describe('sync', () => {
     expect(useSyncState.getState().status).toBe('idle');
   });
 
-  it('clears another account\'s local data before pulling the new user\'s', async () => {
-    useStore.getState().setOwner('user-b');
-    useStore.getState().setProfile(profile('Bea'));
-    useStore.getState().upsert('water', water(999));
-
+  const seedAccountA = () => {
     server.rows.push({
       user_id: 'user-a', collection: 'water', id: '11111111-1111-4111-8111-111111111111', date: '2026-01-05',
       data: { ...water(330), id: '11111111-1111-4111-8111-111111111111' }, deleted: false,
       updated_at: '2026-01-05T08:00:00.000Z', server_updated_at: server.tick(),
     });
     server.profiles.set('user-a', { data: { ...profile('Alex'), updatedAt: '2026-01-02T00:00:00.000Z' }, profile_updated_at: '2026-01-02T00:00:00.000Z', settings: null, settings_updated_at: null });
+  };
 
-    await attachUser('user-a');
+  it('refuses to switch accounts while the device holds unsynced changes of another account', async () => {
+    useStore.getState().setOwner('user-b');
+    useStore.getState().setProfile(profile('Bea'));
+    useStore.getState().upsert('water', water(999));
+    seedAccountA();
 
+    expect(await attachUser('user-a')).toBe('blocked');
+    // Nothing was erased, nothing was uploaded, and the data still belongs to B.
+    const state = useStore.getState();
+    expect(state.ownerId).toBe('user-b');
+    expect(state.profile?.name).toBe('Bea');
+    expect(Object.values(state.water).map((w) => w.ml)).toEqual([999]);
+    expect(server.rows.some((r) => (r.data as { ml?: number }).ml === 999)).toBe(false);
+  });
+
+  it('switches accounts once the user agrees to discard those changes, without leaking them into the new account', async () => {
+    useStore.getState().setOwner('user-b');
+    useStore.getState().setProfile(profile('Bea'));
+    useStore.getState().upsert('water', water(999));
+    seedAccountA();
+
+    expect(await attachUser('user-a', { discardOtherAccount: true })).toBe('ok');
     const state = useStore.getState();
     expect(state.ownerId).toBe('user-a');
     expect(state.profile?.name).toBe('Alex');
-    const amounts = Object.values(state.water).map((w) => w.ml);
-    expect(amounts).toEqual([330]);
-    // Nothing of user B's may have been uploaded under user A.
+    expect(Object.values(state.water).map((w) => w.ml)).toEqual([330]);
     expect(server.rows.some((r) => (r.data as { ml?: number }).ml === 999)).toBe(false);
+  });
+
+  it('switches accounts without asking when everything of the previous account was already backed up', async () => {
+    useStore.getState().setOwner('user-b');
+    useStore.setState({ water: { w: { id: 'w', date: '2026-01-05', ml: 999, beverage: 'water', loggedAt: '2026-01-05T08:00:00.000Z', updatedAt: '2026-01-05T08:00:00.000Z', deleted: false } } });
+    seedAccountA();
+    expect(pendingChanges(useStore.getState())).toBe(0);
+    expect(await attachUser('user-a')).toBe('ok');
+    expect(Object.values(useStore.getState().water).map((w) => w.ml)).toEqual([330]);
   });
 
   it('propagates deletes as soft-deleted rows', async () => {

@@ -19,6 +19,10 @@ export const supabase: SupabaseClient | null = isBackendConfigured
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: Platform.OS === 'web',
+        // PKCE: a link can only complete a sign-in in the browser or app that started it.
+        // With the default flow, anyone could hand a victim a link carrying the sender's own
+        // session, and the victim's on-device data would then upload to the sender's account.
+        flowType: 'pkce',
       },
     })
   : null;
