@@ -201,6 +201,9 @@ export const fonts = {
   semibold: 'PlusJakartaSans_600SemiBold',
   bold: 'PlusJakartaSans_700Bold',
   extrabold: 'PlusJakartaSans_800ExtraBold',
+  /** Numerals only: a semi-condensed face, so headline figures can be large without crowding. */
+  num: 'BarlowSemiCondensed_600SemiBold',
+  numBold: 'BarlowSemiCondensed_700Bold',
 } as const;
 
 export type TextVariant =
@@ -232,9 +235,9 @@ export const typography: Record<
   label: { fontFamily: fonts.semibold, fontSize: 13, lineHeight: 18 },
   caption: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 16 },
   overline: { fontFamily: fonts.bold, fontSize: 11, lineHeight: 14, letterSpacing: 1.1 },
-  numXL: { fontFamily: fonts.extrabold, fontSize: 44, lineHeight: 48, letterSpacing: -1.5 },
-  numL: { fontFamily: fonts.extrabold, fontSize: 28, lineHeight: 32, letterSpacing: -0.8 },
-  numM: { fontFamily: fonts.bold, fontSize: 20, lineHeight: 24, letterSpacing: -0.4 },
+  numXL: { fontFamily: fonts.numBold, fontSize: 56, lineHeight: 56, letterSpacing: -0.5 },
+  numL: { fontFamily: fonts.numBold, fontSize: 34, lineHeight: 36, letterSpacing: -0.2 },
+  numM: { fontFamily: fonts.num, fontSize: 23, lineHeight: 26, letterSpacing: 0 },
 };
 
 /** Content never stretches wider than this on tablets and web. */
