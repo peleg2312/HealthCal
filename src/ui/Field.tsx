@@ -16,7 +16,7 @@ export interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   right?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   /** Forwarded to the input, for moving focus between fields. */
-  ref?: React.Ref<TextInput>;
+  ref?: React.ComponentProps<typeof TextInput>['ref'];
 }
 
 export function TextField({ label, suffix, error, hint, left, right, style, onFocus, onBlur, ...rest }: TextFieldProps) {

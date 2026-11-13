@@ -21,7 +21,6 @@ const PAD_X = 10;
 export function ProjectionChart({ projection: p, units }: { projection: Projection; units: UnitSystem }) {
   const { colors, spacing } = useTheme();
   const [width, setWidth] = useState(0);
-  const lose = p.targetKg < p.startKg;
 
   const w = Math.max(0, width - PAD_X * 2);
   const h = PLOT_H - PAD_TOP - PAD_BOTTOM;
@@ -59,7 +58,7 @@ export function ProjectionChart({ projection: p, units }: { projection: Projecti
         ) : null}
         {width > 0 ? (
           <>
-            <Text variant="caption" color="textSecondary" tabular style={{ position: 'absolute', left: PAD_X, top: lose ? 2 : PLOT_H - PAD_BOTTOM - 34 }}>
+            <Text variant="caption" color="textSecondary" tabular style={{ position: 'absolute', left: PAD_X, top: 2 }}>
               {`${formatWeight(p.startKg, units)} today`}
             </Text>
             <Text

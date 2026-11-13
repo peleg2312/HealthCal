@@ -10,6 +10,7 @@ import {
   summarizePeriod,
   weekendPattern,
   guidelineMinutes,
+  isCompleteDay,
   budgetBalanceText,
   planChangeText,
   recapTiles,
@@ -21,7 +22,7 @@ import {
   type SleepLike,
 } from './insights';
 import type { AdaptiveTdee, TrendPoint } from './trend';
-import { weightTrend } from './trend';
+import { isCompleteDay as sharedComplete, weightTrend } from './trend';
 
 // 2026-11-13 is a Friday. Weeks are Monday-based: Mon Nov 9 .. Sun Nov 15.
 const TODAY = '2026-11-13';
@@ -504,5 +505,23 @@ describe('planChangeText', () => {
       'Your measured expenditure, outside logged workouts, is now 2,440 kcal a day against 2,500 kcal, so the budget moved down 60 kcal.',
     );
     expect(planChangeText({ target: 2000, tdee: 2500, usingAdaptive: false }, { target: 1800, tdee: 2500, usingAdaptive: false })).toContain('change to your goal');
+  });
+});
+
+describe('isCompleteDay (shared rule with the Energy card)', () => {
+  it('uses the app-wide rule: at least 800 kcal and half the budget', () => {
+    // A small budget: 700 kcal is more than half of 1,200 but under 800, so the Energy card does not count it.
+    expect(isCompleteDay(day('2026-11-10', { kcal: 700, budget: 1200 }), TODAY)).toBe(false);
+    expect(isCompleteDay(day('2026-11-10', { kcal: 820, budget: 1200 }), TODAY)).toBe(true);
+    expect(isCompleteDay(day('2026-11-10', { kcal: 999, budget: 2000 }), TODAY)).toBe(false);
+    expect(isCompleteDay(day('2026-11-10', { kcal: 1000, budget: 2000 }), TODAY)).toBe(true);
+    // Today never counts.
+    expect(isCompleteDay(day(TODAY, { kcal: 2000 }), TODAY)).toBe(false);
+  });
+
+  it('agrees with trend.isCompleteDay for every logged closed day', () => {
+    for (const [kcal, budget] of [[700, 1200], [900, 2400], [1300, 2400], [1200, 2400], [790, 1000]]) {
+      expect(isCompleteDay(day('2026-11-10', { kcal, budget }), TODAY)).toBe(sharedComplete(kcal, budget));
+    }
   });
 });

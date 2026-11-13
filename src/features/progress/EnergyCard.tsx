@@ -141,7 +141,7 @@ export function EnergyCard({ model, useAdaptiveSetting }: { model: EnergyModel; 
           </Text>
           <Text variant="caption" color="textSecondary">
             It needs at least {NEED_DAYS} fully logged days and {NEED_WEIGH_INS} weigh-ins spread over two weeks. Confidence rises with more of both, and the
-            estimate is blended with the formula until it is well supported. Days under 800 kcal are treated as partly logged and left out.
+            estimate is blended with the formula until it is well supported. As everywhere in the app, a day counts as fully logged at 800 kcal or more and at least half its reference; here the reference is the formula estimate, since this is what sets the budget. Other days are left out.
           </Text>
         </View>
       ) : null}

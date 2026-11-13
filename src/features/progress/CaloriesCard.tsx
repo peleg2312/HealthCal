@@ -91,7 +91,7 @@ export function CaloriesCard({ days, summary, today, eatBack }: { days: InsightD
           />
           <Note>
             Press and drag on the chart to read each day. Averages use {summary.completeDays} fully logged {summary.completeDays === 1 ? 'day' : 'days'}. Today
-            {summary.partialDays ? ` and ${summary.partialDays} partly logged ${summary.partialDays === 1 ? 'day' : 'days'} (under half the budget)` : ''} {summary.partialDays ? 'are' : 'is'} left out.{eatBack ? ' Budgets include the exercise calories you eat back.' : ''}
+            {summary.partialDays ? ` and ${summary.partialDays} partly logged ${summary.partialDays === 1 ? 'day' : 'days'} (under 800 kcal or half the budget)` : ''} {summary.partialDays ? 'are' : 'is'} left out.{eatBack ? ' Budgets include the exercise calories you eat back.' : ''}
           </Note>
         </>
       ) : (

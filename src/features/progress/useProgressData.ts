@@ -4,6 +4,7 @@ import { diffDays } from '@/lib/dates';
 import {
   computeMilestones,
   generateInsights,
+  isCompleteDay,
   recapWeeks,
   summarizePeriod,
   weeklyRecap,
@@ -79,7 +80,7 @@ export function useProgressData(range: RangeDays) {
     });
     const earlierWeeks = recapWeeks(history, t, 3);
     // Closed, fully logged days across all history: decides the early state.
-    const completeEver = history.filter((d) => d.date < t && d.entries.length > 0 && d.eaten.kcal >= d.budget * 0.5).length;
+    const completeEver = history.filter((d) => isCompleteDay(d, t)).length;
     return {
       today: t,
       profile,

@@ -15,6 +15,7 @@ import { addDays, diffDays, formatShortDate, fromISODate, startOfWeek } from './
 import { KCAL_PER_KG, maxWeeklyRateKg } from './energy';
 import { effectiveMl } from './hydration';
 import type { AdaptiveTdee, TrendPoint } from './trend';
+import { isCompleteDay as sharedIsCompleteDay } from './trend';
 import { formatNumber, formatVolume, formatWeight } from './units';
 
 // ------------------------------------------------------------------ inputs
@@ -47,7 +48,11 @@ export interface SleepLike {
 
 /** Days within this share of the budget count as "on budget". */
 export const BUDGET_BAND = 0.1;
-/** A logged day under this share of its budget is treated as partly logged and left out of averages. */
+/**
+ * A logged day under this share of its budget (or under 800 kcal) is treated as
+ * partly logged and left out of averages. The rule itself is `isCompleteDay` in
+ * `./trend`, shared with the expenditure estimate.
+ */
 export const PARTIAL_DAY_SHARE = 0.5;
 /** Fully logged days needed before any nutrition insight is generated. */
 export const MIN_INSIGHT_DAYS = 3;
@@ -153,9 +158,9 @@ export function isLogged(d: InsightDay): boolean {
   return d.entries.length > 0;
 }
 
-/** Logged, closed (before today) and not obviously partial. */
+/** Logged, closed (before today) and not obviously partial, by the app-wide rule in `./trend`. */
 export function isCompleteDay(d: InsightDay, today: ISODate): boolean {
-  return d.date < today && isLogged(d) && d.eaten.kcal >= d.budget * PARTIAL_DAY_SHARE;
+  return d.date < today && isLogged(d) && sharedIsCompleteDay(d.eaten.kcal, d.budget);
 }
 
 export function inBudgetBand(kcal: number, budget: number): boolean {
