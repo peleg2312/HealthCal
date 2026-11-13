@@ -1,0 +1,7 @@
+# Supabase project config. Link a project with `supabase link`, then
+# `supabase db push` applies migrations and `supabase functions deploy` ships the function.
+project_id = "healthcal"
+
+[functions.analyze-food]
+# The function verifies the user's token itself so it can return friendly errors.
+verify_jwt = false

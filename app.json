@@ -1,0 +1,75 @@
+{
+  "expo": {
+    "name": "HealthCal",
+    "slug": "healthcal",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "healthcal",
+    "userInterfaceStyle": "automatic",
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0C10",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "app.healthcal.mobile",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS"
+      ]
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0A0C10",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 96
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "HealthCal uses the camera to scan barcodes and photograph meals."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "HealthCal reads the photos you pick to estimate the nutrition of a meal.",
+          "cameraPermission": "HealthCal uses the camera to photograph meals."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#C6F26B"
+        }
+      ],
+      "expo-sharing",
+      "expo-localization",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.healthcal.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "HealthCal uses the camera to scan barcodes and photograph meals for nutrition estimates.",
+        "NSPhotoLibraryUsageDescription": "HealthCal reads the photos you pick to estimate the nutrition of a meal."
+      }
+    }
+  }
+}
