@@ -7,6 +7,7 @@
 //   --empty        onboarded profile but no logged data (check empty states)
 //   --fresh        no profile at all (welcome / onboarding flow)
 //   --light        light theme (default is dark)
+//   --imperial     demo profile uses imperial units (lb, ft/in, fl oz, mi)
 //   --full         capture the full scrollable page
 //   --wait=1500    extra milliseconds to wait before the capture
 //   --tap=a,b      testIDs to click in order before the capture
@@ -29,7 +30,7 @@ const types = args.filter((a) => a.startsWith('--type=')).map((a) => a.slice(7))
 const [route = '/', out = 'shot.png'] = args.filter((a) => !a.startsWith('--'));
 const base = flags.url || 'http://localhost:8081';
 
-const seed = buildSeed({ empty: !!flags.empty, onboarded: !flags.fresh, theme: flags.light ? 'light' : 'dark' });
+const seed = buildSeed({ empty: !!flags.empty, onboarded: !flags.fresh, theme: flags.light ? 'light' : 'dark', units: flags.imperial ? 'imperial' : 'metric' });
 const browser = await chromium.launch();
 const context = await browser.newContext({
   viewport: flags.desktop ? { width: 1280, height: 800 } : { width: 390, height: 844 },

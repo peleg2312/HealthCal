@@ -50,7 +50,16 @@ export function logFood(input: LogFoodInput): FoodEntry {
   const built = buildEntry(input);
   if (input.entryId) {
     const existing = store.foodEntries[input.entryId];
-    const entry = store.upsert('foodEntries', { ...built, id: input.entryId, loggedAt: existing?.loggedAt ?? built.loggedAt });
+    // An edited estimate is still an estimate: keep its range, scaled to the new amount.
+    const scale = existing?.kcalRange && existing.nutrients.kcal > 0 ? built.nutrients.kcal / existing.nutrients.kcal : null;
+    const entry = store.upsert('foodEntries', {
+      ...built,
+      id: input.entryId,
+      loggedAt: existing?.loggedAt ?? built.loggedAt,
+      ...(scale !== null && existing?.kcalRange
+        ? { kcalRange: [Math.round(existing.kcalRange[0] * scale), Math.round(existing.kcalRange[1] * scale)] as [number, number], confidence: existing.confidence }
+        : null),
+    });
     haptic.success();
     toast('Entry updated');
     return entry;

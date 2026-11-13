@@ -69,9 +69,9 @@ const SESSIONS = [
   { activityId: 'walking', name: 'Walking', emoji: '🚶', category: 'cardio', intensity: 'moderate', durationMin: 45, met: 3.8, distanceKm: 3.9 },
 ];
 
-/** @param {{ days?: number, empty?: boolean, theme?: 'system'|'light'|'dark', onboarded?: boolean }} opts */
+/** @param {{ days?: number, empty?: boolean, theme?: 'system'|'light'|'dark', onboarded?: boolean, units?: 'metric'|'imperial' }} opts */
 export function buildSeed(opts = {}) {
-  const { days = 35, empty = false, theme = 'dark', onboarded = true } = opts;
+  const { days = 35, empty = false, theme = 'dark', onboarded = true, units = 'metric' } = opts;
   const rand = rng(20261113);
   const stamp = new Date().toISOString();
   const rec = (r) => ({ id: randomUUID(), updatedAt: stamp, deleted: false, ...r });
@@ -83,7 +83,7 @@ export function buildSeed(opts = {}) {
     profile: onboarded
       ? {
           name: 'Alex', sex: 'male', birthDate: '1994-05-12', heightCm: 178, weightKg, bodyFatPct: 18,
-          activityLevel: 'light', goal: 'lose', targetWeightKg: 74, weeklyRateKg: 0.4, units: 'metric',
+          activityLevel: 'light', goal: 'lose', targetWeightKg: 74, weeklyRateKg: 0.4, units,
           eatBackExercise: true, useAdaptiveTdee: true, onboardedAt: at(days, 9), updatedAt: stamp,
         }
       : null,

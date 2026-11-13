@@ -7,13 +7,16 @@ import { atwaterKcal } from '@/lib/nutrition';
 import type { Food, Nutrients, Serving } from '@/types';
 
 const BASE = 'https://world.openfoodfacts.org';
+/** Full-text search service. The older search endpoint on the main site is often unavailable. */
+const SEARCH = 'https://search.openfoodfacts.org/search';
 const FIELDS = 'code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity';
 
 interface OffProduct {
   code?: string;
   product_name?: string;
   product_name_en?: string;
-  brands?: string;
+  /** A comma-separated string from the product API, a list from the search service. */
+  brands?: string | string[];
   nutriments?: Record<string, number | string | undefined>;
   serving_size?: string;
   serving_quantity?: number | string;
@@ -59,7 +62,7 @@ export function offToFood(p: OffProduct): Food | null {
   return {
     id: `off_${p.code}`,
     name,
-    brand: p.brands?.split(',')[0]?.trim() || undefined,
+    brand: (Array.isArray(p.brands) ? p.brands[0] : p.brands?.split(',')[0])?.trim() || undefined,
     barcode: p.code,
     per100g,
     servings,
@@ -94,25 +97,44 @@ export async function lookupBarcode(code: string): Promise<BarcodeResult> {
   return { status: 'found', food };
 }
 
-/** Full-text product search. Returns [] rather than throwing: online results are a bonus on top of local ones. */
-export async function searchProducts(query: string, limit = 20): Promise<Food[]> {
-  const q = query.trim();
-  if (q.length < 2) return [];
-  try {
-    const url = `${BASE}/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=${limit}&fields=${FIELDS}`;
-    const data = (await getJson(url, 10_000)) as { products?: OffProduct[] };
-    const seen = new Set<string>();
-    const out: Food[] = [];
-    for (const p of data.products ?? []) {
-      const food = offToFood(p);
-      if (!food) continue;
-      const key = `${food.name.toLowerCase()}|${food.brand?.toLowerCase() ?? ''}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(food);
-    }
-    return out;
-  } catch {
-    return [];
+function toFoods(products: OffProduct[]): Food[] {
+  const seen = new Set<string>();
+  const out: Food[] = [];
+  for (const p of products) {
+    const food = offToFood(p);
+    if (!food) continue;
+    const key = `${food.name.toLowerCase()}|${food.brand?.toLowerCase() ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(food);
   }
+  return out;
+}
+
+/**
+ * Full-text product search. Never throws: `failed` is true when the service
+ * could not be reached at all, so the screen can tell "offline" from "no matches".
+ */
+export async function searchProductsWithStatus(query: string, limit = 20): Promise<{ foods: Food[]; failed: boolean }> {
+  const q = query.trim();
+  if (q.length < 2) return { foods: [], failed: false };
+  const term = encodeURIComponent(q);
+  try {
+    const data = (await getJson(`${SEARCH}?q=${term}&page_size=${limit}&fields=${FIELDS}`, 10_000)) as { hits?: OffProduct[] };
+    return { foods: toFoods(data.hits ?? []), failed: false };
+  } catch {
+    // Fall back to the classic endpoint before giving up.
+    try {
+      const url = `${BASE}/cgi/search.pl?search_terms=${term}&search_simple=1&action=process&json=1&page_size=${limit}&fields=${FIELDS}`;
+      const data = (await getJson(url, 10_000)) as { products?: OffProduct[] };
+      return { foods: toFoods(data.products ?? []), failed: false };
+    } catch {
+      return { foods: [], failed: true };
+    }
+  }
+}
+
+/** Convenience form of the search that only returns the foods. */
+export async function searchProducts(query: string, limit = 20): Promise<Food[]> {
+  return (await searchProductsWithStatus(query, limit)).foods;
 }

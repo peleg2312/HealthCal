@@ -13,7 +13,7 @@
 import { BUILTIN_FOODS } from '@/data/foods';
 import type { Food } from '@/types';
 
-import { searchProducts } from './openFoodFacts';
+import { searchProductsWithStatus } from './openFoodFacts';
 
 export type SearchOrigin = 'favorite' | 'custom' | 'recent' | 'builtin' | 'online';
 
@@ -264,12 +264,19 @@ export function rankOnline(query: string, products: Food[], exclude: Iterable<st
 }
 
 /**
- * Online community products from Open Food Facts. Never throws: an empty list
- * means nothing was found or the network was unavailable.
+ * Online community products from Open Food Facts. Never throws. `failed` is
+ * true when the service could not be reached, as opposed to finding nothing.
  */
-export async function searchOnline(query: string, opts: { limit?: number; exclude?: Iterable<string> } = {}): Promise<Food[]> {
+export async function searchOnlineWithStatus(
+  query: string,
+  opts: { limit?: number; exclude?: Iterable<string> } = {},
+): Promise<{ items: Food[]; failed: boolean }> {
   const q = query.trim();
-  if (q.length < 2) return [];
-  const products = await searchProducts(q, opts.limit ?? 24);
-  return rankOnline(q, products, opts.exclude);
+  if (q.length < 2) return { items: [], failed: false };
+  const { foods, failed } = await searchProductsWithStatus(q, opts.limit ?? 24);
+  return { items: rankOnline(q, foods, opts.exclude), failed };
+}
+
+export async function searchOnline(query: string, opts: { limit?: number; exclude?: Iterable<string> } = {}): Promise<Food[]> {
+  return (await searchOnlineWithStatus(query, opts)).items;
 }

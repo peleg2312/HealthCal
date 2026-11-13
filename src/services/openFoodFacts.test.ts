@@ -124,3 +124,10 @@ describe('rejection of unusable or inconsistent data', () => {
     expect(f).not.toBeNull();
   });
 });
+
+describe('search service response shape', () => {
+  it('accepts brands as a list, which is how the search service returns them', () => {
+    const food = offToFood({ ...good, brands: ['Acme', 'Other'] });
+    expect(food?.brand).toBe('Acme');
+  });
+});

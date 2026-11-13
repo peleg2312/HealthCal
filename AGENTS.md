@@ -136,7 +136,7 @@ Read the component source in `src/ui/` for exact props before using one. If the 
 ## Working on this project
 
 - A web dev server is already running at http://localhost:8081 with hot reload. Do not start another one and do not stop it.
-- Look at your screens in a real browser: `node scripts/dev/shot.mjs <route> <out.png>` loads demo data, opens the route at phone size and saves a screenshot, printing any runtime errors. Flags: `--empty` (profile but no data), `--fresh` (no profile), `--light`, `--full`, `--tap=testIdA,testIdB`, `--type=testId:text`, `--wait=ms`, `--desktop`. Open the PNG with the Read tool and judge it critically: alignment, spacing, truncation, contrast, both themes, empty and filled states.
+- Look at your screens in a real browser: `node scripts/dev/shot.mjs <route> <out.png>` loads demo data, opens the route at phone size and saves a screenshot, printing any runtime errors. Flags: `--empty` (profile but no data), `--fresh` (no profile), `--light`, `--imperial`, `--full`, `--2x`, `--tap=testIdA,testIdB`, `--type=testId:text`, `--wait=ms`, `--desktop`. Open the PNG with the Read tool and judge it critically: alignment, spacing, truncation, contrast, both themes, empty and filled states.
 - Type-check with `npx tsc --noEmit`. Other people are editing other files at the same time, so errors in files you do not own are not yours to fix; if the bundle is broken by someone else's file, wait a minute and retry.
 - Unit tests: `npx vitest run` (pure logic only, files named `*.test.ts`).
 - Do not run git commands, do not install or remove packages, do not edit `package.json` or `app.json`. If you need a package or a change to a shared file, say so in your report.
