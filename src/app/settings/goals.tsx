@@ -22,6 +22,7 @@ import {
   weightValue,
 } from '@/lib/units';
 import { useStore } from '@/store';
+import { useToday } from '@/store/clock';
 import { computeEnergyModel, useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ActivityLevel, GoalType, MacroSplit, Profile, Sex } from '@/types';
@@ -85,6 +86,8 @@ function GoalsForm() {
   const setProfile = useStore((s) => s.setProfile);
   const food = useLive('foodEntries');
   const weights = useLive('weights');
+  const activities = useLive('activities');
+  const todayDate = useToday();
   const u = saved.units;
 
   // A plan saved as lose or gain with no pace (an older maintain plan switched over) gets the default pace, so Save fixes it.
@@ -136,7 +139,7 @@ function GoalsForm() {
           : PRESETS[macroMode].split,
   };
 
-  const model = computeEnergyModel(effective, food, weights);
+  const model = computeEnergyModel(effective, food, weights, todayDate, activities);
   const macros = macroTargets(effective, model.target.target);
   const water = effective.waterGoalMlOverride ?? baseWaterGoalMl(effective.weightKg, effective.sex);
   const projected = draft.goal === 'maintain' ? null : projectedGoalDate(effective.weightKg, effective.targetWeightKg, model.target.impliedWeeklyKg);

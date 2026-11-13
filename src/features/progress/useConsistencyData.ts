@@ -4,30 +4,23 @@ import { diffDays } from '@/lib/dates';
 import { useStore } from '@/store';
 import { useToday } from '@/store/clock';
 import { useConsistency, useDays, useLive } from '@/store/selectors';
-import type { ISODate, Settings } from '@/types';
+import type { ISODate } from '@/types';
 
 import { cleanTargets, longestStreak, type CalendarDayInput, type RhythmKind, type RhythmTargets } from './consistency';
 
 /** Longest history the calendar and rhythm look at. */
 const MAX_HISTORY = 400;
 
-/**
- * Weekly rhythm targets live in settings so they sync with the rest.
- * TODO(lead): add `rhythmTargets?: { food: number; train: number; weigh: number }`
- * to Settings in src/types; until then the field is carried through untyped
- * (settings are stored and synced as one JSON object, so it round-trips).
- */
-type WithRhythm = Settings & { rhythmTargets?: Partial<RhythmTargets> };
-
+/** Weekly rhythm targets live in settings so they sync with the rest. */
 export function useRhythmTargets(): RhythmTargets {
   const settings = useStore((s) => s.settings);
-  return useMemo(() => cleanTargets((settings as WithRhythm).rhythmTargets), [settings]);
+  return useMemo(() => cleanTargets(settings.rhythmTargets), [settings]);
 }
 
 export function setRhythmTarget(kind: RhythmKind, days: number) {
   const s = useStore.getState();
-  const current = cleanTargets((s.settings as WithRhythm).rhythmTargets);
-  s.setSettings({ rhythmTargets: { ...current, [kind]: days } } as Partial<Settings>);
+  const current = cleanTargets(s.settings.rhythmTargets);
+  s.setSettings({ rhythmTargets: { ...current, [kind]: days } });
 }
 
 /** Everything the Consistency screen shows. */

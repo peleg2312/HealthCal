@@ -4,9 +4,11 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
-import { coachTip } from '@/features/today/coach';
+import { coachTip, rhythmFromReminders } from '@/features/today/coach';
+import { useRecapReady } from '@/features/progress/recapReady';
 import { DayRingStrip } from '@/features/today/DayRingStrip';
 import { mealLine } from '@/features/today/meals';
+import { RecapReadyCard } from '@/features/today/RecapReadyCard';
 import { addWater, defaultGlass, StatusRail } from '@/features/today/StatusRail';
 import { addDays, formatShortDate, greeting, weekdayShort } from '@/lib/dates';
 import { MEALS, MEAL_LABEL, MEAL_SHARE } from '@/lib/nutrition';
@@ -29,6 +31,7 @@ export default function TodayScreen() {
   const day = useDay(date);
   const consistency = useConsistency(todayDate);
   const now = useNow();
+  const recap = useRecapReady();
 
   return (
     <Screen tabs testID="today-screen" backdrop={colors.calories}>
@@ -90,7 +93,7 @@ export default function TodayScreen() {
 
       <EnergyCard day={day} isToday={isToday} />
       <StatusRail day={day} isToday={isToday} />
-      {isToday ? <CoachCard day={day} /> : null}
+      {isToday ? recap.announce ? <RecapReadyCard /> : <CoachCard day={day} /> : null}
 
       <SectionTitle title="Meals" action="Open diary" onAction={() => router.push(`/diary?date=${date}` as never)} />
       <MealsCard day={day} />
@@ -184,7 +187,8 @@ function CoachCard({ day }: { day: DaySummary }) {
   const now = useNow();
   const entries = useLive('foodEntries');
   const presets = useStore((s) => s.settings.waterPresets);
-  const tip = coachTip(day, profile.units, now);
+  const reminders = useStore((s) => s.settings.reminders);
+  const tip = coachTip(day, profile.units, now, rhythmFromReminders(reminders));
   const action = tip.action;
   const quick = tip.quick;
   const prev = quick?.kind === 'repeat' ? findPreviousMeal(entries, day.date, quick.meal, 7) : null;

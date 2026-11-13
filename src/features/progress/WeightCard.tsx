@@ -4,7 +4,7 @@ import { View } from 'react-native';
 
 import { addDays, diffDays, formatShortDate, toISODate } from '@/lib/dates';
 import { projectedGoalDate } from '@/lib/energy';
-import { rateText, STALE_WEIGH_IN_DAYS } from '@/lib/insights';
+import { rateText, STALE_WEIGH_IN_DAYS, type UsualRange } from '@/lib/insights';
 import { weightUnit, weightValue } from '@/lib/units';
 import type { WeightSeries } from '@/store/selectors';
 import { useTheme } from '@/theme';
@@ -13,7 +13,7 @@ import { Button, LineChart, Text } from '@/ui';
 
 import { BigStat, go, Note, SectionCard, StatStrip } from './parts';
 
-export function WeightCard({ series, start, end, profile }: { series: WeightSeries; start: string; end: string; profile: Profile }) {
+export function WeightCard({ series, start, end, profile, usual }: { series: WeightSeries; start: string; end: string; profile: Profile; usual?: UsualRange | null }) {
   const { colors, spacing } = useTheme();
   const units = profile.units;
   const unit = weightUnit(units);
@@ -76,6 +76,7 @@ export function WeightCard({ series, start, end, profile }: { series: WeightSeri
         dots={dots}
         color={colors.weight}
         height={170}
+        band={usual && !outOfRange ? { from: v(usual.low), to: v(usual.high), color: colors.textSecondary } : undefined}
         formatY={(n) => n.toFixed(1)}
         formatPoint={(p) => `${formatShortDate(addDays(origin, p.x))} · trend ${p.y.toFixed(1)} ${unit}`}
         xLabels={[formatShortDate(pts[0].date), formatShortDate(pts[pts.length - 1].date)]}
@@ -90,7 +91,12 @@ export function WeightCard({ series, start, end, profile }: { series: WeightSeri
         ]}
       />
       {outOfRange ? <Note>No weigh-ins in this range. The chart shows your latest weigh-ins, {span}.</Note> : null}
-      <Note>The line smooths out day-to-day swings from water and salt; dots are your individual weigh-ins.</Note>
+      <Note>
+        The line smooths out day-to-day swings from water and salt; dots are your individual weigh-ins.
+        {usual && !outOfRange
+          ? ` The grey band is your usual range over the last 4 weeks, ${v(usual.low).toFixed(1)} to ${v(usual.high).toFixed(1)} ${unit}: weigh-ins inside it are everyday noise.`
+          : ''}
+      </Note>
     </SectionCard>
   );
 }

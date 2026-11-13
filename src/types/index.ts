@@ -293,6 +293,8 @@ export interface Settings {
   fastingTargetHours: number;
   /** Monday of the most recent week whose recap the user has opened. */
   recapSeenWeek?: ISODate;
+  /** Weekly rhythm on the consistency page: days a week the user aims to log food, train and weigh in. */
+  rhythmTargets?: { food: number; train: number; weigh: number };
   updatedAt: ISODateTime;
 }
 

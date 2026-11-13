@@ -198,6 +198,12 @@ function SignedIn({ email }: { email: string }) {
         <Text variant="caption" color="textSecondary" style={{ marginTop: spacing.md }}>
           {pending === 0 ? 'Everything on this device is backed up.' : `${pending} change${pending === 1 ? '' : 's'} waiting to upload.`}
         </Text>
+        {sync.rejected > 0 ? (
+          <Text variant="caption" color="warning" style={{ marginTop: spacing.xs }} testID="account-sync-rejected">
+            {sync.rejected === 1 ? '1 item was not accepted by the server.' : `${sync.rejected} items were not accepted by the server.`} {sync.rejected === 1 ? 'It is' : 'They are'} safe on this
+            device and will be tried again. Everything else is backed up.
+          </Text>
+        ) : null}
         <Button
           testID="account-sync-now"
           title="Sync now"

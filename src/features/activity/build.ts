@@ -2,7 +2,7 @@
  * Pure helpers for activity sessions: building an entry and summarising a week.
  * No React, storage or native imports so they can be unit-tested.
  */
-import { grossKcal, kcalRange, netKcal } from '@/lib/exercise';
+import { grossKcal, kcalRange, MODERATE_MET, netKcal, sessionGuidelineMinutes, VIGOROUS_MET, WEEKLY_GUIDELINE_MINUTES } from '@/lib/exercise';
 import { exerciseWaterMl } from '@/lib/hydration';
 import type { ActivityDef, ActivityEntry, Intensity, StrengthExercise, UnitSystem } from '@/types';
 
@@ -52,6 +52,9 @@ export function buildActivityEntry(input: BuildActivityInput): BuiltActivity {
     met,
     kcalGross: grossKcal(met, weightKg, durationMin),
     kcalNet: netKcal(met, weightKg, durationMin, baselineKcalPerDay),
+    // Kept with the session so a later edit is priced at the weight it was done at.
+    weightKg,
+    baselineKcalPerDay,
     loggedAt,
   };
   if (activity.tracksDistance && input.distanceKm && input.distanceKm > 0) entry.distanceKm = Math.round(input.distanceKm * 1000) / 1000;
@@ -70,20 +73,27 @@ export interface SessionBasis {
   baselineKcalPerDay: number;
 }
 
+const plausibleWeight = (w: number | undefined): w is number => typeof w === 'number' && Number.isFinite(w) && w >= 20 && w <= 400;
+const plausibleBaseline = (b: number | undefined): b is number => typeof b === 'number' && Number.isFinite(b) && b >= 600 && b <= 8000;
+
 /**
- * Recover the weight and baseline a saved entry was built with, so an edit
- * months later is not re-priced at today's weight. Gross kcal is linear in
- * weight and net kcal is gross minus the baseline's share of the minutes, so
- * both can be read back exactly. Falls back per value when the stored numbers
- * cannot carry it (net clipped to zero, missing or implausible values).
+ * The weight and baseline a saved entry was built with, so an edit months
+ * later is not re-priced at today's weight. Entries store both. Older entries
+ * do not, but gross kcal is linear in weight and net kcal is gross minus the
+ * baseline's share of the minutes, so both can be read back from the stored
+ * calories. Falls back per value when neither source can carry it (net clipped
+ * to zero, missing or implausible values).
  */
-export function basisFromEntry(e: Pick<ActivityEntry, 'met' | 'durationMin' | 'kcalGross' | 'kcalNet'>, fallback: SessionBasis): SessionBasis {
+export function basisFromEntry(
+  e: Pick<ActivityEntry, 'met' | 'durationMin' | 'kcalGross' | 'kcalNet' | 'weightKg' | 'baselineKcalPerDay'>,
+  fallback: SessionBasis,
+): SessionBasis {
   const ok = e.met > 0 && e.durationMin > 0 && e.kcalGross > 0;
   const per = ok ? grossKcal(e.met, 1, e.durationMin) : 0;
   const w = per > 0 ? e.kcalGross / per : NaN;
-  const weightKg = Number.isFinite(w) && w >= 20 && w <= 400 ? w : fallback.weightKg;
+  const weightKg = plausibleWeight(e.weightKg) ? e.weightKg : plausibleWeight(w) ? w : fallback.weightKg;
   const b = ok && e.kcalNet > 0 ? ((e.kcalGross - e.kcalNet) * 1440) / e.durationMin : NaN;
-  const baselineKcalPerDay = Number.isFinite(b) && b >= 600 && b <= 8000 ? b : fallback.baselineKcalPerDay;
+  const baselineKcalPerDay = plausibleBaseline(e.baselineKcalPerDay) ? e.baselineKcalPerDay : plausibleBaseline(b) ? b : fallback.baselineKcalPerDay;
   return { weightKg, baselineKcalPerDay };
 }
 
@@ -113,10 +123,9 @@ export function estimateSession(met: number, weightKg: number, minutes: number, 
 
 // ------------------------------------------------------------ week summary
 
-/** Compendium bands used by the WHO guideline: moderate 3 to <6 MET, vigorous 6+ MET. */
-export const MODERATE_MET = 3;
-export const VIGOROUS_MET = 6;
-export const WHO_WEEKLY_MINUTES = 150;
+// The guideline's bands and target live in @/lib/exercise so Train, Progress and the recap share one rule.
+export { MODERATE_MET, VIGOROUS_MET };
+export const WHO_WEEKLY_MINUTES = WEEKLY_GUIDELINE_MINUTES;
 
 export interface WeekSummary {
   /** Moderate minutes + 2 x vigorous minutes. */
@@ -147,7 +156,7 @@ export function summariseWeek(entries: ActivityEntry[], dates: string[]): WeekSu
     net += e.kcalNet;
     gross += e.kcalGross;
     if (e.met >= VIGOROUS_MET) vigorous += e.durationMin;
-    else if (e.met >= MODERATE_MET) moderate += e.durationMin;
+    else if (sessionGuidelineMinutes(e.met, e.durationMin) > 0) moderate += e.durationMin;
     const day = byDate[e.date];
     day.minutes += e.durationMin;
     day.kcalNet += e.kcalNet;

@@ -3,9 +3,8 @@ import { CalendarPlus, Copy, MoreHorizontal, Plus, Save, Trash2, X } from 'lucid
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
-import { addDays, formatDayLabel, fromISODate, startOfWeek, today } from '@/lib/dates';
+import { addDays, formatDayLabel, today } from '@/lib/dates';
 import { MEAL_LABEL, entriesTotal } from '@/lib/nutrition';
-import { useToday } from '@/store/clock';
 import type { DaySummary } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
@@ -15,54 +14,6 @@ import { clearEntries, copyEntries, saveMeal } from './actions';
 import { DayStepper, MacroStat, MealPicker, SourceTag } from './components';
 import { dayPhrase, href, kcal, portionLabel } from './helpers';
 import { deleteEntry } from './log';
-
-const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
-/** Monday-to-Sunday strip for the week around `date`; a dot marks days with food logged. */
-export function WeekStrip({ date, logged, onSelect }: { date: ISODate; logged: Set<ISODate>; onSelect: (d: ISODate) => void }) {
-  const { colors, radius } = useTheme();
-  const start = startOfWeek(date);
-  const t = useToday();
-  return (
-    <View style={{ flexDirection: 'row', gap: 6 }} accessibilityRole="tablist">
-      {LETTERS.map((letter, i) => {
-        const d = addDays(start, i);
-        const selected = d === date;
-        const isToday = d === t;
-        const has = logged.has(d);
-        return (
-          <PressableScale
-            key={d}
-            testID={`week-day-${d}`}
-            feedback="select"
-            scaleTo={0.94}
-            onPress={() => onSelect(d)}
-            accessibilityRole="tab"
-            accessibilityState={{ selected }}
-            accessibilityLabel={`${formatDayLabel(d)}${has ? ', food logged' : ''}`}
-            style={{
-              flex: 1,
-              alignItems: 'center',
-              paddingVertical: 8,
-              gap: 2,
-              borderRadius: radius.md,
-              backgroundColor: selected ? colors.primary : 'transparent',
-              borderWidth: 1,
-              borderColor: selected ? colors.primary : isToday ? colors.borderStrong : 'transparent',
-            }}>
-            <Text variant="caption" color={selected ? 'onPrimary' : 'textTertiary'}>
-              {letter}
-            </Text>
-            <Text variant="bodyStrong" tabular color={selected ? 'onPrimary' : d > t ? 'textSecondary' : 'text'}>
-              {fromISODate(d).getDate()}
-            </Text>
-            <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: has ? (selected ? colors.onPrimary : colors.calories) : 'transparent' }} />
-          </PressableScale>
-        );
-      })}
-    </View>
-  );
-}
 
 /** Calories against budget plus the three macros, in one card. */
 export function DaySummaryCard({ day }: { day: DaySummary }) {

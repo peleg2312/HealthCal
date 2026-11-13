@@ -145,12 +145,16 @@ function init() {
   initialized = true;
   try {
     Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowBanner: true,
-        shouldShowList: true,
-        shouldPlaySound: false,
-        shouldSetBadge: false,
-      }),
+      handleNotification: async (notification) => {
+        // A timer that ends while the app is open is already shown on screen (and felt): no banner on top of it.
+        const timer = (notification.request.content.data as { source?: string } | undefined)?.source === TIMER_SOURCE;
+        return {
+          shouldShowBanner: !timer,
+          shouldShowList: !timer,
+          shouldPlaySound: false,
+          shouldSetBadge: false,
+        };
+      },
     });
     Notifications.addNotificationResponseReceivedListener((response) => handleResponse(response, 50));
     // App launched by tapping a reminder or one of its buttons.
@@ -308,6 +312,62 @@ export function refreshReminders(): Promise<void> {
       log('refresh', e);
     });
   return queue;
+}
+
+// ---------------------------------------------------------- timer alerts
+
+const TIMER_CHANNEL_ID = 'timers';
+/** Not the reminders' prefix: a reminders refresh cancels everything that carries that one. */
+const TIMER_PREFIX = 'hc-timer-';
+const TIMER_SOURCE = 'healthcal-timer';
+
+/**
+ * A one-off alert at a moment the user just asked for in the app, such as the
+ * end of a rest between sets, so it still reaches them with the phone locked.
+ * Unlike reminders it has a sound and ignores quiet hours (the user started
+ * the timer seconds ago). It never asks for permission: without it, or on web,
+ * nothing is scheduled and false is returned. Scheduling the same id again
+ * replaces the pending alert. Never throws.
+ */
+export async function scheduleTimerAlert(id: string, at: Date | number, content: { title: string; body: string; url?: string }): Promise<boolean> {
+  if (!remindersSupported) return false;
+  try {
+    const date = new Date(at);
+    if (!(date.getTime() > Date.now() + 1000)) return false;
+    if (!(await Notifications.getPermissionsAsync()).granted) return false;
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync(TIMER_CHANNEL_ID, {
+        name: 'Timers',
+        description: 'The end of a rest timer you started',
+        importance: AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 150, 250],
+        showBadge: false,
+      });
+    }
+    const identifier = `${TIMER_PREFIX}${id}`;
+    await Notifications.cancelScheduledNotificationAsync(identifier).catch(() => undefined);
+    await Notifications.scheduleNotificationAsync({
+      identifier,
+      content: { title: content.title, body: content.body, data: { source: TIMER_SOURCE, url: content.url }, sound: true },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date, channelId: TIMER_CHANNEL_ID },
+    });
+    return true;
+  } catch (e) {
+    log(`timer ${id}`, e);
+    return false;
+  }
+}
+
+/** Cancel a pending timer alert and clear it from the notification list if it already fired. Never throws. */
+export async function cancelTimerAlert(id: string): Promise<void> {
+  if (!remindersSupported) return;
+  const identifier = `${TIMER_PREFIX}${id}`;
+  try {
+    await Notifications.cancelScheduledNotificationAsync(identifier);
+    await Notifications.dismissNotificationAsync(identifier);
+  } catch (e) {
+    log(`cancel timer ${id}`, e);
+  }
 }
 
 /** Remove every scheduled reminder (sign-out, erase data). Never throws. */

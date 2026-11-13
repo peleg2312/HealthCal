@@ -207,9 +207,14 @@ export function fiberTarget(calories: number): number {
   return Math.round((calories / 1000) * 14);
 }
 
+/** Shares that add up to 1. Negative or non-numeric parts count as 0, so no share can come out negative or above 1. */
 export function normalizeSplit(s: MacroSplit): MacroSplit {
-  const total = s.protein + s.carbs + s.fat || 1;
-  return { protein: s.protein / total, carbs: s.carbs / total, fat: s.fat / total };
+  const part = (x: number) => (Number.isFinite(x) && x > 0 ? x : 0);
+  const protein = part(s.protein);
+  const carbs = part(s.carbs);
+  const fat = part(s.fat);
+  const total = protein + carbs + fat || 1;
+  return { protein: protein / total, carbs: carbs / total, fat: fat / total };
 }
 
 /** Estimated date of reaching the target weight at the implied rate, or null if not applicable. */

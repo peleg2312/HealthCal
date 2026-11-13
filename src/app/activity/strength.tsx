@@ -29,6 +29,7 @@ import { formatDayLabel, formatDuration, formatShortDate, today } from '@/lib/da
 import { formulaTdee } from '@/lib/energy';
 import { INTENSITY_LABELS, estimateOneRepMax, findStrengthRecords, kcalRange, strengthVolumeKg, type StrengthRecord } from '@/lib/exercise';
 import { formatNumber, round, weightToKg, weightUnit, weightValue } from '@/lib/units';
+import { cancelTimerAlert, scheduleTimerAlert } from '@/services/notifications';
 import { useStore } from '@/store';
 import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
@@ -137,6 +138,20 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, [draft.startedAt, resting]);
+
+  // With the phone locked or the app in the background, the end of a rest arrives as an alert
+  // (phones only, and only if notifications were already allowed). Skipping, adjusting or
+  // finishing the rest replaces or removes it.
+  const restEndsAt = draft.restEndsAt;
+  const restExercise = draft.restExercise;
+  useEffect(() => {
+    if (!restEndsAt) return;
+    void scheduleTimerAlert('rest', restEndsAt, {
+      title: 'Rest is over',
+      body: restExercise ? `Next set of ${restExercise.toLowerCase()}.` : 'Time for the next set.',
+    });
+    return () => void cancelTimerAlert('rest');
+  }, [restEndsAt, restExercise]);
 
   // The rest ends: a nudge if the user is here to feel it, then the bar goes away.
   useEffect(() => {

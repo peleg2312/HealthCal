@@ -135,9 +135,10 @@ export function EnergyCard({ model, useAdaptiveSetting }: { model: EnergyModel; 
             how active your days are. It is a population average and can be off by 10% or more for any one person.
           </Text>
           <Text variant="caption" color="textSecondary">
-            Your data estimate works backwards from what actually happened: if you ate an average of 2,200 kcal a day and your trend weight held steady,
-            you burn about 2,200. Each kilo of trend change is counted as about 7,700 kcal. It uses the trend rather than single weigh-ins so water swings
-            do not move it.
+            Your data estimate works backwards from what actually happened: if you ate an average of 2,200 kcal a day and your weight held steady, you
+            burn about 2,200. Weight change is read from a straight line fitted through your weigh-ins of the last {a.windowDays} days, so one high or low
+            reading barely moves it, and each kilo of change is counted as about 7,700 kcal. Calories from logged exercise are taken out of the estimate,
+            because your budget adds those separately.
           </Text>
           <Text variant="caption" color="textSecondary">
             It needs at least {NEED_DAYS} fully logged days and {NEED_WEIGH_INS} weigh-ins spread over two weeks. Confidence rises with more of both, and the

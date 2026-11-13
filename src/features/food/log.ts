@@ -4,10 +4,15 @@
  * recents stay up to date, and every add or delete can be undone.
  */
 import { nowISO } from '@/lib/id';
-import { MEAL_LABEL, scaleNutrients } from '@/lib/nutrition';
+import { MEAL_LABEL } from '@/lib/nutrition';
 import { useStore } from '@/store';
-import type { AiFoodItem, Food, FoodEntry, ISODate, MealType, Nutrients, SavedMealItem, Serving } from '@/types';
+import { live } from '@/store/selectors';
+import type { Food, FoodEntry, ISODate, MealType, Nutrients, SavedMeal, SavedMealItem, Serving } from '@/types';
 import { haptic, toast } from '@/ui';
+
+import { buildEntry, planSavedMeal } from './build';
+
+export { buildEntry } from './build';
 
 export interface LogFoodInput {
   food: Food;
@@ -19,25 +24,15 @@ export interface LogFoodInput {
   entryId?: string;
 }
 
-/** Build the diary line for a food definition and an amount. Pure. */
-export function buildEntry({ food, serving, quantity, meal, date }: Omit<LogFoodInput, 'entryId'>): Omit<FoodEntry, 'id' | 'updatedAt'> {
-  const grams = serving.grams * quantity;
-  return {
-    date,
-    meal,
-    name: food.name,
-    brand: food.brand,
-    emoji: food.emoji,
-    foodId: food.id,
-    source: food.source,
-    verified: food.verified,
-    servingLabel: serving.label,
-    quantity,
-    grams,
-    nutrients: scaleNutrients(food.per100g, grams),
-    food,
-    loggedAt: nowISO(),
-  };
+/** How sure the latest estimate of this AI food was, so a re-log keeps the same band. */
+function lastConfidence(food: Food): number | undefined {
+  if (food.source !== 'ai') return undefined;
+  let best: FoodEntry | undefined;
+  for (const e of live(useStore.getState().foodEntries)) {
+    if (e.foodId !== food.id || e.confidence === undefined) continue;
+    if (!best || e.loggedAt > best.loggedAt) best = e;
+  }
+  return best?.confidence;
 }
 
 function announce(message: string, ids: string[]) {
@@ -48,7 +43,7 @@ function announce(message: string, ids: string[]) {
 /** Rewrite an existing entry with a new food, serving or amount. Keeps when it was logged and scales an estimate's range. */
 function rewriteEntry(input: LogFoodInput & { entryId: string }): FoodEntry {
   const store = useStore.getState();
-  const built = buildEntry(input);
+  const built = buildEntry({ ...input, confidence: lastConfidence(input.food) });
   const existing = store.foodEntries[input.entryId];
   // An edited estimate is still an estimate: keep its range, scaled to the new amount.
   const scale = existing?.kcalRange && existing.nutrients.kcal > 0 ? built.nutrients.kcal / existing.nutrients.kcal : null;
@@ -70,7 +65,7 @@ export function logFood(input: LogFoodInput): FoodEntry {
     toast('Entry updated');
     return entry;
   }
-  const entry = store.upsert('foodEntries', buildEntry(input));
+  const entry = store.upsert('foodEntries', buildEntry({ ...input, confidence: lastConfidence(input.food) }));
   store.rememberFood(input.food);
   announce(`Added to ${MEAL_LABEL[input.meal].toLowerCase()}`, [entry.id]);
   return entry;
@@ -111,34 +106,6 @@ export function logQuickAdd(input: { name: string; nutrients: Nutrients; meal: M
   return entry;
 }
 
-/** Items confirmed by the user after an AI photo or text analysis. */
-export function logAiItems(items: AiFoodItem[], meal: MealType, date: ISODate): FoodEntry[] {
-  const entries = useStore.getState().upsertMany(
-    'foodEntries',
-    items.map((it) => {
-      // Lower confidence widens the band shown next to the estimate.
-      const spread = 0.15 + (1 - Math.min(1, Math.max(0, it.confidence))) * 0.3;
-      return {
-        date,
-        meal,
-        name: it.name,
-        emoji: '✨',
-        source: 'ai' as const,
-        verified: false,
-        servingLabel: `${Math.round(it.grams)} g`,
-        quantity: 1,
-        grams: it.grams,
-        nutrients: { kcal: it.kcal, protein: it.protein, carbs: it.carbs, fat: it.fat, fiber: it.fiber },
-        kcalRange: [Math.round(it.kcal * (1 - spread)), Math.round(it.kcal * (1 + spread))] as [number, number],
-        confidence: it.confidence,
-        loggedAt: nowISO(),
-      };
-    }),
-  );
-  announce(`${entries.length} ${entries.length === 1 ? 'item' : 'items'} added to ${MEAL_LABEL[meal].toLowerCase()}`, entries.map((e) => e.id));
-  return entries;
-}
-
 /** Re-log a set of existing entries or saved-meal items onto a day and meal. */
 export function logItems(items: (SavedMealItem | FoodEntry)[], meal: MealType, date: ISODate, label?: string): FoodEntry[] {
   if (items.length === 0) return [];
@@ -165,6 +132,21 @@ export function logItems(items: (SavedMealItem | FoodEntry)[], meal: MealType, d
   );
   announce(label ?? `${entries.length} ${entries.length === 1 ? 'item' : 'items'} added to ${MEAL_LABEL[meal].toLowerCase()}`, entries.map((e) => e.id));
   return entries;
+}
+
+/**
+ * Log a saved meal. A plain meal adds its items (all, or the ticked ones); a
+ * recipe with servings adds one line for the portion (one serving unless
+ * given). Use this from every place that logs a saved meal.
+ */
+export function logSavedMeal(
+  meal: SavedMeal,
+  mealType: MealType,
+  date: ISODate,
+  opts: { portion?: number; include?: boolean[] } = {},
+): FoodEntry[] {
+  const plan = planSavedMeal(meal, opts);
+  return logItems(plan.items, mealType, date, `${meal.name} added to ${MEAL_LABEL[mealType].toLowerCase()}`);
 }
 
 export function deleteEntry(entry: FoodEntry): void {

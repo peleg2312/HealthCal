@@ -324,6 +324,13 @@ describe('macroTargets (custom split)', () => {
     expect(m.split).toEqual({ protein: 0.25, carbs: 0.25, fat: 0.5 });
     expect([m.proteinG, m.carbsG, m.fatG]).toEqual([125, 125, 111]);
   });
+  it('normalizeSplit never returns a negative share or one above 1', () => {
+    const s = normalizeSplit({ protein: -20, carbs: 60, fat: 60 });
+    expect(s).toEqual({ protein: 0, carbs: 0.5, fat: 0.5 });
+    const n = normalizeSplit({ protein: Number.NaN, carbs: 30, fat: 10 });
+    expect(n).toEqual({ protein: 0, carbs: 0.75, fat: 0.25 });
+  });
+
   it('normalizeSplit of all zeros does not produce NaN', () => {
     const s = normalizeSplit({ protein: 0, carbs: 0, fat: 0 });
     expect(Object.values(s).every(Number.isFinite)).toBe(true);

@@ -24,6 +24,10 @@ const server = vi.hoisted(() => ({
   failNext: null as string | null,
   failRecordsRead: false,
   onPush: null as null | (() => void),
+  /** Ids the server refuses (as a constraint violation would). */
+  refuseIds: new Set<string>(),
+  /** The ids of each push_records call, in order. */
+  pushCalls: [] as string[][],
   tick(): string {
     this.clock += 1;
     return new Date(Date.UTC(2026, 0, 1, 0, 0, this.clock)).toISOString();
@@ -81,6 +85,11 @@ vi.mock('./supabase', () => {
       const hook = server.onPush;
       server.onPush = null;
       hook?.();
+      server.pushCalls.push((args.p_records as { id: string }[]).map((r) => r.id));
+      // Like the real function, a batch with one bad row stores nothing.
+      if ((args.p_records as { id: string }[]).some((r) => server.refuseIds.has(r.id))) {
+        return { data: null, error: { message: 'new row violates check constraint', code: '23514' } };
+      }
       for (const r of args.p_records as Omit<Row, 'user_id' | 'server_updated_at'>[]) {
         const existing = server.rows.find((x) => x.user_id === uid && x.collection === r.collection && x.id === r.id);
         if (existing && existing.updated_at > r.updated_at) continue; // older write loses
@@ -118,7 +127,7 @@ vi.mock('./supabase', () => {
 import { pendingChanges, useStore } from '@/store';
 import type { Profile } from '@/types';
 
-import { attachUser, startAutoSync, syncNow, useSyncState } from './sync';
+import { attachUser, resetRejected, startAutoSync, syncNow, useSyncState } from './sync';
 
 const profile = (name: string): Partial<Profile> => ({
   name,
@@ -144,8 +153,11 @@ beforeEach(() => {
   server.failNext = null;
   server.failRecordsRead = false;
   server.onPush = null;
+  server.refuseIds.clear();
+  server.pushCalls = [];
   useStore.getState().resetAll();
-  useSyncState.setState({ status: 'idle', error: null, lastRunAt: null });
+  resetRejected();
+  useSyncState.setState({ status: 'idle', error: null, lastRunAt: null, rejected: 0 });
 });
 
 describe('sync', () => {
@@ -273,6 +285,47 @@ describe('sync', () => {
     expect(useSyncState.getState().status).toBe('idle');
     expect(server.rows).toHaveLength(1);
     expect(pendingChanges(useStore.getState())).toBe(0);
+  });
+
+  it('sets a record the server refuses aside, so one bad record cannot hold up the rest', async () => {
+    await attachUser('user-a');
+    const s = useStore.getState();
+    const good1 = s.upsert('water', water(250));
+    const bad = s.upsert('water', water(300));
+    const good2 = s.upsert('water', water(500));
+    server.refuseIds.add(bad.id);
+    await syncNow();
+    // The other two reached the server, the refused one is still on the device and still pending.
+    expect(server.rows.map((r) => r.id).sort()).toEqual([good1.id, good2.id].sort());
+    expect(useStore.getState().water[bad.id]).toBeTruthy();
+    expect(useStore.getState().dirty.water).toEqual({ [bad.id]: true });
+    expect(useSyncState.getState()).toMatchObject({ status: 'idle', error: null, rejected: 1 });
+
+    // It is not sent again on every run...
+    server.pushCalls = [];
+    const later = useStore.getState().upsert('water', water(750));
+    await syncNow();
+    expect(server.pushCalls).toEqual([[later.id]]);
+    expect(useSyncState.getState().rejected).toBe(1);
+
+    // ...but an edit to it is tried at once, and goes through when the server accepts it.
+    server.refuseIds.clear();
+    useStore.getState().upsert('water', { ...useStore.getState().water[bad.id], ml: 350 });
+    await syncNow();
+    expect(server.rows.find((r) => r.id === bad.id)?.data.ml).toBe(350);
+    expect(pendingChanges(useStore.getState())).toBe(0);
+    expect(useSyncState.getState().rejected).toBe(0);
+  });
+
+  it('treats a failure that is not about the data as a failed run, keeping every record pending', async () => {
+    await attachUser('user-a');
+    useStore.getState().upsert('water', water(250));
+    useStore.getState().upsert('water', water(500));
+    server.failNext = 'JWT expired';
+    await syncNow();
+    expect(server.rows).toHaveLength(0);
+    expect(pendingChanges(useStore.getState())).toBe(2);
+    expect(useSyncState.getState()).toMatchObject({ status: 'error', rejected: 0 });
   });
 
   it('pulls every row when a page boundary falls inside a group sharing one server timestamp', async () => {

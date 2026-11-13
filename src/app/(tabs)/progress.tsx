@@ -70,19 +70,19 @@ export default function ProgressScreen() {
       ) : null}
       {segment === 'nutrition' ? (
         <>
-          <CaloriesCard days={d.days} summary={d.summary} today={d.today} eatBack={d.profile.eatBackExercise} />
+          <CaloriesCard days={d.days} summary={d.summary} previous={d.previous} usual={d.usualKcal} today={d.today} eatBack={d.profile.eatBackExercise} />
           <MacrosCard summary={d.summary} days={d.days} today={d.today} />
         </>
       ) : null}
       {segment === 'body' ? (
         <>
-          <WeightCard series={d.series} start={start} end={d.today} profile={d.profile} />
+          <WeightCard series={d.series} start={start} end={d.today} profile={d.profile} usual={d.usualWeight} />
           <EnergyCard model={d.model} useAdaptiveSetting={d.profile.useAdaptiveTdee} />
         </>
       ) : null}
       {segment === 'habits' ? (
         <>
-          <HabitsCard summary={d.summary} units={d.profile.units} />
+          <HabitsCard summary={d.summary} previous={d.previous} units={d.profile.units} />
           <ConsistencyCard consistency={d.consistency} weekDays={d.weekDays} today={d.today} />
         </>
       ) : null}

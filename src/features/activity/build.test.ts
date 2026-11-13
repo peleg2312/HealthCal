@@ -111,9 +111,13 @@ describe('editing a saved session (review activity-trackers-2)', () => {
 
   it('falls back when the stored numbers cannot carry the basis', () => {
     expect(basisFromEntry({ met: 0, durationMin: 30, kcalGross: 0, kcalNet: 0 }, today)).toEqual(today);
-    const clipped = basisFromEntry({ ...saved, kcalNet: 0 }, today);
-    expect(clipped.weightKg).toBeCloseTo(90, 6);
-    expect(clipped.baselineKcalPerDay).toBe(2200);
+    // A session whose net was clipped to zero cannot carry the baseline in its calories; the stored value does.
+    const stored = basisFromEntry({ ...saved, kcalNet: 0 }, today);
+    expect(stored.baselineKcalPerDay).toBe(2600);
+    // An older entry without the stored basis falls back for the part it cannot recover.
+    const legacy = basisFromEntry({ ...saved, kcalNet: 0, weightKg: undefined, baselineKcalPerDay: undefined }, today);
+    expect(legacy.weightKg).toBeCloseTo(90, 6);
+    expect(legacy.baselineKcalPerDay).toBe(2200);
   });
 
   it('keeps the saved calories exactly when only notes, date or distance change', () => {

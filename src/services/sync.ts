@@ -17,9 +17,11 @@ interface SyncState {
   status: SyncStatus;
   error: string | null;
   lastRunAt: string | null;
+  /** Records the server refused to store. They stay on this device and are tried again later. */
+  rejected: number;
 }
 
-export const useSyncState = create<SyncState>(() => ({ status: 'idle', error: null, lastRunAt: null }));
+export const useSyncState = create<SyncState>(() => ({ status: 'idle', error: null, lastRunAt: null, rejected: 0 }));
 
 const PUSH_CHUNK = 200;
 const PULL_PAGE = 1000;
@@ -38,22 +40,87 @@ function recordDate(r: SyncedRecord): string | null {
   return typeof d === 'string' ? d : null;
 }
 
-async function push(userId: string): Promise<void> {
-  if (!supabase) return;
+interface PushRow {
+  collection: Collection;
+  id: string;
+  date: string | null;
+  data: SyncedRecord;
+  deleted: boolean;
+  updated_at: string;
+}
+
+/**
+ * The server refused the data itself: a bad value (SQLSTATE class 22), a broken
+ * constraint (23) or a size limit (54). Sending the same record again gets the
+ * same answer, unlike a dropped connection or an expired session.
+ */
+const isRejection = (error: { code?: string | null }): boolean => /^(22|23|54)/.test(error.code ?? '');
+
+/**
+ * Records the server refused, by version, and when. One bad record must not
+ * hold up every other change, so a refused record is set aside: it stays on the
+ * device (and stays pending), is left out of uploads for a while, and is tried
+ * again after RETRY_REJECTED_MS, on the next app start, or as soon as it is edited.
+ */
+const rejectedAt = new Map<string, number>();
+const RETRY_REJECTED_MS = 30 * 60_000;
+const rejectKey = (r: { collection: Collection; id: string; updated_at: string }) => `${r.collection}/${r.id}/${r.updated_at}`;
+
+function isSetAside(collection: Collection, id: string, updatedAt: string, now: number): boolean {
+  const at = rejectedAt.get(`${collection}/${id}/${updatedAt}`);
+  return at !== undefined && now - at < RETRY_REJECTED_MS;
+}
+
+/** Pending records currently set aside after the server refused them. */
+function setAsideCount(now: number = Date.now()): number {
   const s = useStore.getState();
-  const rows: { collection: Collection; id: string; date: string | null; data: SyncedRecord; deleted: boolean; updated_at: string }[] = [];
+  let n = 0;
   for (const c of COLLECTIONS) {
     for (const id of Object.keys(s.dirty[c])) {
       const rec = (s[c] as Record<string, SyncedRecord>)[id];
-      if (!rec) continue;
+      if (rec && isSetAside(c, id, rec.updatedAt, now)) n += 1;
+    }
+  }
+  return n;
+}
+
+/** Forget which records were refused (sign-out, another account, tests). */
+export function resetRejected(): void {
+  rejectedAt.clear();
+  useSyncState.setState({ rejected: 0 });
+}
+
+async function push(userId: string): Promise<void> {
+  if (!supabase) return;
+  const client = supabase;
+  const s = useStore.getState();
+  const now = Date.now();
+  const rows: PushRow[] = [];
+  for (const c of COLLECTIONS) {
+    for (const id of Object.keys(s.dirty[c])) {
+      const rec = (s[c] as Record<string, SyncedRecord>)[id];
+      if (!rec || isSetAside(c, id, rec.updatedAt, now)) continue;
       rows.push({ collection: c, id, date: recordDate(rec), data: rec, deleted: !!rec.deleted, updated_at: rec.updatedAt });
     }
   }
+  const done = (sent: PushRow[]) =>
+    useStore.getState().clearDirty({ ids: sent.map((r) => ({ collection: r.collection, id: r.id, updatedAt: r.updated_at })) });
   for (let i = 0; i < rows.length; i += PUSH_CHUNK) {
     const chunk = rows.slice(i, i + PUSH_CHUNK);
-    const { error } = await supabase.rpc('push_records', { p_records: chunk });
-    if (error) throw new Error(error.message);
-    useStore.getState().clearDirty({ ids: chunk.map((r) => ({ collection: r.collection, id: r.id, updatedAt: r.updated_at })) });
+    const { error } = await client.rpc('push_records', { p_records: chunk });
+    if (!error) {
+      done(chunk);
+      continue;
+    }
+    if (!isRejection(error)) throw new Error(error.message);
+    // The batch is all-or-nothing on the server. Send its records one at a time
+    // to find the refused ones, so the rest still get through.
+    for (const row of chunk) {
+      const single = await client.rpc('push_records', { p_records: [row] });
+      if (!single.error) done([row]);
+      else if (isRejection(single.error)) rejectedAt.set(rejectKey(row), Date.now());
+      else throw new Error(single.error.message);
+    }
   }
 
   const profile = s.profileDirty ? s.profile : null;
@@ -149,10 +216,12 @@ export function syncNow(): Promise<void> {
         useSyncState.setState({ status: 'syncing', error: null });
         await push(userId);
         await pull(userId);
-        useSyncState.setState({ status: 'idle', error: null, lastRunAt: new Date().toISOString() });
+        const setAside = setAsideCount();
+        useSyncState.setState({ status: 'idle', error: null, lastRunAt: new Date().toISOString(), rejected: setAside });
         // Something edited while this run was in flight (an Undo, a second change to the
         // same record) is still pending: go round again instead of waiting for the next trigger.
-        if (pendingChanges(useStore.getState()) > 0 && rounds < 3) rerun = true;
+        // Records the server refused do not count: sending them again changes nothing.
+        if (pendingChanges(useStore.getState()) > setAside && rounds < 3) rerun = true;
         rounds += 1;
       } while (rerun);
     } catch (e) {
@@ -203,6 +272,7 @@ export async function attachUser(userId: string, options: { discardOtherAccount?
       s.markAllDirty();
     } else {
       s.resetAll();
+      resetRejected();
       useStore.getState().setOwner(userId);
     }
   }

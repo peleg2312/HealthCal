@@ -3,12 +3,12 @@ import React from 'react';
 import { View } from 'react-native';
 
 import { formatShortDate, startOfWeek, weekdayShort } from '@/lib/dates';
-import { BUDGET_BAND, isCompleteDay, type InsightDay, type PeriodSummary } from '@/lib/insights';
+import { BUDGET_BAND, direction, isCompleteDay, type InsightDay, type PeriodSummary, type UsualRange } from '@/lib/insights';
 import { formatNumber } from '@/lib/units';
 import { useTheme } from '@/theme';
 import { BarChart, Text, type BarDatum } from '@/ui';
 
-import { BigStat, LegendDot, Note, SectionCard, StatStrip } from './parts';
+import { BigStat, LegendDot, Note, SectionCard, StatStrip, TrendLegend } from './parts';
 
 /** Daily bars for up to ~6 weeks, weekly averages beyond that. */
 function buildBars(days: InsightDay[], today: string, colors: { calories: string; warning: string; textTertiary: string }): { data: BarDatum[]; weekly: boolean } {
@@ -41,7 +41,23 @@ function buildBars(days: InsightDay[], today: string, colors: { calories: string
   return { data, weekly: true };
 }
 
-export function CaloriesCard({ days, summary, today, eatBack }: { days: InsightDay[]; summary: PeriodSummary; today: string; eatBack: boolean }) {
+export function CaloriesCard({
+  days,
+  summary,
+  previous,
+  usual,
+  today,
+  eatBack,
+}: {
+  days: InsightDay[];
+  summary: PeriodSummary;
+  /** The equal period before, for the triangles. */
+  previous?: PeriodSummary | null;
+  /** The user's usual intake range; shaded behind the bars when known. */
+  usual?: UsualRange | null;
+  today: string;
+  eatBack: boolean;
+}) {
   const { colors, spacing } = useTheme();
   const c = summary.calories;
   // Skip leading days from before the user started, so the chart is not half empty.
@@ -72,7 +88,8 @@ export function CaloriesCard({ days, summary, today, eatBack }: { days: InsightD
             testID="progress-calories-chart"
             data={data}
             color={colors.calories}
-            band={{ from: c.avgBudget * (1 - BUDGET_BAND), to: c.avgBudget * (1 + BUDGET_BAND) }}
+            band={usual ? { from: usual.low, to: usual.high, color: colors.textSecondary } : { from: c.avgBudget * (1 - BUDGET_BAND), to: c.avgBudget * (1 + BUDGET_BAND) }}
+            goal={usual ? c.avgBudget : undefined}
             height={160}
             scrub
           />
@@ -80,16 +97,37 @@ export function CaloriesCard({ days, summary, today, eatBack }: { days: InsightD
             <LegendDot color={colors.calories} label="Within 10% or under" />
             <LegendDot color={colors.warning} label="More than 10% over" />
             {!weekly ? <LegendDot color={colors.textTertiary} label="Today so far" /> : null}
-            <LegendDot color={`${colors.calories}44`} label="Budget ±10%" />
+            {usual ? (
+              <>
+                <LegendDot color={colors.borderStrong} label="Average budget" dashed />
+                <LegendDot color={`${colors.textSecondary}55`} label={`Your usual ${formatNumber(Math.round(usual.low))}–${formatNumber(Math.round(usual.high))} kcal`} />
+              </>
+            ) : (
+              <LegendDot color={`${colors.calories}44`} label="Budget ±10%" />
+            )}
           </View>
           <StatStrip
             items={[
-              { label: 'Within 10%', value: `${c.inBand}`, unit: `of ${summary.completeDays}` },
-              { label: 'Average budget', value: formatNumber(Math.round(c.avgBudget)), unit: 'kcal' },
-              { label: 'Days logged', value: `${summary.loggedDaysInclToday}`, unit: `of ${Math.max(summary.effectiveDays, summary.loggedDaysInclToday)}` },
+              {
+                label: 'Within 10%',
+                value: `${c.inBand}`,
+                unit: `of ${summary.completeDays}`,
+                trend: previous?.calories ? direction(c.inBand / Math.max(1, summary.completeDays), previous.calories.inBand / Math.max(1, previous.completeDays), 0.05) : null,
+              },
+              { label: 'Average budget', value: formatNumber(Math.round(c.avgBudget)), unit: 'kcal', trend: direction(c.avgBudget, previous?.calories?.avgBudget, 20) },
+              {
+                label: 'Days logged',
+                value: `${summary.loggedDaysInclToday}`,
+                unit: `of ${Math.max(summary.effectiveDays, summary.loggedDaysInclToday)}`,
+                trend: previous ? direction(summary.loggedDays, previous.loggedDays, 0) : null,
+              },
             ]}
           />
+          {previous ? <TrendLegend period={`${summary.totalDays} days`} /> : null}
           <Note>
+            {usual
+              ? `The grey band is your usual intake, the middle half of your fully logged days in the last 4 weeks. `
+              : ''}
             Press and drag on the chart to read each day. Averages use {summary.completeDays} fully logged {summary.completeDays === 1 ? 'day' : 'days'}. Today
             {summary.partialDays ? ` and ${summary.partialDays} partly logged ${summary.partialDays === 1 ? 'day' : 'days'} (under 800 kcal or half the budget)` : ''} {summary.partialDays ? 'are' : 'is'} left out.{eatBack ? ' Budgets include the exercise calories you eat back.' : ''}
           </Note>

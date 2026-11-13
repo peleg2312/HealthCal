@@ -5,6 +5,8 @@ import {
   computeMilestones,
   generateInsights,
   isCompleteDay,
+  usualKcalRange,
+  usualWeightRange,
   recapWeeks,
   summarizePeriod,
   weeklyRecap,
@@ -92,6 +94,9 @@ export function useProgressData(range: RangeDays) {
       weekDays: all.slice(-14),
       summary,
       previous,
+      // The user's own usual ranges (middle half of the last 28 days), for chart bands.
+      usualKcal: usualKcalRange(all, t),
+      usualWeight: usualWeightRange(series.entries, t),
       insights,
       recap,
       earlierWeeks,

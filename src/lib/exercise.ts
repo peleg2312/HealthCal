@@ -43,6 +43,31 @@ export const INTENSITY_LABELS: Record<Intensity, { title: string; hint: string }
   vigorous: { title: 'Hard', hint: 'Only a few words at a time' },
 };
 
+// ------------------------------------------------- weekly activity guideline
+
+/** WHO guideline for adults: 150 minutes of moderate activity a week (vigorous minutes count double). */
+export const WEEKLY_GUIDELINE_MINUTES = 150;
+/** Compendium bands the guideline uses: moderate 3 to under 6 MET, vigorous 6 MET and up. */
+export const MODERATE_MET = 3;
+export const VIGOROUS_MET = 6;
+
+/** Minutes a single session adds toward the guideline: none when light, its length when moderate, double when vigorous. */
+export function sessionGuidelineMinutes(met: number | undefined, durationMin: number | undefined): number {
+  const m = met ?? 0;
+  const min = Math.max(0, durationMin ?? 0);
+  if (m >= VIGOROUS_MET) return 2 * min;
+  if (m >= MODERATE_MET) return min;
+  return 0;
+}
+
+/**
+ * Minutes that count toward the weekly guideline. Every screen that shows
+ * "minutes toward 150" uses this one rule, so Train, Progress and the recap agree.
+ */
+export function guidelineMinutes(activities: readonly { met?: number; durationMin?: number }[]): number {
+  return activities.reduce((sum, a) => sum + sessionGuidelineMinutes(a.met, a.durationMin), 0);
+}
+
 /** Running/walking MET from speed where distance was entered, falling back to the table value. */
 export function paceKmh(distanceKm: number | undefined, minutes: number): number | null {
   if (!distanceKm || distanceKm <= 0 || minutes <= 0) return null;

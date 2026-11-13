@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
-import { ChevronRight } from 'lucide-react-native';
+import { ChevronRight, Triangle } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
 import { useTheme } from '@/theme';
+import type { Direction } from '@/lib/insights';
 import { Card, PressableScale, Text } from '@/ui';
 
 import type { RangeDays } from './useProgressData';
@@ -89,7 +90,7 @@ export function BigStat({ value, unit, label, color, align = 'left' }: { value: 
 }
 
 /** A row of small stats separated by hairlines. */
-export function StatStrip({ items }: { items: { label: string; value: string; unit?: string; color?: string }[] }) {
+export function StatStrip({ items }: { items: { label: string; value: string; unit?: string; color?: string; trend?: Direction | null }[] }) {
   const { colors, spacing, radius } = useTheme();
   return (
     <View style={{ flexDirection: 'row', backgroundColor: colors.surfaceAlt, borderRadius: radius.md, paddingVertical: spacing.md }}>
@@ -100,10 +101,11 @@ export function StatStrip({ items }: { items: { label: string; value: string; un
               {it.value}
             </Text>
             {it.unit ? (
-              <Text variant="caption" color="textSecondary" numberOfLines={1}>
+              <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flexShrink: 1 }}>
                 {it.unit}
               </Text>
             ) : null}
+            <TrendMark trend={it.trend} />
           </View>
           <Text variant="caption" color="textSecondary" numberOfLines={2}>
             {it.label}
@@ -217,6 +219,43 @@ export function SegmentSwitch<T extends string>({
           </PressableScale>
         );
       })}
+    </View>
+  );
+}
+
+const TREND_WORD: Record<Direction, string> = { up: 'higher than', down: 'lower than', same: 'about the same as' };
+
+/**
+ * Small neutral triangle: which way a value moved against the previous equal
+ * period. Never green or red: a change is information, not a verdict.
+ */
+export function TrendMark({ trend, period }: { trend?: Direction | null; period?: string }) {
+  const { colors } = useTheme();
+  if (!trend) return null;
+  const label = `${TREND_WORD[trend]} the previous ${period ?? 'period'}`;
+  if (trend === 'same')
+    return (
+      <View accessible accessibilityLabel={label} style={{ width: 8, height: 2, borderRadius: 1, backgroundColor: colors.textTertiary, alignSelf: 'center' }} />
+    );
+  return (
+    <View accessible accessibilityLabel={label} style={{ alignSelf: 'center', transform: [{ rotate: trend === 'down' ? '180deg' : '0deg' }] }}>
+      <Triangle size={9} color={colors.textSecondary} fill={colors.textSecondary} />
+    </View>
+  );
+}
+
+/** One line explaining the triangles. */
+export function TrendLegend({ period }: { period: string }) {
+  const { colors, spacing } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+      <Triangle size={8} color={colors.textTertiary} fill={colors.textTertiary} />
+      <View style={{ transform: [{ rotate: '180deg' }] }}>
+        <Triangle size={8} color={colors.textTertiary} fill={colors.textTertiary} />
+      </View>
+      <Text variant="caption" color="textTertiary">
+        compared with your previous {period}
+      </Text>
     </View>
   );
 }

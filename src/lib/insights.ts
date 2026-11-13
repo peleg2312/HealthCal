@@ -13,6 +13,7 @@ import type { GoalType, ISODate, Nutrients, UnitSystem, WaterEntry } from '@/typ
 
 import { addDays, diffDays, formatShortDate, fromISODate, startOfWeek } from './dates';
 import { KCAL_PER_KG, maxWeeklyRateKg } from './energy';
+import { guidelineMinutes, MODERATE_MET, VIGOROUS_MET } from './exercise';
 import { effectiveMl } from './hydration';
 import type { AdaptiveTdee, TrendPoint } from './trend';
 import { isCompleteDay as sharedIsCompleteDay } from './trend';
@@ -61,27 +62,10 @@ export const WEEKLY_ACTIVE_MINUTES = 150;
 /** Sleep most adults need (AASM / Sleep Research Society): 7 to 9 hours. */
 export const SLEEP_TARGET_HOURS = 7;
 export const SLEEP_MAX_HOURS = 9;
-/** Compendium bands used by the WHO guideline (same as Train): moderate 3 to <6 MET, vigorous 6+ MET. */
-export const MODERATE_MET = 3;
-export const VIGOROUS_MET = 6;
 /** A pace insight needs a weigh-in this recent; older rates are history, not the current pace. */
 export const STALE_WEIGH_IN_DAYS = 7;
 
-/**
- * Minutes that count toward the 150-minute weekly guideline, as Train counts
- * them: moderate minutes plus twice the vigorous minutes; light sessions
- * (under 3 MET) do not count.
- */
-export function guidelineMinutes(activities: readonly { met?: number; durationMin?: number }[]): number {
-  let total = 0;
-  for (const a of activities) {
-    const met = a.met ?? 0;
-    const min = a.durationMin ?? 0;
-    if (met >= VIGOROUS_MET) total += 2 * min;
-    else if (met >= MODERATE_MET) total += min;
-  }
-  return total;
-}
+export { guidelineMinutes, MODERATE_MET, VIGOROUS_MET };
 
 /** A glass for water suggestions: 250 ml, or 8 fl oz in imperial. */
 export function glassMl(units: UnitSystem): number {
@@ -880,7 +864,7 @@ function adaptiveInsight({ energy }: InsightContext): Insight | null {
       id: 'adaptive-available',
       tone: 'neutral',
       title: 'Your measured expenditure is ready',
-      body: `Your intake and trend weight put your expenditure at ${kcalText(a.observed)} a day, ${rel} the formula's ${kcalText(formula)}. Turn on the adaptive estimate in goals to base your targets on it.`,
+      body: `Your intake and weigh-ins put your expenditure, before logged exercise, at ${kcalText(a.observed)} a day, ${rel} the formula's ${kcalText(formula)}. Turn on the adaptive estimate in goals to base your targets on it.`,
       action: { label: 'Review goals', route: '/settings/goals' },
       score: 45,
     };
@@ -889,7 +873,7 @@ function adaptiveInsight({ energy }: InsightContext): Insight | null {
     id: 'adaptive-active',
     tone: 'positive',
     title: 'Your expenditure, measured',
-    body: `Your intake and trend weight put your expenditure at ${kcalText(a.observed)} a day, ${rel} the formula's ${kcalText(formula)}. At ${confidenceWord(a.confidence)} confidence (${pct}%) it now sets your targets, from a blended ${kcalText(energy.tdee)} maintenance.`,
+    body: `Your intake and weigh-ins put your expenditure, before logged exercise, at ${kcalText(a.observed)} a day, ${rel} the formula's ${kcalText(formula)}. At ${confidenceWord(a.confidence)} confidence (${pct}%) it now sets your targets, from a blended ${kcalText(energy.tdee)} maintenance.`,
     score: Math.abs(diff) >= 150 ? 42 : 27,
   };
 }

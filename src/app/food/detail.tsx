@@ -5,6 +5,7 @@ import { View } from 'react-native';
 
 import { updateEntryDirect } from '@/features/food/actions';
 import { AmountEditor } from '@/features/food/AmountEditor';
+import { UNKNOWN_AI_CONFIDENCE, estimateRange, scaleRange } from '@/features/food/build';
 import { DayStepper, KcalValue, MacroStat, MealPicker, SourceBadge } from '@/features/food/components';
 import { useFoodDraft } from '@/features/food/draft';
 import { dayPhrase, href, portionLabel, kcal, lastPortions, matchServing, param, parseDate, parseMeal, portionFor, sourceInfo } from '@/features/food/helpers';
@@ -43,6 +44,12 @@ function FoodDetail() {
   if (liveCustom?.deleted) return <Missing message="This food was deleted." />;
   const food = liveCustom ?? draft;
   return <FoodEditor key={`${food.id}-${liveCustom?.updatedAt ?? ''}`} food={food} initialMeal={parseMeal(params.meal)} initialDate={parseDate(params.date)} />;
+}
+
+function latestConfidence(entries: FoodEntry[], foodId: string): number | undefined {
+  let best: FoodEntry | undefined;
+  for (const e of entries) if (e.foodId === foodId && e.confidence !== undefined && (!best || e.loggedAt > best.loggedAt)) best = e;
+  return best?.confidence;
 }
 
 function Missing({ message }: { message: string }) {
@@ -156,7 +163,7 @@ function Hero({ name, brand, emoji, source, explain }: { name: string; brand?: s
   );
 }
 
-function MacroSummary({ n, kcalNote }: { n: Nutrients; kcalNote: string }) {
+function MacroSummary({ n, kcalNote, range }: { n: Nutrients; kcalNote: string; range?: [number, number] | null }) {
   const { colors, spacing } = useTheme();
   return (
     <Card>
@@ -168,6 +175,11 @@ function MacroSummary({ n, kcalNote }: { n: Nutrients; kcalNote: string }) {
           {kcalNote}
         </Text>
       </View>
+      {range ? (
+        <Text variant="caption" color="textSecondary" tabular testID="detail-kcal-range">
+          Likely between {kcal(range[0])} and {kcal(range[1])} kcal
+        </Text>
+      ) : null}
       <View style={{ marginTop: spacing.md }}>
         <MacroBar protein={n.protein * 4} carbs={n.carbs * 4} fat={n.fat * 9} />
       </View>
@@ -196,6 +208,14 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
   const n = scaleNutrients(food.per100g, totalGrams);
   const info = sourceInfo(food.source);
   const perGram = serving.label === '1 g';
+  // An estimate keeps showing as one: the entry's own range scaled to the amount, or the band a new log will get.
+  const range = entry?.kcalRange
+    ? entry.nutrients.kcal > 0
+      ? scaleRange(entry.kcalRange, n.kcal / entry.nutrients.kcal)
+      : null
+    : food.source === 'ai'
+      ? estimateRange(n.kcal, latestConfidence(entries, food.id) ?? UNKNOWN_AI_CONFIDENCE)
+      : null;
 
   const save = () => {
     logFood({ food, serving, quantity, meal, date, entryId: entry?.id });
@@ -211,7 +231,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
           subtitle={`${MEAL_LABEL[meal]} · ${dayPhrase(date).replace(/^./, (c) => c.toUpperCase())}`}
           right={
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              {food.source === 'custom' ? (
+              {food.source === 'custom' && !food.id.startsWith('meal_') ? (
                 <IconButton testID="detail-edit-food" accessibilityLabel="Edit this food" onPress={() => router.push(href('/food/custom', { id: food.id, meal, date }) as never)}>
                   <PenLine size={18} color={colors.text} />
                 </IconButton>
@@ -252,7 +272,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
       }>
       <Hero name={food.name} brand={food.brand} emoji={food.emoji} source={food.source} explain={info.explain} />
 
-      <MacroSummary n={n} kcalNote={`${portionLabel(serving.label, quantity)}${perGram || serving.label === '100 g' || (quantity === 1 && /\d\s?g\)*$/.test(serving.label)) ? '' : ` · ${Math.round(totalGrams)} g`}`} />
+      <MacroSummary range={range} n={n} kcalNote={`${portionLabel(serving.label, quantity)}${perGram || serving.label === '100 g' || (quantity === 1 && /\d\s?g\)*$/.test(serving.label)) ? '' : ` · ${Math.round(totalGrams)} g`}`} />
 
       <Card>
         <Text variant="h3">Amount</Text>

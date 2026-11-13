@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { estimateOneRepMax, findStrengthRecords, grossKcal, kcalRange, netKcal, paceKmh, strengthVolumeKg } from './exercise';
+import { estimateOneRepMax, findStrengthRecords, grossKcal, guidelineMinutes, kcalRange, netKcal, paceKmh, sessionGuidelineMinutes, strengthVolumeKg } from './exercise';
 
 describe('grossKcal', () => {
   it('8 MET, 70 kg, 30 min = 8*3.5*70/200 = 9.8 kcal/min -> 294', () => {
@@ -95,5 +95,18 @@ describe('findStrengthRecords', () => {
     expect(findStrengthRecords([{ name: 'Squat', sets: [{ reps: 5, weightKg: 100 }] }], hist)).toEqual([]);
     expect(findStrengthRecords([{ name: 'Bench press', sets: [{ reps: 3, weightKg: 85 }] }], hist)).toEqual([]);
     expect(findStrengthRecords([{ name: 'Bench press', sets: [{ reps: 5, weightKg: 70 }, { reps: 0, weightKg: 200 }] }], hist)).toEqual([]);
+  });
+});
+
+describe('weekly guideline minutes', () => {
+  it('counts moderate minutes once, vigorous twice and light not at all', () => {
+    expect(sessionGuidelineMinutes(2.9, 40)).toBe(0);
+    expect(sessionGuidelineMinutes(3, 40)).toBe(40);
+    expect(sessionGuidelineMinutes(5.9, 40)).toBe(40);
+    expect(sessionGuidelineMinutes(6, 40)).toBe(80);
+    expect(guidelineMinutes([{ met: 2.5, durationMin: 60 }, { met: 4, durationMin: 30 }, { met: 9, durationMin: 20 }])).toBe(70);
+  });
+  it('ignores missing or negative values', () => {
+    expect(guidelineMinutes([{}, { met: 7 }, { durationMin: 30 }, { met: 7, durationMin: -10 }])).toBe(0);
   });
 });

@@ -19,28 +19,91 @@ export interface CoachTip {
 
 export type CoachQuick = { kind: 'water' } | { kind: 'repeat'; meal: MealType };
 
-const MEAL_WINDOWS: {
-  meal: MealType;
-  label: string;
-  from: number;
-  until: number;
-}[] = [
-  { meal: 'breakfast', label: 'breakfast', from: 6, until: 11 },
-  { meal: 'lunch', label: 'lunch', from: 12, until: 16 },
-  { meal: 'dinner', label: 'dinner', from: 18.5, until: 23 },
-];
-
-/** Share of the daily water goal a person would typically have reached by this hour (awake 07:00 to 22:00). */
-export function expectedWaterFraction(hour: number): number {
-  return Math.min(1, Math.max(0, (hour - 7) / 15));
+/**
+ * The user's own day: when they usually eat and when they are awake. Times are
+ * local 'HH:mm'. Today passes `settings.reminders` (meal times and quiet hours);
+ * the defaults below are the coach's fallback rhythm.
+ */
+export interface CoachRhythm {
+  meals: { breakfast: string; lunch: string; dinner: string };
+  /** Start of the waking day (the end of quiet hours). */
+  wake: string;
+  /** End of the waking day (the start of quiet hours). */
+  sleep: string;
 }
 
-export function coachTip(day: DaySummary, units: UnitSystem, now: Date = new Date()): CoachTip {
+export const DEFAULT_RHYTHM: CoachRhythm = {
+  meals: { breakfast: '07:00', lunch: '12:30', dinner: '19:00' },
+  wake: '07:00',
+  sleep: '22:00',
+};
+
+/** Coach rhythm from the reminder settings: meal times (even with meal reminders off) and quiet hours. */
+export function rhythmFromReminders(r: { quietStart: string; quietEnd: string; meals: { breakfast: string; lunch: string; dinner: string } }): CoachRhythm {
+  return {
+    meals: { breakfast: r.meals.breakfast, lunch: r.meals.lunch, dinner: r.meals.dinner },
+    wake: r.quietEnd,
+    sleep: r.quietStart,
+  };
+}
+
+/** 'HH:mm' to hours since midnight; null when it does not parse. */
+function hoursOf(hhmm: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm?.trim() ?? '');
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  return h + min / 60;
+}
+
+/**
+ * Geometry of the waking day, in hours since waking. Times inside the sleep
+ * window are placed before waking (negative) when they are closer to the
+ * morning, after the end of the day otherwise, so a night shift that crosses
+ * midnight works the same as a usual day.
+ */
+function dayClock(rhythm: CoachRhythm) {
+  const wake = hoursOf(rhythm.wake) ?? hoursOf(DEFAULT_RHYTHM.wake)!;
+  const sleep = hoursOf(rhythm.sleep) ?? hoursOf(DEFAULT_RHYTHM.sleep)!;
+  let length = (((sleep - wake) % 24) + 24) % 24;
+  if (length < 4) length = 15; // A window this short is a typo, not a day.
+  const rel = (h: number) => {
+    const r = (((h - wake) % 24) + 24) % 24;
+    return r > length + (24 - length) / 2 ? r - 24 : r;
+  };
+  return { length, rel };
+}
+
+/** Share of the daily water goal a person would typically have reached `hoursAwake` into a waking day of `dayLength` hours. */
+export function waterPaceFraction(hoursAwake: number, dayLength: number): number {
+  return Math.min(1, Math.max(0, hoursAwake / dayLength));
+}
+
+/** Share of the daily water goal a person would typically have reached by this hour of the day, for the given rhythm (default awake 07:00 to 22:00). */
+export function expectedWaterFraction(hour: number, rhythm: CoachRhythm = DEFAULT_RHYTHM): number {
+  const { length, rel } = dayClock(rhythm);
+  return waterPaceFraction(rel(hour), length);
+}
+
+const MAIN_MEALS = ['breakfast', 'lunch', 'dinner'] as const;
+
+export function coachTip(day: DaySummary, units: UnitSystem, now: Date = new Date(), rhythm: CoachRhythm = DEFAULT_RHYTHM): CoachTip {
   const hour = now.getHours() + now.getMinutes() / 60;
+  const { length, rel } = dayClock(rhythm);
+  const awake = rel(hour);
+  const meals = MAIN_MEALS.map((meal) => ({
+    meal,
+    label: meal as string,
+    at: rel(hoursOf(rhythm.meals[meal]) ?? hoursOf(DEFAULT_RHYTHM.meals[meal])!),
+  }));
   const search = (meal: MealType) => `/food/search?meal=${meal}&date=${day.date}`;
 
   if (day.entries.length === 0) {
-    const meal = hour < 11 ? 'breakfast' : hour < 16 ? 'lunch' : hour < 21 ? 'dinner' : 'snack';
+    // The meal coming up or just past: from 90 minutes before its time, a snack once dinner is 90 minutes gone.
+    const current = [...meals].reverse().find((m) => awake >= m.at - 1.5);
+    const dinnerAt = meals[2].at;
+    const meal: MealType = awake > dinnerAt + 1.5 ? 'snack' : (current?.meal ?? 'breakfast');
     return {
       id: 'start',
       emoji: '👋',
@@ -52,7 +115,12 @@ export function coachTip(day: DaySummary, units: UnitSystem, now: Date = new Dat
     };
   }
 
-  const due = MEAL_WINDOWS.find((w) => hour >= w.from + 1.5 && hour <= w.until && day.byMeal[w.meal].length === 0);
+  // A meal is due an hour after its usual time, until four hours after it or the next meal's time, whichever comes first.
+  const due = meals.find((m, i) => {
+    const next = meals[i + 1]?.at;
+    const until = Math.min(m.at + 4, next !== undefined && next > m.at ? next : Infinity);
+    return awake >= m.at + 1 && awake <= until && day.byMeal[m.meal].length === 0;
+  });
   if (due) {
     return {
       id: `meal-${due.meal}`,
@@ -65,8 +133,8 @@ export function coachTip(day: DaySummary, units: UnitSystem, now: Date = new Dat
     };
   }
 
-  const waterGap = expectedWaterFraction(hour) * day.waterGoalMl - day.waterMl;
-  if (hour >= 10 && waterGap > 500 && day.waterRemainingMl > 0) {
+  const waterGap = waterPaceFraction(awake, length) * day.waterGoalMl - day.waterMl;
+  if (awake >= 3 && waterGap > 500 && day.waterRemainingMl > 0) {
     return {
       id: 'water',
       emoji: '💧',
@@ -79,7 +147,7 @@ export function coachTip(day: DaySummary, units: UnitSystem, now: Date = new Dat
   }
 
   const proteinLeft = Math.round(day.macros.proteinG - day.eaten.protein);
-  if (hour >= 15 && proteinLeft > day.macros.proteinG * 0.4 && day.remaining > 250) {
+  if (awake >= 8 && proteinLeft > day.macros.proteinG * 0.4 && day.remaining > 250) {
     return {
       id: 'protein',
       emoji: '🥚',
@@ -101,12 +169,12 @@ export function coachTip(day: DaySummary, units: UnitSystem, now: Date = new Dat
     };
   }
 
-  if (hour >= 17 && day.activities.length === 0) {
+  if (awake >= 10 && day.activities.length === 0) {
     return {
       id: 'move',
       emoji: '🚶',
       title: 'No activity logged today',
-      body: 'Even a 20 minute walk counts toward your weekly 150 minutes.',
+      body: 'A brisk 20 minute walk counts toward your weekly 150 active minutes.',
       action: { label: 'Log activity', href: '/activity/pick' },
       tone: 'neutral',
     };

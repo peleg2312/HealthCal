@@ -2,13 +2,13 @@ import { ChevronRight, Droplet, Dumbbell, Moon } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
-import { hoursText, plural, SLEEP_MAX_HOURS, SLEEP_TARGET_HOURS, WEEKLY_ACTIVE_MINUTES, type PeriodSummary } from '@/lib/insights';
+import { direction, hoursText, plural, type Direction, SLEEP_MAX_HOURS, SLEEP_TARGET_HOURS, WEEKLY_ACTIVE_MINUTES, type PeriodSummary } from '@/lib/insights';
 import { formatNumber, formatVolume, volumeUnit, volumeValue } from '@/lib/units';
 import { useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
 import { Card, Divider, PressableScale, ProgressBar, Text } from '@/ui';
 
-import { go } from './parts';
+import { go, TrendLegend, TrendMark } from './parts';
 
 function HabitRow({
   testID,
@@ -20,7 +20,11 @@ function HabitRow({
   unit,
   detail,
   progress,
+  trend,
+  period,
 }: {
+  trend?: Direction | null;
+  period?: string;
   testID: string;
   route: string;
   icon: React.ReactNode;
@@ -51,6 +55,7 @@ function HabitRow({
               {unit}
             </Text>
           ) : null}
+          {value ? <TrendMark trend={trend} period={period} /> : null}
         </View>
         <ChevronRight size={18} color={colors.textTertiary} />
       </View>
@@ -59,12 +64,14 @@ function HabitRow({
   );
 }
 
-export function HabitsCard({ summary, units }: { summary: PeriodSummary; units: UnitSystem }) {
+export function HabitsCard({ summary, previous, units }: { summary: PeriodSummary; previous?: PeriodSummary | null; units: UnitSystem }) {
   const { colors, spacing } = useTheme();
   const w = summary.water;
   const a = summary.activity;
   const s = summary.sleep;
   const weekly = Math.round(a.weeklyMinutes);
+  const period = `${summary.totalDays} days`;
+  const p = previous;
   return (
     <Card testID="progress-habits" style={{ gap: spacing.md }}>
       <Text variant="h3">Water, activity and sleep</Text>
@@ -78,6 +85,8 @@ export function HabitsCard({ summary, units }: { summary: PeriodSummary; units: 
         unit={`${volumeUnit(units)} / day`}
         detail={w ? `Goal met on ${w.daysAtGoal} of ${w.daysTracked} days · goal ${formatVolume(w.avgGoalMl, units)}` : 'No drinks logged in this range yet'}
         progress={w ? w.avgMl / w.avgGoalMl : 0}
+        trend={direction(w?.avgMl, p?.water?.avgMl, 50)}
+        period={period}
       />
       <Divider />
       <HabitRow
@@ -94,6 +103,8 @@ export function HabitsCard({ summary, units }: { summary: PeriodSummary; units: 
             : 'No workouts logged in this range yet'
         }
         progress={weekly / WEEKLY_ACTIVE_MINUTES}
+        trend={p && (a.minutes || p.activity.minutes) ? direction(weekly, Math.round(p.activity.weeklyMinutes), 5) : null}
+        period={period}
       />
       <Divider />
       <HabitRow
@@ -106,7 +117,10 @@ export function HabitsCard({ summary, units }: { summary: PeriodSummary; units: 
         unit="h / night"
         detail={s ? `${plural(s.nights, 'night')} logged · quality ${s.avgQuality.toFixed(1)} of 5 · aim for ${SLEEP_TARGET_HOURS} to ${SLEEP_MAX_HOURS} h` : 'No sleep logged in this range yet'}
         progress={s ? Math.min(s.avgHours, SLEEP_MAX_HOURS) / SLEEP_TARGET_HOURS : 0}
+        trend={direction(s?.avgHours, p?.sleep?.avgHours, 0.1)}
+        period={period}
       />
+      {p ? <TrendLegend period={period} /> : null}
     </Card>
   );
 }
