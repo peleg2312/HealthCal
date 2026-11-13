@@ -23,8 +23,10 @@ export function ftInToCm(ft: number, inch: number): number {
   return inToCm(ft * 12 + inch);
 }
 
+/** Fixed decimals without trailing zeros: 2.30 -> "2.3", 3.00 -> "3". */
 function trim(n: number, digits: number): string {
-  return n.toFixed(digits).replace(/\.0+$/, '');
+  const fixed = n.toFixed(digits);
+  return fixed.includes('.') ? fixed.replace(/0+$/, '').replace(/\.$/, '') : fixed;
 }
 
 export function formatWeight(kg: number, units: UnitSystem, digits = 1): string {
@@ -93,7 +95,9 @@ export function formatNumber(n: number, digits = 0): string {
   const fixed = Math.abs(n).toFixed(digits);
   const [int, frac] = fixed.split('.');
   const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return `${n < 0 ? '-' : ''}${grouped}${frac ? `.${frac}` : ''}`;
+  // A value that rounds to zero must not print as "-0".
+  const negative = n < 0 && Number(fixed) !== 0;
+  return `${negative ? '-' : ''}${grouped}${frac ? `.${frac}` : ''}`;
 }
 
 export const round = (n: number, digits = 0) => {

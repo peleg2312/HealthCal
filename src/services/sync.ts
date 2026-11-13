@@ -71,9 +71,19 @@ async function push(userId: string): Promise<void> {
   void userId;
 }
 
+/**
+ * Rows committed by a slower transaction can carry a server timestamp slightly
+ * older than one already seen, so every pull re-reads a short window before the
+ * stored cursor. Merging is idempotent, so the overlap costs only a few rows.
+ */
+const PULL_OVERLAP_MS = 60_000;
+
+const laterOf = (a: string | null, b: string): string => (a && Date.parse(a) > Date.parse(b) ? a : b);
+
 async function pull(userId: string): Promise<void> {
   if (!supabase) return;
-  let cursor = useStore.getState().lastPulledAt ?? '1970-01-01T00:00:00Z';
+  const stored = useStore.getState().lastPulledAt;
+  let cursor = stored ? new Date(Date.parse(stored) - PULL_OVERLAP_MS).toISOString() : '1970-01-01T00:00:00Z';
   // Page through everything newer than the cursor, oldest first.
   for (;;) {
     const { data, error } = await supabase
@@ -86,12 +96,20 @@ async function pull(userId: string): Promise<void> {
     if (error) throw new Error(error.message);
     const rows = (data ?? []) as RemoteRow[];
     if (rows.length === 0) break;
-    cursor = rows[rows.length - 1].server_updated_at;
+    let batch = rows;
+    if (rows.length === PULL_PAGE) {
+      // A batch upload shares one server timestamp. If the page ends inside such a
+      // group, leave the whole group for the next page so none of it is skipped.
+      const lastTs = rows[rows.length - 1].server_updated_at;
+      const cut = rows.findIndex((r) => r.server_updated_at === lastTs);
+      if (cut > 0) batch = rows.slice(0, cut);
+    }
+    cursor = batch[batch.length - 1].server_updated_at;
     useStore.getState().mergeRemote({
-      records: rows
+      records: batch
         .filter((r) => (COLLECTIONS as string[]).includes(r.collection))
         .map((r) => ({ collection: r.collection, record: { ...r.data, id: r.id, updatedAt: r.updated_at, deleted: r.deleted } })),
-      pulledAt: cursor,
+      pulledAt: laterOf(useStore.getState().lastPulledAt, cursor),
     });
     if (rows.length < PULL_PAGE) break;
   }
@@ -103,7 +121,7 @@ async function pull(userId: string): Promise<void> {
       records: [],
       profile: (prof.data as Profile | null) ?? null,
       settings: (prof.settings as Settings | null) ?? null,
-      pulledAt: cursor,
+      pulledAt: laterOf(useStore.getState().lastPulledAt, cursor),
     });
   }
 }

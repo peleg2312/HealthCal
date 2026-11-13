@@ -6,11 +6,11 @@ import {
   PlusJakartaSans_800ExtraBold,
   useFonts,
 } from '@expo-google-fonts/plus-jakarta-sans';
-import { Stack } from 'expo-router';
+import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
-import { AppState, View } from 'react-native';
+import { AppState, Pressable, Text as RNText, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -49,6 +49,28 @@ function Navigation() {
         <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
       </Stack>
       <ToastHost />
+    </View>
+  );
+}
+
+/**
+ * Last-resort screen if a route throws while rendering. It uses plain React
+ * Native elements on purpose: the theme or fonts may be what failed.
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <View style={{ flex: 1, backgroundColor: '#0A0C10', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
+      <RNText style={{ fontSize: 40 }}>🛠️</RNText>
+      <RNText style={{ color: '#F4F6FA', fontSize: 20, fontWeight: '700', textAlign: 'center' }}>Something went wrong on this screen</RNText>
+      <RNText style={{ color: '#A3ACBB', fontSize: 15, textAlign: 'center' }}>Your data is safe on this device. Try again, and if it keeps happening, restart the app.</RNText>
+      {__DEV__ ? <RNText style={{ color: '#6B7485', fontSize: 12, textAlign: 'center' }}>{error.message}</RNText> : null}
+      <Pressable
+        testID="error-retry"
+        accessibilityRole="button"
+        onPress={retry}
+        style={{ marginTop: 12, backgroundColor: '#C6F26B', paddingHorizontal: 28, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
+        <RNText style={{ color: '#0B1205', fontSize: 16, fontWeight: '700' }}>Try again</RNText>
+      </Pressable>
     </View>
   );
 }

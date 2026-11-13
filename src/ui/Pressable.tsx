@@ -1,9 +1,17 @@
 import React, { useRef } from 'react';
-import { Animated, Pressable as RNPressable, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
+import { Animated, Platform, Pressable as RNPressable, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 
 import { haptic } from './haptics';
 
-const AnimatedPressable = Animated.createAnimatedComponent(RNPressable);
+/**
+ * Animated wrappers add `collapsable={false}`, a native-only hint. On web it
+ * would leak into the DOM as an unknown attribute, so it is dropped there.
+ */
+const BasePressable = React.forwardRef<React.ComponentRef<typeof RNPressable>, PressableProps & { collapsable?: boolean }>(function BasePressable({ collapsable, ...props }, ref) {
+  return <RNPressable ref={ref} {...props} {...(Platform.OS === 'web' ? null : { collapsable })} />;
+});
+
+const AnimatedPressable = Animated.createAnimatedComponent(BasePressable);
 
 export interface PressableScaleProps extends Omit<PressableProps, 'style' | 'children'> {
   style?: StyleProp<ViewStyle>;

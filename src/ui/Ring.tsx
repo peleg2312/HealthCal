@@ -1,10 +1,15 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, View, type StyleProp, type ViewStyle } from 'react-native';
-import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
+import { Animated, Easing, Platform, View, type StyleProp, type ViewStyle } from 'react-native';
+import Svg, { Circle, Defs, LinearGradient, Stop, type CircleProps } from 'react-native-svg';
 
 import { useTheme } from '@/theme';
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+/** Animated wrappers add the native-only `collapsable` prop; keep it out of the DOM on web. */
+const BaseCircle = React.forwardRef<React.ComponentRef<typeof Circle>, CircleProps & { collapsable?: boolean }>(function BaseCircle({ collapsable, ...props }, ref) {
+  return <Circle ref={ref} {...props} {...(Platform.OS === 'web' ? null : { collapsable })} />;
+});
+
+const AnimatedCircle = Animated.createAnimatedComponent(BaseCircle);
 
 export interface RingProps {
   size: number;

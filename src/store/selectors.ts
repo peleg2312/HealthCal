@@ -4,7 +4,7 @@
  */
 import { useMemo } from 'react';
 
-import { addDays, lastNDates, today } from '@/lib/dates';
+import { addDays, diffDays, lastNDates, startOfWeek, today } from '@/lib/dates';
 import { bmr, calorieTarget, formulaTdee, macroTargets, type BmrMethod, type CalorieTarget, type MacroTargets } from '@/lib/energy';
 import { baseWaterGoalMl, effectiveMl, exerciseWaterMl } from '@/lib/hydration';
 import { entriesTotal } from '@/lib/nutrition';
@@ -257,7 +257,8 @@ export function computeConsistency(dates: Set<ISODate>, end: ISODate = today()):
       cursor = addDays(cursor, -1);
     } else break;
   }
-  const week = lastNDates(7, end).filter((d) => dates.has(d)).length;
+  // Monday-based week up to and including `end` (the field is documented as the current week, not a rolling 7 days).
+  const week = lastNDates(diffDays(startOfWeek(end), end) + 1, end).filter((d) => dates.has(d)).length;
   return { streak, daysThisWeek: week, loggedToday: dates.has(end), totalDaysLogged: dates.size };
 }
 

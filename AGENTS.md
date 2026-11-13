@@ -114,6 +114,7 @@ Read the component source in `src/ui/` for exact props before using one. If the 
 
 - The same code runs on iOS, Android and web. Guard native-only APIs (camera, notifications, haptics, file system, sharing) with `Platform.OS` and give web a working fallback.
 - `Alert.alert` does not work on web. Use `ConfirmSheet` or `toast`.
+- Never nest one pressable inside another (for example a `Card` with `onPress` that contains a `Button` or `IconButton`). On web both render as `<button>`, which is invalid HTML and breaks keyboard and screen-reader use. Make them siblings: a row `View` holding the main `PressableScale` and the secondary button side by side.
 - Navigation: `router.push('/path?x=1')`, `useLocalSearchParams()`. Leave a screen with `goBack()` from `@/ui` so a deep-linked page still has somewhere to go.
 
 ## Routes

@@ -1,0 +1,157 @@
+/**
+ * Diary-level actions built on top of `@/features/food/log`: copying meals and
+ * days, clearing a meal, saving a meal, and managing custom foods. Every one
+ * of them can be undone from the toast.
+ */
+import { addDays, formatDayLabel } from '@/lib/dates';
+import { nowISO } from '@/lib/id';
+import { MEAL_LABEL } from '@/lib/nutrition';
+import { useStore } from '@/store';
+import { live } from '@/store/selectors';
+import type { CustomFood, FoodEntry, ISODate, MealType, Nutrients, SavedMeal } from '@/types';
+import { haptic, toast } from '@/ui';
+
+import { deleteEntry, logItems, toSavedMealItem } from './log';
+
+const sortByLogged = (a: FoodEntry, b: FoodEntry) => a.loggedAt.localeCompare(b.loggedAt);
+
+function liveEntries(): FoodEntry[] {
+  return live(useStore.getState().foodEntries);
+}
+
+/** Most recent day before `date` (within `maxDays`) that has entries in `meal`. */
+export function findPreviousMeal(
+  entries: FoodEntry[],
+  date: ISODate,
+  meal: MealType,
+  maxDays = 60,
+): { date: ISODate; entries: FoodEntry[] } | null {
+  const byDate = new Map<ISODate, FoodEntry[]>();
+  const floor = addDays(date, -maxDays);
+  for (const e of entries) {
+    if (e.meal !== meal || e.date >= date || e.date < floor) continue;
+    const list = byDate.get(e.date) ?? [];
+    list.push(e);
+    byDate.set(e.date, list);
+  }
+  const latest = [...byDate.keys()].sort().pop();
+  return latest ? { date: latest, entries: byDate.get(latest)!.sort(sortByLogged) } : null;
+}
+
+/** Most recent day before `date` with anything logged. */
+export function findPreviousDay(entries: FoodEntry[], date: ISODate, maxDays = 60): { date: ISODate; entries: FoodEntry[] } | null {
+  const floor = addDays(date, -maxDays);
+  let latest: ISODate | null = null;
+  for (const e of entries) if (e.date < date && e.date >= floor && (!latest || e.date > latest)) latest = e.date;
+  if (!latest) return null;
+  return { date: latest, entries: entries.filter((e) => e.date === latest).sort(sortByLogged) };
+}
+
+function undoAll(ids: string[]) {
+  const s = useStore.getState();
+  ids.forEach((id) => s.remove('foodEntries', id));
+}
+
+/** Copy entries (any meals) onto a day, keeping each entry's meal unless `meal` is given. */
+export function copyEntries(entries: FoodEntry[], toDate: ISODate, meal?: MealType, message?: string): FoodEntry[] {
+  if (entries.length === 0) return [];
+  const groups = new Map<MealType, FoodEntry[]>();
+  for (const e of [...entries].sort(sortByLogged)) {
+    const m = meal ?? e.meal;
+    groups.set(m, [...(groups.get(m) ?? []), e]);
+  }
+  const created: FoodEntry[] = [];
+  for (const [m, list] of groups) created.push(...logItems(list, m, toDate));
+  // One toast whose Undo covers every meal that was copied.
+  const ids = created.map((e) => e.id);
+  toast(message ?? `Copied ${created.length} ${created.length === 1 ? 'item' : 'items'} to ${formatDayLabel(toDate).toLowerCase()}`, {
+    label: 'Undo',
+    onPress: () => undoAll(ids),
+  });
+  return created;
+}
+
+export function copyPreviousMeal(date: ISODate, meal: MealType): boolean {
+  const prev = findPreviousMeal(liveEntries(), date, meal);
+  if (!prev) {
+    toast(`No earlier ${MEAL_LABEL[meal].toLowerCase()} to copy`);
+    return false;
+  }
+  copyEntries(prev.entries, date, meal, `Copied ${MEAL_LABEL[meal].toLowerCase()} from ${formatDayLabel(prev.date).toLowerCase()}`);
+  return true;
+}
+
+export function copyPreviousDay(date: ISODate): boolean {
+  const prev = findPreviousDay(liveEntries(), date);
+  if (!prev) {
+    toast('No earlier day to copy');
+    return false;
+  }
+  copyEntries(prev.entries, date, undefined, `Copied ${prev.entries.length} items from ${formatDayLabel(prev.date).toLowerCase()}`);
+  return true;
+}
+
+export function clearEntries(entries: FoodEntry[], label: string): void {
+  if (entries.length === 0) return;
+  if (entries.length === 1) {
+    deleteEntry(entries[0]);
+    return;
+  }
+  const s = useStore.getState();
+  const ids = entries.map((e) => e.id);
+  ids.forEach((id) => s.remove('foodEntries', id));
+  haptic.tap();
+  toast(`Cleared ${label}`, { label: 'Undo', onPress: () => ids.forEach((id) => useStore.getState().restore('foodEntries', id)) });
+}
+
+export function saveMeal(name: string, entries: FoodEntry[]): SavedMeal | null {
+  if (entries.length === 0) return null;
+  const meal = useStore.getState().upsert('savedMeals', { name: name.trim() || 'Saved meal', items: entries.map(toSavedMealItem) });
+  haptic.success();
+  toast(`Saved "${meal.name}"`, { label: 'Undo', onPress: () => useStore.getState().remove('savedMeals', meal.id) });
+  return meal;
+}
+
+export function renameSavedMeal(meal: SavedMeal, name: string): void {
+  const trimmed = name.trim();
+  if (!trimmed || trimmed === meal.name) return;
+  useStore.getState().upsert('savedMeals', { ...meal, name: trimmed });
+  toast('Renamed');
+}
+
+export function deleteSavedMeal(meal: SavedMeal): void {
+  useStore.getState().remove('savedMeals', meal.id);
+  haptic.tap();
+  toast(`Deleted "${meal.name}"`, { label: 'Undo', onPress: () => useStore.getState().restore('savedMeals', meal.id) });
+}
+
+export function deleteCustomFood(food: CustomFood): void {
+  useStore.getState().remove('customFoods', food.id);
+  haptic.tap();
+  toast(`Deleted ${food.name}`, { label: 'Undo', onPress: () => useStore.getState().restore('customFoods', food.id) });
+}
+
+/**
+ * Edit an entry that has no food definition behind it (AI estimate or quick
+ * add): name, calories and macros are changed directly. A changed calorie
+ * value replaces the AI range, since the number is now the user's own.
+ */
+export function updateEntryDirect(
+  entry: FoodEntry,
+  patch: { name: string; nutrients: Nutrients; meal: MealType; date: ISODate },
+): FoodEntry {
+  const kcalChanged = Math.round(patch.nutrients.kcal) !== Math.round(entry.nutrients.kcal);
+  const next = useStore.getState().upsert('foodEntries', {
+    ...entry,
+    name: patch.name.trim() || entry.name,
+    nutrients: { ...entry.nutrients, ...patch.nutrients },
+    meal: patch.meal,
+    date: patch.date,
+    kcalRange: kcalChanged ? undefined : entry.kcalRange,
+    confidence: kcalChanged ? undefined : entry.confidence,
+    loggedAt: entry.loggedAt ?? nowISO(),
+  });
+  haptic.success();
+  toast('Entry updated', { label: 'Undo', onPress: () => useStore.getState().upsert('foodEntries', entry) });
+  return next;
+}

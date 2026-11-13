@@ -64,7 +64,20 @@ for (const id of String(flags.tap || '').split(',').filter(Boolean)) {
   await page.waitForTimeout(700);
 }
 await page.waitForTimeout(Number(flags.wait || 0));
-await page.screenshot({ path: out, fullPage: !!flags.full });
+if (flags.full) {
+  // React Native Web scrolls an inner element, not the page, so grow the viewport until that element fits.
+  const extra = await page.evaluate(() => {
+    let max = 0;
+    for (const el of document.querySelectorAll('*')) max = Math.max(max, el.scrollHeight - el.clientHeight);
+    return max;
+  });
+  const vp = page.viewportSize();
+  if (extra > 0) {
+    await page.setViewportSize({ width: vp.width, height: Math.min(vp.height + extra, 6000) });
+    await page.waitForTimeout(500);
+  }
+}
+await page.screenshot({ path: out });
 
 const body = await page.evaluate(() => document.body.innerText.slice(0, 300)).catch(() => '');
 console.log(`saved ${out}  (${page.url()})`);

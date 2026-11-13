@@ -1,0 +1,79 @@
+import { describe, expect, it } from 'vitest';
+
+import { estimateOneRepMax, grossKcal, kcalRange, netKcal, paceKmh, strengthVolumeKg } from './exercise';
+
+describe('grossKcal', () => {
+  it('8 MET, 70 kg, 30 min = 8*3.5*70/200 = 9.8 kcal/min -> 294', () => {
+    expect(grossKcal(8, 70, 30)).toBeCloseTo(294, 6);
+  });
+  it('1 MET for 1 h at 70 kg = 1.225 kcal/min * 60 = 73.5', () => {
+    expect(grossKcal(1, 70, 60)).toBeCloseTo(73.5, 6);
+  });
+  it('is linear in each argument', () => {
+    expect(grossKcal(4, 80, 60)).toBeCloseTo(2 * grossKcal(4, 80, 30), 9);
+    expect(grossKcal(4, 80, 60)).toBeCloseTo(2 * grossKcal(2, 80, 60), 9);
+    expect(grossKcal(4, 80, 60)).toBeCloseTo(2 * grossKcal(4, 40, 60), 9);
+  });
+  it('is zero for zero minutes', () => {
+    expect(grossKcal(8, 70, 0)).toBe(0);
+  });
+});
+
+describe('netKcal', () => {
+  it('subtracts the baseline share: 294 - 2400/1440*30 (=50) = 244', () => {
+    expect(netKcal(8, 70, 30, 2400)).toBeCloseTo(244, 6);
+  });
+  it('is never negative (below-baseline activity)', () => {
+    // 1 MET 60 min: gross 73.5; baseline 3000/1440*60 = 125 -> would be -51.5
+    expect(netKcal(1, 70, 60, 3000)).toBe(0);
+  });
+  it('net is always less than gross for a positive baseline', () => {
+    expect(netKcal(6, 75, 45, 2500)).toBeLessThan(grossKcal(6, 75, 45));
+  });
+  it('a zero baseline gives gross', () => {
+    expect(netKcal(6, 75, 45, 0)).toBeCloseTo(grossKcal(6, 75, 45), 9);
+  });
+});
+
+describe('kcalRange', () => {
+  it('is +-20% rounded', () => {
+    expect(kcalRange(500)).toEqual([400, 600]);
+    expect(kcalRange(333)).toEqual([266, 400]); // 266.4, 399.6
+    expect(kcalRange(0)).toEqual([0, 0]);
+  });
+});
+
+describe('paceKmh', () => {
+  it('10 km in 60 min = 10 km/h; 5 km in 45 min = 6.667', () => {
+    expect(paceKmh(10, 60)).toBe(10);
+    expect(paceKmh(5, 45)).toBeCloseTo(6.6667, 4);
+  });
+  it('null for missing, zero or negative inputs', () => {
+    expect(paceKmh(undefined, 60)).toBeNull();
+    expect(paceKmh(0, 60)).toBeNull();
+    expect(paceKmh(5, 0)).toBeNull();
+  });
+});
+
+describe('strength helpers', () => {
+  it('Epley: 100 kg x 5 = 100*(1+5/30) = 116.67; 1 rep is the weight itself', () => {
+    expect(estimateOneRepMax(100, 5)).toBeCloseTo(116.6667, 4);
+    expect(estimateOneRepMax(100, 1)).toBe(100);
+    expect(estimateOneRepMax(60, 10)).toBeCloseTo(80, 9);
+  });
+  it('returns 0 for invalid input', () => {
+    expect(estimateOneRepMax(0, 5)).toBe(0);
+    expect(estimateOneRepMax(100, 0)).toBe(0);
+    expect(estimateOneRepMax(-5, 5)).toBe(0);
+  });
+  it('volume = sum(reps*weight): 5*100 + 8*60 + 10*20 = 1180', () => {
+    expect(
+      strengthVolumeKg([
+        { sets: [{ reps: 5, weightKg: 100 }, { reps: 8, weightKg: 60 }] },
+        { sets: [{ reps: 10, weightKg: 20 }] },
+      ]),
+    ).toBe(1180);
+    expect(strengthVolumeKg([])).toBe(0);
+    expect(strengthVolumeKg([{ sets: [] }])).toBe(0);
+  });
+});
