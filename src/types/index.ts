@@ -9,7 +9,7 @@ export type ISODateTime = string; // full ISO-8601 timestamp
 
 export type Sex = 'male' | 'female';
 export type UnitSystem = 'metric' | 'imperial';
-export type ThemePreference = 'system' | 'light' | 'dark';
+export type ThemePreference = 'system' | 'light' | 'dark' | 'blossom';
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'athlete';
 export type GoalType = 'lose' | 'maintain' | 'gain';
@@ -123,6 +123,7 @@ export interface FoodEntry extends SyncedRecord {
 
 export interface SavedMealItem {
   name: string;
+  brand?: string;
   emoji?: string;
   servingLabel: string;
   quantity: number;
@@ -131,6 +132,14 @@ export interface SavedMealItem {
   food?: Food;
   source: FoodSource;
   verified: boolean;
+  /** Carried along so a saved or copied estimate still reads as an estimate. */
+  kcalRange?: [number, number];
+  confidence?: number;
+}
+
+/** A starred food. Stored with its definition so it can be logged offline and on other devices. */
+export interface FavoriteFood extends SyncedRecord {
+  food: Food;
 }
 
 export interface SavedMeal extends SyncedRecord {
@@ -269,7 +278,8 @@ export type Collection =
   | 'water'
   | 'weights'
   | 'sleep'
-  | 'fasting';
+  | 'fasting'
+  | 'favorites';
 
 // --------------------------------------------------------- AI food scan
 

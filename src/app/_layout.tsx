@@ -9,7 +9,7 @@ import {
 import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useSyncExternalStore } from 'react';
+import React, { useEffect } from 'react';
 import { AppState, Pressable, Text as RNText, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -18,16 +18,50 @@ import { initAuth } from '@/services/auth';
 import { refreshReminders } from '@/services/notifications';
 import { startAutoSync, syncNow } from '@/services/sync';
 import { useStore } from '@/store';
+import { startPersistence, useHydration, wipePersisted } from '@/store/persistence';
 import { ThemeProvider, useTheme } from '@/theme';
 import { ToastHost } from '@/ui';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-function useStoreHydrated(): boolean {
-  return useSyncExternalStore(
-    (onChange) => useStore.persist.onFinishHydration(onChange),
-    () => useStore.persist.hasHydrated(),
-    () => false,
+/** Shown when the last save did not reach the device, so the user knows before more is lost. */
+function StorageWarning() {
+  const failed = useHydration((h) => h.saveFailed);
+  const { colors } = useTheme();
+  if (!failed) return null;
+  return (
+    <View accessibilityRole="alert" style={{ backgroundColor: colors.warning, paddingHorizontal: 16, paddingVertical: 10 }}>
+      <RNText style={{ color: '#201400', fontSize: 13, fontWeight: '600', textAlign: 'center' }}>
+        Changes are not being saved on this device (storage may be full). Export a backup from Profile, Your data.
+      </RNText>
+    </View>
+  );
+}
+
+/** Saved data could not be read. Never leave a blank screen: offer a retry and a clean start. */
+function LoadFailed() {
+  return (
+    <View style={{ flex: 1, backgroundColor: '#0A0C10', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
+      <RNText style={{ fontSize: 40 }}>🗄️</RNText>
+      <RNText style={{ color: '#F4F6FA', fontSize: 20, fontWeight: '700', textAlign: 'center' }}>Could not load your saved data</RNText>
+      <RNText style={{ color: '#A3ACBB', fontSize: 15, textAlign: 'center' }}>
+        Try again first. Starting fresh clears what is saved on this device; anything backed up to your account comes back when you sign in.
+      </RNText>
+      <Pressable
+        testID="load-retry"
+        accessibilityRole="button"
+        onPress={() => void startPersistence()}
+        style={{ marginTop: 12, backgroundColor: '#C6F26B', paddingHorizontal: 28, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
+        <RNText style={{ color: '#0B1205', fontSize: 16, fontWeight: '700' }}>Try again</RNText>
+      </Pressable>
+      <Pressable
+        testID="load-start-fresh"
+        accessibilityRole="button"
+        onPress={() => void wipePersisted().then(() => startPersistence())}
+        style={{ paddingHorizontal: 28, height: 50, alignItems: 'center', justifyContent: 'center' }}>
+        <RNText style={{ color: '#A3ACBB', fontSize: 15, fontWeight: '600' }}>Start fresh on this device</RNText>
+      </Pressable>
+    </View>
   );
 }
 
@@ -36,6 +70,7 @@ function Navigation() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar style={dark ? 'light' : 'dark'} />
+      <StorageWarning />
       <Stack
         screenOptions={{
           headerShown: false,
@@ -81,7 +116,8 @@ export default function RootLayout() {
     PlusJakartaSans_700Bold,
     PlusJakartaSans_800ExtraBold,
   });
-  const hydrated = useStoreHydrated();
+  const hydration = useHydration((h) => h.status);
+  const hydrated = hydration === 'ready';
   const theme = useStore((s) => s.settings.theme);
   const ready = (fontsLoaded || !!fontError) && hydrated;
 
@@ -111,6 +147,16 @@ export default function RootLayout() {
     };
   }, [ready]);
 
+  useEffect(() => {
+    void startPersistence();
+  }, []);
+
+  useEffect(() => {
+    // The recovery screen must not stay hidden behind the splash image.
+    if (hydration === 'error') SplashScreen.hideAsync().catch(() => {});
+  }, [hydration]);
+
+  if (hydration === 'error') return <LoadFailed />;
   if (!ready) return null;
 
   return (

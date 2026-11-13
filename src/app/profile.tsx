@@ -194,7 +194,13 @@ function ProfileHub() {
             <View style={{ flex: 1 }}>
               <Text variant="bodyStrong">Appearance</Text>
               <Text variant="caption" color="textSecondary">
-                {settings.theme === 'system' ? 'Follows your device' : settings.theme === 'dark' ? 'Always dark' : 'Always light'}
+                {settings.theme === 'system'
+                  ? 'Follows your device'
+                  : settings.theme === 'dark'
+                    ? 'Always dark'
+                    : settings.theme === 'blossom'
+                      ? 'Blossom: pink and champagne'
+                      : 'Always light'}
               </Text>
             </View>
           </View>
@@ -205,6 +211,7 @@ function ProfileHub() {
               { value: 'system', label: 'System' },
               { value: 'light', label: 'Light' },
               { value: 'dark', label: 'Dark' },
+              { value: 'blossom', label: 'Blossom' },
             ]}
           />
         </View>

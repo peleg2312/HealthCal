@@ -48,6 +48,11 @@ export interface ThemeColors {
   track: string;
   tabBar: string;
   shadow: string;
+  /** Gradient of the large summary card on Today. */
+  heroStart: string;
+  heroEnd: string;
+  /** Second stop of the calorie ring gradient. */
+  ringEnd: string;
 }
 
 export const darkColors: ThemeColors = {
@@ -79,6 +84,9 @@ export const darkColors: ThemeColors = {
   track: 'rgba(255,255,255,0.08)',
   tabBar: 'rgba(18,22,29,0.92)',
   shadow: '#000000',
+  heroStart: '#171C25',
+  heroEnd: '#11151C',
+  ringEnd: palette.mint,
 };
 
 export const lightColors: ThemeColors = {
@@ -110,6 +118,61 @@ export const lightColors: ThemeColors = {
   track: 'rgba(12,18,28,0.08)',
   tabBar: 'rgba(255,255,255,0.94)',
   shadow: '#5A6B85',
+  heroStart: '#FFFFFF',
+  heroEnd: '#F3F7F1',
+  ringEnd: '#0FA58F',
+};
+
+/**
+ * Blossom: a light theme built on a pink and champagne palette.
+ *   Raspberry Rose #C43670 (primary)   Tickle Me Pink #F283AF (ring, accents)
+ *   Champagne #FBF4EB (background)     Blush #FBD9E5 (soft surfaces)
+ *   Cherry Blossom #FCC3D2 (pressed)   Sunset #F3CC97 (warm highlight)
+ * The palette colours are used as given for surfaces and accents. Text and the
+ * data colours that must stay readable on white (protein, carbs) are deeper
+ * tones of the same hues.
+ */
+export const blossom = {
+  raspberry: '#C43670',
+  ticklePink: '#F283AF',
+  champagne: '#FBF4EB',
+  blush: '#FBD9E5',
+  cherryBlossom: '#FCC3D2',
+  sunset: '#F3CC97',
+};
+
+export const blossomColors: ThemeColors = {
+  bg: blossom.champagne,
+  bgElevated: '#FFFAF4',
+  surface: '#FFFFFF',
+  surfaceAlt: blossom.blush,
+  surfacePressed: blossom.cherryBlossom,
+  border: 'rgba(196,54,112,0.12)',
+  borderStrong: 'rgba(196,54,112,0.28)',
+  text: '#3B1226',
+  textSecondary: '#7B4B60',
+  textTertiary: '#9C7183',
+  primary: blossom.raspberry,
+  onPrimary: '#FFFFFF',
+  primarySoft: 'rgba(196,54,112,0.12)',
+  calories: blossom.raspberry,
+  protein: '#E85D97',
+  carbs: '#E5A04B',
+  fat: '#9A7AE0',
+  water: '#4A9FDD',
+  exercise: '#F08A4B',
+  sleep: '#8577E6',
+  weight: '#2E9E97',
+  success: '#2E9E6B',
+  warning: '#DE8F2F',
+  danger: '#D63A5E',
+  overlay: 'rgba(59,18,38,0.45)',
+  track: 'rgba(196,54,112,0.10)',
+  tabBar: 'rgba(255,250,246,0.94)',
+  shadow: '#B8527A',
+  heroStart: '#FFFFFF',
+  heroEnd: '#FDEAF0',
+  ringEnd: blossom.ticklePink,
 };
 
 export const spacing = {

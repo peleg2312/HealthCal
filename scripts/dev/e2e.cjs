@@ -43,7 +43,8 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   };
   const text = async (id) => (await page.getByTestId(id).first().innerText({ timeout: 15000 })).trim();
   const shot = async (name) => SHOTS && page.screenshot({ path: `${SHOTS}/${name}.png` });
-  const stored = async () => JSON.parse(await page.evaluate(() => window.localStorage.getItem('healthcal-v1'))).state;
+  // The app exposes its live state for tests; this does not depend on how it is laid out in storage.
+  const stored = async () => page.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())));
   const live = (map) => Object.values(map).filter((r) => !r.deleted);
 
   // ------------------------------------------------------------ onboarding

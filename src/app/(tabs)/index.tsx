@@ -77,7 +77,7 @@ export default function TodayScreen() {
 // ------------------------------------------------------------- energy hero
 
 function EnergyCard({ day }: { day: DaySummary }) {
-  const { colors, spacing, dark } = useTheme();
+  const { colors, spacing } = useTheme();
   const profile = useProfile();
   const over = day.remaining < 0;
   const progress = day.budget > 0 ? day.eaten.kcal / day.budget : 0;
@@ -85,11 +85,11 @@ function EnergyCard({ day }: { day: DaySummary }) {
     <Card
       testID="today-energy"
       padding={spacing.xl}
-      gradient={dark ? ['#171C25', '#11151C'] : ['#FFFFFF', '#F3F7F1']}
+      gradient={[colors.heroStart, colors.heroEnd]}
       style={{ gap: spacing.xl }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <SideStat icon={<Utensils size={16} color={colors.textSecondary} />} value={formatNumber(day.eaten.kcal)} label="eaten" />
-        <Ring size={176} stroke={15} progress={progress} color={colors.calories} colorEnd={colors.weight} overColor={colors.warning}>
+        <Ring size={176} stroke={15} progress={progress} color={colors.calories} colorEnd={colors.ringEnd} overColor={colors.warning}>
           <Text variant="numXL" tabular color={over ? 'warning' : 'text'} testID="today-remaining">
             {formatNumber(Math.abs(day.remaining))}
           </Text>

@@ -3,9 +3,14 @@ import { useColorScheme } from 'react-native';
 
 import type { ThemePreference } from '@/types';
 
-import { darkColors, lightColors, radius, spacing, typography, type ThemeColors } from './tokens';
+import { blossomColors, darkColors, lightColors, radius, spacing, typography, type ThemeColors } from './tokens';
+
+export type ThemeName = 'dark' | 'light' | 'blossom';
 
 export interface Theme {
+  /** Which palette is active. */
+  name: ThemeName;
+  /** True for palettes with a dark background (drives status bar and similar). */
   dark: boolean;
   colors: ThemeColors;
   spacing: typeof spacing;
@@ -13,7 +18,10 @@ export interface Theme {
   typography: typeof typography;
 }
 
+const PALETTES: Record<ThemeName, ThemeColors> = { dark: darkColors, light: lightColors, blossom: blossomColors };
+
 const ThemeContext = createContext<Theme>({
+  name: 'dark',
   dark: true,
   colors: darkColors,
   spacing,
@@ -29,10 +37,10 @@ export function ThemeProvider({
   children: React.ReactNode;
 }) {
   const system = useColorScheme();
-  const dark = preference === 'system' ? system !== 'light' : preference === 'dark';
+  const name: ThemeName = preference === 'system' ? (system === 'light' ? 'light' : 'dark') : preference;
   const value = useMemo<Theme>(
-    () => ({ dark, colors: dark ? darkColors : lightColors, spacing, radius, typography }),
-    [dark],
+    () => ({ name, dark: name === 'dark', colors: PALETTES[name], spacing, radius, typography }),
+    [name],
   );
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

@@ -59,11 +59,8 @@ async function device(browser, seedJson) {
     },
     text: async (id) => (await page.getByTestId(id).first().innerText({ timeout: 15000 })).trim(),
     has: async (id) => (await page.getByTestId(id).count()) > 0,
-    // A device that has never stored anything has no saved state yet.
-    state: async () => {
-      const raw = await page.evaluate(() => window.localStorage.getItem('healthcal-v1'));
-      return raw ? JSON.parse(raw).state : { ownerId: null, profile: null, dirty: {}, foodEntries: {}, customFoods: {}, savedMeals: {}, activities: {}, water: {}, weights: {}, sleep: {}, fasting: {} };
-    },
+    // The app exposes its live state for tests; this does not depend on how it is laid out in storage.
+    state: async () => page.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState()))),
     untilPath: (pathname, timeout = 30000) => page.waitForURL((u) => new URL(u).pathname === pathname, { timeout }).then(() => true).catch(() => false),
     shot: async (name) => SHOTS && page.screenshot({ path: `${SHOTS}/${name}.png` }),
   };

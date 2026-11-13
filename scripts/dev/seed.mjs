@@ -69,7 +69,7 @@ const SESSIONS = [
   { activityId: 'walking', name: 'Walking', emoji: '🚶', category: 'cardio', intensity: 'moderate', durationMin: 45, met: 3.8, distanceKm: 3.9 },
 ];
 
-/** @param {{ days?: number, empty?: boolean, theme?: 'system'|'light'|'dark', onboarded?: boolean, units?: 'metric'|'imperial' }} opts */
+/** @param {{ days?: number, empty?: boolean, theme?: 'system'|'light'|'dark'|'blossom', onboarded?: boolean, units?: 'metric'|'imperial' }} opts */
 export function buildSeed(opts = {}) {
   const { days = 35, empty = false, theme = 'dark', onboarded = true, units = 'metric' } = opts;
   const rand = rng(20261113);
