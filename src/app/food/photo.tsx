@@ -324,7 +324,7 @@ export default function PhotoScreen() {
 
       {step === 'review' && result ? (
         <>
-          {isDemo && !access.live ? <SampleNotice reason={access.reason} variant="result" /> : null}
+          {isDemo ? <SampleNotice reason={access.live ? 'signed_out' : access.reason} variant="result" /> : null}
 
           <Card style={{ gap: spacing.lg }}>
             <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>

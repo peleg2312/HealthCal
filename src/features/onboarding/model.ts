@@ -275,7 +275,8 @@ export function validateStep(step: StepId, d: Draft, now: Date = new Date()): Er
         else if (d.heightIn !== null && (d.heightIn < 0 || d.heightIn >= 12)) e.height = 'Inches go from 0 to 11.';
       } else if (d.heightCm === null) e.height = 'Enter your height.';
       if (!e.height && m.heightCm !== null && (m.heightCm < LIMITS.heightCm[0] || m.heightCm > LIMITS.heightCm[1])) {
-        e.height = d.units === 'imperial' ? `Enter a height between 3'11" and 7'7".` : `Enter a height between ${LIMITS.heightCm[0]} and ${LIMITS.heightCm[1]} cm.`;
+        e.height =
+          d.units === 'imperial' ? `Enter a height between 3'11" and 7'7".` : `Enter a height between ${LIMITS.heightCm[0]} and ${LIMITS.heightCm[1]} cm.`;
       }
       if (m.weightKg === null) e.weight = 'Enter your current weight.';
       else if (m.weightKg < LIMITS.weightKg[0] || m.weightKg > LIMITS.weightKg[1]) {

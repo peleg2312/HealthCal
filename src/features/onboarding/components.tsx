@@ -1,5 +1,5 @@
 import { Check } from 'lucide-react-native';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Animated, Easing, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 
@@ -7,8 +7,18 @@ import { useTheme } from '@/theme';
 import { PressableScale, Ring, Text } from '@/ui';
 
 /** Fades and lifts its children in, optionally after a delay (for staggered reveals). */
-export function FadeIn({ delay = 0, distance = 12, children, style }: { delay?: number; distance?: number; children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
-  const v = useRef(new Animated.Value(0)).current;
+export function FadeIn({
+  delay = 0,
+  distance = 12,
+  children,
+  style,
+}: {
+  delay?: number;
+  distance?: number;
+  children: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const [v] = useState(() => new Animated.Value(0));
   useEffect(() => {
     Animated.timing(v, { toValue: 1, duration: 420, delay, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [v, delay]);
@@ -110,7 +120,17 @@ export function ChoiceCard({
 }
 
 /** Soft information panel with a leading icon. `tone` warning is amber, never red. */
-export function Note({ icon, children, tone = 'neutral', testID }: { icon?: React.ReactNode; children: React.ReactNode; tone?: 'neutral' | 'warning' | 'primary'; testID?: string }) {
+export function Note({
+  icon,
+  children,
+  tone = 'neutral',
+  testID,
+}: {
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+  tone?: 'neutral' | 'warning' | 'primary';
+  testID?: string;
+}) {
   const { colors, radius, spacing } = useTheme();
   const tint = tone === 'warning' ? colors.warning : tone === 'primary' ? colors.primary : null;
   return (
@@ -156,7 +176,10 @@ export function BrandRings({ size = 232 }: { size?: number }) {
   const gap = Math.round(size * 0.03);
   const glow = size * 1.5;
   return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <View
+      style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants">
       <Svg width={glow} height={glow} style={{ position: 'absolute', left: (size - glow) / 2, top: (size - glow) / 2 }}>
         <Defs>
           <RadialGradient id="brand-glow" cx="50%" cy="50%" r="50%">
@@ -170,15 +193,7 @@ export function BrandRings({ size = 232 }: { size?: number }) {
       {rings.map((r, i) => {
         const s = size - i * 2 * (stroke + gap);
         return (
-          <Ring
-            key={r.color + i}
-            size={s}
-            stroke={stroke}
-            progress={r.progress}
-            color={r.color}
-            trackColor={`${r.color}26`}
-            style={{ position: 'absolute' }}
-          />
+          <Ring key={r.color + i} size={s} stroke={stroke} progress={r.progress} color={r.color} trackColor={`${r.color}26`} style={{ position: 'absolute' }} />
         );
       })}
     </View>
@@ -188,12 +203,16 @@ export function BrandRings({ size = 232 }: { size?: number }) {
 /** Thin progress indicator for the onboarding steps. */
 export function StepProgress({ index, total }: { index: number; total: number }) {
   const { colors, spacing } = useTheme();
-  const v = useRef(new Animated.Value((index + 1) / total)).current;
+  const [v] = useState(() => new Animated.Value((index + 1) / total));
   useEffect(() => {
     Animated.timing(v, { toValue: (index + 1) / total, duration: 420, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
   }, [index, total, v]);
   return (
-    <View style={{ flex: 1, gap: spacing.xs }} accessibilityRole="progressbar" accessibilityValue={{ min: 1, max: total, now: index + 1 }} accessibilityLabel={`Step ${index + 1} of ${total}`}>
+    <View
+      style={{ flex: 1, gap: spacing.xs }}
+      accessibilityRole="progressbar"
+      accessibilityValue={{ min: 1, max: total, now: index + 1 }}
+      accessibilityLabel={`Step ${index + 1} of ${total}`}>
       <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.track, overflow: 'hidden' }}>
         <Animated.View
           style={{ height: 6, borderRadius: 3, backgroundColor: colors.primary, width: v.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }}

@@ -115,7 +115,11 @@ export function PlanReveal({ plan }: { plan: Plan }) {
           {p.goal !== 'maintain' ? (
             <MathRow
               label={p.goal === 'lose' ? 'Deficit' : 'Surplus'}
-              detail={t.limitedByFloor ? `Held at the ${formatNumber(plan.floor)} kcal minimum` : `For ${formatWeight(p.weeklyRateKg, units, 2)} a week (${units === 'imperial' ? '3,500 kcal per lb' : '7,700 kcal per kg'})`}
+              detail={
+                t.limitedByFloor
+                  ? `Held at the ${formatNumber(plan.floor)} kcal minimum`
+                  : `For ${formatWeight(p.weeklyRateKg, units, 2)} a week (${units === 'imperial' ? '3,500 kcal per lb' : '7,700 kcal per kg'})`
+              }
               value={`${t.dailyDelta < 0 ? '−' : '+'}${kcal(Math.abs(t.dailyDelta))}`}
             />
           ) : null}
@@ -153,7 +157,8 @@ export function PlanReveal({ plan }: { plan: Plan }) {
       <FadeIn delay={600} style={{ flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.xs }}>
         <Sparkles size={18} color={colors.primary} />
         <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
-          These are starting estimates. As your weigh-ins and food logs come in, HealthCal measures what you actually burn and adapts your targets. You can adjust any number in Goals.
+          These are starting estimates. As your weigh-ins and food logs come in, HealthCal measures what you actually burn and adapts your targets. You can
+          adjust any number in Goals.
         </Text>
       </FadeIn>
     </View>

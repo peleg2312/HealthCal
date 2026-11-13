@@ -212,9 +212,16 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
             <Plus size={20} color={colors.text} />
           </IconButton>
         </View>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+        <View style={{ flexDirection: 'row', gap: spacing.xs }}>
           {PRESETS.map((p) => (
-            <Chip key={p} label={p === 60 ? '1 h' : `${p} min`} selected={minutes === p} onPress={() => setDuration(p)} testID={`duration-${p}`} />
+            <Chip
+              key={p}
+              label={p === 60 ? '1 h' : `${p} min`}
+              selected={minutes === p}
+              onPress={() => setDuration(p)}
+              testID={`duration-${p}`}
+              style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 4, height: 44 }}
+            />
           ))}
         </View>
       </View>

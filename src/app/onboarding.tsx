@@ -3,7 +3,7 @@ import { ArrowRight, ChevronLeft, CloudUpload } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
 
-import { BrandRings, FadeIn, StepProgress } from '@/features/onboarding/components';
+import { FadeIn, StepProgress } from '@/features/onboarding/components';
 import { buildPlan, draftFromProfile, effectiveBodyFat, stepsFor, toMetric, useOnboardingDraft, validateStep, type StepId } from '@/features/onboarding/model';
 import { PlanReveal } from '@/features/onboarding/PlanReveal';
 import { AboutStep, ActivityStep, BasicsStep, BodyFatStep, BodyStep, GoalStep, TargetStep, type StepProps } from '@/features/onboarding/steps';
@@ -141,7 +141,7 @@ function Flow({ onFinished }: { onFinished: () => void }) {
 }
 
 function StepTransition({ direction, children }: { direction: 1 | -1; children: React.ReactNode }) {
-  const v = useRef(new Animated.Value(0)).current;
+  const [v] = useState(() => new Animated.Value(0));
   useEffect(() => {
     Animated.timing(v, { toValue: 1, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [v]);
@@ -166,9 +166,8 @@ function AccountOffer() {
         </View>
       }>
       <View style={{ alignItems: 'center' }}>
-        <BrandRings size={150} />
-        <View style={{ position: 'absolute', top: 75 - 22 }}>
-          <CloudUpload size={44} color={colors.text} />
+        <View style={{ width: 80, height: 80, borderRadius: 26, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+          <CloudUpload size={36} color={colors.primary} />
         </View>
       </View>
       <FadeIn style={{ gap: spacing.sm }}>

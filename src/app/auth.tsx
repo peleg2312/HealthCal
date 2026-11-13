@@ -4,7 +4,7 @@ import React, { useRef, useState } from 'react';
 import { View, type TextInputInstance } from 'react-native';
 
 import { destinationAfterSignIn, waitForRestore } from '@/features/onboarding/afterSignIn';
-import { BrandRings, FadeIn, Note } from '@/features/onboarding/components';
+import { FadeIn, Note } from '@/features/onboarding/components';
 import { sendPasswordReset, signIn, signUp, useAuth, validateEmail, validatePassword } from '@/services/auth';
 import { isBackendConfigured } from '@/services/supabase';
 import { useStore } from '@/store';
@@ -218,7 +218,13 @@ function AuthForm({ initial }: { initial: Mode }) {
               }
             />
             {mode === 'signin' ? (
-              <Text variant="label" color="primary" accessibilityRole="button" onPress={() => switchMode('forgot')} testID="auth-forgot" style={{ alignSelf: 'flex-end', paddingVertical: spacing.sm }}>
+              <Text
+                variant="label"
+                color="primary"
+                accessibilityRole="button"
+                onPress={() => switchMode('forgot')}
+                testID="auth-forgot"
+                style={{ alignSelf: 'flex-end', paddingVertical: spacing.sm }}>
                 Forgot password?
               </Text>
             ) : null}
@@ -263,16 +269,21 @@ function NotConfigured() {
       testID="auth-not-configured"
       header={<Header onBack={() => goBack(onboarded ? '/' : '/welcome')} />}
       contentStyle={{ flexGrow: 1, justifyContent: 'center', gap: spacing.xxl }}
-      footer={<Button title={onboarded ? 'Back to today' : 'Set up on this device'} testID="auth-continue-local" onPress={() => router.replace(onboarded ? '/' : '/onboarding')} />}>
+      footer={
+        <Button
+          title={onboarded ? 'Back to today' : 'Set up on this device'}
+          testID="auth-continue-local"
+          onPress={() => router.replace(onboarded ? '/' : '/onboarding')}
+        />
+      }>
       <View style={{ alignItems: 'center' }}>
-        <BrandRings size={150} />
-        <View style={{ position: 'absolute', top: 75 - 20 }}>
-          <Smartphone size={40} color={colors.text} />
+        <View style={{ width: 80, height: 80, borderRadius: 26, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+          <Smartphone size={36} color={colors.primary} />
         </View>
       </View>
       <FadeIn style={{ gap: spacing.sm }}>
         <Text variant="h1" align="center" accessibilityRole="header">
-          Accounts aren't set up in this build
+          Accounts are not set up in this build
         </Text>
         <Text variant="body" color="textSecondary" align="center">
           HealthCal works fully on this device: logging, targets, trends and export. Your data is saved here and never leaves it.

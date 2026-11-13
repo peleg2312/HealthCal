@@ -10,17 +10,7 @@ import type { ActivityLevel, GoalType } from '@/types';
 import { Card, NumberField, PressableScale, Stepper, Text, TextField } from '@/ui';
 
 import { ChoiceCard, ErrorText, Note, StepTitle } from './components';
-import {
-  birthDateOf,
-  buildPlan,
-  convertUnits,
-  rateKgOf,
-  tapeEstimate,
-  toMetric,
-  type BodyFatMode,
-  type Draft,
-  type Errors,
-} from './model';
+import { birthDateOf, buildPlan, convertUnits, rateKgOf, tapeEstimate, toMetric, type BodyFatMode, type Draft, type Errors } from './model';
 
 export interface StepProps {
   draft: Draft;
@@ -124,7 +114,6 @@ function ChoiceTile({
   );
 }
 
-
 function ChoiceCardCompact({
   active,
   onPress,
@@ -169,14 +158,29 @@ function ChoiceCardCompact({
 export function GoalStep({ draft, set, errors }: StepProps) {
   const { colors, spacing } = useTheme();
   const options: { value: GoalType; title: string; hint: string; icon: React.ReactNode; color: string }[] = [
-    { value: 'lose', title: 'Lose weight', hint: 'A steady calorie deficit, protein kept high', icon: <TrendingDown size={22} color={colors.weight} />, color: colors.weight },
+    {
+      value: 'lose',
+      title: 'Lose weight',
+      hint: 'A steady calorie deficit, protein kept high',
+      icon: <TrendingDown size={22} color={colors.weight} />,
+      color: colors.weight,
+    },
     { value: 'maintain', title: 'Maintain', hint: 'Eat to match what you burn', icon: <Scale size={22} color={colors.water} />, color: colors.water },
-    { value: 'gain', title: 'Gain muscle', hint: 'A small surplus to support training', icon: <Dumbbell size={22} color={colors.protein} />, color: colors.protein },
+    {
+      value: 'gain',
+      title: 'Gain muscle',
+      hint: 'A small surplus to support training',
+      icon: <Dumbbell size={22} color={colors.protein} />,
+      color: colors.protein,
+    },
   ];
   const name = draft.name.trim();
   return (
     <Group gap={spacing.xxl}>
-      <StepTitle title={name ? `What's your goal, ${name}?` : "What's your goal?"} subtitle="This sets the direction of your calorie target and how much protein you need." />
+      <StepTitle
+        title={name ? `What's your goal, ${name}?` : "What's your goal?"}
+        subtitle="This sets the direction of your calorie target and how much protein you need."
+      />
       <Group>
         {options.map((o) => (
           <ChoiceCard
@@ -301,7 +305,10 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
   const imp = draft.units === 'imperial';
   return (
     <Group gap={spacing.xxl}>
-      <StepTitle title="Height and weight" subtitle="The two biggest inputs to your energy needs. Weigh yourself in the morning if you can; a rough figure is fine for now." />
+      <StepTitle
+        title="Height and weight"
+        subtitle="The two biggest inputs to your energy needs. Weigh yourself in the morning if you can; a rough figure is fine for now."
+      />
       <Group gap={spacing.lg}>
         {imp ? (
           <View style={{ gap: 6 }}>
@@ -338,7 +345,7 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
               <ErrorText>{errors.height}</ErrorText>
             ) : (
               <Text variant="caption" color="textTertiary">
-                Between 3'11" and 7'7"
+                {`Between 3'11" and 7'7"`}
               </Text>
             )}
           </View>
@@ -441,10 +448,42 @@ export function BodyFatStep({ draft, set, errors, submit }: StepProps) {
             </Text>
           </View>
           <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            <NumberField style={{ flex: 1 }} label="Neck" testID="onb-neck-input" suffix={lu} decimals={1} maxLength={5} value={draft.neck} onChange={(neck) => set({ neck })} error={errors.neck ? ' ' : undefined} />
-            <NumberField style={{ flex: 1 }} label="Waist" testID="onb-waist-input" suffix={lu} decimals={1} maxLength={5} value={draft.waist} onChange={(waist) => set({ waist })} error={errors.waist ? ' ' : undefined} onSubmitEditing={draft.sex === 'female' ? undefined : submit} />
+            <NumberField
+              style={{ flex: 1 }}
+              label="Neck"
+              testID="onb-neck-input"
+              suffix={lu}
+              decimals={1}
+              maxLength={5}
+              value={draft.neck}
+              onChange={(neck) => set({ neck })}
+              error={errors.neck ? ' ' : undefined}
+            />
+            <NumberField
+              style={{ flex: 1 }}
+              label="Waist"
+              testID="onb-waist-input"
+              suffix={lu}
+              decimals={1}
+              maxLength={5}
+              value={draft.waist}
+              onChange={(waist) => set({ waist })}
+              error={errors.waist ? ' ' : undefined}
+              onSubmitEditing={draft.sex === 'female' ? undefined : submit}
+            />
             {draft.sex === 'female' ? (
-              <NumberField style={{ flex: 1 }} label="Hips" testID="onb-hip-input" suffix={lu} decimals={1} maxLength={5} value={draft.hip} onChange={(hip) => set({ hip })} error={errors.hip ? ' ' : undefined} onSubmitEditing={submit} />
+              <NumberField
+                style={{ flex: 1 }}
+                label="Hips"
+                testID="onb-hip-input"
+                suffix={lu}
+                decimals={1}
+                maxLength={5}
+                value={draft.hip}
+                onChange={(hip) => set({ hip })}
+                error={errors.hip ? ' ' : undefined}
+                onSubmitEditing={submit}
+              />
             ) : null}
           </View>
           <ErrorText>{errors.neck ?? errors.waist ?? errors.hip ?? errors.tape}</ErrorText>
@@ -535,7 +574,11 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
     <Group gap={spacing.xxl}>
       <StepTitle
         title={goal === 'lose' ? 'Where are you heading?' : 'Set your pace'}
-        subtitle={goal === 'lose' ? 'A target weight and a pace you can live with. Slower is easier to keep.' : 'A small surplus builds muscle with less fat gain. A target weight is optional.'}
+        subtitle={
+          goal === 'lose'
+            ? 'A target weight and a pace you can live with. Slower is easier to keep.'
+            : 'A small surplus builds muscle with less fat gain. A target weight is optional.'
+        }
       />
       <NumberField
         label={goal === 'lose' ? 'Target weight' : 'Target weight (optional)'}

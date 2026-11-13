@@ -75,7 +75,7 @@ function WeightScreen() {
         <Card>
           <EmptyState
             emoji="⚖️"
-            title="Your trend starts with one weigh-in"
+            title="Start your weight trend"
             message="Weigh yourself in the morning, after the bathroom and before breakfast. Day-to-day jumps are mostly water, so the app draws a smoothed trend that shows where your weight is really heading."
           />
         </Card>

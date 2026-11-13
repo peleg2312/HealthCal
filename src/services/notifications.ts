@@ -11,6 +11,7 @@
  * there and `remindersSupported` is false.
  */
 import * as Notifications from 'expo-notifications';
+import { AndroidImportance } from 'expo-notifications';
 import { router } from 'expo-router';
 import { Platform } from 'react-native';
 
@@ -37,7 +38,7 @@ async function ensureChannel(): Promise<void> {
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     name: 'Reminders',
     description: 'Water, meal and daily check-in reminders with your current numbers',
-    importance: Notifications.AndroidImportance.DEFAULT,
+    importance: AndroidImportance.DEFAULT,
     showBadge: false,
   });
 }

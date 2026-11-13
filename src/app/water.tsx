@@ -60,6 +60,7 @@ function WaterScreen() {
   const [custom, setCustom] = useState<number | null>(null);
   const [editing, setEditing] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
+  const [showAllLog, setShowAllLog] = useState(false);
 
   const consumed = day.waterMl;
   const goal = day.waterGoalMl;
@@ -98,7 +99,8 @@ function WaterScreen() {
     if (!reached) setCelebrate(false);
   }, [reached]);
 
-  const entries = [...day.waterEntries].reverse();
+  const allEntries = [...day.waterEntries].reverse();
+  const entries = showAllLog ? allEntries : allEntries.slice(0, 6);
   const consumedParts = splitUnit(formatVolume(consumed, units));
   const goalParts = splitUnit(formatVolume(goal, units));
   const leftParts = splitUnit(formatVolume(left, units));
@@ -212,7 +214,11 @@ function WaterScreen() {
       </View>
       <Note icon={<Info size={14} color={colors.textTertiary} />}>{factorLine()}</Note>
 
-      <SectionTitle title="Today’s log" />
+      <SectionTitle
+        title="Today’s log"
+        action={allEntries.length > 6 ? (showAllLog ? 'Show less' : `Show all ${allEntries.length}`) : undefined}
+        onAction={() => setShowAllLog((v) => !v)}
+      />
       <Card padding={entries.length ? spacing.md : spacing.lg}>
         {entries.length === 0 ? (
           <EmptyState emoji="💧" title="Nothing logged yet" message="Tap a glass size above and each drink shows up here." />

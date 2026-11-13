@@ -595,7 +595,7 @@ function activityInsight({ summary: s }: InsightContext): Insight | null {
     return {
       id: 'activity-on-track',
       tone: 'positive',
-      title: 'Active week after week',
+      title: 'Above the activity guideline',
       body: `You averaged ${weekly} active minutes a week (${sessions} in this range), above the ${WEEKLY_ACTIVE_MINUTES}-minute guideline.`,
       score: 38,
     };
