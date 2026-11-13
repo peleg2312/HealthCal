@@ -203,7 +203,7 @@ export function useProfile(): Profile {
   return p;
 }
 
-export function useLive<K extends 'foodEntries' | 'activities' | 'water' | 'weights' | 'sleep' | 'fasting' | 'savedMeals' | 'customFoods' | 'favorites' | 'days'>(
+export function useLive<K extends 'foodEntries' | 'activities' | 'water' | 'weights' | 'sleep' | 'fasting' | 'savedMeals' | 'customFoods' | 'favorites' | 'days' | 'routines'>(
   collection: K,
 ): Store[K][string][] {
   const map = useStore((s) => s[collection]);

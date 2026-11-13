@@ -174,3 +174,49 @@ export function RangeSwitch({ value, onChange }: { value: RangeDays; onChange: (
     </View>
   );
 }
+
+/** Pill switch with stable test ids, e.g. the Progress sections. */
+export function SegmentSwitch<T extends string>({
+  options,
+  value,
+  onChange,
+  testIDPrefix,
+}: {
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+  testIDPrefix: string;
+}) {
+  const { colors, radius } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: 4 }} accessibilityRole="tablist">
+      {options.map((o) => {
+        const active = o.value === value;
+        return (
+          <PressableScale
+            key={o.value}
+            testID={`${testIDPrefix}-${o.value}`}
+            onPress={() => onChange(o.value)}
+            feedback="select"
+            scaleTo={0.98}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={o.label}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              height: 40,
+              borderRadius: radius.sm,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: active ? colors.primary : 'transparent',
+            }}>
+            <Text variant="label" color={active ? 'onPrimary' : 'textSecondary'} numberOfLines={1}>
+              {o.label}
+            </Text>
+          </PressableScale>
+        );
+      })}
+    </View>
+  );
+}

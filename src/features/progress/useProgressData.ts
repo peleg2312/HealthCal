@@ -38,8 +38,8 @@ export function useProgressData(range: RangeDays) {
   }, [food, activities, water, weights, sleep]);
   const historyDays = firstDate ? Math.min(MAX_HISTORY, Math.max(1, diffDays(firstDate, t) + 1)) : 1;
 
-  // One run of day summaries covers the range, the recap (two weeks) and the milestones.
-  const all = useDays(Math.max(range, historyDays, 21), t);
+  // One run of day summaries covers the range and the equal period before it, the recap (two weeks) and the milestones.
+  const all = useDays(Math.max(range * 2, historyDays, 21), t);
   const model = useEnergyModel(t);
   const series = useWeightSeries();
   const consistency = useConsistency(t);
@@ -47,6 +47,10 @@ export function useProgressData(range: RangeDays) {
   return useMemo(() => {
     const days: InsightDay[] = all.slice(-range);
     const summary = summarizePeriod({ days, trend: series.trend, sleep, today: t });
+    // The equal period just before, for neutral 'than the previous 30 days' comparisons.
+    const prevDays: InsightDay[] = all.slice(-range * 2, -range);
+    const prevSummary = prevDays.length === range ? summarizePeriod({ days: prevDays, trend: series.trend, sleep, today: t }) : null;
+    const previous = prevSummary && prevSummary.effectiveDays > 0 ? prevSummary : null;
     const insights = generateInsights({
       summary,
       days,
@@ -87,6 +91,7 @@ export function useProgressData(range: RangeDays) {
       days: all.slice(-range),
       weekDays: all.slice(-14),
       summary,
+      previous,
       insights,
       recap,
       earlierWeeks,

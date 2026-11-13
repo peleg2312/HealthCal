@@ -1238,3 +1238,107 @@ export function planChangeText(
   }
   return `Your budget moved ${dir} ${kcalText(Math.abs(diff))} after a change to your goal, weight or activity settings.`;
 }
+
+// ------------------------------------------------------- period comparison
+
+/**
+ * A neutral sentence comparing a value with the same measure over the previous
+ * equal period, e.g. '12 g more than the previous 30 days'. Differences within
+ * `same` read as 'About the same'. Null when either side is missing.
+ */
+export function compareText(
+  current: number | null | undefined,
+  previous: number | null | undefined,
+  opts: {
+    /** e.g. '30 days'. */
+    period: string;
+    /** Formats the absolute difference with its unit, e.g. (n) => `${Math.round(n)} g`. */
+    format: (n: number) => string;
+    /** Differences up to this count as the same. */
+    same: number;
+    more?: string;
+    less?: string;
+  },
+): string | null {
+  if (current === null || current === undefined || previous === null || previous === undefined) return null;
+  if (!Number.isFinite(current) || !Number.isFinite(previous)) return null;
+  const diff = current - previous;
+  if (Math.abs(diff) <= opts.same) return `About the same as the previous ${opts.period}`;
+  return `${opts.format(Math.abs(diff))} ${diff > 0 ? (opts.more ?? 'more') : (opts.less ?? 'less')} than the previous ${opts.period}`;
+}
+
+// -------------------------------------------------------------- baselines
+
+/** Fewest samples before a same-weekday median is shown. */
+export const MIN_WEEKDAY_SAMPLES = 3;
+/** Fewest complete days before a usual range is shown. */
+export const MIN_RANGE_SAMPLES = 7;
+
+/** Linear-interpolated percentile (0..1) of an ascending list. */
+export function percentile(sorted: readonly number[], p: number): number {
+  if (!sorted.length) return NaN;
+  const i = (sorted.length - 1) * Math.min(1, Math.max(0, p));
+  const lo = Math.floor(i);
+  const hi = Math.ceil(i);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+}
+
+export interface UsualRange {
+  /** 25th percentile. */
+  low: number;
+  median: number;
+  /** 75th percentile. */
+  high: number;
+  samples: number;
+}
+
+/** The middle half of a set of values, or null below `min` samples. */
+export function usualRange(values: readonly number[], min = MIN_RANGE_SAMPLES): UsualRange | null {
+  const v = values.filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
+  if (v.length < min) return null;
+  return { low: percentile(v, 0.25), median: percentile(v, 0.5), high: percentile(v, 0.75), samples: v.length };
+}
+
+/** Usual daily intake: the middle half of complete days in the 28 days before today. */
+export function usualKcalRange(days: readonly InsightDay[], today: ISODate): UsualRange | null {
+  const from = addDays(today, -28);
+  return usualRange(days.filter((d) => d.date >= from && isCompleteDay(d, today)).map((d) => d.eaten.kcal));
+}
+
+/** Usual weight: the middle half of weigh-ins in the 28 days up to today. */
+export function usualWeightRange(weighIns: readonly { date: ISODate; kg: number }[], today: ISODate): UsualRange | null {
+  const from = addDays(today, -27);
+  return usualRange(weighIns.filter((w) => w.date >= from && w.date <= today).map((w) => w.kg));
+}
+
+/**
+ * Median of a value on the same weekday over the previous `weeks` weeks (the
+ * date itself excluded), e.g. a usual Friday. Days where `pick` returns null
+ * are skipped; null below MIN_WEEKDAY_SAMPLES.
+ */
+export function weekdayUsual(
+  days: readonly InsightDay[],
+  date: ISODate,
+  pick: (d: InsightDay) => number | null,
+  weeks = 6,
+): number | null {
+  const byDate = new Map(days.map((d) => [d.date, d]));
+  const values: number[] = [];
+  for (let w = 1; w <= weeks; w++) {
+    const d = byDate.get(addDays(date, -7 * w));
+    const v = d ? pick(d) : null;
+    if (v !== null && Number.isFinite(v)) values.push(v);
+  }
+  if (values.length < MIN_WEEKDAY_SAMPLES) return null;
+  return percentile(values.sort((a, b) => a - b), 0.5);
+}
+
+export type Direction = 'up' | 'down' | 'same';
+
+/** Which way a value moved against the previous period; null when either is missing. */
+export function direction(current: number | null | undefined, previous: number | null | undefined, same: number): Direction | null {
+  if (current === null || current === undefined || previous === null || previous === undefined) return null;
+  if (!Number.isFinite(current) || !Number.isFinite(previous)) return null;
+  const d = current - previous;
+  return Math.abs(d) <= same ? 'same' : d > 0 ? 'up' : 'down';
+}

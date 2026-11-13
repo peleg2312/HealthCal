@@ -7,7 +7,7 @@ import { copyEntries, findPreviousMeal } from '@/features/food/actions';
 import { matchServing } from '@/features/food/helpers';
 import { logFood, logItems } from '@/features/food/log';
 import { addWater } from '@/features/today/StatusRail';
-import { usualFoods, usualLabel, type UsualFood } from '@/features/today/usuals';
+import { usualFoods, usualLabel, type UsualFood } from '@/features/food/usuals';
 import { addDays, formatShortDate, today } from '@/lib/dates';
 import { MEAL_LABEL, mealForTime } from '@/lib/nutrition';
 import { formatNumber, formatVolume } from '@/lib/units';
@@ -51,7 +51,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   // Keys logged while the sheet is open turn into ticks; cleared when it closes.
   const [done, setDone] = useState<string[]>([]);
 
-  const usual = usualFoods(entries, meal, todayDate);
+  const usual = usualFoods(entries, meal, todayDate, { limit: 4 });
   const prev = findPreviousMeal(entries, todayDate, meal, 7);
   const alreadyLogged = entries.some((e) => e.date === todayDate && e.meal === meal);
   const savedMeal = [...saved].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] as SavedMeal | undefined;

@@ -1,13 +1,13 @@
 /**
  * Strength routines: a named list of exercises with a set count each, started
- * in one tap. Kept on this device for now (like the drafts), not synced; a
- * synced collection needs a type and a table owned by the lead.
+ * in one tap. Saved in the synced `routines` collection, so they follow the
+ * user to other devices and into backups.
  */
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { useMemo } from 'react';
 
-import type { ActivityEntry, StrengthExercise } from '@/types';
+import { useStore } from '@/store';
+import { useLive } from '@/store/selectors';
+import type { ActivityEntry, Routine, StrengthExercise } from '@/types';
 
 import { draftKey, newDraft, type StrengthDraft } from './strengthDraft';
 
@@ -16,12 +16,7 @@ export interface RoutineExercise {
   sets: number;
 }
 
-export interface Routine {
-  id: string;
-  name: string;
-  exercises: RoutineExercise[];
-  createdAt: string;
-}
+export type { Routine };
 
 /** A routine card that has not been saved: the automatic "repeat last workout". */
 export interface RoutineTemplate {
@@ -98,41 +93,35 @@ export function uniqueRoutineName(name: string, taken: string[]): string {
   return `${base} ${i}`;
 }
 
-interface RoutineState {
-  routines: Routine[];
-  add: (name: string, exercises: RoutineExercise[]) => Routine;
-  remove: (id: string) => Routine | undefined;
-  /** Put a removed routine back at its old position (undo). */
-  restore: (routine: Routine, index: number) => void;
+const byCreation = (a: Routine, b: Routine) => a.createdAt.localeCompare(b.createdAt);
+
+/** Saved routines, oldest first. */
+export function useRoutineList(): Routine[] {
+  const routines = useLive('routines');
+  return useMemo(() => [...routines].sort(byCreation), [routines]);
 }
 
-export const useRoutines = create<RoutineState>()(
-  persist(
-    (set, get) => ({
-      routines: [],
-      add: (name, exercises) => {
-        const routine: Routine = {
-          id: draftKey(),
-          name: uniqueRoutineName(name, get().routines.map((r) => r.name)),
-          exercises,
-          createdAt: new Date().toISOString(),
-        };
-        set((s) => ({ routines: [...s.routines, routine] }));
-        return routine;
-      },
-      remove: (id) => {
-        const found = get().routines.find((r) => r.id === id);
-        set((s) => ({ routines: s.routines.filter((r) => r.id !== id) }));
-        return found;
-      },
-      restore: (routine, index) =>
-        set((s) => {
-          if (s.routines.some((r) => r.id === routine.id)) return {};
-          const next = [...s.routines];
-          next.splice(Math.min(index, next.length), 0, routine);
-          return { routines: next };
-        }),
-    }),
-    { name: 'healthcal-strength-routines', version: 1, storage: createJSONStorage(() => AsyncStorage) },
-  ),
-);
+export function listRoutines(): Routine[] {
+  return Object.values(useStore.getState().routines)
+    .filter((r) => !r.deleted)
+    .sort(byCreation);
+}
+
+export function addRoutine(name: string, exercises: RoutineExercise[]): Routine {
+  return useStore.getState().upsert('routines', {
+    name: uniqueRoutineName(name, listRoutines().map((r) => r.name)),
+    exercises,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+/** Remove a routine (it can be brought back with `restoreRoutine`). Returns it, or undefined if unknown. */
+export function removeRoutine(id: string): Routine | undefined {
+  const found = listRoutines().find((r) => r.id === id);
+  if (found) useStore.getState().remove('routines', id);
+  return found;
+}
+
+export function restoreRoutine(id: string): void {
+  useStore.getState().restore('routines', id);
+}

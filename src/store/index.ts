@@ -18,6 +18,7 @@ import type {
   Food,
   FoodEntry,
   Profile,
+  Routine,
   SavedMeal,
   Settings,
   SleepEntry,
@@ -37,6 +38,7 @@ export interface CollectionTypes {
   fasting: FastingSession;
   favorites: FavoriteFood;
   days: DaySnapshot;
+  routines: Routine;
 }
 
 export const COLLECTIONS: Collection[] = [
@@ -50,6 +52,7 @@ export const COLLECTIONS: Collection[] = [
   'fasting',
   'favorites',
   'days',
+  'routines',
 ];
 
 /** Collections that hold at most one live record per calendar day. */
@@ -136,11 +139,11 @@ interface StoreActions {
 export type Store = StoreState & StoreActions;
 
 function emptyCollections(): Collections {
-  return { foodEntries: {}, customFoods: {}, savedMeals: {}, activities: {}, water: {}, weights: {}, sleep: {}, fasting: {}, favorites: {}, days: {} };
+  return { foodEntries: {}, customFoods: {}, savedMeals: {}, activities: {}, water: {}, weights: {}, sleep: {}, fasting: {}, favorites: {}, days: {}, routines: {} };
 }
 
 export function emptyDirty(): Dirty {
-  return { foodEntries: {}, customFoods: {}, savedMeals: {}, activities: {}, water: {}, weights: {}, sleep: {}, fasting: {}, favorites: {}, days: {} };
+  return { foodEntries: {}, customFoods: {}, savedMeals: {}, activities: {}, water: {}, weights: {}, sleep: {}, fasting: {}, favorites: {}, days: {}, routines: {} };
 }
 
 export function initialState(): StoreState {

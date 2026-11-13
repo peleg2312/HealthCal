@@ -7,14 +7,14 @@ import { useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import { IconButton, PressableScale, Text, toast } from '@/ui';
 
-import { lastWorkoutTemplate, routineSetCount, routineSummary, useRoutines, type RoutineTemplate } from './routines';
+import { lastWorkoutTemplate, removeRoutine, restoreRoutine, routineSetCount, routineSummary, useRoutineList, type RoutineTemplate } from './routines';
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 /** The routines to offer: "repeat last workout" first, then the saved ones. */
 export function useRoutineTemplates(): { template: RoutineTemplate; id?: string }[] {
   const activities = useLive('activities');
-  const routines = useRoutines((s) => s.routines);
+  const routines = useRoutineList();
   const last = lastWorkoutTemplate(activities);
   return [...(last ? [{ template: last }] : []), ...routines.map((r) => ({ template: r as RoutineTemplate, id: r.id }))];
 }
@@ -41,11 +41,9 @@ function RoutineCard({ template, id, onStart, testID }: { template: RoutineTempl
   const title = id ? template.name : `${template.name}${template.date ? `, ${formatShortDate(template.date)}` : ''}`;
   const remove = () => {
     if (!id) return;
-    const store = useRoutines.getState();
-    const index = store.routines.findIndex((r) => r.id === id);
-    const removed = store.remove(id);
+    const removed = removeRoutine(id);
     if (!removed) return;
-    toast(`Removed ${removed.name}`, { label: 'Undo', onPress: () => useRoutines.getState().restore(removed, index) });
+    toast(`Removed ${removed.name}`, { label: 'Undo', onPress: () => restoreRoutine(removed.id) });
   };
   return (
     <View

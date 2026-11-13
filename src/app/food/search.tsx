@@ -66,8 +66,8 @@ export default function FoodSearchScreen() {
   }, [favoriteRecords, favoriteIds, customById]);
   const usuals = useMemo(
     () =>
-      usualFoods(entries, meal, todayDate, { limit: 12 })
-        .map((u) => resolveFood(u.food, customById))
+      usualFoods(entries, meal, todayDate, { limit: 12, withFood: true })
+        .map((u) => (u.food ? resolveFood(u.food, customById) : null))
         .filter((f): f is Food => !!f),
     [entries, meal, todayDate, customById],
   );

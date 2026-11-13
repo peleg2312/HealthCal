@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { ActivityEntry } from '@/types';
 
-import { draftFromRoutine, lastWorkoutTemplate, routineExercises, routineSetCount, startRoutineDraft, uniqueRoutineName, useRoutines } from './routines';
+import { useStore } from '@/store';
+
+import { addRoutine, draftFromRoutine, lastWorkoutTemplate, listRoutines, removeRoutine, restoreRoutine, routineExercises, routineSetCount, startRoutineDraft, uniqueRoutineName } from './routines';
 import { draftHasContent, newDraft } from './strengthDraft';
 
 const lift = (id: string, date: string, loggedAt: string, names: string[], extra: Partial<ActivityEntry> = {}) =>
@@ -70,18 +72,23 @@ describe('starting a routine', () => {
 });
 
 describe('routine store', () => {
-  beforeEach(() => useRoutines.setState({ routines: [] }));
-  it('names routines uniquely and undoes a removal in place', () => {
+  beforeEach(() => useStore.getState().resetAll());
+  it('names routines uniquely, keeps them in the synced store, and undoes a removal', async () => {
     expect(uniqueRoutineName('Push day', ['push day', 'Push day 2'])).toBe('Push day 3');
-    const s = useRoutines.getState();
-    const a = s.add('Push day', [{ name: 'Bench press', sets: 3 }]);
-    s.add('Push day', [{ name: 'Dip', sets: 3 }]);
-    s.add('Legs', [{ name: 'Back squat', sets: 5 }]);
-    expect(useRoutines.getState().routines.map((r) => r.name)).toEqual(['Push day', 'Push day 2', 'Legs']);
-    const removed = useRoutines.getState().remove(a.id)!;
-    expect(useRoutines.getState().routines).toHaveLength(2);
-    useRoutines.getState().restore(removed, 0);
-    useRoutines.getState().restore(removed, 0);
-    expect(useRoutines.getState().routines.map((r) => r.name)).toEqual(['Push day', 'Push day 2', 'Legs']);
+    const a = addRoutine('Push day', [{ name: 'Bench press', sets: 3 }]);
+    await new Promise((r) => setTimeout(r, 2));
+    addRoutine('Push day', [{ name: 'Dip', sets: 3 }]);
+    await new Promise((r) => setTimeout(r, 2));
+    addRoutine('Legs', [{ name: 'Back squat', sets: 5 }]);
+    expect(listRoutines().map((r) => r.name)).toEqual(['Push day', 'Push day 2', 'Legs']);
+    // Saved in the synced collection and queued for upload.
+    expect(useStore.getState().dirty.routines[a.id]).toBe(true);
+
+    const removed = removeRoutine(a.id)!;
+    expect(listRoutines()).toHaveLength(2);
+    restoreRoutine(removed.id);
+    restoreRoutine(removed.id);
+    expect(listRoutines().map((r) => r.name)).toEqual(['Push day', 'Push day 2', 'Legs']);
+    expect(removeRoutine('unknown')).toBeUndefined();
   });
 });

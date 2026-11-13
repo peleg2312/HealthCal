@@ -25,7 +25,9 @@ export function ConsistencyCard({ consistency, weekDays, today }: { consistency:
       title="Consistency"
       subtitle={`${consistency.totalDaysLogged} ${consistency.totalDaysLogged === 1 ? 'day' : 'days'} logged in total`}
       color={colors.primary}
-      icon={<CalendarDays size={18} color={colors.primary} />}>
+      icon={<CalendarDays size={18} color={colors.primary} />}
+      link="/consistency"
+      linkLabel="Calendar">
       <View style={{ flexDirection: 'row', gap: spacing.lg }}>
         <View style={{ flex: 1 }}>
           <BigStat value={`${streak}`} unit={streak === 1 ? 'day' : 'days'} label="Current streak" color={colors.primary} />
@@ -64,8 +66,8 @@ export function ConsistencyCard({ consistency, weekDays, today }: { consistency:
       </View>
       <Note>
         {streak === 0
-          ? 'Log a meal today to start a streak. A single missed day never breaks it.'
-          : 'A single missed day never breaks your streak, so a busy day costs nothing.'}
+          ? 'Log a meal today to start a streak. A single missed day never breaks it; only two in a row do.'
+          : 'A single missed day never breaks your streak, however often it happens; only two missed days in a row do.'}
       </Note>
     </SectionCard>
   );

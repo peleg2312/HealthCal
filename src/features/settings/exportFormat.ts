@@ -126,7 +126,7 @@ export interface BackupSource {
   recentActivityIds: string[];
 }
 
-export const BACKUP_COLLECTIONS: Collection[] = ['foodEntries', 'customFoods', 'savedMeals', 'activities', 'water', 'weights', 'sleep', 'fasting', 'favorites', 'days'];
+export const BACKUP_COLLECTIONS: Collection[] = ['foodEntries', 'customFoods', 'savedMeals', 'activities', 'water', 'weights', 'sleep', 'fasting', 'favorites', 'days', 'routines'];
 
 /** Everything the user created, live records only. */
 export function buildBackup(src: BackupSource, now: Date = new Date()): Backup {
@@ -224,7 +224,7 @@ function isLoggedItem(x: unknown): boolean {
 const VALIDATORS: Record<Collection, (r: Obj) => boolean> = {
   foodEntries: (r) => isDayKey(r.date) && MEALS.includes(r.meal as string) && isLoggedItem(r),
   customFoods: (r) => isFood(r),
-  savedMeals: (r) => isStr(r.name) && Array.isArray(r.items) && r.items.every(isLoggedItem),
+  savedMeals: (r) => isStr(r.name) && Array.isArray(r.items) && r.items.every(isLoggedItem) && optNum(r.servings),
   activities: (r) => isDayKey(r.date) && isStr(r.name) && isNonNeg(r.durationMin) && isNonNeg(r.kcalNet) && isNonNeg(r.kcalGross) && optNum(r.met) && optNum(r.distanceKm),
   water: (r) => isDayKey(r.date) && isNum(r.ml) && r.ml > 0 && r.ml <= 10000,
   weights: (r) => isDayKey(r.date) && isNum(r.kg) && r.kg > 0 && r.kg < 700 && optNum(r.bodyFatPct),
@@ -232,6 +232,12 @@ const VALIDATORS: Record<Collection, (r: Obj) => boolean> = {
   fasting: (r) => isTime(r.start) && (r.end === undefined || r.end === null || isTime(r.end)) && isNum(r.targetHours),
   favorites: (r) => isFood(r.food),
   days: (r) => isDayKey(r.date) && isNonNeg(r.target) && isNonNeg(r.tdee) && isNum(r.weightKg),
+  routines: (r) =>
+    isStr(r.name) &&
+    r.name.length > 0 &&
+    isStr(r.createdAt) &&
+    Array.isArray(r.exercises) &&
+    r.exercises.every((e) => isObj(e) && isStr(e.name) && isNum(e.sets) && e.sets >= 0),
 };
 
 export function isValidRecord(collection: Collection, x: unknown): boolean {

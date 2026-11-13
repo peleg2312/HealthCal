@@ -1,10 +1,11 @@
--- Two more synced collections:
+-- Three more synced collections:
 --   favorites: starred foods, so they survive sign-out and appear on every device
 --   days:      the targets each day had at the time, so history is not rewritten
 --              when a goal changes
+--   routines:  saved strength routines
 alter table public.records drop constraint if exists records_collection_check;
 alter table public.records add constraint records_collection_check check (
-  collection in ('foodEntries', 'customFoods', 'savedMeals', 'activities', 'water', 'weights', 'sleep', 'fasting', 'favorites', 'days')
+  collection in ('foodEntries', 'customFoods', 'savedMeals', 'activities', 'water', 'weights', 'sleep', 'fasting', 'favorites', 'days', 'routines')
 );
 
 -- ---------------------------------------------------------------- AI quota

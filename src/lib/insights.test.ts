@@ -11,6 +11,13 @@ import {
   weekendPattern,
   guidelineMinutes,
   isCompleteDay,
+  compareText,
+  direction,
+  percentile,
+  usualKcalRange,
+  usualRange,
+  usualWeightRange,
+  weekdayUsual,
   budgetBalanceText,
   planChangeText,
   recapTiles,
@@ -523,5 +530,69 @@ describe('isCompleteDay (shared rule with the Energy card)', () => {
     for (const [kcal, budget] of [[700, 1200], [900, 2400], [1300, 2400], [1200, 2400], [790, 1000]]) {
       expect(isCompleteDay(day('2026-11-10', { kcal, budget }), TODAY)).toBe(sharedComplete(kcal, budget));
     }
+  });
+});
+
+describe('compareText', () => {
+  const g = { period: '30 days', format: (n: number) => `${Math.round(n)} g`, same: 2 };
+  it('compares with the previous period in neutral words', () => {
+    expect(compareText(130, 118, g)).toBe('12 g more than the previous 30 days');
+    expect(compareText(110, 118, g)).toBe('8 g less than the previous 30 days');
+    expect(compareText(119, 118, g)).toBe('About the same as the previous 30 days');
+    expect(compareText(7.5, 6.9, { period: '7 days', format: (n) => `${n.toFixed(1)} h`, same: 0.1, more: 'longer', less: 'shorter' })).toBe(
+      '0.6 h longer than the previous 7 days',
+    );
+  });
+  it('says nothing without both sides', () => {
+    expect(compareText(130, null, g)).toBeNull();
+    expect(compareText(undefined, 118, g)).toBeNull();
+    expect(compareText(NaN, 118, g)).toBeNull();
+  });
+});
+
+describe('baselines', () => {
+  it('takes percentiles by interpolation', () => {
+    expect(percentile([1, 2, 3, 4, 5], 0.5)).toBe(3);
+    expect(percentile([1, 2, 3, 4], 0.25)).toBeCloseTo(1.75);
+  });
+
+  it('needs at least 7 samples for a usual range', () => {
+    expect(usualRange([1, 2, 3, 4, 5, 6])).toBeNull();
+    expect(usualRange([1, 2, 3, 4, 5, 6, 7])).toEqual({ low: 2.5, median: 4, high: 5.5, samples: 7 });
+  });
+
+  it('builds the usual intake from complete days in the last 28 only', () => {
+    const days = run(40, (d, i) => (i === 39 ? day(d, { kcal: 9000 }) : i < 12 ? day(d, { kcal: 5000 }) : i % 5 === 0 ? day(d, { kcal: 300 }) : day(d, { kcal: 1800 + (i % 3) * 100 })));
+    const r = usualKcalRange(days, TODAY)!;
+    // Today (9,000), days older than 28 (5,000) and partial days (300) are all left out.
+    expect(r.low).toBeGreaterThanOrEqual(1800);
+    expect(r.high).toBeLessThanOrEqual(2000);
+    expect(usualKcalRange(days.slice(-8), TODAY)).toBeNull();
+  });
+
+  it('takes the usual weight from weigh-ins in the last 28 days', () => {
+    const w = Array.from({ length: 10 }, (_, i) => ({ date: addDays(TODAY, -i * 3), kg: 80 + i * 0.1 }));
+    const r = usualWeightRange(w, TODAY)!;
+    expect(r.samples).toBe(10);
+    expect(r.median).toBeCloseTo(80.45);
+    expect(usualWeightRange(w.slice(0, 3), TODAY)).toBeNull();
+  });
+
+  it('uses the same weekday over the previous six weeks, with at least three samples', () => {
+    const days = run(50, (d, i) => day(d, { kcal: 1500 + i }));
+    const pick = (d: InsightDay) => (d.entries.length ? d.eaten.kcal : null);
+    // Fridays before Nov 13: i = 42, 35, 28, 21, 14, 7 → 1,542 .. 1,507, median 1,524.5.
+    expect(weekdayUsual(days, TODAY, pick)).toBeCloseTo(1524.5);
+    const sparse = days.map((d, i) => (i === 42 || i === 35 || i === 28 ? d : { ...d, entries: [] }));
+    expect(weekdayUsual(sparse, TODAY, pick)).toBe(1535);
+    const tooFew = days.map((d, i) => (i === 42 || i === 35 ? d : { ...d, entries: [] }));
+    expect(weekdayUsual(tooFew, TODAY, pick)).toBeNull();
+  });
+
+  it('gives a direction against the previous period', () => {
+    expect(direction(10, 5, 1)).toBe('up');
+    expect(direction(5, 10, 1)).toBe('down');
+    expect(direction(5.5, 5, 1)).toBe('same');
+    expect(direction(5, null, 1)).toBeNull();
   });
 });

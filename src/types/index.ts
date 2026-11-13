@@ -145,6 +145,8 @@ export interface FavoriteFood extends SyncedRecord {
 export interface SavedMeal extends SyncedRecord {
   name: string;
   items: SavedMealItem[];
+  /** How many servings the items make together. Logging one serving adds the total divided by this. Default 1. */
+  servings?: number;
 }
 
 // -------------------------------------------------------------- activity
@@ -202,6 +204,9 @@ export interface ActivityEntry extends SyncedRecord {
   kcalNet: number;
   /** Total calories during the session, resting included. */
   kcalGross: number;
+  /** Body weight and daily baseline the calories were calculated with, so a later edit does not use today's. */
+  weightKg?: number;
+  baselineKcalPerDay?: number;
   distanceKm?: number;
   notes?: string;
   exercises?: StrengthExercise[];
@@ -234,6 +239,13 @@ export interface SleepEntry extends SyncedRecord {
   date: ISODate;
   hours: number;
   quality: 1 | 2 | 3 | 4 | 5;
+}
+
+/** A saved strength routine: a named list of exercises with a set count each, started in one tap. */
+export interface Routine extends SyncedRecord {
+  name: string;
+  exercises: { name: string; sets: number }[];
+  createdAt: ISODateTime;
 }
 
 /**
@@ -296,7 +308,8 @@ export type Collection =
   | 'sleep'
   | 'fasting'
   | 'favorites'
-  | 'days';
+  | 'days'
+  | 'routines';
 
 // --------------------------------------------------------- AI food scan
 

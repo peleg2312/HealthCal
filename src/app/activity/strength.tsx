@@ -8,7 +8,7 @@ import { basisFromEntry, estimateSession } from '@/features/activity/build';
 import { DateStepper } from '@/features/activity/components';
 import { EXERCISE_GROUPS, searchExercises } from '@/features/activity/exercises';
 import { RoutineCards, useRoutineTemplates } from '@/features/activity/RoutineCards';
-import { draftFromRoutine, routineExercises, useRoutines } from '@/features/activity/routines';
+import { addRoutine, draftFromRoutine, routineExercises } from '@/features/activity/routines';
 import { deleteActivity, leaveFlow, saveActivity } from '@/features/activity/session';
 import {
   draftDurationMin,
@@ -752,7 +752,7 @@ function SaveRoutineSheet({ visible, onClose, exercises }: { visible: boolean; o
   };
   const save = () => {
     if (!list.length || !value.trim()) return;
-    const r = useRoutines.getState().add(value, list);
+    const r = addRoutine(value, list);
     haptic.success();
     toast(`Saved ${r.name} as a routine`);
     close();

@@ -72,6 +72,8 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   await tap('onb-next');
   await fill('onb-target-input', '62');
   await tap('onb-next');
+  // "Your day": reminders are offered once; the first-day flow declines them.
+  await tap('onb-reminders-skip');
   await page.waitForTimeout(600);
   await shot('e2e-plan');
   const planKcal = num(await text('plan-kcal'));

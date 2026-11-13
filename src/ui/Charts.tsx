@@ -69,6 +69,7 @@ export function BarChart({
   formatValue,
   scrub,
   marks,
+  maxValue,
   testID,
 }: {
   data: BarDatum[];
@@ -82,6 +83,8 @@ export function BarChart({
   scrub?: boolean;
   /** Small marks drawn above bars, e.g. a check on days within the band. */
   marks?: (boolean | undefined)[];
+  /** Fixed top of the scale (e.g. 7 for days a week); taller bars and lines still widen it. */
+  maxValue?: number;
   testID?: string;
 }) {
   const { colors } = useTheme();
@@ -90,7 +93,9 @@ export function BarChart({
   const labelH = 20;
   const topPad = 18;
   const chartH = height - labelH - topPad;
-  const max = Math.max(goal ?? 0, band?.to ?? 0, ...data.map((d) => d.value), 1) * 1.08;
+  const max = maxValue && maxValue >= Math.max(goal ?? 0, band?.to ?? 0, ...data.map((d) => d.value))
+    ? maxValue * 1.08
+    : Math.max(goal ?? 0, band?.to ?? 0, ...data.map((d) => d.value), 1) * 1.08;
   const slot = data.length ? width / data.length : 0;
   const barW = Math.min(28, slot * 0.56);
   const y = (v: number) => topPad + chartH - (Math.min(v, max) / max) * chartH;
