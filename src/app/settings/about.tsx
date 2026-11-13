@@ -19,6 +19,7 @@ import { View } from 'react-native';
 import { IconTile } from '@/features/settings/components';
 import { ACTIVITY_FACTORS, ACTIVITY_LABELS, calorieFloor } from '@/lib/energy';
 import { formatNumber } from '@/lib/units';
+import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
 import { useEnergyModel } from '@/store/selectors';
 import { useTheme } from '@/theme';
@@ -83,7 +84,7 @@ function useMine() {
 }
 
 function MyResting() {
-  const m = useEnergyModel();
+  const m = useEnergyModel(useToday());
   return (
     <Yours>
       Yours: {formatNumber(Math.round(m.bmr))} kcal at rest ({m.bmrMethod === 'katch-mcardle' ? 'lean-mass equation' : 'Mifflin-St Jeor'}), about{' '}
@@ -93,7 +94,7 @@ function MyResting() {
 }
 
 function MyTarget() {
-  const m = useEnergyModel();
+  const m = useEnergyModel(useToday());
   return (
     <Yours>
       Yours: {formatNumber(m.target.target)} kcal a day{m.target.source === 'override' ? ', set by you' : ''}

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { diffDays, today } from '@/lib/dates';
+import { diffDays } from '@/lib/dates';
 import {
   computeMilestones,
   generateInsights,
@@ -8,6 +8,7 @@ import {
   weeklyRecap,
   type InsightDay,
 } from '@/lib/insights';
+import { useToday } from '@/store/clock';
 import { useConsistency, useDays, useEnergyModel, useLive, useProfile, useWeightSeries } from '@/store/selectors';
 import type { ISODate } from '@/types';
 
@@ -19,7 +20,7 @@ const MAX_HISTORY = 400;
 /** Everything the Progress tab shows, derived once per data change. */
 export function useProgressData(range: RangeDays) {
   const profile = useProfile();
-  const t = today();
+  const t = useToday();
   const food = useLive('foodEntries');
   const activities = useLive('activities');
   const water = useLive('water');
@@ -39,7 +40,7 @@ export function useProgressData(range: RangeDays) {
   const all = useDays(Math.max(range, historyDays, 14), t);
   const model = useEnergyModel(t);
   const series = useWeightSeries();
-  const consistency = useConsistency();
+  const consistency = useConsistency(t);
 
   return useMemo(() => {
     const days: InsightDay[] = all.slice(-range);

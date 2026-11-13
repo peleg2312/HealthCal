@@ -5,6 +5,7 @@ import { View } from 'react-native';
 
 import { addDays, formatDayLabel, fromISODate, startOfWeek, today } from '@/lib/dates';
 import { MEAL_LABEL, entriesTotal } from '@/lib/nutrition';
+import { useToday } from '@/store/clock';
 import type { DaySummary } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
@@ -21,7 +22,7 @@ const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 export function WeekStrip({ date, logged, onSelect }: { date: ISODate; logged: Set<ISODate>; onSelect: (d: ISODate) => void }) {
   const { colors, radius } = useTheme();
   const start = startOfWeek(date);
-  const t = today();
+  const t = useToday();
   return (
     <View style={{ flexDirection: 'row', gap: 6 }} accessibilityRole="tablist">
       {LETTERS.map((letter, i) => {

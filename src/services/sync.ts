@@ -82,6 +82,19 @@ const laterOf = (a: string | null, b: string): string => (a && Date.parse(a) > D
 
 async function pull(userId: string): Promise<void> {
   if (!supabase) return;
+  // The profile comes first: if the connection drops part-way through a long
+  // history, the app still knows this is an existing account and not a new user.
+  const { data: prof, error: profErr } = await supabase.from('profiles').select('data,settings').eq('user_id', userId).maybeSingle();
+  if (profErr) throw new Error(profErr.message);
+  if (prof) {
+    useStore.getState().mergeRemote({
+      records: [],
+      profile: (prof.data as Profile | null) ?? null,
+      settings: (prof.settings as Settings | null) ?? null,
+      pulledAt: useStore.getState().lastPulledAt ?? '1970-01-01T00:00:00Z',
+    });
+  }
+
   const stored = useStore.getState().lastPulledAt;
   let cursor = stored ? new Date(Date.parse(stored) - PULL_OVERLAP_MS).toISOString() : '1970-01-01T00:00:00Z';
   // Page through everything newer than the cursor, oldest first.
@@ -113,17 +126,6 @@ async function pull(userId: string): Promise<void> {
     });
     if (rows.length < PULL_PAGE) break;
   }
-
-  const { data: prof, error: profErr } = await supabase.from('profiles').select('data,settings').eq('user_id', userId).maybeSingle();
-  if (profErr) throw new Error(profErr.message);
-  if (prof) {
-    useStore.getState().mergeRemote({
-      records: [],
-      profile: (prof.data as Profile | null) ?? null,
-      settings: (prof.settings as Settings | null) ?? null,
-      pulledAt: laterOf(useStore.getState().lastPulledAt, cursor),
-    });
-  }
 }
 
 let running: Promise<void> | null = null;
@@ -137,6 +139,7 @@ export function syncNow(): Promise<void> {
     return running;
   }
   running = (async () => {
+    let rounds = 0;
     try {
       do {
         rerun = false;
@@ -147,6 +150,10 @@ export function syncNow(): Promise<void> {
         await push(userId);
         await pull(userId);
         useSyncState.setState({ status: 'idle', error: null, lastRunAt: new Date().toISOString() });
+        // Something edited while this run was in flight (an Undo, a second change to the
+        // same record) is still pending: go round again instead of waiting for the next trigger.
+        if (pendingChanges(useStore.getState()) > 0 && rounds < 3) rerun = true;
+        rounds += 1;
       } while (rerun);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
@@ -163,14 +170,16 @@ let debounce: ReturnType<typeof setTimeout> | null = null;
 
 /** Start watching the store and push changes a few seconds after the user stops editing. */
 export function startAutoSync(): () => void {
-  let lastPending = pendingChanges(useStore.getState());
+  let last = useStore.getState();
   const unsub = useStore.subscribe((state) => {
-    const pending = pendingChanges(state);
-    if (pending > 0 && pending !== lastPending) {
+    // Compare what is pending by identity: editing the same record twice keeps the
+    // count at one but still needs another upload.
+    const changed = state.dirty !== last.dirty || (state.profileDirty && state.profile !== last.profile) || (state.settingsDirty && state.settings !== last.settings);
+    last = state;
+    if (changed && pendingChanges(state) > 0) {
       if (debounce) clearTimeout(debounce);
       debounce = setTimeout(() => void syncNow(), 2500);
     }
-    lastPending = pending;
   });
   return () => {
     unsub();
@@ -183,18 +192,19 @@ export function startAutoSync(): () => void {
  *  - Data created without an account is adopted and uploaded.
  *  - Data that belongs to a different account is cleared before pulling.
  */
-export async function attachUser(userId: string): Promise<void> {
+export async function attachUser(userId: string): Promise<'ok' | 'failed'> {
   const s = useStore.getState();
-  if (s.ownerId === userId) {
-    await syncNow();
-    return;
-  }
-  if (s.ownerId === null) {
-    s.setOwner(userId);
-    s.markAllDirty();
-  } else {
-    s.resetAll();
-    useStore.getState().setOwner(userId);
+  if (s.ownerId !== userId) {
+    if (s.ownerId === null) {
+      s.setOwner(userId);
+      s.markAllDirty();
+    } else {
+      s.resetAll();
+      useStore.getState().setOwner(userId);
+    }
   }
   await syncNow();
+  useStore.getState().rebuildRecents();
+  const status = useSyncState.getState().status;
+  return status === 'error' || status === 'offline' ? 'failed' : 'ok';
 }

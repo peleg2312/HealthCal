@@ -19,9 +19,10 @@ export function parseMeal(v: string | string[] | undefined): MealType {
   return MEAL_IDS.includes(s as MealType) ? (s as MealType) : mealForTime();
 }
 
-export function parseDate(v: string | string[] | undefined): ISODate {
+/** The date in a route parameter, or `fallback` (pass `useToday()` from a component) when it is absent or malformed. */
+export function parseDate(v: string | string[] | undefined, fallback: ISODate = today()): ISODate {
   const s = first(v);
-  return s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : today();
+  return s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : fallback;
 }
 
 export function param(v: string | string[] | undefined): string | undefined {

@@ -125,7 +125,7 @@ export interface BackupSource {
   recentActivityIds: string[];
 }
 
-export const BACKUP_COLLECTIONS: Collection[] = ['foodEntries', 'customFoods', 'savedMeals', 'activities', 'water', 'weights', 'sleep', 'fasting'];
+export const BACKUP_COLLECTIONS: Collection[] = ['foodEntries', 'customFoods', 'savedMeals', 'activities', 'water', 'weights', 'sleep', 'fasting', 'favorites'];
 
 /** Everything the user created, live records only. */
 export function buildBackup(src: BackupSource, now: Date = new Date()): Backup {

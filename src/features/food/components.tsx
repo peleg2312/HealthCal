@@ -2,6 +2,7 @@ import { CalendarDays, Check, ChevronLeft, ChevronRight, Plus } from 'lucide-rea
 import React, { useEffect, useState } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { useToday } from '@/store/clock';
 import { addDays, formatDayLabel, formatLongDate, today } from '@/lib/dates';
 import { MEALS } from '@/lib/nutrition';
 import { useTheme } from '@/theme';
@@ -84,7 +85,7 @@ export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: 
 /** Previous / next day with the date in the middle; tap the label to return to today. */
 export function DayStepper({ value, onChange, testIDPrefix = 'day' }: { value: ISODate; onChange: (d: ISODate) => void; testIDPrefix?: string }) {
   const { colors, radius } = useTheme();
-  const isToday = value === today();
+  const isToday = value === useToday();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: 4 }}>
       <IconButton testID={`${testIDPrefix}-prev`} accessibilityLabel="Previous day" tone="clear" size={44} onPress={() => onChange(addDays(value, -1))}>

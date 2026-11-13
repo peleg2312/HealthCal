@@ -4,7 +4,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Platform, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import { addDays, formatDayLabel, formatLongDate, today } from '@/lib/dates';
+import { addDays, formatDayLabel, formatLongDate } from '@/lib/dates';
+import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
 import { useTheme } from '@/theme';
 import type { ISODate } from '@/types';
@@ -36,7 +37,7 @@ export function useReduceMotion(): boolean {
 /** Previous / next day picker that never goes past today. */
 export function DayStepper({ date, onChange, testID }: { date: ISODate; onChange: (d: ISODate) => void; testID: string }) {
   const { colors, radius } = useTheme();
-  const atToday = date >= today();
+  const atToday = date >= useToday();
   return (
     <View
       style={{

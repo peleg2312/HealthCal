@@ -8,8 +8,9 @@ import { ActivityTile, SessionRow } from '@/features/activity/components';
 import { summariseWeek, WHO_WEEKLY_MINUTES } from '@/features/activity/build';
 import { deleteActivity, openSession } from '@/features/activity/session';
 import { draftHasContent, useStrengthDrafts } from '@/features/activity/strengthDraft';
-import { addDays, formatDayLabel, formatDuration, formatShortDate, startOfWeek, today, weekdayShort } from '@/lib/dates';
+import { addDays, formatDayLabel, formatDuration, formatShortDate, startOfWeek, weekdayShort } from '@/lib/dates';
 import { formatNumber } from '@/lib/units';
+import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
 import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
@@ -26,7 +27,7 @@ export default function TrainScreen() {
   const draft = useStrengthDrafts((s) => s.drafts.new);
   const [pages, setPages] = useState(1);
 
-  const t = today();
+  const t = useToday();
   const weekStart = startOfWeek(t);
   const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
   const week = useMemo(() => summariseWeek(activities, weekDates), [activities, weekDates]);

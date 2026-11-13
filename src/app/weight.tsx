@@ -2,12 +2,13 @@ import { Info, Plus } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
-import { formatDayLabel, formatShortDate, today } from '@/lib/dates';
+import { formatDayLabel, formatShortDate } from '@/lib/dates';
 import { isPlausibleBodyFat, projectedGoalDate } from '@/lib/energy';
 import { formatWeight, weightToKg, weightUnit, weightValue } from '@/lib/units';
 import { deleteWeightRecord, saveWeightRecord } from '@/features/trackers/actions';
 import { DayStepper, Figure, Note, RequireProfile } from '@/features/trackers/components';
 import { findByDate, weightChartData, weightStats, type WeightRange } from '@/features/trackers/helpers';
+import { useToday } from '@/store/clock';
 import { useProfile, useWeightSeries } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ISODate, UnitSystem, WeightEntry } from '@/types';
@@ -54,7 +55,7 @@ function WeightScreen() {
   const [range, setRange] = useState<WeightRange>('3m');
   const [sheetDate, setSheetDate] = useState<ISODate | null>(null);
   const [showAll, setShowAll] = useState(false);
-  const end = today();
+  const end = useToday();
   const unit = weightUnit(units);
 
   const empty = series.entries.length === 0;
@@ -146,7 +147,7 @@ function WeightScreen() {
               <Figure
                 testID="weight-projected"
                 value={projected ? `${MONTHS[projected.getMonth()]} ${projected.getDate()}` : '–'}
-                unit={projected && projected.getFullYear() !== new Date().getFullYear() ? String(projected.getFullYear()) : undefined}
+                unit={projected && String(projected.getFullYear()) !== end.slice(0, 4) ? String(projected.getFullYear()) : undefined}
                 label={projected ? 'Projected at this rate' : target ? 'No projection at this rate' : 'Set a target to project'}
               />
             </View>

@@ -3,10 +3,11 @@ import { Check, GlassWater, Info, Trash2 } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Animated, View } from 'react-native';
 
-import { today, weekdayShort } from '@/lib/dates';
+import { weekdayShort } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
 import { BEVERAGE_LABELS, baseWaterGoalMl, effectiveMl, exerciseWaterMl, glassesLeft, HYDRATION_FACTOR } from '@/lib/hydration';
 import { formatVolume, formatWeight, volumeToMl, volumeUnit, volumeValue } from '@/lib/units';
+import { useToday } from '@/store/clock';
 import { DEFAULT_SETTINGS, useStore } from '@/store';
 import { useDay, useDays, useProfile } from '@/store/selectors';
 import { Figure, Note, RequireProfile, splitUnit, Tile, WaterWave } from '@/features/trackers/components';
@@ -53,7 +54,7 @@ function WaterScreen() {
   const profile = useProfile();
   const settings = useStore((s) => s.settings);
   const units = profile.units;
-  const date = today();
+  const date = useToday();
   const day = useDay(date);
   const week = useDays(7, date);
   const [beverage, setBeverage] = useState<Beverage>('water');

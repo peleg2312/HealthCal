@@ -12,6 +12,7 @@ import { formatDayLabel } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
 import { MEAL_LABEL, entriesTotal, sumNutrients } from '@/lib/nutrition';
 import { searchLocal, searchOnlineWithStatus } from '@/services/foodSearch';
+import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
@@ -32,7 +33,7 @@ function resolveFood(f: Food, customById: Map<string, Food>): Food | null {
 export default function FoodSearchScreen() {
   const { colors, spacing } = useTheme();
   const params = useLocalSearchParams<{ meal?: string; date?: string }>();
-  const date = parseDate(params.date);
+  const date = parseDate(params.date, useToday());
   const [meal, setMeal] = useState<MealType>(() => parseMeal(params.meal));
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState<Tab>('recent');

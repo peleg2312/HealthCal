@@ -163,14 +163,15 @@ export function useProfile(): Profile {
   return p;
 }
 
-export function useLive<K extends 'foodEntries' | 'activities' | 'water' | 'weights' | 'sleep' | 'fasting' | 'savedMeals' | 'customFoods'>(
+export function useLive<K extends 'foodEntries' | 'activities' | 'water' | 'weights' | 'sleep' | 'fasting' | 'savedMeals' | 'customFoods' | 'favorites'>(
   collection: K,
 ): Store[K][string][] {
   const map = useStore((s) => s[collection]);
   return useMemo(() => live(map as Record<string, SyncedRecord>) as Store[K][string][], [map]);
 }
 
-export function useEnergyModel(date: ISODate = today()): EnergyModel {
+/** `date` is the day the model is for; pass `useToday()` so it rolls over at midnight. */
+export function useEnergyModel(date: ISODate): EnergyModel {
   const profile = useProfile();
   const food = useLive('foodEntries');
   const weights = useLive('weights');
@@ -190,7 +191,7 @@ export function useDay(date: ISODate): DaySummary {
 }
 
 /** Summaries for a run of days ending at `end`, oldest first. */
-export function useDays(count: number, end: ISODate = today()): DaySummary[] {
+export function useDays(count: number, end: ISODate): DaySummary[] {
   const profile = useProfile();
   const food = useLive('foodEntries');
   const weights = useLive('weights');
@@ -262,7 +263,7 @@ export function computeConsistency(dates: Set<ISODate>, end: ISODate = today()):
   return { streak, daysThisWeek: week, loggedToday: dates.has(end), totalDaysLogged: dates.size };
 }
 
-export function useConsistency(): Consistency {
+export function useConsistency(end: ISODate): Consistency {
   const food = useLive('foodEntries');
-  return useMemo(() => computeConsistency(new Set(food.map((e) => e.date))), [food]);
+  return useMemo(() => computeConsistency(new Set(food.map((e) => e.date)), end), [food, end]);
 }

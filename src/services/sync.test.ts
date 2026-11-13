@@ -3,7 +3,7 @@
  * implements the same contract as the SQL in supabase/migrations: last write
  * wins on the client `updated_at`, and a server clock orders the pull cursor.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 interface Row {
   user_id: string;
@@ -22,6 +22,8 @@ const server = vi.hoisted(() => ({
   userId: 'user-a' as string | null,
   clock: 0,
   failNext: null as string | null,
+  failRecordsRead: false,
+  onPush: null as null | (() => void),
   tick(): string {
     this.clock += 1;
     return new Date(Date.UTC(2026, 0, 1, 0, 0, this.clock)).toISOString();
@@ -58,6 +60,7 @@ vi.mock('./supabase', () => {
       },
       then: (resolve: (v: { data: Row[]; error: null }) => unknown) => {
         if (table !== 'records') return resolve({ data: [], error: null });
+        if (server.failRecordsRead) return resolve({ data: null as never, error: { message: 'TypeError: Network request failed' } as never });
         const data = server.rows
           .filter((r) => r.user_id === filters.user && r.server_updated_at > (filters.after ?? ''))
           .sort((a, b) => a.server_updated_at.localeCompare(b.server_updated_at))
@@ -75,6 +78,9 @@ vi.mock('./supabase', () => {
     }
     const uid = server.userId as string;
     if (name === 'push_records') {
+      const hook = server.onPush;
+      server.onPush = null;
+      hook?.();
       for (const r of args.p_records as Omit<Row, 'user_id' | 'server_updated_at'>[]) {
         const existing = server.rows.find((x) => x.user_id === uid && x.collection === r.collection && x.id === r.id);
         if (existing && existing.updated_at > r.updated_at) continue; // older write loses
@@ -112,7 +118,7 @@ vi.mock('./supabase', () => {
 import { pendingChanges, useStore } from '@/store';
 import type { Profile } from '@/types';
 
-import { attachUser, syncNow, useSyncState } from './sync';
+import { attachUser, startAutoSync, syncNow, useSyncState } from './sync';
 
 const profile = (name: string): Partial<Profile> => ({
   name,
@@ -136,6 +142,8 @@ beforeEach(() => {
   server.profiles.clear();
   server.userId = 'user-a';
   server.failNext = null;
+  server.failRecordsRead = false;
+  server.onPush = null;
   useStore.getState().resetAll();
   useSyncState.setState({ status: 'idle', error: null, lastRunAt: null });
 });
@@ -280,6 +288,29 @@ describe('sync', () => {
     expect(Date.parse(useStore.getState().lastPulledAt!)).toBeGreaterThanOrEqual(Date.parse(cursor));
   });
 
+  it('fetches the profile before the history, so a dropped connection cannot make an existing account look new', async () => {
+    server.profiles.set('user-a', { data: { ...profile('Alex'), updatedAt: '2026-01-02T00:00:00.000Z' }, profile_updated_at: '2026-01-02T00:00:00.000Z', settings: null, settings_updated_at: null });
+    server.failRecordsRead = true;
+    const outcome = await attachUser('user-a');
+    expect(outcome).toBe('failed');
+    expect(useStore.getState().profile?.name).toBe('Alex');
+    expect(useStore.getState().profile?.onboardedAt).toBeTruthy();
+  });
+
+  it('reports a clean first sync as ok', async () => {
+    expect(await attachUser('user-a')).toBe('ok');
+  });
+
+  it('uploads an edit made while a push was in flight in the same run (an Undo during sync)', async () => {
+    await attachUser('user-a');
+    const entry = useStore.getState().upsert('water', water(250));
+    // The user taps Undo exactly while the first upload is on its way.
+    server.onPush = () => useStore.getState().remove('water', entry.id);
+    await syncNow();
+    expect(server.rows.find((r) => r.id === entry.id)?.deleted).toBe(true);
+    expect(pendingChanges(useStore.getState())).toBe(0);
+  });
+
   it('does nothing when signed out', async () => {
     server.userId = null;
     useStore.getState().upsert('water', water(250));
@@ -294,5 +325,25 @@ describe('sync', () => {
     server.failNext = 'TypeError: Network request failed';
     await syncNow();
     expect(useSyncState.getState().status).toBe('offline');
+  });
+
+  describe('auto-sync', () => {
+    afterEach(() => vi.useRealTimers());
+
+    it('schedules another upload when the same record is edited again (pending count unchanged)', async () => {
+      await attachUser('user-a');
+      const entry = useStore.getState().upsert('water', water(250));
+      vi.useFakeTimers();
+      const stop = startAutoSync();
+      // Still one pending record, but its content changed: this must count as a change.
+      useStore.getState().upsert('water', { ...water(400), id: entry.id });
+      expect(pendingChanges(useStore.getState())).toBe(1);
+      await vi.advanceTimersByTimeAsync(3000);
+      vi.useRealTimers();
+      // No manual sync here: only the scheduled one may have uploaded the edit.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      stop();
+      expect((server.rows.find((r) => r.id === entry.id)?.data as { ml: number }).ml).toBe(400);
+    });
   });
 });

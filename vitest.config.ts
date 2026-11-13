@@ -8,6 +8,7 @@ export default defineConfig({
       // Native modules cannot load under Node; logic tests get small stand-ins.
       'react-native': path.resolve(__dirname, './test/stubs/react-native.ts'),
       '@react-native-async-storage/async-storage': path.resolve(__dirname, './test/stubs/async-storage.ts'),
+      'expo-crypto': path.resolve(__dirname, './test/stubs/expo-crypto.ts'),
     },
   },
   test: {

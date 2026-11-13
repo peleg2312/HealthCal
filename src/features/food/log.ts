@@ -126,7 +126,10 @@ export function logItems(items: (SavedMealItem | FoodEntry)[], meal: MealType, d
       date,
       meal,
       name: it.name,
+      brand: it.brand,
       emoji: it.emoji,
+      // A copied or saved estimate is still an estimate: keep its range and confidence.
+      ...(it.kcalRange ? { kcalRange: it.kcalRange, confidence: it.confidence } : null),
       foodId: it.food?.id,
       source: it.source,
       verified: it.verified,
@@ -151,7 +154,9 @@ export function deleteEntry(entry: FoodEntry): void {
 export function toSavedMealItem(e: FoodEntry): SavedMealItem {
   return {
     name: e.name,
+    brand: e.brand,
     emoji: e.emoji,
+    ...(e.kcalRange ? { kcalRange: e.kcalRange, confidence: e.confidence } : null),
     servingLabel: e.servingLabel,
     quantity: e.quantity,
     grams: e.grams,

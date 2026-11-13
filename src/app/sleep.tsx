@@ -2,10 +2,11 @@ import { Info, Moon, Plus } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
-import { formatDayLabel, fromISODate, today, weekdayShort } from '@/lib/dates';
+import { formatDayLabel, fromISODate, weekdayShort } from '@/lib/dates';
 import { deleteSleep, saveSleep } from '@/features/trackers/actions';
 import { DayStepper, Figure, Note, RequireProfile } from '@/features/trackers/components';
 import { findByDate, formatHours, QUALITY_LABELS, SLEEP_RANGE, sleepSummary } from '@/features/trackers/helpers';
+import { useToday } from '@/store/clock';
 import { useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ISODate, SleepEntry } from '@/types';
@@ -62,7 +63,7 @@ function SleepScreen() {
   const entries = useLive('sleep');
   const [win, setWin] = useState<Window>('7');
   const [sheetDate, setSheetDate] = useState<ISODate | null>(null);
-  const end = today();
+  const end = useToday();
   const lastNight = findByDate(entries, end);
   const days = win === '7' ? 7 : 30;
   const summary = sleepSummary(entries, days, end);

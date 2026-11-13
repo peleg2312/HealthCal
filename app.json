@@ -57,7 +57,13 @@
       ],
       "expo-sharing",
       "expo-localization",
-      "expo-font"
+      "expo-font",
+      [
+        "./plugins/withStorageSize",
+        {
+          "megabytes": 64
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

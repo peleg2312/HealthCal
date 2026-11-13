@@ -8,6 +8,7 @@ import { DaySummaryCard, MealCard, MealMenuSheet, WeekStrip } from '@/features/f
 import { dayPhrase, href, kcal, parseDate } from '@/features/food/helpers';
 import { addDays, formatDayLabel, formatLongDate, today } from '@/lib/dates';
 import { MEALS, entriesTotal, mealForTime } from '@/lib/nutrition';
+import { useToday } from '@/store/clock';
 import { useDay, useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ISODate, MealType } from '@/types';
@@ -16,7 +17,8 @@ import { Button, Card, Chip, IconButton, Screen, Text } from '@/ui';
 export default function DiaryScreen() {
   const { colors, spacing } = useTheme();
   const params = useLocalSearchParams<{ date?: string }>();
-  const date = parseDate(params.date);
+  const t = useToday();
+  const date = parseDate(params.date, t);
   const setDate = (d: ISODate) => router.setParams({ date: d === today() ? undefined : d });
 
   const day = useDay(date);
@@ -30,7 +32,7 @@ export default function DiaryScreen() {
   const previousDay = useMemo(() => findPreviousDay(allEntries, date), [allEntries, date]);
 
   const [menuMeal, setMenuMeal] = useState<MealType | null>(null);
-  const isToday = date === today();
+  const isToday = date === t;
   const empty = day.entries.length === 0;
 
   return (
@@ -38,7 +40,7 @@ export default function DiaryScreen() {
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingTop: spacing.sm }}>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text variant="label" color="textSecondary" numberOfLines={1}>
-            {isToday ? formatLongDate(date) : date > today() ? 'Planning ahead' : 'Diary'}
+            {isToday ? formatLongDate(date) : date > t ? 'Planning ahead' : 'Diary'}
           </Text>
           <Text variant="h1" numberOfLines={1} testID="diary-date-title">
             {isToday ? 'Food diary' : formatDayLabel(date)}
@@ -59,7 +61,7 @@ export default function DiaryScreen() {
 
       {empty ? (
         <Card testID="diary-empty" tone="alt">
-          <Text variant="title">{date > today() ? 'Nothing planned yet' : 'Nothing logged for this day'}</Text>
+          <Text variant="title">{date > t ? 'Nothing planned yet' : 'Nothing logged for this day'}</Text>
           <Text variant="body" color="textSecondary" style={{ marginTop: 4 }}>
             {previousDay
               ? `Ate the same as ${dayPhrase(previousDay.date)}? Copy it in one tap, then adjust.`

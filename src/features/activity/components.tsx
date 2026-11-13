@@ -2,7 +2,8 @@ import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
-import { addDays, formatDayLabel, formatLongDate, today } from '@/lib/dates';
+import { useToday } from '@/store/clock';
+import { addDays, formatDayLabel, formatLongDate } from '@/lib/dates';
 import { INTENSITY_LABELS } from '@/lib/exercise';
 import { formatDistance, formatNumber } from '@/lib/units';
 import { useTheme } from '@/theme';
@@ -12,7 +13,7 @@ import { Avatar, IconButton, PressableScale, Text } from '@/ui';
 /** Day chooser: today by default, earlier days allowed, never the future. */
 export function DateStepper({ date, onChange, testID = 'date' }: { date: string; onChange: (d: string) => void; testID?: string }) {
   const { colors, radius, spacing } = useTheme();
-  const isToday = date >= today();
+  const isToday = date >= useToday();
   return (
     <View
       style={{

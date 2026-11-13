@@ -27,6 +27,7 @@ import { useAuth } from '@/services/auth';
 import { remindersSupported } from '@/services/notifications';
 import { isBackendConfigured } from '@/services/supabase';
 import { useSyncState } from '@/services/sync';
+import { useToday } from '@/store/clock';
 import { pendingChanges, useStore } from '@/store';
 import { useEnergyModel, useProfile, useWeightSeries } from '@/store/selectors';
 import { useTheme } from '@/theme';
@@ -59,7 +60,7 @@ function ProfileHub() {
   const settings = useStore((s) => s.settings);
   const setSettings = useStore((s) => s.setSettings);
   const setProfile = useStore((s) => s.setProfile);
-  const model = useEnergyModel();
+  const model = useEnergyModel(useToday());
   const weights = useWeightSeries();
   const u = profile.units;
 

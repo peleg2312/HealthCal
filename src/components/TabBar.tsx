@@ -101,10 +101,13 @@ function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose: () => 
   const { colors, radius } = useTheme();
   const go = (href: string) => {
     onClose();
+    // The meal and the date are read at the moment of the tap: this sheet stays mounted for
+    // the whole session, so anything computed while rendering would be hours or days old.
+    const target = href.replace('{food}', `meal=${mealForTime()}&date=${today()}`);
     // Let the sheet start closing before the next screen slides in.
-    setTimeout(() => router.push(href as never), 60);
+    setTimeout(() => router.push(target as never), 60);
   };
-  const food = `meal=${mealForTime()}&date=${today()}`;
+  const food = '{food}';
   const actions = [
     { id: 'search', label: 'Search food', hint: 'Database and your recents', icon: Search, color: colors.calories, href: `/food/search?${food}` },
     { id: 'photo', label: 'Snap a meal', hint: 'AI estimates from a photo', icon: Camera, color: colors.fat, href: `/food/photo?${food}` },

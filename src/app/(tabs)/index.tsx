@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { coachTip } from '@/features/today/coach';
-import { useToday } from '@/features/today/useToday';
+import { useNow, useToday } from '@/store/clock';
 import { formatDuration, formatShortDate, greeting } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
 import { MEALS, MEAL_SHARE } from '@/lib/nutrition';
@@ -20,12 +20,13 @@ export default function TodayScreen() {
   const profile = useProfile();
   const date = useToday();
   const day = useDay(date);
-  const consistency = useConsistency();
+  const consistency = useConsistency(date);
+  const now = useNow();
 
   return (
     <Screen tabs testID="today-screen">
       <LargeTitle
-        subtitle={`${greeting()}${profile.name ? `, ${profile.name}` : ''}`}
+        subtitle={`${greeting(now)}${profile.name ? `, ${profile.name}` : ''}`}
         title={`Today, ${formatShortDate(date)}`}
         right={
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
@@ -151,7 +152,8 @@ function Macro({ label, value, target, color }: { label: string; value: number; 
 function CoachCard({ day }: { day: DaySummary }) {
   const { colors, spacing } = useTheme();
   const profile = useProfile();
-  const tip = coachTip(day, profile.units);
+  const now = useNow();
+  const tip = coachTip(day, profile.units, now);
   const action = tip.action;
   return (
     <Card
