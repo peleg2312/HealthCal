@@ -24,7 +24,7 @@ export default function TodayScreen() {
   const now = useNow();
 
   return (
-    <Screen tabs testID="today-screen">
+    <Screen tabs testID="today-screen" backdrop={colors.calories}>
       <LargeTitle
         subtitle={`${greeting(now)}${profile.name ? `, ${profile.name}` : ''}`}
         title={`Today, ${formatShortDate(date)}`}

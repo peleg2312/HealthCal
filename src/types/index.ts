@@ -265,6 +265,8 @@ export interface Settings {
   /** Quick-add glass sizes in ml. */
   waterPresets: number[];
   fastingTargetHours: number;
+  /** Monday of the most recent week whose recap the user has opened. */
+  recapSeenWeek?: ISODate;
   updatedAt: ISODateTime;
 }
 

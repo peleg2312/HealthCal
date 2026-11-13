@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MAX_CONTENT_WIDTH, useTheme } from '@/theme';
 
+import { AmbientGlow } from './AmbientGlow';
 import { IconButton } from './Button';
 import { Text } from './Text';
 
@@ -27,10 +28,12 @@ export interface ScreenProps {
   scrollProps?: ScrollViewProps;
   /** Skip the top safe-area inset (modals presented as sheets on iOS). */
   noTopInset?: boolean;
+  /** A theme colour washed softly behind the top of the screen (pass the screen's semantic colour). */
+  backdrop?: string;
   testID?: string;
 }
 
-export function Screen({ children, scroll = true, header, footer, tabs, padded = true, contentStyle, scrollProps, noTopInset, testID }: ScreenProps) {
+export function Screen({ children, scroll = true, header, footer, tabs, padded = true, contentStyle, scrollProps, noTopInset, backdrop, testID }: ScreenProps) {
   const { colors, spacing } = useTheme();
   const insets = useSafeAreaInsets();
   const inner: ViewStyle = {
@@ -42,6 +45,7 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
   const bottomPad = (tabs ? TAB_BAR_SPACE : spacing.xxl) + (footer ? 0 : insets.bottom);
   return (
     <KeyboardAvoidingView testID={testID} style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {backdrop ? <AmbientGlow color={backdrop} /> : null}
       <View style={{ paddingTop: noTopInset ? 0 : insets.top }} />
       {header ? <View style={inner}>{header}</View> : null}
       {scroll ? (
