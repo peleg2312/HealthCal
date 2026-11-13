@@ -151,7 +151,11 @@ function WaterScreen() {
         <View style={{ flexDirection: 'row', alignSelf: 'stretch', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.lg }}>
           <Figure testID="water-consumed" align="center" value={consumedParts.value} unit={consumedParts.unit} label="Drunk" />
           <Figure align="center" value={goalParts.value} unit={goalParts.unit} label="Goal" />
-          <Figure align="center" value={String(glassesLeft(left, glassMl))} label={`× ${formatVolume(glassMl, units)} to go`} color="water" />
+          {reached ? (
+            <Figure align="center" value={splitUnit(formatVolume(consumed - goal, units)).value} unit={splitUnit(formatVolume(consumed - goal, units)).unit} label="Extra today" color="water" />
+          ) : (
+            <Figure align="center" value={String(glassesLeft(left, glassMl))} label={`× ${formatVolume(glassMl, units)} to go`} color="water" />
+          )}
         </View>
       </Card>
 
