@@ -79,7 +79,7 @@ describe('weekCaption', () => {
     expect(weekCaption(week([2400, 2400]), TODAY)).toBe('Week so far: 400 kcal a day over budget, 2 days logged');
   });
   it('calls a small average difference on budget', () => {
-    expect(weekCaption(week([2030, 1980, 2010]), TODAY)).toBe('Week so far: on budget on average, 3 days logged');
+    expect(weekCaption(week([2030, 1980, 2010]), TODAY)).toBe('Week so far: on budget, 3 days logged');
   });
   it('says so when no complete day exists yet', () => {
     expect(weekCaption(week([null, null, null, null, 900]), TODAY)).toBe('Week so far: no full days logged yet');

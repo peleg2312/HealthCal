@@ -32,16 +32,20 @@ export function DayRingStrip({ today, selected, onSelect }: { today: ISODate; se
     if (width > 0) ref.current?.scrollTo({ x: (STRIP_WEEKS - 1 - b) * width, animated });
   };
 
-  // Follow the selection when it moves to another week (the Today chip, a deep link).
+  // Follow the selection whenever it changes (a tap, the Today chip, midnight), even within the same week.
   const selectedBack = weeksBetween(selected, today);
-  const [followed, setFollowed] = useState(selectedBack);
-  if (followed !== selectedBack) {
-    setFollowed(selectedBack);
+  const [followed, setFollowed] = useState(selected);
+  if (followed !== selected) {
+    setFollowed(selected);
     setBack(selectedBack);
   }
+  // The first placement jumps; later moves (a new selection) glide.
+  const placed = useRef(false);
   useEffect(() => {
-    if (width > 0) ref.current?.scrollTo({ x: (STRIP_WEEKS - 1 - selectedBack) * width, animated: true });
-  }, [selectedBack, width]);
+    if (width <= 0) return;
+    ref.current?.scrollTo({ x: (STRIP_WEEKS - 1 - selectedBack) * width, animated: placed.current });
+    placed.current = true;
+  }, [selected, selectedBack, width]);
 
   const onLayout = (e: LayoutChangeEvent) => {
     const w = Math.round(e.nativeEvent.layout.width);

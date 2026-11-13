@@ -218,5 +218,6 @@ function importMessage(res: Extract<ImportResult, { ok: true }>): string {
   const skipped = res.skipped > 0 ? ` ${res.skipped} damaged ${res.skipped === 1 ? 'entry was' : 'entries were'} left out.` : '';
   const profile = res.profileRestored ? ' Profile and goals restored from the backup.' : res.profileSkipped ? ' Your current profile and goals were kept.' : '';
   if (total === 0) return `Backup read. Everything in it was already here.${profile}${skipped}`;
-  return `Imported ${res.added} new and ${res.updated} updated ${total === 1 ? 'entry' : 'entries'}.${profile}${skipped}`;
+  const parts = [res.added > 0 ? `${res.added} new` : '', res.updated > 0 ? `${res.updated} updated` : ''].filter(Boolean).join(' and ');
+  return `Imported ${parts} ${total === 1 ? 'entry' : 'entries'}.${profile}${skipped}`;
 }

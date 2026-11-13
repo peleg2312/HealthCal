@@ -56,9 +56,10 @@ describe('usualFoods', () => {
     expect(usualFoods(list, 'dinner', TODAY)[0].key).toBe('food-new');
   });
 
-  it('ignores entries outside 30 days, in the future or deleted', () => {
+  it('ignores entries older than 30 days, from today on, or deleted', () => {
     const list = [
-      e('rice', '2026-10-14'),
+      e('rice', '2026-10-13'),
+      e('rice', '2026-11-13'),
       e('rice', '2026-11-14'),
       e('rice', '2026-11-12', 'dinner', { deleted: true }),
       e('beans', '2026-11-12'),

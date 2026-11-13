@@ -37,6 +37,20 @@ export interface StrengthDraft {
   accumulatedMs: number;
   /** Duration typed by the user; wins over the timer when set. */
   manualMin: number | null;
+  /** Epoch ms when the current rest between sets ends; null or absent when not resting. */
+  restEndsAt?: number | null;
+  /** Length of the current rest, seconds (what -15 s / +15 s change). */
+  restTotalSec?: number;
+  /** Exercise the current rest follows. */
+  restExercise?: string;
+}
+
+export const DEFAULT_REST_SEC = 90;
+export const MIN_REST_SEC = 15;
+export const MAX_REST_SEC = 600;
+
+export function restRemainingMs(d: StrengthDraft, now: number = Date.now()): number {
+  return d.restEndsAt ? Math.max(0, d.restEndsAt - now) : 0;
 }
 
 let seq = 0;
@@ -104,6 +118,13 @@ export function draftOnOpen(stored: StrengthDraft | undefined, open: { entry?: A
 
 interface DraftState {
   drafts: Record<string, StrengthDraft>;
+  /** Last rest length per exercise (lower-case name), seconds. */
+  restSec: Record<string, number>;
+  setRestSec: (exercise: string, sec: number) => void;
+  /** Not persisted: which screen visit last decided the draft for each key. */
+  openedBy: Record<string, string>;
+  /** Put the draft a visit starts from (or keep the stored one) and mark the visit as decided. */
+  open: (key: string, visit: string, next: StrengthDraft | null) => void;
   put: (key: string, draft: StrengthDraft) => void;
   update: (key: string, fn: (d: StrengthDraft) => StrengthDraft) => void;
   discard: (key: string) => void;
@@ -113,6 +134,11 @@ export const useStrengthDrafts = create<DraftState>()(
   persist(
     (set) => ({
       drafts: {},
+      restSec: {},
+      openedBy: {},
+      open: (key, visit, next) =>
+        set((s) => ({ drafts: next ? { ...s.drafts, [key]: next } : s.drafts, openedBy: { ...s.openedBy, [key]: visit } })),
+      setRestSec: (exercise, sec) => set((s) => ({ restSec: { ...s.restSec, [exercise.trim().toLowerCase()]: sec } })),
       put: (key, draft) => set((s) => ({ drafts: { ...s.drafts, [key]: draft } })),
       update: (key, fn) =>
         set((s) => {
@@ -127,7 +153,12 @@ export const useStrengthDrafts = create<DraftState>()(
           return { drafts: next };
         }),
     }),
-    { name: 'healthcal-strength-drafts', version: 1, storage: createJSONStorage(() => AsyncStorage) },
+    {
+      name: 'healthcal-strength-drafts',
+      version: 1,
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (s) => ({ drafts: s.drafts, restSec: s.restSec }),
+    },
   ),
 );
 
@@ -167,4 +198,19 @@ export const edits = {
   start: (d: StrengthDraft): StrengthDraft =>
     d.startedAt ? d : { ...d, startedAt: Date.now(), accumulatedMs: d.manualMin ? d.manualMin * 60000 : d.accumulatedMs, manualMin: null },
   pause: (d: StrengthDraft): StrengthDraft => (d.startedAt ? { ...d, accumulatedMs: elapsedMs(d), startedAt: null } : d),
+  /** Ticking a set starts the rest before the next one. */
+  startRest: (d: StrengthDraft, exercise: string, sec: number, now: number = Date.now()): StrengthDraft => {
+    const len = clampRest(sec);
+    return { ...d, restEndsAt: now + len * 1000, restTotalSec: len, restExercise: exercise };
+  },
+  /** -15 s / +15 s on a running rest; never below zero left. */
+  adjustRest: (d: StrengthDraft, deltaSec: number, now: number = Date.now()): StrengthDraft => {
+    if (!d.restEndsAt || d.restEndsAt <= now) return d;
+    return { ...d, restEndsAt: Math.max(now, d.restEndsAt + deltaSec * 1000), restTotalSec: clampRest((d.restTotalSec ?? DEFAULT_REST_SEC) + deltaSec) };
+  },
+  skipRest: (d: StrengthDraft): StrengthDraft => ({ ...d, restEndsAt: null }),
 };
+
+function clampRest(sec: number): number {
+  return Math.min(MAX_REST_SEC, Math.max(MIN_REST_SEC, Math.round(sec)));
+}

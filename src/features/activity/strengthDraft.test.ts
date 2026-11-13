@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ActivityEntry } from '@/types';
 
-import { draftFromEntry, draftHasContent, draftOnOpen, edits, newDraft } from './strengthDraft';
+import { draftFromEntry, draftHasContent, draftOnOpen, edits, newDraft, restRemainingMs } from './strengthDraft';
 
 const entry = {
   id: 'w1',
@@ -57,5 +57,26 @@ describe('draftOnOpen for an edit (review activity-trackers-4)', () => {
     const legacy = { ...draftFromEntry(entry) };
     delete legacy.baseUpdatedAt;
     expect(draftOnOpen(legacy, { entry, date: '2026-11-13' })).not.toBeNull();
+  });
+});
+
+describe('rest between sets', () => {
+  const d0 = newDraft('2026-11-13');
+  it('starts, adjusts and skips a rest', () => {
+    const d = edits.startRest(d0, 'Bench press', 90, 1_000);
+    expect(d.restEndsAt).toBe(91_000);
+    expect(restRemainingMs(d, 31_000)).toBe(60_000);
+    const longer = edits.adjustRest(d, 15, 31_000);
+    expect(longer.restEndsAt).toBe(106_000);
+    expect(longer.restTotalSec).toBe(105);
+    const shorter = edits.adjustRest(d, -15, 85_000);
+    expect(restRemainingMs(shorter, 85_000)).toBe(0);
+    expect(edits.skipRest(d).restEndsAt).toBeNull();
+  });
+  it('keeps rest lengths within 15 s and 10 min and ignores adjustments after it ended', () => {
+    expect(edits.startRest(d0, 'Row', 3, 0).restTotalSec).toBe(15);
+    expect(edits.startRest(d0, 'Row', 5000, 0).restTotalSec).toBe(600);
+    const ended = edits.startRest(d0, 'Row', 60, 0);
+    expect(edits.adjustRest(ended, 15, 61_000)).toBe(ended);
   });
 });

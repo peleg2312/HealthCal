@@ -184,21 +184,17 @@ function Flow({ onFinished }: { onFinished: () => void }) {
         step === 'plan' ? (
           <Button title="Start tracking" testID="onb-finish" onPress={finish} disabled={!plan} iconRight={<ArrowRight size={18} color={colors.onPrimary} />} />
         ) : step === 'routine' ? (
-          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            <View style={{ flex: 1 }}>
-              <Button title="Not now" variant="secondary" testID="onb-reminders-skip" disabled={asking} onPress={() => void answerReminders(false)} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Button
-                title="Turn on reminders"
-                variant="secondary"
-                testID="onb-reminders-on"
-                loading={asking}
-                disabled={!Object.values(draft.routine.nudges).some(Boolean)}
-                icon={<BellRing size={18} color={colors.text} />}
-                onPress={() => void answerReminders(true)}
-              />
-            </View>
+          <View style={{ gap: spacing.sm }}>
+            <Button
+              title="Turn on reminders"
+              variant="secondary"
+              testID="onb-reminders-on"
+              loading={asking}
+              disabled={!Object.values(draft.routine.nudges).some(Boolean)}
+              icon={<BellRing size={18} color={colors.text} />}
+              onPress={() => void answerReminders(true)}
+            />
+            <Button title="Not now" variant="secondary" testID="onb-reminders-skip" disabled={asking} onPress={() => void answerReminders(false)} />
           </View>
         ) : (
           <Button title="Continue" testID="onb-next" onPress={next} />

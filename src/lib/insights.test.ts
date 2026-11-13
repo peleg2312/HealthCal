@@ -482,6 +482,11 @@ describe('weekly check-in tiles', () => {
     expect(t.activity.value).toBe(420); // 7 × 30 min at 7 MET, counted double
     expect(t.activity.delta).toBe(420);
     expect(t.water.unit).toBe('of 7 days');
+    const now = weeklyRecap({ days, trend: [], sleep: [], today: TODAY, units: 'metric', goal: 'lose', week: '2026-11-09' })!;
+    const n = Object.fromEntries(recapTiles(now).map((x) => [x.id, x]));
+    expect(n.activity.delta).toBeNull();
+    expect(n.activity.soFar).toBe(true);
+    expect(n.protein.delta).toBe(0);
   });
 
   it('describes the week against budget', () => {

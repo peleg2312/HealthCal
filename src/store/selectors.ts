@@ -60,21 +60,33 @@ export function exerciseByDate(activities: ActivityEntry[]): Record<ISODate, num
   return out;
 }
 
+/** Lookups the energy model needs, built once when the model is wanted for many dates. */
+export interface ModelInputs {
+  weights: { date: ISODate; kg: number }[];
+  intake: Record<ISODate, number>;
+  exercise: Record<ISODate, number>;
+}
+
+export function modelInputs(foodEntries: FoodEntry[], weights: WeightEntry[], activities: ActivityEntry[] = []): ModelInputs {
+  return { weights: weights.map((w) => ({ date: w.date, kg: w.kg })), intake: intakeByDate(foodEntries), exercise: exerciseByDate(activities) };
+}
+
 export function computeEnergyModel(
   profile: Profile,
   foodEntries: FoodEntry[],
   weights: WeightEntry[],
   end: ISODate = today(),
   activities: ActivityEntry[] = [],
+  inputs: ModelInputs = modelInputs(foodEntries, weights, activities),
 ): EnergyModel {
   const b = bmr(profile);
   const formula = formulaTdee(profile);
   // Yesterday is the last complete day; today's partial log would bias intake low.
   const adaptive = adaptiveTdee({
     formulaTdee: formula,
-    weights: weights.map((w) => ({ date: w.date, kg: w.kg })),
-    intakeByDate: intakeByDate(foodEntries),
-    exerciseByDate: exerciseByDate(activities),
+    weights: inputs.weights,
+    intakeByDate: inputs.intake,
+    exerciseByDate: inputs.exercise,
     end: addDays(end, -1),
   });
   const usingAdaptive = profile.useAdaptiveTdee && adaptive.observed !== null;
@@ -229,8 +241,15 @@ export function useDays(count: number, end: ISODate): DaySummary[] {
   const water = useLive('water');
   const days = useLive('days');
   return useMemo(() => {
-    const model = computeEnergyModel(profile, food, weights, end, activities);
-    return lastNDates(count, end).map((d) => computeDay(d, profile, model, food, activities, water, days));
+    // Each day gets the model as of that day, exactly as useDay(date) does, so a past day
+    // shows the same budget on every screen. Days with a recorded snapshot use that instead.
+    const inputs = modelInputs(food, weights, activities);
+    const recorded = new Set(days.map((d) => d.date));
+    const current = computeEnergyModel(profile, food, weights, end, activities, inputs);
+    return lastNDates(count, end).map((d) => {
+      const model = d === end || recorded.has(d) ? current : computeEnergyModel(profile, food, weights, d, activities, inputs);
+      return computeDay(d, profile, model, food, activities, water, days);
+    });
   }, [count, end, profile, food, weights, activities, water, days]);
 }
 

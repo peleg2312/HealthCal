@@ -60,13 +60,13 @@ export function ProjectionChart({ projection: p, units }: { projection: Projecti
         {width > 0 ? (
           <>
             <Text variant="caption" color="textSecondary" tabular style={{ position: 'absolute', left: PAD_X, top: lose ? 2 : PLOT_H - PAD_BOTTOM - 34 }}>
-              {formatWeight(p.startKg, units)}
+              {`${formatWeight(p.startKg, units)} today`}
             </Text>
             <Text
               variant="caption"
               color="weight"
               tabular
-              style={{ position: 'absolute', right: PAD_X, top: lose ? end.y - 26 : end.y - 26, textAlign: 'right' }}>
+              style={{ position: 'absolute', right: PAD_X, top: end.y - 26, textAlign: 'right' }}>
               {`Goal ${formatWeight(p.targetKg, units)}`}
             </Text>
           </>
@@ -75,9 +75,6 @@ export function ProjectionChart({ projection: p, units }: { projection: Projecti
       <View style={{ height: 34, marginTop: spacing.xs }}>
         {width > 0 ? (
           <>
-            <Text variant="caption" color="textTertiary" style={{ position: 'absolute', left: PAD_X }}>
-              Today
-            </Text>
             {p.waypoints.map((wp) => (
               <View key={wp.share} style={{ position: 'absolute', left: x(wp.weeks) - labelW / 2, width: labelW, alignItems: 'center' }}>
                 <Text variant="caption" color="textSecondary" tabular>

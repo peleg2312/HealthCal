@@ -1154,13 +1154,20 @@ export interface RecapTile {
   delta: number | null;
   /** Whether a rise is good news (shown in the success colour); calories stay neutral either way. */
   upIsGood: boolean;
+  /** Set when the tile is a running total for a week still in progress, so a comparison would mislead. */
+  soFar?: boolean;
 }
 
 /** The four check-in tiles, each with the week before for comparison. */
-export function recapTiles(r: Pick<WeeklyRecap, 'summary' | 'previous'>): RecapTile[] {
+export function recapTiles(r: Pick<WeeklyRecap, 'summary' | 'previous' | 'label'>): RecapTile[] {
   const s = r.summary;
   const p = r.previous;
-  const tile = (t: Omit<RecapTile, 'delta'>): RecapTile => ({ ...t, delta: t.value !== null && t.previous !== null ? t.value - t.previous : null });
+  const partial = r.label === 'This week';
+  const tile = (t: Omit<RecapTile, 'delta'>): RecapTile => {
+    // Totals (minutes, goal days) of a part week cannot be compared with a full week; averages can.
+    if (partial && (t.id === 'activity' || t.id === 'water')) return { ...t, previous: null, delta: null, soFar: true };
+    return { ...t, delta: t.value !== null && t.previous !== null ? t.value - t.previous : null };
+  };
   const round = (n: number | undefined | null) => (n === undefined || n === null ? null : Math.round(n));
   return [
     tile({

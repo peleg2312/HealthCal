@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { BookmarkPlus, Check, Clock, Pause, Play, Plus, Search, Trash2, X } from 'lucide-react-native';
+import { BookmarkPlus, Check, Clock, Pause, Play, Plus, Search, Trash2, Trophy, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { View } from 'react-native';
 
@@ -12,7 +12,12 @@ import { draftFromRoutine, routineExercises, useRoutines } from '@/features/acti
 import { deleteActivity, leaveFlow, saveActivity } from '@/features/activity/session';
 import {
   draftDurationMin,
+  DEFAULT_REST_SEC,
+  draftKey,
+  MAX_REST_SEC,
+  MIN_REST_SEC,
   draftOnOpen,
+  restRemainingMs,
   draftToExercises,
   edits,
   elapsedMs,
@@ -22,7 +27,7 @@ import {
 } from '@/features/activity/strengthDraft';
 import { formatDayLabel, formatDuration, formatShortDate, today } from '@/lib/dates';
 import { formulaTdee } from '@/lib/energy';
-import { INTENSITY_LABELS, estimateOneRepMax, strengthVolumeKg } from '@/lib/exercise';
+import { INTENSITY_LABELS, estimateOneRepMax, findStrengthRecords, kcalRange, strengthVolumeKg, type StrengthRecord } from '@/lib/exercise';
 import { formatNumber, round, weightToKg, weightUnit, weightValue } from '@/lib/units';
 import { useStore } from '@/store';
 import { useLive, useProfile } from '@/store/selectors';
@@ -30,6 +35,7 @@ import { useTheme } from '@/theme';
 import type { ActivityEntry, Intensity, StrengthSet, UnitSystem } from '@/types';
 import {
   Button,
+  Card,
   Chip,
   ChipRow,
   ConfirmSheet,
@@ -74,25 +80,27 @@ export default function StrengthScreen() {
   // Decide once per visit which draft to show. Later renders never re-create a
   // draft, so finishing or discarding (which removes it) cannot leave a fresh
   // one behind with a stale date.
-  const [opened, setOpened] = useState(false);
+  const [visit] = useState(draftKey);
+  const opened = useStrengthDrafts((s) => s.openedBy[key] === visit);
+  const [summary, setSummary] = useState<FinishSummary | null>(null);
   useEffect(() => {
     if (!hydrated || opened) return;
     if (entryId && (!entry || entry.deleted)) return;
     const d = typeof params.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(params.date) && params.date <= today() ? params.date : today();
     const next = draftOnOpen(useStrengthDrafts.getState().drafts[key], { entry: entryId ? entry : undefined, date: d });
-    if (next) useStrengthDrafts.getState().put(key, next);
-    setOpened(true);
-  }, [hydrated, opened, entryId, entry, key, params.date]);
+    useStrengthDrafts.getState().open(key, visit, next);
+  }, [hydrated, opened, visit, entryId, entry, key, params.date]);
 
-  if (entryId && (!entry || entry.deleted)) {
+  if (entryId && (!entry || entry.deleted) && !summary) {
     return (
       <Screen header={<Header title="Workout" />}>
         <EmptyState emoji="🤷" title="This workout is no longer here" message="It may have been deleted on this or another device." action="Back to training" onAction={() => goBack('/train')} />
       </Screen>
     );
   }
+  if (summary) return <FinishSummaryView summary={summary} />;
   if (!draft || !opened) return <Screen header={<Header title="Workout" />}>{null}</Screen>;
-  return <Logger draftKey={key} draft={draft} entry={entry} />;
+  return <Logger draftKey={key} draft={draft} entry={entry} onFinished={setSummary} />;
 }
 
 interface PrevRef {
@@ -100,7 +108,15 @@ interface PrevRef {
   sets: StrengthSet[];
 }
 
-function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthDraft; entry?: ActivityEntry }) {
+interface FinishSummary {
+  entry: ActivityEntry;
+  volumeKg: number;
+  setsDone: number;
+  records: StrengthRecord[];
+  exercises: DraftExercise[];
+}
+
+function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draft: StrengthDraft; entry?: ActivityEntry; onFinished: (s: FinishSummary) => void }) {
   const { colors, radius, spacing } = useTheme();
   const profile = useProfile();
   const activities = useLive('activities');
@@ -115,11 +131,19 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
   const [saveRoutine, setSaveRoutine] = useState(false);
   const templates = useRoutineTemplates();
 
+  const resting = !!draft.restEndsAt;
   useEffect(() => {
-    if (!draft.startedAt) return;
+    if (!draft.startedAt && !resting) return;
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
-  }, [draft.startedAt]);
+  }, [draft.startedAt, resting]);
+
+  // The rest ends: a nudge if the user is here to feel it, then the bar goes away.
+  useEffect(() => {
+    if (!draft.restEndsAt || now < draft.restEndsAt) return;
+    if (now - draft.restEndsAt < 3000) haptic.success();
+    useStrengthDrafts.getState().update(draftKey, edits.skipRest);
+  }, [now, draft.restEndsAt, draftKey]);
 
   // Most recent earlier numbers for each exercise name.
   const previous = useMemo(() => {
@@ -193,7 +217,19 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
     });
     if (!saved) return;
     useStrengthDrafts.getState().discard(draftKey);
-    leaveFlow();
+    if (draft.entryId) {
+      leaveFlow();
+      return;
+    }
+    // A new workout ends on a short summary with any records against earlier sessions.
+    const history = activities.filter((a) => a.id !== saved.id && a.exercises?.length).map((a) => a.exercises!);
+    onFinished({
+      entry: saved,
+      volumeKg: volume,
+      setsDone: doneSets,
+      records: findStrengthRecords(saved.exercises ?? [], history),
+      exercises: draft.exercises,
+    });
   };
 
   const discard = () => {
@@ -235,13 +271,16 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
         />
       }
       footer={
-        <Button
-          testID="strength-finish"
-          title={draft.entryId ? 'Save workout' : 'Finish workout'}
-          icon={<Check size={18} color={colors.onPrimary} />}
-          onPress={() => finish()}
-          disabled={draft.exercises.length === 0 && minutes < 1}
-        />
+        <View style={{ gap: spacing.md }}>
+          {draft.restEndsAt && draft.restEndsAt > now ? <RestBar draft={draft} now={now} update={update} /> : null}
+          <Button
+            testID="strength-finish"
+            title={draft.entryId ? 'Save workout' : 'Finish workout'}
+            icon={<Check size={18} color={colors.onPrimary} />}
+            onPress={() => finish()}
+            disabled={draft.exercises.length === 0 && minutes < 1}
+          />
+        </View>
       }>
       {/* Summary: timer and running totals */}
       <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.md }}>
@@ -304,7 +343,9 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
         <Text variant="caption" color="textSecondary" testID="strength-kcal">
           {minutes > 0
             ? `About ${formatNumber(est.gross)} kcal in ${minutes} min (likely ${formatNumber(est.grossRange[0])}–${formatNumber(est.grossRange[1])}), of which ${formatNumber(est.net)} is above resting. Based on ${STRENGTH.met[draft.intensity]} MET.`
-            : 'Start the timer or set a duration to estimate calories.'}
+            : running
+              ? 'Calories show after the first minute.'
+              : 'Start the timer or set a duration to estimate calories.'}
         </Text>
       </View>
 
@@ -400,6 +441,110 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
         onConfirm={discard}
         onCancel={() => setConfirmDiscard(false)}
       />
+    </Screen>
+  );
+}
+
+function RestBar({ draft, now, update }: { draft: StrengthDraft; now: number; update: (fn: (d: StrengthDraft) => StrengthDraft) => void }) {
+  const { colors, radius, spacing } = useTheme();
+  // `now` can trail a just-started rest by up to a tick; never show more than the rest's length.
+  const left = Math.min(restRemainingMs(draft, now), (draft.restTotalSec ?? DEFAULT_REST_SEC) * 1000);
+  const name = draft.restExercise ?? '';
+  const adjust = (delta: number) => {
+    update((d) => edits.adjustRest(d, delta));
+    const total = Math.min(MAX_REST_SEC, Math.max(MIN_REST_SEC, (draft.restTotalSec ?? DEFAULT_REST_SEC) + delta));
+    if (name) useStrengthDrafts.getState().setRestSec(name, total);
+  };
+  const small = (label: string, a11y: string, testID: string, onPress: () => void) => (
+    <PressableScale
+      testID={testID}
+      accessibilityLabel={a11y}
+      feedback="tap"
+      onPress={onPress}
+      style={{ minWidth: 52, height: 44, paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+      <Text variant="label" tabular>
+        {label}
+      </Text>
+    </PressableScale>
+  );
+  return (
+    <View
+      testID="strength-rest"
+      accessibilityLiveRegion="polite"
+      style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: `${colors.exercise}22`, borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.md }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text variant="caption" color="textSecondary" numberOfLines={1}>
+          Rest{name ? ` after ${name.toLowerCase()}` : ''}
+        </Text>
+        <Text variant="numL" tabular testID="strength-rest-left">
+          {formatClock(Math.ceil(left / 1000) * 1000)}
+        </Text>
+      </View>
+      {small('−15 s', 'Rest 15 seconds less', 'strength-rest-minus', () => adjust(-15))}
+      {small('+15 s', 'Rest 15 seconds more', 'strength-rest-plus', () => adjust(15))}
+      {small('Skip', 'Skip rest', 'strength-rest-skip', () => update(edits.skipRest))}
+    </View>
+  );
+}
+
+function FinishSummaryView({ summary }: { summary: FinishSummary }) {
+  const { colors, spacing } = useTheme();
+  const profile = useProfile();
+  const units = profile.units;
+  const [saveRoutine, setSaveRoutine] = useState(false);
+  const e = summary.entry;
+  // Undo on the "logged" toast removes the session while this summary is open.
+  const undone = useStore((s) => s.activities[e.id]?.deleted !== false);
+  const [lo, hi] = kcalRange(e.kcalNet);
+  return (
+    <Screen
+      header={<Header title={undone ? 'Workout not saved' : 'Workout saved'} subtitle={formatDayLabel(e.date)} back={false} />}
+      footer={
+        <View style={{ gap: spacing.sm }}>
+          <Button testID="strength-summary-done" title="Done" onPress={leaveFlow} />
+          {summary.exercises.length ? (
+            <Button testID="strength-summary-routine" title="Save as routine" variant="ghost" size="md" icon={<BookmarkPlus size={18} color={colors.primary} />} onPress={() => setSaveRoutine(true)} />
+          ) : null}
+        </View>
+      }>
+      <Card testID="strength-summary">
+        <View style={{ flexDirection: 'row', gap: spacing.md }}>
+          <Metric label="Duration" value={formatDuration(e.durationMin)} testID="strength-summary-duration" />
+          <Metric label="Volume" value={formatNumber(round(weightValue(summary.volumeKg, units)))} unit={weightUnit(units)} />
+          <Metric label="Sets done" value={String(summary.setsDone)} />
+        </View>
+        <View style={{ marginVertical: spacing.md }}>
+          <Divider />
+        </View>
+        <Text variant="body" color="textSecondary" testID="strength-summary-kcal">
+          {undone
+            ? 'You undid this workout, so it is not in your log.'
+            : `About ${formatNumber(Math.round(e.kcalNet))} kcal above resting (likely ${formatNumber(lo)}–${formatNumber(hi)}).`}
+        </Text>
+      </Card>
+      {summary.records.length ? (
+        <View style={{ gap: spacing.sm }} testID="strength-summary-records">
+          <Text variant="title">Personal records</Text>
+          <Card padding={spacing.md} style={{ paddingVertical: spacing.xs }}>
+            {summary.records.map((r, i) => (
+              <View
+                key={r.exercise}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, borderTopWidth: i ? 1 : 0, borderTopColor: colors.border }}>
+                <Trophy size={20} color={colors.warning} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text variant="bodyStrong" numberOfLines={1}>
+                    {r.exercise}
+                  </Text>
+                  <Text variant="caption" color="textSecondary">
+                    {r.kind === 'e1rm' ? 'Best est. 1RM' : 'Heaviest set'} {fmtW(r.valueKg, units)} {weightUnit(units)}, up {fmtW(r.valueKg - r.previousKg, units)} {weightUnit(units)}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </Card>
+        </View>
+      ) : null}
+      <SaveRoutineSheet visible={saveRoutine} onClose={() => setSaveRoutine(false)} exercises={summary.exercises} />
     </Screen>
   );
 }
@@ -530,14 +675,18 @@ function ExerciseCard({
               accessibilityState={{ checked: s.done }}
               feedback="select"
               onPress={() =>
-                update((d) =>
-                  edits.updateSet(d, ex.key, s.key, {
+                update((d) => {
+                  const next = edits.updateSet(d, ex.key, s.key, {
                     done: !s.done,
                     // Ticking an empty set takes last session's numbers, as shown in the placeholders.
                     ...(!s.done && s.weightKg === null && ref ? { weightKg: ref.weightKg } : {}),
                     ...(!s.done && s.reps === null && ref ? { reps: ref.reps } : {}),
-                  }),
-                )
+                  });
+                  if (s.done) return next;
+                  // Ticking a set starts the rest before the next one, at this exercise's last rest length.
+                  const len = useStrengthDrafts.getState().restSec[ex.name.trim().toLowerCase()] ?? DEFAULT_REST_SEC;
+                  return edits.startRest(next, ex.name, len);
+                })
               }
               style={{
                 width: 44,
@@ -583,14 +732,20 @@ function suggestedRoutineName(exercises: DraftExercise[]): string {
     const g = EXERCISE_GROUPS.find((x) => x.exercises.some((n) => n.toLowerCase() === ex.name.toLowerCase()));
     if (g) counts.set(g.label, (counts.get(g.label) ?? 0) + 1);
   }
-  const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
-  return top ? `${top[0]} workout` : 'My workout';
+  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  if (!ranked.length) return 'My workout';
+  if (ranked.length === 1 || ranked[0][1] > ranked[1][1]) return `${ranked[0][0]} workout`;
+  const labels = ranked.map((r) => r[0]);
+  if (labels.every((l) => ['Chest', 'Back', 'Shoulders', 'Arms'].includes(l))) return 'Upper body workout';
+  if (labels.every((l) => ['Legs', 'Glutes'].includes(l))) return 'Lower body workout';
+  return 'Full body workout';
 }
 
 function SaveRoutineSheet({ visible, onClose, exercises }: { visible: boolean; onClose: () => void; exercises: DraftExercise[] }) {
   const [name, setName] = useState<string | null>(null);
   const value = name ?? suggestedRoutineName(exercises);
-  const list = routineExercises(exercises.map((e) => ({ name: e.name, sets: e.sets.map((s) => ({ reps: s.reps ?? 0, weightKg: s.weightKg ?? 0 })) })));
+  // Every set in the workout counts, filled in or not: the routine is the plan.
+  const list = routineExercises(exercises.map((e) => ({ name: e.name, sets: e.sets.map(() => ({ reps: 1, weightKg: 0 })) })));
   const close = () => {
     setName(null);
     onClose();

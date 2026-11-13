@@ -87,7 +87,7 @@ function RoutineCard({ template, id, onStart, testID }: { template: RoutineTempl
           gap: spacing.sm,
         }}>
         <Play size={16} color={colors.exercise} />
-        <Text variant="bodyStrong" color={colors.exercise}>
+        <Text variant="bodyStrong" color="text">
           Start
         </Text>
       </PressableScale>

@@ -1,6 +1,6 @@
 import { Activity, BellRing, Droplets, Dumbbell, Info, MoonStar, Ruler, Scale, TrendingDown, TrendingUp, TriangleAlert, Utensils } from 'lucide-react-native';
 import React from 'react';
-import { View } from 'react-native';
+import { Switch, View } from 'react-native';
 
 import { Group as SettingsGroup, IconTile, prefers12h, TimeRow } from '@/features/settings/components';
 import { ageFromBirthDate, formatClock, formatLongDate, toISODate } from '@/lib/dates';
@@ -9,7 +9,7 @@ import { formatNumber, kgToLb, lbToKg, round, weightUnit } from '@/lib/units';
 import { remindersSupported } from '@/services/notifications';
 import { useTheme } from '@/theme';
 import type { ActivityLevel, GoalType } from '@/types';
-import { Card, NumberField, PressableScale, Stepper, Text, TextField, ToggleRow } from '@/ui';
+import { Card, NumberField, PressableScale, Stepper, Text, TextField } from '@/ui';
 
 import { ChoiceCard, ErrorText, Note, StepTitle } from './components';
 import { birthDateOf, buildPlan, convertUnits, heightRangeText, weightRangeText, rateKgOf, tapeEstimate, toMetric, type BodyFatMode, type Draft, type Errors } from './model';
@@ -696,14 +696,16 @@ export function RoutineStep({ draft, set, errors }: StepProps) {
   const plan = buildPlan(draft);
   const setRoutine = (patch: Partial<Routine>) => set({ routine: { ...r, ...patch } });
   const examples = plan ? nudgeExamples(r, { targetKcal: plan.target.target, waterMl: plan.waterMl, macros: plan.macros }, draft.units, hour12) : null;
-  const subtitleFor = (key: NudgeKind): string => {
+  const whenFor = (key: NudgeKind): string => {
+    if (key === 'weighIn') return `Mon and Thu, ${formatClock(WEIGH_IN_TIME, hour12)}`;
+    if (key === 'water') return `Every 2 hours${examples?.water ? `, like ${examples.water.time}` : ''}`;
+    if (key === 'meals') return `When a meal is not logged${examples?.meals ? `, like ${examples.meals.time}` : ''}`;
+    return examples?.checkin?.time ?? formatClock('20:30', hour12);
+  };
+  const exampleFor = (key: NudgeKind): string | null => {
     const ex = examples?.[key];
-    if (key === 'weighIn') {
-      const when = `Mon and Thu, ${formatClock(WEIGH_IN_TIME, hour12)}`;
-      return ex ? `${when}: ${ex.body}` : `${when}. That falls before you are up, so it would stay silent.`;
-    }
-    if (!ex) return 'Falls in your sleeping hours with these times, so it would stay silent.';
-    return `${ex.time}: ${ex.body}`;
+    if (ex) return ex.body;
+    return plan ? 'With these times this one falls while you sleep, so it stays silent.' : null;
   };
 
   return (
@@ -713,27 +715,28 @@ export function RoutineStep({ draft, set, errors }: StepProps) {
         <TimeRow title="Breakfast" value={r.breakfast} hour12={hour12} onChange={(breakfast) => setRoutine({ breakfast })} testID="onb-routine-breakfast" />
         <TimeRow title="Lunch" value={r.lunch} hour12={hour12} onChange={(lunch) => setRoutine({ lunch })} testID="onb-routine-lunch" />
         <TimeRow title="Dinner" value={r.dinner} hour12={hour12} onChange={(dinner) => setRoutine({ dinner })} testID="onb-routine-dinner" />
+      </SettingsGroup>
+      <SettingsGroup title="AND YOUR WAKING HOURS?" footer="Nothing is sent between bedtime and wake-up.">
         <TimeRow title="Wake up" value={r.wake} hour12={hour12} onChange={(wake) => setRoutine({ wake })} testID="onb-routine-wake" />
         <TimeRow title="Bedtime" value={r.bed} hour12={hour12} onChange={(bed) => setRoutine({ bed })} testID="onb-routine-bed" />
       </SettingsGroup>
       {errors.meals || errors.sleep ? <ErrorText testID="onb-routine-error">{errors.sleep ?? errors.meals}</ErrorText> : null}
-      <View style={{ gap: spacing.sm }}>
-        <SettingsGroup
-          title="WHICH NUDGES WOULD HELP?"
-          footer="Each one carries your live numbers, skips itself once the goal is met and stays silent between bedtime and wake-up. Change them any time in Profile, Reminders.">
-          {NUDGES.map((n) => (
-            <ToggleRow
-              key={n.key}
-              title={n.title}
-              subtitle={subtitleFor(n.key)}
-              value={r.nudges[n.key]}
-              onChange={(on) => setRoutine({ nudges: { ...r.nudges, [n.key]: on } })}
-              left={<IconTile color={colors[n.color]}>{n.icon(colors[n.color])}</IconTile>}
-              testID={`onb-nudge-${n.key}`}
-            />
-          ))}
-        </SettingsGroup>
-      </View>
+      <SettingsGroup
+        title="WHICH NUDGES WOULD HELP?"
+        footer="Examples from a typical day on your plan. Real ones carry your live numbers and skip themselves once a goal is met. Change them any time in Profile, Reminders.">
+        {NUDGES.map((n) => (
+          <NudgeRow
+            key={n.key}
+            title={n.title}
+            when={whenFor(n.key)}
+            example={exampleFor(n.key)}
+            value={r.nudges[n.key]}
+            onChange={(on) => setRoutine({ nudges: { ...r.nudges, [n.key]: on } })}
+            icon={<IconTile color={colors[n.color]}>{n.icon(colors[n.color])}</IconTile>}
+            testID={`onb-nudge-${n.key}`}
+          />
+        ))}
+      </SettingsGroup>
       {!remindersSupported ? (
         <Note icon={<BellRing size={18} color={colors.textSecondary} />}>
           <Text variant="caption" color="textSecondary">
@@ -742,5 +745,64 @@ export function RoutineStep({ draft, set, errors }: StepProps) {
         </Note>
       ) : null}
     </Group>
+  );
+}
+
+/** A reminder choice with its example written out in full, so the person sees exactly what would arrive. */
+function NudgeRow({
+  title,
+  when,
+  example,
+  value,
+  onChange,
+  icon,
+  testID,
+}: {
+  title: string;
+  when: string;
+  example: string | null;
+  value: boolean;
+  onChange: (on: boolean) => void;
+  icon: React.ReactNode;
+  testID: string;
+}) {
+  const { colors, radius, spacing } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.md, alignItems: 'flex-start' }}>
+      {icon}
+      <View style={{ flex: 1, minWidth: 0, gap: spacing.xs }}>
+        <View style={{ minHeight: 36, justifyContent: 'center' }}>
+          <Text variant="bodyStrong">{title}</Text>
+          <Text variant="caption" color="textSecondary">
+            {when}
+          </Text>
+        </View>
+        {example ? (
+          <View
+            testID={`${testID}-example`}
+            style={{
+              borderRadius: radius.sm,
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.sm,
+              backgroundColor: colors.surfaceAlt,
+              opacity: value ? 1 : 0.6,
+            }}>
+            <Text variant="caption" color={value ? 'text' : 'textSecondary'}>
+              {example}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+      <View style={{ minHeight: 44, minWidth: 44, alignItems: 'flex-end', justifyContent: 'center' }}>
+        <Switch
+          testID={testID}
+          value={value}
+          onValueChange={onChange}
+          trackColor={{ false: colors.track, true: colors.primary }}
+          thumbColor="#FFFFFF"
+          accessibilityLabel={`${title} reminders`}
+        />
+      </View>
+    </View>
   );
 }

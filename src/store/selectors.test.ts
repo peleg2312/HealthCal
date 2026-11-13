@@ -14,6 +14,7 @@ import {
   computeEnergyModel,
   intakeByDate,
   live,
+  modelInputs,
 } from './selectors';
 
 const DAY = '2026-06-15';
@@ -373,5 +374,25 @@ describe('a past day keeps the target it had at the time', () => {
     const m = computeEnergyModel(profile, [], [], DAY);
     const other = { id: 's', updatedAt: '', date: addDays(DAY, -1), target: 1500, tdee: 2000, eatBackExercise: true, weightKg: 80 };
     expect(computeDay(DAY, profile, m, [], [], [], [other]).target).toBe(m.target.target);
+  });
+});
+
+describe('a past day has one budget, whichever way it is asked for', () => {
+  it('the per-date model used for a run of days equals the model for that single day', () => {
+    // A history in which the learned expenditure moves: intake rises half-way through at flat weight.
+    const END = '2026-08-30';
+    const p = { ...profile, useAdaptiveTdee: true, goal: 'maintain' as const, weeklyRateKg: 0 };
+    const dates = Array.from({ length: 60 }, (_, i) => addDays(END, -i));
+    const foods = dates.map((d, i) => food(d, i < 30 ? 2600 : 2100));
+    const weights = dates.map((d) => weight(d, 80));
+    const inputs = modelInputs(foods, weights, []);
+    for (const d of [addDays(END, -5), addDays(END, -20), addDays(END, -33)]) {
+      const single = computeEnergyModel(p, foods, weights, d);
+      const shared = computeEnergyModel(p, foods, weights, d, [], inputs);
+      expect(shared.target.target).toBe(single.target.target);
+      expect(shared.tdee).toBe(single.tdee);
+    }
+    // And the model really does differ between dates here, so the check above is not vacuous.
+    expect(computeEnergyModel(p, foods, weights, END).tdee).not.toBe(computeEnergyModel(p, foods, weights, addDays(END, -33)).tdee);
   });
 });

@@ -54,6 +54,7 @@ export function ThemeSwatches({ value, onChange }: { value: ThemePreference; onC
             testID={`profile-theme-${o.value}`}
             accessibilityRole="radio"
             accessibilityState={{ checked: selected, selected }}
+            aria-checked={selected}
             accessibilityLabel={`${o.label}. ${o.hint}`}
             feedback="select"
             onPress={() => onChange(o.value)}

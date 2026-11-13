@@ -6,12 +6,7 @@ import { Group, Hint, OptionRow } from '@/features/settings/components';
 import { formatMonthDayYear } from '@/features/settings/format';
 import { birthDateError, customSplitError, heightError, rateForGoal, targetWeightError } from '@/features/settings/goalsValidation';
 import { ageFromBirthDate } from '@/lib/dates';
-import {
-  ACTIVITY_LABELS,
-  macroTargets,
-  maxWeeklyRateKg,
-  projectedGoalDate,
-} from '@/lib/energy';
+import { ACTIVITY_LABELS, macroTargets, maxWeeklyRateKg, projectedGoalDate } from '@/lib/energy';
 import { baseWaterGoalMl } from '@/lib/hydration';
 import {
   cmToFtIn,
@@ -35,15 +30,28 @@ import { Button, Card, Chip, goBack, Header, MacroBar, NumberField, Screen, Segm
 type MacroMode = 'auto' | 'balanced' | 'protein' | 'lowcarb' | 'custom';
 
 const PRESETS: Record<Exclude<MacroMode, 'auto' | 'custom'>, { label: string; split: MacroSplit }> = {
-  balanced: { label: 'Balanced', split: { protein: 0.3, carbs: 0.4, fat: 0.3 } },
-  protein: { label: 'Higher protein', split: { protein: 0.4, carbs: 0.3, fat: 0.3 } },
-  lowcarb: { label: 'Lower carb', split: { protein: 0.35, carbs: 0.25, fat: 0.4 } },
+  balanced: {
+    label: 'Balanced',
+    split: { protein: 0.3, carbs: 0.4, fat: 0.3 },
+  },
+  protein: {
+    label: 'Higher protein',
+    split: { protein: 0.4, carbs: 0.3, fat: 0.3 },
+  },
+  lowcarb: {
+    label: 'Lower carb',
+    split: { protein: 0.35, carbs: 0.25, fat: 0.4 },
+  },
 };
 
 function modeOf(split: MacroSplit | undefined): MacroMode {
   if (!split) return 'auto';
   for (const [k, p] of Object.entries(PRESETS)) {
-    if (Math.abs(p.split.protein - split.protein) < 0.005 && Math.abs(p.split.carbs - split.carbs) < 0.005 && Math.abs(p.split.fat - split.fat) < 0.005) {
+    if (
+      Math.abs(p.split.protein - split.protein) < 0.005 &&
+      Math.abs(p.split.carbs - split.carbs) < 0.005 &&
+      Math.abs(p.split.fat - split.fat) < 0.005
+    ) {
       return k as MacroMode;
     }
   }
@@ -89,7 +97,11 @@ function GoalsForm() {
   const [birthText, setBirthText] = useState(saved.birthDate);
   const [macroMode, setMacroMode] = useState<MacroMode>(modeOf(saved.macroSplitOverride));
   const initialCustom = saved.macroSplitOverride ?? PRESETS.balanced.split;
-  const [custom, setCustom] = useState({ protein: pct(initialCustom.protein), carbs: pct(initialCustom.carbs), fat: pct(initialCustom.fat) });
+  const [custom, setCustom] = useState({
+    protein: pct(initialCustom.protein),
+    carbs: pct(initialCustom.carbs),
+    fat: pct(initialCustom.fat),
+  });
   const [manualCalories, setManualCalories] = useState(!!saved.calorieTargetOverride);
   const [manualWater, setManualWater] = useState(!!saved.waterGoalMlOverride);
 
@@ -100,7 +112,8 @@ function GoalsForm() {
   const heightMessage = heightError(draft.heightCm, u);
   const heightValid = heightMessage === null;
   const bodyFatValid = draft.bodyFatPct === undefined || (draft.bodyFatPct >= 3 && draft.bodyFatPct <= 60);
-  const caloriesValid = !manualCalories || (!!draft.calorieTargetOverride && draft.calorieTargetOverride >= 800 && draft.calorieTargetOverride <= 6000);
+  const caloriesValid =
+    !manualCalories || (!!draft.calorieTargetOverride && draft.calorieTargetOverride >= 800 && draft.calorieTargetOverride <= 6000);
   const waterValid = !manualWater || (!!draft.waterGoalMlOverride && draft.waterGoalMlOverride >= 500 && draft.waterGoalMlOverride <= 8000);
   const targetMessage = targetWeightError(draft.goal, draft.weightKg, draft.targetWeightKg, u);
   const targetValid = targetMessage === null;
@@ -115,7 +128,11 @@ function GoalsForm() {
       macroMode === 'auto'
         ? undefined
         : macroMode === 'custom'
-          ? { protein: custom.protein / 100, carbs: custom.carbs / 100, fat: custom.fat / 100 }
+          ? {
+              protein: custom.protein / 100,
+              carbs: custom.carbs / 100,
+              fat: custom.fat / 100,
+            }
           : PRESETS[macroMode].split,
   };
 
@@ -153,7 +170,13 @@ function GoalsForm() {
         <Text variant="overline" color="textSecondary">
           Your plan
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: spacing.xs }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'baseline',
+            gap: 6,
+            marginTop: spacing.xs,
+          }}>
           <Text variant="numXL" tabular color={colors.calories} testID="goals-preview-kcal">
             {formatNumber(model.target.target)}
           </Text>
@@ -203,7 +226,16 @@ function GoalsForm() {
 
       <Group title="Goal">
         <View style={{ paddingVertical: spacing.md, gap: spacing.md }}>
-          <Segmented<GoalType> value={draft.goal} onChange={(goal) => patch({ goal, weeklyRateKg: rateForGoal(goal, draft.weeklyRateKg, draft.weightKg) })} options={GOALS} />
+          <Segmented<GoalType>
+            value={draft.goal}
+            onChange={(goal) =>
+              patch({
+                goal,
+                weeklyRateKg: rateForGoal(goal, draft.weeklyRateKg, draft.weightKg),
+              })
+            }
+            options={GOALS}
+          />
           {draft.goal !== 'maintain' ? (
             <>
               <NumberField
@@ -219,7 +251,12 @@ function GoalsForm() {
                 <Text variant="label" color="textSecondary">
                   Weekly pace
                 </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}>
                   <Stepper
                     label="weekly pace"
                     value={draft.weeklyRateKg}
@@ -266,26 +303,38 @@ function GoalsForm() {
             ]}
           />
           {u === 'imperial' ? (
-            <View style={{ flexDirection: 'row', gap: spacing.md }}>
-              <NumberField
-                testID="goals-height-ft"
-                label="Height"
-                suffix="ft"
-                decimals={0}
-                style={{ flex: 1 }}
-                value={ft}
-                onChange={(v) => v !== null && patch({ heightCm: ftInToCm(Math.round(v), inch) })}
-                error={heightMessage}
-              />
-              <NumberField
-                testID="goals-height-in"
-                label=" "
-                suffix="in"
-                decimals={0}
-                style={{ flex: 1 }}
-                value={inch}
-                onChange={(v) => v !== null && patch({ heightCm: ftInToCm(ft, Math.min(11, Math.max(0, Math.round(v)))) })}
-              />
+            <View style={{ gap: spacing.xs }}>
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <NumberField
+                  testID="goals-height-ft"
+                  label="Height"
+                  suffix="ft"
+                  decimals={0}
+                  style={{ flex: 1 }}
+                  value={ft}
+                  onChange={(v) => v !== null && patch({ heightCm: ftInToCm(Math.round(v), inch) })}
+                />
+                <NumberField
+                  testID="goals-height-in"
+                  label=" "
+                  suffix="in"
+                  decimals={0}
+                  style={{ flex: 1 }}
+                  value={inch}
+                  onChange={(v) =>
+                    v !== null &&
+                    patch({
+                      heightCm: ftInToCm(ft, Math.min(11, Math.max(0, Math.round(v)))),
+                    })
+                  }
+                />
+              </View>
+              {/* One message under both fields, so it is not squeezed into the narrow ft column. */}
+              {heightMessage ? (
+                <Text variant="caption" color="danger" testID="goals-height-error">
+                  {heightMessage}
+                </Text>
+              ) : null}
             </View>
           ) : (
             <NumberField
@@ -350,7 +399,11 @@ function GoalsForm() {
               This is below {formatNumber(floor)} kcal, the lowest HealthCal recommends without medical supervision.
             </Text>
           ) : null}
-          <Hint>{manualCalories ? 'Use this if a dietitian or coach gave you a number.' : 'Worked out from your body, activity and pace. Updates as your weight changes.'}</Hint>
+          <Hint>
+            {manualCalories
+              ? 'Use this if a dietitian or coach gave you a number.'
+              : 'Worked out from your body, activity and pace. Updates as your weight changes.'}
+          </Hint>
         </View>
       </Group>
 
@@ -366,9 +419,33 @@ function GoalsForm() {
           {macroMode === 'custom' ? (
             <>
               <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                <NumberField testID="goals-pct-protein" label="Protein" suffix="%" decimals={0} style={{ flex: 1 }} value={custom.protein} onChange={(v) => setCustom((c) => ({ ...c, protein: v ?? 0 }))} />
-                <NumberField testID="goals-pct-carbs" label="Carbs" suffix="%" decimals={0} style={{ flex: 1 }} value={custom.carbs} onChange={(v) => setCustom((c) => ({ ...c, carbs: v ?? 0 }))} />
-                <NumberField testID="goals-pct-fat" label="Fat" suffix="%" decimals={0} style={{ flex: 1 }} value={custom.fat} onChange={(v) => setCustom((c) => ({ ...c, fat: v ?? 0 }))} />
+                <NumberField
+                  testID="goals-pct-protein"
+                  label="Protein"
+                  suffix="%"
+                  decimals={0}
+                  style={{ flex: 1 }}
+                  value={custom.protein}
+                  onChange={(v) => setCustom((c) => ({ ...c, protein: v ?? 0 }))}
+                />
+                <NumberField
+                  testID="goals-pct-carbs"
+                  label="Carbs"
+                  suffix="%"
+                  decimals={0}
+                  style={{ flex: 1 }}
+                  value={custom.carbs}
+                  onChange={(v) => setCustom((c) => ({ ...c, carbs: v ?? 0 }))}
+                />
+                <NumberField
+                  testID="goals-pct-fat"
+                  label="Fat"
+                  suffix="%"
+                  decimals={0}
+                  style={{ flex: 1 }}
+                  value={custom.fat}
+                  onChange={(v) => setCustom((c) => ({ ...c, fat: v ?? 0 }))}
+                />
               </View>
               <Text variant="caption" color={splitError ? 'warning' : 'textSecondary'} testID="goals-pct-total">
                 {splitError ?? 'Total 100%'}
@@ -391,7 +468,10 @@ function GoalsForm() {
             value={manualWater ? 'manual' : 'auto'}
             onChange={(v) => {
               setManualWater(v === 'manual');
-              if (v === 'manual' && !draft.waterGoalMlOverride) patch({ waterGoalMlOverride: baseWaterGoalMl(draft.weightKg, draft.sex) });
+              if (v === 'manual' && !draft.waterGoalMlOverride)
+                patch({
+                  waterGoalMlOverride: baseWaterGoalMl(draft.weightKg, draft.sex),
+                });
             }}
             options={[
               { value: 'auto', label: 'Automatic' },
@@ -405,7 +485,11 @@ function GoalsForm() {
               suffix={volumeUnit(u)}
               decimals={0}
               value={draft.waterGoalMlOverride ? Math.round(volumeValue(draft.waterGoalMlOverride, u)) : null}
-              onChange={(v) => patch({ waterGoalMlOverride: v ? Math.round(volumeToMl(v, u)) : undefined })}
+              onChange={(v) =>
+                patch({
+                  waterGoalMlOverride: v ? Math.round(volumeToMl(v, u)) : undefined,
+                })
+              }
               error={waterValid ? null : `Enter between ${formatVolume(500, u)} and ${formatVolume(8000, u)}.`}
             />
           ) : null}

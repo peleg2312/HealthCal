@@ -2,7 +2,7 @@ import { Scale } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
-import { diffDays, formatShortDate, toISODate } from '@/lib/dates';
+import { addDays, diffDays, formatShortDate, toISODate } from '@/lib/dates';
 import { projectedGoalDate } from '@/lib/energy';
 import { rateText, STALE_WEIGH_IN_DAYS } from '@/lib/insights';
 import { weightUnit, weightValue } from '@/lib/units';
@@ -77,6 +77,7 @@ export function WeightCard({ series, start, end, profile }: { series: WeightSeri
         color={colors.weight}
         height={170}
         formatY={(n) => n.toFixed(1)}
+        formatPoint={(p) => `${formatShortDate(addDays(origin, p.x))} · trend ${p.y.toFixed(1)} ${unit}`}
         xLabels={[formatShortDate(pts[0].date), formatShortDate(pts[pts.length - 1].date)]}
       />
       <StatStrip

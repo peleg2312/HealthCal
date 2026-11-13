@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { estimateOneRepMax, grossKcal, kcalRange, netKcal, paceKmh, strengthVolumeKg } from './exercise';
+import { estimateOneRepMax, findStrengthRecords, grossKcal, kcalRange, netKcal, paceKmh, strengthVolumeKg } from './exercise';
 
 describe('grossKcal', () => {
   it('8 MET, 70 kg, 30 min = 8*3.5*70/200 = 9.8 kcal/min -> 294', () => {
@@ -75,5 +75,25 @@ describe('strength helpers', () => {
     ).toBe(1180);
     expect(strengthVolumeKg([])).toBe(0);
     expect(strengthVolumeKg([{ sets: [] }])).toBe(0);
+  });
+});
+
+describe('findStrengthRecords', () => {
+  const hist = [[{ name: 'Bench press', sets: [{ reps: 5, weightKg: 80 }, { reps: 3, weightKg: 85 }] }]];
+  it('reports a better estimated 1RM against earlier sessions', () => {
+    const r = findStrengthRecords([{ name: 'bench press', sets: [{ reps: 5, weightKg: 85 }] }], hist);
+    expect(r).toHaveLength(1);
+    expect(r[0].kind).toBe('e1rm');
+    expect(r[0].valueKg).toBeCloseTo(85 * (1 + 5 / 30), 6);
+    expect(r[0].previousKg).toBeCloseTo(85 * 1.1, 6);
+  });
+  it('falls back to a heavier set when the 1RM did not improve', () => {
+    const r = findStrengthRecords([{ name: 'Bench press', sets: [{ reps: 1, weightKg: 90 }] }], [[{ name: 'Bench press', sets: [{ reps: 10, weightKg: 75 }] }]]);
+    expect(r).toEqual([{ exercise: 'Bench press', kind: 'heaviest', valueKg: 90, previousKg: 75 }]);
+  });
+  it('sets no record for a first-time exercise, a tie or a worse session', () => {
+    expect(findStrengthRecords([{ name: 'Squat', sets: [{ reps: 5, weightKg: 100 }] }], hist)).toEqual([]);
+    expect(findStrengthRecords([{ name: 'Bench press', sets: [{ reps: 3, weightKg: 85 }] }], hist)).toEqual([]);
+    expect(findStrengthRecords([{ name: 'Bench press', sets: [{ reps: 5, weightKg: 70 }, { reps: 0, weightKg: 200 }] }], hist)).toEqual([]);
   });
 });

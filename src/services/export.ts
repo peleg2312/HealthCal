@@ -24,7 +24,7 @@ import {
 import { toISODate } from '@/lib/dates';
 import { COLLECTIONS, ONE_PER_DATE, collapseDateDuplicates, favoriteRecordId, nextStamp, useStore, withSettingsDefaults, type Store } from '@/store';
 import { live } from '@/store/selectors';
-import type { Collection, Food } from '@/types';
+import type { Collection, Food, Profile } from '@/types';
 
 export type ExportKind = 'backup' | 'food' | 'activities' | 'weight' | 'water';
 
@@ -186,9 +186,19 @@ export function importBackupText(text: string, options: { forceProfile?: boolean
     updated: merged.updated,
     unchanged: merged.unchanged,
     profileRestored,
-    profileSkipped: hasProfile && !profileRestored,
+    // Only worth asking when the backup's profile actually differs from the one in use.
+    profileSkipped: hasProfile && !profileRestored && !sameProfile(b.profile, s.profile),
     skipped: parsed.skipped,
   };
+}
+
+function sameProfile(a: Profile | null, b: Profile | null): boolean {
+  if (!a || !b) return a === b;
+  const { updatedAt: _a, ...x } = a;
+  const { updatedAt: _b, ...y } = b;
+  void _a;
+  void _b;
+  return JSON.stringify(x, Object.keys(x).sort()) === JSON.stringify(y, Object.keys(y).sort());
 }
 
 /** Apply the profile, goals and settings from the backup that was just imported (after the user confirms). */

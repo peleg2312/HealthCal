@@ -14,7 +14,7 @@ import { PressableScale, Text } from '@/ui';
  */
 const ON_PHOTO = '#FFFFFF';
 const ON_PHOTO_SOFT = 'rgba(255,255,255,0.82)';
-const SCRIM = ['rgba(0,0,0,0)', 'rgba(0,0,0,0.28)', 'rgba(0,0,0,0.78)'] as const;
+const SCRIM = ['rgba(0,0,0,0)', 'rgba(0,0,0,0.45)', 'rgba(0,0,0,0.85)'] as const;
 const PILL_BG = 'rgba(255,255,255,0.94)';
 const PILL_TEXT = '#14161A';
 
@@ -45,7 +45,7 @@ export function PhotoHero({
       testID="ai-photo-hero"
       style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.surfaceAlt }}>
       <Image source={{ uri }} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }} contentFit="cover" accessibilityLabel="Your meal photo" />
-      <LinearGradient colors={SCRIM} locations={[0.25, 0.5, 1]} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }} pointerEvents="none" />
+      <LinearGradient colors={SCRIM} locations={[0.12, 0.5, 1]} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }} pointerEvents="none" />
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: spacing.lg, gap: spacing.sm }}>
         <Text variant="h3" color={ON_PHOTO} numberOfLines={2} testID="ai-dish">
           {dish}

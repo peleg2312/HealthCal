@@ -343,8 +343,11 @@ describe('local match for a missed item', () => {
     const avocado = matchFoods('1/2 avocado', BUILTIN_FOODS)[0];
     expect(avocado.name.toLowerCase()).toContain('avocado');
     const half = foodToItem(avocado, '1/2 avocado');
-    const whole = foodToItem(avocado, 'avocado');
+    const whole = foodToItem(avocado, '1 avocado');
     expect(half.grams).toBe(Math.round(whole.grams / 2));
+    // The bundled avocado's first serving is already half a fruit; a count is of whole fruit.
+    expect(whole.grams).toBe(201);
+    expect(half).toMatchObject({ grams: 101, kcal: Math.round(avocado.per100g.kcal * 1.01) });
   });
   it('finds bundled foods and scales to the typed amount', () => {
     const hits = matchFoods('banana', BUILTIN_FOODS);
@@ -353,6 +356,9 @@ describe('local match for a missed item', () => {
     expect(item.grams).toBe(200);
     expect(item.kcal).toBe(Math.round(hits[0].per100g.kcal * 2));
     expect(matchFoods('   ', BUILTIN_FOODS)).toEqual([]);
+    // A state word alone does not make a match.
+    expect(matchFoods('raw', BUILTIN_FOODS)).toEqual([]);
+    expect(matchFoods('avocado', BUILTIN_FOODS).some((f) => /apple/i.test(f.name))).toBe(false);
   });
 });
 

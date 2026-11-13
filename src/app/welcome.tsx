@@ -78,7 +78,7 @@ export default function Welcome() {
             size="sm"
             testID="welcome-restore"
             loading={importing}
-            icon={<FileUp size={16} color={colors.textSecondary} />}
+            icon={<FileUp size={16} color={colors.primary} />}
             onPress={() => void restore()}
           />
         </View>

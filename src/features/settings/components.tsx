@@ -70,6 +70,7 @@ export function OptionRow({
       scaleTo={0.985}
       accessibilityRole="radio"
       accessibilityState={{ checked: selected, selected }}
+      aria-checked={selected}
       accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
       style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: spacing.sm }}>
       <View style={{ flex: 1, minWidth: 0 }}>

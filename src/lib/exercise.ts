@@ -63,3 +63,58 @@ export function estimateOneRepMax(weightKg: number, reps: number): number {
   if (reps === 1) return weightKg;
   return weightKg * (1 + reps / 30);
 }
+
+export interface StrengthRecord {
+  exercise: string;
+  kind: 'e1rm' | 'heaviest';
+  /** New best, kg. */
+  valueKg: number;
+  /** Previous best, kg. */
+  previousKg: number;
+}
+
+type SetLike = { reps: number; weightKg: number };
+type ExerciseLike = { name: string; sets: SetLike[] };
+
+function bests(sets: SetLike[]): { e1rm: number; heaviest: number } {
+  let e1rm = 0;
+  let heaviest = 0;
+  for (const s of sets) {
+    if (!(s.reps > 0) || !(s.weightKg > 0)) continue;
+    e1rm = Math.max(e1rm, estimateOneRepMax(s.weightKg, s.reps));
+    heaviest = Math.max(heaviest, s.weightKg);
+  }
+  return { e1rm, heaviest };
+}
+
+/**
+ * Personal records in a session against earlier sessions: a better estimated
+ * one-rep max, else a heavier set. An exercise with no earlier weighted sets
+ * sets no record (there is nothing to beat), and ties are not records.
+ * Exercise names match case-insensitively.
+ */
+export function findStrengthRecords(session: ExerciseLike[], history: ExerciseLike[][]): StrengthRecord[] {
+  const prior = new Map<string, { e1rm: number; heaviest: number }>();
+  for (const s of history) for (const ex of s) {
+    const k = ex.name.trim().toLowerCase();
+    const b = bests(ex.sets);
+    const p = prior.get(k);
+    prior.set(k, { e1rm: Math.max(p?.e1rm ?? 0, b.e1rm), heaviest: Math.max(p?.heaviest ?? 0, b.heaviest) });
+  }
+  const now = new Map<string, { name: string; e1rm: number; heaviest: number }>();
+  for (const ex of session) {
+    const k = ex.name.trim().toLowerCase();
+    const b = bests(ex.sets);
+    const c = now.get(k);
+    now.set(k, { name: c?.name ?? ex.name.trim(), e1rm: Math.max(c?.e1rm ?? 0, b.e1rm), heaviest: Math.max(c?.heaviest ?? 0, b.heaviest) });
+  }
+  const out: StrengthRecord[] = [];
+  const EPS = 1e-6;
+  for (const [k, c] of now) {
+    const p = prior.get(k);
+    if (!p || p.e1rm <= 0) continue;
+    if (c.e1rm > p.e1rm + EPS) out.push({ exercise: c.name, kind: 'e1rm', valueKg: c.e1rm, previousKg: p.e1rm });
+    else if (c.heaviest > p.heaviest + EPS) out.push({ exercise: c.name, kind: 'heaviest', valueKg: c.heaviest, previousKg: p.heaviest });
+  }
+  return out;
+}

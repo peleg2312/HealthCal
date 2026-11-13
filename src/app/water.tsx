@@ -280,7 +280,7 @@ function WaterScreen() {
           <>
             <GoalLine
               label="Base for your body weight"
-              hint={`About 33 ml per kg at ${formatWeight(profile.weightKg, units)}, kept within the usual range for ${profile.sex === 'male' ? 'men' : 'women'}`}
+              hint={`About ${units === 'imperial' ? '0.5 fl oz per lb' : '33 ml per kg'} at ${formatWeight(profile.weightKg, units)}, kept within the usual range for ${profile.sex === 'male' ? 'men' : 'women'}`}
               value={formatVolume(baseMl, units)}
             />
             <GoalLine

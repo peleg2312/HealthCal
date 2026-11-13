@@ -245,6 +245,11 @@ export default function PhotoScreen() {
     });
   }
 
+  /** Swap chips for estimated items, not for the fat amount or a food the person already picked. */
+  function swappable(r: ReviewRow): boolean {
+    return r.kind !== 'fat' && !(r.food && !r.estimate);
+  }
+
   function showRow(key: string) {
     const y = layout.current.rows[key];
     if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(0, layout.current.section + layout.current.card + y - 12), animated: true });
@@ -506,8 +511,8 @@ export default function PhotoScreen() {
                     <ItemRow
                       row={r}
                       index={i}
-                      matches={r.kind === 'fat' ? [] : matchFoods(r.food?.name ?? r.item.name, matchPool, 3)}
-                      onSwap={r.kind === 'fat' ? undefined : (food) => setRows((rs) => rs.map((x) => (x.key === r.key ? swapRow(x, food) : x)))}
+                      matches={swappable(r) ? matchFoods(r.estimate?.name ?? r.item.name, matchPool, 3) : []}
+                      onSwap={!swappable(r) ? undefined : (food) => setRows((rs) => rs.map((x) => (x.key === r.key ? swapRow(x, food) : x)))}
                       onUnswap={() => setRows((rs) => rs.map((x) => (x.key === r.key ? unswapRow(x) : x)))}
                       onGrams={(g) => setRows((rs) => rs.map((x) => (x.key === r.key ? setRowGrams(x, g) : x)))}
                       onRename={(name) => setRows((rs) => rs.map((x) => (x.key === r.key ? renameRow(x, name) : x)))}

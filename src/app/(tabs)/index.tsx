@@ -321,7 +321,7 @@ function MealsCard({ day }: { day: DaySummary }) {
                     </Text>
                   ) : (
                     <Text variant="caption" color="textSecondary" numberOfLines={1}>
-                      {`Around ${formatNumber(Math.round((day.budget * MEAL_SHARE[m.id]) / 10) * 10)} kcal suggested`}
+                      {`Around ${formatNumber(Math.round((day.budget * MEAL_SHARE[m.id]) / 10) * 10)} kcal${prev ? '' : ' suggested'}`}
                     </Text>
                   )}
                 </View>

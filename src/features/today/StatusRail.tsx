@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Droplets, Flame, Moon, Plus, Timer } from 'lucide-react-native';
+import { Droplets, Flame, Moon, Plus, Scale, Timer } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
@@ -70,7 +70,7 @@ export function StatusRail({ day, isToday }: { day: DaySummary; isToday: boolean
       <View style={{ flex: 1, alignItems: 'center', gap: spacing.sm }}>
         <Column
           testID="today-water"
-          label="Water"
+          label={`of ${formatVolume(day.waterGoalMl, units)}`}
           accessibilityLabel={`Water, ${formatVolume(day.waterMl, units)} of ${formatVolume(day.waterGoalMl, units)}`}
           onPress={() => router.push(`/water${dateQuery}` as never)}
           ring={
@@ -82,7 +82,7 @@ export function StatusRail({ day, isToday }: { day: DaySummary; isToday: boolean
           unit={waterUnit}
         />
         <PressableScale
-          testID="today-water-add"
+          testID={`today-water-${glass}`}
           feedback="none"
           onPress={() => addWater(day.date, glass, units)}
           accessibilityLabel={`Add ${formatVolume(glass, units)} of water`}
@@ -155,7 +155,7 @@ export function StatusRail({ day, isToday }: { day: DaySummary; isToday: boolean
                 borderRadius: 22,
                 backgroundColor: `${colors.weight}22`,
               }}>
-              <Sparkline values={trendValues(series.trend, day.date)} color={colors.weight} width={32} height={18} />
+              {series.trend.length > 1 ? <Sparkline values={trendValues(series.trend, day.date)} color={colors.weight} width={32} height={18} /> : <Scale size={18} color={colors.weight} />}
             </View>
           }
           value={series.trendKg !== null ? weightValue(series.trendKg, units).toFixed(1) : null}
@@ -223,28 +223,18 @@ function Column({
         paddingHorizontal: 2,
       }}>
       {ring}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'baseline',
-          gap: 2,
-          marginTop: 2,
-        }}>
-        {value !== null ? (
-          <>
-            <Text variant="numM" tabular numberOfLines={1} style={{ fontSize: 18 }}>
-              {value}
-            </Text>
-            <Text variant="caption" color="textSecondary" numberOfLines={1}>
-              {unit}
-            </Text>
-          </>
-        ) : (
-          <Text variant="label" color="primary" style={{ lineHeight: 24 }}>
-            Add
+      {value !== null ? (
+        <Text variant="numM" tabular numberOfLines={1} style={{ fontSize: 18, marginTop: 2 }}>
+          {value}
+          <Text variant="caption" color="textSecondary">
+            {unit ? ` ${unit}` : ''}
           </Text>
-        )}
-      </View>
+        </Text>
+      ) : (
+        <Text variant="label" color="primary" style={{ lineHeight: 24, marginTop: 2 }}>
+          Add
+        </Text>
+      )}
       <Text variant="caption" color="textTertiary" numberOfLines={1}>
         {label}
       </Text>

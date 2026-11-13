@@ -32,6 +32,9 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
         accessibilityLabel={label}
         onPress={() => navigateToTab(route.key)}
         style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, height: 56 }}>
+        {focused ? (
+          <View pointerEvents="none" style={{ position: 'absolute', width: 60, height: 50, borderRadius: radius.md, backgroundColor: colors.primarySoft }} />
+        ) : null}
         <Icon size={22} color={focused ? colors.primary : colors.textTertiary} strokeWidth={focused ? 2.4 : 2} />
         <Text variant="caption" color={focused ? 'text' : 'textTertiary'} style={{ fontSize: 10.5 }}>
           {label}

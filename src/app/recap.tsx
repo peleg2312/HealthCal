@@ -13,6 +13,7 @@ import { useTheme } from '@/theme';
 import { BarChart, Card, EmptyState, Header, PressableScale, Screen, Text } from '@/ui';
 
 function deltaText(t: RecapTile): string {
+  if (t.soFar) return 'So far, week in progress';
   if (t.delta === null) return t.previous === null ? 'No data the week before' : '';
   if (t.delta === 0) return 'Same as the week before';
   const n = formatNumber(Math.abs(t.delta));

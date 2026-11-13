@@ -24,14 +24,15 @@ export function foodKey(e: Pick<FoodEntry, 'foodId' | 'name' | 'brand'>): string
 }
 
 /**
- * Rank foods logged in `meal` over the last 30 days (today included). Each log
- * counts once, weighted from 1 (today) down to 0.5 (30 days ago), so a food
+ * Rank foods logged in `meal` over the 30 days before today. Today is left out
+ * so the order stays put while the user taps several tiles in a row. Each log
+ * counts once, weighted from about 1 (yesterday) down to 0.5 (30 days ago), so a food
  * eaten often lately beats one eaten often a month ago. Ties go to the most
  * recently logged. Returns nothing until the slot has at least 3 entries.
  */
 export function usualFoods(entries: FoodEntry[], meal: MealType, today: ISODate, limit = 4): UsualFood[] {
-  const floor = addDays(today, -(USUAL_WINDOW_DAYS - 1));
-  const inSlot = entries.filter((e) => !e.deleted && e.meal === meal && e.date >= floor && e.date <= today && e.quantity > 0);
+  const floor = addDays(today, -USUAL_WINDOW_DAYS);
+  const inSlot = entries.filter((e) => !e.deleted && e.meal === meal && e.date >= floor && e.date < today && e.quantity > 0);
   if (inSlot.length < USUAL_MIN_ENTRIES) return [];
   const map = new Map<string, UsualFood>();
   for (const e of inSlot) {

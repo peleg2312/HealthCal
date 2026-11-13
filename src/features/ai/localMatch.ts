@@ -47,8 +47,11 @@ export function parseAmount(query: string): { count: number | null; grams: numbe
   return { count: null, grams: null, rest: query };
 }
 
+/** Words that describe a state, not a food: "raw apple" should not match "raw egg". */
+const GENERIC = new Set(['raw', 'cooked', 'fresh', 'with', 'and', 'of', 'the', 'plain', 'whole', 'homemade', 'small', 'large', 'medium']);
+
 export function matchFoods(query: string, foods: Food[], limit = 3): Food[] {
-  const q = words(parseAmount(query).rest);
+  const q = words(parseAmount(query).rest).filter((w) => !GENERIC.has(w));
   if (q.length === 0) return [];
   const scored: { food: Food; score: number }[] = [];
   for (const food of foods) {
@@ -76,7 +79,9 @@ export function matchFoods(query: string, foods: Food[], limit = 3): Food[] {
 /** Convert a matched food to a review item, honouring a typed amount. */
 export function foodToItem(food: Food, query: string): AiFoodItem {
   const { count, grams } = parseAmount(query);
-  const serving = food.servings.find((s) => s.grams > 0);
+  const usable = food.servings.filter((s) => s.grams > 0);
+  // A count means whole units: "1/2 avocado" is half of "1 whole", not half of the "1/2 fruit" serving.
+  const serving = (count !== null ? usable.find((s) => /^1\s/.test(s.label)) : undefined) ?? usable[0];
   const g = grams ?? (serving ? serving.grams * (count ?? 1) : 100 * (count ?? 1));
   // Reference data, but the portion is still the user's guess.
   return itemFromFood(food, g, 0.8);
