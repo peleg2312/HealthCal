@@ -6,7 +6,7 @@ import { View } from 'react-native';
 import { updateEntryDirect } from '@/features/food/actions';
 import { DayStepper, KcalValue, MacroStat, MealPicker, SourceBadge } from '@/features/food/components';
 import { useFoodDraft } from '@/features/food/draft';
-import { dayPhrase, formatQty, href, kcal, lastPortions, matchServing, param, parseDate, parseMeal, portionFor, sourceInfo } from '@/features/food/helpers';
+import { dayPhrase, formatQty, href, portionLabel, kcal, lastPortions, matchServing, param, parseDate, parseMeal, portionFor, sourceInfo } from '@/features/food/helpers';
 import { deleteEntry, logFood } from '@/features/food/log';
 import { RequireProfile } from '@/features/food/RequireProfile';
 import { MEAL_LABEL, atwaterKcal, formatMacro, scaleNutrients, servingsFor } from '@/lib/nutrition';
@@ -253,7 +253,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
       }>
       <Hero name={food.name} brand={food.brand} emoji={food.emoji} source={food.source} explain={info.explain} />
 
-      <MacroSummary n={n} kcalNote={`${perGram ? `${formatQty(quantity)} g` : `${formatQty(quantity)} × ${serving.label}`}${perGram ? '' : ` · ${Math.round(totalGrams)} g`}`} />
+      <MacroSummary n={n} kcalNote={`${portionLabel(serving.label, quantity)}${perGram || /\bg\)?$/.test(serving.label) ? '' : ` · ${Math.round(totalGrams)} g`}`} />
 
       <Card>
         <Text variant="h3">Amount</Text>
