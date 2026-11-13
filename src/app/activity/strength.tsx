@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { Check, Clock, Pause, Play, Plus, Search, Trash2, X } from 'lucide-react-native';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { View } from 'react-native';
 
 import { ACTIVITY_BY_ID } from '@/data/activities';
@@ -51,13 +51,10 @@ import {
 const STRENGTH = ACTIVITY_BY_ID.strength_training;
 
 function useDraftsHydrated(): boolean {
-  const [ok, setOk] = useState(() => useStrengthDrafts.persist.hasHydrated());
-  useEffect(() => {
-    const unsub = useStrengthDrafts.persist.onFinishHydration(() => setOk(true));
-    if (useStrengthDrafts.persist.hasHydrated()) setOk(true);
-    return unsub;
-  }, []);
-  return ok;
+  return useSyncExternalStore(
+    (cb) => useStrengthDrafts.persist.onFinishHydration(cb),
+    () => useStrengthDrafts.persist.hasHydrated(),
+  );
 }
 
 export default function StrengthScreen() {
@@ -108,7 +105,6 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
 
   useEffect(() => {
     if (!draft.startedAt) return;
-    setNow(Date.now());
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, [draft.startedAt]);

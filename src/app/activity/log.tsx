@@ -16,7 +16,7 @@ import { useStore } from '@/store';
 import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { Intensity } from '@/types';
-import { Button, Card, Chip, EmptyState, Header, IconButton, NumberField, PressableScale, Screen, Text, TextField, goBack } from '@/ui';
+import { Button, Card, Chip, EmptyState, Header, IconButton, NumberField, PressableScale, Screen, Text, TextField } from '@/ui';
 
 const INTENSITIES: Intensity[] = ['light', 'moderate', 'vigorous'];
 const PRESETS = [15, 30, 45, 60, 90];
