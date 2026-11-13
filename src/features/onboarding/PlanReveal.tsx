@@ -50,7 +50,7 @@ export function PlanReveal({ plan }: { plan: Plan }) {
             <Text variant="numXL" tabular testID="plan-kcal">
               {formatNumber(t.target)}
             </Text>
-            <Text variant="caption" color="textSecondary">
+            <Text variant="label" color="textSecondary" style={{ marginTop: 2 }}>
               kcal a day
             </Text>
           </Ring>

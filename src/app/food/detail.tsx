@@ -253,7 +253,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
       }>
       <Hero name={food.name} brand={food.brand} emoji={food.emoji} source={food.source} explain={info.explain} />
 
-      <MacroSummary n={n} kcalNote={`${portionLabel(serving.label, quantity)}${perGram || /\bg\)?$/.test(serving.label) ? '' : ` · ${Math.round(totalGrams)} g`}`} />
+      <MacroSummary n={n} kcalNote={`${portionLabel(serving.label, quantity)}${perGram || serving.label === '100 g' || (quantity === 1 && /\d\s?g\)*$/.test(serving.label)) ? '' : ` · ${Math.round(totalGrams)} g`}`} />
 
       <Card>
         <Text variant="h3">Amount</Text>

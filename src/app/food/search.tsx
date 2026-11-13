@@ -36,7 +36,7 @@ export default function FoodSearchScreen() {
   const [meal, setMeal] = useState<MealType>(() => parseMeal(params.meal));
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState<Tab>('recent');
-  const [online, setOnline] = useState<Online>({ query: '', status: 'idle', items: [] });
+  const [onlineResult, setOnlineResult] = useState<{ query: string; items: Food[] }>({ query: '', items: [] });
   const [openedAt] = useState(() => nowISO());
 
   const recentFoods = useStore((s) => s.recentFoods);
@@ -70,17 +70,19 @@ export default function FoodSearchScreen() {
   const latest = useRef('');
   useEffect(() => {
     latest.current = q;
-    if (q.length < 2) {
-      setOnline({ query: q, status: 'idle', items: [] });
-      return;
-    }
-    setOnline((o) => ({ query: q, status: 'loading', items: o.query && q.startsWith(o.query) ? o.items : [] }));
+    if (q.length < 2) return;
     const t = setTimeout(async () => {
       const items = await searchOnline(q);
-      if (latest.current === q) setOnline({ query: q, status: 'done', items });
+      if (latest.current === q) setOnlineResult({ query: q, items });
     }, 450);
     return () => clearTimeout(t);
   }, [q]);
+  const online: Online = {
+    query: q,
+    status: q.length < 2 ? 'idle' : onlineResult.query === q ? 'done' : 'loading',
+    // While a refined query loads, keep showing the previous answer.
+    items: q.length < 2 ? [] : onlineResult.query && q.startsWith(onlineResult.query) ? onlineResult.items : [],
+  };
   const localIds = new Set(local.map((h) => h.food.id));
   const onlineItems = online.items.filter((f) => !localIds.has(f.id)).slice(0, 15);
 

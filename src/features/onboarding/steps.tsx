@@ -612,7 +612,7 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
             onChange={(v) => set({ weeklyRateKg: imp ? lbToKg(v) : v })}
           />
         </View>
-        <PaceMeter value={rateDisplay / maxDisplay} color={goal === 'lose' ? colors.weight : colors.protein} />
+        <PaceMeter value={rateDisplay / maxDisplay} color={colors.weight} />
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs }} testID="onb-pace-delta">
           <Text variant="numM" tabular color="calories">
             {`${delta < 0 ? '−' : '+'}${formatNumber(Math.abs(Math.round(delta / 10) * 10))}`}

@@ -158,7 +158,7 @@ function WaveLayer({
   reduceMotion: boolean;
   lift?: number;
 }) {
-  const shift = useRef(new Animated.Value(phase)).current;
+  const [shift] = useState(() => new Animated.Value(phase));
   useEffect(() => {
     if (reduceMotion) {
       shift.setValue(phase);
@@ -196,8 +196,8 @@ export function WaterWave({ progress, size = 220, children }: { progress: number
   const clamped = Math.max(0, Math.min(1, Number.isFinite(progress) ? progress : 0));
   // Keep a sliver visible at the bottom once anything is logged, and never quite flat when full.
   const visual = clamped === 0 ? 0 : 0.03 + clamped * 0.92;
-  const fill = useRef(new Animated.Value(0)).current;
-  const bump = useRef(new Animated.Value(1)).current;
+  const [fill] = useState(() => new Animated.Value(0));
+  const [bump] = useState(() => new Animated.Value(1));
   const prev = useRef(clamped);
 
   useEffect(() => {

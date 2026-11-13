@@ -98,11 +98,6 @@ export function DayStepper({ value, onChange, testIDPrefix = 'day' }: { value: I
         style={{ flex: 1, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, minHeight: 44 }}>
         <CalendarDays size={16} color={colors.textSecondary} />
         <Text variant="label">{formatDayLabel(value)}</Text>
-        {!isToday ? (
-          <Text variant="caption" color="primary">
-            · Today
-          </Text>
-        ) : null}
       </PressableScale>
       <IconButton testID={`${testIDPrefix}-next`} accessibilityLabel="Next day" tone="clear" size={44} onPress={() => onChange(addDays(value, 1))}>
         <ChevronRight size={20} color={colors.text} />

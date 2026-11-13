@@ -3,12 +3,13 @@
  * toast, and weigh-ins keep `profile.weightKg` (and body fat) in step with the
  * newest record so calorie and water targets follow.
  */
+import { formatDuration } from '@/lib/dates';
 import { live } from '@/store/selectors';
 import { useStore } from '@/store';
 import type { FastingSession, ISODate, Profile, SleepEntry, WeightEntry } from '@/types';
 import { haptic, toast } from '@/ui';
 
-import { findByDate, isMostRecentDate } from './helpers';
+import { fastProgress, findByDate, isMostRecentDate } from './helpers';
 
 type WeightPatch = Partial<Omit<WeightEntry, 'id' | 'updatedAt' | 'deleted' | 'date'>>;
 
@@ -98,8 +99,10 @@ export function updateFast(session: FastingSession, patch: Partial<Pick<FastingS
   return useStore.getState().upsert('fasting', { ...session, ...patch });
 }
 
-export function endFast(session: FastingSession, message: string) {
+export function endFast(session: FastingSession) {
   const ended = updateFast(session, { end: new Date().toISOString() });
+  const mins = Math.round(fastProgress(ended.start, ended.targetHours, Date.now(), ended.end).elapsedMs / 60_000);
+  const message = `Fast ended after ${formatDuration(mins)}`;
   haptic.success();
   toast(message, {
     label: 'Undo',

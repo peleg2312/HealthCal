@@ -25,7 +25,6 @@ import { Button, Card, Chip, Divider, Header, IconButton, NumberField, Ring, Scr
 function useNow(active: boolean): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    setNow(Date.now());
     if (!active) return;
     const t = setInterval(() => setNow(Date.now()), 1000);
     const sub = AppState.addEventListener('change', (s) => s === 'active' && setNow(Date.now()));
@@ -89,7 +88,7 @@ function FastingScreen() {
       title="End fast"
       variant="secondary"
       icon={<Square size={18} color={colors.text} />}
-      onPress={() => endFast(active, `Fast ended after ${formatDuration(minutes(fastProgress(active.start, active.targetHours, Date.now()).elapsedMs))}`)}
+      onPress={() => endFast(active)}
     />
   ) : (
     <Button testID="fasting-start" title={`Start ${fastingLabel(target)} fast`} icon={<Play size={18} color={colors.onPrimary} />} onPress={() => startFast(target)} />

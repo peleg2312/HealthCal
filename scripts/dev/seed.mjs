@@ -159,6 +159,9 @@ export function buildSeed(opts = {}) {
     const gross = (s.met * 3.5 * weightKg * s.durationMin) / 200;
     put('activities', { date: iso(daysAgo(0)), ...s, kcalGross: gross, kcalNet: Math.max(0, gross - (baselineTdee / 1440) * s.durationMin), loggedAt: at(0, 7) });
   }
+  // Keep the profile in step with the newest weigh-in, as the app itself does.
+  const latest = Object.values(state.weights).sort((a, b) => b.date.localeCompare(a.date))[0];
+  if (latest) state.profile.weightKg = latest.kg;
   state.recentFoods = Object.values(FOODS).slice(0, 12);
   state.favoriteFoodIds = [FOODS.oats.id, FOODS.chicken.id];
   state.recentActivityIds = ['volleyball', 'running', 'strength_training', 'yoga'];

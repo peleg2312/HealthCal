@@ -26,13 +26,12 @@ function len(cm: number | undefined, units: UnitSystem): string {
 function ZoneScale({ min, max, zones, value, testID }: { min: number; max: number; zones: { to: number; color: string }[]; value: number; testID?: string }) {
   const { colors } = useTheme();
   const pos = Math.max(0, Math.min(1, (value - min) / (max - min)));
-  let from = min;
+  const starts = zones.map((_, i) => (i === 0 ? min : zones[i - 1].to));
   return (
     <View testID={testID} style={{ height: 22, justifyContent: 'center' }}>
       <View style={{ flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', gap: 2 }}>
         {zones.map((z, i) => {
-          const width = (Math.min(z.to, max) - from) / (max - min);
-          from = z.to;
+          const width = (Math.min(z.to, max) - starts[i]) / (max - min);
           return <View key={i} style={{ flex: width, backgroundColor: z.color }} />;
         })}
       </View>

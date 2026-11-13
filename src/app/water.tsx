@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { Check, GlassWater, Info, Trash2 } from 'lucide-react-native';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Animated, View } from 'react-native';
 
 import { today, weekdayShort } from '@/lib/dates';
@@ -94,10 +94,6 @@ function WaterScreen() {
     toast(`Removed ${formatVolume(e.ml, units)}`, { label: 'Undo', onPress: () => useStore.getState().restore('water', e.id) });
   };
 
-  // The banner is a one-off acknowledgement: it leaves when intake drops back under the goal.
-  useEffect(() => {
-    if (!reached) setCelebrate(false);
-  }, [reached]);
 
   const allEntries = [...day.waterEntries].reverse();
   const entries = showAllLog ? allEntries : allEntries.slice(0, 6);
@@ -159,7 +155,8 @@ function WaterScreen() {
         </View>
       </Card>
 
-      {celebrate ? <Celebration onDone={() => setCelebrate(false)} /> : null}
+      {/* A one-off acknowledgement; it leaves if intake drops back under the goal. */}
+      {celebrate && reached ? <Celebration onDone={() => setCelebrate(false)} /> : null}
 
       <SectionTitle title="Add a drink" action="Edit sizes" onAction={() => setEditing(true)} />
       <ChipRow>
@@ -325,7 +322,7 @@ function GoalLine({ label, hint, value, strong }: { label: string; hint?: string
 
 function Celebration({ onDone }: { onDone: () => void }) {
   const { colors, spacing } = useTheme();
-  const anim = useRef(new Animated.Value(0)).current;
+  const [anim] = useState(() => new Animated.Value(0));
   useEffect(() => {
     Animated.spring(anim, { toValue: 1, speed: 12, bounciness: 8, useNativeDriver: false }).start();
   }, [anim]);
