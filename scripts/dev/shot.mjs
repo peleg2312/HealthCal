@@ -12,6 +12,7 @@
 //   --tap=a,b      testIDs to click in order before the capture
 //   --type=id:text type text into the input with that testID (repeatable)
 //   --desktop      1280x800 viewport instead of a phone
+//   --2x           render at double density (for screenshots people will look at)
 //   --url=...      base URL (default http://localhost:8081)
 //
 // Prints page errors and console errors, and exits 1 if the page crashed.
@@ -32,7 +33,7 @@ const seed = buildSeed({ empty: !!flags.empty, onboarded: !flags.fresh, theme: f
 const browser = await chromium.launch();
 const context = await browser.newContext({
   viewport: flags.desktop ? { width: 1280, height: 800 } : { width: 390, height: 844 },
-  deviceScaleFactor: 1,
+  deviceScaleFactor: flags['2x'] ? 2 : 1,
   isMobile: !flags.desktop,
   hasTouch: !flags.desktop,
   colorScheme: flags.light ? 'light' : 'dark',

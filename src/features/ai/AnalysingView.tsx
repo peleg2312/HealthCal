@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { Sparkles } from 'lucide-react-native';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Animated, Easing, View } from 'react-native';
 
 import { useTheme } from '@/theme';
@@ -13,8 +13,8 @@ import { Card, Text } from '@/ui';
  */
 export function AnalysingView({ photoUri, aspect, description, precise }: { photoUri?: string; aspect?: number; description?: string; precise: boolean }) {
   const { colors, radius, spacing } = useTheme();
-  const sweep = useRef(new Animated.Value(0)).current;
-  const pulse = useRef(new Animated.Value(0)).current;
+  const [sweep] = useState(() => new Animated.Value(0));
+  const [pulse] = useState(() => new Animated.Value(0));
   const [slow, setSlow] = useState(false);
   const [boxH, setBoxH] = useState(0);
 

@@ -92,10 +92,10 @@ export function DayStepper({ value, onChange, testIDPrefix = 'day' }: { value: I
       </IconButton>
       <PressableScale
         testID={`${testIDPrefix}-today`}
-        onPress={() => onChange(today())}
-        disabled={isToday}
+        onPress={() => !isToday && onChange(today())}
+        feedback={isToday ? 'none' : 'tap'}
         accessibilityLabel={isToday ? 'Today' : `${formatLongDate(value)}, tap for today`}
-        style={{ flex: 1, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, opacity: 1 }}>
+        style={{ flex: 1, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, minHeight: 44 }}>
         <CalendarDays size={16} color={colors.textSecondary} />
         <Text variant="label">{formatDayLabel(value)}</Text>
         {!isToday ? (

@@ -1,0 +1,286 @@
+import Constants from 'expo-constants';
+import {
+  Activity,
+  BookOpen,
+  Brain,
+  Droplets,
+  Flame,
+  Gauge,
+  HeartPulse,
+  Lock,
+  Scale,
+  Sparkles,
+  Stethoscope,
+  Target,
+} from 'lucide-react-native';
+import React from 'react';
+import { View } from 'react-native';
+
+import { IconTile } from '@/features/settings/components';
+import { ACTIVITY_FACTORS, ACTIVITY_LABELS, calorieFloor } from '@/lib/energy';
+import { formatNumber } from '@/lib/units';
+import { useStore } from '@/store';
+import { useEnergyModel } from '@/store/selectors';
+import { useTheme } from '@/theme';
+import type { ActivityLevel } from '@/types';
+import { Card, Header, Screen, Text } from '@/ui';
+
+function Section({
+  icon,
+  color,
+  title,
+  source,
+  children,
+  testID,
+}: {
+  icon: (c: string) => React.ReactNode;
+  color: string;
+  title: string;
+  source?: string;
+  children: React.ReactNode;
+  testID?: string;
+}) {
+  const { spacing } = useTheme();
+  return (
+    <Card testID={testID}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.sm }}>
+        <IconTile color={color}>{icon(color)}</IconTile>
+        <Text variant="h3" style={{ flex: 1 }}>
+          {title}
+        </Text>
+      </View>
+      <View style={{ gap: spacing.sm }}>{children}</View>
+      {source ? (
+        <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.md }}>
+          Source: {source}
+        </Text>
+      ) : null}
+    </Card>
+  );
+}
+
+function P({ children }: { children: React.ReactNode }) {
+  return (
+    <Text variant="body" color="textSecondary">
+      {children}
+    </Text>
+  );
+}
+
+function Yours({ children }: { children: React.ReactNode }) {
+  const { colors, radius, spacing } = useTheme();
+  return (
+    <View style={{ backgroundColor: colors.primarySoft, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
+      <Text variant="label">{children}</Text>
+    </View>
+  );
+}
+
+/** Live numbers for the signed-up user; absent before onboarding. */
+function useMine() {
+  const onboarded = useStore((s) => !!s.profile?.onboardedAt);
+  return onboarded;
+}
+
+function MyResting() {
+  const m = useEnergyModel();
+  return (
+    <Yours>
+      Yours: {formatNumber(Math.round(m.bmr))} kcal at rest ({m.bmrMethod === 'katch-mcardle' ? 'lean-mass equation' : 'Mifflin-St Jeor'}), about{' '}
+      {formatNumber(Math.round(m.formulaTdee))} kcal with everyday activity.
+    </Yours>
+  );
+}
+
+function MyTarget() {
+  const m = useEnergyModel();
+  return (
+    <Yours>
+      Yours: {formatNumber(m.target.target)} kcal a day{m.target.source === 'override' ? ', set by you' : ''}
+      {m.usingAdaptive ? `, using ${formatNumber(Math.round(m.tdee))} kcal learned from your data` : ''}.
+    </Yours>
+  );
+}
+
+export default function AboutScreen() {
+  const { colors, spacing } = useTheme();
+  const mine = useMine();
+  const version = Constants.expoConfig?.version ?? '1.0.0';
+
+  return (
+    <Screen header={<Header title="About HealthCal" subtitle="How your numbers are calculated" />}>
+      <Text variant="body" color="textSecondary">
+        Every number in HealthCal comes from a published method. Here is each one in plain language, with where it comes from. All of them are
+        estimates: bodies differ, and the app says so rather than showing false precision.
+      </Text>
+
+      <Section
+        testID="about-resting"
+        icon={(c) => <HeartPulse size={20} color={c} />}
+        color={colors.protein}
+        title="Resting metabolism"
+        source="Mifflin et al., American Journal of Clinical Nutrition, 1990; Katch and McArdle, Nutrition, Weight Control and Exercise, 1983.">
+        <P>
+          What your body burns at complete rest. HealthCal uses the Mifflin-St Jeor equation, which predicts measured values best for most adults: 10
+          × weight in kg + 6.25 × height in cm − 5 × age, then + 5 for men or − 161 for women.
+        </P>
+        <P>
+          If you enter a body fat percentage between 3 and 60%, the Katch-McArdle equation is used instead: 370 + 21.6 × lean mass in kg. It fits
+          muscular and very lean people better. Body fat readings are noisy, so the result is kept within 15% of the Mifflin-St Jeor value: a
+          mistyped number can never swing your budget wildly.
+        </P>
+        {mine ? <MyResting /> : null}
+      </Section>
+
+      <Section
+        icon={(c) => <Gauge size={20} color={c} />}
+        color={colors.exercise}
+        title="Everyday activity"
+        source="Activity factors as used with the Harris-Benedict and Mifflin-St Jeor equations (FAO/WHO/UNU 2004 physical activity levels).">
+        <P>Resting metabolism is multiplied by a factor for how much you move outside workouts:</P>
+        <View style={{ gap: 4 }}>
+          {(Object.keys(ACTIVITY_FACTORS) as ActivityLevel[]).map((k) => (
+            <View key={k} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}>
+              <Text variant="label" color="textSecondary" style={{ flex: 1 }}>
+                {ACTIVITY_LABELS[k].title}, {ACTIVITY_LABELS[k].hint.toLowerCase()}
+              </Text>
+              <Text variant="label" tabular>
+                × {ACTIVITY_FACTORS[k]}
+              </Text>
+            </View>
+          ))}
+        </View>
+        <P>Logged workouts are not part of this factor. They are added separately, so nothing is counted twice.</P>
+      </Section>
+
+      <Section
+        icon={(c) => <Target size={20} color={c} />}
+        color={colors.calories}
+        title="Calorie target and the safety floor"
+        source="7,700 kcal per kg of body weight change (Wishnofsky 1958, the standard approximation); pace limits from common clinical guidance.">
+        <P>
+          To lose or gain, your chosen weekly pace is turned into a daily difference using about 7,700 kcal per kg, then subtracted from or added to
+          your expenditure. The result is rounded to 10 kcal.
+        </P>
+        <P>
+          The pace is capped at 1% of body weight a week for loss and 0.5% for gain. The target never goes below {formatNumber(calorieFloor('female'))}{' '}
+          kcal for women or {formatNumber(calorieFloor('male'))} kcal for men (or your expenditure, if that is lower). When the floor applies, HealthCal
+          tells you the pace will be slower. You can always set your own number instead.
+        </P>
+        {mine ? <MyTarget /> : null}
+      </Section>
+
+      <Section
+        icon={(c) => <Flame size={20} color={c} />}
+        color={colors.protein}
+        title="Protein and macros"
+        source="International Society of Sports Nutrition position stand on protein (2017); Dietary Guidelines for Americans 2020-2025 for fibre.">
+        <P>
+          Protein is set per kg of body weight: 2.0 g when losing (to protect muscle), 1.6 g when maintaining and 1.8 g when gaining. For people
+          with a higher body mass index (above 27.5) the weight at a BMI of 25 is used, and with a known body fat percentage lean mass is used, so
+          targets do not overshoot. Protein stays between 15% and 40% of calories.
+        </P>
+        <P>
+          Fat is about 28% of calories and never below 0.6 g per kg. Carbohydrates fill the rest, with at least 50 g. Fibre is 14 g per 1,000 kcal.
+          You can pick a preset or your own split in Goals and targets.
+        </P>
+      </Section>
+
+      <Section
+        icon={(c) => <Activity size={20} color={c} />}
+        color={colors.exercise}
+        title="Exercise calories"
+        source="2024 Adult Compendium of Physical Activities (Herrmann et al., Journal of Sport and Health Science, 2024).">
+        <P>
+          Each activity has a MET value from the 2024 Compendium for easy, moderate and hard effort. Calories during a session are MET × 3.5 × body
+          weight in kg ÷ 200 per minute.
+        </P>
+        <P>
+          Your daily budget already covers what you would have burned in those minutes anyway, so only the net part, above that baseline, is added
+          back. Adding the gross number would count your resting burn twice, which is a common reason calorie apps overestimate. Real costs vary
+          by about a fifth either way, so burns are shown with a range.
+        </P>
+      </Section>
+
+      <Section
+        icon={(c) => <Droplets size={20} color={c} />}
+        color={colors.water}
+        title="Hydration goal"
+        source="EFSA Scientific Opinion on Dietary Reference Values for water (2010); US National Academies, Dietary Reference Intakes for Water (2004).">
+        <P>
+          The reference intakes (EFSA: 2.0 L for women and 2.5 L for men; US National Academies: 2.7 L and 3.7 L) include the 20 to 30% of water
+          that comes from food. HealthCal sets a goal for drinks only: 33 ml per kg of body weight, kept between 1.6 and 3.0 L for women and 2.0 and
+          3.7 L for men.
+        </P>
+        <P>
+          Logged exercise adds 350 to 800 ml per hour depending on intensity (at most 2 L a day). Water, tea and sports drinks count fully; coffee, milk and other
+          drinks count at 90%, juice at 95%.
+        </P>
+      </Section>
+
+      <Section
+        icon={(c) => <Scale size={20} color={c} />}
+        color={colors.weight}
+        title="Weight trend and adaptive expenditure"
+        source="Exponentially smoothed moving average as popularised by The Hacker's Diet (Walker); energy balance method.">
+        <P>
+          Scale weight swings by a kilo or more from water, salt and digestion. The trend line smooths this out: each day moves 10% of the way toward
+          the new weigh-in, and gaps between weigh-ins are filled in evenly.
+        </P>
+        <P>
+          With &quot;Learn from my data&quot; on, HealthCal compares what you ate with how your trend moved over the last 28 days: expenditure = average
+          intake − trend change × 7,700 ÷ days. It needs at least 10 fully logged days (800 kcal or more), 5 weigh-ins and two weeks between the first
+          and last. The result is blended with the equation, trusting your data more as it grows (up to 85%), and kept within 65% to 145% of the
+          equation so a few missed logs cannot produce an extreme target.
+        </P>
+      </Section>
+
+      <Section
+        icon={(c) => <Sparkles size={20} color={c} />}
+        color={colors.fat}
+        title="AI food estimates"
+        source="Claude vision models by Anthropic, with server-side checks.">
+        <P>
+          When you ask, a photo or description is analysed to identify the foods and estimate portions. Results are checked before you see them:
+          macros cannot weigh more than the food, and calories must agree with the macros.
+        </P>
+        <P>
+          Portions are hard to judge from a photo, especially oils, butter and sauces, so every AI entry shows a calorie range that widens when the
+          model is less sure, and asks about hidden fats. Treat them as a starting point you can adjust.
+        </P>
+      </Section>
+
+      <Section icon={(c) => <BookOpen size={20} color={c} />} color={colors.carbs} title="Where food data comes from">
+        <P>
+          Three sources, ranked by how much to trust them, and each food shows which one it came from. First, a bundled reference list of common
+          foods based on USDA FoodData Central values, available offline. Second, Open Food Facts, a free community database of packaged products
+          used for barcode scans; entries are checked for plausible values but are crowd-sourced, so they rank below reference data. Third, foods
+          and meals you create yourself.
+        </P>
+      </Section>
+
+      <Section icon={(c) => <Lock size={20} color={c} />} color={colors.success} title="Privacy" testID="about-privacy">
+        <P>
+          Your data stays on this device unless you create an account. With an account it is stored in your private space on HealthCal&apos;s
+          server so it can sync, and nobody else can read it. Photos and descriptions are sent for analysis only when you ask for an AI estimate,
+          and are not kept afterwards. No ads, no tracking, no selling of data. You can export everything or delete it at any time.
+        </P>
+      </Section>
+
+      <Section icon={(c) => <Stethoscope size={20} color={c} />} color={colors.warning} title="Not medical advice">
+        <P>
+          HealthCal is a tracking tool, not a medical device. Its numbers are estimates for healthy adults. If you are pregnant or breastfeeding,
+          under 18, have diabetes, kidney disease, an eating disorder or another medical condition, talk to a doctor or registered dietitian before
+          changing how you eat.
+        </P>
+      </Section>
+
+      <View style={{ alignItems: 'center', gap: 4, paddingVertical: spacing.md }}>
+        <Brain size={18} color={colors.textTertiary} />
+        <Text variant="caption" color="textTertiary">
+          HealthCal {version}
+        </Text>
+      </View>
+    </Screen>
+  );
+}

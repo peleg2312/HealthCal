@@ -7,7 +7,7 @@ import { ACTIVITY_BY_ID } from '@/data/activities';
 import { estimateSession } from '@/features/activity/build';
 import { DateStepper } from '@/features/activity/components';
 import { EXERCISE_GROUPS, searchExercises } from '@/features/activity/exercises';
-import { deleteActivity, saveActivity } from '@/features/activity/session';
+import { deleteActivity, leaveFlow, saveActivity } from '@/features/activity/session';
 import {
   draftDurationMin,
   draftFromEntry,
@@ -21,7 +21,7 @@ import {
 } from '@/features/activity/strengthDraft';
 import { formatDayLabel, formatShortDate, today } from '@/lib/dates';
 import { formulaTdee } from '@/lib/energy';
-import { INTENSITY_LABELS, estimateOneRepMax, kcalRange, strengthVolumeKg } from '@/lib/exercise';
+import { INTENSITY_LABELS, estimateOneRepMax, strengthVolumeKg } from '@/lib/exercise';
 import { formatNumber, round, weightToKg, weightUnit, weightValue } from '@/lib/units';
 import { useStore } from '@/store';
 import { useLive, useProfile } from '@/store/selectors';
@@ -29,6 +29,8 @@ import { useTheme } from '@/theme';
 import type { ActivityEntry, Intensity, StrengthSet, UnitSystem } from '@/types';
 import {
   Button,
+  Chip,
+  ChipRow,
   ConfirmSheet,
   Divider,
   EmptyState,
@@ -149,7 +151,6 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
   const elapsed = elapsedMs(draft, now);
   const minutes = draftDurationMin(draft, now);
   const est = estimateSession(STRENGTH.met[draft.intensity], profile.weightKg, minutes, formulaTdee(profile));
-  const netRange = kcalRange(est.net);
   const running = !!draft.startedAt;
   const manual = draft.manualMin !== null;
 
@@ -170,13 +171,13 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
     });
     if (!saved) return;
     useStrengthDrafts.getState().discard(draftKey);
-    goBack('/train');
+    leaveFlow();
   };
 
   const discard = () => {
     setConfirmDiscard(false);
     useStrengthDrafts.getState().discard(draftKey);
-    goBack('/train');
+    leaveFlow();
   };
 
   const addExercise = (name: string) => {
@@ -201,7 +202,7 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
                 onPress={() => {
                   deleteActivity(entry);
                   useStrengthDrafts.getState().discard(draftKey);
-                  goBack('/train');
+                  leaveFlow();
                 }}>
                 <Trash2 size={18} color={colors.danger} />
               </IconButton>
@@ -260,6 +261,7 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
                 variant="secondary"
                 size="md"
                 full={false}
+                style={{ alignSelf: 'flex-end' }}
                 onPress={() => update((d) => ({ ...d, manualMin: null }))}
               />
             ) : null}
@@ -269,7 +271,7 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
         <View style={{ flexDirection: 'row', gap: spacing.md }}>
           <Metric label="Volume" value={formatNumber(round(weightValue(volume, units)))} unit={weightUnit(units)} testID="strength-volume" />
           <Metric
-            label={best ? `Best e1RM, ${best.name}` : 'Best e1RM'}
+            label="Best est. 1RM"
             value={best ? formatNumber(round(weightValue(best.kg, units), 1), 1).replace(/\.0$/, '') : '–'}
             unit={best ? weightUnit(units) : undefined}
             testID="strength-e1rm"
@@ -278,7 +280,7 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
         </View>
         <Text variant="caption" color="textSecondary" testID="strength-kcal">
           {minutes > 0
-            ? `About ${formatNumber(est.gross)} kcal in ${minutes} min, ${netRange[0]}–${netRange[1]} kcal above resting (${STRENGTH.met[draft.intensity]} MET).`
+            ? `About ${formatNumber(est.gross)} kcal in ${minutes} min (likely ${est.grossRange[0]}–${est.grossRange[1]}), of which ${formatNumber(est.net)} is above resting. Based on ${STRENGTH.met[draft.intensity]} MET.`
             : 'Start the timer or set a duration to estimate calories.'}
         </Text>
       </View>
@@ -290,7 +292,7 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
           options={(['light', 'moderate', 'vigorous'] as Intensity[]).map((i) => ({ value: i, label: INTENSITY_LABELS[i].title }))}
         />
         <Text variant="caption" color="textTertiary">
-          {STRENGTH.intensityHint?.[draft.intensity]} · {INTENSITY_LABELS[draft.intensity].hint.toLowerCase()} between sets
+          {STRENGTH.intensityHint?.[draft.intensity]} · talk test: {INTENSITY_LABELS[draft.intensity].hint.toLowerCase()}
         </Text>
       </View>
 
@@ -523,6 +525,7 @@ function ExerciseCard({
 function ExercisePicker({ visible, onClose, onPick, recent }: { visible: boolean; onClose: () => void; onPick: (name: string) => void; recent: string[] }) {
   const { colors, spacing } = useTheme();
   const [query, setQuery] = useState('');
+  const [group, setGroup] = useState<string>('all');
   const q = query.trim();
   const results = q ? searchExercises(q, recent) : [];
   const exact = results.some((r) => r.name.toLowerCase() === q.toLowerCase());
@@ -552,6 +555,14 @@ function ExercisePicker({ visible, onClose, onPick, recent }: { visible: boolean
         returnKeyType="done"
         onSubmitEditing={() => q && pick(results[0]?.name ?? q)}
       />
+      {!q ? (
+        <ChipRow>
+          <Chip label="All" selected={group === 'all'} onPress={() => setGroup('all')} testID="exercise-group-all" />
+          {EXERCISE_GROUPS.filter((g) => group === 'all' || g.id === group).map((g) => (
+            <Chip key={g.id} label={g.label} selected={group === g.id} onPress={() => setGroup(g.id)} testID={`exercise-group-${g.id}`} />
+          ))}
+        </ChipRow>
+      ) : null}
       {q && !exact ? (
         <ListRow
           testID="exercise-custom"
@@ -565,7 +576,7 @@ function ExercisePicker({ visible, onClose, onPick, recent }: { visible: boolean
         results.map((r) => row(r.name, r.group, `s-${r.name}`))
       ) : (
         <>
-          {recent.length ? (
+          {recent.length && group === 'all' ? (
             <View>
               <Text variant="overline" color="textSecondary" style={{ marginTop: spacing.sm }}>
                 RECENT
@@ -573,7 +584,7 @@ function ExercisePicker({ visible, onClose, onPick, recent }: { visible: boolean
               {recent.slice(0, 8).map((n) => row(n, undefined, `r-${n}`))}
             </View>
           ) : null}
-          {EXERCISE_GROUPS.map((g) => (
+          {EXERCISE_GROUPS.filter((g) => group === 'all' || g.id === group).map((g) => (
             <View key={g.id}>
               <Text variant="overline" color="textSecondary" style={{ marginTop: spacing.sm }}>
                 {g.label.toUpperCase()}

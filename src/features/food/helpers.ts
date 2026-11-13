@@ -2,7 +2,7 @@
  * Pure helpers shared by the food screens: route params, number formatting,
  * data-source labels and the "last portion" used for one-tap re-logging.
  */
-import { today } from '@/lib/dates';
+import { formatDayLabel, today } from '@/lib/dates';
 import { defaultServing, formatMacro, mealForTime, servingsFor } from '@/lib/nutrition';
 import { formatNumber } from '@/lib/units';
 import type { ThemeColors } from '@/theme';
@@ -127,4 +127,10 @@ export function portionKcal(food: Food, p: Portion): number {
 /** Convert label values to per-100 g. */
 export function toPer100(value: number, servingGrams: number): number {
   return servingGrams > 0 ? (value * 100) / servingGrams : value;
+}
+
+/** "today", "yesterday", "tomorrow" or "Wed, Nov 11", for use inside a sentence. */
+export function dayPhrase(date: ISODate): string {
+  const label = formatDayLabel(date);
+  return ['Today', 'Yesterday', 'Tomorrow'].includes(label) ? label.toLowerCase() : label;
 }

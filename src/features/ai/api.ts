@@ -59,7 +59,7 @@ const COPY: Record<AiErrorCode, { message: string; retryable: boolean }> = {
   bad_request: { message: 'That image could not be read. Try another photo.', retryable: false },
   upstream: { message: 'The analysis service is unavailable right now. Try again in a moment.', retryable: true },
   network: { message: 'No connection. Check your internet and try again.', retryable: true },
-  timeout: { message: 'The analysis took too long. Try again, or describe the meal instead.', retryable: true },
+  timeout: { message: 'The analysis took too long. It usually works on a second try.', retryable: true },
   unknown: { message: 'Something went wrong analysing that. Try again.', retryable: true },
 };
 

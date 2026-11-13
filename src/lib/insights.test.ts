@@ -366,3 +366,11 @@ describe('computeMilestones', () => {
     expect(m.every((x) => !x.achieved)).toBe(true);
   });
 });
+
+describe('rankInsights', () => {
+  it('keeps a positive insight in the top five', () => {
+    const mk = (id: string, tone: Insight['tone'], score: number): Insight => ({ id, tone, title: id, body: id, score });
+    const list = [mk('a', 'attention', 90), mk('b', 'attention', 80), mk('c', 'neutral', 70), mk('d', 'neutral', 60), mk('e', 'attention', 50), mk('f', 'neutral', 45), mk('g', 'positive', 10)];
+    expect(ids(rankInsights(list))).toEqual(['a', 'b', 'c', 'd', 'g']);
+  });
+});

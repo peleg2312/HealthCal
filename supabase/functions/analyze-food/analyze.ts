@@ -229,7 +229,10 @@ export async function analyzeFood(client: Anthropic, input: AnalyzeInput, option
   for (const block of response.content) if (block.type === 'text') text += block.text;
   let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(text) as Record<string, unknown>;
+    const value: unknown = JSON.parse(text);
+    // `null`, numbers and strings are valid JSON but not an answer.
+    if (!value || typeof value !== 'object') throw new Error('not an object');
+    parsed = value as Record<string, unknown>;
   } catch {
     throw new AnalyzeError('upstream', 'The analysis came back in an unexpected format. Try again.', 502);
   }

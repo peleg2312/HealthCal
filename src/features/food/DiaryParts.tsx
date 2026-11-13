@@ -12,7 +12,7 @@ import { Avatar, Button, Card, Divider, IconButton, ListRow, PressableScale, Pro
 
 import { clearEntries, copyEntries, saveMeal } from './actions';
 import { DayStepper, MacroStat, MealPicker, SourceTag } from './components';
-import { href, kcal, portionLabel } from './helpers';
+import { dayPhrase, href, kcal, portionLabel } from './helpers';
 import { deleteEntry } from './log';
 
 const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -242,7 +242,7 @@ export function MealCard({
               style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 4 }}>
               <Copy size={16} color={colors.primary} />
               <Text variant="label" color="primary" style={{ flexShrink: 1 }} numberOfLines={1}>
-                Repeat {formatDayLabel(previous.date).toLowerCase()}: {previous.entries.map((e) => e.name.split(',')[0]).join(', ')}
+                Repeat {dayPhrase(previous.date)}: {previous.entries.map((e) => e.name.split(',')[0]).join(', ')}
               </Text>
               <Text variant="caption" color="textSecondary" tabular numberOfLines={1} style={{ marginLeft: 'auto', flexShrink: 0 }}>
                 {kcal(entriesTotal(previous.entries).kcal)} kcal
@@ -309,7 +309,7 @@ export function MealMenuSheet({
             title={`Copy ${count}`}
             disabled={targetDate === date && targetMeal === meal}
             onPress={() => {
-              copyEntries(entries, targetDate, targetMeal, `Copied ${count} to ${formatDayLabel(targetDate).toLowerCase()}`);
+              copyEntries(entries, targetDate, targetMeal, `Copied ${count} to ${dayPhrase(targetDate)}`);
               onClose();
             }}
           />
@@ -350,7 +350,7 @@ export function MealMenuSheet({
       <View>
         <ListRow
           testID="meal-menu-copy-previous"
-          title={previous ? `Copy from ${formatDayLabel(previous.date).toLowerCase()}` : `Copy from an earlier day`}
+          title={previous ? `Copy from ${dayPhrase(previous.date)}` : `Copy from an earlier day`}
           subtitle={
             previous
               ? `${previous.entries.length} ${previous.entries.length === 1 ? 'item' : 'items'} · ${kcal(entriesTotal(previous.entries).kcal)} kcal`

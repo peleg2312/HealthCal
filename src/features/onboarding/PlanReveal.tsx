@@ -115,7 +115,7 @@ export function PlanReveal({ plan }: { plan: Plan }) {
           {p.goal !== 'maintain' ? (
             <MathRow
               label={p.goal === 'lose' ? 'Deficit' : 'Surplus'}
-              detail={t.limitedByFloor ? `Held at the ${formatNumber(plan.floor)} kcal minimum` : `For ${formatWeight(p.weeklyRateKg, units, 2)} a week (7,700 kcal per kg)`}
+              detail={t.limitedByFloor ? `Held at the ${formatNumber(plan.floor)} kcal minimum` : `For ${formatWeight(p.weeklyRateKg, units, 2)} a week (${units === 'imperial' ? '3,500 kcal per lb' : '7,700 kcal per kg'})`}
               value={`${t.dailyDelta < 0 ? '−' : '+'}${kcal(Math.abs(t.dailyDelta))}`}
             />
           ) : null}

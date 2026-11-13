@@ -6,7 +6,7 @@ import { View } from 'react-native';
 import { ACTIVITY_BY_ID, MET_SOURCES } from '@/data/activities';
 import { estimateSession, formatPace, paceModeFor } from '@/features/activity/build';
 import { DateStepper } from '@/features/activity/components';
-import { deleteActivity, saveActivity } from '@/features/activity/session';
+import { deleteActivity, leaveFlow, saveActivity } from '@/features/activity/session';
 import { formatDayLabel, today } from '@/lib/dates';
 import { formulaTdee } from '@/lib/energy';
 import { INTENSITY_LABELS } from '@/lib/exercise';
@@ -19,7 +19,7 @@ import type { Intensity } from '@/types';
 import { Button, Card, Chip, EmptyState, Header, IconButton, NumberField, PressableScale, Screen, Text, TextField, goBack } from '@/ui';
 
 const INTENSITIES: Intensity[] = ['light', 'moderate', 'vigorous'];
-const PRESETS = [15, 30, 45, 60, 90, 120];
+const PRESETS = [15, 30, 45, 60, 90];
 
 export default function LogActivityScreen() {
   const params = useLocalSearchParams<{ activityId?: string; entryId?: string; date?: string }>();
@@ -95,7 +95,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
       exercises: entry?.exercises ?? null,
       entryId,
     });
-    goBack('/train');
+    leaveFlow();
   };
 
   const sentence = profile.eatBackExercise
@@ -115,7 +115,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
                 testID="log-activity-delete"
                 onPress={() => {
                   deleteActivity(entry);
-                  goBack('/train');
+                  leaveFlow();
                 }}>
                 <Trash2 size={18} color={colors.danger} />
               </IconButton>
@@ -214,7 +214,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
           {PRESETS.map((p) => (
-            <Chip key={p} label={p < 60 ? `${p} min` : `${p / 60} h`} selected={minutes === p} onPress={() => setDuration(p)} testID={`duration-${p}`} />
+            <Chip key={p} label={p === 60 ? '1 h' : `${p} min`} selected={minutes === p} onPress={() => setDuration(p)} testID={`duration-${p}`} />
           ))}
         </View>
       </View>

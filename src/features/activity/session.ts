@@ -76,3 +76,13 @@ export function openSession(entry: ActivityEntry) {
   if (entry.exercises?.length) router.push(`/activity/strength?entryId=${entry.id}`);
   else router.push(`/activity/log?entryId=${entry.id}`);
 }
+
+/**
+ * Leave the logging flow after save or delete: back to wherever it started
+ * (the tab the user was on), skipping the picker. A deep-linked page with no
+ * stack lands on the Train tab.
+ */
+export function leaveFlow() {
+  if (router.canDismiss()) router.dismissAll();
+  else router.replace('/train');
+}

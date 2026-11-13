@@ -10,7 +10,7 @@ import type { AiErrorCode } from './api';
 export type ScreenErrorCode = AiErrorCode | 'camera_denied' | 'unreadable';
 
 const TITLE: Record<ScreenErrorCode, string> = {
-  daily_limit: "That's today's analyses",
+  daily_limit: "You've used today's analyses",
   not_food: 'No food found',
   declined: 'This one could not be analysed',
   truncated: 'Too much on one plate',

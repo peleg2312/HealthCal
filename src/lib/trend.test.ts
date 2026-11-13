@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { addDays } from './dates';
-import { adaptiveTdee, TREND_ALPHA, weeklyRate, weightTrend, type TrendPoint, type WeightPoint } from './trend';
+import { adaptiveTdee, linearSlope, TREND_ALPHA, weeklyRate, weightTrend, type TrendPoint, type WeightPoint } from './trend';
 
 const D0 = '2026-01-01';
 const series = (n: number, f: (i: number) => number, start = D0): WeightPoint[] =>
@@ -242,21 +242,50 @@ describe('adaptiveTdee', () => {
     expect(r.loggedDays).toBe(21);
     expect(r.observed).toBe(2550);
   });
-  // A 14-day window holds at most 13 days of span, but MIN_SPAN_DAYS is 14, so it can never produce
-  // an estimate and the needs text then blames the user's weigh-in spacing. Latent only: nothing in the
-  // app passes windowDays. Reported, not changed.
-  it('windowDays 14 can never reach the 14-day span requirement (latent quirk)', () => {
+  it('a 14-day window works: the span requirement shrinks to what the window can hold', () => {
     const r = adaptiveTdee({ formulaTdee: 2500, weights: falling(), intakeByDate: intake(2000), end: END, windowDays: 14 });
-    expect(r.observed).toBeNull();
-    expect(r.needs).toBe('weigh-ins spread over two weeks');
+    expect(r.observed).toBe(2550);
+    expect(r.needs).toBeNull();
   });
 
-  // JUDGEMENT CALL (not fixed): the trend is seeded with the first weigh-in, so when the user's
-  // history starts inside the window the trend has not caught up with a steady fall and the
-  // observed expenditure is biased towards intake. By construction here the true expenditure is 2550.
-  it.fails('a user whose history starts at the window start still gets ~2550 (cold-start bias)', () => {
+  // The rate of change is a least-squares line through the weigh-ins, so a user whose history
+  // starts at the window start gets the same answer as one with months of data. (A difference of
+  // smoothed trend values would read about 190 kcal low here, because the trend starts with no lag.)
+  it('a user whose history starts at the window start still gets 2550 (no cold-start bias)', () => {
     const w = series(28, (i) => 90 - (0.5 / 7) * i, WINDOW_START);
     const r = adaptiveTdee({ formulaTdee: 2500, weights: w, intakeByDate: intake(2000), end: END });
-    expect(Math.abs((r.observed ?? 0) - 2550)).toBeLessThan(50);
+    expect(r.observed).toBe(2550);
+  });
+
+  it('daily scale noise of +-0.6 kg moves the estimate by well under 100 kcal', () => {
+    // Deterministic zig-zag noise with zero mean on top of a steady 0.5 kg/week fall.
+    const noise = [0.6, -0.4, 0.1, -0.6, 0.5, -0.2, 0.0, 0.4, -0.5, 0.3, -0.1, -0.3, 0.6, -0.4];
+    const w = series(28, (i) => 90 - (0.5 / 7) * i + noise[i % noise.length], WINDOW_START);
+    const r = adaptiveTdee({ formulaTdee: 2500, weights: w, intakeByDate: intake(2000), end: END });
+    expect(Math.abs((r.observed ?? 0) - 2550)).toBeLessThan(100);
+  });
+
+  it('sparse weigh-ins (every third day) still recover the true value on clean data', () => {
+    const w = series(28, (i) => 90 - (0.5 / 7) * i, WINDOW_START).filter((_, i) => i % 3 === 0);
+    const r = adaptiveTdee({ formulaTdee: 2500, weights: w, intakeByDate: intake(2000), end: END });
+    expect(r.weighIns).toBe(10);
+    expect(r.observed).toBe(2550);
+  });
+});
+
+describe('linearSlope', () => {
+  it('null for fewer than two distinct dates', () => {
+    expect(linearSlope([])).toBeNull();
+    expect(linearSlope([{ date: '2026-01-01', kg: 80 }])).toBeNull();
+    expect(linearSlope([{ date: '2026-01-01', kg: 80 }, { date: '2026-01-01', kg: 81 }])).toBeNull();
+  });
+  it('exact on a straight line, including unevenly spaced dates', () => {
+    const pts = [0, 1, 4, 9, 20].map((d) => ({ date: addDays('2026-01-01', d), kg: 80 - 0.07 * d }));
+    expect(linearSlope(pts)).toBeCloseTo(-0.07, 12);
+  });
+  it('hand-computed: (0,80) (1,82) (2,81) -> slope 0.5 kg/day', () => {
+    // mean x = 1, mean y = 81; num = (-1)(-1) + 0 + (1)(0) = 1; den = 2 -> 0.5
+    const pts = [80, 82, 81].map((kg, d) => ({ date: addDays('2026-01-01', d), kg }));
+    expect(linearSlope(pts)).toBeCloseTo(0.5, 12);
   });
 });

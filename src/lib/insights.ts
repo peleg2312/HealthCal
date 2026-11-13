@@ -901,7 +901,7 @@ export function recapWinFocus(s: PeriodSummary, units: UnitSystem, goal: GoalTyp
   if (w && w.daysTracked >= 2) {
     const r = w.daysAtGoal / w.daysTracked;
     if (r >= 0.7) wins.push({ score: r, text: `You hit your water goal on ${w.daysAtGoal} of ${w.daysTracked} days.` });
-    else focuses.push({ score: (1 - r) * 0.8, text: `Water: goal reached on ${w.daysAtGoal} of ${w.daysTracked} days; one more glass in the afternoon would help.` });
+    else focuses.push({ score: (1 - r) * 0.8, text: `Water: goal reached on ${w.daysAtGoal} of ${w.daysTracked} days; one more 250 ml glass a day would help.` });
   }
   const mins = s.activity.minutes;
   if (mins >= WEEKLY_ACTIVE_MINUTES) wins.push({ score: 0.85, text: `${mins} active minutes across ${plural(s.activity.sessions, 'session')}, above the 150-minute guideline.` });
@@ -968,9 +968,13 @@ export function computeMilestones(input: {
     count('first-day', 'First day logged', 'Every trend starts with one day.', loggedDates, 1),
     count('first-week', 'First week logged', '7 days of food logged, in any order.', loggedDates, 7),
     count('month-logged', '30 days logged', 'A month of data makes your estimates personal.', loggedDates, 30),
+    count('days-100', '100 days logged', 'A long-term record few people build.', loggedDates, 100),
     count('weigh-ins-10', '10 weigh-ins', 'Enough for a reliable trend line.', weighIns, 10),
+    count('weigh-ins-50', '50 weigh-ins', 'A trend you can trust week to week.', weighIns, 50),
     count('water-7', '7 days at water goal', 'Counted across any days, not in a row.', waterDates, 7),
+    count('water-30', '30 days at water goal', 'Counted across any days, not in a row.', waterDates, 30),
     count('sessions-10', '10 workouts logged', 'Any activity counts.', sessionDates, 10),
+    count('sessions-50', '50 workouts logged', 'Any activity counts.', sessionDates, 50),
   ];
 
   // First Monday-based week with 150+ active minutes.

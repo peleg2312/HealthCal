@@ -4,7 +4,7 @@ import { View } from 'react-native';
 
 import { addDays, formatDayLabel, formatLongDate, today } from '@/lib/dates';
 import { INTENSITY_LABELS } from '@/lib/exercise';
-import { formatDistance } from '@/lib/units';
+import { formatDistance, formatNumber } from '@/lib/units';
 import { useTheme } from '@/theme';
 import type { ActivityEntry, UnitSystem } from '@/types';
 import { Avatar, IconButton, PressableScale, Text } from '@/ui';
@@ -76,13 +76,13 @@ export function SessionRow({ entry, units, onPress, onDelete }: { entry: Activit
           <Text variant="bodyStrong" numberOfLines={1}>
             {entry.name}
           </Text>
-          <Text variant="caption" color="textSecondary" numberOfLines={1}>
+          <Text variant="caption" color="textSecondary" numberOfLines={2}>
             {sessionSubtitle(entry, units)}
           </Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <Text variant="bodyStrong" tabular>
-            ~{Math.round(entry.kcalNet)}
+            ~{formatNumber(entry.kcalNet)}
             <Text variant="caption" color="textSecondary">
               {' '}
               kcal

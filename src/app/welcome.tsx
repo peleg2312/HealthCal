@@ -35,14 +35,11 @@ export default function Welcome() {
         <View style={{ alignItems: 'center', gap: spacing.xxl }}>
           <BrandRings size={208} />
           <FadeIn delay={150} style={{ alignItems: 'center', gap: spacing.sm }}>
-            <Text variant="overline" color="primary">
-              HEALTHCAL
+            <Text variant="display" align="center" accessibilityRole="header" style={{ fontSize: 40, lineHeight: 46 }}>
+              HealthCal
             </Text>
-            <Text variant="display" align="center" accessibilityRole="header">
-              Know your numbers.{'\n'}Trust your numbers.
-            </Text>
-            <Text variant="body" color="textSecondary" align="center" style={{ maxWidth: 340 }}>
-              Food, training, water and weight in one calm place, with targets built from your own body.
+            <Text variant="h3" color="textSecondary" align="center" style={{ maxWidth: 320 }}>
+              Calorie tracking you can trust, built from your own body.
             </Text>
           </FadeIn>
         </View>

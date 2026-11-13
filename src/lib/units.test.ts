@@ -91,9 +91,8 @@ describe('formatting', () => {
     expect(formatDistance(5, 'metric')).toBe('5 km');
     expect(formatDistance(10, 'imperial')).toBe('6.21 mi');
   });
-  // JUDGEMENT CALL (not fixed): trim() only strips an all-zero fraction, so 2.1 L shows as "2.10 L"
-  // and 5.5 km as "5.50 km". Cosmetic but visible on the hydration and activity screens.
-  it.fails('trailing zeros are trimmed: 2100 ml -> "2.1 L", 5.5 km -> "5.5 km"', () => {
+  // trim() strips trailing zeros of the fraction (fixed concurrently by another agent).
+  it('trailing zeros are trimmed: 2100 ml -> "2.1 L", 5.5 km -> "5.5 km"', () => {
     expect(formatVolume(2100, 'metric')).toBe('2.1 L');
     expect(formatDistance(5.5, 'metric')).toBe('5.5 km');
   });

@@ -5,7 +5,7 @@ import { View } from 'react-native';
 
 import { copyPreviousDay, copyPreviousMeal, findPreviousDay, findPreviousMeal } from '@/features/food/actions';
 import { DaySummaryCard, MealCard, MealMenuSheet, WeekStrip } from '@/features/food/DiaryParts';
-import { href, kcal, parseDate } from '@/features/food/helpers';
+import { dayPhrase, href, kcal, parseDate } from '@/features/food/helpers';
 import { addDays, formatDayLabel, formatLongDate, today } from '@/lib/dates';
 import { MEALS, entriesTotal, mealForTime } from '@/lib/nutrition';
 import { useDay, useLive } from '@/store/selectors';
@@ -62,7 +62,7 @@ export default function DiaryScreen() {
           <Text variant="title">{date > today() ? 'Nothing planned yet' : 'Nothing logged for this day'}</Text>
           <Text variant="body" color="textSecondary" style={{ marginTop: 4 }}>
             {previousDay
-              ? `Ate the same as ${formatDayLabel(previousDay.date).toLowerCase()}? Copy it in one tap, then adjust.`
+              ? `Ate the same as ${dayPhrase(previousDay.date)}? Copy it in one tap, then adjust.`
               : 'Search for a food, scan a barcode or snap a photo to start.'}
           </Text>
           <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
@@ -71,7 +71,7 @@ export default function DiaryScreen() {
                 testID="diary-copy-yesterday"
                 size="md"
                 icon={<Copy size={18} color={colors.onPrimary} />}
-                title={`Copy ${formatDayLabel(previousDay.date).toLowerCase()} · ${kcal(entriesTotal(previousDay.entries).kcal)} kcal`}
+                title={`Copy ${dayPhrase(previousDay.date)} · ${kcal(entriesTotal(previousDay.entries).kcal)} kcal`}
                 onPress={() => copyPreviousDay(date)}
               />
             ) : null}

@@ -216,7 +216,6 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
       value={draft.dobDay}
       onChange={(dobDay) => set({ dobDay })}
       returnKeyType="next"
-      onSubmitEditing={submit}
     />
   );
   const month = (
@@ -231,7 +230,6 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
       value={draft.dobMonth}
       onChange={(dobMonth) => set({ dobMonth })}
       returnKeyType="next"
-      onSubmitEditing={submit}
     />
   );
   const year = (
@@ -336,7 +334,13 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
                 returnKeyType="next"
               />
             </View>
-            <ErrorText>{errors.height}</ErrorText>
+            {errors.height ? (
+              <ErrorText>{errors.height}</ErrorText>
+            ) : (
+              <Text variant="caption" color="textTertiary">
+                Between 3'11" and 7'7"
+              </Text>
+            )}
           </View>
         ) : (
           <NumberField
@@ -516,8 +520,9 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
   const toDisplay = (kg: number) => (imp ? kgToLb(kg) : kg);
   const step = imp ? 0.25 : 0.05;
   const minDisplay = step * 2;
-  const maxDisplay = Math.max(minDisplay, Math.floor(toDisplay(maxKg) / step + 1e-6) * step);
-  const rateDisplay = Math.min(maxDisplay, Math.max(minDisplay, round(toDisplay(rateKg) / step) * step));
+  // The safe maximum itself is always reachable, even when it is not a whole step.
+  const maxDisplay = Math.max(minDisplay, round(toDisplay(maxKg), 2));
+  const rateDisplay = Math.min(maxDisplay, Math.max(minDisplay, round(toDisplay(rateKg), 2)));
   const fmtRate = (v: number) => `${formatNumber(v, 2).replace(/\.?0+$/, '')} ${unit}`;
 
   const delta = plan ? plan.target.dailyDelta : (goal === 'lose' ? -1 : 1) * ((rateKg * KCAL_PER_KG) / 7);

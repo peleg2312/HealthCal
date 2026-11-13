@@ -74,10 +74,10 @@ export default function TrainScreen() {
             </Text>
             <View style={{ flexDirection: 'row', gap: spacing.md }}>
               <Stat label="Sessions" value={String(week.sessions)} />
-              <Stat label="Net, est." value={`~${formatNumber(week.kcalNet)}`} unit="kcal" color={colors.exercise} />
+              <Stat label="Net, est." value={week.kcalNet > 0 ? `~${formatNumber(week.kcalNet)}` : '0'} unit="kcal" color={colors.exercise} />
             </View>
             <Text variant="caption" color="textSecondary" testID="train-total-time">
-              {formatDuration(week.totalMinutes)} logged in total
+              {week.totalMinutes > 0 ? `${formatDuration(week.totalMinutes)} logged in total` : 'Nothing logged yet this week'}
             </Text>
           </View>
         </View>
@@ -166,9 +166,11 @@ export default function TrainScreen() {
                   <Text variant="overline" color="textSecondary">
                     {formatDayLabel(g.date).toUpperCase()}
                   </Text>
-                  <Text variant="caption" color="textTertiary" tabular>
-                    {formatDuration(minutes)} · ~{Math.round(net)} kcal
-                  </Text>
+                  {g.entries.length > 1 ? (
+                    <Text variant="caption" color="textTertiary" tabular>
+                      {formatDuration(minutes)} · ~{formatNumber(net)} kcal
+                    </Text>
+                  ) : null}
                 </View>
                 <Card padding={spacing.md} style={{ paddingVertical: spacing.xs }}>
                   {g.entries.map((e, i) => (

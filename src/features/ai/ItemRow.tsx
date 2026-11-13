@@ -75,24 +75,26 @@ export function ItemRow({
               kcal
             </Text>
           </View>
-          <Text variant="caption" color="textSecondary" tabular numberOfLines={1}>
-            <Text variant="caption" color={colors.protein}>
-              P
-            </Text>{' '}
-            {formatMacro(item.protein)}
-            {'  '}
-            <Text variant="caption" color={colors.carbs}>
-              C
-            </Text>{' '}
-            {formatMacro(item.carbs)}
-            {'  '}
-            <Text variant="caption" color={colors.fat}>
-              F
-            </Text>{' '}
-            {formatMacro(item.fat)} g
-          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Macro letter="P" value={item.protein} color={colors.protein} />
+            <Macro letter="C" value={item.carbs} color={colors.carbs} />
+            <Macro letter="F" value={item.fat} color={colors.fat} />
+          </View>
         </View>
       </View>
+    </View>
+  );
+}
+
+function Macro({ letter, value, color }: { letter: string; value: number; color: string }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 2 }}>
+      <Text variant="caption" color={color}>
+        {letter}
+      </Text>
+      <Text variant="caption" color="textSecondary" tabular>
+        {formatMacro(value)}
+      </Text>
     </View>
   );
 }

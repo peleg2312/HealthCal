@@ -14,7 +14,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 
-import { aiError, AiError, postAnalyze, type AnalyzeRequest, type AnalyzeResponse, type AiErrorCode } from '@/features/ai/api';
+import { aiError, postAnalyze, type AnalyzeRequest, type AnalyzeResponse, type AiErrorCode } from '@/features/ai/api';
 import { DEMO_DELAY_MS, demoResult } from '@/features/ai/demo';
 import { fitWithin, IMAGE_EDGE, JPEG_QUALITY } from '@/features/ai/image';
 

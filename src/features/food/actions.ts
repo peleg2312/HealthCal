@@ -3,13 +3,15 @@
  * days, clearing a meal, saving a meal, and managing custom foods. Every one
  * of them can be undone from the toast.
  */
-import { addDays, formatDayLabel } from '@/lib/dates';
+import { addDays } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
 import { MEAL_LABEL } from '@/lib/nutrition';
 import { useStore } from '@/store';
 import { live } from '@/store/selectors';
 import type { CustomFood, FoodEntry, ISODate, MealType, Nutrients, SavedMeal } from '@/types';
 import { haptic, toast } from '@/ui';
+
+import { dayPhrase } from './helpers';
 
 import { deleteEntry, logItems, toSavedMealItem } from './log';
 
@@ -64,7 +66,7 @@ export function copyEntries(entries: FoodEntry[], toDate: ISODate, meal?: MealTy
   for (const [m, list] of groups) created.push(...logItems(list, m, toDate));
   // One toast whose Undo covers every meal that was copied.
   const ids = created.map((e) => e.id);
-  toast(message ?? `Copied ${created.length} ${created.length === 1 ? 'item' : 'items'} to ${formatDayLabel(toDate).toLowerCase()}`, {
+  toast(message ?? `Copied ${created.length} ${created.length === 1 ? 'item' : 'items'} to ${dayPhrase(toDate)}`, {
     label: 'Undo',
     onPress: () => undoAll(ids),
   });
@@ -77,7 +79,7 @@ export function copyPreviousMeal(date: ISODate, meal: MealType): boolean {
     toast(`No earlier ${MEAL_LABEL[meal].toLowerCase()} to copy`);
     return false;
   }
-  copyEntries(prev.entries, date, meal, `Copied ${MEAL_LABEL[meal].toLowerCase()} from ${formatDayLabel(prev.date).toLowerCase()}`);
+  copyEntries(prev.entries, date, meal, `Copied ${MEAL_LABEL[meal].toLowerCase()} from ${dayPhrase(prev.date)}`);
   return true;
 }
 
@@ -87,7 +89,7 @@ export function copyPreviousDay(date: ISODate): boolean {
     toast('No earlier day to copy');
     return false;
   }
-  copyEntries(prev.entries, date, undefined, `Copied ${prev.entries.length} items from ${formatDayLabel(prev.date).toLowerCase()}`);
+  copyEntries(prev.entries, date, undefined, `Copied ${prev.entries.length} items from ${dayPhrase(prev.date)}`);
   return true;
 }
 

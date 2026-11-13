@@ -37,7 +37,7 @@ export function AddMissingItem({
     <View style={{ gap: spacing.sm }}>
       <TextField
         testID="ai-add-item-input"
-        placeholder="Add something that was missed, e.g. 1 banana"
+        placeholder="Add a missed item, e.g. 1 banana"
         value={query}
         onChangeText={setQuery}
         returnKeyType="done"
