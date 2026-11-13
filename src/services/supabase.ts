@@ -27,6 +27,17 @@ export const supabase: SupabaseClient | null = isBackendConfigured
     })
   : null;
 
+// A password-reset link signs in while the client starts up, and the client says so
+// exactly once. The app's own listener is added after the first render, which can be
+// later than that, so the fact is noted here, in the same tick the client is created.
+let recoveryLink = false;
+supabase?.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') recoveryLink = true;
+});
+
+/** True when this start of the app signed in through a password-reset link. */
+export const openedFromRecoveryLink = (): boolean => recoveryLink;
+
 // Token refresh should only run while the app is in the foreground.
 if (supabase && Platform.OS !== 'web') {
   AppState.addEventListener('change', (state) => {

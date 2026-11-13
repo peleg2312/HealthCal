@@ -90,6 +90,7 @@ describe('coachTip', () => {
     const tip = coachTip(d, 'metric', at(21, 30));
     expect(tip.id).toBe('protein');
     expect(tip.title).toBe('95 g of protein to go');
+    expect(tip.quick).toEqual({ kind: 'fits' });
   });
 
   it('states an overage neutrally', () => {

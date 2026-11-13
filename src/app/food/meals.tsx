@@ -1,17 +1,18 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { PenLine, Trash2 } from 'lucide-react-native';
+import { PenLine, Plus, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
-import { deleteSavedMeal, renameSavedMeal } from '@/features/food/actions';
+import { deleteSavedMeal } from '@/features/food/actions';
+import { formatPortion, itemsRange, mealServings } from '@/features/food/build';
 import { DayStepper, MealPicker } from '@/features/food/components';
-import { dayPhrase, href, kcal, parseDate, parseMeal, portionLabel } from '@/features/food/helpers';
-import { logItems } from '@/features/food/log';
+import { dayPhrase, href, kcal, parseDate, parseMeal } from '@/features/food/helpers';
+import { LogSavedMealSheet, itemLine } from '@/features/food/SavedMealParts';
 import { MEAL_LABEL, sumNutrients } from '@/lib/nutrition';
 import { useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { SavedMeal } from '@/types';
-import { Button, Card, EmptyState, Header, IconButton, MacroBar, Screen, Sheet, Text, TextField } from '@/ui';
+import { Button, Card, EmptyState, Header, IconButton, MacroBar, Screen, Text } from '@/ui';
 
 export default function SavedMealsScreen() {
   const { colors, spacing } = useTheme();
@@ -20,8 +21,8 @@ export default function SavedMealsScreen() {
   const [date, setDate] = useState(() => parseDate(params.date));
   const saved = useLive('savedMeals');
   const meals = [...saved].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  const [renaming, setRenaming] = useState<SavedMeal | null>(null);
-  const [newName, setNewName] = useState('');
+  const [logging, setLogging] = useState<SavedMeal | null>(null);
+  const build = (id?: string) => router.push(href('/food/meal-edit', { id, meal, date }) as never);
 
   return (
     <Screen testID="food-meals-screen" header={<Header title="Saved meals" subtitle={`Log to ${MEAL_LABEL[meal].toLowerCase()}, ${dayPhrase(date)}`} />}>
@@ -29,6 +30,7 @@ export default function SavedMealsScreen() {
         <>
           <MealPicker value={meal} onChange={setMeal} testIDPrefix="meals-meal" />
           <DayStepper value={date} onChange={setDate} testIDPrefix="meals-day" />
+          <Button testID="meals-new" variant="secondary" size="md" title="New meal or recipe" icon={<Plus size={18} color={colors.text} />} onPress={() => build()} />
         </>
       ) : null}
 
@@ -36,13 +38,15 @@ export default function SavedMealsScreen() {
         <EmptyState
           emoji="🍱"
           title="No saved meals yet"
-          message="Meals you eat often, saved once, log in one tap. In the diary, open a meal's menu and choose Save as a meal."
-          action="Open diary"
-          onAction={() => router.replace(href('/diary', { date }) as never)}
+          message="Build a meal you eat often, or a recipe that makes several servings, and log it in a couple of taps. You can also save a meal from the diary's meal menu."
+          action="New meal or recipe"
+          onAction={() => build()}
         />
       ) : (
         meals.map((m, i) => {
           const n = sumNutrients(m.items.map((it) => it.nutrients));
+          const count = mealServings(m);
+          const approx = itemsRange(m.items) ? '~' : '';
           return (
             <Card key={m.id} testID={`saved-meal-card-${i}`} style={{ gap: spacing.md }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
@@ -50,18 +54,13 @@ export default function SavedMealsScreen() {
                   <Text variant="h3" numberOfLines={1}>
                     {m.name}
                   </Text>
-                  <Text variant="caption" color="textSecondary" tabular>
-                    {kcal(n.kcal)} kcal · P {Math.round(n.protein)} g · C {Math.round(n.carbs)} g · F {Math.round(n.fat)} g
+                  <Text variant="caption" color="textSecondary" tabular numberOfLines={2}>
+                    {count > 1
+                      ? `${approx}${kcal(n.kcal / count)} kcal per serving · makes ${formatPortion(count)}`
+                      : `${approx}${kcal(n.kcal)} kcal · P ${Math.round(n.protein)} g · C ${Math.round(n.carbs)} g · F ${Math.round(n.fat)} g`}
                   </Text>
                 </View>
-                <IconButton
-                  testID={`saved-meal-rename-${i}`}
-                  accessibilityLabel={`Rename ${m.name}`}
-                  tone="clear"
-                  onPress={() => {
-                    setNewName(m.name);
-                    setRenaming(m);
-                  }}>
+                <IconButton testID={`saved-meal-edit-${i}`} accessibilityLabel={`Edit ${m.name}`} tone="clear" onPress={() => build(m.id)}>
                   <PenLine size={18} color={colors.textSecondary} />
                 </IconButton>
                 <IconButton testID={`saved-meal-delete-${i}`} accessibilityLabel={`Delete ${m.name}`} tone="clear" onPress={() => deleteSavedMeal(m)}>
@@ -77,7 +76,7 @@ export default function SavedMealsScreen() {
                       {it.name}
                     </Text>
                     <Text variant="caption" color="textSecondary" numberOfLines={1}>
-                      {portionLabel(it.servingLabel, it.quantity)} · {kcal(it.nutrients.kcal)} kcal
+                      {itemLine(it)}
                     </Text>
                   </View>
                 ))}
@@ -87,30 +86,14 @@ export default function SavedMealsScreen() {
                 title={`Log to ${MEAL_LABEL[meal].toLowerCase()}`}
                 size="md"
                 variant="secondary"
-                onPress={() => logItems(m.items, meal, date, `${m.name} added to ${MEAL_LABEL[meal].toLowerCase()}`)}
+                onPress={() => setLogging(m)}
               />
             </Card>
           );
         })
       )}
 
-      <Sheet
-        visible={!!renaming}
-        onClose={() => setRenaming(null)}
-        title="Rename meal"
-        footer={
-          <Button
-            testID="saved-meal-rename-save"
-            title="Save name"
-            disabled={!newName.trim()}
-            onPress={() => {
-              if (renaming) renameSavedMeal(renaming, newName);
-              setRenaming(null);
-            }}
-          />
-        }>
-        <TextField testID="saved-meal-rename-input" label="Name" value={newName} onChangeText={setNewName} autoFocus maxLength={60} />
-      </Sheet>
+      <LogSavedMealSheet key={logging?.id ?? 'none'} meal={logging} mealType={meal} date={date} onClose={() => setLogging(null)} />
     </Screen>
   );
 }

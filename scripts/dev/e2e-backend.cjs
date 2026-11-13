@@ -27,7 +27,8 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  (${detail})` : ''}`);
 };
 const server = async () => (await fetch(`${API}/__state`)).json();
-const liveCount = (state) => ['foodEntries', 'customFoods', 'savedMeals', 'activities', 'water', 'weights', 'sleep', 'fasting'].reduce((n, c) => n + Object.keys(state[c]).length, 0);
+// Every synced collection, read from the app itself so a new one is counted without touching this file.
+const liveCount = (state) => Object.keys(state.dirty).reduce((n, c) => n + Object.keys(state[c] || {}).length, 0);
 
 async function device(browser, seedJson) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, colorScheme: 'dark' });
@@ -194,6 +195,68 @@ async function device(browser, seedJson) {
   srv = await server();
   check('signing out deletes nothing on the server', srv.records.filter((r) => r.user_id === user.id).length >= expectedRecords);
 
+  // --------------------------------------------------- forgotten password
+  const NEW_PASSWORD = 'a new horse, the same battery';
+  await B.go('/auth?mode=forgot');
+  await B.fill('auth-email-input', EMAIL);
+  await B.tap('auth-submit');
+  await B.page.waitForTimeout(1500);
+  srv = await server();
+  const reset = srv.recoveries.find((r) => r.email === EMAIL.toLowerCase());
+  check('asking for a reset produces a link back to this app', !!reset && /\/auth\?mode=reset$/.test(reset.redirectTo || ''), reset ? reset.redirectTo : 'no reset requested');
+
+  // The link only works in the browser that asked for it (PKCE): a third device cannot use it.
+  const C = await device(browser, null);
+  await C.go(`/auth?mode=reset&code=${reset?.code}`);
+  await C.page.waitForSelector('[data-testid="auth-reset-expired"]', { timeout: 20000 }).catch(() => {});
+  check('the reset link is refused in a browser that did not ask for it', (await C.has('auth-reset-expired')) && (await C.state()).ownerId == null);
+
+  await B.go(`/auth?mode=reset&code=${reset?.code}`);
+  await B.page.waitForSelector('[data-testid="auth-reset-password"]', { timeout: 20000 }).catch(() => {});
+  await B.shot('backend-reset');
+  await B.fill('auth-reset-password', NEW_PASSWORD);
+  await B.fill('auth-reset-confirm', NEW_PASSWORD);
+  await B.tap('auth-reset-submit');
+  const resetHome = await B.untilPath('/', 20000);
+  await B.page.waitForTimeout(1500);
+  const bReset = await B.state();
+  check('choosing a new password signs the device in with its data restored', resetHome && bReset.ownerId === user.id && bReset.profile?.name === 'Alex', B.page.url());
+
+  await C.go('/auth?mode=signin');
+  await C.fill('auth-email-input', EMAIL);
+  await C.fill('auth-password-input', PASSWORD);
+  await C.tap('auth-submit');
+  await C.page.waitForTimeout(1200);
+  check('the old password no longer works', (await C.has('auth-error')) && (await C.state()).ownerId == null);
+  await C.fill('auth-password-input', NEW_PASSWORD);
+  await C.tap('auth-submit');
+  check('the new password does', await C.untilPath('/', 20000), C.page.url());
+  await C.page.waitForTimeout(1500);
+
+  // ------------------------------------- sign-out with changes not backed up
+  // Uploads fail (as with no connection); the entry exists only on this device.
+  await C.page.route('**/rest/v1/rpc/push_records', (route) => route.abort());
+  await C.tap('today-water-250');
+  await C.page.waitForTimeout(3000);
+  const pendingWater = Object.keys((await C.state()).dirty.water);
+  await C.go('/settings/account');
+  await C.tap('account-sign-out');
+  if (await C.has('confirm-yes')) await C.tap('confirm-yes');
+  await C.page.waitForTimeout(2500);
+  const cBlocked = await C.state();
+  check(
+    'sign-out stops and asks when an entry has not been backed up',
+    pendingWater.length === 1 && (await C.has('account-sign-out-anyway')) && cBlocked.ownerId === user.id && !!cBlocked.water[pendingWater[0]],
+    `${pendingWater.length} pending`,
+  );
+  await C.shot('backend-signout-blocked');
+  await C.tap('account-sign-out-keep');
+  await C.page.unroute('**/rest/v1/rpc/push_records');
+  await C.tap('account-sync-now');
+  await C.page.waitForTimeout(2500);
+  srv = await server();
+  check('once the connection is back the entry is uploaded', srv.records.some((r) => r.id === pendingWater[0]) && Object.keys((await C.state()).dirty.water).length === 0);
+
   // ------------------------------------------------------ delete account
   await A.go('/settings/account');
   await A.tap('account-delete');
@@ -204,8 +267,8 @@ async function device(browser, seedJson) {
   check('deleting the account erases the user and all their rows', !srv.users.some((u) => u.id === user.id) && srv.records.filter((r) => r.user_id === user.id).length === 0 && !srv.profiles[user.id]);
   check('device A is back at the welcome screen with no data', new URL(A.page.url()).pathname === '/welcome' && (await A.state()).profile === null, A.page.url());
 
-  const errs = [...A.errors, ...B.errors];
-  check('no uncaught errors on either device', errs.length === 0, errs.slice(0, 2).join(' || '));
+  const errs = [...A.errors, ...B.errors, ...C.errors];
+  check('no uncaught errors on any device', errs.length === 0, errs.slice(0, 2).join(' || '));
 
   await browser.close();
   const failed = results.filter((r) => !r.ok).length;

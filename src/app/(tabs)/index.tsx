@@ -7,11 +7,12 @@ import { copyEntries, findPreviousMeal } from '@/features/food/actions';
 import { coachTip, rhythmFromReminders } from '@/features/today/coach';
 import { useRecapReady } from '@/features/progress/recapReady';
 import { DayRingStrip } from '@/features/today/DayRingStrip';
+import { FitsSheet } from '@/features/today/FitsSheet';
 import { mealLine } from '@/features/today/meals';
 import { RecapReadyCard } from '@/features/today/RecapReadyCard';
 import { addWater, defaultGlass, StatusRail } from '@/features/today/StatusRail';
 import { addDays, formatShortDate, greeting, weekdayShort } from '@/lib/dates';
-import { MEALS, MEAL_LABEL, MEAL_SHARE } from '@/lib/nutrition';
+import { MEALS, MEAL_LABEL, MEAL_SHARE, mealForTime } from '@/lib/nutrition';
 import { formatNumber, formatVolume } from '@/lib/units';
 import { useStore } from '@/store';
 import { useNow, useToday } from '@/store/clock';
@@ -32,6 +33,8 @@ export default function TodayScreen() {
   const consistency = useConsistency(todayDate);
   const now = useNow();
   const recap = useRecapReady();
+  // The "What fits" sheet: null when closed, else whether protein is the gap it was opened for.
+  const [fits, setFits] = useState<{ proteinFirst: boolean } | null>(null);
 
   return (
     <Screen tabs testID="today-screen" backdrop={colors.calories}>
@@ -91,19 +94,29 @@ export default function TodayScreen() {
 
       <DayRingStrip today={todayDate} selected={date} onSelect={(d) => setPicked(d === todayDate ? null : d)} />
 
-      <EnergyCard day={day} isToday={isToday} />
+      <EnergyCard day={day} isToday={isToday} onFits={() => setFits({ proteinFirst: false })} />
       <StatusRail day={day} isToday={isToday} />
-      {isToday ? recap.announce ? <RecapReadyCard /> : <CoachCard day={day} /> : null}
+      {isToday ? recap.announce ? <RecapReadyCard /> : <CoachCard day={day} onFits={() => setFits({ proteinFirst: true })} /> : null}
 
       <SectionTitle title="Meals" action="Open diary" onAction={() => router.push(`/diary?date=${date}` as never)} />
       <MealsCard day={day} />
+
+      <FitsSheet
+        visible={fits !== null}
+        onClose={() => setFits(null)}
+        date={date}
+        meal={isToday ? mealForTime(now) : 'snack'}
+        kcalLeft={day.remaining}
+        proteinFirst={fits?.proteinFirst ?? false}
+        proteinLeft={day.macros.proteinG - day.eaten.protein}
+      />
     </Screen>
   );
 }
 
 // ------------------------------------------------------------- energy hero
 
-function EnergyCard({ day, isToday }: { day: DaySummary; isToday: boolean }) {
+function EnergyCard({ day, isToday, onFits }: { day: DaySummary; isToday: boolean; onFits: () => void }) {
   const { colors, spacing } = useTheme();
   const profile = useProfile();
   const over = day.remaining < 0;
@@ -117,14 +130,21 @@ function EnergyCard({ day, isToday }: { day: DaySummary; isToday: boolean }) {
           justifyContent: 'space-between',
         }}>
         <SideStat icon={<Utensils size={16} color={colors.textSecondary} />} value={formatNumber(day.eaten.kcal)} label="eaten" />
-        <Ring size={160} stroke={14} progress={progress} color={colors.calories} colorEnd={colors.ringEnd} overColor={colors.warning}>
-          <Text variant="numXL" tabular color={over ? 'warning' : 'text'} testID="today-remaining">
-            {formatNumber(Math.abs(day.remaining))}
-          </Text>
-          <Text variant="label" color="textSecondary">
-            {over ? 'kcal over' : isToday ? 'kcal left' : 'kcal under'}
-          </Text>
-        </Ring>
+        <PressableScale
+          testID="today-remaining-open"
+          scaleTo={0.97}
+          onPress={onFits}
+          accessibilityLabel={`${formatNumber(Math.abs(day.remaining))} ${over ? 'kilocalories over' : isToday ? 'kilocalories left' : 'kilocalories under'}. See which of your foods fit`}
+          style={{ borderRadius: 80 }}>
+          <Ring size={160} stroke={14} progress={progress} color={colors.calories} colorEnd={colors.ringEnd} overColor={colors.warning}>
+            <Text variant="numXL" tabular color={over ? 'warning' : 'text'} testID="today-remaining">
+              {formatNumber(Math.abs(day.remaining))}
+            </Text>
+            <Text variant="label" color="textSecondary">
+              {over ? 'kcal over' : isToday ? 'kcal left' : 'kcal under'}
+            </Text>
+          </Ring>
+        </PressableScale>
         <SideStat icon={<Flame size={16} color={colors.exercise} />} value={formatNumber(day.exerciseNet)} label="burned" />
       </View>
 
@@ -181,7 +201,7 @@ function relativeTo(date: ISODate, from: ISODate): string {
   return date === addDays(from, -1) ? 'yesterday' : formatShortDate(date);
 }
 
-function CoachCard({ day }: { day: DaySummary }) {
+function CoachCard({ day, onFits }: { day: DaySummary; onFits: () => void }) {
   const { colors, spacing, radius } = useTheme();
   const profile = useProfile();
   const now = useNow();
@@ -193,7 +213,7 @@ function CoachCard({ day }: { day: DaySummary }) {
   const quick = tip.quick;
   const prev = quick?.kind === 'repeat' ? findPreviousMeal(entries, day.date, quick.meal, 7) : null;
   const glass = defaultGlass(presets);
-  const open = action ? () => router.push(action.href as never) : undefined;
+  const open = quick?.kind === 'fits' ? onFits : action ? () => router.push(action.href as never) : undefined;
 
   const chips: React.ReactNode[] = [];
   if (quick?.kind === 'water') {

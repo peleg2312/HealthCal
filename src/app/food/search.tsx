@@ -8,7 +8,9 @@ import { AmountEditor } from '@/features/food/AmountEditor';
 import { FoodRow, MealPicker } from '@/features/food/components';
 import { setFoodDraft } from '@/features/food/draft';
 import { amountLabel, href, kcal, lastPortions, matchServing, parseDate, parseMeal, portionFor, portionKcal, portionLabel, stepAmount } from '@/features/food/helpers';
-import { deleteEntry, logFood, logItems, setEntryAmount } from '@/features/food/log';
+import { formatPortion, itemsRange, mealServings } from '@/features/food/build';
+import { deleteEntry, logFood, setEntryAmount } from '@/features/food/log';
+import { LogSavedMealSheet } from '@/features/food/SavedMealParts';
 import { usualFoods } from '@/features/food/usuals';
 import { formatDayLabel } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
@@ -18,7 +20,7 @@ import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
 import { useDay, useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
-import type { Food, FoodEntry, MealType } from '@/types';
+import type { Food, FoodEntry, MealType, SavedMeal } from '@/types';
 import { Avatar, Button, Chip, ChipRow, Divider, Header, IconButton, PressableScale, Screen, Sheet, Text, TextField } from '@/ui';
 
 type Tab = 'usual' | 'recent' | 'favorites' | 'mine' | 'meals';
@@ -42,6 +44,7 @@ export default function FoodSearchScreen() {
   // null until the user picks a tab: then Usual leads when there is history for this meal.
   const [pickedTab, setTab] = useState<Tab | null>(null);
   const [amountEntryId, setAmountEntryId] = useState<string | null>(null);
+  const [logging, setLogging] = useState<SavedMeal | null>(null);
   const [onlineResult, setOnlineResult] = useState<{ query: string; items: Food[]; failed: boolean; unavailable: boolean }>({ query: '', items: [], failed: false, unavailable: false });
   const [openedAt] = useState(() => nowISO());
 
@@ -275,17 +278,20 @@ export default function FoodSearchScreen() {
             </>
           ) : null}
           {tab === 'meals' ? (
-            savedMeals.length ? (
+            <>
+            {savedMeals.length ? (
               <List>
                 {savedMeals.map((m, i) => {
-                  const total = sumNutrients(m.items.map((it) => it.nutrients)).kcal;
+                  const count = mealServings(m);
+                  const total = sumNutrients(m.items.map((it) => it.nutrients)).kcal / count;
+                  const approx = itemsRange(m.items) ? '~' : '';
                   return (
                     <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                       <PressableScale
                         testID={`saved-meal-${i}`}
                         onPress={() => go('/food/meals')}
                         scaleTo={0.985}
-                        accessibilityLabel={`${m.name}, ${m.items.length} items`}
+                        accessibilityLabel={`${m.name}, ${m.items.length} items. Open saved meals`}
                         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 60, paddingVertical: spacing.sm }}>
                         <Avatar size={42}>
                           <Utensils size={20} color={colors.textSecondary} />
@@ -295,7 +301,9 @@ export default function FoodSearchScreen() {
                             {m.name}
                           </Text>
                           <Text variant="caption" color="textSecondary" numberOfLines={1}>
-                            {m.items.length} {m.items.length === 1 ? 'item' : 'items'} · {kcal(total)} kcal
+                            {count > 1
+                              ? `${approx}${kcal(total)} kcal per serving · makes ${formatPortion(count)}`
+                              : `${m.items.length} ${m.items.length === 1 ? 'item' : 'items'} · ${approx}${kcal(total)} kcal`}
                           </Text>
                         </View>
                       </PressableScale>
@@ -305,15 +313,24 @@ export default function FoodSearchScreen() {
                         size="sm"
                         variant="secondary"
                         full={false}
-                        onPress={() => logItems(m.items, meal, date, `${m.name} added to ${MEAL_LABEL[meal].toLowerCase()}`)}
+                        onPress={() => setLogging(m)}
                       />
                     </View>
                   );
                 })}
               </List>
             ) : (
-              <Hint title="No saved meals yet" message="In the diary, open a meal's menu and choose Save as a meal. Then log it here in one tap." />
-            )
+              <Hint title="No saved meals yet" message="Build a meal you eat often, or a recipe that makes several servings. You can also save a meal from the diary's meal menu." />
+            )}
+            <Button
+              testID="search-new-meal"
+              variant="secondary"
+              size="md"
+              title="New meal or recipe"
+              icon={<Utensils size={18} color={colors.text} />}
+              onPress={() => go('/food/meal-edit')}
+            />
+            </>
           ) : null}
         </>
       ) : (
@@ -366,6 +383,7 @@ export default function FoodSearchScreen() {
           </View>
         </>
       )}
+      <LogSavedMealSheet key={logging?.id ?? 'none'} meal={logging} mealType={meal} date={date} onClose={() => setLogging(null)} />
       <Sheet
         visible={!!amountEntry}
         onClose={() => setAmountEntryId(null)}

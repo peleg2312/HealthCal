@@ -17,7 +17,8 @@ export interface CoachTip {
   tone: 'neutral' | 'positive';
 }
 
-export type CoachQuick = { kind: 'water' } | { kind: 'repeat'; meal: MealType };
+/** `fits` opens the "What fits" sheet (foods of the user's own that fit the calories left). */
+export type CoachQuick = { kind: 'water' } | { kind: 'repeat'; meal: MealType } | { kind: 'fits' };
 
 /**
  * The user's own day: when they usually eat and when they are awake. Times are
@@ -152,8 +153,9 @@ export function coachTip(day: DaySummary, units: UnitSystem, now: Date = new Dat
       id: 'protein',
       emoji: '🥚',
       title: `${proteinLeft} g of protein to go`,
-      body: `You are at ${Math.round(day.eaten.protein)} of ${day.macros.proteinG} g. Building dinner around a protein source would cover most of it.`,
-      action: { label: 'Find food', href: search('dinner') },
+      body: `You are at ${Math.round(day.eaten.protein)} of ${day.macros.proteinG} g. A few of your own foods would close most of the gap.`,
+      action: { label: 'See what fits', href: search('dinner') },
+      quick: { kind: 'fits' },
       tone: 'neutral',
     };
   }

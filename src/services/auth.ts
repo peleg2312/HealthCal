@@ -6,7 +6,7 @@ import { create } from 'zustand';
 import { pendingChanges, useStore } from '@/store';
 import { flushPersistence } from '@/store/persistence';
 
-import { isBackendConfigured, supabase } from './supabase';
+import { isBackendConfigured, openedFromRecoveryLink, supabase } from './supabase';
 import { attachUser, syncNow } from './sync';
 
 interface AuthState {
@@ -94,6 +94,8 @@ export function initAuth(): void {
     // Local data belongs to an account but no session came back: it ended while the app was closed.
     else if (useStore.getState().ownerId) useAuth.setState({ sessionLost: true });
   });
+  // The reset link may have been handled before this listener existed (see supabase.ts).
+  if (openedFromRecoveryLink()) useAuth.setState({ recovery: true });
   supabase.auth.onAuthStateChange((event, session) => {
     useAuth.setState({ session });
     if (event === 'PASSWORD_RECOVERY') useAuth.setState({ recovery: true });

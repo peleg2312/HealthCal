@@ -1,18 +1,31 @@
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
-import { View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  CalendarDays,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Minus,
+  Plus,
+} from "lucide-react-native";
+import React, { useEffect, useState } from "react";
+import { View, type StyleProp, type ViewStyle } from "react-native";
 
-import { useToday } from '@/store/clock';
-import { addDays, formatDayLabel, formatLongDate, today } from '@/lib/dates';
-import { MEALS } from '@/lib/nutrition';
-import { useTheme } from '@/theme';
-import type { Food, FoodSource, ISODate, MealType } from '@/types';
-import { Avatar, IconButton, PressableScale, Text } from '@/ui';
+import { useToday } from "@/store/clock";
+import { addDays, formatDayLabel, formatLongDate, today } from "@/lib/dates";
+import { MEALS } from "@/lib/nutrition";
+import { useTheme } from "@/theme";
+import type { Food, FoodSource, ISODate, MealType } from "@/types";
+import { Avatar, IconButton, PressableScale, Text } from "@/ui";
 
-import { kcal, sourceInfo } from './helpers';
+import { kcal, sourceInfo } from "./helpers";
 
 /** Pill naming where the numbers come from. */
-export function SourceBadge({ source, style }: { source: FoodSource; style?: StyleProp<ViewStyle> }) {
+export function SourceBadge({
+  source,
+  style,
+}: {
+  source: FoodSource;
+  style?: StyleProp<ViewStyle>;
+}) {
   const { colors, radius } = useTheme();
   const info = sourceInfo(source);
   const c = colors[info.color];
@@ -21,10 +34,22 @@ export function SourceBadge({ source, style }: { source: FoodSource; style?: Sty
       testID="food-source-badge"
       accessibilityLabel={`Data source: ${info.label}`}
       style={[
-        { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, height: 26, borderRadius: radius.pill, backgroundColor: `${c}22`, alignSelf: 'flex-start' },
+        {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          paddingHorizontal: 10,
+          height: 26,
+          borderRadius: radius.pill,
+          backgroundColor: `${c}22`,
+          alignSelf: "flex-start",
+        },
         style,
-      ]}>
-      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c }} />
+      ]}
+    >
+      <View
+        style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c }}
+      />
       <Text variant="caption" color={c}>
         {info.label}
       </Text>
@@ -37,8 +62,15 @@ export function SourceTag({ source }: { source: FoodSource }) {
   const { colors } = useTheme();
   const info = sourceInfo(source);
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-      <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors[info.color] }} />
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+      <View
+        style={{
+          width: 5,
+          height: 5,
+          borderRadius: 3,
+          backgroundColor: colors[info.color],
+        }}
+      />
       <Text variant="caption" color="textTertiary" style={{ fontSize: 11 }}>
         {info.short}
       </Text>
@@ -47,10 +79,26 @@ export function SourceTag({ source }: { source: FoodSource }) {
 }
 
 /** Meal selector as four chips with stable test ids (`meal-breakfast`, ...). */
-export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: MealType; onChange: (m: MealType) => void; testIDPrefix?: string }) {
+export function MealPicker({
+  value,
+  onChange,
+  testIDPrefix = "meal",
+}: {
+  value: MealType;
+  onChange: (m: MealType) => void;
+  testIDPrefix?: string;
+}) {
   const { colors, radius } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', gap: 6, backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: 4 }}>
+    <View
+      style={{
+        flexDirection: "row",
+        gap: 6,
+        backgroundColor: colors.surfaceAlt,
+        borderRadius: radius.md,
+        padding: 4,
+      }}
+    >
       {MEALS.map((m) => {
         const active = m.id === value;
         return (
@@ -66,13 +114,18 @@ export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: 
               flex: 1,
               minHeight: 44,
               borderRadius: radius.sm,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: active ? colors.surface : 'transparent',
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: active ? colors.surface : "transparent",
               borderWidth: active ? 1 : 0,
               borderColor: colors.borderStrong,
-            }}>
-            <Text variant="label" color={active ? 'text' : 'textSecondary'} numberOfLines={1}>
+            }}
+          >
+            <Text
+              variant="label"
+              color={active ? "text" : "textSecondary"}
+              numberOfLines={1}
+            >
               {m.label}
             </Text>
           </PressableScale>
@@ -83,24 +136,63 @@ export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: 
 }
 
 /** Previous / next day with the date in the middle; tap the label to return to today. */
-export function DayStepper({ value, onChange, testIDPrefix = 'day' }: { value: ISODate; onChange: (d: ISODate) => void; testIDPrefix?: string }) {
+export function DayStepper({
+  value,
+  onChange,
+  testIDPrefix = "day",
+}: {
+  value: ISODate;
+  onChange: (d: ISODate) => void;
+  testIDPrefix?: string;
+}) {
   const { colors, radius } = useTheme();
   const isToday = value === useToday();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: 4 }}>
-      <IconButton testID={`${testIDPrefix}-prev`} accessibilityLabel="Previous day" tone="clear" size={44} onPress={() => onChange(addDays(value, -1))}>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        backgroundColor: colors.surfaceAlt,
+        borderRadius: radius.md,
+        padding: 4,
+      }}
+    >
+      <IconButton
+        testID={`${testIDPrefix}-prev`}
+        accessibilityLabel="Previous day"
+        tone="clear"
+        size={44}
+        onPress={() => onChange(addDays(value, -1))}
+      >
         <ChevronLeft size={20} color={colors.text} />
       </IconButton>
       <PressableScale
         testID={`${testIDPrefix}-today`}
         onPress={() => !isToday && onChange(today())}
-        feedback={isToday ? 'none' : 'tap'}
-        accessibilityLabel={isToday ? 'Today' : `${formatLongDate(value)}, tap for today`}
-        style={{ flex: 1, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, minHeight: 44 }}>
+        feedback={isToday ? "none" : "tap"}
+        accessibilityLabel={
+          isToday ? "Today" : `${formatLongDate(value)}, tap for today`
+        }
+        style={{
+          flex: 1,
+          alignItems: "center",
+          flexDirection: "row",
+          justifyContent: "center",
+          gap: 6,
+          minHeight: 44,
+        }}
+      >
         <CalendarDays size={16} color={colors.textSecondary} />
         <Text variant="label">{formatDayLabel(value)}</Text>
       </PressableScale>
-      <IconButton testID={`${testIDPrefix}-next`} accessibilityLabel="Next day" tone="clear" size={44} onPress={() => onChange(addDays(value, 1))}>
+      <IconButton
+        testID={`${testIDPrefix}-next`}
+        accessibilityLabel="Next day"
+        tone="clear"
+        size={44}
+        onPress={() => onChange(addDays(value, 1))}
+      >
         <ChevronRight size={20} color={colors.text} />
       </IconButton>
     </View>
@@ -108,10 +200,18 @@ export function DayStepper({ value, onChange, testIDPrefix = 'day' }: { value: I
 }
 
 /** Calories as a large number with a small unit. */
-export function KcalValue({ value, variant = 'numL', color }: { value: number; variant?: 'numXL' | 'numL' | 'numM'; color?: string }) {
+export function KcalValue({
+  value,
+  variant = "numL",
+  color,
+}: {
+  value: number;
+  variant?: "numXL" | "numL" | "numM";
+  color?: string;
+}) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-      <Text variant={variant} tabular color={color ?? 'text'}>
+    <View style={{ flexDirection: "row", alignItems: "baseline", gap: 4 }}>
+      <Text variant={variant} tabular color={color ?? "text"}>
         {kcal(value)}
       </Text>
       <Text variant="label" color="textSecondary">
@@ -161,24 +261,44 @@ export function FoodRow({
     return () => clearTimeout(t);
   }, [added]);
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+    <View
+      style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}
+    >
       <PressableScale
         testID={testID}
         onPress={onPress}
         scaleTo={0.985}
         accessibilityLabel={`${food.name}, ${Math.round(kcalValue)} kilocalories. Open details`}
-        style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 60, paddingVertical: spacing.sm }}>
-        <Avatar emoji={food.emoji ?? '🍽️'} size={42} />
+        style={{
+          flex: 1,
+          minWidth: 0,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing.md,
+          minHeight: 60,
+          paddingVertical: spacing.sm,
+        }}
+      >
+        <Avatar emoji={food.emoji ?? "🍽️"} size={42} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text variant="bodyStrong" numberOfLines={1}>
             {food.name}
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flexShrink: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Text
+              variant="caption"
+              color="textSecondary"
+              numberOfLines={1}
+              style={{ flexShrink: 1 }}
+            >
               {/* Once added, the live kcal leads so a narrower line still shows it. */}
-              {amount ? `${kcal(kcalValue)} kcal · ` : food.brand ? `${food.brand} · ` : ''}
+              {amount
+                ? `${kcal(kcalValue)} kcal · `
+                : food.brand
+                  ? `${food.brand} · `
+                  : ""}
               {subtitle}
-              {amount ? '' : ` · ${kcal(kcalValue)} kcal`}
+              {amount ? "" : ` · ${kcal(kcalValue)} kcal`}
             </Text>
             <SourceTag source={food.source} />
           </View>
@@ -191,26 +311,51 @@ export function FoodRow({
         <IconButton
           testID={testID ? `${testID}-add` : undefined}
           accessibilityLabel={`Add ${food.name}`}
-          tone={added ? 'primary' : 'alt'}
+          tone={added ? "primary" : "alt"}
           size={40}
           onPress={() => {
             setAdded(true);
             onQuickAdd();
-          }}>
-          {added ? <Check size={18} color={colors.onPrimary} /> : <Plus size={18} color={colors.text} />}
+          }}
+        >
+          {added ? (
+            <Check size={18} color={colors.onPrimary} />
+          ) : (
+            <Plus size={18} color={colors.text} />
+          )}
         </IconButton>
       ) : null}
     </View>
   );
 }
 
-function AmountStepper({ amount, name, testID }: { amount: RowAmount; name: string; testID?: string }) {
+function AmountStepper({
+  amount,
+  name,
+  testID,
+}: {
+  amount: RowAmount;
+  name: string;
+  testID?: string;
+}) {
   const { colors, radius } = useTheme();
   return (
     <View
       testID={testID ? `${testID}-stepper` : undefined}
-      style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, backgroundColor: colors.primarySoft }}>
-      <IconButton testID={testID ? `${testID}-less` : undefined} accessibilityLabel={`Less ${name}`} tone="clear" size={44} onPress={() => amount.onStep(-1)}>
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        borderRadius: radius.pill,
+        backgroundColor: colors.primarySoft,
+      }}
+    >
+      <IconButton
+        testID={testID ? `${testID}-less` : undefined}
+        accessibilityLabel={`Less ${name}`}
+        tone="clear"
+        size={44}
+        onPress={() => amount.onStep(-1)}
+      >
         <Minus size={18} color={colors.primary} />
       </IconButton>
       <PressableScale
@@ -218,12 +363,24 @@ function AmountStepper({ amount, name, testID }: { amount: RowAmount; name: stri
         onPress={amount.onOpen}
         feedback="select"
         accessibilityLabel={`${name}, ${amount.label}. Change amount`}
-        style={{ minWidth: 40, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
+        style={{
+          minWidth: 40,
+          minHeight: 44,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         <Text variant="label" color="primary" tabular numberOfLines={1}>
           {amount.label}
         </Text>
       </PressableScale>
-      <IconButton testID={testID ? `${testID}-more` : undefined} accessibilityLabel={`More ${name}`} tone="clear" size={44} onPress={() => amount.onStep(1)}>
+      <IconButton
+        testID={testID ? `${testID}-more` : undefined}
+        accessibilityLabel={`More ${name}`}
+        tone="clear"
+        size={44}
+        onPress={() => amount.onStep(1)}
+      >
         <Plus size={18} color={colors.primary} />
       </IconButton>
     </View>
@@ -231,11 +388,28 @@ function AmountStepper({ amount, name, testID }: { amount: RowAmount; name: stri
 }
 
 /** Small labelled number used in macro rows: "32 g / 150 g". */
-export function MacroStat({ label, value, target, color }: { label: string; value: number; target?: number; color: string }) {
+export function MacroStat({
+  label,
+  value,
+  target,
+  color,
+}: {
+  label: string;
+  value: number;
+  target?: number;
+  color: string;
+}) {
   return (
     <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <View
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: color,
+          }}
+        />
         <Text variant="caption" color="textSecondary" numberOfLines={1}>
           {label}
         </Text>
@@ -243,7 +417,7 @@ export function MacroStat({ label, value, target, color }: { label: string; valu
       <Text variant="bodyStrong" tabular numberOfLines={1}>
         {Math.round(value)}
         <Text variant="caption" color="textSecondary">
-          {target !== undefined ? ` / ${Math.round(target)} g` : ' g'}
+          {target !== undefined ? ` / ${Math.round(target)} g` : " g"}
         </Text>
       </Text>
     </View>

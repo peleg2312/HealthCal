@@ -1,9 +1,11 @@
+import { useLocalSearchParams } from 'expo-router';
 import { Info, Moon, Plus } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { formatDayLabel, fromISODate, weekdayShort } from '@/lib/dates';
 import { deleteSleep, saveSleep } from '@/features/trackers/actions';
+import { dayTitle, resolveDateParam } from '@/features/trackers/dateParam';
 import { DayStepper, Figure, Note, RequireProfile } from '@/features/trackers/components';
 import { findByDate, formatHours, QUALITY_LABELS, SLEEP_RANGE, sleepSummary } from '@/features/trackers/helpers';
 import { useToday } from '@/store/clock';
@@ -63,22 +65,26 @@ function SleepScreen() {
   const entries = useLive('sleep');
   const [win, setWin] = useState<Window>('7');
   const [sheetDate, setSheetDate] = useState<ISODate | null>(null);
-  const end = useToday();
+  const todayDate = useToday();
+  const params = useLocalSearchParams<{ date?: string }>();
+  // Opened from a past day on Today (?date=), the screen shows and logs that day's night.
+  const end = resolveDateParam(params.date, todayDate);
+  const isToday = end === todayDate;
   const lastNight = findByDate(entries, end);
   const days = win === '7' ? 7 : 30;
   const summary = sleepSummary(entries, days, end);
   const history = [...entries].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30);
 
   const bars = summary.series.map((d, i) => ({
-    label: days === 7 ? (i === days - 1 ? 'Today' : weekdayShort(d.date)) : i % 5 === 4 || i === days - 1 ? String(fromISODate(d.date).getDate()) : '',
+    label: days === 7 ? (d.date === todayDate ? 'Today' : weekdayShort(d.date)) : i % 5 === 4 || i === days - 1 ? String(fromISODate(d.date).getDate()) : '',
     value: d.hours,
     color: d.hours >= SLEEP_RANGE[0] && d.hours <= SLEEP_RANGE[1] ? colors.sleep : `${colors.sleep}77`,
   }));
 
-  const footer = <Button testID="sleep-log" title={lastNight ? 'Log sleep' : 'Log last night'} icon={<Plus size={20} color={colors.onPrimary} />} onPress={() => setSheetDate(end)} />;
+  const footer = <Button testID="sleep-log" title={lastNight ? (isToday ? 'Log sleep' : 'Edit this night') : isToday ? 'Log last night' : 'Log this night'} icon={<Plus size={20} color={colors.onPrimary} />} onPress={() => setSheetDate(end)} />;
 
   return (
-    <Screen header={<Header title="Sleep" />} footer={footer} backdrop={colors.sleep} testID="sleep-screen">
+    <Screen header={<Header title="Sleep" subtitle={isToday ? undefined : dayTitle(end)} />} footer={footer} backdrop={colors.sleep} testID="sleep-screen">
       {entries.length === 0 ? (
         <Card>
           <EmptyState
@@ -91,7 +97,7 @@ function SleepScreen() {
         <>
           <Card style={{ gap: spacing.sm }}>
             <Text variant="overline" color="textSecondary">
-              LAST NIGHT
+              {isToday ? 'LAST NIGHT' : `NIGHT BEFORE ${dayTitle(end).toUpperCase()}`}
             </Text>
             {lastNight ? (
               <>

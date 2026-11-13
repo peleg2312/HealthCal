@@ -70,9 +70,10 @@ export function RecapReadyCard() {
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text variant="bodyStrong" numberOfLines={1}>
             Your week is ready
+            <Text variant="caption" color="textTertiary">{`  ${range}`}</Text>
           </Text>
-          <Text variant="caption" color="textSecondary" numberOfLines={1}>
-            {`${range} · ${line}`}
+          <Text variant="caption" color="textSecondary" numberOfLines={2}>
+            {line}
           </Text>
         </View>
         <ChevronRight size={18} color={colors.textTertiary} />

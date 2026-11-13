@@ -1,9 +1,9 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Check, GlassWater, Info, Trash2 } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Animated, View } from 'react-native';
 
-import { weekdayShort } from '@/lib/dates';
+import { toISODate, weekdayShort } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
 import { BEVERAGE_LABELS, baseWaterGoalMl, effectiveMl, exerciseWaterMl, glassesLeft, HYDRATION_FACTOR } from '@/lib/hydration';
 import { formatVolume, formatWeight, volumeToMl, volumeUnit, volumeValue } from '@/lib/units';
@@ -11,6 +11,7 @@ import { useToday } from '@/store/clock';
 import { DEFAULT_SETTINGS, useStore } from '@/store';
 import { useDay, useDays, useProfile } from '@/store/selectors';
 import { Figure, Note, RequireProfile, splitUnit, Tile, WaterWave } from '@/features/trackers/components';
+import { dayTitle, resolveDateParam } from '@/features/trackers/dateParam';
 import { crossedGoal, keepOrConvert, MAX_PRESET_ML, MIN_PRESET_ML, normalizePresets } from '@/features/trackers/helpers';
 import { useTheme } from '@/theme';
 import type { Beverage, WaterEntry } from '@/types';
@@ -41,6 +42,11 @@ function clockTime(iso: string): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+/** When a drink was logged, or "Added later" for one back-filled on another day (its clock time would mislead). */
+function loggedLabel(e: WaterEntry): string {
+  return toISODate(new Date(e.loggedAt)) === e.date ? clockTime(e.loggedAt) : 'Added later';
+}
+
 /** One line on drinks that count less, built from the factors so it never drifts from the maths. */
 function factorLine(): string {
   const less = BEVERAGES.filter((b) => HYDRATION_FACTOR[b] < 1)
@@ -54,7 +60,12 @@ function WaterScreen() {
   const profile = useProfile();
   const settings = useStore((s) => s.settings);
   const units = profile.units;
-  const date = useToday();
+  const todayDate = useToday();
+  const params = useLocalSearchParams<{ date?: string }>();
+  const date = resolveDateParam(params.date, todayDate);
+  const isToday = date === todayDate;
+  /** "today" or "Wed, Nov 11", for copy that names the day. */
+  const dayName = isToday ? 'today' : dayTitle(date);
   const day = useDay(date);
   const week = useDays(7, date);
   const [beverage, setBeverage] = useState<Beverage>('water');
@@ -107,14 +118,14 @@ function WaterScreen() {
   const override = !!(profile.waterGoalMlOverride && profile.waterGoalMlOverride > 0);
 
   const bars = week.map((d, i) => ({
-    label: i === week.length - 1 ? 'Today' : weekdayShort(d.date),
+    label: d.date === todayDate ? 'Today' : weekdayShort(d.date),
     value: volumeValue(d.waterMl, units),
     color: d.waterMl >= d.waterGoalMl ? colors.water : `${colors.water}99`,
   }));
   const daysMet = week.filter((d) => d.waterMl >= d.waterGoalMl && d.waterGoalMl > 0).length;
 
   return (
-    <Screen header={<Header title="Water" subtitle="Today" />} backdrop={colors.water} testID="water-screen">
+    <Screen header={<Header title="Water" subtitle={isToday ? 'Today' : dayTitle(date)} />} backdrop={colors.water} testID="water-screen">
       <Card padding={spacing.xl} style={{ alignItems: 'center', gap: spacing.lg }}>
         <WaterWave progress={progress} size={224}>
           <View style={{ alignItems: 'center', backgroundColor: `${colors.surface}CC`, borderRadius: radius.lg, paddingHorizontal: 16, paddingVertical: 6 }}>
@@ -122,7 +133,7 @@ function WaterScreen() {
               {Math.round(progress * 100)}%
             </Text>
             <Text variant="caption" color="textSecondary">
-              of today’s goal
+              {isToday ? 'of today’s goal' : 'of the day’s goal'}
             </Text>
           </View>
         </WaterWave>
@@ -131,7 +142,7 @@ function WaterScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Check size={18} color={colors.success} />
             <Text testID="water-goal-reached" variant="bodyStrong" color="success">
-              Goal reached for today
+              {isToday ? 'Goal reached for today' : `Goal reached on ${dayName}`}
             </Text>
           </View>
         ) : (
@@ -149,7 +160,7 @@ function WaterScreen() {
           <Figure testID="water-consumed" align="center" value={consumedParts.value} unit={consumedParts.unit} label="Drunk" />
           <Figure align="center" value={goalParts.value} unit={goalParts.unit} label="Goal" />
           {reached ? (
-            <Figure align="center" value={splitUnit(formatVolume(consumed - goal, units)).value} unit={splitUnit(formatVolume(consumed - goal, units)).unit} label="Extra today" color="water" />
+            <Figure align="center" value={splitUnit(formatVolume(consumed - goal, units)).value} unit={splitUnit(formatVolume(consumed - goal, units)).unit} label={isToday ? 'Extra today' : 'Extra'} color="water" />
           ) : (
             <Figure align="center" value={String(glassesLeft(left, glassMl))} label={`× ${formatVolume(glassMl, units)} to go`} color="water" />
           )}
@@ -157,7 +168,7 @@ function WaterScreen() {
       </Card>
 
       {/* A one-off acknowledgement; it leaves if intake drops back under the goal. */}
-      {celebrate && reached ? <Celebration onDone={() => setCelebrate(false)} /> : null}
+      {celebrate && reached ? <Celebration isToday={isToday} onDone={() => setCelebrate(false)} /> : null}
 
       <SectionTitle title="Add a drink" action="Edit sizes" onAction={() => setEditing(true)} />
       <ChipRow>
@@ -217,13 +228,17 @@ function WaterScreen() {
       <Note icon={<Info size={14} color={colors.textTertiary} />}>{factorLine()}</Note>
 
       <SectionTitle
-        title="Today’s log"
+        title={isToday ? 'Today’s log' : `Log for ${dayName}`}
         action={allEntries.length > 6 ? (showAllLog ? 'Show less' : `Show all ${allEntries.length}`) : undefined}
         onAction={() => setShowAllLog((v) => !v)}
       />
       <Card padding={entries.length ? spacing.md : spacing.lg}>
         {entries.length === 0 ? (
-          <EmptyState emoji="💧" title="Nothing logged yet" message="Tap a glass size above and each drink shows up here." />
+          <EmptyState
+            emoji="💧"
+            title={isToday ? 'Nothing logged yet' : `Nothing logged for ${dayName}`}
+            message={isToday ? 'Tap a glass size above and each drink shows up here.' : 'Tap a glass size above to add what you drank that day.'}
+          />
         ) : (
           entries.map((e, i) => {
             const counts = Math.round(effectiveMl(e.ml, e.beverage));
@@ -237,13 +252,13 @@ function WaterScreen() {
                       {formatVolume(e.ml, units)} {BEVERAGE_LABELS[e.beverage].label.toLowerCase()}
                     </Text>
                     <Text variant="caption" color="textSecondary">
-                      {clockTime(e.loggedAt)}
+                      {loggedLabel(e)}
                       {counts !== e.ml ? ` · counts as ${formatVolume(counts, units)}` : ''}
                     </Text>
                   </View>
                   <IconButton
                     testID={`water-delete-${i}`}
-                    accessibilityLabel={`Delete ${formatVolume(e.ml, units)} at ${clockTime(e.loggedAt)}`}
+                    accessibilityLabel={`Delete ${formatVolume(e.ml, units)}, ${loggedLabel(e)}`}
                     tone="clear"
                     size={44}
                     onPress={() => removeEntry(e)}>
@@ -256,10 +271,10 @@ function WaterScreen() {
         )}
       </Card>
 
-      <SectionTitle title="Last 7 days" />
+      <SectionTitle title={isToday ? 'Last 7 days' : `7 days to ${dayTitle(date)}`} />
       <Card style={{ gap: spacing.md }}>
         <Text variant="caption" color="textSecondary">
-          {week.some((d) => d.waterMl > 0) ? `Goal met on ${daysMet} of 7 days.` : 'Bars fill in as you log drinks.'} Dashed line: today’s goal of {formatVolume(goal, units)}.
+          {week.some((d) => d.waterMl > 0) ? `Goal met on ${daysMet} of 7 days.` : 'Bars fill in as you log drinks.'} Dashed line: {isToday ? 'today’s' : 'the day’s'} goal of {formatVolume(goal, units)}.
         </Text>
         <BarChart
           data={bars}
@@ -284,12 +299,16 @@ function WaterScreen() {
               value={formatVolume(baseMl, units)}
             />
             <GoalLine
-              label="Extra for today’s exercise"
-              hint={day.activities.length ? `${day.activeMinutes} min logged today, to replace some of the sweat` : 'Log a workout and this goes up for the day'}
+              label={isToday ? 'Extra for today’s exercise' : 'Extra for the day’s exercise'}
+              hint={
+                day.activities.length
+                  ? `${day.activeMinutes} min logged ${isToday ? 'today' : 'that day'}, to replace some of the sweat`
+                  : 'Log a workout and this goes up for the day'
+              }
               value={`+${formatVolume(exerciseMl, units)}`}
             />
             <Divider />
-            <GoalLine label="Today’s goal" value={formatVolume(goal, units)} strong />
+            <GoalLine label={isToday ? 'Today’s goal' : `Goal for ${dayName}`} value={formatVolume(goal, units)} strong />
             <Text variant="caption" color="textTertiary">
               This counts drinks only. Food supplies roughly a fifth of the water you take in, so it is not included.
             </Text>
@@ -321,7 +340,7 @@ function GoalLine({ label, hint, value, strong }: { label: string; hint?: string
   );
 }
 
-function Celebration({ onDone }: { onDone: () => void }) {
+function Celebration({ isToday, onDone }: { isToday: boolean; onDone: () => void }) {
   const { colors, spacing } = useTheme();
   const [anim] = useState(() => new Animated.Value(0));
   useEffect(() => {
@@ -335,7 +354,7 @@ function Celebration({ onDone }: { onDone: () => void }) {
         style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
         <Text style={{ fontSize: 30, lineHeight: 38 }}>🌊</Text>
         <View style={{ flex: 1 }}>
-          <Text variant="title">That’s your water goal for today</Text>
+          <Text variant="title">{isToday ? 'That’s your water goal for today' : 'That’s your water goal for the day'}</Text>
           <Text variant="caption" color="textSecondary">
             Nicely done. Anything more is a bonus, not a requirement.
           </Text>

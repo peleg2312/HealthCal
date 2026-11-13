@@ -8,7 +8,7 @@ import { nowISO } from '@/lib/id';
 import { MEAL_LABEL } from '@/lib/nutrition';
 import { useStore } from '@/store';
 import { live } from '@/store/selectors';
-import type { CustomFood, FoodEntry, ISODate, MealType, Nutrients, SavedMeal } from '@/types';
+import type { CustomFood, FoodEntry, ISODate, MealType, Nutrients, SavedMeal, SavedMealItem } from '@/types';
 import { haptic, toast } from '@/ui';
 
 import { dayPhrase } from './helpers';
@@ -111,6 +111,30 @@ export function saveMeal(name: string, entries: FoodEntry[]): SavedMeal | null {
   const meal = useStore.getState().upsert('savedMeals', { name: name.trim() || 'Saved meal', items: entries.map(toSavedMealItem) });
   haptic.success();
   toast(`Saved "${meal.name}"`, { label: 'Undo', onPress: () => useStore.getState().remove('savedMeals', meal.id) });
+  return meal;
+}
+
+/**
+ * Store a meal built or edited in the meal builder. Servings of 1 or less mean
+ * a plain meal. Undo removes a new meal or puts an edited one back as it was.
+ */
+export function storeSavedMeal(input: { id: string | null; name: string; servings: number | null; items: SavedMealItem[] }): SavedMeal | null {
+  if (input.items.length === 0) return null;
+  const store = useStore.getState();
+  const before = input.id ? store.savedMeals[input.id] : undefined;
+  const servings = input.servings && input.servings > 1 ? Math.round(input.servings * 100) / 100 : 1;
+  const meal = store.upsert('savedMeals', {
+    ...(before && !before.deleted ? before : null),
+    ...(input.id ? { id: input.id } : null),
+    name: input.name.trim() || 'Saved meal',
+    items: input.items,
+    servings,
+  });
+  haptic.success();
+  toast(before ? `Saved changes to "${meal.name}"` : `Saved "${meal.name}"`, {
+    label: 'Undo',
+    onPress: () => (before ? useStore.getState().upsert('savedMeals', before) : useStore.getState().remove('savedMeals', meal.id)),
+  });
   return meal;
 }
 

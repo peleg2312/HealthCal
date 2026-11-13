@@ -67,7 +67,7 @@ const readBody = (req) =>
 
 const api = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] || '*');
   res.setHeader('Access-Control-Expose-Headers', 'content-range');
   if (req.method === 'OPTIONS') return res.writeHead(204).end();
