@@ -49,7 +49,9 @@ Without these steps the app keeps everything on the device, and the AI screen ru
    ```bash
    supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
    supabase functions deploy analyze-food
+   supabase functions deploy food-search
    ```
+   `food-search` is a small proxy the web build needs for searching packaged products by name (the Open Food Facts search service does not allow direct browser calls; phones call it directly).
    Optional secrets: `AI_DAILY_LIMIT` (analyses per user per day, default 40), `FOOD_MODEL` (default `claude-haiku-5-5`), `FOOD_MODEL_PRECISE` (default `claude-sonnet-5-5`).
 4. Copy `.env.example` to `.env` and fill in the project URL and anon key from the Supabase dashboard (Project Settings, API), then restart the dev server.
 
@@ -62,6 +64,30 @@ The design keeps token use low without giving up accuracy:
 - The server validates every number (macros cannot outweigh the food, calories must agree with macros) before the app sees it.
 
 At list prices this works out to a few hundredths of a US cent per analysis on the default model and under one cent on the careful pass. These figures are estimates from the published per-token prices, not measurements: check the usage page of your Anthropic console after real use. Per-user daily limits are enforced by the function and recorded in `ai_usage`.
+
+### Testing without a live backend
+
+Three checks run entirely on your machine:
+
+```bash
+npm test                              # 540+ unit tests: formulas, sync engine, reminders, search, AI validation
+node scripts/dev/e2e.cjs              # a new user's first day in a real browser (needs `npm run web` running);
+                                      # every number is checked against an independent calculation
+bash scripts/dev/test-sql.sh          # applies the migration to a throwaway PostgreSQL and tests row-level
+                                      # security, last-write-wins sync, the AI quota and account deletion
+```
+
+Accounts, two-device sync and the AI request can be exercised against a local stand-in for Supabase:
+
+```bash
+EXPO_PUBLIC_SUPABASE_URL=http://localhost:54321 \
+EXPO_PUBLIC_SUPABASE_ANON_KEY=mock-anon-key-for-local-end-to-end-tests \
+  npx expo export --platform web --output-dir /tmp/healthcal-mock
+node scripts/dev/mock-backend.cjs --static=/tmp/healthcal-mock --static-port=8090 &
+node scripts/dev/e2e-backend.cjs      # sign-up, sign-in on a second device, sync both ways, AI, sign-out, delete account
+```
+
+The stand-in follows the same rules as the SQL, but it is not Supabase: run through sign-up, sync and one photo analysis once against your real project before relying on it.
 
 ## Ship it
 
