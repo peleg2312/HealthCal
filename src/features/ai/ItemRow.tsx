@@ -2,11 +2,14 @@ import { Droplet, Minus, Plus, X } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { TextInput, View } from 'react-native';
 
+import { SourceTag } from '@/features/food/components';
 import { formatMacro } from '@/lib/nutrition';
 import { fonts, useTheme } from '@/theme';
-import { Badge, IconButton, parseNumber, Text } from '@/ui';
+import type { Food } from '@/types';
+import { Badge, Chip, IconButton, parseNumber, Text } from '@/ui';
 
 import { confidenceLevel, gramStep, type ReviewRow } from './estimate';
+import { itemFromFood } from './localMatch';
 
 /** One editable line of the estimate: name, grams, live calories and macros, remove. */
 export function ItemRow({
@@ -15,12 +18,19 @@ export function ItemRow({
   onGrams,
   onRename,
   onRemove,
+  matches = [],
+  onSwap,
+  onUnswap,
 }: {
   row: ReviewRow;
   index: number;
   onGrams: (grams: number) => void;
   onRename: (name: string) => void;
   onRemove: () => void;
+  /** Database foods this item could be, offered as swap chips. */
+  matches?: Food[];
+  onSwap?: (food: Food) => void;
+  onUnswap?: () => void;
 }) {
   const { colors, spacing } = useTheme();
   const { item } = row;
@@ -45,7 +55,7 @@ export function ItemRow({
             { outlineStyle: 'none' } as object,
           ]}
         />
-        {unsure ? <Badge label="Unsure" color={colors.warning} /> : null}
+        {unsure && !row.food ? <Badge label="Unsure" color={colors.warning} /> : null}
         <IconButton testID={`${id}-remove`} accessibilityLabel={`Remove ${item.name}`} size={32} tone="clear" onPress={onRemove}>
           <X size={18} color={colors.textTertiary} />
         </IconButton>
@@ -82,6 +92,41 @@ export function ItemRow({
           </View>
         </View>
       </View>
+      <View testID={`${id}-source`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        <SourceTag source={row.food ? row.food.source : 'ai'} />
+        {row.food && row.estimate ? (
+          <Text variant="caption" color="textTertiary" style={{ fontSize: 11 }}>
+            · portion still estimated
+          </Text>
+        ) : null}
+      </View>
+      {onSwap && (matches.length > 0 || row.food) ? (
+        <View style={{ gap: 6 }}>
+          <Text variant="caption" color="textSecondary">
+            {row.food ? 'Matched to' : 'Could also be'}
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+            {(row.food && !matches.some((m) => m.id === row.food?.id) ? [row.food, ...matches.slice(0, 2)] : matches).map((food, i) => {
+              const selected = row.food?.id === food.id;
+              const kcal = itemFromFood(food, item.grams, item.confidence).kcal;
+              return (
+                <Chip
+                  key={food.id}
+                  testID={`${id}-swap-${i}`}
+                  label={`${food.name} · ${kcal} kcal`}
+                  selected={selected}
+                  onPress={() => (selected ? onUnswap?.() : onSwap(food))}
+                />
+              );
+            })}
+          </View>
+          {row.food && row.estimate ? (
+            <Text variant="caption" color="textTertiary">
+              Tap the selected food again to go back to the AI estimate.
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }

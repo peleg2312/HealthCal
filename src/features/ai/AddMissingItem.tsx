@@ -2,9 +2,8 @@ import { Plus, Sparkles } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
-import { BUILTIN_FOODS } from '@/data/foods';
 import { useTheme } from '@/theme';
-import type { AiFoodItem } from '@/types';
+import type { AiFoodItem, Food } from '@/types';
 import { Avatar, Divider, ListRow, Text, TextField } from '@/ui';
 
 import { foodToItem, matchFoods } from './localMatch';
@@ -15,11 +14,14 @@ import { foodToItem, matchFoods } from './localMatch';
  * says that it uses an analysis.
  */
 export function AddMissingItem({
+  foods,
   onAdd,
   onAskAi,
   aiBusy,
 }: {
-  onAdd: (item: AiFoodItem) => void;
+  /** Foods to match against: the person's own first, then the bundled reference. */
+  foods: Food[];
+  onAdd: (item: AiFoodItem, food?: Food) => void;
   /** Undefined when AI is not available (sample mode). */
   onAskAi?: (text: string) => Promise<boolean>;
   aiBusy?: boolean;
@@ -27,9 +29,9 @@ export function AddMissingItem({
   const { colors, spacing } = useTheme();
   const [query, setQuery] = useState('');
   const q = query.trim();
-  const matches = q.length >= 2 ? matchFoods(q, BUILTIN_FOODS, 3) : [];
-  const add = (item: AiFoodItem) => {
-    onAdd(item);
+  const matches = q.length >= 2 ? matchFoods(q, foods, 3) : [];
+  const add = (item: AiFoodItem, food?: Food) => {
+    onAdd(item, food);
     setQuery('');
   };
 
@@ -55,8 +57,8 @@ export function AddMissingItem({
                   testID={`ai-add-match-${i}`}
                   left={<Avatar emoji={food.emoji ?? '🍽️'} size={40} />}
                   title={food.name}
-                  subtitle={`${item.grams} g · ${item.kcal} kcal · reference data`}
-                  onPress={() => add(item)}
+                  subtitle={`${item.grams} g · ${item.kcal} kcal · ${food.source === 'custom' ? 'your food' : 'reference data'}`}
+                  onPress={() => add(item, food)}
                   right={<Plus size={18} color={colors.primary} />}
                 />
               </View>
@@ -64,7 +66,7 @@ export function AddMissingItem({
           })}
           {matches.length === 0 ? (
             <Text variant="caption" color="textSecondary" style={{ paddingVertical: spacing.sm }}>
-              No match in the built-in foods.{onAskAi ? '' : ' Try a simpler name, such as “rice” or “apple”.'}
+              No match in your foods or the built-in foods.{onAskAi ? '' : ' Try a simpler name, such as “rice” or “apple”.'}
             </Text>
           ) : null}
           {onAskAi ? (

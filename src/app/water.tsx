@@ -11,7 +11,7 @@ import { useToday } from '@/store/clock';
 import { DEFAULT_SETTINGS, useStore } from '@/store';
 import { useDay, useDays, useProfile } from '@/store/selectors';
 import { Figure, Note, RequireProfile, splitUnit, Tile, WaterWave } from '@/features/trackers/components';
-import { crossedGoal, MAX_PRESET_ML, MIN_PRESET_ML, normalizePresets } from '@/features/trackers/helpers';
+import { crossedGoal, keepOrConvert, MAX_PRESET_ML, MIN_PRESET_ML, normalizePresets } from '@/features/trackers/helpers';
 import { useTheme } from '@/theme';
 import type { Beverage, WaterEntry } from '@/types';
 import {
@@ -114,7 +114,7 @@ function WaterScreen() {
   const daysMet = week.filter((d) => d.waterMl >= d.waterGoalMl && d.waterGoalMl > 0).length;
 
   return (
-    <Screen header={<Header title="Water" subtitle="Today" />} testID="water-screen">
+    <Screen header={<Header title="Water" subtitle="Today" />} backdrop={colors.water} testID="water-screen">
       <Card padding={spacing.xl} style={{ alignItems: 'center', gap: spacing.lg }}>
         <WaterWave progress={progress} size={224}>
           <View style={{ alignItems: 'center', backgroundColor: `${colors.surface}CC`, borderRadius: radius.lg, paddingHorizontal: 16, paddingVertical: 6 }}>
@@ -348,55 +348,90 @@ function Celebration({ onDone }: { onDone: () => void }) {
   );
 }
 
+/** A preset field: what it shows, and the stored ml it was filled from (null for a new field). */
+type PresetField = { shown: number | null; ml: number | null };
+
 function PresetSheet({ visible, onClose, presets, units }: { visible: boolean; onClose: () => void; presets: number[]; units: 'metric' | 'imperial' }) {
+  const { spacing } = useTheme();
   const toDisplay = (ml: number) => Math.round(volumeValue(ml, units));
-  const [values, setValues] = useState<(number | null)[]>(() => presets.map(toDisplay));
+  const fieldsFor = (list: number[]): PresetField[] => list.map((ml) => ({ shown: toDisplay(ml), ml }));
+  const [fields, setFields] = useState<PresetField[]>(() => fieldsFor(presets));
+  const [error, setError] = useState<string | null>(null);
   const [wasVisible, setWasVisible] = useState(visible);
   if (visible !== wasVisible) {
     setWasVisible(visible);
-    if (visible) setValues(presets.map(toDisplay));
+    if (visible) {
+      setFields(fieldsFor(presets));
+      setError(null);
+    }
   }
   const unit = volumeUnit(units);
   const save = () => {
-    const ml = normalizePresets(values.map((v) => (v === null ? null : volumeToMl(v, units))));
+    // Untouched fields keep their stored ml, so an imperial save does not shift 250 ml to 237 ml.
+    const ml = normalizePresets(fields.map((f) => keepOrConvert(f.shown, f.ml, toDisplay, (v) => volumeToMl(v, units))));
     if (ml.length === 0) {
-      toast('Keep at least one size');
+      // Inline, not a toast: a toast would sit behind the sheet's native modal.
+      haptic.warn();
+      setError(`Keep at least one size between ${formatVolume(MIN_PRESET_ML, units)} and ${formatVolume(MAX_PRESET_ML, units)}`);
       return;
     }
     useStore.getState().setSettings({ waterPresets: ml });
-    toast('Glass sizes saved');
     onClose();
+    toast('Glass sizes saved');
   };
   return (
     <Sheet
       visible={visible}
       onClose={onClose}
       title="Glass sizes"
-      footer={<Button testID="water-presets-save" title="Save sizes" onPress={save} />}>
+      footer={
+        <View style={{ gap: spacing.sm }}>
+          {error ? (
+            <Text testID="water-presets-error" variant="caption" color="danger" align="center">
+              {error}
+            </Text>
+          ) : null}
+          <Button testID="water-presets-save" title="Save sizes" onPress={save} />
+        </View>
+      }>
       <Text variant="body" color="textSecondary">
         These are the one-tap buttons. Leave a field empty to remove it. Between {formatVolume(MIN_PRESET_ML, units)} and {formatVolume(MAX_PRESET_ML, units)}.
       </Text>
-      {values.map((v, i) => (
+      {fields.map((f, i) => (
         <NumberField
           key={i}
           testID={`water-preset-${i}`}
           label={`Size ${i + 1}`}
           suffix={unit}
           decimals={0}
-          value={v}
-          onChange={(n) => setValues((cur) => cur.map((x, j) => (j === i ? n : x)))}
+          value={f.shown}
+          onChange={(n) => {
+            setError(null);
+            setFields((cur) => cur.map((x, j) => (j === i ? { ...x, shown: n } : x)));
+          }}
         />
       ))}
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        {values.length < 6 ? (
-          <Button title="Add a size" variant="secondary" size="md" style={{ flex: 1 }} onPress={() => setValues((cur) => [...cur, null])} />
+      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+        {fields.length < 6 ? (
+          <Button
+            testID="water-presets-add"
+            title="Add a size"
+            variant="secondary"
+            size="md"
+            style={{ flex: 1 }}
+            onPress={() => setFields((cur) => [...cur, { shown: null, ml: null }])}
+          />
         ) : null}
         <Button
+          testID="water-presets-reset"
           title="Reset"
           variant="ghost"
           size="md"
           style={{ flex: 1 }}
-          onPress={() => setValues(DEFAULT_SETTINGS.waterPresets.map(toDisplay))}
+          onPress={() => {
+            setError(null);
+            setFields(fieldsFor(DEFAULT_SETTINGS.waterPresets));
+          }}
         />
       </View>
     </Sheet>

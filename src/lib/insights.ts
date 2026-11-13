@@ -29,7 +29,8 @@ export interface InsightDay {
   eaten: Nutrients;
   budget: number;
   macros: { proteinG: number; carbsG: number; fatG: number; fiberG: number };
-  activities: readonly unknown[];
+  /** MET and duration are used to count guideline minutes (moderate + 2 × vigorous). */
+  activities: readonly { met?: number; durationMin?: number }[];
   activeMinutes: number;
   waterEntries: readonly Pick<WaterEntry, 'ml' | 'beverage' | 'loggedAt'>[];
   waterMl: number;
@@ -52,8 +53,39 @@ export const PARTIAL_DAY_SHARE = 0.5;
 export const MIN_INSIGHT_DAYS = 3;
 /** WHO guideline for adults: at least 150 minutes of moderate activity a week. */
 export const WEEKLY_ACTIVE_MINUTES = 150;
-/** Sleep most adults need (AASM / Sleep Research Society). */
+/** Sleep most adults need (AASM / Sleep Research Society): 7 to 9 hours. */
 export const SLEEP_TARGET_HOURS = 7;
+export const SLEEP_MAX_HOURS = 9;
+/** Compendium bands used by the WHO guideline (same as Train): moderate 3 to <6 MET, vigorous 6+ MET. */
+export const MODERATE_MET = 3;
+export const VIGOROUS_MET = 6;
+/** A pace insight needs a weigh-in this recent; older rates are history, not the current pace. */
+export const STALE_WEIGH_IN_DAYS = 7;
+
+/**
+ * Minutes that count toward the 150-minute weekly guideline, as Train counts
+ * them: moderate minutes plus twice the vigorous minutes; light sessions
+ * (under 3 MET) do not count.
+ */
+export function guidelineMinutes(activities: readonly { met?: number; durationMin?: number }[]): number {
+  let total = 0;
+  for (const a of activities) {
+    const met = a.met ?? 0;
+    const min = a.durationMin ?? 0;
+    if (met >= VIGOROUS_MET) total += 2 * min;
+    else if (met >= MODERATE_MET) total += min;
+  }
+  return total;
+}
+
+/** A glass for water suggestions: 250 ml, or 8 fl oz in imperial. */
+export function glassMl(units: UnitSystem): number {
+  return units === 'imperial' ? 8 * 29.5735 : 250;
+}
+
+function glassText(units: UnitSystem): string {
+  return units === 'imperial' ? '8 fl oz' : '250 ml';
+}
 export const MAX_INSIGHTS = 5;
 
 // ---------------------------------------------------------- period summary
@@ -89,7 +121,16 @@ export interface PeriodSummary {
     fiber: { avg: number; target: number } | null;
   } | null;
   water: { avgMl: number; avgGoalMl: number; daysAtGoal: number; daysTracked: number } | null;
-  activity: { minutes: number; sessions: number; activeDays: number; weeklyMinutes: number };
+  activity: {
+    /** Logged minutes, whatever the intensity. */
+    minutes: number;
+    /** Minutes that count toward the guideline (moderate + 2 × vigorous). */
+    guidelineMinutes: number;
+    sessions: number;
+    activeDays: number;
+    /** Guideline minutes per week. */
+    weeklyMinutes: number;
+  };
   sleep: { avgHours: number; nights: number; avgQuality: number } | null;
   weight: {
     startTrend: number;
@@ -186,13 +227,15 @@ export function summarizePeriod(input: {
     : null;
 
   const minutes = days.reduce((s, d) => s + d.activeMinutes, 0);
+  const guideline = days.reduce((s, d) => s + guidelineMinutes(d.activities), 0);
   const sessions = days.reduce((s, d) => s + d.activities.length, 0);
   const activity = {
     minutes,
+    guidelineMinutes: guideline,
     sessions,
     activeDays: days.filter((d) => d.activities.length > 0).length,
     // Never extrapolate a short history up to a full week.
-    weeklyMinutes: (minutes * 7) / Math.max(7, effectiveDays),
+    weeklyMinutes: (guideline * 7) / Math.max(7, effectiveDays),
   };
 
   const sleepSummary = sleepIn.length
@@ -359,6 +402,8 @@ export interface InsightContext {
   currentWeeklyRateKg: number | null;
   /** All weigh-ins ever, for the minimum-data check on pace. */
   weighInsTotal: number;
+  /** Date of the latest weigh-in; a rate from weigh-ins older than a week is not presented as current. */
+  lastWeighIn?: ISODate | null;
   energy: {
     formulaTdee: number;
     adaptive: AdaptiveTdee;
@@ -556,13 +601,13 @@ function hydrationInsight({ summary: s, days, today, units }: InsightContext): I
     const patternText = pattern
       ? `; ${pattern.low === 'morning' ? 'mornings' : pattern.low === 'afternoon' ? 'afternoons' : 'evenings'} are where intake drops, about ${formatVolume(round50(pattern.ml[pattern.low]), units)} ${label(pattern.low)} against ${formatVolume(round50(pattern.ml[pattern.high]), units)} ${label(pattern.high)}`
       : '';
-    const glasses = Math.max(1, Math.ceil(gap / 250));
+    const glasses = Math.max(1, Math.ceil(gap / glassMl(units)));
     const when = pattern?.low === 'afternoon' ? ' in the afternoon' : pattern?.low === 'morning' ? ' in the morning' : pattern?.low === 'evening' ? ' in the early evening' : '';
     return {
       id: 'water-low',
       tone: 'attention',
       title: 'Water goal missed on most days',
-      body: `${head}, averaging ${formatVolume(w.avgMl, units)} against ${formatVolume(w.avgGoalMl, units)}${patternText}. ${glasses === 1 ? 'One more 250 ml glass' : `${glasses} more 250 ml glasses`}${when} would close the gap.`,
+      body: `${head}, averaging ${formatVolume(w.avgMl, units)} against ${formatVolume(w.avgGoalMl, units)}${patternText}. ${glasses === 1 ? `One more ${glassText(units)} glass` : `${glasses} more ${glassText(units)} glasses`}${when} would close the gap.`,
       action: { label: 'Log water', route: '/water' },
       score: 42 + (1 - rate) * 20,
     };
@@ -591,12 +636,13 @@ function activityInsight({ summary: s }: InsightContext): Insight | null {
   const a = s.activity;
   const weekly = Math.round(a.weeklyMinutes);
   const sessions = plural(a.sessions, 'session');
+  const light = a.minutes > 0 && a.guidelineMinutes < a.minutes ? ' Light sessions such as easy walks are logged but do not count toward it.' : '';
   if (weekly >= WEEKLY_ACTIVE_MINUTES) {
     return {
       id: 'activity-on-track',
       tone: 'positive',
       title: 'Above the activity guideline',
-      body: `You averaged ${weekly} active minutes a week (${sessions} in this range), above the ${WEEKLY_ACTIVE_MINUTES}-minute guideline.`,
+      body: `You averaged ${weekly} guideline minutes a week (${sessions} in this range, vigorous minutes count double), above the ${WEEKLY_ACTIVE_MINUTES}-minute guideline.`,
       score: 38,
     };
   }
@@ -605,8 +651,8 @@ function activityInsight({ summary: s }: InsightContext): Insight | null {
   return {
     id: 'activity-low',
     tone: 'attention',
-    title: `Under ${WEEKLY_ACTIVE_MINUTES} active minutes a week`,
-    body: `You averaged ${weekly} active minutes a week (${sessions} in this range), ${gap} short of the ${WEEKLY_ACTIVE_MINUTES}-minute guideline. ${walks === 1 ? 'One brisk 30-minute walk' : `${walks} brisk 30-minute walks`} a week would cover it.`,
+    title: `Under ${WEEKLY_ACTIVE_MINUTES} guideline minutes a week`,
+    body: `You averaged ${weekly} guideline minutes a week (${sessions} in this range), ${gap} short of the ${WEEKLY_ACTIVE_MINUTES}-minute guideline.${light} ${walks === 1 ? 'One brisk 30-minute walk' : `${walks} brisk 30-minute walks`} a week would cover it.`,
     action: { label: 'Log activity', route: '/activity/pick' },
     score: 30 + Math.min(20, (gap / WEEKLY_ACTIVE_MINUTES) * 20),
   };
@@ -624,6 +670,16 @@ function sleepInsight({ summary: s }: InsightContext): Insight | null {
       body: `Sleep averaged ${hoursText(sl.avgHours)} over ${plural(sl.nights, 'night')}, under the 7 h most adults need. Going to bed ${mins} minutes earlier would close the gap.`,
       action: { label: 'Sleep log', route: '/sleep' },
       score: 33 + Math.min(20, (SLEEP_TARGET_HOURS - sl.avgHours) * 15),
+    };
+  }
+  if (sl.avgHours > SLEEP_MAX_HOURS) {
+    return {
+      id: 'sleep-long',
+      tone: 'neutral',
+      title: 'Sleep above 9 hours',
+      body: `Sleep averaged ${hoursText(sl.avgHours)} over ${plural(sl.nights, 'night')}, above the 7 to 9 h most adults need. Long sleep is often catch-up after short nights; if it lasts, it is worth mentioning to a doctor.`,
+      action: { label: 'Sleep log', route: '/sleep' },
+      score: 36,
     };
   }
   return {
@@ -650,6 +706,17 @@ function sleepAppetiteInsight({ days, sleep, today }: InsightContext): Insight |
 function paceInsight(ctx: InsightContext): Insight | null {
   const { currentWeeklyRateKg: rate, weighInsTotal, goal, chosenWeeklyKg, weightKg, units, energy } = ctx;
   if (rate === null || weighInsTotal < 5) return null;
+  if (ctx.lastWeighIn && diffDays(ctx.lastWeighIn, ctx.today) > STALE_WEIGH_IN_DAYS) {
+    const ago = diffDays(ctx.lastWeighIn, ctx.today);
+    return {
+      id: 'pace-stale',
+      tone: 'neutral',
+      title: 'Weigh in to update your pace',
+      body: `Your last weigh-in was ${ago} days ago (${formatShortDate(ctx.lastWeighIn)}), so there is no current rate to compare with your plan. A few mornings this week will bring the trend up to date.`,
+      action: { label: 'Log weight', route: '/weight' },
+      score: 35,
+    };
+  }
   const r = (kg: number) => rateText(kg, units);
   const movement = rate < -0.02 ? `falling ${r(rate)} a week` : rate > 0.02 ? `rising ${r(rate)} a week` : 'holding flat';
   const adjust = (kgPerWeek: number) => `${kcalText(round10((Math.abs(kgPerWeek) * KCAL_PER_KG) / 7))}`;
@@ -728,16 +795,19 @@ function weekendInsight({ summary: s, days, today }: InsightContext): Insight | 
   if (!p || Math.abs(p.diff) < 150) return null;
   const c = s.calories!;
   if (p.diff > 0) {
-    const onBudget = c.avgDiff <= c.avgBudget * 0.05;
+    const onBudget = Math.abs(c.avgDiff) <= c.avgBudget * 0.05;
+    const under = c.avgDiff < -c.avgBudget * 0.05;
     const step = onBudget
       ? 'Your overall average is still on budget, so this is a pattern to know about rather than something to fix.'
-      : `Setting aside about ${kcalText(round10((p.diff * 2) / 5))} on each weekday would balance the week.`;
+      : under
+        ? 'Your overall average is under budget, so this is a pattern to know about rather than something to trim.'
+        : `Setting aside about ${kcalText(round10((p.diff * 2) / 5))} on each weekday would balance the week.`;
     return {
       id: 'weekend-higher',
       tone: 'neutral',
       title: 'Weekends run higher',
       body: `Weekends average ${kcalText(p.diff)} more than weekdays (${kcalText(p.weekendAvg)} against ${kcalText(p.weekdayAvg)}). ${step}`,
-      score: onBudget ? 30 : 46,
+      score: onBudget || under ? 30 : 46,
     };
   }
   return {
@@ -821,44 +891,68 @@ function adaptiveInsight({ energy }: InsightContext): Insight | null {
 
 // ------------------------------------------------------------ weekly recap
 
+export type RecapLabel = 'This week' | 'Last week' | 'Week';
+
 export interface WeeklyRecap {
-  /** 'This week' while the current week has enough data, else 'Last week'. */
-  label: 'This week' | 'Last week';
+  /** 'Last week' for the last closed week (the default), 'This week' for the week in progress, else 'Week'. */
+  label: RecapLabel;
   weekStart: ISODate;
   weekEnd: ISODate;
+  /** The seven days of the week that are on or before today, oldest first. */
+  days: InsightDay[];
   summary: PeriodSummary;
+  /** The week before, for comparisons. Null when it has no logged day. */
+  previous: PeriodSummary | null;
+  /** Sum of (eaten - budget) over the week's complete days; negative means under. Null without complete days. */
+  budgetBalance: number | null;
   bestDay: { date: ISODate; detail: string } | null;
   win: string;
   focus: string;
 }
 
+/** Monday of the last closed (fully past) Monday-based week. */
+export function lastClosedWeek(today: ISODate): ISODate {
+  return addDays(startOfWeek(today), -7);
+}
+
+/** Words for a recap's period in running text. */
+export function recapPeriodWord(label: RecapLabel): string {
+  return label === 'This week' ? 'this week' : label === 'Last week' ? 'last week' : 'that week';
+}
+
 /**
- * Recap of a Monday-based week. Uses the current week once it has 3 closed
- * logged days, otherwise the last full week. Null when neither has 2 logged days.
+ * Recap of one Monday-based week: by default the last closed week, so its
+ * numbers no longer move. Pass `week` (a Monday) for another week. Null when
+ * the week has fewer than 2 logged days.
  */
-export function weeklyRecap(input: { days: InsightDay[]; trend: TrendPoint[]; sleep: SleepLike[]; today: ISODate; units: UnitSystem; goal: GoalType }): WeeklyRecap | null {
+export function weeklyRecap(input: {
+  days: InsightDay[];
+  trend: TrendPoint[];
+  sleep: SleepLike[];
+  today: ISODate;
+  units: UnitSystem;
+  goal: GoalType;
+  week?: ISODate;
+}): WeeklyRecap | null {
   const { days, today } = input;
   const thisStart = startOfWeek(today);
-  const pick = (start: ISODate, end: ISODate) => days.filter((d) => d.date >= start && d.date <= end);
-  const current = pick(thisStart, today);
-  const currentClosedLogged = current.filter((d) => d.date < today && isLogged(d)).length;
-  let label: WeeklyRecap['label'] = 'This week';
-  let weekStart = thisStart;
-  let weekDays = current;
-  if (currentClosedLogged < 3) {
-    label = 'Last week';
-    weekStart = addDays(thisStart, -7);
-    weekDays = pick(weekStart, addDays(thisStart, -1));
-    if (weekDays.filter(isLogged).length < 2) return null;
-  }
+  const weekStart = startOfWeek(input.week ?? lastClosedWeek(today));
+  if (weekStart > thisStart) return null;
   const weekEnd = addDays(weekStart, 6);
+  const pick = (start: ISODate, end: ISODate) => days.filter((d) => d.date >= start && d.date <= end && d.date <= today);
+  const weekDays = pick(weekStart, weekEnd);
+  if (weekDays.filter(isLogged).length < 2) return null;
+  const label: RecapLabel = weekStart === thisStart ? 'This week' : weekStart === addDays(thisStart, -7) ? 'Last week' : 'Week';
   const summary = summarizePeriod({ days: weekDays, trend: input.trend, sleep: input.sleep, today });
+  const prevDays = pick(addDays(weekStart, -7), addDays(weekStart, -1));
+  const previous = prevDays.some(isLogged) ? summarizePeriod({ days: prevDays, trend: input.trend, sleep: input.sleep, today }) : null;
+  const complete = weekDays.filter((d) => isCompleteDay(d, today));
+  const budgetBalance = complete.length ? complete.reduce((sum, d) => sum + d.eaten.kcal - d.budget, 0) : null;
 
   // Best day: closest to budget, with protein and water as tie-breakers.
   let bestDay: WeeklyRecap['bestDay'] = null;
   let bestScore = Infinity;
-  for (const d of weekDays) {
-    if (!isCompleteDay(d, today)) continue;
+  for (const d of complete) {
     const kcalOff = Math.abs(d.eaten.kcal - d.budget) / d.budget;
     const proteinShort = d.macros.proteinG > 0 ? Math.max(0, 1 - d.eaten.protein / d.macros.proteinG) : 0;
     const waterMet = d.waterMl >= d.waterGoalMl;
@@ -872,12 +966,26 @@ export function weeklyRecap(input: { days: InsightDay[]; trend: TrendPoint[]; sl
     }
   }
 
-  const { win, focus } = recapWinFocus(summary, input.units, input.goal);
-  return { label, weekStart, weekEnd, summary, bestDay, win, focus };
+  const { win, focus } = recapWinFocus(summary, input.units, input.goal, recapPeriodWord(label));
+  return { label, weekStart, weekEnd, days: weekDays, summary, previous, budgetBalance, bestDay, win, focus };
+}
+
+/** Mondays of earlier weeks (newest first, before the last closed week) that have a recap. */
+export function recapWeeks(days: InsightDay[], today: ISODate, max = 8): ISODate[] {
+  const logged = new Map<ISODate, number>();
+  for (const d of days) if (d.date < today && isLogged(d)) logged.set(startOfWeek(d.date), (logged.get(startOfWeek(d.date)) ?? 0) + 1);
+  const out: ISODate[] = [];
+  let wk = addDays(lastClosedWeek(today), -7);
+  const first = days[0]?.date;
+  while (out.length < max && first && addDays(wk, 6) >= first) {
+    if ((logged.get(wk) ?? 0) >= 2) out.push(wk);
+    wk = addDays(wk, -7);
+  }
+  return out;
 }
 
 /** One win and one focus, each from the user's own numbers. */
-export function recapWinFocus(s: PeriodSummary, units: UnitSystem, goal: GoalType): { win: string; focus: string } {
+export function recapWinFocus(s: PeriodSummary, units: UnitSystem, goal: GoalType, period = 'this week'): { win: string; focus: string } {
   const wins: { score: number; text: string }[] = [];
   const focuses: { score: number; text: string }[] = [];
   const c = s.calories;
@@ -901,29 +1009,29 @@ export function recapWinFocus(s: PeriodSummary, units: UnitSystem, goal: GoalTyp
   if (w && w.daysTracked >= 2) {
     const r = w.daysAtGoal / w.daysTracked;
     if (r >= 0.7) wins.push({ score: r, text: `You hit your water goal on ${w.daysAtGoal} of ${w.daysTracked} days.` });
-    else focuses.push({ score: (1 - r) * 0.8, text: `Water: goal reached on ${w.daysAtGoal} of ${w.daysTracked} days; one more 250 ml glass a day would help.` });
+    else focuses.push({ score: (1 - r) * 0.8, text: `Water: goal reached on ${w.daysAtGoal} of ${w.daysTracked} days; one more ${glassText(units)} glass a day would help.` });
   }
-  const mins = s.activity.minutes;
-  if (mins >= WEEKLY_ACTIVE_MINUTES) wins.push({ score: 0.85, text: `${mins} active minutes across ${plural(s.activity.sessions, 'session')}, above the 150-minute guideline.` });
+  const mins = s.activity.guidelineMinutes;
+  if (mins >= WEEKLY_ACTIVE_MINUTES) wins.push({ score: 0.85, text: `${mins} guideline minutes across ${plural(s.activity.sessions, 'session')}, above the 150-minute guideline.` });
   else if (s.totalDays >= 5)
-    focuses.push({ score: ((WEEKLY_ACTIVE_MINUTES - mins) / WEEKLY_ACTIVE_MINUTES) * 0.7, text: `Activity: ${mins} of 150 minutes; ${Math.ceil((WEEKLY_ACTIVE_MINUTES - mins) / 30)} brisk 30-minute walks would get you there.` });
+    focuses.push({ score: ((WEEKLY_ACTIVE_MINUTES - mins) / WEEKLY_ACTIVE_MINUTES) * 0.7, text: `Activity: ${mins} of 150 guideline minutes; ${plural(Math.ceil((WEEKLY_ACTIVE_MINUTES - mins) / 30), 'brisk 30-minute walk')} would get you there.` });
   const sl = s.sleep;
   if (sl && sl.nights >= 3) {
-    if (sl.avgHours >= SLEEP_TARGET_HOURS) wins.push({ score: 0.6, text: `Sleep averaged ${hoursText(sl.avgHours)} a night.` });
-    else focuses.push({ score: Math.min(1, (SLEEP_TARGET_HOURS - sl.avgHours) / 1.5) * 0.7, text: `Sleep averaged ${hoursText(sl.avgHours)}; aim for lights out ${Math.max(5, Math.round(((SLEEP_TARGET_HOURS - sl.avgHours) * 60) / 5) * 5)} minutes earlier.` });
+    if (sl.avgHours >= SLEEP_TARGET_HOURS && sl.avgHours <= SLEEP_MAX_HOURS) wins.push({ score: 0.6, text: `Sleep averaged ${hoursText(sl.avgHours)} a night.` });
+    else if (sl.avgHours < SLEEP_TARGET_HOURS) focuses.push({ score: Math.min(1, (SLEEP_TARGET_HOURS - sl.avgHours) / 1.5) * 0.7, text: `Sleep averaged ${hoursText(sl.avgHours)}; aim for lights out ${Math.max(5, Math.round(((SLEEP_TARGET_HOURS - sl.avgHours) * 60) / 5) * 5)} minutes earlier.` });
   }
   const wt = s.weight;
   if (wt && wt.weighIns >= 2 && goal !== 'maintain') {
     const toward = goal === 'lose' ? -wt.changeKg : wt.changeKg;
     if (toward >= 0.1) wins.push({ score: 0.8, text: `Trend weight moved ${rateText(wt.changeKg, units)} toward your goal.` });
   }
-  const loggedText = `You logged food on ${plural(s.loggedDaysInclToday, 'day')} this week.`;
+  const loggedText = `You logged food on ${plural(s.loggedDaysInclToday, 'day')} ${period}.`;
   if (s.loggedDaysInclToday >= 6) wins.push({ score: 0.7, text: loggedText });
   wins.sort((a, b) => b.score - a.score);
   focuses.sort((a, b) => b.score - a.score);
   return {
     win: wins[0]?.text ?? loggedText,
-    focus: focuses[0]?.text ?? 'Keep the same rhythm next week; it is working.',
+    focus: focuses[0]?.text ?? 'Keep the same rhythm; it is working.',
   };
 }
 
@@ -982,17 +1090,18 @@ export function computeMilestones(input: {
   let activeWeek: ISODate | undefined;
   let bestWeek = 0;
   for (const d of days) {
-    if (!d.activeMinutes) continue;
+    const g = guidelineMinutes(d.activities);
+    if (!g) continue;
     const wk = startOfWeek(d.date);
-    const total = (weekMinutes.get(wk) ?? 0) + d.activeMinutes;
+    const total = (weekMinutes.get(wk) ?? 0) + g;
     weekMinutes.set(wk, total);
     bestWeek = Math.max(bestWeek, total);
     if (!activeWeek && total >= WEEKLY_ACTIVE_MINUTES) activeWeek = d.date;
   }
   out.push({
     id: 'active-week',
-    title: '150 active minutes in a week',
-    detail: 'The weekly guideline for adults.',
+    title: '150 guideline minutes in a week',
+    detail: 'The weekly guideline for adults; vigorous minutes count double.',
     achieved: !!activeWeek,
     date: activeWeek,
     current: Math.min(bestWeek, WEEKLY_ACTIVE_MINUTES),
@@ -1029,4 +1138,91 @@ export function weekRangeLabel(start: ISODate, end: ISODate): string {
   const a = formatShortDate(start);
   const b = formatShortDate(end);
   return a.slice(0, 3) === b.slice(0, 3) ? `${a} – ${b.slice(4)}` : `${a} – ${b}`;
+}
+
+// ------------------------------------------------------- weekly check-in
+
+export interface RecapTile {
+  id: 'calories' | 'protein' | 'activity' | 'water';
+  label: string;
+  value: number | null;
+  unit: string;
+  /** What the value is measured against, e.g. 'budget 2,050 kcal'. */
+  context: string;
+  previous: number | null;
+  /** value - previous, when both exist. */
+  delta: number | null;
+  /** Whether a rise is good news (shown in the success colour); calories stay neutral either way. */
+  upIsGood: boolean;
+}
+
+/** The four check-in tiles, each with the week before for comparison. */
+export function recapTiles(r: Pick<WeeklyRecap, 'summary' | 'previous'>): RecapTile[] {
+  const s = r.summary;
+  const p = r.previous;
+  const tile = (t: Omit<RecapTile, 'delta'>): RecapTile => ({ ...t, delta: t.value !== null && t.previous !== null ? t.value - t.previous : null });
+  const round = (n: number | undefined | null) => (n === undefined || n === null ? null : Math.round(n));
+  return [
+    tile({
+      id: 'calories',
+      label: 'Average intake',
+      value: round(s.calories?.avgKcal),
+      unit: 'kcal',
+      context: s.calories ? `budget ${kcalText(s.calories.avgBudget)}` : 'no fully logged days',
+      previous: round(p?.calories?.avgKcal),
+      upIsGood: false,
+    }),
+    tile({
+      id: 'protein',
+      label: 'Protein',
+      value: round(s.macros?.protein.avg),
+      unit: 'g / day',
+      context: s.macros ? `target ${gText(s.macros.protein.target)}` : 'no fully logged days',
+      previous: round(p?.macros?.protein.avg),
+      upIsGood: true,
+    }),
+    tile({
+      id: 'activity',
+      label: 'Guideline minutes',
+      value: s.activity.guidelineMinutes,
+      unit: 'min',
+      context: `of ${WEEKLY_ACTIVE_MINUTES}, ${plural(s.activity.sessions, 'session')}`,
+      previous: p ? p.activity.guidelineMinutes : null,
+      upIsGood: true,
+    }),
+    tile({
+      id: 'water',
+      label: 'Water goal met',
+      value: s.water ? s.water.daysAtGoal : null,
+      unit: s.water ? `of ${s.water.daysTracked} days` : 'days',
+      context: s.water ? `${plural(s.water.daysTracked, 'day')} tracked` : 'no drinks logged',
+      previous: p?.water ? p.water.daysAtGoal : null,
+      upIsGood: true,
+    }),
+  ];
+}
+
+/** Caption under the check-in bars, e.g. '310 kcal under budget for the week'. */
+export function budgetBalanceText(balance: number | null): string {
+  if (balance === null) return 'No fully logged days to compare with the budget.';
+  const b = Math.round(balance);
+  if (Math.abs(b) < 50) return 'Right on budget for the week';
+  return `${kcalText(Math.abs(b))} ${b > 0 ? 'over' : 'under'} budget for the week`;
+}
+
+/** One line on why the daily budget changed between two weeks. */
+export function planChangeText(
+  before: { target: number; tdee: number; usingAdaptive: boolean },
+  after: { target: number; tdee: number; usingAdaptive: boolean },
+): string {
+  const diff = Math.round(after.target - before.target);
+  if (Math.abs(diff) < 20) return 'Same budget as last week.';
+  const dir = diff > 0 ? 'up' : 'down';
+  if (after.usingAdaptive && !before.usingAdaptive) {
+    return `Your budget now follows your measured expenditure, ${kcalText(after.tdee)} a day outside logged workouts, so it moved ${dir} ${kcalText(Math.abs(diff))}.`;
+  }
+  if (after.usingAdaptive && Math.abs(after.tdee - before.tdee) >= 20) {
+    return `Your measured expenditure, outside logged workouts, is now ${kcalText(after.tdee)} a day against ${kcalText(before.tdee)}, so the budget moved ${dir} ${kcalText(Math.abs(diff))}.`;
+  }
+  return `Your budget moved ${dir} ${kcalText(Math.abs(diff))} after a change to your goal, weight or activity settings.`;
 }

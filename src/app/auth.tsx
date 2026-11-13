@@ -1,15 +1,15 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { Eye, EyeOff, Lock, MailCheck, Smartphone, TriangleAlert } from 'lucide-react-native';
-import React, { useRef, useState } from 'react';
+import { Eye, EyeOff, KeyRound, Lock, MailCheck, Smartphone, TriangleAlert } from 'lucide-react-native';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, type TextInputInstance } from 'react-native';
 
-import { destinationAfterSignIn, waitForRestore } from '@/features/onboarding/afterSignIn';
 import { FadeIn, Note } from '@/features/onboarding/components';
-import { sendPasswordReset, signIn, signUp, useAuth, validateEmail, validatePassword } from '@/services/auth';
+import { SignInGate } from '@/features/onboarding/SignInGate';
+import { sendPasswordReset, signIn, signUp, updatePassword, useAuth, validateEmail, validatePassword } from '@/services/auth';
 import { isBackendConfigured } from '@/services/supabase';
 import { useStore } from '@/store';
 import { useTheme } from '@/theme';
-import { Button, goBack, haptic, Header, IconButton, Screen, Text, TextField } from '@/ui';
+import { Button, goBack, haptic, Header, IconButton, Screen, Text, TextField, toast } from '@/ui';
 
 type Mode = 'signin' | 'signup' | 'forgot';
 
@@ -23,9 +23,10 @@ export default function Auth() {
   const params = useLocalSearchParams<{ mode?: string }>();
   const initial: Mode = params.mode === 'signup' ? 'signup' : params.mode === 'forgot' ? 'forgot' : 'signin';
   // Someone already signed in has nothing to do here.
-  const [arrivedSignedIn] = useState(() => !!useAuth.getState().session);
+  const [arrivedSignedIn, setArrivedSignedIn] = useState(() => !!useAuth.getState().session && params.mode !== 'reset');
   if (!isBackendConfigured) return <NotConfigured />;
-  if (arrivedSignedIn) return <Redirect href={destinationAfterSignIn()} />;
+  if (params.mode === 'reset') return <ResetPassword />;
+  if (arrivedSignedIn) return <SignInGate waitFirst={useAuth.getState().restoring} onCancelled={() => setArrivedSignedIn(false)} />;
   return <AuthForm initial={initial} />;
 }
 
@@ -38,7 +39,7 @@ function AuthForm({ initial }: { initial: Mode }) {
   const [fieldErrors, setFieldErrors] = useState<{ email?: string | null; password?: string | null }>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [restoring, setRestoring] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
   const [done, setDone] = useState<null | 'confirm' | 'reset'>(null);
   const passwordRef = useRef<TextInputInstance>(null);
 
@@ -82,15 +83,25 @@ function AuthForm({ initial }: { initial: Mode }) {
         return;
       }
       haptic.success();
-      setRestoring(true);
-      await waitForRestore();
-      router.replace(destinationAfterSignIn());
+      setSignedIn(true);
     } catch {
       setFormError('Something went wrong on our side. Try again in a moment.');
     } finally {
       setBusy(false);
     }
   };
+
+  if (signedIn) {
+    return (
+      <SignInGate
+        onCancelled={() => {
+          setSignedIn(false);
+          setPassword('');
+          setFormError('Sign-in cancelled. Everything on this device is as it was.');
+        }}
+      />
+    );
+  }
 
   if (done) {
     const confirm = done === 'confirm';
@@ -140,7 +151,7 @@ function AuthForm({ initial }: { initial: Mode }) {
       contentStyle={{ gap: spacing.xxl, paddingTop: spacing.lg }}
       footer={
         <View style={{ gap: spacing.sm }}>
-          <Button title={restoring ? 'Restoring your data' : copy.submit} testID="auth-submit" onPress={submit} loading={busy} />
+          <Button title={copy.submit} testID="auth-submit" onPress={submit} loading={busy} />
           {mode !== 'forgot' ? (
             <Button
               title={mode === 'signin' ? 'New here? Create an account' : 'Already have an account? Sign in'}
@@ -239,11 +250,6 @@ function AuthForm({ initial }: { initial: Mode }) {
           </Note>
         ) : null}
 
-        {restoring ? (
-          <Text variant="caption" color="textSecondary" align="center" testID="auth-restoring">
-            Signed in. Bringing your plan and logs to this device...
-          </Text>
-        ) : null}
       </View>
 
       {mode === 'signup' ? (
@@ -256,6 +262,173 @@ function AuthForm({ initial }: { initial: Mode }) {
           </Text>
         </View>
       ) : null}
+    </Screen>
+  );
+}
+
+/** How long a reset link may take to sign the device in before it is called expired. */
+const RECOVERY_GRACE_MS = 4000;
+
+/**
+ * Arrived from a password-reset email. The link signs the device in with a
+ * short-lived recovery session (`useAuth().recovery`); choosing a password
+ * then continues exactly as after a sign-in.
+ */
+function ResetPassword() {
+  const { colors, spacing } = useTheme();
+  const recovery = useAuth((s) => s.recovery);
+  const ready = useAuth((s) => s.ready);
+  const [waited, setWaited] = useState(false);
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [show, setShow] = useState(false);
+  const [errors, setErrors] = useState<{ password?: string | null; confirm?: string | null }>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [doneReset, setDoneReset] = useState(false);
+  const confirmRef = useRef<TextInputInstance>(null);
+
+  useEffect(() => {
+    if (!ready) return;
+    const t = setTimeout(() => setWaited(true), RECOVERY_GRACE_MS);
+    return () => clearTimeout(t);
+  }, [ready]);
+
+  if (doneReset) return <SignInGate onCancelled={() => router.replace('/auth?mode=signin')} />;
+
+  if (!recovery) {
+    if (!waited) {
+      return (
+        <Screen testID="auth-reset-checking" header={<Header onBack={() => goBack('/welcome')} />} contentStyle={{ flexGrow: 1, justifyContent: 'center' }}>
+          <Text variant="body" color="textSecondary" align="center">
+            Checking your reset link...
+          </Text>
+        </Screen>
+      );
+    }
+    return (
+      <Screen
+        testID="auth-reset-expired"
+        header={<Header onBack={() => goBack('/welcome')} />}
+        contentStyle={{ flexGrow: 1, justifyContent: 'center', gap: spacing.xxl }}
+        footer={
+          <View style={{ gap: spacing.sm }}>
+            <Button title="Send a new link" testID="auth-reset-resend" onPress={() => router.replace('/auth?mode=forgot')} />
+            <Button title="Back to sign in" variant="ghost" size="md" testID="auth-reset-signin" onPress={() => router.replace('/auth?mode=signin')} />
+          </View>
+        }>
+        <FadeIn style={{ alignItems: 'center', gap: spacing.lg }}>
+          <View style={{ width: 72, height: 72, borderRadius: 24, backgroundColor: `${colors.warning}22`, alignItems: 'center', justifyContent: 'center' }}>
+            <KeyRound size={34} color={colors.warning} />
+          </View>
+          <Text variant="h1" align="center" accessibilityRole="header">
+            This reset link no longer works
+          </Text>
+          <Text variant="body" color="textSecondary" align="center">
+            A link works once, for about an hour, and only on the device that asked for it. If you opened it somewhere else, or it is older, send a new one.
+          </Text>
+        </FadeIn>
+      </Screen>
+    );
+  }
+
+  const submit = async () => {
+    if (busy) return;
+    const pErr = validatePassword(password);
+    const cErr = !pErr && confirm !== password ? 'The two passwords do not match.' : null;
+    setErrors({ password: pErr, confirm: cErr });
+    setFormError(null);
+    if (pErr || cErr) {
+      haptic.warn();
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await updatePassword(password);
+      if (!r.ok) {
+        haptic.warn();
+        return setFormError(r.message);
+      }
+      haptic.success();
+      toast('Password updated');
+      setDoneReset(true);
+    } catch {
+      setFormError('Something went wrong on our side. Try again in a moment.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const eye = (
+    <IconButton tone="clear" size={36} accessibilityLabel={show ? 'Hide passwords' : 'Show passwords'} testID="auth-reset-toggle" onPress={() => setShow((s) => !s)}>
+      {show ? <EyeOff size={20} color={colors.textSecondary} /> : <Eye size={20} color={colors.textSecondary} />}
+    </IconButton>
+  );
+
+  return (
+    <Screen
+      testID="auth-reset"
+      header={<Header onBack={() => goBack('/welcome')} />}
+      contentStyle={{ gap: spacing.xxl, paddingTop: spacing.lg }}
+      footer={<Button title="Save new password" testID="auth-reset-submit" onPress={submit} loading={busy} />}>
+      <FadeIn style={{ gap: spacing.sm }}>
+        <Text variant="h1" accessibilityRole="header">
+          Choose a new password
+        </Text>
+        <Text variant="body" color="textSecondary">
+          You are signed in from the reset link. Pick a password for next time; your plan and logs then load as usual.
+        </Text>
+      </FadeIn>
+      <View style={{ gap: spacing.lg }}>
+        <TextField
+          label="New password"
+          testID="auth-reset-password"
+          placeholder="At least 8 characters"
+          value={password}
+          onChangeText={(t) => {
+            setPassword(t);
+            if (errors.password) setErrors((e) => ({ ...e, password: null }));
+          }}
+          secureTextEntry={!show}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="new-password"
+          textContentType="newPassword"
+          returnKeyType="next"
+          onSubmitEditing={() => confirmRef.current?.focus()}
+          editable={!busy}
+          error={errors.password}
+          hint="At least 8 characters. A short phrase is easy to remember."
+          right={eye}
+        />
+        <TextField
+          {...({ ref: confirmRef } as object)}
+          label="Confirm new password"
+          testID="auth-reset-confirm"
+          placeholder="Type it again"
+          value={confirm}
+          onChangeText={(t) => {
+            setConfirm(t);
+            if (errors.confirm) setErrors((e) => ({ ...e, confirm: null }));
+          }}
+          secureTextEntry={!show}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="new-password"
+          textContentType="newPassword"
+          returnKeyType="go"
+          onSubmitEditing={() => void submit()}
+          editable={!busy}
+          error={errors.confirm}
+        />
+        {formError ? (
+          <Note tone="warning" icon={<TriangleAlert size={18} color={colors.warning} />} testID="auth-reset-error">
+            <Text variant="body" accessibilityLiveRegion="polite">
+              {formError}
+            </Text>
+          </Note>
+        ) : null}
+      </View>
     </Screen>
   );
 }

@@ -121,11 +121,7 @@ export function Note({ icon, children, style }: { icon?: React.ReactNode; childr
   );
 }
 
-/** Split a formatted value such as '1.25 L' into number and unit. */
-export function splitUnit(formatted: string): { value: string; unit: string } {
-  const i = formatted.lastIndexOf(' ');
-  return i < 0 ? { value: formatted, unit: '' } : { value: formatted.slice(0, i), unit: formatted.slice(i + 1) };
-}
+export { splitUnit } from './helpers';
 
 // ------------------------------------------------------------- water wave
 

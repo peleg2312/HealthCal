@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Animated, View } from 'react-native';
+import { AccessibilityInfo, Animated, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { create } from 'zustand';
 
 import { MAX_CONTENT_WIDTH, useTheme } from '@/theme';
 
+import { PressableScale } from './Pressable';
 import { Text } from './Text';
 
 interface ToastState {
@@ -37,12 +38,22 @@ export function ToastHost() {
 
   useEffect(() => {
     if (!message) return;
+    // Live regions are Android-only; announcing explicitly covers iOS as well.
+    AccessibilityInfo.announceForAccessibility(actionLabel ? `${message}. ${actionLabel} available.` : message);
     Animated.spring(anim, { toValue: 1, useNativeDriver: true, speed: 18, bounciness: 6 }).start();
-    const t = setTimeout(
-      () => Animated.timing(anim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => hide()),
-      actionLabel ? 4500 : 2200,
-    );
-    return () => clearTimeout(t);
+    let cancelled = false;
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const close = () => Animated.timing(anim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => hide());
+    // Someone using a screen reader needs longer to reach the action.
+    AccessibilityInfo.isScreenReaderEnabled()
+      .catch(() => false)
+      .then((reader) => {
+        if (!cancelled) t = setTimeout(close, actionLabel ? (reader ? 12000 : 4500) : 2200);
+      });
+    return () => {
+      cancelled = true;
+      if (t) clearTimeout(t);
+    };
   }, [id, message, actionLabel, anim, hide]);
 
   if (!message) return null;
@@ -66,17 +77,19 @@ export function ToastHost() {
           {message}
         </Text>
         {actionLabel ? (
-          <Text
-            variant="label"
-            color={colors.bg}
-            style={{ textDecorationLine: 'underline' }}
-            accessibilityRole="button"
+          <PressableScale
+            testID="toast-action"
+            accessibilityLabel={actionLabel}
+            hitSlop={10}
             onPress={() => {
               onAction?.();
               hide();
-            }}>
-            {actionLabel}
-          </Text>
+            }}
+            style={{ minHeight: 44, paddingHorizontal: 10, marginVertical: -12, marginRight: -6, justifyContent: 'center' }}>
+            <Text variant="label" color={colors.bg} style={{ textDecorationLine: 'underline' }}>
+              {actionLabel}
+            </Text>
+          </PressableScale>
         ) : null}
       </Animated.View>
     </View>

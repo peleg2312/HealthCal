@@ -230,6 +230,7 @@ describe('soft-deleted records and computeDayFromStore', () => {
       activities: rec(act(DAY, 300, 450), act(DAY, 400, 600, { deleted: true })),
       water: rec(water(DAY, 500), { ...water(DAY, 1000), deleted: true }),
       weights: rec(weight('2026-06-01', 80)),
+      days: {},
       ...over,
     }) as never;
 
@@ -291,9 +292,13 @@ describe('computeConsistency (forgiving streak)', () => {
     // today logged, -1 and -2 missed, -3 and -4 logged -> streak is only today
     expect(computeConsistency(set(0, -3, -4), END).streak).toBe(1);
   });
-  it('only one bridge is allowed per streak', () => {
-    // today, miss, -2, miss, -4: second gap is not bridged -> today and -2
-    expect(computeConsistency(set(0, -2, -4), END).streak).toBe(2);
+  it('every single missed day is bridged, not just the first one', () => {
+    // today, miss, -2, miss, -4: both gaps are single days, so all three logged days count
+    expect(computeConsistency(set(0, -2, -4), END).streak).toBe(3);
+  });
+  it('two missed days in a row end the streak wherever they fall', () => {
+    // today, miss, -2, miss, miss, -5: the run stops before the double gap
+    expect(computeConsistency(set(0, -2, -5), END).streak).toBe(2);
   });
   it('a missed yesterday with today still open is bridged once', () => {
     // nothing today or yesterday, -2 and -3 logged: yesterday is the one forgiven gap
@@ -321,5 +326,52 @@ describe('computeConsistency (forgiving streak)', () => {
   it('daysThisWeek on Sunday covers the full week', () => {
     const all = new Set(['2026-06-15', '2026-06-16', '2026-06-17', '2026-06-18', '2026-06-19', '2026-06-20', '2026-06-21']);
     expect(computeConsistency(all, '2026-06-21').daysThisWeek).toBe(7);
+  });
+});
+
+describe('exercise is not counted twice once expenditure is learned from data', () => {
+  const END = '2026-07-01';
+  const p = { ...profile, useAdaptiveTdee: true, eatBackExercise: true, goal: 'maintain' as const, weeklyRateKg: 0 };
+  // 28 days: weight flat at 80 kg, 2,800 kcal eaten and a 400 kcal (net) workout every day.
+  const dates = Array.from({ length: 28 }, (_, i) => addDays(END, -1 - i));
+  const foods = dates.map((d) => food(d, 2800));
+  const weights = dates.map((d) => weight(d, 80));
+  const acts = dates.map((d) => act(d, 400, 520));
+
+  it('the learned baseline excludes workouts, and a workout day\'s budget equals what the user really burns', () => {
+    const m = computeEnergyModel(p, foods, weights, END, acts);
+    expect(m.usingAdaptive).toBe(true);
+    expect(m.adaptive.observedTotal).toBe(2800);
+    expect(m.adaptive.observed).toBe(2400);
+    const day = computeDay(END, p, m, [], [act(END, 400, 520)], []);
+    // Target is close to the 2,400 baseline (blended with the formula); with today's
+    // 400 kcal session the budget lands near the 2,800 actually burned, not near 3,200.
+    expect(day.budget).toBeGreaterThan(day.target + 399);
+    expect(day.budget).toBeLessThan(2800 + 0.15 * Math.abs(m.formulaTdee - 2400) + 15);
+  });
+
+  it('with eating back turned off, the average workout burn is part of the target instead', () => {
+    const off = { ...p, eatBackExercise: false };
+    const withBack = computeEnergyModel(p, foods, weights, END, acts);
+    const without = computeEnergyModel(off, foods, weights, END, acts);
+    expect(Math.round(without.tdee - withBack.tdee)).toBe(400);
+    const day = computeDay(END, off, without, [], [act(END, 400, 520)], []);
+    expect(day.budget).toBe(day.target);
+  });
+});
+
+describe('a past day keeps the target it had at the time', () => {
+  it('uses the recorded snapshot instead of today\'s model, including its eat-back setting', () => {
+    const m = computeEnergyModel(profile, [], [], DAY);
+    const snap = { id: 's', updatedAt: '', date: DAY, target: 1500, tdee: 2000, eatBackExercise: false, weightKg: 80 };
+    const d = computeDay(DAY, { ...profile, eatBackExercise: true }, m, [food(DAY, 400)], [act(DAY, 300, 450)], [], [snap]);
+    expect(d.target).toBe(1500);
+    expect(d.budget).toBe(1500);
+    expect(d.remaining).toBe(1100);
+  });
+  it('falls back to the current model for days without a snapshot', () => {
+    const m = computeEnergyModel(profile, [], [], DAY);
+    const other = { id: 's', updatedAt: '', date: addDays(DAY, -1), target: 1500, tdee: 2000, eatBackExercise: true, weightKg: 80 };
+    expect(computeDay(DAY, profile, m, [], [], [], [other]).target).toBe(m.target.target);
   });
 });

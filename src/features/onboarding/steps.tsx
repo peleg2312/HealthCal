@@ -1,16 +1,19 @@
-import { Activity, Dumbbell, Info, Ruler, Scale, TrendingDown, TrendingUp, TriangleAlert } from 'lucide-react-native';
+import { Activity, BellRing, Droplets, Dumbbell, Info, MoonStar, Ruler, Scale, TrendingDown, TrendingUp, TriangleAlert, Utensils } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
-import { ageFromBirthDate, formatLongDate, toISODate } from '@/lib/dates';
-import { ACTIVITY_LABELS, KCAL_PER_KG, maxWeeklyRateKg } from '@/lib/energy';
+import { Group as SettingsGroup, IconTile, prefers12h, TimeRow } from '@/features/settings/components';
+import { ageFromBirthDate, formatClock, formatLongDate, toISODate } from '@/lib/dates';
+import { ACTIVITY_LABELS, calorieFloor, KCAL_PER_KG, maxWeeklyRateKg } from '@/lib/energy';
 import { formatNumber, kgToLb, lbToKg, round, weightUnit } from '@/lib/units';
+import { remindersSupported } from '@/services/notifications';
 import { useTheme } from '@/theme';
 import type { ActivityLevel, GoalType } from '@/types';
-import { Card, NumberField, PressableScale, Stepper, Text, TextField } from '@/ui';
+import { Card, NumberField, PressableScale, Stepper, Text, TextField, ToggleRow } from '@/ui';
 
 import { ChoiceCard, ErrorText, Note, StepTitle } from './components';
-import { birthDateOf, buildPlan, convertUnits, rateKgOf, tapeEstimate, toMetric, type BodyFatMode, type Draft, type Errors } from './model';
+import { birthDateOf, buildPlan, convertUnits, heightRangeText, weightRangeText, rateKgOf, tapeEstimate, toMetric, type BodyFatMode, type Draft, type Errors } from './model';
+import { nudgeExamples, WEIGH_IN_TIME, type NudgeKind, type Routine } from './routine';
 
 export interface StepProps {
   draft: Draft;
@@ -345,7 +348,7 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
               <ErrorText>{errors.height}</ErrorText>
             ) : (
               <Text variant="caption" color="textTertiary">
-                {`Between 3'11" and 7'7"`}
+                {`Between ${heightRangeText('imperial')}`}
               </Text>
             )}
           </View>
@@ -360,7 +363,7 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
             value={draft.heightCm}
             onChange={(heightCm) => set({ heightCm })}
             error={errors.height}
-            hint="Between 120 and 230 cm"
+            hint={`Between ${heightRangeText('metric')}`}
             returnKeyType="next"
           />
         )}
@@ -374,7 +377,7 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
           value={draft.weight}
           onChange={(weight) => set({ weight })}
           error={errors.weight}
-          hint={imp ? 'Between 77 and 661 lb' : 'Between 35 and 300 kg'}
+          hint={`Between ${weightRangeText(draft.units)}`}
           returnKeyType="done"
           onSubmitEditing={submit}
         />
@@ -622,7 +625,14 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
           </Text>
         </View>
       </Card>
-      {plan?.target.limitedByFloor ? (
+      {plan?.target.belowFloor ? (
+        <Note tone="warning" icon={<TriangleAlert size={18} color={colors.warning} />} testID="onb-floor-note">
+          <Text variant="bodyStrong">{`Your plan stays at ${formatNumber(plan.floor)} kcal a day`}</Text>
+          <Text variant="caption" color="textSecondary">
+            {`You burn about ${formatNumber(plan.floor)} kcal on a normal day, already at or below the ${formatNumber(MIN_KCAL(draft))} kcal HealthCal recommends as a minimum, so no ${word} is planned from food. Logged workouts add room on top.`}
+          </Text>
+        </Note>
+      ) : plan?.target.limitedByFloor ? (
         <Note tone="warning" icon={<TriangleAlert size={18} color={colors.warning} />} testID="onb-floor-note">
           <Text variant="bodyStrong">{`Your plan stops at ${formatNumber(plan.floor)} kcal a day`}</Text>
           <Text variant="caption" color="textSecondary">
@@ -643,6 +653,8 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
     </Group>
   );
 }
+
+const MIN_KCAL = (d: Draft) => calorieFloor(d.sex ?? 'female');
 
 function PaceMeter({ value, color }: { value: number; color: string }) {
   const { colors, spacing } = useTheme();
@@ -665,5 +677,70 @@ function PaceMeter({ value, color }: { value: number; color: string }) {
         </Text>
       </View>
     </View>
+  );
+}
+
+// ----------------------------------------------------------------- routine
+
+const NUDGES: { key: NudgeKind; title: string; icon: (c: string) => React.ReactNode; color: 'water' | 'calories' | 'primary' | 'weight' }[] = [
+  { key: 'water', title: 'Water', icon: (c) => <Droplets size={20} color={c} />, color: 'water' },
+  { key: 'meals', title: 'Meals', icon: (c) => <Utensils size={20} color={c} />, color: 'calories' },
+  { key: 'checkin', title: 'Evening check-in', icon: (c) => <MoonStar size={20} color={c} />, color: 'primary' },
+  { key: 'weighIn', title: 'Weigh-in days', icon: (c) => <Scale size={20} color={c} />, color: 'weight' },
+];
+
+export function RoutineStep({ draft, set, errors }: StepProps) {
+  const { colors, spacing } = useTheme();
+  const r = draft.routine;
+  const hour12 = prefers12h(draft.units);
+  const plan = buildPlan(draft);
+  const setRoutine = (patch: Partial<Routine>) => set({ routine: { ...r, ...patch } });
+  const examples = plan ? nudgeExamples(r, { targetKcal: plan.target.target, waterMl: plan.waterMl, macros: plan.macros }, draft.units, hour12) : null;
+  const subtitleFor = (key: NudgeKind): string => {
+    const ex = examples?.[key];
+    if (key === 'weighIn') {
+      const when = `Mon and Thu, ${formatClock(WEIGH_IN_TIME, hour12)}`;
+      return ex ? `${when}: ${ex.body}` : `${when}. That falls before you are up, so it would stay silent.`;
+    }
+    if (!ex) return 'Falls in your sleeping hours with these times, so it would stay silent.';
+    return `${ex.time}: ${ex.body}`;
+  };
+
+  return (
+    <Group gap={spacing.xxl}>
+      <StepTitle title="Your day" subtitle="Optional. Your usual times let reminders arrive when they help and stay quiet while you sleep." />
+      <SettingsGroup title="WHEN DO YOU USUALLY EAT?">
+        <TimeRow title="Breakfast" value={r.breakfast} hour12={hour12} onChange={(breakfast) => setRoutine({ breakfast })} testID="onb-routine-breakfast" />
+        <TimeRow title="Lunch" value={r.lunch} hour12={hour12} onChange={(lunch) => setRoutine({ lunch })} testID="onb-routine-lunch" />
+        <TimeRow title="Dinner" value={r.dinner} hour12={hour12} onChange={(dinner) => setRoutine({ dinner })} testID="onb-routine-dinner" />
+        <TimeRow title="Wake up" value={r.wake} hour12={hour12} onChange={(wake) => setRoutine({ wake })} testID="onb-routine-wake" />
+        <TimeRow title="Bedtime" value={r.bed} hour12={hour12} onChange={(bed) => setRoutine({ bed })} testID="onb-routine-bed" />
+      </SettingsGroup>
+      {errors.meals || errors.sleep ? <ErrorText testID="onb-routine-error">{errors.sleep ?? errors.meals}</ErrorText> : null}
+      <View style={{ gap: spacing.sm }}>
+        <SettingsGroup
+          title="WHICH NUDGES WOULD HELP?"
+          footer="Each one carries your live numbers, skips itself once the goal is met and stays silent between bedtime and wake-up. Change them any time in Profile, Reminders.">
+          {NUDGES.map((n) => (
+            <ToggleRow
+              key={n.key}
+              title={n.title}
+              subtitle={subtitleFor(n.key)}
+              value={r.nudges[n.key]}
+              onChange={(on) => setRoutine({ nudges: { ...r.nudges, [n.key]: on } })}
+              left={<IconTile color={colors[n.color]}>{n.icon(colors[n.color])}</IconTile>}
+              testID={`onb-nudge-${n.key}`}
+            />
+          ))}
+        </SettingsGroup>
+      </View>
+      {!remindersSupported ? (
+        <Note icon={<BellRing size={18} color={colors.textSecondary} />}>
+          <Text variant="caption" color="textSecondary">
+            Browsers cannot schedule reminders for later. Your choices are saved, and HealthCal on your phone sends them once you sign in there.
+          </Text>
+        </Note>
+      ) : null}
+    </Group>
   );
 }

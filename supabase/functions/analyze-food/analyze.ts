@@ -27,6 +27,9 @@ export interface AnalyzeInput {
   precise?: boolean;
 }
 
+/** How much of the daily allowance one analysis uses: the careful pass weighs five fast ones. */
+export const costOf = (input: Pick<AnalyzeInput, 'precise'>): number => (input.precise ? 5 : 1);
+
 export interface AnalyzedItem {
   name: string;
   grams: number;
@@ -48,12 +51,22 @@ export interface AnalyzeOutput {
 }
 
 export class AnalyzeError extends Error {
+  /** Tokens the model already used before this error, when it got that far (those are billed). */
+  usage?: { inputTokens: number; outputTokens: number };
+
   constructor(
     public code: 'bad_request' | 'not_food' | 'declined' | 'truncated' | 'rate_limited' | 'upstream',
     message: string,
     public status: number,
+    usage?: { inputTokens: number; outputTokens: number },
   ) {
     super(message);
+    this.usage = usage;
+  }
+
+  /** True when the provider was never reached or refused before producing output, so nothing was billed. */
+  get unbilled(): boolean {
+    return !this.usage && (this.code === 'rate_limited' || this.code === 'upstream');
   }
 }
 
@@ -217,11 +230,12 @@ export async function analyzeFood(client: Anthropic, input: AnalyzeInput, option
     throw error;
   }
 
+  const usage = { inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens };
   if (response.stop_reason === 'refusal') {
-    throw new AnalyzeError('declined', 'This photo could not be analysed. Try a different one or describe the meal instead.', 422);
+    throw new AnalyzeError('declined', 'This photo could not be analysed. Try a different one or describe the meal instead.', 422, usage);
   }
   if (response.stop_reason === 'max_tokens') {
-    throw new AnalyzeError('truncated', 'The meal was too complex to analyse in one go. Try a closer photo of fewer items.', 422);
+    throw new AnalyzeError('truncated', 'The meal was too complex to analyse in one go. Try a closer photo of fewer items.', 422, usage);
   }
 
   // Thinking blocks can come first, so find the text block by type rather than position.
@@ -230,17 +244,16 @@ export async function analyzeFood(client: Anthropic, input: AnalyzeInput, option
   let parsed: Record<string, unknown>;
   try {
     const value: unknown = JSON.parse(text);
-    // `null`, numbers and strings are valid JSON but not an answer.
-    if (!value || typeof value !== 'object') throw new Error('not an object');
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('not an object');
     parsed = value as Record<string, unknown>;
   } catch {
-    throw new AnalyzeError('upstream', 'The analysis came back in an unexpected format. Try again.', 502);
+    throw new AnalyzeError('upstream', 'The analysis came back in an unexpected format. Try again.', 502, usage);
   }
 
   const items = sanitizeItems(parsed.items);
   const str = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
   if (items.length === 0) {
-    throw new AnalyzeError('not_food', str(parsed.note, 160) ?? 'No food was recognised. Try a clearer photo or describe the meal.', 422);
+    throw new AnalyzeError('not_food', str(parsed.note, 160) ?? 'No food was recognised. Try a clearer photo or describe the meal.', 422, usage);
   }
   return {
     dish: str(parsed.dish, 80) ?? items[0].name,
@@ -248,6 +261,6 @@ export async function analyzeFood(client: Anthropic, input: AnalyzeInput, option
     hiddenFatQuestion: str(parsed.hidden_fat_question, 160),
     note: str(parsed.note, 160),
     model: response.model,
-    usage: { inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens },
+    usage,
   };
 }

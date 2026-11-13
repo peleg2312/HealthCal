@@ -14,6 +14,10 @@ import {
 } from './exportFormat';
 import type { ActivityEntry, FoodEntry, Settings, WaterEntry, WeightEntry } from '@/types';
 
+const U1 = '0b6f3c1e-8f0a-4c49-9d3e-1a2b3c4d5e6f';
+const U2 = '1c7a4d2f-9a1b-4d5a-8e4f-2b3c4d5e6f70';
+const U3 = '2d8b5e3a-0b2c-4e6b-9f50-3c4d5e6f7081';
+
 const SETTINGS = { theme: 'system', haptics: true, celebrations: true, waterPresets: [250], fastingTargetHours: 16, updatedAt: '' } as unknown as Settings;
 
 const food = (over: Partial<FoodEntry>): FoodEntry => ({
@@ -86,14 +90,15 @@ describe('CSV tables', () => {
 describe('JSON backup', () => {
   it('round-trips through parseBackup with live records only', () => {
     const src = emptySource();
-    src.collections.foodEntries = { f1: food({}), f2: food({ id: 'f2', deleted: true }) };
+    src.collections.foodEntries = { [U1]: food({ id: U1 }), [U2]: food({ id: U2, deleted: true }) };
     src.favoriteFoodIds = ['b_oats'];
     const json = backupJson(src, new Date('2026-11-13T12:00:00Z'));
     const parsed = parseBackup(json);
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
     expect(parsed.backup.exportedAt).toBe('2026-11-13T12:00:00.000Z');
-    expect(parsed.backup.collections.foodEntries.map((r) => r.id)).toEqual(['f1']);
+    expect(parsed.backup.collections.foodEntries.map((r) => r.id)).toEqual([U1]);
+    expect(parsed.skipped).toBe(0);
     expect(parsed.backup.collections.weights).toEqual([]);
     expect(parsed.backup.favoriteFoodIds).toEqual(['b_oats']);
   });
@@ -126,5 +131,53 @@ describe('JSON backup', () => {
     expect(res.updated).toBe(1);
     expect(res.unchanged).toBe(2);
     expect(res.changed.foodEntries.sort()).toEqual(['fresh', 'older']);
+  });
+});
+
+describe('backup validation', () => {
+  const wrap = (collections: Record<string, unknown[]>, extra: Record<string, unknown> = {}) =>
+    JSON.stringify({ format: 'healthcal-backup', version: 1, collections, ...extra });
+
+  it('skips records the sync server or the screens would choke on', () => {
+    const parsed = parseBackup(
+      wrap({
+        foodEntries: [
+          food({ id: U1 }),
+          food({ id: 'abc' }),
+          food({ id: U2, updatedAt: 'yesterday' }),
+          { ...food({ id: U3 }), nutrients: undefined },
+          food({ id: '3e9c6f4b-1c3d-4f7c-8a61-4d5e6f708192', date: '2026-02-31' }),
+        ],
+        water: [{ id: U1, updatedAt: '2026-11-10T10:00:00Z', date: '2026-11-10', ml: 'lots', beverage: 'water', loggedAt: '' }],
+        weights: [{ id: U2, updatedAt: '2026-11-10T10:00:00Z', date: '2026-11-10', kg: 80.2 }],
+      }),
+    );
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.backup.collections.foodEntries.map((r) => r.id)).toEqual([U1]);
+    expect(parsed.backup.collections.water).toEqual([]);
+    expect(parsed.backup.collections.weights).toHaveLength(1);
+    expect(parsed.skipped).toBe(5);
+  });
+
+  it('drops a malformed profile, settings and recent foods', () => {
+    const parsed = parseBackup(
+      wrap({}, { profile: { name: 'x', updatedAt: '2026-11-10T10:00:00Z', heightCm: 'tall' }, settings: 'dark', recentFoods: [{ id: 'b_x' }, null] }),
+    );
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.backup.profile).toBeNull();
+    expect(parsed.backup.settings).toBeNull();
+    expect(parsed.backup.recentFoods).toEqual([]);
+    expect(parsed.skipped).toBe(1);
+  });
+
+  it('keeps a valid profile', () => {
+    const profile = {
+      name: 'A', sex: 'female', birthDate: '1990-04-21', heightCm: 170, weightKg: 70, activityLevel: 'light', goal: 'lose', weeklyRateKg: 0.5,
+      units: 'metric', eatBackExercise: true, useAdaptiveTdee: true, updatedAt: '2026-11-10T10:00:00Z',
+    };
+    const parsed = parseBackup(wrap({}, { profile }));
+    expect(parsed.ok && parsed.backup.profile).toEqual(profile);
   });
 });

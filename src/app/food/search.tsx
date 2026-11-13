@@ -4,22 +4,24 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
 import { BUILTIN_FOODS } from '@/data/foods';
+import { AmountEditor } from '@/features/food/AmountEditor';
 import { FoodRow, MealPicker } from '@/features/food/components';
 import { setFoodDraft } from '@/features/food/draft';
-import { href, kcal, lastPortions, parseDate, parseMeal, portionFor, portionKcal, portionLabel } from '@/features/food/helpers';
-import { logFood, logItems } from '@/features/food/log';
+import { amountLabel, href, kcal, lastPortions, matchServing, parseDate, parseMeal, portionFor, portionKcal, portionLabel, stepAmount } from '@/features/food/helpers';
+import { deleteEntry, logFood, logItems, setEntryAmount } from '@/features/food/log';
+import { usualFoods } from '@/features/food/usuals';
 import { formatDayLabel } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
 import { MEAL_LABEL, entriesTotal, sumNutrients } from '@/lib/nutrition';
 import { searchLocal, searchOnlineWithStatus } from '@/services/foodSearch';
 import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
-import { useLive } from '@/store/selectors';
+import { useDay, useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
-import type { Food, MealType } from '@/types';
-import { Avatar, Button, Chip, ChipRow, Divider, Header, IconButton, PressableScale, Screen, Text, TextField } from '@/ui';
+import type { Food, FoodEntry, MealType } from '@/types';
+import { Avatar, Button, Chip, ChipRow, Divider, Header, IconButton, PressableScale, Screen, Sheet, Text, TextField } from '@/ui';
 
-type Tab = 'recent' | 'favorites' | 'mine' | 'meals';
+type Tab = 'usual' | 'recent' | 'favorites' | 'mine' | 'meals';
 type Online = { query: string; status: 'idle' | 'loading' | 'done'; items: Food[] };
 
 const BUILTIN_BY_ID = new Map(BUILTIN_FOODS.map((f) => [f.id, f]));
@@ -33,15 +35,20 @@ function resolveFood(f: Food, customById: Map<string, Food>): Food | null {
 export default function FoodSearchScreen() {
   const { colors, spacing } = useTheme();
   const params = useLocalSearchParams<{ meal?: string; date?: string }>();
-  const date = parseDate(params.date, useToday());
+  const todayDate = useToday();
+  const date = parseDate(params.date, todayDate);
   const [meal, setMeal] = useState<MealType>(() => parseMeal(params.meal));
   const [query, setQuery] = useState('');
-  const [tab, setTab] = useState<Tab>('recent');
+  // null until the user picks a tab: then Usual leads when there is history for this meal.
+  const [pickedTab, setTab] = useState<Tab | null>(null);
+  const [amountEntryId, setAmountEntryId] = useState<string | null>(null);
   const [onlineResult, setOnlineResult] = useState<{ query: string; items: Food[]; failed: boolean; unavailable: boolean }>({ query: '', items: [], failed: false, unavailable: false });
   const [openedAt] = useState(() => nowISO());
 
   const recentFoods = useStore((s) => s.recentFoods);
   const favoriteIds = useStore((s) => s.favoriteFoodIds);
+  const favoriteRecords = useLive('favorites');
+  const day = useDay(date);
   const customFoods = useLive('customFoods');
   const savedMeals = useLive('savedMeals');
   const entries = useLive('foodEntries');
@@ -53,12 +60,18 @@ export default function FoodSearchScreen() {
     [recentFoods, customById],
   );
   const favorites = useMemo(() => {
-    const byId = new Map<string, Food>();
-    for (const f of recentFoods) byId.set(f.id, f);
-    for (const [id, f] of BUILTIN_BY_ID) byId.set(id, f);
-    for (const [id, f] of customById) byId.set(id, f);
+    // Each favourite carries its own definition; favoriteFoodIds gives the newest-first order.
+    const byId = new Map(favoriteRecords.map((r) => [r.food.id, r.food]));
     return favoriteIds.map((id) => (byId.has(id) ? resolveFood(byId.get(id)!, customById) : null)).filter((f): f is Food => !!f);
-  }, [favoriteIds, recentFoods, customById]);
+  }, [favoriteRecords, favoriteIds, customById]);
+  const usuals = useMemo(
+    () =>
+      usualFoods(entries, meal, todayDate, { limit: 12 })
+        .map((u) => resolveFood(u.food, customById))
+        .filter((f): f is Food => !!f),
+    [entries, meal, todayDate, customById],
+  );
+  const tab: Tab = pickedTab ?? (usuals.length ? 'usual' : 'recent');
   const mine = useMemo(() => [...customFoods].sort((a, b) => a.name.localeCompare(b.name)), [customFoods]);
 
   const q = query.trim();
@@ -90,6 +103,15 @@ export default function FoodSearchScreen() {
   // Running count of everything added to this day since the screen opened (Undo lowers it).
   const added = entries.filter((e) => e.date === date && e.loggedAt >= openedAt);
   const addedKcal = entriesTotal(added).kcal;
+  // Latest entry added from this screen for each food in the current meal: its row shows a stepper.
+  const addedByFood = new Map<string, FoodEntry>();
+  for (const e of added) {
+    if (!e.foodId || e.meal !== meal || !e.food) continue;
+    const prev = addedByFood.get(e.foodId);
+    if (!prev || e.loggedAt > prev.loggedAt) addedByFood.set(e.foodId, e);
+  }
+  const amountEntry = amountEntryId ? added.find((e) => e.id === amountEntryId) : undefined;
+  const left = Math.round(day.remaining);
 
   const open = (food: Food) => {
     setFoodDraft(food);
@@ -103,16 +125,26 @@ export default function FoodSearchScreen() {
 
   const row = (food: Food, testID: string, trailing?: React.ReactNode) => {
     const p = portionFor(food, lastMap);
+    const e = addedByFood.get(food.id);
     return (
       <FoodRow
         key={`${testID}`}
         testID={testID}
         food={food}
-        subtitle={portionLabel(p.serving.label, p.quantity)}
-        kcalValue={portionKcal(food, p)}
+        subtitle={e ? portionLabel(e.servingLabel, e.quantity) : portionLabel(p.serving.label, p.quantity)}
+        kcalValue={e ? e.nutrients.kcal : portionKcal(food, p)}
         onPress={() => open(food)}
         onQuickAdd={() => quickAdd(food)}
         trailing={trailing}
+        amount={
+          e
+            ? {
+                label: amountLabel(e.servingLabel, e.quantity),
+                onStep: (dir) => setEntryAmount(e, stepAmount(e.quantity, e.servingLabel, dir)),
+                onOpen: () => setAmountEntryId(e.id),
+              }
+            : undefined
+        }
       />
     );
   };
@@ -125,6 +157,8 @@ export default function FoodSearchScreen() {
       <ActionTile testID="search-create" icon={<PenLine size={22} color={colors.primary} />} label="Create food" onPress={() => go('/food/custom', q ? { name: q } : {})} />
     </View>
   );
+
+  const meals = <Chip testID="search-tab-meals" label={`Saved meals${savedMeals.length ? ` ${savedMeals.length}` : ''}`} selected={tab === 'meals'} onPress={() => setTab('meals')} />;
 
   const header = (
     <View style={{ gap: spacing.sm, paddingBottom: spacing.sm }}>
@@ -151,20 +185,27 @@ export default function FoodSearchScreen() {
     </View>
   );
 
-  const footer =
-    added.length > 0 ? (
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-        <View style={{ flex: 1 }}>
-          <Text variant="title" testID="search-added-count">
-            {added.length} added
+  const over = left < 0;
+  const budget = (
+    <Text variant={added.length > 0 ? 'caption' : 'label'} color={over ? 'warning' : 'textSecondary'} tabular testID="search-budget">
+      {over ? `${kcal(-left)} kcal over` : `${kcal(left)} kcal left`} {date === todayDate ? 'today' : `on ${formatDayLabel(date)}`}
+    </Text>
+  );
+  const footer = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 44 }}>
+      <View style={{ flex: 1 }}>
+        {added.length > 0 ? (
+          <Text variant="title" testID="search-added-count" tabular>
+            {added.length} added · {kcal(addedKcal)} kcal
           </Text>
-          <Text variant="caption" color="textSecondary" tabular>
-            {kcal(addedKcal)} kcal · {formatDayLabel(date)}
-          </Text>
-        </View>
-        <Button testID="search-done" title="Done" size="md" full={false} onPress={() => router.canGoBack() ? router.back() : router.replace(href('/diary', { date }) as never)} />
+        ) : null}
+        {budget}
       </View>
-    ) : undefined;
+      {added.length > 0 ? (
+        <Button testID="search-done" title="Done" size="md" full={false} onPress={() => (router.canGoBack() ? router.back() : router.replace(href('/diary', { date }) as never))} />
+      ) : null}
+    </View>
+  );
 
   return (
     <Screen header={header} footer={footer} testID="food-search-screen">
@@ -174,11 +215,22 @@ export default function FoodSearchScreen() {
         <>
           {escapes}
           <ChipRow>
+            {usuals.length ? <Chip testID="search-tab-usual" label="Usual" selected={tab === 'usual'} onPress={() => setTab('usual')} /> : null}
             <Chip testID="search-tab-recent" label="Recent" selected={tab === 'recent'} onPress={() => setTab('recent')} />
             <Chip testID="search-tab-favorites" label={`Favourites${favorites.length ? ` ${favorites.length}` : ''}`} selected={tab === 'favorites'} onPress={() => setTab('favorites')} />
+            {/* Saved meals move ahead of My foods once there are any, so the chip shows without scrolling the row. */}
+            {savedMeals.length ? meals : null}
             <Chip testID="search-tab-mine" label={`My foods${mine.length ? ` ${mine.length}` : ''}`} selected={tab === 'mine'} onPress={() => setTab('mine')} />
-            <Chip testID="search-tab-meals" label={`Saved meals${savedMeals.length ? ` ${savedMeals.length}` : ''}`} selected={tab === 'meals'} onPress={() => setTab('meals')} />
+            {savedMeals.length ? null : meals}
           </ChipRow>
+          {tab === 'usual' && usuals.length ? (
+            <View style={{ gap: spacing.xs }}>
+              <Text variant="caption" color="textSecondary" testID="search-usual-note">
+                What you log most at {MEAL_LABEL[meal].toLowerCase()}, from your last 30 days
+              </Text>
+              <List>{usuals.map((f, i) => row(f, `usual-${i}`))}</List>
+            </View>
+          ) : null}
           {tab === 'recent' ? (
             recents.length ? (
               <List>{recents.map((f, i) => row(f, `recent-${i}`))}</List>
@@ -314,6 +366,40 @@ export default function FoodSearchScreen() {
           </View>
         </>
       )}
+      <Sheet
+        visible={!!amountEntry}
+        onClose={() => setAmountEntryId(null)}
+        title={amountEntry ? amountEntry.name : undefined}
+        footer={
+          amountEntry ? (
+            <View style={{ flexDirection: 'row', gap: spacing.md }}>
+              <Button
+                testID="search-amount-remove"
+                variant="secondary"
+                full={false}
+                title="Remove"
+                onPress={() => {
+                  setAmountEntryId(null);
+                  deleteEntry(amountEntry);
+                }}
+              />
+              <Button testID="search-amount-done" style={{ flex: 1 }} title={`Done · ${kcal(amountEntry.nutrients.kcal)} kcal`} onPress={() => setAmountEntryId(null)} />
+            </View>
+          ) : null
+        }>
+        {amountEntry?.food ? (
+          <AmountEditor
+            key={amountEntry.id}
+            food={amountEntry.food}
+            value={{
+              serving: matchServing(amountEntry.food, amountEntry.servingLabel, amountEntry.quantity > 0 ? amountEntry.grams / amountEntry.quantity : amountEntry.grams),
+              quantity: amountEntry.quantity,
+            }}
+            onChange={(v) => setEntryAmount(amountEntry, v.quantity, v.serving)}
+            testIDPrefix="search-amount"
+          />
+        ) : null}
+      </Sheet>
     </Screen>
   );
 }

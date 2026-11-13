@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it, vi } from 'vitest';
 
-import { analyzeFood, AnalyzeError, FAST_MODEL, PRECISE_MODEL, sanitizeItems, validateInput } from './analyze';
+import { analyzeFood, AnalyzeError, costOf, FAST_MODEL, PRECISE_MODEL, sanitizeItems, validateInput } from './analyze';
 
 const err = (fn: () => unknown): AnalyzeError => {
   try {
@@ -358,3 +358,42 @@ describe('analyzeFood error mapping', () => {
     await expect(analyzeFood(throwing(boom).client, { text: 'x' })).rejects.toBe(boom);
   });
 });
+
+describe('cost and billing of failed analyses', () => {
+  const ok = { content: [{ type: 'text', text: '{"dish":"x","items":[],"hidden_fat_question":null,"note":"no food here"}' }], stop_reason: 'end_turn', model: 'claude-haiku-5-5', usage: { input_tokens: 700, output_tokens: 40 } };
+  const client = (response: unknown) => ({ messages: { create: async () => response }, beta: { messages: { create: async () => response } } }) as never;
+
+  it('a careful analysis weighs five fast ones', () => {
+    expect(costOf({})).toBe(1);
+    expect(costOf({ precise: false })).toBe(1);
+    expect(costOf({ precise: true })).toBe(5);
+  });
+
+  it('errors raised after the model answered carry the tokens that were billed', async () => {
+    const cases: [unknown, string][] = [
+      [ok, 'not_food'],
+      [{ ...ok, stop_reason: 'max_tokens', usage: { input_tokens: 900, output_tokens: 2000 } }, 'truncated'],
+      [{ ...ok, stop_reason: 'refusal' }, 'declined'],
+      [{ ...ok, content: [{ type: 'text', text: 'not json' }] }, 'upstream'],
+      [{ ...ok, content: [{ type: 'text', text: 'null' }] }, 'upstream'],
+    ];
+    for (const [response, code] of cases) {
+      const err = await analyzeFood(client(response), { text: 'toast' }).catch((e) => e);
+      expect(err).toBeInstanceOf(AnalyzeError);
+      expect(err.code).toBe(code);
+      expect(err.usage).toBeTruthy();
+      expect(err.unbilled).toBe(false);
+    }
+    const truncated = await analyzeFood(client({ ...ok, stop_reason: 'max_tokens', usage: { input_tokens: 900, output_tokens: 2000 } }), { text: 'toast' }).catch((e) => e);
+    expect(truncated.usage).toEqual({ inputTokens: 900, outputTokens: 2000 });
+  });
+
+  it('errors raised before any output are marked unbilled, so the analysis can be given back', () => {
+    expect(new AnalyzeError('rate_limited', 'busy', 429).unbilled).toBe(true);
+    expect(new AnalyzeError('upstream', 'down', 502).unbilled).toBe(true);
+    // The same code with usage attached means the model did answer.
+    expect(new AnalyzeError('upstream', 'bad json', 502, { inputTokens: 1, outputTokens: 1 }).unbilled).toBe(false);
+    expect(new AnalyzeError('bad_request', 'no', 400).unbilled).toBe(false);
+  });
+});
+

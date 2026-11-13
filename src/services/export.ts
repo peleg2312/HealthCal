@@ -86,7 +86,8 @@ export async function exportData(kind: ExportKind): Promise<ExportResult> {
     const out = new File(Paths.cache, file.name);
     if (out.exists) out.delete();
     out.create();
-    out.write(content);
+    // write() is async in SDK 58: wait for it, so the share sheet never gets a partial file and a failed write is reported.
+    await out.write(content);
     if (!(await Sharing.isAvailableAsync())) {
       return { ok: false, message: 'Sharing is not available on this device.' };
     }
@@ -107,6 +108,8 @@ export type ImportResult =
       profileRestored: boolean;
       /** The backup has a profile that was not applied because this device already has a newer one. */
       profileSkipped: boolean;
+      /** Records left out because they were malformed. */
+      skipped: number;
     }
   | { ok: false; message: string; canceled?: boolean };
 
@@ -130,8 +133,8 @@ export function importBackupText(text: string, options: { forceProfile?: boolean
 
   const hasProfile = !!b.profile;
   const profileRestored = hasProfile && (!!options.forceProfile || !s.profile || b.profile!.updatedAt > s.profile.updatedAt);
-  const hasSettings = !!b.settings && typeof b.settings === 'object';
-  const settingsRestored = hasSettings && (!!options.forceProfile || b.settings.updatedAt > s.settings.updatedAt);
+  const backupSettings = b.settings;
+  const settingsRestored = !!backupSettings && (!!options.forceProfile || backupSettings.updatedAt > s.settings.updatedAt);
 
   useStore.setState((cur) => {
     const next = { ...(merged.collections as Partial<Store>) } as Record<string, Record<string, { id: string; updatedAt: string; deleted?: boolean }>>;
@@ -174,10 +177,18 @@ export function importBackupText(text: string, options: { forceProfile?: boolean
       recentActivityIds: [...new Set([...cur.recentActivityIds, ...b.recentActivityIds])].slice(0, 12),
       // Stamped now, so the restored profile also wins on the account's other devices.
       ...(profileRestored && b.profile ? { profile: { ...b.profile, updatedAt: nextStamp(cur.profile?.updatedAt) }, profileDirty: true } : {}),
-      ...(settingsRestored ? { settings: { ...withSettingsDefaults(b.settings), updatedAt: nextStamp(cur.settings.updatedAt) }, settingsDirty: true } : {}),
+      ...(settingsRestored && backupSettings ? { settings: { ...withSettingsDefaults(backupSettings), updatedAt: nextStamp(cur.settings.updatedAt) }, settingsDirty: true } : {}),
     };
   });
-  return { ok: true, added: merged.added, updated: merged.updated, unchanged: merged.unchanged, profileRestored, profileSkipped: hasProfile && !profileRestored };
+  return {
+    ok: true,
+    added: merged.added,
+    updated: merged.updated,
+    unchanged: merged.unchanged,
+    profileRestored,
+    profileSkipped: hasProfile && !profileRestored,
+    skipped: parsed.skipped,
+  };
 }
 
 /** Apply the profile, goals and settings from the backup that was just imported (after the user confirms). */

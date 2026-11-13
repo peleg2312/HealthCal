@@ -2,8 +2,8 @@ import { ChevronRight, Droplet, Dumbbell, Moon } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
-import { hoursText, plural, SLEEP_TARGET_HOURS, WEEKLY_ACTIVE_MINUTES, type PeriodSummary } from '@/lib/insights';
-import { formatVolume } from '@/lib/units';
+import { hoursText, plural, SLEEP_MAX_HOURS, SLEEP_TARGET_HOURS, WEEKLY_ACTIVE_MINUTES, type PeriodSummary } from '@/lib/insights';
+import { formatNumber, formatVolume, volumeUnit, volumeValue } from '@/lib/units';
 import { useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
 import { Card, Divider, PressableScale, ProgressBar, Text } from '@/ui';
@@ -65,7 +65,6 @@ export function HabitsCard({ summary, units }: { summary: PeriodSummary; units: 
   const a = summary.activity;
   const s = summary.sleep;
   const weekly = Math.round(a.weeklyMinutes);
-  const water = w ? formatVolume(w.avgMl, units).split(' ') : null;
   return (
     <Card testID="progress-habits" style={{ gap: spacing.md }}>
       <Text variant="h3">Water, activity and sleep</Text>
@@ -75,8 +74,8 @@ export function HabitsCard({ summary, units }: { summary: PeriodSummary; units: 
         color={colors.water}
         icon={<Droplet size={18} color={colors.water} />}
         title="Hydration"
-        value={water ? water[0] : null}
-        unit={water ? `${water[1]} / day` : undefined}
+        value={w ? formatNumber(Math.round(volumeValue(w.avgMl, units))) : null}
+        unit={`${volumeUnit(units)} / day`}
         detail={w ? `Goal met on ${w.daysAtGoal} of ${w.daysTracked} days · goal ${formatVolume(w.avgGoalMl, units)}` : 'No drinks logged in this range yet'}
         progress={w ? w.avgMl / w.avgGoalMl : 0}
       />
@@ -88,10 +87,10 @@ export function HabitsCard({ summary, units }: { summary: PeriodSummary; units: 
         icon={<Dumbbell size={18} color={colors.exercise} />}
         title="Activity"
         value={a.minutes ? `${weekly}` : null}
-        unit="min / week"
+        unit="min / wk"
         detail={
           a.minutes
-            ? `${plural(a.sessions, 'session')} · guideline ${WEEKLY_ACTIVE_MINUTES} min`
+            ? `${plural(a.sessions, 'session')}, ${formatNumber(a.minutes)} min logged · vigorous minutes count double toward ${WEEKLY_ACTIVE_MINUTES}`
             : 'No workouts logged in this range yet'
         }
         progress={weekly / WEEKLY_ACTIVE_MINUTES}
@@ -105,8 +104,8 @@ export function HabitsCard({ summary, units }: { summary: PeriodSummary; units: 
         title="Sleep"
         value={s ? hoursText(s.avgHours).replace(' h', '') : null}
         unit="h / night"
-        detail={s ? `${plural(s.nights, 'night')} logged · quality ${s.avgQuality.toFixed(1)} of 5 · aim for ${SLEEP_TARGET_HOURS} to 9 h` : 'No sleep logged in this range yet'}
-        progress={s ? s.avgHours / SLEEP_TARGET_HOURS : 0}
+        detail={s ? `${plural(s.nights, 'night')} logged · quality ${s.avgQuality.toFixed(1)} of 5 · aim for ${SLEEP_TARGET_HOURS} to ${SLEEP_MAX_HOURS} h` : 'No sleep logged in this range yet'}
+        progress={s ? Math.min(s.avgHours, SLEEP_MAX_HOURS) / SLEEP_TARGET_HOURS : 0}
       />
     </Card>
   );

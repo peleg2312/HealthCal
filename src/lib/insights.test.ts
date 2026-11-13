@@ -9,6 +9,11 @@ import {
   sleepAppetite,
   summarizePeriod,
   weekendPattern,
+  guidelineMinutes,
+  budgetBalanceText,
+  planChangeText,
+  recapTiles,
+  recapWeeks,
   weeklyRecap,
   type Insight,
   type InsightContext,
@@ -39,6 +44,8 @@ interface DayOpts {
   waterGoal?: number;
   minutes?: number;
   sessions?: number;
+  /** MET of each session (default 4, moderate). */
+  met?: number;
   logged?: boolean;
 }
 
@@ -54,7 +61,7 @@ function day(date: string, o: DayOpts = {}): InsightDay {
     eaten: { kcal, protein: logged ? (o.protein ?? 140) : 0, carbs: o.carbs ?? 200, fat: o.fat ?? 70, fiber: fiber ?? 0 },
     budget: o.budget ?? 2000,
     macros: { proteinG: o.proteinTarget ?? 140, carbsG: 200, fatG: 70, fiberG: o.fiberTarget ?? 28 },
-    activities: Array.from({ length: o.sessions ?? (o.minutes ? 1 : 0) }, () => ({})),
+    activities: Array.from({ length: o.sessions ?? (o.minutes ? 1 : 0) }, (_, __, n = o.sessions ?? 1) => ({ met: o.met ?? 4, durationMin: (o.minutes ?? 0) / n })),
     activeMinutes: o.minutes ?? 0,
     waterEntries: water.map((w) => ({ ml: w.ml, beverage: 'water' as const, loggedAt: at(date, w.hour) })),
     waterMl,
@@ -207,7 +214,7 @@ describe('insight content cites the numbers', () => {
     const out = generateInsights(ctx(days));
     const a = find(out, 'activity-low');
     expect(a).toBeDefined();
-    expect(a!.body).toContain('You averaged 40 active minutes a week');
+    expect(a!.body).toContain('You averaged 40 guideline minutes a week');
     expect(a!.body).toContain('110 short');
     expect(a!.body).toContain('4 brisk 30-minute walks');
   });
@@ -308,15 +315,38 @@ describe('adaptive estimate insight', () => {
 });
 
 describe('weeklyRecap', () => {
-  it('uses the current week once it has 3 closed logged days', () => {
+  it('always reports the last closed week, so its numbers stop moving', () => {
     const days = run(21, (d) => day(d, { kcal: 2000, minutes: 40 }));
     const r = weeklyRecap({ days, trend: [], sleep: [], today: TODAY, units: 'metric', goal: 'lose' })!;
-    expect(r.label).toBe('This week');
-    expect(r.weekStart).toBe('2026-11-09');
-    expect(r.weekEnd).toBe('2026-11-15');
-    expect(r.summary.completeDays).toBe(4);
+    expect(r.label).toBe('Last week');
+    expect(r.weekStart).toBe('2026-11-02');
+    expect(r.weekEnd).toBe('2026-11-08');
+    expect(r.summary.completeDays).toBe(7);
+    expect(r.days).toHaveLength(7);
+    expect(r.previous?.completeDays).toBe(7);
+    expect(r.budgetBalance).toBe(0);
     expect(r.bestDay).not.toBeNull();
     expect(r.win.length).toBeGreaterThan(0);
+  });
+
+  it('reports a chosen week, including the one in progress', () => {
+    const days = run(21, (d) => day(d, { kcal: 2100 }));
+    const r = weeklyRecap({ days, trend: [], sleep: [], today: TODAY, units: 'metric', goal: 'lose', week: '2026-11-09' })!;
+    expect(r.label).toBe('This week');
+    expect(r.days.map((d) => d.date)).toEqual(['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13']);
+    expect(r.budgetBalance).toBe(400); // 4 closed days at +100
+    const old = weeklyRecap({ days, trend: [], sleep: [], today: TODAY, units: 'metric', goal: 'lose', week: '2026-10-26' })!;
+    expect(old.label).toBe('Week');
+    expect(old.previous?.completeDays).toBe(2); // Oct 24 and 25 only
+  });
+
+  it('says "last week" in the win when it shows last week (insights-9)', () => {
+    const tue = '2026-11-10';
+    const days = Array.from({ length: 14 }, (_, i) => day(addDays(tue, i - 13), { kcal: 1200, budget: 2000, protein: 50, water: [{ ml: 500, hour: 9 }] }));
+    const r = weeklyRecap({ days, trend: [], sleep: [], today: tue, units: 'metric', goal: 'lose' })!;
+    expect(r.label).toBe('Last week');
+    expect(r.win).toBe('You logged food on 7 days last week.');
+    expect(r.win).not.toContain('this week');
   });
 
   it('falls back to last week early in the week', () => {
@@ -328,6 +358,12 @@ describe('weeklyRecap', () => {
     expect(r.focus).toContain('400 kcal above budget');
   });
 
+  it('lists earlier weeks with a recap', () => {
+    const days = run(35, (d, i) => (i < 7 ? day(d, { logged: false, water: [] }) : day(d)));
+    // Last closed week is Nov 2; earlier: Oct 26, Oct 19, Oct 12 (Oct 13+ logged).
+    expect(recapWeeks(days, TODAY)).toEqual(['2026-10-26', '2026-10-19', '2026-10-12']);
+  });
+
   it('returns null with nothing to recap', () => {
     const days = run(10, (d) => day(d, { logged: false }));
     expect(weeklyRecap({ days, trend: [], sleep: [], today: TODAY, units: 'metric', goal: 'lose' })).toBeNull();
@@ -335,7 +371,7 @@ describe('weeklyRecap', () => {
 
   it('picks the day closest to plan as best day', () => {
     const days = run(5, (d, i) => day(d, { kcal: i === 2 ? 2000 : 2300, budget: 2000 }));
-    const r = weeklyRecap({ days, trend: [], sleep: [], today: TODAY, units: 'metric', goal: 'lose' })!;
+    const r = weeklyRecap({ days, trend: [], sleep: [], today: TODAY, units: 'metric', goal: 'lose', week: '2026-11-09' })!;
     expect(r.bestDay?.date).toBe('2026-11-11');
     expect(r.bestDay?.detail).toContain('2,000 of 2,000 kcal');
   });
@@ -372,5 +408,96 @@ describe('rankInsights', () => {
     const mk = (id: string, tone: Insight['tone'], score: number): Insight => ({ id, tone, title: id, body: id, score });
     const list = [mk('a', 'attention', 90), mk('b', 'attention', 80), mk('c', 'neutral', 70), mk('d', 'neutral', 60), mk('e', 'attention', 50), mk('f', 'neutral', 45), mk('g', 'positive', 10)];
     expect(ids(rankInsights(list))).toEqual(['a', 'b', 'c', 'd', 'g']);
+  });
+});
+
+describe('review findings', () => {
+  const base = (o: DayOpts) => run(8, (d, i) => (i === 7 ? day(d, { kcal: 300 }) : day(d, o)));
+
+  it('insights-5: no current pace from weigh-ins that stopped weeks ago', () => {
+    const days = run(10, (d) => day(d));
+    const out = generateInsights(ctx(days, { currentWeeklyRateKg: -0.6, weighInsTotal: 40, lastWeighIn: '2026-08-30' }));
+    expect(ids(out).filter((i) => i.startsWith('pace'))).toEqual(['pace-stale']);
+    expect(find(out, 'pace-stale')!.body).toContain('75 days ago');
+    expect(find(out, 'pace-stale')!.body).not.toContain('0.6');
+    const fresh = generateInsights(ctx(days, { currentWeeklyRateKg: -0.4, weighInsTotal: 40, lastWeighIn: '2026-11-11' }));
+    expect(find(fresh, 'pace-on-track')).toBeDefined();
+  });
+
+  it('insights-6: weekend insight does not call an under-budget average "on budget"', () => {
+    const days = run(13, (d) => {
+      const wd = new Date(`${d}T12:00:00`).getDay();
+      return day(d, { kcal: wd === 0 || wd === 6 ? 1750 : 1450, budget: 2000 });
+    });
+    const out = generateInsights(ctx(days));
+    expect(find(out, 'calories-well-under')).toBeDefined();
+    const w = find(out, 'weekend-higher')!;
+    expect(w.body).not.toContain('on budget');
+    expect(w.body).toContain('under budget');
+  });
+
+  it('insights-8: 10 h of sleep is not called healthy', () => {
+    const days = base({});
+    const sleep = days.map((d) => ({ date: d.date, hours: 10, quality: 3 }));
+    const out = generateInsights(ctx(days, { sleep, energy: { formulaTdee: 2000, adaptive: { ...adaptivePending, observed: 2000, needs: null }, usingAdaptive: true, useAdaptiveSetting: true, tdee: 2000 } }));
+    expect(find(out, 'sleep-on-track')).toBeUndefined();
+    expect(find(out, 'sleep-long')?.tone).toBe('neutral');
+    expect(find(out, 'sleep-long')?.body).toContain('above the 7 to 9 h');
+    const ok = generateInsights(ctx(days, { sleep: days.map((d) => ({ date: d.date, hours: 8, quality: 3 })) }));
+    expect(find(ok, 'sleep-long')).toBeUndefined();
+  });
+
+  it('imperial-6: water suggestions use 8 fl oz glasses in imperial', () => {
+    const dropping = run(7, (d) => day(d, { water: [{ ml: 1000, hour: 9 }, { ml: 150, hour: 14 }, { ml: 800, hour: 19 }] }));
+    const w = find(generateInsights(ctx(dropping, { units: 'imperial' })), 'water-low')!;
+    expect(w.body).not.toContain('ml');
+    expect(w.body).toContain('more 8 fl oz glasses');
+  });
+
+  it('consistency-3: guideline minutes count vigorous double and light not at all, as Train does', () => {
+    expect(guidelineMinutes([{ met: 2.8, durationMin: 30 }, { met: 4, durationMin: 20 }, { met: 8, durationMin: 30 }])).toBe(80);
+    // Five easy 30-minute walks: 150 logged minutes, 0 guideline minutes.
+    const walks = run(7, (d, i) => day(d, { minutes: i < 5 ? 30 : 0, met: 2.8 }));
+    const s = summarizePeriod({ days: walks, trend: [], sleep: [], today: TODAY });
+    expect(s.activity.minutes).toBe(150);
+    expect(s.activity.guidelineMinutes).toBe(0);
+    // 75 minutes of hard running meets the guideline.
+    const runs = run(14, (d, i) => day(d, { minutes: i % 7 === 0 ? 75 : 0, met: 9.8 }));
+    const out = generateInsights(ctx(runs));
+    expect(find(out, 'activity-on-track')).toBeDefined();
+    const m = computeMilestones({ days: walks, weighInDates: [], trend: [], goal: 'lose', units: 'metric' });
+    expect(m.find((x) => x.id === 'active-week')!.achieved).toBe(false);
+  });
+});
+
+describe('weekly check-in tiles', () => {
+  it('compares each tile with the week before', () => {
+    const days = run(21, (d) => (d >= '2026-11-02' ? day(d, { kcal: 2100, protein: 130, minutes: 30, met: 7 }) : day(d, { kcal: 1900, protein: 120 })));
+    const r = weeklyRecap({ days, trend: [], sleep: [], today: TODAY, units: 'metric', goal: 'lose' })!;
+    const t = Object.fromEntries(recapTiles(r).map((x) => [x.id, x]));
+    expect(t.calories.value).toBe(2100);
+    expect(t.calories.delta).toBe(200);
+    expect(t.calories.upIsGood).toBe(false);
+    expect(t.protein.delta).toBe(10);
+    expect(t.activity.value).toBe(420); // 7 × 30 min at 7 MET, counted double
+    expect(t.activity.delta).toBe(420);
+    expect(t.water.unit).toBe('of 7 days');
+  });
+
+  it('describes the week against budget', () => {
+    expect(budgetBalanceText(-310)).toBe('310 kcal under budget for the week');
+    expect(budgetBalanceText(420)).toBe('420 kcal over budget for the week');
+    expect(budgetBalanceText(20)).toBe('Right on budget for the week');
+    expect(budgetBalanceText(null)).toContain('No fully logged days');
+  });
+});
+
+describe('planChangeText', () => {
+  it('explains a budget that follows the measured expenditure', () => {
+    expect(planChangeText({ target: 2000, tdee: 2500, usingAdaptive: true }, { target: 2010, tdee: 2510, usingAdaptive: true })).toBe('Same budget as last week.');
+    expect(planChangeText({ target: 2000, tdee: 2500, usingAdaptive: true }, { target: 1940, tdee: 2440, usingAdaptive: true })).toBe(
+      'Your measured expenditure, outside logged workouts, is now 2,440 kcal a day against 2,500 kcal, so the budget moved down 60 kcal.',
+    );
+    expect(planChangeText({ target: 2000, tdee: 2500, usingAdaptive: false }, { target: 1800, tdee: 2500, usingAdaptive: false })).toContain('change to your goal');
   });
 });

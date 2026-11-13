@@ -109,7 +109,8 @@ export interface Backup {
   /** Stored values are metric: kg, cm, ml, km, kcal, g. */
   units: 'metric';
   profile: Profile | null;
-  settings: Settings;
+  /** Null in a parsed backup whose settings were missing or malformed. */
+  settings: Settings | null;
   collections: BackupCollections;
   favoriteFoodIds: string[];
   recentFoods: Food[];
@@ -125,7 +126,7 @@ export interface BackupSource {
   recentActivityIds: string[];
 }
 
-export const BACKUP_COLLECTIONS: Collection[] = ['foodEntries', 'customFoods', 'savedMeals', 'activities', 'water', 'weights', 'sleep', 'fasting', 'favorites'];
+export const BACKUP_COLLECTIONS: Collection[] = ['foodEntries', 'customFoods', 'savedMeals', 'activities', 'water', 'weights', 'sleep', 'fasting', 'favorites', 'days'];
 
 /** Everything the user created, live records only. */
 export function buildBackup(src: BackupSource, now: Date = new Date()): Backup {
@@ -154,13 +155,121 @@ export function backupJson(src: BackupSource, now: Date = new Date()): string {
   return JSON.stringify(buildBackup(src, now), null, 2);
 }
 
-export type ParseResult = { ok: true; backup: Backup } | { ok: false; message: string };
+export type ParseResult = { ok: true; backup: Backup; skipped: number } | { ok: false; message: string };
 
-function isRecord(x: unknown): x is SyncedRecord {
-  return !!x && typeof x === 'object' && typeof (x as SyncedRecord).id === 'string' && typeof (x as SyncedRecord).updatedAt === 'string';
+// --------------------------------------------------------- validation
+//
+// A backup can be hand-edited or come from elsewhere. Every record is checked
+// against the shape the app and the sync server need (UUID id, parseable
+// timestamp, real day key, finite numbers), because one bad row would fail
+// every sync push or crash the screens that read it. Bad records are skipped
+// and counted, never repaired by guesswork.
+
+type Obj = Record<string, unknown>;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+const isObj = (x: unknown): x is Obj => !!x && typeof x === 'object' && !Array.isArray(x);
+const isStr = (x: unknown): x is string => typeof x === 'string';
+const isNum = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
+const isNonNeg = (x: unknown): x is number => isNum(x) && x >= 0;
+const optNum = (x: unknown) => x === undefined || x === null || isNum(x);
+const isTime = (x: unknown) => isStr(x) && Number.isFinite(Date.parse(x));
+
+/** A real local calendar day key, YYYY-MM-DD. */
+export function isDayKey(x: unknown): x is string {
+  if (!isStr(x) || !/^\d{4}-\d{2}-\d{2}$/.test(x)) return false;
+  const [y, m, d] = x.split('-').map(Number);
+  const date = new Date(y, m - 1, d, 12);
+  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
 }
 
-/** Validate an imported file. Unknown fields are kept; malformed records are skipped. */
+function isRecord(x: unknown): x is SyncedRecord & Obj {
+  return isObj(x) && isStr(x.id) && UUID.test(x.id) && isTime(x.updatedAt) && (x.deleted === undefined || typeof x.deleted === 'boolean');
+}
+
+export function isNutrients(x: unknown): boolean {
+  return (
+    isObj(x) &&
+    isNonNeg(x.kcal) &&
+    isNonNeg(x.protein) &&
+    isNonNeg(x.carbs) &&
+    isNonNeg(x.fat) &&
+    optNum(x.fiber) &&
+    optNum(x.sugar) &&
+    optNum(x.satFat) &&
+    optNum(x.sodium)
+  );
+}
+
+export function isFood(x: unknown): x is Food {
+  return (
+    isObj(x) &&
+    isStr(x.id) &&
+    x.id.length > 0 &&
+    isStr(x.name) &&
+    isNutrients(x.per100g) &&
+    Array.isArray(x.servings) &&
+    x.servings.every((v) => isObj(v) && isStr(v.label) && isNum(v.grams) && v.grams > 0) &&
+    isStr(x.source)
+  );
+}
+
+function isLoggedItem(x: unknown): boolean {
+  return isObj(x) && isStr(x.name) && isNutrients(x.nutrients) && optNum(x.quantity) && optNum(x.grams) && (x.food === undefined || x.food === null || isFood(x.food));
+}
+
+/** Shape checks per collection, on top of the common id and timestamp. */
+const VALIDATORS: Record<Collection, (r: Obj) => boolean> = {
+  foodEntries: (r) => isDayKey(r.date) && MEALS.includes(r.meal as string) && isLoggedItem(r),
+  customFoods: (r) => isFood(r),
+  savedMeals: (r) => isStr(r.name) && Array.isArray(r.items) && r.items.every(isLoggedItem),
+  activities: (r) => isDayKey(r.date) && isStr(r.name) && isNonNeg(r.durationMin) && isNonNeg(r.kcalNet) && isNonNeg(r.kcalGross) && optNum(r.met) && optNum(r.distanceKm),
+  water: (r) => isDayKey(r.date) && isNum(r.ml) && r.ml > 0 && r.ml <= 10000,
+  weights: (r) => isDayKey(r.date) && isNum(r.kg) && r.kg > 0 && r.kg < 700 && optNum(r.bodyFatPct),
+  sleep: (r) => isDayKey(r.date) && isNum(r.hours) && r.hours >= 0 && r.hours <= 24,
+  fasting: (r) => isTime(r.start) && (r.end === undefined || r.end === null || isTime(r.end)) && isNum(r.targetHours),
+  favorites: (r) => isFood(r.food),
+  days: (r) => isDayKey(r.date) && isNonNeg(r.target) && isNonNeg(r.tdee) && isNum(r.weightKg),
+};
+
+export function isValidRecord(collection: Collection, x: unknown): boolean {
+  return isRecord(x) && VALIDATORS[collection](x);
+}
+
+/** The profile fields the energy maths reads. Anything else is kept as it is. */
+export function isValidProfile(x: unknown): x is Profile {
+  return (
+    isObj(x) &&
+    isTime(x.updatedAt) &&
+    (x.sex === 'female' || x.sex === 'male') &&
+    isDayKey(x.birthDate) &&
+    isNum(x.heightCm) &&
+    x.heightCm > 50 &&
+    x.heightCm < 300 &&
+    isNum(x.weightKg) &&
+    x.weightKg > 20 &&
+    x.weightKg < 700 &&
+    (x.goal === 'lose' || x.goal === 'maintain' || x.goal === 'gain') &&
+    isNonNeg(x.weeklyRateKg) &&
+    (x.units === 'metric' || x.units === 'imperial') &&
+    isStr(x.activityLevel) &&
+    optNum(x.targetWeightKg) &&
+    optNum(x.calorieTargetOverride) &&
+    optNum(x.waterGoalMlOverride) &&
+    optNum(x.bodyFatPct) &&
+    (x.macroSplitOverride === undefined ||
+      x.macroSplitOverride === null ||
+      (isObj(x.macroSplitOverride) && isNonNeg(x.macroSplitOverride.protein) && isNonNeg(x.macroSplitOverride.carbs) && isNonNeg(x.macroSplitOverride.fat)))
+  );
+}
+
+function isValidSettings(x: unknown): x is Settings {
+  return isObj(x) && isTime(x.updatedAt) && (x.reminders === undefined || isObj(x.reminders)) && (x.waterPresets === undefined || (Array.isArray(x.waterPresets) && x.waterPresets.every(isNum)));
+}
+
+/** Validate an imported file. Unknown fields are kept; malformed records are skipped and counted. */
 export function parseBackup(text: string): ParseResult {
   let raw: unknown;
   try {
@@ -175,24 +284,32 @@ export function parseBackup(text: string): ParseResult {
   if (typeof o.version !== 'number' || o.version > BACKUP_VERSION) {
     return { ok: false, message: 'This backup was made by a newer version of HealthCal. Update the app and try again.' };
   }
+  let skipped = 0;
   const collections = {} as BackupCollections;
   for (const c of BACKUP_COLLECTIONS) {
     const list = (o.collections as Partial<BackupCollections> | undefined)?.[c];
-    collections[c] = Array.isArray(list) ? list.filter(isRecord) : [];
+    const all: unknown[] = Array.isArray(list) ? list : [];
+    collections[c] = all.filter((r) => isValidRecord(c, r)) as SyncedRecord[];
+    skipped += all.length - collections[c].length;
   }
+  const profile = o.profile === null || o.profile === undefined ? null : isValidProfile(o.profile) ? o.profile : null;
+  if (o.profile && !profile) skipped += 1;
+  const recent: unknown[] = Array.isArray(o.recentFoods) ? o.recentFoods : [];
   return {
     ok: true,
+    skipped,
     backup: {
       format: BACKUP_FORMAT,
       version: o.version,
       exportedAt: typeof o.exportedAt === 'string' ? o.exportedAt : '',
       app: 'HealthCal',
       units: 'metric',
-      profile: o.profile && typeof o.profile === 'object' ? o.profile : null,
-      settings: o.settings as Settings,
+      profile,
+      // Null when missing or malformed: the device keeps its own settings.
+      settings: isValidSettings(o.settings) ? o.settings : null,
       collections,
       favoriteFoodIds: Array.isArray(o.favoriteFoodIds) ? o.favoriteFoodIds.filter((x) => typeof x === 'string') : [],
-      recentFoods: Array.isArray(o.recentFoods) ? o.recentFoods : [],
+      recentFoods: recent.filter(isFood),
       recentActivityIds: Array.isArray(o.recentActivityIds) ? o.recentActivityIds.filter((x) => typeof x === 'string') : [],
     },
   };

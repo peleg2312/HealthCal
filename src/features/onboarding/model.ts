@@ -12,7 +12,6 @@ import { ageFromBirthDate, toISODate } from '@/lib/dates';
 import {
   ACTIVITY_FACTORS,
   bmr,
-  calorieFloor,
   calorieTarget,
   isPlausibleBodyFat,
   leanMassKg,
@@ -26,6 +25,8 @@ import {
 import { baseWaterGoalMl } from '@/lib/hydration';
 import { cmToFtIn, cmToIn, ftInToCm, inToCm, kgToLb, lbToKg, round } from '@/lib/units';
 import type { ActivityLevel, GoalType, Profile, Sex, UnitSystem } from '@/types';
+
+import { defaultRoutine, validateRoutine, type Routine } from './routine';
 
 export type BodyFatMode = 'unknown' | 'direct' | 'tape';
 
@@ -55,11 +56,15 @@ export interface Draft {
   target: number | null;
   /** Weekly pace in kg; null means "use the default for this goal". */
   weeklyRateKg: number | null;
+  /** The optional "Your day" step. */
+  routine: Routine;
+  /** The answer to "Turn on reminders": null until the step is passed. */
+  remindersOn: boolean | null;
 }
 
-export type StepId = 'basics' | 'goal' | 'about' | 'body' | 'bodyfat' | 'activity' | 'target' | 'plan';
+export type StepId = 'basics' | 'goal' | 'about' | 'body' | 'bodyfat' | 'activity' | 'target' | 'routine' | 'plan';
 
-const ALL_STEPS: StepId[] = ['basics', 'goal', 'about', 'body', 'bodyfat', 'activity', 'target', 'plan'];
+const ALL_STEPS: StepId[] = ['basics', 'goal', 'about', 'body', 'bodyfat', 'activity', 'target', 'routine', 'plan'];
 
 export function stepsFor(goal: GoalType | null): StepId[] {
   return goal === 'maintain' ? ALL_STEPS.filter((s) => s !== 'target') : ALL_STEPS;
@@ -96,6 +101,8 @@ export function emptyDraft(): Draft {
     activity: null,
     target: null,
     weeklyRateKg: null,
+    routine: defaultRoutine(),
+    remindersOn: null,
   };
 }
 
@@ -233,12 +240,28 @@ export type Errors = Partial<Record<string, string>>;
 
 const fmt = (n: number, digits = 0) => String(round(n, digits));
 
+/**
+ * The limits as the person reads them. Imperial bounds are rounded inward
+ * (up at the bottom, down at the top) so every stated bound passes validation.
+ */
 function rangeText(units: UnitSystem, kind: 'weight' | 'length', [lo, hi]: readonly [number, number]): string {
   if (units === 'imperial') {
     const f = kind === 'weight' ? kgToLb : cmToIn;
-    return `${fmt(f(lo))} and ${fmt(f(hi))} ${kind === 'weight' ? 'lb' : 'in'}`;
+    return `${Math.ceil(f(lo) - 1e-9)} and ${Math.floor(f(hi) + 1e-9)} ${kind === 'weight' ? 'lb' : 'in'}`;
   }
   return `${lo} and ${hi} ${kind === 'weight' ? 'kg' : 'cm'}`;
+}
+
+export function weightRangeText(units: UnitSystem): string {
+  return rangeText(units, 'weight', LIMITS.weightKg);
+}
+
+export function heightRangeText(units: UnitSystem): string {
+  if (units !== 'imperial') return rangeText(units, 'length', LIMITS.heightCm);
+  const ftIn = (inches: number) => `${Math.floor(inches / 12)}'${inches % 12}"`;
+  const lo = Math.ceil(cmToIn(LIMITS.heightCm[0]) - 1e-9);
+  const hi = Math.floor(cmToIn(LIMITS.heightCm[1]) + 1e-9);
+  return `${ftIn(lo)} and ${ftIn(hi)}`;
 }
 
 export function validateStep(step: StepId, d: Draft, now: Date = new Date()): Errors {
@@ -275,12 +298,11 @@ export function validateStep(step: StepId, d: Draft, now: Date = new Date()): Er
         else if (d.heightIn !== null && (d.heightIn < 0 || d.heightIn >= 12)) e.height = 'Inches go from 0 to 11.';
       } else if (d.heightCm === null) e.height = 'Enter your height.';
       if (!e.height && m.heightCm !== null && (m.heightCm < LIMITS.heightCm[0] || m.heightCm > LIMITS.heightCm[1])) {
-        e.height =
-          d.units === 'imperial' ? `Enter a height between 3'11" and 7'7".` : `Enter a height between ${LIMITS.heightCm[0]} and ${LIMITS.heightCm[1]} cm.`;
+        e.height = `Enter a height between ${heightRangeText(d.units)}.`;
       }
       if (m.weightKg === null) e.weight = 'Enter your current weight.';
       else if (m.weightKg < LIMITS.weightKg[0] || m.weightKg > LIMITS.weightKg[1]) {
-        e.weight = `Enter a weight between ${rangeText(d.units, 'weight', LIMITS.weightKg)}.`;
+        e.weight = `Enter a weight between ${weightRangeText(d.units)}.`;
       }
       break;
     }
@@ -315,7 +337,7 @@ export function validateStep(step: StepId, d: Draft, now: Date = new Date()): Er
         break;
       }
       if (m.targetKg < LIMITS.weightKg[0] || m.targetKg > LIMITS.weightKg[1]) {
-        e.target = `Enter a weight between ${rangeText(d.units, 'weight', LIMITS.weightKg)}.`;
+        e.target = `Enter a weight between ${weightRangeText(d.units)}.`;
       } else if (d.goal === 'lose' && m.targetKg >= m.weightKg - 0.2) {
         e.target = `To lose weight, the target needs to be below your current ${fmt(d.weight ?? 0, 1)} ${unit}.`;
       } else if (d.goal === 'gain' && m.targetKg <= m.weightKg + 0.2) {
@@ -323,6 +345,9 @@ export function validateStep(step: StepId, d: Draft, now: Date = new Date()): Er
       }
       break;
     }
+    case 'routine':
+      Object.assign(e, validateRoutine(d.routine, d.units === 'imperial'));
+      break;
     case 'plan':
       break;
   }
@@ -385,7 +410,7 @@ export function buildPlan(d: Draft, now: Date = new Date()): Plan | null {
     target,
     macros: macroTargets(full, target.target),
     waterMl: baseWaterGoalMl(weightKg, d.sex),
-    floor: calorieFloor(d.sex),
+    floor: target.floor,
     maxRateKg: maxWeeklyRateKg(goal, weightKg),
     goalDate: projectedGoalDate(weightKg, targetWeightKg, target.impliedWeeklyKg, now),
   };

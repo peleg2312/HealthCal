@@ -44,7 +44,10 @@ export function IconTile({ color, children }: { color: string; children: React.R
   );
 }
 
-/** Single-choice list row with a check mark. */
+/**
+ * Single-choice list row with a check mark. Announced as a radio button with
+ * its checked state, so screen readers say which option is in effect.
+ */
 export function OptionRow({
   title,
   subtitle,
@@ -58,30 +61,41 @@ export function OptionRow({
   onPress: () => void;
   testID?: string;
 }) {
-  const { colors } = useTheme();
+  const { colors, spacing } = useTheme();
   return (
-    <ListRow
-      title={title}
-      subtitle={subtitle}
-      onPress={onPress}
+    <PressableScale
       testID={testID}
-      right={
-        <View
-          accessibilityState={{ selected }}
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: 12,
-            borderWidth: selected ? 0 : 2,
-            borderColor: colors.borderStrong,
-            backgroundColor: selected ? colors.primary : 'transparent',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-          {selected ? <Check size={15} color={colors.onPrimary} strokeWidth={3} /> : null}
-        </View>
-      }
-    />
+      onPress={onPress}
+      feedback="select"
+      scaleTo={0.985}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected, selected }}
+      accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: spacing.sm }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text variant="bodyStrong" numberOfLines={1}>
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text variant="caption" color="textSecondary" numberOfLines={2}>
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+      <View
+        style={{
+          width: 24,
+          height: 24,
+          borderRadius: 12,
+          borderWidth: selected ? 0 : 2,
+          borderColor: colors.borderStrong,
+          backgroundColor: selected ? colors.primary : 'transparent',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        {selected ? <Check size={15} color={colors.onPrimary} strokeWidth={3} /> : null}
+      </View>
+    </PressableScale>
   );
 }
 

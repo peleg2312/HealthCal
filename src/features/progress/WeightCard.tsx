@@ -4,7 +4,7 @@ import { View } from 'react-native';
 
 import { diffDays, formatShortDate, toISODate } from '@/lib/dates';
 import { projectedGoalDate } from '@/lib/energy';
-import { rateText } from '@/lib/insights';
+import { rateText, STALE_WEIGH_IN_DAYS } from '@/lib/insights';
 import { weightUnit, weightValue } from '@/lib/units';
 import type { WeightSeries } from '@/store/selectors';
 import { useTheme } from '@/theme';
@@ -33,12 +33,18 @@ export function WeightCard({ series, start, end, profile }: { series: WeightSeri
   }
 
   let pts = series.trend.filter((t) => t.date >= start && t.date <= end);
-  if (pts.length < 2) pts = series.trend.slice(-14);
+  // No trend in the selected range: show the latest stretch instead, and say so in the labels.
+  const outOfRange = pts.length < 2;
+  if (outOfRange) pts = series.trend.slice(-14);
+  const span = `${formatShortDate(pts[0].date)} – ${formatShortDate(pts[pts.length - 1].date)}`;
   const origin = pts[0].date;
   const line = pts.map((t) => ({ x: diffDays(origin, t.date), y: v(t.trend) }));
   const dots = pts.filter((t) => !t.interpolated).map((t) => ({ x: diffDays(origin, t.date), y: v(t.kg) }));
   const change = pts[pts.length - 1].trend - pts[0].trend;
-  const rate = series.weeklyRateKg;
+  const lastDate = series.latest!.date;
+  const stale = diffDays(lastDate, end) > STALE_WEIGH_IN_DAYS;
+  // An old rate is history, not the current pace: hide it rather than present it as current.
+  const rate = stale ? null : series.weeklyRateKg;
   const target = profile.targetWeightKg;
   const eta = rate !== null && target ? projectedGoalDate(series.trendKg, target, rate) : null;
   const sign = (kg: number) => (kg < -0.005 ? '−' : kg > 0.005 ? '+' : '');
@@ -52,8 +58,12 @@ export function WeightCard({ series, start, end, profile }: { series: WeightSeri
       icon={<Scale size={18} color={colors.weight} />}
       link="/weight">
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: spacing.md }}>
-        <BigStat value={v(series.trendKg).toFixed(1)} unit={unit} label="Trend weight" color={colors.weight} />
-        {rate !== null ? (
+        <BigStat value={v(series.trendKg).toFixed(1)} unit={unit} label={stale ? `Trend at ${formatShortDate(lastDate)}` : 'Trend weight'} color={colors.weight} />
+        {stale ? (
+          <Text testID="progress-weight-stale" variant="caption" color="textSecondary" align="right" style={{ flexShrink: 1, marginBottom: 2 }}>
+            Last weigh-in {diffDays(lastDate, end)} days ago.{'\n'}Weigh in to update your pace.
+          </Text>
+        ) : rate !== null ? (
           <BigStat value={`${sign(rate)}${rateText(rate, units).replace(` ${unit}`, '')}`} unit={`${unit} / wk`} label="Last two weeks" align="right" />
         ) : (
           <Text variant="caption" color="textSecondary" align="right" style={{ flexShrink: 1, marginBottom: 2 }}>
@@ -71,13 +81,14 @@ export function WeightCard({ series, start, end, profile }: { series: WeightSeri
       />
       <StatStrip
         items={[
-          { label: 'Trend change in range', value: `${sign(change)}${Math.abs(v(change)).toFixed(1)}`, unit },
-          { label: 'Weigh-ins in range', value: `${dots.length}` },
+          { label: outOfRange ? `Trend change, ${span}` : 'Trend change in range', value: `${sign(change)}${Math.abs(v(change)).toFixed(1)}`, unit },
+          { label: 'Weigh-ins in range', value: outOfRange ? '0' : `${dots.length}` },
           target
             ? { label: eta ? `Goal, around ${formatShortDate(toISODate(eta))}` : 'Goal weight', value: v(target).toFixed(1), unit }
             : { label: 'Latest weigh-in', value: v(series.latest!.kg).toFixed(1), unit },
         ]}
       />
+      {outOfRange ? <Note>No weigh-ins in this range. The chart shows your latest weigh-ins, {span}.</Note> : null}
       <Note>The line smooths out day-to-day swings from water and salt; dots are your individual weigh-ins.</Note>
     </SectionCard>
   );

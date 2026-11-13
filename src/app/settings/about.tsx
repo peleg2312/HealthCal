@@ -98,7 +98,7 @@ function MyTarget() {
   return (
     <Yours>
       Yours: {formatNumber(m.target.target)} kcal a day{m.target.source === 'override' ? ', set by you' : ''}
-      {m.usingAdaptive ? `, using ${formatNumber(Math.round(m.tdee))} kcal learned from your data` : ''}.
+      {m.usingAdaptive ? `, built on ${formatNumber(Math.round(m.tdee))} kcal of expenditure, a blend of your data and the equation` : ''}.
     </Yours>
   );
 }
@@ -223,14 +223,16 @@ export default function AboutScreen() {
         icon={(c) => <Scale size={20} color={c} />}
         color={colors.weight}
         title="Weight trend and adaptive expenditure"
-        source="Exponentially smoothed moving average as popularised by The Hacker's Diet (Walker); energy balance method.">
+        source="Exponentially smoothed moving average as popularised by The Hacker's Diet (Walker); least-squares line; energy balance method.">
         <P>
           Scale weight swings by a kilo or more from water, salt and digestion. The trend line smooths this out: each day moves 10% of the way toward
-          the new weigh-in, and gaps between weigh-ins are filled in evenly.
+          the new weigh-in, and gaps between weigh-ins are filled in evenly. The weekly rate of change is measured on the weigh-ins themselves: the
+          slope of a straight line fitted through the last three weeks of weigh-ins, because the smoothed line is slow to show a new rate.
         </P>
         <P>
-          With &quot;Learn from my data&quot; on, HealthCal compares what you ate with how your trend moved over the last 28 days: expenditure = average
-          intake − trend change × 7,700 ÷ days. It needs at least 10 fully logged days (800 kcal or more), 5 weigh-ins and two weeks between the first
+          With &quot;Learn from my data&quot; on, HealthCal fits a straight line through your weigh-ins of the last 28 days and compares its slope
+          with what you ate: expenditure = average intake − rate of change (kg a day) × 7,700. Logged workouts are then taken out, because each one is
+          already added to its own day, so eating back exercise calories is never counted twice. It needs at least 10 fully logged days (800 kcal or more), 5 weigh-ins and two weeks between the first
           and last. The result is blended with the equation, trusting your data more as it grows (up to 85%), and kept within 65% to 145% of the
           equation so a few missed logs cannot produce an extreme target.
         </P>

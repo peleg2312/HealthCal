@@ -7,6 +7,8 @@ import { ACTIVITY_BY_ID, POPULAR_ACTIVITY_IDS } from '@/data/activities';
 import { ActivityTile, SessionRow } from '@/features/activity/components';
 import { summariseWeek, WHO_WEEKLY_MINUTES } from '@/features/activity/build';
 import { deleteActivity, openSession } from '@/features/activity/session';
+import { RoutineCards, useRoutineTemplates } from '@/features/activity/RoutineCards';
+import { startRoutineDraft, type RoutineTemplate } from '@/features/activity/routines';
 import { draftHasContent, useStrengthDrafts } from '@/features/activity/strengthDraft';
 import { addDays, formatDayLabel, formatDuration, formatShortDate, startOfWeek, weekdayShort } from '@/lib/dates';
 import { formatNumber } from '@/lib/units';
@@ -15,7 +17,7 @@ import { useStore } from '@/store';
 import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ActivityEntry } from '@/types';
-import { Button, Card, EmptyState, LargeTitle, PressableScale, Ring, Screen, SectionTitle, Stat, Text } from '@/ui';
+import { Button, Card, ConfirmSheet, EmptyState, LargeTitle, PressableScale, Ring, Screen, SectionTitle, Stat, Text } from '@/ui';
 
 const DAYS_PER_PAGE = 14;
 
@@ -52,6 +54,16 @@ export default function TrainScreen() {
   const maxDay = Math.max(60, ...weekDates.map((d) => week.byDate[d].minutes));
   const visibleGroups = history.slice(0, pages * DAYS_PER_PAGE);
   const draftActive = draftHasContent(draft);
+  const routines = useRoutineTemplates();
+  const [replace, setReplace] = useState<RoutineTemplate | null>(null);
+
+  const begin = (tpl: RoutineTemplate) => {
+    setReplace(null);
+    useStrengthDrafts.getState().put('new', startRoutineDraft(tpl, t));
+    router.push('/activity/strength');
+  };
+  // Starting a routine never silently throws away a workout in progress.
+  const startRoutine = (tpl: RoutineTemplate) => (draftActive ? setReplace(tpl) : begin(tpl));
 
   return (
     <Screen tabs testID="train-screen">
@@ -134,6 +146,13 @@ export default function TrainScreen() {
         </Text>
       ) : null}
 
+      {routines.length > 0 ? (
+        <>
+          <SectionTitle title="Routines" />
+          <RoutineCards onStart={startRoutine} />
+        </>
+      ) : null}
+
       <SectionTitle title="Quick start" action="All activities" onAction={() => router.push('/activity/pick')} />
       <View style={{ gap: spacing.sm }}>
         {[quick.slice(0, 4), quick.slice(4, 8)].map((row, i) => (
@@ -192,6 +211,16 @@ export default function TrainScreen() {
           ) : null}
         </View>
       )}
+      <ConfirmSheet
+        visible={replace !== null}
+        title="Replace the workout in progress?"
+        message={`The workout you started has ${draft?.exercises.length ?? 0} ${draft?.exercises.length === 1 ? 'exercise' : 'exercises'} that are not saved yet. Starting ${replace?.name.toLowerCase() ?? 'this routine'} clears them.`}
+        confirmLabel="Start routine"
+        cancelLabel="Keep my workout"
+        destructive
+        onConfirm={() => replace && begin(replace)}
+        onCancel={() => setReplace(null)}
+      />
     </Screen>
   );
 }

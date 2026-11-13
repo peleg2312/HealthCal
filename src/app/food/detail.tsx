@@ -4,17 +4,18 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { updateEntryDirect } from '@/features/food/actions';
+import { AmountEditor } from '@/features/food/AmountEditor';
 import { DayStepper, KcalValue, MacroStat, MealPicker, SourceBadge } from '@/features/food/components';
 import { useFoodDraft } from '@/features/food/draft';
-import { dayPhrase, formatQty, href, portionLabel, kcal, lastPortions, matchServing, param, parseDate, parseMeal, portionFor, sourceInfo } from '@/features/food/helpers';
+import { dayPhrase, href, portionLabel, kcal, lastPortions, matchServing, param, parseDate, parseMeal, portionFor, sourceInfo } from '@/features/food/helpers';
 import { deleteEntry, logFood } from '@/features/food/log';
 import { RequireProfile } from '@/features/food/RequireProfile';
-import { MEAL_LABEL, atwaterKcal, formatMacro, scaleNutrients, servingsFor } from '@/lib/nutrition';
+import { MEAL_LABEL, atwaterKcal, formatMacro, scaleNutrients } from '@/lib/nutrition';
 import { useStore } from '@/store';
 import { useDay, useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { Food, FoodEntry, ISODate, MealType, Nutrients, Serving } from '@/types';
-import { Avatar, Button, Card, Chip, ChipRow, Divider, EmptyState, Header, IconButton, MacroBar, NumberField, Screen, Stepper, Text, TextField, goBack } from '@/ui';
+import { Avatar, Button, Card, Divider, EmptyState, Header, IconButton, MacroBar, NumberField, Screen, Stepper, Text, TextField, goBack } from '@/ui';
 
 export default function FoodDetailRoute() {
   return (
@@ -29,6 +30,9 @@ function FoodDetail() {
   const entryId = param(params.entryId);
   const entry = useStore((s) => (entryId ? s.foodEntries[entryId] : undefined));
   const draft = useFoodDraft((s) => s.food);
+  // A custom food can be edited or deleted while this screen sits under the
+  // edit form, so read its live record instead of the snapshot in the draft.
+  const liveCustom = useStore((s) => (draft?.source === 'custom' ? s.customFoods[draft.id] : undefined));
 
   if (entryId) {
     if (!entry || entry.deleted) return <Missing message="This entry was removed." />;
@@ -36,7 +40,9 @@ function FoodDetail() {
     return <ManualEditor key={entry.id} entry={entry} />;
   }
   if (!draft) return <Missing message="Pick a food from search to see its details." />;
-  return <FoodEditor key={draft.id} food={draft} initialMeal={parseMeal(params.meal)} initialDate={parseDate(params.date)} />;
+  if (liveCustom?.deleted) return <Missing message="This food was deleted." />;
+  const food = liveCustom ?? draft;
+  return <FoodEditor key={`${food.id}-${liveCustom?.updatedAt ?? ''}`} food={food} initialMeal={parseMeal(params.meal)} initialDate={parseDate(params.date)} />;
 }
 
 function Missing({ message }: { message: string }) {
@@ -178,25 +184,18 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
   const { colors, spacing } = useTheme();
   const entries = useLive('foodEntries');
   const isFav = useStore((s) => s.favoriteFoodIds.includes(food.id));
-  const options = servingsFor(food);
   const [portion, setPortion] = useState<{ serving: Serving; quantity: number }>(() => {
     if (entry) return { serving: matchServing(food, entry.servingLabel, entry.quantity > 0 ? entry.grams / entry.quantity : entry.grams), quantity: entry.quantity };
     return portionFor(food, lastPortions(entries));
   });
   const [meal, setMeal] = useState(initialMeal);
   const [date, setDate] = useState(initialDate);
+  const [gramsInvalid, setGramsInvalid] = useState(false);
   const { serving, quantity } = portion;
-  const servingList = options.some((s) => s.label === serving.label) ? options : [serving, ...options];
   const totalGrams = serving.grams * quantity;
   const n = scaleNutrients(food.per100g, totalGrams);
   const info = sourceInfo(food.source);
   const perGram = serving.label === '1 g';
-
-  const chooseServing = (s: Serving) => {
-    // Gram-based servings keep the amount; household measures start at one.
-    const keepGrams = s.label === '1 g' || s.label === '100 g';
-    setPortion({ serving: s, quantity: keepGrams ? Math.max(0.01, Math.round((totalGrams / s.grams) * 100) / 100) : 1 });
-  };
 
   const save = () => {
     logFood({ food, serving, quantity, meal, date, entryId: entry?.id });
@@ -246,7 +245,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
             testID="detail-save"
             style={{ flex: 1 }}
             title={entry ? 'Save changes' : `Add to ${MEAL_LABEL[meal].toLowerCase()}`}
-            disabled={!(totalGrams > 0)}
+            disabled={!(totalGrams > 0) || gramsInvalid}
             onPress={save}
           />
         </View>
@@ -257,32 +256,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
 
       <Card>
         <Text variant="h3">Amount</Text>
-        <ChipRow style={{ paddingVertical: spacing.md }}>
-          {servingList.map((s, i) => (
-            <Chip key={`${s.label}-${i}`} testID={`serving-${i}`} label={s.label === '1 g' ? 'grams' : s.label} selected={s.label === serving.label} onPress={() => chooseServing(s)} />
-          ))}
-        </ChipRow>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, flexWrap: 'wrap' }}>
-          <Stepper
-            label="quantity"
-            value={quantity}
-            step={perGram ? 10 : 0.5}
-            min={perGram ? 1 : 0.25}
-            max={perGram ? 5000 : 50}
-            format={(v) => (perGram ? `${formatQty(v)} g` : formatQty(v))}
-            onChange={(v) => setPortion({ serving, quantity: v })}
-          />
-          <NumberField
-            testID="detail-grams"
-            value={Math.round(totalGrams * 10) / 10}
-            onChange={(g) => {
-              if (g !== null && g > 0) setPortion({ serving, quantity: g / serving.grams });
-            }}
-            suffix="g"
-            accessibilityLabel="Amount in grams"
-            style={{ width: 120 }}
-          />
-        </View>
+        <AmountEditor food={food} value={portion} onChange={setPortion} onPendingChange={setGramsInvalid} testIDPrefix="detail" />
       </Card>
 
       <ImpactLine date={date} kcalValue={n.kcal} replacing={entry} />

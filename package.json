@@ -61,9 +61,11 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.functions.json",
     "test": "vitest run",
-    "build:web": "expo export --platform web"
+    "build:web": "expo export --platform web",
+    "test:sql": "bash scripts/dev/test-sql.sh",
+    "test:e2e": "node scripts/dev/e2e.cjs"
   },
   "private": true
 }

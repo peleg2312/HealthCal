@@ -56,7 +56,7 @@ export function ListRow({
   const rowStyle: ViewStyle = { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: spacing.sm };
   if (onPress) {
     return (
-      <PressableScale testID={testID} onPress={onPress} scaleTo={0.985} style={[rowStyle, style]} accessibilityLabel={title}>
+      <PressableScale testID={testID} onPress={onPress} scaleTo={0.985} style={[rowStyle, style]} accessibilityLabel={[title, subtitle, value].filter(Boolean).join(', ')}>
         {content}
       </PressableScale>
     );

@@ -24,7 +24,7 @@ export function PlanReveal({ plan }: { plan: Plan }) {
     { key: 'fat', label: 'Fat', grams: plan.macros.fatG, share: plan.macros.split.fat, color: colors.fat },
   ];
   const goalLine =
-    p.goal === 'maintain'
+    p.goal === 'maintain' || Math.abs(t.dailyDelta) < 5
       ? 'Matched to what you burn'
       : `${t.dailyDelta < 0 ? '−' : '+'}${kcal(Math.abs(t.dailyDelta))} kcal a day, about ${formatWeight(Math.abs(t.impliedWeeklyKg), units, 2)} a week`;
   const date = plan.goalDate ? formatLongDate(toISODate(plan.goalDate)).replace(/^\w+, /, '') : null;
@@ -116,7 +116,9 @@ export function PlanReveal({ plan }: { plan: Plan }) {
             <MathRow
               label={p.goal === 'lose' ? 'Deficit' : 'Surplus'}
               detail={
-                t.limitedByFloor
+                t.belowFloor
+                  ? 'None planned: your burn is already at the recommended minimum'
+                  : t.limitedByFloor
                   ? `Held at the ${formatNumber(plan.floor)} kcal minimum`
                   : `For ${formatWeight(p.weeklyRateKg, units, 2)} a week (${units === 'imperial' ? '3,500 kcal per lb' : '7,700 kcal per kg'})`
               }

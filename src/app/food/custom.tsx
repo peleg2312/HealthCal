@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { deleteCustomFood } from '@/features/food/actions';
-import { setFoodDraft } from '@/features/food/draft';
+import { setFoodDraft, useFoodDraft } from '@/features/food/draft';
 import { href, kcal, param, toPer100 } from '@/features/food/helpers';
 import { atwaterKcal } from '@/lib/nutrition';
 import { useStore } from '@/store';
@@ -92,7 +92,7 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
       haptic.warn();
       return;
     }
-    const n: Nutrients = { kcal: Math.round(per100(values.kcal)!), protein: per100(values.protein) ?? 0, carbs: per100(values.carbs) ?? 0, fat: per100(values.fat) ?? 0 };
+    const n: Nutrients = { kcal: Math.round(per100(values.kcal)! * 100) / 100, protein: per100(values.protein) ?? 0, carbs: per100(values.carbs) ?? 0, fat: per100(values.fat) ?? 0 };
     for (const k of ['fiber', 'sugar', 'satFat', 'sodium'] as const) {
       const v = per100(values[k]);
       if (v !== undefined) n[k] = Math.round(v * 100) / 100;
@@ -114,6 +114,8 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
     haptic.success();
     if (existing) {
       toast('Food updated');
+      // Keep a detail screen underneath in step with the new definition.
+      if (useFoodDraft.getState().food?.id === food.id) setFoodDraft(food);
       goBack('/food/search');
       return;
     }

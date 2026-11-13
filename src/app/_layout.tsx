@@ -7,34 +7,43 @@ import {
   useFonts,
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { BarlowSemiCondensed_600SemiBold, BarlowSemiCondensed_700Bold } from '@expo-google-fonts/barlow-semi-condensed';
-import { Stack, type ErrorBoundaryProps } from 'expo-router';
+import * as Linking from 'expo-linking';
+import { router, Stack, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
-import { AppState, Pressable, Text as RNText, View } from 'react-native';
+import { AppState, Platform, Pressable, Text as RNText, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { initAuth } from '@/services/auth';
+import { handleAuthLink, initAuth } from '@/services/auth';
 import { refreshReminders } from '@/services/notifications';
 import { startAutoSync, syncNow } from '@/services/sync';
 import { useStore } from '@/store';
+import { startDaySnapshots } from '@/store/daySnapshot';
 import { startPersistence, useHydration, wipePersisted } from '@/store/persistence';
 import { ThemeProvider, useTheme } from '@/theme';
 import { ToastHost } from '@/ui';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-/** Shown when the last save did not reach the device, so the user knows before more is lost. */
+/**
+ * Shown when the last save did not reach the device, so the user knows before
+ * more is lost. It floats above the tab bar, clear of the status bar and the
+ * home indicator, instead of sitting at the very top under the notch.
+ */
 function StorageWarning() {
   const failed = useHydration((h) => h.saveFailed);
-  const { colors } = useTheme();
+  const { colors, radius } = useTheme();
+  const insets = useSafeAreaInsets();
   if (!failed) return null;
   return (
-    <View accessibilityRole="alert" style={{ backgroundColor: colors.warning, paddingHorizontal: 16, paddingVertical: 10 }}>
-      <RNText style={{ color: '#201400', fontSize: 13, fontWeight: '600', textAlign: 'center' }}>
-        Changes are not being saved on this device (storage may be full). Export a backup from Profile, Your data.
-      </RNText>
+    <View pointerEvents="none" style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 100, alignItems: 'center' }}>
+      <View accessibilityRole="alert" style={{ maxWidth: 520, backgroundColor: colors.warning, borderRadius: radius.md, paddingHorizontal: 16, paddingVertical: 12 }}>
+        <RNText style={{ color: '#201400', fontSize: 13, fontWeight: '600', textAlign: 'center' }}>
+          Changes are not being saved on this device (storage may be full). Export a backup from Profile, Your data.
+        </RNText>
+      </View>
     </View>
   );
 }
@@ -71,7 +80,6 @@ function Navigation() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar style={dark ? 'light' : 'dark'} />
-      <StorageWarning />
       <Stack
         screenOptions={{
           headerShown: false,
@@ -83,6 +91,7 @@ function Navigation() {
         <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
       </Stack>
       <ToastHost />
+      <StorageWarning />
     </View>
   );
 }
@@ -129,6 +138,7 @@ export default function RootLayout() {
     SplashScreen.hideAsync().catch(() => {});
     initAuth();
     const stopSync = startAutoSync();
+    const stopSnapshots = startDaySnapshots();
     // Reminder text carries live numbers ("620 ml left"), so it is rebuilt whenever data changes.
     void refreshReminders();
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -144,6 +154,7 @@ export default function RootLayout() {
     });
     return () => {
       stopSync();
+      stopSnapshots();
       unsubStore();
       appState.remove();
       if (timer) clearTimeout(timer);
@@ -153,6 +164,16 @@ export default function RootLayout() {
   useEffect(() => {
     void startPersistence();
   }, []);
+
+  // On a phone a password-reset link opens the app with a one-time code. The browser build
+  // reads the code from its own address bar, so this is only needed natively.
+  const link = Linking.useURL();
+  useEffect(() => {
+    if (Platform.OS === 'web' || !ready || !link) return;
+    void handleAuthLink(link).then((ok) => {
+      if (ok) router.replace('/auth?mode=reset');
+    });
+  }, [link, ready]);
 
   useEffect(() => {
     // The recovery screen must not stay hidden behind the splash image.

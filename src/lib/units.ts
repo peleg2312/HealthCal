@@ -62,7 +62,11 @@ export function lengthToCm(value: number, units: UnitSystem): number {
 export const lengthUnit = (units: UnitSystem) => (units === 'imperial' ? 'in' : 'cm');
 
 export function formatVolume(ml: number, units: UnitSystem): string {
-  if (units === 'imperial') return `${Math.round(mlToFlOz(ml))} fl oz`;
+  if (units === 'imperial') {
+    const oz = mlToFlOz(ml);
+    // Below 10 fl oz whole numbers hide real differences (225 ml and 250 ml both read "8").
+    return `${oz < 10 ? trim(oz, 1) : Math.round(oz)} fl oz`;
+  }
   return ml >= 1000 ? `${trim(ml / 1000, 2)} L` : `${Math.round(ml)} ml`;
 }
 

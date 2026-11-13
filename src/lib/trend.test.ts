@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { addDays } from './dates';
-import { adaptiveTdee, linearSlope, TREND_ALPHA, weeklyRate, weightTrend, type TrendPoint, type WeightPoint } from './trend';
+import { adaptiveTdee, isCompleteDay, linearSlope, TREND_ALPHA, weeklyRate, weightTrend, type TrendPoint, type WeightPoint } from './trend';
 
 const D0 = '2026-01-01';
 const series = (n: number, f: (i: number) => number, start = D0): WeightPoint[] =>
@@ -193,12 +193,23 @@ describe('adaptiveTdee', () => {
   });
 
   describe('partial days', () => {
-    it('days under 800 kcal are excluded: 799 not counted, 800 counted', () => {
-      const m = intake(2000, 14);
-      m[addDays(END, -14)] = 799;
-      m[addDays(END, -15)] = 800;
-      const r = adaptiveTdee({ formulaTdee: 2500, weights: falling(), intakeByDate: m, end: END });
-      expect(r.loggedDays).toBe(15);
+    it('a day counts as complete from 800 kcal or half the expenditure estimate, whichever is higher', () => {
+      // Small person: formula 1500, half is 750, so the 800 floor decides.
+      const small = intake(1400, 14);
+      small[addDays(END, -14)] = 799;
+      small[addDays(END, -15)] = 800;
+      expect(adaptiveTdee({ formulaTdee: 1500, weights: falling(), intakeByDate: small, end: END }).loggedDays).toBe(15);
+      // Larger person: formula 2500, half is 1250, so a 1,249 kcal day is treated as unfinished.
+      const large = intake(2000, 14);
+      large[addDays(END, -14)] = 1249;
+      large[addDays(END, -15)] = 1250;
+      expect(adaptiveTdee({ formulaTdee: 2500, weights: falling(), intakeByDate: large, end: END }).loggedDays).toBe(15);
+    });
+    it('isCompleteDay is the shared rule', () => {
+      expect(isCompleteDay(799, 1000)).toBe(false);
+      expect(isCompleteDay(800, 1000)).toBe(true);
+      expect(isCompleteDay(1100, 2400)).toBe(false);
+      expect(isCompleteDay(1200, 2400)).toBe(true);
     });
     it('half-logged days do not drag the average down', () => {
       const m = intake(2000);
@@ -223,10 +234,11 @@ describe('adaptiveTdee', () => {
       const r = adaptiveTdee({ formulaTdee: 2500, weights: w, intakeByDate: intake(6000), end: END });
       expect(r.observed).toBe(3625);
     });
-    it('lower clamp at 0.65 x formula: eating 900 at stable weight -> 1625', () => {
+    it('lower clamp at 0.65 x formula: eating 900 at stable weight with formula 1600 -> 1040', () => {
+      // 900 kcal days are complete here (half of 1600 is 800), and 900 is below 0.65 x 1600.
       const w = series(60, () => 75, addDays(END, -59));
-      const r = adaptiveTdee({ formulaTdee: 2500, weights: w, intakeByDate: intake(900), end: END });
-      expect(r.observed).toBe(1625);
+      const r = adaptiveTdee({ formulaTdee: 1600, weights: w, intakeByDate: intake(900), end: END });
+      expect(r.observed).toBe(1040);
     });
     it('blended tdee stays between formula and clamped observed', () => {
       const w = series(60, () => 75, addDays(END, -59));
@@ -270,6 +282,56 @@ describe('adaptiveTdee', () => {
     const r = adaptiveTdee({ formulaTdee: 2500, weights: w, intakeByDate: intake(2000), end: END });
     expect(r.weighIns).toBe(10);
     expect(r.observed).toBe(2550);
+  });
+});
+
+describe('adaptiveTdee and logged exercise', () => {
+  const END = '2026-04-30';
+  const START = addDays(END, -27);
+  const flat = (): WeightPoint[] => series(28, () => 80, START);
+  const map = (kcal: number): Record<string, number> => Object.fromEntries(Array.from({ length: 28 }, (_, i) => [addDays(START, i), kcal]));
+
+  it('subtracts the average logged workout burn, so adding workouts back later does not count them twice', () => {
+    // Holding weight on 2,800 kcal while logging 400 kcal of exercise every day:
+    // total burn is 2,800, of which 2,400 is outside workouts.
+    const r = adaptiveTdee({ formulaTdee: 2400, weights: flat(), intakeByDate: map(2800), exerciseByDate: map(400), end: END });
+    expect(r.observedTotal).toBe(2800);
+    expect(r.avgExercise).toBe(400);
+    expect(r.observed).toBe(2400);
+  });
+
+  it('averages workouts over the whole window, not only the days they happened', () => {
+    // 500 kcal sessions on 4 days of each week: 16 sessions in 28 days = 285.7 kcal a day.
+    const exercise: Record<string, number> = {};
+    for (let i = 0; i < 28; i++) if (i % 7 < 4) exercise[addDays(START, i)] = 500;
+    const r = adaptiveTdee({ formulaTdee: 2400, weights: flat(), intakeByDate: map(2700), exerciseByDate: exercise, end: END });
+    expect(r.avgExercise).toBe(286);
+    expect(r.observed).toBe(2414);
+  });
+
+  it('is unchanged when no exercise is logged', () => {
+    const r = adaptiveTdee({ formulaTdee: 2400, weights: flat(), intakeByDate: map(2300), end: END });
+    expect(r.observed).toBe(2300);
+    expect(r.observedTotal).toBe(2300);
+    expect(r.avgExercise).toBe(0);
+  });
+});
+
+describe('weeklyRate has no start-up lag and expires', () => {
+  const real = (n: number, f: (i: number) => number, start = '2026-03-01'): TrendPoint[] => weightTrend(series(n, f, start));
+  it('reports the true pace from the first weeks: 0.5 kg a week after 8, 14 and 28 days', () => {
+    for (const n of [8, 14, 28]) expect(weeklyRate(real(n, (i) => 90 - (0.5 / 7) * i))).toBeCloseTo(-0.5, 9);
+  });
+  it('ignores interpolated days and needs a week of real weigh-ins', () => {
+    const sparse = weightTrend([{ date: '2026-03-01', kg: 80 }, { date: '2026-03-05', kg: 79.8 }]);
+    expect(weeklyRate(sparse)).toBeNull();
+    const ok = weightTrend([{ date: '2026-03-01', kg: 80 }, { date: '2026-03-08', kg: 79.5 }]);
+    expect(weeklyRate(ok)).toBeCloseTo(-0.5, 9);
+  });
+  it('is null when the newest weigh-in is more than ten days old, so an old pace is not shown as current', () => {
+    const t = real(20, (i) => 90 - 0.1 * i); // last weigh-in 2026-03-20
+    expect(weeklyRate(t, 21, '2026-03-30')).toBeCloseTo(-0.7, 9);
+    expect(weeklyRate(t, 21, '2026-03-31')).toBeNull();
   });
 });
 

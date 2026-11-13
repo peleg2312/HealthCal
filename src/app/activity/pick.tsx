@@ -1,7 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Dumbbell, Search, Timer } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { FlatList, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ACTIVITIES, ACTIVITY_BY_ID, ACTIVITY_CATEGORIES, POPULAR_ACTIVITY_IDS, searchActivities } from '@/data/activities';
 import { ActivityTile } from '@/features/activity/components';
@@ -19,8 +20,13 @@ function metRange(a: ActivityDef): string {
   return lo === hi ? `${lo} MET` : `${lo}–${hi} MET`;
 }
 
+function ActivitySeparator() {
+  return <Divider inset={56} />;
+}
+
 export default function PickActivityScreen() {
   const { colors, spacing } = useTheme();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ date?: string }>();
   const date = typeof params.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : today();
   const recentIds = useStore((s) => s.recentActivityIds);
@@ -69,6 +75,7 @@ export default function PickActivityScreen() {
 
   return (
     <Screen
+      scroll={false}
       header={
         <View style={{ gap: spacing.md, paddingBottom: spacing.sm }}>
           <Header title="Log activity" subtitle={date === today() ? `${ACTIVITIES.length} activities` : `For ${formatDayLabel(date).toLowerCase()}`} />
@@ -89,44 +96,52 @@ export default function PickActivityScreen() {
           </ChipRow>
         </View>
       }>
-      {showShortcuts && recents.length > 0 ? (
-        <>
-          <SectionTitle title="Recent" />
-          {grid(recents, 'recent')}
-        </>
-      ) : null}
-      {showShortcuts ? (
-        <>
-          <SectionTitle title={recents.length ? 'Popular' : 'Popular activities'} />
-          {grid(popular, 'popular')}
-        </>
-      ) : null}
-
-      {showShortcuts ? <SectionTitle title="All activities" /> : null}
-      {list.length === 0 ? (
-        <EmptyState
-          emoji="🔎"
-          title="No activity matches"
-          message={`Nothing found for "${query.trim()}"${category === 'all' ? '' : ` in ${CATEGORY_LABEL[category].toLowerCase()}`}. Try a broader word like "ball", "swim" or "dance", or pick the closest activity with a similar effort.`}
-          action={category === 'all' ? 'Clear search' : 'Search all categories'}
-          onAction={() => (category === 'all' ? setQuery('') : setCategory('all'))}
-        />
-      ) : (
-        <View testID="activity-list">
-          {list.map((a, i) => (
-            <View key={a.id}>
-              {i > 0 ? <Divider inset={56} /> : null}
-              <ListRow
-                testID={`activity-${a.id}`}
-                title={a.name}
-                subtitle={`${CATEGORY_LABEL[a.category]} · ${metRange(a)}${a.tracksDistance ? ' · distance' : ''}`}
-                left={<Avatar emoji={a.emoji} />}
-                onPress={() => choose(a)}
-              />
+      {/* 108 rows: a virtualised list so the fastest-logging path opens without mounting them all. */}
+      <FlatList
+        testID="activity-list"
+        data={list}
+        keyExtractor={(a) => a.id}
+        initialNumToRender={12}
+        maxToRenderPerBatch={16}
+        windowSize={7}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: spacing.xxl + insets.bottom }}
+        ItemSeparatorComponent={ActivitySeparator}
+        ListHeaderComponent={
+          showShortcuts ? (
+            <View style={{ gap: spacing.lg, paddingBottom: spacing.sm }}>
+              {recents.length > 0 ? (
+                <View style={{ gap: spacing.lg }}>
+                  <SectionTitle title="Recent" />
+                  {grid(recents, 'recent')}
+                </View>
+              ) : null}
+              <SectionTitle title={recents.length ? 'Popular' : 'Popular activities'} />
+              {grid(popular, 'popular')}
+              <SectionTitle title="All activities" />
             </View>
-          ))}
-        </View>
-      )}
+          ) : undefined
+        }
+        ListEmptyComponent={
+          <EmptyState
+            emoji="🔎"
+            title="No activity matches"
+            message={`Nothing found for "${query.trim()}"${category === 'all' ? '' : ` in ${CATEGORY_LABEL[category].toLowerCase()}`}. Try a broader word like "ball", "swim" or "dance", or pick the closest activity with a similar effort.`}
+            action={category === 'all' ? 'Clear search' : 'Search all categories'}
+            onAction={() => (category === 'all' ? setQuery('') : setCategory('all'))}
+          />
+        }
+        renderItem={({ item: a }) => (
+          <ListRow
+            testID={`activity-${a.id}`}
+            title={a.name}
+            subtitle={`${CATEGORY_LABEL[a.category]} · ${metRange(a)}${a.tracksDistance ? ' · distance' : ''}`}
+            left={<Avatar emoji={a.emoji} />}
+            onPress={() => choose(a)}
+          />
+        )}
+      />
 
       <Sheet visible={strengthChoice} onClose={() => setStrengthChoice(false)} title="Strength training">
         <Text variant="body" color="textSecondary">

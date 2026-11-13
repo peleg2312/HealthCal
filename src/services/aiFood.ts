@@ -79,6 +79,23 @@ export async function pickPhoto(source: 'camera' | 'library'): Promise<PickedPho
   return res.canceled || !res.assets?.[0] ? null : toPicked(res.assets[0]);
 }
 
+/**
+ * Android only: a photo taken while the system killed HealthCal in the
+ * background (low memory while the camera app was open). The original
+ * promise never resolves for the remounted screen, so the result is collected
+ * here instead. Returns null everywhere else, or when there is nothing.
+ */
+export async function takePendingPhoto(): Promise<PickedPhoto | null> {
+  if (Platform.OS !== 'android') return null;
+  try {
+    const res = await ImagePicker.getPendingResultAsync();
+    if (!res || !('canceled' in res) || res.canceled || !res.assets?.[0]) return null;
+    return toPicked(res.assets[0]);
+  } catch {
+    return null;
+  }
+}
+
 function toPicked(a: ImagePicker.ImagePickerAsset): PickedPhoto {
   return { uri: a.uri, width: a.width ?? 0, height: a.height ?? 0 };
 }

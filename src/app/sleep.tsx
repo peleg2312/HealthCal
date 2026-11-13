@@ -78,7 +78,7 @@ function SleepScreen() {
   const footer = <Button testID="sleep-log" title={lastNight ? 'Log sleep' : 'Log last night'} icon={<Plus size={20} color={colors.onPrimary} />} onPress={() => setSheetDate(end)} />;
 
   return (
-    <Screen header={<Header title="Sleep" />} footer={footer} testID="sleep-screen">
+    <Screen header={<Header title="Sleep" />} footer={footer} backdrop={colors.sleep} testID="sleep-screen">
       {entries.length === 0 ? (
         <Card>
           <EmptyState

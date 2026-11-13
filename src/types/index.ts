@@ -236,6 +236,20 @@ export interface SleepEntry extends SyncedRecord {
   quality: 1 | 2 | 3 | 4 | 5;
 }
 
+/**
+ * The targets a day had while it was the current day. Kept so that history is
+ * judged against what applied at the time, not against today's goals.
+ */
+export interface DaySnapshot extends SyncedRecord {
+  date: ISODate;
+  /** Calorie target before exercise. */
+  target: number;
+  /** Expenditure estimate the target was built on. */
+  tdee: number;
+  eatBackExercise: boolean;
+  weightKg: number;
+}
+
 export interface FastingSession extends SyncedRecord {
   start: ISODateTime;
   end?: ISODateTime;
@@ -281,7 +295,8 @@ export type Collection =
   | 'weights'
   | 'sleep'
   | 'fasting'
-  | 'favorites';
+  | 'favorites'
+  | 'days';
 
 // --------------------------------------------------------- AI food scan
 

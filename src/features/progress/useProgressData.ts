@@ -4,6 +4,7 @@ import { diffDays } from '@/lib/dates';
 import {
   computeMilestones,
   generateInsights,
+  recapWeeks,
   summarizePeriod,
   weeklyRecap,
   type InsightDay,
@@ -37,7 +38,7 @@ export function useProgressData(range: RangeDays) {
   const historyDays = firstDate ? Math.min(MAX_HISTORY, Math.max(1, diffDays(firstDate, t) + 1)) : 1;
 
   // One run of day summaries covers the range, the recap (two weeks) and the milestones.
-  const all = useDays(Math.max(range, historyDays, 14), t);
+  const all = useDays(Math.max(range, historyDays, 21), t);
   const model = useEnergyModel(t);
   const series = useWeightSeries();
   const consistency = useConsistency(t);
@@ -56,6 +57,7 @@ export function useProgressData(range: RangeDays) {
       weightKg: profile.weightKg,
       currentWeeklyRateKg: series.weeklyRateKg,
       weighInsTotal: series.entries.length,
+      lastWeighIn: series.latest?.date ?? null,
       energy: {
         formulaTdee: model.formulaTdee,
         adaptive: model.adaptive,
@@ -65,7 +67,8 @@ export function useProgressData(range: RangeDays) {
       },
       streak: consistency.streak,
     });
-    const recap = weeklyRecap({ days: all.slice(-14), trend: series.trend, sleep, today: t, units: profile.units, goal: profile.goal });
+    // Always the last closed week, so its numbers no longer move.
+    const recap = weeklyRecap({ days: all.slice(-21), trend: series.trend, sleep, today: t, units: profile.units, goal: profile.goal });
     const history = all.slice(-historyDays);
     const milestones = computeMilestones({
       days: history,
@@ -74,6 +77,7 @@ export function useProgressData(range: RangeDays) {
       goal: profile.goal,
       units: profile.units,
     });
+    const earlierWeeks = recapWeeks(history, t, 3);
     // Closed, fully logged days across all history: decides the early state.
     const completeEver = history.filter((d) => d.date < t && d.entries.length > 0 && d.eaten.kcal >= d.budget * 0.5).length;
     return {
@@ -84,6 +88,7 @@ export function useProgressData(range: RangeDays) {
       summary,
       insights,
       recap,
+      earlierWeeks,
       milestones,
       model,
       series,

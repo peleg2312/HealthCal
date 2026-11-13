@@ -6,11 +6,21 @@ import type { FoodEntry } from '@/types';
 import { coachTip, expectedWaterFraction } from './coach';
 
 const entry = (meal: FoodEntry['meal'], protein = 20): FoodEntry =>
-  ({ id: meal, meal, name: meal, nutrients: { kcal: 400, protein, carbs: 40, fat: 10 } }) as FoodEntry;
+  ({
+    id: meal,
+    meal,
+    name: meal,
+    nutrients: { kcal: 400, protein, carbs: 40, fat: 10 },
+  }) as FoodEntry;
 
 function day(patch: Partial<DaySummary> = {}): DaySummary {
   const entries = patch.entries ?? [];
-  const byMeal: DaySummary['byMeal'] = { breakfast: [], lunch: [], dinner: [], snack: [] };
+  const byMeal: DaySummary['byMeal'] = {
+    breakfast: [],
+    lunch: [],
+    dinner: [],
+    snack: [],
+  };
   for (const e of entries) byMeal[e.meal].push(e);
   const kcal = entries.reduce((s, e) => s + e.nutrients.kcal, 0);
   const protein = entries.reduce((s, e) => s + e.nutrients.protein, 0);
@@ -26,7 +36,13 @@ function day(patch: Partial<DaySummary> = {}): DaySummary {
     target: 2000,
     budget: 2000,
     remaining: 2000 - kcal,
-    macros: { proteinG: 150, carbsG: 200, fatG: 60, fiberG: 28, split: { protein: 0.3, carbs: 0.4, fat: 0.3 } },
+    macros: {
+      proteinG: 150,
+      carbsG: 200,
+      fatG: 60,
+      fiberG: 28,
+      split: { protein: 0.3, carbs: 0.4, fat: 0.3 },
+    },
     waterEntries: [],
     waterMl: 2600,
     waterGoalMl: 2600,
@@ -53,8 +69,12 @@ describe('coachTip', () => {
     expect(coachTip(withLunch, 'metric', at(14)).id).not.toBe('meal-lunch');
   });
 
-  it('flags water only when well behind an even pace, in the user\'s units', () => {
-    const d = day({ entries: [entry('breakfast'), entry('lunch'), entry('dinner', 120)], waterMl: 300, waterRemainingMl: 2300 });
+  it("flags water only when well behind an even pace, in the user's units", () => {
+    const d = day({
+      entries: [entry('breakfast'), entry('lunch'), entry('dinner', 120)],
+      waterMl: 300,
+      waterRemainingMl: 2300,
+    });
     const tip = coachTip(d, 'metric', at(16));
     expect(tip.id).toBe('water');
     expect(tip.title).toContain('2.3 L');
@@ -64,22 +84,30 @@ describe('coachTip', () => {
   });
 
   it('quotes the protein gap late in the day', () => {
-    const d = day({ entries: [entry('breakfast', 20), entry('lunch', 25), entry('dinner', 10)] });
+    const d = day({
+      entries: [entry('breakfast', 20), entry('lunch', 25), entry('dinner', 10)],
+    });
     const tip = coachTip(d, 'metric', at(21, 30));
     expect(tip.id).toBe('protein');
     expect(tip.title).toBe('95 g of protein to go');
   });
 
   it('states an overage neutrally', () => {
-    const d = day({ entries: [entry('breakfast', 60), entry('lunch', 60), entry('dinner', 60)], remaining: -320 });
+    const d = day({
+      entries: [entry('breakfast', 60), entry('lunch', 60), entry('dinner', 60)],
+      remaining: -320,
+    });
     const tip = coachTip(d, 'metric', at(22));
     expect(tip.id).toBe('over');
-    expect(tip.title).toBe('320 kcal over today\'s budget');
+    expect(tip.title).toBe("320 kcal over today's budget");
     expect(`${tip.title} ${tip.body}`).not.toMatch(/fail|bad|cheat|guilt|!/i);
   });
 
   it('reports on track when nothing needs attention', () => {
-    const d = day({ entries: [entry('breakfast', 60), entry('lunch', 60), entry('dinner', 60)], activities: [{} as never] });
+    const d = day({
+      entries: [entry('breakfast', 60), entry('lunch', 60), entry('dinner', 60)],
+      activities: [{} as never],
+    });
     const tip = coachTip(d, 'metric', at(22));
     expect(tip.id).toBe('on-track');
     expect(tip.tone).toBe('positive');
@@ -92,5 +120,33 @@ describe('expectedWaterFraction', () => {
     expect(expectedWaterFraction(7)).toBe(0);
     expect(expectedWaterFraction(14.5)).toBeCloseTo(0.5);
     expect(expectedWaterFraction(23)).toBe(1);
+  });
+});
+
+describe('coachTip quick actions', () => {
+  it('offers a one-tap glass on the water tip', () => {
+    const tip = coachTip(
+      day({
+        entries: [entry('breakfast'), entry('lunch')],
+        waterMl: 300,
+        waterRemainingMl: 2300,
+      }),
+      'metric',
+      at(15),
+    );
+    expect(tip.id).toBe('water');
+    expect(tip.quick).toEqual({ kind: 'water' });
+  });
+  it('offers to repeat the meal that is due', () => {
+    const tip = coachTip(day({ entries: [entry('breakfast')] }), 'metric', at(14));
+    expect(tip.id).toBe('meal-lunch');
+    expect(tip.quick).toEqual({ kind: 'repeat', meal: 'lunch' });
+  });
+  it('offers to repeat the current meal before the first log, but not a snack', () => {
+    expect(coachTip(day(), 'metric', at(8)).quick).toEqual({
+      kind: 'repeat',
+      meal: 'breakfast',
+    });
+    expect(coachTip(day(), 'metric', at(22)).quick).toBeUndefined();
   });
 });

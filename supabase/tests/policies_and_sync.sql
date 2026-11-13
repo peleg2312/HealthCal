@@ -148,8 +148,14 @@ set role authenticated;
 select pg_temp.act_as('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
 do $$
 begin
-  perform public.bump_ai_usage('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 3);
+  perform public.bump_ai_usage('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'user:a', 1, 3, 100);
   raise exception 'a signed-in user may raise their own AI usage counter';
+exception when insufficient_privilege then null;
+end $$;
+do $$
+begin
+  perform public.refund_ai_usage('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'user:a', 1);
+  raise exception 'a signed-in user may refund their own AI usage';
 exception when insufficient_privilege then null;
 end $$;
 do $$
@@ -158,19 +164,70 @@ begin
   raise exception 'a signed-in user may write ai_usage directly';
 exception when insufficient_privilege then null;
 end $$;
+do $$
+declare n int;
+begin
+  begin
+    select count(*) into n from public.ai_quota;
+  exception when insufficient_privilege then n := 0;
+  end;
+  if n <> 0 then raise exception 'a signed-in user can read the quota table'; end if;
+end $$;
 reset role;
 
 set role service_role;
 do $$
 declare a int; b int; c int; d int; u uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 begin
-  a := public.bump_ai_usage(u, 3);
-  b := public.bump_ai_usage(u, 3);
-  c := public.bump_ai_usage(u, 3);
-  d := public.bump_ai_usage(u, 3);
-  if (a, b, c, d) is distinct from (1, 2, 3, -1) then raise exception 'quota sequence wrong: % % % %', a, b, c, d; end if;
+  -- Per-identity limit of 3 units: three fast calls fit, the fourth does not.
+  a := public.bump_ai_usage(u, 'user:a', 1, 3, 100);
+  b := public.bump_ai_usage(u, 'user:a', 1, 3, 100);
+  c := public.bump_ai_usage(u, 'user:a', 1, 3, 100);
+  d := public.bump_ai_usage(u, 'user:a', 1, 3, 100);
+  if (a, b, c, d) is distinct from (2, 1, 0, -1) then raise exception 'quota sequence wrong: % % % %', a, b, c, d; end if;
   perform public.add_ai_tokens(u, 900, 300);
   perform public.add_ai_tokens(u, 100, 50);
+end $$;
+
+do $$
+declare r int; used_now int; u uuid := 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+begin
+  -- A careful analysis weighs 5: with a limit of 8, one fits, a second does not, three fast ones still do.
+  r := public.bump_ai_usage(u, 'user:b', 5, 8, 100);
+  if r <> 3 then raise exception 'weighted call should leave 3, left %', r; end if;
+  r := public.bump_ai_usage(u, 'user:b', 5, 8, 100);
+  if r <> -1 then raise exception 'second weighted call should be refused, got %', r; end if;
+  select used into used_now from public.ai_quota where identity = 'user:b';
+  if used_now <> 5 then raise exception 'a refused call changed the count: %', used_now; end if;
+  r := public.bump_ai_usage(u, 'user:b', 1, 8, 100);
+  if r <> 2 then raise exception 'fast call after a careful one should leave 2, left %', r; end if;
+
+  -- A first call that is itself larger than the limit is refused and leaves no trace.
+  r := public.bump_ai_usage(u, 'user:big', 5, 3, 100);
+  select coalesce(sum(used), 0) into used_now from public.ai_quota where identity = 'user:big';
+  if r <> -1 or used_now <> 0 then raise exception 'oversized first call: result %, used %', r, used_now; end if;
+end $$;
+
+do $$
+declare r int; mine int; everyone int; u uuid := 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+begin
+  -- Project-wide ceiling: so far 3 (a) + 6 (b) = 9 units are used. With a ceiling of 10, a 5-unit call is refused...
+  select used into everyone from public.ai_quota where identity = '*';
+  if everyone <> 9 then raise exception 'project counter should be 9, is %', everyone; end if;
+  r := public.bump_ai_usage(u, 'user:c', 5, 40, 10);
+  if r <> -2 then raise exception 'project ceiling not enforced, got %', r; end if;
+  -- ...and neither counter moved.
+  select coalesce(sum(used), 0) into mine from public.ai_quota where identity = 'user:c';
+  select used into everyone from public.ai_quota where identity = '*';
+  if mine <> 0 or everyone <> 9 then raise exception 'refused call leaked into counters: mine %, project %', mine, everyone; end if;
+
+  -- A refund gives the units back to both counters and never goes below zero.
+  r := public.bump_ai_usage(u, 'user:c', 1, 40, 10);
+  perform public.refund_ai_usage(u, 'user:c', 1);
+  perform public.refund_ai_usage(u, 'user:c', 1);
+  select used into mine from public.ai_quota where identity = 'user:c';
+  select used into everyone from public.ai_quota where identity = '*';
+  if mine <> 0 or everyone <> 8 then raise exception 'refund wrong: mine %, project %', mine, everyone; end if;
 end $$;
 reset role;
 set role authenticated;
@@ -197,6 +254,9 @@ begin
   if n <> 0 then raise exception '% rows survived account deletion', n; end if;
   select count(*) into n from public.records where user_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
   if n <> 1 then raise exception 'deleting A removed B''s data (B has % rows)', n; end if;
+  -- The allowance is counted against the identity, so deleting the account does not reset it.
+  select used into n from public.ai_quota where identity = 'user:a';
+  if n <> 3 then raise exception 'quota was reset by deleting the account (used = %)', n; end if;
 end $$;
 
 do $$ begin raise notice 'ALL DATABASE TESTS PASSED'; end $$;

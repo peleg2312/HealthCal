@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "types": [], "lib": ["es2022", "dom"], "allowImportingTsExtensions": true, "skipLibCheck": true },
+  "include": ["supabase/functions/**/index.ts", "supabase/functions/deno-shim.d.ts"],
+  "exclude": []
+}

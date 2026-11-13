@@ -11,7 +11,7 @@ import { isBackendConfigured } from '@/services/supabase';
 import { syncNow, useSyncState } from '@/services/sync';
 import { pendingChanges, useStore } from '@/store';
 import { useTheme } from '@/theme';
-import { Button, Card, ConfirmSheet, Header, ListRow, Screen, Text, toast } from '@/ui';
+import { Button, Card, ConfirmSheet, Header, ListRow, Screen, Sheet, Text, toast } from '@/ui';
 
 export default function AccountScreen() {
   const session = useAuth((s) => s.session);
@@ -37,6 +37,37 @@ function Benefit({ icon, title, text }: { icon: React.ReactNode; title: string; 
 
 function SignedOut() {
   const { colors, spacing } = useTheme();
+  const sessionLost = useAuth((s) => s.sessionLost);
+  const pending = useStore(pendingChanges);
+  if (sessionLost && isBackendConfigured) {
+    return (
+      <>
+        <Card testID="account-session-lost">
+          <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+            <IconTile color={colors.warning}>
+              <CloudOff size={20} color={colors.warning} />
+            </IconTile>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text variant="title">Signed out of your account</Text>
+              <Text variant="caption" color="textSecondary">
+                The session ended, it may have expired or been signed out on another device.
+              </Text>
+            </View>
+          </View>
+          <Text variant="body" color="textSecondary" style={{ marginTop: spacing.md }}>
+            Your entries are safe on this device{pending > 0 ? `, including ${pending} change${pending === 1 ? '' : 's'} not uploaded yet` : ''}, but nothing new is
+            being backed up. Sign in again to resume sync.
+          </Text>
+          <Button
+            testID="account-sign-in-again"
+            title="Sign in again"
+            style={{ marginTop: spacing.md }}
+            onPress={() => router.push('/auth?mode=signin' as never)}
+          />
+        </Card>
+      </>
+    );
+  }
   return (
     <>
       <Card>
@@ -105,6 +136,8 @@ function SignedIn({ email }: { email: string }) {
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState<'signout' | 'delete' | null>(null);
+  /** Message from a sign-out that stopped because changes are not backed up. */
+  const [signOutBlocked, setSignOutBlocked] = useState<string | null>(null);
 
   const when = timeAgo(sync.lastRunAt ?? lastSyncedAt);
   const status =
@@ -118,12 +151,18 @@ function SignedIn({ email }: { email: string }) {
             ? `Last synced ${when}`
             : 'Not synced yet';
 
-  const doSignOut = async () => {
+  const doSignOut = async (discardPending = false) => {
     setConfirmSignOut(false);
+    setSignOutBlocked(null);
     setBusy('signout');
-    await cancelAllReminders();
-    await signOut();
+    const res = await signOut({ discardPending });
     setBusy(null);
+    if (!res.ok) {
+      // Nothing was removed: offer to try again or to sign out anyway.
+      setSignOutBlocked(res.message);
+      return;
+    }
+    await cancelAllReminders();
     router.replace('/welcome');
   };
 
@@ -218,6 +257,21 @@ function SignedIn({ email }: { email: string }) {
         onConfirm={() => void doSignOut()}
         onCancel={() => setConfirmSignOut(false)}
       />
+      <Sheet
+        visible={signOutBlocked !== null}
+        onClose={() => setSignOutBlocked(null)}
+        title="Changes not backed up"
+        footer={
+          <View style={{ gap: 10 }}>
+            <Button testID="account-sign-out-retry" title="Try again" onPress={() => void doSignOut()} />
+            <Button testID="account-sign-out-anyway" title="Sign out anyway" variant="danger" onPress={() => void doSignOut(true)} />
+            <Button testID="account-sign-out-keep" title="Stay signed in" variant="ghost" onPress={() => setSignOutBlocked(null)} />
+          </View>
+        }>
+        <Text variant="body" color="textSecondary">
+          {signOutBlocked}
+        </Text>
+      </Sheet>
       <ConfirmSheet
         visible={confirmDelete}
         title="Delete your account?"

@@ -3,7 +3,8 @@
  * No React, storage or native imports so they can be unit-tested.
  */
 import { grossKcal, kcalRange, netKcal } from '@/lib/exercise';
-import type { ActivityDef, ActivityEntry, Intensity, StrengthExercise } from '@/types';
+import { exerciseWaterMl } from '@/lib/hydration';
+import type { ActivityDef, ActivityEntry, Intensity, StrengthExercise, UnitSystem } from '@/types';
 
 export interface BuildActivityInput {
   activity: ActivityDef;
@@ -59,6 +60,48 @@ export function buildActivityEntry(input: BuildActivityInput): BuiltActivity {
   const exercises = cleanExercises(input.exercises);
   if (exercises) entry.exercises = exercises;
   return entry;
+}
+
+// ----------------------------------------------------- editing saved sessions
+
+/** The body weight and daily baseline a session's calories were worked out from. */
+export interface SessionBasis {
+  weightKg: number;
+  baselineKcalPerDay: number;
+}
+
+/**
+ * Recover the weight and baseline a saved entry was built with, so an edit
+ * months later is not re-priced at today's weight. Gross kcal is linear in
+ * weight and net kcal is gross minus the baseline's share of the minutes, so
+ * both can be read back exactly. Falls back per value when the stored numbers
+ * cannot carry it (net clipped to zero, missing or implausible values).
+ */
+export function basisFromEntry(e: Pick<ActivityEntry, 'met' | 'durationMin' | 'kcalGross' | 'kcalNet'>, fallback: SessionBasis): SessionBasis {
+  const ok = e.met > 0 && e.durationMin > 0 && e.kcalGross > 0;
+  const per = ok ? grossKcal(e.met, 1, e.durationMin) : 0;
+  const w = per > 0 ? e.kcalGross / per : NaN;
+  const weightKg = Number.isFinite(w) && w >= 20 && w <= 400 ? w : fallback.weightKg;
+  const b = ok && e.kcalNet > 0 ? ((e.kcalGross - e.kcalNet) * 1440) / e.durationMin : NaN;
+  const baselineKcalPerDay = Number.isFinite(b) && b >= 600 && b <= 8000 ? b : fallback.baselineKcalPerDay;
+  return { weightKg, baselineKcalPerDay };
+}
+
+/**
+ * Build the replacement for a saved entry. The calories stay exactly as saved
+ * unless the activity, effort or duration changed (notes, distance, date and
+ * sets do not move them); when they do change, they are worked out from the
+ * weight and baseline the session was first saved with.
+ */
+export function rebuildActivityEntry(existing: ActivityEntry, input: Omit<BuildActivityInput, 'weightKg' | 'baselineKcalPerDay' | 'loggedAt'>, current: SessionBasis): BuiltActivity {
+  const basis = basisFromEntry(existing, current);
+  const built = buildActivityEntry({ ...input, ...basis, loggedAt: existing.loggedAt });
+  if (existing.activityId === built.activityId && existing.intensity === built.intensity && existing.durationMin === built.durationMin) {
+    built.met = existing.met;
+    built.kcalGross = existing.kcalGross;
+    built.kcalNet = existing.kcalNet;
+  }
+  return built;
 }
 
 /** Live estimate shown while the user fills the form. */
@@ -121,6 +164,34 @@ export function summariseWeek(entries: ActivityEntry[], dates: string[]): WeekSu
     kcalGross: Math.round(gross),
     byDate,
   };
+}
+
+// ------------------------------------------------------------- water preview
+
+/**
+ * How much one session raises the day's water goal, given the day's other
+ * sessions. The day's extra is capped and rounded as a whole, so the session's
+ * share is the difference with and without it.
+ */
+export function sessionWaterMl(
+  others: Pick<ActivityEntry, 'durationMin' | 'intensity'>[],
+  session: Pick<ActivityEntry, 'durationMin' | 'intensity'>,
+): number {
+  return Math.max(0, exerciseWaterMl([...others, session]) - exerciseWaterMl(others));
+}
+
+// --------------------------------------------------------- speeds in hints
+
+const KMH_RE = /(\d+(?:\.\d+)?)(?:\s*-\s*(\d+(?:\.\d+)?))?\s*km\/h/g;
+
+/** Rewrite "about 10 km/h" in catalogue hints as mph for imperial users (to the nearest half). */
+export function localiseSpeedText(text: string, units: UnitSystem): string {
+  if (units !== 'imperial') return text;
+  const mph = (s: string) => {
+    const v = Math.round(Number(s) * 0.621371 * 2) / 2;
+    return String(v);
+  };
+  return text.replace(KMH_RE, (_m, a: string, b?: string) => (b ? `${mph(a)}-${mph(b)} mph` : `${mph(a)} mph`));
 }
 
 // --------------------------------------------------------- pace and speed

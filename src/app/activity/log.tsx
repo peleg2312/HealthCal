@@ -4,13 +4,13 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { ACTIVITY_BY_ID, MET_SOURCES } from '@/data/activities';
-import { estimateSession, formatPace, paceModeFor } from '@/features/activity/build';
+import { basisFromEntry, estimateSession, formatPace, localiseSpeedText, paceModeFor, sessionWaterMl } from '@/features/activity/build';
 import { DateStepper } from '@/features/activity/components';
 import { deleteActivity, leaveFlow, saveActivity } from '@/features/activity/session';
 import { formatDayLabel, today } from '@/lib/dates';
 import { formulaTdee } from '@/lib/energy';
-import { INTENSITY_LABELS } from '@/lib/exercise';
 import { exerciseWaterMl } from '@/lib/hydration';
+import { INTENSITY_LABELS } from '@/lib/exercise';
 import { distanceToKm, distanceUnit, distanceValue, formatNumber, formatVolume, formatWeight, round } from '@/lib/units';
 import { useStore } from '@/store';
 import { useLive, useProfile } from '@/store/selectors';
@@ -58,16 +58,22 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
   const singleMet = activity.met.light === activity.met.moderate && activity.met.moderate === activity.met.vigorous;
   const [duration, setDuration] = useState<number | null>(entry?.durationMin ?? last?.durationMin ?? 30);
   const [intensity, setIntensity] = useState<Intensity>(entry?.intensity ?? (singleMet ? 'moderate' : last?.intensity ?? 'moderate'));
-  const [distance, setDistance] = useState<number | null>(entry?.distanceKm ? round(distanceValue(entry.distanceKm, units), 2) : null);
+  const [initialDistance] = useState<number | null>(entry?.distanceKm ? round(distanceValue(entry.distanceKm, units), 2) : null);
+  const [distance, setDistance] = useState<number | null>(initialDistance);
   const [date, setDate] = useState(entry?.date ?? (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) && dateParam <= today() ? dateParam : today()));
   const [notes, setNotes] = useState(entry?.notes ?? '');
   const [showSource, setShowSource] = useState(false);
 
   const minutes = Math.max(0, Math.round(duration ?? 0));
   const met = activity.met[intensity];
-  const tdee = formulaTdee(profile);
-  const est = estimateSession(met, profile.weightKg, minutes, tdee);
-  const water = exerciseWaterMl([{ durationMin: minutes, intensity }]);
+  // An edit is priced at the weight and baseline the session was saved with.
+  const current = { weightKg: profile.weightKg, baselineKcalPerDay: formulaTdee(profile) };
+  const basis = entry ? basisFromEntry(entry, current) : current;
+  const tdee = basis.baselineKcalPerDay;
+  const est = estimateSession(met, basis.weightKg, minutes, tdee);
+  // The day's exercise water is capped as a whole, so preview this session's share of it.
+  const others = activities.filter((a) => a.date === date && a.id !== entryId);
+  const water = sessionWaterMl(others, { durationMin: minutes, intensity });
   const dayWord = date === today() ? "today's" : `${formatDayLabel(date).toLowerCase()}'s`;
   const restingShare = Math.round((tdee / 1440) * minutes);
 
@@ -89,7 +95,8 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
       activityId,
       intensity,
       durationMin: minutes,
-      distanceKm: distance && distance > 0 ? distanceToKm(distance, units) : null,
+      // An untouched field keeps the stored distance exactly; converting the rounded display value back would drift it.
+      distanceKm: entry && distance === initialDistance ? (entry.distanceKm ?? null) : distance && distance > 0 ? distanceToKm(distance, units) : null,
       notes,
       date,
       exercises: entry?.exercises ?? null,
@@ -163,7 +170,9 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
               ? profile.waterGoalMlOverride
                 ? `Drink about ${formatVolume(water, units)} extra; your fixed water goal is not changed`
                 : `Adds ${formatVolume(water, units)} to ${dayWord} water goal`
-              : 'Too short to change the water goal'}
+              : exerciseWaterMl(others) >= 2000
+                ? `${dayWord[0].toUpperCase()}${dayWord.slice(1)} water goal already includes the most exercise adds (${formatVolume(2000, units)})`
+                : 'Too short to change the water goal'}
           </Text>
         </View>
         <PressableScale
@@ -180,7 +189,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
         {showSource ? (
           <View style={{ gap: spacing.sm, marginTop: -spacing.xs }} testID="log-activity-source-body">
             <Text variant="caption" color="textSecondary">
-              {met} MET × 3.5 ml O₂ per kg per minute × {formatWeight(profile.weightKg, 'metric')} × {minutes} min ÷ 200 = {formatNumber(est.gross)} kcal in total. Your
+              {met} MET × 3.5 ml O₂ per kg per minute × {formatWeight(round(basis.weightKg, 1), 'metric')} × {minutes} min ÷ 200 = {formatNumber(est.gross)} kcal in total. Your
               day already assumes {formatNumber(Math.round(tdee))} kcal for resting and daily life, {formatNumber(restingShare)} kcal of it in these minutes, so{' '}
               {formatNumber(est.net)} kcal is extra. MET values describe an average adult, so the range allows about 20% either way.
             </Text>
@@ -260,7 +269,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
                     }}>
                     <Text variant="bodyStrong">{INTENSITY_LABELS[i].title}</Text>
                     <Text variant="caption" color="textSecondary" numberOfLines={3} style={{ flex: 1 }}>
-                      {activity.intensityHint?.[i] ?? INTENSITY_LABELS[i].hint}
+                      {localiseSpeedText(activity.intensityHint?.[i] ?? INTENSITY_LABELS[i].hint, units)}
                     </Text>
                     <Text variant="caption" color={active ? colors.exercise : 'textTertiary'} tabular>
                       {activity.met[i]} MET

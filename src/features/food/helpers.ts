@@ -54,6 +54,32 @@ export function portionLabel(servingLabel: string, quantity: number): string {
   return quantity === 1 ? servingLabel : `${formatQty(quantity)} × ${servingLabel}`;
 }
 
+/** Step size for an amount: 10 g in gram mode, 0.5 servings otherwise. */
+export function amountStep(servingLabel: string): number {
+  if (servingLabel === '1 g') return 10;
+  if (servingLabel === '100 g') return 0.1;
+  return 0.5;
+}
+
+/**
+ * One tap of a compact amount stepper. Steps snap to the step grid (1.2 + 0.5
+ * gives 1.5, 15 g − 10 g gives 10 g), and stepping down from the smallest
+ * step returns 0, which the caller treats as "remove".
+ */
+export function stepAmount(quantity: number, servingLabel: string, dir: 1 | -1): number {
+  const step = amountStep(servingLabel);
+  const units = quantity / step;
+  const snapped = Math.abs(units - Math.round(units)) < 1e-6 ? Math.round(units) + dir : dir > 0 ? Math.ceil(units) : Math.floor(units);
+  return Math.max(0, Math.round(snapped * step * 1000) / 1000);
+}
+
+/** Short amount for a compact stepper: "1.5 ×" or "150 g". */
+export function amountLabel(servingLabel: string, quantity: number): string {
+  if (servingLabel === '1 g') return `${formatQty(quantity)} g`;
+  if (servingLabel === '100 g') return `${formatQty(quantity * 100)} g`;
+  return `${formatQty(quantity)} ×`;
+}
+
 // ------------------------------------------------------------- data source
 
 export interface SourceInfo {

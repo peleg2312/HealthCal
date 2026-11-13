@@ -1,13 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { ACTIVITY_BY_ID } from '@/data/activities';
 import { addDays, toISODate } from '@/lib/dates';
+import { netKcal } from '@/lib/exercise';
 import {
   checkInBody,
   inQuietHours,
   MAX_PER_DAY,
   MIN_GAP_MINUTES,
   planReminders,
+  mealRepeatCategory,
+  parseReminderAction,
   reminderTimeLabel,
+  snoozeTime,
+  walkNetKcal,
+  waterActionAmounts,
+  waterCategory,
+  WEIGHIN_CATEGORY,
   type PlannerDay,
   type PlannerInput,
 } from '@/features/settings/reminderPlanner';
@@ -248,8 +257,15 @@ describe('planReminders', () => {
   it('movement only when no activity is logged', () => {
     const r = reminders({ movement: { enabled: true, time: '17:00' } });
     const now = at(6);
-    const plan = planReminders(input(now, { reminders: r }), now);
-    expect(plan.find((x) => x.kind === 'movement')?.body).toBe('No activity logged today. A 20 minute brisk walk burns about 80 kcal above resting.');
+    const plan = planReminders(input(now, { reminders: r, baselineKcalPerDay: 2400 }), now);
+    // Same number the logger gives for Walking, moderate (3.8 MET), 20 min, 80 kg, 2,400 kcal baseline: 106.4 - 33.3 = 73 -> 75.
+    expect(plan.find((x) => x.kind === 'movement')?.body).toBe(
+      'No activity logged today. A 20 minute walk at a moderate pace burns about 75 kcal above resting.',
+    );
+    const logged = netKcal(ACTIVITY_BY_ID.walking.met.moderate, 80, 20, 2400);
+    expect(Math.abs(walkNetKcal(80, 2400)! - logged)).toBeLessThanOrEqual(2.5);
+    const noBaseline = planReminders(input(now, { reminders: r }), now);
+    expect(noBaseline.find((x) => x.kind === 'movement')?.body).toBe('No activity logged today. A short walk now still counts.');
     const active = planReminders(input(now, { reminders: r }, day('2026-11-11', { activities: 1 })), now);
     expect(active.find((x) => x.kind === 'movement')).toBeUndefined();
   });
@@ -287,5 +303,67 @@ describe('time zones are local', () => {
     const breakfast = plan.find((r) => r.id === 'meal-breakfast-2026-11-01');
     expect(breakfast?.at.getHours()).toBe(8);
     expect(breakfast?.at.getMinutes()).toBe(30);
+  });
+});
+
+describe('reminder links and actions', () => {
+  it('a meal reminder opens food search for its own meal and day', () => {
+    const now = at(6);
+    const plan = planReminders(input(now), now);
+    const lunch = plan.find((r) => r.id === 'meal-lunch-2026-11-11');
+    expect(lunch?.url).toBe('/food/search?meal=lunch&date=2026-11-11');
+    expect(lunch?.data).toEqual({ date: '2026-11-11', meal: 'lunch' });
+    const tomorrowBreakfast = plan.find((r) => r.id === 'meal-breakfast-2026-11-12');
+    expect(tomorrowBreakfast?.url).toBe('/food/search?meal=breakfast&date=2026-11-12');
+    expect(plan.find((r) => r.kind === 'water')?.url).toBe('/water');
+  });
+
+  it('water reminders carry the first two presets as buttons, in the user units', () => {
+    const now = at(6);
+    const plan = planReminders(input(now, { waterPresetsMl: [330, 500, 750] }), now);
+    const water = plan.find((r) => r.kind === 'water');
+    expect(water?.category?.actions.map((a) => a.buttonTitle)).toEqual(['+330 ml', '+500 ml']);
+    expect(water?.category?.actions.map((a) => a.identifier)).toEqual(['water-add-330', 'water-add-500']);
+    expect(waterCategory([237, 473], 'imperial').actions.map((a) => a.buttonTitle)).toEqual(['+8 fl oz', '+16 fl oz']);
+    expect(waterCategory([250, 500], 'metric').identifier).not.toBe(waterCategory([250, 500], 'imperial').identifier);
+    expect(waterActionAmounts(undefined)).toEqual([250, 500]);
+    expect(waterActionAmounts([250, 250, 5])).toEqual([250]);
+  });
+
+  it('offers to repeat a meal only when the day before had it', () => {
+    const now = at(6);
+    const today: PlannerDay = { summary: day('2026-11-11'), weighed: false, previousDayMeals: ['lunch'] };
+    const plan = planReminders({ ...input(now), today }, now);
+    expect(plan.find((r) => r.id === 'meal-lunch-2026-11-11')?.category).toEqual(mealRepeatCategory('lunch'));
+    expect(plan.find((r) => r.id === 'meal-dinner-2026-11-11')?.category).toBeUndefined();
+    expect(mealRepeatCategory('lunch').actions[0].buttonTitle).toBe("Repeat yesterday's lunch");
+  });
+
+  it('a weigh-in offers "Later today" only when the snooze lands before quiet hours', () => {
+    const now = at(6);
+    const r = reminders({ weighIn: { enabled: true, time: '07:45', weekdays: [3] } });
+    const plan = planReminders(input(now, { reminders: r }), now);
+    expect(plan.find((x) => x.kind === 'weighin')?.category).toEqual(WEIGHIN_CATEGORY);
+    const late = reminders({ weighIn: { enabled: true, time: '20:30', weekdays: [3] }, dailySummary: { enabled: false, time: '20:30' } });
+    const latePlan = planReminders(input(now, { reminders: late }), now);
+    expect(latePlan.find((x) => x.kind === 'weighin')).toBeDefined();
+    expect(latePlan.find((x) => x.kind === 'weighin')?.category).toBeUndefined();
+  });
+
+  it('parses action buttons and rejects anything unexpected', () => {
+    expect(parseReminderAction('water-add-250', {})).toEqual({ type: 'water', ml: 250 });
+    expect(parseReminderAction('water-add-9999', {})).toBeNull();
+    expect(parseReminderAction('water-add-abc', {})).toBeNull();
+    expect(parseReminderAction('repeat-meal', { meal: 'lunch', date: '2026-11-11' })).toEqual({ type: 'repeat-meal', meal: 'lunch', date: '2026-11-11' });
+    expect(parseReminderAction('repeat-meal', { meal: 'snack', date: '2026-11-11' })).toBeNull();
+    expect(parseReminderAction('repeat-meal', { meal: 'lunch' })).toBeNull();
+    expect(parseReminderAction('snooze', {})).toEqual({ type: 'snooze' });
+    expect(parseReminderAction('expo.modules.notifications.actions.DEFAULT', {})).toBeNull();
+  });
+
+  it('snoozes two hours unless that is in quiet hours or tomorrow', () => {
+    expect(snoozeTime(at(8), '22:00', '07:30')?.getHours()).toBe(10);
+    expect(snoozeTime(at(20, 30), '22:00', '07:30')).toBeNull();
+    expect(snoozeTime(at(23), '00:00', '00:00')).toBeNull();
   });
 });

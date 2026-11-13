@@ -4,7 +4,7 @@ import { BUILTIN_FOODS } from '@/data/foods';
 import type { AiFoodItem } from '@/types';
 
 import { AiError, buildAnalyzeRequest, errorFromResponse, parseAnalyzeBody, postAnalyze, stripDataPrefix } from './api';
-import { checkBarcode, hasValidCheckDigit } from './barcode';
+import { barcodeKey, checkBarcode, expandUpcE, findLocalByBarcode, hasValidCheckDigit, lookupCode, sameBarcode } from './barcode';
 import { availability, demoResult } from './demo';
 import {
   addedFatItem,
@@ -15,9 +15,15 @@ import {
   makeRow,
   overallConfidence,
   rescaleItem,
+  aiFoodDefinition,
+  renameRow,
   rowsFromResult,
+  rowsToLogItems,
   setRowGrams,
+  swapRow,
   totals,
+  unswapRow,
+  withCorrection,
 } from './estimate';
 import { fitWithin, IMAGE_EDGE, visionTokens } from './image';
 import { foodToItem, matchFoods, parseAmount } from './localMatch';
@@ -264,14 +270,81 @@ describe('barcodes', () => {
     expect(checkBarcode('')).toMatchObject({ ok: false });
     expect(checkBarcode('12345')).toMatchObject({ ok: false, message: expect.stringContaining('5') });
     expect(checkBarcode('737628064503')).toMatchObject({ ok: false, message: expect.stringContaining('typo') });
+    // A typed UPC-E is accepted and looked up by its full code.
+    expect(checkBarcode('0425 2614')).toEqual({ ok: true, code: '042100005264' });
+  });
+  it('expands UPC-E to UPC-A by all four rules', () => {
+    expect(expandUpcE('04252614')).toBe('042100005264');
+    expect(expandUpcE('01234505')).toBe('012000003455');
+    // last data digit 3, 4 and 5-9
+    expect(expandUpcE('0123453' + checkOf('01230000045'))).toBe('01230000045' + checkOf('01230000045'));
+    expect(expandUpcE('0123454' + checkOf('01234000005'))).toBe('01234000005' + checkOf('01234000005'));
+    expect(expandUpcE('0123457' + checkOf('01234500007'))).toBe('01234500007' + checkOf('01234500007'));
+    expect(expandUpcE('04252615')).toBeNull();
+    expect(expandUpcE('24252614')).toBeNull();
+    expect(expandUpcE('5000159484695')).toBeNull();
+  });
+  it('looks UPC-E scans up by their expanded code and leaves EAN-8 alone', () => {
+    expect(lookupCode('04252614', 'upc_e')).toBe('042100005264');
+    expect(lookupCode('04252614', 'UPC_E')).toBe('042100005264');
+    // A valid EAN-8 stays as it is unless the scanner says UPC-E.
+    expect(lookupCode('96385074', 'ean8')).toBe('96385074');
+    expect(lookupCode('5000159484695', 'ean13')).toBe('5000159484695');
+  });
+  it('matches UPC-A, EAN-13 and GTIN-14 forms of one product', () => {
+    expect(barcodeKey('0737628064502')).toBe('737628064502');
+    expect(sameBarcode('737628064502', '0737628064502')).toBe(true);
+    expect(sameBarcode('00737628064502', '737628064502')).toBe(true);
+    expect(sameBarcode('04252614', '0042100005264')).toBe(true);
+    expect(sameBarcode('042100005264', '04252614')).toBe(true);
+    expect(sameBarcode('737628064502', '737628064519')).toBe(false);
+    expect(sameBarcode('', '')).toBe(false);
+  });
+  it('finds own foods first, then recents, then the newest diary entry', () => {
+    const f = (id: string, barcode?: string, deleted?: boolean) => ({ id, barcode, deleted });
+    const sources = {
+      custom: [f('c-old', '0737628064502', true), f('c1', '5000159484695')],
+      recent: [f('r1', '737628064502')],
+      entries: [
+        { food: f('e-old', '96385074'), loggedAt: '2026-01-01T08:00:00Z' },
+        { food: f('e-new', '96385074'), loggedAt: '2026-02-01T08:00:00Z' },
+        { food: f('e-del', '12345670'), loggedAt: '2026-03-01T08:00:00Z', deleted: true },
+      ],
+    };
+    expect(findLocalByBarcode('5000159484695', sources)).toMatchObject({ from: 'custom', food: { id: 'c1' } });
+    // The deleted custom food is skipped; the recent one with the same product matches.
+    expect(findLocalByBarcode('0737628064502', sources)).toMatchObject({ from: 'recent', food: { id: 'r1' } });
+    expect(findLocalByBarcode('96385074', sources)).toMatchObject({ from: 'diary', food: { id: 'e-new' } });
+    expect(findLocalByBarcode('12345670', sources)).toBeNull();
+    expect(findLocalByBarcode('123', sources)).toBeNull();
   });
 });
+
+function checkOf(body: string): string {
+  for (let d = 0; d <= 9; d++) if (hasValidCheckDigit(body + d)) return String(d);
+  return 'x';
+}
 
 describe('local match for a missed item', () => {
   it('parses amounts', () => {
     expect(parseAmount('150 g rice')).toEqual({ count: null, grams: 150, rest: 'rice' });
     expect(parseAmount('2 eggs')).toEqual({ count: 2, grams: null, rest: 'eggs' });
     expect(parseAmount('banana')).toEqual({ count: null, grams: null, rest: 'banana' });
+    expect(parseAmount('100g oats')).toEqual({ count: null, grams: 100, rest: 'oats' });
+    expect(parseAmount('1,5 bananas')).toEqual({ count: 1.5, grams: null, rest: 'bananas' });
+  });
+  it('reads fractions as fractions, not as the first digit', () => {
+    expect(parseAmount('1/2 avocado')).toEqual({ count: 0.5, grams: null, rest: 'avocado' });
+    expect(parseAmount('½ avocado')).toEqual({ count: 0.5, grams: null, rest: 'avocado' });
+    expect(parseAmount('¾ cup rice').count).toBe(0.75);
+    expect(parseAmount('1 1/2 bananas')).toEqual({ count: 1.5, grams: null, rest: 'bananas' });
+    expect(parseAmount('1½ bananas').count).toBe(1.5);
+    expect(parseAmount('1/0 avocado')).toEqual({ count: null, grams: null, rest: '1/0 avocado' });
+    const avocado = matchFoods('1/2 avocado', BUILTIN_FOODS)[0];
+    expect(avocado.name.toLowerCase()).toContain('avocado');
+    const half = foodToItem(avocado, '1/2 avocado');
+    const whole = foodToItem(avocado, 'avocado');
+    expect(half.grams).toBe(Math.round(whole.grams / 2));
   });
   it('finds bundled foods and scales to the typed amount', () => {
     const hits = matchFoods('banana', BUILTIN_FOODS);
@@ -280,5 +353,71 @@ describe('local match for a missed item', () => {
     expect(item.grams).toBe(200);
     expect(item.kcal).toBe(Math.round(hits[0].per100g.kcal * 2));
     expect(matchFoods('   ', BUILTIN_FOODS)).toEqual([]);
+  });
+});
+
+describe('swapping a row to a database food', () => {
+  const cauli = BUILTIN_FOODS.find((f) => /cauliflower/i.test(f.name))!;
+  it('uses the food per gram at the current weight and can be undone', () => {
+    const row = setRowGrams(makeRow(rice, 'detected'), 150);
+    const swapped = swapRow(row, cauli);
+    expect(swapped.food?.id).toBe(cauli.id);
+    expect(swapped.item.name).toBe(cauli.name);
+    expect(swapped.item.grams).toBe(150);
+    expect(swapped.item.kcal).toBe(Math.round(cauli.per100g.kcal * 1.5));
+    // The portion is still a guess: confidence stays.
+    expect(swapped.item.confidence).toBe(0.7);
+    const heavier = setRowGrams(swapped, 300);
+    expect(heavier.item.kcal).toBe(Math.round(cauli.per100g.kcal * 3));
+    const back = unswapRow(heavier);
+    expect(back.food).toBeUndefined();
+    expect(back.item).toMatchObject({ name: 'Rice', grams: 300, kcal: 390 });
+  });
+  it('keeps the original estimate across repeated swaps', () => {
+    const other = BUILTIN_FOODS.find((f) => /white rice|rice, white|rice/i.test(f.name) && f.id !== cauli.id)!;
+    const twice = swapRow(swapRow(makeRow(rice, 'detected'), cauli), other);
+    expect(twice.food?.id).toBe(other.id);
+    expect(unswapRow(twice).item).toMatchObject({ name: 'Rice', kcal: 260 });
+  });
+  it('renaming a swapped row returns it to an estimate under the new name', () => {
+    const renamed = renameRow(swapRow(makeRow(rice, 'detected'), cauli), 'Fried rice');
+    expect(renamed.food).toBeUndefined();
+    expect(renamed.item).toMatchObject({ name: 'Fried rice', kcal: 260, grams: 200 });
+  });
+});
+
+describe('logging reviewed rows', () => {
+  let n = 0;
+  const id = () => `id${++n}`;
+  it('gives an estimate a definition that re-scales to the same numbers', () => {
+    const food = aiFoodDefinition(rice, 'ai_x');
+    expect(food).toMatchObject({ id: 'ai_x', source: 'ai', verified: false, servings: [{ label: '200 g', grams: 200 }] });
+    expect(food.per100g.kcal).toBe(130);
+    expect(food.per100g.protein).toBe(2.7);
+  });
+  it('logs estimates with range and definition, matched rows with the food per gram', () => {
+    const cauli = BUILTIN_FOODS.find((f) => /cauliflower/i.test(f.name))!;
+    const rows = [makeRow(rice, 'detected'), swapRow(makeRow(chicken, 'detected'), cauli), makeRow({ ...rice, name: '  ' }, 'added'), makeRow({ ...rice, grams: 0 }, 'added')];
+    const items = rowsToLogItems(rows, id);
+    expect(items).toHaveLength(2);
+    expect(items[0]).toMatchObject({ name: 'Rice', source: 'ai', servingLabel: '200 g', quantity: 1, grams: 200, nutrients: { kcal: 260 }, confidence: 0.7 });
+    expect(items[0].food?.id).toMatch(/^ai_id/);
+    expect(items[0].kcalRange![0]).toBeLessThan(260);
+    expect(items[0].kcalRange![1]).toBeGreaterThan(260);
+    expect(items[1]).toMatchObject({ name: cauli.name, source: cauli.source, servingLabel: '1 g', quantity: 150, grams: 150, confidence: 1 });
+    expect(items[1].food?.id).toBe(cauli.id);
+  });
+});
+
+describe('re-estimate with a correction', () => {
+  it('adds the correction after the original text', () => {
+    expect(withCorrection('large plate', 'that is cauliflower rice')).toBe('large plate\nCorrection from the person who ate it: that is cauliflower rice');
+    expect(withCorrection(undefined, 'no cheese')).toBe('Correction from the person who ate it: no cheese');
+    expect(withCorrection('desc', '  ')).toBe('desc');
+  });
+  it('fits the 500-character limit and keeps the correction whole', () => {
+    const out = withCorrection('x'.repeat(500), 'it was brown rice');
+    expect(out.length).toBeLessThanOrEqual(500);
+    expect(out.endsWith('it was brown rice')).toBe(true);
   });
 });

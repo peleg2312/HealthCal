@@ -2,12 +2,12 @@ import { Info, Plus } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
-import { formatDayLabel, formatShortDate } from '@/lib/dates';
+import { diffDays, formatDayLabel, formatShortDate } from '@/lib/dates';
 import { isPlausibleBodyFat, projectedGoalDate } from '@/lib/energy';
 import { formatWeight, weightToKg, weightUnit, weightValue } from '@/lib/units';
 import { deleteWeightRecord, saveWeightRecord } from '@/features/trackers/actions';
 import { DayStepper, Figure, Note, RequireProfile } from '@/features/trackers/components';
-import { findByDate, weightChartData, weightStats, type WeightRange } from '@/features/trackers/helpers';
+import { findByDate, keepOrConvert, weightChartData, weightStats, type WeightRange } from '@/features/trackers/helpers';
 import { useToday } from '@/store/clock';
 import { useProfile, useWeightSeries } from '@/store/selectors';
 import { useTheme } from '@/theme';
@@ -71,7 +71,7 @@ function WeightScreen() {
   const footer = <Button testID="weight-log" title="Log weigh-in" icon={<Plus size={20} color={colors.onPrimary} />} onPress={() => setSheetDate(end)} />;
 
   return (
-    <Screen header={<Header title="Weight" subtitle={target ? `Target ${formatWeight(target, units)}` : undefined} />} footer={footer} testID="weight-screen">
+    <Screen header={<Header title="Weight" subtitle={target ? `Target ${formatWeight(target, units)}` : undefined} />} footer={footer} backdrop={colors.weight} testID="weight-screen">
       {empty || !stats ? (
         <Card>
           <EmptyState
@@ -133,7 +133,13 @@ function WeightScreen() {
                 testID="weight-rate"
                 value={stats.weeklyKg === null ? '–' : signed(stats.weeklyKg, units, units === 'imperial' ? 1 : 2)}
                 unit={stats.weeklyKg === null ? undefined : `${unit}/week`}
-                label={stats.weeklyKg === null ? 'Per week (needs 7 days)' : 'Per week, last 2 weeks'}
+                label={
+                  stats.weeklyKg !== null
+                    ? 'Per week, last 3 weeks'
+                    : latest && diffDays(latest.date, end) > 10
+                      ? 'Per week (weigh in to update)'
+                      : 'Per week (needs more weigh-ins)'
+                }
               />
               <Figure value={signed(stats.totalChangeKg, units)} unit={unit} label={`Since ${formatShortDate(series.entries[0].date)}`} />
             </View>
@@ -232,7 +238,8 @@ function WeighInSheet({
   const save = () => {
     if (!date) return;
     if (weight === null || weight <= 0) return setError('Enter your weight');
-    const kg = weightToKg(weight, units);
+    // An untouched prefilled field keeps the stored kg instead of a value rounded through lb.
+    const kg = keepOrConvert(weight, existing ? existing.kg : fallbackKg, display, (v) => weightToKg(v, units)) ?? 0;
     if (kg < 20 || kg > 400) return setError(`That looks off. Enter a weight between ${formatWeight(20, units, 0)} and ${formatWeight(400, units, 0)}.`);
     if (fat !== null && !isPlausibleBodyFat(fat)) return setError('Body fat should be between 3 and 60%');
     saveWeightRecord(date, { kg: Math.round(kg * 100) / 100, ...(fat !== null ? { bodyFatPct: fat } : existing?.bodyFatPct !== undefined ? { bodyFatPct: undefined } : {}) });

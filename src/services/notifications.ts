@@ -7,6 +7,10 @@
  * every data change: the plan is rebuilt from the current numbers and only
  * replaces what is scheduled when it actually changed.
  *
+ * Some reminders carry action buttons (water "+250 ml", "Repeat yesterday's
+ * lunch", weigh-in "Later today"). Every action opens the app, so the
+ * response listener always runs and the Undo toast is on screen.
+ *
  * Web has no scheduled local notifications: every function is a safe no-op
  * there and `remindersSupported` is false.
  */
@@ -15,9 +19,16 @@ import { AndroidImportance } from 'expo-notifications';
 import { router } from 'expo-router';
 import { Platform } from 'react-native';
 
+import { logItems } from '@/features/food/log';
 import { planFromStore } from '@/features/settings/planFromStore';
-import { REMINDER_ROUTES, type PlannedReminder } from '@/features/settings/reminderPlanner';
+import { parseReminderAction, snoozeTime, type PlannedReminder, type ReminderCategory } from '@/features/settings/reminderPlanner';
+import { addDays, today } from '@/lib/dates';
+import { nowISO } from '@/lib/id';
+import { formatVolume } from '@/lib/units';
 import { useStore } from '@/store';
+import { live } from '@/store/selectors';
+import { haptic } from '@/ui/haptics';
+import { toast } from '@/ui/Toast';
 
 export { planReminders, type PlannedReminder, type PlannerInput, type ReminderKind } from '@/features/settings/reminderPlanner';
 
@@ -28,6 +39,11 @@ export type ReminderPermission = 'granted' | 'denied' | 'unsupported';
 const CHANNEL_ID = 'reminders';
 const ID_PREFIX = 'healthcal-';
 const SOURCE = 'healthcal-reminder';
+/** A snoozed reminder. Kept out of `cancelOurs`, so a re-plan does not drop it. */
+const SNOOZE_PREFIX = 'healthcal-snooze-';
+const SNOOZE_SOURCE = 'healthcal-snooze';
+/** Reminders closer than this to now are skipped: iOS rejects a date trigger that is already past. */
+const MIN_LEAD_MS = 5000;
 
 function log(where: string, e: unknown) {
   console.warn(`[reminders] ${where}:`, e instanceof Error ? e.message : e);
@@ -43,18 +59,82 @@ async function ensureChannel(): Promise<void> {
   });
 }
 
-function openFromResponse(response: Notifications.NotificationResponse | null | undefined) {
-  const data = response?.notification.request.content.data as { source?: string; url?: string } | undefined;
-  if (!data || data.source !== SOURCE || typeof data.url !== 'string') return;
-  const url = data.url;
-  // Give the navigator a moment to mount on a cold start.
+type ReminderData = { source?: string; url?: string; kind?: string; date?: string; meal?: string };
+
+/** Responses already handled: a cold start can report the same one twice. */
+const handled = new Set<string>();
+
+function addWaterFromReminder(ml: number) {
+  const s = useStore.getState();
+  const units = s.profile?.units ?? 'metric';
+  const entry = s.upsert('water', { date: today(), ml, beverage: 'water', loggedAt: nowISO() });
+  haptic.success();
+  toast(`Added ${formatVolume(ml, units)} of water`, { label: 'Undo', onPress: () => useStore.getState().remove('water', entry.id) });
+}
+
+function repeatMealFromReminder(meal: 'breakfast' | 'lunch' | 'dinner', date: string) {
+  const s = useStore.getState();
+  const from = addDays(date, -1);
+  const items = live(s.foodEntries).filter((e) => e.date === from && e.meal === meal);
+  if (items.length === 0) {
+    toast(`Nothing was logged for ${meal} yesterday`);
+    return;
+  }
+  const already = live(s.foodEntries).some((e) => e.date === date && e.meal === meal);
+  if (already) {
+    toast(`${meal.charAt(0).toUpperCase()}${meal.slice(1)} is already logged today`);
+    return;
+  }
+  logItems(items, meal, date, `Yesterday's ${meal} added`);
+}
+
+async function snoozeReminder(content: Notifications.NotificationContent, data: ReminderData) {
+  const r = useStore.getState().settings.reminders;
+  const at = snoozeTime(new Date(), r.quietStart, r.quietEnd);
+  if (!at) {
+    toast('Too close to quiet hours to remind you later today');
+    return;
+  }
+  await Notifications.scheduleNotificationAsync({
+    identifier: `${SNOOZE_PREFIX}${data.kind ?? 'reminder'}-${data.date ?? today()}`,
+    content: {
+      title: content.title ?? 'Reminder',
+      body: content.body ?? '',
+      data: { ...data, source: SNOOZE_SOURCE },
+      sound: false,
+    },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at, channelId: CHANNEL_ID },
+  });
+  const clock = `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
+  toast(`Reminder moved to ${clock}`);
+}
+
+function handleResponse(response: Notifications.NotificationResponse | null | undefined, delayMs: number) {
+  if (!response) return;
+  const { content, identifier } = response.notification.request;
+  const data = content.data as ReminderData | undefined;
+  if (!data || (data.source !== SOURCE && data.source !== SNOOZE_SOURCE)) return;
+  const key = `${identifier}|${response.notification.date}|${response.actionIdentifier}`;
+  if (handled.has(key)) return;
+  handled.add(key);
+  const action = parseReminderAction(response.actionIdentifier, data);
+  // Give the navigator and the toast host a moment to mount on a cold start.
   setTimeout(() => {
     try {
-      router.push(url as never);
+      if (!action) {
+        if (typeof data.url === 'string') router.push(data.url as never);
+        return;
+      }
+      if (action.type === 'water') addWaterFromReminder(action.ml);
+      else if (action.type === 'repeat-meal') repeatMealFromReminder(action.meal, action.date);
+      else void snoozeReminder(content, data).catch((e) => log('snooze', e));
+      // Android leaves the notification in the shade after an action button.
+      void Notifications.dismissNotificationAsync(identifier).catch(() => {});
+      void refreshReminders();
     } catch (e) {
-      log('open', e);
+      log('response', e);
     }
-  }, 50);
+  }, delayMs);
 }
 
 let initialized = false;
@@ -72,11 +152,11 @@ function init() {
         shouldSetBadge: false,
       }),
     });
-    Notifications.addNotificationResponseReceivedListener((response) => openFromResponse(response));
-    // App launched by tapping a reminder.
+    Notifications.addNotificationResponseReceivedListener((response) => handleResponse(response, 50));
+    // App launched by tapping a reminder or one of its buttons.
     const last = Notifications.getLastNotificationResponse();
     if (last) {
-      openFromResponse(last);
+      handleResponse(last, 600);
       Notifications.clearLastNotificationResponse();
     }
   } catch (e) {
@@ -123,27 +203,70 @@ async function cancelOurs(): Promise<void> {
   }
 }
 
+/** Drop snoozed reminders whose job is done (the weigh-in was logged). */
+async function cancelResolvedSnoozes(): Promise<void> {
+  const s = useStore.getState();
+  const weighedDates = new Set(live(s.weights).map((w) => w.date));
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  for (const n of scheduled) {
+    const data = n.content.data as ReminderData | undefined;
+    if (!n.identifier.startsWith(SNOOZE_PREFIX) || data?.source !== SNOOZE_SOURCE) continue;
+    const done = !s.settings.reminders.enabled || (data.kind === 'weighin' && !!data.date && weighedDates.has(data.date));
+    if (done) await Notifications.cancelScheduledNotificationAsync(n.identifier);
+  }
+}
+
 function signature(plan: PlannedReminder[]): string {
-  return plan.map((p) => `${p.id}|${p.at.getTime()}|${p.title}|${p.body}`).join('\n');
+  return plan.map((p) => `${p.id}|${p.at.getTime()}|${p.title}|${p.body}|${p.category?.identifier ?? ''}|${p.url}`).join('\n');
+}
+
+const registeredCategories = new Set<string>();
+
+async function ensureCategories(plan: PlannedReminder[]): Promise<void> {
+  const wanted = new Map<string, ReminderCategory>();
+  for (const p of plan) if (p.category) wanted.set(p.category.identifier, p.category);
+  for (const c of wanted.values()) {
+    if (registeredCategories.has(c.identifier)) continue;
+    await Notifications.setNotificationCategoryAsync(
+      c.identifier,
+      c.actions.map((a) => ({ identifier: a.identifier, buttonTitle: a.buttonTitle, options: { opensAppToForeground: true } })),
+    );
+    registeredCategories.add(c.identifier);
+  }
 }
 
 async function schedule(plan: PlannedReminder[]): Promise<void> {
   await ensureChannel();
+  try {
+    await ensureCategories(plan);
+  } catch (e) {
+    // Without categories the reminders still arrive, just without buttons.
+    log('categories', e);
+  }
   for (const p of plan) {
-    await Notifications.scheduleNotificationAsync({
-      identifier: `${ID_PREFIX}${p.id}`,
-      content: {
-        title: p.title,
-        body: p.body,
-        data: { source: SOURCE, kind: p.kind, url: REMINDER_ROUTES[p.kind] },
-        sound: false,
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: p.at,
-        channelId: CHANNEL_ID,
-      },
-    });
+    // Planning and the awaits before this can take a moment: a time that has
+    // just passed would make iOS throw and stop the rest of the plan.
+    if (p.at.getTime() <= Date.now() + MIN_LEAD_MS) continue;
+    const categoryIdentifier = p.category && registeredCategories.has(p.category.identifier) ? p.category.identifier : undefined;
+    try {
+      await Notifications.scheduleNotificationAsync({
+        identifier: `${ID_PREFIX}${p.id}`,
+        content: {
+          title: p.title,
+          body: p.body,
+          data: { source: SOURCE, kind: p.kind, url: p.url, ...p.data },
+          sound: false,
+          ...(categoryIdentifier ? { categoryIdentifier } : null),
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: p.at,
+          channelId: CHANNEL_ID,
+        },
+      });
+    } catch (e) {
+      log(`schedule ${p.id}`, e);
+    }
   }
 }
 
@@ -154,6 +277,7 @@ async function refresh(): Promise<void> {
   init();
   const s = useStore.getState();
   const wanted = s.settings.reminders.enabled && (await getReminderPermission()) === 'granted';
+  if (wanted) await cancelResolvedSnoozes().catch((e) => log('snoozes', e));
   if (!wanted) {
     if (lastSignature !== '') {
       await cancelOurs();
@@ -191,6 +315,8 @@ export async function cancelAllReminders(): Promise<void> {
   if (!remindersSupported) return;
   try {
     await cancelOurs();
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const n of scheduled) if (n.identifier.startsWith(SNOOZE_PREFIX)) await Notifications.cancelScheduledNotificationAsync(n.identifier);
     lastSignature = '';
   } catch (e) {
     log('cancel', e);

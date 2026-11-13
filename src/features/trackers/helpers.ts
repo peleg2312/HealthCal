@@ -223,3 +223,37 @@ export function relativeDayTime(d: Date, now: Date = new Date()): string {
   if (diff === -1) return `Tomorrow ${hhmm}`;
   return `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]} ${hhmm}`;
 }
+
+// ------------------------------------------------------- display round-trip
+
+/**
+ * A number field is prefilled with a rounded display value of a stored metric
+ * value. When the user leaves it untouched, keep the stored value instead of
+ * converting the rounded number back (which would drift: 38.0 cm -> 15.0 in -> 38.1 cm).
+ */
+export function keepOrConvert(
+  shown: number | null,
+  original: number | null | undefined,
+  toDisplay: (metric: number) => number,
+  toMetric: (display: number) => number,
+): number | null {
+  if (shown === null || !Number.isFinite(shown)) return null;
+  if (original !== null && original !== undefined && toDisplay(original) === shown) return original;
+  return toMetric(shown);
+}
+
+/** Split a formatted figure at the first space after the number: '70 fl oz' -> 70 / 'fl oz'. */
+export function splitUnit(formatted: string): { value: string; unit: string } {
+  const m = /^(\S+)\s(.+)$/.exec(formatted);
+  return m ? { value: m[1], unit: m[2] } : { value: formatted, unit: '' };
+}
+
+/** Body fat the profile should carry: the newest live weigh-in that has one, else none. */
+export function latestBodyFat(entries: { date: ISODate; bodyFatPct?: number }[]): number | undefined {
+  let best: { date: ISODate; bodyFatPct?: number } | undefined;
+  for (const e of entries) {
+    if (e.bodyFatPct === undefined || e.bodyFatPct === null) continue;
+    if (!best || e.date > best.date) best = e;
+  }
+  return best?.bodyFatPct;
+}

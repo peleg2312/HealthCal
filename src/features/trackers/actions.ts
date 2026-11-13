@@ -9,7 +9,7 @@ import { useStore } from '@/store';
 import type { FastingSession, ISODate, Profile, SleepEntry, WeightEntry } from '@/types';
 import { haptic, toast } from '@/ui';
 
-import { fastProgress, findByDate, isMostRecentDate } from './helpers';
+import { fastProgress, findByDate, isMostRecentDate, latestBodyFat } from './helpers';
 
 type WeightPatch = Partial<Omit<WeightEntry, 'id' | 'updatedAt' | 'deleted' | 'date'>>;
 
@@ -18,12 +18,23 @@ function profileSnapshot(): Pick<Profile, 'weightKg' | 'bodyFatPct'> | null {
   return p ? { weightKg: p.weightKg, bodyFatPct: p.bodyFatPct } : null;
 }
 
-/** Point the profile at the newest live weigh-in. */
-function syncProfileToLatest() {
+/**
+ * Point the profile at the newest live weigh-in. When `bodyFatChanged`, body fat
+ * also follows the newest weigh-in that has a reading, or is cleared, so BMR does
+ * not keep using a value the user removed.
+ */
+function syncProfileToLatest(bodyFatChanged: boolean) {
   const s = useStore.getState();
+  if (!s.profile) return;
   const entries = live(s.weights).sort((a, b) => a.date.localeCompare(b.date));
   const latest = entries[entries.length - 1];
-  if (latest && s.profile && latest.kg !== s.profile.weightKg) s.setProfile({ weightKg: latest.kg });
+  const patch: Partial<Profile> = {};
+  if (latest && latest.kg !== s.profile.weightKg) patch.weightKg = latest.kg;
+  if (bodyFatChanged) {
+    const bf = latestBodyFat(entries);
+    if (bf !== s.profile.bodyFatPct) patch.bodyFatPct = bf;
+  }
+  if (Object.keys(patch).length) s.setProfile(patch);
 }
 
 /**
@@ -39,6 +50,8 @@ export function saveWeightRecord(date: ISODate, patch: WeightPatch & { kg: numbe
   const updatesProfile = isMostRecentDate(entries, date);
   if (updatesProfile) {
     s.setProfile({ weightKg: patch.kg, ...(patch.bodyFatPct !== undefined ? { bodyFatPct: patch.bodyFatPct } : {}) });
+    // Body fat cleared on the newest weigh-in: fall back to the newest other reading, or none.
+    if ('bodyFatPct' in patch && patch.bodyFatPct === undefined) syncProfileToLatest(true);
   }
   haptic.success();
   toast(opts.message ?? (existing ? 'Weigh-in updated' : 'Weigh-in saved'), {
@@ -56,8 +69,11 @@ export function saveWeightRecord(date: ISODate, patch: WeightPatch & { kg: numbe
 export function deleteWeightRecord(entry: WeightEntry) {
   const s = useStore.getState();
   const before = profileSnapshot();
+  // Only the newest body fat reading feeds the profile; deleting an older one leaves it alone.
+  const feedsBodyFat =
+    entry.bodyFatPct !== undefined && live(s.weights).every((e) => e.id === entry.id || e.bodyFatPct === undefined || e.date < entry.date);
   s.remove('weights', entry.id);
-  syncProfileToLatest();
+  syncProfileToLatest(feedsBodyFat);
   haptic.tap();
   toast('Weigh-in deleted', {
     label: 'Undo',

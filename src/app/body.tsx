@@ -8,11 +8,11 @@ import { isPlausibleBodyFat, leanMassKg } from '@/lib/energy';
 import { formatHeight, lengthToCm, lengthUnit, lengthValue, weightToKg, weightUnit, weightValue } from '@/lib/units';
 import { saveWeightRecord } from '@/features/trackers/actions';
 import { Figure, Note, RequireProfile } from '@/features/trackers/components';
-import { findByDate, hasMeasurements, NAVY_ERROR_PCT, WHTR_GUIDELINE } from '@/features/trackers/helpers';
+import { findByDate, hasMeasurements, keepOrConvert, NAVY_ERROR_PCT, WHTR_GUIDELINE } from '@/features/trackers/helpers';
 import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
-import { Badge, Button, Card, Divider, EmptyState, Header, ListRow, NumberField, Screen, SectionTitle, Text, ToggleRow } from '@/ui';
+import { Badge, Button, Card, Divider, EmptyState, haptic, Header, ListRow, NumberField, Screen, SectionTitle, Text, toast, ToggleRow } from '@/ui';
 
 function w1(kg: number, units: UnitSystem) {
   return `${weightValue(kg, units).toFixed(1)} ${weightUnit(units)}`;
@@ -81,16 +81,21 @@ function BodyScreen() {
   const female = profile.sex === 'female';
   const unit = lengthUnit(units);
 
-  const toInput = (cm?: number) => (cm ? Math.round(lengthValue(cm, units) * 10) / 10 : null);
+  const toDisplayLength = (cm: number) => Math.round(lengthValue(cm, units) * 10) / 10;
+  const toInput = (cm?: number) => (cm ? toDisplayLength(cm) : null);
   const [neck, setNeck] = useState<number | null>(() => toInput(lastMeasured?.neckCm));
   const [waist, setWaist] = useState<number | null>(() => toInput(lastMeasured?.waistCm));
   const [hip, setHip] = useState<number | null>(() => toInput(lastMeasured?.hipCm));
-  const [weightIn, setWeightIn] = useState<number | null>(() => Math.round(weightValue(todays?.kg ?? profile.weightKg, units) * 10) / 10);
+  const toWeightInput = (kg: number) => Math.round(weightValue(kg, units) * 10) / 10;
+  const [weightIn, setWeightIn] = useState<number | null>(() => toWeightInput(todays?.kg ?? profile.weightKg));
+  const [weightError, setWeightError] = useState<string | null>(null);
   const [useEstimate, setUseEstimate] = useState(true);
 
-  const neckCm = neck ? lengthToCm(neck, units) : 0;
-  const waistCm = waist ? lengthToCm(waist, units) : 0;
-  const hipCm = hip ? lengthToCm(hip, units) : 0;
+  // Untouched prefilled fields keep the stored cm, so re-saving in inches does not drift them.
+  const toCm = (v: number) => lengthToCm(v, units);
+  const neckCm = (neck ? keepOrConvert(neck, lastMeasured?.neckCm, toDisplayLength, toCm) : 0) ?? 0;
+  const waistCm = (waist ? keepOrConvert(waist, lastMeasured?.waistCm, toDisplayLength, toCm) : 0) ?? 0;
+  const hipCm = (hip ? keepOrConvert(hip, lastMeasured?.hipCm, toDisplayLength, toCm) : 0) ?? 0;
   const estimate = neckCm && waistCm ? navyBodyFatPct({ sex: profile.sex, heightCm: profile.heightCm, neckCm, waistCm, hipCm: hipCm || undefined }) : null;
   const missing = !neck || !waist || (female && !hip);
 
@@ -106,8 +111,18 @@ function BodyScreen() {
 
   const canSave = !!(neck || waist || hip);
   const save = () => {
-    const kg = todays?.kg ?? (weightIn ? weightToKg(weightIn, units) : 0);
-    if (!(kg >= 20 && kg <= 400)) return;
+    const kg = todays?.kg ?? keepOrConvert(weightIn, profile.weightKg, toWeightInput, (v) => weightToKg(v, units)) ?? 0;
+    if (!(kg >= 20 && kg <= 400)) {
+      const message =
+        weightIn === null || weightIn <= 0
+          ? 'Enter today’s weight to save measurements'
+          : `Enter a weight between ${weightValue(20, units).toFixed(0)} and ${weightValue(400, units).toFixed(0)} ${weightUnit(units)}`;
+      setWeightError(message);
+      // The field can sit above the fold when the footer button is tapped.
+      haptic.warn();
+      toast(message);
+      return;
+    }
     saveWeightRecord(
       date,
       {
@@ -124,7 +139,7 @@ function BodyScreen() {
   const footer = <Button testID="body-save" title="Save measurements" disabled={!canSave} onPress={save} />;
 
   return (
-    <Screen header={<Header title="Body" subtitle={`${formatHeight(profile.heightCm, units)} · ${w1(weightKg, units)}`} />} footer={footer} testID="body-screen">
+    <Screen header={<Header title="Body" subtitle={`${formatHeight(profile.heightCm, units)} · ${w1(weightKg, units)}`} />} footer={footer} backdrop={colors.weight} testID="body-screen">
       <Card style={{ gap: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View>
@@ -196,7 +211,11 @@ function BodyScreen() {
             label="Today’s weight"
             suffix={weightUnit(units)}
             value={weightIn}
-            onChange={setWeightIn}
+            onChange={(n) => {
+              setWeightIn(n);
+              setWeightError(null);
+            }}
+            error={weightError}
             hint="No weigh-in today yet. Measurements are saved with today’s weight."
           />
         )}

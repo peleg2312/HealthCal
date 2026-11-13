@@ -14,12 +14,36 @@ const words = (s: string) =>
     .split(/[^a-z0-9]+/)
     .filter((w) => w.length > 1);
 
-/** Leading amount like "2 eggs" or "150 g rice". */
+const UNICODE_FRACTIONS: Record<string, number> = { '½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 1 / 3, '⅔': 2 / 3, '⅛': 0.125 };
+
+/**
+ * A leading number: "2", "1.5", "1,5", "1/2", "1 1/2", "½" or "1½".
+ * Fractions are read before whole numbers so "1/2 avocado" is half, not one.
+ */
+const NUMBER = /^\s*(\d+\s+\d+\s*\/\s*\d+|\d+\s*\/\s*\d+|\d*\s*[½¼¾⅓⅔⅛]|\d+(?:[.,]\d+)?)/;
+
+function toNumber(raw: string): number | null {
+  const s = raw.trim();
+  const mixed = s.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/);
+  if (mixed) return Number(mixed[3]) > 0 ? Number(mixed[1]) + Number(mixed[2]) / Number(mixed[3]) : null;
+  const frac = s.match(/^(\d+)\s*\/\s*(\d+)$/);
+  if (frac) return Number(frac[2]) > 0 ? Number(frac[1]) / Number(frac[2]) : null;
+  const uni = s.match(/^(\d*)\s*([½¼¾⅓⅔⅛])$/);
+  if (uni) return (uni[1] ? Number(uni[1]) : 0) + UNICODE_FRACTIONS[uni[2]];
+  const n = Number(s.replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Leading amount like "2 eggs", "1/2 avocado" or "150 g rice". */
 export function parseAmount(query: string): { count: number | null; grams: number | null; rest: string } {
-  const g = query.match(/^\s*(\d+(?:[.,]\d+)?)\s*(g|gr|grams?|ml)\b\s*(?:of\s+)?(.*)$/i);
-  if (g) return { count: null, grams: Number(g[1].replace(',', '.')), rest: g[3] };
-  const c = query.match(/^\s*(\d+(?:[.,]\d+)?)\s*(?:x\s*)?(.*)$/i);
-  if (c && c[2]) return { count: Number(c[1].replace(',', '.')), grams: null, rest: c[2] };
+  const num = query.match(NUMBER);
+  const value = num ? toNumber(num[1]) : null;
+  if (!num || value === null || !(value > 0)) return { count: null, grams: null, rest: query };
+  const after = query.slice(num[0].length);
+  const g = after.match(/^\s*(g|gr|grams?|ml)\b\s*(?:of\s+)?(.*)$/i);
+  if (g) return { count: null, grams: value, rest: g[2] };
+  const c = after.match(/^\s*(?:x\s*)?(?:of\s+)?(.*)$/i);
+  if (c && c[1]) return { count: value, grams: null, rest: c[1] };
   return { count: null, grams: null, rest: query };
 }
 
@@ -54,17 +78,23 @@ export function foodToItem(food: Food, query: string): AiFoodItem {
   const { count, grams } = parseAmount(query);
   const serving = food.servings.find((s) => s.grams > 0);
   const g = grams ?? (serving ? serving.grams * (count ?? 1) : 100 * (count ?? 1));
+  // Reference data, but the portion is still the user's guess.
+  return itemFromFood(food, g, 0.8);
+}
+
+/** A review item for `grams` of a food definition, with exact per-gram values. */
+export function itemFromFood(food: Food, grams: number, confidence: number): AiFoodItem {
+  const g = Math.max(0, Math.round(Number.isFinite(grams) ? grams : 0));
   const n = scaleNutrients(food.per100g, g);
   const r1 = (x: number | undefined) => Math.round((x ?? 0) * 10) / 10;
   return {
     name: food.name,
-    grams: Math.round(g),
+    grams: g,
     kcal: Math.round(n.kcal),
     protein: r1(n.protein),
     carbs: r1(n.carbs),
     fat: r1(n.fat),
     fiber: r1(n.fiber),
-    // Reference data, but the portion is still the user's guess.
-    confidence: 0.8,
+    confidence,
   };
 }

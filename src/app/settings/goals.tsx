@@ -4,10 +4,10 @@ import { View } from 'react-native';
 
 import { Group, Hint, OptionRow } from '@/features/settings/components';
 import { formatMonthDayYear } from '@/features/settings/format';
-import { ageFromBirthDate, fromISODate } from '@/lib/dates';
+import { birthDateError, customSplitError, heightError, rateForGoal, targetWeightError } from '@/features/settings/goalsValidation';
+import { ageFromBirthDate } from '@/lib/dates';
 import {
   ACTIVITY_LABELS,
-  calorieFloor,
   macroTargets,
   maxWeeklyRateKg,
   projectedGoalDate,
@@ -79,7 +79,10 @@ function GoalsForm() {
   const weights = useLive('weights');
   const u = saved.units;
 
-  const [draft, setDraft] = useState<Profile>(saved);
+  // A plan saved as lose or gain with no pace (an older maintain plan switched over) gets the default pace, so Save fixes it.
+  const [draft, setDraft] = useState<Profile>(() =>
+    saved.goal !== 'maintain' && !(saved.weeklyRateKg > 0) ? { ...saved, weeklyRateKg: rateForGoal(saved.goal, 0, saved.weightKg) } : saved,
+  );
   const patch = (p: Partial<Profile>) => setDraft((d) => ({ ...d, ...p }));
 
   // Text-backed inputs that need validation before they reach the draft.
@@ -90,20 +93,17 @@ function GoalsForm() {
   const [manualCalories, setManualCalories] = useState(!!saved.calorieTargetOverride);
   const [manualWater, setManualWater] = useState(!!saved.waterGoalMlOverride);
 
-  const birthValid = /^\d{4}-\d{2}-\d{2}$/.test(birthText) && !Number.isNaN(fromISODate(birthText).getTime()) && (() => {
-    const age = ageFromBirthDate(birthText);
-    return age >= 13 && age <= 110;
-  })();
-  const customTotal = custom.protein + custom.carbs + custom.fat;
-  const macroValid = macroMode !== 'custom' || customTotal === 100;
-  const heightValid = draft.heightCm >= 100 && draft.heightCm <= 250;
+  const birthError = birthDateError(birthText);
+  const birthValid = birthError === null;
+  const splitError = customSplitError(custom);
+  const macroValid = macroMode !== 'custom' || splitError === null;
+  const heightMessage = heightError(draft.heightCm, u);
+  const heightValid = heightMessage === null;
   const bodyFatValid = draft.bodyFatPct === undefined || (draft.bodyFatPct >= 3 && draft.bodyFatPct <= 60);
   const caloriesValid = !manualCalories || (!!draft.calorieTargetOverride && draft.calorieTargetOverride >= 800 && draft.calorieTargetOverride <= 6000);
   const waterValid = !manualWater || (!!draft.waterGoalMlOverride && draft.waterGoalMlOverride >= 500 && draft.waterGoalMlOverride <= 8000);
-  const targetValid =
-    draft.goal === 'maintain' ||
-    draft.targetWeightKg === undefined ||
-    (draft.goal === 'lose' ? draft.targetWeightKg < draft.weightKg : draft.targetWeightKg > draft.weightKg);
+  const targetMessage = targetWeightError(draft.goal, draft.weightKg, draft.targetWeightKg, u);
+  const targetValid = targetMessage === null;
 
   // The profile the preview and Save use.
   const effective: Profile = {
@@ -124,7 +124,7 @@ function GoalsForm() {
   const water = effective.waterGoalMlOverride ?? baseWaterGoalMl(effective.weightKg, effective.sex);
   const projected = draft.goal === 'maintain' ? null : projectedGoalDate(effective.weightKg, effective.targetWeightKg, model.target.impliedWeeklyKg);
   const maxRate = maxWeeklyRateKg(draft.goal, draft.weightKg);
-  const floor = calorieFloor(draft.sex);
+  const floor = model.target.floor;
 
   const valid = birthValid && macroValid && heightValid && bodyFatValid && caloriesValid && waterValid && targetValid;
   const dirty = JSON.stringify(effective) !== JSON.stringify(saved);
@@ -164,7 +164,7 @@ function GoalsForm() {
         <Text variant="caption" color="textSecondary">
           {model.target.source === 'override'
             ? `Set by you. Estimated expenditure is ${formatNumber(Math.round(model.tdee))} kcal.`
-            : `Expenditure ${formatNumber(Math.round(model.tdee))} kcal${model.usingAdaptive ? ' (learned from your data)' : ''}, ${
+            : `Expenditure ${formatNumber(Math.round(model.tdee))} kcal${model.usingAdaptive ? ' (adjusted to your logs and weigh-ins)' : ''}, ${
                 model.target.dailyDelta < -5
                   ? `${formatNumber(Math.round(-model.target.dailyDelta))} kcal below`
                   : model.target.dailyDelta > 5
@@ -172,7 +172,11 @@ function GoalsForm() {
                     : 'matched'
               }.`}
         </Text>
-        {model.target.limitedByFloor ? (
+        {model.target.belowFloor && draft.goal === 'lose' && model.target.source !== 'override' ? (
+          <Text variant="caption" color="warning" style={{ marginTop: 4 }}>
+            Your estimated expenditure is already at the recommended minimum, so the plan holds at maintenance.
+          </Text>
+        ) : model.target.limitedByFloor ? (
           <Text variant="caption" color="warning" style={{ marginTop: 4 }}>
             Held at the {formatNumber(floor)} kcal minimum, so the pace will be slower than chosen.
           </Text>
@@ -199,7 +203,7 @@ function GoalsForm() {
 
       <Group title="Goal">
         <View style={{ paddingVertical: spacing.md, gap: spacing.md }}>
-          <Segmented<GoalType> value={draft.goal} onChange={(goal) => patch({ goal })} options={GOALS} />
+          <Segmented<GoalType> value={draft.goal} onChange={(goal) => patch({ goal, weeklyRateKg: rateForGoal(goal, draft.weeklyRateKg, draft.weightKg) })} options={GOALS} />
           {draft.goal !== 'maintain' ? (
             <>
               <NumberField
@@ -208,7 +212,7 @@ function GoalsForm() {
                 suffix={weightUnit(u)}
                 value={draft.targetWeightKg ? Math.round(weightValue(draft.targetWeightKg, u) * 10) / 10 : null}
                 onChange={(v) => patch({ targetWeightKg: v ? weightToKg(v, u) : undefined })}
-                error={targetValid ? null : draft.goal === 'lose' ? 'Choose a weight below your current weight.' : 'Choose a weight above your current weight.'}
+                error={targetMessage}
                 hint={`Now ${formatWeight(draft.weightKg, u)}. Log new weigh-ins on the weight screen.`}
               />
               <View style={{ gap: spacing.sm }}>
@@ -270,7 +274,8 @@ function GoalsForm() {
                 decimals={0}
                 style={{ flex: 1 }}
                 value={ft}
-                onChange={(v) => v !== null && patch({ heightCm: ftInToCm(v, inch) })}
+                onChange={(v) => v !== null && patch({ heightCm: ftInToCm(Math.round(v), inch) })}
+                error={heightMessage}
               />
               <NumberField
                 testID="goals-height-in"
@@ -279,7 +284,7 @@ function GoalsForm() {
                 decimals={0}
                 style={{ flex: 1 }}
                 value={inch}
-                onChange={(v) => v !== null && patch({ heightCm: ftInToCm(ft, Math.min(11, v)) })}
+                onChange={(v) => v !== null && patch({ heightCm: ftInToCm(ft, Math.min(11, Math.max(0, Math.round(v)))) })}
               />
             </View>
           ) : (
@@ -290,7 +295,7 @@ function GoalsForm() {
               decimals={0}
               value={Math.round(draft.heightCm)}
               onChange={(v) => v !== null && patch({ heightCm: v })}
-              error={heightValid ? null : 'Enter a height between 100 and 250 cm.'}
+              error={heightMessage}
             />
           )}
           <TextField
@@ -301,7 +306,7 @@ function GoalsForm() {
             onChangeText={setBirthText}
             autoCapitalize="none"
             inputMode="numeric"
-            error={birthValid ? null : 'Use the format YYYY-MM-DD, for example 1990-04-21.'}
+            error={birthError}
             hint={birthValid ? `${ageFromBirthDate(birthText)} years old` : undefined}
           />
           <NumberField
@@ -365,8 +370,8 @@ function GoalsForm() {
                 <NumberField testID="goals-pct-carbs" label="Carbs" suffix="%" decimals={0} style={{ flex: 1 }} value={custom.carbs} onChange={(v) => setCustom((c) => ({ ...c, carbs: v ?? 0 }))} />
                 <NumberField testID="goals-pct-fat" label="Fat" suffix="%" decimals={0} style={{ flex: 1 }} value={custom.fat} onChange={(v) => setCustom((c) => ({ ...c, fat: v ?? 0 }))} />
               </View>
-              <Text variant="caption" color={customTotal === 100 ? 'textSecondary' : 'warning'}>
-                Total {customTotal}%{customTotal === 100 ? '' : `, ${customTotal > 100 ? 'remove' : 'add'} ${Math.abs(100 - customTotal)} to reach 100%`}
+              <Text variant="caption" color={splitError ? 'warning' : 'textSecondary'} testID="goals-pct-total">
+                {splitError ?? 'Total 100%'}
               </Text>
             </>
           ) : null}
@@ -426,7 +431,7 @@ function GoalsForm() {
           subtitle={
             model.adaptive.observed !== null
               ? `Your logs and weigh-ins suggest ${formatNumber(model.adaptive.observed)} kcal a day of expenditure.`
-              : `Adjusts expenditure from your weight trend and logs. Needs ${model.adaptive.needs ?? 'a little more data'}.`
+              : `Compares what you log with a straight line through your weigh-ins of the last four weeks. Needs ${model.adaptive.needs ?? 'a little more data'}.`
           }
           value={draft.useAdaptiveTdee}
           onChange={(useAdaptiveTdee) => patch({ useAdaptiveTdee })}

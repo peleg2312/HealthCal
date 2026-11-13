@@ -19,7 +19,8 @@ function buildBars(days: InsightDay[], today: string, colors: { calories: string
       const fromEnd = days.length - 1 - i;
       const label = every === 1 ? (d.date === today ? 'Today' : weekdayShort(d.date)) : fromEnd % every === 3 ? formatShortDate(d.date) : '';
       const kcal = d.entries.length ? d.eaten.kcal : 0;
-      return { label, value: kcal, color: d.date === today ? colors.textTertiary : colorFor(kcal, d.budget) };
+      const detail = `${formatShortDate(d.date)} · ${kcal ? `${formatNumber(Math.round(kcal))} of ${formatNumber(Math.round(d.budget))} kcal` : 'not logged'}`;
+      return { label, value: kcal, color: d.date === today ? colors.textTertiary : colorFor(kcal, d.budget), detail };
     });
     return { data, weekly: false };
   }
@@ -34,7 +35,8 @@ function buildBars(days: InsightDay[], today: string, colors: { calories: string
     const kcal = complete.length ? complete.reduce((s, d) => s + d.eaten.kcal, 0) / complete.length : 0;
     const budget = complete.length ? complete.reduce((s, d) => s + d.budget, 0) / complete.length : 0;
     const fromEnd = entries.length - 1 - i;
-    return { label: fromEnd % 3 === 1 ? formatShortDate(start) : '', value: kcal, color: colorFor(kcal, budget) };
+    const detail = `Week of ${formatShortDate(start)} · ${kcal ? `${formatNumber(Math.round(kcal))} kcal a day` : 'no full days'}`;
+    return { label: fromEnd % 3 === 1 ? formatShortDate(start) : '', value: kcal, color: colorFor(kcal, budget), detail };
   });
   return { data, weekly: true };
 }
@@ -66,12 +68,19 @@ export function CaloriesCard({ days, summary, today, eatBack }: { days: InsightD
               {diffText}
             </Text>
           </View>
-          <BarChart data={data} color={colors.calories} goal={Math.round(c.avgBudget)} height={160} />
+          <BarChart
+            testID="progress-calories-chart"
+            data={data}
+            color={colors.calories}
+            band={{ from: c.avgBudget * (1 - BUDGET_BAND), to: c.avgBudget * (1 + BUDGET_BAND) }}
+            height={160}
+            scrub
+          />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.lg, rowGap: spacing.xs }}>
             <LegendDot color={colors.calories} label="Within 10% or under" />
             <LegendDot color={colors.warning} label="More than 10% over" />
             {!weekly ? <LegendDot color={colors.textTertiary} label="Today so far" /> : null}
-            <LegendDot color={colors.textSecondary} label="Average budget" dashed />
+            <LegendDot color={`${colors.calories}44`} label="Budget ±10%" />
           </View>
           <StatStrip
             items={[
@@ -81,7 +90,7 @@ export function CaloriesCard({ days, summary, today, eatBack }: { days: InsightD
             ]}
           />
           <Note>
-            Averages use {summary.completeDays} fully logged {summary.completeDays === 1 ? 'day' : 'days'}. Today
+            Press and drag on the chart to read each day. Averages use {summary.completeDays} fully logged {summary.completeDays === 1 ? 'day' : 'days'}. Today
             {summary.partialDays ? ` and ${summary.partialDays} partly logged ${summary.partialDays === 1 ? 'day' : 'days'} (under half the budget)` : ''} {summary.partialDays ? 'are' : 'is'} left out.{eatBack ? ' Budgets include the exercise calories you eat back.' : ''}
           </Note>
         </>

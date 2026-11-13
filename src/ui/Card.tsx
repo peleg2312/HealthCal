@@ -36,7 +36,7 @@ export function Card({ onPress, padding, gradient, tone = 'surface', style, chil
   );
   if (onPress) {
     return (
-      <PressableScale onPress={onPress} style={[base, style]} scaleTo={0.985} accessibilityLabel={accessibilityLabel}>
+      <PressableScale testID={rest.testID} accessibilityHint={rest.accessibilityHint} onPress={onPress} style={[base, style]} scaleTo={0.985} accessibilityLabel={accessibilityLabel}>
         {body}
       </PressableScale>
     );

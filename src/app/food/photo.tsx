@@ -1,8 +1,8 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Camera, Droplet, FlaskConical, ImagePlus, Info, Lightbulb, RefreshCw, Sparkles } from 'lucide-react-native';
-import React, { useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Camera, Droplet, FlaskConical, ImagePlus, Info, Lightbulb, MessageSquareText, RefreshCw, Sparkles } from 'lucide-react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
 
 import { AddMissingItem } from '@/features/ai/AddMissingItem';
 import { AiError, aiError, type AiErrorCode } from '@/features/ai/api';
@@ -20,21 +20,31 @@ import {
   overallConfidence,
   renameRow,
   rowsFromResult,
+  rowsToLogItems,
   setRowGrams,
+  swapRow,
   totals,
+  unswapRow,
+  withCorrection,
   type AddedFat,
   type ReviewRow,
 } from '@/features/ai/estimate';
 import { ItemRow } from '@/features/ai/ItemRow';
+import { matchFoods } from '@/features/ai/localMatch';
+import { PhotoHero } from '@/features/ai/PhotoHero';
 import { SampleNotice } from '@/features/ai/SampleNotice';
-import { logAiItems } from '@/features/food/log';
+import { logItems } from '@/features/food/log';
+import { BUILTIN_FOODS } from '@/data/foods';
 import { today } from '@/lib/dates';
+import { newId } from '@/lib/id';
 import { formatMacro, mealForTime, MEALS } from '@/lib/nutrition';
 import { useAuth } from '@/services/auth';
-import { analyzeFood, PhotoError, pickPhoto, prepareImage, type PickedPhoto, type PreparedImage } from '@/services/aiFood';
+import { analyzeFood, PhotoError, pickPhoto, prepareImage, takePendingPhoto, type PickedPhoto, type PreparedImage } from '@/services/aiFood';
 import { isBackendConfigured } from '@/services/supabase';
+import { useStore } from '@/store';
+import { useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
-import type { AiFoodResult, MealType } from '@/types';
+import type { AiFoodResult, Food, MealType } from '@/types';
 import { Button, Card, Chip, Divider, goBack, haptic, Header, MacroBar, Screen, Segmented, Text, TextField, toast } from '@/ui';
 
 type InputMode = 'photo' | 'text';
@@ -74,7 +84,33 @@ export default function PhotoScreen() {
   const [error, setError] = useState<ScreenError | null>(null);
   const [addingAi, setAddingAi] = useState(false);
   const [pendingPrecise, setPendingPrecise] = useState(false);
+  const [correction, setCorrection] = useState('');
+  const [highlight, setHighlight] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  // Where the item rows sit in the scroll content, so a hero pill can scroll to one.
+  const layout = useRef<{ section: number; card: number; rows: Record<string, number> }>({ section: 0, card: 0, rows: {} });
+  const customFoods = useLive('customFoods');
+  // The person's own foods first, then the bundled reference foods.
+  const matchPool: Food[] = [...customFoods, ...BUILTIN_FOODS];
+
+  // Android can kill the app while the camera app is open; collect that photo on return.
+  useEffect(() => {
+    let live = true;
+    void takePendingPhoto().then((picked) => {
+      if (live && picked) void acceptPhoto(picked);
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!highlight) return;
+    const t = setTimeout(() => setHighlight(null), 1600);
+    return () => clearTimeout(t);
+  }, [highlight]);
 
   const searchHref = `/food/search?meal=${meal}&date=${date}`;
   const ready = mode === 'photo' ? !!preview : description.trim().length >= 3;
@@ -97,6 +133,16 @@ export default function PhotoScreen() {
     try {
       const picked = await pickPhoto(source);
       if (!picked) return;
+      await acceptPhoto(picked);
+    } catch (e) {
+      setPhoto(null);
+      fail(e, false);
+    }
+  }
+
+  async function acceptPhoto(picked: PickedPhoto) {
+    try {
+      setMode('photo');
       setPreparing(true);
       setPhoto(picked);
       setPreview(null);
@@ -110,7 +156,7 @@ export default function PhotoScreen() {
     }
   }
 
-  async function analyse(precise: boolean) {
+  async function analyse(precise: boolean, fix?: string) {
     const controller = new AbortController();
     abortRef.current = controller;
     setPendingPrecise(precise);
@@ -121,7 +167,8 @@ export default function PhotoScreen() {
         // The careful pass gets more pixels: 1024 px instead of 768 px.
         image = precise ? (await prepareImage(photo, { precise: true })).base64 : preview.base64;
       }
-      const text = mode === 'photo' ? note.trim() || undefined : description.trim();
+      const base = mode === 'photo' ? note.trim() || undefined : description.trim();
+      const text = fix?.trim() ? withCorrection(base, fix) : base;
       const res = await analyzeFood({ image, text, precise }, { signal: controller.signal, demoError });
       if (controller.signal.aborted) return;
       setResult(res.result);
@@ -129,7 +176,8 @@ export default function PhotoScreen() {
       // A new pass replaces what the model found; items the user added stay.
       const kept = rows.filter((r) => r.kind === 'added');
       setRows(applyAddedFat([...rowsFromResult(res.result), ...kept], fat));
-      setPrecisePass(precise);
+      setPrecisePass(precise || (!!fix && precisePass));
+      if (fix) setCorrection('');
       setError(null);
       setStep('review');
       haptic.success();
@@ -169,14 +217,38 @@ export default function PhotoScreen() {
   }
 
   function add() {
-    const items = rows.map((r) => r.item).filter((it) => it.grams > 0 && it.name.trim());
+    const items = rowsToLogItems(rows, newId);
     if (items.length === 0) return;
-    logAiItems(
-      items.map((it) => ({ ...it, name: it.name.trim() })),
-      meal,
-      date,
-    );
+    logItems(items, meal, date);
+    // Estimates and matched foods show up in Recent, ready to log again.
+    const store = useStore.getState();
+    for (const it of items) if (it.food) store.rememberFood(it.food);
     goBack(`/diary?date=${date}`);
+  }
+
+  function removeRow(r: ReviewRow) {
+    const index = rows.findIndex((x) => x.key === r.key);
+    const fatBefore = fat;
+    if (r.kind === 'fat') setFat('none');
+    setRows((rs) => rs.filter((x) => x.key !== r.key));
+    toast(`Removed ${r.item.name.trim() || 'item'}`, {
+      label: 'Undo',
+      onPress: () => {
+        if (r.kind === 'fat') {
+          // Put the chosen amount back the same way the chips set it.
+          setFat(fatBefore);
+          setRows((rs) => applyAddedFat(rs, fatBefore));
+          return;
+        }
+        setRows((rs) => (rs.some((x) => x.key === r.key) ? rs : [...rs.slice(0, index), r, ...rs.slice(index)]));
+      },
+    });
+  }
+
+  function showRow(key: string) {
+    const y = layout.current.rows[key];
+    if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(0, layout.current.section + layout.current.card + y - 12), animated: true });
+    setHighlight(key);
   }
 
   function switchMode(m: InputMode) {
@@ -193,6 +265,8 @@ export default function PhotoScreen() {
   const range = calorieRange(items);
   const conf = confidenceLevel(overallConfidence(rows.filter((r) => r.kind === 'detected').map((r) => r.item)));
   const isDemo = !!result?.demo;
+  // The sample result is not about the photo, so it does not wear it.
+  const heroPhoto = mode === 'photo' && preview && !isDemo ? preview.uri : null;
   const allowance = remaining !== null ? `${remaining} ${remaining === 1 ? 'analysis' : 'analyses'} left today` : null;
 
   let footer: React.ReactNode = null;
@@ -221,7 +295,10 @@ export default function PhotoScreen() {
   }
 
   return (
-    <Screen header={<Header title={title} subtitle={step === 'review' ? undefined : 'AI estimate'} close onBack={() => goBack(`/diary?date=${date}`)} />} footer={footer}>
+    <Screen
+      header={<Header title={title} subtitle={step === 'review' ? undefined : 'AI estimate'} close onBack={() => goBack(`/diary?date=${date}`)} />}
+      footer={footer}
+      scrollProps={{ ref: scrollRef } as ScrollViewProps}>
       {step === 'capture' ? (
         <>
           <Segmented
@@ -326,44 +403,64 @@ export default function PhotoScreen() {
         <>
           {isDemo ? <SampleNotice reason={access.live ? 'signed_out' : access.reason} variant="result" /> : null}
 
-          <Card style={{ gap: spacing.lg }}>
-            <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-              {mode === 'photo' && preview && !isDemo ? (
-                <Image source={{ uri: preview.uri }} style={{ width: 64, height: 64, borderRadius: radius.md }} contentFit="cover" accessibilityLabel="Your meal photo" />
-              ) : (
+          {heroPhoto ? (
+            <>
+              <PhotoHero
+                uri={heroPhoto}
+                dish={result.dish}
+                kcal={sum.kcal}
+                range={`${formatKcalRange(range)} kcal`}
+                items={rows.filter((r) => r.kind !== 'fat').map((r) => ({ key: r.key, item: r.item }))}
+                onItemPress={showRow}
+              />
+              <Card style={{ gap: spacing.md }}>
+                <Text variant="caption" color="textSecondary">
+                  {`AI estimate · ${CONFIDENCE_WORDS[conf]}${precisePass ? ' · checked carefully' : ''}`}
+                </Text>
+                <MacroBar protein={sum.protein} carbs={sum.carbs} fat={sum.fat} />
+                <View style={{ flexDirection: 'row' }}>
+                  <MacroStat label="Protein" value={sum.protein} color={colors.protein} />
+                  <MacroStat label="Carbs" value={sum.carbs} color={colors.carbs} />
+                  <MacroStat label="Fat" value={sum.fat} color={colors.fat} />
+                </View>
+              </Card>
+            </>
+          ) : (
+            <Card style={{ gap: spacing.lg }}>
+              <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
                 <View style={{ width: 64, height: 64, borderRadius: radius.md, backgroundColor: `${isDemo ? colors.warning : colors.primary}22`, alignItems: 'center', justifyContent: 'center' }}>
                   {isDemo ? <FlaskConical size={24} color={colors.warning} /> : <Sparkles size={24} color={colors.primary} />}
                 </View>
-              )}
-              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                <Text variant="h3" numberOfLines={2} testID="ai-dish">
-                  {isDemo ? `Sample: ${result.dish}` : result.dish}
-                </Text>
-                <Text variant="caption" color="textSecondary">
-                  {isDemo ? 'Example data' : `AI estimate · ${CONFIDENCE_WORDS[conf]}${precisePass ? ' · checked carefully' : ''}`}
+                <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                  <Text variant="h3" numberOfLines={2} testID="ai-dish">
+                    {isDemo ? `Sample: ${result.dish}` : result.dish}
+                  </Text>
+                  <Text variant="caption" color="textSecondary">
+                    {isDemo ? 'Example data' : `AI estimate · ${CONFIDENCE_WORDS[conf]}${precisePass ? ' · checked carefully' : ''}`}
+                  </Text>
+                </View>
+              </View>
+              <View>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+                  <Text variant="numXL" tabular testID="ai-total-kcal">
+                    {sum.kcal}
+                  </Text>
+                  <Text variant="title" color="textSecondary">
+                    kcal
+                  </Text>
+                </View>
+                <Text variant="label" color="textSecondary" testID="ai-total-range">
+                  {formatKcalRange(range)} kcal
                 </Text>
               </View>
-            </View>
-            <View>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                <Text variant="numXL" tabular testID="ai-total-kcal">
-                  {sum.kcal}
-                </Text>
-                <Text variant="title" color="textSecondary">
-                  kcal
-                </Text>
+              <MacroBar protein={sum.protein} carbs={sum.carbs} fat={sum.fat} />
+              <View style={{ flexDirection: 'row' }}>
+                <MacroStat label="Protein" value={sum.protein} color={colors.protein} />
+                <MacroStat label="Carbs" value={sum.carbs} color={colors.carbs} />
+                <MacroStat label="Fat" value={sum.fat} color={colors.fat} />
               </View>
-              <Text variant="label" color="textSecondary" testID="ai-total-range">
-                {formatKcalRange(range)} kcal
-              </Text>
-            </View>
-            <MacroBar protein={sum.protein} carbs={sum.carbs} fat={sum.fat} />
-            <View style={{ flexDirection: 'row' }}>
-              <MacroStat label="Protein" value={sum.protein} color={colors.protein} />
-              <MacroStat label="Carbs" value={sum.carbs} color={colors.carbs} />
-              <MacroStat label="Fat" value={sum.fat} color={colors.fat} />
-            </View>
-          </Card>
+            </Card>
+          )}
 
           <Card style={{ gap: spacing.md, borderColor: result.hiddenFatQuestion ? `${colors.fat}66` : colors.border }}>
             <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
@@ -382,38 +479,47 @@ export default function PhotoScreen() {
             </View>
           </Card>
 
-          <View style={{ gap: spacing.sm }}>
+          <View style={{ gap: spacing.sm }} onLayout={(e) => (layout.current.section = e.nativeEvent.layout.y)}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
               <Text variant="h3">Items</Text>
               <Text variant="caption" color="textSecondary">
                 Tap a name or weight to correct it
               </Text>
             </View>
-            <Card padding={spacing.lg} style={{ paddingVertical: spacing.xs }}>
+            <Card padding={spacing.lg} style={{ paddingVertical: spacing.xs }} onLayout={(e) => (layout.current.card = e.nativeEvent.layout.y)}>
               {rows.length === 0 ? (
                 <Text variant="body" color="textSecondary" style={{ paddingVertical: spacing.lg }}>
                   No items left. Add what you ate below, or go back and try again.
                 </Text>
               ) : (
                 rows.map((r, i) => (
-                  <View key={r.key}>
+                  <View
+                    key={r.key}
+                    onLayout={(e) => (layout.current.rows[r.key] = e.nativeEvent.layout.y)}
+                    style={{
+                      marginHorizontal: -spacing.md,
+                      paddingHorizontal: spacing.md,
+                      borderRadius: radius.md,
+                      backgroundColor: highlight === r.key ? colors.primarySoft : 'transparent',
+                    }}>
                     {i > 0 ? <Divider /> : null}
                     <ItemRow
                       row={r}
                       index={i}
+                      matches={r.kind === 'fat' ? [] : matchFoods(r.food?.name ?? r.item.name, matchPool, 3)}
+                      onSwap={r.kind === 'fat' ? undefined : (food) => setRows((rs) => rs.map((x) => (x.key === r.key ? swapRow(x, food) : x)))}
+                      onUnswap={() => setRows((rs) => rs.map((x) => (x.key === r.key ? unswapRow(x) : x)))}
                       onGrams={(g) => setRows((rs) => rs.map((x) => (x.key === r.key ? setRowGrams(x, g) : x)))}
                       onRename={(name) => setRows((rs) => rs.map((x) => (x.key === r.key ? renameRow(x, name) : x)))}
-                      onRemove={() => {
-                        if (r.kind === 'fat') setFat('none');
-                        setRows((rs) => rs.filter((x) => x.key !== r.key));
-                      }}
+                      onRemove={() => removeRow(r)}
                     />
                   </View>
                 ))
               )}
             </Card>
             <AddMissingItem
-              onAdd={(item) => setRows((rs) => [...rs.filter((r) => r.kind !== 'fat'), makeRow(item, 'added'), ...rs.filter((r) => r.kind === 'fat')])}
+              foods={matchPool}
+              onAdd={(item, food) => setRows((rs) => [...rs.filter((r) => r.kind !== 'fat'), makeRow(item, 'added', food), ...rs.filter((r) => r.kind === 'fat')])}
               onAskAi={access.live ? askAiForItem : undefined}
               aiBusy={addingAi}
             />
@@ -427,6 +533,37 @@ export default function PhotoScreen() {
               </Text>
             </View>
           ) : null}
+
+          <Card style={{ gap: spacing.md }} testID="ai-correction">
+            <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
+              <MessageSquareText size={18} color={colors.primary} style={{ marginTop: 2 }} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text variant="title">What did it get wrong?</Text>
+                <Text variant="caption" color="textSecondary">
+                  {`Say it in a few words and the ${mode === 'photo' ? 'photo' : 'description'} is estimated again with your correction. Uses one analysis; items you added stay.`}
+                </Text>
+              </View>
+            </View>
+            <TextField
+              testID="ai-correction-input"
+              placeholder="e.g. it's cauliflower rice, and no cheese"
+              value={correction}
+              onChangeText={setCorrection}
+              maxLength={300}
+              accessibilityLabel="What the estimate got wrong"
+              returnKeyType="send"
+              onSubmitEditing={() => correction.trim().length >= 3 && void analyse(precisePass, correction)}
+            />
+            <Button
+              testID="ai-reestimate"
+              title="Re-estimate"
+              variant="secondary"
+              size="md"
+              disabled={correction.trim().length < 3}
+              icon={<RefreshCw size={16} color={colors.text} />}
+              onPress={() => void analyse(precisePass, correction)}
+            />
+          </Card>
 
           <View style={{ gap: spacing.sm }}>
             <Text variant="h3">Meal</Text>

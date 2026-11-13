@@ -6,7 +6,9 @@
  * they are right now. The rules exist to keep reminders useful or silent:
  * skip what is already done, respect quiet hours, space them out, cap the day.
  */
+import { ACTIVITY_BY_ID } from '@/data/activities';
 import { addDays, formatClock, fromISODate, parseHHmm, toISODate } from '@/lib/dates';
+import { netKcal } from '@/lib/exercise';
 import { glassesLeft } from '@/lib/hydration';
 import { formatNumber, formatVolume, mlToFlOz } from '@/lib/units';
 import type { DaySummary } from '@/store/selectors';
@@ -20,12 +22,31 @@ export interface PlannedReminder {
   title: string;
   body: string;
   kind: ReminderKind;
+  /** Screen a tap opens. A meal reminder carries its meal and day. */
+  url: string;
+  /** Notification category with action buttons, when this reminder has any. */
+  category?: ReminderCategory;
+  /** What the actions need: the day, and the meal for a meal reminder. */
+  data?: { date: ISODate; meal?: Exclude<MealType, 'snack'> };
+}
+
+export interface ReminderAction {
+  identifier: string;
+  buttonTitle: string;
+}
+
+export interface ReminderCategory {
+  /** Unique per set of buttons, so a change of presets or units registers a new category. */
+  identifier: string;
+  actions: ReminderAction[];
 }
 
 export interface PlannerDay {
   summary: DaySummary;
   /** A weight entry exists for this date. */
   weighed: boolean;
+  /** Main meals logged on the day before, which a meal reminder can offer to repeat. */
+  previousDayMeals?: MealType[];
 }
 
 export interface PlannerInput {
@@ -37,6 +58,13 @@ export interface PlannerInput {
   tomorrow?: PlannerDay | null;
   /** Current body weight, used for the movement suggestion. */
   weightKg?: number;
+  /**
+   * Non-exercise daily expenditure the budget is built on (formulaTdee), so the
+   * movement suggestion uses the same net calories as the activity logger.
+   */
+  baselineKcalPerDay?: number;
+  /** Quick-add glass sizes in ml; the first two become water reminder buttons. */
+  waterPresetsMl?: number[];
 }
 
 /** Minimum gap between any two reminders. */
@@ -62,6 +90,9 @@ export const REMINDER_ROUTES: Record<ReminderKind, string> = {
   weighin: '/weight',
   movement: '/activity/pick',
 };
+
+/** How long "Later today" on a weigh-in reminder waits. */
+export const SNOOZE_MINUTES = 120;
 
 const MEALS: { key: Exclude<MealType, 'snack'>; label: string }[] = [
   { key: 'breakfast', label: 'Breakfast' },
@@ -143,14 +174,91 @@ export function checkInBody(day: DaySummary, units: UnitSystem): string {
   return `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}.${tail}`;
 }
 
-/** Net calories of a 20 minute brisk walk (MET 3.8, Compendium), resting share removed. */
-function walkNetKcal(weightKg: number): number {
-  return Math.round(((3.8 - 1) * 3.5 * weightKg * 5 * 20) / 1000 / 5) * 5;
+/** Minutes of the suggested walk. */
+const WALK_MINUTES = 20;
+
+/**
+ * Net calories of a 20 minute walk at a moderate pace, computed exactly as
+ * the activity logger would log it (catalogue MET, the budget's own baseline
+ * removed), rounded to 5. Null when there is no baseline to measure against.
+ */
+export function walkNetKcal(weightKg: number, baselineKcalPerDay: number): number | null {
+  const met = ACTIVITY_BY_ID.walking?.met.moderate;
+  if (!met || !(weightKg > 0) || !(baselineKcalPerDay > 0)) return null;
+  return Math.round(netKcal(met, weightKg, WALK_MINUTES, baselineKcalPerDay) / 5) * 5;
 }
 
-export function movementBody(weightKg: number | undefined): string {
-  if (!weightKg) return 'No activity logged today. A short walk now still counts.';
-  return `No activity logged today. A 20 minute brisk walk burns about ${walkNetKcal(weightKg)} kcal above resting.`;
+export function movementBody(weightKg: number | undefined, baselineKcalPerDay?: number): string {
+  const net = weightKg && baselineKcalPerDay ? walkNetKcal(weightKg, baselineKcalPerDay) : null;
+  if (!net) return 'No activity logged today. A short walk now still counts.';
+  return `No activity logged today. A ${WALK_MINUTES} minute walk at a moderate pace burns about ${net} kcal above resting.`;
+}
+
+// ------------------------------------------------------------- actions
+
+/** Short volume for a button: "+250 ml", "+8 fl oz". */
+export function waterButtonTitle(ml: number, units: UnitSystem): string {
+  return `+${formatVolume(ml, units)}`;
+}
+
+/** The two water buttons: the first two distinct sensible presets, or 250 and 500 ml. */
+export function waterActionAmounts(presets: number[] | undefined): number[] {
+  const valid = [...new Set((presets ?? []).filter((n) => Number.isFinite(n) && n >= 50 && n <= 2000).map((n) => Math.round(n)))];
+  return valid.length >= 2 ? valid.slice(0, 2) : valid.length === 1 ? valid : [250, 500];
+}
+
+export function waterCategory(presets: number[] | undefined, units: UnitSystem): ReminderCategory {
+  const amounts = waterActionAmounts(presets);
+  return {
+    identifier: `healthcal-water-${amounts.join('-')}-${units}`,
+    actions: amounts.map((ml) => ({ identifier: `water-add-${ml}`, buttonTitle: waterButtonTitle(ml, units) })),
+  };
+}
+
+export function mealRepeatCategory(meal: Exclude<MealType, 'snack'>): ReminderCategory {
+  return {
+    identifier: `healthcal-meal-repeat-${meal}`,
+    actions: [{ identifier: 'repeat-meal', buttonTitle: `Repeat yesterday's ${meal}` }],
+  };
+}
+
+export const WEIGHIN_CATEGORY: ReminderCategory = {
+  identifier: 'healthcal-weighin',
+  actions: [{ identifier: 'snooze', buttonTitle: 'Later today' }],
+};
+
+export type ParsedAction =
+  | { type: 'water'; ml: number }
+  | { type: 'repeat-meal'; meal: Exclude<MealType, 'snack'>; date: ISODate }
+  | { type: 'snooze' }
+  | null;
+
+/** What an action button asks for, from its identifier and the reminder's data. Null for a plain tap or anything unknown. */
+export function parseReminderAction(actionIdentifier: string, data: unknown): ParsedAction {
+  const m = /^water-add-(\d{2,4})$/.exec(actionIdentifier);
+  if (m) {
+    const ml = Number(m[1]);
+    return ml >= 50 && ml <= 2000 ? { type: 'water', ml } : null;
+  }
+  if (actionIdentifier === 'snooze') return { type: 'snooze' };
+  if (actionIdentifier === 'repeat-meal') {
+    const d = (data ?? {}) as { meal?: unknown; date?: unknown };
+    const meal = MEALS.find((x) => x.key === d.meal)?.key;
+    if (!meal || typeof d.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(d.date)) return null;
+    return { type: 'repeat-meal', meal, date: d.date };
+  }
+  return null;
+}
+
+/**
+ * When a snoozed reminder should come back: `SNOOZE_MINUTES` from now, or
+ * null when that is past midnight or inside quiet hours.
+ */
+export function snoozeTime(now: Date, quietStart: string, quietEnd: string, minutes = SNOOZE_MINUTES): Date | null {
+  const at = new Date(now.getTime() + minutes * 60_000);
+  if (toISODate(at) !== toISODate(now)) return null;
+  if (inQuietHours(at.getHours() * 60 + at.getMinutes(), quietStart, quietEnd)) return null;
+  return at;
 }
 
 interface Candidate extends PlannedReminder {
@@ -162,9 +270,27 @@ function candidatesForDay(input: PlannerInput, day: PlannerDay, untilMinutes: nu
   const r = input.reminders;
   const s = day.summary;
   const out: Candidate[] = [];
-  const add = (kind: ReminderKind, minutes: number, key: string, title: string, body: string) => {
+  const add = (
+    kind: ReminderKind,
+    minutes: number,
+    key: string,
+    title: string,
+    body: string,
+    extra: Pick<PlannedReminder, 'category' | 'data'> & { url?: string } = {},
+  ) => {
     if (minutes < 0 || minutes >= untilMinutes) return;
-    out.push({ id: `${kind}-${key}-${s.date}`, kind, minutes, date: s.date, at: atLocal(s.date, minutes), title, body });
+    out.push({
+      id: `${kind}-${key}-${s.date}`,
+      kind,
+      minutes,
+      date: s.date,
+      at: atLocal(s.date, minutes),
+      title,
+      body,
+      url: extra.url ?? REMINDER_ROUTES[kind],
+      data: extra.data ?? { date: s.date },
+      ...(extra.category ? { category: extra.category } : null),
+    });
   };
 
   if (r.water.enabled && s.waterRemainingMl > 0 && r.water.everyMinutes >= 15) {
@@ -174,14 +300,19 @@ function candidatesForDay(input: PlannerInput, day: PlannerDay, untilMinutes: nu
     const windowEnd = sleep > wake ? sleep : sleep + 1440;
     const body = waterBody(s, input.units);
     for (let t = wake + r.water.everyMinutes; t < windowEnd && t < 1440; t += r.water.everyMinutes) {
-      add('water', t, String(t), 'Water', body);
+      add('water', t, String(t), 'Water', body, { category: waterCategory(input.waterPresetsMl, input.units) });
     }
   }
 
   if (r.meals.enabled) {
     for (const m of MEALS) {
       if (s.byMeal[m.key].length > 0) continue;
-      add('meal', parseHHmm(r.meals[m.key]), m.key, m.label, mealBody(s, m.label));
+      const repeatable = day.previousDayMeals?.includes(m.key) ?? false;
+      add('meal', parseHHmm(r.meals[m.key]), m.key, m.label, mealBody(s, m.label), {
+        url: `/food/search?meal=${m.key}&date=${s.date}`,
+        data: { date: s.date, meal: m.key },
+        ...(repeatable ? { category: mealRepeatCategory(m.key) } : null),
+      });
     }
   }
 
@@ -190,11 +321,14 @@ function candidatesForDay(input: PlannerInput, day: PlannerDay, untilMinutes: nu
   }
 
   if (r.weighIn.enabled && !day.weighed && r.weighIn.weekdays.includes(fromISODate(s.date).getDay())) {
-    add('weighin', parseHHmm(r.weighIn.time), 'day', 'Weigh-in', 'Weighing in before breakfast keeps your trend line accurate.');
+    const t = parseHHmm(r.weighIn.time);
+    // "Later today" only when the snoozed reminder would still land before quiet hours.
+    const canSnooze = snoozeTime(atLocal(s.date, t), r.quietStart, r.quietEnd) !== null;
+    add('weighin', t, 'day', 'Weigh-in', 'Weighing in before breakfast keeps your trend line accurate.', canSnooze ? { category: WEIGHIN_CATEGORY } : {});
   }
 
   if (r.movement.enabled && s.activities.length === 0) {
-    add('movement', parseHHmm(r.movement.time), 'day', 'Movement', movementBody(input.weightKg));
+    add('movement', parseHHmm(r.movement.time), 'day', 'Movement', movementBody(input.weightKg, input.baselineKcalPerDay));
   }
 
   return out;
@@ -235,7 +369,7 @@ export function planReminders(input: PlannerInput, now: Date): PlannedReminder[]
 
   return kept
     .sort((a, b) => a.at.getTime() - b.at.getTime())
-    .map(({ id, at, title, body, kind }) => ({ id, at, title, body, kind }));
+    .map(({ date: _date, minutes: _minutes, ...reminder }) => reminder);
 }
 
 /** Label for a planned time, relative to `now`: "14:30" or "Tomorrow 08:30". */

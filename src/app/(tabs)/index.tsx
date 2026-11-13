@@ -1,41 +1,64 @@
 import { router } from 'expo-router';
-import { ChevronRight, Droplets, Flame, Moon, Plus, Timer, Utensils } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import { ChevronRight, Copy, Droplets, Flame, Plus, Utensils } from 'lucide-react-native';
+import React, { useState } from 'react';
 import { View } from 'react-native';
 
+import { copyEntries, findPreviousMeal } from '@/features/food/actions';
 import { coachTip } from '@/features/today/coach';
-import { useNow, useToday } from '@/store/clock';
-import { formatDuration, formatShortDate, greeting } from '@/lib/dates';
-import { nowISO } from '@/lib/id';
-import { MEALS, MEAL_SHARE } from '@/lib/nutrition';
-import { formatNumber, formatVolume, formatWeight, weightUnit, weightValue } from '@/lib/units';
+import { DayRingStrip } from '@/features/today/DayRingStrip';
+import { mealLine } from '@/features/today/meals';
+import { addWater, defaultGlass, StatusRail } from '@/features/today/StatusRail';
+import { addDays, formatShortDate, greeting, weekdayShort } from '@/lib/dates';
+import { MEALS, MEAL_LABEL, MEAL_SHARE } from '@/lib/nutrition';
+import { formatNumber, formatVolume } from '@/lib/units';
 import { useStore } from '@/store';
-import { useConsistency, useDay, useLive, useProfile, useWeightSeries, type DaySummary } from '@/store/selectors';
+import { useNow, useToday } from '@/store/clock';
+import { useConsistency, useDay, useLive, useProfile, type DaySummary } from '@/store/selectors';
 import { useTheme } from '@/theme';
-import type { MealType } from '@/types';
-import { Avatar, Card, haptic, IconButton, LargeTitle, PressableScale, ProgressBar, Ring, Screen, SectionTitle, Sparkline, Text, toast } from '@/ui';
+import type { FoodEntry, ISODate, MealType } from '@/types';
+import { Avatar, Card, Chip, IconButton, LargeTitle, PressableScale, ProgressBar, Ring, Screen, SectionTitle, Text } from '@/ui';
 
 export default function TodayScreen() {
   const { colors, spacing } = useTheme();
   const profile = useProfile();
-  const date = useToday();
+  const todayDate = useToday();
+  // Null follows the clock, so the screen rolls over at midnight unless a day was picked.
+  const [picked, setPicked] = useState<ISODate | null>(null);
+  const date = picked && picked < todayDate ? picked : todayDate;
+  const isToday = date === todayDate;
   const day = useDay(date);
-  const consistency = useConsistency(date);
+  const consistency = useConsistency(todayDate);
   const now = useNow();
 
   return (
     <Screen tabs testID="today-screen" backdrop={colors.calories}>
       <LargeTitle
-        subtitle={`${greeting(now)}${profile.name ? `, ${profile.name}` : ''}`}
-        title={`Today, ${formatShortDate(date)}`}
+        subtitle={isToday ? `${greeting(now)}${profile.name ? `, ${profile.name}` : ''}` : 'Looking back'}
+        title={isToday ? `Today, ${formatShortDate(date)}` : `${weekdayShort(date)}, ${formatShortDate(date)}`}
         right={
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            {consistency.streak > 1 ? (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.sm,
+            }}>
+            {!isToday ? (
+              <Chip testID="today-jump-today" label="Today" selected onPress={() => setPicked(null)} />
+            ) : consistency.streak > 1 ? (
               <PressableScale
                 testID="today-streak"
-                onPress={() => router.push('/progress')}
+                onPress={() => router.push('/consistency' as never)}
+                hitSlop={4}
                 accessibilityLabel={`${consistency.streak} day logging streak`}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 36, paddingHorizontal: 10, borderRadius: 18, backgroundColor: `${colors.exercise}22` }}>
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  height: 36,
+                  paddingHorizontal: 10,
+                  borderRadius: 18,
+                  backgroundColor: `${colors.exercise}22`,
+                }}>
                 <Flame size={15} color={colors.exercise} fill={colors.exercise} />
                 <Text variant="label" color="exercise" tabular>
                   {consistency.streak}
@@ -45,8 +68,16 @@ export default function TodayScreen() {
             <PressableScale
               testID="today-profile"
               onPress={() => router.push('/profile')}
+              hitSlop={4}
               accessibilityLabel="Profile and settings"
-              style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: colors.primarySoft,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
               <Text variant="title" color="primary">
                 {(profile.name || 'Me').slice(0, 1).toUpperCase()}
               </Text>
@@ -55,47 +86,40 @@ export default function TodayScreen() {
         }
       />
 
-      <EnergyCard day={day} />
-      <CoachCard day={day} />
+      <DayRingStrip today={todayDate} selected={date} onSelect={(d) => setPicked(d === todayDate ? null : d)} />
 
-      <SectionTitle title="Meals" action="Open diary" onAction={() => router.push('/diary')} />
+      <EnergyCard day={day} isToday={isToday} />
+      <StatusRail day={day} isToday={isToday} />
+      {isToday ? <CoachCard day={day} /> : null}
+
+      <SectionTitle title="Meals" action="Open diary" onAction={() => router.push(`/diary?date=${date}` as never)} />
       <MealsCard day={day} />
-
-      <WaterCard day={day} />
-
-      <View style={{ flexDirection: 'row', gap: spacing.md }}>
-        <ActivityTile day={day} />
-        <WeightTile />
-      </View>
-      <View style={{ flexDirection: 'row', gap: spacing.md }}>
-        <SleepTile date={date} />
-        <FastingTile />
-      </View>
     </Screen>
   );
 }
 
 // ------------------------------------------------------------- energy hero
 
-function EnergyCard({ day }: { day: DaySummary }) {
+function EnergyCard({ day, isToday }: { day: DaySummary; isToday: boolean }) {
   const { colors, spacing } = useTheme();
   const profile = useProfile();
   const over = day.remaining < 0;
   const progress = day.budget > 0 ? day.eaten.kcal / day.budget : 0;
   return (
-    <Card
-      testID="today-energy"
-      padding={spacing.xl}
-      gradient={[colors.heroStart, colors.heroEnd]}
-      style={{ gap: spacing.xl }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+    <Card testID="today-energy" padding={spacing.lg} gradient={[colors.heroStart, colors.heroEnd]} style={{ gap: spacing.lg }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
         <SideStat icon={<Utensils size={16} color={colors.textSecondary} />} value={formatNumber(day.eaten.kcal)} label="eaten" />
-        <Ring size={176} stroke={15} progress={progress} color={colors.calories} colorEnd={colors.ringEnd} overColor={colors.warning}>
+        <Ring size={160} stroke={14} progress={progress} color={colors.calories} colorEnd={colors.ringEnd} overColor={colors.warning}>
           <Text variant="numXL" tabular color={over ? 'warning' : 'text'} testID="today-remaining">
             {formatNumber(Math.abs(day.remaining))}
           </Text>
           <Text variant="label" color="textSecondary">
-            {over ? 'kcal over' : 'kcal left'}
+            {over ? 'kcal over' : isToday ? 'kcal left' : 'kcal under'}
           </Text>
         </Ring>
         <SideStat icon={<Flame size={16} color={colors.exercise} />} value={formatNumber(day.exerciseNet)} label="burned" />
@@ -149,68 +173,168 @@ function Macro({ label, value, target, color }: { label: string; value: number; 
 
 // ------------------------------------------------------------------ coach
 
+/** "yesterday" or "Nov 10", from the date of the day being viewed (never the wall clock). */
+function relativeTo(date: ISODate, from: ISODate): string {
+  return date === addDays(from, -1) ? 'yesterday' : formatShortDate(date);
+}
+
 function CoachCard({ day }: { day: DaySummary }) {
-  const { colors, spacing } = useTheme();
+  const { colors, spacing, radius } = useTheme();
   const profile = useProfile();
   const now = useNow();
+  const entries = useLive('foodEntries');
+  const presets = useStore((s) => s.settings.waterPresets);
   const tip = coachTip(day, profile.units, now);
   const action = tip.action;
+  const quick = tip.quick;
+  const prev = quick?.kind === 'repeat' ? findPreviousMeal(entries, day.date, quick.meal, 7) : null;
+  const glass = defaultGlass(presets);
+  const open = action ? () => router.push(action.href as never) : undefined;
+
+  const chips: React.ReactNode[] = [];
+  if (quick?.kind === 'water') {
+    chips.push(
+      <Chip
+        key="water"
+        testID="today-coach-water"
+        icon={<Droplets size={15} color={colors.water} />}
+        label={`Add ${formatVolume(glass, profile.units)}`}
+        onPress={() => addWater(day.date, glass, profile.units)}
+      />,
+    );
+  }
+  if (quick?.kind === 'repeat' && prev) {
+    const kcal = prev.entries.reduce((s, e) => s + e.nutrients.kcal, 0);
+    const meal = MEAL_LABEL[quick.meal].toLowerCase();
+    chips.push(
+      <Chip
+        key="repeat"
+        testID="today-coach-repeat"
+        icon={<Copy size={15} color={colors.primary} />}
+        label={`Repeat ${relativeTo(prev.date, day.date)}'s ${meal}, ${formatNumber(kcal)} kcal`}
+        onPress={() => copyEntries(prev.entries, day.date, quick.meal, `Copied ${meal} from ${relativeTo(prev.date, day.date)}`)}
+      />,
+    );
+    if (open) chips.push(<Chip key="else" testID="today-coach-else" label="Something else" onPress={open} />);
+  }
+
   return (
-    <Card
+    <View
       testID="today-coach"
-      tone="alt"
-      onPress={action ? () => router.push(action.href as never) : undefined}
-      accessibilityLabel={action ? `${tip.title}. ${action.label}` : tip.title}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-      <Avatar emoji={tip.emoji} color={tip.tone === 'positive' ? colors.success : colors.primary} />
-      <View style={{ flex: 1 }}>
-        <Text variant="bodyStrong">{tip.title}</Text>
-        <Text variant="caption" color="textSecondary">
-          {tip.body}
-        </Text>
-      </View>
-      {action ? <ChevronRight size={18} color={colors.textTertiary} /> : null}
-    </Card>
+      style={{
+        backgroundColor: colors.surfaceAlt,
+        borderRadius: radius.lg,
+        borderWidth: 1,
+        borderColor: colors.border,
+        padding: spacing.lg,
+        gap: spacing.md,
+      }}>
+      <PressableScale
+        testID="today-coach-open"
+        scaleTo={0.99}
+        disabled={!open}
+        feedback={open ? 'tap' : 'none'}
+        onPress={open}
+        accessibilityLabel={action ? `${tip.title}. ${action.label}` : tip.title}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.md,
+          opacity: 1,
+        }}>
+        <Avatar emoji={tip.emoji} color={tip.tone === 'positive' ? colors.success : colors.primary} />
+        <View style={{ flex: 1 }}>
+          <Text variant="bodyStrong">{tip.title}</Text>
+          <Text variant="caption" color="textSecondary">
+            {tip.body}
+          </Text>
+        </View>
+        {action ? <ChevronRight size={18} color={colors.textTertiary} /> : null}
+      </PressableScale>
+      {chips.length ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>{chips}</View> : null}
+    </View>
   );
 }
 
 // ------------------------------------------------------------------ meals
 
 function MealsCard({ day }: { day: DaySummary }) {
-  const { colors, spacing } = useTheme();
+  const { colors, spacing, radius } = useTheme();
+  const all = useLive('foodEntries');
   const open = (meal: MealType) => router.push(`/food/search?meal=${meal}&date=${day.date}`);
   return (
-    <Card padding={0} testID="today-meals">
+    <View
+      testID="today-meals"
+      style={{
+        backgroundColor: colors.surface,
+        borderRadius: radius.lg,
+        borderWidth: 1,
+        borderColor: colors.border,
+        overflow: 'hidden',
+      }}>
       {MEALS.map((m, i) => {
         const entries = day.byMeal[m.id];
-        const kcal = entries.reduce((s, e) => s + e.nutrients.kcal, 0);
-        const names = entries.map((e) => e.name).join(', ');
+        const line = mealLine(entries);
+        const prev = entries.length ? null : findPreviousMeal(all, day.date, m.id, 7);
         return (
           <View key={m.id}>
-            {i > 0 ? <View style={{ height: 1, backgroundColor: colors.border, marginLeft: 72 }} /> : null}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}>
+            {i > 0 ? (
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: colors.border,
+                  marginLeft: 72,
+                }}
+              />
+            ) : null}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing.sm,
+                paddingLeft: spacing.lg,
+                paddingRight: spacing.md,
+                paddingVertical: spacing.md,
+              }}>
               <PressableScale
                 testID={`today-meal-${m.id}`}
                 scaleTo={0.99}
-                onPress={() => (entries.length ? router.push(`/diary?date=${day.date}`) : open(m.id))}
-                accessibilityLabel={`${m.label}, ${entries.length ? `${Math.round(kcal)} kilocalories` : 'not logged yet'}`}
-                style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                onPress={() => (entries.length ? router.push(`/diary?date=${day.date}&meal=${m.id}` as never) : open(m.id))}
+                accessibilityLabel={`${m.label}, ${entries.length ? `${line.approx ? 'about ' : ''}${Math.round(line.kcal)} kilocalories, ${line.detail}` : 'not logged yet'}`}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  minHeight: 44,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: spacing.md,
+                }}>
                 <Avatar emoji={m.emoji} />
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text variant="bodyStrong">{m.label}</Text>
-                  <Text variant="caption" color="textSecondary" numberOfLines={1}>
-                    {entries.length ? names : `Around ${formatNumber(Math.round((day.budget * MEAL_SHARE[m.id]) / 10) * 10)} kcal suggested`}
-                  </Text>
+                <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                    <Text variant="bodyStrong">{m.label}</Text>
+                    {entries.length ? <EmojiStack emojis={line.emojis} /> : null}
+                  </View>
+                  {entries.length ? (
+                    <Text variant="caption" color="textSecondary" numberOfLines={1}>
+                      {line.detail}
+                    </Text>
+                  ) : (
+                    <Text variant="caption" color="textSecondary" numberOfLines={1}>
+                      {`Around ${formatNumber(Math.round((day.budget * MEAL_SHARE[m.id]) / 10) * 10)} kcal suggested`}
+                    </Text>
+                  )}
                 </View>
                 {entries.length ? (
                   <Text variant="title" tabular>
-                    {formatNumber(kcal)}
+                    {`${line.approx ? '~' : ''}${formatNumber(line.kcal)}`}
                     <Text variant="caption" color="textTertiary">
                       {' kcal'}
                     </Text>
                   </Text>
                 ) : null}
               </PressableScale>
+              {prev ? <RepeatButton meal={m.id} date={day.date} prev={prev} /> : null}
               <IconButton testID={`today-add-${m.id}`} accessibilityLabel={`Add food to ${m.label}`} tone="alt" size={36} onPress={() => open(m.id)}>
                 <Plus size={18} color={colors.primary} />
               </IconButton>
@@ -218,220 +342,60 @@ function MealsCard({ day }: { day: DaySummary }) {
           </View>
         );
       })}
-    </Card>
-  );
-}
-
-// ------------------------------------------------------------------ water
-
-function WaterCard({ day }: { day: DaySummary }) {
-  const { colors, spacing, radius } = useTheme();
-  const profile = useProfile();
-  const presets = useStore((s) => s.settings.waterPresets);
-  const quick = [...presets].sort((a, b) => a - b).slice(1, 3);
-  const done = day.waterRemainingMl <= 0;
-
-  const add = (ml: number) => {
-    const entry = useStore.getState().upsert('water', { date: day.date, ml, beverage: 'water', loggedAt: nowISO() });
-    haptic.success();
-    toast(`Added ${formatVolume(ml, profile.units)} of water`, { label: 'Undo', onPress: () => useStore.getState().remove('water', entry.id) });
-  };
-
-  return (
-    <Card testID="today-water" style={{ gap: spacing.md }}>
-      <PressableScale
-        testID="today-water-open"
-        scaleTo={0.99}
-        onPress={() => router.push('/water')}
-        accessibilityLabel="Water, open hydration"
-        style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-        <Avatar color={colors.water}>
-          <Droplets size={20} color={colors.water} />
-        </Avatar>
-        <View style={{ flex: 1 }}>
-          <Text variant="bodyStrong">Water</Text>
-          <Text variant="caption" color="textSecondary">
-            {done ? 'Goal reached for today' : `${formatVolume(day.waterRemainingMl, profile.units)} left to drink`}
-          </Text>
-        </View>
-        <Text variant="title" tabular>
-          {formatVolume(day.waterMl, profile.units)}
-          <Text variant="caption" color="textTertiary">{` / ${formatVolume(day.waterGoalMl, profile.units)}`}</Text>
-        </Text>
-      </PressableScale>
-      <ProgressBar progress={day.waterGoalMl > 0 ? day.waterMl / day.waterGoalMl : 0} color={colors.water} height={10} />
-      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-        {quick.map((ml) => (
-          <PressableScale
-            key={ml}
-            testID={`today-water-${ml}`}
-            feedback="none"
-            onPress={() => add(ml)}
-            accessibilityLabel={`Add ${formatVolume(ml, profile.units)} of water`}
-            style={{ flex: 1, height: 42, borderRadius: radius.md, backgroundColor: `${colors.water}22`, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}>
-            <Plus size={15} color={colors.water} strokeWidth={2.6} />
-            <Text variant="label" color="water">
-              {formatVolume(ml, profile.units)}
-            </Text>
-          </PressableScale>
-        ))}
-      </View>
-    </Card>
-  );
-}
-
-// ------------------------------------------------------------------ tiles
-
-function Tile({
-  testID,
-  title,
-  icon,
-  onPress,
-  children,
-}: {
-  testID: string;
-  title: string;
-  icon: React.ReactNode;
-  onPress: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <Card testID={testID} onPress={onPress} accessibilityLabel={title} style={{ flex: 1, gap: 10, minHeight: 124 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        {icon}
-        <Text variant="label" color="textSecondary">
-          {title}
-        </Text>
-      </View>
-      {children}
-    </Card>
-  );
-}
-
-function BigValue({ value, unit }: { value: string; unit?: string }) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-      <Text variant="numL" tabular>
-        {value}
-      </Text>
-      {unit ? (
-        <Text variant="label" color="textSecondary">
-          {unit}
-        </Text>
-      ) : null}
     </View>
   );
 }
 
-function ActivityTile({ day }: { day: DaySummary }) {
-  const { colors } = useTheme();
-  const has = day.activities.length > 0;
+function RepeatButton({ meal, date, prev }: { meal: MealType; date: ISODate; prev: { date: ISODate; entries: FoodEntry[] } }) {
+  const { colors, radius } = useTheme();
+  const kcal = prev.entries.reduce((s, e) => s + e.nutrients.kcal, 0);
+  const label = MEAL_LABEL[meal].toLowerCase();
+  const when = relativeTo(prev.date, date);
   return (
-    <Tile testID="today-activity" title="Activity" icon={<Flame size={16} color={colors.exercise} />} onPress={() => router.push(has ? '/train' : '/activity/pick')}>
-      {has ? (
-        <>
-          <BigValue value={String(day.activeMinutes)} unit="min" />
-          <Text variant="caption" color="textSecondary" numberOfLines={2}>
-            {`${day.activities.map((a) => a.name).join(', ')} · about ${formatNumber(day.exerciseNet)} kcal`}
-          </Text>
-        </>
-      ) : (
-        <>
-          <Text variant="h3">Nothing yet</Text>
-          <Text variant="caption" color="primary">
-            Log a session
-          </Text>
-        </>
-      )}
-    </Tile>
+    <PressableScale
+      testID={`today-repeat-${meal}`}
+      hitSlop={4}
+      onPress={() => copyEntries(prev.entries, date, meal, `Copied ${label} from ${when}`)}
+      accessibilityLabel={`Repeat ${when}'s ${label}, ${Math.round(kcal)} kilocalories`}
+      style={{
+        height: 36,
+        paddingHorizontal: 10,
+        borderRadius: radius.pill,
+        backgroundColor: colors.primarySoft,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+      }}>
+      <Copy size={14} color={colors.primary} />
+      <Text variant="label" color="primary" style={{ fontSize: 12 }}>
+        Repeat
+      </Text>
+    </PressableScale>
   );
 }
 
-function WeightTile() {
+function EmojiStack({ emojis }: { emojis: string[] }) {
   const { colors } = useTheme();
-  const profile = useProfile();
-  const series = useWeightSeries();
-  const rate = series.weeklyRateKg;
-  const recent = series.trend.slice(-30).map((t) => t.trend);
   return (
-    <Tile testID="today-weight" title="Weight trend" icon={<Sparkline values={recent.length > 1 ? recent : [0, 0]} color={colors.weight} width={34} height={16} />} onPress={() => router.push('/weight')}>
-      {series.trendKg !== null ? (
-        <>
-          <BigValue value={weightValue(series.trendKg, profile.units).toFixed(1)} unit={weightUnit(profile.units)} />
-          <Text variant="caption" color="textSecondary" numberOfLines={2}>
-            {rate === null
-              ? 'Weigh in over a week to see your pace'
-              : Math.abs(rate) < 0.05
-                ? 'Holding steady'
-                : `${rate < 0 ? 'Down' : 'Up'} ${formatWeight(Math.abs(rate), profile.units, 2)} a week`}
-          </Text>
-        </>
-      ) : (
-        <>
-          <Text variant="h3">No weigh-ins</Text>
-          <Text variant="caption" color="primary">
-            Add your weight
-          </Text>
-        </>
-      )}
-    </Tile>
-  );
-}
-
-function SleepTile({ date }: { date: string }) {
-  const { colors } = useTheme();
-  const sleep = useLive('sleep');
-  const last = sleep.find((s) => s.date === date);
-  return (
-    <Tile testID="today-sleep" title="Sleep" icon={<Moon size={16} color={colors.sleep} />} onPress={() => router.push('/sleep')}>
-      {last ? (
-        <>
-          <BigValue value={formatDuration(last.hours * 60).replace(' min', ' m')} />
-          <Text variant="caption" color="textSecondary">
-            Last night
-          </Text>
-        </>
-      ) : (
-        <>
-          <Text variant="h3">Not logged</Text>
-          <Text variant="caption" color="primary">
-            Add last night
-          </Text>
-        </>
-      )}
-    </Tile>
-  );
-}
-
-function FastingTile() {
-  const { colors } = useTheme();
-  const sessions = useLive('fasting');
-  const active = sessions.find((f) => !f.end);
-  // The clock lives in state so rendering stays pure; it ticks while a fast is running.
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!active) return;
-    const t = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(t);
-  }, [active]);
-  const elapsedMin = active ? Math.max(0, (now - new Date(active.start).getTime()) / 60_000) : 0;
-  return (
-    <Tile testID="today-fasting" title="Fasting" icon={<Timer size={16} color={colors.fat} />} onPress={() => router.push('/fasting')}>
-      {active ? (
-        <>
-          <BigValue value={formatDuration(elapsedMin).replace(' min', ' m')} />
-          <Text variant="caption" color="textSecondary">
-            {`of ${active.targetHours} h target`}
-          </Text>
-        </>
-      ) : (
-        <>
-          <Text variant="h3">Not fasting</Text>
-          <Text variant="caption" color="primary">
-            Start a fast
-          </Text>
-        </>
-      )}
-    </Tile>
+    <View style={{ flexDirection: 'row' }} accessible={false}>
+      {emojis.map((e, i) => (
+        <View
+          key={i}
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: 10,
+            marginLeft: i === 0 ? 0 : -6,
+            backgroundColor: colors.surfaceAlt,
+            borderWidth: 1.5,
+            borderColor: colors.surface,
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: emojis.length - i,
+          }}>
+          <Text style={{ fontSize: 11, lineHeight: 14 }}>{e}</Text>
+        </View>
+      ))}
+    </View>
   );
 }

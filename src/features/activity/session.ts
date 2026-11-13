@@ -1,7 +1,7 @@
 /**
  * The single path for writing activity sessions. Screens call these instead of
  * touching the store so every entry is built the same way (net and gross kcal
- * from the profile's current weight), recents stay current and every change
+ * from the profile's weight at the time it was first saved), recents stay current and every change
  * can be undone.
  */
 import { router } from 'expo-router';
@@ -13,7 +13,8 @@ import { useStore } from '@/store';
 import type { ActivityEntry, Intensity, StrengthExercise } from '@/types';
 import { haptic, toast } from '@/ui';
 
-import { buildActivityEntry } from './build';
+import { buildActivityEntry, rebuildActivityEntry } from './build';
+import { useStrengthDrafts } from './strengthDraft';
 
 export interface SaveActivityInput {
   activityId: string;
@@ -33,13 +34,12 @@ export function saveActivity(input: SaveActivityInput): ActivityEntry | null {
   const activity = ACTIVITY_BY_ID[input.activityId];
   if (!profile || !activity) return null;
   const existing = input.entryId ? store.activities[input.entryId] : undefined;
-  const built = buildActivityEntry({
-    ...input,
-    activity,
-    weightKg: profile.weightKg,
-    baselineKcalPerDay: formulaTdee(profile),
-    loggedAt: existing?.loggedAt ?? nowISO(),
-  });
+  const current = { weightKg: profile.weightKg, baselineKcalPerDay: formulaTdee(profile) };
+  // An edit keeps the calories the session was saved with unless its effort changed,
+  // and never re-prices an old session at today's weight.
+  const built = existing
+    ? rebuildActivityEntry(existing, { ...input, activity }, current)
+    : buildActivityEntry({ ...input, activity, ...current, loggedAt: nowISO() });
 
   if (existing) {
     const previous = existing;
@@ -64,6 +64,8 @@ export function saveActivity(input: SaveActivityInput): ActivityEntry | null {
 
 export function deleteActivity(entry: ActivityEntry): void {
   useStore.getState().remove('activities', entry.id);
+  // An unsaved edit of this workout would otherwise outlive it.
+  useStrengthDrafts.getState().discard(entry.id);
   haptic.tap();
   toast(`Removed ${entry.name.toLowerCase()}`, {
     label: 'Undo',

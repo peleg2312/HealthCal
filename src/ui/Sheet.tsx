@@ -6,6 +6,7 @@ import { MAX_CONTENT_WIDTH, useTheme } from '@/theme';
 
 import { Button } from './Button';
 import { Text } from './Text';
+import { ToastHost } from './Toast';
 
 /** Bottom sheet for short, focused tasks (pick a value, confirm, quick add). */
 export function Sheet({
@@ -25,7 +26,7 @@ export function Sheet({
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'web' ? undefined : 'padding'} style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Pressable accessibilityLabel="Close sheet" onPress={onClose} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: colors.overlay }} />
         <View
           style={{
@@ -54,6 +55,8 @@ export function Sheet({
           </ScrollView>
           {footer ? <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.sm }}>{footer}</View> : null}
         </View>
+        {/* A native modal covers the app's own toast layer, so the sheet carries one too. */}
+        <ToastHost />
       </KeyboardAvoidingView>
     </Modal>
   );

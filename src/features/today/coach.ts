@@ -12,10 +12,19 @@ export interface CoachTip {
   title: string;
   body: string;
   action?: { label: string; href: string };
+  /** One-tap actions shown under the tip, so the advice can be done from the card itself. */
+  quick?: CoachQuick;
   tone: 'neutral' | 'positive';
 }
 
-const MEAL_WINDOWS: { meal: MealType; label: string; from: number; until: number }[] = [
+export type CoachQuick = { kind: 'water' } | { kind: 'repeat'; meal: MealType };
+
+const MEAL_WINDOWS: {
+  meal: MealType;
+  label: string;
+  from: number;
+  until: number;
+}[] = [
   { meal: 'breakfast', label: 'breakfast', from: 6, until: 11 },
   { meal: 'lunch', label: 'lunch', from: 12, until: 16 },
   { meal: 'dinner', label: 'dinner', from: 18.5, until: 23 },
@@ -38,6 +47,7 @@ export function coachTip(day: DaySummary, units: UnitSystem, now: Date = new Dat
       title: 'Nothing logged yet today',
       body: `Your budget is ${formatNumber(day.budget)} kcal. Logging the first thing takes a few seconds.`,
       action: { label: 'Log food', href: search(meal) },
+      ...(meal === 'snack' ? null : { quick: { kind: 'repeat' as const, meal } }),
       tone: 'neutral',
     };
   }
@@ -50,6 +60,7 @@ export function coachTip(day: DaySummary, units: UnitSystem, now: Date = new Dat
       title: `Had ${due.label} yet?`,
       body: `It is not in today's log. You have ${formatNumber(Math.max(0, day.remaining))} kcal left.`,
       action: { label: `Log ${due.label}`, href: search(due.meal) },
+      quick: { kind: 'repeat', meal: due.meal },
       tone: 'neutral',
     };
   }
@@ -62,6 +73,7 @@ export function coachTip(day: DaySummary, units: UnitSystem, now: Date = new Dat
       title: `${formatVolume(day.waterRemainingMl, units)} of water to go`,
       body: `You are about ${formatVolume(Math.round(waterGap / 50) * 50, units)} behind an even pace for the day. A glass now gets you back on it.`,
       action: { label: 'Add water', href: '/water' },
+      quick: { kind: 'water' },
       tone: 'neutral',
     };
   }

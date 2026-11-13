@@ -25,6 +25,8 @@ export interface DraftExercise {
 
 export interface StrengthDraft {
   entryId?: string;
+  /** updatedAt of the saved entry this edit started from; a newer entry replaces an untouched draft. */
+  baseUpdatedAt?: string;
   date: string;
   intensity: Intensity;
   notes: string;
@@ -47,6 +49,7 @@ export function newDraft(date: string): StrengthDraft {
 export function draftFromEntry(entry: ActivityEntry): StrengthDraft {
   return {
     entryId: entry.id,
+    baseUpdatedAt: entry.updatedAt,
     date: entry.date,
     intensity: entry.intensity,
     notes: entry.notes ?? '',
@@ -78,7 +81,25 @@ export function draftToExercises(d: StrengthDraft): StrengthExercise[] {
 }
 
 export function draftHasContent(d: StrengthDraft | undefined): boolean {
-  return !!d && (d.exercises.length > 0 || elapsedMs(d) > 0);
+  return !!d && (d.exercises.length > 0 || elapsedMs(d) > 0 || d.manualMin !== null || d.notes.trim().length > 0);
+}
+
+/**
+ * The draft to show when the workout screen opens, or null to keep the stored
+ * one. A new workout reuses the stored draft only while it holds something
+ * (otherwise it starts fresh on the requested day, so an empty leftover from
+ * an earlier day never decides the date). An edit reuses the stored draft only
+ * if it was made from the entry as it is now; if the entry changed since
+ * (sync, undo), the draft is rebuilt from the record so stale sets cannot
+ * overwrite newer data.
+ */
+export function draftOnOpen(stored: StrengthDraft | undefined, open: { entry?: ActivityEntry; date: string }): StrengthDraft | null {
+  if (open.entry) {
+    if (stored && stored.entryId === open.entry.id && stored.baseUpdatedAt === open.entry.updatedAt) return null;
+    return draftFromEntry(open.entry);
+  }
+  if (stored && !stored.entryId && draftHasContent(stored)) return null;
+  return newDraft(open.date);
 }
 
 interface DraftState {

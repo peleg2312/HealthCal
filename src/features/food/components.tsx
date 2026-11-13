@@ -1,4 +1,4 @@
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Plus } from 'lucide-react-native';
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 
@@ -121,9 +121,18 @@ export function KcalValue({ value, variant = 'numL', color }: { value: number; v
   );
 }
 
+/** Amount controls for a row whose food was just added: step it, or open the full amount editor. */
+export interface RowAmount {
+  /** "1.5 ×" or "150 g". */
+  label: string;
+  onStep: (dir: 1 | -1) => void;
+  onOpen: () => void;
+}
+
 /**
  * Search result row: tap opens the detail screen, the trailing button logs the
- * shown portion in one tap. The button briefly turns into a tick.
+ * shown portion in one tap. Once added, the button becomes a compact stepper
+ * for that diary entry (minus at the smallest step removes it).
  */
 export function FoodRow({
   food,
@@ -133,6 +142,7 @@ export function FoodRow({
   onQuickAdd,
   trailing,
   testID,
+  amount,
 }: {
   food: Food;
   subtitle: string;
@@ -141,6 +151,7 @@ export function FoodRow({
   onQuickAdd?: () => void;
   trailing?: React.ReactNode;
   testID?: string;
+  amount?: RowAmount;
 }) {
   const { colors, spacing } = useTheme();
   const [added, setAdded] = useState(false);
@@ -164,15 +175,19 @@ export function FoodRow({
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flexShrink: 1 }}>
-              {food.brand ? `${food.brand} · ` : ''}
-              {subtitle} · {kcal(kcalValue)} kcal
+              {/* Once added, the live kcal leads so a narrower line still shows it. */}
+              {amount ? `${kcal(kcalValue)} kcal · ` : food.brand ? `${food.brand} · ` : ''}
+              {subtitle}
+              {amount ? '' : ` · ${kcal(kcalValue)} kcal`}
             </Text>
             <SourceTag source={food.source} />
           </View>
         </View>
       </PressableScale>
       {trailing}
-      {onQuickAdd ? (
+      {amount ? (
+        <AmountStepper amount={amount} name={food.name} testID={testID} />
+      ) : onQuickAdd ? (
         <IconButton
           testID={testID ? `${testID}-add` : undefined}
           accessibilityLabel={`Add ${food.name}`}
@@ -185,6 +200,32 @@ export function FoodRow({
           {added ? <Check size={18} color={colors.onPrimary} /> : <Plus size={18} color={colors.text} />}
         </IconButton>
       ) : null}
+    </View>
+  );
+}
+
+function AmountStepper({ amount, name, testID }: { amount: RowAmount; name: string; testID?: string }) {
+  const { colors, radius } = useTheme();
+  return (
+    <View
+      testID={testID ? `${testID}-stepper` : undefined}
+      style={{ flexDirection: 'row', alignItems: 'center', borderRadius: radius.pill, backgroundColor: colors.primarySoft }}>
+      <IconButton testID={testID ? `${testID}-less` : undefined} accessibilityLabel={`Less ${name}`} tone="clear" size={44} onPress={() => amount.onStep(-1)}>
+        <Minus size={18} color={colors.primary} />
+      </IconButton>
+      <PressableScale
+        testID={testID ? `${testID}-amount` : undefined}
+        onPress={amount.onOpen}
+        feedback="select"
+        accessibilityLabel={`${name}, ${amount.label}. Change amount`}
+        style={{ minWidth: 40, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
+        <Text variant="label" color="primary" tabular numberOfLines={1}>
+          {amount.label}
+        </Text>
+      </PressableScale>
+      <IconButton testID={testID ? `${testID}-more` : undefined} accessibilityLabel={`More ${name}`} tone="clear" size={44} onPress={() => amount.onStep(1)}>
+        <Plus size={18} color={colors.primary} />
+      </IconButton>
     </View>
   );
 }

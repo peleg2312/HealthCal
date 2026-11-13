@@ -4,18 +4,25 @@ import { Camera, CloudOff, Flashlight, FlashlightOff, Keyboard, PackageSearch, P
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, View } from 'react-native';
 
-import { checkBarcode, cleanBarcode } from '@/features/ai/barcode';
+import { checkBarcode, cleanBarcode, findLocalByBarcode, lookupCode } from '@/features/ai/barcode';
+import { ScanResultCard, type ScanFoundFrom } from '@/features/ai/ScanResultCard';
 import { setFoodDraft } from '@/features/food/draft';
+import { href, kcal } from '@/features/food/helpers';
+import { logFood } from '@/features/food/log';
 import { today } from '@/lib/dates';
-import { mealForTime, MEALS } from '@/lib/nutrition';
+import { nowISO } from '@/lib/id';
+import { entriesTotal, mealForTime, MEALS } from '@/lib/nutrition';
 import { lookupBarcode } from '@/services/openFoodFacts';
+import { useStore } from '@/store';
+import { useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
-import type { MealType } from '@/types';
+import type { Food, MealType, Serving } from '@/types';
 import { Button, Card, goBack, haptic, Header, IconButton, Screen, Text, TextField } from '@/ui';
 
 type Phase =
   | { kind: 'scan' }
   | { kind: 'looking'; code: string }
+  | { kind: 'found'; code: string; food: Food; from: ScanFoundFrom }
   | { kind: 'not_found'; code: string }
   | { kind: 'incomplete'; code: string; name: string }
   | { kind: 'error'; code: string };
@@ -39,6 +46,14 @@ export default function ScanScreen() {
   const [phase, setPhase] = useState<Phase>({ kind: 'scan' });
   const locked = useRef(false);
   const lookupId = useRef(0);
+  // The product just handled is often still in front of the camera: ignore it briefly.
+  const recent = useRef<{ code: string; at: number } | null>(null);
+  const [openedAt] = useState(() => nowISO());
+  const [manualKey, setManualKey] = useState(0);
+  const entries = useLive('foodEntries');
+  // Everything added to this day since the scanner opened (Undo lowers it).
+  const added = entries.filter((e) => e.date === date && e.loggedAt >= openedAt);
+  const addedKcal = entriesTotal(added).kcal;
 
   useEffect(() => {
     if (!web) return;
@@ -47,15 +62,32 @@ export default function ScanScreen() {
       .catch(() => setHasCamera(false));
   }, [web]);
 
-  async function lookup(code: string) {
+  /** The person's own copy of a product, if they have one: no network needed. */
+  function findOwn(code: string) {
+    const s = useStore.getState();
+    const custom = Object.values(s.customFoods);
+    const deletedCustom = new Set(custom.filter((f) => f.deleted).map((f) => f.id));
+    return findLocalByBarcode(code, {
+      custom,
+      recent: s.recentFoods.filter((f) => !deletedCustom.has(f.id)),
+      entries: Object.values(s.foodEntries),
+    });
+  }
+
+  async function lookup(raw: string, type?: string) {
+    const code = lookupCode(raw, type);
     const id = ++lookupId.current;
+    const own = findOwn(code);
+    if (own) {
+      setPhase({ kind: 'found', code, food: own.food, from: own.from });
+      return;
+    }
     setPhase({ kind: 'looking', code });
     try {
       const res = await lookupBarcode(code);
       if (id !== lookupId.current) return;
       if (res.status === 'found') {
-        setFoodDraft(res.food);
-        router.replace(`/food/detail?meal=${meal}&date=${date}` as never);
+        setPhase({ kind: 'found', code, food: res.food, from: 'openfoodfacts' });
         return;
       }
       haptic.warn();
@@ -72,12 +104,26 @@ export default function ScanScreen() {
     if (locked.current) return;
     const code = cleanBarcode(result.data);
     if (code.length < 6) return;
+    if (recent.current && recent.current.code === lookupCode(code, result.type) && Date.now() - recent.current.at < 2500) return;
     locked.current = true;
     haptic.success();
-    void lookup(code);
+    void lookup(code, result.type);
+  }
+
+  function addFound(food: Food, serving: Serving, quantity: number) {
+    // logFood shows the Undo toast and keeps recents up to date.
+    logFood({ food, serving, quantity, meal, date });
+    setManualKey((k) => k + 1);
+    scanAgain();
+  }
+
+  function openDetails(food: Food) {
+    setFoodDraft(food);
+    router.push(href('/food/detail', { meal, date }) as never);
   }
 
   function scanAgain() {
+    if (phase.kind !== 'scan' && 'code' in phase) recent.current = { code: phase.code, at: Date.now() };
     lookupId.current++;
     locked.current = false;
     setPhase({ kind: 'scan' });
@@ -93,12 +139,41 @@ export default function ScanScreen() {
   }
 
   const granted = !!permission?.granted;
-  const showCamera = !manual && phase.kind === 'scan' && granted && !mountError;
+  const scanning = phase.kind === 'scan' || phase.kind === 'found';
+  const showCamera = !manual && scanning && granted && !mountError;
+  const found = phase.kind === 'found' ? phase : null;
+  const resultCard = found ? (
+    <ScanResultCard
+      key={`${found.code}-${found.food.id}`}
+      food={found.food}
+      from={found.from}
+      meal={meal}
+      date={date}
+      onAdd={(serving, quantity) => addFound(found.food, serving, quantity)}
+      onDetails={() => openDetails(found.food)}
+      onClose={scanAgain}
+    />
+  ) : null;
+  const footer =
+    added.length > 0 ? (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 44 }}>
+        <View style={{ flex: 1 }}>
+          <Text variant="title" tabular testID="scan-added-count">
+            {added.length} added · {kcal(addedKcal)} kcal
+          </Text>
+          <Text variant="caption" color="textSecondary">
+            {found ? 'Add this one, or close it to scan the next' : manual ? 'Type the next number, or finish' : 'Point at the next barcode, or finish'}
+          </Text>
+        </View>
+        <Button testID="scan-done" title="Done" size="md" full={false} onPress={() => goBack(href('/diary', { date }))} />
+      </View>
+    ) : undefined;
   const cameraOffer = hasCamera && (web || permission?.canAskAgain !== false || granted);
 
   return (
     <Screen
       scroll={!showCamera}
+      footer={footer}
       header={
         <Header
           title="Scan barcode"
@@ -106,7 +181,7 @@ export default function ScanScreen() {
           close
           onBack={() => goBack(`/diary?date=${date}`)}
           right={
-            phase.kind === 'scan' && hasCamera && (granted || web) ? (
+            scanning && hasCamera && (granted || web) ? (
               <IconButton
                 testID="scan-toggle-manual"
                 accessibilityLabel={manual ? 'Scan with the camera' : 'Type the barcode number'}
@@ -117,9 +192,9 @@ export default function ScanScreen() {
           }
         />
       }>
-      {phase.kind === 'scan' ? (
+      {scanning ? (
         showCamera ? (
-          <View style={{ flex: 1, gap: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xl }}>
+          <View style={{ flex: 1, gap: spacing.lg, paddingTop: spacing.sm, paddingBottom: added.length > 0 ? spacing.md : spacing.xl }}>
             <View style={{ flex: 1, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.surfaceAlt }}>
               <CameraView
                 style={{ flex: 1 }}
@@ -129,9 +204,10 @@ export default function ScanScreen() {
                 onBarcodeScanned={onScanned}
                 onMountError={(e) => setMountError(e.message || 'The camera could not start.')}
               />
-              <Viewfinder />
+              {found ? null : <Viewfinder />}
+              {found ? <View style={{ position: 'absolute', left: spacing.md, right: spacing.md, bottom: spacing.md }}>{resultCard}</View> : null}
             </View>
-            <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center', display: found ? 'none' : 'flex' }}>
               {!web ? (
                 <IconButton testID="scan-torch" size={52} tone={torch ? 'primary' : 'surface'} accessibilityLabel={torch ? 'Turn the light off' : 'Turn the light on'} onPress={() => setTorch((t) => !t)}>
                   {torch ? <Flashlight size={22} color={colors.onPrimary} /> : <FlashlightOff size={22} color={colors.text} />}
@@ -157,7 +233,8 @@ export default function ScanScreen() {
                 </Text>
               </Card>
             ) : null}
-            <ManualEntry onLookup={(code) => void lookup(code)} autoFocus={manual} />
+            {resultCard}
+            <ManualEntry key={manualKey} onLookup={(code) => void lookup(code)} autoFocus={manual && !found} />
             {cameraOffer && manual ? (
               <Button testID="scan-use-camera" title={web ? 'Scan with your camera' : 'Back to the camera'} variant="ghost" icon={<Camera size={18} color={colors.primary} />} onPress={() => void startCamera()} />
             ) : null}

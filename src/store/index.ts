@@ -13,6 +13,7 @@ import type {
   Collection,
   CustomFood,
   FastingSession,
+  DaySnapshot,
   FavoriteFood,
   Food,
   FoodEntry,
@@ -35,6 +36,7 @@ export interface CollectionTypes {
   sleep: SleepEntry;
   fasting: FastingSession;
   favorites: FavoriteFood;
+  days: DaySnapshot;
 }
 
 export const COLLECTIONS: Collection[] = [
@@ -47,10 +49,11 @@ export const COLLECTIONS: Collection[] = [
   'sleep',
   'fasting',
   'favorites',
+  'days',
 ];
 
 /** Collections that hold at most one live record per calendar day. */
-export const ONE_PER_DATE: Collection[] = ['weights', 'sleep'];
+export const ONE_PER_DATE: Collection[] = ['weights', 'sleep', 'days'];
 
 type Collections = { [K in Collection]: Record<string, CollectionTypes[K]> };
 type Dirty = { [K in Collection]: Record<string, true> };
@@ -133,11 +136,11 @@ interface StoreActions {
 export type Store = StoreState & StoreActions;
 
 function emptyCollections(): Collections {
-  return { foodEntries: {}, customFoods: {}, savedMeals: {}, activities: {}, water: {}, weights: {}, sleep: {}, fasting: {}, favorites: {} };
+  return { foodEntries: {}, customFoods: {}, savedMeals: {}, activities: {}, water: {}, weights: {}, sleep: {}, fasting: {}, favorites: {}, days: {} };
 }
 
 export function emptyDirty(): Dirty {
-  return { foodEntries: {}, customFoods: {}, savedMeals: {}, activities: {}, water: {}, weights: {}, sleep: {}, fasting: {}, favorites: {} };
+  return { foodEntries: {}, customFoods: {}, savedMeals: {}, activities: {}, water: {}, weights: {}, sleep: {}, fasting: {}, favorites: {}, days: {} };
 }
 
 export function initialState(): StoreState {

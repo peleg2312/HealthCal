@@ -95,7 +95,7 @@ function FastingScreen() {
   );
 
   return (
-    <Screen header={<Header title="Fasting" />} footer={footer} testID="fasting-screen">
+    <Screen header={<Header title="Fasting" />} footer={footer} backdrop={colors.fat} testID="fasting-screen">
       <Card padding={spacing.xl} style={{ alignItems: 'center', gap: spacing.lg }}>
         <Ring size={240} stroke={16} progress={p ? Math.min(1, p.progress) : 0} color={ringColor} colorEnd={p?.reached ? colors.success : colors.weight}>
           <View style={{ alignItems: 'center', gap: 2 }}>

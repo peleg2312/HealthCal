@@ -3,7 +3,9 @@
  * totals, an honest calorie range, and the added-fat item that covers what a
  * camera cannot see. No React, no storage, so it is unit-tested directly.
  */
-import type { AiFoodItem, AiFoodResult } from '@/types';
+import type { AiFoodItem, AiFoodResult, Food, SavedMealItem } from '@/types';
+
+import { itemFromFood } from './localMatch';
 
 export type AiTotals = Pick<AiFoodItem, 'kcal' | 'protein' | 'carbs' | 'fat' | 'fiber'>;
 
@@ -130,6 +132,13 @@ export interface ReviewRow {
   origin: AiFoodItem;
   item: AiFoodItem;
   kind: 'detected' | 'added' | 'fat';
+  /**
+   * A database food the row was matched or swapped to. Its per-gram values
+   * replace the model's, and it is logged with this definition.
+   */
+  food?: Food;
+  /** The model's own estimate, kept so a swap can be undone. */
+  estimate?: AiFoodItem;
 }
 
 let seq = 0;
@@ -139,16 +148,44 @@ export function rowsFromResult(result: AiFoodResult): ReviewRow[] {
   return result.items.map((it) => ({ key: nextKey(), origin: it, item: it, kind: 'detected' as const }));
 }
 
-export function makeRow(item: AiFoodItem, kind: ReviewRow['kind']): ReviewRow {
-  return { key: nextKey(), origin: item, item, kind };
+export function makeRow(item: AiFoodItem, kind: ReviewRow['kind'], food?: Food): ReviewRow {
+  return { key: nextKey(), origin: item, item, kind, ...(food ? { food } : null) };
 }
 
 export function setRowGrams(row: ReviewRow, grams: number): ReviewRow {
+  if (row.food) return { ...row, item: itemFromFood(row.food, grams, row.item.confidence) };
   return { ...row, item: rescaleItem(row.origin, grams) };
 }
 
+/**
+ * Rename a row. A row swapped to a database food goes back to being an
+ * estimate under the new name: the food's values no longer describe it.
+ */
 export function renameRow(row: ReviewRow, name: string): ReviewRow {
+  if (row.food) {
+    const base = row.estimate ? rescaleItem(row.estimate, row.item.grams) : row.item;
+    const { food: _food, estimate: _estimate, ...rest } = row;
+    return { ...rest, origin: { ...base, name }, item: { ...base, name } };
+  }
   return { ...row, origin: { ...row.origin, name }, item: { ...row.item, name } };
+}
+
+/**
+ * Swap a row to a database food at the current weight. The calories now come
+ * from the food; the portion is still the model's (or the user's) guess, so
+ * the row keeps its confidence and its range.
+ */
+export function swapRow(row: ReviewRow, food: Food): ReviewRow {
+  const estimate = row.estimate ?? (row.food ? undefined : row.origin);
+  const item = itemFromFood(food, row.item.grams, row.item.confidence);
+  return { ...row, origin: item, item, food, ...(estimate ? { estimate } : null) };
+}
+
+/** Undo a swap: back to the model's estimate at the current weight. */
+export function unswapRow(row: ReviewRow): ReviewRow {
+  if (!row.food || !row.estimate) return row;
+  const item = rescaleItem(row.estimate, row.item.grams);
+  return { key: row.key, kind: row.kind, origin: row.estimate, item };
 }
 
 /** Replace any added-fat row with the chosen amount (or remove it for none). */
@@ -168,4 +205,97 @@ export function gramStep(grams: number): number {
 
 export function formatKcalRange([low, high]: [number, number]): string {
   return `likely ${low} to ${high}`;
+}
+
+// ------------------------------------------------------------ correction
+
+/** Longest text the analyze function accepts. */
+export const MAX_TEXT = 500;
+
+/**
+ * Text for a re-estimate: the original note or description plus what the
+ * user says was wrong. The correction is kept whole; the original is cut to
+ * fit when the two together are too long.
+ */
+export function withCorrection(base: string | undefined, correction: string): string {
+  const fix = correction.trim().slice(0, 300);
+  const label = 'Correction from the person who ate it: ';
+  const original = (base ?? '').trim();
+  if (!fix) return original.slice(0, MAX_TEXT);
+  const tail = `${label}${fix}`;
+  if (!original) return tail;
+  const room = MAX_TEXT - tail.length - 1;
+  return room > 0 ? `${original.slice(0, room)}\n${tail}` : tail;
+}
+
+// ------------------------------------------------------------ logging
+
+/**
+ * A food definition for an estimated item, so the diary entry can be
+ * re-portioned later in the grams editor and found again in Recent.
+ */
+export function aiFoodDefinition(item: AiFoodItem, id: string): Food {
+  const g = item.grams > 0 ? item.grams : 100;
+  const per = (v: number) => Math.round(((v * 100) / g) * 10) / 10;
+  return {
+    id,
+    name: item.name,
+    per100g: { kcal: Math.round((item.kcal * 100) / g), protein: per(item.protein), carbs: per(item.carbs), fat: per(item.fat), fiber: per(item.fiber) },
+    servings: [{ label: `${Math.round(g)} g`, grams: Math.round(g) }],
+    source: 'ai',
+    verified: false,
+    emoji: '✨',
+  };
+}
+
+/** Likely calorie range for one logged item, the same band the review shows. */
+export function itemRange(item: AiFoodItem): [number, number] {
+  const s = itemSpread(item.confidence);
+  return [Math.round(item.kcal * (1 - s)), Math.round(item.kcal * (1 + s))];
+}
+
+/**
+ * The diary lines for the reviewed rows. Estimated rows carry a derived
+ * definition and their range; rows matched to a database food are logged
+ * with that food per gram, keeping the range because the portion is still a
+ * guess. Rows without a name or weight are left out.
+ */
+export function rowsToLogItems(rows: ReviewRow[], makeId: () => string): SavedMealItem[] {
+  const out: SavedMealItem[] = [];
+  for (const r of rows) {
+    const it = { ...r.item, name: r.item.name.trim() };
+    if (!(it.grams > 0) || !it.name) continue;
+    const nutrients = { kcal: it.kcal, protein: it.protein, carbs: it.carbs, fat: it.fat, fiber: it.fiber };
+    const range = { kcalRange: itemRange(it), confidence: it.confidence };
+    if (r.food) {
+      out.push({
+        name: r.food.name,
+        brand: r.food.brand,
+        emoji: r.food.emoji ?? '🍽️',
+        servingLabel: '1 g',
+        quantity: it.grams,
+        grams: it.grams,
+        nutrients,
+        food: r.food,
+        source: r.food.source,
+        verified: r.food.verified,
+        ...range,
+      });
+      continue;
+    }
+    const food = aiFoodDefinition(it, `ai_${makeId()}`);
+    out.push({
+      name: it.name,
+      emoji: '✨',
+      servingLabel: food.servings[0].label,
+      quantity: 1,
+      grams: it.grams,
+      nutrients,
+      food,
+      source: 'ai',
+      verified: false,
+      ...range,
+    });
+  }
+  return out;
 }

@@ -44,7 +44,7 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
   };
   const bottomPad = (tabs ? TAB_BAR_SPACE : spacing.xxl) + (footer ? 0 : insets.bottom);
   return (
-    <KeyboardAvoidingView testID={testID} style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView testID={testID} style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'web' ? undefined : 'padding'}>
       {backdrop ? <AmbientGlow color={backdrop} /> : null}
       <View style={{ paddingTop: noTopInset ? 0 : insets.top }} />
       {header ? <View style={inner}>{header}</View> : null}
@@ -57,7 +57,7 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
           {children}
         </ScrollView>
       ) : (
-        <View style={[inner, { flex: 1 }, contentStyle]}>{children}</View>
+        <View style={[inner, { flex: 1, paddingBottom: (tabs ? TAB_BAR_SPACE : 0) + (footer ? 0 : insets.bottom) }, contentStyle]}>{children}</View>
       )}
       {footer ? (
         <View style={{ borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg }}>

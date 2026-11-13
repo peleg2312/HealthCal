@@ -1,25 +1,26 @@
 import { useLocalSearchParams } from 'expo-router';
-import { Check, Clock, Pause, Play, Plus, Search, Trash2, X } from 'lucide-react-native';
+import { BookmarkPlus, Check, Clock, Pause, Play, Plus, Search, Trash2, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { View } from 'react-native';
 
 import { ACTIVITY_BY_ID } from '@/data/activities';
-import { estimateSession } from '@/features/activity/build';
+import { basisFromEntry, estimateSession } from '@/features/activity/build';
 import { DateStepper } from '@/features/activity/components';
 import { EXERCISE_GROUPS, searchExercises } from '@/features/activity/exercises';
+import { RoutineCards, useRoutineTemplates } from '@/features/activity/RoutineCards';
+import { draftFromRoutine, routineExercises, useRoutines } from '@/features/activity/routines';
 import { deleteActivity, leaveFlow, saveActivity } from '@/features/activity/session';
 import {
   draftDurationMin,
-  draftFromEntry,
+  draftOnOpen,
   draftToExercises,
   edits,
   elapsedMs,
-  newDraft,
   useStrengthDrafts,
   type DraftExercise,
   type StrengthDraft,
 } from '@/features/activity/strengthDraft';
-import { formatDayLabel, formatShortDate, today } from '@/lib/dates';
+import { formatDayLabel, formatDuration, formatShortDate, today } from '@/lib/dates';
 import { formulaTdee } from '@/lib/energy';
 import { INTENSITY_LABELS, estimateOneRepMax, strengthVolumeKg } from '@/lib/exercise';
 import { formatNumber, round, weightToKg, weightUnit, weightValue } from '@/lib/units';
@@ -45,10 +46,15 @@ import {
   Text,
   TextField,
   goBack,
+  haptic,
   toast,
 } from '@/ui';
 
 const STRENGTH = ACTIVITY_BY_ID.strength_training;
+/** Nothing longer than a day can be saved, as on the log form. */
+const MAX_MIN = 24 * 60;
+/** A timed workout longer than this asks before saving. */
+const LONG_MIN = 4 * 60;
 
 function useDraftsHydrated(): boolean {
   return useSyncExternalStore(
@@ -65,15 +71,18 @@ export default function StrengthScreen() {
   const hydrated = useDraftsHydrated();
   const draft = useStrengthDrafts((s) => s.drafts[key]);
 
+  // Decide once per visit which draft to show. Later renders never re-create a
+  // draft, so finishing or discarding (which removes it) cannot leave a fresh
+  // one behind with a stale date.
+  const [opened, setOpened] = useState(false);
   useEffect(() => {
-    if (!hydrated || draft) return;
-    if (entryId) {
-      if (entry && !entry.deleted) useStrengthDrafts.getState().put(key, draftFromEntry(entry));
-    } else {
-      const d = typeof params.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(params.date) && params.date <= today() ? params.date : today();
-      useStrengthDrafts.getState().put(key, newDraft(d));
-    }
-  }, [hydrated, draft, entryId, entry, key, params.date]);
+    if (!hydrated || opened) return;
+    if (entryId && (!entry || entry.deleted)) return;
+    const d = typeof params.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(params.date) && params.date <= today() ? params.date : today();
+    const next = draftOnOpen(useStrengthDrafts.getState().drafts[key], { entry: entryId ? entry : undefined, date: d });
+    if (next) useStrengthDrafts.getState().put(key, next);
+    setOpened(true);
+  }, [hydrated, opened, entryId, entry, key, params.date]);
 
   if (entryId && (!entry || entry.deleted)) {
     return (
@@ -82,7 +91,7 @@ export default function StrengthScreen() {
       </Screen>
     );
   }
-  if (!draft) return <Screen header={<Header title="Workout" />}>{null}</Screen>;
+  if (!draft || !opened) return <Screen header={<Header title="Workout" />}>{null}</Screen>;
   return <Logger draftKey={key} draft={draft} entry={entry} />;
 }
 
@@ -102,6 +111,9 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
   const [picker, setPicker] = useState(false);
   const [editTime, setEditTime] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [confirmLong, setConfirmLong] = useState(false);
+  const [saveRoutine, setSaveRoutine] = useState(false);
+  const templates = useRoutineTemplates();
 
   useEffect(() => {
     if (!draft.startedAt) return;
@@ -146,16 +158,30 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
 
   const elapsed = elapsedMs(draft, now);
   const minutes = draftDurationMin(draft, now);
-  const est = estimateSession(STRENGTH.met[draft.intensity], profile.weightKg, minutes, formulaTdee(profile));
+  // An edit is priced at the weight the workout was saved with, not today's.
+  const current = { weightKg: profile.weightKg, baselineKcalPerDay: formulaTdee(profile) };
+  const basis = entry ? basisFromEntry(entry, current) : current;
+  const est = estimateSession(STRENGTH.met[draft.intensity], basis.weightKg, minutes, basis.baselineKcalPerDay);
   const running = !!draft.startedAt;
   const manual = draft.manualMin !== null;
 
-  const finish = () => {
+  const finish = (confirmed = false) => {
     if (minutes < 1) {
       setEditTime(true);
       toast('Add how long the workout took');
       return;
     }
+    if (minutes > MAX_MIN) {
+      setEditTime(true);
+      toast('That is longer than a day. Set how long the workout took');
+      return;
+    }
+    // A timer left running overnight would add thousands of kcal; ask first.
+    if (!confirmed && !manual && minutes > LONG_MIN) {
+      setConfirmLong(true);
+      return;
+    }
+    setConfirmLong(false);
     const saved = saveActivity({
       activityId: STRENGTH.id,
       intensity: draft.intensity,
@@ -213,7 +239,7 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
           testID="strength-finish"
           title={draft.entryId ? 'Save workout' : 'Finish workout'}
           icon={<Check size={18} color={colors.onPrimary} />}
-          onPress={finish}
+          onPress={() => finish()}
           disabled={draft.exercises.length === 0 && minutes < 1}
         />
       }>
@@ -224,8 +250,8 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
             <Text variant="overline" color="textSecondary">
               {manual ? 'DURATION, SET BY YOU' : running ? 'ELAPSED' : elapsed > 0 ? 'PAUSED' : 'TIMER'}
             </Text>
-            <Text variant="numXL" tabular testID="strength-timer" color={running ? 'text' : 'textSecondary'}>
-              {manual ? `${draft.manualMin} min` : formatClock(elapsed)}
+            <Text variant="numXL" tabular testID="strength-timer" color={running ? 'text' : 'textSecondary'} numberOfLines={1} adjustsFontSizeToFit>
+              {manual ? formatDuration(draft.manualMin!) : formatClock(elapsed)}
             </Text>
           </View>
           <IconButton
@@ -250,6 +276,7 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
               decimals={0}
               suffix="min"
               style={{ flex: 1 }}
+              error={draft.manualMin !== null && draft.manualMin > MAX_MIN ? 'That is longer than a day' : null}
             />
             {manual ? (
               <Button
@@ -276,7 +303,7 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
         </View>
         <Text variant="caption" color="textSecondary" testID="strength-kcal">
           {minutes > 0
-            ? `About ${formatNumber(est.gross)} kcal in ${minutes} min (likely ${est.grossRange[0]}–${est.grossRange[1]}), of which ${formatNumber(est.net)} is above resting. Based on ${STRENGTH.met[draft.intensity]} MET.`
+            ? `About ${formatNumber(est.gross)} kcal in ${minutes} min (likely ${formatNumber(est.grossRange[0])}–${formatNumber(est.grossRange[1])}), of which ${formatNumber(est.net)} is above resting. Based on ${STRENGTH.met[draft.intensity]} MET.`
             : 'Start the timer or set a duration to estimate calories.'}
         </Text>
       </View>
@@ -291,6 +318,13 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
           {STRENGTH.intensityHint?.[draft.intensity]} · talk test: {INTENSITY_LABELS[draft.intensity].hint.toLowerCase()}
         </Text>
       </View>
+
+      {draft.exercises.length === 0 && templates.length > 0 ? (
+        <View style={{ gap: spacing.md }}>
+          <Text variant="title">Start from a routine</Text>
+          <RoutineCards onStart={(t) => update((d) => draftFromRoutine(t, d))} testID="strength-routines" />
+        </View>
+      ) : null}
 
       {draft.exercises.length === 0 ? (
         <View style={{ borderRadius: radius.lg, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.borderStrong }}>
@@ -316,7 +350,17 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
       )}
 
       {draft.exercises.length > 0 ? (
-        <Button testID="strength-add-exercise" title="Add exercise" variant="secondary" icon={<Plus size={18} color={colors.text} />} onPress={() => setPicker(true)} />
+        <View style={{ gap: spacing.xs }}>
+          <Button testID="strength-add-exercise" title="Add exercise" variant="secondary" icon={<Plus size={18} color={colors.text} />} onPress={() => setPicker(true)} />
+          <Button
+            testID="strength-save-routine"
+            title="Save as routine"
+            variant="ghost"
+            size="md"
+            icon={<BookmarkPlus size={18} color={colors.primary} />}
+            onPress={() => setSaveRoutine(true)}
+          />
+        </View>
       ) : null}
 
       <View style={{ gap: spacing.sm }}>
@@ -332,7 +376,21 @@ function Logger({ draftKey, draft, entry }: { draftKey: string; draft: StrengthD
         multiline
       />
 
+      <SaveRoutineSheet visible={saveRoutine} onClose={() => setSaveRoutine(false)} exercises={draft.exercises} />
       <ExercisePicker visible={picker} onClose={() => setPicker(false)} onPick={addExercise} recent={recentNames} />
+      <ConfirmSheet
+        visible={confirmLong}
+        title={`Save a ${formatDuration(minutes)} workout?`}
+        message={`The timer has been running for ${formatDuration(minutes)}, which would count as about ${formatNumber(est.net)} kcal above resting. If it was left running, set the real duration instead.`}
+        confirmLabel={`Save ${formatDuration(minutes)}`}
+        cancelLabel="Set the duration"
+        onConfirm={() => finish(true)}
+        onCancel={() => {
+          setConfirmLong(false);
+          update((d) => ({ ...edits.pause(d), manualMin: null }));
+          setEditTime(true);
+        }}
+      />
       <ConfirmSheet
         visible={confirmDiscard}
         title="Discard this workout?"
@@ -515,6 +573,46 @@ function ExerciseCard({
         }}
       />
     </View>
+  );
+}
+
+/** Default routine name from the main muscle group of the exercises ("Legs workout"). */
+function suggestedRoutineName(exercises: DraftExercise[]): string {
+  const counts = new Map<string, number>();
+  for (const ex of exercises) {
+    const g = EXERCISE_GROUPS.find((x) => x.exercises.some((n) => n.toLowerCase() === ex.name.toLowerCase()));
+    if (g) counts.set(g.label, (counts.get(g.label) ?? 0) + 1);
+  }
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  return top ? `${top[0]} workout` : 'My workout';
+}
+
+function SaveRoutineSheet({ visible, onClose, exercises }: { visible: boolean; onClose: () => void; exercises: DraftExercise[] }) {
+  const [name, setName] = useState<string | null>(null);
+  const value = name ?? suggestedRoutineName(exercises);
+  const list = routineExercises(exercises.map((e) => ({ name: e.name, sets: e.sets.map((s) => ({ reps: s.reps ?? 0, weightKg: s.weightKg ?? 0 })) })));
+  const close = () => {
+    setName(null);
+    onClose();
+  };
+  const save = () => {
+    if (!list.length || !value.trim()) return;
+    const r = useRoutines.getState().add(value, list);
+    haptic.success();
+    toast(`Saved ${r.name} as a routine`);
+    close();
+  };
+  return (
+    <Sheet
+      visible={visible}
+      onClose={close}
+      title="Save as routine"
+      footer={<Button testID="routine-save" title="Save routine" onPress={save} disabled={!list.length || !value.trim()} />}>
+      <TextField testID="routine-name" label="Name" value={value} onChangeText={setName} maxLength={40} returnKeyType="done" onSubmitEditing={save} />
+      <Text variant="caption" color="textSecondary">
+        {list.map((e) => `${e.name} × ${e.sets}`).join(', ')}. Starting it later adds these exercises with empty sets; your last numbers show as a guide.
+      </Text>
+    </Sheet>
   );
 }
 

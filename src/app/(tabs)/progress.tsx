@@ -12,6 +12,7 @@ import { MacrosCard } from '@/features/progress/MacrosCard';
 import { MilestonesCard } from '@/features/progress/MilestonesCard';
 import { RangeSwitch } from '@/features/progress/parts';
 import { RecapCard } from '@/features/progress/RecapCard';
+import { useRecapReady } from '@/features/progress/recapReady';
 import { useProgressData, type RangeDays } from '@/features/progress/useProgressData';
 import { WeightCard } from '@/features/progress/WeightCard';
 import { LargeTitle, Screen } from '@/ui';
@@ -19,6 +20,7 @@ import { LargeTitle, Screen } from '@/ui';
 export default function ProgressScreen() {
   const [range, setRange] = useState<RangeDays>(30);
   const d = useProgressData(range);
+  const recapReady = useRecapReady();
   const early = d.completeEver < MIN_INSIGHT_DAYS;
   const start = d.days[0].date;
 
@@ -47,6 +49,7 @@ export default function ProgressScreen() {
     <Screen tabs testID="progress-screen">
       <LargeTitle title="Progress" subtitle={weekRangeLabel(start, d.today)} />
       <RangeSwitch value={range} onChange={setRange} />
+      {d.recap ? <RecapCard recap={d.recap} earlier={d.earlierWeeks} unseen={recapReady.ready && recapReady.week === d.recap.weekStart} /> : null}
       <InsightsCard insights={d.insights} rangeDays={range} />
       <CaloriesCard days={d.days} summary={d.summary} today={d.today} eatBack={d.profile.eatBackExercise} />
       <MacrosCard summary={d.summary} />
@@ -54,7 +57,6 @@ export default function ProgressScreen() {
       <EnergyCard model={d.model} useAdaptiveSetting={d.profile.useAdaptiveTdee} />
       <HabitsCard summary={d.summary} units={d.profile.units} />
       <ConsistencyCard consistency={d.consistency} weekDays={d.weekDays} today={d.today} />
-      {d.recap ? <RecapCard recap={d.recap} /> : null}
       <MilestonesCard milestones={d.milestones} />
     </Screen>
   );

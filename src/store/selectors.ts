@@ -11,6 +11,7 @@ import { entriesTotal } from '@/lib/nutrition';
 import { adaptiveTdee, weightTrend, weeklyRate, type AdaptiveTdee, type TrendPoint } from '@/lib/trend';
 import type {
   ActivityEntry,
+  DaySnapshot,
   FoodEntry,
   ISODate,
   MealType,
@@ -21,6 +22,7 @@ import type {
   WeightEntry,
 } from '@/types';
 
+import { useToday } from './clock';
 import { useStore, type Store } from './index';
 
 export function live<T extends SyncedRecord>(map: Record<string, T>): T[] {
@@ -32,9 +34,15 @@ export function live<T extends SyncedRecord>(map: Record<string, T>): T[] {
 export interface EnergyModel {
   bmr: number;
   bmrMethod: BmrMethod;
+  /** Formula estimate of expenditure outside logged workouts. */
   formulaTdee: number;
   adaptive: AdaptiveTdee;
-  /** Expenditure actually used for targets. */
+  /**
+   * Expenditure the calorie target is built on. When exercise is added back to
+   * the budget this excludes logged workouts (each session then adds its own
+   * calories on the day); when it is not, the average workout burn is included
+   * here instead, so the target still reflects how active the person is.
+   */
   tdee: number;
   usingAdaptive: boolean;
   target: CalorieTarget;
@@ -46,11 +54,18 @@ export function intakeByDate(entries: FoodEntry[]): Record<ISODate, number> {
   return out;
 }
 
+export function exerciseByDate(activities: ActivityEntry[]): Record<ISODate, number> {
+  const out: Record<ISODate, number> = {};
+  for (const a of activities) out[a.date] = (out[a.date] ?? 0) + a.kcalNet;
+  return out;
+}
+
 export function computeEnergyModel(
   profile: Profile,
   foodEntries: FoodEntry[],
   weights: WeightEntry[],
   end: ISODate = today(),
+  activities: ActivityEntry[] = [],
 ): EnergyModel {
   const b = bmr(profile);
   const formula = formulaTdee(profile);
@@ -59,10 +74,13 @@ export function computeEnergyModel(
     formulaTdee: formula,
     weights: weights.map((w) => ({ date: w.date, kg: w.kg })),
     intakeByDate: intakeByDate(foodEntries),
+    exerciseByDate: exerciseByDate(activities),
     end: addDays(end, -1),
   });
   const usingAdaptive = profile.useAdaptiveTdee && adaptive.observed !== null;
-  const tdee = usingAdaptive ? adaptive.tdee : formula;
+  // adaptive.tdee and the formula are both non-exercise figures.
+  const nonExercise = usingAdaptive ? adaptive.tdee : formula;
+  const tdee = usingAdaptive && !profile.eatBackExercise ? nonExercise + (adaptive.avgExercise ?? 0) : nonExercise;
   return {
     bmr: b.kcal,
     bmrMethod: b.method,
@@ -99,6 +117,12 @@ export interface DaySummary {
   waterRemainingMl: number;
 }
 
+/**
+ * `snapshots` are the targets recorded on each day as it happened. A past day
+ * is judged against the target it had at the time, so changing a goal (or the
+ * expenditure estimate moving) does not rewrite history. Days without one
+ * (before the feature, or never opened) fall back to the current model.
+ */
 export function computeDay(
   date: ISODate,
   profile: Profile,
@@ -106,6 +130,7 @@ export function computeDay(
   foodEntries: FoodEntry[],
   activities: ActivityEntry[],
   water: WaterEntry[],
+  snapshots: DaySnapshot[] = [],
 ): DaySummary {
   const entries = foodEntries.filter((e) => e.date === date).sort((a, b) => a.loggedAt.localeCompare(b.loggedAt));
   const byMeal: Record<MealType, FoodEntry[]> = { breakfast: [], lunch: [], dinner: [], snack: [] };
@@ -117,8 +142,10 @@ export function computeDay(
   const exerciseGross = dayActivities.reduce((s, a) => s + a.kcalGross, 0);
   const activeMinutes = dayActivities.reduce((s, a) => s + a.durationMin, 0);
 
-  const target = model.target.target;
-  const budget = Math.round(target + (profile.eatBackExercise ? exerciseNet : 0));
+  const snapshot = snapshots.find((d) => d.date === date);
+  const target = snapshot ? snapshot.target : model.target.target;
+  const eatBack = snapshot ? snapshot.eatBackExercise : profile.eatBackExercise;
+  const budget = Math.round(target + (eatBack ? exerciseNet : 0));
 
   const waterEntries = water.filter((w) => w.date === date).sort((a, b) => a.loggedAt.localeCompare(b.loggedAt));
   const waterMl = Math.round(waterEntries.reduce((s, w) => s + effectiveMl(w.ml, w.beverage), 0));
@@ -151,8 +178,9 @@ export function computeDay(
 export function computeDayFromStore(s: Store, date: ISODate = today()): DaySummary | null {
   if (!s.profile?.onboardedAt) return null;
   const food = live(s.foodEntries);
-  const model = computeEnergyModel(s.profile, food, live(s.weights), date);
-  return computeDay(date, s.profile, model, food, live(s.activities), live(s.water));
+  const activities = live(s.activities);
+  const model = computeEnergyModel(s.profile, food, live(s.weights), date, activities);
+  return computeDay(date, s.profile, model, food, activities, live(s.water), live(s.days));
 }
 
 // ------------------------------------------------------------------ hooks
@@ -163,7 +191,7 @@ export function useProfile(): Profile {
   return p;
 }
 
-export function useLive<K extends 'foodEntries' | 'activities' | 'water' | 'weights' | 'sleep' | 'fasting' | 'savedMeals' | 'customFoods' | 'favorites'>(
+export function useLive<K extends 'foodEntries' | 'activities' | 'water' | 'weights' | 'sleep' | 'fasting' | 'savedMeals' | 'customFoods' | 'favorites' | 'days'>(
   collection: K,
 ): Store[K][string][] {
   const map = useStore((s) => s[collection]);
@@ -175,7 +203,8 @@ export function useEnergyModel(date: ISODate): EnergyModel {
   const profile = useProfile();
   const food = useLive('foodEntries');
   const weights = useLive('weights');
-  return useMemo(() => computeEnergyModel(profile, food, weights, date), [profile, food, weights, date]);
+  const activities = useLive('activities');
+  return useMemo(() => computeEnergyModel(profile, food, weights, date, activities), [profile, food, weights, date, activities]);
 }
 
 export function useDay(date: ISODate): DaySummary {
@@ -184,10 +213,11 @@ export function useDay(date: ISODate): DaySummary {
   const weights = useLive('weights');
   const activities = useLive('activities');
   const water = useLive('water');
+  const days = useLive('days');
   return useMemo(() => {
-    const model = computeEnergyModel(profile, food, weights, date);
-    return computeDay(date, profile, model, food, activities, water);
-  }, [date, profile, food, weights, activities, water]);
+    const model = computeEnergyModel(profile, food, weights, date, activities);
+    return computeDay(date, profile, model, food, activities, water, days);
+  }, [date, profile, food, weights, activities, water, days]);
 }
 
 /** Summaries for a run of days ending at `end`, oldest first. */
@@ -197,10 +227,11 @@ export function useDays(count: number, end: ISODate): DaySummary[] {
   const weights = useLive('weights');
   const activities = useLive('activities');
   const water = useLive('water');
+  const days = useLive('days');
   return useMemo(() => {
-    const model = computeEnergyModel(profile, food, weights, end);
-    return lastNDates(count, end).map((d) => computeDay(d, profile, model, food, activities, water));
-  }, [count, end, profile, food, weights, activities, water]);
+    const model = computeEnergyModel(profile, food, weights, end, activities);
+    return lastNDates(count, end).map((d) => computeDay(d, profile, model, food, activities, water, days));
+  }, [count, end, profile, food, weights, activities, water, days]);
 }
 
 export interface WeightSeries {
@@ -209,13 +240,14 @@ export interface WeightSeries {
   latest: WeightEntry | null;
   /** Current smoothed weight. */
   trendKg: number | null;
-  /** kg per week over the last two weeks, signed. */
+  /** Current pace in kg per week (signed): a straight-line fit through the last three weeks of weigh-ins, or null when there are too few or the newest is over ten days old. */
   weeklyRateKg: number | null;
   startKg: number | null;
 }
 
 export function useWeightSeries(): WeightSeries {
   const weights = useLive('weights');
+  const asOf = useToday();
   return useMemo(() => {
     const entries = [...weights].sort((a, b) => a.date.localeCompare(b.date));
     const trend = weightTrend(entries.map((w) => ({ date: w.date, kg: w.kg })));
@@ -224,14 +256,14 @@ export function useWeightSeries(): WeightSeries {
       trend,
       latest: entries[entries.length - 1] ?? null,
       trendKg: trend.length ? trend[trend.length - 1].trend : null,
-      weeklyRateKg: weeklyRate(trend),
+      weeklyRateKg: weeklyRate(trend, 21, asOf),
       startKg: entries[0]?.kg ?? null,
     };
-  }, [weights]);
+  }, [weights, asOf]);
 }
 
 export interface Consistency {
-  /** Consecutive days with something logged; one missed day does not break it. */
+  /** Days logged in the current run. A single missed day never breaks it; two in a row do. */
   streak: number;
   /** Days with food logged in the current Monday-based week. */
   daysThisWeek: number;
@@ -246,15 +278,15 @@ export interface Consistency {
 export function computeConsistency(dates: Set<ISODate>, end: ISODate = today()): Consistency {
   let streak = 0;
   let cursor = end;
-  let graceUsed = false;
   // Today not logged yet should not read as a broken streak.
   if (!dates.has(cursor)) cursor = addDays(cursor, -1);
   while (true) {
     if (dates.has(cursor)) {
       streak += 1;
       cursor = addDays(cursor, -1);
-    } else if (!graceUsed && dates.has(addDays(cursor, -1))) {
-      graceUsed = true;
+    } else if (dates.has(addDays(cursor, -1))) {
+      // One missed day next to a logged day is bridged, every time: only two
+      // missed days in a row end a streak.
       cursor = addDays(cursor, -1);
     } else break;
   }

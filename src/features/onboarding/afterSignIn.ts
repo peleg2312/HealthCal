@@ -1,6 +1,8 @@
 import { useAuth } from '@/services/auth';
 import { useStore } from '@/store';
 
+import { signInOutcome, type SignInOutcome } from './outcome';
+
 /**
  * Resolve once the first sync after sign-in has finished, so an existing
  * profile has been pulled before deciding where to go. `restoring` is set by
@@ -24,11 +26,24 @@ export function waitForRestore({ startGraceMs = 1500, maxMs = 20000 } = {}): Pro
       if (s.restoring) sawRestoring = true;
       const elapsed = Date.now() - started;
       if (elapsed > maxMs) return finish();
-      if (s.session && !s.restoring && (sawRestoring || elapsed > startGraceMs)) finish();
+      if (!s.session) return finish();
+      if (!s.restoring && (sawRestoring || elapsed > startGraceMs || s.restoreFailed || s.switchBlocked !== null)) finish();
     };
     const unsub = useAuth.subscribe(check);
     const timer = setInterval(check, 200);
     check();
+  });
+}
+
+/** Read the current outcome from the live auth and store state. */
+export function currentSignInOutcome(): SignInOutcome {
+  const a = useAuth.getState();
+  return signInOutcome({
+    signedIn: !!a.session,
+    restoring: a.restoring,
+    restoreFailed: a.restoreFailed,
+    switchBlocked: a.switchBlocked,
+    onboarded: !!useStore.getState().profile?.onboardedAt,
   });
 }
 

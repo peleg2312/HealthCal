@@ -45,29 +45,51 @@ function announce(message: string, ids: string[]) {
   toast(message, { label: 'Undo', onPress: () => ids.forEach((id) => useStore.getState().remove('foodEntries', id)) });
 }
 
-export function logFood(input: LogFoodInput): FoodEntry {
+/** Rewrite an existing entry with a new food, serving or amount. Keeps when it was logged and scales an estimate's range. */
+function rewriteEntry(input: LogFoodInput & { entryId: string }): FoodEntry {
   const store = useStore.getState();
   const built = buildEntry(input);
+  const existing = store.foodEntries[input.entryId];
+  // An edited estimate is still an estimate: keep its range, scaled to the new amount.
+  const scale = existing?.kcalRange && existing.nutrients.kcal > 0 ? built.nutrients.kcal / existing.nutrients.kcal : null;
+  return store.upsert('foodEntries', {
+    ...built,
+    id: input.entryId,
+    loggedAt: existing?.loggedAt ?? built.loggedAt,
+    ...(scale !== null && existing?.kcalRange
+      ? { kcalRange: [Math.round(existing.kcalRange[0] * scale), Math.round(existing.kcalRange[1] * scale)] as [number, number], confidence: existing.confidence }
+      : null),
+  });
+}
+
+export function logFood(input: LogFoodInput): FoodEntry {
+  const store = useStore.getState();
   if (input.entryId) {
-    const existing = store.foodEntries[input.entryId];
-    // An edited estimate is still an estimate: keep its range, scaled to the new amount.
-    const scale = existing?.kcalRange && existing.nutrients.kcal > 0 ? built.nutrients.kcal / existing.nutrients.kcal : null;
-    const entry = store.upsert('foodEntries', {
-      ...built,
-      id: input.entryId,
-      loggedAt: existing?.loggedAt ?? built.loggedAt,
-      ...(scale !== null && existing?.kcalRange
-        ? { kcalRange: [Math.round(existing.kcalRange[0] * scale), Math.round(existing.kcalRange[1] * scale)] as [number, number], confidence: existing.confidence }
-        : null),
-    });
+    const entry = rewriteEntry({ ...input, entryId: input.entryId });
     haptic.success();
     toast('Entry updated');
     return entry;
   }
-  const entry = store.upsert('foodEntries', built);
+  const entry = store.upsert('foodEntries', buildEntry(input));
   store.rememberFood(input.food);
   announce(`Added to ${MEAL_LABEL[input.meal].toLowerCase()}`, [entry.id]);
   return entry;
+}
+
+/**
+ * Quietly change the amount of an entry that was just added (the search row
+ * stepper): no toast per tap. A quantity of zero removes it, with Undo.
+ * Pass `serving` to switch the serving as well.
+ */
+export function setEntryAmount(entry: FoodEntry, quantity: number, serving?: Serving): FoodEntry | null {
+  if (!(quantity > 0)) {
+    deleteEntry(entry);
+    return null;
+  }
+  if (!entry.food) return entry;
+  const s = serving ?? { label: entry.servingLabel, grams: entry.quantity > 0 ? entry.grams / entry.quantity : entry.grams };
+  haptic.select();
+  return rewriteEntry({ food: entry.food, serving: s, quantity, meal: entry.meal, date: entry.date, entryId: entry.id });
 }
 
 /** Calories-only (optionally macros) entry for when the user just knows the number. */

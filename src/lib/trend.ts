@@ -80,22 +80,44 @@ export function linearSlope(points: WeightPoint[]): number | null {
   return den > 0 ? num / den : null;
 }
 
-/** Change of the trend line over the last `days`, in kg per week (signed). */
-export function weeklyRate(trend: TrendPoint[], days = 14): number | null {
-  if (trend.length < 2) return null;
-  const last = trend[trend.length - 1];
-  const startIndex = Math.max(0, trend.length - 1 - days);
-  const first = trend[startIndex];
-  const span = diffDays(first.date, last.date);
-  if (span < 7) return null;
-  return ((last.trend - first.trend) / span) * 7;
+/** A rate older than this many days is history, not a current pace. */
+export const RATE_STALE_AFTER_DAYS = 10;
+
+/**
+ * Current rate of weight change in kg per week (signed): the slope of a
+ * straight line through the real weigh-ins of the last `days` days.
+ *
+ * The smoothed trend is right for drawing a calm line, but its slope lags for
+ * the first weeks (it would report a 0.5 kg/week loss as 0.24 after a
+ * fortnight), so the rate is measured on the weigh-ins themselves. Returns
+ * null with fewer than three weigh-ins, less than a week of span, or, when
+ * `asOf` is given, when the newest weigh-in is too old to call the rate current.
+ */
+export function weeklyRate(trend: TrendPoint[], days = 21, asOf?: ISODate): number | null {
+  const real = trend.filter((t) => !t.interpolated);
+  if (real.length < 2) return null;
+  const last = real[real.length - 1];
+  if (asOf && diffDays(last.date, asOf) > RATE_STALE_AFTER_DAYS) return null;
+  const from = addDays(last.date, -days);
+  const recent = real.filter((t) => t.date >= from);
+  if (recent.length < 2 || diffDays(recent[0].date, last.date) < 7) return null;
+  const slope = linearSlope(recent);
+  return slope === null ? null : slope * 7;
 }
 
 export interface AdaptiveTdee {
   /** Blended estimate to use for targets. */
   tdee: number;
-  /** Pure data-driven estimate before blending, or null when data is too thin. */
+  /**
+   * Data-driven estimate before blending, or null when data is too thin. Like
+   * the formula it is a non-exercise figure: logged workouts are subtracted, so
+   * adding them back to the daily budget does not count them twice.
+   */
   observed: number | null;
+  /** Everything burned per day on average, logged workouts included. */
+  observedTotal?: number | null;
+  /** Average net calories of logged workouts per day over the window. */
+  avgExercise?: number;
   /** 0..1: how much weight the observed value gets against the formula. */
   confidence: number;
   loggedDays: number;
@@ -110,12 +132,25 @@ export interface AdaptiveInput {
   weights: WeightPoint[];
   /** Calories eaten per day. Days missing from the map count as not logged. */
   intakeByDate: Record<ISODate, number>;
+  /** Net calories of logged workouts per day. Days missing from the map count as none. */
+  exerciseByDate?: Record<ISODate, number>;
   end: ISODate;
   windowDays?: number;
 }
 
-/** A day counts as fully logged only above this; partial days would bias the estimate low. */
-const MIN_COMPLETE_DAY_KCAL = 800;
+/** Below this, a day's log is treated as unfinished whatever the person's size. */
+export const MIN_COMPLETE_DAY_KCAL = 800;
+
+/**
+ * Whether a day's food log looks complete enough to average. One rule for the
+ * whole app: at least 800 kcal and at least half of the reference (that day's
+ * budget, or the expenditure estimate where no budget applies). Half-logged
+ * days would otherwise drag averages and the expenditure estimate down.
+ */
+export function isCompleteDay(kcal: number, reference: number): boolean {
+  return kcal >= Math.max(MIN_COMPLETE_DAY_KCAL, reference * 0.5);
+}
+
 const MIN_LOGGED_DAYS = 10;
 const MIN_WEIGH_INS = 5;
 const MIN_SPAN_DAYS = 14;
@@ -123,6 +158,7 @@ const MIN_SPAN_DAYS = 14;
 /**
  * Energy balance over a rolling window:
  *   expenditure = average intake - (rate of weight change x 7700 kcal/kg)
+ *   non-exercise expenditure = expenditure - average logged workout calories
  * The rate of change is the least-squares line through the weigh-ins in the
  * window, which averages out daily water noise without the start-up lag a
  * smoothed trend has. The result is blended with the formula estimate
@@ -138,16 +174,22 @@ export function adaptiveTdee(input: AdaptiveInput): AdaptiveTdee {
   const intakes: number[] = [];
   for (let i = 0; i < windowDays; i++) {
     const kcal = input.intakeByDate[addDays(start, i)];
-    if (kcal !== undefined && kcal >= MIN_COMPLETE_DAY_KCAL) intakes.push(kcal);
+    if (kcal !== undefined && isCompleteDay(kcal, input.formulaTdee)) intakes.push(kcal);
   }
   const loggedDays = intakes.length;
   const span = weighIns >= 2 ? diffDays(inWindow[0].date, inWindow[weighIns - 1].date) : 0;
   // A short window cannot hold a longer span than its own length.
   const minSpan = Math.min(MIN_SPAN_DAYS, windowDays - 1);
 
+  let exerciseSum = 0;
+  for (let i = 0; i < windowDays; i++) exerciseSum += input.exerciseByDate?.[addDays(start, i)] ?? 0;
+  const avgExercise = exerciseSum / windowDays;
+
   const base: AdaptiveTdee = {
     tdee: input.formulaTdee,
     observed: null,
+    observedTotal: null,
+    avgExercise: Math.round(avgExercise),
     confidence: 0,
     loggedDays,
     weighIns,
@@ -165,8 +207,10 @@ export function adaptiveTdee(input: AdaptiveInput): AdaptiveTdee {
   }
 
   const avgIntake = intakes.reduce((a, b) => a + b, 0) / loggedDays;
-  const observedRaw = avgIntake - slope * KCAL_PER_KG;
-  const observed = clamp(observedRaw, input.formulaTdee * 0.65, input.formulaTdee * 1.45);
+  // Energy balance gives everything burned. The budget is built on what is burned outside
+  // logged workouts (those are added back per session), so they come out here.
+  const observedTotal = avgIntake - slope * KCAL_PER_KG;
+  const observed = clamp(observedTotal - avgExercise, input.formulaTdee * 0.65, input.formulaTdee * 1.45);
 
   const coverage = Math.min(1, loggedDays / (windowDays * 0.85));
   const weighCoverage = Math.min(1, weighIns / 12);
@@ -175,6 +219,7 @@ export function adaptiveTdee(input: AdaptiveInput): AdaptiveTdee {
   return {
     ...base,
     observed: Math.round(observed),
+    observedTotal: Math.round(observedTotal),
     confidence,
     tdee: Math.round(input.formulaTdee * (1 - confidence) + observed * confidence),
   };
