@@ -5,7 +5,6 @@
  * Pure: no React, no storage.
  */
 
-
 export const PACE_LOW = 0.75;
 export const PACE_HIGH = 1.25;
 

@@ -34,13 +34,13 @@ export function DayRingStrip({ today, selected, onSelect }: { today: ISODate; se
 
   // Follow the selection when it moves to another week (the Today chip, a deep link).
   const selectedBack = weeksBetween(selected, today);
-  useEffect(() => {
+  const [followed, setFollowed] = useState(selectedBack);
+  if (followed !== selectedBack) {
+    setFollowed(selectedBack);
     setBack(selectedBack);
-    if (width > 0)
-      ref.current?.scrollTo({
-        x: (STRIP_WEEKS - 1 - selectedBack) * width,
-        animated: true,
-      });
+  }
+  useEffect(() => {
+    if (width > 0) ref.current?.scrollTo({ x: (STRIP_WEEKS - 1 - selectedBack) * width, animated: true });
   }, [selectedBack, width]);
 
   const onLayout = (e: LayoutChangeEvent) => {

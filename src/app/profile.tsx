@@ -19,6 +19,7 @@ import React from 'react';
 import { View } from 'react-native';
 
 import { Group, IconTile, InitialsAvatar } from '@/features/settings/components';
+import { THEME_OPTIONS, ThemeSwatches } from '@/features/settings/ThemeSwatches';
 import { timeAgo } from '@/features/settings/format';
 import { toISODate } from '@/lib/dates';
 import { usePlannedReminders } from '@/features/settings/usePlannedReminders';
@@ -31,7 +32,7 @@ import { useToday } from '@/store/clock';
 import { pendingChanges, useStore } from '@/store';
 import { useEnergyModel, useProfile, useWeightSeries } from '@/store/selectors';
 import { useTheme } from '@/theme';
-import type { ThemePreference, UnitSystem } from '@/types';
+import type { UnitSystem } from '@/types';
 import { Card, EmptyState, Header, ListRow, Screen, Segmented, Text, ToggleRow } from '@/ui';
 
 const GOAL_LABEL = { lose: 'Lose weight', maintain: 'Maintain weight', gain: 'Gain weight' } as const;
@@ -195,26 +196,13 @@ function ProfileHub() {
             <View style={{ flex: 1 }}>
               <Text variant="bodyStrong">Appearance</Text>
               <Text variant="caption" color="textSecondary">
-                {settings.theme === 'system'
-                  ? 'Follows your device'
-                  : settings.theme === 'dark'
-                    ? 'Always dark'
-                    : settings.theme === 'blossom'
-                      ? 'Blossom: pink and champagne'
-                      : 'Always light'}
+                {THEME_OPTIONS.find((o) => o.value === settings.theme)?.hint ?? 'Follows your device'}
               </Text>
             </View>
           </View>
-          <Segmented<ThemePreference>
-            value={settings.theme}
-            onChange={(theme) => setSettings({ theme })}
-            options={[
-              { value: 'system', label: 'System' },
-              { value: 'light', label: 'Light' },
-              { value: 'dark', label: 'Dark' },
-              { value: 'blossom', label: 'Blossom' },
-            ]}
-          />
+          <View style={{ paddingTop: spacing.xs }}>
+            <ThemeSwatches value={settings.theme} onChange={(theme) => setSettings({ theme })} />
+          </View>
         </View>
         <ToggleRow
           testID="profile-haptics"
@@ -290,6 +278,7 @@ function AccountRow() {
   const sync = useSyncState();
   const lastSyncedAt = useStore((s) => s.lastSyncedAt);
   const pending = useStore(pendingChanges);
+  const sessionLost = useAuth((s) => s.sessionLost);
 
   let title = 'Account and sync';
   let subtitle: string;
@@ -310,6 +299,11 @@ function AccountRow() {
             : when
               ? `Backed up, last synced ${when}`
               : 'Signed in, not synced yet';
+  } else if (sessionLost && isBackendConfigured) {
+    icon = <CloudOff size={20} color={colors.warning} />;
+    tone = colors.warning;
+    title = 'Signed out of your account';
+    subtitle = 'Entries are safe here but not backed up. Sign in again';
   } else if (isBackendConfigured) {
     icon = <Smartphone size={20} color={colors.warning} />;
     tone = colors.warning;

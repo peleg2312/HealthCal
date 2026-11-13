@@ -13,7 +13,7 @@ import { MEAL_LABEL, mealForTime } from '@/lib/nutrition';
 import { formatNumber, formatVolume } from '@/lib/units';
 import { useStore } from '@/store';
 import { useNow, useToday } from '@/store/clock';
-import { useLive, useProfile } from '@/store/selectors';
+import { live, useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { FoodEntry, ISODate, SavedMeal } from '@/types';
 import { PressableScale, Sheet, Text } from '@/ui';
@@ -168,7 +168,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
           onPress={() => {
             const m = mealForTime();
             const date = today();
-            const p = findPreviousMeal(useStore.getState().foodEntries ? Object.values(useStore.getState().foodEntries).filter((e) => !e.deleted) : [], date, m, 7);
+            const p = findPreviousMeal(live(useStore.getState().foodEntries), date, m, 7);
             if (p) copyEntries(p.entries, date, m, `Copied ${MEAL_LABEL[m].toLowerCase()} from ${whenPhrase(p.date, date)}`);
             mark('repeat');
           }}
@@ -204,36 +204,34 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
             </View>
           </PressableScale>
         ))}
-        <View style={[tile, { flexBasis: '100%', flexDirection: 'row', alignItems: 'center', padding: 10, paddingLeft: 14, gap: spacing.sm }]} testID="quick-water-row">
+        <View style={[tile, { flexBasis: '47%', flexGrow: 1, padding: 14, gap: 10 }]} testID="quick-water-tile">
           <PressableScale
             testID="quick-water"
             onPress={() => go('/water')}
             accessibilityLabel="Water, open hydration"
-            style={{ flex: 1, minWidth: 0, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 }}>
             <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: `${colors.water}22`, alignItems: 'center', justifyContent: 'center' }}>
               <Droplets size={20} color={colors.water} />
             </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text variant="bodyStrong">Water</Text>
-              <Text variant="caption" color="textSecondary" numberOfLines={1}>
-                Drinks and hydration
-              </Text>
-            </View>
+            <Text variant="bodyStrong">Water</Text>
           </PressableScale>
-          {glasses.map((ml) => (
-            <PressableScale
-              key={ml}
-              testID={`quick-water-${ml}`}
-              feedback="none"
-              onPress={() => addWater(today(), ml, profile.units)}
-              accessibilityLabel={`Add ${formatVolume(ml, profile.units)} of water`}
-              style={{ height: 44, paddingHorizontal: 12, borderRadius: radius.pill, backgroundColor: `${colors.water}22`, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Plus size={14} color={colors.water} strokeWidth={2.8} />
-              <Text variant="label" color="water">
-                {formatVolume(ml, profile.units)}
-              </Text>
-            </PressableScale>
-          ))}
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            {glasses.map((ml) => (
+              <PressableScale
+                key={ml}
+                testID={`quick-water-${ml}`}
+                feedback="none"
+                hitSlop={4}
+                onPress={() => addWater(today(), ml, profile.units)}
+                accessibilityLabel={`Add ${formatVolume(ml, profile.units)} of water`}
+                style={{ flex: 1, height: 38, borderRadius: radius.pill, backgroundColor: `${colors.water}22`, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                <Plus size={12} color={colors.water} strokeWidth={2.8} />
+                <Text variant="label" color="water" style={{ fontSize: 12 }} numberOfLines={1}>
+                  {formatVolume(ml, profile.units)}
+                </Text>
+              </PressableScale>
+            ))}
+          </View>
         </View>
       </View>
     </Sheet>

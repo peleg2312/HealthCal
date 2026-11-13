@@ -87,7 +87,7 @@ export default function TrainScreen() {
             </Text>
             <View style={{ flexDirection: 'row', gap: spacing.md }}>
               <Stat label="Sessions" value={String(week.sessions)} />
-              <Stat label="Net, est." value={week.kcalNet > 0 ? `~${formatNumber(week.kcalNet)}` : '0'} unit="kcal" color={colors.exercise} />
+              <Stat label="Net, est." value={formatNumber(week.kcalNet)} unit="kcal" color={colors.exercise} />
             </View>
             <Text variant="caption" color="textSecondary" testID="train-total-time">
               {week.totalMinutes > 0 ? `${formatDuration(week.totalMinutes)} logged in total` : 'Nothing logged yet this week'}

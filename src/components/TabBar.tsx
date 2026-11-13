@@ -1,14 +1,13 @@
 import type { BottomTabBarProps } from 'expo-router/build/layouts/Tabs';
-import { router } from 'expo-router';
-import { Activity, BarChart3, BookOpenText, Camera, Droplets, Dumbbell, Home, PenLine, Plus, ScanBarcode, Scale, Search } from 'lucide-react-native';
+import { Activity, BarChart3, BookOpenText, Dumbbell, Home, Plus } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { today } from '@/lib/dates';
-import { mealForTime } from '@/lib/nutrition';
 import { MAX_CONTENT_WIDTH, useTheme } from '@/theme';
-import { PressableScale, Sheet, Text } from '@/ui';
+import { PressableScale, Text } from '@/ui';
+
+import { QuickLogSheet } from './QuickLogSheet';
 
 const ICONS = { index: Home, diary: BookOpenText, train: Dumbbell, progress: BarChart3 } as const;
 
@@ -94,62 +93,5 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
       </View>
       <QuickLogSheet visible={open} onClose={() => setOpen(false)} />
     </>
-  );
-}
-
-function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const { colors, radius } = useTheme();
-  const go = (href: string) => {
-    onClose();
-    // The meal and the date are read at the moment of the tap: this sheet stays mounted for
-    // the whole session, so anything computed while rendering would be hours or days old.
-    const target = href.replace('{food}', `meal=${mealForTime()}&date=${today()}`);
-    // Let the sheet start closing before the next screen slides in.
-    setTimeout(() => router.push(target as never), 60);
-  };
-  const food = '{food}';
-  const actions = [
-    { id: 'search', label: 'Search food', hint: 'Database and your recents', icon: Search, color: colors.calories, href: `/food/search?${food}` },
-    { id: 'photo', label: 'Snap a meal', hint: 'AI estimates from a photo', icon: Camera, color: colors.fat, href: `/food/photo?${food}` },
-    { id: 'scan', label: 'Scan barcode', hint: 'Packaged products', icon: ScanBarcode, color: colors.carbs, href: `/food/scan?${food}` },
-    { id: 'describe', label: 'Describe it', hint: 'Type what you ate', icon: PenLine, color: colors.protein, href: `/food/photo?mode=text&${food}` },
-    { id: 'activity', label: 'Log activity', hint: 'Sport, gym, walk', icon: Activity, color: colors.exercise, href: '/activity/pick' },
-    { id: 'water', label: 'Add water', hint: 'Drinks and hydration', icon: Droplets, color: colors.water, href: '/water' },
-    { id: 'weight', label: 'Weigh in', hint: 'Weight and body fat', icon: Scale, color: colors.weight, href: '/weight' },
-  ];
-  return (
-    <Sheet visible={visible} onClose={onClose} title="Log something">
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-        {actions.map((a, i) => (
-          <PressableScale
-            key={a.id}
-            testID={`quick-${a.id}`}
-            onPress={() => go(a.href)}
-            accessibilityLabel={a.label}
-            style={{
-              flexBasis: i === 0 ? '100%' : '47%',
-              flexGrow: 1,
-              flexDirection: i === 0 ? 'row' : 'column',
-              alignItems: i === 0 ? 'center' : 'flex-start',
-              backgroundColor: colors.surface,
-              borderRadius: radius.lg,
-              borderWidth: 1,
-              borderColor: colors.border,
-              padding: 14,
-              gap: i === 0 ? 14 : 10,
-            }}>
-            <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: `${a.color}22`, alignItems: 'center', justifyContent: 'center' }}>
-              <a.icon size={20} color={a.color} />
-            </View>
-            <View>
-              <Text variant="bodyStrong">{a.label}</Text>
-              <Text variant="caption" color="textSecondary">
-                {a.hint}
-              </Text>
-            </View>
-          </PressableScale>
-        ))}
-      </View>
-    </Sheet>
   );
 }

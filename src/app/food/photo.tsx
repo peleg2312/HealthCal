@@ -94,18 +94,6 @@ export default function PhotoScreen() {
   // The person's own foods first, then the bundled reference foods.
   const matchPool: Food[] = [...customFoods, ...BUILTIN_FOODS];
 
-  // Android can kill the app while the camera app is open; collect that photo on return.
-  useEffect(() => {
-    let live = true;
-    void takePendingPhoto().then((picked) => {
-      if (live && picked) void acceptPhoto(picked);
-    });
-    return () => {
-      live = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   useEffect(() => {
     if (!highlight) return;
     const t = setTimeout(() => setHighlight(null), 1600);
@@ -155,6 +143,18 @@ export default function PhotoScreen() {
       setPreparing(false);
     }
   }
+
+  // Android can kill the app while the camera app is open; collect that photo on return.
+  useEffect(() => {
+    let live = true;
+    void takePendingPhoto().then((picked) => {
+      if (live && picked) void acceptPhoto(picked);
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function analyse(precise: boolean, fix?: string) {
     const controller = new AbortController();

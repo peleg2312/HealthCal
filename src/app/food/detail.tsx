@@ -15,7 +15,7 @@ import { useStore } from '@/store';
 import { useDay, useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { Food, FoodEntry, ISODate, MealType, Nutrients, Serving } from '@/types';
-import { Avatar, Button, Card, Divider, EmptyState, Header, IconButton, MacroBar, NumberField, Screen, Stepper, Text, TextField, goBack } from '@/ui';
+import { Avatar, Button, Card, Divider, EmptyState, Header, IconButton, MacroBar, NumberField, Screen, Text, TextField, goBack } from '@/ui';
 
 export default function FoodDetailRoute() {
   return (

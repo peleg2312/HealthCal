@@ -12,11 +12,12 @@ import { Avatar, Button, Chip, ChipRow, IconButton, Stepper, Text } from '@/ui';
 
 export type ScanFoundFrom = 'custom' | 'recent' | 'diary' | 'openfoodfacts';
 
+/** Shown beside the source tag when the product came from this device, not the network. */
 const FROM_COPY: Record<ScanFoundFrom, string> = {
-  custom: 'From your foods',
+  custom: '',
   recent: 'Logged before',
   diary: 'Logged before',
-  openfoodfacts: 'Open Food Facts',
+  openfoodfacts: '',
 };
 
 /**
@@ -81,7 +82,7 @@ export function ScanResultCard({
           ) : null}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 2 }}>
             <SourceTag source={food.source} />
-            {from !== 'openfoodfacts' ? (
+            {from === 'recent' || from === 'diary' ? (
               <Text variant="caption" color="textTertiary" style={{ fontSize: 11 }}>
                 · {FROM_COPY[from]}
               </Text>

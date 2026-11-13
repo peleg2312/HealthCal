@@ -20,7 +20,7 @@ const crypto = require('node:crypto');
 const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith('--')).map((a) => a.slice(2).split('=')));
 const PORT = Number(flags.port || 54321);
 
-const state = { users: new Map(), records: [], profiles: new Map(), aiRequests: [], aiUsage: new Map(), clock: Date.now() };
+const state = { users: new Map(), records: [], profiles: new Map(), aiRequests: [], aiUsage: new Map(), recoveries: [], clock: Date.now() };
 const tick = () => new Date((state.clock += 5)).toISOString();
 
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -83,6 +83,8 @@ const api = http.createServer(async (req, res) => {
       records: state.records,
       profiles: Object.fromEntries(state.profiles),
       aiRequests: state.aiRequests,
+      // What the reset email would carry: lets a test follow the link without a mailbox.
+      recoveries: state.recoveries.map((r) => ({ email: r.email, code: r.code, redirectTo: r.redirectTo })),
     });
   }
 
@@ -96,6 +98,15 @@ const api = http.createServer(async (req, res) => {
     return send(res, 200, issueSession(user));
   }
   if (route === 'POST /auth/v1/token') {
+    if (url.searchParams.get('grant_type') === 'pkce') {
+      // The emailed code only works with the secret kept by the browser that asked for it.
+      const rec = state.recoveries.find((r) => r.code === body.auth_code);
+      const challenge = crypto.createHash('sha256').update(String(body.code_verifier || '')).digest('base64url');
+      if (!rec || rec.challenge !== challenge) return send(res, 400, { code: 400, error_code: 'bad_code_verifier', msg: 'code challenge does not match previously saved code verifier' });
+      state.recoveries = state.recoveries.filter((r) => r !== rec);
+      const user = state.users.get(rec.email);
+      return user ? send(res, 200, issueSession(user)) : send(res, 400, { code: 400, error_code: 'user_not_found', msg: 'User not found' });
+    }
     if (url.searchParams.get('grant_type') === 'refresh_token') {
       const user = [...state.users.values()].find((u) => `refresh-${u.id}` === body.refresh_token);
       return user ? send(res, 200, issueSession(user)) : send(res, 400, { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' });
@@ -110,7 +121,24 @@ const api = http.createServer(async (req, res) => {
     return user ? send(res, 200, issueSession(user).user) : send(res, 401, { code: 401, msg: 'invalid JWT' });
   }
   if (route === 'POST /auth/v1/logout') return res.writeHead(204).end();
-  if (route === 'POST /auth/v1/recover') return send(res, 200, {});
+  if (route === 'POST /auth/v1/recover') {
+    const email = String(body.email || '').toLowerCase();
+    if (state.users.has(email)) {
+      state.recoveries.push({ email, code: crypto.randomUUID(), challenge: body.code_challenge || null, redirectTo: url.searchParams.get('redirect_to') });
+    }
+    // Like the real service: the answer does not reveal whether the address has an account.
+    return send(res, 200, {});
+  }
+  if (route === 'PUT /auth/v1/user') {
+    const uid = userFromRequest(req);
+    const user = [...state.users.values()].find((u) => u.id === uid);
+    if (!user) return send(res, 401, { code: 401, msg: 'invalid JWT' });
+    if (typeof body.password === 'string') {
+      if (body.password.length < 6) return send(res, 422, { code: 422, error_code: 'weak_password', msg: 'Password should be at least 6 characters.' });
+      user.password = body.password;
+    }
+    return send(res, 200, issueSession(user).user);
+  }
 
   // -------------------------------------------------------- database (RLS)
   const uid = userFromRequest(req);
@@ -170,7 +198,8 @@ const api = http.createServer(async (req, res) => {
   // -------------------------------------------------------- edge functions
   if (route === 'POST /functions/v1/analyze-food') {
     if (!uid) return send(res, 401, { error: 'unauthorized', message: 'Sign in to analyse food.' });
-    const used = (state.aiUsage.get(uid) || 0) + 1;
+    // As on the real function: a careful analysis uses five units of the daily allowance.
+    const used = (state.aiUsage.get(uid) || 0) + (body.precise === true ? 5 : 1);
     const LIMIT = 40;
     state.aiRequests.push({ user: uid, hasImage: typeof body.image === 'string' && body.image.length > 0, imageChars: (body.image || '').length, mediaType: body.mediaType ?? null, text: body.text ?? null, precise: body.precise === true });
     if (/daily limit/i.test(body.text || '')) return send(res, 429, { error: 'daily_limit', message: `You have used today's ${LIMIT} AI analyses. They reset at midnight UTC.`, remaining: 0 });

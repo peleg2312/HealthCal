@@ -1,9 +1,10 @@
 import { Redirect, router } from 'expo-router';
-import { HeartHandshake, ShieldCheck, Zap } from 'lucide-react-native';
-import React from 'react';
+import { FileUp, HeartHandshake, ShieldCheck, TriangleAlert, Zap } from 'lucide-react-native';
+import React, { useState } from 'react';
 import { View } from 'react-native';
 
-import { BrandRings, FadeIn } from '@/features/onboarding/components';
+import { BrandRings, FadeIn, Note } from '@/features/onboarding/components';
+import { pickAndImportBackup } from '@/services/export';
 import { isBackendConfigured } from '@/services/supabase';
 import { useStore } from '@/store';
 import { useTheme } from '@/theme';
@@ -12,7 +13,33 @@ import { Button, Screen, Text } from '@/ui';
 export default function Welcome() {
   const { colors, spacing } = useTheme();
   const onboarded = useStore((s) => !!s.profile?.onboardedAt);
+  const [importing, setImporting] = useState(false);
+  const [importNote, setImportNote] = useState<{ tone: 'neutral' | 'warning'; text: string } | null>(null);
   if (onboarded) return <Redirect href="/" />;
+
+  const restore = async () => {
+    setImporting(true);
+    setImportNote(null);
+    const r = await pickAndImportBackup({ forceProfile: true });
+    setImporting(false);
+    if (!r.ok) {
+      if (!r.canceled) setImportNote({ tone: 'warning', text: `That file could not be restored. ${r.message}` });
+      return;
+    }
+    // A backup with a finished plan opens straight onto Today.
+    if (useStore.getState().profile?.onboardedAt) {
+      router.replace('/');
+      return;
+    }
+    const n = r.added + r.updated;
+    setImportNote({
+      tone: 'neutral',
+      text:
+        n > 0
+          ? `Imported ${n} ${n === 1 ? 'record' : 'records'}, but the file has no finished plan. Set up your plan with Get started and they will be there.`
+          : 'Nothing new was in that file, and it has no finished plan. Choose another backup, or set up with Get started.',
+    });
+  };
 
   const points = [
     {
@@ -45,6 +72,15 @@ export default function Welcome() {
           {isBackendConfigured ? (
             <Button title="I already have an account" variant="ghost" testID="welcome-sign-in" onPress={() => router.push('/auth?mode=signin')} />
           ) : null}
+          <Button
+            title="Restore from a backup file"
+            variant="ghost"
+            size="sm"
+            testID="welcome-restore"
+            loading={importing}
+            icon={<FileUp size={16} color={colors.textSecondary} />}
+            onPress={() => void restore()}
+          />
         </View>
       }>
       <View style={{ alignItems: 'center', gap: spacing.xxl }}>
@@ -58,6 +94,16 @@ export default function Welcome() {
           </Text>
         </FadeIn>
       </View>
+      {importNote ? (
+        <Note
+          tone={importNote.tone}
+          testID="welcome-restore-note"
+          icon={importNote.tone === 'warning' ? <TriangleAlert size={18} color={colors.warning} /> : <FileUp size={18} color={colors.textSecondary} />}>
+          <Text variant="caption" color="textSecondary" accessibilityLiveRegion="polite">
+            {importNote.text}
+          </Text>
+        </Note>
+      ) : null}
       <View style={{ gap: spacing.lg }}>
         {points.map((p, i) => (
           <FadeIn key={p.title} delay={300 + i * 90} style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>

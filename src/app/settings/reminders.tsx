@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Linking, Platform, View } from 'react-native';
 
 import { Group, IconTile, prefers12h, TimeRow } from '@/features/settings/components';
-import { reminderTimeLabel, type PlannedReminder, type ReminderKind } from '@/features/settings/reminderPlanner';
+import { reminderTimeLabel, waterCategory, type PlannedReminder, type ReminderKind } from '@/features/settings/reminderPlanner';
 import { usePlannedReminders } from '@/features/settings/usePlannedReminders';
 import { formatDuration } from '@/lib/dates';
 import { getReminderPermission, remindersSupported, requestReminderPermission, type ReminderPermission } from '@/services/notifications';
@@ -27,6 +27,10 @@ export default function RemindersScreen() {
   const r = useStore((s) => s.settings.reminders);
   const setReminders = useStore((s) => s.setReminders);
   const units = useStore((s) => s.profile?.units);
+  const waterPresets = useStore((s) => s.settings.waterPresets);
+  const waterButtons = waterCategory(waterPresets, units ?? 'metric')
+    .actions.map((x) => x.buttonTitle)
+    .join(' and ');
   const hour12 = prefers12h(units);
   const [permission, setPermission] = useState<ReminderPermission | null>(remindersSupported ? null : 'unsupported');
   const [asking, setAsking] = useState(false);
@@ -113,7 +117,7 @@ export default function RemindersScreen() {
         </Card>
       ) : null}
 
-      <Group title="Water" footer="Every reminder says how much is left today in your units. None once the goal is met.">
+      <Group title="Water" footer={`Every reminder says how much is left today in your units, with ${waterButtons} buttons to log a drink from the notification. None once the goal is met.`}>
         <ToggleRow
           testID="reminders-water"
           title="Water reminders"
@@ -145,7 +149,7 @@ export default function RemindersScreen() {
         ) : null}
       </Group>
 
-      <Group title="Meals" footer="Only when nothing is logged for that meal yet.">
+      <Group title="Meals" footer="Only when nothing is logged for that meal yet. Tapping one opens that meal, and if you logged it yesterday you can repeat it from the notification.">
         <ToggleRow
           testID="reminders-meals"
           title="Meal reminders"
@@ -185,7 +189,7 @@ export default function RemindersScreen() {
         ) : null}
       </Group>
 
-      <Group title="Weigh-in" footer="Only on the days you choose, and only if no weight is logged yet that day.">
+      <Group title="Weigh-in" footer="Only on the days you choose, and only if no weight is logged yet that day. Later today moves it two hours on, outside quiet hours.">
         <ToggleRow
           testID="reminders-weighin"
           title="Weigh-in reminder"

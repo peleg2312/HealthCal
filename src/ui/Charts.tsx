@@ -115,9 +115,9 @@ export function BarChart({
       }
     : {};
   return (
-    <View onLayout={onLayout} style={{ height }} testID={testID} {...responder}>
+    <View onLayout={onLayout} style={{ height }} testID={testID}>
       {width > 0 ? (
-        <Svg width={width} height={height} pointerEvents="none">
+        <Svg width={width} height={height}>
           {data.map((d, i) => (
             <Rect key={`t-${i}`} x={i * slot + (slot - barW) / 2} y={topPad} width={barW} height={chartH} rx={barW / 2.6} fill={colors.track} opacity={0.5} />
           ))}
@@ -181,6 +181,7 @@ export function BarChart({
           })}
         </Svg>
       ) : null}
+      {scrub ? <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, cursor: 'crosshair', userSelect: 'none' } as object} {...responder} /> : null}
       {active !== null && data[active] ? (
         <ScrubPill text={data[active].detail ?? `${data[active].label} · ${fmt(data[active].value)}`} x={active * slot + slot / 2} width={width} />
       ) : null}
@@ -291,9 +292,9 @@ export function LineChart({
       : {};
   const ap = active !== null ? pts[active] : null;
   return (
-    <View onLayout={onLayout} style={{ height }} {...responder}>
+    <View onLayout={onLayout} style={{ height }}>
       {width > 0 ? (
-        <Svg width={width} height={height} pointerEvents="none">
+        <Svg width={width} height={height}>
           {band && band.to > band.from ? (
             <Rect x={padL} y={sy(Math.min(band.to, maxY))} width={w} height={Math.max(1, sy(Math.max(band.from, minY)) - sy(Math.min(band.to, maxY)))} fill={band.color ?? color} opacity={0.12} rx={4} />
           ) : null}
@@ -345,6 +346,7 @@ export function LineChart({
           ))}
         </Svg>
       ) : null}
+      {formatPoint ? <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, cursor: 'crosshair', userSelect: 'none' } as object} {...responder} /> : null}
       {ap && formatPoint && active !== null ? <ScrubPill text={formatPoint(line[active])} x={ap.px} width={width} /> : null}
     </View>
   );

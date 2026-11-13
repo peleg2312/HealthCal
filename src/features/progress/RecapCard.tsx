@@ -45,7 +45,7 @@ export function RecapCard({ recap, earlier, unseen }: { recap: WeeklyRecap; earl
       </PressableScale>
       {earlier.length ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingLeft: 52 }}>
-          {earlier.slice(0, 3).map((w) => (
+          {earlier.slice(0, 2).map((w) => (
             <PressableScale
               key={w}
               testID={`progress-recap-week-${w}`}

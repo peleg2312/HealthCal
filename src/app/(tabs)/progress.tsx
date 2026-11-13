@@ -52,7 +52,7 @@ export default function ProgressScreen() {
       {d.recap ? <RecapCard recap={d.recap} earlier={d.earlierWeeks} unseen={recapReady.ready && recapReady.week === d.recap.weekStart} /> : null}
       <InsightsCard insights={d.insights} rangeDays={range} />
       <CaloriesCard days={d.days} summary={d.summary} today={d.today} eatBack={d.profile.eatBackExercise} />
-      <MacrosCard summary={d.summary} />
+      <MacrosCard summary={d.summary} days={d.days} today={d.today} />
       <WeightCard series={d.series} start={start} end={d.today} profile={d.profile} />
       <EnergyCard model={d.model} useAdaptiveSetting={d.profile.useAdaptiveTdee} />
       <HabitsCard summary={d.summary} units={d.profile.units} />

@@ -1,14 +1,15 @@
-import { CalendarCheck, Droplet, Sparkles } from 'lucide-react-native';
+import { CalendarRange, Droplet, Sparkles } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
-import { formatLongDate, toISODate } from '@/lib/dates';
 import { formatNumber, formatVolume, formatWeight, round } from '@/lib/units';
 import { useTheme } from '@/theme';
 import { Card, Divider, Ring, Text } from '@/ui';
 
 import { FadeIn } from './components';
 import { METHOD_LABEL, type Plan } from './model';
+import { projectTo, rangeText, shortDate } from './projection';
+import { ProjectionChart } from './ProjectionChart';
 
 const kcal = (n: number) => formatNumber(Math.round(n / 10) * 10);
 
@@ -27,7 +28,8 @@ export function PlanReveal({ plan }: { plan: Plan }) {
     p.goal === 'maintain' || Math.abs(t.dailyDelta) < 5
       ? 'Matched to what you burn'
       : `${t.dailyDelta < 0 ? '−' : '+'}${kcal(Math.abs(t.dailyDelta))} kcal a day, about ${formatWeight(Math.abs(t.impliedWeeklyKg), units, 2)} a week`;
-  const date = plan.goalDate ? formatLongDate(toISODate(plan.goalDate)).replace(/^\w+, /, '') : null;
+  const projection = p.goal !== 'maintain' ? projectTo(p.weightKg, p.targetWeightKg, t.impliedWeeklyKg) : null;
+  const range = projection ? rangeText(projection) : '';
   const methodWhy =
     plan.bmrMethod === 'katch-mcardle' && plan.leanMassKg !== null
       ? `From your lean mass of ${formatWeight(plan.leanMassKg, units)} (body fat ${round(p.bodyFatPct ?? 0, 1)}%)`
@@ -140,18 +142,30 @@ export function PlanReveal({ plan }: { plan: Plan }) {
         </Card>
       </FadeIn>
 
-      {date && p.targetWeightKg ? (
+      {projection ? (
         <FadeIn delay={480}>
-          <Card style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }} testID="plan-date">
-            <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: `${colors.weight}22`, alignItems: 'center', justifyContent: 'center' }}>
-              <CalendarCheck size={20} color={colors.weight} />
+          <Card
+            style={{ gap: spacing.md }}
+            testID="plan-projection"
+            accessible
+            accessibilityLabel={`Projected to reach ${formatWeight(projection.targetKg, units)} ${range}, about ${shortDate(projection.date)} at this pace. A projection, not a promise.`}>
+            <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+              <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: `${colors.weight}22`, alignItems: 'center', justifyContent: 'center' }}>
+                <CalendarRange size={20} color={colors.weight} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text variant="caption" color="textSecondary">
+                  {`Projected to reach ${formatWeight(projection.targetKg, units)}`}
+                </Text>
+                <Text variant="h3" testID="plan-date">
+                  {range.charAt(0).toUpperCase() + range.slice(1)}
+                </Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text variant="caption" color="textSecondary">
-                {`Projected to reach ${formatWeight(p.targetWeightKg, units)}`}
-              </Text>
-              <Text variant="h3">{date}</Text>
-            </View>
+            <ProjectionChart projection={projection} units={units} />
+            <Text variant="caption" color="textSecondary">
+              A projection, not a promise. It redraws from your real trend.
+            </Text>
           </Card>
         </FadeIn>
       ) : null}

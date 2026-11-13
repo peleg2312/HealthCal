@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Platform, View } from 'react-native';
 
 import { Group, IconTile } from '@/features/settings/components';
-import { exportData, pickAndImportBackup, type ExportKind } from '@/services/export';
+import { applyLastBackupProfile, exportData, pickAndImportBackup, type ExportKind, type ImportResult } from '@/services/export';
 import { signOut, useAuth } from '@/services/auth';
 import { cancelAllReminders } from '@/services/notifications';
 import { useStore } from '@/store';
@@ -23,6 +23,8 @@ export default function DataScreen() {
   const signedIn = useAuth((s) => !!s.session);
   const [busy, setBusy] = useState<ExportKind | 'import' | null>(null);
   const [confirmErase, setConfirmErase] = useState(false);
+  /** An import whose backup profile was not applied because this device has a newer one. */
+  const [askProfile, setAskProfile] = useState<Extract<ImportResult, { ok: true }> | null>(null);
 
   const verb = Platform.OS === 'web' ? 'Downloaded' : 'Exported';
 
@@ -42,20 +44,37 @@ export default function DataScreen() {
       if (!res.canceled) toast(res.message);
       return;
     }
-    const total = res.added + res.updated;
-    toast(
-      total === 0 && !res.profileRestored
-        ? 'Backup read. Everything in it was already here'
-        : `Imported ${res.added} new and ${res.updated} updated entries${res.profileRestored ? ', and your profile' : ''}`,
-    );
+    if (res.profileSkipped) {
+      setAskProfile(res);
+      return;
+    }
+    toast(importMessage(res));
+  };
+
+  const answerProfile = (useBackup: boolean) => {
+    const first = askProfile;
+    setAskProfile(null);
+    if (!first) return;
+    if (!useBackup) {
+      toast(importMessage(first));
+      return;
+    }
+    const res = applyLastBackupProfile();
+    toast(res.ok ? importMessage({ ...res, added: first.added, updated: first.updated, skipped: first.skipped }) : res.message);
   };
 
   const erase = async () => {
     setConfirmErase(false);
     await cancelAllReminders();
     // Signed in, erasing this device means signing out: otherwise the next sync would bring everything back.
-    if (signedIn) await signOut();
-    else useStore.getState().resetAll();
+    // The person chose to erase this device, so changes that never reached the account go too (the sheet says so).
+    if (signedIn) {
+      const res = await signOut({ discardPending: true });
+      if (!res.ok) {
+        toast(res.message);
+        return;
+      }
+    } else useStore.getState().resetAll();
     router.replace('/welcome');
   };
 
@@ -172,7 +191,7 @@ export default function DataScreen() {
         title="Erase everything on this device?"
         message={`This removes every food, activity, weight, water, sleep and fasting entry, your custom foods, saved meals, profile, goals and settings from this device, and turns off reminders. ${
           signedIn
-            ? 'You will also be signed out. Your account is not affected: the synced copy stays there and returns when you sign in again. To remove it everywhere, delete your account instead.'
+            ? 'You will also be signed out, and changes that have not been uploaded yet are lost. Your account is not affected: the synced copy stays there and returns when you sign in again. To remove it everywhere, delete your account instead.'
             : 'Without an account there is no other copy, so export a backup first if you might want it later.'
         }`}
         confirmLabel="Erase this device"
@@ -180,6 +199,24 @@ export default function DataScreen() {
         onConfirm={() => void erase()}
         onCancel={() => setConfirmErase(false)}
       />
+      <ConfirmSheet
+        visible={askProfile !== null}
+        title="Use the profile and goals from this backup?"
+        message={`The entries are merged. This device has a newer profile than the backup, so your current profile, goals and settings were kept. Use the ones from the backup instead?`}
+        confirmLabel="Use the backup's profile"
+        cancelLabel="Keep my current profile"
+        onConfirm={() => answerProfile(true)}
+        onCancel={() => answerProfile(false)}
+      />
     </Screen>
   );
+}
+
+/** Result line for an import: what was merged, whether the profile was restored, and anything skipped. */
+function importMessage(res: Extract<ImportResult, { ok: true }>): string {
+  const total = res.added + res.updated;
+  const skipped = res.skipped > 0 ? ` ${res.skipped} damaged ${res.skipped === 1 ? 'entry was' : 'entries were'} left out.` : '';
+  const profile = res.profileRestored ? ' Profile and goals restored from the backup.' : res.profileSkipped ? ' Your current profile and goals were kept.' : '';
+  if (total === 0) return `Backup read. Everything in it was already here.${profile}${skipped}`;
+  return `Imported ${res.added} new and ${res.updated} updated ${total === 1 ? 'entry' : 'entries'}.${profile}${skipped}`;
 }
