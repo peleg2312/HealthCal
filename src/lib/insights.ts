@@ -631,7 +631,7 @@ function activityInsight({ summary: s }: InsightContext): Insight | null {
       id: 'activity-on-track',
       tone: 'positive',
       title: 'Above the activity guideline',
-      body: `You averaged ${weekly} guideline minutes a week (${sessions} in this range, vigorous minutes count double), above the ${WEEKLY_ACTIVE_MINUTES}-minute guideline.`,
+      body: `You averaged ${weekly} guideline minutes a week (${sessions} in this range, hard sessions count double), above the ${WEEKLY_ACTIVE_MINUTES}-minute guideline.`,
       score: 38,
     };
   }
@@ -1090,7 +1090,7 @@ export function computeMilestones(input: {
   out.push({
     id: 'active-week',
     title: '150 guideline minutes in a week',
-    detail: 'The weekly guideline for adults; vigorous minutes count double.',
+    detail: 'The weekly guideline for adults; hard sessions count double.',
     achieved: !!activeWeek,
     date: activeWeek,
     current: Math.min(bestWeek, WEEKLY_ACTIVE_MINUTES),

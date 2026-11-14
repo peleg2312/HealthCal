@@ -7,7 +7,9 @@ import { pendingChanges, useStore } from '@/store';
 import { flushPersistence } from '@/store/persistence';
 
 import { isBackendConfigured, openedFromRecoveryLink, supabase } from './supabase';
-import { attachUser, syncNow } from './sync';
+import { toast } from '@/ui/Toast';
+
+import { attachUser, syncNow, useSyncState } from './sync';
 
 interface AuthState {
   /** False until the persisted session has been read on launch. */
@@ -52,6 +54,10 @@ let signingOut = false;
 async function restore(userId: string, options: { discardOtherAccount?: boolean } = {}): Promise<void> {
   useAuth.setState({ restoring: true, restoreFailed: false, switchBlocked: null });
   const outcome = await attachUser(userId, options).catch(() => 'failed' as const);
+  if (outcome === 'ok' && useSyncState.getState().keptAccountPlan) {
+    useSyncState.setState({ keptAccountPlan: false });
+    toast("Signed in. Your account's profile, goals and settings were kept, and what you logged on this device was added.");
+  }
   useAuth.setState({
     restoring: false,
     restoreFailed: outcome === 'failed',

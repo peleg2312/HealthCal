@@ -60,9 +60,11 @@ function rewriteEntry(input: LogFoodInput & { entryId: string }): FoodEntry {
 export function logFood(input: LogFoodInput): FoodEntry {
   const store = useStore.getState();
   if (input.entryId) {
+    const before = store.foodEntries[input.entryId];
     const entry = rewriteEntry({ ...input, entryId: input.entryId });
     haptic.success();
-    toast('Entry updated');
+    // Undo puts the entry back exactly as it was (amount, meal and day).
+    toast('Entry updated', before ? { label: 'Undo', onPress: () => useStore.getState().upsert('foodEntries', before) } : undefined);
     return entry;
   }
   const entry = store.upsert('foodEntries', buildEntry({ ...input, confidence: lastConfidence(input.food) }));

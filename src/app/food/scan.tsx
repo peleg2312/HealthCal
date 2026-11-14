@@ -71,7 +71,8 @@ export default function ScanScreen() {
     return findLocalByBarcode(code, {
       custom,
       recent: s.recentFoods.filter((f) => !deletedCustom.has(f.id)),
-      entries: Object.values(s.foodEntries),
+      // A diary entry still carries a copy of an own food after that food was deleted.
+      entries: Object.values(s.foodEntries).filter((e) => !(e.food?.source === 'custom' && (deletedCustom.has(e.food.id) || !s.customFoods[e.food.id]))),
     });
   }
 

@@ -264,3 +264,19 @@ export async function analyzeFood(client: Anthropic, input: AnalyzeInput, option
     usage,
   };
 }
+
+/**
+ * The mailbox an address delivers to: lower case, without a "+tag", and for Gmail
+ * without dots. alex+1@gmail.com and a.lex@gmail.com are the same person's inbox and
+ * share one allowance.
+ */
+export function mailboxOf(email: string): string {
+  const e = email.trim().toLowerCase();
+  const at = e.lastIndexOf('@');
+  if (at < 1) return e;
+  let local = e.slice(0, at).split('+')[0];
+  let domain = e.slice(at + 1);
+  if (domain === 'googlemail.com') domain = 'gmail.com';
+  if (domain === 'gmail.com') local = local.replace(/\./g, '');
+  return `${local}@${domain}`;
+}

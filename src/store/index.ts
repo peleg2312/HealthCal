@@ -125,7 +125,13 @@ interface StoreActions {
     pulledAt: string;
   }) => void;
   clearDirty: (input: { ids: { collection: Collection; id: string; updatedAt: string }[]; profileAt?: string; settingsAt?: string }) => void;
-  markAllDirty: () => void;
+  /**
+   * Flag everything on the device for upload (data made without an account is being
+   * attached to one). With `keepAccountPlan`, the account already has a profile: the
+   * device's profile, settings and per-day targets are not uploaded over it, and the
+   * per-day targets are dropped so the account's own arrive with the next download.
+   */
+  markAllDirty: (options?: { keepAccountPlan?: boolean }) => void;
   setOwner: (ownerId: string | null) => void;
   resetAll: () => void;
   /** Replace the in-memory state with what was saved on the device (app start). */
@@ -386,11 +392,15 @@ export const useStore = create<Store>()((set, get) => ({
       };
     }),
 
-  markAllDirty: () =>
+  markAllDirty: (options) =>
     set((s) => {
       const dirty = emptyDirty();
-      for (const c of COLLECTIONS) for (const id of Object.keys(s[c])) dirty[c][id] = true;
-      return { dirty, profileDirty: !!s.profile, settingsDirty: true };
+      const keep = !!options?.keepAccountPlan;
+      for (const c of COLLECTIONS) {
+        if (keep && c === 'days') continue;
+        for (const id of Object.keys(s[c])) dirty[c][id] = true;
+      }
+      return keep ? { dirty, days: {}, profileDirty: false, settingsDirty: false } : { dirty, profileDirty: !!s.profile, settingsDirty: true };
     }),
 
   setOwner: (ownerId) => set({ ownerId }),

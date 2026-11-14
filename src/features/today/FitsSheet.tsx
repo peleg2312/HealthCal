@@ -5,7 +5,7 @@ import { View } from 'react-native';
 
 import { lastPortions, matchServing } from '@/features/food/helpers';
 import { logFood } from '@/features/food/log';
-import { usualFoods } from '@/features/food/usuals';
+import { customFoodIndex, resolveFood, resolveUsuals, usualFoods } from '@/features/food/usuals';
 import { MEAL_LABEL } from '@/lib/nutrition';
 import { formatNumber } from '@/lib/units';
 import { useStore } from '@/store';
@@ -51,6 +51,7 @@ export function FitsSheet({
   const entries = useLive('foodEntries');
   const favourites = useLive('favorites');
   const recents = useStore((s) => s.recentFoods);
+  const customFoods = useLive('customFoods');
   // Foods added while the sheet is open turn into ticks; cleared when it closes.
   const [added, setAdded] = useState<{ key: string; kcal: number }[]>([]);
 
@@ -61,10 +62,12 @@ export function FitsSheet({
 
   // While the sheet is open, rank against the budget it opened with, so a row does not vanish the moment it is added.
   const budget = kcalLeft + added.reduce((s, a) => s + a.kcal, 0);
+  const customById = customFoodIndex(customFoods);
   const candidates = fitCandidates({
-    usual: usualFoods(entries, meal, todayDate, { limit: 8, withFood: true }).map((u) => u.last),
-    favourites: favourites.map((f) => f.food),
-    recents,
+    // Own foods as they are now: an edited one uses today's values, a deleted one is left out.
+    usual: resolveUsuals(usualFoods(entries, meal, todayDate, { limit: 8, withFood: true }), customById).map((u) => u.last),
+    favourites: favourites.map((f) => resolveFood(f.food, customById)).filter((f) => f !== null),
+    recents: recents.map((f) => resolveFood(f, customById)).filter((f) => f !== null),
     lastByFood: lastPortions(entries),
   });
   const fits = rankFits(candidates, { kcalLeft: budget, proteinFirst });

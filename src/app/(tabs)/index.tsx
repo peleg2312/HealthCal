@@ -197,6 +197,8 @@ function Macro({ label, value, target, color }: { label: string; value: number; 
 // ------------------------------------------------------------------ coach
 
 /** "yesterday" or "Nov 10", from the date of the day being viewed (never the wall clock). */
+const sentence = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 function relativeTo(date: ISODate, from: ISODate): string {
   return date === addDays(from, -1) ? 'yesterday' : formatShortDate(date);
 }
@@ -345,7 +347,9 @@ function MealsCard({ day }: { day: DaySummary }) {
                     </Text>
                   ) : (
                     <Text variant="caption" color="textSecondary" numberOfLines={1}>
-                      {`Around ${formatNumber(Math.round((day.budget * MEAL_SHARE[m.id]) / 10) * 10)} kcal${prev ? '' : ' suggested'}`}
+                      {prev
+                        ? `${sentence(relativeTo(prev.date, day.date))}: ${formatNumber(prev.entries.reduce((s, e) => s + e.nutrients.kcal, 0))} kcal`
+                        : `Around ${formatNumber(Math.round((day.budget * MEAL_SHARE[m.id]) / 10) * 10)} kcal suggested`}
                     </Text>
                   )}
                 </View>

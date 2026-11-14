@@ -93,10 +93,12 @@ export interface NumberFieldProps extends Omit<TextFieldProps, 'value' | 'onChan
   value: number | null;
   onChange: (n: number | null) => void;
   decimals?: number;
+  /** Amounts, weights and nutrients are never below zero, so a minus sign is not accepted unless this is set. */
+  allowNegative?: boolean;
 }
 
 /** Numeric text field that keeps the raw text while typing so "1." is not eaten. */
-export function NumberField({ value, onChange, decimals = 1, ...rest }: NumberFieldProps) {
+export function NumberField({ value, onChange, decimals = 1, allowNegative = false, ...rest }: NumberFieldProps) {
   const format = (n: number | null) => (n === null ? '' : String(Math.round(n * 10 ** decimals) / 10 ** decimals));
   const [text, setText] = useState(format(value));
   const [lastValue, setLastValue] = useState(value);
@@ -110,7 +112,8 @@ export function NumberField({ value, onChange, decimals = 1, ...rest }: NumberFi
       inputMode={decimals > 0 ? 'decimal' : 'numeric'}
       {...rest}
       value={text}
-      onChangeText={(t) => {
+      onChangeText={(raw) => {
+        const t = allowNegative ? raw : raw.replace(/-/g, '');
         setText(t);
         const n = parseNumber(t);
         setLastValue(n);

@@ -2,7 +2,7 @@
  * Pure helpers for activity sessions: building an entry and summarising a week.
  * No React, storage or native imports so they can be unit-tested.
  */
-import { grossKcal, kcalRange, MODERATE_MET, netKcal, sessionGuidelineMinutes, VIGOROUS_MET, WEEKLY_GUIDELINE_MINUTES } from '@/lib/exercise';
+import { countsDouble, grossKcal, kcalRange, MODERATE_MET, netKcal, sessionGuidelineMinutes, VIGOROUS_MET, WEEKLY_GUIDELINE_MINUTES } from '@/lib/exercise';
 import { exerciseWaterMl } from '@/lib/hydration';
 import type { ActivityDef, ActivityEntry, Intensity, StrengthExercise, UnitSystem } from '@/types';
 
@@ -155,8 +155,8 @@ export function summariseWeek(entries: ActivityEntry[], dates: string[]): WeekSu
     total += e.durationMin;
     net += e.kcalNet;
     gross += e.kcalGross;
-    if (e.met >= VIGOROUS_MET) vigorous += e.durationMin;
-    else if (sessionGuidelineMinutes(e.met, e.durationMin) > 0) moderate += e.durationMin;
+    if (countsDouble(e.met, e.intensity)) vigorous += e.durationMin;
+    else if (sessionGuidelineMinutes(e.met, e.durationMin, e.intensity) > 0) moderate += e.durationMin;
     const day = byDate[e.date];
     day.minutes += e.durationMin;
     day.kcalNet += e.kcalNet;

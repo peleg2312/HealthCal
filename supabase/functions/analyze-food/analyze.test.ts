@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it, vi } from 'vitest';
 
-import { analyzeFood, AnalyzeError, costOf, FAST_MODEL, PRECISE_MODEL, sanitizeItems, validateInput } from './analyze';
+import { AnalyzeError, analyzeFood, costOf, FAST_MODEL, mailboxOf, PRECISE_MODEL, sanitizeItems, validateInput } from './analyze';
 
 const err = (fn: () => unknown): AnalyzeError => {
   try {
@@ -397,3 +397,15 @@ describe('cost and billing of failed analyses', () => {
   });
 });
 
+describe('mailboxOf', () => {
+  it('gives one identity to the aliases of one inbox', () => {
+    expect(mailboxOf(' Alex@Gmail.com ')).toBe('alex@gmail.com');
+    expect(mailboxOf('alex+1@gmail.com')).toBe('alex@gmail.com');
+    expect(mailboxOf('a.l.e.x+food@googlemail.com')).toBe('alex@gmail.com');
+    expect(mailboxOf('dana+test@example.org')).toBe('dana@example.org');
+  });
+  it('keeps dots outside Gmail and leaves odd input alone', () => {
+    expect(mailboxOf('first.last@example.org')).toBe('first.last@example.org');
+    expect(mailboxOf('not-an-email')).toBe('not-an-email');
+  });
+});

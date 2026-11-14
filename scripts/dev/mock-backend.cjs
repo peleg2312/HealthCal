@@ -180,9 +180,12 @@ const api = http.createServer(async (req, res) => {
     if (route === 'GET /rest/v1/records') {
       const after = (url.searchParams.get('server_updated_at') || '').replace(/^gt\./, '');
       const limit = Number(url.searchParams.get('limit') || 1000);
+      // id=in.(a,b,c): the client asking for the server's copy of specific records.
+      const idList = (url.searchParams.get('id') || '').match(/^in\.\((.*)\)$/);
+      const wanted = idList ? new Set(idList[1].split(',').map((x) => x.replace(/^"|"$/g, ''))) : null;
       // Row-level security: only the caller's rows, whatever the query asks for.
       const rows = state.records
-        .filter((r) => r.user_id === uid && (!after || Date.parse(r.server_updated_at) > Date.parse(after)))
+        .filter((r) => r.user_id === uid && (!wanted || wanted.has(r.id)) && (!after || Date.parse(r.server_updated_at) > Date.parse(after)))
         .sort((a, b) => a.server_updated_at.localeCompare(b.server_updated_at))
         .slice(0, limit)
         .map(({ collection, id, data, deleted, updated_at, server_updated_at }) => ({ collection, id, data, deleted, updated_at, server_updated_at }));

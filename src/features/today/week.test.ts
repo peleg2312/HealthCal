@@ -73,13 +73,13 @@ describe('weekCaption', () => {
 
   it('averages complete days only, leaving out today and partial days', () => {
     // Mon 1700, Tue 1690, Wed 800 (partial), Thu nothing, Fri (today) 300.
-    expect(weekCaption(week([1700, 1690, 800, null, 300]), TODAY)).toBe('Week so far: 310 kcal a day under budget, 2 days logged');
+    expect(weekCaption(week([1700, 1690, 800, null, 300]), TODAY)).toBe('Week so far: 310 kcal a day under budget, 2 full days');
   });
   it('reports over budget neutrally', () => {
-    expect(weekCaption(week([2400, 2400]), TODAY)).toBe('Week so far: 400 kcal a day over budget, 2 days logged');
+    expect(weekCaption(week([2400, 2400]), TODAY)).toBe('Week so far: 400 kcal a day over budget, 2 full days');
   });
   it('calls a small average difference on budget', () => {
-    expect(weekCaption(week([2030, 1980, 2010]), TODAY)).toBe('Week so far: on budget, 3 days logged');
+    expect(weekCaption(week([2030, 1980, 2010]), TODAY)).toBe('Week so far: on budget, 3 full days');
   });
   it('says so when no complete day exists yet', () => {
     expect(weekCaption(week([null, null, null, null, 900]), TODAY)).toBe('Week so far: no full days logged yet');
@@ -92,6 +92,6 @@ describe('weekCaption', () => {
   });
   it('labels a past week as that week', () => {
     const past = weekDates(TODAY, 1).map((x) => d(x, 1800));
-    expect(weekCaption(past, TODAY)).toBe('That week: 200 kcal a day under budget, 7 days logged');
+    expect(weekCaption(past, TODAY)).toBe('That week: 200 kcal a day under budget, 7 full days');
   });
 });

@@ -4,7 +4,9 @@
  * that offers history-ranked picks (the + sheet and food search) so both show
  * the same order.
  */
+import { BUILTIN_FOODS } from '@/data/foods';
 import { diffDays } from '@/lib/dates';
+import { scaleNutrients } from '@/lib/nutrition';
 import { formatNumber } from '@/lib/units';
 import type { Food, FoodEntry, ISODate, MealType } from '@/types';
 
@@ -30,6 +32,48 @@ export interface UsualOptions {
   halfLifeDays?: number;
   /** Only foods that carry a definition (needed where the row opens the food's own page). */
   withFood?: boolean;
+}
+
+const BUILTIN_BY_ID = new Map(BUILTIN_FOODS.map((f) => [f.id, f]));
+
+/**
+ * The freshest definition of a remembered food. Diary entries, recents and
+ * favourites each carry a copy of the food as it was; an own food may have been
+ * edited or deleted since. Returns the live own food, the bundled food, or null
+ * when it was an own food that no longer exists.
+ */
+export function resolveFood(f: Food, customById: ReadonlyMap<string, Food>): Food | null {
+  if (f.source === 'custom') return customById.get(f.id) ?? null;
+  return BUILTIN_BY_ID.get(f.id) ?? f;
+}
+
+/** Index of the user's own live foods, for `resolveFood`. */
+export function customFoodIndex(customFoods: readonly Food[]): Map<string, Food> {
+  return new Map(customFoods.filter((f) => !(f as Food & { deleted?: boolean }).deleted).map((f) => [f.id, f]));
+}
+
+/**
+ * Usual foods as they are now: a deleted own food is dropped, and an edited
+ * one shows and logs today's values at the remembered amount.
+ */
+export function resolveUsuals(usuals: UsualFood[], customById: ReadonlyMap<string, Food>): UsualFood[] {
+  const out: UsualFood[] = [];
+  for (const u of usuals) {
+    const stored = u.last.food ?? u.food;
+    if (!stored) {
+      out.push(u);
+      continue;
+    }
+    const food = resolveFood(stored, customById);
+    if (!food) continue;
+    if (food === stored) {
+      out.push(u);
+      continue;
+    }
+    const last = { ...u.last, food, name: food.name, brand: food.brand, emoji: food.emoji ?? u.last.emoji, nutrients: scaleNutrients(food.per100g, u.last.grams) };
+    out.push({ ...u, food, last });
+  }
+  return out;
 }
 
 export function foodKey(e: Pick<FoodEntry, 'foodId' | 'name' | 'brand'>): string {

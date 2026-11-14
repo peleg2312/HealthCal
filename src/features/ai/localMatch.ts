@@ -50,8 +50,27 @@ export function parseAmount(query: string): { count: number | null; grams: numbe
 /** Words that describe a state, not a food: "raw apple" should not match "raw egg". */
 const GENERIC = new Set(['raw', 'cooked', 'fresh', 'with', 'and', 'of', 'the', 'plain', 'whole', 'homemade', 'small', 'large', 'medium']);
 
+const COOKED_WORDS = new Set(['cooked', 'grilled', 'roasted', 'baked', 'fried', 'boiled', 'steamed', 'sauteed', 'stewed', 'braised', 'toasted', 'poached', 'scrambled', 'barbecued', 'seared']);
+const RAW_WORDS = new Set(['raw', 'dry', 'dried', 'uncooked']);
+
+/**
+ * +1 when the food's state matches what was asked for, -1 when it contradicts it.
+ * "Grilled chicken" should offer the cooked reference food before the raw one:
+ * the same weight of raw meat or dry rice has very different calories.
+ */
+function stateFit(queryWords: string[], nameWords: string[]): number {
+  const wantsCooked = queryWords.some((w) => COOKED_WORDS.has(w));
+  const wantsRaw = queryWords.some((w) => RAW_WORDS.has(w));
+  if (wantsCooked === wantsRaw) return 0;
+  const isCooked = nameWords.some((w) => COOKED_WORDS.has(w));
+  const isRaw = nameWords.some((w) => RAW_WORDS.has(w));
+  if (isCooked === isRaw) return 0;
+  return wantsCooked === isCooked ? 1 : -1;
+}
+
 export function matchFoods(query: string, foods: Food[], limit = 3): Food[] {
-  const q = words(parseAmount(query).rest).filter((w) => !GENERIC.has(w));
+  const all = words(parseAmount(query).rest);
+  const q = all.filter((w) => !GENERIC.has(w));
   if (q.length === 0) return [];
   const scored: { food: Food; score: number }[] = [];
   for (const food of foods) {
@@ -68,6 +87,10 @@ export function matchFoods(query: string, foods: Food[], limit = 3): Food[] {
     // Prefer the first word matching, and shorter, more generic names.
     if (name[0] && q.some((w) => name[0].startsWith(w.replace(/e?s$/, '')))) score += 1;
     score -= name.length * 0.05;
+    const fit = stateFit(all, name);
+    // The opposite state is a different food by weight: dry rice is not a swap for cooked rice.
+    if (fit < 0) continue;
+    score += fit;
     scored.push({ food, score });
   }
   return scored

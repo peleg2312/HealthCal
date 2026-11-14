@@ -99,7 +99,7 @@ export function HabitsCard({ summary, previous, units }: { summary: PeriodSummar
         unit="min / wk"
         detail={
           a.minutes
-            ? `${plural(a.sessions, 'session')}, ${formatNumber(a.minutes)} min logged · vigorous minutes count double toward ${WEEKLY_ACTIVE_MINUTES}`
+            ? `${plural(a.sessions, 'session')}, ${formatNumber(a.minutes)} min logged · hard sessions count double toward ${WEEKLY_ACTIVE_MINUTES}`
             : 'No workouts logged in this range yet'
         }
         progress={weekly / WEEKLY_ACTIVE_MINUTES}

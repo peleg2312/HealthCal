@@ -263,6 +263,15 @@ export function flushPersistence(): Promise<void> {
 async function mergeFromOtherTab(): Promise<void> {
   try {
     const snapshot = await loadPersisted();
+    const mine = useStore.getState();
+    const theirOwner = snapshot?.ownerId ?? null;
+    const erased = !snapshot || (!snapshot.profile && theirOwner === null);
+    // The other tab erased the device, signed out or changed account. Merging would bring
+    // the old data back or mix two accounts, so this tab starts again from what is stored.
+    if ((erased && (mine.profile || mine.ownerId !== null)) || (!erased && mine.ownerId !== theirOwner && mine.ownerId !== null)) {
+      if (typeof window !== 'undefined' && typeof window.location?.reload === 'function') window.location.reload();
+      return;
+    }
     if (snapshot) useStore.getState().mergeLocal(snapshot);
   } catch {
     // The other tab may be mid-write; the next storage event retries.

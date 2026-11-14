@@ -45,17 +45,28 @@ export const INTENSITY_LABELS: Record<Intensity, { title: string; hint: string }
 
 // ------------------------------------------------- weekly activity guideline
 
-/** WHO guideline for adults: 150 minutes of moderate activity a week (vigorous minutes count double). */
+/** WHO guideline for adults: 150 minutes of moderate activity a week (hard, vigorous minutes count double). */
 export const WEEKLY_GUIDELINE_MINUTES = 150;
 /** Compendium bands the guideline uses: moderate 3 to under 6 MET, vigorous 6 MET and up. */
 export const MODERATE_MET = 3;
 export const VIGOROUS_MET = 6;
 
-/** Minutes a single session adds toward the guideline: none when light, its length when moderate, double when vigorous. */
-export function sessionGuidelineMinutes(met: number | undefined, durationMin: number | undefined): number {
+/** True when a session counts double: 6 MET or more, and not one the user rated easy or moderate. */
+export function countsDouble(met: number | undefined, intensity?: Intensity): boolean {
+  return (met ?? 0) >= VIGOROUS_MET && (intensity === undefined || intensity === 'vigorous');
+}
+
+/**
+ * Minutes a single session adds toward the guideline: none under 3 MET, its
+ * length from 3 MET, and double only when it is both 6 MET or more and logged
+ * as hard. A steady ride the user called moderate counts once even though its
+ * table value is above 6, so the label on the session and its credit agree.
+ * (Sessions without an effort level are judged on MET alone.)
+ */
+export function sessionGuidelineMinutes(met: number | undefined, durationMin: number | undefined, intensity?: Intensity): number {
   const m = met ?? 0;
   const min = Math.max(0, durationMin ?? 0);
-  if (m >= VIGOROUS_MET) return 2 * min;
+  if (countsDouble(m, intensity)) return 2 * min;
   if (m >= MODERATE_MET) return min;
   return 0;
 }
@@ -64,8 +75,8 @@ export function sessionGuidelineMinutes(met: number | undefined, durationMin: nu
  * Minutes that count toward the weekly guideline. Every screen that shows
  * "minutes toward 150" uses this one rule, so Train, Progress and the recap agree.
  */
-export function guidelineMinutes(activities: readonly { met?: number; durationMin?: number }[]): number {
-  return activities.reduce((sum, a) => sum + sessionGuidelineMinutes(a.met, a.durationMin), 0);
+export function guidelineMinutes(activities: readonly { met?: number; durationMin?: number; intensity?: Intensity }[]): number {
+  return activities.reduce((sum, a) => sum + sessionGuidelineMinutes(a.met, a.durationMin, a.intensity), 0);
 }
 
 /** Running/walking MET from speed where distance was entered, falling back to the table value. */

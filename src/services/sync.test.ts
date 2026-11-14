@@ -23,6 +23,7 @@ const server = vi.hoisted(() => ({
   clock: 0,
   failNext: null as string | null,
   failRecordsRead: false,
+  failProfileRead: false,
   onPush: null as null | (() => void),
   /** Ids the server refuses (as a constraint violation would). */
   refuseIds: new Set<string>(),
@@ -50,21 +51,27 @@ vi.mock('expo-crypto', () => ({ randomUUID: () => `00000000-0000-4000-8000-${Str
 
 vi.mock('./supabase', () => {
   const from = (table: string) => {
-    const filters: { user?: string; after?: string } = {};
+    const filters: { user?: string; after?: string; ids?: string[] } = {};
     let limit = 1000;
     const builder = {
       select: () => builder,
       eq: (_col: string, v: string) => ((filters.user = v), builder),
       gt: (_col: string, v: string) => ((filters.after = v), builder),
+      in: (_col: string, ids: string[]) => ((filters.ids = ids), builder),
       order: () => builder,
       limit: (n: number) => ((limit = n), builder),
       maybeSingle: async () => {
+        if (server.failProfileRead) return { data: null, error: { message: 'TypeError: Network request failed' } };
         const p = server.profiles.get(filters.user ?? '');
         return { data: p ? { data: p.data, settings: p.settings } : null, error: null };
       },
       then: (resolve: (v: { data: Row[]; error: null }) => unknown) => {
         if (table !== 'records') return resolve({ data: [], error: null });
         if (server.failRecordsRead) return resolve({ data: null as never, error: { message: 'TypeError: Network request failed' } as never });
+        if (filters.ids) {
+          const wanted = new Set(filters.ids);
+          return resolve({ data: server.rows.filter((r) => r.user_id === filters.user && wanted.has(r.id)), error: null });
+        }
         const data = server.rows
           .filter((r) => r.user_id === filters.user && r.server_updated_at > (filters.after ?? ''))
           .sort((a, b) => a.server_updated_at.localeCompare(b.server_updated_at))
@@ -90,13 +97,17 @@ vi.mock('./supabase', () => {
       if ((args.p_records as { id: string }[]).some((r) => server.refuseIds.has(r.id))) {
         return { data: null, error: { message: 'new row violates check constraint', code: '23514' } };
       }
+      // Like the SQL function, the answer is the number of rows stored: a row older than the server's copy is skipped silently.
+      let stored = 0;
       for (const r of args.p_records as Omit<Row, 'user_id' | 'server_updated_at'>[]) {
         const existing = server.rows.find((x) => x.user_id === uid && x.collection === r.collection && x.id === r.id);
         if (existing && existing.updated_at > r.updated_at) continue; // older write loses
         const row: Row = { ...r, user_id: uid, server_updated_at: server.tick() };
         if (existing) Object.assign(existing, row);
         else server.rows.push(row);
+        stored += 1;
       }
+      return { data: stored, error: null };
     }
     if (name === 'push_profile') {
       const cur = server.profiles.get(uid) ?? { data: null, profile_updated_at: null, settings: null, settings_updated_at: null };
@@ -152,12 +163,13 @@ beforeEach(() => {
   server.userId = 'user-a';
   server.failNext = null;
   server.failRecordsRead = false;
+  server.failProfileRead = false;
   server.onPush = null;
   server.refuseIds.clear();
   server.pushCalls = [];
   useStore.getState().resetAll();
   resetRejected();
-  useSyncState.setState({ status: 'idle', error: null, lastRunAt: null, rejected: 0 });
+  useSyncState.setState({ status: 'idle', error: null, lastRunAt: null, rejected: 0, keptAccountPlan: false });
 });
 
 describe('sync', () => {
@@ -186,6 +198,75 @@ describe('sync', () => {
     });
     server.profiles.set('user-a', { data: { ...profile('Alex'), updatedAt: '2026-01-02T00:00:00.000Z' }, profile_updated_at: '2026-01-02T00:00:00.000Z', settings: null, settings_updated_at: null });
   };
+
+  it('keeps the plan of an existing account when a device with a guest profile signs in, and adds only what was logged', async () => {
+    // The account, as its other devices left it months ago.
+    server.profiles.set('user-a', {
+      data: { ...profile('Alex'), weightKg: 92, goal: 'lose', calorieTargetOverride: 1800, updatedAt: '2026-01-02T00:00:00.000Z' },
+      profile_updated_at: '2026-01-02T00:00:00.000Z',
+      settings: { ...useStore.getState().settings, fastingTargetHours: 18, updatedAt: '2026-01-02T00:00:00.000Z' },
+      settings_updated_at: '2026-01-02T00:00:00.000Z',
+    });
+    server.rows.push({
+      user_id: 'user-a', collection: 'days', id: 'days-2026-01-05', date: '2026-01-05',
+      data: { date: '2026-01-05', target: 1800, tdee: 2300, eatBackExercise: true, weightKg: 92 },
+      deleted: false, updated_at: '2026-01-05T08:00:00.000Z', server_updated_at: server.tick(),
+    });
+    // The same person onboards again as a guest on a new device and logs a glass of water.
+    const s = useStore.getState();
+    s.setProfile({ ...profile('Guest'), weightKg: 70, goal: 'gain' });
+    s.setSettings({ fastingTargetHours: 12 });
+    const glass = s.upsert('water', water(250));
+    const guestDay = s.upsert('days', { date: '2026-01-05', target: 2900, tdee: 2500, eatBackExercise: true, weightKg: 70 });
+
+    expect(await attachUser('user-a')).toBe('ok');
+
+    const account = server.profiles.get('user-a')!;
+    expect(account.data).toMatchObject({ name: 'Alex', weightKg: 92, goal: 'lose', calorieTargetOverride: 1800 });
+    expect((account.settings as { fastingTargetHours: number }).fastingTargetHours).toBe(18);
+    // The device now shows the account's plan, and the user is told once.
+    const after = useStore.getState();
+    expect(after.profile).toMatchObject({ name: 'Alex', weightKg: 92, goal: 'lose' });
+    expect(after.settings.fastingTargetHours).toBe(18);
+    expect(useSyncState.getState().keptAccountPlan).toBe(true);
+    // What was logged is in the account; the guest's targets for a past day did not replace the account's.
+    expect(server.rows.some((r) => r.id === glass.id)).toBe(true);
+    expect(server.rows.filter((r) => r.collection === 'days').map((r) => (r.data as { target: number }).target)).toEqual([1800]);
+    expect(Object.values(after.days).map((d) => d.target)).toEqual([1800]);
+    expect(after.days[guestDay.id]?.target ?? 1800).toBe(1800);
+    expect(pendingChanges(after)).toBe(0);
+  });
+
+  it('does not attach guest data while it cannot tell whether the account already has a plan', async () => {
+    useStore.getState().setProfile(profile('Guest'));
+    useStore.getState().upsert('water', water(250));
+    server.failProfileRead = true;
+    expect(await attachUser('user-a')).toBe('failed');
+    expect(useStore.getState().ownerId).toBeNull();
+    expect(server.rows).toHaveLength(0);
+    server.failProfileRead = false;
+    expect(await attachUser('user-a')).toBe('ok');
+    expect(server.rows).toHaveLength(1);
+    expect((server.profiles.get('user-a')!.data as { name: string }).name).toBe('Guest');
+  });
+
+  it('takes the server copy when the server has a newer version of a record it was sent (an old backup restored)', async () => {
+    await attachUser('user-a');
+    const entry = useStore.getState().upsert('water', water(250));
+    await syncNow();
+    const old = { ...useStore.getState().water[entry.id] };
+    // Deleted and synced; later the tombstone is gone from the device and an old backup brings the entry back.
+    useStore.getState().remove('water', entry.id);
+    await syncNow();
+    expect(server.rows.find((r) => r.id === entry.id)!.deleted).toBe(true);
+    useStore.setState((st) => ({ water: { [entry.id]: old }, dirty: { ...st.dirty, water: { [entry.id]: true } } }));
+
+    await syncNow();
+    // The device agrees with the server (and every other device) instead of keeping a copy only it can see.
+    expect(useStore.getState().water[entry.id].deleted).toBe(true);
+    expect(pendingChanges(useStore.getState())).toBe(0);
+    expect(server.rows.find((r) => r.id === entry.id)!.deleted).toBe(true);
+  });
 
   it('refuses to switch accounts while the device holds unsynced changes of another account', async () => {
     useStore.getState().setOwner('user-b');

@@ -9,7 +9,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-import { AnalyzeError, analyzeFood, costOf, validateInput } from './analyze.ts';
+import { AnalyzeError, analyzeFood, costOf, mailboxOf, validateInput } from './analyze.ts';
 
 /** Units per person per day. A fast analysis uses 1, a careful one 5. */
 const DAILY_LIMIT = Number(Deno.env.get('AI_DAILY_LIMIT') ?? '40');
@@ -19,7 +19,7 @@ const GLOBAL_DAILY_LIMIT = Number(Deno.env.get('AI_GLOBAL_DAILY_LIMIT') ?? '3000
 /** Stable identity for the allowance: survives deleting the account and signing up again. */
 async function identityOf(email: string | undefined, userId: string): Promise<string> {
   if (!email) return `id:${userId}`;
-  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(email.trim().toLowerCase())));
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(mailboxOf(email))));
   return `user:${Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')}`;
 }
 

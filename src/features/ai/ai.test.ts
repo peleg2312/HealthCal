@@ -358,6 +358,16 @@ describe('local match for a missed item', () => {
     expect(matchFoods('   ', BUILTIN_FOODS)).toEqual([]);
     // A state word alone does not make a match.
     expect(matchFoods('raw', BUILTIN_FOODS)).toEqual([]);
+  });
+
+  it('offers the cooked reference food first for a cooked item, and the raw one for a raw item', () => {
+    const grilled = matchFoods('Grilled chicken breast', BUILTIN_FOODS);
+    expect(grilled[0].name).toMatch(/COOKED/i);
+    const raw = matchFoods('raw chicken breast', BUILTIN_FOODS);
+    expect(raw[0].name).toMatch(/RAW/i);
+    const rice = matchFoods('White rice, cooked', BUILTIN_FOODS);
+    expect(rice[0].name).toMatch(/cooked/i);
+    expect(rice.slice(0, 2).every((f) => !/DRY|uncooked/i.test(f.name))).toBe(true);
     expect(matchFoods('avocado', BUILTIN_FOODS).some((f) => /apple/i.test(f.name))).toBe(false);
   });
 });

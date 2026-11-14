@@ -70,10 +70,19 @@ function dayClock(rhythm: CoachRhythm) {
   let length = (((sleep - wake) % 24) + 24) % 24;
   if (length < 4) length = 15; // A window this short is a typo, not a day.
   const rel = (h: number) => {
+    // A day that starts and ends on the same date: before waking, the date's day has not begun
+    // (00:30 is not "17 hours into" the day whose log started half an hour ago).
+    if (wake <= sleep) return h - wake;
     const r = (((h - wake) % 24) + 24) % 24;
     return r > length + (24 - length) / 2 ? r - 24 : r;
   };
-  return { length, rel };
+  /**
+   * Waking hours of this calendar date that have passed by clock time `h`. The log
+   * restarts at midnight, so the pace is measured against the date, not the waking day:
+   * for someone awake across midnight the date holds the end of one shift and the start of the next.
+   */
+  const awakeSoFar = (h: number) => (wake <= sleep ? Math.min(Math.max(0, h - wake), length) : Math.min(h, sleep) + Math.max(0, h - wake));
+  return { length, rel, awakeSoFar };
 }
 
 /** Share of the daily water goal a person would typically have reached `hoursAwake` into a waking day of `dayLength` hours. */
@@ -83,16 +92,17 @@ export function waterPaceFraction(hoursAwake: number, dayLength: number): number
 
 /** Share of the daily water goal a person would typically have reached by this hour of the day, for the given rhythm (default awake 07:00 to 22:00). */
 export function expectedWaterFraction(hour: number, rhythm: CoachRhythm = DEFAULT_RHYTHM): number {
-  const { length, rel } = dayClock(rhythm);
-  return waterPaceFraction(rel(hour), length);
+  const { length, awakeSoFar } = dayClock(rhythm);
+  return waterPaceFraction(awakeSoFar(hour), length);
 }
 
 const MAIN_MEALS = ['breakfast', 'lunch', 'dinner'] as const;
 
 export function coachTip(day: DaySummary, units: UnitSystem, now: Date = new Date(), rhythm: CoachRhythm = DEFAULT_RHYTHM): CoachTip {
   const hour = now.getHours() + now.getMinutes() / 60;
-  const { length, rel } = dayClock(rhythm);
+  const { length, rel, awakeSoFar } = dayClock(rhythm);
   const awake = rel(hour);
+  const awakeToday = awakeSoFar(hour);
   const meals = MAIN_MEALS.map((meal) => ({
     meal,
     label: meal as string,
@@ -134,13 +144,13 @@ export function coachTip(day: DaySummary, units: UnitSystem, now: Date = new Dat
     };
   }
 
-  const waterGap = waterPaceFraction(awake, length) * day.waterGoalMl - day.waterMl;
-  if (awake >= 3 && waterGap > 500 && day.waterRemainingMl > 0) {
+  const waterGap = waterPaceFraction(awakeToday, length) * day.waterGoalMl - day.waterMl;
+  if (awakeToday >= 3 && waterGap > 500 && day.waterRemainingMl > 0) {
     return {
       id: 'water',
       emoji: '💧',
       title: `${formatVolume(day.waterRemainingMl, units)} of water to go`,
-      body: `You are about ${formatVolume(Math.round(waterGap / 50) * 50, units)} behind an even pace for the day. A glass now gets you back on it.`,
+      body: `You are about ${formatVolume(Math.round(waterGap / 50) * 50, units)} behind an even pace for the day. A glass now narrows it.`,
       action: { label: 'Add water', href: '/water' },
       quick: { kind: 'water' },
       tone: 'neutral',

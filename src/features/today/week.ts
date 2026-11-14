@@ -51,7 +51,8 @@ export function weekCaption(days: InsightDay[], today: ISODate): string {
   }
   const diff = complete.reduce((s, d) => s + (d.eaten.kcal - d.budget), 0) / complete.length;
   const budget = complete.reduce((s, d) => s + d.budget, 0) / complete.length;
-  const n = `${complete.length} ${complete.length === 1 ? 'day' : 'days'} logged`;
+  // Full days only: today is still open and a barely logged day would skew the average.
+  const n = `${complete.length} full ${complete.length === 1 ? 'day' : 'days'}`;
   if (Math.abs(diff) <= budget * BUDGET_BAND * 0.5 || Math.abs(diff) < 50) return `${lead}: on budget, ${n}`;
   const amount = formatNumber(Math.round(Math.abs(diff) / 10) * 10);
   return `${lead}: ${amount} kcal a day ${diff < 0 ? 'under' : 'over'} budget, ${n}`;

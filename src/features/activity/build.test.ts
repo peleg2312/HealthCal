@@ -57,7 +57,7 @@ describe('buildActivityEntry', () => {
 });
 
 describe('summariseWeek', () => {
-  const mk = (date: string, met: number, durationMin: number, kcalNet = 100): ActivityEntry => ({
+  const mk = (date: string, met: number, durationMin: number, kcalNet = 100, intensity: ActivityEntry['intensity'] = 'moderate'): ActivityEntry => ({
     id: `${date}-${met}`,
     updatedAt: '',
     date,
@@ -65,7 +65,7 @@ describe('summariseWeek', () => {
     name: 'x',
     emoji: 'x',
     category: 'cardio',
-    intensity: 'moderate',
+    intensity,
     durationMin,
     met,
     kcalNet,
@@ -75,7 +75,7 @@ describe('summariseWeek', () => {
 
   it('counts vigorous minutes double and light minutes not at all toward the guideline', () => {
     const dates = ['2026-11-09', '2026-11-10'];
-    const s = summariseWeek([mk('2026-11-09', 4, 30), mk('2026-11-10', 9.3, 20), mk('2026-11-10', 2.3, 40), mk('2026-11-01', 8, 60)], dates);
+    const s = summariseWeek([mk('2026-11-09', 4, 30), mk('2026-11-10', 9.3, 20, 100, 'vigorous'), mk('2026-11-10', 2.3, 40), mk('2026-11-01', 8, 60)], dates);
     expect(s.moderateMinutes).toBe(30);
     expect(s.vigorousMinutes).toBe(20);
     expect(s.guidelineMinutes).toBe(70);
@@ -83,6 +83,18 @@ describe('summariseWeek', () => {
     expect(s.sessions).toBe(3);
     expect(s.kcalNet).toBe(300);
     expect(s.byDate['2026-11-10'].minutes).toBe(60);
+  });
+});
+
+describe('guideline credit follows the effort the session was logged with', () => {
+  const mk = (met: number, durationMin: number, intensity: ActivityEntry['intensity']) =>
+    ({ id: `${met}-${intensity}`, updatedAt: '', date: '2026-11-09', activityId: 'x', name: 'x', emoji: 'x', category: 'cardio', intensity, durationMin, met, kcalGross: 1, kcalNet: 1, loggedAt: '' }) as ActivityEntry;
+  it('a ride logged as moderate counts once even at 8 MET; logged as hard it counts double', () => {
+    expect(summariseWeek([mk(8, 45, 'moderate')], ['2026-11-09']).guidelineMinutes).toBe(45);
+    expect(summariseWeek([mk(10, 45, 'vigorous')], ['2026-11-09']).guidelineMinutes).toBe(90);
+    // Hard for the person but under 6 MET (power yoga): once. Easy and under 3 MET: not counted.
+    expect(summariseWeek([mk(4, 60, 'vigorous')], ['2026-11-09']).guidelineMinutes).toBe(60);
+    expect(summariseWeek([mk(2.8, 30, 'light')], ['2026-11-09']).guidelineMinutes).toBe(0);
   });
 });
 

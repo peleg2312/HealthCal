@@ -50,7 +50,8 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
   const trendPts = d.series.trend.filter((t) => t.date >= start && t.date <= d.today).map((t) => weightValue(t.trend, units));
   const rate = d.series.weeklyRateKg;
 
-  const loggedDiff = p ? s.loggedDays - p.loggedDays : null;
+  // Both counts include every logged day of their period (today too), matching the headline above.
+  const loggedDiff = p ? s.loggedDaysInclToday - p.loggedDaysInclToday : null;
   const loggedCompare =
     loggedDiff === null || p?.effectiveDays === 0
       ? null

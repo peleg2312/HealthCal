@@ -119,7 +119,7 @@ export default function TrainScreen() {
           })}
         </View>
         <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.md }}>
-          WHO suggests 150 minutes of moderate activity a week. Vigorous minutes (6 MET or more) count double; light ones (under 3 MET) are logged but not counted.
+          WHO suggests 150 minutes of moderate activity a week. Minutes of a session logged as hard (and 6 MET or more) count double; light ones (under 3 MET) are logged but not counted.
         </Text>
       </Card>
 

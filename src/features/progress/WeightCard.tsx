@@ -64,7 +64,7 @@ export function WeightCard({ series, start, end, profile, usual }: { series: Wei
             Last weigh-in {diffDays(lastDate, end)} days ago.{'\n'}Weigh in to update your pace.
           </Text>
         ) : rate !== null ? (
-          <BigStat value={`${sign(rate)}${rateText(rate, units).replace(` ${unit}`, '')}`} unit={`${unit} / wk`} label="Last two weeks" align="right" />
+          <BigStat value={`${sign(rate)}${rateText(rate, units).replace(` ${unit}`, '')}`} unit={`${unit} / wk`} label="Last 3 weeks" align="right" />
         ) : (
           <Text variant="caption" color="textSecondary" align="right" style={{ flexShrink: 1, marginBottom: 2 }}>
             Weekly rate appears after{'\n'}a week of weigh-ins

@@ -182,19 +182,24 @@ describe("coachTip follows the user's own day", () => {
       quietEnd: '17:00',
       meals: { breakfast: '17:30', lunch: '00:30', dinner: '06:00' },
     });
-    // Awake since 17:00: at 20:00 three hours in, about 19% of the goal expected.
-    expect(expectedWaterFraction(20, night)).toBeCloseTo(3 / 16);
-    expect(expectedWaterFraction(16, night)).toBe(0);
-    expect(expectedWaterFraction(8.5, night)).toBeCloseTo(15.5 / 16);
+    // The log restarts at midnight, so the pace counts the waking hours of the date so far:
+    // 00:00 to 09:00 at the end of one shift, then from 17:00 at the start of the next.
+    expect(expectedWaterFraction(0.5, night)).toBeCloseTo(0.5 / 16);
+    expect(expectedWaterFraction(8.5, night)).toBeCloseTo(8.5 / 16);
+    expect(expectedWaterFraction(16, night)).toBeCloseTo(9 / 16);
+    expect(expectedWaterFraction(20, night)).toBeCloseTo(12 / 16);
     const d = day({
       entries: [entry('breakfast'), entry('lunch'), entry('dinner', 120)],
       waterMl: 300,
       waterRemainingMl: 2300,
     });
-    // The default rhythm says 20:00 is far behind; the night-shift rhythm does not.
-    expect(coachTip(d, 'metric', at(20)).id).toBe('water');
-    expect(coachTip(d, 'metric', at(20), night).id).not.toBe('water');
-    expect(coachTip(d, 'metric', at(2), night).id).toBe('water');
+    // At 08:00 a day worker has barely started; the night worker is eight waking hours into the date.
+    expect(coachTip(d, 'metric', at(8)).id).not.toBe('water');
+    expect(coachTip(d, 'metric', at(8), night).id).toBe('water');
+    // Two hours after midnight nobody is "behind" on a log that started two hours ago.
+    expect(coachTip(d, 'metric', at(2), night).id).not.toBe('water');
+    expect(coachTip(d, 'metric', at(0, 30)).id).not.toBe('water');
+    expect(expectedWaterFraction(0.5)).toBe(0);
     // Lunch at 00:30 is due from 01:30.
     const noLunch = day({ entries: [entry('breakfast')], waterMl: 2600, waterRemainingMl: 0 });
     expect(coachTip(noLunch, 'metric', at(1, 45), night).id).toBe('meal-lunch');

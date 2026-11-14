@@ -122,6 +122,9 @@ export function KcalValue({ value, variant = 'numL', color }: { value: number; v
 }
 
 /** Amount controls for a row whose food was just added: step it, or open the full amount editor. */
+/** Taps on the stepper are ignored for this long after the + that created it. */
+const STEPPER_GUARD_MS = 450;
+
 export interface RowAmount {
   /** "1.5 ×" or "150 g". */
   label: string;
@@ -155,6 +158,16 @@ export function FoodRow({
 }) {
   const { colors, spacing } = useTheme();
   const [added, setAdded] = useState(false);
+  // The + turns into a stepper whose own + sits under the same finger. A second tap of a
+  // double tap must not land on it and change the amount that was just logged.
+  const [addedAt, setAddedAt] = useState(0);
+  const guarded: RowAmount | undefined = amount && {
+    ...amount,
+    onStep: (direction) => {
+      if (Date.now() - addedAt < STEPPER_GUARD_MS) return;
+      amount.onStep(direction);
+    },
+  };
   useEffect(() => {
     if (!added) return;
     const t = setTimeout(() => setAdded(false), 1400);
@@ -186,7 +199,7 @@ export function FoodRow({
       </PressableScale>
       {trailing}
       {amount ? (
-        <AmountStepper amount={amount} name={food.name} testID={testID} />
+        <AmountStepper amount={guarded ?? amount} name={food.name} testID={testID} />
       ) : onQuickAdd ? (
         <IconButton
           testID={testID ? `${testID}-add` : undefined}
@@ -194,6 +207,7 @@ export function FoodRow({
           tone={added ? 'primary' : 'alt'}
           size={40}
           onPress={() => {
+            setAddedAt(Date.now());
             setAdded(true);
             onQuickAdd();
           }}>

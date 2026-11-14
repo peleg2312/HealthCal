@@ -19,9 +19,15 @@ interface SyncState {
   lastRunAt: string | null;
   /** Records the server refused to store. They stay on this device and are tried again later. */
   rejected: number;
+  /**
+   * Set when data made without an account was attached to an account that already had a
+   * profile: the account's plan was kept and only the logged entries were added. The UI
+   * tells the user once and clears it.
+   */
+  keptAccountPlan: boolean;
 }
 
-export const useSyncState = create<SyncState>(() => ({ status: 'idle', error: null, lastRunAt: null, rejected: 0 }));
+export const useSyncState = create<SyncState>(() => ({ status: 'idle', error: null, lastRunAt: null, rejected: 0, keptAccountPlan: false }));
 
 const PUSH_CHUNK = 200;
 const PULL_PAGE = 1000;
@@ -90,6 +96,27 @@ export function resetRejected(): void {
   useSyncState.setState({ rejected: 0 });
 }
 
+const toRecord = (r: RemoteRow) => ({ collection: r.collection, record: { ...r.data, id: r.id, updatedAt: r.updated_at, deleted: r.deleted } });
+const knownCollection = (r: RemoteRow) => (COLLECTIONS as string[]).includes(r.collection);
+
+/**
+ * The server keeps its own copy of a record when that copy is newer, and says so
+ * only through the number of rows it stored. When fewer were stored than sent
+ * (an old backup was imported, or another device edited the same record), fetch
+ * the server's version of what was sent, so this device ends up with what every
+ * other device has instead of quietly keeping an older copy and calling it backed up.
+ */
+async function adoptServerCopies(client: NonNullable<typeof supabase>, userId: string, sent: PushRow[]): Promise<void> {
+  const BATCH = 50;
+  for (let i = 0; i < sent.length; i += BATCH) {
+    const ids = sent.slice(i, i + BATCH).map((r) => r.id);
+    const { data, error } = await client.from('records').select('collection,id,data,deleted,updated_at,server_updated_at').eq('user_id', userId).in('id', ids);
+    if (error) throw new Error(error.message);
+    const rows = ((data ?? []) as RemoteRow[]).filter(knownCollection);
+    useStore.getState().mergeRemote({ records: rows.map(toRecord), pulledAt: useStore.getState().lastPulledAt ?? '1970-01-01T00:00:00Z' });
+  }
+}
+
 async function push(userId: string): Promise<void> {
   if (!supabase) return;
   const client = supabase;
@@ -107,8 +134,9 @@ async function push(userId: string): Promise<void> {
     useStore.getState().clearDirty({ ids: sent.map((r) => ({ collection: r.collection, id: r.id, updatedAt: r.updated_at })) });
   for (let i = 0; i < rows.length; i += PUSH_CHUNK) {
     const chunk = rows.slice(i, i + PUSH_CHUNK);
-    const { error } = await client.rpc('push_records', { p_records: chunk });
+    const { data: stored, error } = await client.rpc('push_records', { p_records: chunk });
     if (!error) {
+      if (typeof stored === 'number' && stored < chunk.length) await adoptServerCopies(client, userId, chunk);
       done(chunk);
       continue;
     }
@@ -117,7 +145,10 @@ async function push(userId: string): Promise<void> {
     // to find the refused ones, so the rest still get through.
     for (const row of chunk) {
       const single = await client.rpc('push_records', { p_records: [row] });
-      if (!single.error) done([row]);
+      if (!single.error) {
+        if (single.data === 0) await adoptServerCopies(client, userId, [row]);
+        done([row]);
+      }
       else if (isRejection(single.error)) rejectedAt.set(rejectKey(row), Date.now());
       else throw new Error(single.error.message);
     }
@@ -186,9 +217,7 @@ async function pull(userId: string): Promise<void> {
     }
     cursor = batch[batch.length - 1].server_updated_at;
     useStore.getState().mergeRemote({
-      records: batch
-        .filter((r) => (COLLECTIONS as string[]).includes(r.collection))
-        .map((r) => ({ collection: r.collection, record: { ...r.data, id: r.id, updatedAt: r.updated_at, deleted: r.deleted } })),
+      records: batch.filter(knownCollection).map(toRecord),
       pulledAt: laterOf(useStore.getState().lastPulledAt, cursor),
     });
     if (rows.length < PULL_PAGE) break;
@@ -268,8 +297,20 @@ export async function attachUser(userId: string, options: { discardOtherAccount?
     // switching. Stop and let the user decide instead of losing them silently.
     if (s.ownerId !== null && pendingChanges(s) > 0 && !options.discardOtherAccount) return 'blocked';
     if (s.ownerId === null) {
+      // The device holds data made without an account. If the account already has a plan
+      // (a profile that finished onboarding), that plan stays: the profile made here a
+      // moment ago must not replace months of goals and settings on every device. Only
+      // what was logged here is added to the account.
+      let keepAccountPlan = false;
+      if (supabase) {
+        const { data: account, error } = await supabase.from('profiles').select('data,settings').eq('user_id', userId).maybeSingle();
+        // Without knowing what the account holds, attaching could overwrite it: try again later.
+        if (error) return 'failed';
+        keepAccountPlan = !!(account?.data as Profile | null | undefined)?.onboardedAt;
+      }
       s.setOwner(userId);
-      s.markAllDirty();
+      s.markAllDirty({ keepAccountPlan });
+      if (keepAccountPlan && s.profile) useSyncState.setState({ keptAccountPlan: true });
     } else {
       s.resetAll();
       resetRejected();

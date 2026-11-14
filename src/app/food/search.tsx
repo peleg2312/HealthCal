@@ -3,7 +3,6 @@ import { Camera, PenLine, ScanBarcode, Search, Star, Utensils, X, Zap } from 'lu
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
-import { BUILTIN_FOODS } from '@/data/foods';
 import { AmountEditor } from '@/features/food/AmountEditor';
 import { FoodRow, MealPicker } from '@/features/food/components';
 import { setFoodDraft } from '@/features/food/draft';
@@ -11,7 +10,7 @@ import { amountLabel, href, kcal, lastPortions, matchServing, parseDate, parseMe
 import { formatPortion, itemsRange, mealServings } from '@/features/food/build';
 import { deleteEntry, logFood, setEntryAmount } from '@/features/food/log';
 import { LogSavedMealSheet } from '@/features/food/SavedMealParts';
-import { usualFoods } from '@/features/food/usuals';
+import { resolveFood, usualFoods } from '@/features/food/usuals';
 import { formatDayLabel } from '@/lib/dates';
 import { MEAL_LABEL, entriesTotal, sumNutrients } from '@/lib/nutrition';
 import { searchLocal, searchOnlineWithStatus } from '@/services/foodSearch';
@@ -24,14 +23,6 @@ import { Avatar, Button, Chip, ChipRow, Divider, Header, IconButton, PressableSc
 
 type Tab = 'usual' | 'recent' | 'favorites' | 'mine' | 'meals';
 type Online = { query: string; status: 'idle' | 'loading' | 'done'; items: Food[] };
-
-const BUILTIN_BY_ID = new Map(BUILTIN_FOODS.map((f) => [f.id, f]));
-
-/** Freshest definition of a remembered food; null when it was an own food that has since been deleted. */
-function resolveFood(f: Food, customById: Map<string, Food>): Food | null {
-  if (f.source === 'custom') return customById.get(f.id) ?? null;
-  return BUILTIN_BY_ID.get(f.id) ?? f;
-}
 
 export default function FoodSearchScreen() {
   const { colors, spacing } = useTheme();
@@ -75,7 +66,8 @@ export default function FoodSearchScreen() {
         .filter((f): f is Food => !!f),
     [entries, meal, todayDate, customById],
   );
-  const tab: Tab = pickedTab ?? (usuals.length ? 'usual' : 'recent');
+  // The Usual tab only exists for a meal with history: after switching to a meal without, fall back.
+  const tab: Tab = pickedTab === 'usual' && !usuals.length ? 'recent' : (pickedTab ?? (usuals.length ? 'usual' : 'recent'));
   const mine = useMemo(() => [...customFoods].sort((a, b) => a.name.localeCompare(b.name)), [customFoods]);
 
   const q = query.trim();
