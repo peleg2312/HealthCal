@@ -21,7 +21,11 @@ const PORTIONS = [0.5, 1, 2];
 
 /** "1 cup · 205 kcal" for a saved-meal line, with "~" for an estimate. */
 export function itemLine(it: SavedMealItem): string {
-  return `${portionLabel(it.servingLabel, it.quantity)} · ${it.kcalRange ? '~' : ''}${kcal(it.nutrients.kcal)} kcal`;
+  const portion = portionLabel(it.servingLabel, it.quantity);
+  const g = Math.round(it.grams);
+  // Show the weight too when the portion is a household measure ("1.5 × 1 cup · 240 g").
+  const weight = g > 0 && !/\bg$/.test(portion) && it.servingLabel !== '1 g' ? ` · ${g} g` : '';
+  return `${portion}${weight} · ${it.kcalRange ? '~' : ''}${kcal(it.nutrients.kcal)} kcal`;
 }
 
 /**

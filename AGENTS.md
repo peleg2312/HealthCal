@@ -81,7 +81,7 @@ scripts/dev/        seed.mjs (demo data) and shot.mjs (browser screenshots).
 - Day keys are local-calendar `YYYY-MM-DD` strings from `@/lib/dates` (`today()`, `addDays`, `toISODate`). Never build one with `toISOString()`.
 - Read with hooks from `@/store/selectors`: `useProfile()`, `useDay(date)`, `useDays(n)`, `useEnergyModel()`, `useWeightSeries()`, `useConsistency()`, `useLive('activities')`. They already filter soft-deleted records.
 - Write with `useStore.getState().upsert(collection, record)`, `.remove(collection, id)` (soft delete), `.restore(collection, id)`, `.setProfile(patch)`, `.setSettings(patch)`, `.setReminders(patch)`. `upsert` fills `id` and `updatedAt`.
-- Food goes to the diary only through `@/features/food/log` (`logFood`, `logQuickAdd`, `logAiItems`, `logItems`, `deleteEntry`), which handle recents, haptics and Undo.
+- Food goes to the diary only through `@/features/food/log` (`logFood`, `logQuickAdd`, `logItems`, `logSavedMeal`, `setEntryAmount`, `deleteEntry`), which handle recents, haptics and Undo. AI estimates become items with `rowsToLogItems` (`@/features/ai/estimate`) and then go through `logItems`.
 - Never read the clock while rendering (`today()`, `new Date()`, `Date.now()`, `mealForTime()`): the React Compiler caches a render's results, and tab screens stay mounted for the whole session, so the value would be hours or days old. Use `useToday()` and `useNow()` from `@/store/clock`; the plain functions are fine inside event handlers and effects. `useEnergyModel(date)`, `useDays(count, end)` and `useConsistency(end)` take the date explicitly for the same reason.
 - One record per day for weights and sleep: `upsert` gives them an id derived from the date, so saving a second value for a date replaces the first on every device.
 - Favourites are the synced `favorites` collection (each record holds the food); `favoriteFoodIds` is derived from it.
@@ -99,7 +99,7 @@ scripts/dev/        seed.mjs (demo data) and shot.mjs (browser screenshots).
 - Input: `TextField`, `NumberField` (`value: number | null`), `Stepper`, `parseNumber`.
 - Lists: `ListRow`, `ToggleRow`, `Avatar` (emoji tile), `EmptyState`, `Stat`.
 - Data viz: `Ring`, `ProgressBar`, `BarChart`, `LineChart`, `Sparkline`, `MacroBar`.
-- Feedback: `toast(message, { label, onPress })`, `haptic.tap/press/select/success/warn`.
+- Feedback: `toast(message, { label, onPress })`, `haptic.tap/press/select/success/warn`. A `Sheet` shows toasts itself, just above its top edge, so there is one `toast-action` on screen at a time.
 - Icons: `lucide-react-native` (size 18 to 22 in rows, colour from the theme).
 
 Read the component source in `src/ui/` for exact props before using one. If the kit lacks something you need, build it inside your own `src/features/<area>/` folder; do not edit `src/ui/`, `src/theme/`, `src/store/`, `src/lib/` or `src/types/` unless your brief says you own the file. Report gaps instead.
@@ -134,6 +134,7 @@ Read the component source in `src/ui/` for exact props before using one. If the 
 /food/search?meal=&date=      /food/detail?meal=&date=&entryId=   (new food arrives via @/features/food/draft)
 /food/scan?meal=&date=        /food/photo?meal=&date=&mode=photo|text
 /food/quick?meal=&date=       /food/custom?barcode=               /food/meals?meal=&date=
+/food/meal-edit?id=&meal=&date=   saved meal or recipe builder     /food/meal-pick   adds foods to the open builder draft
 /activity/pick?date=          /activity/log?activityId=&entryId=&date=      /activity/strength?entryId=&date=
 /water  /weight  /body  /sleep  /fasting
 /profile  /settings/goals  /settings/reminders  /settings/account  /settings/data  /settings/about

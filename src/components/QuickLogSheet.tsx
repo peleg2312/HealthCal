@@ -5,7 +5,8 @@ import { ScrollView, View } from 'react-native';
 
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
 import { matchServing } from '@/features/food/helpers';
-import { logFood, logItems } from '@/features/food/log';
+import { formatPortion, mealServings, planSavedMeal } from '@/features/food/build';
+import { logFood, logItems, logSavedMeal } from '@/features/food/log';
 import { addWater } from '@/features/today/StatusRail';
 import { usualFoods, usualLabel, type UsualFood } from '@/features/food/usuals';
 import { addDays, formatShortDate, today } from '@/lib/dates';
@@ -55,6 +56,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   const prev = findPreviousMeal(entries, todayDate, meal, 7);
   const alreadyLogged = entries.some((e) => e.date === todayDate && e.meal === meal);
   const savedMeal = [...saved].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] as SavedMeal | undefined;
+  const savedServings = savedMeal ? mealServings(savedMeal) : 1;
   const glasses = [...presets]
     .filter((p) => p > 0)
     .sort((a, b) => a - b)
@@ -137,7 +139,8 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                 feedback="none"
                 disabled={done.includes('saved')}
                 onPress={() => {
-                  logItems(savedMeal.items, mealForTime(), today(), `${savedMeal.name} added to ${MEAL_LABEL[mealForTime()].toLowerCase()}`);
+                  // A recipe logs one serving as a single line; a plain meal logs its items.
+                  logSavedMeal(savedMeal, mealForTime(), today());
                   mark('saved');
                 }}
                 accessibilityLabel={`Add saved meal ${savedMeal.name} to ${mealName}`}
@@ -152,7 +155,9 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                   {savedMeal.name}
                 </Text>
                 <Text variant="caption" color="textSecondary" numberOfLines={1}>
-                  {`${savedMeal.items.length} ${savedMeal.items.length === 1 ? 'item' : 'items'}, ${formatNumber(savedMeal.items.reduce((s, i) => s + i.nutrients.kcal, 0))} kcal`}
+                  {savedServings > 1
+                    ? `1 of ${formatPortion(savedServings)} servings, ${formatNumber(planSavedMeal(savedMeal).kcal)} kcal`
+                    : `${savedMeal.items.length} ${savedMeal.items.length === 1 ? 'item' : 'items'}, ${formatNumber(planSavedMeal(savedMeal).kcal)} kcal`}
                 </Text>
               </PressableScale>
             ) : null}

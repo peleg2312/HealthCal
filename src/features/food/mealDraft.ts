@@ -29,7 +29,19 @@ const nextKey = () => `d${Date.now().toString(36)}${(seq++).toString(36)}`;
 
 export const useMealDraft = create<MealDraftState>(() => ({ active: false, id: null, name: '', servings: 1, rows: [], dirty: false }));
 
-export function openMealDraft(meal?: SavedMeal): void {
+/**
+ * Open the builder's draft for a meal (or a new one). Leaving the builder does
+ * not throw unsaved work away: opening the same meal again picks the draft up
+ * where it was left. Returns true when it did. `fresh` starts over regardless.
+ */
+export function openMealDraft(meal?: SavedMeal, fresh = false): boolean {
+  const cur = useMealDraft.getState();
+  if (!fresh && cur.active && cur.dirty && cur.id === (meal?.id ?? null) && (cur.rows.length > 0 || cur.name.trim() !== '')) return true;
+  resetDraft(meal);
+  return false;
+}
+
+function resetDraft(meal?: SavedMeal): void {
   useMealDraft.setState({
     active: true,
     id: meal?.id ?? null,

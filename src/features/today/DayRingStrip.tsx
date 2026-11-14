@@ -17,7 +17,18 @@ export const STRIP_WEEKS = 8;
  * Monday-to-Sunday strip of day rings, paged back over the last eight weeks.
  * Each ring is eaten kcal over that day's budget; tapping a day selects it.
  */
-export function DayRingStrip({ today, selected, onSelect }: { today: ISODate; selected: ISODate; onSelect: (d: ISODate) => void }) {
+export function DayRingStrip({
+  today,
+  selected,
+  onSelect,
+  testIDPrefix = 'today',
+}: {
+  today: ISODate;
+  selected: ISODate;
+  onSelect: (d: ISODate) => void;
+  /** Tab screens stay mounted together, so each place that shows the strip names its own test ids. */
+  testIDPrefix?: string;
+}) {
   const { colors, spacing } = useTheme();
   const ref = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const [width, setWidth] = useState(0);
@@ -67,7 +78,7 @@ export function DayRingStrip({ today, selected, onSelect }: { today: ISODate; se
     .filter((d) => d !== undefined);
 
   return (
-    <View style={{ gap: spacing.xs }} testID="today-week">
+    <View style={{ gap: spacing.xs }} testID={`${testIDPrefix}-week`}>
       <View onLayout={onLayout}>
         {width > 0 ? (
           <ScrollView
@@ -96,7 +107,7 @@ export function DayRingStrip({ today, selected, onSelect }: { today: ISODate; se
                   return (
                     <PressableScale
                       key={d}
-                      testID={`today-day-${d}`}
+                      testID={`${testIDPrefix}-day-${d}`}
                       feedback="select"
                       scaleTo={0.94}
                       disabled={future}
@@ -152,11 +163,11 @@ export function DayRingStrip({ today, selected, onSelect }: { today: ISODate; se
         )}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-        <Text variant="caption" color="textSecondary" style={{ flex: 1 }} numberOfLines={2} testID="today-week-caption">
+        <Text variant="caption" color="textSecondary" style={{ flex: 1 }} numberOfLines={2} testID={`${testIDPrefix}-week-caption`}>
           {weekCaption(shownWeek, today)}
         </Text>
         <IconButton
-          testID="today-week-prev"
+          testID={`${testIDPrefix}-week-prev`}
           accessibilityLabel="Previous week"
           size={32}
           tone="clear"
@@ -164,7 +175,7 @@ export function DayRingStrip({ today, selected, onSelect }: { today: ISODate; se
           onPress={() => page(back + 1)}>
           <ChevronLeft size={18} color={back >= STRIP_WEEKS - 1 ? colors.textTertiary : colors.textSecondary} />
         </IconButton>
-        <IconButton testID="today-week-next" accessibilityLabel="Next week" size={32} tone="clear" disabled={back <= 0} onPress={() => page(back - 1)}>
+        <IconButton testID={`${testIDPrefix}-week-next`} accessibilityLabel="Next week" size={32} tone="clear" disabled={back <= 0} onPress={() => page(back - 1)}>
           <ChevronRight size={18} color={back <= 0 ? colors.textTertiary : colors.textSecondary} />
         </IconButton>
       </View>

@@ -45,7 +45,7 @@ export function totals(items: AiFoodItem[]): AiTotals {
 const clamp01 = (n: number) => Math.min(1, Math.max(0, Number.isFinite(n) ? n : 0));
 
 /**
- * Relative uncertainty of one item. Matches `logAiItems`, so the range shown
+ * Relative uncertainty of one item. `buildEntry` (src/features/food/build.ts) uses it too, so the range shown
  * here is the same one the diary shows after logging: 15 % for a confident
  * item, widening to 45 % for a guess.
  */

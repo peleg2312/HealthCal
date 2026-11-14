@@ -70,7 +70,7 @@ export default function DiaryScreen() {
         </IconButton>
       </View>
 
-      <DayRingStrip today={t} selected={date} onSelect={setDate} />
+      <DayRingStrip today={t} selected={date} onSelect={setDate} testIDPrefix="diary" />
 
       <DaySummaryCard day={day} />
 

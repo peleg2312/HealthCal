@@ -6,7 +6,7 @@ import { View } from 'react-native';
 import { storeSavedMeal } from '@/features/food/actions';
 import { formatPortion, itemsRange, mealServings } from '@/features/food/build';
 import { href, kcal, param } from '@/features/food/helpers';
-import { openMealDraft, removeDraftItem, setDraftName, setDraftServings, updateDraftItem, useMealDraft } from '@/features/food/mealDraft';
+import { closeMealDraft, openMealDraft, removeDraftItem, setDraftName, setDraftServings, updateDraftItem, useMealDraft } from '@/features/food/mealDraft';
 import { RequireProfile } from '@/features/food/RequireProfile';
 import { ItemAmountSheet, itemLine } from '@/features/food/SavedMealParts';
 import { sumNutrients } from '@/lib/nutrition';
@@ -28,11 +28,13 @@ function MealEdit() {
   const id = param(params.id);
   const saved = useStore((s) => (id ? s.savedMeals[id] : undefined));
   // Open the draft once, from the stored meal (or empty for a new one).
-  const [missing] = useState(() => {
-    if (id && (!saved || saved.deleted)) return true;
-    openMealDraft(id ? saved : undefined);
-    return false;
+  const [opened] = useState<'missing' | 'resumed' | 'fresh'>(() => {
+    if (id && (!saved || saved.deleted)) return 'missing';
+    return openMealDraft(id ? saved : undefined) ? 'resumed' : 'fresh';
   });
+  const missing = opened === 'missing';
+  // Unsaved work from an earlier visit was kept; say so and offer a clean start.
+  const [resumed, setResumed] = useState(opened === 'resumed');
   const name = useMealDraft((s) => s.name);
   const servings = useMealDraft((s) => s.servings);
   const rows = useMealDraft((s) => s.rows);
@@ -71,10 +73,30 @@ function MealEdit() {
           title={id ? 'Save changes' : 'Save meal'}
           disabled={!canSave}
           onPress={() => {
-            if (storeSavedMeal({ id: id ?? null, name, servings, items })) goBack(back);
+            if (storeSavedMeal({ id: id ?? null, name, servings, items })) {
+              closeMealDraft();
+              goBack(back);
+            }
           }}
         />
       }>
+      {resumed ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }} testID="meal-edit-resumed">
+          <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
+            Picked up where you left off. Nothing is saved until you tap {id ? 'Save changes' : 'Save meal'}.
+          </Text>
+          <Button
+            title="Start over"
+            variant="ghost"
+            size="sm"
+            testID="meal-edit-start-over"
+            onPress={() => {
+              openMealDraft(id ? saved : undefined, true);
+              setResumed(false);
+            }}
+          />
+        </View>
+      ) : null}
       <Card style={{ gap: spacing.md }}>
         <TextField testID="meal-edit-name" label="Name" placeholder="Chili, overnight oats, work lunch" value={name} onChangeText={setDraftName} maxLength={60} autoFocus={!id} />
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md }}>
