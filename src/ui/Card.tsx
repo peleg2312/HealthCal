@@ -1,49 +1,45 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { View, type StyleProp, type ViewProps, type ViewStyle } from 'react-native';
 
-import { useTheme } from '@/theme';
+import { cup, useTheme } from '@/theme';
 
 import { PressableScale } from './Pressable';
 
 export interface CardProps extends ViewProps {
   onPress?: () => void;
   padding?: number;
-  /** Two or more colours render a gradient background. */
+  /** @deprecated Pour has no gradients. Accepted so old callers compile; ignored (the card is flat). */
   gradient?: readonly [string, string, ...string[]];
+  /** `surface` (default): surface with a 1 px border. `alt`: surfaceAlt, no border (invites, notes). `transparent`: no fill, no border. */
   tone?: 'surface' | 'alt' | 'transparent';
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
 }
 
-export function Card({ onPress, padding, gradient, tone = 'surface', style, children, accessibilityLabel, ...rest }: CardProps) {
+/**
+ * The cup: square shoulders (6), round base (22), a 1 px border, no shadow.
+ * Related stats share one card, separated by `Divider`s, rather than many small cards.
+ */
+export function Card({ onPress, padding, gradient: _gradient, tone = 'surface', style, children, accessibilityLabel, ...rest }: CardProps) {
   const { colors, radius, spacing } = useTheme();
   const base: ViewStyle = {
     backgroundColor: tone === 'surface' ? colors.surface : tone === 'alt' ? colors.surfaceAlt : 'transparent',
-    borderRadius: radius.lg,
-    borderWidth: tone === 'transparent' ? 0 : 1,
+    ...cup(radius.card),
+    borderWidth: tone === 'surface' ? 1 : 0,
     borderColor: colors.border,
     padding: padding ?? spacing.lg,
     overflow: 'hidden',
   };
-  const body = gradient ? (
-    <>
-      <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }} />
-      {children}
-    </>
-  ) : (
-    children
-  );
   if (onPress) {
     return (
       <PressableScale testID={rest.testID} accessibilityHint={rest.accessibilityHint} onPress={onPress} style={[base, style]} scaleTo={0.985} accessibilityLabel={accessibilityLabel}>
-        {body}
+        {children}
       </PressableScale>
     );
   }
   return (
     <View {...rest} style={[base, style]}>
-      {body}
+      {children}
     </View>
   );
 }
