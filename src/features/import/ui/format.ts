@@ -78,8 +78,10 @@ export function calorieView(c: Pick<ImportCandidate, 'workout' | 'entry' | 'stat
   const measured = gross !== null && gross > 0;
   // A row that is the same workout again adds nothing, so it shows only what the file says.
   if (!c.entry || c.status === 'already-imported' || c.status === 'duplicate-in-file') {
-    return measured
-      ? { added: null, estimate: false, detail: `${formatNumber(gross)} by watch`, spoken: `${formatNumber(gross)} kcal measured by the watch` }
+    if (measured) return { added: null, estimate: false, detail: `${formatNumber(gross)} by watch`, spoken: `${formatNumber(gross)} kcal measured by the watch` };
+    // A file that states 0 kcal does have a calorie figure; it is just zero.
+    return gross === 0
+      ? { added: null, estimate: true, detail: '0 kcal in file', spoken: 'The file states 0 kcal' }
       : { added: null, estimate: true, detail: 'No calories in file', spoken: 'No calories in the file' };
   }
   const net = Math.round(c.entry.kcalNet);
@@ -96,13 +98,13 @@ export function calorieView(c: Pick<ImportCandidate, 'workout' | 'entry' | 'stat
     added: `~${formatNumber(net)}`,
     estimate: true,
     detail: `est. ${formatNumber(lo)}–${formatNumber(hi)}`,
-    spoken: `About ${formatNumber(net)} kcal added, an estimate between ${formatNumber(lo)} and ${formatNumber(hi)}`,
+    spoken: `${gross === 0 ? 'The file states 0 kcal. ' : ''}About ${formatNumber(net)} kcal added, an estimate between ${formatNumber(lo)} and ${formatNumber(hi)}`,
   };
 }
 
 export type RowFilter = 'all' | 'selected' | 'choose' | 'duplicates';
 
-export const isDuplicate = (c: ImportCandidate) => c.status !== 'new';
+export const isDuplicate = (c: ImportCandidate) => c.status !== 'new' && c.status !== 'update';
 /** A row the person can still tick (has an activity and is not the same workout again). */
 export const isTickable = (c: ImportCandidate) => c.entry !== null && c.status !== 'already-imported' && c.status !== 'duplicate-in-file';
 
@@ -125,6 +127,8 @@ export interface RowCounts {
   /** Rows waiting for the person to choose an activity (repeats excluded). */
   choose: number;
   alreadyImported: number;
+  /** Workouts already imported from a poorer file, which this one improves. */
+  updates: number;
   /** Imported before and then deleted: can be restored. */
   deletedBefore: number;
   duplicates: number;
@@ -134,14 +138,15 @@ export interface RowCounts {
 }
 
 export function countRows(rows: ImportCandidate[]): RowCounts {
-  const c: RowCounts = { total: rows.length, selected: 0, choose: 0, alreadyImported: 0, deletedBefore: 0, duplicates: 0, probable: 0, locked: 0 };
+  const c: RowCounts = { total: rows.length, selected: 0, choose: 0, alreadyImported: 0, updates: 0, deletedBefore: 0, duplicates: 0, probable: 0, locked: 0 };
   for (const r of rows) {
     if (r.selected) c.selected += 1;
     if (r.status === 'already-imported') {
       c.alreadyImported += 1;
       if (r.match?.deleted) c.deletedBefore += 1;
     }
-    if (r.status !== 'new') c.duplicates += 1;
+    if (r.status === 'update') c.updates += 1;
+    if (isDuplicate(r)) c.duplicates += 1;
     if (r.status === 'probable-duplicate') c.probable += 1;
     if (r.status === 'already-imported' || r.status === 'duplicate-in-file') c.locked += 1;
     else if (r.activityId === null) c.choose += 1;
@@ -149,22 +154,37 @@ export function countRows(rows: ImportCandidate[]): RowCounts {
   return c;
 }
 
-/** Totals of what an import adds: sessions, minutes, net kcal and the days touched (newest first). */
-export function summarise(entries: { date: ISODate; durationMin: number; kcalNet: number }[]) {
-  const byDay = new Map<ISODate, { date: ISODate; sessions: number; kcal: number; minutes: number }>();
+type Totals = { id?: string; date: ISODate; durationMin: number; kcalNet: number };
+
+/**
+ * Totals of what an import changes: sessions, minutes, net kcal and the days
+ * touched (newest first). `previous` holds the stored versions of workouts the
+ * import updated: they count as updated, not added, and only the difference
+ * in calories and minutes is counted.
+ */
+export function summarise(entries: Totals[], previous: Totals[] = []) {
+  const before = new Map(previous.filter((p) => p.id).map((p) => [p.id as string, p]));
+  const byDay = new Map<ISODate, { date: ISODate; sessions: number; updated: number; kcal: number; minutes: number }>();
   let kcal = 0;
   let minutes = 0;
+  let updated = 0;
   for (const e of entries) {
-    kcal += e.kcalNet;
-    minutes += e.durationMin;
-    const d = byDay.get(e.date) ?? { date: e.date, sessions: 0, kcal: 0, minutes: 0 };
-    d.sessions += 1;
-    d.kcal += e.kcalNet;
-    d.minutes += e.durationMin;
+    const old = e.id ? before.get(e.id) : undefined;
+    const dk = e.kcalNet - (old?.kcalNet ?? 0);
+    const dm = e.durationMin - (old?.durationMin ?? 0);
+    kcal += dk;
+    minutes += dm;
+    const d = byDay.get(e.date) ?? { date: e.date, sessions: 0, updated: 0, kcal: 0, minutes: 0 };
+    if (old) {
+      d.updated += 1;
+      updated += 1;
+    } else d.sessions += 1;
+    d.kcal += dk;
+    d.minutes += dm;
     byDay.set(e.date, d);
   }
   const days = [...byDay.values()].sort((a, b) => b.date.localeCompare(a.date));
-  return { sessions: entries.length, kcal: Math.round(kcal), minutes, days };
+  return { sessions: entries.length - updated, updated, kcal: Math.round(kcal), minutes, days };
 }
 
 /** "1 workout", "12 workouts". */

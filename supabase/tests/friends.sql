@@ -214,7 +214,9 @@ begin
 end $$;
 
 -- ------------------------------------------- declining, asking again, mutual requests
--- Jonas asks Alex; Alex declines; Jonas cannot tell and cannot ask again or clear it.
+-- Jonas asks Alex; Alex declines. Jonas cannot tell: his request keeps showing as
+-- waiting, he can take it back (it goes, as a pending one would) and ask again, and
+-- Alex never sees it again, not even after Jonas turns friends off and on.
 select pg_temp.act_as('c3333333-3333-4333-8333-333333333333');
 select public.friend_request((select code from codes where who = 'alex'));
 select pg_temp.act_as('c1111111-1111-4111-8111-111111111111');
@@ -228,16 +230,50 @@ do $$
 declare o jsonb;
 begin
   if public.friend_request((select code from codes where who = 'alex')) ->> 'status' <> 'sent' then raise exception 'the decline was revealed'; end if;
+  o := public.friends_overview();
+  if jsonb_array_length(o -> 'outgoing') <> 1 then raise exception 'a declined request should still show as waiting: %', o; end if;
+  -- Taking it back works exactly as for a pending request.
   perform public.friend_remove('c1111111-1111-4111-8111-111111111111');
   o := public.friends_overview();
-  if jsonb_array_length(o -> 'outgoing') <> 1 then raise exception 'a declined request could be cleared by its sender: %', o; end if;
+  if jsonb_array_length(o -> 'outgoing') <> 0 then raise exception 'take back did nothing for a declined request: %', o; end if;
+  if public.friend_request((select code from codes where who = 'alex')) ->> 'status' <> 'sent' then raise exception 'asking again after taking back'; end if;
+  if jsonb_array_length(public.friends_overview() -> 'outgoing') <> 1 then raise exception 'asking again should show as waiting'; end if;
+end $$;
+select pg_temp.act_as('c1111111-1111-4111-8111-111111111111');
+do $$
+begin
+  if jsonb_array_length(public.friends_overview() -> 'incoming') <> 0 then raise exception 'asking again got past the decline'; end if;
+end $$;
+-- Jonas turns friends off and on again (a new code) and asks once more.
+select pg_temp.act_as('c3333333-3333-4333-8333-333333333333');
+do $$
+declare card jsonb;
+begin
+  perform public.social_leave();
+  card := public.social_setup('Jonas', 'J', '{}');
+  update codes set code = card ->> 'code' where who = 'jonas';
+  if public.friend_request((select code from codes where who = 'alex')) ->> 'status' <> 'sent' then raise exception 'asking after rejoining'; end if;
+  if jsonb_array_length(public.friends_overview() -> 'outgoing') <> 1 then raise exception 'the new request should show as waiting'; end if;
 end $$;
 select pg_temp.act_as('c1111111-1111-4111-8111-111111111111');
 do $$
 declare r jsonb;
 begin
-  if jsonb_array_length(public.friends_overview() -> 'incoming') <> 0 then raise exception 'the declined request came back'; end if;
-  -- Alex changes his mind and enters Jonas's code: that accepts the old request.
+  if jsonb_array_length(public.friends_overview() -> 'incoming') <> 0 then raise exception 'leaving and rejoining cleared the decline'; end if;
+  -- A hidden request cannot be answered blindly, and removing it would show Jonas something changed.
+  if public.friend_respond('c3333333-3333-4333-8333-333333333333', true) <> 'not_found' then raise exception 'a declined request could be accepted without the code'; end if;
+  perform public.friend_remove('c3333333-3333-4333-8333-333333333333');
+end $$;
+select pg_temp.act_as('c3333333-3333-4333-8333-333333333333');
+do $$
+begin
+  if jsonb_array_length(public.friends_overview() -> 'outgoing') <> 1 then raise exception 'the receiver cleared a request the sender sees as waiting'; end if;
+end $$;
+select pg_temp.act_as('c1111111-1111-4111-8111-111111111111');
+do $$
+declare r jsonb;
+begin
+  -- Only Alex can lift the decline: he changes his mind and enters Jonas's code.
   r := public.friend_request((select code from codes where who = 'jonas'));
   if r ->> 'status' <> 'accepted' then raise exception 'entering the code of someone who asked: %', r; end if;
   if jsonb_array_length(public.friends_overview() -> 'friends') <> 2 then raise exception 'Alex should have two friends'; end if;
@@ -255,6 +291,25 @@ begin
   end loop;
   r := public.friend_request((select code from codes where who = 'alex'));
   if r ->> 'status' <> 'too_many' then raise exception 'guessing was not stopped: %', r; end if;
+  -- Turning friends off and on does not reset the count.
+  perform public.social_leave();
+  perform public.social_setup('Guesser', 'G', '{}');
+  r := public.friend_request('QQQQ3333');
+  if r ->> 'status' <> 'too_many' then raise exception 'leaving and rejoining reset the guess limit: %', r; end if;
+  -- And friends can be turned on only a few times a day (this is the second; five are allowed).
+  for i in 3..5 loop
+    perform public.social_leave();
+    perform public.social_setup('Guesser', 'G', '{}');
+  end loop;
+  -- Changing the card is not turning friends on.
+  perform public.social_setup('Guesser 2', 'G', '{}');
+  perform public.social_leave();
+  begin
+    perform public.social_setup('Guesser', 'G', '{}');
+    raise exception 'friends could be turned on a sixth time in a day';
+  exception when program_limit_exceeded then null;
+  end;
+  if (public.friends_overview() -> 'me') <> 'null'::jsonb then raise exception 'a refused set-up left a card'; end if;
 end $$;
 
 -- ---------------------------------------------------------- remove and leave
@@ -286,6 +341,48 @@ begin
   if jsonb_array_length(public.friends_overview() -> 'friends') <> 0 then raise exception 'a friend who left is still listed'; end if;
 end $$;
 
+-- ------------------------------------------- one friendship per pair, even in a race
+-- Dan and Eve enter each other's codes at the same moment. Dan's call runs in a
+-- second session that holds its transaction open; Eve's starts while it is open.
+-- They must end up friends once, not with two requests or two friendships.
+select pg_temp.act_as('c5555555-5555-4555-8555-555555555555');
+do $$ begin insert into codes values ('dan', public.social_setup('Dan', 'D', '{}') ->> 'code'); end $$;
+select pg_temp.act_as('c6666666-6666-4666-8666-666666666666');
+do $$ begin insert into codes values ('eve', public.social_setup('Eve', 'E', '{}') ->> 'code'); end $$;
+select code as race_eve_code from codes where who = 'eve' \gset
+\setenv RACE_CODE :race_eve_code
+\setenv PGHOST :HOST
+\setenv PGPORT :PORT
+\setenv PGUSER :USER
+\setenv PGDATABASE :DBNAME
+\! psql -X -q -v ON_ERROR_STOP=1 -c "set role authenticated" -c "select set_config('request.jwt.claim.sub', 'c5555555-5555-4555-8555-555555555555', false)" -c "begin" -c "select public.friend_request('$RACE_CODE')" -c "select pg_sleep(2)" -c "commit" > /dev/null 2>&1 &
+select pg_sleep(0.7);
+do $$
+declare r jsonb;
+begin
+  r := public.friend_request((select code from codes where who = 'dan'));
+  if r ->> 'status' <> 'accepted' then raise exception 'two people asking each other at once should become friends: %', r; end if;
+end $$;
+-- Let Dan's session finish whatever happened, then look at the table as its owner.
+select pg_sleep(2.5);
+reset role;
+do $$
+declare n int; a int;
+begin
+  select count(*), count(*) filter (where status = 'accepted') into n, a from public.friendships
+    where 'c5555555-5555-4555-8555-555555555555' in (requester, addressee) and 'c6666666-6666-4666-8666-666666666666' in (requester, addressee);
+  if n <> 1 or a <> 1 then raise exception 'expected one accepted friendship for the pair, found % rows (% accepted)', n, a; end if;
+  -- The database itself refuses a second row for the same two people, either way round.
+  begin
+    insert into public.friendships (requester, addressee, status) values ('c6666666-6666-4666-8666-666666666666', 'c5555555-5555-4555-8555-555555555555', 'pending');
+    insert into public.friendships (requester, addressee, status) values ('c5555555-5555-4555-8555-555555555555', 'c6666666-6666-4666-8666-666666666666', 'pending');
+    raise exception 'a second friendship row for the same pair was stored';
+  exception when unique_violation then null;
+  end;
+end $$;
+set role authenticated;
+select pg_temp.act_as('c1111111-1111-4111-8111-111111111111');
+
 -- ------------------------------------------- deleting the account removes the card
 select public.delete_my_account();
 reset role;
@@ -297,7 +394,12 @@ begin
        + (select count(*) from public.cheers where 'c1111111-1111-4111-8111-111111111111' in (from_user, to_user)) into n;
   if n <> 0 then raise exception '% friend rows survived account deletion', n; end if;
   select count(*) into n from public.social_profiles;
-  if n <> 2 then raise exception 'expected the cards of Maya and the guesser to remain, found %', n; end if;
+  if n <> 3 then raise exception 'expected the cards of Maya, Dan and Eve to remain, found %', n; end if;
+  -- Declines and the guess limit outlive leaving friends, but not the account.
+  select count(*) into n from public.friend_declines where 'c1111111-1111-4111-8111-111111111111' in (decliner, asker);
+  if n <> 0 then raise exception 'declines survived account deletion'; end if;
+  select count(*) into n from public.social_limits where user_id = 'c4444444-4444-4444-8444-444444444444';
+  if n <> 1 then raise exception 'the guesser''s limits were not kept after leaving'; end if;
 end $$;
 
 -- ------------------------------------------------ signed-out callers get nothing

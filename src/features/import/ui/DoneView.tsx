@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { formatDuration } from '@/lib/dates';
 import { formatNumber } from '@/lib/units';
 import { useTheme } from '@/theme';
-import type { ISODate } from '@/types';
+import type { ActivityEntry, ISODate } from '@/types';
 import { Card, CupKey, Divider, EmptyState, MiniCup, Text } from '@/ui';
 
 import type { ImportedEntry } from '../convert';
@@ -14,16 +14,33 @@ import { TextLink } from './ReviewHeader';
 
 const MAX_DAYS = 8;
 
+/** "+306" or "−206": an update can lower a day's figure. */
+const signed = (n: number) => `${n < 0 ? '−' : '+'}${formatNumber(Math.abs(Math.round(n)))}`;
+
 /** After saving: what was added, to which days. */
-export function DoneView({ entries, undone, todayDate, onStartOver }: { entries: ImportedEntry[]; undone: boolean; todayDate: ISODate; onStartOver: () => void }) {
+export function DoneView({
+  entries,
+  previous,
+  undone,
+  todayDate,
+  onStartOver,
+}: {
+  entries: ImportedEntry[];
+  /** Stored versions of the workouts this import updated. */
+  previous: ActivityEntry[];
+  undone: boolean;
+  todayDate: ISODate;
+  onStartOver: () => void;
+}) {
   const { colors, spacing } = useTheme();
-  const sum = summarise(entries);
+  const sum = summarise(entries, previous);
+  const n = entries.length;
   if (undone) {
     return (
       <Card testID="import-undone">
         <EmptyState
           title="Import undone"
-          message={`${sum.sessions === 1 ? 'The workout was' : `The ${workouts(sum.sessions)} were`} taken out again, and every day is as it was. To bring ${sum.sessions === 1 ? 'it' : 'them'} back, choose the files again and restore ${sum.sessions === 1 ? 'it' : 'them'} from the list.`}
+          message={`${n === 1 ? 'The workout was' : `The ${workouts(n)} were`} put back as before, and every day is as it was. To import ${n === 1 ? 'it' : 'them'} again, choose the files again.`}
           action="Import files"
           onAction={onStartOver}
         />
@@ -35,9 +52,11 @@ export function DoneView({ entries, undone, todayDate, onStartOver }: { entries:
   return (
     <View style={{ gap: spacing.lg }} testID="import-done">
       <View style={{ gap: spacing.sm }}>
-        <Text variant="h1">{workouts(sum.sessions)} added</Text>
+        <Text variant="h1">{[sum.sessions ? `${workouts(sum.sessions)} added` : '', sum.updated ? `${workouts(sum.updated)} updated` : ''].filter(Boolean).join(', ')}</Text>
         <Text variant="body" color="textSecondary">
-          {formatDuration(sum.minutes)} of activity on {sum.days.length === 1 ? 'one day' : `${sum.days.length} days`}. Each day’s budget now includes the calories above resting.
+          {sum.sessions
+            ? `${formatDuration(Math.max(0, sum.minutes))} of activity on ${sum.days.length === 1 ? 'one day' : `${sum.days.length} days`}. Each day’s budget now includes the calories above resting.`
+            : `The workouts now carry the numbers from the file. Each day’s budget follows them.`}
         </Text>
       </View>
       <Card style={{ gap: spacing.md }}>
@@ -47,24 +66,24 @@ export function DoneView({ entries, undone, todayDate, onStartOver }: { entries:
             Added to the days
           </Text>
           <Text variant="numM" tabular testID="import-done-kcal">
-            +{formatNumber(sum.kcal)}
+            {signed(sum.kcal)}
             <Text variant="unit"> kcal</Text>
           </Text>
         </View>
         <Divider />
         {shown.map((d) => (
           <View key={d.date} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }} testID={`import-done-day-${d.date}`}>
-            <MiniCup progress={d.kcal / maxKcal} color={colors.exercise} width={22} height={26} />
+            <MiniCup progress={Math.max(0, d.kcal) / maxKcal} color={colors.exercise} width={22} height={26} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text variant="bodyStrong" numberOfLines={1}>
                 {dayLabel(d.date, todayDate)}
               </Text>
               <Text variant="caption" color="textSecondary">
-                {workouts(d.sessions)} · {formatDuration(d.minutes)}
+                {[d.sessions ? `${workouts(d.sessions)} · ${formatDuration(d.minutes)}` : '', d.updated ? `${workouts(d.updated)} updated` : ''].filter(Boolean).join(' · ')}
               </Text>
             </View>
             <Text variant="bodyStrong" tabular>
-              +{formatNumber(d.kcal)}
+              {signed(d.kcal)}
               <Text variant="unit"> kcal</Text>
             </Text>
           </View>
