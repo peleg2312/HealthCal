@@ -75,7 +75,7 @@ At list prices this works out to a few hundredths of a US cent per analysis on t
 Three checks run entirely on your machine:
 
 ```bash
-npm test                              # 780+ unit tests: formulas, sync engine, reminders, search, AI validation, insights
+npm test                              # 800+ unit tests: formulas, sync engine, reminders, search, AI validation, insights
 npm run test:e2e                      # a new user's first day in a real browser (needs `npm run web` running);
                                       # every number is checked against an independent calculation
 npm run test:sql                      # applies the migrations to a throwaway PostgreSQL 16 and tests row-level
@@ -132,7 +132,7 @@ Every record is written locally first, so the app is instant and works offline. 
 
 Changed records are flagged and pushed to Supabase in batches; the server keeps the newest version of each record (last write wins on the edit time) and other devices pull what changed. Deletes are soft so they propagate. A record the server refuses is set aside and retried later, so it cannot hold up everything else.
 
-Signing in on a device that already has data uploads it to the account. Signing in to a different account clears the device first, and asks before doing so if the previous account still has changes that were never uploaded. Signing out does the same check.
+Signing in on a device that already has data uploads what was logged there to the account. If the account already has a profile, its profile, goals and settings are kept and the ones made on the device are dropped. When the server holds a newer copy of a record than the device sent, the device takes the server's copy. Signing in to a different account clears the device first, and asks before doing so if the previous account still has changes that were never uploaded. Signing out does the same check.
 
 ## Accuracy notes and limits
 
