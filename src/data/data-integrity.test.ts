@@ -32,6 +32,12 @@ describe('BUILTIN_FOODS', () => {
   it('every food is builtin-sourced with a boolean verified flag', () => {
     expect(BUILTIN_FOODS.filter((f) => f.source !== 'builtin' || typeof f.verified !== 'boolean').map((f) => f.id)).toEqual([]);
   });
+  it('a food is verified exactly when it names the USDA record it was checked against', () => {
+    const hasFdc = (f: (typeof BUILTIN_FOODS)[number]) => Number.isInteger(f.fdcId) && (f.fdcId ?? 0) > 0;
+    expect(BUILTIN_FOODS.filter((f) => f.verified !== hasFdc(f) || (!f.verified && f.fdcId !== undefined)).map((f) => f.id)).toEqual([]);
+    const fdc = BUILTIN_FOODS.filter(hasFdc).map((f) => f.fdcId);
+    expect(fdc.filter((id, i) => fdc.indexOf(id) !== i)).toEqual([]);
+  });
   it('every food has at least one serving, all with positive finite grams', () => {
     const bad = BUILTIN_FOODS.filter((f) => f.servings.length < 1 || f.servings.some((s) => !(s.grams > 0) || !Number.isFinite(s.grams) || !s.label));
     expect(bad.map((f) => f.id)).toEqual([]);

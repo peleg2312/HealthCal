@@ -14,12 +14,21 @@ const ATWATER_EXCEPTIONS = {
 let bad = 0;
 const fail = (id, msg) => { bad++; console.log(`FAIL ${id}: ${msg}`); };
 const ids = new Set();
+const fdcIds = new Map();
 for (const food of BUILTIN_FOODS) {
   const { id, per100g: n } = food;
   if (ids.has(id)) fail(id, 'duplicate id');
   ids.add(id);
   if (food.source !== 'builtin') fail(id, 'source');
   if (typeof food.verified !== 'boolean') fail(id, 'verified');
+  // verified means "checked against a USDA FoodData Central record", so the two go together.
+  const hasFdc = Number.isInteger(food.fdcId) && food.fdcId > 0;
+  if (food.verified && !hasFdc) fail(id, 'verified without an fdcId');
+  if (!food.verified && food.fdcId !== undefined) fail(id, 'fdcId on an unverified food');
+  if (hasFdc) {
+    if (fdcIds.has(food.fdcId) && fdcIds.get(food.fdcId) !== id) fail(id, `fdcId ${food.fdcId} also used by ${fdcIds.get(food.fdcId)}`);
+    fdcIds.set(food.fdcId, id);
+  }
   if (!food.servings.length || food.servings.length > 4) fail(id, `servings count ${food.servings.length}`);
   for (const s of food.servings) {
     if (!(s.grams > 0)) fail(id, `serving ${s.label} grams`);
