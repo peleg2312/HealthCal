@@ -96,7 +96,9 @@ function runChecks() {
         let found = { cut: [], small: [], wide: 0 };
         try {
           await page.goto(base + route, { waitUntil: 'networkidle', timeout: 120000 });
-          await page.waitForTimeout(600);
+          // Wait until the app has drawn something, so a slow start is not photographed as a blank page.
+          await page.waitForSelector('[data-testid]', { timeout: 15000 }).catch(() => errors.push('nothing was drawn within 15 s'));
+          await page.waitForTimeout(700);
           found = await page.evaluate(scan);
           await page.screenshot({ path: path.join(out, `${name}.png`), fullPage: true });
         } catch (e) {

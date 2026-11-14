@@ -54,6 +54,10 @@ const OPEN_WITHOUT_PROFILE = ['/welcome', '/auth', '/onboarding', '/friends/add'
       try {
         await page.goto(base + route, { waitUntil: 'networkidle', timeout: 120000 });
         await page.waitForTimeout(700);
+        // A busy machine can take a moment to redirect: give a link opened before setup up to 8 s to reach /welcome.
+        if (mode.key === 'none' && !OPEN_WITHOUT_PROFILE.includes(route.split('?')[0])) {
+          await page.waitForFunction(() => location.pathname === '/welcome', null, { timeout: 8000 }).catch(() => {});
+        }
       } catch (e) {
         errors.push(`did not load: ${String(e.message).split('\n')[0].slice(0, 80)}`);
       }
