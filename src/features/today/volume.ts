@@ -62,3 +62,8 @@ export function volumeUnitFor(ml: number, units: UnitSystem): string {
   if (units === 'imperial') return 'fl oz';
   return ml >= 1000 ? 'L' : 'ml';
 }
+
+/** True when adding `ml` to `beforeMl` reaches a goal that was not reached yet. */
+export function crossesGoal(beforeMl: number, ml: number, goalMl: number): boolean {
+  return goalMl > 0 && ml > 0 && beforeMl < goalMl && beforeMl + ml >= goalMl;
+}

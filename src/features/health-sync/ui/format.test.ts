@@ -4,7 +4,7 @@ import { planSync } from '../plan';
 import { CTX, handLogged, TYPE, workout } from '../testing';
 import { NO_ACCESS } from '../types';
 
-import { accessNote, originLine, profileSubtitle, reviewView, switchSubtitle } from './format';
+import { accessNote, originLine, profileSubtitle, reviewLabels, reviewView, switchSubtitle } from './format';
 
 const plain = (s: string) => s.replace(/ /g, ' ');
 
@@ -21,9 +21,9 @@ describe('sync screen wording', () => {
     const hand = handLogged('running', 45, '2026-11-13', '2026-11-13T09:00:00');
     const item = planSync({ workouts: [workout({ start: '2026-11-13T06:00:00Z', minutes: 45, activeKcal: 480, totalKcal: 552, distanceM: 8200 })], existing: [hand], ctx: CTX }).review[0];
     const v = reviewView(item, '2026-11-14', 'metric', false);
-    expect(v).toMatchObject({ title: 'Running', emoji: '🏃', source: 'From Garmin Connect', added: '+480', estimate: false, detail: '552 in total' });
+    expect(v).toMatchObject({ title: 'Running', emoji: '🏃', source: 'From Garmin Connect', added: '+483', estimate: false, detail: '552 in total' });
     expect(plain(v.meta)).toBe('Yesterday · 07:00 · 45 min · 8.2 km');
-    expect(v.spoken).toBe('Running, Yesterday · 07:00 · 45 min · 8.2 km, From Garmin Connect, 480 kilocalories above resting, measured');
+    expect(v.spoken).toBe('Running, Yesterday · 07:00 · 45 min · 8.2 km, From Garmin Connect, 483 kilocalories above resting, measured');
     expect(plain(reviewView(item, '2026-11-14', 'imperial', true).meta)).toBe('Yesterday · 7:00 AM · 45 min · 5.1 mi');
   });
 
@@ -43,6 +43,22 @@ describe('sync screen wording', () => {
     expect(v).toMatchObject({ title: 'Paddling', emoji: null, added: null, detail: '300 kcal active' });
     // The time shown is the one where it was recorded.
     expect(plain(v.meta)).toBe('Yesterday · 11:00 · 1 h 30 min');
+  });
+
+  it('names the workout in every button label, so three Skip buttons can be told apart', () => {
+    const hand = handLogged('running', 45, '2026-11-13', '2026-11-13T09:00:00');
+    const dup = planSync({ workouts: [workout({ start: '2026-11-13T06:00:00Z', minutes: 45, totalKcal: 552 })], existing: [hand], ctx: CTX }).review[0];
+    const l = reviewLabels(dup, reviewView(dup, '2026-11-14', 'metric', false));
+    expect(l).toMatchObject({
+      skip: 'Skip running, yesterday 07:00',
+      add: 'Keep both: add running, yesterday 07:00, as well',
+      replace: 'Replace my hand-logged session with running, yesterday 07:00',
+    });
+    const paddle = planSync({ workouts: [workout({ start: '2026-11-12T16:00:00Z', minutes: 60, exerciseType: TYPE.paddling })], existing: [], ctx: CTX }).review[0];
+    const p = reviewLabels(paddle, reviewView(paddle, '2026-11-20', 'metric', false));
+    expect(p.skip).toBe('Skip paddling, Thu, Nov 12 17:00');
+    expect(p.choose).toBe('Choose the activity for paddling, Thu, Nov 12 17:00');
+    expect(p.likely).toBe('Likely activities for paddling, Thu, Nov 12 17:00');
   });
 
   it('words the app list, the switch and the Profile row', () => {

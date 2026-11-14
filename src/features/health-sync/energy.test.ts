@@ -14,8 +14,8 @@ describe('workoutEnergy', () => {
     expect(wholeMinutes(90)).toBe(2);
   });
 
-  it('active and total', () => {
-    expect(workoutEnergy({ activeKcal: 480, totalKcal: 552 }, SEC, CTX)).toEqual({ basis: 'active-and-total', kcalGross: 552, kcalNet: 480 });
+  it('active and total: the total decides, as for a file (the active figure is above the device BMR, not above the baseline)', () => {
+    expect(workoutEnergy({ activeKcal: 480, totalKcal: 552 }, SEC, CTX)).toEqual({ basis: 'active-and-total', kcalGross: 552, kcalNet: 552 - resting });
   });
 
   it('only total: net is the total minus the resting share, never below zero', () => {
@@ -24,8 +24,16 @@ describe('workoutEnergy', () => {
     expect(workoutEnergy({ activeKcal: null, totalKcal: 110 }, SEC, { weightKg: 78.8, baselineKcalPerDay: 3800 }).kcalNet).toBe(0);
   });
 
-  it('only active: gross adds the resting share', () => {
-    expect(workoutEnergy({ activeKcal: 480, totalKcal: null }, SEC, CTX)).toEqual({ basis: 'active', kcalGross: 480 + resting, kcalNet: 480 });
+  it('only active: gross is the device total rebuilt with the resting rate, net that minus the resting share', () => {
+    const gross = Math.round((480 + (1650 / 1440) * 45) * 10) / 10;
+    expect(workoutEnergy({ activeKcal: 480, totalKcal: null }, SEC, CTX)).toEqual({ basis: 'active', kcalGross: gross, kcalNet: gross - resting });
+    // The same workout with the device's own total gives the same net.
+    expect(workoutEnergy({ activeKcal: 480, totalKcal: 480 + (1650 / 1440) * 45 }, SEC, CTX).kcalNet).toBeCloseTo(gross - resting, 0);
+  });
+
+  it('only active, without a resting rate: the active figure stands as the net', () => {
+    const ctx = { weightKg: CTX.weightKg, baselineKcalPerDay: CTX.baselineKcalPerDay };
+    expect(workoutEnergy({ activeKcal: 480, totalKcal: null }, SEC, ctx)).toEqual({ basis: 'active', kcalGross: 480 + resting, kcalNet: 480 });
   });
 
   it('neither, zero or nonsense: no measurement', () => {
@@ -36,7 +44,7 @@ describe('workoutEnergy', () => {
 
   it('a total that is not above the active figure is ignored', () => {
     expect(workoutEnergy({ activeKcal: 480, totalKcal: 480 }, SEC, CTX).basis).toBe('active');
-    expect(workoutEnergy({ activeKcal: 480, totalKcal: 300 }, SEC, CTX)).toEqual({ basis: 'active', kcalGross: 480 + resting, kcalNet: 480 });
+    expect(workoutEnergy({ activeKcal: 480, totalKcal: 300 }, SEC, CTX)).toMatchObject({ basis: 'active', kcalGross: workoutEnergy({ activeKcal: 480, totalKcal: null }, SEC, CTX).kcalGross });
   });
 
   it('a total on its own at the level of sitting still is not a workout measurement', () => {
@@ -49,6 +57,6 @@ describe('workoutEnergy', () => {
   });
 
   it('drops floating point noise from the health store', () => {
-    expect(workoutEnergy({ activeKcal: 480.00000001, totalKcal: 551.96 }, SEC, CTX)).toMatchObject({ kcalNet: 480, kcalGross: 552 });
+    expect(workoutEnergy({ activeKcal: 480.00000001, totalKcal: 551.96 }, SEC, CTX)).toMatchObject({ kcalNet: 552 - resting, kcalGross: 552 });
   });
 });

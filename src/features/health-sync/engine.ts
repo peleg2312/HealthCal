@@ -10,12 +10,12 @@
  * anything by itself.
  */
 import { ACTIVITY_BY_ID } from '@/data/activities';
-import type { ConvertContext, ImportedEntry } from '@/features/import/convert';
+import type { ImportedEntry } from '@/features/import/convert';
 import { replaceHandLoggedPlan } from '@/features/import/plan';
 import { isoSeconds } from '@/features/import/time';
 import type { ActivityEntry } from '@/types';
 
-import { recordIdFor, workoutSpan, type HealthEntry } from './convert';
+import { recordIdFor, workoutSpan, type HealthContext, type HealthEntry } from './convert';
 import { choiceKey, planSync, workoutKey, type Handled, type ReviewItem, type SyncPlan } from './plan';
 import { pruneHandled, readRange, RECHECK_DAYS, shouldAutoSync, syncMessage, type HealthSyncState, type SyncError, type SyncErrorCode } from './state';
 import { HealthError, storeName, type HealthAccess, type HealthAdapter, type HealthWorkout } from './types';
@@ -35,8 +35,8 @@ export type EnableOutcome =
 export interface Diary {
   /** Every saved activity, soft-deleted ones included. */
   all(): ActivityEntry[];
-  /** Weight and resting baseline, as a hand-logged session uses; null before setup. */
-  context(): ConvertContext | null;
+  /** Weight and resting baseline, as a hand-logged session uses, and the resting rate (BMR); null before setup. */
+  context(): HealthContext | null;
   /** Insert or replace (a soft-deleted record that is saved again is live again). */
   save(entries: (HealthEntry | ActivityEntry)[]): void;
   /** Soft delete. */
@@ -151,8 +151,9 @@ export function createHealthSync(deps: SyncDeps) {
       if (!access.workouts) return fail('permission');
 
       // Details (three more questions per workout) are only asked where they can still
-      // change something: not for a workout the diary has with measured calories, one the
-      // person deleted, or one this phone already dealt with. "Sync now" asks for all.
+      // change something: not for a workout the diary has with measured calories or that
+      // the person edited, one the person deleted, or one this phone already dealt with.
+      // "Sync now" asks for all.
       const stored = new Map(diary.all().map((e) => [e.id, e]));
       const recheckFrom = now - RECHECK_DAYS * DAY_MS;
       const needsDetail = (w: { startTime: string }) => {
@@ -161,7 +162,8 @@ export function createHealthSync(deps: SyncDeps) {
         if (!Number.isFinite(startMs)) return true;
         const id = recordIdFor(isoSeconds(startMs));
         const have = stored.get(id);
-        if (have) return !have.deleted && !have.measured && startMs >= recheckFrom;
+        // An estimate may still get its calories; measured: false is the person's own edit, which a sync leaves alone.
+        if (have) return !have.deleted && have.measured === undefined && startMs >= recheckFrom;
         return !s.handled[id];
       };
       read = await withTimeout(adapter.readWorkouts(readRange(now), access, { needsDetail }), timeout);

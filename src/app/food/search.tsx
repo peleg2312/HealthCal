@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Camera, PenLine, ScanBarcode, Search, Star, Utensils, X, Zap } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 
 import { AmountEditor } from '@/features/food/AmountEditor';
 import { FoodRow, MealPicker } from '@/features/food/components';
@@ -26,6 +26,8 @@ type Online = { query: string; status: 'idle' | 'loading' | 'done'; items: Food[
 
 export default function FoodSearchScreen() {
   const { colors, spacing } = useTheme();
+  // A 320 px phone cannot fit the long hint; it keeps the words that matter.
+  const narrow = useWindowDimensions().width < 360;
   const params = useLocalSearchParams<{ meal?: string; date?: string }>();
   const todayDate = useToday();
   const date = parseDate(params.date, todayDate);
@@ -161,7 +163,7 @@ export default function FoodSearchScreen() {
       <Header title={`Add to ${MEAL_LABEL[meal].toLowerCase()}`} subtitle={formatDayLabel(date)} />
       <TextField
         testID="food-search-input"
-        placeholder="Search foods, brands, your foods"
+        placeholder={narrow ? 'Search foods and brands' : 'Search foods, brands, your foods'}
         value={query}
         onChangeText={setQuery}
         autoFocus
@@ -459,7 +461,9 @@ function ActionTile({ icon, label, onPress, testID }: { icon: React.ReactNode; l
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
-        padding: spacing.sm,
+        paddingVertical: spacing.sm,
+        // Narrow side padding, so "barcode" and "describe" fit whole in a quarter of a 320 px screen.
+        paddingHorizontal: spacing.xs,
       }}>
       {icon}
       <Text variant="label" align="center" numberOfLines={2} style={{ fontSize: 12.5, lineHeight: 16 }}>

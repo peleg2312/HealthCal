@@ -6,7 +6,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createHealthSync, type SyncDeps } from './engine';
 import { createFakeAdapter, FULL_ACCESS, type FakeHealth } from './fake';
-import { CTX, GARMIN, handLogged, memoryDiary, memoryState, SAMSUNG, TYPE, workout, type MemoryDiary } from './testing';
+import { CTX, GARMIN, handLogged, memoryDiary, memoryState, restingKcal, SAMSUNG, totalFromActive, TYPE, workout, type MemoryDiary } from './testing';
+
+/** The net figure of the morning run (552 kcal in total over 45 min). */
+const RUN_NET = expect.closeTo(552 - restingKcal(45), 0);
 import { HealthError, NO_ACCESS, type HealthWorkout } from './types';
 
 const NOON = Date.parse('2026-11-14T12:00:00Z');
@@ -272,7 +275,7 @@ describe('health sync', () => {
       r.clock.now += 16 * MIN;
       expect(await r.sync.sync('auto')).toEqual({ status: 'done', added: 0, updated: 1, review: 0 });
       expect(r.diary.live()).toHaveLength(1);
-      expect(r.diary.live()[0]).toMatchObject({ id: estimate.id, kcalNet: 480, kcalGross: 552, measured: true, distanceKm: 8.2 });
+      expect(r.diary.live()[0]).toMatchObject({ id: estimate.id, kcalNet: RUN_NET, kcalGross: 552, measured: true, distanceKm: 8.2 });
       expect(r.toasts[1].message).toBe('1 workout updated from Garmin Connect');
 
       r.toasts[1].undo();
@@ -305,7 +308,7 @@ describe('health sync', () => {
       const id = r.state.get().review[0].id;
       expect(r.sync.replaceItem(id)).toBe(true);
       expect(r.diary.live()).toHaveLength(1);
-      expect(r.diary.live()[0]).toMatchObject({ id, source: 'health', kcalNet: 480, notes: 'easy pace' });
+      expect(r.diary.live()[0]).toMatchObject({ id, source: 'health', kcalNet: RUN_NET, notes: 'easy pace' });
       expect(r.state.get().review).toEqual([]);
       expect(r.toasts[0].message).toBe('Replaced your hand-logged running');
 
@@ -366,7 +369,7 @@ describe('health sync', () => {
       expect(item).toMatchObject({ kind: 'activity', entry: null });
 
       expect(r.sync.chooseActivity(item.id, 'bouldering')).toBe(true);
-      expect(r.diary.live()).toMatchObject([{ activityId: 'bouldering', kcalNet: 500, measured: true, notes: 'Climbing gym' }]);
+      expect(r.diary.live()).toMatchObject([{ activityId: 'bouldering', kcalNet: expect.closeTo(totalFromActive(500, 90) - restingKcal(90), 0), measured: true, notes: 'Climbing gym' }]);
       expect(r.state.get().review).toEqual([]);
       expect(r.toasts[0].message).toBe('1 workout added from Garmin Connect');
 
@@ -410,7 +413,7 @@ describe('health sync', () => {
       r.health.workouts.push(morningRun());
       r.clock.now += 16 * MIN;
       expect(await r.sync.sync('auto')).toEqual({ status: 'done', added: 0, updated: 1, review: 0 });
-      expect(r.diary.live()).toMatchObject([{ kcalNet: 480, measured: true }]);
+      expect(r.diary.live()).toMatchObject([{ kcalNet: RUN_NET, measured: true }]);
       expect(r.diary.live()[0].id).not.toBe(phoneId);
       expect(r.toasts[1].message).toBe('1 workout updated from Garmin Connect');
 

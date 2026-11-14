@@ -9,12 +9,13 @@ import { useToday } from '@/store/clock';
 import type { DaySummary } from '@/store/selectors';
 import { cup, fonts, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
-import { AnimatedItem, AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, Hatch, IconButton, ListRow, PressableScale, ProgressBar, Sheet, Text, TextField, Trough } from '@/ui';
+import { AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, Hatch, IconButton, ListRow, PressableScale, ProgressBar, Sheet, Text, TextField, Trough } from '@/ui';
 
 import { clearEntries, copyEntries, saveMeal } from './actions';
 import { DayStepper, KcalTrail, MealPicker, RowEmoji, sourceKeyVariant } from './components';
 import { dayPhrase, href, kcal, portionLabel, sourceInfo } from './helpers';
 import { deleteEntry } from './log';
+import { FadeRow, useLeavingRows } from './rowMotion';
 
 /**
  * The diary summary: calories left as a big number, the day as a trough
@@ -25,6 +26,9 @@ export function DaySummaryCard({ day }: { day: DaySummary }) {
   const { colors, spacing } = useTheme();
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
+  // On a phone "eaten of" always sits under the big number. Wrapping only when the number grew
+  // a digit would make the whole page jump by a line as a log or a delete ticks it past 999.
+  const stacked = screenW < 480;
   const over = day.remaining < 0;
   const budget = Math.max(0, day.budget);
   // Calories added by exercise, drawn as hatched headroom at the right end.
@@ -32,7 +36,7 @@ export function DaySummaryCard({ day }: { day: DaySummary }) {
   const notAdded = headroom === 0 && day.exerciseNet > 0;
   return (
     <Card testID="diary-summary" padding={18}>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md, flexWrap: 'wrap' }}>
+      <View style={stacked ? { gap: 2 } : { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
           <AnimatedNumber
             variant="numXL"
@@ -46,7 +50,7 @@ export function DaySummaryCard({ day }: { day: DaySummary }) {
           />
           <Text variant="unit" style={{ fontSize: 15 }}>{over ? 'kcal over' : 'kcal left'}</Text>
         </View>
-        <Text variant="caption" color="textSecondary" style={{ paddingBottom: 4 }}>
+        <Text variant="caption" color="textSecondary" style={{ paddingBottom: stacked ? 0 : 4 }}>
           <AnimatedNumber variant="numM" style={{ fontSize: 16, lineHeight: 20 }} testID="diary-eaten" value={day.eaten.kcal} format={kcal} />
           {' eaten of '}
           <Text variant="numM" style={{ fontSize: 16, lineHeight: 20 }}>
@@ -200,8 +204,10 @@ export function MealCard({
   const { colors, spacing, radius } = useTheme();
   const total = entriesTotal(entries).kcal;
   const add = () => router.push(href('/food/search', { meal, date }) as never);
+  // A removed row fades where it is before the rows below glide up into its place.
+  const rows = useLeavingRows(entries);
   return (
-    <Card testID={`meal-card-${meal}`} padding={0} style={{ paddingTop: 12, paddingBottom: entries.length ? 4 : previous ? 6 : ROW_PAD }}>
+    <Card testID={`meal-card-${meal}`} padding={0} style={{ paddingTop: 12, paddingBottom: rows.length ? 4 : previous ? 6 : ROW_PAD }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingLeft: ROW_PAD, paddingRight: 14 }}>
         <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'baseline', gap: 10 }}>
           <Text variant="h3" numberOfLines={1} style={{ flexShrink: 1 }}>
@@ -221,17 +227,17 @@ export function MealCard({
         </IconButton>
       </View>
       {/* Always mounted (keyed by the day), so a meal's first row slides in too; Undo brings a row back the same way. */}
-      <View style={{ marginTop: entries.length ? 6 : 0 }}>
+      <View style={{ marginTop: rows.length ? 6 : 0 }}>
         <AnimatedList key={date}>
-          {entries.map((e, i) => (
-            <AnimatedItem key={e.id}>
+          {rows.map(({ item: e, leaving }, i) => (
+            <FadeRow key={e.id} leaving={leaving}>
               {i > 0 ? <Divider inset={TEXT_INSET} /> : null}
               <EntryRow entry={e} />
-            </AnimatedItem>
+            </FadeRow>
           ))}
         </AnimatedList>
       </View>
-      {entries.length > 0 ? null : (
+      {rows.length > 0 ? null : (
         <View style={{ marginTop: spacing.sm, gap: spacing.xs, paddingHorizontal: ROW_PAD }}>
           <PressableScale
             testID={`meal-empty-${meal}`}

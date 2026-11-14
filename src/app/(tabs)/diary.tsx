@@ -113,16 +113,16 @@ export default function DiaryScreen() {
           onLayout={(e) => {
             mealY.current[m.id] = e.nativeEvent.layout.y;
           }}>
-        <MealCard
-          meal={m.id}
-          label={m.label}
-          emoji={m.emoji}
-          date={date}
-          entries={day.byMeal[m.id]}
-          previous={previousByMeal[m.id]}
-          onMenu={() => setMenuMeal(m.id)}
-          onRepeat={() => copyPreviousMeal(date, m.id)}
-        />
+          <MealCard
+            meal={m.id}
+            label={m.label}
+            emoji={m.emoji}
+            date={date}
+            entries={day.byMeal[m.id]}
+            previous={previousByMeal[m.id]}
+            onMenu={() => setMenuMeal(m.id)}
+            onRepeat={() => copyPreviousMeal(date, m.id)}
+          />
         </View>
       ))}
 

@@ -11,9 +11,9 @@ import { grossKcal, netKcal } from '@/lib/exercise';
 
 import { syncedFrom } from './origins';
 import { choiceKey, planSync, workoutKey } from './plan';
-import { CTX, handLogged, SAMSUNG, stored, STRAVA, TYPE, workout } from './testing';
+import { CTX, handLogged, restingKcal as resting, SAMSUNG, stored, STRAVA, TYPE, totalFromActive, workout } from './testing';
 
-const resting = (minutes: number) => (CTX.baselineKcalPerDay / 1440) * minutes;
+const near = (n: number) => expect.closeTo(n, 0);
 const plan = (workouts: Parameters<typeof planSync>[0]['workouts'], existing: Parameters<typeof planSync>[0]['existing'] = [], more: Partial<Parameters<typeof planSync>[0]> = {}) =>
   planSync({ workouts, existing, ctx: CTX, ...more });
 
@@ -95,8 +95,8 @@ describe('planSync', () => {
   describe('calories', () => {
     const run = (over: Partial<Parameters<typeof workout>[0]>) => plan([workout({ start: '2026-11-12T06:00:00Z', minutes: 45, ...over })]).add[0].entry;
 
-    it('active and total: net is the active figure, gross the total', () => {
-      expect(run({ activeKcal: 480, totalKcal: 552 })).toMatchObject({ kcalNet: 480, kcalGross: 552, measured: true });
+    it('active and total: gross is the total, net that minus the resting share (the figure a Garmin file gives)', () => {
+      expect(run({ activeKcal: 480, totalKcal: 552 })).toMatchObject({ kcalNet: near(552 - resting(45)), kcalGross: 552, measured: true });
     });
 
     it('only total: gross is the total, net is that minus the resting share, as for a Garmin file', () => {
@@ -106,10 +106,10 @@ describe('planSync', () => {
       expect(e.measured).toBe(true);
     });
 
-    it('only active: net is the active figure, gross adds the resting share', () => {
+    it('only active: gross is the device total rebuilt (active plus the resting rate), net that minus the resting share', () => {
       const e = run({ activeKcal: 480 });
-      expect(e.kcalNet).toBe(480);
-      expect(e.kcalGross).toBeCloseTo(480 + resting(45), 6);
+      expect(e.kcalGross).toBeCloseTo(totalFromActive(480, 45), 0);
+      expect(e.kcalNet).toBeCloseTo(totalFromActive(480, 45) - resting(45), 0);
       expect(e.measured).toBe(true);
     });
 
@@ -194,7 +194,7 @@ describe('planSync', () => {
       expect(p.review).toEqual([]);
       expect(p.replace).toHaveLength(1);
       expect(p.replace[0].remove.id).toBe(saved.id);
-      expect(p.replace[0].entry).toMatchObject({ kcalNet: 480, measured: true, notes: 'felt good' });
+      expect(p.replace[0].entry).toMatchObject({ kcalNet: near(552 - resting(45)), measured: true, notes: 'felt good' });
       expect(p.replace[0].entry.id).not.toBe(saved.id);
     });
 
@@ -228,7 +228,7 @@ describe('planSync', () => {
       expect(p.review).toHaveLength(1);
       expect(p.review[0]).toMatchObject({ kind: 'duplicate', matchId: hand.id, matchByHand: true, from: 'Garmin Connect' });
       expect(p.review[0].reason).toBe('You logged a 45 min running session by hand on this day. If it is the same workout, replace it with this one or skip this one.');
-      expect(p.review[0].entry).toMatchObject({ kcalNet: 430, source: 'health' });
+      expect(p.review[0].entry).toMatchObject({ kcalNet: near(500 - resting(46)), source: 'health' });
     });
 
     it('adds it when the hand-logged session is clearly something else', () => {
@@ -268,7 +268,7 @@ describe('planSync', () => {
       expect(p.add).toEqual([]);
       expect(p.update).toHaveLength(1);
       expect(p.update[0].before).toBe(saved);
-      expect(p.update[0].entry).toMatchObject({ id: saved.id, date: saved.date, source: 'health', externalId: saved.externalId, kcalNet: 430, kcalGross: 500, measured: true, distanceKm: 8, notes: 'with Sam' });
+      expect(p.update[0].entry).toMatchObject({ id: saved.id, date: saved.date, source: 'health', externalId: saved.externalId, kcalNet: near(500 - resting(46)), kcalGross: 500, measured: true, distanceKm: 8, notes: 'with Sam' });
     });
 
     it('leaves it alone when the person changed its length since', () => {
@@ -284,14 +284,14 @@ describe('planSync', () => {
       const trail = ACTIVITY_BY_ID.trail_running;
       const saved = stored({ ...plan([bare]).add[0].entry, activityId: trail.id, name: trail.name, category: trail.category });
       const p = plan([{ ...bare, activeKcal: 430 }], [saved]);
-      expect(p.update[0].entry).toMatchObject({ activityId: 'trail_running', kcalNet: 430 });
+      expect(p.update[0].entry).toMatchObject({ activityId: 'trail_running', kcalNet: near(totalFromActive(430, 46) - resting(46)) });
     });
 
     it('a workout imported from a Garmin file without calories gets them, and stays a Garmin import', () => {
       const gpxLike = stored({ ...plan([workout({ start: '2026-11-14T06:00:00Z', minutes: 46 })]).add[0].entry, source: 'garmin' });
       const p = plan([run()], [gpxLike]);
       expect(p.update).toHaveLength(1);
-      expect(p.update[0].entry).toMatchObject({ source: 'garmin', kcalNet: 430, measured: true });
+      expect(p.update[0].entry).toMatchObject({ source: 'garmin', kcalNet: near(500 - resting(46)), measured: true });
     });
 
     it('a stored reading with calories is not touched again', () => {
@@ -318,7 +318,7 @@ describe('planSync', () => {
       const w = workout({ start: '2026-11-12T06:00:00Z', minutes: 60, exerciseType: TYPE.paddling, activeKcal: 300 });
       const p = plan([w], [], { picks: { [workoutKey(w)]: 'kayaking' } });
       expect(p.review).toEqual([]);
-      expect(p.add[0].entry).toMatchObject({ activityId: 'kayaking', kcalNet: 300, measured: true });
+      expect(p.add[0].entry).toMatchObject({ activityId: 'kayaking', kcalNet: near(totalFromActive(300, 60) - resting(60)), measured: true });
     });
 
     it('remembers a choice for the same kind of workout, but not for a nameless "other workout"', () => {

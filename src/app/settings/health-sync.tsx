@@ -252,7 +252,19 @@ export default function HealthSyncScreen() {
           </Text>
         </View>
         <ListRow testID="health-sync-open-store" title={`Open ${store}`} subtitle="See or change what HealthCal may read" onPress={() => healthAdapter.openSettings()} />
-        <ListRow testID="health-sync-privacy" title="What happens to this data" subtitle="Privacy, in About" onPress={() => router.push('/settings/about')} />
+      </Group>
+
+      <Group title="What happens to this data">
+        <View style={{ paddingVertical: spacing.md, gap: spacing.sm }} testID="health-sync-privacy">
+          <Text variant="caption" color="textSecondary">
+            HealthCal reads workouts and, for each, its active and total calories and distance. Nothing is written back to {store}.
+          </Text>
+          <Text variant="caption" color="textSecondary">
+            A synced workout is kept like a session you log yourself: on this phone, and in your account if you have one, so your other devices show it. It is never sent to the
+            AI food analysis. Friends, if you share with any, see what they see for every workout: its name, length, distance and date, and your weekly minutes, sessions and
+            streak. Never its calories.
+          </Text>
+        </View>
       </Group>
 
       <PressableScale

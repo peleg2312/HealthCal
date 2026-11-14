@@ -244,6 +244,10 @@ describe('day card meal bands', () => {
     const clip = s.prims.find((p): p is Extract<Prim, { k: 'clip' }> => p.k === 'clip')!;
     const fills = clip.children.filter((p): p is Extract<Prim, { k: 'rect' }> => p.k === 'rect' && p.fill === darkColors.calories);
     expect(fills.map((f) => f.opacity)).toEqual(BAND_OPACITY);
+    // By meal, not by position: a day without dinner still draws snacks at 55%.
+    const noDinner = dayScene(dayCardContent(day({ mealKcal: { breakfast: 420, lunch: 610, dinner: 0, snack: 120 }, kcal: 1150 }), DEFAULT_SHARE_CHOICES), darkColors);
+    const clip2 = noDinner.prims.find((p): p is Extract<Prim, { k: 'clip' }> => p.k === 'clip')!;
+    expect(clip2.children.filter((p): p is Extract<Prim, { k: 'rect' }> => p.k === 'rect' && p.fill === darkColors.calories).map((f) => f.opacity)).toEqual([1, 0.85, 0.55]);
   });
 
   it('names every meal, whatever the day looks like', () => {

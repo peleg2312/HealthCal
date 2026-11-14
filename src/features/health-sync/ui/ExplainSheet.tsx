@@ -6,8 +6,8 @@ import { Button, CupKey, Sheet, Text } from '@/ui';
 
 const READS: { title: string; why: string }[] = [
   { title: 'Exercise', why: 'Your workouts: what kind, when they started and ended, and their name.' },
-  { title: 'Active calories burned', why: 'What a workout burned above resting. This is what is added to your day.' },
-  { title: 'Total calories burned', why: 'The workout\'s total, kept beside it so resting energy is never counted twice.' },
+  { title: 'Total calories burned', why: 'The workout\'s total. Only the part above your resting rate is added to your day, as for a session you log yourself.' },
+  { title: 'Active calories burned', why: 'What a workout burned above resting, used when an app records no total.' },
   { title: 'Distance', why: 'How far a run, ride or swim was.' },
 ];
 

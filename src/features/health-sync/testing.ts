@@ -19,7 +19,13 @@ export const STRAVA = 'com.strava';
 /** Health Connect exercise type numbers used in tests. */
 export const TYPE = { other: 0, cycling: 8, exerciseClass: 26, breathing: 33, paddling: 46, running: 56, walking: 79, yoga: 83, handball: 35 } as const;
 
-export const CTX = { weightKg: 78.8, baselineKcalPerDay: 2200 };
+/** A person's pricing: weight, the baseline the budget assumes, and the resting rate (BMR) a device's active figure is above. */
+export const CTX = { weightKg: 78.8, baselineKcalPerDay: 2200, bmrKcalPerDay: 1650 };
+
+/** What the budget already holds for these minutes (the resting share subtracted from every gross figure). */
+export const restingKcal = (minutes: number) => (CTX.baselineKcalPerDay / 1440) * minutes;
+/** A device's total for a workout it reported only an active figure for: active plus the resting rate. */
+export const totalFromActive = (active: number, minutes: number) => active + (CTX.bmrKcalPerDay / 1440) * minutes;
 
 let seq = 0;
 

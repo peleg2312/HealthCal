@@ -31,6 +31,8 @@ export interface ReviewView {
   detail: string;
   /** Everything above in one sentence, for screen readers. */
   spoken: string;
+  /** The workout in a few words for button labels: "running, yesterday 07:00". */
+  named: string;
 }
 
 const nbsp = (s: string) => s.replace(/ /g, ' ');
@@ -40,7 +42,9 @@ export function reviewView(item: ReviewItem, todayDate: ISODate, units: UnitSyst
   const span = workoutSpan(w);
   const offsetMin = typeof w.zoneOffsetSec === 'number' ? w.zoneOffsetSec / 60 : Number.NaN;
   const recorded = { startUtc: span?.startUtc ?? w.startTime, ...(plausibleOffsetMin(offsetMin) ? { utcOffsetMin: offsetMin } : null) };
-  const parts = [dayLabel(localDay(recorded), todayDate), clockTime(recorded, hour12), durationLabel(span?.durationSec ?? 0)];
+  const day = dayLabel(localDay(recorded), todayDate);
+  const time = clockTime(recorded, hour12);
+  const parts = [day, time, durationLabel(span?.durationSec ?? 0)];
   const dist = distanceLabel(item.entry?.distanceKm ? item.entry.distanceKm * 1000 : w.distanceM, units);
   if (dist) parts.push(dist);
   const meta = parts.map(nbsp).join(' · ');
@@ -73,7 +77,26 @@ export function reviewView(item: ReviewItem, todayDate: ISODate, units: UnitSyst
     detail = active !== null ? `${formatNumber(active)} kcal active` : total !== null ? `${formatNumber(total)} kcal in total` : 'No calories recorded';
     said = detail.replace('kcal', 'kilocalories');
   }
-  return { title, emoji: activity?.emoji ?? null, meta, source, added, estimate, detail, spoken: `${title}, ${meta.replace(/ /g, ' ')}, ${source}, ${said}` };
+  // "Yesterday" and "Today" are words in a sentence here; a date stays as it is written.
+  const dayWord = /^(today|yesterday)$/i.test(day) ? day.toLowerCase() : day;
+  const named = `${title.toLowerCase()}, ${dayWord} ${time}`.replace(/ /g, ' ');
+  return { title, emoji: activity?.emoji ?? null, meta, source, added, estimate, detail, spoken: `${title}, ${meta.replace(/ /g, ' ')}, ${source}, ${said}`, named };
+}
+
+/**
+ * What the controls on a "Needs a look" card say to a screen reader. Each names
+ * the workout, so the Skip of one card can be told from the Skip of the next.
+ */
+export function reviewLabels(item: Pick<ReviewItem, 'matchId' | 'matchByHand'>, v: Pick<ReviewView, 'named'>) {
+  const n = v.named;
+  return {
+    skip: `Skip ${n}`,
+    add: item.matchId ? `Keep both: add ${n}, as well` : `Add ${n}`,
+    replace: item.matchByHand ? `Replace my hand-logged session with ${n}` : `Replace the session I have with ${n}`,
+    choose: `Choose the activity for ${n}`,
+    /** The group that holds the likely activities (a chip's own label is its name). */
+    likely: `Likely activities for ${n}`,
+  };
 }
 
 /** "3 workouts, latest Nov 13". */

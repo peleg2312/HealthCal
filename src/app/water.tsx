@@ -13,11 +13,11 @@ import { useDay, useDays, useProfile } from '@/store/selectors';
 import { Figure, Note, RequireProfile, splitUnit, Tile } from '@/features/trackers/components';
 import { dayTitle, resolveDateParam } from '@/features/trackers/dateParam';
 import { keepOrConvert, MAX_PRESET_ML, MIN_PRESET_ML, normalizePresets } from '@/features/trackers/helpers';
+import { FadeRow, useLeavingRows } from '@/features/food/rowMotion';
 import { leftLitreDecimals, shownMl, volumeNumber, volumeUnitFor, waterLeftMl } from '@/features/today/volume';
 import { useTheme } from '@/theme';
 import type { Beverage, WaterEntry } from '@/types';
 import {
-  AnimatedItem,
   AnimatedList,
   AnimatedNumber,
   BarChart,
@@ -120,6 +120,8 @@ function WaterScreen() {
 
   const allEntries = [...day.waterEntries].reverse();
   const entries = showAllLog ? allEntries : allEntries.slice(0, 6);
+  // A removed drink fades where it is before the rows below glide up into its place.
+  const rows = useLeavingRows(entries);
   const goalParts = splitUnit(formatVolume(goal, units));
   const extraParts = splitUnit(formatVolume(Math.max(0, shownMl(consumed, units) - shownMl(goal, units)), units));
 
@@ -293,8 +295,8 @@ function WaterScreen() {
         action={allEntries.length > 6 ? (showAllLog ? 'Show less' : `Show all ${allEntries.length}`) : undefined}
         onAction={() => setShowAllLog((v) => !v)}
       />
-      <Card padding={entries.length ? spacing.md : spacing.lg}>
-        {entries.length === 0 ? (
+      <Card padding={rows.length ? spacing.md : spacing.lg}>
+        {rows.length === 0 ? (
           <EmptyState
             emoji="💧"
             title={isToday ? 'Nothing logged yet' : `Nothing logged for ${dayName}`}
@@ -302,10 +304,10 @@ function WaterScreen() {
           />
         ) : (
           <AnimatedList key={date}>
-          {entries.map((e, i) => {
+          {rows.map(({ item: e, leaving }, i) => {
             const counts = Math.round(effectiveMl(e.ml, e.beverage));
             return (
-              <AnimatedItem key={e.id}>
+              <FadeRow key={e.id} leaving={leaving}>
                 {i > 0 ? <Divider inset={36} /> : null}
                 <View testID={`water-entry-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 6 }}>
                   <View style={{ width: 24, alignItems: 'center' }}>
@@ -329,7 +331,7 @@ function WaterScreen() {
                     <Trash2 size={18} color={colors.textSecondary} strokeWidth={1.9} />
                   </IconButton>
                 </View>
-              </AnimatedItem>
+              </FadeRow>
             );
           })}
           </AnimatedList>
@@ -348,7 +350,8 @@ function WaterScreen() {
           goalKind="reach"
           highlightIndex={bars.length - 1}
           openIndex={isToday ? bars.length - 1 : undefined}
-          formatValue={(n) => (units === 'imperial' ? `${Math.round(n)}` : n >= 1000 ? `${(n / 1000).toFixed(1)} L` : `${Math.round(n)}`)}
+          // Printed exactly as the hero prints the same amount ("1.23 L", "41"), with no unit for fl oz or ml.
+          formatValue={(n) => formatVolume(volumeToMl(n, units), units).replace(/ (fl oz|ml)$/, '')}
         />
       </Card>
 

@@ -65,8 +65,10 @@ export const EXPORT_SCALE = 3;
 
 const PAD = 28;
 const MEAL_LABEL = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snacks' } as const;
-/** The meal bands from breakfast up: the calorie colour at 100, 85, 70 and 55%. */
+/** The meal bands, breakfast to snacks: the calorie colour at 100, 85, 70 and 55%, by meal (so snacks always read the same). */
 export const BAND_OPACITY = [1, 0.85, 0.7, 0.55];
+const MEALS = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
+const bandOpacity = (meal: (typeof MEALS)[number]) => BAND_OPACITY[Math.max(0, MEALS.indexOf(meal))];
 /** A partly logged day in a week row: the recap's lighter fill. */
 export const PARTIAL_OPACITY = 0.45;
 /** Height of one meal label beside the cup. */
@@ -281,11 +283,11 @@ interface MealLabel {
 /** One label per meal band, bottom first, wanting the middle of its band. */
 function mealLabels(content: DayCardContent, cupTop: number, cupH: number): MealLabel[] {
   let prev = cupTop + cupH;
-  return content.cup.bands.map((b, i) => {
+  return content.cup.bands.map((b) => {
     const top = cupTop + cupH - Math.min(1, b.top) * cupH;
     const want = (top + prev) / 2 + 4;
     prev = top;
-    return { text: MEAL_LABEL[b.meal], kcal: b.kcal ? formatKcal(b.kcal) : null, opacity: BAND_OPACITY[Math.min(i, BAND_OPACITY.length - 1)], want };
+    return { text: MEAL_LABEL[b.meal], kcal: b.kcal ? formatKcal(b.kcal) : null, opacity: bandOpacity(b.meal), want };
   });
 }
 
@@ -334,7 +336,7 @@ export function dayScene(content: DayCardContent, c: CardColors): Scene {
 
   // The hero cup, filled in meal bands from breakfast up, each a step lighter, with a level line between them.
   const level = content.cup.level;
-  const bands = content.cup.bands.map((b, i) => ({ top: b.top, opacity: BAND_OPACITY[Math.min(i, BAND_OPACITY.length - 1)] }));
+  const bands = content.cup.bands.map((b) => ({ top: b.top, opacity: bandOpacity(b.meal) }));
   prims.push(
     ...cup(c, {
       x: PAD,

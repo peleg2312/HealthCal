@@ -9,7 +9,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
-import { formulaTdee } from '@/lib/energy';
+import { bmr, formulaTdee } from '@/lib/energy';
 import { useStore } from '@/store';
 import { toast } from '@/ui';
 
@@ -45,10 +45,11 @@ export const healthSync = createHealthSync({
   },
   diary: {
     all: () => Object.values(useStore.getState().activities),
-    // The same weight and baseline a hand-logged session is priced with (saveActivity).
+    // The same weight and baseline a hand-logged session is priced with (saveActivity), and the
+    // resting rate a device's active figure is measured above (energy.ts).
     context: () => {
       const profile = useStore.getState().profile;
-      return profile?.onboardedAt ? { weightKg: profile.weightKg, baselineKcalPerDay: formulaTdee(profile) } : null;
+      return profile?.onboardedAt ? { weightKg: profile.weightKg, baselineKcalPerDay: formulaTdee(profile), bmrKcalPerDay: bmr(profile).kcal } : null;
     },
     save: (entries) => {
       useStore.getState().upsertMany('activities', entries);

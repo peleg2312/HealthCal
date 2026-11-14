@@ -232,7 +232,8 @@ const sessionNoun = (name: string) => {
   return /\b(class|session|workout|training)$/.test(n) ? n : `${n} session`;
 };
 
-const isGarmin = (e: ActivityEntry) => e.source === 'garmin';
+/** A record with a device's own start time: a file import, or a workout synced from a health store (health-sync). */
+const isGarmin = (e: ActivityEntry) => e.source === 'garmin' || e.source === 'health';
 
 /**
  * Check each candidate against the others in the same import and against the

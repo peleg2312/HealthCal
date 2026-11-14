@@ -127,7 +127,7 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
       goBack(href('/food/search', { meal, date }));
       return;
     }
-    toast('Saved to my foods');
+    toast(`Saved ${food.name} to my foods`, { label: 'Undo', onPress: () => useStore.getState().remove('customFoods', food.id) });
     goBack('/food/search');
   };
 

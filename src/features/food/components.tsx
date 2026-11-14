@@ -209,7 +209,8 @@ export function FoodRow({
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>
         <RowEmoji emoji={food.emoji} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Text variant="bodyStrong" numberOfLines={1} style={{ fontFamily: fonts.semibold }}>
+          {/* Two lines, as in the diary: a long name ("Israeli salad (tomato, cucumber, onion, ...)") is read, not cut. */}
+          <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
             {food.name}
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

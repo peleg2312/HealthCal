@@ -19,18 +19,18 @@
  *   no matching activity     waits in "Needs a look" until the person says what it was
  */
 import { ACTIVITY_BY_ID } from '@/data/activities';
-import { garminExternalId, type ConvertContext } from '@/features/import/convert';
-import { candidateKey, chooseActivity, entriesToSave, prepareImport, type ImportCandidate } from '@/features/import/plan';
+import { garminExternalId, toActivityEntry } from '@/features/import/convert';
+import { asReplacement, candidateKey, chooseActivity, entriesToSave, prepareImport, type ImportCandidate } from '@/features/import/plan';
 import { sportKey } from '@/features/import/sports';
 import { isoSeconds } from '@/features/import/time';
 import type { ImportedWorkout } from '@/features/import/types';
 import type { ActivityEntry } from '@/types';
 
-import { finishEntry, recordIdFor, sportOf, toImportedWorkout, workoutSpan, type HealthEntry } from './convert';
+import { finishEntry, recordIdFor, sportOf, toImportedWorkout, workoutSpan, type HealthContext, type HealthEntry } from './convert';
 import { wholeMinutes, workoutEnergy } from './energy';
 import { HEALTH_CONNECT_TYPES } from './exerciseTypes';
 import { mergeOrigins } from './merge';
-import { originName } from './origins';
+import { originName, syncedFrom } from './origins';
 import type { HealthWorkout } from './types';
 
 /** What this phone already did with a workout, by record id. */
@@ -108,7 +108,7 @@ export interface PlanInput {
   workouts: HealthWorkout[];
   /** Every saved activity, soft-deleted ones included. */
   existing: ActivityEntry[];
-  ctx: ConvertContext;
+  ctx: HealthContext;
   handled?: Record<string, Handled>;
   /** Activities the person chose before for a kind of workout (see `choiceKey`). */
   choices?: Record<string, string>;
@@ -238,8 +238,9 @@ export function planSync(input: PlanInput): SyncPlan {
   for (const d of merged.dropped) {
     const stored = storedFor(d.workout);
     const span = workoutSpan(d.workout);
-    // Only a synced record still as it was read: the person has not changed its length.
-    if (!stored || stored.source !== 'health' || !span || stored.durationMin !== wholeMinutes(span.durationSec)) continue;
+    // Only a synced record still as it was read: the person has not changed its length,
+    // its effort or its activity (an edit that turned measured calories into an estimate).
+    if (!stored || stored.source !== 'health' || !span || stored.measured === false || stored.durationMin !== wholeMinutes(span.durationSec)) continue;
     outranked.set(d.keptInstead, [...(outranked.get(d.keptInstead) ?? []), stored]);
   }
 
@@ -268,14 +269,42 @@ export function planSync(input: PlanInput): SyncPlan {
   if (anchor && staged.some((r, i) => r !== rows[i])) rows = chooseActivity(staged, anchor.key, anchor.activityId as string, view, ctx);
 
   // 5. Decide each row; entriesToSave then yields what is saved by itself, each record once.
+  /**
+   * The other app's stored reading this row is the same workout as (the watch's
+   * reading of a run the phone's reading is saved for). The file pipeline
+   * matches the two as one workout, by start and length, whatever their
+   * statuses say: then this reading takes that one's place.
+   */
+  const twinOf = (row: ImportCandidate): ActivityEntry | null => {
+    const twins = outranked.get(byKey.get(row.key) as HealthWorkout) ?? [];
+    return (row.match && twins.find((t) => t.id === row.match?.id)) || null;
+  };
+  /** The stored record came from another app than this reading. */
+  const otherApp = (stored: ActivityEntry, row: ImportCandidate) => {
+    const w = byKey.get(row.key) as HealthWorkout;
+    return stored.source === 'health' && syncedFrom(stored) !== originName(w.origin, w.originName);
+  };
   const decide = (row: ImportCandidate): Decision => {
-    if (row.status === 'duplicate-in-file' || row.status === 'already-imported') return 'none';
-    const done = handled[recordIdFor(row.workout.startUtc)];
+    if (row.status === 'duplicate-in-file') return 'none';
+    const id = recordIdFor(row.workout.startUtc);
+    const done = handled[id];
     if (done?.how === 'skipped') return 'none';
+    const twin = twinOf(row);
+    if (twin && row.entry && row.activityId) {
+      // Same start second: one record, which now carries this reading. Else this
+      // reading is saved under its own id (a Garmin file's id) and the other goes,
+      // unless this one was saved here before and deleted since.
+      if (twin.id === id) return 'update';
+      return done ? 'none' : 'replace';
+    }
+    if (row.status === 'already-imported') return 'none';
     if (row.status === 'update') {
       const stored = row.match ? real.get(row.match.id) : undefined;
-      // Only a record that is still as it was read: there, and of the same length (the person has not edited it).
-      if (!stored || stored.deleted || !row.entry || stored.durationMin !== row.entry.durationMin) return 'none';
+      if (!stored || stored.deleted || !row.entry) return 'none';
+      // The file import's own rule: an update that would undo the person's change
+      // (length, effort or activity) is not made by itself. When the changed record
+      // is another app's reading of this workout, the person is asked (replace or skip).
+      if (row.edited) return otherApp(stored, row) && stored.id !== id ? 'ask-duplicate' : 'none';
       return 'update';
     }
     // Saved here before and gone since: the person deleted it.
@@ -291,7 +320,18 @@ export function planSync(input: PlanInput): SyncPlan {
   rows = rows.map((row) => {
     const d = decide(row);
     decisions.set(row.key, d);
-    return { ...row, selected: (d === 'add' || d === 'update' || d === 'replace') && row.entry !== null };
+    const twin = d === 'update' || d === 'replace' ? twinOf(row) : null;
+    let entry = row.entry;
+    const activity = row.activityId ? ACTIVITY_BY_ID[row.activityId] : undefined;
+    if (twin && activity) {
+      // This reading's own entry: the pipeline built it as a repeat of the twin (or not at all).
+      const fresh = toActivityEntry(row.workout, activity, ctx);
+      entry = d === 'replace' ? fresh : asReplacement(twin, fresh, row.workout);
+    } else if (d === 'ask-duplicate' && row.status === 'update' && activity) {
+      // Asked about beside another app's reading the person changed: "Replace" saves it under its own id.
+      entry = toActivityEntry(row.workout, activity, ctx);
+    }
+    return { ...row, entry, selected: (d === 'add' || d === 'update' || d === 'replace') && entry !== null };
   });
   const rowOf = new Map(rows.filter((r) => r.entry !== null).map((r) => [r.entry, r]));
 

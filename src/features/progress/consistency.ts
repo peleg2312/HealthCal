@@ -54,6 +54,9 @@ export interface CalendarCell {
   logged: boolean;
   /** Eaten / that day's own budget (0 when not logged): how full its cup is. */
   ratio: number;
+  /** kcal eaten and that day's budget (0 when not logged), for the day's words. */
+  kcal: number;
+  budget: number;
   /** Logged, closed and not fully logged: the lighter fill. */
   partial: boolean;
   /** Fully logged and within 10% of that day's budget: the check. */
@@ -107,6 +110,8 @@ export function monthGrid(month: string, byDate: ReadonlyMap<ISODate, CalendarDa
       isToday: date === today,
       logged,
       ratio: logged && d && d.budget > 0 ? d.kcal / d.budget : 0,
+      kcal: logged && d ? d.kcal : 0,
+      budget: logged && d ? d.budget : 0,
       partial: logged && !!d && !d.complete && date !== today,
       onBudget: logged && !!d && d.complete && inBudgetBand(d.kcal, d.budget),
       waterMet: !future && !!d?.waterMet,

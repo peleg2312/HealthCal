@@ -1,12 +1,12 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
-import React, { useEffect, useRef, useState } from 'react';
-import { ScrollView, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Platform, ScrollView, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 
 import { diffDays, formatDayLabel, fromISODate, startOfWeek } from '@/lib/dates';
 import { useDays } from '@/store/selectors';
 import { cup, fonts, useTheme } from '@/theme';
 import type { ISODate } from '@/types';
-import { IconButton, MiniCup, PressableScale, Text } from '@/ui';
+import { FadeUp, IconButton, MiniCup, PressableScale, Text, useReducedMotion } from '@/ui';
 
 import { dayRing, weekCaption, weekDates } from './week';
 
@@ -29,6 +29,7 @@ export function DayRingStrip({
   testIDPrefix = 'today',
   accessory,
   start,
+  note,
 }: {
   today: ISODate;
   selected: ISODate;
@@ -39,6 +40,11 @@ export function DayRingStrip({
   accessory?: React.ReactNode;
   /** The day the profile was made: earlier days with nothing logged are drawn as a dot and cannot be picked. */
   start?: ISODate;
+  /**
+   * A line said in the caption's place while the current week is shown (Today's streak line), so
+   * it never pushes the page down. It fades in after `delay` ms (at once under reduced motion).
+   */
+  note?: { text: string; delay: number; testID?: string } | null;
 }) {
   const { colors, spacing } = useTheme();
   const ref = useRef<React.ComponentRef<typeof ScrollView>>(null);
@@ -62,13 +68,17 @@ export function DayRingStrip({
     setFollowed(selected);
     setBack(selectedBack);
   }
-  // The first placement jumps; later moves (a new selection) glide.
+  // The first placement jumps; later moves (a new selection) glide. It runs before the browser
+  // paints (web ignores contentOffset), so even a slow first paint shows the right week, never
+  // the oldest one, and the strip is never hidden while it waits.
   const placed = useRef(false);
-  // Hidden until the first jump (once the pages have their size), so a slow first paint never shows the oldest week (web ignores contentOffset).
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
+  // Where a scroll this component started is heading, so the scroll events on the way do not move `back`.
+  const heading = useRef<number | null>(null);
+  useLayoutEffect(() => {
     if (width <= 0) return;
-    ref.current?.scrollTo({ x: (maxBack - selectedBack) * width, animated: placed.current });
+    const x = (maxBack - selectedBack) * width;
+    heading.current = placed.current ? x : null;
+    ref.current?.scrollTo({ x, animated: placed.current });
     placed.current = true;
   }, [selected, selectedBack, width, maxBack]);
 
@@ -79,13 +89,41 @@ export function DayRingStrip({
   const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (width <= 0) return;
     const page = Math.round(e.nativeEvent.contentOffset.x / width);
+    heading.current = null;
     setBack(Math.min(maxBack, Math.max(0, maxBack - page)));
+  };
+  // Web has no scroll-end events: whenever the strip comes to rest on a page (a swipe, a trackpad,
+  // focus scrolling a day into view) the caption and arrows follow the week that is shown.
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (width <= 0) return;
+    const x = e.nativeEvent.contentOffset.x;
+    const page = Math.round(x / width);
+    if (Math.abs(x - page * width) > 1) return;
+    if (heading.current !== null) {
+      if (Math.abs(x - heading.current) > 1) return;
+      heading.current = null;
+    }
+    const b = Math.min(maxBack, Math.max(0, maxBack - page));
+    if (b !== back) setBack(b);
   };
   const page = (b: number) => {
     const next = Math.min(maxBack, Math.max(0, b));
     setBack(next);
+    heading.current = (maxBack - next) * width;
     scrollTo(next, true);
   };
+
+  // The note takes the caption's place once its delay has passed; it shows only on the current week.
+  const reduce = useReducedMotion();
+  const [noteShown, setNoteShown] = useState<string | null>(null);
+  const noteText = note?.text ?? null;
+  const noteDelay = note?.delay ?? 0;
+  useEffect(() => {
+    if (!noteText) return;
+    const timer = setTimeout(() => setNoteShown(noteText), reduce ? 0 : noteDelay);
+    return () => clearTimeout(timer);
+  }, [noteText, noteDelay, reduce]);
+  const showNote = noteText !== null && noteShown === noteText && back === 0;
 
   const shownWeek = weekDates(today, back)
     .map((d) => byDate.get(d))
@@ -102,16 +140,20 @@ export function DayRingStrip({
             showsHorizontalScrollIndicator={false}
             onMomentumScrollEnd={onScrollEnd}
             onScrollEndDrag={onScrollEnd}
+            onScroll={onScroll}
             contentOffset={{ x: (maxBack - back) * width, y: 0 }}
-            style={{ opacity: ready ? 1 : 0 }}
-            onContentSizeChange={() => {
-              if (ready) return;
-              ref.current?.scrollTo({ x: (maxBack - selectedBack) * width, animated: false });
-              setReady(true);
-            }}
+            // Native: the content can be laid out after the first placement; place it again, without a frame of the oldest week.
+            onContentSizeChange={Platform.OS === 'web' ? undefined : () => ref.current?.scrollTo({ x: (maxBack - back) * width, animated: false })}
             scrollEventThrottle={16}>
             {Array.from({ length: maxBack + 1 }, (_, i) => maxBack - i).map((b) => (
-              <View key={b} style={{ width, flexDirection: 'row', paddingTop: 2 }} accessibilityRole="tablist">
+              <View
+                key={b}
+                style={{ width, flexDirection: 'row', paddingTop: 2 }}
+                accessibilityRole="tablist"
+                // Only the week on screen is in the tab order and read out; the arrows page to the others.
+                accessibilityElementsHidden={b !== back}
+                importantForAccessibility={b !== back ? 'no-hide-descendants' : 'auto'}
+                {...(Platform.OS === 'web' && b !== back ? ({ 'aria-hidden': true } as object) : null)}>
                 {weekDates(today, b).map((d, i) => {
                   const summary = byDate.get(d);
                   const ring = summary ? dayRing(summary, today, start) : { date: d, state: 'future' as const, progress: 0, close: false };
@@ -130,6 +172,9 @@ export function DayRingStrip({
                   return (
                     <PressableScale
                       key={d}
+                      // Only the week on screen takes keyboard focus (react-native-web reads tabIndex).
+                      focusable={b === back}
+                      tabIndex={b === back && !future && !before ? 0 : -1}
                       testID={`${testIDPrefix}-day-${d}`}
                       feedback="select"
                       scaleTo={0.94}
@@ -182,10 +227,19 @@ export function DayRingStrip({
           <View style={{ height: 96 }} />
         )}
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-        <Text variant="caption" color="textSecondary" style={{ flex: 1 }} numberOfLines={2} testID={`${testIDPrefix}-week-caption`}>
-          {weekCaption(shownWeek, today, start)}
-        </Text>
+      {/* With a note slot, two caption lines' height is kept, so a note that wraps moves nothing. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: note !== undefined ? 34 : undefined }}>
+        {showNote ? (
+          <FadeUp key={noteText} style={{ flex: 1 }}>
+            <Text variant="caption" color="text" numberOfLines={2} testID={note?.testID} accessibilityLiveRegion="polite">
+              {noteText}
+            </Text>
+          </FadeUp>
+        ) : (
+          <Text variant="caption" color="textSecondary" style={{ flex: 1 }} numberOfLines={2} testID={`${testIDPrefix}-week-caption`}>
+            {weekCaption(shownWeek, today, start)}
+          </Text>
+        )}
         {accessory}
         <IconButton
           testID={`${testIDPrefix}-week-prev`}

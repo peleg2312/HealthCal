@@ -27,7 +27,7 @@ import { useNow, useToday } from '@/store/clock';
 import { useConsistency, useDay, useLive, useProfile, type DaySummary } from '@/store/selectors';
 import { cupFor, motion, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
-import { AnimatedNumber, Button, FadeUp, Card, Chip, CupKey, IconButton, PressableScale, ProgressBar, Screen, Text, Vessel, type VesselLabel } from '@/ui';
+import { AnimatedNumber, Button, Card, Chip, CupKey, IconButton, PressableScale, ProgressBar, Screen, Text, Vessel, type VesselLabel } from '@/ui';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const longDay = (date: ISODate) => `${WEEKDAYS[fromISODate(date).getDay()]}, ${formatShortDate(date)}`;
@@ -85,14 +85,10 @@ export default function TodayScreen() {
           onSelect={(d) => setPicked(d === todayDate ? null : d)}
           start={start}
           accessory={streak.streak > 1 ? <StreakMark days={streak.streak} filled={streak.filled} /> : null}
+          // Said in the caption's place once the streak cup has poured and its number ticked up, so
+          // logging never pushes the page down and the line never runs ahead of the count.
+          note={isToday && streak.line ? { text: streak.line, delay: AFTER_STRIP_MS + motion.duration.pourSmall, testID: 'today-streak-line' } : null}
         />
-        {isToday && streak.line ? (
-          <FadeUp delay={AFTER_STRIP_MS}>
-            <Text variant="caption" color="text" testID="today-streak-line">
-              {streak.line}
-            </Text>
-          </FadeUp>
-        ) : null}
       </View>
 
       <EnergyCard day={day} isToday={isToday} firstDay={firstDay} meal={mealForTime(now)} onFits={() => setFits({ proteinFirst: false })} />
@@ -393,7 +389,7 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
         testID="today-coach-water"
         icon={<Droplets size={15} color={colors.water} strokeWidth={2.2} />}
         label={`Add ${formatVolume(glass, profile.units)}`}
-        onPress={() => addWater(day.date, glass, profile.units)}
+        onPress={() => addWater(day.date, glass, profile.units, day.waterGoalMl)}
       />,
     );
   }

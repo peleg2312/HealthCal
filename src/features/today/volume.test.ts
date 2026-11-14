@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { formatVolume } from '@/lib/units';
 
-import { formatWaterLeft, shownMl, volumeNumber, volumeUnitFor, waterLeftMl } from './volume';
+import { crossesGoal, formatWaterLeft, shownMl, volumeNumber, volumeUnitFor, waterLeftMl } from './volume';
 
 describe('water left adds up to the goal shown', () => {
   it('metric: 1.23 L drunk and 2.07 L left make the 3.3 L goal', () => {
@@ -49,5 +49,15 @@ describe('volumeNumber', () => {
     expect(volumeUnitFor(1230, 'metric')).toBe('L');
     expect(volumeUnitFor(250, 'metric')).toBe('ml');
     expect(volumeUnitFor(250, 'imperial')).toBe('fl oz');
+  });
+});
+
+describe('crossesGoal', () => {
+  it('is true only for the glass that reaches the goal', () => {
+    expect(crossesGoal(3130, 250, 3300)).toBe(true);
+    expect(crossesGoal(3050, 250, 3300)).toBe(true);
+    expect(crossesGoal(3000, 250, 3300)).toBe(false);
+    expect(crossesGoal(3300, 250, 3300)).toBe(false);
+    expect(crossesGoal(0, 250, 0)).toBe(false);
   });
 });

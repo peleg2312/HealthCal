@@ -11,13 +11,13 @@ import { formatVolume, weightUnit, weightValue } from '@/lib/units';
 import { useFriends } from '@/services/friends';
 import { useStore } from '@/store';
 import { useNow } from '@/store/clock';
-import { useLive, useProfile, useWeightSeries, type DaySummary } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { live, useLive, useProfile, useWeightSeries, type DaySummary } from '@/store/selectors';
+import { isReducedMotion, motion, useTheme } from '@/theme';
 import type { ISODate } from '@/types';
 import { AnimatedNumber, Button, Card, CupKey, haptic, PressableScale, ProgressBar, Text, toast } from '@/ui';
 
 import { cheersLabel, recentCheerCount } from './cheers';
-import { volumeNumber, volumeUnitFor } from './volume';
+import { crossesGoal, volumeNumber, volumeUnitFor } from './volume';
 import { weightCell } from './weightCell';
 
 /** "1.23 L" -> ["1.23", "L"], "84 fl oz" -> ["84", "fl oz"]. */
@@ -32,15 +32,33 @@ export function defaultGlass(presets: number[]): number {
   return sorted[1] ?? sorted[0] ?? 250;
 }
 
-/** One glass, with Undo. Reaching the goal is marked by the bar itself (its `onReached` adds the success haptic). */
-export function addWater(date: ISODate, ml: number, units: 'metric' | 'imperial') {
+/**
+ * How long the toast waits when a glass reaches the goal: the bar's pour, its brim flash and the
+ * settle, so the toast (which rests over the foot of Today's first screen, where the water bar
+ * often is) never covers the moment. The glass itself is stored at once.
+ */
+const REACHED_TOAST_WAIT = motion.duration.pourSmall + motion.duration.fade + motion.duration.settle;
+
+/**
+ * One glass, with Undo. Reaching the goal is marked by the bar itself (its `onReached` adds the
+ * success haptic). Pass the day's goal so the glass that reaches it says so in its toast, after
+ * the bar's flash.
+ */
+export function addWater(date: ISODate, ml: number, units: 'metric' | 'imperial', goalMl?: number) {
+  const before = live(useStore.getState().water)
+    .filter((w) => w.date === date)
+    .reduce((sum, w) => sum + w.ml, 0);
   const entry = useStore.getState().upsert('water', { date, ml, beverage: 'water', loggedAt: nowISO() });
   haptic.tap();
-  toast(`Added ${formatVolume(ml, units)} of water`, {
-    label: 'Undo',
-    tint: 'water',
-    onPress: () => useStore.getState().remove('water', entry.id),
-  });
+  const reaches = goalMl !== undefined && crossesGoal(before, ml, goalMl);
+  const show = () =>
+    toast(reaches ? `Added ${formatVolume(ml, units)}. Water goal reached` : `Added ${formatVolume(ml, units)} of water`, {
+      label: 'Undo',
+      tint: 'water',
+      onPress: () => useStore.getState().remove('water', entry.id),
+    });
+  if (reaches && !isReducedMotion()) setTimeout(show, REACHED_TOAST_WAIT);
+  else show();
 }
 
 /**
@@ -126,7 +144,7 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
             size="sm"
             full={false}
             icon={<Plus size={16} color={quiet ? colors.text : colors.water} strokeWidth={2.6} />}
-            onPress={() => addWater(day.date, glass, units)}
+            onPress={() => addWater(day.date, glass, units, day.waterGoalMl)}
           />
         </View>
         <ProgressBar

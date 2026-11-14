@@ -8,7 +8,7 @@ import { Button, Card, Chip, CupKey, Text } from '@/ui';
 
 import type { ReviewItem } from '../plan';
 
-import { reviewView } from './format';
+import { reviewLabels, reviewView } from './format';
 
 /**
  * One workout in "Needs a look": what it is, where it came from, why it was
@@ -41,6 +41,7 @@ export function ReviewCard({
 }) {
   const { colors, spacing } = useTheme();
   const v = reviewView(item, todayDate, units, hour12);
+  const labels = reviewLabels(item, v);
   const asksActivity = item.kind === 'activity';
   const likely = item.alternatives.slice(0, 3).map((id) => ACTIVITY_BY_ID[id]).filter(Boolean);
   return (
@@ -84,7 +85,7 @@ export function ReviewCard({
       </Text>
 
       {asksActivity && likely.length ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+        <View role="group" aria-label={labels.likely} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
           {likely.map((a) => (
             <Chip key={a.id} testID={`health-review-pick-${a.id}-${item.id}`} label={a.name} onPress={() => onPick(item.id, a.id)} />
           ))}
@@ -96,7 +97,7 @@ export function ReviewCard({
           <Button
             testID={`health-review-choose-${item.id}`}
             title={likely.length ? 'Something else' : 'Choose activity'}
-            accessibilityLabel={`Choose the activity for this ${item.sportName.toLowerCase()}`}
+            accessibilityLabel={labels.choose}
             variant="secondary"
             size="sm"
             full={false}
@@ -108,7 +109,7 @@ export function ReviewCard({
               <Button
                 testID={`health-review-replace-${item.id}`}
                 title="Replace"
-                accessibilityLabel={item.matchByHand ? 'Replace my hand-logged session with this workout' : 'Replace the session I have with this workout'}
+                accessibilityLabel={labels.replace}
                 variant="secondary"
                 size="sm"
                 full={false}
@@ -118,7 +119,7 @@ export function ReviewCard({
             <Button
               testID={`health-review-add-${item.id}`}
               title={item.matchId ? 'Keep both' : 'Add'}
-              accessibilityLabel={item.matchId ? 'Keep both: add this workout as well' : 'Add this workout'}
+              accessibilityLabel={labels.add}
               variant={item.matchId ? 'ghost' : 'secondary'}
               size="sm"
               full={false}
@@ -126,7 +127,7 @@ export function ReviewCard({
             />
           </>
         )}
-        <Button testID={`health-review-skip-${item.id}`} title="Skip" accessibilityLabel="Skip this workout" variant="ghost" size="sm" full={false} onPress={() => onSkip(item.id)} />
+        <Button testID={`health-review-skip-${item.id}`} title="Skip" accessibilityLabel={labels.skip} variant="ghost" size="sm" full={false} onPress={() => onSkip(item.id)} />
       </View>
     </Card>
   );
