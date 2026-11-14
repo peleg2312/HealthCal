@@ -11,7 +11,7 @@ import { grossKcal, netKcal } from '@/lib/exercise';
 
 import { syncedFrom } from './origins';
 import { choiceKey, planSync, workoutKey } from './plan';
-import { CTX, GARMIN, handLogged, SAMSUNG, stored, STRAVA, TYPE, workout } from './testing';
+import { CTX, handLogged, SAMSUNG, stored, STRAVA, TYPE, workout } from './testing';
 
 const resting = (minutes: number) => (CTX.baselineKcalPerDay / 1440) * minutes;
 const plan = (workouts: Parameters<typeof planSync>[0]['workouts'], existing: Parameters<typeof planSync>[0]['existing'] = [], more: Partial<Parameters<typeof planSync>[0]> = {}) =>

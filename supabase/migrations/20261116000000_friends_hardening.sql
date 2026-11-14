@@ -3,9 +3,10 @@
 -- database that still has the first version of the friends migration.
 --
 -- 1. Bring an older friends schema up to date (share_key, declines and limits in
---    their own tables, one row per pair, references only in cheers). A database
---    that already holds two rows for one pair stops at the pair index in the
---    first friends migration; that cannot be mended from here.
+--    their own tables, one row per pair, references only in cheers), also when the
+--    first version of 20261115000000 is recorded as applied and is not run again:
+--    the functions that changed in it are repeated here, and two rows for one pair
+--    are merged before the pair index is made.
 -- 2. A request that overlaps "turn friends off" can no longer survive it.
 -- 3. A friend's summary is completed on the way in: a workout without a length or
 --    a real date is dropped, one without a name is "Workout".
@@ -64,10 +65,76 @@ begin
   end if;
 end $$;
 
+-- The first version could store two rows for one pair (two people entering each
+-- other's codes at once). Keep one: an accepted row if there is one; two requests
+-- that cross become a friendship, as friend_request now makes them, unless either
+-- person had declined the other, in which case the older request stays.
+with pairs as (
+  select least(requester, addressee) as a, greatest(requester, addressee) as b
+  from public.friendships group by 1, 2 having count(*) > 1
+),
+ranked as (
+  select f.requester, f.addressee, f.status,
+         row_number() over (partition by p.a, p.b order by (f.status = 'accepted') desc, f.created_at, f.requester) as n,
+         exists (select 1 from public.friend_declines d where (d.decliner = p.a and d.asker = p.b) or (d.decliner = p.b and d.asker = p.a)) as declined
+  from pairs p
+  join public.friendships f on least(f.requester, f.addressee) = p.a and greatest(f.requester, f.addressee) = p.b
+),
+kept as (
+  update public.friendships f set status = 'accepted', responded_at = coalesce(f.responded_at, now())
+  from ranked r
+  where r.n = 1 and r.status = 'pending' and not r.declined and f.requester = r.requester and f.addressee = r.addressee
+  returning f.requester
+)
+delete from public.friendships f
+using ranked r
+where r.n > 1 and f.requester = r.requester and f.addressee = r.addressee;
+
 create unique index if not exists friendships_pair_idx
   on public.friendships (least(requester, addressee), greatest(requester, addressee));
 
 -- ------------------------------------------------------------------ helpers
+
+-- These came with the second version of 20261115000000_friends.sql. A project that
+-- recorded the first version as applied does not run that file again, so they are
+-- repeated here (identical, create or replace).
+
+-- A workout as friends may know it: an opaque 32-hex reference, never a record id.
+create or replace function public.social_is_workout_ref(p text)
+returns boolean
+language sql
+immutable
+as $$
+  select coalesce(p ~ '^[0-9a-f]{32}$', false)
+$$;
+
+-- Requests and answers between two people run one at a time for that pair, so two
+-- people entering each other's codes at once become friends once (the second call
+-- sees the first one's request and accepts it).
+create or replace function public.social_lock_pair(p_a uuid, p_b uuid)
+returns void
+language sql
+volatile
+as $$
+  select pg_advisory_xact_lock(hashtextextended('friendship:' || least(p_a, p_b)::text || ':' || greatest(p_a, p_b)::text, 0))
+$$;
+
+-- The caller's limits row, locked, created on first use.
+create or replace function public.social_my_limits(p_user uuid)
+returns public.social_limits
+language plpgsql
+volatile
+set search_path = public
+as $$
+declare
+  v public.social_limits;
+begin
+  insert into public.social_limits (user_id) values (p_user) on conflict (user_id) do nothing;
+  select * into v from public.social_limits where user_id = p_user for update;
+  return v;
+end;
+$$;
+
 
 -- A real calendar date written as YYYY-MM-DD ('2031-02-30' and '9999-99-99' are not).
 create or replace function public.social_is_date(p text)
@@ -419,6 +486,141 @@ begin
   delete from public.cheers where from_user = me or to_user = me;
 end;
 $$;
+
+-- Also from the second version of the first friends migration, repeated for the same
+-- reason: refusing record ids, take-back that the receiver cannot undo, and the
+-- caller's share key and declines in the overview.
+
+-- Store the caller's week. Does nothing for someone who has not turned friends on.
+create or replace function public.social_publish(p_summary jsonb)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+begin
+  if me is null then
+    raise exception 'not authenticated';
+  end if;
+  if p_summary is null or jsonb_typeof(p_summary) <> 'object' or pg_column_size(p_summary) > 8192 then
+    raise exception 'summary is not valid' using errcode = '22023';
+  end if;
+  -- Every workout must carry an opaque reference. A summary with anything else (a
+  -- record id from an older app) is refused whole rather than published.
+  if jsonb_typeof(p_summary -> 'workouts') = 'array' and exists (
+    select 1 from jsonb_array_elements(p_summary -> 'workouts') e
+    where jsonb_typeof(e) = 'object' and not public.social_is_workout_ref(case when jsonb_typeof(e -> 'id') = 'string' then e ->> 'id' end)
+  ) then
+    raise exception 'summary is not valid: workouts need opaque references' using errcode = '22023';
+  end if;
+  update public.social_profiles
+    set summary = public.social_clean_summary(p_summary), summary_updated_at = now()
+    where user_id = me;
+  return found;
+end;
+$$;
+
+-- Stop being friends with someone, or take back a request the caller sent
+-- (whether or not it was declined: the sender sees the same either way).
+-- A request sent to the caller is answered with friend_respond, not removed here,
+-- so its sender never sees it disappear.
+create or replace function public.friend_remove(p_user uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+begin
+  if me is null then
+    raise exception 'not authenticated';
+  end if;
+  if p_user is null or p_user = me then
+    return;
+  end if;
+  perform public.social_lock_pair(me, p_user);
+  delete from public.friendships
+    where (requester = me and addressee = p_user)
+       or (requester = p_user and addressee = me and status = 'accepted');
+  delete from public.cheers
+    where (from_user = me and to_user = p_user) or (from_user = p_user and to_user = me);
+end;
+$$;
+
+-- Everything the Friends screen shows, in one call.
+create or replace function public.friends_overview()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+begin
+  if me is null then
+    raise exception 'not authenticated';
+  end if;
+  return jsonb_build_object(
+    'me', (
+      -- share_key is in the caller's own card only, never in anyone else's.
+      select jsonb_build_object('code', p.code, 'display_name', p.display_name, 'avatar', p.avatar, 'sharing', p.sharing, 'share_key', p.share_key)
+      from public.social_profiles p where p.user_id = me
+    ),
+    'friends', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'user_id', p.user_id,
+        'display_name', p.display_name,
+        'avatar', p.avatar,
+        'since', f.responded_at,
+        'summary', public.social_visible_summary(p.summary, p.sharing),
+        'summary_updated_at', p.summary_updated_at,
+        'cheered', coalesce((
+          select jsonb_agg(c.ref) from public.cheers c
+          where c.from_user = me and c.to_user = p.user_id and c.created_at > now() - interval '14 days'
+        ), '[]'::jsonb)
+      ) order by lower(p.display_name), p.user_id)
+      from public.friendships f
+      join public.social_profiles p on p.user_id = case when f.requester = me then f.addressee else f.requester end
+      where f.status = 'accepted' and (f.requester = me or f.addressee = me)
+    ), '[]'::jsonb),
+    'incoming', coalesce((
+      select jsonb_agg(jsonb_build_object('user_id', p.user_id, 'display_name', p.display_name, 'avatar', p.avatar, 'created_at', f.created_at) order by f.created_at desc)
+      from public.friendships f
+      join public.social_profiles p on p.user_id = f.requester
+      where f.addressee = me and f.status = 'pending'
+        and not exists (select 1 from public.friend_declines d where d.decliner = me and d.asker = f.requester)
+    ), '[]'::jsonb),
+    'outgoing', coalesce((
+      select jsonb_agg(jsonb_build_object('user_id', p.user_id, 'display_name', p.display_name, 'avatar', p.avatar, 'created_at', f.created_at) order by f.created_at desc)
+      from public.friendships f
+      join public.social_profiles p on p.user_id = f.addressee
+      -- Pending, whether or not it was declined: the sender cannot tell.
+      where f.requester = me and f.status = 'pending'
+    ), '[]'::jsonb),
+    'cheers', coalesce((
+      select jsonb_agg(jsonb_build_object('from_user', c.from_user, 'display_name', p.display_name, 'avatar', p.avatar, 'ref', c.ref, 'created_at', c.created_at) order by c.created_at desc)
+      from public.cheers c
+      join public.social_profiles p on p.user_id = c.from_user
+      where c.to_user = me and c.created_at > now() - interval '14 days' and public.social_are_friends(me, c.from_user)
+    ), '[]'::jsonb)
+  );
+end;
+$$;
+
+
+revoke all on function public.social_is_workout_ref(text) from public, anon;
+revoke all on function public.social_lock_pair(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.social_my_limits(uuid) from public, anon, authenticated;
+revoke all on function public.social_publish(jsonb) from public, anon;
+revoke all on function public.friend_remove(uuid) from public, anon;
+revoke all on function public.friends_overview() from public, anon;
+grant execute on function public.social_publish(jsonb) to authenticated;
+grant execute on function public.friend_remove(uuid) to authenticated;
+grant execute on function public.friends_overview() to authenticated;
 
 revoke all on function public.social_is_date(text) from public, anon;
 revoke all on function public.social_clean_summary(jsonb) from public, anon;

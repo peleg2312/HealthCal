@@ -208,7 +208,7 @@ export default function Welcome() {
             size="sm"
             testID="welcome-restore"
             loading={importing}
-            icon={<FileUp size={16} color={colors.primary} />}
+            icon={<FileUp size={16} color={colors.primaryInk} />}
             onPress={() => void restore()}
           />
         </FadeUp>
@@ -249,7 +249,7 @@ export default function Welcome() {
         <Note
           tone={importNote.tone}
           testID="welcome-restore-note"
-          icon={importNote.tone === 'warning' ? <TriangleAlert size={18} color={colors.warning} /> : <FileUp size={18} color={colors.textSecondary} />}>
+          icon={importNote.tone === 'warning' ? <TriangleAlert size={18} color={colors.warningInk} /> : <FileUp size={18} color={colors.textSecondary} />}>
           <Text variant="caption" color="textSecondary" accessibilityLiveRegion="polite">
             {importNote.text}
           </Text>

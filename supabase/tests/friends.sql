@@ -624,7 +624,10 @@ reset role;
 -- ------------------------------------- upgrading a database made with the first version
 -- A scratch database gets the first friends migration (tests/fixtures/friends_v1.sql),
 -- some use through its functions (a declined request, a cheer carrying a record id),
--- then the current migrations. Friends must then work for everyone.
+-- then the migrations that came after it. A project that already recorded
+-- 20261115000000 as applied skips it (scripts/ops/provision-supabase.mjs), so the
+-- hardening migration alone must bring it up to date, twice over harmlessly. The
+-- first version also let two people asking each other at once end up with two rows.
 \set main_db :DBNAME
 \c postgres
 drop database if exists friends_upgrade;
@@ -636,7 +639,17 @@ create database friends_upgrade;
 \ir ../migrations/20261114000000_collections_and_ai_quota.sql
 \ir fixtures/friends_v1.sql
 insert into auth.users (id) values
-  ('d1111111-1111-4111-8111-111111111111'), ('d2222222-2222-4222-8222-222222222222'), ('d3333333-3333-4333-8333-333333333333');
+  ('d1111111-1111-4111-8111-111111111111'), ('d2222222-2222-4222-8222-222222222222'), ('d3333333-3333-4333-8333-333333333333'),
+  ('d4444444-4444-4444-8444-444444444444'), ('d5555555-5555-4555-8555-555555555555'),
+  ('d6666666-6666-4666-8666-666666666666'), ('d7777777-7777-4777-8777-777777777777');
+insert into public.social_profiles (user_id, code, display_name)
+  select id, 'OLDCODE' || substr(id::text, 2, 1), 'Old ' || substr(id::text, 2, 1) from auth.users where id::text like 'd4%' or id::text like 'd5%' or id::text like 'd6%' or id::text like 'd7%';
+-- D4 and D5 asked each other at once; D6 accepted D7 while D7's own request to D6 was stored too.
+insert into public.friendships (requester, addressee, status, created_at) values
+  ('d4444444-4444-4444-8444-444444444444', 'd5555555-5555-4555-8555-555555555555', 'pending', now() - interval '2 minutes'),
+  ('d5555555-5555-4555-8555-555555555555', 'd4444444-4444-4444-8444-444444444444', 'pending', now() - interval '1 minute'),
+  ('d6666666-6666-4666-8666-666666666666', 'd7777777-7777-4777-8777-777777777777', 'accepted', now() - interval '2 minutes'),
+  ('d7777777-7777-4777-8777-777777777777', 'd6666666-6666-4666-8666-666666666666', 'pending', now() - interval '1 minute');
 set role authenticated;
 select set_config('request.jwt.claim.sub', 'd1111111-1111-4111-8111-111111111111', false);
 select public.social_setup('Old A', '', '{}') ->> 'code' as old_a \gset
@@ -652,7 +665,7 @@ select public.friend_respond('d3333333-3333-4333-8333-333333333333', true);
 select set_config('request.jwt.claim.sub', 'd3333333-3333-4333-8333-333333333333', false);
 select public.send_cheer('d1111111-1111-4111-8111-111111111111', '8b552e86-b4b0-5c91-a9b5-0267052a9b4f');
 reset role;
-\ir ../migrations/20261115000000_friends.sql
+\ir ../migrations/20261116000000_friends_hardening.sql
 \ir ../migrations/20261116000000_friends_hardening.sql
 \set QUIET off
 set role authenticated;
@@ -674,10 +687,31 @@ begin
   if jsonb_array_length(o -> 'outgoing') <> 1 then raise exception 'upgrade: B should still see the request as waiting: %', o; end if;
   perform set_config('request.jwt.claim.sub', 'd3333333-3333-4333-8333-333333333333', false);
   if public.send_cheer('d1111111-1111-4111-8111-111111111111', 'see you at 7') <> 'invalid' then raise exception 'upgrade: free text cheer'; end if;
+  -- A summary carrying record ids is refused, as in a new database.
+  begin
+    perform public.social_publish('{"workouts": [{"id": "8b552e86-b4b0-5c91-a9b5-0267052a9b4f", "name": "Running", "minutes": 30, "date": "2026-11-14"}]}'::jsonb);
+    raise exception 'upgrade: a summary with a record id was published';
+  exception when sqlstate '22023' then null;
+  end;
+  -- The person who declined cannot make the request vanish from the asker's list.
+  perform set_config('request.jwt.claim.sub', 'd1111111-1111-4111-8111-111111111111', false);
+  perform public.friend_remove('d2222222-2222-4222-8222-222222222222');
+  perform set_config('request.jwt.claim.sub', 'd2222222-2222-4222-8222-222222222222', false);
+  if jsonb_array_length(public.friends_overview() -> 'outgoing') <> 1 then raise exception 'upgrade: the receiver removed a request the sender sees as waiting'; end if;
+  -- Two people who had asked each other are friends once.
+  perform set_config('request.jwt.claim.sub', 'd4444444-4444-4444-8444-444444444444', false);
+  o := public.friends_overview();
+  if jsonb_array_length(o -> 'friends') <> 1 or jsonb_array_length(o -> 'incoming') <> 0 or jsonb_array_length(o -> 'outgoing') <> 0 then
+    raise exception 'upgrade: two requests between D4 and D5 should have become one friendship: %', o;
+  end if;
+  perform set_config('request.jwt.claim.sub', 'd7777777-7777-4777-8777-777777777777', false);
+  o := public.friends_overview();
+  if jsonb_array_length(o -> 'friends') <> 1 or jsonb_array_length(o -> 'outgoing') <> 0 then raise exception 'upgrade: D6 and D7 %', o; end if;
 end $$;
 reset role;
 do $$
 begin
+  if (select count(*) from public.friendships) <> 4 then raise exception 'upgrade: expected 4 rows, found %', (select count(*) from public.friendships); end if;
   if exists (select 1 from public.friendships where status not in ('pending', 'accepted')) then raise exception 'upgrade: old statuses remain'; end if;
   begin
     insert into public.friendships (requester, addressee, status) values ('d2222222-2222-4222-8222-222222222222', 'd1111111-1111-4111-8111-111111111111', 'declined');

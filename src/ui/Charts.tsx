@@ -54,6 +54,12 @@ export interface BarDatum {
   segments?: { value: number; color: string }[];
   /** Text for the scrub tooltip, e.g. 'Mon, Nov 3 · 1,980 kcal'. Defaults to label and value. */
   detail?: string;
+  /**
+   * This bar's own goal, when days have different ones (a calorie budget that changes with
+   * exercise). It replaces the chart's `goal` for this bar's amber part and reached state, so a
+   * day is never marked over against an average. The chart's `goal` still draws the dashed line.
+   */
+  goal?: number;
 }
 
 /** A shaded horizontal zone, such as a target range. */
@@ -188,15 +194,16 @@ export function BarChart({
   // the check mark and the highlighted value. Drawn per column so each column can pour.
   const barParts = (d: BarDatum, i: number) => {
     const v = Math.max(0, d.value);
+    const g = d.goal ?? goal;
     const h = Math.max(v > 0 ? 3 : 0, (Math.min(v, max) / max) * chartH);
     const x = i * slot + (slot - barW) / 2;
     // Bars dim only while scrubbing, to point at the one under the finger.
     const on = active === null || active === i;
-    const over = goalKind === 'limit' && !!goal && v > goal;
+    const over = goalKind === 'limit' && !!g && v > g;
     // A day that met a goal meant to be reached wears the brim line: its rim a little wider than the bar and 1 px heavier.
-    const reached = goalKind === 'reach' && !!goal && v >= goal;
+    const reached = goalKind === 'reach' && !!g && v >= g;
     const brim = reached ? (barW >= 10 ? 2 : 1) : 0;
-    const fillTo = over ? y(goal) : base - h;
+    const fillTo = over ? y(g) : base - h;
     const r = Math.min(3, barW / 3);
     const c = d.color ?? color;
     const open = openIndex === i;

@@ -46,7 +46,8 @@ export function reviewView(item: ReviewItem, todayDate: ISODate, units: UnitSyst
   const meta = parts.map(nbsp).join(' · ');
 
   const activity = item.entry ? ACTIVITY_BY_ID[item.entry.activityId] : undefined;
-  const title = activity?.name ?? item.sportName;
+  // While the activity is unknown, the name the origin app gave the workout says most ('Evening session').
+  const title = activity?.name ?? (w.title?.trim() || item.sportName);
   const source = `From ${item.from}`;
 
   let added: string | null = null;

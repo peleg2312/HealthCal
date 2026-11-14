@@ -142,12 +142,12 @@ export function useHealthStatus(): HealthStatus {
  * nothing can swap the adapter there.
  */
 if ((typeof __DEV__ !== 'undefined' && __DEV__) || process.env.EXPO_PUBLIC_E2E === '1') {
-  const useFake = (options: Partial<Omit<FakeHealth, 'calls'>> = {}): FakeHealth => {
+  const swapToFake = (options: Partial<Omit<FakeHealth, 'calls'>> = {}): FakeHealth => {
     const fake = createFakeAdapter(options);
     active = fake.adapter;
     return fake.health;
   };
   const g = globalThis as { __healthcalHealthSync?: unknown; __healthcalHealthDemo?: Partial<Omit<FakeHealth, 'calls'>> };
-  g.__healthcalHealthSync = { useFake, usePlatform: () => void (active = platformAdapter), state: useHealthSync, sync: healthSync };
-  if (g.__healthcalHealthDemo) useFake(g.__healthcalHealthDemo);
+  g.__healthcalHealthSync = { swapToFake, backToPlatform: () => void (active = platformAdapter), state: useHealthSync, sync: healthSync };
+  if (g.__healthcalHealthDemo) swapToFake(g.__healthcalHealthDemo);
 }

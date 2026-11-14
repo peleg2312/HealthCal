@@ -548,14 +548,14 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
         </View>
       </Card>
       {plan?.target.belowFloor ? (
-        <Note tone="warning" icon={<TriangleAlert size={18} color={colors.warning} />} testID="onb-floor-note">
+        <Note tone="warning" icon={<TriangleAlert size={18} color={colors.warningInk} />} testID="onb-floor-note">
           <Text variant="bodyStrong">{`Your plan stays at ${formatNumber(plan.floor)} kcal a day`}</Text>
           <Text variant="caption" color="textSecondary">
             {`You burn about ${formatNumber(plan.floor)} kcal on a normal day, already at or below the ${formatNumber(MIN_KCAL(draft))} kcal HealthCal recommends as a minimum, so no ${word} is planned from food. Logged workouts add room on top.`}
           </Text>
         </Note>
       ) : plan?.target.limitedByFloor ? (
-        <Note tone="warning" icon={<TriangleAlert size={18} color={colors.warning} />} testID="onb-floor-note">
+        <Note tone="warning" icon={<TriangleAlert size={18} color={colors.warningInk} />} testID="onb-floor-note">
           <Text variant="bodyStrong">{`Your plan stops at ${formatNumber(plan.floor)} kcal a day`}</Text>
           <Text variant="caption" color="textSecondary">
             {`A ${formatNumber(Math.round(requestedDelta / 10) * 10)} kcal deficit would take you below ${formatNumber(plan.floor)} kcal, the lowest HealthCal recommends. Expect about ${fmtRate(
