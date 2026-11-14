@@ -91,6 +91,8 @@ export interface Food {
   source: FoodSource;
   /** True for lab/label-sourced data, false for crowd-sourced entries. */
   verified: boolean;
+  /** The USDA FoodData Central record a bundled food's values were checked against. */
+  fdcId?: number;
   category?: string;
   /** Emoji shown in lists. */
   emoji?: string;
