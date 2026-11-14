@@ -39,8 +39,9 @@ const STEP_COMPONENTS: Record<Exclude<StepId, 'plan'>, (p: StepProps) => React.R
 const CHOICE_BEAT = 250;
 /**
  * After a step moved on by itself, a Continue tap this soon was aimed at the
- * screen that just left. It is dropped, so nobody gets an error for a question
- * they have not seen yet.
+ * screen that just left. If the new question has no answer yet the tap does
+ * nothing, so nobody is told off for a question they have not seen; if it
+ * already has one, the tap works as usual.
  */
 const STRAY_TAP = 450;
 
@@ -149,9 +150,10 @@ function Flow({ onFinished }: { onFinished: () => void }) {
     scrollRef.current?.scrollTo({ y: 0, animated: false });
   };
 
-  const tryNext = (): boolean => {
+  const tryNext = (quiet = false): boolean => {
     const { draft: d, list, at, id } = where();
     if (Object.keys(validateStep(id, d)).length > 0) {
+      if (quiet) return false;
       setShowErrors(true);
       haptic.warn();
       return false;
@@ -161,16 +163,12 @@ function Flow({ onFinished }: { onFinished: () => void }) {
   };
 
   const next = () => {
-    if (Date.now() - movedByItselfAt.current < STRAY_TAP) return;
-    tryNext();
+    tryNext(Date.now() - movedByItselfAt.current < STRAY_TAP);
   };
 
   /** A single-choice answer was tapped: let it be seen, then move on. Back, Continue and another tap all cancel the wait. */
   const advance = () => {
     if (beat.current) clearTimeout(beat.current);
-    beat.current = null;
-    // A second tap that lands on the next screen picks an answer there but does not skip that screen too.
-    if (Date.now() - movedByItselfAt.current < STRAY_TAP) return;
     const from = where().id;
     beat.current = setTimeout(() => {
       beat.current = null;

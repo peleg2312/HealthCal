@@ -35,17 +35,18 @@ function slopOf(hitSlop: PressableProps['hitSlop']): Slop | null {
 
 const hitRules = new Set<string>();
 
-/** Adds the CSS rule for one slop the first time it is used (web only). */
-function ensureHitRule(key: string, s: Slop) {
+/** Adds the CSS rule for one slop ('top-right-bottom-left' in px) the first time it is used (web only). */
+function ensureHitRule(key: string) {
   if (hitRules.has(key) || typeof document === 'undefined') return;
   hitRules.add(key);
+  const [top, right, bottom, left] = key.split('-');
   let el = document.getElementById('healthcal-hit-areas') as HTMLStyleElement | null;
   if (!el) {
     el = document.createElement('style');
     el.id = 'healthcal-hit-areas';
     document.head.appendChild(el);
   }
-  el.appendChild(document.createTextNode(`[data-hit="${key}"]::after{content:"";position:absolute;z-index:-1;top:-${s.top}px;right:-${s.right}px;bottom:-${s.bottom}px;left:-${s.left}px}`));
+  el.appendChild(document.createTextNode(`[data-hit="${key}"]::after{content:"";position:absolute;z-index:-1;top:-${top}px;right:-${right}px;bottom:-${bottom}px;left:-${left}px}`));
 }
 
 /** Web: the `data-hit` value that gives a control its slop as a real hit area. Undefined on native, where `hitSlop` works. */
@@ -59,9 +60,7 @@ function useWebHitArea(hitSlop: PressableProps['hitSlop'], style: StyleProp<View
   }
   const key = s ? `${s.top}-${s.right}-${s.bottom}-${s.left}` : undefined;
   useEffect(() => {
-    if (key && s) ensureHitRule(key, s);
-    // `key` is the slop itself, so it is the only dependency that matters.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (key) ensureHitRule(key);
   }, [key]);
   return key;
 }

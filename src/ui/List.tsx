@@ -89,18 +89,19 @@ export function Divider({ inset = 0 }: { inset?: number }) {
   return <View style={{ height: 1, backgroundColor: colors.border, marginLeft: inset }} />;
 }
 
-const SWITCH_W = 48;
-const SWITCH_H = 28;
-const KNOB = 20;
+// 40 wide, as the platform switch was on web, so a row's text keeps the room it had.
+const SWITCH_W = 40;
+const SWITCH_H = 24;
+const KNOB = 16;
 const KNOB_INSET = (SWITCH_H - KNOB) / 2;
 
 /**
  * The Pour switch, drawn the same on iOS, Android and web (no platform pill):
- * a small cup lying across (48 x 28, corners 5 5 9 9) with a square-ish knob
- * (20 x 20, corners 3 3 6 6). Off is an empty cup: a 1.5 px borderStrong edge
+ * a small cup lying across (40 x 24, corners 4 4 8 8) with a square-ish knob
+ * (16 x 16, corners 3 3 5 5). Off is an empty cup: a 1.5 px borderStrong edge
  * and a textTertiary knob on the left. On is a full one: the primary fill and
  * an onPrimary knob on the right. The knob slides (a transform), or jumps
- * under reduced motion. The touch target is 48 x 44.
+ * under reduced motion. The touch target is 44 x 44.
  */
 export function Toggle({
   value,
@@ -135,7 +136,7 @@ export function Toggle({
       disabled={disabled}
       feedback="select"
       scaleTo={1}
-      hitSlop={{ top: (44 - SWITCH_H) / 2, bottom: (44 - SWITCH_H) / 2 }}
+      hitSlop={{ top: (44 - SWITCH_H) / 2, bottom: (44 - SWITCH_H) / 2, left: (44 - SWITCH_W) / 2, right: (44 - SWITCH_W) / 2 }}
       accessibilityRole="switch"
       accessibilityState={{ checked: value, disabled: !!disabled }}
       aria-checked={value}
@@ -143,7 +144,7 @@ export function Toggle({
       style={{
         width: SWITCH_W,
         height: SWITCH_H,
-        ...cup(9, 5),
+        ...cup(8, 4),
         justifyContent: 'center',
         backgroundColor: value ? colors.primary : 'transparent',
         borderWidth: 1.5,
@@ -153,9 +154,9 @@ export function Toggle({
         style={{
           width: KNOB,
           height: KNOB,
-          // The border is inside the 48 x 28 box, so the knob's inset is measured from it.
+          // The border is inside the 40 x 24 box, so the knob's inset is measured from it.
           marginLeft: KNOB_INSET - 1.5,
-          ...cup(6, 3),
+          ...cup(5, 3),
           backgroundColor: value ? colors.onPrimary : colors.textTertiary,
           transform: [{ translateX: x.interpolate({ inputRange: [0, 1], outputRange: [0, SWITCH_W - KNOB - 2 * KNOB_INSET] }) }],
         }}

@@ -157,7 +157,8 @@ export function Vessel({
   const brimH = rimWidth + 1;
   const brimFrom = width / (width + 2 * out);
   // Only transforms and opacity animate: the fill is full height and slides up inside the clipped cup.
-  const fillStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - level.get()) * inner }] }));
+  // At level 0 it is hidden outright, so no hairline of colour shows at the base of an empty cup.
+  const fillStyle = useAnimatedStyle(() => ({ opacity: level.get() > 0.0005 ? 1 : 0, transform: [{ translateY: (1 - level.get()) * inner }] }));
   const rimStyle = useAnimatedStyle(() => ({ opacity: level.get() > 0.0005 ? 1 : 0, transform: [{ translateY: -settle.get() }] }));
   const headStyle = useAnimatedStyle(() => ({ opacity: headOpacity.get() }));
   const lipStyle = useAnimatedStyle(() => ({ opacity: lipOpacity.get() }));
@@ -394,7 +395,7 @@ export function Trough({
   const flash = useReachFlash(reached, { delay: pour.endsIn, instant: pour.instant, memoryKey, onReached });
   const { level, settle } = pour;
   // The fill is full width and slides in from the open left end; the tick rides on its edge.
-  const fillStyle = useAnimatedStyle(() => ({ transform: [{ translateX: -(1 - level.get()) * innerW }] }));
+  const fillStyle = useAnimatedStyle(() => ({ opacity: level.get() > 0.0005 ? 1 : 0, transform: [{ translateX: -(1 - level.get()) * innerW }] }));
   const tickStyle = useAnimatedStyle(() => ({ opacity: level.get() > 0.0005 ? 1 : 0, transform: [{ translateX: level.get() * innerW + settle.get() }] }));
   const headStyle = useAnimatedStyle(() => ({ opacity: headOpacity.get() }));
   const lipStyle = useAnimatedStyle(() => ({ opacity: lipOpacity.get() }));

@@ -11,11 +11,11 @@ export interface ButtonProps {
   onPress?: () => void;
   /**
    * primary: solid primary. secondary: transparent with a 1.5 px borderStrong edge.
-   * ghost: no edge, primary text. danger: danger text and edge, no fill.
-   * soft: primarySoft fill with primary text (a done state such as "Cheered").
+   * ghost: no edge, primaryInk text. danger: danger text and edge, no fill.
+   * soft: primarySoft fill with primaryInk text (a done state such as "Cheered").
    */
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'soft';
-  /** lg 48, md 44, sm 36 visible (44 hit area). */
+  /** lg 48, md 44, sm 36 visible (a 44 px touch target through hitSlop, on web too). */
   size?: 'sm' | 'md' | 'lg';
   icon?: React.ReactNode;
   iconRight?: React.ReactNode;
@@ -41,7 +41,8 @@ export function Button({ title, onPress, variant = 'primary', size = 'lg', icon,
       : variant === 'danger'
         ? colors.danger
         : variant === 'ghost' || variant === 'soft'
-          ? colors.primary
+          ? // Not `primary`: it is under 4.5:1 on the soft fill and on bg in light and Blossom.
+            colors.primaryInk
           : colors.text;
   const edge = variant === 'secondary' ? (tint ?? colors.borderStrong) : variant === 'danger' ? colors.danger : 'transparent';
   return (
@@ -86,7 +87,8 @@ export function Button({ title, onPress, variant = 'primary', size = 'lg', icon,
 /**
  * Square icon button, 44 by default, with cup corners. `surface` has a 1 px
  * border; `alt` is a surfaceAlt tile; `primary` is solid; `clear` has nothing
- * behind the icon. Small sizes keep a 44 hit area through hitSlop.
+ * behind the icon. Small sizes keep a 44 px touch target through hitSlop, on
+ * web as well (see `PressableScale`).
  */
 export function IconButton({
   children,

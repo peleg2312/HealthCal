@@ -8,8 +8,8 @@ import { PressableScale } from './Pressable';
 import { Text } from './Text';
 
 /**
- * A label you can tap: 32 visible (44 hit), corners 6, a 1 px borderStrong
- * edge. Selected is an ink chip (text fill, bg text). `dropdown` adds a
+ * A label you can tap: 32 visible (a 44 px touch target through hitSlop, on
+ * web too), corners 6, a 1 px borderStrong edge. Selected is an ink chip (text fill, bg text). `dropdown` adds a
  * chevron for a chip that opens a choice (the "30 days" chip on Progress).
  */
 export function Chip({

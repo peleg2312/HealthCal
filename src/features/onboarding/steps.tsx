@@ -244,7 +244,8 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
               />
               <BigNumberField
                 style={{ flex: 1 }}
-                label=" "
+                // A no-break space keeps this field level with the one beside it.
+                label={'\u00A0'}
                 accessibilityLabel="Height, inches"
                 testID="onb-height-in"
                 placeholder="9"
@@ -674,12 +675,13 @@ export function RoutineStep({ draft, set, errors }: StepProps) {
           scaleTo={0.99}
           accessibilityRole="button"
           accessibilityState={{ expanded: open }}
-          accessibilityLabel={`Adjust times, ${formatClock(r.wake, hour12)} to ${formatClock(r.bed, hour12)}`}
+          accessibilityLabel={`Adjust times and the evening check-in. Awake ${formatClock(r.wake, hour12)} to ${formatClock(r.bed, hour12)}`}
           style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 48, paddingHorizontal: spacing.xs }}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text variant="title">Adjust times</Text>
             <Text variant="caption" color="textSecondary" tabular>
-              {`Awake ${formatClock(r.wake, hour12)} to ${formatClock(r.bed, hour12)}, meals ${formatClock(r.breakfast, hour12)}, ${formatClock(r.lunch, hour12)}, ${formatClock(r.dinner, hour12)}`}
+              {/* The evening check-in lives behind this row, so the row says whether it is on. */}
+              {`Awake ${formatClock(r.wake, hour12)} to ${formatClock(r.bed, hour12)}, meals ${formatClock(r.breakfast, hour12)}, ${formatClock(r.lunch, hour12)} and ${formatClock(r.dinner, hour12)}. Evening check-in ${r.nudges.checkin ? `at ${whenFor('checkin')}` : 'off'}.`}
             </Text>
           </View>
           <Chevron size={20} color={colors.textSecondary} strokeWidth={2} />

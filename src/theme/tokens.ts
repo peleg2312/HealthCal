@@ -22,10 +22,12 @@ export interface ThemeColors {
   textSecondary: string;
   /** Only on bg or surface: it is just under 4.5:1 on surfaceAlt in light and Blossom. */
   textTertiary: string;
-  /** Brand accent (persimmon, raspberry in Blossom) and the text colour that sits on top of it. */
+  /** Brand accent (persimmon, raspberry in Blossom) and the text colour that sits on top of it. As text, `primary` is 4.5:1 on surface only. */
   primary: string;
   onPrimary: string;
   primarySoft: string;
+  /** The primary as text where `primary` itself is under 4.5:1: on primarySoft (the soft button), bg and surfaceAlt. A shade darker in light and Blossom. */
+  primaryInk: string;
   /** Semantic data colours, identical meaning in every theme. Fills and key marks only, never text. */
   calories: string;
   protein: string;
@@ -67,8 +69,8 @@ export interface ThemeColors {
   ringEnd: string;
 }
 
+/** Dark: warm black, not chocolate. The surfaces are neutral; the warmth lives in the cream text and the persimmon accent. */
 export const darkColors: ThemeColors = {
-  // Warm black, not chocolate: neutral surfaces, the warmth lives in text and the persimmon accent.
   bg: '#121110',
   bgElevated: '#1A1918',
   surface: '#1F1E1C',
@@ -82,6 +84,7 @@ export const darkColors: ThemeColors = {
   primary: '#FF9466',
   onPrimary: '#1F120A',
   primarySoft: '#FF946624',
+  primaryInk: '#FF9466',
   calories: '#FF9466',
   protein: '#F28BB8',
   carbs: '#C9D45A',
@@ -108,6 +111,7 @@ export const darkColors: ThemeColors = {
   ringEnd: '#FF9466',
 };
 
+/** Light: oat paper, ink text and level line, a persimmon accent, fresh leaf-green carbs and caramel fat. */
 export const lightColors: ThemeColors = {
   bg: '#F4EEE5',
   bgElevated: '#FAF6F0',
@@ -122,6 +126,7 @@ export const lightColors: ThemeColors = {
   primary: '#BF4420',
   onPrimary: '#FFFFFF',
   primarySoft: '#BF44201A',
+  primaryInk: '#AD3C1C',
   calories: '#E2683F',
   protein: '#B43872',
   carbs: '#5E9B1F',
@@ -175,6 +180,7 @@ export const blossomColors: ThemeColors = {
   primary: blossom.raspberry,
   onPrimary: '#FFFFFF',
   primarySoft: blossom.blush,
+  primaryInk: '#AE2E64',
   calories: blossom.ticklePink,
   protein: '#8A2F72',
   carbs: '#5E9B1F',
@@ -204,9 +210,18 @@ export const blossomColors: ThemeColors = {
 /**
  * Opacity of a bar-chart cup's fill (the solid rim sits on top), read as `useTheme().chartFill`.
  * 42% is a clean tint on the light papers. On the dark surface 42% turns every data colour
- * brown, so dark uses 70%: the bar keeps its colour and the cream rim still stands 3:1 off it.
+ * brown, so dark uses 70%: the bar keeps its colour and the cream rim still reads on top of it.
  */
 export const chartFillOpacity: Record<'dark' | 'light' | 'blossom', number> = { dark: 0.7, light: 0.42, blossom: 0.42 };
+
+/**
+ * A six-digit hex colour at an opacity, as '#RRGGBBAA'. For a tint that matches the bar charts
+ * in every theme: `withOpacity(colors.calories, useTheme().chartFill)`.
+ */
+export function withOpacity(hex: string, opacity: number): string {
+  const a = Math.round(Math.max(0, Math.min(1, opacity)) * 255);
+  return `${hex.slice(0, 7)}${a.toString(16).padStart(2, '0').toUpperCase()}`;
+}
 
 export const spacing = {
   xxs: 2,

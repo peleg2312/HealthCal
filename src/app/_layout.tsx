@@ -11,7 +11,7 @@ import {
   useFonts,
 } from '@expo-google-fonts/hanken-grotesk';
 import * as Linking from 'expo-linking';
-import { router, Stack, type ErrorBoundaryProps } from 'expo-router';
+import { Redirect, router, Stack, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
@@ -86,6 +86,19 @@ function LoadFailed() {
  */
 const TASK_SCREENS = ['food/search', 'food/quick', 'food/scan', 'food/photo', 'activity/import', 'friends/add'] as const;
 
+/**
+ * The only screens someone without a finished setup may open. Every other screen reads the
+ * profile (budget, units, goals), so a link opened before setup goes to the welcome screen
+ * instead of a screen that cannot draw. The tabs have the same rule in their own layout.
+ */
+const OPEN_WITHOUT_PROFILE = new Set(['welcome', 'auth', 'onboarding', 'friends/add', 'settings/data', 'settings/about', '+not-found', '_sitemap']);
+
+function ProfileGate({ name, children }: { name: string; children: React.ReactNode }) {
+  const onboarded = useStore((s) => !!s.profile?.onboardedAt);
+  if (!onboarded && !OPEN_WITHOUT_PROFILE.has(name)) return <Redirect href="/welcome" />;
+  return <>{children}</>;
+}
+
 function Navigation() {
   const { colors, dark } = useTheme();
   const reduce = useReducedMotion();
@@ -93,6 +106,7 @@ function Navigation() {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar style={dark ? 'light' : 'dark'} />
       <Stack
+        screenLayout={({ children, route }) => <ProfileGate name={route.name}>{children}</ProfileGate>}
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.bg },

@@ -1,12 +1,13 @@
 import { Check } from 'lucide-react-native';
 import React, { useEffect } from 'react';
 import { useColorScheme, useWindowDimensions, View } from 'react-native';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { create } from 'zustand';
 
 import { useStore } from '@/store';
-import { blossomColors, cup, darkColors, fonts, lightColors, useTheme, vesselBase, type ThemeColors } from '@/theme';
+import { blossomColors, cup, darkColors, fonts, lightColors, motion, useTheme, vesselBase, type ThemeColors } from '@/theme';
 import type { ThemePreference } from '@/types';
-import { FadeUp, Hatch, PressableScale, Text } from '@/ui';
+import { FadeUp, Hatch, PressableScale, Text, usePour } from '@/ui';
 
 import { StepTitle } from './components';
 
@@ -71,7 +72,7 @@ export function ThemeStep() {
       <View accessibilityRole="radiogroup" accessibilityLabel="Appearance" style={{ gap: spacing.sm }}>
         {THEME_CHOICES.map((o, i) => (
           <FadeUp key={o.value} index={i}>
-            <ThemeCard title={o.title} hint={o.hint} value={o.value} selected={selected === o.value} onPress={() => choose(o.value)} />
+            <ThemeCard title={o.title} hint={o.hint} value={o.value} selected={selected === o.value} onPress={() => choose(o.value)} index={i} />
           </FadeUp>
         ))}
       </View>
@@ -82,7 +83,7 @@ export function ThemeStep() {
   );
 }
 
-function ThemeCard({ title, hint, value, selected, onPress }: { title: string; hint: string; value: ThemePreference; selected: boolean; onPress: () => void }) {
+function ThemeCard({ title, hint, value, selected, onPress, index }: { title: string; hint: string; value: ThemePreference; selected: boolean; onPress: () => void; index: number }) {
   const { colors, radius, spacing } = useTheme();
   const narrow = useWindowDimensions().width < 360;
   const w = narrow ? 112 : 136;
@@ -112,16 +113,16 @@ function ThemeCard({ title, hint, value, selected, onPress }: { title: string; h
         {value === 'system' ? (
           <>
             <View style={{ position: 'absolute', left: 0, top: 0, width: w / 2, height: h, overflow: 'hidden' }}>
-              <MiniToday c={lightColors} width={w} height={h} />
+              <MiniToday c={lightColors} width={w} height={h} index={index} />
             </View>
             <View style={{ position: 'absolute', left: w / 2, top: 0, width: w / 2, height: h, overflow: 'hidden' }}>
               <View style={{ position: 'absolute', left: -w / 2, top: 0 }}>
-                <MiniToday c={darkColors} width={w} height={h} />
+                <MiniToday c={darkColors} width={w} height={h} index={index} />
               </View>
             </View>
           </>
         ) : (
-          <MiniToday c={value === 'dark' ? darkColors : value === 'blossom' ? blossomColors : lightColors} width={w} height={h} />
+          <MiniToday c={value === 'dark' ? darkColors : value === 'blossom' ? blossomColors : lightColors} width={w} height={h} index={index} />
         )}
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
@@ -144,15 +145,19 @@ function ThemeCard({ title, hint, value, selected, onPress }: { title: string; h
 
 /**
  * The Today hero in miniature, drawn in a given palette (not the active one):
- * the background, a card holding the cup with hatched exercise headroom, the
- * calorie fill and its level line, the big number left and two macro bars.
+ * the background, a card holding the cup (an open tumbler, as on Today) with
+ * hatched exercise headroom, the calorie fill and its level line, the big
+ * number left and two macro bars.
  * Purely decorative; the card around it carries the label.
  */
-function MiniToday({ c, width, height }: { c: ThemeColors; width: number; height: number }) {
+function MiniToday({ c, width, height, index = 0 }: { c: ThemeColors; width: number; height: number; index?: number }) {
   const vh = height - 30;
   const vw = Math.round(vh * 0.4);
   const head = Math.round(vh * 0.16);
   const fill = 0.52;
+  // The little cup pours once when the step arrives, each card a beat after the one above (the kit's pour: instant under reduced motion).
+  const { level } = usePour(fill, { duration: motion.duration.pourSmall, delay: 120 + index * motion.duration.stagger * 2, settle: 0 });
+  const pourStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - level.get() / fill) * (vh - 1) * fill }] }));
   return (
     <View style={{ width, height, backgroundColor: c.bg, padding: 5, ...cup(12, 4), overflow: 'hidden' }}>
       <View style={{ flex: 1, backgroundColor: c.surface, ...cup(10, 3), borderWidth: 1, borderColor: c.border, padding: 7, flexDirection: 'row', gap: 7 }}>
@@ -165,17 +170,16 @@ function MiniToday({ c, width, height }: { c: ThemeColors; width: number; height
               borderColor: c.vesselEdge,
               borderBottomLeftRadius: vesselBase(vh, vw) / 2,
               borderBottomRightRadius: vesselBase(vh, vw) / 2,
-              backgroundColor: c.track,
+              backgroundColor: c.vesselEmpty,
               overflow: 'hidden',
             }}>
             <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: head, borderBottomWidth: 1, borderStyle: 'dashed', borderColor: c.vesselEdge }}>
               <Hatch width={vw - 2} height={head} color={c.headroom} step={4} />
             </View>
-            <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: (vh - 1) * fill, backgroundColor: c.calories }}>
+            <Animated.View style={[{ position: 'absolute', left: 0, right: 0, bottom: 0, height: (vh - 1) * fill, backgroundColor: c.calories }, pourStyle]}>
               <View style={{ height: 2, backgroundColor: c.rim }} />
-            </View>
+            </Animated.View>
           </View>
-          <View style={{ position: 'absolute', left: -3, right: -3, top: -1, height: 1.5, backgroundColor: c.vesselEdge }} />
         </View>
         <View style={{ flex: 1, minWidth: 0, justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
