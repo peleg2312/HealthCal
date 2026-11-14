@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Activity, Camera, Check, Copy, Droplets, PenLine, Plus, Scale, ScanBarcode, Search } from 'lucide-react-native';
+import { Activity, Camera, Check, Droplets, PenLine, Plus, Repeat2, Scale, ScanBarcode, Search } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 
@@ -16,7 +16,7 @@ import { formatNumber, formatVolume } from '@/lib/units';
 import { useStore } from '@/store';
 import { useNow, useToday } from '@/store/clock';
 import { live, useLive, useProfile } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { cup, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, SavedMeal } from '@/types';
 import { PressableScale, Sheet, Text } from '@/ui';
 
@@ -91,9 +91,10 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
     { id: 'weight', label: 'Weigh in', hint: 'Weight and body fat', icon: Scale, color: colors.weight, href: '/weight?{past}' },
   ];
 
+  // Every tile is a small cup: square shoulders, round base, 1 px border, flat.
   const tile = {
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    ...cup(radius.tile, 5),
     borderWidth: 1,
     borderColor: colors.border,
   } as const;
@@ -122,12 +123,10 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                     mark(u.key);
                   }}
                   accessibilityLabel={isDone ? `${u.last.name} added` : `Add ${u.last.name}, ${usualLabel(u)}, to ${mealName}`}
-                  style={[tile, { width: 132, padding: spacing.md, gap: 6, borderColor: isDone ? colors.success : colors.border }]}>
+                  style={[tile, { width: 136, padding: spacing.md, gap: 4, borderColor: isDone ? colors.success : colors.border }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 22, lineHeight: 28 }}>{u.last.emoji || '🍽️'}</Text>
-                    <View style={{ width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: isDone ? colors.success : colors.primarySoft }}>
-                      {isDone ? <Check size={14} color={colors.onPrimary} strokeWidth={3} /> : <Plus size={14} color={colors.primary} strokeWidth={2.6} />}
-                    </View>
+                    <Text style={{ fontSize: 17, lineHeight: 24 }}>{u.last.emoji || '🍽️'}</Text>
+                    <AddMark done={isDone} />
                   </View>
                   <Text variant="label" numberOfLines={1}>
                     {u.last.name}
@@ -150,12 +149,10 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                   mark('saved');
                 }}
                 accessibilityLabel={`Add saved meal ${savedMeal.name} to ${mealName}`}
-                style={[tile, { width: 132, padding: spacing.md, gap: 6, borderColor: done.includes('saved') ? colors.success : colors.border }]}>
+                style={[tile, { width: 136, padding: spacing.md, gap: 4, borderColor: done.includes('saved') ? colors.success : colors.border }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Text style={{ fontSize: 22, lineHeight: 28 }}>🍱</Text>
-                  <View style={{ width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: done.includes('saved') ? colors.success : colors.primarySoft }}>
-                    {done.includes('saved') ? <Check size={14} color={colors.onPrimary} strokeWidth={3} /> : <Plus size={14} color={colors.primary} strokeWidth={2.6} />}
-                  </View>
+                  <Text style={{ fontSize: 17, lineHeight: 24 }}>🍱</Text>
+                  <AddMark done={done.includes('saved')} />
                 </View>
                 <Text variant="label" numberOfLines={1}>
                   {savedMeal.name}
@@ -201,11 +198,12 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                 flexDirection: i === 0 ? 'row' : 'column',
                 alignItems: i === 0 ? 'center' : 'flex-start',
                 padding: 14,
+                minHeight: i === 0 ? 64 : 92,
                 gap: i === 0 ? 14 : 10,
               },
             ]}>
-            <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: `${a.color}22`, alignItems: 'center', justifyContent: 'center' }}>
-              <a.icon size={20} color={a.color} />
+            <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+              <a.icon size={22} color={a.color} strokeWidth={1.9} />
             </View>
             <View>
               <Text variant="bodyStrong">{a.label}</Text>
@@ -221,8 +219,8 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
             onPress={() => go('/water')}
             accessibilityLabel="Water, open hydration"
             style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 }}>
-            <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: `${colors.water}22`, alignItems: 'center', justifyContent: 'center' }}>
-              <Droplets size={20} color={colors.water} />
+            <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+              <Droplets size={22} color={colors.water} strokeWidth={1.9} />
             </View>
             <Text variant="bodyStrong">Water</Text>
           </PressableScale>
@@ -235,9 +233,9 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                 hitSlop={4}
                 onPress={() => addWater(quickLogPastDate(), ml, profile.units)}
                 accessibilityLabel={`Add ${formatVolume(ml, profile.units)} of water`}
-                style={{ flex: 1, height: 38, borderRadius: radius.pill, backgroundColor: `${colors.water}22`, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                <Plus size={12} color={colors.water} strokeWidth={2.8} />
-                <Text variant="label" color="water" style={{ fontSize: 12 }} numberOfLines={1}>
+                style={{ flex: 1, height: 36, ...cup(radius.buttonSm, 5), borderWidth: 1.5, borderColor: colors.water, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+                <Plus size={14} color={colors.water} strokeWidth={2.6} />
+                <Text variant="label" color="text" style={{ fontSize: 12.5 }} numberOfLines={1}>
                   {formatVolume(ml, profile.units)}
                 </Text>
               </PressableScale>
@@ -265,13 +263,13 @@ function RepeatRow({ label, entries, done, onPress }: { label: string; entries: 
         alignItems: 'center',
         gap: spacing.md,
         padding: 14,
-        borderRadius: radius.lg,
-        backgroundColor: colors.primarySoft,
+        ...cup(radius.tile, 5),
+        backgroundColor: colors.surfaceAlt,
         borderWidth: 1,
         borderColor: done ? colors.success : 'transparent',
       }}>
-      <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }}>
-        {done ? <Check size={20} color={colors.success} strokeWidth={2.6} /> : <Copy size={18} color={colors.primary} />}
+      <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+        {done ? <Check size={22} color={colors.success} strokeWidth={2.4} /> : <Repeat2 size={22} color={colors.text} strokeWidth={2} />}
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text variant="bodyStrong">{`${label}, ${formatNumber(kcal)} kcal`}</Text>
@@ -280,5 +278,25 @@ function RepeatRow({ label, entries, done, onPress }: { label: string; entries: 
         </Text>
       </View>
     </PressableScale>
+  );
+}
+
+/** The "+" on a usual-food tile: a tiny bordered cup that turns into a tick once added. */
+function AddMark({ done }: { done: boolean }) {
+  const { colors } = useTheme();
+  return (
+    <View
+      style={{
+        width: 26,
+        height: 26,
+        ...cup(9, 4),
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: done ? 0 : 1.5,
+        borderColor: colors.borderStrong,
+        backgroundColor: done ? colors.success : 'transparent',
+      }}>
+      {done ? <Check size={15} color={colors.surface} strokeWidth={3} /> : <Plus size={15} color={colors.text} strokeWidth={2.4} />}
+    </View>
   );
 }

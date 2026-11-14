@@ -2,7 +2,7 @@ import React from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MAX_CONTENT_WIDTH, useTheme } from '@/theme';
+import { MAX_CONTENT_WIDTH, sheetShadow, useTheme } from '@/theme';
 
 import { Button } from './Button';
 import { Text } from './Text';
@@ -36,19 +36,21 @@ export function Sheet({
             maxWidth: MAX_CONTENT_WIDTH,
             alignSelf: 'center',
             maxHeight: '88%',
-            backgroundColor: colors.bgElevated,
-            borderTopLeftRadius: radius.xl,
-            borderTopRightRadius: radius.xl,
+            // A lid, not a cup: 6 px corners on top only, and the only shadow in the kit.
+            backgroundColor: colors.surface,
+            borderTopLeftRadius: radius.sheet,
+            borderTopRightRadius: radius.sheet,
             borderWidth: 1,
             borderBottomWidth: 0,
             borderColor: colors.border,
             paddingBottom: Math.max(insets.bottom, spacing.lg),
+            ...sheetShadow,
           }}>
-          <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 6 }}>
-            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.borderStrong }} />
+          <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 8 }}>
+            <View style={{ width: 36, height: 4, borderRadius: 1, backgroundColor: colors.borderStrong }} />
           </View>
           {title ? (
-            <Text variant="h3" style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.md }}>
+            <Text variant="h2" style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.md }}>
               {title}
             </Text>
           ) : null}

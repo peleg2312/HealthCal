@@ -3,7 +3,7 @@ import { AccessibilityInfo, Animated, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { create } from 'zustand';
 
-import { MAX_CONTENT_WIDTH, useTheme } from '@/theme';
+import { cup, MAX_CONTENT_WIDTH, useTheme } from '@/theme';
 
 import { PressableScale } from './Pressable';
 import { Text } from './Text';
@@ -92,7 +92,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       style={
         inSheet
           ? { alignSelf: 'stretch', alignItems: 'center', paddingHorizontal: 20, marginBottom: 12 }
-          : { position: 'absolute', left: 0, right: 0, bottom: insets.bottom + 108, alignItems: 'center', paddingHorizontal: 20 }
+          : { position: 'absolute', left: 0, right: 0, bottom: insets.bottom + 92, alignItems: 'center', paddingHorizontal: 20 }
       }>
       <Animated.View
         accessibilityLiveRegion="polite"
@@ -101,8 +101,9 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
           flexDirection: 'row',
           alignItems: 'center',
           gap: 16,
+          // An ink cup: text-coloured, square shoulders, round base.
           backgroundColor: colors.text,
-          borderRadius: radius.md,
+          ...cup(radius.tile),
           paddingHorizontal: 16,
           paddingVertical: 12,
           opacity: anim,

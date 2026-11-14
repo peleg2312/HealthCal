@@ -1,20 +1,18 @@
 import type { BottomTabBarProps } from 'expo-router/build/layouts/Tabs';
-import { Activity, BarChart3, BookOpenText, Dumbbell, Home, Plus } from 'lucide-react-native';
+import { Activity, BookOpen, ChartLine, Dumbbell, House, Plus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { AccessibilityInfo, Animated, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MAX_CONTENT_WIDTH, useTheme } from '@/theme';
-import { PressableScale, Text } from '@/ui';
+import { cup, fonts, MAX_CONTENT_WIDTH, useTheme } from '@/theme';
+import { PressableScale, TAB_BAR_HEIGHT, Text } from '@/ui';
 
 import { QuickLogSheet } from './QuickLogSheet';
 
-const ICONS = { index: Home, diary: BookOpenText, train: Dumbbell, progress: BarChart3 } as const;
+const ICONS = { index: House, diary: BookOpen, train: Dumbbell, progress: ChartLine } as const;
 
-const PILL_WIDTH = 60;
-const PILL_HEIGHT = 50;
-const BAR_HEIGHT = 68;
-const BAR_BORDER = 1;
+/** The active tab's level line: a 28 x 3 rim bar hanging from the bar's top edge. */
+const MARK_WIDTH = 28;
 
 /** The user's reduced-motion setting (on web, the prefers-reduced-motion media query). */
 function webReducedMotionQuery(): MediaQueryList | null {
@@ -45,11 +43,11 @@ function useReducedMotion(): boolean {
 }
 
 /**
- * The active-tab highlight: one pill that springs from tab to tab. It waits
+ * The active-tab mark: one level line that slides from tab to tab. It waits
  * for the tabs' layout, jumps into place the first time, and jumps instead of
  * sliding when reduced motion is on.
  */
-function useSlidingPill(index: number, centres: Record<number, number>) {
+function useSlidingMark(index: number, centres: Record<number, number>) {
   const reduce = useReducedMotion();
   // Animated values live in state, not refs: they are read while rendering.
   const [x] = useState(() => new Animated.Value(0));
@@ -59,8 +57,7 @@ function useSlidingPill(index: number, centres: Record<number, number>) {
   const centre = centres[index];
   useEffect(() => {
     if (centre === undefined) return;
-    // Tab layout x counts from the bar's outer edge; an absolute `left: 0` sits inside its border.
-    const to = centre - PILL_WIDTH / 2 - BAR_BORDER;
+    const to = centre - MARK_WIDTH / 2;
     if (!placed.has('pill') || reduce) {
       x.setValue(to);
       opacity.setValue(1);
@@ -74,14 +71,19 @@ function useSlidingPill(index: number, centres: Record<number, number>) {
   return { x, opacity };
 }
 
-/** Floating tab bar with a centre action that opens the quick-log sheet. */
+/**
+ * Docked tab bar: a full-width tabBar surface with a 1 px top border. The
+ * active tab is in the text colour with a rim bar hanging from the top edge;
+ * the centre + is a cup (primary, 5 5 18 18) rising 14 px out of the bar and
+ * opens the quick-log sheet.
+ */
 export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps) {
   const { colors, radius } = useTheme();
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
-  // Centre x of each tab inside the bar, by route index, from layout.
+  // Centre x of each tab inside the row, by route index, from layout.
   const [centres, setCentres] = useState<Record<number, number>>({});
-  const pill = useSlidingPill(state.index, centres);
+  const mark = useSlidingMark(state.index, centres);
 
   const tabs = state.routes.map((route, index) => {
     const focused = state.index === index;
@@ -92,7 +94,7 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
         key={route.key}
         testID={`tab-${route.name}`}
         feedback="select"
-        scaleTo={0.92}
+        scaleTo={0.94}
         accessibilityRole="tab"
         accessibilityState={{ selected: focused }}
         accessibilityLabel={label}
@@ -102,9 +104,13 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
           const c = x + width / 2;
           setCentres((cur) => (cur[index] === c ? cur : { ...cur, [index]: c }));
         }}
-        style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, height: 56 }}>
-        <Icon size={22} color={focused ? colors.primary : colors.textTertiary} strokeWidth={focused ? 2.4 : 2} />
-        <Text variant="caption" color={focused ? 'text' : 'textTertiary'} style={{ fontSize: 10.5 }}>
+        style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 9, gap: 3, height: TAB_BAR_HEIGHT }}>
+        <Icon size={22} color={focused ? colors.text : colors.textTertiary} strokeWidth={focused ? 2.2 : 1.9} />
+        <Text
+          variant="caption"
+          color={focused ? 'text' : 'textTertiary'}
+          numberOfLines={1}
+          style={{ fontSize: 11.5, lineHeight: 14, fontFamily: focused ? fonts.bold : fonts.semibold }}>
           {label}
         </Text>
       </PressableScale>
@@ -115,63 +121,51 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
     <>
       <View
         pointerEvents="box-none"
-        style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: Math.max(insets.bottom, 12), paddingHorizontal: 16, alignItems: 'center' }}>
-        <View
-          style={{
-            width: '100%',
-            maxWidth: MAX_CONTENT_WIDTH - 32,
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: colors.tabBar,
-            borderRadius: radius.xl,
-            borderWidth: BAR_BORDER,
-            borderColor: colors.border,
-            paddingHorizontal: 6,
-            height: BAR_HEIGHT,
-            shadowColor: colors.shadow,
-            shadowOpacity: 0.28,
-            shadowRadius: 24,
-            shadowOffset: { width: 0, height: 10 },
-            elevation: 12,
-            ...(Platform.OS === 'web' ? ({ backdropFilter: 'blur(18px)' } as object) : null),
-          }}>
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: colors.tabBar,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+          paddingBottom: insets.bottom,
+        }}>
+        <View style={{ width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', flexDirection: 'row', paddingHorizontal: 10, height: TAB_BAR_HEIGHT }}>
           <Animated.View
             pointerEvents="none"
             testID="tab-pill"
             style={{
               position: 'absolute',
               left: 0,
-              top: (BAR_HEIGHT - 2 * BAR_BORDER - PILL_HEIGHT) / 2,
-              width: PILL_WIDTH,
-              height: PILL_HEIGHT,
-              borderRadius: radius.md,
-              backgroundColor: colors.primarySoft,
-              opacity: pill.opacity,
-              transform: [{ translateX: pill.x }],
+              top: -1,
+              width: MARK_WIDTH,
+              height: 3,
+              borderBottomLeftRadius: 2,
+              borderBottomRightRadius: 2,
+              backgroundColor: colors.rim,
+              opacity: mark.opacity,
+              transform: [{ translateX: mark.x }],
             }}
           />
           {tabs.slice(0, 2)}
-          <View style={{ width: 72, alignItems: 'center' }}>
+          <View style={{ flex: 1.1, alignItems: 'center' }}>
             <PressableScale
               testID="tab-add"
               feedback="press"
-              scaleTo={0.9}
+              scaleTo={0.92}
               accessibilityLabel="Log something"
               onPress={() => setOpen(true)}
               style={{
-                width: 54,
-                height: 54,
-                borderRadius: 27,
+                width: 56,
+                height: 50,
+                marginTop: -14,
+                ...cup(radius.plus, 5),
                 backgroundColor: colors.primary,
                 alignItems: 'center',
                 justifyContent: 'center',
-                shadowColor: colors.primary,
-                shadowOpacity: 0.45,
-                shadowRadius: 14,
-                shadowOffset: { width: 0, height: 4 },
-                elevation: 8,
               }}>
-              <Plus size={26} color={colors.onPrimary} strokeWidth={2.8} />
+              <Plus size={28} color={colors.onPrimary} strokeWidth={2.6} />
             </PressableScale>
           </View>
           {tabs.slice(2)}

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
-import Svg, { Circle, Defs, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, ClipPath, Defs, G, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import { niceTicks } from '@/lib/chart';
-import { fonts, useTheme } from '@/theme';
+import { cup, fonts, useTheme } from '@/theme';
 
 import { haptic } from './haptics';
 import { Text } from './Text';
@@ -40,15 +40,15 @@ function slotAt(e: GestureResponderEvent, count: number, x0: number, w: number):
   return Math.max(0, Math.min(count - 1, Math.floor((x / Math.max(1, w)) * count)));
 }
 
-/** Floating pill above a chart while scrubbing. */
+/** Ink label above a chart while scrubbing (a small cup, not a pill). */
 function ScrubPill({ text, x, width }: { text: string; x: number; width: number }) {
-  const { colors, radius, spacing } = useTheme();
+  const { colors, spacing } = useTheme();
   const pillW = Math.min(width, Math.max(96, text.length * 6.6 + 20));
   const left = Math.max(0, Math.min(width - pillW, x - pillW / 2));
   return (
     <View
       pointerEvents="none"
-      style={{ position: 'absolute', top: -6, left, width: pillW, paddingVertical: 4, paddingHorizontal: spacing.sm, borderRadius: radius.pill, backgroundColor: colors.text, alignItems: 'center' }}>
+      style={{ position: 'absolute', top: -6, left, width: pillW, paddingVertical: 4, paddingHorizontal: spacing.sm, ...cup(8, 4), backgroundColor: colors.text, alignItems: 'center' }}>
       <Text variant="caption" numberOfLines={1} style={{ color: colors.bg, fontFamily: fonts.bold }}>
         {text}
       </Text>
@@ -56,9 +56,25 @@ function ScrubPill({ text, x, width }: { text: string; x: number; width: number 
   );
 }
 
+/** Bar outline with square shoulders and a small round base (a slim cup). */
+function cupPath(x: number, top: number, w: number, bottom: number, r: number): string {
+  const rr = Math.max(0, Math.min(r, (bottom - top) / 2, w / 2));
+  return `M ${x} ${top} L ${x + w} ${top} L ${x + w} ${bottom - rr} Q ${x + w} ${bottom} ${x + w - rr} ${bottom} L ${x + rr} ${bottom} Q ${x} ${bottom} ${x} ${bottom - rr} Z`;
+}
+
+/** "/" hatch lines covering a box, for clipping into a shape. */
+function hatchLines(x: number, top: number, w: number, h: number, color: string, step = 4) {
+  const out: React.ReactNode[] = [];
+  for (let i = -h; i < w + step; i += step) out.push(<Line key={i} x1={x + i} y1={top + h} x2={x + i + h} y2={top} stroke={color} strokeWidth={1.5} />);
+  return out;
+}
+
 /**
- * Vertical bars with an optional dashed goal line, a shaded target band,
- * stacked segments and press-and-drag scrubbing (when `scrub` is set).
+ * Rows of slim cups: each bar is a flat fill at about 42% of its colour with a
+ * solid 2.5 px rim (the day's level) on top, so a row of bars reads as a
+ * skyline of level lines. The part above the dashed `goal` line is amber. The
+ * `openIndex` bar (today, not finished) is hatched. Stacked `segments` are
+ * drawn solid. Press and drag scrubs when `scrub` is set.
  */
 export function BarChart({
   data,
@@ -67,6 +83,7 @@ export function BarChart({
   goal,
   band,
   highlightIndex,
+  openIndex,
   formatValue,
   scrub,
   marks,
@@ -76,9 +93,12 @@ export function BarChart({
   data: BarDatum[];
   color: string;
   height?: number;
+  /** Dashed budget line; the part of a bar above it is drawn in warning. */
   goal?: number;
   band?: ChartBand;
   highlightIndex?: number;
+  /** A bar whose day is still open (today): hatched instead of filled. */
+  openIndex?: number;
   formatValue?: (n: number) => string;
   /** Press and drag to read each bar's value. */
   scrub?: boolean;
@@ -91,6 +111,7 @@ export function BarChart({
   const { colors } = useTheme();
   const [width, onLayout] = useWidth();
   const [active, setActive] = useState<number | null>(null);
+  const [uid] = useState(() => `bars-${seq++}`);
   const labelH = 20;
   const topPad = 18;
   const chartH = height - labelH - topPad;
@@ -98,7 +119,8 @@ export function BarChart({
     ? maxValue * 1.08
     : Math.max(goal ?? 0, band?.to ?? 0, ...data.map((d) => d.value), 1) * 1.08;
   const slot = data.length ? width / data.length : 0;
-  const barW = Math.min(28, slot * 0.56);
+  const barW = Math.max(3, Math.min(20, slot * 0.5));
+  const base = topPad + chartH;
   const y = (v: number) => topPad + chartH - (Math.min(v, max) / max) * chartH;
   const hi = active ?? highlightIndex;
   const fmt = (n: number) => (formatValue ? formatValue(n) : `${Math.round(n)}`);
@@ -124,48 +146,52 @@ export function BarChart({
     <View onLayout={onLayout} style={{ height }} testID={testID}>
       {width > 0 ? (
         <Svg width={width} height={height}>
-          {data.map((d, i) => (
-            <Rect key={`t-${i}`} x={i * slot + (slot - barW) / 2} y={topPad} width={barW} height={chartH} rx={barW / 2.6} fill={colors.track} opacity={0.5} />
-          ))}
           {band && band.to > band.from ? (
-            <Rect x={0} y={y(band.to)} width={width} height={Math.max(1, y(band.from) - y(band.to))} fill={band.color ?? color} opacity={0.18} rx={4} />
-          ) : null}
-          {goal ? (
-            <Line x1={0} x2={width} y1={y(goal)} y2={y(goal)} stroke={colors.borderStrong} strokeWidth={1} strokeDasharray="4 5" />
+            <Rect x={0} y={y(band.to)} width={width} height={Math.max(1, y(band.from) - y(band.to))} fill={band.color ?? color} opacity={0.12} rx={2} />
           ) : null}
           {data.map((d, i) => {
-            const h = Math.max(d.value > 0 ? 4 : 0, (Math.min(d.value, max) / max) * chartH);
+            const v = Math.max(0, d.value);
+            const h = Math.max(v > 0 ? 3 : 0, (Math.min(v, max) / max) * chartH);
             const x = i * slot + (slot - barW) / 2;
             const on = hi === undefined || hi === null || hi === i;
-            const r = Math.min(barW / 2.6, h / 2);
+            const fillTo = goal && v > goal ? y(goal) : base - h;
+            const r = Math.min(3, barW / 3);
+            const c = d.color ?? color;
+            const open = openIndex === i;
             let acc = 0;
             return (
-              <React.Fragment key={`${d.label}-${i}`}>
+              <G key={`${d.label}-${i}`} opacity={on ? 1 : 0.5}>
                 {h > 0 && d.segments?.length
-                  ? d.segments.map((sg, j, arr) => {
+                  ? d.segments.map((sg, j) => {
                       const sh = (Math.min(sg.value, max) / max) * chartH;
-                      const top = topPad + chartH - acc - sh;
+                      const top = base - acc - sh;
                       acc += sh;
-                      const last = j === arr.length - 1;
                       if (sh <= 0) return null;
-                      // 2 px gap between parts; only the top part is rounded.
-                      return last ? (
-                        <Path
-                          key={j}
-                          d={`M ${x} ${top + sh - (j ? 2 : 0)} L ${x} ${top + Math.min(r, sh / 2)} Q ${x} ${top} ${x + Math.min(r, sh / 2)} ${top} L ${x + barW - Math.min(r, sh / 2)} ${top} Q ${x + barW} ${top} ${x + barW} ${top + Math.min(r, sh / 2)} L ${x + barW} ${top + sh - (j ? 2 : 0)} Z`}
-                          fill={sg.color}
-                          opacity={on ? 1 : 0.45}
-                        />
+                      return j === 0 ? (
+                        <Path key={j} d={cupPath(x, top, barW, base, r)} fill={sg.color} />
                       ) : (
-                        <Rect key={j} x={x} y={top} width={barW} height={Math.max(0, sh - (j ? 2 : 0))} fill={sg.color} opacity={on ? 1 : 0.45} />
+                        <Rect key={j} x={x} y={top} width={barW} height={Math.max(0, sh - 1.5)} fill={sg.color} />
                       );
                     })
-                  : h > 0
-                    ? <Rect x={x} y={topPad + chartH - h} width={barW} height={h} rx={r} fill={d.color ?? color} opacity={on ? 1 : 0.45} />
-                    : null}
+                  : h > 0 && open
+                    ? (
+                        <>
+                          <Defs>
+                            <ClipPath id={`${uid}-${i}`}>
+                              <Path d={cupPath(x, fillTo, barW, base, r)} />
+                            </ClipPath>
+                          </Defs>
+                          <G clipPath={`url(#${uid}-${i})`}>{hatchLines(x, fillTo, barW, base - fillTo, c)}</G>
+                        </>
+                      )
+                    : h > 0
+                      ? <Path d={cupPath(x, fillTo, barW, base, r)} fill={c} opacity={0.42} />
+                      : null}
+                {h > 0 && goal && v > goal ? <Rect x={x} y={base - h} width={barW} height={Math.max(0, fillTo - (base - h))} fill={colors.warning} /> : null}
+                {h > 0 ? <Rect x={x} y={(goal && v > goal ? fillTo : base - h) - 1.25} width={barW} height={2.5} fill={colors.rim} /> : null}
                 {marks?.[i] ? (
                   <Path
-                    d={`M ${x + barW / 2 - 4} ${topPad + chartH - h - 9} l 3 3 l 5 -6`}
+                    d={`M ${x + barW / 2 - 4} ${base - h - 9} l 3 3 l 5 -6`}
                     stroke={colors.success}
                     strokeWidth={2}
                     fill="none"
@@ -173,18 +199,28 @@ export function BarChart({
                     strokeLinejoin="round"
                   />
                 ) : null}
-                {active === i ? <Line x1={x + barW / 2} x2={x + barW / 2} y1={topPad - 4} y2={topPad + chartH} stroke={colors.textSecondary} strokeWidth={1} /> : null}
-                {active === null && highlightIndex === i && d.value > 0 ? (
-                  <SvgText x={x + barW / 2} y={Math.max(11, topPad + chartH - h - 5)} fontSize={10} fontFamily={fonts.bold} fill={colors.text} textAnchor="middle">
+                {active === i ? <Line x1={x + barW / 2} x2={x + barW / 2} y1={topPad - 4} y2={base} stroke={colors.textSecondary} strokeWidth={1} /> : null}
+                {active === null && highlightIndex === i && v > 0 ? (
+                  <SvgText x={x + barW / 2} y={Math.max(11, base - h - 6)} fontSize={11} fontFamily={fonts.numBold} fill={colors.text} textAnchor="middle">
                     {formatValue ? formatValue(d.value) : Math.round(d.value)}
                   </SvgText>
                 ) : null}
-                <SvgText x={x + barW / 2} y={height - 5} fontSize={10} fontFamily={fonts.medium} fill={hi === i ? colors.text : colors.textTertiary} textAnchor="middle">
-                  {d.label}
-                </SvgText>
-              </React.Fragment>
+              </G>
             );
           })}
+          {goal ? <Line x1={0} x2={width} y1={y(goal)} y2={y(goal)} stroke={colors.borderStrong} strokeWidth={1.5} strokeDasharray="4 4" /> : null}
+          {data.map((d, i) => (
+            <SvgText
+              key={`l-${i}`}
+              x={i * slot + slot / 2}
+              y={height - 5}
+              fontSize={10.5}
+              fontFamily={hi === i ? fonts.bold : fonts.semibold}
+              fill={hi === i ? colors.text : colors.textSecondary}
+              textAnchor="middle">
+              {d.label}
+            </SvgText>
+          ))}
         </Svg>
       ) : null}
       {scrub ? <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, cursor: 'crosshair', userSelect: 'none' } as object} {...responder} /> : null}
@@ -216,8 +252,9 @@ function toPath(points: { px: number; py: number }[], smooth: boolean): string {
 }
 
 /**
- * Line chart with a filled main series, optional scattered raw points and an
- * optional horizontal goal line. Used for the weight trend.
+ * Line chart: a 2 px line in the data colour over a flat 10% tint (never a
+ * gradient), optional faint raw points, a dashed borderStrong goal line and a
+ * rim dot on the latest value. Used for the weight trend.
  */
 export function LineChart({
   line,
@@ -248,7 +285,6 @@ export function LineChart({
 }) {
   const { colors } = useTheme();
   const [width, onLayout] = useWidth();
-  const [gradId] = useState(() => `line-${seq++}`);
   const [active, setActive] = useState<number | null>(null);
   const all = [...line, ...(dots ?? [])];
   const padL = 40;
@@ -305,38 +341,31 @@ export function LineChart({
           {band && band.to > band.from ? (
             <Rect x={padL} y={sy(Math.min(band.to, maxY))} width={w} height={Math.max(1, sy(Math.max(band.from, minY)) - sy(Math.min(band.to, maxY)))} fill={band.color ?? color} opacity={0.12} rx={4} />
           ) : null}
-          <Defs>
-            <LinearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={color} stopOpacity={0.28} />
-              <Stop offset="1" stopColor={color} stopOpacity={0} />
-            </LinearGradient>
-          </Defs>
           {ticks.map((t, i) => (
             <React.Fragment key={i}>
               <Line x1={padL} x2={width - padR} y1={sy(t)} y2={sy(t)} stroke={colors.border} strokeWidth={1} />
-              <SvgText x={padL - 8} y={sy(t) + 3} fontSize={10} fontFamily={fonts.medium} fill={colors.textTertiary} textAnchor="end">
+              <SvgText x={padL - 8} y={sy(t) + 3} fontSize={10.5} fontFamily={fonts.medium} fill={colors.textSecondary} textAnchor="end">
                 {formatY ? formatY(t) : String(Math.round(t * 10) / 10)}
               </SvgText>
             </React.Fragment>
           ))}
           {goal !== undefined ? (
-            <Line x1={padL} x2={width - padR} y1={sy(goal)} y2={sy(goal)} stroke={colors.success} strokeWidth={1.5} strokeDasharray="5 5" />
+            <Line x1={padL} x2={width - padR} y1={sy(goal)} y2={sy(goal)} stroke={colors.borderStrong} strokeWidth={1.5} strokeDasharray="4 4" />
           ) : null}
-          {area ? <Path d={area} fill={`url(#${gradId})`} /> : null}
+          {area ? <Path d={area} fill={color} opacity={0.1} /> : null}
           {(dots ?? []).map((p, i) => (
             <Circle key={i} cx={sx(p.x)} cy={sy(p.y)} r={2.6} fill={colors.textTertiary} opacity={0.7} />
           ))}
-          {path ? <Path d={path} stroke={color} strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" /> : null}
+          {path ? <Path d={path} stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" /> : null}
           {pts.length ? (
             <>
-              <Circle cx={pts[pts.length - 1].px} cy={pts[pts.length - 1].py} r={7} fill={color} opacity={0.25} />
-              <Circle cx={pts[pts.length - 1].px} cy={pts[pts.length - 1].py} r={4} fill={color} />
+              <Circle cx={pts[pts.length - 1].px} cy={pts[pts.length - 1].py} r={3} fill={colors.rim} stroke={colors.surface} strokeWidth={1.5} />
             </>
           ) : null}
           {ap ? (
             <>
               <Line x1={ap.px} x2={ap.px} y1={padT} y2={padT + h} stroke={colors.textSecondary} strokeWidth={1} />
-              <Circle cx={ap.px} cy={ap.py} r={5} fill={color} stroke={colors.surface} strokeWidth={2} />
+              <Circle cx={ap.px} cy={ap.py} r={4} fill={colors.rim} stroke={colors.surface} strokeWidth={2} />
             </>
           ) : null}
           {(xLabels ?? []).map((label, i, arr) => (
@@ -344,9 +373,9 @@ export function LineChart({
               key={`${label}-${i}`}
               x={padL + (arr.length === 1 ? w / 2 : (i / (arr.length - 1)) * w)}
               y={height - 5}
-              fontSize={10}
+              fontSize={10.5}
               fontFamily={fonts.medium}
-              fill={colors.textTertiary}
+              fill={colors.textSecondary}
               textAnchor={i === 0 ? 'start' : i === arr.length - 1 ? 'end' : 'middle'}>
               {label}
             </SvgText>
@@ -361,6 +390,7 @@ export function LineChart({
 
 /** Tiny inline trend line with no axes. */
 export function Sparkline({ values, color, width = 72, height = 28 }: { values: number[]; color: string; width?: number; height?: number }) {
+  const { colors } = useTheme();
   if (values.length < 2) return <View style={{ width, height }} />;
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -368,19 +398,19 @@ export function Sparkline({ values, color, width = 72, height = 28 }: { values: 
   const pts = values.map((v, i) => ({ px: 2 + (i / (values.length - 1)) * (width - 4), py: 2 + (height - 4) - ((v - min) / span) * (height - 4) }));
   return (
     <Svg width={width} height={height}>
-      <Path d={toPath(pts, true)} stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" />
-      <Circle cx={pts[pts.length - 1].px} cy={pts[pts.length - 1].py} r={2.6} fill={color} />
+      <Path d={toPath(pts, true)} stroke={color} strokeWidth={1.75} fill="none" strokeLinecap="round" />
+      <Circle cx={pts[pts.length - 1].px} cy={pts[pts.length - 1].py} r={2.5} fill={colors.rim} />
     </Svg>
   );
 }
 
-/** Horizontal stacked bar showing macro split. */
+/** Horizontal stacked bar showing macro split: flat parts, 2 px gaps, square-ish ends (radius 2). */
 export function MacroBar({ protein, carbs, fat, height = 8 }: { protein: number; carbs: number; fat: number; height?: number }) {
-  const { colors } = useTheme();
+  const { colors, radius } = useTheme();
   const total = protein + carbs + fat;
-  if (total <= 0) return <View style={{ height, borderRadius: height / 2, backgroundColor: colors.track }} />;
+  if (total <= 0) return <View style={{ height, borderRadius: radius.track, backgroundColor: colors.track }} />;
   return (
-    <View style={{ height, borderRadius: height / 2, flexDirection: 'row', overflow: 'hidden', gap: 2 }}>
+    <View style={{ height, borderRadius: radius.track, flexDirection: 'row', overflow: 'hidden', gap: 2 }}>
       <View style={{ flex: protein, backgroundColor: colors.protein }} />
       <View style={{ flex: carbs, backgroundColor: colors.carbs }} />
       <View style={{ flex: fat, backgroundColor: colors.fat }} />

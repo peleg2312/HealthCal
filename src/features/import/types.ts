@@ -91,8 +91,7 @@ export type ImportErrorCode =
   | 'csv-options-needed'
   | 'bad-time-zone'
   | 'not-zip'
-  | 'zip-empty'
-  | 'too-large';
+  | 'zip-empty';
 
 /** A file that cannot be read. `message` is written for the person, not the developer. */
 export class ImportError extends Error {

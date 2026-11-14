@@ -2,7 +2,7 @@ import { Minus, Plus } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 
-import { fonts, useTheme } from '@/theme';
+import { cup, fonts, useTheme } from '@/theme';
 
 import { IconButton } from './Button';
 import { Text } from './Text';
@@ -34,11 +34,12 @@ export function TextField({ label, suffix, error, hint, left, right, style, onFo
           flexDirection: 'row',
           alignItems: 'center',
           gap: 10,
-          minHeight: 52,
-          borderRadius: radius.md,
+          minHeight: 50,
+          ...cup(radius.buttonSm),
           backgroundColor: colors.surface,
           borderWidth: 1.5,
-          borderColor: error ? colors.danger : focused ? colors.primary : colors.border,
+          // Focus is the level line: a rim-coloured edge.
+          borderColor: error ? colors.danger : focused ? colors.rim : colors.borderStrong,
           paddingHorizontal: 14,
         }}>
         {left}
@@ -62,7 +63,7 @@ export function TextField({ label, suffix, error, hint, left, right, style, onFo
           ]}
         />
         {suffix ? (
-          <Text variant="label" color="textTertiary">
+          <Text variant="unit" color="textSecondary">
             {suffix}
           </Text>
         ) : null}
@@ -147,7 +148,7 @@ export function Stepper({
       <IconButton accessibilityLabel={`Decrease ${label}`} tone="alt" onPress={() => set(value - step)} disabled={value <= min}>
         <Minus size={18} color={colors.text} />
       </IconButton>
-      <Text variant="numM" tabular align="center" style={{ minWidth: 72 }}>
+      <Text variant="numL" align="center" style={{ minWidth: 72, fontSize: 26, lineHeight: 30 }}>
         {format ? format(value) : String(value)}
       </Text>
       <IconButton accessibilityLabel={`Increase ${label}`} tone="alt" onPress={() => set(value + step)} disabled={value >= max}>

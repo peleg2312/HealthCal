@@ -11,9 +11,9 @@ import { formatNumber } from '@/lib/units';
 import { useStore } from '@/store';
 import { useToday } from '@/store/clock';
 import { useLive } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { fonts, useTheme } from '@/theme';
 import type { ISODate, MealType } from '@/types';
-import { Avatar, Button, Divider, EmptyState, IconButton, Sheet, Text } from '@/ui';
+import { Button, CupKey, Divider, EmptyState, IconButton, Sheet, Text } from '@/ui';
 
 import { fitCandidates, rankFits, type Fit } from './fits';
 
@@ -122,11 +122,12 @@ export function FitsSheet({
             const isAdded = added.some((a) => a.key === f.key);
             return (
               <React.Fragment key={f.key}>
-                {i > 0 ? <Divider inset={56} /> : null}
-                <View testID={`fits-row-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 60, paddingVertical: 6 }}>
-                  <Avatar emoji={f.food.emoji || '🍽️'} size={40} />
+                {i > 0 ? <Divider inset={34} /> : null}
+                <View testID={`fits-row-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 60, paddingVertical: 8 }}>
+                  {/* Emoji are content marks only: 17 px, no tile. */}
+                  <Text style={{ fontSize: 17, lineHeight: 22, width: 22, textAlign: 'center' }}>{f.food.emoji || '🍽️'}</Text>
                   <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                    <Text variant="bodyStrong" numberOfLines={1}>
+                    <Text variant="bodyStrong" numberOfLines={1} style={{ fontFamily: fonts.semibold }}>
                       {f.food.name}
                     </Text>
                     <Text variant="caption" color="textSecondary" numberOfLines={1}>
@@ -134,24 +135,25 @@ export function FitsSheet({
                     </Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text variant="label" tabular>
+                    <Text variant="numM" style={{ fontSize: 17, lineHeight: 22 }}>
                       {formatNumber(Math.round(f.kcal))}
-                      <Text variant="caption" color="textTertiary">
-                        {' kcal'}
+                      <Text variant="unit">{' kcal'}</Text>
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <CupKey color={colors.protein} size={8} />
+                      <Text variant="caption" color="textSecondary">
+                        {`${Math.round(f.protein)} g protein`}
                       </Text>
-                    </Text>
-                    <Text variant="caption" color="protein" tabular>
-                      {`${Math.round(f.protein)} g protein`}
-                    </Text>
+                    </View>
                   </View>
                   <IconButton
                     testID={`fits-add-${i}`}
                     accessibilityLabel={isAdded ? `${f.food.name} added` : `Add ${f.food.name}, ${portionLabel(f)}, ${Math.round(f.kcal)} kilocalories, to ${mealName}`}
-                    tone={isAdded ? 'primary' : 'alt'}
+                    tone={isAdded ? 'primary' : 'surface'}
                     size={44}
                     disabled={isAdded}
                     onPress={() => add(f)}>
-                    {isAdded ? <Check size={18} color={colors.onPrimary} strokeWidth={3} /> : <Plus size={18} color={colors.primary} />}
+                    {isAdded ? <Check size={20} color={colors.onPrimary} strokeWidth={2.6} /> : <Plus size={20} color={colors.text} strokeWidth={2.2} />}
                   </IconButton>
                 </View>
               </React.Fragment>

@@ -43,7 +43,8 @@ function zoneFormatter(timeZone: string, file: string): Intl.DateTimeFormat {
   if (!f) {
     try {
       f = new Intl.DateTimeFormat('en-US', {
-        timeZone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric',
+        // hour12: false is the most widely supported way to get a 24-hour clock; some engines write midnight as 24, handled below.
+        timeZone, hour12: false, year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric',
       });
     } catch {
       throw new ImportError('bad-time-zone', `"${timeZone}" is not a time zone this device knows. Choose another one.`, file);

@@ -4,9 +4,9 @@ import { ScrollView, View, type LayoutChangeEvent, type NativeScrollEvent, type 
 
 import { diffDays, formatDayLabel, fromISODate, startOfWeek } from '@/lib/dates';
 import { useDays } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { cup, fonts, useTheme } from '@/theme';
 import type { ISODate } from '@/types';
-import { IconButton, PressableScale, Ring, Text } from '@/ui';
+import { IconButton, MiniCup, PressableScale, Text } from '@/ui';
 
 import { dayRing, weekCaption, weekDates } from './week';
 
@@ -14,20 +14,25 @@ const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 export const STRIP_WEEKS = 8;
 
 /**
- * Monday-to-Sunday strip of day rings, paged back over the last eight weeks.
- * Each ring is eaten kcal over that day's budget; tapping a day selects it.
+ * Monday-to-Sunday strip of mini cups, paged back over the last eight weeks.
+ * Each cup is filled to that day's eaten kcal over its budget (an amber lip
+ * when over, a dashed outline for a day still to come), so the strip doubles
+ * as a chart. The selected day's date is an ink box; tapping a day selects it.
  */
 export function DayRingStrip({
   today,
   selected,
   onSelect,
   testIDPrefix = 'today',
+  accessory,
 }: {
   today: ISODate;
   selected: ISODate;
   onSelect: (d: ISODate) => void;
   /** Tab screens stay mounted together, so each place that shows the strip names its own test ids. */
   testIDPrefix?: string;
+  /** Shown in the caption row before the week arrows (Today puts the streak there). */
+  accessory?: React.ReactNode;
 }) {
   const { colors, spacing } = useTheme();
   const ref = useRef<React.ComponentRef<typeof ScrollView>>(null);
@@ -91,7 +96,7 @@ export function DayRingStrip({
             contentOffset={{ x: (STRIP_WEEKS - 1 - back) * width, y: 0 }}
             scrollEventThrottle={16}>
             {Array.from({ length: STRIP_WEEKS }, (_, i) => STRIP_WEEKS - 1 - i).map((b) => (
-              <View key={b} style={{ width, flexDirection: 'row', gap: 4 }} accessibilityRole="tablist">
+              <View key={b} style={{ width, flexDirection: 'row', paddingTop: 2 }} accessibilityRole="tablist">
                 {weekDates(today, b).map((d, i) => {
                   const summary = byDate.get(d);
                   const ring = summary ? dayRing(summary, today) : { date: d, state: 'future' as const, progress: 0 };
@@ -118,40 +123,31 @@ export function DayRingStrip({
                         disabled: future,
                       }}
                       accessibilityLabel={`${formatDayLabel(d)}${kcal}`}
-                      style={{
-                        flex: 1,
-                        minHeight: 44,
-                        alignItems: 'center',
-                        paddingTop: 6,
-                        paddingBottom: 4,
-                        gap: 4,
-                        borderRadius: 14,
-                        backgroundColor: isSelected ? colors.primarySoft : 'transparent',
-                        opacity: future ? 0.45 : 1,
-                      }}>
-                      <Text variant="caption" color={isSelected ? 'primary' : 'textTertiary'} style={{ fontSize: 11 }}>
+                      // A future day is drawn dashed; fading it as well would make its date unreadable.
+                      dimDisabled={false}
+                      style={{ flex: 1, minHeight: 44, alignItems: 'center', gap: 6, paddingBottom: 2 }}>
+                      <Text variant="label" color={isSelected ? 'text' : 'textSecondary'} style={{ fontSize: 12, lineHeight: 16, fontFamily: isSelected ? fonts.bold : fonts.semibold }}>
                         {LETTERS[i]}
                       </Text>
-                      <Ring size={32} stroke={4} animate={false} progress={ring.progress} color={colors.calories} overColor={colors.warning}>
-                        <Text
-                          variant="caption"
-                          tabular
-                          color={isSelected ? 'primary' : isToday ? 'text' : 'textSecondary'}
-                          style={{
-                            fontSize: 12,
-                            fontWeight: isSelected || isToday ? '700' : '500',
-                          }}>
-                          {fromISODate(d).getDate()}
-                        </Text>
-                      </Ring>
+                      <MiniCup progress={ring.progress} over={ring.state === 'over'} future={future} color={colors.calories} />
                       <View
                         style={{
-                          width: 4,
-                          height: 4,
-                          borderRadius: 2,
-                          backgroundColor: isToday ? colors.primary : 'transparent',
-                        }}
-                      />
+                          width: 32,
+                          height: 24,
+                          ...cup(9, 4),
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: isSelected ? colors.text : 'transparent',
+                          borderWidth: isToday && !isSelected ? 1.5 : 0,
+                          borderColor: colors.text,
+                        }}>
+                        <Text
+                          variant="numM"
+                          color={isSelected ? 'bg' : future ? 'textTertiary' : 'text'}
+                          style={{ fontSize: 14, lineHeight: 20, letterSpacing: 0 }}>
+                          {fromISODate(d).getDate()}
+                        </Text>
+                      </View>
                     </PressableScale>
                   );
                 })}
@@ -159,13 +155,14 @@ export function DayRingStrip({
             ))}
           </ScrollView>
         ) : (
-          <View style={{ height: 70 }} />
+          <View style={{ height: 96 }} />
         )}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
         <Text variant="caption" color="textSecondary" style={{ flex: 1 }} numberOfLines={2} testID={`${testIDPrefix}-week-caption`}>
           {weekCaption(shownWeek, today)}
         </Text>
+        {accessory}
         <IconButton
           testID={`${testIDPrefix}-week-prev`}
           accessibilityLabel="Previous week"
@@ -173,10 +170,10 @@ export function DayRingStrip({
           tone="clear"
           disabled={back >= STRIP_WEEKS - 1}
           onPress={() => page(back + 1)}>
-          <ChevronLeft size={18} color={back >= STRIP_WEEKS - 1 ? colors.textTertiary : colors.textSecondary} />
+          <ChevronLeft size={20} color={colors.text} strokeWidth={2} />
         </IconButton>
         <IconButton testID={`${testIDPrefix}-week-next`} accessibilityLabel="Next week" size={32} tone="clear" disabled={back <= 0} onPress={() => page(back - 1)}>
-          <ChevronRight size={18} color={back <= 0 ? colors.textTertiary : colors.textSecondary} />
+          <ChevronRight size={20} color={colors.text} strokeWidth={2} />
         </IconButton>
       </View>
     </View>

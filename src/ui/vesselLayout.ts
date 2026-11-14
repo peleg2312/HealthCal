@@ -24,7 +24,10 @@ export function placeLabels(desired: number[], heights: number[], zone: number, 
     tops[i] = Math.min(tops[i], limit);
   }
   // A zone too small for every label: stack from the top rather than above it.
-  for (let i = 0; i < n; i++) if (tops[i] < 0) tops[i] = i === 0 ? 0 : tops[i - 1] + heights[i - 1] + gap;
+  if (n && tops[0] < 0) {
+    tops[0] = 0;
+    for (let i = 1; i < n; i++) tops[i] = Math.max(tops[i], tops[i - 1] + heights[i - 1] + gap);
+  }
   return tops;
 }
 

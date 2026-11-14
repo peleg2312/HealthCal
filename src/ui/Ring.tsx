@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Animated, Easing, Platform, View, type StyleProp, type ViewStyle } from 'react-native';
-import Svg, { Circle, Defs, LinearGradient, Stop, type CircleProps } from 'react-native-svg';
+import Svg, { Circle, type CircleProps } from 'react-native-svg';
 
 import { useTheme } from '@/theme';
 
@@ -17,7 +17,7 @@ export interface RingProps {
   /** 0..1; values above 1 draw a second lap in `overColor`. */
   progress: number;
   color: string;
-  /** Second gradient stop; defaults to a solid stroke. */
+  /** @deprecated Pour has no gradients; ignored (the ring is one flat colour). */
   colorEnd?: string;
   overColor?: string;
   trackColor?: string;
@@ -26,10 +26,14 @@ export interface RingProps {
   animate?: boolean;
 }
 
-let gradientSeq = 0;
-
-/** Animated circular progress. Starts at 12 o'clock and fills clockwise. */
-export function Ring({ size, stroke = 12, progress, color, colorEnd, overColor, trackColor, children, style, animate = true }: RingProps) {
+/**
+ * @deprecated Replaced by `Vessel` (hero amounts), `MiniCup` (week strips and
+ * lists) and `ProgressBar` (small amounts in a row). Kept, flat (one colour,
+ * square ends, no gradient), until its last callers move to the cups.
+ *
+ * Animated circular progress. Starts at 12 o'clock and fills clockwise.
+ */
+export function Ring({ size, stroke = 12, progress, color, colorEnd: _colorEnd, overColor, trackColor, children, style, animate = true }: RingProps) {
   const { colors } = useTheme();
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
@@ -38,7 +42,6 @@ export function Ring({ size, stroke = 12, progress, color, colorEnd, overColor, 
   const over = Math.min(1, Math.max(0, clamped - 1));
   const [value] = useState(() => new Animated.Value(animate ? 0 : first));
   const [overValue] = useState(() => new Animated.Value(animate ? 0 : over));
-  const [gradId] = useState(() => `ring-${gradientSeq++}`);
 
   useEffect(() => {
     if (!animate) {
@@ -58,20 +61,14 @@ export function Ring({ size, stroke = 12, progress, color, colorEnd, overColor, 
   return (
     <View style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }, style]}>
       <Svg width={size} height={size} style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
-        <Defs>
-          <LinearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0" stopColor={color} />
-            <Stop offset="1" stopColor={colorEnd ?? color} />
-          </LinearGradient>
-        </Defs>
         <Circle cx={size / 2} cy={size / 2} r={r} stroke={trackColor ?? colors.track} strokeWidth={stroke} fill="none" />
         <AnimatedCircle
           cx={size / 2}
           cy={size / 2}
           r={r}
-          stroke={`url(#${gradId})`}
+          stroke={color}
           strokeWidth={stroke}
-          strokeLinecap="round"
+          strokeLinecap="butt"
           fill="none"
           strokeDasharray={`${c} ${c}`}
           strokeDashoffset={dash}
@@ -84,7 +81,7 @@ export function Ring({ size, stroke = 12, progress, color, colorEnd, overColor, 
             r={r}
             stroke={overColor ?? colors.warning}
             strokeWidth={stroke}
-            strokeLinecap="round"
+            strokeLinecap="butt"
             fill="none"
             strokeDasharray={`${c} ${c}`}
             strokeDashoffset={overDash}

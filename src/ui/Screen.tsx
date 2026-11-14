@@ -6,13 +6,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MAX_CONTENT_WIDTH, useTheme } from '@/theme';
 
-import { AmbientGlow } from './AmbientGlow';
 import { IconButton } from './Button';
 import { PressableScale } from './Pressable';
 import { Text } from './Text';
 
-/** Height reserved at the bottom of tab screens for the floating tab bar. */
-export const TAB_BAR_SPACE = 104;
+/** Height of the docked tab bar above the home indicator (the + cup rises 14 px above it). */
+export const TAB_BAR_HEIGHT = 58;
+/** Height reserved at the bottom of tab screens for the docked tab bar, plus breathing room. */
+export const TAB_BAR_SPACE = TAB_BAR_HEIGHT + 28;
 
 export interface ScreenProps {
   children: React.ReactNode;
@@ -29,12 +30,12 @@ export interface ScreenProps {
   scrollProps?: ScrollViewProps;
   /** Skip the top safe-area inset (modals presented as sheets on iOS). */
   noTopInset?: boolean;
-  /** A theme colour washed softly behind the top of the screen (pass the screen's semantic colour). */
+  /** @deprecated Pour has no glow backdrops. Accepted so callers do not break; ignored. */
   backdrop?: string;
   testID?: string;
 }
 
-export function Screen({ children, scroll = true, header, footer, tabs, padded = true, contentStyle, scrollProps, noTopInset, backdrop, testID }: ScreenProps) {
+export function Screen({ children, scroll = true, header, footer, tabs, padded = true, contentStyle, scrollProps, noTopInset, backdrop: _backdrop, testID }: ScreenProps) {
   const { colors, spacing } = useTheme();
   const insets = useSafeAreaInsets();
   const inner: ViewStyle = {
@@ -46,7 +47,6 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
   const bottomPad = (tabs ? TAB_BAR_SPACE : spacing.xxl) + (footer ? 0 : insets.bottom);
   return (
     <KeyboardAvoidingView testID={testID} style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'web' ? undefined : 'padding'}>
-      {backdrop ? <AmbientGlow color={backdrop} /> : null}
       <View style={{ paddingTop: noTopInset ? 0 : insets.top }} />
       {header ? <View style={inner}>{header}</View> : null}
       {scroll ? (
@@ -97,11 +97,11 @@ export function Header({
     <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 56, gap: spacing.md, paddingVertical: spacing.sm }}>
       {close ? (
         <IconButton accessibilityLabel="Close" onPress={handle} testID="header-close">
-          <X size={20} color={colors.text} />
+          <X size={20} color={colors.text} strokeWidth={2.2} />
         </IconButton>
       ) : back ? (
         <IconButton accessibilityLabel="Back" onPress={handle} testID="header-back">
-          <ChevronLeft size={22} color={colors.text} />
+          <ChevronLeft size={22} color={colors.text} strokeWidth={2.2} />
         </IconButton>
       ) : null}
       <View style={{ flex: 1 }}>
@@ -121,14 +121,14 @@ export function Header({
   );
 }
 
-/** Large title used at the top of tab screens. */
+/** Large title used at the top of tab screens: an overline (the date or range) above a Bricolage h1. */
 export function LargeTitle({ title, subtitle, right }: { title: string; subtitle?: string; right?: React.ReactNode }) {
   const { spacing } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: spacing.sm, paddingBottom: spacing.xs, gap: spacing.md }}>
-      <View style={{ flex: 1 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', paddingTop: spacing.sm, paddingBottom: spacing.xs, gap: spacing.md }}>
+      <View style={{ flex: 1, gap: 6 }}>
         {subtitle ? (
-          <Text variant="label" color="textSecondary">
+          <Text variant="overline" numberOfLines={1}>
             {subtitle}
           </Text>
         ) : null}
@@ -150,13 +150,14 @@ export function SectionTitle({ title, action, onAction, testID }: { title: strin
       </Text>
       {action && onAction ? (
         // The label is small; the pressable around it is a full-height touch target.
+        // Section titles sit on bg, where light primary text is just under 4.5:1, so the action is an underlined text link.
         <PressableScale testID={`section-${slug}-action`} accessibilityLabel={action} onPress={onAction} hitSlop={8} style={{ minHeight: 44, justifyContent: 'center', paddingLeft: 12, marginVertical: -10 }}>
-          <Text variant="label" color="primary">
+          <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
             {action}
           </Text>
         </PressableScale>
       ) : action ? (
-        <Text variant="label" color="primary">
+        <Text variant="label" color="textSecondary">
           {action}
         </Text>
       ) : null}

@@ -93,26 +93,35 @@ scripts/dev/        seed.mjs (demo data) and shot.mjs (browser screenshots).
 
 ## UI kit (`import { ... } from '@/ui'`)
 
-- Layout: `Screen` (props: `header`, `footer`, `tabs`, `scroll`, `padded`), `Header` (`title`, `subtitle`, `back`, `close`, `right`), `LargeTitle`, `SectionTitle`, `goBack()`.
-- Surfaces: `Card` (`onPress`, `gradient`, `tone`, `padding`), `Sheet`, `ConfirmSheet`, `Divider`.
-- Text: `Text` with `variant` (display, h1, h2, h3, title, body, bodyStrong, label, caption, overline, numXL, numL, numM), `color` (any theme colour name), `tabular` for changing numbers.
-- Actions: `Button` (variant primary/secondary/ghost/danger, size sm/md/lg, `icon`, `loading`), `IconButton`, `PressableScale`, `Chip`, `ChipRow`, `Segmented`, `Badge`.
+The visual identity is "Pour": the day fills up like a cup. Every amount is a flat colour poured into an open, straight-sided vessel, topped by a crisp level line (the `rim` colour), with what is left visible above it. The rules for each piece are in its source comments (`src/ui/Vessel.tsx` for the cups, `src/theme/tokens.ts` for colours, type and the cup corner).
+
+- Layout: `Screen` (props: `header`, `footer`, `tabs`, `scroll`, `padded`; `backdrop` is accepted but ignored, there is no glow), `Header` (`title`, `subtitle`, `back`, `close`, `right`), `LargeTitle` (overline `subtitle` above a Bricolage h1), `SectionTitle`, `goBack()`, `TAB_BAR_SPACE`.
+- Surfaces: `Card` (`onPress`, `tone` surface/alt/transparent, `padding`; cup corners, 1 px border, flat; `gradient` is ignored), `Sheet` (a lid: 6 px top corners, the only shadow), `ConfirmSheet`, `Divider`.
+- Text: `Text` with `variant` (display, h1, h2, h3, title, body, bodyStrong, label, caption, overline, numXL, numL, numM, unit), `color` (any theme colour name), `tabular`. Headings and every num variant are Bricolage Grotesque, the rest Hanken Grotesk. A unit is a nested `<Text variant="unit">` inside the number.
+- Actions: `Button` (variant primary/secondary/ghost/danger/soft, size sm/md/lg, `icon`, `tint` for a data-coloured edge, `loading`), `IconButton` (44 square cup by default), `PressableScale` (`dimDisabled`), `Chip` (`dropdown`), `ChipRow`, `Segmented` (underline tabs), `Badge`.
 - Input: `TextField`, `NumberField` (`value: number | null`), `Stepper`, `parseNumber`.
-- Lists: `ListRow`, `ToggleRow`, `Avatar` (emoji tile), `EmptyState`, `Stat`.
-- Data viz: `Ring`, `ProgressBar`, `BarChart`, `LineChart`, `Sparkline`, `MacroBar`.
+- Lists: `ListRow`, `ToggleRow`, `Avatar` (cup tile: `initials`, `emoji` or an icon), `EmptyState` (draws an empty dashed cup; `emoji` is ignored), `Stat` (`color` gives a cup key, the number stays text-coloured), `CupKey` (legend key and data-source mark: filled, outline, dashed).
+- Amounts: `Vessel` (the open cup: `value`, `max`, `headroom` hatched at the top, amber lip when over, `labels` at the height they describe, `children` under the labels), `MiniCup` (week strips and lists, 30 x 38), `Trough` (the sideways vessel), `ProgressBar` (flat fill with the rim tick; over target turns amber), `Hatch`.
+- Data viz: `BarChart` (slim cups with a rim, amber above `goal`, `openIndex` hatched), `LineChart`, `Sparkline`, `MacroBar`. `Ring` is deprecated and flat: replace it with `Vessel`, `MiniCup` or `ProgressBar`.
 - Feedback: `toast(message, { label, onPress })`, `haptic.tap/press/select/success/warn`. A `Sheet` shows toasts itself, just above its top edge, so there is one `toast-action` on screen at a time.
-- Icons: `lucide-react-native` (size 18 to 22 in rows, colour from the theme).
+- Icons: `lucide-react-native` only, stroke 1.9 (2.2 when active or on a button), 18 to 22 px, colour from the theme. A data icon takes its data colour only when it stands alone; next to a number use a `CupKey`.
 
 Read the component source in `src/ui/` for exact props before using one. If the kit lacks something you need, build it inside your own `src/features/<area>/` folder; do not edit `src/ui/`, `src/theme/`, `src/store/`, `src/lib/` or `src/types/` unless your brief says you own the file. Report gaps instead.
 
 ## Design rules
 
-- Never hard-code a colour, font or radius. Use `useTheme()` (`colors`, `spacing`, `radius`). There are three themes (dark, light and the pink Blossom theme) and all must look right, so never branch on `dark` to pick a colour: add a token instead.
-- Semantic colours are fixed: calories `colors.calories`, protein `colors.protein`, carbs `colors.carbs`, fat `colors.fat`, water `colors.water`, exercise `colors.exercise`, sleep `colors.sleep`, weight `colors.weight`. A tinted background is the colour plus `'22'` (hex alpha).
+- Never hard-code a colour, font or radius. Use `useTheme()` (`colors`, `spacing`, `radius`) and the helpers from `@/theme` (`cup`, `cupFor`, `fonts`). There are three themes (dark espresso, light oat paper and the pink Blossom theme) and all must look right, so never branch on `dark` to pick a colour: add a token instead.
+- Flat only: no gradients, no glow, no blur, no shadows (the Sheet is the one exception). Everything is a flat fill plus one line.
+- The level line is the signature: a 3 px `colors.rim` bar on top of every fill (2.5 px in mini cups and bar charts), the tick on every progress bar, the active tab and the selected segment. `rim` is never a data colour.
+- Containers are cups: square shoulders on top, a round base. Spread `cup(radius.card)` on cards (6 6 22 22), `cup(radius.button)` on buttons, `cup(radius.buttonSm, 5)` on small buttons, `cup(radius.tile, 5)` or `cupFor(size)` on tiles, avatars and icon buttons. Labels (chips, segments, keys, badges) keep small equal corners (`radius.chip`, 6). Nothing is a pill, nothing is fully round, and no large uniform radius. `radius.pill` is 6 now; do not use it in new code.
+- Semantic colours are fixed: calories `colors.calories`, protein `colors.protein`, carbs `colors.carbs`, fat `colors.fat`, water `colors.water`, exercise `colors.exercise`, sleep `colors.sleep`, weight `colors.weight`. Data colours are fills and key marks only, never text. Calorie numbers use `colors.caloriesInk`; other numbers use `text`. Exercise-added budget is hatched in `colors.headroom`; vessel outlines are `colors.vesselEdge`.
+- Over target is `colors.warning` (amber lip on a vessel, the over part of a bar), with neutral words. Never red.
+- Contrast: 4.5:1 for small text, 3:1 for large numbers. `textTertiary` and primary-coloured text go only on `surface` (light primary on `bg` is 4.48). Nothing small in `textTertiary` on `surfaceAlt`.
 - One primary action per screen, pinned in the `Screen` footer when the screen is a form.
-- Numbers that matter are large (`numL`/`numXL`), their unit small and secondary beside them. Group related stats in one card rather than many small cards.
-- Spacing comes from the scale (4, 8, 12, 16, 20, 24, 32). Screen side padding is 20 (handled by `Screen`). Cards use radius `lg`.
-- Touch targets are at least 44 px. Every interactive element has an `accessibilityLabel` (the kit adds one from `title`/`label` where it can) and a stable `testID` in kebab-case (`food-search-input`, `log-activity-save`).
+- Numbers that matter are large Bricolage (`numL`/`numXL`), their unit small (`unit` variant) beside them. Group related stats in one card, separated by dividers, rather than many small cards.
+- Emoji are content marks only: 17 px, no tile, in food and activity rows. Never in headers, buttons, navigation or empty states. People get initials in a cup tile.
+- Spacing comes from the scale (4, 8, 12, 16, 20, 24, 32). Screen side padding is 20 (handled by `Screen`). Card padding 16 to 18.
+- Touch targets are at least 44 px (small buttons and chips are 32 to 36 visible with `hitSlop`). Every interactive element has an `accessibilityLabel` (the kit adds one from `title`/`label` where it can) and a stable `testID` in kebab-case (`food-search-input`, `log-activity-save`).
 - Content is capped at 560 px wide and centred (handled by `Screen`), so the app reads well on tablets and desktop web.
 - Empty states explain what the screen will show and offer the action that fills it.
 - Sentence case everywhere. No exclamation marks in routine copy. Units always shown.
