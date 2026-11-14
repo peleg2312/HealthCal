@@ -72,7 +72,6 @@ export type ImportWarningCode =
   | 'csv-skipped-bad-row'
   | 'csv-elapsed-time'
   | 'csv-date-order'
-  | 'csv-total-row'
   | 'zip-skipped-files'
   | 'zip-nested-depth';
 
