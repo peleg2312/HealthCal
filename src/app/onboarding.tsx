@@ -3,12 +3,12 @@ import { ArrowRight, BellRing, ChevronLeft, CloudUpload } from 'lucide-react-nat
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
 
-import { FadeIn, StepProgress } from '@/features/onboarding/components';
-import { buildPlan, draftFromProfile, effectiveBodyFat, stepsFor, toMetric, useOnboardingDraft, validateStep, type StepId } from '@/features/onboarding/model';
-import { PlanReveal } from '@/features/onboarding/PlanReveal';
+import { FadeIn, StepProgress } from '@/features/onboarding/_before/components';
+import { buildPlan, draftFromProfile, effectiveBodyFat, stepsFor, toMetric, useOnboardingDraft, validateStep, type StepId } from '@/features/onboarding/_before/model';
+import { PlanReveal } from '@/features/onboarding/_before/PlanReveal';
 import { remindersPatch } from '@/features/onboarding/routine';
 import { RestoreFailed } from '@/features/onboarding/SignInGate';
-import { AboutStep, ActivityStep, BasicsStep, BodyFatStep, BodyStep, GoalStep, RoutineStep, TargetStep, type StepProps } from '@/features/onboarding/steps';
+import { AboutStep, ActivityStep, BasicsStep, BodyFatStep, BodyStep, GoalStep, RoutineStep, TargetStep, type StepProps } from '@/features/onboarding/_before/steps';
 import { today } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
 import { round } from '@/lib/units';

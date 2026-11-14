@@ -8,10 +8,11 @@
  * Only kcalNet is added to the day, so nothing is counted twice.
  */
 import { grossKcal, netKcal } from '@/lib/exercise';
-import { toISODate } from '@/lib/dates';
 import { stableId } from '@/lib/hash';
 import type { ActivityDef, ActivityEntry, Intensity } from '@/types';
 
+import { speedIntensity } from './effort';
+import { recordedWallTime } from './time';
 import type { ImportedWorkout } from './types';
 
 export interface ConvertContext {
@@ -83,20 +84,24 @@ export function toActivityEntry(w: ImportedWorkout, activity: ActivityDef, ctx: 
   const externalId = garminExternalId(w);
   const { weightKg, baselineKcalPerDay } = ctx;
 
+  // For activities whose effort levels are described by speed, the speed decides
+  // the level, so the label matches the pace shown beside it (effort.ts).
+  const bySpeed = speedIntensity(activity, w);
   let intensity: Intensity;
   let kcalGross: number;
   let kcalNet: number;
   let measured = false;
   if (w.kcal !== null && w.kcal > 0) {
-    // Measured: Garmin's total is gross. The effort level is the one whose
-    // table MET is nearest what the calories imply, so guideline minutes stay honest.
-    intensity = nearestIntensity(activity, impliedMet(w.kcal, weightKg, Math.max(exactMinutes, 1 / 60)));
+    // Measured: Garmin's total is gross and is kept exactly. Without a speed to go
+    // by, the effort level is the one whose table MET is nearest what the calories imply.
+    intensity = bySpeed ?? nearestIntensity(activity, impliedMet(w.kcal, weightKg, Math.max(exactMinutes, 1 / 60)));
     kcalGross = w.kcal;
     kcalNet = Math.max(0, w.kcal - (baselineKcalPerDay / 1440) * durationMin);
     measured = true;
   } else {
-    // No calories in the file (GPX): estimate exactly as a hand-logged session does.
-    intensity = ctx.estimateIntensity ?? 'moderate';
+    // No calories in the file (GPX): estimate exactly as a hand-logged session does,
+    // at the effort the speed gives, else the one the person chose for estimates.
+    intensity = bySpeed ?? ctx.estimateIntensity ?? 'moderate';
     const met = activity.met[intensity];
     kcalGross = grossKcal(met, weightKg, durationMin);
     kcalNet = netKcal(met, weightKg, durationMin, baselineKcalPerDay);
@@ -104,7 +109,8 @@ export function toActivityEntry(w: ImportedWorkout, activity: ActivityDef, ctx: 
 
   const entry: ImportedEntry = {
     id: importedEntryId(externalId),
-    date: toISODate(new Date(startMs)),
+    // The day where the workout was done (the file's own offset when it states one).
+    date: recordedWallTime(w).date,
     activityId: activity.id,
     name: activity.name,
     emoji: activity.emoji,

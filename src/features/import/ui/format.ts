@@ -2,13 +2,14 @@
  * Plain formatting and counting for the Garmin import screen. Pure: no React,
  * no storage, no clock (today's date is passed in), so it is unit-tested.
  */
-import { addDays, formatDuration, fromISODate, toISODate } from '@/lib/dates';
+import { addDays, formatDuration, fromISODate } from '@/lib/dates';
 import { kcalRange } from '@/lib/exercise';
 import { formatDistance, formatNumber } from '@/lib/units';
 import type { ISODate, UnitSystem } from '@/types';
 
 import type { ImportCandidate } from '../plan';
 import type { ImportBatch } from '../read';
+import { recordedWallTime } from '../time';
 import type { ImportedWorkout } from '../types';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -23,17 +24,22 @@ export function dayLabel(date: ISODate, todayDate: ISODate): string {
   return date.slice(0, 4) === todayDate.slice(0, 4) ? base : `${base}, ${d.getFullYear()}`;
 }
 
-/** Local clock time of an instant: "07:05", or "7:05 AM" for a 12-hour clock. */
-export function clockTime(utc: string, hour12: boolean): string {
-  const d = new Date(utc);
-  const h = d.getHours();
-  const m = String(d.getMinutes()).padStart(2, '0');
+type Recorded = Pick<ImportedWorkout, 'startUtc' | 'utcOffsetMin'>;
+
+/**
+ * Start time where the workout was recorded (the file's own offset, else this
+ * device's zone): "07:05", or "7:05 AM" for a 12-hour clock.
+ */
+export function clockTime(w: Recorded, hour12: boolean): string {
+  const t = recordedWallTime(w);
+  const h = t.hour;
+  const m = String(t.minute).padStart(2, '0');
   if (!hour12) return `${String(h).padStart(2, '0')}:${m}`;
   return `${h % 12 === 0 ? 12 : h % 12}:${m} ${h >= 12 ? 'PM' : 'AM'}`;
 }
 
-/** The local calendar day an instant falls on, on this device. */
-export const localDay = (utc: string): ISODate => toISODate(new Date(utc));
+/** The calendar day the workout was done on, where it was recorded (the day its entry is saved under). */
+export const localDay = (w: Recorded): ISODate => recordedWallTime(w).date;
 
 /** Seconds as the app shows durations: "48 min", "1 h 2 min". Under a minute: "45 s". */
 export function durationLabel(sec: number): string {
@@ -50,7 +56,7 @@ export function distanceLabel(m: number | null, units: UnitSystem): string | nul
 
 /** The meta line under a row: day, start time, duration and distance. Non-breaking spaces keep a value with its unit. */
 export function metaLine(w: ImportedWorkout, todayDate: ISODate, units: UnitSystem, hour12: boolean): string {
-  const parts = [dayLabel(localDay(w.startUtc), todayDate), clockTime(w.startUtc, hour12), durationLabel(w.durationSec)];
+  const parts = [dayLabel(localDay(w), todayDate), clockTime(w, hour12), durationLabel(w.durationSec)];
   const dist = distanceLabel(w.distanceM, units);
   if (dist) parts.push(dist);
   return parts.map((p) => p.replace(/ /g, ' ')).join(' · ');

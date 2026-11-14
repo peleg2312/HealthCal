@@ -96,7 +96,7 @@ function SystemTimeCard({ files, todayDate, hour12, zone, onChangeZone }: { file
         const first = all.find((w) => w.fileName === file || w.fileName.startsWith(`${file}/`));
         if (!first) return null;
         const shift = shifts[file] ?? 0;
-        const day = localDay(first.startUtc);
+        const day = localDay(first);
         return (
           <View key={file} style={{ gap: spacing.sm }}>
             <Text variant="overline" numberOfLines={1}>
@@ -111,7 +111,7 @@ function SystemTimeCard({ files, todayDate, hour12, zone, onChangeZone }: { file
                   {dayLabel(day, todayDate)}
                 </Text>
                 <Text variant="caption" color="textSecondary">
-                  Started at {clockTime(first.startUtc, hour12)}
+                  Started at {clockTime(first, hour12)}
                 </Text>
               </View>
               <IconButton accessibilityLabel="One day later" testID="import-fit-day-next" disabled={day >= todayDate} onPress={() => setDayShift(file, shift + 1)}>

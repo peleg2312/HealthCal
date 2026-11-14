@@ -3,6 +3,9 @@
  *
  *  - The same workout read twice (the same file again, or FIT and CSV of one
  *    activity) is 'already-imported' or 'duplicate-in-file' and adds nothing.
+ *  - A workout already imported from a file that carried less (a GPX with
+ *    no calories, a CSV without heart rate) is an 'update' when this reading
+ *    adds something: saving replaces the numbers and keeps the record.
  *  - A workout that overlaps something already in the diary (typically a
  *    session the person logged by hand) is a 'probable-duplicate': the screen
  *    should show it unticked so the person decides.
@@ -10,14 +13,17 @@
 import type { ActivityEntry } from '@/types';
 
 import { garminExternalId } from './convert';
+import { recordedWallTime } from './time';
 import type { ImportedWorkout } from './types';
 
-export type ImportStatus = 'new' | 'already-imported' | 'duplicate-in-file' | 'probable-duplicate';
+export type ImportStatus = 'new' | 'update' | 'already-imported' | 'duplicate-in-file' | 'probable-duplicate';
 
 export interface DuplicateCheck {
   status: ImportStatus;
   /** Plain-language reason for any status other than 'new'. */
   reason: string | null;
+  /** For 'update' (and a deleted workout this reading would restore richer): what this reading adds. */
+  adds: UpdateGain[];
   /** The saved entry this matched, when there is one (may be soft-deleted). */
   match: ActivityEntry | null;
   /** For 'duplicate-in-file' and batch overlaps: index of the workout in the same batch that is kept instead. */
@@ -29,6 +35,33 @@ export interface DedupeCandidate {
   workout: ImportedWorkout;
   activityId?: string | null;
   category?: string | null;
+  /** True when the matched activity records a distance (so a distance in the file is worth having). */
+  tracksDistance?: boolean;
+}
+
+/** What a reading of a workout carries that the stored copy lacks. */
+export type UpdateGain = 'calories' | 'heart-rate' | 'distance';
+
+/**
+ * What this reading would add to a stored copy of the same workout: the
+ * device's own calories where the stored ones are an estimate, heart rate, or
+ * distance. Empty when it carries nothing more.
+ */
+export function updateGains(c: DedupeCandidate, stored: ActivityEntry): UpdateGain[] {
+  const w = c.workout;
+  const out: UpdateGain[] = [];
+  if (w.kcal !== null && w.kcal > 0 && !stored.measured) out.push('calories');
+  if (w.avgHeartRate !== null && w.avgHeartRate > 0 && !stored.avgHeartRate) out.push('heart-rate');
+  if (c.tracksDistance && w.distanceM !== null && w.distanceM >= 10 && !stored.distanceKm) out.push('distance');
+  return out;
+}
+
+const GAIN_WORDS: Record<UpdateGain, string> = { calories: 'the calories your watch measured', 'heart-rate': 'heart rate', distance: 'distance' };
+
+/** "the calories your watch measured, heart rate and distance". */
+export function gainsText(gains: UpdateGain[]): string {
+  const words = gains.map((g) => GAIN_WORDS[g]);
+  return words.length <= 1 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`;
 }
 
 /** Richer formats win when the same workout arrives twice in one import. */
@@ -71,27 +104,36 @@ function overlapShare(a: Span, b: Span): number {
   return Math.max(0, Math.min(a.end, b.end) - Math.max(a.start, b.start)) / shorter;
 }
 
-const PADDING_MS = 30 * 60_000;
+/** Durations of one workout logged twice are within this share of the longer one. */
+const HAND_DURATION_SHARE = 0.25;
 
 /**
- * When a saved entry happened. Imported entries know their start; a session
- * logged by hand only has the time it was saved, so it is taken to have ended
- * then, give or take half an hour.
+ * A session logged by hand has no real start time, only the moment it was
+ * saved (loggedAt). It may be the imported workout when all of these hold:
+ *  - it is on the same local day the workout was done,
+ *  - the activities are in the same category (Spinning and Stationary bike,
+ *    Running and Trail running),
+ *  - the durations are within 25% of each other,
+ *  - it was saved after the workout started: a session saved before the
+ *    workout began cannot be a record of it.
  */
-function entrySpan(e: ActivityEntry): { span: Span; exact: boolean } | null {
-  const minutes = Math.max(1, e.durationMin || 0) * 60_000;
-  const started = e.startedAt ? Date.parse(e.startedAt) : Number.NaN;
-  if (Number.isFinite(started)) return { span: { start: started, end: started + minutes }, exact: true };
+export function handLoggedMatch(
+  e: Pick<ActivityEntry, 'startedAt' | 'source' | 'date' | 'category' | 'durationMin' | 'loggedAt' | 'deleted'>,
+  w: { day: string; startMs: number; durationSec: number; category: string | null },
+): boolean {
+  if (e.deleted || e.startedAt || e.source) return false;
+  if (!w.category || e.category !== w.category || e.date !== w.day) return false;
+  const a = Math.max(1, e.durationMin || 0);
+  const b = w.durationSec / 60;
+  if (Math.abs(a - b) > HAND_DURATION_SHARE * Math.max(a, b)) return false;
   const logged = Date.parse(e.loggedAt);
-  if (!Number.isFinite(logged)) return null;
-  return { span: { start: logged - minutes - PADDING_MS, end: logged + PADDING_MS }, exact: false };
+  return Number.isFinite(logged) && logged >= w.startMs;
 }
 
+const handLoggedReason = (e: ActivityEntry) =>
+  `You logged a ${Math.round(e.durationMin)} min ${e.name.toLowerCase()} session by hand on this day. If it is the same workout, leave this unticked, or import it and delete the hand-logged one.`;
+
 const isGarmin = (e: ActivityEntry) => e.source === 'garmin';
-const localDay = (ms: number) => {
-  const d = new Date(ms);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
 
 /**
  * Check each candidate against the others in the same import and against the
@@ -100,7 +142,7 @@ const localDay = (ms: number) => {
  * 'already-imported' rather than silently brought back.
  */
 export function checkDuplicates(candidates: DedupeCandidate[], existing: ActivityEntry[]): DuplicateCheck[] {
-  const out: DuplicateCheck[] = candidates.map(() => ({ status: 'new', reason: null, match: null, sameAs: null }));
+  const out: DuplicateCheck[] = candidates.map(() => ({ status: 'new', reason: null, match: null, sameAs: null, adds: [] }));
   const spans = candidates.map((c) => workoutSpan(c.workout));
   const byExternal = new Map<string, ActivityEntry>();
   for (const e of existing) if (e.externalId) byExternal.set(e.externalId, e);
@@ -117,7 +159,7 @@ export function checkDuplicates(candidates: DedupeCandidate[], existing: Activit
     if (twin !== undefined) {
       const other = candidates[twin].workout.fileName;
       const reason = other === w.fileName ? `This workout is listed twice in ${other}; it is imported once.` : `The same workout is also in ${other}, which is used instead.`;
-      out[i] = { status: 'duplicate-in-file', reason, match: null, sameAs: twin };
+      out[i] = { status: 'duplicate-in-file', reason, match: null, sameAs: twin, adds: [] };
     } else kept.push(i);
   }
 
@@ -126,17 +168,24 @@ export function checkDuplicates(candidates: DedupeCandidate[], existing: Activit
     const c = candidates[i];
     const w = c.workout;
     const span = spans[i];
-    const ext = byExternal.get(garminExternalId(w));
+    const ext =
+      byExternal.get(garminExternalId(w)) ??
+      existing.find((e) => isGarmin(e) && !!e.startedAt && sameWorkout({ startMs: span.start, durationSec: w.durationSec }, { startMs: Date.parse(e.startedAt), durationSec: e.durationMin * 60 }));
     if (ext) {
-      out[i] = { status: 'already-imported', reason: ext.deleted ? 'You imported this workout before and then deleted it.' : 'Already imported.', match: ext, sameAs: null };
-      continue;
-    }
-    const sameGarmin = existing.find((e) => {
-      if (!isGarmin(e) || !e.startedAt) return false;
-      return sameWorkout({ startMs: span.start, durationSec: w.durationSec }, { startMs: Date.parse(e.startedAt), durationSec: e.durationMin * 60 });
-    });
-    if (sameGarmin) {
-      out[i] = { status: 'already-imported', reason: sameGarmin.deleted ? 'You imported this workout before and then deleted it.' : 'Already imported.', match: sameGarmin, sameAs: null };
+      const adds = updateGains(c, ext);
+      if (ext.deleted) {
+        // Restoring brings the workout back with this row's numbers (session.ts), so say what that adds.
+        const more = adds.length ? ` Restoring it uses this file, which adds ${gainsText(adds)}.` : '';
+        out[i] = { status: 'already-imported', reason: `You imported this workout before and then deleted it.${more}`, match: ext, sameAs: null, adds };
+      } else if (adds.length) {
+        out[i] = {
+          status: 'update',
+          reason: `Imported before from a file with less in it. This one adds ${gainsText(adds)}. Importing replaces the numbers; the day and your notes stay.`,
+          match: ext,
+          sameAs: null,
+          adds,
+        };
+      } else out[i] = { status: 'already-imported', reason: 'Already imported.', match: ext, sameAs: null, adds: [] };
       continue;
     }
     const live = existing.filter((e) => !e.deleted);
@@ -148,22 +197,23 @@ export function checkDuplicates(candidates: DedupeCandidate[], existing: Activit
       return diff > START_TOLERANCE_MS && diff <= 14 * 3_600_000 && diff % quarter <= 2000 && Math.abs(e.durationMin - Math.round(w.durationSec / 60)) <= 1 && Math.abs(e.kcalGross - w.kcal) <= 1;
     });
     if (shifted) {
-      out[i] = { status: 'probable-duplicate', reason: `Looks like the ${shifted.name.toLowerCase()} already imported, at a different clock time. The time zone chosen for this file may differ.`, match: shifted, sameAs: null };
+      out[i] = { status: 'probable-duplicate', reason: `Looks like the ${shifted.name.toLowerCase()} already imported, at a different clock time. The time zone chosen for this file may differ.`, match: shifted, sameAs: null, adds: [] };
       continue;
     }
+    // Something with a real start time (another import) that covers the same time.
     const overlapping = live.find((e) => {
-      const s = entrySpan(e);
-      if (!s) return false;
-      if (s.exact) return overlapShare(span, s.span) >= 0.5;
-      // Logged by hand: same day, and either the same activity or a time that fits.
-      if (e.date !== localDay(span.start)) return false;
-      if (c.activityId && e.activityId === c.activityId) return true;
-      return overlapShare(span, s.span) >= 0.5 && (!c.category || e.category === c.category);
+      const started = e.startedAt ? Date.parse(e.startedAt) : Number.NaN;
+      if (!Number.isFinite(started)) return false;
+      return overlapShare(span, { start: started, end: started + Math.max(1, e.durationMin || 0) * 60_000 }) >= 0.5;
     });
     if (overlapping) {
       const how = overlapping.source === 'garmin' ? 'an imported' : 'a';
-      out[i] = { status: 'probable-duplicate', reason: `You already have ${how} ${overlapping.name.toLowerCase()} session at this time.`, match: overlapping, sameAs: null };
+      out[i] = { status: 'probable-duplicate', reason: `You already have ${how} ${overlapping.name.toLowerCase()} session at this time.`, match: overlapping, sameAs: null, adds: [] };
+      continue;
     }
+    const day = recordedWallTime(w).date;
+    const hand = live.find((e) => handLoggedMatch(e, { day, startMs: span.start, durationSec: w.durationSec, category: c.category ?? null }));
+    if (hand) out[i] = { status: 'probable-duplicate', reason: handLoggedReason(hand), match: hand, sameAs: null, adds: [] };
   }
 
   // 3. Different workouts in this import that cover the same time (a CSV multisport row and the FIT legs).
@@ -181,7 +231,7 @@ export function checkDuplicates(candidates: DedupeCandidate[], existing: Activit
       const lj = spans[j].end - spans[j].start;
       const loser = ri !== rj ? (ri > rj ? i : j) : li !== lj ? (li > lj ? i : j) : Math.max(i, j);
       const winner = loser === i ? j : i;
-      out[loser] = { status: 'probable-duplicate', reason: `Covers the same time as another workout in this import (${candidates[winner].workout.fileName}).`, match: null, sameAs: winner };
+      out[loser] = { status: 'probable-duplicate', reason: `Covers the same time as another workout in this import (${candidates[winner].workout.fileName}).`, match: null, sameAs: winner, adds: [] };
     }
   }
   return out;

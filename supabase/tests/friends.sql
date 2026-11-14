@@ -6,7 +6,9 @@ insert into auth.users (id) values
   ('c1111111-1111-4111-8111-111111111111'),
   ('c2222222-2222-4222-8222-222222222222'),
   ('c3333333-3333-4333-8333-333333333333'),
-  ('c4444444-4444-4444-8444-444444444444');
+  ('c4444444-4444-4444-8444-444444444444'),
+  ('c5555555-5555-4555-8555-555555555555'),
+  ('c6666666-6666-4666-8666-666666666666');
 
 create or replace function pg_temp.act_as(p_user text) returns void language plpgsql as $$
 begin
@@ -36,11 +38,16 @@ begin
   if card ->> 'display_name' <> 'Alex' then raise exception 'name not trimmed: %', card; end if;
   if card ->> 'code' !~ '^[A-HJKMNP-Z2-9]{8}$' then raise exception 'unexpected code format: %', card ->> 'code'; end if;
   if card -> 'sharing' ? 'calories' then raise exception 'sharing accepted an unknown switch'; end if;
+  -- The owner gets the secret that makes their workout references opaque; nobody else ever does.
+  if coalesce(card ->> 'share_key', '') !~ '^[0-9a-f]{64}$' then raise exception 'no share key for the owner: %', card; end if;
   insert into codes values ('alex', card ->> 'code');
+  insert into codes values ('alex-key', card ->> 'share_key');
 
   -- Set-up again keeps the code and changes the rest.
   card := public.social_setup('Alex R', '🦊', '{"workouts": true, "streak": true, "minutes": true}');
   if card ->> 'code' <> (select code from codes where who = 'alex') then raise exception 'code changed on update'; end if;
+  if card ->> 'share_key' <> (select code from codes where who = 'alex-key') then raise exception 'share key changed on update'; end if;
+  if public.friends_overview() -> 'me' ->> 'share_key' <> (select code from codes where who = 'alex-key') then raise exception 'own card lacks the share key'; end if;
 
   begin
     perform public.social_setup('   ', '', '{}');
@@ -113,12 +120,24 @@ select pg_temp.act_as('c1111111-1111-4111-8111-111111111111');
 do $$
 declare o jsonb;
 begin
+  -- A workout must be referred to by an opaque 32-hex reference, never its record id
+  -- (an imported workout's id is derived from its start time).
+  begin
+    perform public.social_publish('{"week": "2026-11-09", "workouts": [{"id": "8b552e86-b4b0-5c91-a9b5-0267052a9b4f", "name": "Running", "minutes": 48, "date": "2026-11-14"}]}');
+    raise exception 'a summary with a real record id was accepted';
+  exception when invalid_parameter_value then null;
+  end;
+  begin
+    perform public.social_publish('{"workouts": [{"id": "0123456789ABCDEF0123456789ABCDEF", "name": "Running"}]}');
+    raise exception 'a summary with an upper-case reference was accepted';
+  exception when invalid_parameter_value then null;
+  end;
   if not public.social_publish('{
     "week": "2026-11-09", "minutes": 236.4, "sessions": 4, "streak": 33,
     "kcal": 2100, "weightKg": 79, "notes": "private",
     "workouts": [
-      {"id": "w1", "name": "Running", "emoji": "🏃", "minutes": 32, "date": "2026-11-14", "distanceKm": 5.2, "kcalNet": 310},
-      {"id": "w2", "name": "Volleyball", "emoji": "🏐", "minutes": 75, "date": "2026-11-13"},
+      {"id": "0123456789abcdef0123456789abcdef", "name": "Running", "emoji": "🏃", "minutes": 32, "date": "2026-11-14", "distanceKm": 5.2, "kcalNet": 310},
+      {"id": "fedcba9876543210fedcba9876543210", "name": "Volleyball", "emoji": "🏐", "minutes": 75, "date": "2026-11-13"},
       "not an object"
     ]
   }') then raise exception 'publish reported no card'; end if;
@@ -139,6 +158,8 @@ begin
   s := o -> 'friends' -> 0 -> 'summary';
   if (s ->> 'minutes')::int <> 236 or (s ->> 'sessions')::int <> 4 or (s ->> 'streak')::int <> 33 then raise exception 'summary numbers: %', s; end if;
   if s ? 'kcal' or s ? 'weightKg' or s ? 'notes' then raise exception 'private fields reached a friend: %', s; end if;
+  if position((select code from codes where who = 'alex-key') in o::text) > 0 then raise exception 'a friend can see the share key'; end if;
+  if s -> 'workouts' -> 0 ->> 'id' <> '0123456789abcdef0123456789abcdef' then raise exception 'workout reference: %', s -> 'workouts' -> 0; end if;
   if jsonb_array_length(s -> 'workouts') <> 2 then raise exception 'workouts: %', s -> 'workouts'; end if;
   if (s -> 'workouts' -> 0) ? 'kcalNet' then raise exception 'workout calories reached a friend'; end if;
   if s -> 'workouts' -> 0 ->> 'name' <> 'Running' or (s -> 'workouts' -> 0 ->> 'distanceKm')::numeric <> 5.2 then raise exception 'workout fields: %', s -> 'workouts' -> 0; end if;
@@ -152,7 +173,7 @@ declare o jsonb;
 begin
   o := public.friends_overview();
   if jsonb_array_length(o -> 'friends') <> 0 or jsonb_array_length(o -> 'incoming') <> 0 or jsonb_array_length(o -> 'cheers') <> 0 then raise exception 'stranger overview: %', o; end if;
-  if public.send_cheer('c1111111-1111-4111-8111-111111111111', 'w1') <> 'not_friends' then raise exception 'a stranger could cheer'; end if;
+  if public.send_cheer('c1111111-1111-4111-8111-111111111111', '0123456789abcdef0123456789abcdef') <> 'not_friends' then raise exception 'a stranger could cheer'; end if;
   if public.friend_respond('c2222222-2222-4222-8222-222222222222', true) <> 'not_found' then raise exception 'a stranger could answer a request'; end if;
 end $$;
 
@@ -175,18 +196,21 @@ select pg_temp.act_as('c2222222-2222-4222-8222-222222222222');
 do $$
 declare o jsonb;
 begin
-  if public.send_cheer('c1111111-1111-4111-8111-111111111111', 'w1') <> 'ok' then raise exception 'cheer failed'; end if;
-  if public.send_cheer('c1111111-1111-4111-8111-111111111111', 'w1') <> 'ok' then raise exception 'cheering twice should be harmless'; end if;
-  if public.send_cheer('c1111111-1111-4111-8111-111111111111', '   ') <> 'not_friends' then raise exception 'an empty cheer was accepted'; end if;
+  if public.send_cheer('c1111111-1111-4111-8111-111111111111', '0123456789abcdef0123456789abcdef') <> 'ok' then raise exception 'cheer failed'; end if;
+  if public.send_cheer('c1111111-1111-4111-8111-111111111111', '0123456789abcdef0123456789abcdef') <> 'ok' then raise exception 'cheering twice should be harmless'; end if;
+  if public.send_cheer('c1111111-1111-4111-8111-111111111111', 'day:2026-11-14') <> 'ok' then raise exception 'a day cheer failed'; end if;
+  if public.send_cheer('c1111111-1111-4111-8111-111111111111', '   ') <> 'invalid' then raise exception 'an empty cheer was accepted'; end if;
+  -- A cheer carries a reference, not a message.
+  if public.send_cheer('c1111111-1111-4111-8111-111111111111', 'see you at the park at 7') <> 'invalid' then raise exception 'free text was accepted as a cheer'; end if;
   o := public.friends_overview();
-  if o -> 'friends' -> 0 -> 'cheered' <> '["w1"]'::jsonb then raise exception 'cheered list: %', o -> 'friends' -> 0 -> 'cheered'; end if;
+  if not (o -> 'friends' -> 0 -> 'cheered') @> '["0123456789abcdef0123456789abcdef", "day:2026-11-14"]'::jsonb or jsonb_array_length(o -> 'friends' -> 0 -> 'cheered') <> 2 then raise exception 'cheered list: %', o -> 'friends' -> 0 -> 'cheered'; end if;
 end $$;
 select pg_temp.act_as('c1111111-1111-4111-8111-111111111111');
 do $$
 declare o jsonb;
 begin
   o := public.friends_overview();
-  if jsonb_array_length(o -> 'cheers') <> 1 or o -> 'cheers' -> 0 ->> 'display_name' <> 'Maya' or o -> 'cheers' -> 0 ->> 'ref' <> 'w1' then raise exception 'received cheers: %', o -> 'cheers'; end if;
+  if jsonb_array_length(o -> 'cheers') <> 2 or o -> 'cheers' -> 0 ->> 'display_name' <> 'Maya' or not (o -> 'cheers') @> '[{"ref": "0123456789abcdef0123456789abcdef"}]'::jsonb then raise exception 'received cheers: %', o -> 'cheers'; end if;
 end $$;
 
 -- ------------------------------------------- declining, asking again, mutual requests

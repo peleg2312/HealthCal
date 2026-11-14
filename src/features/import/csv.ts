@@ -12,7 +12,7 @@
  * its zone, so both come from the caller.
  */
 import { normalizeText } from './text';
-import { validWallTime, wallTimeToEpoch, isoSeconds, type WallTime } from './time';
+import { isDeviceZone, isoSeconds, validWallTime, wallTimeToEpoch, zoneOffsetMinutes, type WallTime } from './time';
 import { ImportError, plural, warn, type CsvOptions, type ImportedWorkout, type ImportWarning, type ReadResult } from './types';
 
 // ------------------------------------------------------------ parsing
@@ -369,7 +369,7 @@ export function readGarminCsv(text: string, fileName: string, options: CsvOption
     const elapsed = parseDuration(cell(r, 'elapsed'));
     const title = cell(r, 'title');
     const startMs = wallTimeToEpoch(date.wall, options.timeZone, fileName);
-    workouts.push({
+    const w: ImportedWorkout = {
       format: 'csv',
       fileName,
       index: i + 1,
@@ -386,7 +386,10 @@ export function readGarminCsv(text: string, fileName: string, options: CsvOption
       subSport: null,
       title: title && !isMissing(title) ? title : null,
       device: null,
-    });
+    };
+    // A zone the person chose: the rows are that zone's wall time, so the day is the one written in the file.
+    if (!isDeviceZone(options.timeZone)) w.utcOffsetMin = zoneOffsetMinutes(startMs, options.timeZone as string, fileName);
+    workouts.push(w);
   });
 
   if (noDuration) warnings.push(warn('csv-skipped-no-duration', `${plural(noDuration, 'row', 'rows')} had no duration and ${noDuration === 1 ? 'was' : 'were'} skipped.`, fileName));

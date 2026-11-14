@@ -80,6 +80,39 @@ export function wallTimeToEpoch(w: WallTime, timeZone: string | undefined, file:
   return guess;
 }
 
+/** Offset of a time zone from UTC at an instant, in whole minutes east of Greenwich. */
+export function zoneOffsetMinutes(ms: number, timeZone: string, file: string): number {
+  return Math.round(zoneOffsetMs(ms, timeZone, file) / 60_000);
+}
+
+/** Real zones lie between UTC-12 and UTC+14, on quarter hours. */
+export function plausibleOffsetMin(min: number): boolean {
+  return Number.isFinite(min) && min >= -12 * 60 && min <= 14 * 60 && min % 15 === 0;
+}
+
+export interface RecordedWallTime {
+  /** Local calendar day, 'YYYY-MM-DD'. */
+  date: string;
+  hour: number;
+  minute: number;
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/**
+ * The calendar day and clock time a workout started at where it was recorded:
+ * in the offset the file states (utcOffsetMin), else in the phone's own zone.
+ */
+export function recordedWallTime(w: { startUtc: string; utcOffsetMin?: number }): RecordedWallTime {
+  const ms = Date.parse(w.startUtc);
+  if (w.utcOffsetMin !== undefined && plausibleOffsetMin(w.utcOffsetMin)) {
+    const d = new Date(ms + w.utcOffsetMin * 60_000);
+    return { date: `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`, hour: d.getUTCHours(), minute: d.getUTCMinutes() };
+  }
+  const d = new Date(ms);
+  return { date: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`, hour: d.getHours(), minute: d.getMinutes() };
+}
+
 /** Wall time from FIT local_date_time seconds (same epoch as UTC date_time, but local). */
 export function fitLocalToWallTime(localSeconds: number): WallTime {
   const d = new Date((localSeconds + FIT_EPOCH_OFFSET_S) * 1000);

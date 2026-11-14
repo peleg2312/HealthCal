@@ -9,7 +9,7 @@
  * One workout is returned per session message; multisport files have several.
  */
 import { FIT_FILE_ACTIVITY, FIT_FILE_KINDS, FIT_MANUFACTURERS, FIT_SPORTS, FIT_SUB_SPORTS, MESG } from './fitProfile';
-import { FIT_EPOCH_OFFSET_S, FIT_MIN_DATE_TIME, fitLocalToWallTime, isoSeconds, wallTimeToEpoch } from './time';
+import { FIT_EPOCH_OFFSET_S, FIT_MIN_DATE_TIME, fitLocalToWallTime, isDeviceZone, isoSeconds, plausibleOffsetMin, wallTimeToEpoch, zoneOffsetMinutes } from './time';
 import { ImportError, plural, warn, type ImportedWorkout, type ImportWarning, type ReadResult } from './types';
 
 // ------------------------------------------------------------ low level
@@ -374,6 +374,15 @@ export function readFit(bytes: Uint8Array, fileName = 'file.fit', options: FitRe
   // Summaries may be written first or last in the file: order legs by start time.
   raws.sort((a, b) => (a.start ?? Infinity) - (b.start ?? Infinity) || a.order - b.order);
 
+  // A real-time activity message with local_timestamp states the recording's UTC offset.
+  const recordedOffset = (() => {
+    const localTs = num(activity, 5);
+    const actTs = num(activity, TIMESTAMP_FIELD);
+    if (localTs === undefined || actTs === undefined || !isRealTime(actTs)) return undefined;
+    const min = Math.round((localTs - actTs) / 60);
+    return plausibleOffsetMin(min) ? min : undefined;
+  })();
+
   const workouts: ImportedWorkout[] = [];
   let systemTime = 0;
   let noStart = 0;
@@ -446,6 +455,9 @@ export function readFit(bytes: Uint8Array, fileName = 'file.fit', options: FitRe
       title,
       device,
     };
+    if (!fromLocal && recordedOffset !== undefined) w.utcOffsetMin = recordedOffset;
+    // A clock that was never set: the local time is in the zone the person chose.
+    if (fromLocal && !isDeviceZone(options.timeZone)) w.utcOffsetMin = zoneOffsetMinutes(startMs, options.timeZone as string, fileName);
     if (raws.length > 1) w.leg = { number: i + 1, of: raws.length };
     if (sportNum === 3) w.transition = true;
     workouts.push(w);

@@ -23,6 +23,14 @@ export interface ImportedWorkout {
    * The screen should show the time so the person can check it.
    */
   startFromLocalTime: boolean;
+  /**
+   * Minutes east of UTC where the workout was recorded, when the file says
+   * (a FIT file with both timestamp and local_timestamp) or the person chose a
+   * zone for a CSV. The entry's day and the time shown use it, so a run done in
+   * New York lands on the New York day whatever zone the phone is in now.
+   * Absent: the phone's own zone is used.
+   */
+  utcOffsetMin?: number;
   /** Moving (timer) time in seconds, pauses excluded. For GPX this is the elapsed span, see `durationIncludesPauses`. */
   durationSec: number;
   /** Start to finish including pauses, seconds, when the file says. */

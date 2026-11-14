@@ -11,7 +11,7 @@ import type { ActivityEntry, Intensity } from '@/types';
 import { haptic, toast } from '@/ui';
 
 import type { ConvertContext, ImportedEntry } from '../convert';
-import { chooseActivity, entriesToSave, prepareImport, setSelected, type ImportCandidate } from '../plan';
+import { chooseActivity, entriesToSave, prepareImport, replaceHandLoggedPlan, setSelected, type ImportCandidate } from '../plan';
 import { readImportFile, type ImportBatch } from '../read';
 import type { ReadOptions } from '../types';
 
@@ -33,6 +33,8 @@ export interface Answers {
 
 export interface ImportResult {
   entries: ImportedEntry[];
+  /** The stored versions of workouts this import updated, as they were before (Undo puts them back). */
+  previous: ActivityEntry[];
   undone: boolean;
 }
 
@@ -169,7 +171,7 @@ export function toggleRow(key: string) {
 
 /** Tick every new workout that has an activity, or untick everything. */
 export function selectAll(on: boolean) {
-  set({ rows: get().rows.map((r) => ({ ...r, selected: on ? r.status === 'new' && isTickable(r) : false })) });
+  set({ rows: get().rows.map((r) => ({ ...r, selected: on ? (r.status === 'new' || r.status === 'update') && isTickable(r) : false })) });
 }
 
 /**
@@ -185,7 +187,7 @@ export function pickActivity(key: string, activityId: string, alsoKeys: string[]
   // Rows given an activity in bulk become ticked when they are new (chooseActivity ticks only `key`).
   for (const k of others) {
     const r = next.find((x) => x.key === k);
-    if (r && r.status === 'new' && r.entry && !r.selected) next = setSelected(next, k, true);
+    if (r && (r.status === 'new' || r.status === 'update') && r.entry && !r.selected) next = setSelected(next, k, true);
   }
   set({ rows: next });
 }
@@ -203,42 +205,86 @@ export function setEstimateIntensity(intensity: Intensity) {
   set({ rows: next });
 }
 
-/** Bring back workouts imported before and then deleted. */
+/**
+ * Bring back workouts imported before and then deleted. The workout comes back
+ * with the numbers of the row being shown (the file just read), keeping its
+ * id, day and the person's note; a row without an activity restores as it was.
+ */
 export function restoreDeleted(keys: string[]) {
   const s = useStore.getState();
-  let n = 0;
+  const restored: { before: ActivityEntry }[] = [];
   for (const r of get().rows) {
-    if (keys.includes(r.key) && r.match?.deleted) {
-      s.restore('activities', r.match.id);
-      n += 1;
-    }
+    if (!keys.includes(r.key) || !r.match?.deleted) continue;
+    restored.push({ before: r.match });
+    if (r.entry && r.entry.id === r.match.id) s.upsert('activities', r.entry);
+    else s.restore('activities', r.match.id);
   }
-  if (!n) return;
+  if (!restored.length) return;
   rebuild();
   haptic.success();
-  toast(`${workoutsLabel(n)} restored`, {
+  toast(`${workoutsLabel(restored.length)} restored`, {
     label: 'Undo',
     onPress: () => {
-      for (const r of get().rows) if (keys.includes(r.key) && r.match) useStore.getState().remove('activities', r.match.id);
+      // Put back exactly what was there: the old values, still deleted.
+      useStore.getState().upsertMany('activities', restored.map((x) => x.before));
+      for (const x of restored) useStore.getState().remove('activities', x.before.id);
       rebuild();
     },
   });
 }
 
-/** Save the ticked workouts. Undo removes exactly what was added. */
-export function commitImport() {
-  const entries = entriesToSave(get().rows);
-  if (!entries.length) return;
-  useStore.getState().upsertMany('activities', entries);
+/**
+ * Replace a session logged by hand with the imported workout it duplicates:
+ * the device's measured numbers win. Undo brings the hand log back and takes
+ * the import out again.
+ */
+export function replaceHandLogged(key: string) {
+  const row = get().rows.find((r) => r.key === key);
+  const plan = row ? replaceHandLoggedPlan(row) : null;
+  if (!plan) return;
+  const store = useStore.getState();
+  const before = store.activities[plan.save.id];
+  store.upsert('activities', plan.save);
+  store.remove('activities', plan.remove.id);
+  rebuild();
   haptic.success();
-  set({ phase: 'done', result: { entries, undone: false } });
-  toast(`${workoutsLabel(entries.length)} imported`, { label: 'Undo', onPress: () => undoImport(entries) });
+  toast(`Replaced your hand-logged ${plan.remove.name.toLowerCase()}`, {
+    label: 'Undo',
+    onPress: () => {
+      const st = useStore.getState();
+      st.restore('activities', plan.remove.id);
+      if (before) {
+        st.upsert('activities', before);
+        if (before.deleted) st.remove('activities', before.id);
+      } else st.remove('activities', plan.save.id);
+      rebuild();
+    },
+  });
 }
 
-export function undoImport(entries: ImportedEntry[]) {
+/** Save the ticked workouts. Undo removes exactly what was added and puts updated workouts back as they were. */
+export function commitImport() {
+  const rows = get().rows;
+  const entries = entriesToSave(rows);
+  if (!entries.length) return;
+  const stored = useStore.getState().activities;
+  const previous = entries.map((e) => stored[e.id]).filter((e): e is ActivityEntry => !!e && !e.deleted);
+  useStore.getState().upsertMany('activities', entries);
+  haptic.success();
+  const result: ImportResult = { entries, previous, undone: false };
+  set({ phase: 'done', result });
+  const updated = previous.length;
+  const added = entries.length - updated;
+  const message = [added ? `${workoutsLabel(added)} imported` : '', updated ? `${workoutsLabel(updated)} updated` : ''].filter(Boolean).join(', ');
+  toast(message, { label: 'Undo', onPress: () => undoImport(result) });
+}
+
+export function undoImport(result: ImportResult) {
   const store = useStore.getState();
-  for (const e of entries) store.remove('activities', e.id);
+  const back = new Set(result.previous.map((e) => e.id));
+  if (result.previous.length) store.upsertMany('activities', result.previous);
+  for (const e of result.entries) if (!back.has(e.id)) store.remove('activities', e.id);
   const r = get().result;
   // Only mark this session's result when it is the import being undone.
-  if (r && r.entries === entries) set({ result: { ...r, undone: true } });
+  if (r && r.entries === result.entries) set({ result: { ...r, undone: true } });
 }
