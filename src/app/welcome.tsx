@@ -86,7 +86,10 @@ function HeroCup({ height, narrow }: { height: number; narrow: boolean }) {
                 format={(n) => formatNumber(Math.round(n))}
                 numberOfLines={1}
                 style={{ fontSize: big, lineHeight: big + 2 }}>
-                <Text variant="unit"> kcal left</Text>
+                {/* The unit keeps its own spacing, not the big number's tight one. */}
+                <Text variant="unit" style={{ letterSpacing: 0 }}>
+                  {' kcal left'}
+                </Text>
               </AnimatedNumber>
             ),
           },
@@ -139,7 +142,7 @@ export default function Welcome() {
   const narrow = window.width < 360;
   // The cup takes what the words and the actions leave, so the whole welcome fits one screen on most phones.
   const room = window.height - insets.top - insets.bottom - (isBackendConfigured ? 500 : 444);
-  const cupHeight = Math.round(Math.max(210, Math.min(320, room)));
+  const cupHeight = Math.round(Math.max(210, Math.min(340, room)));
 
   const restore = async () => {
     setImporting(true);
@@ -170,7 +173,7 @@ export default function Welcome() {
       testID="welcome-screen"
       // The screen runs its own entrance: the cup first, then the headline, then the actions.
       enter={false}
-      contentStyle={{ flexGrow: 1, justifyContent: 'space-between', gap: spacing.xl, paddingTop: spacing.md }}
+      contentStyle={{ flexGrow: 1, justifyContent: 'space-between', gap: spacing.xl, paddingTop: spacing.lg }}
       footer={
         <FadeUp delay={ACTIONS_AT} style={{ gap: spacing.sm }}>
           <Button title="Get started" testID="welcome-get-started" onPress={() => router.push('/onboarding')} />
