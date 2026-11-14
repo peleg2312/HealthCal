@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MAX_CONTENT_WIDTH, useTheme } from '@/theme';
 
 import { IconButton } from './Button';
+import { FadeUp } from './motion';
 import { PressableScale } from './Pressable';
 import { Text } from './Text';
 
@@ -32,10 +33,16 @@ export interface ScreenProps {
   noTopInset?: boolean;
   /** @deprecated Pour has no glow backdrops. Accepted so callers do not break; ignored. */
   backdrop?: string;
+  /**
+   * Fade the content up 8 px when the screen first mounts (default true). On web this is the
+   * page change, since the stack does not animate there. Set false for a screen that runs its
+   * own entrance (onboarding steps, the plan reveal). Reduced motion turns it off.
+   */
+  enter?: boolean;
   testID?: string;
 }
 
-export function Screen({ children, scroll = true, header, footer, tabs, padded = true, contentStyle, scrollProps, noTopInset, backdrop: _backdrop, testID }: ScreenProps) {
+export function Screen({ children, scroll = true, header, footer, tabs, padded = true, contentStyle, scrollProps, noTopInset, backdrop: _backdrop, enter = true, testID }: ScreenProps) {
   const { colors, spacing } = useTheme();
   const insets = useSafeAreaInsets();
   const inner: ViewStyle = {
@@ -47,24 +54,58 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
   const bottomPad = (tabs ? TAB_BAR_SPACE : spacing.xxl) + (footer ? 0 : insets.bottom);
   return (
     <KeyboardAvoidingView testID={testID} style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'web' ? undefined : 'padding'}>
-      <View style={{ paddingTop: noTopInset ? 0 : insets.top }} />
-      {header ? <View style={inner}>{header}</View> : null}
-      {scroll ? (
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          {...scrollProps}
-          contentContainerStyle={[inner, { paddingTop: spacing.sm, paddingBottom: bottomPad, gap: spacing.lg }, contentStyle]}>
-          {children}
-        </ScrollView>
-      ) : (
-        <View style={[inner, { flex: 1, paddingBottom: (tabs ? TAB_BAR_SPACE : 0) + (footer ? 0 : insets.bottom) }, contentStyle]}>{children}</View>
-      )}
-      {footer ? (
-        <View style={{ borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg }}>
-          <View style={[inner, { paddingTop: spacing.md, paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>{footer}</View>
-        </View>
-      ) : null}
+      <FadeUp disabled={!enter} style={{ flex: 1 }}>
+        <View style={{ paddingTop: noTopInset ? 0 : insets.top }} />
+        {header ? <View style={inner}>{header}</View> : null}
+        {scroll ? (
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            {...scrollProps}
+            contentContainerStyle={[
+              inner,
+              {
+                paddingTop: spacing.sm,
+                paddingBottom: bottomPad,
+                gap: spacing.lg,
+              },
+              contentStyle,
+            ]}>
+            {children}
+          </ScrollView>
+        ) : (
+          <View
+            style={[
+              inner,
+              {
+                flex: 1,
+                paddingBottom: (tabs ? TAB_BAR_SPACE : 0) + (footer ? 0 : insets.bottom),
+              },
+              contentStyle,
+            ]}>
+            {children}
+          </View>
+        )}
+        {footer ? (
+          <View
+            style={{
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
+              backgroundColor: colors.bg,
+            }}>
+            <View
+              style={[
+                inner,
+                {
+                  paddingTop: spacing.md,
+                  paddingBottom: Math.max(insets.bottom, spacing.lg),
+                },
+              ]}>
+              {footer}
+            </View>
+          </View>
+        ) : null}
+      </FadeUp>
     </KeyboardAvoidingView>
   );
 }
@@ -94,7 +135,14 @@ export function Header({
   const { colors, spacing } = useTheme();
   const handle = onBack ?? (() => goBack());
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 56, gap: spacing.md, paddingVertical: spacing.sm }}>
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        minHeight: 56,
+        gap: spacing.md,
+        paddingVertical: spacing.sm,
+      }}>
       {close ? (
         <IconButton accessibilityLabel="Close" onPress={handle} testID="header-close">
           <X size={20} color={colors.text} strokeWidth={2.2} />
@@ -125,7 +173,14 @@ export function Header({
 export function LargeTitle({ title, subtitle, right }: { title: string; subtitle?: string; right?: React.ReactNode }) {
   const { spacing } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', paddingTop: spacing.sm, paddingBottom: spacing.xs, gap: spacing.md }}>
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        paddingTop: spacing.sm,
+        paddingBottom: spacing.xs,
+        gap: spacing.md,
+      }}>
       <View style={{ flex: 1, gap: 6 }}>
         {subtitle ? (
           <Text variant="overline" numberOfLines={1}>
@@ -142,16 +197,35 @@ export function LargeTitle({ title, subtitle, right }: { title: string; subtitle
 }
 
 export function SectionTitle({ title, action, onAction, testID }: { title: string; action?: string; onAction?: () => void; testID?: string }) {
-  const slug = (testID ?? title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const slug = (testID ?? title)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 4,
+      }}>
       <Text variant="h3" style={{ flexShrink: 1 }}>
         {title}
       </Text>
       {action && onAction ? (
         // The label is small; the pressable around it is a full-height touch target.
         // Section titles sit on bg, where light primary text is just under 4.5:1, so the action is an underlined text link.
-        <PressableScale testID={`section-${slug}-action`} accessibilityLabel={action} onPress={onAction} hitSlop={8} style={{ minHeight: 44, justifyContent: 'center', paddingLeft: 12, marginVertical: -10 }}>
+        <PressableScale
+          testID={`section-${slug}-action`}
+          accessibilityLabel={action}
+          onPress={onAction}
+          hitSlop={8}
+          style={{
+            minHeight: 44,
+            justifyContent: 'center',
+            paddingLeft: 12,
+            marginVertical: -10,
+          }}>
           <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
             {action}
           </Text>

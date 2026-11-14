@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { AccessibilityInfo, Animated, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { create } from 'zustand';
 
-import { cup, MAX_CONTENT_WIDTH, useTheme } from '@/theme';
+import { cup, isReducedMotion, MAX_CONTENT_WIDTH, motion, useTheme } from '@/theme';
 
 import { PressableScale } from './Pressable';
 import { Text } from './Text';
@@ -69,10 +69,13 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       // Live regions are Android-only; announcing explicitly covers iOS as well.
       AccessibilityInfo.announceForAccessibility(actionLabel ? `${message}. ${actionLabel} available.` : message);
     }
-    Animated.spring(anim, { toValue: 1, useNativeDriver: true, speed: 18, bounciness: 6 }).start();
+    // Rises 16 px and fades in, ease-out, no bounce; instant under reduced motion.
+    if (isReducedMotion()) anim.setValue(1);
+    else Animated.timing(anim, { toValue: 1, duration: motion.duration.row, easing: Easing.bezier(...motion.easing.enter), useNativeDriver: Platform.OS !== 'web' }).start();
     let cancelled = false;
     let t: ReturnType<typeof setTimeout> | undefined;
-    const close = () => Animated.timing(anim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => hide());
+    const close = () =>
+      isReducedMotion() ? hide() : Animated.timing(anim, { toValue: 0, duration: motion.duration.fade, easing: Easing.bezier(...motion.easing.exit), useNativeDriver: Platform.OS !== 'web' }).start(() => hide());
     // Someone using a screen reader needs longer to reach the action.
     AccessibilityInfo.isScreenReaderEnabled()
       .catch(() => false)

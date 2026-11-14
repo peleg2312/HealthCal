@@ -1,14 +1,24 @@
-import React from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { scheduleOnRN } from 'react-native-worklets';
 
-import { MAX_CONTENT_WIDTH, sheetShadow, useTheme } from '@/theme';
+import { MAX_CONTENT_WIDTH, motion, sheetShadow, useReducedMotion, useTheme } from '@/theme';
 
 import { Button } from './Button';
+import { ease } from './motion';
 import { Text } from './Text';
 import { ToastHost } from './Toast';
 
-/** Bottom sheet for short, focused tasks (pick a value, confirm, quick add). */
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/**
+ * Bottom sheet for short, focused tasks (pick a value, confirm, quick add).
+ * It slides up while its backdrop fades in, and slides down with the backdrop
+ * fading out when closed; reduced motion makes both instant. The sheet stays
+ * mounted for the ~200 ms of its exit, with touches passing through it.
+ */
 export function Sheet({
   visible,
   onClose,
@@ -24,14 +34,50 @@ export function Sheet({
 }) {
   const { colors, radius, spacing } = useTheme();
   const insets = useSafeAreaInsets();
+  const reduce = useReducedMotion();
+  const { height: winH } = useWindowDimensions();
+  // Stays true through the exit animation, then the modal unmounts.
+  const [mounted, setMounted] = useState(visible);
+  if (visible && !mounted) setMounted(true);
+  const [sheetH, setSheetH] = useState(0);
+  // 0 hidden, 1 open.
+  const open = useSharedValue(visible && reduce ? 1 : 0);
+  useEffect(() => {
+    if (!mounted) return;
+    if (reduce) {
+      cancelAnimation(open);
+      open.set(visible ? 1 : 0);
+      if (!visible) setMounted(false);
+      return;
+    }
+    if (visible) open.set(withTiming(1, { duration: motion.duration.sheetIn, easing: ease.enter }));
+    else
+      open.set(
+        withTiming(0, { duration: motion.duration.sheetOut, easing: ease.exit }, (finished) => {
+          if (finished) scheduleOnRN(setMounted, false);
+        }),
+      );
+  }, [visible, mounted, reduce, open]);
+  const travel = sheetH || winH;
+  const backdropStyle = useAnimatedStyle(() => ({ opacity: open.get() }));
+  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - open.get()) * (travel + 24) }] }));
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <KeyboardAvoidingView behavior={Platform.OS === 'web' ? undefined : 'padding'} style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <Pressable accessibilityLabel="Close sheet" onPress={onClose} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: colors.overlay }} />
+    <Modal visible={mounted} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+      <KeyboardAvoidingView
+        pointerEvents={visible ? 'auto' : 'none'}
+        behavior={Platform.OS === 'web' ? undefined : 'padding'}
+        style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <AnimatedPressable
+          accessibilityLabel="Close sheet"
+          onPress={onClose}
+          style={[{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: colors.overlay }, backdropStyle]}
+        />
         {/* A native modal covers the app's own toast layer, so the sheet shows toasts itself, just above its top edge. */}
         <ToastHost placement="sheet" />
-        <View
-          style={{
+        <Animated.View
+          onLayout={(e) => setSheetH(Math.round(e.nativeEvent.layout.height))}
+          style={[
+            {
             width: '100%',
             maxWidth: MAX_CONTENT_WIDTH,
             alignSelf: 'center',
@@ -45,7 +91,9 @@ export function Sheet({
             borderColor: colors.border,
             paddingBottom: Math.max(insets.bottom, spacing.lg),
             ...sheetShadow,
-          }}>
+            },
+            sheetStyle,
+          ]}>
           <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 8 }}>
             <View style={{ width: 36, height: 4, borderRadius: 1, backgroundColor: colors.borderStrong }} />
           </View>
@@ -58,7 +106,7 @@ export function Sheet({
             {children}
           </ScrollView>
           {footer ? <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.sm }}>{footer}</View> : null}
-        </View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
   );

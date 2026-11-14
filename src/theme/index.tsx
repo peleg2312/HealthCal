@@ -50,3 +50,4 @@ export function useTheme(): Theme {
 }
 
 export * from './tokens';
+export { isReducedMotion, motion, useReducedMotion } from './motion';

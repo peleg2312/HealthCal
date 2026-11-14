@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { Animated, Easing, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
+import React, { useState } from 'react';
+import { View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import Svg, { Line } from 'react-native-svg';
 
-import { useTheme, vesselBase } from '@/theme';
+import { motion, useTheme, vesselBase } from '@/theme';
 
+import { useFadeAfter, usePour } from './motion';
 import { fillRatio, levelY, placeLabels } from './vesselLayout';
 
 const EDGE = 1.5;
@@ -20,21 +22,6 @@ export function Hatch({ width, height, color, step = 6, opacity = 0.75 }: { widt
       {lines}
     </Svg>
   );
-}
-
-/** Animated 0..1 that follows `to` (a pour), or jumps when `animate` is false. */
-function usePour(to: number, animate: boolean) {
-  const [v] = useState(() => new Animated.Value(animate ? 0 : to));
-  useEffect(() => {
-    if (!animate) {
-      v.setValue(to);
-      return;
-    }
-    const a = Animated.timing(v, { toValue: to, duration: 650, easing: Easing.out(Easing.cubic), useNativeDriver: false });
-    a.start();
-    return () => a.stop();
-  }, [to, animate, v]);
-  return v;
 }
 
 export interface VesselLabel {
@@ -74,7 +61,14 @@ export interface VesselProps {
   children?: React.ReactNode;
   /** Space between the vessel and its labels. */
   labelGap?: number;
+  /** Pour on mount and on change (default). False jumps to the value. Reduced motion always jumps. */
   animate?: boolean;
+  /** Pour length in ms (default `motion.duration.pour`). */
+  duration?: number;
+  /** Wait before pouring, e.g. `index * motion.duration.stagger` in a row of cups. */
+  delay?: number;
+  /** Remember the level for this session under this key, so a remount with the same value does not pour again. */
+  memoryKey?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
   accessibilityLabel?: string;
@@ -103,6 +97,9 @@ export function Vessel({
   children,
   labelGap = 16,
   animate = true,
+  duration = motion.duration.pour,
+  delay = 0,
+  memoryKey,
   style,
   testID,
   accessibilityLabel,
@@ -114,9 +111,18 @@ export function Vessel({
   const over = max > 0 && value > max;
   const base = vesselBase(height, width);
   const showLip = lip ?? height >= 120;
-  const pour = usePour(ratio, animate);
+  const pour = usePour(ratio, { animate: animate && !future, duration, delay, memoryKey });
   const headH = max > 0 ? Math.min(inner, (Math.max(0, headroom) / max) * inner) : 0;
   const [childH, setChildH] = useState(0);
+  // The hatched headroom fades in once the pour has landed; the over-target lip appears at its end.
+  const headOpacity = useFadeAfter(headH > 0, pour.endsIn, pour.instant);
+  const lipOpacity = useFadeAfter(over, pour.endsIn, pour.instant);
+  const { level, settle } = pour;
+  // Only transforms animate: the fill is full height and slides up inside the clipped cup.
+  const fillStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - level.get()) * inner }] }));
+  const rimStyle = useAnimatedStyle(() => ({ opacity: level.get() > 0.0005 ? 1 : 0, transform: [{ translateY: -settle.get() }] }));
+  const headStyle = useAnimatedStyle(() => ({ opacity: headOpacity.get() }));
+  const lipStyle = useAnimatedStyle(() => ({ opacity: lipOpacity.get() }));
 
   const cupView = future ? (
     <View
@@ -149,26 +155,19 @@ export function Vessel({
           overflow: 'hidden',
         }}>
         {headH > 0 ? (
-          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: headH, borderBottomWidth: EDGE, borderStyle: 'dashed', borderColor: colors.vesselEdge }}>
+          <Animated.View style={[{ position: 'absolute', left: 0, right: 0, top: 0, height: headH, borderBottomWidth: EDGE, borderStyle: 'dashed', borderColor: colors.vesselEdge }, headStyle]}>
             <Hatch width={innerW} height={headH} color={colors.headroom} />
-          </View>
+          </Animated.View>
         ) : null}
-        <Animated.View
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: pour.interpolate({ inputRange: [0, 1], outputRange: [0, inner] }),
-          }}>
+        <Animated.View style={[{ position: 'absolute', left: 0, right: 0, top: 0, height: inner }, fillStyle]}>
           <View style={{ flex: 1, backgroundColor: hatchFill ? 'transparent' : color, overflow: 'hidden' }}>
             {hatchFill ? <Hatch width={innerW} height={inner} color={color} step={4} opacity={1} /> : null}
           </View>
-          {ratio > 0 ? <View style={{ position: 'absolute', left: 0, right: 0, top: -rimWidth / 2, height: rimWidth, backgroundColor: colors.rim }} /> : null}
+          <Animated.View style={[{ position: 'absolute', left: 0, right: 0, top: -rimWidth / 2, height: rimWidth, backgroundColor: colors.rim }, rimStyle]} />
         </Animated.View>
       </View>
       {showLip ? <View style={{ position: 'absolute', left: -6, right: -6, top: -1, height: 2, backgroundColor: colors.vesselEdge }} /> : null}
-      {over ? <View style={{ position: 'absolute', left: -3, right: -3, top: showLip ? -6 : -4, height: 5, borderRadius: 2, backgroundColor: colors.warning }} /> : null}
+      {over ? <Animated.View style={[{ position: 'absolute', left: -3, right: -3, top: showLip ? -6 : -4, height: 5, borderRadius: 2, backgroundColor: colors.warning }, lipStyle]} /> : null}
     </View>
   );
 
@@ -235,6 +234,9 @@ export function MiniCup({
   future,
   over,
   hatchFill,
+  index = 0,
+  memoryKey,
+  animate = true,
   style,
 }: {
   /** 0..1 of the target; above 1 shows the amber lip. */
@@ -246,6 +248,12 @@ export function MiniCup({
   /** Force the over-target lip (by default it shows when progress > 1). */
   over?: boolean;
   hatchFill?: boolean;
+  /** Position in a row: cups pour left to right, `motion.duration.stagger` ms apart. */
+  index?: number;
+  /** Remember this cup's level for the session (e.g. `cal-${date}`), so a past day does not pour again on a revisit. */
+  memoryKey?: string;
+  /** Pour on mount and on change (default true). */
+  animate?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   const p = Number.isFinite(progress) ? Math.max(0, progress) : 0;
@@ -261,7 +269,10 @@ export function MiniCup({
       lip={false}
       future={future}
       hatchFill={hatchFill}
-      animate={false}
+      animate={animate}
+      duration={motion.duration.pourSmall}
+      delay={index * motion.duration.stagger}
+      memoryKey={memoryKey}
       style={style}
     />
   );
@@ -280,6 +291,9 @@ export function Trough({
   headroom = 0,
   height = 14,
   animate = true,
+  duration = motion.duration.pourSmall,
+  delay = 0,
+  memoryKey,
   style,
   testID,
 }: {
@@ -288,7 +302,12 @@ export function Trough({
   color: string;
   headroom?: number;
   height?: number;
+  /** Pour on mount and on change (default true). */
   animate?: boolean;
+  duration?: number;
+  delay?: number;
+  /** Remember the level for the session, so a remount with the same value does not pour again. */
+  memoryKey?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }) {
@@ -296,11 +315,18 @@ export function Trough({
   const [w, setW] = useState(0);
   const ratio = fillRatio(value, max);
   const over = max > 0 && value > max;
-  const pour = usePour(ratio, animate);
+  const pour = usePour(ratio, { animate, duration, delay, memoryKey });
   const innerW = Math.max(0, w - EDGE);
   const innerH = height - 2 * EDGE;
   const headW = max > 0 ? Math.min(innerW, (Math.max(0, headroom) / max) * innerW) : 0;
-  const left = pour.interpolate({ inputRange: [0, 1], outputRange: [0, innerW] });
+  const headOpacity = useFadeAfter(headW > 0, pour.endsIn, pour.instant);
+  const lipOpacity = useFadeAfter(over, pour.endsIn, pour.instant);
+  const { level, settle } = pour;
+  // The fill is full width and slides in from the open left end; the tick rides on its edge.
+  const fillStyle = useAnimatedStyle(() => ({ transform: [{ translateX: -(1 - level.get()) * innerW }] }));
+  const tickStyle = useAnimatedStyle(() => ({ opacity: level.get() > 0.0005 ? 1 : 0, transform: [{ translateX: level.get() * innerW + settle.get() }] }));
+  const headStyle = useAnimatedStyle(() => ({ opacity: headOpacity.get() }));
+  const lipStyle = useAnimatedStyle(() => ({ opacity: lipOpacity.get() }));
   return (
     <View
       testID={testID}
@@ -324,19 +350,20 @@ export function Trough({
           overflow: 'hidden',
         }}>
         {headW > 0 ? (
-          <View style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: headW, borderLeftWidth: EDGE, borderStyle: 'dashed', borderColor: colors.vesselEdge }}>
+          <Animated.View style={[{ position: 'absolute', top: 0, bottom: 0, right: 0, width: headW, borderLeftWidth: EDGE, borderStyle: 'dashed', borderColor: colors.vesselEdge }, headStyle]}>
             <Hatch width={headW} height={innerH} color={colors.headroom} step={5} />
-          </View>
+          </Animated.View>
         ) : null}
-        <Animated.View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: left, backgroundColor: color }} />
+        {/* Drawn only once the width is known, so the first frame never shows a full trough. */}
+        {innerW > 0 ? <Animated.View style={[{ position: 'absolute', top: 0, bottom: 0, left: 0, width: innerW, backgroundColor: color }, fillStyle]} /> : null}
       </View>
       <View style={{ position: 'absolute', left: 0, top: -4, bottom: -4, width: 2, backgroundColor: colors.vesselEdge }} />
-      {ratio > 0 ? (
-        <Animated.View pointerEvents="none" style={{ position: 'absolute', top: -5, bottom: -5, left, width: 0 }}>
+      {innerW > 0 ? (
+        <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: -5, bottom: -5, left: 0, width: 0 }, tickStyle]}>
           <View style={{ position: 'absolute', left: -1.5, top: 0, bottom: 0, width: 3, borderRadius: 1, backgroundColor: colors.rim }} />
         </Animated.View>
       ) : null}
-      {over ? <View style={{ position: 'absolute', right: -4, top: -3, bottom: -3, width: 5, borderRadius: 2, backgroundColor: colors.warning }} /> : null}
+      {over ? <Animated.View style={[{ position: 'absolute', right: -4, top: -3, bottom: -3, width: 5, borderRadius: 2, backgroundColor: colors.warning }, lipStyle]} /> : null}
     </View>
   );
 }

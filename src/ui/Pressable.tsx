@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Animated, Platform, Pressable as RNPressable, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 
+import { useReducedMotion } from '@/theme';
+
 import { haptic } from './haptics';
 
 /**
@@ -21,6 +23,8 @@ export interface PressableScaleProps extends Omit<PressableProps, 'style' | 'chi
   feedback?: 'tap' | 'press' | 'select' | 'none';
   /** Fade to 45% when disabled (default). Turn off when the content already shows it is unavailable (a dashed future day). */
   dimDisabled?: boolean;
+  /** Also sink this many px while pressed (the centre + cup dips). */
+  dip?: number;
 }
 
 /**
@@ -28,17 +32,24 @@ export interface PressableScaleProps extends Omit<PressableProps, 'style' | 'chi
  * tappable surface. It renders a single node, so layout styles (flex, width,
  * margins) passed in `style` behave exactly as on a View.
  */
-export function PressableScale({ style, scaleTo = 0.97, feedback = 'tap', dimDisabled = true, onPressIn, onPressOut, onPress, disabled, children, ...rest }: PressableScaleProps) {
-  // Held in state, not a ref: the value is read while rendering.
-  const [scale] = useState(() => new Animated.Value(1));
-  const to = (v: number) => Animated.spring(scale, { toValue: v, useNativeDriver: true, speed: 40, bounciness: 4 }).start();
+export function PressableScale({ style, scaleTo = 0.97, feedback = 'tap', dimDisabled = true, dip = 0, onPressIn, onPressOut, onPress, disabled, children, ...rest }: PressableScaleProps) {
+  // Held in state, not a ref: the value is read while rendering. 1 at rest, 0 fully pressed.
+  const [press] = useState(() => new Animated.Value(1));
+  const reduce = useReducedMotion();
+  const to = (v: number) => {
+    // Reduced motion: the pressed state still shows, it just does not spring.
+    if (reduce) press.setValue(v);
+    else Animated.spring(press, { toValue: v, useNativeDriver: Platform.OS !== 'web', speed: 40, bounciness: 0 }).start();
+  };
+  const scale = scaleTo === 1 ? 1 : press.interpolate({ inputRange: [0, 1], outputRange: [scaleTo, 1] });
+  const transform = dip ? [{ scale }, { translateY: press.interpolate({ inputRange: [0, 1], outputRange: [dip, 0] }) }] : [{ scale }];
   return (
     <AnimatedPressable
       {...rest}
       disabled={disabled}
       accessibilityRole={rest.accessibilityRole ?? 'button'}
       onPressIn={(e) => {
-        to(scaleTo);
+        to(0);
         onPressIn?.(e);
       }}
       onPressOut={(e) => {
@@ -49,7 +60,7 @@ export function PressableScale({ style, scaleTo = 0.97, feedback = 'tap', dimDis
         if (feedback !== 'none') haptic[feedback]();
         onPress?.(e);
       }}
-      style={[style, { transform: [{ scale }] }, disabled && dimDisabled && { opacity: 0.45 }]}>
+      style={[style, { transform }, disabled && dimDisabled && { opacity: 0.45 }]}>
       {children}
     </AnimatedPressable>
   );

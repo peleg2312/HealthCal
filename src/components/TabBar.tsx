@@ -1,10 +1,10 @@
 import type { BottomTabBarProps } from 'expo-router/build/layouts/Tabs';
 import { Activity, BookOpen, ChartLine, Dumbbell, House, Plus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { AccessibilityInfo, Animated, Platform, View } from 'react-native';
+import { Animated, Easing, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { cup, fonts, MAX_CONTENT_WIDTH, useTheme } from '@/theme';
+import { cup, fonts, MAX_CONTENT_WIDTH, motion, useReducedMotion, useTheme } from '@/theme';
 import { PressableScale, TAB_BAR_HEIGHT, Text } from '@/ui';
 
 import { QuickLogSheet } from './QuickLogSheet';
@@ -13,34 +13,6 @@ const ICONS = { index: House, diary: BookOpen, train: Dumbbell, progress: ChartL
 
 /** The active tab's level line: a 28 x 3 rim bar hanging from the bar's top edge. */
 const MARK_WIDTH = 28;
-
-/** The user's reduced-motion setting (on web, the prefers-reduced-motion media query). */
-function webReducedMotionQuery(): MediaQueryList | null {
-  return Platform.OS === 'web' && typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
-}
-
-function useReducedMotion(): boolean {
-  const [reduce, setReduce] = useState(() => webReducedMotionQuery()?.matches ?? false);
-  useEffect(() => {
-    let alive = true;
-    if (Platform.OS === 'web') {
-      const mq = webReducedMotionQuery();
-      if (!mq) return;
-      const onChange = (e: MediaQueryListEvent) => setReduce(e.matches);
-      mq.addEventListener?.('change', onChange);
-      return () => mq.removeEventListener?.('change', onChange);
-    }
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then((v) => alive && setReduce(v))
-      .catch(() => {});
-    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduce);
-    return () => {
-      alive = false;
-      sub.remove();
-    };
-  }, []);
-  return reduce;
-}
 
 /**
  * The active-tab mark: one level line that slides from tab to tab. It waits
@@ -64,7 +36,8 @@ function useSlidingMark(index: number, centres: Record<number, number>) {
       placed.add('pill');
       return;
     }
-    const anim = Animated.spring(x, { toValue: to, speed: 18, bounciness: 6, useNativeDriver: Platform.OS !== 'web' });
+    // A level line moving to its new place: ease-out, no overshoot.
+    const anim = Animated.timing(x, { toValue: to, duration: motion.duration.slide, easing: Easing.bezier(...motion.easing.move), useNativeDriver: Platform.OS !== 'web' });
     anim.start();
     return () => anim.stop();
   }, [centre, reduce, x, opacity, placed]);
@@ -153,7 +126,8 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
             <PressableScale
               testID="tab-add"
               feedback="press"
-              scaleTo={0.92}
+              scaleTo={0.94}
+              dip={motion.distance.dip}
               accessibilityLabel="Log something"
               onPress={() => setOpen(true)}
               style={{

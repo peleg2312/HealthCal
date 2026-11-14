@@ -26,7 +26,7 @@ import { startAutoSync, syncNow } from '@/services/sync';
 import { useStore } from '@/store';
 import { startDaySnapshots } from '@/store/daySnapshot';
 import { startPersistence, useHydration, wipePersisted } from '@/store/persistence';
-import { ThemeProvider, useTheme } from '@/theme';
+import { ThemeProvider, useReducedMotion, useTheme } from '@/theme';
 import { ToastHost } from '@/ui';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -79,8 +79,16 @@ function LoadFailed() {
   );
 }
 
+/**
+ * Task screens (search, quick add, import, add a friend) rise from the bottom like a sheet;
+ * everything else keeps the platform's push. On web the native stack does not animate, so
+ * `Screen`'s fade-up is the page change there. Reduced motion turns every transition off.
+ */
+const TASK_SCREENS = ['food/search', 'food/quick', 'food/scan', 'food/photo', 'activity/import', 'friends/add'] as const;
+
 function Navigation() {
   const { colors, dark } = useTheme();
+  const reduce = useReducedMotion();
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar style={dark ? 'light' : 'dark'} />
@@ -88,11 +96,14 @@ function Navigation() {
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.bg },
-          animation: 'slide_from_right',
+          animation: reduce ? 'none' : 'slide_from_right',
         }}>
-        <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
-        <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
-        <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
+        <Stack.Screen name="(tabs)" options={{ animation: reduce ? 'none' : 'fade' }} />
+        <Stack.Screen name="welcome" options={{ animation: reduce ? 'none' : 'fade' }} />
+        <Stack.Screen name="onboarding" options={{ animation: reduce ? 'none' : 'fade', gestureEnabled: false }} />
+        {TASK_SCREENS.map((name) => (
+          <Stack.Screen key={name} name={name} options={{ animation: reduce ? 'none' : 'slide_from_bottom', animationDuration: 320 }} />
+        ))}
       </Stack>
       <ToastHost />
       <StorageWarning />
