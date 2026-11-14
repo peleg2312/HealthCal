@@ -48,7 +48,7 @@ export function PlanReveal({ plan }: { plan: Plan }) {
 
       <FadeIn delay={120}>
         <Card padding={spacing.xxl} style={{ alignItems: 'center', gap: spacing.lg }} testID="plan-calories">
-          <Ring size={196} stroke={16} progress={1} color={colors.calories} colorEnd={colors.weight} trackColor={`${colors.calories}22`}>
+          <Ring size={196} stroke={16} progress={1} color={colors.calories} colorEnd={colors.ringEnd} trackColor={`${colors.calories}22`}>
             <Text variant="numXL" tabular testID="plan-kcal">
               {formatNumber(t.target)}
             </Text>

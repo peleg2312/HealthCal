@@ -77,7 +77,7 @@ export function WeightCard({ series, start, end, profile, usual }: { series: Wei
         color={colors.weight}
         height={170}
         band={usual && !outOfRange ? { from: v(usual.low), to: v(usual.high), color: colors.textSecondary } : undefined}
-        formatY={(n) => n.toFixed(1)}
+        formatY={(n) => (Number.isInteger(n) ? String(n) : n.toFixed(1))}
         formatPoint={(p) => `${formatShortDate(addDays(origin, p.x))} · trend ${p.y.toFixed(1)} ${unit}`}
         xLabels={[formatShortDate(pts[0].date), formatShortDate(pts[pts.length - 1].date)]}
       />

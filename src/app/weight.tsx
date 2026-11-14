@@ -123,7 +123,7 @@ function WeightScreen() {
               goal={target ? weightValue(target, units) : undefined}
               height={200}
               xLabels={chart.labels}
-              formatY={(n) => n.toFixed(units === 'imperial' ? 0 : 1)}
+              formatY={(n) => (Number.isInteger(n) ? String(n) : n.toFixed(1))}
             />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg }}>
               <Legend swatch={<View style={{ width: 16, height: 3, borderRadius: 2, backgroundColor: colors.weight }} />} label="Trend" />

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
 
+import { niceTicks } from '@/lib/chart';
 import { fonts, useTheme } from '@/theme';
 
 import { haptic } from './haptics';
@@ -269,7 +270,8 @@ export function LineChart({
   const pts = line.map((p) => ({ px: sx(p.x), py: sy(p.y) }));
   const path = toPath(pts, true);
   const area = pts.length > 1 ? `${path} L ${pts[pts.length - 1].px} ${padT + h} L ${pts[0].px} ${padT + h} Z` : '';
-  const ticks = Array.from({ length: yLabels }, (_, i) => minY + ((maxY - minY) * (i + 0.5)) / yLabels);
+  // Round grid values (steps of 1, 2 or 5 times a power of ten) read better than even fractions of the range.
+  const ticks = niceTicks(minY, maxY, yLabels);
   const nearest = (e: GestureResponderEvent) => {
     const x = e.nativeEvent.locationX;
     let best = 0;
@@ -313,7 +315,7 @@ export function LineChart({
             <React.Fragment key={i}>
               <Line x1={padL} x2={width - padR} y1={sy(t)} y2={sy(t)} stroke={colors.border} strokeWidth={1} />
               <SvgText x={padL - 8} y={sy(t) + 3} fontSize={10} fontFamily={fonts.medium} fill={colors.textTertiary} textAnchor="end">
-                {formatY ? formatY(t) : t.toFixed(1)}
+                {formatY ? formatY(t) : String(Math.round(t * 10) / 10)}
               </SvgText>
             </React.Fragment>
           ))}

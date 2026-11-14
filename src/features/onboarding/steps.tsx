@@ -165,16 +165,16 @@ export function GoalStep({ draft, set, errors }: StepProps) {
       value: 'lose',
       title: 'Lose weight',
       hint: 'A steady calorie deficit, protein kept high',
-      icon: <TrendingDown size={22} color={colors.weight} />,
-      color: colors.weight,
+      icon: <TrendingDown size={22} color={colors.primary} />,
+      color: colors.primary,
     },
-    { value: 'maintain', title: 'Maintain', hint: 'Eat to match what you burn', icon: <Scale size={22} color={colors.water} />, color: colors.water },
+    { value: 'maintain', title: 'Maintain', hint: 'Eat to match what you burn', icon: <Scale size={22} color={colors.primary} />, color: colors.primary },
     {
       value: 'gain',
       title: 'Gain muscle',
       hint: 'A small surplus to support training',
-      icon: <Dumbbell size={22} color={colors.protein} />,
-      color: colors.protein,
+      icon: <Dumbbell size={22} color={colors.primary} />,
+      color: colors.primary,
     },
   ];
   const name = draft.name.trim();
