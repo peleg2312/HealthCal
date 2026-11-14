@@ -10,7 +10,6 @@ import { setFoodDraft } from '@/features/food/draft';
 import { href, kcal } from '@/features/food/helpers';
 import { logFood } from '@/features/food/log';
 import { today } from '@/lib/dates';
-import { nowISO } from '@/lib/id';
 import { entriesTotal, mealForTime, MEALS } from '@/lib/nutrition';
 import { lookupBarcode } from '@/services/openFoodFacts';
 import { useStore } from '@/store';
@@ -48,11 +47,13 @@ export default function ScanScreen() {
   const lookupId = useRef(0);
   // The product just handled is often still in front of the camera: ignore it briefly.
   const recent = useRef<{ code: string; at: number } | null>(null);
-  const [openedAt] = useState(() => nowISO());
+  // Entries that already existed when the screen opened. Compared by id, not by time: a clock
+  // that was wrong when an entry was logged must not make old entries count as added here.
+  const [existing] = useState(() => new Set(Object.keys(useStore.getState().foodEntries)));
   const [manualKey, setManualKey] = useState(0);
   const entries = useLive('foodEntries');
   // Everything added to this day since the scanner opened (Undo lowers it).
-  const added = entries.filter((e) => e.date === date && e.loggedAt >= openedAt);
+  const added = entries.filter((e) => e.date === date && !existing.has(e.id));
   const addedKcal = entriesTotal(added).kcal;
 
   useEffect(() => {

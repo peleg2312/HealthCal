@@ -13,7 +13,6 @@ import { deleteEntry, logFood, setEntryAmount } from '@/features/food/log';
 import { LogSavedMealSheet } from '@/features/food/SavedMealParts';
 import { usualFoods } from '@/features/food/usuals';
 import { formatDayLabel } from '@/lib/dates';
-import { nowISO } from '@/lib/id';
 import { MEAL_LABEL, entriesTotal, sumNutrients } from '@/lib/nutrition';
 import { searchLocal, searchOnlineWithStatus } from '@/services/foodSearch';
 import { useToday } from '@/store/clock';
@@ -46,7 +45,9 @@ export default function FoodSearchScreen() {
   const [amountEntryId, setAmountEntryId] = useState<string | null>(null);
   const [logging, setLogging] = useState<SavedMeal | null>(null);
   const [onlineResult, setOnlineResult] = useState<{ query: string; items: Food[]; failed: boolean; unavailable: boolean }>({ query: '', items: [], failed: false, unavailable: false });
-  const [openedAt] = useState(() => nowISO());
+  // Entries that already existed when the screen opened. Compared by id, not by time: a clock
+  // that was wrong when an entry was logged must not make old entries count as added here.
+  const [existing] = useState(() => new Set(Object.keys(useStore.getState().foodEntries)));
 
   const recentFoods = useStore((s) => s.recentFoods);
   const favoriteIds = useStore((s) => s.favoriteFoodIds);
@@ -104,7 +105,7 @@ export default function FoodSearchScreen() {
   const onlineItems = online.items.filter((f) => !localIds.has(f.id)).slice(0, 15);
 
   // Running count of everything added to this day since the screen opened (Undo lowers it).
-  const added = entries.filter((e) => e.date === date && e.loggedAt >= openedAt);
+  const added = entries.filter((e) => e.date === date && !existing.has(e.id));
   const addedKcal = entriesTotal(added).kcal;
   // Latest entry added from this screen for each food in the current meal: its row shows a stepper.
   const addedByFood = new Map<string, FoodEntry>();
