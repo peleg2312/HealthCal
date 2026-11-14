@@ -10,7 +10,7 @@ import { formatDayLabel, today } from '@/lib/dates';
 import { useStore } from '@/store';
 import { useTheme } from '@/theme';
 import type { ActivityCategory, ActivityDef } from '@/types';
-import { Avatar, Chip, ChipRow, Divider, EmptyState, Header, ListRow, Screen, SectionTitle, Sheet, Text, TextField } from '@/ui';
+import { Chip, ChipRow, Divider, EmptyState, Header, ListRow, Screen, SectionTitle, Sheet, Text, TextField } from '@/ui';
 
 const CATEGORY_LABEL = Object.fromEntries(ACTIVITY_CATEGORIES.map((c) => [c.id, c.label])) as Record<ActivityCategory, string>;
 
@@ -21,7 +21,7 @@ function metRange(a: ActivityDef): string {
 }
 
 function ActivitySeparator() {
-  return <Divider inset={56} />;
+  return <Divider inset={36} />;
 }
 
 export default function PickActivityScreen() {
@@ -91,7 +91,7 @@ export default function PickActivityScreen() {
           <ChipRow>
             <Chip label="All" selected={category === 'all'} onPress={() => setCategory('all')} testID="category-all" />
             {ACTIVITY_CATEGORIES.map((c) => (
-              <Chip key={c.id} label={`${c.emoji} ${c.label}`} selected={category === c.id} onPress={() => setCategory(c.id)} testID={`category-${c.id}`} />
+              <Chip key={c.id} label={c.label} selected={category === c.id} onPress={() => setCategory(c.id)} testID={`category-${c.id}`} />
             ))}
           </ChipRow>
         </View>
@@ -137,7 +137,7 @@ export default function PickActivityScreen() {
             testID={`activity-${a.id}`}
             title={a.name}
             subtitle={`${CATEGORY_LABEL[a.category]} · ${metRange(a)}${a.tracksDistance ? ' · distance' : ''}`}
-            left={<Avatar emoji={a.emoji} />}
+            left={<View style={{ width: 24, alignItems: 'center' }}><Text style={{ fontSize: 17, lineHeight: 24 }}>{a.emoji}</Text></View>}
             onPress={() => choose(a)}
           />
         )}
@@ -152,9 +152,9 @@ export default function PickActivityScreen() {
           title="Set-by-set workout"
           subtitle="Exercises, weight and reps, with a timer"
           left={
-            <Avatar color={colors.exercise}>
-              <Dumbbell size={20} color={colors.exercise} />
-            </Avatar>
+            <View style={{ width: 24, alignItems: 'center' }}>
+              <Dumbbell size={20} color={colors.exercise} strokeWidth={1.9} />
+            </View>
           }
           onPress={() => {
             setStrengthChoice(false);
@@ -166,9 +166,9 @@ export default function PickActivityScreen() {
           title="Time and effort only"
           subtitle="Quickest: duration and intensity"
           left={
-            <Avatar>
-              <Timer size={20} color={colors.text} />
-            </Avatar>
+            <View style={{ width: 24, alignItems: 'center' }}>
+              <Timer size={20} color={colors.text} strokeWidth={1.9} />
+            </View>
           }
           onPress={() => {
             setStrengthChoice(false);

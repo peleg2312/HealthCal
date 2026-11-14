@@ -14,9 +14,9 @@ import { RequireProfile } from '@/features/food/RequireProfile';
 import { MEAL_LABEL, atwaterKcal, formatMacro, scaleNutrients } from '@/lib/nutrition';
 import { useStore } from '@/store';
 import { useDay, useLive } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { cup, useTheme } from '@/theme';
 import type { Food, FoodEntry, ISODate, MealType, Nutrients, Serving } from '@/types';
-import { Avatar, Button, Card, Divider, EmptyState, Header, IconButton, MacroBar, NumberField, Screen, Text, TextField, goBack } from '@/ui';
+import { Button, Card, CupKey, Divider, EmptyState, Header, IconButton, MacroBar, NumberField, Screen, Text, TextField, goBack } from '@/ui';
 
 export default function FoodDetailRoute() {
   return (
@@ -76,11 +76,11 @@ function ImpactLine({ date, kcalValue, replacing }: { date: ISODate; kcalValue: 
         gap: spacing.sm,
         paddingHorizontal: spacing.lg,
         paddingVertical: spacing.md,
-        borderRadius: radius.md,
-        backgroundColor: over ? `${colors.warning}22` : colors.primarySoft,
+        ...cup(radius.tile, 5),
+        backgroundColor: colors.surfaceAlt,
       }}>
-      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: over ? colors.warning : colors.calories }} />
-      <Text variant="label" color={over ? 'warning' : 'text'} style={{ flex: 1 }}>
+      <CupKey color={over ? colors.warning : colors.calories} />
+      <Text variant="label" color="text" style={{ flex: 1 }}>
         {over ? `Puts ${dayPhrase(date)} ${kcal(-after)} kcal over budget` : `Leaves ${kcal(after)} kcal for ${dayPhrase(date)}`}
       </Text>
     </View>
@@ -140,12 +140,10 @@ function NutritionFacts({ portion, per100g, showPer100 }: { portion: Nutrients; 
   );
 }
 
-function Hero({ name, brand, emoji, source, explain }: { name: string; brand?: string; emoji?: string; source: Food['source']; explain: string }) {
-  const { spacing } = useTheme();
+function Hero({ name, brand, source, explain }: { name: string; brand?: string; emoji?: string; source: Food['source']; explain: string }) {
   return (
-    <View style={{ flexDirection: 'row', gap: spacing.lg, alignItems: 'flex-start' }}>
-      <Avatar emoji={emoji ?? '🍽️'} size={60} />
-      <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
+    <View>
+      <View style={{ gap: 6 }}>
         <Text variant="h2" numberOfLines={3} testID="detail-name">
           {name}
         </Text>
@@ -169,7 +167,7 @@ function MacroSummary({ n, kcalNote, range }: { n: Nutrients; kcalNote: string; 
     <Card>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md }}>
         <View testID="detail-kcal">
-          <KcalValue value={n.kcal} variant="numXL" />
+          <KcalValue value={n.kcal} variant="numXL" color="caloriesInk" />
         </View>
         <Text variant="caption" color="textSecondary" align="right" style={{ flexShrink: 1, paddingBottom: 6 }} numberOfLines={2}>
           {kcalNote}
@@ -252,13 +250,14 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
             <IconButton
               testID="detail-delete"
               accessibilityLabel="Delete entry"
-              size={54}
-              tone="alt"
+              size={48}
+              tone="clear"
+              style={{ borderWidth: 1.5, borderColor: colors.danger }}
               onPress={() => {
                 deleteEntry(entry);
                 goBack(href('/diary', { date: entry.date }));
               }}>
-              <Trash2 size={20} color={colors.danger} />
+              <Trash2 size={20} color={colors.danger} strokeWidth={1.9} />
             </IconButton>
           ) : null}
           <Button
@@ -316,13 +315,14 @@ function ManualEditor({ entry }: { entry: FoodEntry }) {
           <IconButton
             testID="detail-delete"
             accessibilityLabel="Delete entry"
-            size={54}
-            tone="alt"
+            size={48}
+            tone="clear"
+            style={{ borderWidth: 1.5, borderColor: colors.danger }}
             onPress={() => {
               deleteEntry(entry);
               goBack(href('/diary', { date: entry.date }));
             }}>
-            <Trash2 size={20} color={colors.danger} />
+            <Trash2 size={20} color={colors.danger} strokeWidth={1.9} />
           </IconButton>
           <Button
             testID="detail-save"

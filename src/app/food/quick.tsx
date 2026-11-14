@@ -7,10 +7,10 @@ import { href, kcal, parseDate, parseMeal } from '@/features/food/helpers';
 import { logQuickAdd } from '@/features/food/log';
 import { atwaterKcal, MEAL_LABEL } from '@/lib/nutrition';
 import { useTheme } from '@/theme';
-import { Button, Card, Header, NumberField, Screen, Text, TextField, goBack } from '@/ui';
+import { Button, Card, CupKey, Header, NumberField, Screen, Text, TextField, goBack } from '@/ui';
 
 export default function QuickAddScreen() {
-  const { spacing } = useTheme();
+  const { colors, spacing } = useTheme();
   const params = useLocalSearchParams<{ meal?: string; date?: string }>();
   const [meal, setMeal] = useState(() => parseMeal(params.meal));
   const [date, setDate] = useState(() => parseDate(params.date));
@@ -66,9 +66,12 @@ export default function QuickAddScreen() {
           <NumberField testID="quick-fat" label="Fat" suffix="g" value={fat} onChange={setFat} style={{ flex: 1 }} />
         </View>
         {mismatch ? (
-          <Text testID="quick-mismatch" variant="caption" color="warning">
-            These macros add up to about {kcal(implied)} kcal, not {kcal(kcalV!)}. Labels round, so both can be fine; worth a second look if it is a typo.
-          </Text>
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+            <CupKey color={colors.warning} style={{ marginTop: 4 }} />
+            <Text testID="quick-mismatch" variant="caption" color="text" style={{ flex: 1 }}>
+              These macros add up to about {kcal(implied)} kcal, not {kcal(kcalV!)}. Labels round, so both can be fine; worth a second look if it is a typo.
+            </Text>
+          </View>
         ) : null}
       </Card>
 

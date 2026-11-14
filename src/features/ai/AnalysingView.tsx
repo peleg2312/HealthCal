@@ -3,7 +3,7 @@ import { Sparkles } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Animated, Easing, View } from 'react-native';
 
-import { useTheme } from '@/theme';
+import { cup, useTheme } from '@/theme';
 import { Card, Text } from '@/ui';
 
 /**
@@ -44,7 +44,7 @@ export function AnalysingView({ photoUri, aspect, description, precise }: { phot
       {photoUri ? (
         <View
           onLayout={(e) => setBoxH(e.nativeEvent.layout.height)}
-          style={{ width: '100%', aspectRatio: Math.max(0.75, Math.min(1.6, aspect ?? 1.33)), maxHeight: 340, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.surfaceAlt }}>
+          style={{ width: '100%', aspectRatio: Math.max(0.75, Math.min(1.6, aspect ?? 1.33)), maxHeight: 340, ...cup(radius.card), overflow: 'hidden', backgroundColor: colors.surfaceAlt }}>
           <Image source={{ uri: photoUri }} style={{ width: '100%', height: '100%', opacity: 0.75 }} contentFit="cover" accessibilityLabel="Your meal photo" />
           <Animated.View
             style={{
@@ -53,10 +53,7 @@ export function AnalysingView({ photoUri, aspect, description, precise }: { phot
               right: 0,
               top: 0,
               height: 3,
-              backgroundColor: colors.primary,
-              shadowColor: colors.primary,
-              shadowOpacity: 0.9,
-              shadowRadius: 12,
+              backgroundColor: colors.rim,
               transform: [{ translateY }],
             }}
           />
@@ -71,7 +68,7 @@ export function AnalysingView({ photoUri, aspect, description, precise }: { phot
 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
         <Animated.View style={{ opacity }}>
-          <Sparkles size={20} color={colors.primary} />
+          <Sparkles size={20} color={colors.text} strokeWidth={1.9} />
         </Animated.View>
         <Text variant="h3">{precise ? 'Checking more carefully' : 'Estimating your meal'}</Text>
       </View>
@@ -86,9 +83,9 @@ export function AnalysingView({ photoUri, aspect, description, precise }: { phot
       <Card padding={spacing.lg} style={{ gap: spacing.lg }}>
         {[0.62, 0.48, 0.55].map((w, i) => (
           <Animated.View key={i} style={{ opacity, flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-            <View style={{ height: 12, width: `${w * 100}%`, borderRadius: 6, backgroundColor: colors.track }} />
+            <View style={{ height: 12, width: `${w * 100}%`, borderRadius: radius.track, backgroundColor: colors.track }} />
             <View style={{ flex: 1 }} />
-            <View style={{ height: 12, width: 44, borderRadius: 6, backgroundColor: colors.track }} />
+            <View style={{ height: 12, width: 44, borderRadius: radius.track, backgroundColor: colors.track }} />
           </Animated.View>
         ))}
       </Card>

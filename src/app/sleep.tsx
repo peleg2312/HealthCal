@@ -12,7 +12,7 @@ import { useToday } from '@/store/clock';
 import { useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ISODate, SleepEntry } from '@/types';
-import { BarChart, Button, Card, Chip, Divider, EmptyState, Header, ListRow, Screen, SectionTitle, Segmented, Sheet, Stepper, Text } from '@/ui';
+import { BarChart, Button, Card, Chip, CupKey, Divider, EmptyState, Header, ListRow, Screen, SectionTitle, Segmented, Sheet, Stepper, Text } from '@/ui';
 
 type Window = '7' | '30';
 const QUALITIES: SleepEntry['quality'][] = [1, 2, 3, 4, 5];
@@ -28,7 +28,7 @@ function QualityDots({ quality, size = 10 }: { quality: number; size?: number })
   return (
     <View style={{ flexDirection: 'row', gap: 4 }} accessibilityLabel={`Quality ${quality} of 5`}>
       {QUALITIES.map((q) => (
-        <View key={q} style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: q <= quality ? colors.sleep : colors.track }} />
+        <CupKey key={q} size={size} color={q <= quality ? colors.sleep : colors.borderStrong} variant={q <= quality ? 'filled' : 'outline'} />
       ))}
     </View>
   );
@@ -40,18 +40,18 @@ function HoursBig({ hours, testID }: { hours: number; testID?: string }) {
   const m = mins % 60;
   return (
     <View testID={testID} style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-      <Text variant="numXL" tabular color="sleep">
+      <Text variant="numXL" tabular>
         {h}
       </Text>
-      <Text variant="title" color="textSecondary">
+      <Text variant="unit" style={{ fontSize: 15 }}>
         h
       </Text>
       {m > 0 ? (
         <>
-          <Text variant="numXL" tabular color="sleep" style={{ marginLeft: 6 }}>
+          <Text variant="numXL" tabular style={{ marginLeft: 6 }}>
             {m}
           </Text>
-          <Text variant="title" color="textSecondary">
+          <Text variant="unit" style={{ fontSize: 15 }}>
             min
           </Text>
         </>
@@ -80,7 +80,7 @@ function SleepScreen() {
   const bars = summary.series.map((d, i) => ({
     label: days === 7 ? (d.date === todayDate ? 'Today' : weekdayShort(d.date)) : i % 5 === 4 || i === days - 1 ? String(fromISODate(d.date).getDate()) : '',
     value: d.hours,
-    color: d.hours >= SLEEP_RANGE[0] && d.hours <= SLEEP_RANGE[1] ? colors.sleep : `${colors.sleep}77`,
+    color: colors.sleep,
   }));
 
   const footer = <Button testID="sleep-log" title={lastNight ? (isToday ? 'Log sleep' : 'Edit this night') : isToday ? 'Log last night' : 'Log this night'} icon={<Plus size={20} color={colors.onPrimary} />} onPress={() => setSheetDate(end)} />;
@@ -98,9 +98,10 @@ function SleepScreen() {
       ) : (
         <>
           <Card style={{ gap: spacing.sm }}>
-            <Text variant="overline" color="textSecondary">
-              {isToday ? 'LAST NIGHT' : `NIGHT BEFORE ${dayTitle(end).toUpperCase()}`}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <CupKey color={colors.sleep} />
+              <Text variant="overline">{isToday ? 'Last night' : `Night before ${dayTitle(end)}`}</Text>
+            </View>
             {lastNight ? (
               <>
                 <HoursBig hours={lastNight.hours} testID="sleep-last-night" />
@@ -139,10 +140,10 @@ function SleepScreen() {
                 label="Night to night"
               />
             </View>
-            <BarChart data={bars} color={colors.sleep} goal={SLEEP_RANGE[0]} height={160} formatValue={(n) => `${n.toFixed(1)}`} />
+            <BarChart data={bars} color={colors.sleep} band={{ from: SLEEP_RANGE[0], to: SLEEP_RANGE[1] }} height={160} formatValue={(n) => `${n.toFixed(1)}`} />
             <Text variant="caption" color="textSecondary">
               {[
-                'Brighter bars are nights within 7 to 9 hours; the dashed line marks 7 hours.',
+                'The shaded band marks 7 to 9 hours, the range most adults need.',
                 summary.nights < days ? `${days - summary.nights} of ${days} nights not logged.` : null,
                 summary.avgQuality !== null ? `Average quality: ${QUALITY_LABELS[Math.round(summary.avgQuality) as SleepEntry['quality']].toLowerCase()}.` : null,
               ]
@@ -246,7 +247,7 @@ function SleepSheet({ date, onDate, onClose, entries }: { date: ISODate | null; 
       </Text>
       <View style={{ flexDirection: 'row', gap: 6 }}>
         {QUALITIES.map((q) => (
-          <Chip key={q} testID={`sleep-quality-${q}`} label={QUALITY_LABELS[q]} selected={quality === q} onPress={() => setQuality(q)} style={{ flex: 1, paddingHorizontal: 4, justifyContent: 'center', height: 44 }} />
+          <Chip key={q} testID={`sleep-quality-${q}`} label={QUALITY_LABELS[q]} selected={quality === q} onPress={() => setQuality(q)} style={{ flex: 1, paddingHorizontal: 4, justifyContent: 'center' }} />
         ))}
       </View>
     </Sheet>

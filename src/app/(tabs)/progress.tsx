@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 
 import { startOfWeek } from '@/lib/dates';
 import { MIN_INSIGHT_DAYS, weekRangeLabel } from '@/lib/insights';
+import { CaloriesADay } from '@/features/progress/CaloriesADay';
 import { CaloriesCard } from '@/features/progress/CaloriesCard';
 import { ConsistencyCard } from '@/features/progress/ConsistencyCard';
 import { EarlyState } from '@/features/progress/EarlyState';
@@ -57,13 +58,13 @@ export default function ProgressScreen() {
   return (
     // Keyed by section so a switch starts at the top instead of mid-way down the previous section.
     <Screen tabs testID="progress-screen" key={segment}>
-      <LargeTitle title="Progress" subtitle={weekRangeLabel(start, d.today)} />
+      <LargeTitle title="Progress" subtitle={weekRangeLabel(start, d.today)} right={<RangeSwitch value={range} onChange={setRange} />} />
       <SegmentSwitch options={SEGMENTS} value={segment} onChange={setSegment} testIDPrefix="progress-segment" />
-      <RangeSwitch value={range} onChange={setRange} />
       {segment === 'overview' ? (
         <>
-          <InsightsCard insights={d.insights} rangeDays={range} />
+          <CaloriesADay days={d.days} summary={d.summary} today={d.today} onOpen={() => setSegment('nutrition')} />
           <OverviewGrid d={d} range={range} onOpen={setSegment} />
+          <InsightsCard insights={d.insights} rangeDays={range} />
           {d.recap ? <RecapCard recap={d.recap} earlier={d.earlierWeeks} unseen={recapReady.ready && recapReady.week === d.recap.weekStart} /> : null}
           <MilestonesCard milestones={d.milestones} />
         </>

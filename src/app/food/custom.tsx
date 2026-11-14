@@ -8,7 +8,7 @@ import { setFoodDraft, useFoodDraft } from '@/features/food/draft';
 import { href, kcal, param, toPer100 } from '@/features/food/helpers';
 import { atwaterKcal } from '@/lib/nutrition';
 import { useStore } from '@/store';
-import { useTheme } from '@/theme';
+import { cupFor, useTheme } from '@/theme';
 import type { CustomFood, Nutrients } from '@/types';
 import { Button, Card, EmptyState, Header, IconButton, NumberField, PressableScale, Screen, Segmented, Text, TextField, goBack, haptic, toast } from '@/ui';
 
@@ -42,7 +42,7 @@ export default function CustomFoodScreen() {
 }
 
 function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { existing?: CustomFood; barcode?: string; name?: string; meal?: string; date?: string }) {
-  const { colors, spacing, radius } = useTheme();
+  const { colors, spacing } = useTheme();
   const own = existing?.servings[0];
   const [basis, setBasis] = useState<Basis>(own && Math.abs(own.grams - 100) > 0.01 ? 'serving' : existing ? 'per100' : 'serving');
   const [name, setName] = useState(existing?.name ?? initialName ?? '');
@@ -134,8 +134,9 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
             <IconButton
               testID="custom-delete"
               accessibilityLabel="Delete food"
-              size={54}
-              tone="alt"
+              size={48}
+              tone="clear"
+              style={{ borderWidth: 1.5, borderColor: colors.danger }}
               onPress={() => {
                 deleteCustomFood(existing);
                 goBack('/food/search');
@@ -168,14 +169,13 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
                 style={{
                   width: 44,
                   height: 44,
-                  borderRadius: radius.sm,
+                  ...cupFor(44),
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: e === emoji ? colors.primarySoft : colors.surfaceAlt,
                   borderWidth: 1.5,
-                  borderColor: e === emoji ? colors.primary : 'transparent',
+                  borderColor: e === emoji ? colors.text : 'transparent',
                 }}>
-                <Text style={{ fontSize: 22, lineHeight: 28 }}>{e}</Text>
+                <Text style={{ fontSize: 20, lineHeight: 26 }}>{e}</Text>
               </PressableScale>
             ))}
           </View>

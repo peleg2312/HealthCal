@@ -128,8 +128,8 @@ function AuthForm({ initial }: { initial: Mode }) {
           />
         }>
         <FadeIn style={{ alignItems: 'center', gap: spacing.lg }}>
-          <View style={{ width: 72, height: 72, borderRadius: 24, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-            <MailCheck size={34} color={colors.primary} />
+          <View style={{ width: 72, height: 72, alignItems: 'center', justifyContent: 'center' }}>
+            <MailCheck size={40} color={colors.text} strokeWidth={1.6} />
           </View>
           <Text variant="h1" align="center" accessibilityRole="header">
             Check your inbox
@@ -231,11 +231,11 @@ function AuthForm({ initial }: { initial: Mode }) {
             {mode === 'signin' ? (
               <Text
                 variant="label"
-                color="primary"
+                color="text"
                 accessibilityRole="button"
                 onPress={() => switchMode('forgot')}
                 testID="auth-forgot"
-                style={{ alignSelf: 'flex-end', paddingVertical: spacing.sm }}>
+                style={{ alignSelf: 'flex-end', paddingVertical: spacing.sm, textDecorationLine: 'underline' }}>
                 Forgot password?
               </Text>
             ) : null}
@@ -318,8 +318,8 @@ function ResetPassword() {
           </View>
         }>
         <FadeIn style={{ alignItems: 'center', gap: spacing.lg }}>
-          <View style={{ width: 72, height: 72, borderRadius: 24, backgroundColor: `${colors.warning}22`, alignItems: 'center', justifyContent: 'center' }}>
-            <KeyRound size={34} color={colors.warning} />
+          <View style={{ width: 72, height: 72, alignItems: 'center', justifyContent: 'center' }}>
+            <KeyRound size={40} color={colors.warning} strokeWidth={1.6} />
           </View>
           <Text variant="h1" align="center" accessibilityRole="header">
             This reset link no longer works
@@ -450,8 +450,8 @@ function NotConfigured() {
         />
       }>
       <View style={{ alignItems: 'center' }}>
-        <View style={{ width: 80, height: 80, borderRadius: 26, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-          <Smartphone size={36} color={colors.primary} />
+        <View style={{ width: 80, height: 80, alignItems: 'center', justifyContent: 'center' }}>
+          <Smartphone size={40} color={colors.text} strokeWidth={1.6} />
         </View>
       </View>
       <FadeIn style={{ gap: spacing.sm }}>

@@ -1,12 +1,12 @@
-import { Droplet, Minus, Plus, X } from 'lucide-react-native';
+import { Minus, Plus, X } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { TextInput, View } from 'react-native';
 
 import { SourceTag } from '@/features/food/components';
 import { formatMacro } from '@/lib/nutrition';
-import { fonts, useTheme } from '@/theme';
+import { cup, fonts, useTheme } from '@/theme';
 import type { Food } from '@/types';
-import { Badge, Chip, IconButton, parseNumber, Text } from '@/ui';
+import { Badge, Chip, CupKey, IconButton, parseNumber, Text } from '@/ui';
 
 import { confidenceLevel, gramStep, type ReviewRow } from './estimate';
 import { itemFromFood } from './localMatch';
@@ -41,7 +41,7 @@ export function ItemRow({
   return (
     <View testID={id} style={{ paddingVertical: spacing.md, gap: spacing.sm }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-        {row.kind === 'fat' ? <Droplet size={16} color={colors.fat} /> : null}
+        {row.kind === 'fat' ? <CupKey color={colors.fat} /> : null}
         <TextInput
           testID={`${id}-name`}
           value={item.name}
@@ -57,7 +57,7 @@ export function ItemRow({
         />
         {unsure && !row.food ? <Badge label="Unsure" color={colors.warning} /> : null}
         <IconButton testID={`${id}-remove`} accessibilityLabel={`Remove ${item.name}`} size={32} tone="clear" onPress={onRemove}>
-          <X size={18} color={colors.textTertiary} />
+          <X size={18} color={colors.textSecondary} strokeWidth={1.9} />
         </IconButton>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
@@ -66,24 +66,22 @@ export function ItemRow({
             testID={`${id}-minus`}
             accessibilityLabel={`Less ${item.name}, minus ${step} grams`}
             size={36}
-            tone="alt"
+            tone="surface"
             disabled={item.grams <= step}
             onPress={() => onGrams(Math.max(step, item.grams - step))}>
             <Minus size={16} color={colors.text} />
           </IconButton>
           <GramsInput testID={`${id}-grams`} value={item.grams} onChange={onGrams} label={item.name} />
-          <IconButton testID={`${id}-plus`} accessibilityLabel={`More ${item.name}, plus ${step} grams`} size={36} tone="alt" onPress={() => onGrams(item.grams + step)}>
+          <IconButton testID={`${id}-plus`} accessibilityLabel={`More ${item.name}, plus ${step} grams`} size={36} tone="surface" onPress={() => onGrams(item.grams + step)}>
             <Plus size={16} color={colors.text} />
           </IconButton>
         </View>
         <View style={{ flex: 1, alignItems: 'flex-end', minWidth: 0 }}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
-            <Text variant="title" tabular testID={`${id}-kcal`}>
+            <Text variant="numM" tabular testID={`${id}-kcal`} style={{ fontSize: 17, lineHeight: 22 }}>
               {item.kcal}
             </Text>
-            <Text variant="caption" color="textSecondary">
-              kcal
-            </Text>
+            <Text variant="unit">kcal</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Macro letter="P" value={item.protein} color={colors.protein} />
@@ -95,7 +93,7 @@ export function ItemRow({
       <View testID={`${id}-source`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
         <SourceTag source={row.food ? row.food.source : 'ai'} />
         {row.food && row.estimate ? (
-          <Text variant="caption" color="textTertiary" style={{ fontSize: 11 }}>
+          <Text variant="caption" color="textSecondary">
             · portion still estimated
           </Text>
         ) : null}
@@ -133,8 +131,9 @@ export function ItemRow({
 
 function Macro({ letter, value, color }: { letter: string; value: number; color: string }) {
   return (
-    <View style={{ flexDirection: 'row', gap: 2 }}>
-      <Text variant="caption" color={color}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+      <CupKey color={color} size={8} />
+      <Text variant="caption" color="textSecondary">
         {letter}
       </Text>
       <Text variant="caption" color="textSecondary" tabular>
@@ -162,9 +161,9 @@ function GramsInput({ value, onChange, label, testID }: { value: number; onChang
         height: 36,
         minWidth: 72,
         paddingHorizontal: 10,
-        borderRadius: radius.sm,
+        ...cup(radius.buttonSm, 5),
         borderWidth: 1.5,
-        borderColor: focused ? colors.primary : colors.border,
+        borderColor: focused ? colors.rim : colors.borderStrong,
         backgroundColor: colors.surface,
       }}>
       <TextInput

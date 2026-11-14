@@ -55,21 +55,21 @@ export default function DiaryScreen() {
 
   return (
     <Screen tabs testID="diary-screen" scrollProps={{ ref: scrollRef } as ScrollViewProps}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingTop: spacing.sm }}>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text variant="label" color="textSecondary" numberOfLines={1}>
-            {isToday ? formatLongDate(date) : date > t ? 'Planning ahead' : 'Diary'}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingTop: spacing.sm }}>
+        <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
+          <Text variant="overline" numberOfLines={1}>
+            {isToday ? formatLongDate(date) : date > t ? 'Planning ahead' : 'Looking back'}
           </Text>
           <Text variant="h1" numberOfLines={1} testID="diary-date-title">
             {isToday ? 'Food diary' : formatDayLabel(date)}
           </Text>
         </View>
-        {!isToday ? <Chip testID="diary-today" label="Today" onPress={() => setDate(today())} /> : null}
-        <IconButton testID="diary-prev" accessibilityLabel="Previous day" onPress={() => setDate(addDays(date, -1))}>
-          <ChevronLeft size={20} color={colors.text} />
+        {!isToday ? <Chip testID="diary-today" label="Today" selected onPress={() => setDate(today())} style={{ marginTop: 6 }} /> : null}
+        <IconButton testID="diary-prev" accessibilityLabel="Previous day" onPress={() => setDate(addDays(date, -1))} style={{ borderColor: colors.borderStrong }}>
+          <ChevronLeft size={20} color={colors.text} strokeWidth={2.2} />
         </IconButton>
         <IconButton testID="diary-next" accessibilityLabel="Next day" onPress={() => setDate(addDays(date, 1))}>
-          <ChevronRight size={20} color={colors.text} />
+          <ChevronRight size={20} color={colors.textSecondary} strokeWidth={2.2} />
         </IconButton>
       </View>
 
@@ -79,7 +79,7 @@ export default function DiaryScreen() {
 
       {empty ? (
         <Card testID="diary-empty" tone="alt">
-          <Text variant="title">{date > t ? 'Nothing planned yet' : 'Nothing logged for this day'}</Text>
+          <Text variant="h3">{date > t ? 'Nothing planned yet' : 'Nothing logged for this day'}</Text>
           <Text variant="body" color="textSecondary" style={{ marginTop: 4 }}>
             {previousDay
               ? `Ate the same as ${dayPhrase(previousDay.date)}? Copy it in one tap, then adjust.`

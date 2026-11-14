@@ -6,13 +6,14 @@ import { View } from 'react-native';
 import { storeSavedMeal } from '@/features/food/actions';
 import { formatPortion, itemsRange, mealServings } from '@/features/food/build';
 import { href, kcal, param } from '@/features/food/helpers';
+import { RowEmoji } from '@/features/food/components';
 import { closeMealDraft, openMealDraft, removeDraftItem, setDraftName, setDraftServings, updateDraftItem, useMealDraft } from '@/features/food/mealDraft';
 import { RequireProfile } from '@/features/food/RequireProfile';
 import { ItemAmountSheet, itemLine } from '@/features/food/SavedMealParts';
 import { sumNutrients } from '@/lib/nutrition';
 import { useStore } from '@/store';
-import { useTheme } from '@/theme';
-import { Avatar, Button, Card, Divider, EmptyState, Header, IconButton, MacroBar, NumberField, PressableScale, Screen, Text, TextField, goBack, haptic, toast } from '@/ui';
+import { fonts, useTheme } from '@/theme';
+import { Button, Card, Divider, EmptyState, Header, IconButton, MacroBar, NumberField, PressableScale, Screen, Text, TextField, goBack, haptic, toast } from '@/ui';
 
 export default function MealEditRoute() {
   return (
@@ -123,13 +124,11 @@ function MealEdit() {
                 {count > 1 ? 'Per serving' : 'Total'}
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                <Text variant="numL" tabular testID="meal-edit-kcal">
+                <Text variant="numL" tabular color="caloriesInk" testID="meal-edit-kcal">
                   {range ? '~' : ''}
                   {kcal(n.kcal / count)}
                 </Text>
-                <Text variant="label" color="textSecondary">
-                  kcal
-                </Text>
+                <Text variant="unit">kcal</Text>
               </View>
             </View>
             <Text variant="caption" color="textSecondary" align="right" tabular style={{ flexShrink: 1, paddingBottom: 6 }}>
@@ -158,17 +157,17 @@ function MealEdit() {
         ) : (
           rows.map((r, i) => (
             <View key={r.key}>
-              {i > 0 ? <Divider inset={50} /> : null}
+              {i > 0 ? <Divider inset={36} /> : null}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
                 <PressableScale
                   testID={`meal-edit-item-${i}`}
                   scaleTo={0.985}
                   onPress={() => setEditing(r.key)}
                   accessibilityLabel={`${r.item.name}, ${itemLine(r.item)}. Change amount`}
-                  style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 6 }}>
-                  <Avatar emoji={r.item.emoji ?? '🍽️'} size={38} />
+                  style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>
+                  <RowEmoji emoji={r.item.emoji} />
                   <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                    <Text variant="bodyStrong" numberOfLines={1}>
+                    <Text variant="bodyStrong" numberOfLines={1} style={{ fontFamily: fonts.semibold }}>
                       {r.item.name}
                     </Text>
                     <Text variant="caption" color="textSecondary" numberOfLines={1} tabular>
@@ -177,7 +176,7 @@ function MealEdit() {
                   </View>
                 </PressableScale>
                 <IconButton testID={`meal-edit-item-${i}-remove`} accessibilityLabel={`Remove ${r.item.name}`} tone="clear" size={44} onPress={() => remove(r.key)}>
-                  <X size={16} color={colors.textTertiary} />
+                  <X size={16} color={colors.textSecondary} strokeWidth={1.9} />
                 </IconButton>
               </View>
             </View>

@@ -4,7 +4,9 @@ import { View } from 'react-native';
 
 import { useTheme } from '@/theme';
 import type { AiFoodItem, Food } from '@/types';
-import { Avatar, Divider, ListRow, Text, TextField } from '@/ui';
+import { Divider, ListRow, Text, TextField } from '@/ui';
+
+import { RowEmoji } from '@/features/food/components';
 
 import { foodToItem, matchFoods } from './localMatch';
 
@@ -52,14 +54,14 @@ export function AddMissingItem({
             const item = foodToItem(food, q);
             return (
               <View key={food.id}>
-                {i > 0 ? <Divider inset={56} /> : null}
+                {i > 0 ? <Divider inset={36} /> : null}
                 <ListRow
                   testID={`ai-add-match-${i}`}
-                  left={<Avatar emoji={food.emoji ?? '🍽️'} size={40} />}
+                  left={<RowEmoji emoji={food.emoji} />}
                   title={food.name}
                   subtitle={`${item.grams} g · ${item.kcal} kcal · ${food.source === 'custom' ? 'your food' : 'reference data'}`}
                   onPress={() => add(item, food)}
-                  right={<Plus size={18} color={colors.primary} />}
+                  right={<Plus size={20} color={colors.text} strokeWidth={2.2} />}
                 />
               </View>
             );
@@ -71,13 +73,13 @@ export function AddMissingItem({
           ) : null}
           {onAskAi ? (
             <>
-              {matches.length > 0 ? <Divider inset={56} /> : null}
+              {matches.length > 0 ? <Divider inset={36} /> : null}
               <ListRow
                 testID="ai-add-ask-ai"
                 left={
-                  <Avatar color={colors.primary} size={40}>
-                    <Sparkles size={18} color={colors.primary} />
-                  </Avatar>
+                  <View style={{ width: 24, alignItems: 'center' }}>
+                    <Sparkles size={19} color={colors.text} strokeWidth={1.9} />
+                  </View>
                 }
                 title={aiBusy ? 'Estimating…' : `Estimate “${q}” with AI`}
                 subtitle="Uses one of today's analyses"

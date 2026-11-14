@@ -1,18 +1,20 @@
-import { Flame } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
 import { formatShortDate, startOfWeek, weekdayShort } from '@/lib/dates';
-import { BUDGET_BAND, direction, isCompleteDay, type InsightDay, type PeriodSummary, type UsualRange } from '@/lib/insights';
+import { direction, isCompleteDay, type InsightDay, type PeriodSummary, type UsualRange } from '@/lib/insights';
 import { formatNumber } from '@/lib/units';
 import { useTheme } from '@/theme';
 import { BarChart, Text, type BarDatum } from '@/ui';
 
 import { BigStat, LegendDot, Note, SectionCard, StatStrip, TrendLegend } from './parts';
 
-/** Daily bars for up to ~6 weeks, weekly averages beyond that. */
-function buildBars(days: InsightDay[], today: string, colors: { calories: string; warning: string; textTertiary: string }): { data: BarDatum[]; weekly: boolean } {
-  const colorFor = (kcal: number, budget: number) => (kcal > budget * (1 + BUDGET_BAND) ? colors.warning : colors.calories);
+/**
+ * Daily bars for up to ~6 weeks, weekly averages beyond that. Bars are slim
+ * cups: the kit draws the part above the budget line in amber and hatches
+ * today (`openIndex`), so no bar picks its own colour.
+ */
+export function buildBars(days: InsightDay[], today: string): { data: BarDatum[]; weekly: boolean; openIndex?: number } {
   if (days.length <= 45) {
     const every = days.length <= 10 ? 1 : 7;
     const data = days.map((d, i) => {
@@ -20,9 +22,10 @@ function buildBars(days: InsightDay[], today: string, colors: { calories: string
       const label = every === 1 ? (d.date === today ? 'Today' : weekdayShort(d.date)) : fromEnd % every === 3 ? formatShortDate(d.date) : '';
       const kcal = d.entries.length ? d.eaten.kcal : 0;
       const detail = `${formatShortDate(d.date)} · ${kcal ? `${formatNumber(Math.round(kcal))} of ${formatNumber(Math.round(d.budget))} kcal` : 'not logged'}`;
-      return { label, value: kcal, color: d.date === today ? colors.textTertiary : colorFor(kcal, d.budget), detail };
+      return { label, value: kcal, detail };
     });
-    return { data, weekly: false };
+    const open = days.findIndex((d) => d.date === today);
+    return { data, weekly: false, openIndex: open >= 0 ? open : undefined };
   }
   const weeks = new Map<string, InsightDay[]>();
   for (const d of days) {
@@ -33,10 +36,9 @@ function buildBars(days: InsightDay[], today: string, colors: { calories: string
   const data = entries.map(([start, list], i) => {
     const complete = list.filter((d) => isCompleteDay(d, today));
     const kcal = complete.length ? complete.reduce((s, d) => s + d.eaten.kcal, 0) / complete.length : 0;
-    const budget = complete.length ? complete.reduce((s, d) => s + d.budget, 0) / complete.length : 0;
     const fromEnd = entries.length - 1 - i;
     const detail = `Week of ${formatShortDate(start)} · ${kcal ? `${formatNumber(Math.round(kcal))} kcal a day` : 'no full days'}`;
-    return { label: fromEnd % 3 === 1 ? formatShortDate(start) : '', value: kcal, color: colorFor(kcal, budget), detail };
+    return { label: fromEnd % 3 === 1 ? formatShortDate(start) : '', value: kcal, detail };
   });
   return { data, weekly: true };
 }
@@ -63,7 +65,7 @@ export function CaloriesCard({
   // Skip leading days from before the user started, so the chart is not half empty.
   const first = days.findIndex((d) => d.entries.length > 0);
   const shown = first > 0 ? days.slice(first) : days;
-  const { data, weekly } = buildBars(shown, today, colors);
+  const { data, weekly, openIndex } = buildBars(shown, today);
   const diff = c ? Math.round(c.avgDiff) : 0;
   const diffText = !c ? '' : Math.abs(diff) < 10 ? 'Right on budget' : `${formatNumber(Math.abs(diff))} kcal ${diff > 0 ? 'over' : 'under'} budget on average`;
 
@@ -73,14 +75,13 @@ export function CaloriesCard({
       title="Calories"
       subtitle={weekly ? 'Weekly averages of fully logged days' : 'Daily intake against budget'}
       color={colors.calories}
-      icon={<Flame size={18} color={colors.calories} />}
       link="/diary"
       linkLabel="Diary">
       {c ? (
         <>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md }}>
             <BigStat value={formatNumber(Math.round(c.avgKcal))} unit="kcal" label="Daily average" />
-            <Text variant="label" color={diff > c.avgBudget * BUDGET_BAND ? 'warning' : 'textSecondary'} align="right" style={{ flexShrink: 1, marginBottom: 18 }}>
+            <Text variant="label" color="textSecondary" align="right" style={{ flexShrink: 1, marginBottom: 18 }}>
               {diffText}
             </Text>
           </View>
@@ -88,23 +89,18 @@ export function CaloriesCard({
             testID="progress-calories-chart"
             data={data}
             color={colors.calories}
-            band={usual ? { from: usual.low, to: usual.high, color: colors.textSecondary } : { from: c.avgBudget * (1 - BUDGET_BAND), to: c.avgBudget * (1 + BUDGET_BAND) }}
-            goal={usual ? c.avgBudget : undefined}
+            band={usual ? { from: usual.low, to: usual.high, color: colors.textSecondary } : undefined}
+            goal={c.avgBudget}
+            openIndex={openIndex}
             height={160}
             scrub
           />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.lg, rowGap: spacing.xs }}>
-            <LegendDot color={colors.calories} label="Within 10% or under" />
-            <LegendDot color={colors.warning} label="More than 10% over" />
-            {!weekly ? <LegendDot color={colors.textTertiary} label="Today so far" /> : null}
-            {usual ? (
-              <>
-                <LegendDot color={colors.borderStrong} label="Average budget" dashed />
-                <LegendDot color={`${colors.textSecondary}55`} label={`Your usual ${formatNumber(Math.round(usual.low))}–${formatNumber(Math.round(usual.high))} kcal`} />
-              </>
-            ) : (
-              <LegendDot color={`${colors.calories}44`} label="Budget ±10%" />
-            )}
+            <LegendDot color={colors.borderStrong} label="Average budget" dashed />
+            <LegendDot color={colors.rim} label="Day's level" level />
+            <LegendDot color={colors.warning} label="Above budget" />
+            {openIndex !== undefined ? <LegendDot color={colors.calories} label="Today, hatched: not finished" /> : null}
+            {usual ? <LegendDot color={`${colors.textSecondary}55`} label={`Your usual ${formatNumber(Math.round(usual.low))}–${formatNumber(Math.round(usual.high))} kcal`} /> : null}
           </View>
           <StatStrip
             items={[

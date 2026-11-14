@@ -17,6 +17,7 @@ import type { ISODate, UnitSystem, WeightEntry } from '@/types';
 import {
   Button,
   Card,
+  CupKey,
   Divider,
   EmptyState,
   Header,
@@ -92,14 +93,15 @@ function WeightScreen() {
           <Card style={{ gap: spacing.md }}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md }}>
               <View>
-                <Text variant="overline" color="textSecondary">
-                  TREND WEIGHT
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <CupKey color={colors.weight} />
+                  <Text variant="overline">Trend weight</Text>
+                </View>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                  <Text testID="weight-trend" variant="numXL" tabular color="weight">
+                  <Text testID="weight-trend" variant="numXL" tabular>
                     {weightValue(stats.trendKg, units).toFixed(1)}
                   </Text>
-                  <Text variant="title" color="textSecondary">
+                  <Text variant="unit" style={{ fontSize: 15 }}>
                     {unit}
                   </Text>
                 </View>
@@ -109,7 +111,7 @@ function WeightScreen() {
                   <Text variant="caption" color="textSecondary">
                     Scale, {latest.date === end ? 'today' : formatShortDate(latest.date)}
                   </Text>
-                  <Text variant="title" tabular>
+                  <Text variant="numM" tabular>
                     {fixedWeight(latest.kg, units)}
                   </Text>
                 </View>
@@ -126,10 +128,10 @@ function WeightScreen() {
               formatY={(n) => (Number.isInteger(n) ? String(n) : n.toFixed(1))}
             />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg }}>
-              <Legend swatch={<View style={{ width: 16, height: 3, borderRadius: 2, backgroundColor: colors.weight }} />} label="Trend" />
-              <Legend swatch={<View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.textTertiary }} />} label="Weigh-ins" />
+              <Legend swatch={<View style={{ width: 16, height: 2, borderRadius: 1, backgroundColor: colors.weight }} />} label="Trend" />
+              <Legend swatch={<CupKey color={colors.textTertiary} size={7} />} label="Weigh-ins" />
               {target ? (
-                <Legend swatch={<View style={{ width: 16, borderTopWidth: 2, borderStyle: 'dashed', borderColor: colors.success }} />} label="Target" />
+                <Legend swatch={<View style={{ width: 16, borderTopWidth: 2, borderStyle: 'dashed', borderColor: colors.borderStrong }} />} label="Target" />
               ) : null}
             </View>
           </Card>

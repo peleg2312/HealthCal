@@ -1,4 +1,3 @@
-import { Scale } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
@@ -21,7 +20,7 @@ export function WeightCard({ series, start, end, profile, usual }: { series: Wei
 
   if (series.entries.length < 2 || series.trendKg === null) {
     return (
-      <SectionCard testID="progress-weight" title="Weight" color={colors.weight} icon={<Scale size={18} color={colors.weight} />} link="/weight">
+      <SectionCard testID="progress-weight" title="Weight" color={colors.weight} link="/weight">
         <Text variant="body" color="textSecondary">
           {series.entries.length === 0
             ? 'Log your weight a few mornings a week. The trend line appears after two weigh-ins and the weekly rate after one week.'
@@ -55,7 +54,6 @@ export function WeightCard({ series, start, end, profile, usual }: { series: Wei
       title="Weight"
       subtitle="Smoothed trend"
       color={colors.weight}
-      icon={<Scale size={18} color={colors.weight} />}
       link="/weight">
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: spacing.md }}>
         <BigStat value={v(series.trendKg).toFixed(1)} unit={unit} label={stale ? `Trend at ${formatShortDate(lastDate)}` : 'Trend weight'} color={colors.weight} />

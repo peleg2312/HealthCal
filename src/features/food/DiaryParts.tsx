@@ -1,53 +1,71 @@
 import { router } from 'expo-router';
-import { CalendarPlus, Copy, MoreHorizontal, Plus, Save, Trash2, X } from 'lucide-react-native';
+import { CalendarPlus, Copy, MoreHorizontal, Plus, Repeat2, Save, Trash2, X } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { addDays, formatDayLabel, today } from '@/lib/dates';
 import { MEAL_LABEL, entriesTotal } from '@/lib/nutrition';
 import type { DaySummary } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { cup, fonts, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
-import { Avatar, Button, Card, Divider, IconButton, ListRow, PressableScale, ProgressBar, Sheet, Text, TextField } from '@/ui';
+import { Button, Card, CupKey, Divider, Hatch, IconButton, ListRow, PressableScale, ProgressBar, Sheet, Text, TextField, Trough } from '@/ui';
 
 import { clearEntries, copyEntries, saveMeal } from './actions';
-import { DayStepper, MacroStat, MealPicker, SourceTag } from './components';
+import { DayStepper, KcalTrail, MealPicker, RowEmoji, SourceTag } from './components';
 import { dayPhrase, href, kcal, portionLabel } from './helpers';
 import { deleteEntry } from './log';
 
-/** Calories against budget plus the three macros, in one card. */
+/**
+ * The diary summary: calories left as a big number, the day as a trough
+ * (eaten poured in from the left, exercise headroom hatched at the right end),
+ * then the three macros with their level ticks.
+ */
 export function DaySummaryCard({ day }: { day: DaySummary }) {
   const { colors, spacing } = useTheme();
   const over = day.remaining < 0;
-  const p = day.budget > 0 ? day.eaten.kcal / day.budget : 0;
+  const budget = Math.max(0, day.budget);
+  // Calories added by exercise, drawn as hatched headroom at the right end.
+  const headroom = Math.max(0, day.budget - day.target);
+  const notAdded = headroom === 0 && day.exerciseNet > 0;
   return (
-    <Card testID="diary-summary">
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md }}>
-        <View>
-          <Text variant="caption" color="textSecondary">
-            {over ? 'Over budget by' : 'Remaining'}
+    <Card testID="diary-summary" padding={18}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md, flexWrap: 'wrap' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+          <Text variant="numXL" color={over ? 'warning' : 'caloriesInk'} testID="diary-remaining" numberOfLines={1} style={{ fontSize: 46, lineHeight: 50, letterSpacing: -1.4 }}>
+            {kcal(Math.abs(day.remaining))}
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-            <Text variant="numL" tabular color={over ? 'warning' : 'text'} testID="diary-remaining">
-              {kcal(Math.abs(day.remaining))}
-            </Text>
-            <Text variant="label" color="textSecondary">
-              kcal
+          <Text variant="unit" style={{ fontSize: 15 }}>{over ? 'kcal over' : 'kcal left'}</Text>
+        </View>
+        <Text variant="caption" color="textSecondary" style={{ paddingBottom: 4 }}>
+          <Text variant="numM" style={{ fontSize: 16, lineHeight: 20 }} testID="diary-eaten">
+            {kcal(day.eaten.kcal)}
+          </Text>
+          {' eaten of '}
+          <Text variant="numM" style={{ fontSize: 16, lineHeight: 20 }}>
+            {kcal(budget)}
+          </Text>
+        </Text>
+      </View>
+      <Trough value={day.eaten.kcal} max={budget} headroom={headroom} color={colors.calories} style={{ marginTop: spacing.md }} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: 10 }}>
+        <Text variant="caption" color="textSecondary" tabular>
+          {`Target ${kcal(day.target)}`}
+        </Text>
+        {headroom > 0 || notAdded ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
+            {headroom > 0 ? (
+              <View style={{ width: 11, height: 11, overflow: 'hidden', borderWidth: 1, borderColor: colors.headroom, borderRadius: 2 }}>
+                <Hatch width={11} height={11} color={colors.headroom} step={4} opacity={1} />
+              </View>
+            ) : null}
+            <Text variant="caption" color="textSecondary" tabular numberOfLines={1} style={{ flexShrink: 1 }}>
+              {headroom > 0 ? `+${kcal(headroom)} from exercise` : `${kcal(day.exerciseNet)} kcal burned, not added`}
             </Text>
           </View>
-        </View>
-        <View style={{ alignItems: 'flex-end', gap: 2 }}>
-          <Text variant="caption" color="textSecondary" tabular>
-            Eaten <Text variant="label" tabular testID="diary-eaten">{kcal(day.eaten.kcal)}</Text>
-          </Text>
-          <Text variant="caption" color="textSecondary" tabular>
-            Budget <Text variant="label" tabular>{kcal(day.budget)}</Text>
-            {day.exerciseNet > 0 && day.budget !== day.target ? ` (incl. ${kcal(day.exerciseNet)} exercise)` : ''}
-          </Text>
-        </View>
+        ) : null}
       </View>
-      <ProgressBar progress={p} color={over ? colors.warning : colors.calories} style={{ marginTop: spacing.md }} />
-      <View style={{ flexDirection: 'row', gap: spacing.lg, marginTop: spacing.lg }}>
+      <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
+      <View style={{ flexDirection: 'row', gap: spacing.lg }}>
         {(
           [
             ['Protein', day.eaten.protein, day.macros.proteinG, colors.protein],
@@ -55,9 +73,18 @@ export function DaySummaryCard({ day }: { day: DaySummary }) {
             ['Fat', day.eaten.fat, day.macros.fatG, colors.fat],
           ] as const
         ).map(([label, value, target, color]) => (
-          <View key={label} style={{ flex: 1, gap: 6 }}>
-            <MacroStat label={label} value={value} target={target} color={color} />
-            <ProgressBar progress={target > 0 ? value / target : 0} color={color} height={5} />
+          <View key={label} style={{ flex: 1, minWidth: 0, gap: 8 }} accessible accessibilityLabel={`${label}, ${Math.round(value)} of ${target} grams`}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <CupKey color={color} />
+              <Text variant="label" numberOfLines={1}>
+                {label}
+              </Text>
+            </View>
+            <ProgressBar progress={target > 0 ? value / target : 0} color={color} height={6} />
+            <Text variant="numM" tabular numberOfLines={1} style={{ fontSize: 17, lineHeight: 22 }}>
+              {Math.round(value)}
+              <Text variant="caption" color="textSecondary">{` / ${Math.round(target)} g`}</Text>
+            </Text>
           </View>
         ))}
       </View>
@@ -65,44 +92,42 @@ export function DaySummaryCard({ day }: { day: DaySummary }) {
   );
 }
 
+const ROW_PAD = 18;
+/** Where the text column starts in a meal card: the padding, the 24 px emoji column and the gap. */
+const TEXT_INSET = ROW_PAD + 24 + 12;
+
 function EntryRow({ entry }: { entry: FoodEntry }) {
-  const { colors, spacing } = useTheme();
+  const { colors } = useTheme();
   // Any entry that carries a range is an estimate, whatever food it was matched to afterwards.
   const ai = !!entry.kcalRange;
+  const portion =
+    entry.grams > 0 && entry.servingLabel !== `${Math.round(entry.grams)} g` && !/^\d+(\.\d+)?\s*g$/.test(entry.servingLabel.trim())
+      ? `${portionLabel(entry.servingLabel, entry.quantity)} · ${Math.round(entry.grams)} g`
+      : portionLabel(entry.servingLabel, entry.quantity);
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: ROW_PAD, paddingRight: 4 }}>
       <PressableScale
         testID={`entry-${entry.id}`}
         onPress={() => router.push(href('/food/detail', { entryId: entry.id, meal: entry.meal, date: entry.date }) as never)}
         scaleTo={0.985}
-        accessibilityLabel={`${entry.name}, ${Math.round(entry.nutrients.kcal)} kilocalories. Edit`}
-        style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 6 }}>
-        <Avatar emoji={entry.emoji ?? '🍽️'} size={38} />
+        accessibilityLabel={`${entry.name}, ${ai ? 'about ' : ''}${Math.round(entry.nutrients.kcal)} kilocalories. Edit`}
+        style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: 11 }}>
+        <RowEmoji emoji={entry.emoji} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Text variant="bodyStrong" numberOfLines={1}>
+          <Text variant="bodyStrong" numberOfLines={1} style={{ fontFamily: fonts.semibold }}>
             {entry.name}
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flexShrink: 1 }}>
-              {entry.grams > 0 && entry.servingLabel !== `${Math.round(entry.grams)} g` && !/^\d+(\.\d+)?\s*g$/.test(entry.servingLabel.trim())
-                ? `${portionLabel(entry.servingLabel, entry.quantity)} · ${Math.round(entry.grams)} g`
-                : portionLabel(entry.servingLabel, entry.quantity)}
+              {`${portion} ·`}
             </Text>
-            <SourceTag source={entry.source} />
+            <SourceTag source={ai ? 'ai' : entry.source} />
           </View>
         </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          <Text variant="bodyStrong" tabular>
-            {ai ? '~' : ''}
-            {kcal(entry.nutrients.kcal)}
-          </Text>
-          <Text variant="caption" color="textTertiary" tabular>
-            {ai ? `${kcal(entry.kcalRange![0])}–${kcal(entry.kcalRange![1])}` : 'kcal'}
-          </Text>
-        </View>
+        <KcalTrail value={entry.nutrients.kcal} range={entry.kcalRange} />
       </PressableScale>
       <IconButton testID={`entry-delete-${entry.id}`} accessibilityLabel={`Delete ${entry.name}`} tone="clear" size={36} onPress={() => deleteEntry(entry)}>
-        <X size={16} color={colors.textTertiary} />
+        <X size={16} color={colors.textSecondary} strokeWidth={1.9} />
       </IconButton>
     </View>
   );
@@ -136,35 +161,37 @@ export function MealCard({
   const total = entriesTotal(entries).kcal;
   const add = () => router.push(href('/food/search', { meal, date }) as never);
   return (
-    <Card testID={`meal-card-${meal}`} padding={spacing.lg} style={{ paddingVertical: spacing.md }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-        <Text style={{ fontSize: 18, lineHeight: 24 }}>{emoji}</Text>
-        <Text variant="h3" style={{ flex: 1 }} numberOfLines={1}>
-          {label}
-        </Text>
-        {entries.length > 0 ? (
-          <Text variant="label" color="textSecondary" tabular testID={`meal-total-${meal}`}>
-            {kcal(total)} kcal
+    <Card testID={`meal-card-${meal}`} padding={0} style={{ paddingTop: 12, paddingBottom: entries.length ? 4 : previous ? 6 : ROW_PAD }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingLeft: ROW_PAD, paddingRight: 14 }}>
+        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'baseline', gap: 10 }}>
+          <Text variant="h3" numberOfLines={1} style={{ flexShrink: 1 }}>
+            {label}
           </Text>
-        ) : null}
-        <IconButton testID={`meal-menu-${meal}`} accessibilityLabel={`${label} options`} tone="clear" size={40} onPress={onMenu}>
-          <MoreHorizontal size={20} color={colors.textSecondary} />
+          {entries.length > 0 ? (
+            <Text variant="numM" color="textSecondary" tabular testID={`meal-total-${meal}`} style={{ fontSize: 15, lineHeight: 20 }}>
+              {kcal(total)}
+              <Text variant="unit">{' kcal'}</Text>
+            </Text>
+          ) : null}
+        </View>
+        <IconButton testID={`meal-menu-${meal}`} accessibilityLabel={`${label} options`} tone="clear" size={44} onPress={onMenu}>
+          <MoreHorizontal size={20} color={colors.textSecondary} strokeWidth={1.9} />
         </IconButton>
-        <IconButton testID={`meal-add-${meal}`} accessibilityLabel={`Add food to ${label.toLowerCase()}`} tone="alt" size={40} onPress={add}>
-          <Plus size={20} color={colors.primary} />
+        <IconButton testID={`meal-add-${meal}`} accessibilityLabel={`Add food to ${label.toLowerCase()}`} tone="surface" size={44} onPress={add} style={{ borderColor: colors.borderStrong }}>
+          <Plus size={20} color={colors.text} strokeWidth={2.2} />
         </IconButton>
       </View>
       {entries.length > 0 ? (
-        <View style={{ marginTop: spacing.xs }}>
+        <View style={{ marginTop: 6 }}>
           {entries.map((e, i) => (
             <View key={e.id}>
-              {i > 0 ? <Divider inset={50} /> : null}
+              {i > 0 ? <Divider inset={TEXT_INSET} /> : null}
               <EntryRow entry={e} />
             </View>
           ))}
         </View>
       ) : (
-        <View style={{ marginTop: spacing.sm, gap: spacing.sm }}>
+        <View style={{ marginTop: spacing.sm, gap: spacing.xs, paddingHorizontal: ROW_PAD }}>
           <PressableScale
             testID={`meal-empty-${meal}`}
             onPress={add}
@@ -172,8 +199,9 @@ export function MealCard({
             accessibilityLabel={`Log ${label.toLowerCase()}`}
             style={{
               minHeight: 48,
-              borderRadius: radius.md,
-              borderWidth: 1,
+              ...cup(radius.buttonSm, 5),
+              borderWidth: 1.5,
+              borderTopWidth: 0,
               borderStyle: 'dashed',
               borderColor: colors.borderStrong,
               flexDirection: 'row',
@@ -181,7 +209,7 @@ export function MealCard({
               justifyContent: 'center',
               gap: 8,
             }}>
-            <Plus size={16} color={colors.textSecondary} />
+            <Plus size={16} color={colors.textSecondary} strokeWidth={2.2} />
             <Text variant="label" color="textSecondary">
               Log {label.toLowerCase()}
             </Text>
@@ -192,9 +220,9 @@ export function MealCard({
               onPress={onRepeat}
               scaleTo={0.985}
               accessibilityLabel={`Repeat ${label.toLowerCase()} from ${formatDayLabel(previous.date)}`}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 4 }}>
-              <Copy size={16} color={colors.primary} />
-              <Text variant="label" color="primary" style={{ flexShrink: 1 }} numberOfLines={1}>
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}>
+              <Repeat2 size={16} color={colors.text} strokeWidth={2.2} />
+              <Text variant="label" color="text" style={{ flexShrink: 1, textDecorationLine: 'underline' }} numberOfLines={1}>
                 Repeat {dayPhrase(previous.date)}: {previous.entries.map((e) => e.name.split(',')[0]).join(', ')}
               </Text>
               <Text variant="caption" color="textSecondary" tabular numberOfLines={1} style={{ marginLeft: 'auto', flexShrink: 0 }}>

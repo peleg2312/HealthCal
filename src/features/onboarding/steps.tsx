@@ -1,4 +1,4 @@
-import { Activity, BellRing, Droplets, Dumbbell, Info, MoonStar, Ruler, Scale, TrendingDown, TrendingUp, TriangleAlert, Utensils } from 'lucide-react-native';
+import { Activity, BellRing, CircleHelp, Droplets, Dumbbell, Info, MoonStar, Ruler, Scale, Target, TrendingDown, TrendingUp, TriangleAlert, Utensils } from 'lucide-react-native';
 import React from 'react';
 import { Switch, View } from 'react-native';
 
@@ -7,9 +7,9 @@ import { ageFromBirthDate, formatClock, formatLongDate, toISODate } from '@/lib/
 import { ACTIVITY_LABELS, calorieFloor, KCAL_PER_KG, maxWeeklyRateKg } from '@/lib/energy';
 import { formatNumber, kgToLb, lbToKg, round, weightUnit } from '@/lib/units';
 import { remindersSupported } from '@/services/notifications';
-import { useTheme } from '@/theme';
+import { cup, useTheme } from '@/theme';
 import type { ActivityLevel, GoalType } from '@/types';
-import { Card, NumberField, PressableScale, Stepper, Text, TextField } from '@/ui';
+import { Card, MiniCup, NumberField, ProgressBar, PressableScale, Stepper, Text, TextField } from '@/ui';
 
 import { ChoiceCard, ErrorText, Note, StepTitle } from './components';
 import { birthDateOf, buildPlan, convertUnits, heightRangeText, weightRangeText, rateKgOf, tapeEstimate, toMetric, type BodyFatMode, type Draft, type Errors } from './model';
@@ -79,7 +79,7 @@ function UnitsSwitch({ draft, set }: Pick<StepProps, 'draft' | 'set'>) {
               title={o.title}
               hint={o.hint}
               colors={colors}
-              radius={radius.lg}
+              radius={radius.tile}
             />
           </View>
         );
@@ -110,7 +110,7 @@ function ChoiceTile({
       <Text variant="title" color={active ? 'text' : 'textSecondary'}>
         {title}
       </Text>
-      <Text variant="caption" color="textTertiary">
+      <Text variant="caption" color="textSecondary">
         {hint}
       </Text>
     </ChoiceCardCompact>
@@ -146,10 +146,12 @@ function ChoiceCardCompact({
         paddingHorizontal: 16,
         paddingVertical: 12,
         gap: 2,
-        borderRadius: radius,
-        borderWidth: 1.5,
-        borderColor: active ? colors.primary : colors.border,
-        backgroundColor: active ? colors.primarySoft : colors.surface,
+        // A cup: ink edge when chosen (the selection colour in Pour), hairline otherwise.
+        ...cup(radius, 5),
+        borderWidth: active ? 2 : 1,
+        margin: active ? 0 : 1,
+        borderColor: active ? colors.text : colors.border,
+        backgroundColor: colors.surface,
       }}>
       {children}
     </PressableScale>
@@ -165,15 +167,15 @@ export function GoalStep({ draft, set, errors }: StepProps) {
       value: 'lose',
       title: 'Lose weight',
       hint: 'A steady calorie deficit, protein kept high',
-      icon: <TrendingDown size={22} color={colors.primary} />,
+      icon: <TrendingDown size={22} color={colors.text} strokeWidth={1.9} />,
       color: colors.primary,
     },
-    { value: 'maintain', title: 'Maintain', hint: 'Eat to match what you burn', icon: <Scale size={22} color={colors.primary} />, color: colors.primary },
+    { value: 'maintain', title: 'Maintain', hint: 'Eat to match what you burn', icon: <Scale size={22} color={colors.text} strokeWidth={1.9} />, color: colors.primary },
     {
       value: 'gain',
       title: 'Gain muscle',
       hint: 'A small surplus to support training',
-      icon: <Dumbbell size={22} color={colors.primary} />,
+      icon: <Dumbbell size={22} color={colors.text} strokeWidth={1.9} />,
       color: colors.primary,
     },
   ];
@@ -398,10 +400,11 @@ export function BodyFatStep({ draft, set, errors, submit }: StepProps) {
   const imp = draft.units === 'imperial';
   const lu = imp ? 'in' : 'cm';
   const estimate = draft.bodyFatMode === 'tape' ? tapeEstimate(draft) : null;
-  const modes: { value: BodyFatMode; title: string; hint: string; emoji: string }[] = [
-    { value: 'unknown', title: "I don't know", hint: 'Skip it. The standard equation works well for most people.', emoji: '🤷' },
-    { value: 'direct', title: 'I know my body fat %', hint: 'From a smart scale, DEXA scan or calipers', emoji: '🎯' },
-    { value: 'tape', title: 'Estimate it with a tape measure', hint: 'US Navy method, about two minutes', emoji: '📏' },
+  const mark = (Icon: typeof Ruler) => <Icon size={22} color={colors.text} strokeWidth={1.9} />;
+  const modes: { value: BodyFatMode; title: string; hint: string; icon: React.ReactNode }[] = [
+    { value: 'unknown', title: "I don't know", hint: 'Skip it. The standard equation works well for most people.', icon: mark(CircleHelp) },
+    { value: 'direct', title: 'I know my body fat %', hint: 'From a smart scale, DEXA scan or calipers', icon: mark(Target) },
+    { value: 'tape', title: 'Estimate it with a tape measure', hint: 'US Navy method, about two minutes', icon: mark(Ruler) },
   ];
   return (
     <Group gap={spacing.xxl}>
@@ -416,8 +419,7 @@ export function BodyFatStep({ draft, set, errors, submit }: StepProps) {
             testID={`onb-bf-${m.value}`}
             title={m.title}
             hint={m.hint}
-            emoji={m.emoji}
-            color={colors.fat}
+            icon={m.icon}
             selected={draft.bodyFatMode === m.value}
             onPress={() => set({ bodyFatMode: m.value })}
           />
@@ -494,11 +496,9 @@ export function BodyFatStep({ draft, set, errors, submit }: StepProps) {
             <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
               Estimated body fat
             </Text>
-            <Text variant="numL" tabular color={estimate !== null ? 'fat' : 'textTertiary'}>
+            <Text variant="numL" color={estimate !== null ? 'text' : 'textTertiary'}>
               {estimate !== null ? String(estimate) : '–'}
-            </Text>
-            <Text variant="label" color="textSecondary">
-              %
+              <Text variant="unit"> %</Text>
             </Text>
           </View>
           <Text variant="caption" color="textTertiary">
@@ -512,7 +512,8 @@ export function BodyFatStep({ draft, set, errors, submit }: StepProps) {
 
 // ---------------------------------------------------------------- activity
 
-const ACTIVITY_EMOJI: Record<ActivityLevel, string> = { sedentary: '🪑', light: '🚶', moderate: '🛒', active: '🏗️', athlete: '⛏️' };
+/** How full a normal day's movement is: each level is a small cup in the exercise colour, filled a step higher. */
+const ACTIVITY_LEVEL: Record<ActivityLevel, number> = { sedentary: 0.2, light: 0.4, moderate: 0.6, active: 0.8, athlete: 1 };
 
 export function ActivityStep({ draft, set, errors }: StepProps) {
   const { colors, spacing } = useTheme();
@@ -527,8 +528,7 @@ export function ActivityStep({ draft, set, errors }: StepProps) {
             testID={`onb-activity-${l}`}
             title={ACTIVITY_LABELS[l].title}
             hint={ACTIVITY_LABELS[l].hint}
-            emoji={ACTIVITY_EMOJI[l]}
-            color={colors.exercise}
+            icon={<MiniCup progress={ACTIVITY_LEVEL[l]} color={colors.exercise} width={20} height={26} />}
             selected={draft.activity === l}
             onPress={() => set({ activity: l })}
           />
@@ -617,7 +617,7 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
         </View>
         <PaceMeter value={rateDisplay / maxDisplay} color={colors.weight} />
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs }} testID="onb-pace-delta">
-          <Text variant="numM" tabular color="calories">
+          <Text variant="numM" color="caloriesInk">
             {`${delta < 0 ? '−' : '+'}${formatNumber(Math.abs(Math.round(delta / 10) * 10))}`}
           </Text>
           <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
@@ -643,7 +643,7 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
         </Note>
       ) : null}
       {showTargetSummary ? (
-        <Note tone="primary" icon={goal === 'lose' ? <TrendingDown size={18} color={colors.primary} /> : <TrendingUp size={18} color={colors.primary} />}>
+        <Note tone="primary" icon={goal === 'lose' ? <TrendingDown size={18} color={colors.text} /> : <TrendingUp size={18} color={colors.text} />}>
           <Text variant="bodyStrong">{date ? `About ${formatLongDate(toISODate(date)).replace(/^\w+, /, '')}` : 'No date yet'}</Text>
           <Text variant="caption" color="textSecondary">
             {date ? 'Projected at this pace. The date updates as your real trend comes in.' : 'At this pace the target is not reached; try a different pace.'}
@@ -657,19 +657,17 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
 const MIN_KCAL = (d: Draft) => calorieFloor(d.sex ?? 'female');
 
 function PaceMeter({ value, color }: { value: number; color: string }) {
-  const { colors, spacing } = useTheme();
+  const { spacing } = useTheme();
   const v = Math.max(0, Math.min(1, value));
   const label = v <= 0.4 ? 'Relaxed' : v <= 0.75 ? 'Steady' : 'Ambitious';
   return (
     <View style={{ gap: spacing.xs }}>
-      <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.track, overflow: 'hidden' }}>
-        <View style={{ width: `${v * 100}%`, height: 6, borderRadius: 3, backgroundColor: color }} />
-      </View>
+      <ProgressBar progress={v} color={color} height={6} />
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         <Text variant="caption" color="textTertiary">
           Relaxed
         </Text>
-        <Text variant="caption" color={color}>
+        <Text variant="caption" color="text">
           {label}
         </Text>
         <Text variant="caption" color="textTertiary">
@@ -781,7 +779,7 @@ function NudgeRow({
           <View
             testID={`${testID}-example`}
             style={{
-              borderRadius: radius.sm,
+              ...cup(radius.buttonSm, 4),
               paddingHorizontal: spacing.md,
               paddingVertical: spacing.sm,
               backgroundColor: colors.surfaceAlt,

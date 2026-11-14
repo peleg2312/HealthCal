@@ -4,7 +4,7 @@ import { View } from 'react-native';
 
 import { formatShortDate } from '@/lib/dates';
 import { useLive } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { cup, useTheme } from '@/theme';
 import { IconButton, PressableScale, Text, toast } from '@/ui';
 
 import { lastWorkoutTemplate, removeRoutine, restoreRoutine, routineSetCount, routineSummary, useRoutineList, type RoutineTemplate } from './routines';
@@ -48,7 +48,7 @@ function RoutineCard({ template, id, onStart, testID }: { template: RoutineTempl
   return (
     <View
       testID={testID}
-      style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.md }}>
+      style={{ backgroundColor: colors.surface, ...cup(radius.card), borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.md }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
@@ -60,13 +60,13 @@ function RoutineCard({ template, id, onStart, testID }: { template: RoutineTempl
           <Text variant="caption" color="textSecondary" numberOfLines={2} testID={`${testID}-exercises`}>
             {routineSummary(template)}
           </Text>
-          <Text variant="caption" color="textTertiary" tabular>
+          <Text variant="caption" color="textSecondary" tabular>
             {template.exercises.length} {template.exercises.length === 1 ? 'exercise' : 'exercises'} · {sets} {sets === 1 ? 'set' : 'sets'}
           </Text>
         </View>
         {id ? (
           <IconButton accessibilityLabel={`Remove routine ${template.name}`} testID={`${testID}-remove`} tone="clear" size={44} onPress={remove}>
-            <X size={18} color={colors.textTertiary} />
+            <X size={18} color={colors.textSecondary} strokeWidth={1.9} />
           </IconButton>
         ) : null}
       </View>
@@ -76,15 +76,16 @@ function RoutineCard({ template, id, onStart, testID }: { template: RoutineTempl
         feedback="press"
         onPress={onStart}
         style={{
-          height: 46,
-          borderRadius: radius.md,
-          backgroundColor: `${colors.exercise}22`,
+          height: 44,
+          ...cup(radius.button),
+          borderWidth: 1.5,
+          borderColor: colors.exercise,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
           gap: spacing.sm,
         }}>
-        <Play size={16} color={colors.exercise} />
+        <Play size={16} color={colors.text} strokeWidth={2.2} />
         <Text variant="bodyStrong" color="text">
           Start
         </Text>

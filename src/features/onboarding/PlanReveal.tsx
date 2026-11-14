@@ -1,10 +1,10 @@
-import { CalendarRange, Droplet, Sparkles } from 'lucide-react-native';
+import { CalendarRange, Sparkles } from 'lucide-react-native';
 import React from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { formatNumber, formatVolume, formatWeight, round } from '@/lib/units';
 import { useTheme } from '@/theme';
-import { Card, Divider, Ring, Text } from '@/ui';
+import { Card, CupKey, Divider, MacroBar, Text, Vessel } from '@/ui';
 
 import { FadeIn } from './components';
 import { METHOD_LABEL, type Plan } from './model';
@@ -28,6 +28,10 @@ export function PlanReveal({ plan }: { plan: Plan }) {
     p.goal === 'maintain' || Math.abs(t.dailyDelta) < 5
       ? 'Matched to what you burn'
       : `${t.dailyDelta < 0 ? '−' : '+'}${kcal(Math.abs(t.dailyDelta))} kcal a day, about ${formatWeight(Math.abs(t.impliedWeeklyKg), units, 2)} a week`;
+  const water = formatVolume(plan.waterMl, units);
+  const wi = water.indexOf(' ');
+  const waterNum = wi > 0 ? water.slice(0, wi) : water;
+  const waterUnit = wi > 0 ? water.slice(wi + 1) : '';
   const projection = p.goal !== 'maintain' ? projectTo(p.weightKg, p.targetWeightKg, t.impliedWeeklyKg) : null;
   const range = projection ? rangeText(projection) : '';
   const methodWhy =
@@ -38,30 +42,19 @@ export function PlanReveal({ plan }: { plan: Plan }) {
   return (
     <View style={{ gap: spacing.lg }}>
       <FadeIn style={{ gap: spacing.sm, marginBottom: spacing.xs }}>
-        <Text variant="overline" color="primary">
-          YOUR PLAN IS READY
-        </Text>
+        <Text variant="overline">Your plan is ready</Text>
         <Text variant="h1" accessibilityRole="header">
           {p.name ? `Here's your plan, ${p.name}` : "Here's your plan"}
         </Text>
       </FadeIn>
 
       <FadeIn delay={120}>
-        <Card padding={spacing.xxl} style={{ alignItems: 'center', gap: spacing.lg }} testID="plan-calories">
-          <Ring size={196} stroke={16} progress={1} color={colors.calories} colorEnd={colors.ringEnd} trackColor={`${colors.calories}22`}>
-            <Text variant="numXL" tabular testID="plan-kcal">
-              {formatNumber(t.target)}
-            </Text>
-            <Text variant="label" color="textSecondary" style={{ marginTop: 2 }}>
-              kcal a day
-            </Text>
-          </Ring>
-          <View style={{ alignItems: 'center', gap: 2 }}>
-            <Text variant="bodyStrong" align="center">
-              {goalLine}
-            </Text>
-            <Text variant="caption" color="textSecondary" align="center">
-              Logged workouts add their calories on top.
+        <Card padding={spacing.xl} style={{ gap: spacing.lg }} testID="plan-calories">
+          <BudgetVessel target={t.target} tdee={plan.tdee} goal={p.goal} />
+          <View style={{ gap: 2, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md }}>
+            <Text variant="bodyStrong">{goalLine}</Text>
+            <Text variant="caption" color="textSecondary">
+              Logged workouts add their calories on top, as hatched headroom in the cup.
             </Text>
           </View>
         </Card>
@@ -69,42 +62,45 @@ export function PlanReveal({ plan }: { plan: Plan }) {
 
       <FadeIn delay={240}>
         <Card style={{ gap: spacing.lg }} testID="plan-macros">
+          <MacroBar protein={plan.macros.split.protein} carbs={plan.macros.split.carbs} fat={plan.macros.split.fat} height={10} />
           <View style={{ flexDirection: 'row' }}>
-            {macros.map((m) => (
-              <View key={m.key} style={{ flex: 1, alignItems: 'center', gap: spacing.sm }}>
-                <Ring size={64} stroke={7} progress={m.share} color={m.color} trackColor={`${m.color}22`}>
-                  <Text variant="caption" color="textSecondary" tabular>
-                    {`${Math.round(m.share * 100)}%`}
-                  </Text>
-                </Ring>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
-                  <Text variant="numM" tabular testID={`plan-${m.key}`}>
-                    {String(m.grams)}
-                  </Text>
-                  <Text variant="caption" color="textSecondary">
-                    g
+            {macros.map((m, i) => (
+              <View
+                key={m.key}
+                style={{ flex: 1, minWidth: 0, gap: 2, paddingLeft: i ? spacing.md : 0, borderLeftWidth: i ? 1 : 0, borderLeftColor: colors.border }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <CupKey color={m.color} />
+                  <Text variant="label" color="textSecondary" numberOfLines={1}>
+                    {m.label}
                   </Text>
                 </View>
-                <Text variant="label" color={m.color}>
-                  {m.label}
+                <Text variant="numL" testID={`plan-${m.key}`}>
+                  {String(m.grams)}
+                  <Text variant="unit"> g</Text>
+                </Text>
+                <Text variant="caption" color="textSecondary" numberOfLines={1}>
+                  {`${Math.round(m.share * 100)}% of calories`}
                 </Text>
               </View>
             ))}
           </View>
           <Divider />
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-            <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: `${colors.water}22`, alignItems: 'center', justifyContent: 'center' }}>
-              <Droplet size={20} color={colors.water} />
+          <View style={{ gap: 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <CupKey color={colors.water} />
+              <Text variant="label" color="textSecondary">
+                Water
+              </Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text variant="title">Water</Text>
-              <Text variant="caption" color="textSecondary">
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.md }}>
+              <Text variant="numL" testID="plan-water">
+                {waterNum}
+                {waterUnit ? <Text variant="unit">{` ${waterUnit}`}</Text> : null}
+              </Text>
+              <Text variant="caption" color="textSecondary" align="right" style={{ flexShrink: 1 }}>
                 Drinks only; food covers the rest
               </Text>
             </View>
-            <Text variant="numM" tabular color="water" testID="plan-water">
-              {formatVolume(plan.waterMl, units)}
-            </Text>
           </View>
         </Card>
       </FadeIn>
@@ -132,11 +128,9 @@ export function PlanReveal({ plan }: { plan: Plan }) {
             <Text variant="bodyStrong" style={{ flex: 1 }}>
               Daily target
             </Text>
-            <Text variant="numM" tabular color="calories">
+            <Text variant="numM" color="caloriesInk">
               {formatNumber(t.target)}
-            </Text>
-            <Text variant="caption" color="textSecondary">
-              {' kcal'}
+              <Text variant="unit"> kcal</Text>
             </Text>
           </View>
         </Card>
@@ -150,9 +144,7 @@ export function PlanReveal({ plan }: { plan: Plan }) {
             accessible
             accessibilityLabel={`Projected to reach ${formatWeight(projection.targetKg, units)} ${range}, about ${shortDate(projection.date)} at this pace. A projection, not a promise.`}>
             <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-              <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: `${colors.weight}22`, alignItems: 'center', justifyContent: 'center' }}>
-                <CalendarRange size={20} color={colors.weight} />
-              </View>
+              <CalendarRange size={22} color={colors.text} strokeWidth={1.9} />
               <View style={{ flex: 1 }}>
                 <Text variant="caption" color="textSecondary">
                   {`Projected to reach ${formatWeight(projection.targetKg, units)}`}
@@ -171,7 +163,7 @@ export function PlanReveal({ plan }: { plan: Plan }) {
       ) : null}
 
       <FadeIn delay={600} style={{ flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.xs }}>
-        <Sparkles size={18} color={colors.primary} />
+        <Sparkles size={18} color={colors.textSecondary} strokeWidth={1.9} />
         <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
           These are starting estimates. As your weigh-ins and food logs come in, HealthCal measures what you actually burn and adapts your targets. You can
           adjust any number in Goals.
@@ -191,14 +183,86 @@ function MathRow({ label, detail, value, testID }: { label: string; detail: stri
           {detail}
         </Text>
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-        <Text variant="title" tabular>
-          {value}
-        </Text>
-        <Text variant="caption" color="textSecondary">
-          {' kcal'}
-        </Text>
-      </View>
+      <Text variant="numM" style={{ fontSize: 17, lineHeight: 22 }}>
+        {value}
+        <Text variant="unit"> kcal</Text>
+      </Text>
     </View>
+  );
+}
+
+/**
+ * The plan as a cup. Its capacity is what you burn in a day; it fills to the
+ * daily budget, with the level line on the budget. For weight loss the space
+ * left above the level is the deficit; for gain the cup is the budget and a
+ * tick marks what you burn below it. Pours in when the plan appears.
+ */
+function BudgetVessel({ target, tdee, goal }: { target: number; tdee: number; goal: 'lose' | 'maintain' | 'gain' }) {
+  const { colors } = useTheme();
+  const top = Math.max(target, tdee);
+  const gap = Math.round(tdee - target);
+  const showBurn = Math.abs(gap) >= 5;
+  const narrow = useWindowDimensions().width < 360;
+  return (
+    <Vessel
+      value={target}
+      max={top}
+      color={colors.calories}
+      width={narrow ? 66 : 80}
+      height={210}
+      testID="plan-vessel"
+      accessibilityLabel={`Daily budget ${formatNumber(target)} kcal${showBurn ? `, against about ${kcal(tdee)} kcal you burn` : ''}`}
+      labels={[
+        ...(showBurn
+          ? [
+              {
+                key: 'burn',
+                at: tdee,
+                height: 40,
+                tick: colors.vesselEdge,
+                content: (
+                  <View>
+                    <Text variant="numM" style={{ fontSize: 17, lineHeight: 21 }}>
+                      {kcal(tdee)}
+                      <Text variant="unit"> kcal</Text>
+                    </Text>
+                    <Text variant="caption" color="textSecondary">
+                      what you burn a day
+                    </Text>
+                  </View>
+                ),
+              },
+            ]
+          : []),
+        ...(goal === 'lose' && gap >= 5
+          ? [
+              {
+                key: 'gap',
+                at: target + gap / 2,
+                height: 20,
+                content: (
+                  <Text variant="caption" color="textSecondary">
+                    {`−${kcal(gap)} for your goal`}
+                  </Text>
+                ),
+              },
+            ]
+          : []),
+        {
+          key: 'budget',
+          at: target,
+          height: 74,
+          tick: colors.rim,
+          content: (
+            <View>
+              <Text variant="numXL" color="caloriesInk" testID="plan-kcal" style={narrow ? { fontSize: 44, lineHeight: 46 } : { fontSize: 52, lineHeight: 54 }}>
+                {formatNumber(target)}
+              </Text>
+              <Text variant="unit">kcal a day</Text>
+            </View>
+          ),
+        },
+      ]}
+    />
   );
 }

@@ -146,9 +146,12 @@ Read the component source in `src/ui/` for exact props before using one. If the 
 /food/quick?meal=&date=       /food/custom?barcode=               /food/meals?meal=&date=
 /food/meal-edit?id=&meal=&date=   saved meal or recipe builder     /food/meal-pick   adds foods to the open builder draft
 /activity/pick?date=          /activity/log?activityId=&entryId=&date=      /activity/strength?entryId=&date=
+/activity/import              Garmin import: pick FIT/TCX/GPX/CSV/ZIP files, review, save (docs/garmin-import.md)
 /water  /weight  /body  /sleep  /fasting
 /profile  /settings/goals  /settings/reminders  /settings/account  /settings/data  /settings/about
 /recap?week=           weekly check-in                /consistency   logging calendar
+/friends               friends, invite code, requests, cheers (needs an account)
+/friends/add?code=     add a friend by code; invite links (healthcal://friends/add?code=) open here
 ```
 
 ## Working on this project

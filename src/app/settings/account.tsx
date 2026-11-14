@@ -90,17 +90,17 @@ function SignedOut() {
         </Text>
         <View style={{ gap: spacing.lg }}>
           <Benefit
-            icon={<Cloud size={20} color={colors.water} />}
+            icon={<Cloud size={20} color={colors.textSecondary} strokeWidth={1.9} />}
             title="Backup"
             text="A lost or replaced phone does not take your history with it."
           />
           <Benefit
-            icon={<RefreshCw size={20} color={colors.primary} />}
+            icon={<RefreshCw size={20} color={colors.textSecondary} strokeWidth={1.9} />}
             title="Sync across devices"
             text="Log on your phone, review on the web. Changes merge automatically."
           />
           <Benefit
-            icon={<ShieldCheck size={20} color={colors.weight} />}
+            icon={<ShieldCheck size={20} color={colors.textSecondary} strokeWidth={1.9} />}
             title="Yours to take or delete"
             text="Export everything any time, and delete the account with one confirmation."
           />

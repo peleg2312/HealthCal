@@ -26,7 +26,7 @@ import { useToday } from '@/store/clock';
 import { computeEnergyModel, useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ActivityLevel, GoalType, MacroSplit, Profile, Sex } from '@/types';
-import { Button, Card, Chip, goBack, Header, MacroBar, NumberField, Screen, Segmented, Stepper, Text, TextField, ToggleRow, toast } from '@/ui';
+import { Button, Card, Chip, CupKey, goBack, Header, MacroBar, NumberField, Screen, Segmented, Stepper, Text, TextField, ToggleRow, toast } from '@/ui';
 
 type MacroMode = 'auto' | 'balanced' | 'protein' | 'lowcarb' | 'custom';
 
@@ -170,22 +170,18 @@ function GoalsForm() {
       footer={<Button testID="goals-save" title={dirty ? 'Save plan' : 'No changes'} disabled={!valid || !dirty} onPress={save} />}>
       {/* Live preview */}
       <Card testID="goals-preview">
-        <Text variant="overline" color="textSecondary">
-          Your plan
-        </Text>
+        <Text variant="overline">Your plan</Text>
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'baseline',
             gap: 6,
-            marginTop: spacing.xs,
+            marginTop: spacing.sm,
           }}>
-          <Text variant="numXL" tabular color={colors.calories} testID="goals-preview-kcal">
+          <Text variant="numXL" color="caloriesInk" testID="goals-preview-kcal">
             {formatNumber(model.target.target)}
           </Text>
-          <Text variant="label" color="textSecondary">
-            kcal a day
-          </Text>
+          <Text variant="unit">kcal a day</Text>
         </View>
         <Text variant="caption" color="textSecondary">
           {model.target.source === 'override'
@@ -209,7 +205,7 @@ function GoalsForm() {
         ) : null}
         <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
           <MacroBar protein={macros.proteinG * 4} carbs={macros.carbsG * 4} fat={macros.fatG * 9} />
-          <View style={{ flexDirection: 'row', gap: spacing.md }}>
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
             <PreviewStat label="Protein" value={`${macros.proteinG} g`} color={colors.protein} />
             <PreviewStat label="Carbs" value={`${macros.carbsG} g`} color={colors.carbs} />
             <PreviewStat label="Fat" value={`${macros.fatG} g`} color={colors.fat} />
@@ -533,14 +529,20 @@ function GoalsForm() {
   );
 }
 
+/** A cup key and label over the number; data colours mark, numbers stay in the text colour. */
 function PreviewStat({ label, value, color }: { label: string; value: string; color: string }) {
+  const i = value.lastIndexOf(' ');
   return (
     <View style={{ flex: 1, minWidth: 0 }}>
-      <Text variant="title" tabular color={color} numberOfLines={1}>
-        {value}
-      </Text>
-      <Text variant="caption" color="textSecondary" numberOfLines={1}>
-        {label}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <CupKey color={color} />
+        <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flexShrink: 1 }}>
+          {label}
+        </Text>
+      </View>
+      <Text variant="numM" numberOfLines={1} style={{ fontSize: 18, lineHeight: 23 }}>
+        {i > 0 ? value.slice(0, i) : value}
+        {i > 0 ? <Text variant="unit">{` ${value.slice(i + 1)}`}</Text> : null}
       </Text>
     </View>
   );

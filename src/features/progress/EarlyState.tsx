@@ -1,16 +1,15 @@
-import { CalendarCheck, Gauge, Lock, Scale, Sparkles, Unlock } from 'lucide-react-native';
+import { Lock, Unlock } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
 import { MIN_INSIGHT_DAYS } from '@/lib/insights';
 import { useTheme } from '@/theme';
-import { Button, Card, ProgressBar, Text } from '@/ui';
+import { Button, Card, CupKey, ProgressBar, Text } from '@/ui';
 
 import { go } from './parts';
 
 interface UnlockItem {
   id: string;
-  icon: React.ReactNode;
   color: string;
   title: string;
   detail: string;
@@ -31,11 +30,10 @@ export function EarlyState({
   adaptiveNeeds: string | null;
   adaptiveDays: number;
 }) {
-  const { colors, spacing, radius } = useTheme();
+  const { colors, spacing } = useTheme();
   const items: UnlockItem[] = [
     {
       id: 'insights',
-      icon: <Sparkles size={18} color={colors.primary} />,
       color: colors.primary,
       title: 'Insights and calorie trends',
       detail: `Personal insights, calorie bars and macro averages. Unlocks after ${MIN_INSIGHT_DAYS} fully logged days.`,
@@ -44,7 +42,6 @@ export function EarlyState({
     },
     {
       id: 'recap',
-      icon: <CalendarCheck size={18} color={colors.carbs} />,
       color: colors.carbs,
       title: 'Weekly recap',
       detail: 'Your week in numbers, best day, one win and one focus. Unlocks after 3 logged days in a week.',
@@ -53,7 +50,6 @@ export function EarlyState({
     },
     {
       id: 'weight',
-      icon: <Scale size={18} color={colors.weight} />,
       color: colors.weight,
       title: 'Weight trend',
       detail: 'A smoothed trend line that ignores daily water swings. Starts with 2 weigh-ins; the weekly rate follows after a week.',
@@ -62,7 +58,6 @@ export function EarlyState({
     },
     {
       id: 'adaptive',
-      icon: <Gauge size={18} color={colors.exercise} />,
       color: colors.exercise,
       title: 'Your measured expenditure',
       detail: adaptiveNeeds ? `Calories you really burn, worked out from your logs. Still needs ${adaptiveNeeds}.` : 'Ready.',
@@ -82,21 +77,21 @@ export function EarlyState({
         const ready = it.have >= it.need;
         return (
           <View key={it.id} testID={`progress-unlock-${it.id}`} style={{ flexDirection: 'row', gap: spacing.md }}>
-            <View style={{ width: 36, height: 36, borderRadius: radius.sm, backgroundColor: `${it.color}22`, alignItems: 'center', justifyContent: 'center' }}>{it.icon}</View>
+            <CupKey color={it.color} size={10} style={{ marginTop: 6 }} />
             <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                 <Text variant="bodyStrong" style={{ flex: 1 }}>
                   {it.title}
                 </Text>
-                {ready ? <Unlock size={14} color={colors.success} /> : <Lock size={14} color={colors.textTertiary} />}
-                <Text variant="caption" color={ready ? 'success' : 'textSecondary'} tabular>
+                {ready ? <Unlock size={14} color={colors.text} /> : <Lock size={14} color={colors.textTertiary} />}
+                <Text variant="caption" color={ready ? 'text' : 'textSecondary'} tabular>
                   {Math.min(it.have, it.need)} of {it.need}
                 </Text>
               </View>
               <Text variant="caption" color="textSecondary">
                 {it.detail}
               </Text>
-              <ProgressBar progress={it.have / it.need} color={it.color} height={5} />
+              <ProgressBar progress={it.have / it.need} color={it.color} height={6} style={{ marginTop: 4, marginBottom: 4 }} />
             </View>
           </View>
         );

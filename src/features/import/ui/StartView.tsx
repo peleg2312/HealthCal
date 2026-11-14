@@ -1,0 +1,141 @@
+import { ChevronDown, ChevronUp, FileArchive, FileSpreadsheet, FileText, Map as MapIcon, Watch } from 'lucide-react-native';
+import React, { useState } from 'react';
+import { View } from 'react-native';
+
+import { fonts, useTheme } from '@/theme';
+import { Card, Divider, PressableScale, Text } from '@/ui';
+
+/** The first state: what this does, what can be picked, and how to get the files out of Garmin Connect. */
+export function StartView({ failed }: { failed: { name: string; message: string }[] }) {
+  const { spacing } = useTheme();
+  return (
+    <View style={{ gap: spacing.lg }}>
+      <View style={{ gap: spacing.sm }}>
+        <Text variant="h1">Bring in Garmin workouts</Text>
+        <Text variant="body" color="textSecondary">
+          Choose the files you exported from Garmin Connect and HealthCal adds each workout to Train, with Garmin’s measured calories. You check every workout
+          before anything is added, and the files are read on this device only.
+        </Text>
+      </View>
+
+      {failed.length ? (
+        <Card tone="alt" testID="import-open-failed">
+          {failed.map((f) => (
+            <Text key={f.name} variant="caption" color="text">
+              <Text variant="caption" color="text" style={{ fontFamily: fonts.bold }}>
+                {f.name}
+              </Text>
+              {`: ${f.message}`}
+            </Text>
+          ))}
+        </Card>
+      ) : null}
+
+      <Guide />
+      <FormatsCard />
+    </View>
+  );
+}
+
+function FormatsCard() {
+  const { colors, spacing } = useTheme();
+  const rows = [
+    { icon: <Watch size={20} color={colors.text} strokeWidth={1.9} />, name: 'FIT', text: 'The original file from the watch. The most complete: measured calories, heart rate, every leg of a triathlon.' },
+    { icon: <FileText size={20} color={colors.text} strokeWidth={1.9} />, name: 'TCX', text: 'Laps with time, distance, calories and heart rate.' },
+    { icon: <MapIcon size={20} color={colors.text} strokeWidth={1.9} />, name: 'GPX', text: 'The route only. It has no calories, so they are estimated.' },
+    { icon: <FileSpreadsheet size={20} color={colors.text} strokeWidth={1.9} />, name: 'CSV', text: 'The Activities list: many workouts at once, one row each.' },
+    { icon: <FileArchive size={20} color={colors.text} strokeWidth={1.9} />, name: 'ZIP', text: 'As Garmin downloads it. No need to unzip.' },
+  ];
+  return (
+    <Card padding={0} style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.xs }} testID="import-formats">
+      {rows.map((r, i) => (
+        <React.Fragment key={r.name}>
+          {i > 0 ? <Divider inset={32} /> : null}
+          <View style={{ flexDirection: 'row', gap: spacing.md, paddingVertical: 11, alignItems: 'flex-start' }}>
+            <View style={{ paddingTop: 1 }}>{r.icon}</View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text variant="bodyStrong">{r.name}</Text>
+              <Text variant="caption" color="textSecondary">
+                {r.text}
+              </Text>
+            </View>
+          </View>
+        </React.Fragment>
+      ))}
+    </Card>
+  );
+}
+
+/** How to export from Garmin Connect, folded away until asked for. */
+function Guide() {
+  const { colors, spacing } = useTheme();
+  const [open, setOpen] = useState(false);
+  const Chevron = open ? ChevronUp : ChevronDown;
+  return (
+    <Card padding={0} testID="import-guide">
+      <PressableScale
+        testID="import-guide-toggle"
+        accessibilityLabel="How to get your files from Garmin Connect"
+        accessibilityState={{ expanded: open }}
+        onPress={() => setOpen((o) => !o)}
+        scaleTo={0.99}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.lg }}>
+        <Text variant="title" style={{ flex: 1 }}>
+          How to get your files from Garmin Connect
+        </Text>
+        <Chevron size={20} color={colors.textSecondary} strokeWidth={1.9} />
+      </PressableScale>
+      {open ? (
+        <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.md }}>
+          <Divider />
+          <Step n={1} title="Use the Garmin Connect website">
+            The phone app cannot export workouts. Sign in at connect.garmin.com on a computer, or in your phone’s browser with the desktop site turned on.
+          </Step>
+          <Step n={2} title="One workout">
+            Open the activity, tap the gear icon at the top right and choose Export Original. You get a ZIP with the FIT file in it: choose that ZIP here. Export to TCX
+            and Export to GPX work too.
+          </Step>
+          <Step n={3} title="Many workouts at once">
+            Open Activities, then All Activities. Scroll down until every workout you want is loaded (only loaded rows are exported), then choose Export CSV at the top
+            right.
+          </Step>
+          <Text variant="caption" color="textSecondary">
+            The CSV does not say whether its distances are in kilometres or miles, or which time zone it is in, so you will be asked. It follows the units set in
+            Garmin Connect’s account settings.
+          </Text>
+        </View>
+      ) : null}
+    </Card>
+  );
+}
+
+function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+  const { colors, spacing } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', gap: spacing.md }}>
+      <View
+        style={{
+          width: 24,
+          height: 24,
+          borderTopLeftRadius: 4,
+          borderTopRightRadius: 4,
+          borderBottomLeftRadius: 8,
+          borderBottomRightRadius: 8,
+          borderWidth: 1.5,
+          borderColor: colors.borderStrong,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <Text variant="caption" color="text" style={{ fontSize: 12, lineHeight: 15, fontFamily: fonts.bold }}>
+          {n}
+        </Text>
+      </View>
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <Text variant="bodyStrong">{title}</Text>
+        <Text variant="body" color="textSecondary">
+          {children}
+        </Text>
+      </View>
+    </View>
+  );
+}

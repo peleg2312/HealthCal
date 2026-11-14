@@ -1,12 +1,11 @@
-import { CalendarDays, Check } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
 import { addDays, startOfWeek, weekdayShort } from '@/lib/dates';
 import type { InsightDay } from '@/lib/insights';
 import type { Consistency } from '@/store/selectors';
-import { useTheme } from '@/theme';
-import { Text } from '@/ui';
+import { fonts, useTheme } from '@/theme';
+import { MiniCup, Text } from '@/ui';
 
 import { BigStat, Note, SectionCard } from './parts';
 
@@ -24,42 +23,29 @@ export function ConsistencyCard({ consistency, weekDays, today }: { consistency:
       testID="progress-consistency"
       title="Consistency"
       subtitle={`${consistency.totalDaysLogged} ${consistency.totalDaysLogged === 1 ? 'day' : 'days'} logged in total`}
-      color={colors.primary}
-      icon={<CalendarDays size={18} color={colors.primary} />}
       link="/consistency"
       linkLabel="Calendar">
       <View style={{ flexDirection: 'row', gap: spacing.lg }}>
         <View style={{ flex: 1 }}>
-          <BigStat value={`${streak}`} unit={streak === 1 ? 'day' : 'days'} label="Current streak" color={colors.primary} />
+          <BigStat value={`${streak}`} unit={streak === 1 ? 'day' : 'days'} label="Current streak" />
         </View>
         <View style={{ flex: 1 }}>
           <BigStat value={`${thisWeek}`} unit={`of ${elapsed}`} label="Days logged this week" />
         </View>
       </View>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }} accessibilityLabel={`Logged ${thisWeek} of ${elapsed} days this week`}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }} accessible accessibilityLabel={`Logged ${thisWeek} of ${elapsed} days this week`}>
         {week.map((d) => {
           const isLogged = logged.has(d);
           const future = d > today;
           const isToday = d === today;
           return (
-            <View key={d} style={{ alignItems: 'center', gap: 6 }}>
-              <View
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 17,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: isLogged ? colors.primary : future ? 'transparent' : colors.surfaceAlt,
-                  borderWidth: isToday && !isLogged ? 1.5 : future ? 1 : 0,
-                  borderColor: isToday ? colors.primary : colors.border,
-                  borderStyle: future ? 'dashed' : 'solid',
-                }}>
-                {isLogged ? <Check size={16} color={colors.onPrimary} strokeWidth={3} /> : null}
-              </View>
-              <Text variant="caption" color={isToday ? 'text' : 'textTertiary'}>
-                {weekdayShort(d).slice(0, 2)}
+            <View key={d} style={{ alignItems: 'center', gap: 6, width: 36 }}>
+              <Text variant="caption" color={isToday ? 'text' : 'textSecondary'} style={{ fontFamily: fonts.semibold }}>
+                {weekdayShort(d).slice(0, 1)}
               </Text>
+              {/* A full cup for a logged day, an empty one for a missed day, a dashed outline for days to come. */}
+              <MiniCup progress={isLogged ? 1 : 0} color={colors.calories} future={future} height={30} width={26} />
+              <View style={{ width: 8, height: 3, borderRadius: 1, backgroundColor: isToday ? colors.rim : 'transparent' }} />
             </View>
           );
         })}

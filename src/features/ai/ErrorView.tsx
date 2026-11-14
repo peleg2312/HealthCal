@@ -27,7 +27,7 @@ const TITLE: Record<ScreenErrorCode, string> = {
 };
 
 function Icon({ code, color }: { code: ScreenErrorCode; color: string }) {
-  const p = { size: 26, color };
+  const p = { size: 28, color, strokeWidth: 1.9 };
   switch (code) {
     case 'daily_limit':
       return <CalendarClock {...p} />;
@@ -61,13 +61,11 @@ export interface ErrorAction {
 /** A designed failure: what happened, and every reasonable way forward. The first action is primary. */
 export function ErrorView({ code, message, actions, footnote }: { code: ScreenErrorCode; message: string; actions: ErrorAction[]; footnote?: string }) {
   const { colors, spacing } = useTheme();
-  // Running out of the allowance is information, not a fault: neutral colour.
-  const tone = code === 'daily_limit' || code === 'not_food' ? colors.textSecondary : colors.warning;
+  // Every failure is information, not alarm: the icon stands alone in the text colour.
+  const tone = code === 'daily_limit' || code === 'not_food' ? colors.textSecondary : colors.text;
   return (
     <Card testID={`ai-error-${code}`} style={{ gap: spacing.md, alignItems: 'stretch' }}>
-      <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: `${tone}22`, alignItems: 'center', justifyContent: 'center' }}>
-        <Icon code={code} color={tone} />
-      </View>
+      <Icon code={code} color={tone} />
       <Text variant="h3">{TITLE[code]}</Text>
       <Text variant="body" color="textSecondary">
         {message}

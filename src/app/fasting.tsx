@@ -1,6 +1,6 @@
 import { Info, Pencil, Play, Square, Trash2 } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { AppState, View } from 'react-native';
+import { AppState, useWindowDimensions, View } from 'react-native';
 
 import { formatDuration } from '@/lib/dates';
 import { deleteFast, endFast, startFast, updateFast } from '@/features/trackers/actions';
@@ -19,7 +19,7 @@ import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { FastingSession } from '@/types';
-import { Button, Card, Chip, Divider, Header, IconButton, NumberField, Ring, Screen, SectionTitle, Sheet, Text, toast } from '@/ui';
+import { Button, Card, Chip, CupKey, Divider, Header, IconButton, NumberField, Screen, SectionTitle, Sheet, Text, toast, Vessel } from '@/ui';
 
 /** Current time, ticking every second while `active`. Elapsed time is always derived from stored timestamps. */
 function useNow(active: boolean): number {
@@ -44,7 +44,7 @@ function TimeBlock({ label, value, testID }: { label: string; value: string; tes
       <Text variant="caption" color="textSecondary">
         {label}
       </Text>
-      <Text testID={testID} variant="title" tabular numberOfLines={1}>
+      <Text testID={testID} variant="numM" tabular numberOfLines={1} style={{ fontSize: 16, lineHeight: 21 }}>
         {value}
       </Text>
     </View>
@@ -58,6 +58,8 @@ function article(n: number): string {
 
 function FastingScreen() {
   const { colors, spacing } = useTheme();
+  const { width: screenW } = useWindowDimensions();
+  const narrow = screenW < 360;
   const sessions = useLive('fasting');
   const target = useStore((s) => s.settings.fastingTargetHours);
   const sorted = [...sessions].sort((a, b) => b.start.localeCompare(a.start));
@@ -70,7 +72,6 @@ function FastingScreen() {
 
   const activeTarget = active?.targetHours ?? target;
   const p = active ? fastProgress(active.start, active.targetHours, now) : null;
-  const ringColor = p?.reached ? colors.success : colors.primary;
   const isPreset = FASTING_PRESETS.some((x) => x.hours === activeTarget);
 
   const setTarget = (hours: number) => {
@@ -96,24 +97,51 @@ function FastingScreen() {
 
   return (
     <Screen header={<Header title="Fasting" />} footer={footer} backdrop={colors.fat} testID="fasting-screen">
-      <Card padding={spacing.xl} style={{ alignItems: 'center', gap: spacing.lg }}>
-        <Ring size={240} stroke={16} progress={p ? Math.min(1, p.progress) : 0} color={ringColor} colorEnd={p?.reached ? colors.success : colors.weight}>
-          <View style={{ alignItems: 'center', gap: 2 }}>
-            <Text variant="overline" color={p?.reached ? 'success' : 'textSecondary'}>
-              {active ? (p?.reached ? 'TARGET REACHED' : 'FASTING') : 'NOT FASTING'}
-            </Text>
-            <Text testID="fasting-elapsed" variant="numL" tabular style={{ fontSize: 36, lineHeight: 42 }}>
-              {p ? formatClockDuration(p.elapsedMs) : '0:00:00'}
-            </Text>
+      <Card padding={18} style={{ gap: spacing.lg }} testID="fasting-hero">
+        <Vessel
+          value={p ? Math.min(p.elapsedMs, p.targetMs) / 3_600_000 : 0}
+          max={activeTarget}
+          color={colors.primary}
+          width={narrow ? 72 : 88}
+          height={210}
+          labelGap={narrow ? 14 : 18}
+          accessibilityLabel={active ? `Fasting for ${formatDuration(minutes(p?.elapsedMs ?? 0))} of ${activeTarget} hours` : 'Not fasting'}
+          labels={[
+            {
+              key: 'target',
+              at: activeTarget,
+              height: 20,
+              content: (
+                <Text variant="caption" color="textSecondary" numberOfLines={1}>
+                  {`Target ${fastingLabel(activeTarget)}`}
+                </Text>
+              ),
+            },
+            {
+              key: 'elapsed',
+              at: p ? Math.min(p.elapsedMs, p.targetMs) / 3_600_000 : 0,
+              height: 64,
+              tick: p && p.elapsedMs > 0 ? colors.rim : undefined,
+              content: (
+                <View style={{ gap: 2 }}>
+                  <Text variant="overline">{active ? (p?.reached ? 'Target reached' : 'Fasting') : 'Not fasting'}</Text>
+                  <Text testID="fasting-elapsed" variant="numL" tabular numberOfLines={1} style={{ fontSize: narrow ? 30 : 36, lineHeight: narrow ? 34 : 40 }}>
+                    {p ? formatClockDuration(p.elapsedMs) : '0:00:00'}
+                  </Text>
+                </View>
+              ),
+            },
+          ]}>
+          {active ? (
             <Text variant="caption" color="textSecondary">
-              {active ? `${Math.round((p?.progress ?? 0) * 100)}% of ${activeTarget} h` : `Target ${fastingLabel(activeTarget)}`}
+              {`${Math.round((p?.progress ?? 0) * 100)}% of ${activeTarget} h`}
             </Text>
-          </View>
-        </Ring>
+          ) : null}
+        </Vessel>
 
         {active && p ? (
           <>
-            <Text testID="fasting-remaining" variant="title" color={p.reached ? 'success' : 'text'} align="center">
+            <Text testID="fasting-remaining" variant="title">
               {p.reached
                 ? `Target reached ${formatDuration(Math.max(1, minutes(p.elapsedMs - p.targetMs)))} ago`
                 : `${formatDuration(Math.max(1, minutes(p.remainingMs)))} to go`}
@@ -121,7 +149,7 @@ function FastingScreen() {
             <View style={{ flexDirection: 'row', alignSelf: 'stretch', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.lg, alignItems: 'center' }}>
               <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <TimeBlock testID="fasting-started" label="Started" value={relativeDayTime(new Date(active.start), new Date(now))} />
-                <IconButton testID="fasting-adjust" accessibilityLabel="Change start time" tone="alt" size={44} onPress={() => setAdjusting(true)}>
+                <IconButton testID="fasting-adjust" accessibilityLabel="Change start time" tone="surface" size={44} style={{ borderColor: colors.borderStrong }} onPress={() => setAdjusting(true)}>
                   <Pencil size={16} color={colors.text} />
                 </IconButton>
               </View>
@@ -132,7 +160,7 @@ function FastingScreen() {
             </View>
           </>
         ) : (
-          <Text variant="body" color="textSecondary" align="center">
+          <Text variant="body" color="textSecondary">
             Start when you finish your last meal. The timer keeps running if you close the app.
           </Text>
         )}
@@ -196,7 +224,7 @@ function FastingScreen() {
                 <React.Fragment key={s.id}>
                   <Divider />
                   <View testID={`fasting-row-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 6 }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: fp.reached ? colors.success : colors.textTertiary }} />
+                    <CupKey color={fp.reached ? colors.primary : colors.textTertiary} variant={fp.reached ? 'filled' : 'outline'} />
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text variant="bodyStrong" tabular>
                         {formatDuration(minutes(fp.elapsedMs))}
@@ -206,7 +234,7 @@ function FastingScreen() {
                       </Text>
                     </View>
                     <IconButton testID={`fasting-delete-${i}`} accessibilityLabel="Delete this fast" tone="clear" size={44} onPress={() => deleteFast(s)}>
-                      <Trash2 size={18} color={colors.textTertiary} />
+                      <Trash2 size={18} color={colors.textSecondary} strokeWidth={1.9} />
                     </IconButton>
                   </View>
                 </React.Fragment>

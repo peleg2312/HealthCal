@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Gauge } from 'lucide-react-native';
+import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
@@ -14,33 +14,27 @@ import { SectionCard } from './parts';
 const NEED_DAYS = 10;
 const NEED_WEIGH_INS = 5;
 
-function Column({ title, value, caption, active, color }: { title: string; value: string | null; caption: string; active: boolean; color: string }) {
-  const { colors, spacing, radius } = useTheme();
+/** One estimate; the two share the card, split by a hairline. The one that sets targets carries a badge. */
+function Column({ title, value, caption, active, color, first }: { title: string; value: string | null; caption: string; active: boolean; color: string; first?: boolean }) {
+  const { colors, spacing } = useTheme();
   return (
     <View
       style={{
         flex: 1,
         minWidth: 0,
-        padding: spacing.md,
-        borderRadius: radius.md,
-        backgroundColor: active ? `${color}22` : colors.surfaceAlt,
-        borderWidth: 1,
-        borderColor: active ? `${color}66` : 'transparent',
+        paddingLeft: first ? 0 : spacing.lg,
+        paddingRight: first ? spacing.md : 0,
+        borderLeftWidth: first ? 0 : 1,
+        borderLeftColor: colors.border,
         gap: 4,
       }}>
       <Text variant="caption" color="textSecondary" numberOfLines={1}>
         {title}
       </Text>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
-        <Text variant="numM" tabular color={value ? 'text' : 'textTertiary'}>
-          {value ?? 'Not yet'}
-        </Text>
-        {value ? (
-          <Text variant="caption" color="textSecondary">
-            kcal
-          </Text>
-        ) : null}
-      </View>
+      <Text variant="numL" color={value ? 'text' : 'textTertiary'} numberOfLines={1} style={value ? undefined : { fontSize: 22 }}>
+        {value ?? 'Not yet'}
+        {value ? <Text variant="unit"> kcal</Text> : null}
+      </Text>
       <Text variant="caption" color="textSecondary" numberOfLines={2}>
         {caption}
       </Text>
@@ -65,11 +59,11 @@ export function EnergyCard({ model, useAdaptiveSetting }: { model: EnergyModel; 
       title="Energy expenditure"
       subtitle="Calories you burn in a typical day"
       color={accent}
-      icon={<Gauge size={18} color={accent} />}
       link="/settings/goals"
       linkLabel="Goals">
-      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+      <View style={{ flexDirection: 'row' }}>
         <Column
+          first
           title="Formula estimate"
           value={formatNumber(Math.round(model.formulaTdee))}
           caption={`${model.bmrMethod === 'katch-mcardle' ? 'Lean-mass' : 'Mifflin-St Jeor'} BMR × activity`}

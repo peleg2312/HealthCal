@@ -233,8 +233,8 @@ function AccountOffer() {
         </View>
       }>
       <View style={{ alignItems: 'center' }}>
-        <View style={{ width: 80, height: 80, borderRadius: 26, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-          <CloudUpload size={36} color={colors.primary} />
+        <View style={{ width: 80, height: 80, alignItems: 'center', justifyContent: 'center' }}>
+          <CloudUpload size={40} color={colors.text} strokeWidth={1.6} />
         </View>
       </View>
       <FadeIn style={{ gap: spacing.sm }}>

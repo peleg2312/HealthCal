@@ -43,9 +43,9 @@ import { analyzeFood, PhotoError, pickPhoto, prepareImage, takePendingPhoto, typ
 import { isBackendConfigured } from '@/services/supabase';
 import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { cup, useTheme } from '@/theme';
 import type { AiFoodResult, Food, MealType } from '@/types';
-import { Button, Card, Chip, Divider, goBack, haptic, Header, MacroBar, Screen, Segmented, Text, TextField, toast } from '@/ui';
+import { Button, Card, Chip, CupKey, Divider, goBack, haptic, Header, MacroBar, Screen, Segmented, Text, TextField, toast } from '@/ui';
 
 type InputMode = 'photo' | 'text';
 type Step = 'capture' | 'analysing' | 'review' | 'error';
@@ -324,7 +324,7 @@ export default function PhotoScreen() {
                       width: '100%',
                       aspectRatio: preview ? Math.max(0.75, Math.min(1.6, preview.width / Math.max(1, preview.height))) : 1.33,
                       maxHeight: 340,
-                      borderRadius: radius.lg,
+                      ...cup(radius.card),
                       overflow: 'hidden',
                       backgroundColor: colors.surfaceAlt,
                       alignItems: 'center',
@@ -345,9 +345,7 @@ export default function PhotoScreen() {
                 </View>
               ) : (
                 <Card style={{ alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xxl }}>
-                  <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: `${colors.fat}22`, alignItems: 'center', justifyContent: 'center' }}>
-                    <Camera size={28} color={colors.fat} />
-                  </View>
+                  <Camera size={32} color={colors.text} strokeWidth={1.9} />
                   <Text variant="h3" align="center">
                     Photograph your meal
                   </Text>
@@ -433,9 +431,7 @@ export default function PhotoScreen() {
           ) : (
             <Card style={{ gap: spacing.lg }}>
               <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-                <View style={{ width: 64, height: 64, borderRadius: radius.md, backgroundColor: `${isDemo ? colors.warning : colors.primary}22`, alignItems: 'center', justifyContent: 'center' }}>
-                  {isDemo ? <FlaskConical size={24} color={colors.warning} /> : <Sparkles size={24} color={colors.primary} />}
-                </View>
+                {isDemo ? <FlaskConical size={24} color={colors.text} strokeWidth={1.9} /> : <Sparkles size={24} color={colors.text} strokeWidth={1.9} />}
                 <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                   <Text variant="h3" numberOfLines={2} testID="ai-dish">
                     {isDemo ? `Sample: ${result.dish}` : result.dish}
@@ -447,10 +443,10 @@ export default function PhotoScreen() {
               </View>
               <View>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                  <Text variant="numXL" tabular testID="ai-total-kcal">
-                    {sum.kcal}
+                  <Text variant="numXL" tabular color="caloriesInk" testID="ai-total-kcal">
+                    {`~${sum.kcal}`}
                   </Text>
-                  <Text variant="title" color="textSecondary">
+                  <Text variant="unit" style={{ fontSize: 15 }}>
                     kcal
                   </Text>
                 </View>
@@ -467,7 +463,7 @@ export default function PhotoScreen() {
             </Card>
           )}
 
-          <Card style={{ gap: spacing.md, borderColor: result.hiddenFatQuestion ? `${colors.fat}66` : colors.border }}>
+          <Card style={{ gap: spacing.md, borderColor: result.hiddenFatQuestion ? colors.borderStrong : colors.border }}>
             <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
               <Droplet size={18} color={colors.fat} style={{ marginTop: 2 }} />
               <View style={{ flex: 1, gap: 2 }}>
@@ -504,8 +500,8 @@ export default function PhotoScreen() {
                     style={{
                       marginHorizontal: -spacing.md,
                       paddingHorizontal: spacing.md,
-                      borderRadius: radius.md,
-                      backgroundColor: highlight === r.key ? colors.primarySoft : 'transparent',
+                      ...cup(radius.tile, 5),
+                      backgroundColor: highlight === r.key ? colors.surfaceAlt : 'transparent',
                     }}>
                     {i > 0 ? <Divider /> : null}
                     <ItemRow
@@ -541,7 +537,7 @@ export default function PhotoScreen() {
 
           <Card style={{ gap: spacing.md }} testID="ai-correction">
             <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
-              <MessageSquareText size={18} color={colors.primary} style={{ marginTop: 2 }} />
+              <MessageSquareText size={18} color={colors.text} strokeWidth={1.9} style={{ marginTop: 2 }} />
               <View style={{ flex: 1, gap: 2 }}>
                 <Text variant="title">What did it get wrong?</Text>
                 <Text variant="caption" color="textSecondary">
@@ -655,13 +651,12 @@ function MacroStat({ label, value, color }: { label: string; value: number; colo
   return (
     <View style={{ flex: 1, gap: 2 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
-        <Text variant="caption" color="textSecondary">
-          {label}
-        </Text>
+        <CupKey color={color} />
+        <Text variant="label">{label}</Text>
       </View>
-      <Text variant="title" tabular>
-        {formatMacro(value)} g
+      <Text variant="numM" tabular style={{ fontSize: 17, lineHeight: 22 }}>
+        {formatMacro(value)}
+        <Text variant="unit">{' g'}</Text>
       </Text>
     </View>
   );

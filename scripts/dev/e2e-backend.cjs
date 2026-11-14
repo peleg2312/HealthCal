@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * End-to-end test of accounts, cross-device sync and AI analysis against the
+ * End-to-end test of accounts, cross-device sync, AI analysis and friends against the
  * local mock backend. It drives the real client code (Supabase auth, the sync
  * engine, the AI request) in two separate browser profiles acting as two devices.
  *
@@ -257,6 +257,131 @@ async function device(browser, seedJson) {
   srv = await server();
   check('once the connection is back the entry is uploaded', srv.records.some((r) => r.id === pendingWater[0]) && Object.keys((await C.state()).dirty.water).length === 0);
 
+  // ------------------------------------------------------------- friends
+  // A second person (Sam) on another device. Both turn friends on, Sam adds Alex by code, Alex accepts.
+  const EMAIL2 = `sam+${Date.now()}@example.com`;
+  // Sam's week differs from Alex's (one session fewer), so equal minutes cannot pass by accident.
+  const seedD = buildSeed();
+  const samActs = Object.values(seedD.state.activities).sort((x, y) => y.date.localeCompare(x.date));
+  if (samActs[0]) delete seedD.state.activities[samActs[0].id];
+  const D = await device(browser, JSON.stringify(seedD));
+  await D.go('/auth?mode=signup');
+  await D.fill('auth-email-input', EMAIL2);
+  await D.fill('auth-password-input', PASSWORD);
+  await D.tap('auth-submit');
+  check('a second person signs up on another device', await D.untilPath('/'), D.page.url());
+  await D.page.waitForTimeout(2500);
+  srv = await server();
+  const user2 = srv.users.find((u) => u.email === EMAIL2.toLowerCase());
+  const tid = (id) => String(id).replace(/[^A-Za-z0-9-]/g, '').toLowerCase();
+  const myCode = (d) => d.page.evaluate(() => window.__healthcalFriends?.getState().overview?.me?.code ?? null);
+  const waitFor = (d, id, timeout = 20000) => d.page.waitForSelector(`[data-testid="${id}"]`, { timeout }).then(() => true).catch(() => false);
+
+  await A.go('/friends');
+  await waitFor(A, 'friends-setup-save');
+  const setupText = (await A.has('friends-setup')) ? await A.text('friends-setup') : '';
+  const prefilled = await A.page.getByTestId('friends-setup-name').first().inputValue().catch(() => '');
+  check('friends start off, with a set-up prefilled from the profile that says what is never shared', /never shared/i.test(setupText) && prefilled === 'Alex', `name "${prefilled}"`);
+  await A.shot('friends-setup');
+  await A.tap('friends-setup-save');
+  await waitFor(A, 'friends-code');
+  const codeA = await myCode(A);
+  srv = await server();
+  check('turning friends on gives an 8-character code shown on the screen', /^[A-HJKMNP-Z2-9]{8}$/.test(codeA || '') && srv.social[user.id]?.code === codeA, codeA);
+
+  await D.go('/friends');
+  await waitFor(D, 'friends-setup-save');
+  await D.fill('friends-setup-name', 'Sam');
+  await D.tap('friends-setup-save');
+  await waitFor(D, 'friends-code');
+  const codeD = await myCode(D);
+  check('the second person turns friends on too', !!codeD && (await server()).social[user2?.id]?.display_name === 'Sam');
+
+  // Every answer is said in plain words.
+  await D.go(`/friends/add?code=${codeD}`);
+  await D.tap('friends-add-send');
+  check('entering your own code says so', await waitFor(D, 'friends-add-outcome-self', 10000));
+  await D.fill('friends-add-input', 'ZZZZ-ZZZZ');
+  await D.tap('friends-add-send');
+  check('a code nobody has says so', await waitFor(D, 'friends-add-outcome-not-found', 10000));
+
+  // The invite link opens the add screen with the code filled in.
+  await D.go(`/friends/add?code=${codeA.toLowerCase().slice(0, 4)}-${codeA.slice(4)}`);
+  const filled = await D.page.getByTestId('friends-add-input').first().inputValue();
+  check('an invite link opens the add screen with the code filled in and normalised', filled === `${codeA.slice(0, 4)} ${codeA.slice(4)}`, filled);
+  await D.tap('friends-add-send');
+  check('sending a request says it was sent', await waitFor(D, 'friends-add-outcome-sent', 10000));
+  await D.shot('friends-request-sent');
+  await D.go('/friends');
+  check('the request shows as waiting for the sender', await waitFor(D, `friends-outgoing-${tid(user.id)}`));
+
+  await A.go('/friends');
+  check('the request reaches the other person', await waitFor(A, `friends-accept-${tid(user2.id)}`));
+  await A.shot('friends-request-received');
+  await A.tap(`friends-accept-${tid(user2.id)}`);
+  check('accepting makes them friends on the server', await waitFor(A, `friends-card-${tid(user2.id)}`) && (await server()).friendships.some((f) => f.status === 'accepted' && [f.requester, f.addressee].sort().join() === [user.id, user2.id].sort().join()));
+  await A.page.waitForTimeout(800);
+  await A.shot('friends-full');
+
+  // Each sees the other's week; the minutes match that person's own Train screen.
+  const ownMinutes = async (d) => {
+    await d.go('/train');
+    return d.text('train-guideline-minutes');
+  };
+  const minutesA = await ownMinutes(A);
+  const minutesD = await ownMinutes(D);
+  await A.go('/friends');
+  await waitFor(A, `friends-minutes-${tid(user2.id)}`);
+  const samSeenByAlex = (await A.text(`friends-minutes-${tid(user2.id)}`)).replace(/\D+/g, '');
+  await D.go('/friends');
+  await waitFor(D, `friends-minutes-${tid(user.id)}`);
+  const alexSeenBySam = (await D.text(`friends-minutes-${tid(user.id)}`)).replace(/\D+/g, '');
+  check("each sees the other's weekly minutes, equal to that person's own", samSeenByAlex === minutesD && alexSeenBySam === minutesA && minutesA !== minutesD, `Alex sees Sam ${samSeenByAlex} (own ${minutesD}), Sam sees Alex ${alexSeenBySam} (own ${minutesA})`);
+  const card = await A.text(`friends-friend-${tid(user2.id)}`);
+  srv = await server();
+  const shared = srv.social[user2.id]?.summary || {};
+  const allowed = ['week', 'minutes', 'sessions', 'streak', 'workouts'];
+  check(
+    "no calories, weight or food appear on the friend's card or in what was shared",
+    !/kcal|calor|\bkg\b|\blb\b|weight|food/i.test(card) && Object.keys(shared).every((k) => allowed.includes(k)) && !/kcal|weight|food/i.test(JSON.stringify(shared)),
+    card.replace(/\s+/g, ' ').slice(0, 120),
+  );
+
+  // A cheer on one device appears on the other, matched to the workout it was for.
+  const latest = [...(shared.workouts || [])].sort((x, y) => String(y.date).localeCompare(String(x.date)))[0];
+  await A.go('/friends');
+  await waitFor(A, `friends-cheer-${latest?.id}`);
+  await A.tap(`friends-cheer-${latest?.id}`);
+  await A.page.waitForTimeout(1200);
+  srv = await server();
+  check('cheering shows at once and is stored', (await A.text(`friends-cheer-${latest?.id}`)) === 'Cheered' && srv.cheers.some((c) => c.from_user === user.id && c.to_user === user2.id && c.ref === latest?.id));
+  await D.go('/friends');
+  await waitFor(D, 'friends-cheers');
+  const cheersText = (await D.has('friends-cheers')) ? await D.text('friends-cheers') : '';
+  check('the cheer appears on the other device, naming the workout', /Alex\s+cheered your (?!day)/.test(cheersText) && !/workout of yours/.test(cheersText), cheersText.replace(/\s+/g, ' ').slice(0, 80));
+  await D.shot('friends-cheer-received');
+
+  // Removing the friend clears both sides.
+  await A.go('/friends');
+  await A.tap(`friends-card-${tid(user2.id)}`);
+  await A.tap('friends-remove');
+  await A.tap('confirm-yes');
+  await A.page.waitForTimeout(1500);
+  srv = await server();
+  const between = (x) => [x.requester ?? x.from_user, x.addressee ?? x.to_user].sort().join() === [user.id, user2.id].sort().join();
+  check('removing a friend clears the friendship and cheers on the server', !srv.friendships.some(between) && !srv.cheers.some(between) && !(await A.has(`friends-card-${tid(user2.id)}`)));
+  await D.go('/friends');
+  await waitFor(D, 'friends-empty');
+  check('the other side no longer shows them either', (await D.has('friends-empty')) && !(await D.has(`friends-card-${tid(user.id)}`)));
+
+  // Turning friends off removes the card.
+  await D.tap('friends-settings-open');
+  await D.tap('friends-leave');
+  await D.tap('confirm-yes');
+  await D.page.waitForTimeout(1500);
+  srv = await server();
+  check('turning friends off removes the card and returns to the set-up', !srv.social[user2.id] && (await waitFor(D, 'friends-setup-save')));
+
   // ------------------------------------------------------ delete account
   await A.go('/settings/account');
   await A.tap('account-delete');
@@ -267,7 +392,7 @@ async function device(browser, seedJson) {
   check('deleting the account erases the user and all their rows', !srv.users.some((u) => u.id === user.id) && srv.records.filter((r) => r.user_id === user.id).length === 0 && !srv.profiles[user.id]);
   check('device A is back at the welcome screen with no data', new URL(A.page.url()).pathname === '/welcome' && (await A.state()).profile === null, A.page.url());
 
-  const errs = [...A.errors, ...B.errors, ...C.errors];
+  const errs = [...A.errors, ...B.errors, ...C.errors, ...D.errors];
   check('no uncaught errors on any device', errs.length === 0, errs.slice(0, 2).join(' || '));
 
   await browser.close();

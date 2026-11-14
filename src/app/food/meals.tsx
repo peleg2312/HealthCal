@@ -5,7 +5,7 @@ import { View } from 'react-native';
 
 import { deleteSavedMeal } from '@/features/food/actions';
 import { formatPortion, itemsRange, mealServings } from '@/features/food/build';
-import { DayStepper, MealPicker } from '@/features/food/components';
+import { DayStepper, MealPicker, RowEmoji } from '@/features/food/components';
 import { dayPhrase, href, kcal, parseDate, parseMeal } from '@/features/food/helpers';
 import { LogSavedMealSheet, itemLine } from '@/features/food/SavedMealParts';
 import { MEAL_LABEL, sumNutrients } from '@/lib/nutrition';
@@ -71,7 +71,7 @@ export default function SavedMealsScreen() {
               <View style={{ gap: 6 }}>
                 {m.items.map((it, j) => (
                   <View key={j} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                    <Text style={{ fontSize: 16, lineHeight: 22 }}>{it.emoji ?? '🍽️'}</Text>
+                    <RowEmoji emoji={it.emoji} />
                     <Text variant="body" numberOfLines={1} style={{ flex: 1 }}>
                       {it.name}
                     </Text>

@@ -1,16 +1,19 @@
-import { Award, Medal } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
 import { formatShortDate } from '@/lib/dates';
 import type { Milestone } from '@/lib/insights';
 import { useTheme } from '@/theme';
-import { ProgressBar, Text } from '@/ui';
+import { MiniCup, Text } from '@/ui';
 
 import { SectionCard } from './parts';
 
+/**
+ * Milestones as cups: a reached one is a full cup, one still to come is filled
+ * to how close it is. Rows share the card, divided by hairlines.
+ */
 export function MilestonesCard({ milestones }: { milestones: Milestone[] }) {
-  const { colors, spacing, radius } = useTheme();
+  const { colors, spacing } = useTheme();
   const doneAll = milestones.filter((m) => m.achieved).sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
   const done = doneAll.slice(0, 4);
   const next = milestones
@@ -21,27 +24,26 @@ export function MilestonesCard({ milestones }: { milestones: Milestone[] }) {
     <SectionCard
       testID="progress-milestones"
       title="Milestones"
-      subtitle={`${doneAll.length} of ${milestones.length} reached${doneAll.length > done.length ? ', latest shown' : ''}`}
-      color={colors.carbs}
-      icon={<Award size={18} color={colors.carbs} />}>
+      subtitle={`${doneAll.length} of ${milestones.length} reached${doneAll.length > done.length ? ', latest shown' : ''}`}>
       {done.length ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-          {done.map((m) => (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.md }}>
+          {done.map((m, i) => (
             <View
               key={m.id}
               testID={`milestone-${m.id}`}
+              accessible
+              accessibilityLabel={`Reached: ${m.title}${m.date ? `, ${formatShortDate(m.date)}` : ''}`}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: spacing.sm,
-                paddingVertical: spacing.sm,
-                paddingHorizontal: spacing.md,
-                borderRadius: radius.md,
-                backgroundColor: `${colors.carbs}1A`,
-                flexGrow: 1,
-                flexBasis: '45%',
+                gap: spacing.md,
+                width: '50%',
+                paddingLeft: i % 2 ? spacing.md : 0,
+                paddingRight: i % 2 ? 0 : spacing.md,
+                borderLeftWidth: i % 2 ? 1 : 0,
+                borderLeftColor: colors.border,
               }}>
-              <Medal size={18} color={colors.carbs} />
+              <MiniCup progress={1} color={colors.primary} width={22} height={28} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text variant="label" numberOfLines={2}>
                   {m.title}
@@ -57,26 +59,26 @@ export function MilestonesCard({ milestones }: { milestones: Milestone[] }) {
         </View>
       ) : null}
       {next.length ? (
-        <View style={{ gap: spacing.md }}>
-          <Text variant="overline" color="textTertiary">
-            UP NEXT
-          </Text>
-          {next.map((m) => (
-            <View key={m.id} testID={`milestone-${m.id}`} style={{ gap: 6 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm }}>
+        <View style={{ gap: spacing.md, borderTopWidth: done.length ? 1 : 0, borderTopColor: colors.border, paddingTop: done.length ? spacing.md : 0 }}>
+          <Text variant="overline">Up next</Text>
+          {next.map((m) => {
+            const pct = Math.round((m.current / m.goal) * 100);
+            return (
+              <View key={m.id} testID={`milestone-${m.id}`} accessible accessibilityLabel={`${m.title}, ${pct}% of the way. ${m.detail}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                <MiniCup progress={Math.min(0.999, m.current / m.goal)} color={colors.primary} width={22} height={28} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text variant="label">{m.title}</Text>
                   <Text variant="caption" color="textSecondary">
                     {m.detail}
                   </Text>
                 </View>
-                <Text variant="caption" color="textSecondary" tabular>
-                  {Math.round((m.current / m.goal) * 100)}%
+                <Text variant="numM" style={{ fontSize: 17, lineHeight: 22 }}>
+                  {pct}
+                  <Text variant="unit">%</Text>
                 </Text>
               </View>
-              <ProgressBar progress={m.current / m.goal} color={colors.carbs} height={6} />
-            </View>
-          ))}
+            );
+          })}
         </View>
       ) : null}
     </SectionCard>

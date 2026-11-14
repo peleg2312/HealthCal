@@ -3,12 +3,73 @@ import { FileUp, HeartHandshake, ShieldCheck, TriangleAlert, Zap } from 'lucide-
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
-import { BrandRings, FadeIn, Note } from '@/features/onboarding/components';
+import { FadeIn, Note } from '@/features/onboarding/components';
 import { pickAndImportBackup } from '@/services/export';
 import { isBackendConfigured } from '@/services/supabase';
 import { useStore } from '@/store';
 import { useTheme } from '@/theme';
-import { Button, Screen, Text } from '@/ui';
+import { Button, Screen, Text, Vessel } from '@/ui';
+
+/**
+ * The idea in one picture: a day as a cup, with exercise adding hatched
+ * headroom on top, what is eaten poured in, and what is left visible above
+ * the level line. Illustrative numbers, labelled as an example.
+ */
+function DemoCup() {
+  const { colors } = useTheme();
+  const budget = 2160;
+  const eaten = 1219;
+  const burned = 290;
+  return (
+    <View accessible accessibilityLabel="Example day: 2,160 kcal budget including 290 burned by exercise, 1,219 eaten, 941 left">
+      <Vessel
+        value={eaten}
+        max={budget}
+        headroom={burned}
+        color={colors.calories}
+        width={76}
+        height={180}
+        labels={[
+          {
+            key: 'burned',
+            at: budget - burned / 2,
+            height: 22,
+            tick: colors.exercise,
+            content: (
+              <Text variant="label" color="textSecondary">
+                <Text variant="numM" style={{ fontSize: 17 }}>+290</Text> burned, added
+              </Text>
+            ),
+          },
+          {
+            key: 'left',
+            at: eaten + (budget - burned - eaten) / 2,
+            height: 40,
+            content: (
+              <Text variant="numL" color="caloriesInk">
+                941<Text variant="unit"> kcal left</Text>
+              </Text>
+            ),
+          },
+          {
+            key: 'eaten',
+            at: eaten,
+            height: 22,
+            tick: colors.rim,
+            content: (
+              <Text variant="label" color="textSecondary">
+                <Text variant="numM" style={{ fontSize: 17 }}>1,219</Text> eaten
+              </Text>
+            ),
+          },
+        ]}>
+        <Text variant="caption" color="textTertiary">
+          An example day
+        </Text>
+      </Vessel>
+    </View>
+  );
+}
 
 export default function Welcome() {
   const { colors, spacing } = useTheme();
@@ -43,20 +104,17 @@ export default function Welcome() {
 
   const points = [
     {
-      icon: <ShieldCheck size={20} color={colors.weight} />,
-      color: colors.weight,
+      icon: <ShieldCheck size={22} color={colors.text} strokeWidth={1.9} />,
       title: 'Honest numbers',
       text: 'Targets from your own body data, estimates shown as estimates.',
     },
     {
-      icon: <Zap size={20} color={colors.carbs} />,
-      color: colors.carbs,
+      icon: <Zap size={22} color={colors.text} strokeWidth={1.9} />,
       title: 'Fast logging',
       text: 'Recents, favourites and one-tap repeats are always close.',
     },
     {
-      icon: <HeartHandshake size={20} color={colors.protein} />,
-      color: colors.protein,
+      icon: <HeartHandshake size={22} color={colors.text} strokeWidth={1.9} />,
       title: 'No paywalls, no ads',
       text: 'Every feature included, and your data exports in full.',
     },
@@ -83,16 +141,16 @@ export default function Welcome() {
           />
         </View>
       }>
-      <View style={{ alignItems: 'center', gap: spacing.xxl }}>
-        <BrandRings size={208} />
-        <FadeIn delay={150} style={{ alignItems: 'center', gap: spacing.sm }}>
-          <Text variant="display" align="center" accessibilityRole="header" style={{ fontSize: 40, lineHeight: 46 }}>
+      <View style={{ gap: spacing.xxl }}>
+        <FadeIn delay={50} style={{ gap: spacing.sm }}>
+          <Text variant="display" accessibilityRole="header" style={{ fontSize: 44, lineHeight: 46, letterSpacing: -1.5 }}>
             HealthCal
           </Text>
-          <Text variant="h3" color="textSecondary" align="center" style={{ maxWidth: 320 }}>
-            Calorie tracking you can trust, built from your own body.
+          <Text variant="h3" color="textSecondary" style={{ maxWidth: 340 }}>
+            Your day fills up like a cup. Calorie tracking you can trust, built from your own body.
           </Text>
         </FadeIn>
+        <DemoCup />
       </View>
       {importNote ? (
         <Note
@@ -107,9 +165,7 @@ export default function Welcome() {
       <View style={{ gap: spacing.lg }}>
         {points.map((p, i) => (
           <FadeIn key={p.title} delay={300 + i * 90} style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-            <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: `${p.color}22`, alignItems: 'center', justifyContent: 'center' }}>
-              {p.icon}
-            </View>
+            <View style={{ width: 28, alignItems: 'center' }}>{p.icon}</View>
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text variant="title">{p.title}</Text>
               <Text variant="caption" color="textSecondary">

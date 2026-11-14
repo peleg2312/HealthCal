@@ -14,7 +14,7 @@ import { entriesTotal, mealForTime, MEALS } from '@/lib/nutrition';
 import { lookupBarcode } from '@/services/openFoodFacts';
 import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { cup, useTheme } from '@/theme';
 import type { Food, MealType, Serving } from '@/types';
 import { Button, Card, goBack, haptic, Header, IconButton, Screen, Text, TextField } from '@/ui';
 
@@ -197,7 +197,7 @@ export default function ScanScreen() {
       {scanning ? (
         showCamera ? (
           <View style={{ flex: 1, gap: spacing.lg, paddingTop: spacing.sm, paddingBottom: added.length > 0 ? spacing.md : spacing.xl }}>
-            <View style={{ flex: 1, borderRadius: radius.xl, overflow: 'hidden', backgroundColor: colors.surfaceAlt }}>
+            <View style={{ flex: 1, ...cup(radius.card), overflow: 'hidden', backgroundColor: colors.surfaceAlt }}>
               <CameraView
                 style={{ flex: 1 }}
                 facing="back"
@@ -238,7 +238,7 @@ export default function ScanScreen() {
             {resultCard}
             <ManualEntry key={manualKey} onLookup={(code) => void lookup(code)} autoFocus={manual && !found} />
             {cameraOffer && manual ? (
-              <Button testID="scan-use-camera" title={web ? 'Scan with your camera' : 'Back to the camera'} variant="ghost" icon={<Camera size={18} color={colors.primary} />} onPress={() => void startCamera()} />
+              <Button testID="scan-use-camera" title={web ? 'Scan with your camera' : 'Back to the camera'} variant="ghost" icon={<Camera size={18} color={colors.primary} strokeWidth={2.2} />} onPress={() => void startCamera()} />
             ) : null}
             {web && !hasCamera ? (
               <Text variant="caption" color="textTertiary" align="center">
@@ -261,8 +261,8 @@ export default function ScanScreen() {
 
       {phase.kind === 'not_found' || phase.kind === 'incomplete' ? (
         <Card testID={`scan-${phase.kind}`} style={{ gap: spacing.md }}>
-          <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: `${colors.carbs}22`, alignItems: 'center', justifyContent: 'center' }}>
-            {phase.kind === 'not_found' ? <PackageX size={26} color={colors.carbs} /> : <PackageSearch size={26} color={colors.carbs} />}
+          <View style={{ width: 44, height: 44, justifyContent: 'center' }}>
+            {phase.kind === 'not_found' ? <PackageX size={28} color={colors.text} strokeWidth={1.9} /> : <PackageSearch size={28} color={colors.text} strokeWidth={1.9} />}
           </View>
           <Text variant="h3">{phase.kind === 'not_found' ? 'Product not found' : 'Nutrition data is incomplete'}</Text>
           <Text variant="body" color="textSecondary">
@@ -285,8 +285,8 @@ export default function ScanScreen() {
 
       {phase.kind === 'error' ? (
         <Card testID="scan-error" style={{ gap: spacing.md }}>
-          <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: `${colors.warning}22`, alignItems: 'center', justifyContent: 'center' }}>
-            <CloudOff size={26} color={colors.warning} />
+          <View style={{ width: 44, height: 44, justifyContent: 'center' }}>
+            <CloudOff size={28} color={colors.text} strokeWidth={1.9} />
           </View>
           <Text variant="h3">Could not reach the product database</Text>
           <Text variant="body" color="textSecondary">
@@ -306,16 +306,16 @@ export default function ScanScreen() {
 /** Frame with corner marks and a hint, drawn over the camera. */
 function Viewfinder() {
   const { colors, radius } = useTheme();
-  const corner = { position: 'absolute' as const, width: 28, height: 28, borderColor: colors.primary };
+  const corner = { position: 'absolute' as const, width: 28, height: 28, borderColor: '#FFFFFF' };
   return (
     <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
       <View style={{ width: '78%', aspectRatio: 1.7 }}>
-        <View style={[corner, { left: 0, top: 0, borderLeftWidth: 4, borderTopWidth: 4, borderTopLeftRadius: radius.md }]} />
-        <View style={[corner, { right: 0, top: 0, borderRightWidth: 4, borderTopWidth: 4, borderTopRightRadius: radius.md }]} />
-        <View style={[corner, { left: 0, bottom: 0, borderLeftWidth: 4, borderBottomWidth: 4, borderBottomLeftRadius: radius.md }]} />
-        <View style={[corner, { right: 0, bottom: 0, borderRightWidth: 4, borderBottomWidth: 4, borderBottomRightRadius: radius.md }]} />
+        <View style={[corner, { left: 0, top: 0, borderLeftWidth: 4, borderTopWidth: 4 }]} />
+        <View style={[corner, { right: 0, top: 0, borderRightWidth: 4, borderTopWidth: 4 }]} />
+        <View style={[corner, { left: 0, bottom: 0, borderLeftWidth: 4, borderBottomWidth: 4 }]} />
+        <View style={[corner, { right: 0, bottom: 0, borderRightWidth: 4, borderBottomWidth: 4 }]} />
       </View>
-      <View style={{ position: 'absolute', bottom: 20, paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.overlay }}>
+      <View style={{ position: 'absolute', bottom: 20, paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.chip, backgroundColor: colors.overlay }}>
         {/* Fixed white on a dark scrim: the camera image is not themed. */}
         <Text variant="label" color="#FFFFFF">
           Line the barcode up inside the frame
@@ -329,8 +329,8 @@ function PermissionCard({ canAsk, loading, onAllow }: { canAsk: boolean; loading
   const { colors, spacing } = useTheme();
   return (
     <Card testID="scan-permission" style={{ gap: spacing.md }}>
-      <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: `${colors.carbs}22`, alignItems: 'center', justifyContent: 'center' }}>
-        <ScanBarcode size={26} color={colors.carbs} />
+      <View style={{ width: 44, height: 44, justifyContent: 'center' }}>
+        <ScanBarcode size={28} color={colors.text} strokeWidth={1.9} />
       </View>
       <Text variant="h3">Scan with your camera</Text>
       <Text variant="body" color="textSecondary">

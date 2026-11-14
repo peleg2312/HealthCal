@@ -10,7 +10,7 @@ import { saveWeightRecord } from '@/features/trackers/actions';
 import { Figure, Note, RequireProfile } from '@/features/trackers/components';
 import { findByDate, hasMeasurements, keepOrConvert, NAVY_ERROR_PCT, WHTR_GUIDELINE } from '@/features/trackers/helpers';
 import { useLive, useProfile } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { cup, useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
 import { Badge, Button, Card, Divider, EmptyState, haptic, Header, ListRow, NumberField, Screen, SectionTitle, Text, toast, ToggleRow } from '@/ui';
 
@@ -29,7 +29,7 @@ function ZoneScale({ min, max, zones, value, testID }: { min: number; max: numbe
   const starts = zones.map((_, i) => (i === 0 ? min : zones[i - 1].to));
   return (
     <View testID={testID} style={{ height: 22, justifyContent: 'center' }}>
-      <View style={{ flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', gap: 2 }}>
+      <View style={{ flexDirection: 'row', height: 8, borderRadius: 2, overflow: 'hidden', gap: 2 }}>
         {zones.map((z, i) => {
           const width = (Math.min(z.to, max) - starts[i]) / (max - min);
           return <View key={i} style={{ flex: width, backgroundColor: z.color }} />;
@@ -39,13 +39,11 @@ function ZoneScale({ min, max, zones, value, testID }: { min: number; max: numbe
         style={{
           position: 'absolute',
           left: `${pos * 100}%`,
-          marginLeft: -9,
-          width: 18,
+          marginLeft: -1.5,
+          width: 3,
           height: 18,
-          borderRadius: 9,
-          backgroundColor: colors.text,
-          borderWidth: 3,
-          borderColor: colors.surface,
+          borderRadius: 1,
+          backgroundColor: colors.rim,
         }}
       />
     </View>
@@ -70,7 +68,7 @@ function ScaleLabels({ min, max, ticks }: { min: number; max: number; ticks: num
 }
 
 function BodyScreen() {
-  const { colors, spacing } = useTheme();
+  const { colors, radius, spacing } = useTheme();
   const profile = useProfile();
   const units = profile.units;
   const weights = useLive('weights');
@@ -219,14 +217,14 @@ function BodyScreen() {
             hint="No weigh-in today yet. Measurements are saved with today’s weight."
           />
         )}
-        <View style={{ backgroundColor: colors.surfaceAlt, borderRadius: 14, padding: spacing.lg, gap: 4 }}>
+        <View style={{ backgroundColor: colors.surfaceAlt, ...cup(radius.tile, 5), padding: spacing.lg, gap: 4 }}>
           {estimate !== null ? (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                <Text testID="body-estimate" variant="numL" tabular color="weight">
+                <Text testID="body-estimate" variant="numL" tabular>
                   {estimate.toFixed(1)}
                 </Text>
-                <Text variant="title" color="textSecondary">
+                <Text variant="unit" style={{ fontSize: 15 }}>
                   % body fat
                 </Text>
               </View>

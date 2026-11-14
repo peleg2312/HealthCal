@@ -3,8 +3,8 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { formatClock, formatHHmm, parseHHmm } from '@/lib/dates';
-import { useTheme } from '@/theme';
-import { Button, Card, Divider, IconButton, ListRow, PressableScale, Sheet, Text } from '@/ui';
+import { cup, cupFor, useTheme } from '@/theme';
+import { Button, Card, Chip, Divider, IconButton, ListRow, PressableScale, Sheet, Text } from '@/ui';
 
 /** A titled card of rows separated by hairlines. */
 export function Group({ title, footer, children }: { title?: string; footer?: string; children: React.ReactNode }) {
@@ -34,14 +34,20 @@ export function Group({ title, footer, children }: { title?: string; footer?: st
   );
 }
 
-/** Coloured square holding a row icon. */
-export function IconTile({ color, children }: { color: string; children: React.ReactNode }) {
-  const { radius } = useTheme();
-  return (
-    <View style={{ width: 36, height: 36, borderRadius: radius.sm, backgroundColor: `${color}22`, alignItems: 'center', justifyContent: 'center' }}>
-      {children}
-    </View>
-  );
+/**
+ * The leading mark of a settings row. Pour has no tinted icon tiles: the
+ * Lucide icon stands alone, 20 px with stroke 1.9, in textSecondary. A
+ * warning or danger `color` (or `keep`) leaves the icon's own colour, since
+ * there the colour is a status; any other colour is ignored.
+ */
+export function IconTile({ color, keep, children }: { color?: string; keep?: boolean; children: React.ReactNode }) {
+  const { colors } = useTheme();
+  // A status colour (warning, danger) carries meaning, so it stays; any other colour gives way to the neutral icon.
+  const own = keep || (!!color && (color === colors.warning || color === colors.danger));
+  const child = React.isValidElement<{ color?: string; size?: number; strokeWidth?: number }>(children)
+    ? React.cloneElement(children, { ...(own ? null : { color: colors.textSecondary }), size: 20, strokeWidth: 1.9 })
+    : children;
+  return <View style={{ width: 24, height: 36, alignItems: 'center', justifyContent: 'center' }}>{child}</View>;
 }
 
 /**
@@ -83,18 +89,19 @@ export function OptionRow({
           </Text>
         ) : null}
       </View>
+      {/* A small cup: an ink cup with a check when chosen, an empty outline otherwise. */}
       <View
         style={{
           width: 24,
           height: 24,
-          borderRadius: 12,
-          borderWidth: selected ? 0 : 2,
+          ...cupFor(24),
+          borderWidth: selected ? 0 : 1.5,
           borderColor: colors.borderStrong,
-          backgroundColor: selected ? colors.primary : 'transparent',
+          backgroundColor: selected ? colors.text : 'transparent',
           alignItems: 'center',
           justifyContent: 'center',
         }}>
-        {selected ? <Check size={15} color={colors.onPrimary} strokeWidth={3} /> : null}
+        {selected ? <Check size={15} color={colors.bg} strokeWidth={3} /> : null}
       </View>
     </PressableScale>
   );
@@ -169,32 +176,14 @@ export function TimeSheet({
             accessibilityLabel={h < 12 ? 'Switch to PM' : 'Switch to AM'}
             testID="time-ampm"
             onPress={() => set(minutes + (h < 12 ? 720 : -720))}
-            style={{ marginBottom: 24, paddingHorizontal: 14, height: 44, borderRadius: radius.sm, backgroundColor: colors.surfaceAlt, justifyContent: 'center' }}>
+            style={{ marginBottom: 24, paddingHorizontal: 14, height: 44, ...cup(radius.buttonSm, 5), borderWidth: 1.5, borderColor: colors.borderStrong, justifyContent: 'center' }}>
             <Text variant="title">{h < 12 ? 'AM' : 'PM'}</Text>
           </PressableScale>
         ) : null}
       </View>
       <View style={{ flexDirection: 'row', gap: spacing.sm, justifyContent: 'center' }}>
         {QUICK_MINUTES.map((q) => (
-          <PressableScale
-            key={q}
-            accessibilityLabel={`:${String(q).padStart(2, '0')}`}
-            onPress={() => set(h * 60 + q)}
-            style={{
-              height: 40,
-              minWidth: 56,
-              paddingHorizontal: 12,
-              borderRadius: radius.pill,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: m === q ? colors.primarySoft : colors.surface,
-              borderWidth: 1,
-              borderColor: m === q ? colors.primary : colors.border,
-            }}>
-            <Text variant="label" color={m === q ? 'text' : 'textSecondary'}>
-              :{String(q).padStart(2, '0')}
-            </Text>
-          </PressableScale>
+          <Chip key={q} label={`:${String(q).padStart(2, '0')}`} selected={m === q} onPress={() => set(h * 60 + q)} style={{ minWidth: 56, justifyContent: 'center' }} />
         ))}
       </View>
     </Sheet>
@@ -255,13 +244,14 @@ export function InitialsAvatar({ name, size = 64 }: { name: string; size?: numbe
       .filter(Boolean)
       .slice(0, 2)
       .map((p) => p[0]?.toUpperCase() ?? '')
-      .join('') || '🙂';
+      .join('') || 'Me';
   return (
+    // A cup tile with initials in Bricolage (Pour avatars are never round and never emoji).
     <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
-      <Text variant="h2" color="onPrimary" style={{ fontSize: size * 0.38, lineHeight: size * 0.48 }}>
+      style={{ width: size, height: size, ...cupFor(size), backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+      <Text variant="h2" color="text" style={{ fontSize: size * 0.38, lineHeight: size * 0.48 }}>
         {initials}
       </Text>
     </View>

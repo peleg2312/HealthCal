@@ -17,9 +17,9 @@ import { searchLocal, searchOnlineWithStatus } from '@/services/foodSearch';
 import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
 import { useDay, useLive } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { cup, fonts, useTheme } from '@/theme';
 import type { Food, FoodEntry, MealType, SavedMeal } from '@/types';
-import { Avatar, Button, Chip, ChipRow, Divider, Header, IconButton, PressableScale, Screen, Sheet, Text, TextField } from '@/ui';
+import { Button, Chip, ChipRow, Divider, EmptyState, Header, IconButton, PressableScale, Screen, Sheet, Text, TextField } from '@/ui';
 
 type Tab = 'usual' | 'recent' | 'favorites' | 'mine' | 'meals';
 type Online = { query: string; status: 'idle' | 'loading' | 'done'; items: Food[] };
@@ -147,10 +147,10 @@ export default function FoodSearchScreen() {
 
   const escapes = (
     <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-      <ActionTile testID="search-scan" icon={<ScanBarcode size={22} color={colors.primary} />} label="Scan barcode" onPress={() => go('/food/scan')} />
-      <ActionTile testID="search-photo" icon={<Camera size={22} color={colors.primary} />} label="Photo or describe" onPress={() => go('/food/photo', { mode: 'photo' })} />
-      <ActionTile testID="search-quick" icon={<Zap size={22} color={colors.primary} />} label="Quick add" onPress={() => go('/food/quick')} />
-      <ActionTile testID="search-create" icon={<PenLine size={22} color={colors.primary} />} label="Create food" onPress={() => go('/food/custom', q ? { name: q } : {})} />
+      <ActionTile testID="search-scan" icon={<ScanBarcode size={22} color={colors.text} strokeWidth={1.9} />} label="Scan barcode" onPress={() => go('/food/scan')} />
+      <ActionTile testID="search-photo" icon={<Camera size={22} color={colors.text} strokeWidth={1.9} />} label="Photo or describe" onPress={() => go('/food/photo', { mode: 'photo' })} />
+      <ActionTile testID="search-quick" icon={<Zap size={22} color={colors.text} strokeWidth={1.9} />} label="Quick add" onPress={() => go('/food/quick')} />
+      <ActionTile testID="search-create" icon={<PenLine size={22} color={colors.text} strokeWidth={1.9} />} label="Create food" onPress={() => go('/food/custom', q ? { name: q } : {})} />
     </View>
   );
 
@@ -183,7 +183,7 @@ export default function FoodSearchScreen() {
 
   const over = left < 0;
   const budget = (
-    <Text variant={added.length > 0 ? 'caption' : 'label'} color={over ? 'warning' : 'textSecondary'} tabular testID="search-budget">
+    <Text variant={added.length > 0 ? 'caption' : 'label'} color={over ? 'text' : 'textSecondary'} tabular testID="search-budget">
       {over ? `${kcal(-left)} kcal over` : `${kcal(left)} kcal left`} {date === todayDate ? 'today' : `on ${formatDayLabel(date)}`}
     </Text>
   );
@@ -285,12 +285,12 @@ export default function FoodSearchScreen() {
                         onPress={() => go('/food/meals')}
                         scaleTo={0.985}
                         accessibilityLabel={`${m.name}, ${m.items.length} items. Open saved meals`}
-                        style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 60, paddingVertical: spacing.sm }}>
-                        <Avatar size={42}>
-                          <Utensils size={20} color={colors.textSecondary} />
-                        </Avatar>
+                        style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>
+                        <View style={{ width: 24, alignItems: 'center' }}>
+                          <Utensils size={19} color={colors.textSecondary} strokeWidth={1.9} />
+                        </View>
                         <View style={{ flex: 1, minWidth: 0 }}>
-                          <Text variant="bodyStrong" numberOfLines={1}>
+                          <Text variant="bodyStrong" numberOfLines={1} style={{ fontFamily: fonts.semibold }}>
                             {m.name}
                           </Text>
                           <Text variant="caption" color="textSecondary" numberOfLines={1}>
@@ -332,7 +332,7 @@ export default function FoodSearchScreen() {
             <List testID="search-local-results">{local.map((h, i) => row(h.food, `result-${i}`))}</List>
           ) : (
             <View testID="search-no-local" style={{ gap: 4, paddingVertical: spacing.sm }}>
-              <Text variant="title">No matches in your foods or the reference list</Text>
+              <Text variant="h3">No matches in your foods or the reference list</Text>
               <Text variant="body" color="textSecondary">
                 Try fewer words, check the online products below, or add it another way.
               </Text>
@@ -421,7 +421,7 @@ function List({ children, testID }: { children: React.ReactNode; testID?: string
     <View testID={testID}>
       {items.map((c, i) => (
         <View key={i}>
-          {i > 0 ? <Divider inset={54} /> : null}
+          {i > 0 ? <Divider inset={36} /> : null}
           {c}
         </View>
       ))}
@@ -429,19 +429,8 @@ function List({ children, testID }: { children: React.ReactNode; testID?: string
   );
 }
 
-function Hint({ title, message, icon }: { title: string; message: string; icon?: React.ReactNode }) {
-  const { spacing } = useTheme();
-  return (
-    <View style={{ alignItems: 'center', paddingVertical: spacing.xxl, paddingHorizontal: spacing.lg, gap: 6 }}>
-      {icon}
-      <Text variant="title" align="center">
-        {title}
-      </Text>
-      <Text variant="body" color="textSecondary" align="center">
-        {message}
-      </Text>
-    </View>
-  );
+function Hint({ title, message }: { title: string; message: string; icon?: React.ReactNode }) {
+  return <EmptyState title={title} message={message} />;
 }
 
 function ActionTile({ icon, label, onPress, testID }: { icon: React.ReactNode; label: string; onPress: () => void; testID: string }) {
@@ -454,18 +443,18 @@ function ActionTile({ icon, label, onPress, testID }: { icon: React.ReactNode; l
       accessibilityLabel={label}
       style={{
         flex: 1,
-        minHeight: 84,
-        borderRadius: radius.md,
+        minHeight: 80,
+        ...cup(radius.tile, 5),
         backgroundColor: colors.surface,
         borderWidth: 1,
         borderColor: colors.border,
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 6,
+        gap: 8,
         padding: spacing.sm,
       }}>
-      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
-      <Text variant="caption" align="center" numberOfLines={2}>
+      {icon}
+      <Text variant="label" align="center" numberOfLines={2} style={{ fontSize: 12.5, lineHeight: 16 }}>
         {label}
       </Text>
     </PressableScale>

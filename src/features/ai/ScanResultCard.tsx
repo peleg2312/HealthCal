@@ -6,9 +6,9 @@ import { SourceTag } from '@/features/food/components';
 import { dayPhrase, formatQty, kcal, lastPortions, portionFor } from '@/features/food/helpers';
 import { MEAL_LABEL, scaleNutrients, servingsFor } from '@/lib/nutrition';
 import { useDay, useLive } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { cup, useTheme } from '@/theme';
 import type { Food, ISODate, MealType, Serving } from '@/types';
-import { Avatar, Button, Chip, ChipRow, IconButton, Stepper, Text } from '@/ui';
+import { Button, CupKey, Chip, ChipRow, IconButton, Stepper, Text } from '@/ui';
 
 export type ScanFoundFrom = 'custom' | 'recent' | 'diary' | 'openfoodfacts';
 
@@ -61,7 +61,7 @@ export function ScanResultCard({
       testID="scan-result"
       style={{
         backgroundColor: colors.surface,
-        borderRadius: radius.lg,
+        ...cup(radius.card),
         borderWidth: 1,
         borderColor: colors.border,
         padding: spacing.lg,
@@ -70,7 +70,6 @@ export function ScanResultCard({
         transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [32, 0] }) }],
       }}>
       <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
-        <Avatar emoji={food.emoji ?? '🛒'} size={48} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text variant="title" numberOfLines={2} testID="scan-result-name">
             {food.name}
@@ -83,25 +82,23 @@ export function ScanResultCard({
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 2 }}>
             <SourceTag source={food.source} />
             {from === 'recent' || from === 'diary' ? (
-              <Text variant="caption" color="textTertiary" style={{ fontSize: 11 }}>
+              <Text variant="caption" color="textSecondary">
                 · {FROM_COPY[from]}
               </Text>
             ) : null}
           </View>
         </View>
-        <IconButton testID="scan-result-close" accessibilityLabel="Close and scan again" size={36} tone="alt" onPress={onClose}>
-          <X size={18} color={colors.textSecondary} />
+        <IconButton testID="scan-result-close" accessibilityLabel="Close and scan again" size={36} tone="clear" onPress={onClose}>
+          <X size={18} color={colors.textSecondary} strokeWidth={1.9} />
         </IconButton>
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-          <Text variant="numL" tabular testID="scan-result-kcal">
+          <Text variant="numL" tabular color="caloriesInk" testID="scan-result-kcal">
             {kcal(n.kcal)}
           </Text>
-          <Text variant="label" color="textSecondary">
-            kcal
-          </Text>
+          <Text variant="unit">kcal</Text>
         </View>
         <Stepper
           label="quantity"
@@ -158,11 +155,11 @@ function Impact({ date, kcalValue, grams }: { date: ISODate; kcalValue: number; 
         gap: spacing.sm,
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
-        borderRadius: radius.md,
-        backgroundColor: over ? `${colors.warning}22` : colors.primarySoft,
+        ...cup(radius.buttonSm, 5),
+        backgroundColor: colors.surfaceAlt,
       }}>
-      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: over ? colors.warning : colors.calories }} />
-      <Text variant="caption" color={over ? 'warning' : 'text'} style={{ flex: 1 }}>
+      <CupKey color={over ? colors.warning : colors.calories} />
+      <Text variant="caption" color="text" style={{ flex: 1 }}>
         {over ? `Puts ${dayPhrase(date)} ${kcal(-after)} kcal over budget` : `Leaves ${kcal(after)} kcal for ${dayPhrase(date)}`}
       </Text>
       <Text variant="caption" color="textSecondary" tabular>

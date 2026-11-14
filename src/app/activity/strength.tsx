@@ -32,12 +32,13 @@ import { formatNumber, round, weightToKg, weightUnit, weightValue } from '@/lib/
 import { cancelTimerAlert, scheduleTimerAlert } from '@/services/notifications';
 import { useStore } from '@/store';
 import { useLive, useProfile } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { cup, cupFor, useTheme } from '@/theme';
 import type { ActivityEntry, Intensity, StrengthSet, UnitSystem } from '@/types';
 import {
   Button,
   Card,
   Chip,
+  CupKey,
   ChipRow,
   ConfirmSheet,
   Divider,
@@ -52,6 +53,7 @@ import {
   Sheet,
   Text,
   TextField,
+  Trough,
   goBack,
   haptic,
   toast,
@@ -298,11 +300,11 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
         </View>
       }>
       {/* Summary: timer and running totals */}
-      <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.md }}>
+      <View style={{ backgroundColor: colors.surface, ...cup(radius.card), borderWidth: 1, borderColor: colors.border, padding: 18, gap: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
           <View style={{ flex: 1 }}>
-            <Text variant="overline" color="textSecondary">
-              {manual ? 'DURATION, SET BY YOU' : running ? 'ELAPSED' : elapsed > 0 ? 'PAUSED' : 'TIMER'}
+            <Text variant="overline">
+              {manual ? 'Duration, set by you' : running ? 'Elapsed' : elapsed > 0 ? 'Paused' : 'Timer'}
             </Text>
             <Text variant="numXL" tabular testID="strength-timer" color={running ? 'text' : 'textSecondary'} numberOfLines={1} adjustsFontSizeToFit>
               {manual ? formatDuration(draft.manualMin!) : formatClock(elapsed)}
@@ -311,12 +313,13 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
           <IconButton
             accessibilityLabel={running ? 'Pause timer' : 'Start timer'}
             testID="strength-timer-toggle"
-            tone={running ? 'alt' : 'primary'}
+            tone={running ? 'surface' : 'primary'}
             size={52}
+            style={running ? { borderColor: colors.borderStrong } : undefined}
             onPress={() => update((d) => (d.startedAt ? edits.pause(d) : edits.start(d)))}>
             {running ? <Pause size={22} color={colors.text} /> : <Play size={22} color={colors.onPrimary} />}
           </IconButton>
-          <IconButton accessibilityLabel="Set duration" testID="strength-time-edit" tone="alt" size={52} onPress={() => setEditTime((v) => !v)}>
+          <IconButton accessibilityLabel="Set duration" testID="strength-time-edit" tone="surface" size={52} style={{ borderColor: colors.borderStrong }} onPress={() => setEditTime((v) => !v)}>
             <Clock size={20} color={colors.text} />
           </IconButton>
         </View>
@@ -383,7 +386,7 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
       ) : null}
 
       {draft.exercises.length === 0 ? (
-        <View style={{ borderRadius: radius.lg, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.borderStrong }}>
+        <View style={{ ...cup(radius.card), borderWidth: 1, borderStyle: 'dashed', borderColor: colors.borderStrong }}>
           <EmptyState
             emoji="🏋️"
             title="Add your first exercise"
@@ -476,7 +479,7 @@ function RestBar({ draft, now, update }: { draft: StrengthDraft; now: number; up
       accessibilityLabel={a11y}
       feedback="tap"
       onPress={onPress}
-      style={{ minWidth: 52, height: 44, paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+      style={{ minWidth: 52, height: 44, paddingHorizontal: spacing.sm, ...cup(radius.buttonSm, 5), borderWidth: 1.5, borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center' }}>
       <Text variant="label" tabular>
         {label}
       </Text>
@@ -486,18 +489,25 @@ function RestBar({ draft, now, update }: { draft: StrengthDraft; now: number; up
     <View
       testID="strength-rest"
       accessibilityLiveRegion="polite"
-      style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: `${colors.exercise}22`, borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.md }}>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text variant="caption" color="textSecondary" numberOfLines={1}>
-          Rest{name ? ` after ${name.toLowerCase()}` : ''}
-        </Text>
-        <Text variant="numL" tabular testID="strength-rest-left">
-          {formatClock(Math.ceil(left / 1000) * 1000)}
-        </Text>
+      style={{ gap: 10, ...cup(radius.tile, 5), backgroundColor: colors.surfaceAlt, paddingVertical: spacing.sm, paddingHorizontal: spacing.md }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <CupKey color={colors.exercise} />
+            <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flexShrink: 1 }}>
+              Rest{name ? ` after ${name.toLowerCase()}` : ''}
+            </Text>
+          </View>
+          <Text variant="numL" tabular testID="strength-rest-left">
+            {formatClock(Math.ceil(left / 1000) * 1000)}
+          </Text>
+        </View>
+        {small('−15 s', 'Rest 15 seconds less', 'strength-rest-minus', () => adjust(-15))}
+        {small('+15 s', 'Rest 15 seconds more', 'strength-rest-plus', () => adjust(15))}
+        {small('Skip', 'Skip rest', 'strength-rest-skip', () => update(edits.skipRest))}
       </View>
-      {small('−15 s', 'Rest 15 seconds less', 'strength-rest-minus', () => adjust(-15))}
-      {small('+15 s', 'Rest 15 seconds more', 'strength-rest-plus', () => adjust(15))}
-      {small('Skip', 'Skip rest', 'strength-rest-skip', () => update(edits.skipRest))}
+      {/* The rest drains like a trough emptying toward the next set. */}
+      <Trough value={left} max={(draft.restTotalSec ?? DEFAULT_REST_SEC) * 1000} color={colors.exercise} height={10} animate={false} style={{ marginBottom: 4 }} />
     </View>
   );
 }
@@ -518,7 +528,7 @@ function FinishSummaryView({ summary }: { summary: FinishSummary }) {
         <View style={{ gap: spacing.sm }}>
           <Button testID="strength-summary-done" title="Done" onPress={leaveFlow} />
           {summary.exercises.length ? (
-            <Button testID="strength-summary-routine" title="Save as routine" variant="ghost" size="md" icon={<BookmarkPlus size={18} color={colors.primary} />} onPress={() => setSaveRoutine(true)} />
+            <Button testID="strength-summary-routine" title="Save as routine" variant="ghost" size="md" icon={<BookmarkPlus size={18} color={colors.primary} strokeWidth={2.2} />} onPress={() => setSaveRoutine(true)} />
           ) : null}
         </View>
       }>
@@ -545,7 +555,7 @@ function FinishSummaryView({ summary }: { summary: FinishSummary }) {
               <View
                 key={r.exercise}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md, borderTopWidth: i ? 1 : 0, borderTopColor: colors.border }}>
-                <Trophy size={20} color={colors.warning} />
+                <Trophy size={20} color={colors.text} strokeWidth={1.9} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text variant="bodyStrong" numberOfLines={1}>
                     {r.exercise}
@@ -580,11 +590,7 @@ function Metric({ label, value, unit, testID }: { label: string; value: string; 
         <Text variant="numM" tabular numberOfLines={1} testID={testID}>
           {value}
         </Text>
-        {unit ? (
-          <Text variant="caption" color="textSecondary">
-            {unit}
-          </Text>
-        ) : null}
+        {unit ? <Text variant="unit">{unit}</Text> : null}
       </View>
       <Text variant="caption" color="textSecondary" numberOfLines={1}>
         {label}
@@ -620,7 +626,7 @@ function ExerciseCard({
         .join(', ') + (prev.sets.length > 5 ? ` +${prev.sets.length - 5}` : '')
     : null;
   return (
-    <View testID={slug} style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.sm }}>
+    <View testID={slug} style={{ backgroundColor: colors.surface, ...cup(radius.card), borderWidth: 1, borderColor: colors.border, padding: 18, gap: spacing.sm }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text variant="h3" numberOfLines={1}>
@@ -660,8 +666,8 @@ function ExerciseCard({
               marginHorizontal: -spacing.sm,
               paddingHorizontal: spacing.sm,
               paddingVertical: 2,
-              borderRadius: radius.sm,
-              backgroundColor: s.done ? `${colors.success}22` : 'transparent',
+              ...cup(radius.buttonSm, 5),
+              backgroundColor: s.done ? colors.surfaceAlt : 'transparent',
             }}>
             <Text variant="bodyStrong" color="textSecondary" tabular style={{ width: 28, textAlign: 'center' }}>
               {i + 1}
@@ -706,12 +712,14 @@ function ExerciseCard({
               style={{
                 width: 44,
                 height: 44,
-                borderRadius: radius.sm,
+                ...cupFor(44),
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: s.done ? colors.success : colors.surfaceAlt,
+                backgroundColor: s.done ? colors.text : 'transparent',
+                borderWidth: 1.5,
+                borderColor: s.done ? colors.text : colors.borderStrong,
               }}>
-              <Check size={20} color={s.done ? colors.bg : colors.textTertiary} />
+              <Check size={20} color={s.done ? colors.bg : colors.textSecondary} strokeWidth={2.4} />
             </PressableScale>
             <IconButton
               accessibilityLabel={`Remove set ${i + 1}`}
@@ -719,7 +727,7 @@ function ExerciseCard({
               tone="clear"
               size={32}
               onPress={() => update((d) => edits.removeSet(d, ex.key, s.key))}>
-              <X size={16} color={colors.textTertiary} />
+              <X size={16} color={colors.textSecondary} strokeWidth={1.9} />
             </IconButton>
           </View>
         );

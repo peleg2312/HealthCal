@@ -12,6 +12,7 @@ import {
   SunMoon,
   Target,
   Timer,
+  Users,
   Vibrate,
   Weight,
 } from 'lucide-react-native';
@@ -33,7 +34,7 @@ import { pendingChanges, useStore } from '@/store';
 import { useEnergyModel, useProfile, useWeightSeries } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
-import { Card, EmptyState, Header, ListRow, Screen, Segmented, Text, ToggleRow } from '@/ui';
+import { Card, CupKey, EmptyState, Header, ListRow, Screen, Segmented, Text, ToggleRow } from '@/ui';
 
 const GOAL_LABEL = { lose: 'Lose weight', maintain: 'Maintain weight', gain: 'Gain weight' } as const;
 
@@ -43,7 +44,6 @@ export default function ProfileScreen() {
     return (
       <Screen header={<Header title="Profile" />}>
         <EmptyState
-          emoji="🙂"
           title="No profile yet"
           message="Set up your goals first. Your profile, targets and reminders live here afterwards."
           action="Get started"
@@ -99,10 +99,10 @@ function ProfileHub() {
             </Text>
           </View>
         </View>
-        <View style={{ flexDirection: 'row', marginTop: spacing.lg, gap: spacing.md }}>
-          <HeaderStat label="Current weight" value={formatWeight(currentKg, u)} color={colors.weight} />
-          <HeaderStat label={profile.goal === 'maintain' ? 'Goal' : 'Target'} value={profile.goal === 'maintain' ? 'Maintain' : goalLine.replace('Goal ', '')} />
-          <HeaderStat label="Daily budget" value={`${formatNumber(model.target.target)} kcal`} color={colors.calories} />
+        <View style={{ flexDirection: 'row', marginTop: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border }}>
+          <HeaderStat label="Weight" value={formatWeight(currentKg, u)} color={colors.weight} />
+          <HeaderStat divider label={profile.goal === 'maintain' ? 'Goal' : 'Target'} value={profile.goal === 'maintain' ? 'Maintain' : goalLine.replace('Goal ', '')} />
+          <HeaderStat divider label="Daily budget" value={`${formatNumber(model.target.target)} kcal`} color={colors.calories} />
         </View>
       </Card>
 
@@ -233,6 +233,17 @@ function ProfileHub() {
       <Group title="Account and data">
         <AccountRow />
         <ListRow
+          testID="profile-friends"
+          title="Friends"
+          subtitle="Share your training week with people you choose"
+          left={
+            <IconTile color={colors.exercise}>
+              <Users size={20} color={colors.exercise} />
+            </IconTile>
+          }
+          onPress={() => router.push('/friends' as never)}
+        />
+        <ListRow
           testID="profile-data"
           title="Your data"
           subtitle="Export, import or erase"
@@ -259,14 +270,24 @@ function ProfileHub() {
   );
 }
 
-function HeaderStat({ label, value, color }: { label: string; value: string; color?: string }) {
+/** One stat of the header row: the number large with its unit small inside it; a cup key marks a data colour. */
+function HeaderStat({ label, value, color, divider }: { label: string; value: string; color?: string; divider?: boolean }) {
+  const { colors, spacing } = useTheme();
+  const i = value.lastIndexOf(' ');
+  const numeric = /^[−\-+]?[\d.,]/.test(value) && i > 0;
+  const num = numeric ? value.slice(0, i) : value;
+  const unit = numeric ? value.slice(i + 1) : '';
   return (
-    <View style={{ flex: 1, minWidth: 0 }}>
-      <Text variant="title" tabular color={color ?? 'text'} numberOfLines={1}>
-        {value}
-      </Text>
-      <Text variant="caption" color="textSecondary" numberOfLines={1}>
-        {label}
+    <View style={{ flex: 1, minWidth: 0, paddingLeft: divider ? spacing.md : 0, borderLeftWidth: divider ? 1 : 0, borderLeftColor: colors.border }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        {color ? <CupKey color={color} /> : null}
+        <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flexShrink: 1 }}>
+          {label}
+        </Text>
+      </View>
+      <Text variant="numM" numberOfLines={1} style={numeric ? undefined : { fontSize: 17 }}>
+        {num}
+        {unit ? <Text variant="unit">{` ${unit}`}</Text> : null}
       </Text>
     </View>
   );
@@ -284,6 +305,7 @@ function AccountRow() {
   let subtitle: string;
   let icon = <CloudOff size={20} color={colors.textSecondary} />;
   let tone = colors.textSecondary;
+  let keep = false;
   if (session) {
     tone = colors.success;
     icon = <Cloud size={20} color={colors.success} />;
@@ -302,11 +324,13 @@ function AccountRow() {
   } else if (sessionLost && isBackendConfigured) {
     icon = <CloudOff size={20} color={colors.warning} />;
     tone = colors.warning;
+    keep = true;
     title = 'Signed out of your account';
     subtitle = 'Entries are safe here but not backed up. Sign in again';
   } else if (isBackendConfigured) {
     icon = <Smartphone size={20} color={colors.warning} />;
     tone = colors.warning;
+    keep = true;
     subtitle = 'On this device only. Create a free account to back up and sync';
   } else {
     icon = <Smartphone size={20} color={colors.textSecondary} />;
@@ -317,7 +341,11 @@ function AccountRow() {
       testID="profile-account"
       title={title}
       subtitle={subtitle}
-      left={<IconTile color={tone}>{icon}</IconTile>}
+      left={
+        <IconTile color={tone} keep={keep}>
+          {icon}
+        </IconTile>
+      }
       onPress={() => router.push('/settings/account')}
     />
   );

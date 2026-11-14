@@ -1,4 +1,4 @@
-import { ChevronRight, Droplet, Dumbbell, Moon } from 'lucide-react-native';
+import { ChevronRight } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
@@ -6,14 +6,13 @@ import { direction, hoursText, plural, type Direction, SLEEP_MAX_HOURS, SLEEP_TA
 import { formatNumber, formatVolume, volumeUnit, volumeValue } from '@/lib/units';
 import { useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
-import { Card, Divider, PressableScale, ProgressBar, Text } from '@/ui';
+import { Card, CupKey, Divider, PressableScale, ProgressBar, Text } from '@/ui';
 
 import { go, TrendLegend, TrendMark } from './parts';
 
 function HabitRow({
   testID,
   route,
-  icon,
   color,
   title,
   value,
@@ -27,7 +26,6 @@ function HabitRow({
   period?: string;
   testID: string;
   route: string;
-  icon: React.ReactNode;
   color: string;
   title: string;
   value: string | null;
@@ -35,31 +33,27 @@ function HabitRow({
   detail: string;
   progress: number;
 }) {
-  const { colors, spacing, radius } = useTheme();
+  const { colors, spacing } = useTheme();
   return (
     <PressableScale testID={testID} onPress={() => go(route)} scaleTo={0.985} accessibilityLabel={`${title}: ${value ?? 'no data'} ${unit ?? ''}. ${detail}`} style={{ gap: spacing.sm, paddingVertical: spacing.xs }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-        <View style={{ width: 36, height: 36, borderRadius: radius.sm, backgroundColor: `${color}22`, alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
+        <CupKey color={color} size={10} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text variant="bodyStrong">{title}</Text>
           <Text variant="caption" color="textSecondary" numberOfLines={2}>
             {detail}
           </Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
-          <Text variant="numM" tabular color={value ? 'text' : 'textTertiary'}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+          <Text variant="numM" color={value ? 'text' : 'textTertiary'}>
             {value ?? '–'}
+            {unit && value ? <Text variant="unit">{` ${unit}`}</Text> : null}
           </Text>
-          {unit && value ? (
-            <Text variant="caption" color="textSecondary">
-              {unit}
-            </Text>
-          ) : null}
           {value ? <TrendMark trend={trend} period={period} /> : null}
         </View>
-        <ChevronRight size={18} color={colors.textTertiary} />
+        <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.9} />
       </View>
-      <ProgressBar progress={progress} color={color} height={6} style={{ marginLeft: 48 }} />
+      <ProgressBar progress={progress} color={color} overColor={color} height={6} style={{ marginLeft: 22, marginBottom: 4 }} />
     </PressableScale>
   );
 }
@@ -79,7 +73,6 @@ export function HabitsCard({ summary, previous, units }: { summary: PeriodSummar
         testID="progress-habit-water"
         route="/water"
         color={colors.water}
-        icon={<Droplet size={18} color={colors.water} />}
         title="Hydration"
         value={w ? formatNumber(Math.round(volumeValue(w.avgMl, units))) : null}
         unit={`${volumeUnit(units)} / day`}
@@ -93,7 +86,6 @@ export function HabitsCard({ summary, previous, units }: { summary: PeriodSummar
         testID="progress-habit-activity"
         route="/train"
         color={colors.exercise}
-        icon={<Dumbbell size={18} color={colors.exercise} />}
         title="Activity"
         value={a.minutes ? `${weekly}` : null}
         unit="min / wk"
@@ -111,7 +103,6 @@ export function HabitsCard({ summary, previous, units }: { summary: PeriodSummar
         testID="progress-habit-sleep"
         route="/sleep"
         color={colors.sleep}
-        icon={<Moon size={18} color={colors.sleep} />}
         title="Sleep"
         value={s ? hoursText(s.avgHours).replace(' h', '') : null}
         unit="h / night"

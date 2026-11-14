@@ -118,6 +118,17 @@ export default function DataScreen() {
           right={spinner('import')}
           onPress={() => void runImport()}
         />
+        <ListRow
+          testID="data-import-garmin"
+          title="Import from Garmin"
+          subtitle="Workouts from FIT, TCX, GPX or the Activities CSV"
+          left={
+            <IconTile color={colors.exercise}>
+              <Activity size={20} color={colors.exercise} />
+            </IconTile>
+          }
+          onPress={() => router.push('/activity/import')}
+        />
       </Group>
 
       <Group title="Spreadsheets (CSV)" footer="Opens in Excel, Numbers or Google Sheets. Values are metric with the unit in each column name.">

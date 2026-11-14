@@ -5,19 +5,21 @@ import { View } from 'react-native';
 
 import { ACTIVITY_BY_ID, POPULAR_ACTIVITY_IDS } from '@/data/activities';
 import { ActivityTile, SessionRow } from '@/features/activity/components';
-import { summariseWeek, WHO_WEEKLY_MINUTES } from '@/features/activity/build';
+import { summariseWeek } from '@/features/activity/build';
 import { deleteActivity, openSession } from '@/features/activity/session';
 import { RoutineCards, useRoutineTemplates } from '@/features/activity/RoutineCards';
+import { WeekCard } from '@/features/activity/WeekCard';
 import { startRoutineDraft, type RoutineTemplate } from '@/features/activity/routines';
 import { draftHasContent, useStrengthDrafts } from '@/features/activity/strengthDraft';
-import { addDays, formatDayLabel, formatDuration, formatShortDate, startOfWeek, weekdayShort } from '@/lib/dates';
+import { FriendsEntry } from '@/features/friends/FriendsEntry';
+import { addDays, formatDayLabel, formatDuration, formatShortDate, startOfWeek } from '@/lib/dates';
 import { formatNumber } from '@/lib/units';
 import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
 import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ActivityEntry } from '@/types';
-import { Button, Card, ConfirmSheet, EmptyState, LargeTitle, PressableScale, Ring, Screen, SectionTitle, Stat, Text } from '@/ui';
+import { Button, Card, ConfirmSheet, EmptyState, LargeTitle, PressableScale, Screen, SectionTitle, Text } from '@/ui';
 
 const DAYS_PER_PAGE = 14;
 
@@ -50,8 +52,6 @@ export default function TrainScreen() {
     return ids.slice(0, 8).map((id) => ACTIVITY_BY_ID[id]);
   }, [recentIds]);
 
-  const progress = week.guidelineMinutes / WHO_WEEKLY_MINUTES;
-  const maxDay = Math.max(60, ...weekDates.map((d) => week.byDate[d].minutes));
   const visibleGroups = history.slice(0, pages * DAYS_PER_PAGE);
   const draftActive = draftHasContent(draft);
   const routines = useRoutineTemplates();
@@ -67,61 +67,9 @@ export default function TrainScreen() {
 
   return (
     <Screen tabs testID="train-screen">
-      <LargeTitle title="Train" subtitle={`Week of ${formatShortDate(weekStart)}`} />
+      <LargeTitle title="Train" subtitle={`Week of ${formatShortDate(weekStart)}`} right={<FriendsEntry />} />
 
-      <Card testID="train-week-card">
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xl }}>
-          <Ring size={124} stroke={12} progress={Math.min(progress, 1.5)} color={colors.exercise} overColor={colors.success}>
-            <Text variant="numL" tabular testID="train-guideline-minutes">
-              {week.guidelineMinutes}
-            </Text>
-            <Text variant="caption" color="textSecondary">
-              of {WHO_WEEKLY_MINUTES} min
-            </Text>
-          </Ring>
-          <View style={{ flex: 1, gap: spacing.md }}>
-            <Text variant="label" color="textSecondary">
-              {progress >= 1
-                ? 'Weekly activity guideline reached'
-                : `${WHO_WEEKLY_MINUTES - week.guidelineMinutes} min to the weekly guideline`}
-            </Text>
-            <View style={{ flexDirection: 'row', gap: spacing.md }}>
-              <Stat label="Sessions" value={String(week.sessions)} />
-              <Stat label="Net, est." value={formatNumber(week.kcalNet)} unit="kcal" color={colors.exercise} />
-            </View>
-            <Text variant="caption" color="textSecondary" testID="train-total-time">
-              {week.totalMinutes > 0 ? `${formatDuration(week.totalMinutes)} logged in total` : 'Nothing logged yet this week'}
-            </Text>
-          </View>
-        </View>
-
-        <View style={{ flexDirection: 'row', marginTop: spacing.lg, gap: spacing.xs }} testID="train-week-strip">
-          {weekDates.map((d) => {
-            const day = week.byDate[d];
-            const isToday = d === t;
-            const future = d > t;
-            const h = day.minutes > 0 ? Math.max(6, (day.minutes / maxDay) * 52) : 0;
-            return (
-              <View key={d} style={{ flex: 1, alignItems: 'center', gap: 4, opacity: future ? 0.45 : 1 }} accessibilityLabel={`${formatDayLabel(d)}: ${day.minutes} minutes`}>
-                <Text variant="caption" color={isToday ? 'text' : 'textTertiary'}>
-                  {weekdayShort(d).slice(0, 1)}
-                </Text>
-                <View style={{ width: 22, height: 52, borderRadius: 8, backgroundColor: colors.track, justifyContent: 'flex-end', overflow: 'hidden' }}>
-                  {h > 0 ? <View style={{ height: h, borderRadius: 8, backgroundColor: colors.exercise }} /> : null}
-                </View>
-                <Text style={{ fontSize: 15, lineHeight: 20, opacity: day.sessions.length ? 1 : 0 }}>{day.sessions[0]?.emoji ?? '·'}</Text>
-                <Text variant="caption" tabular color={day.minutes ? 'textSecondary' : 'textTertiary'} style={{ fontSize: 11 }}>
-                  {day.minutes ? `${day.minutes}m` : '–'}
-                </Text>
-                {isToday ? <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: colors.primary }} /> : <View style={{ height: 4 }} />}
-              </View>
-            );
-          })}
-        </View>
-        <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.md }}>
-          WHO suggests 150 minutes of moderate activity a week. Minutes of a session logged as hard (and 6 MET or more) count double; light ones (under 3 MET) are logged but not counted.
-        </Text>
-      </Card>
+      <WeekCard week={week} dates={weekDates} today={t} />
 
       <View style={{ flexDirection: 'row', gap: spacing.md }}>
         <Button
@@ -145,6 +93,16 @@ export default function TrainScreen() {
           A strength workout is in progress with {draft!.exercises.length} {draft!.exercises.length === 1 ? 'exercise' : 'exercises'}.
         </Text>
       ) : null}
+      <PressableScale
+        testID="train-import-garmin"
+        accessibilityLabel="Import workouts from Garmin"
+        onPress={() => router.push('/activity/import')}
+        hitSlop={6}
+        style={{ alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginTop: -spacing.sm }}>
+        <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
+          Import workouts from Garmin
+        </Text>
+      </PressableScale>
 
       {routines.length > 0 ? (
         <>
@@ -183,18 +141,19 @@ export default function TrainScreen() {
             return (
               <View key={g.date} style={{ gap: spacing.xs }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingHorizontal: spacing.xs }}>
-                  <Text variant="overline" color="textSecondary">
-                    {formatDayLabel(g.date).toUpperCase()}
+                  <Text variant="overline">
+                    {formatDayLabel(g.date)}
                   </Text>
                   {g.entries.length > 1 ? (
-                    <Text variant="caption" color="textTertiary" tabular>
+                    <Text variant="caption" color="textSecondary" tabular>
                       {formatDuration(minutes)} · ~{formatNumber(net)} kcal
                     </Text>
                   ) : null}
                 </View>
-                <Card padding={spacing.md} style={{ paddingVertical: spacing.xs }}>
+                <Card padding={0} style={{ paddingVertical: 2 }}>
                   {g.entries.map((e, i) => (
-                    <View key={e.id} style={i > 0 ? { borderTopWidth: 1, borderTopColor: colors.border } : undefined}>
+                    <View key={e.id}>
+                      {i > 0 ? <View style={{ height: 1, backgroundColor: colors.border, marginLeft: 18 + 24 + 12 }} /> : null}
                       <SessionRow entry={e} units={profile.units} onPress={() => openSession(e)} onDelete={() => deleteActivity(e)} />
                     </View>
                   ))}
@@ -204,7 +163,7 @@ export default function TrainScreen() {
           })}
           {history.length > visibleGroups.length ? (
             <PressableScale onPress={() => setPages((p) => p + 1)} accessibilityLabel="Show earlier sessions" testID="train-show-more" style={{ alignItems: 'center', paddingVertical: spacing.md }}>
-              <Text variant="label" color="primary">
+              <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
                 Show earlier sessions
               </Text>
             </PressableScale>

@@ -3,7 +3,7 @@ import { FlaskConical } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
-import { useTheme } from '@/theme';
+import { cup, useTheme } from '@/theme';
 import { Button, Text } from '@/ui';
 
 import type { AiAvailability } from './demo';
@@ -27,15 +27,15 @@ export function SampleNotice({ reason, variant }: { reason: Reason; variant: 'be
       testID={`ai-sample-notice-${variant}`}
       accessibilityRole="alert"
       style={{
-        backgroundColor: `${colors.warning}22`,
-        borderColor: `${colors.warning}66`,
-        borderWidth: 1,
-        borderRadius: radius.lg,
+        backgroundColor: colors.surfaceAlt,
+        borderLeftWidth: 3,
+        borderColor: colors.warning,
+        ...cup(radius.card),
         padding: spacing.lg,
         gap: spacing.sm,
       }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-        <FlaskConical size={18} color={colors.warning} />
+        <FlaskConical size={18} color={colors.text} strokeWidth={1.9} />
         <Text variant="title" style={{ flex: 1 }}>
           {title}
         </Text>
@@ -44,7 +44,7 @@ export function SampleNotice({ reason, variant }: { reason: Reason; variant: 'be
         {what} {why}
       </Text>
       {reason === 'no_backend' ? (
-        <Text variant="caption" color="textTertiary">
+        <Text variant="caption" color="textSecondary">
           For the app owner: connect a Supabase project and add an Anthropic API key to the analyze-food function.
         </Text>
       ) : null}

@@ -1,4 +1,3 @@
-import { ChartPie } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
@@ -6,7 +5,7 @@ import { formatShortDate, weekdayShort } from '@/lib/dates';
 import { isCompleteDay, type InsightDay, type PeriodSummary } from '@/lib/insights';
 import { macroPercents } from '@/lib/nutrition';
 import { useTheme } from '@/theme';
-import { BarChart, MacroBar, ProgressBar, Text, type BarDatum } from '@/ui';
+import { BarChart, CupKey, MacroBar, ProgressBar, Text, type BarDatum } from '@/ui';
 
 import { LegendDot, Note, SectionCard } from './parts';
 
@@ -51,23 +50,20 @@ export function MacrosCard({ summary, days, today }: { summary: PeriodSummary; d
       testID="progress-macros"
       title="Macros"
       subtitle="Daily average against your targets"
-      color={colors.protein}
-      icon={<ChartPie size={18} color={colors.protein} />}>
+      color={colors.protein}>
       <View style={{ gap: spacing.md }}>
         {rows.map((r) => {
           const ratio = r.target > 0 ? r.avg / r.target : 0;
           return (
             <View key={r.key} testID={`progress-macro-${r.key}`} style={{ gap: 6 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: r.color }} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                <CupKey color={r.color} />
                 <Text variant="bodyStrong" style={{ flex: 1 }}>
                   {r.label}
                 </Text>
-                <Text variant="bodyStrong" tabular>
+                <Text variant="numM" style={{ fontSize: 17, lineHeight: 22 }}>
                   {Math.round(r.avg)}
-                </Text>
-                <Text variant="caption" color="textSecondary" tabular>
-                  / {Math.round(r.target)} g
+                  <Text variant="unit">{` / ${Math.round(r.target)} g`}</Text>
                 </Text>
                 <Text variant="caption" color="textTertiary" tabular style={{ width: 40, textAlign: 'right' }}>
                   {Math.round(ratio * 100)}%

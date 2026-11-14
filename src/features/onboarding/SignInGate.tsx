@@ -88,8 +88,8 @@ export function RestoreFailed() {
         </View>
       }>
       <View style={{ alignItems: 'center' }}>
-        <View style={{ width: 80, height: 80, borderRadius: 26, backgroundColor: `${colors.warning}22`, alignItems: 'center', justifyContent: 'center' }}>
-          <CloudOff size={36} color={colors.warning} />
+        <View style={{ width: 80, height: 80, alignItems: 'center', justifyContent: 'center' }}>
+          <CloudOff size={40} color={colors.warning} strokeWidth={1.6} />
         </View>
       </View>
       <FadeIn style={{ gap: spacing.sm }}>

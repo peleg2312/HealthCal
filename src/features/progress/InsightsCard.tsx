@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, ChevronUp, CircleCheck, Info, Lightbulb, Sparkles } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, ChevronUp, CircleCheck, Info, Lightbulb } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
@@ -19,9 +19,7 @@ export function InsightsCard({ insights, rangeDays }: { insights: Insight[]; ran
     <SectionCard
       testID="progress-insights"
       title="Insights"
-      subtitle={`From your last ${rangeDays} days`}
-      color={colors.primary}
-      icon={<Sparkles size={18} color={colors.primary} />}>
+      subtitle={`From your last ${rangeDays} days`}>
       <View style={{ gap: spacing.md }}>
         {shown.map((ins, i) => (
           <React.Fragment key={ins.id}>
@@ -55,8 +53,8 @@ function InsightRow({ insight, clamp }: { insight: Insight; clamp?: boolean }) {
         : { color: colors.water, Icon: Info };
   return (
     <View testID={`insight-${insight.id}`} style={{ flexDirection: 'row', gap: spacing.md }}>
-      <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: `${tone.color}22`, alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
-        <tone.Icon size={16} color={tone.color} />
+      <View style={{ width: 20, alignItems: 'center', paddingTop: 1 }}>
+        <tone.Icon size={19} color={tone.color} strokeWidth={1.9} />
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         <Text variant="bodyStrong">{insight.title}</Text>
@@ -68,12 +66,13 @@ function InsightRow({ insight, clamp }: { insight: Insight; clamp?: boolean }) {
             testID={`insight-${insight.id}-action`}
             onPress={() => go(insight.action!.route)}
             accessibilityLabel={insight.action.label}
-            hitSlop={8}
+            accessibilityRole="link"
+            hitSlop={6}
             style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', minHeight: 32, gap: 2 }}>
-            <Text variant="label" color="primary">
+            <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
               {insight.action.label}
             </Text>
-            <ChevronRight size={15} color={colors.primary} />
+            <ChevronRight size={15} color={colors.text} strokeWidth={1.9} />
           </PressableScale>
         ) : null}
       </View>

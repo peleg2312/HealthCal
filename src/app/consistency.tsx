@@ -18,7 +18,7 @@ import {
 import { go } from '@/features/progress/parts';
 import { setRhythmTarget, useConsistencyData } from '@/features/progress/useConsistencyData';
 import { useTheme } from '@/theme';
-import { BarChart, Button, Card, EmptyState, Header, IconButton, Screen, Sheet, Stepper, Text } from '@/ui';
+import { BarChart, Button, Card, CupKey, EmptyState, Header, IconButton, MiniCup, Screen, Sheet, Stepper, Text } from '@/ui';
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const RHYTHM_WEEKS = 8;
@@ -31,10 +31,15 @@ const RHYTHM_COPY: Record<RhythmKind, { title: string; verb: string }> = {
   weigh: { title: 'Weigh in', verb: 'with a weigh-in' },
 };
 
+/**
+ * One day of the month: the date above a small cup. A cup filled solid is a
+ * day within 10% of its budget, a lighter fill a day logged outside it, an
+ * empty cup a day with nothing logged and a dashed outline a day to come.
+ * Below it, cup keys for the water goal and a workout. Today's date is an ink box.
+ */
 function DayCell({ cell }: { cell: CalendarCell | null }) {
   const { colors } = useTheme();
-  if (!cell) return <View style={{ flex: 1, height: 48 }} />;
-  const pill = `${colors.primary}22`;
+  if (!cell) return <View style={{ flex: 1, height: 66 }} />;
   const label = [
     formatDayLabel(cell.date),
     cell.future ? 'upcoming' : cell.logged ? (cell.onBudget ? 'logged, within 10% of budget' : 'logged') : 'not logged',
@@ -44,46 +49,38 @@ function DayCell({ cell }: { cell: CalendarCell | null }) {
     .filter(Boolean)
     .join(', ');
   return (
-    <View style={{ flex: 1, height: 48, alignItems: 'center' }} accessible accessibilityLabel={label} testID={`consistency-day-${cell.date}`}>
-      {cell.logged ? (
-        <View
-          style={{
-            position: 'absolute',
-            top: 2,
-            height: 34,
-            left: cell.joinPrev ? 0 : 3,
-            right: cell.joinNext ? 0 : 3,
-            backgroundColor: pill,
-            borderTopLeftRadius: cell.joinPrev ? 0 : 17,
-            borderBottomLeftRadius: cell.joinPrev ? 0 : 17,
-            borderTopRightRadius: cell.joinNext ? 0 : 17,
-            borderBottomRightRadius: cell.joinNext ? 0 : 17,
-          }}
-        />
-      ) : null}
+    <View style={{ flex: 1, height: 66, alignItems: 'center', gap: 3 }} accessible accessibilityLabel={label} testID={`consistency-day-${cell.date}`}>
       <View
         style={{
-          marginTop: 4,
-          width: 30,
-          height: 30,
-          borderRadius: 15,
+          minWidth: 24,
+          height: 20,
+          paddingHorizontal: 3,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: cell.onBudget ? colors.primary : 'transparent',
-          borderWidth: cell.logged && !cell.onBudget ? 1.5 : cell.isToday ? 1 : 0,
-          borderColor: cell.logged ? colors.primary : colors.borderStrong,
+          borderTopLeftRadius: 4,
+          borderTopRightRadius: 4,
+          borderBottomLeftRadius: 8,
+          borderBottomRightRadius: 8,
+          backgroundColor: cell.isToday ? colors.text : 'transparent',
         }}>
         <Text
           variant="label"
           tabular
-          style={{ fontSize: 13 }}
-          color={cell.onBudget ? 'onPrimary' : cell.future ? 'textTertiary' : cell.logged || cell.isToday ? 'text' : 'textSecondary'}>
+          style={{ fontSize: 12.5, lineHeight: 16 }}
+          color={cell.isToday ? 'bg' : cell.future ? 'textTertiary' : cell.logged ? 'text' : 'textSecondary'}>
           {cell.day}
         </Text>
       </View>
-      <View style={{ flexDirection: 'row', gap: 3, height: 5, marginTop: 4 }}>
-        {cell.waterMet ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.water }} /> : null}
-        {cell.trained ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.exercise }} /> : null}
+      <MiniCup
+        progress={cell.logged ? 1 : 0}
+        color={cell.onBudget ? colors.calories : `${colors.calories}6B`}
+        future={cell.future}
+        width={22}
+        height={26}
+      />
+      <View style={{ flexDirection: 'row', gap: 3, height: 6 }}>
+        {cell.waterMet ? <CupKey color={colors.water} size={6} /> : null}
+        {cell.trained ? <CupKey color={colors.exercise} size={6} /> : null}
       </View>
     </View>
   );
@@ -128,7 +125,6 @@ export default function ConsistencyScreen() {
       <Screen header={<Header title="Consistency" />} testID="consistency-screen">
         <Card>
           <EmptyState
-            emoji="🗓️"
             title="Your logging rhythm shows here"
             message="Once you log food, this page shows your streak, a month calendar of logged days and how many days a week you log, train and weigh in."
             action="Open diary"
@@ -145,25 +141,22 @@ export default function ConsistencyScreen() {
         <View style={{ flexDirection: 'row', gap: spacing.lg }}>
           <View style={{ flex: 1 }} accessible accessibilityLabel={`Current streak ${streak} ${word(streak, 'day')}`}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-              <Text variant="numXL" tabular color="primary" testID="consistency-streak">
+              <Text variant="numXL" testID="consistency-streak">
                 {streak}
               </Text>
-              <Text variant="label" color="textSecondary">
-                {word(streak, 'day')}
-              </Text>
+              <Text variant="unit">{word(streak, 'day')}</Text>
             </View>
             <Text variant="caption" color="textSecondary">
               Current streak
             </Text>
           </View>
+          <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: colors.border }} />
           <View style={{ flex: 1 }} accessible accessibilityLabel={`Longest streak ${longest} ${word(longest, 'day')}`}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-              <Text variant="numXL" tabular testID="consistency-longest">
+              <Text variant="numXL" testID="consistency-longest">
                 {longest}
               </Text>
-              <Text variant="label" color="textSecondary">
-                {word(longest, 'day')}
-              </Text>
+              <Text variant="unit">{word(longest, 'day')}</Text>
             </View>
             <Text variant="caption" color="textSecondary" numberOfLines={1}>
               Longest streak
@@ -175,6 +168,7 @@ export default function ConsistencyScreen() {
             ) : null}
           </View>
         </View>
+        <View style={{ height: 1, backgroundColor: colors.border }} />
         <Text variant="body" color="textSecondary" testID="consistency-month-tally">
           Logged {tally.logged} of {tally.elapsed} {word(tally.elapsed, 'day')} {isCurrentMonth ? 'this month' : `in ${monthLabel(month)}`}
         </Text>
@@ -221,10 +215,10 @@ export default function ConsistencyScreen() {
           ))}
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.lg, rowGap: spacing.xs }}>
-          <Legend swatch={<View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: colors.primary }} />} label="Within 10% of budget" />
-          <Legend swatch={<View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: colors.primary }} />} label="Logged" />
-          <Legend swatch={<View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.water }} />} label="Water goal met" />
-          <Legend swatch={<View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.exercise }} />} label="Workout" />
+          <Legend swatch={<CupKey color={colors.calories} />} label="Within 10% of budget" />
+          <Legend swatch={<CupKey color={`${colors.calories}6B`} />} label="Logged" />
+          <Legend swatch={<CupKey color={colors.water} size={7} />} label="Water goal met" />
+          <Legend swatch={<CupKey color={colors.exercise} size={7} />} label="Workout" />
         </View>
         <Text variant="caption" color="textTertiary">
           A single missed day never ends a streak, however often it happens; only two missed days in a row do.
@@ -243,12 +237,10 @@ export default function ConsistencyScreen() {
         </View>
         <View accessible accessibilityLabel={`${total.total} ${word(total.total, 'week')} on rhythm in total`}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-            <Text variant="numL" tabular testID="consistency-weeks-on-rhythm">
+            <Text variant="numL" testID="consistency-weeks-on-rhythm">
               {total.total}
             </Text>
-            <Text variant="label" color="textSecondary">
-              {word(total.total, 'week')} on rhythm
-            </Text>
+            <Text variant="unit">{word(total.total, 'week')} on rhythm</Text>
           </View>
           <Text variant="caption" color="textSecondary">
             Weeks that met all three of your current targets, in total, not in a row
@@ -280,11 +272,12 @@ export default function ConsistencyScreen() {
                 data={weeks.map((w) => ({
                   label: w.partial ? 'Now' : formatShortDate(w.weekStart),
                   value: w.count,
-                  color: w.partial ? `${color}66` : color,
                   detail: `Week of ${formatShortDate(w.weekStart)} · ${w.count} ${word(w.count, 'day')} ${RHYTHM_COPY[k].verb}${w.partial ? ' so far' : ''}`,
                 }))}
                 marks={weeks.map((w) => w.met)}
-                goal={target}
+                openIndex={weeks.findIndex((w) => w.partial) >= 0 ? weeks.findIndex((w) => w.partial) : undefined}
+                // The target is a shaded zone, not a budget line: more days than the target is never "over".
+                band={{ from: target, to: 7, color }}
                 maxValue={7}
                 color={color}
                 height={110}
@@ -294,8 +287,7 @@ export default function ConsistencyScreen() {
           );
         })}
         <Text variant="caption" color="textTertiary">
-          Bars show days per week, Monday to Sunday; the dashed line is your target and a check marks a week that met it. The lighter bar is this week so
-          far.
+          Bars show days per week, Monday to Sunday; the shaded zone starts at your target and a check marks a week that reached it. The hatched bar is this week so far.
         </Text>
       </Card>
 

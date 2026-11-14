@@ -22,7 +22,7 @@ import { formatNumber } from '@/lib/units';
 import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
 import { useEnergyModel } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { cup, useTheme } from '@/theme';
 import type { ActivityLevel } from '@/types';
 import { Card, Header, Screen, Text } from '@/ui';
 
@@ -71,7 +71,8 @@ function P({ children }: { children: React.ReactNode }) {
 function Yours({ children }: { children: React.ReactNode }) {
   const { colors, radius, spacing } = useTheme();
   return (
-    <View style={{ backgroundColor: colors.primarySoft, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
+    // Your own number: an alt cup (surfaceAlt, no border) with the level line down its side.
+    <View style={{ backgroundColor: colors.surfaceAlt, ...cup(radius.tile, 5), borderLeftWidth: 3, borderLeftColor: colors.rim, paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
       <Text variant="label">{children}</Text>
     </View>
   );

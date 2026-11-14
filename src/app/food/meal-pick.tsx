@@ -227,7 +227,7 @@ function List({ children }: { children: React.ReactNode }) {
     <View>
       {items.map((c, i) => (
         <View key={i}>
-          {i > 0 ? <Divider inset={54} /> : null}
+          {i > 0 ? <Divider inset={36} /> : null}
           {c}
         </View>
       ))}

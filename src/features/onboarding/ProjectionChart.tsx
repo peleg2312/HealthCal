@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
-import Svg, { Circle, Line, Path, Polygon } from 'react-native-svg';
+import Svg, { Line, Path, Polygon, Rect } from 'react-native-svg';
 
 import { formatWeight } from '@/lib/units';
 import { useTheme } from '@/theme';
@@ -15,8 +15,10 @@ const PAD_BOTTOM = 12;
 const PAD_X = 10;
 
 /**
- * The road from today's weight to the target: the planned line, a band for
- * real-world pace, and dated waypoints. Drawn in the weight colour only.
+ * The road from today's weight to the target: a flat 2 px line, a flat 12%
+ * band for real-world pace (no gradient, no glow), square waypoint marks and
+ * the goal marked by a rim tick (the level line). Drawn in the weight colour;
+ * every label stays a text colour.
  */
 export function ProjectionChart({ projection: p, units }: { projection: Projection; units: UnitSystem }) {
   const { colors, spacing } = useTheme();
@@ -41,19 +43,19 @@ export function ProjectionChart({ projection: p, units }: { projection: Projecti
         {width > 0 ? (
           <Svg width={width} height={PLOT_H}>
             <Line x1={PAD_X} x2={width - PAD_X} y1={axisY} y2={axisY} stroke={colors.border} strokeWidth={1} />
-            <Polygon points={band} fill={`${colors.weight}22`} />
+            <Polygon points={band} fill={colors.weight} fillOpacity={0.12} />
             <Line x1={end.x} x2={x(p.slowWeeks)} y1={end.y} y2={end.y} stroke={colors.weight} strokeOpacity={0.5} strokeWidth={2} strokeDasharray="4 4" />
             {p.waypoints.map((wp) => (
               <Line key={`t${wp.share}`} x1={x(wp.weeks)} x2={x(wp.weeks)} y1={y(wp.kg) + 6} y2={axisY} stroke={colors.border} strokeWidth={1} strokeDasharray="2 3" />
             ))}
             <Line x1={end.x} x2={end.x} y1={end.y + 8} y2={axisY} stroke={colors.border} strokeWidth={1} strokeDasharray="2 3" />
-            <Path d={`M${start.x},${start.y} L${end.x},${end.y}`} stroke={colors.weight} strokeWidth={3} strokeLinecap="round" fill="none" />
+            <Path d={`M${start.x},${start.y} L${end.x},${end.y}`} stroke={colors.weight} strokeWidth={2} fill="none" />
             {p.waypoints.map((wp) => (
-              <Circle key={`d${wp.share}`} cx={x(wp.weeks)} cy={y(wp.kg)} r={4} fill={colors.surface} stroke={colors.weight} strokeWidth={2} />
+              <Rect key={`d${wp.share}`} x={x(wp.weeks) - 3.5} y={y(wp.kg) - 3.5} width={7} height={7} rx={1} fill={colors.surface} stroke={colors.weight} strokeWidth={1.75} />
             ))}
-            <Circle cx={start.x} cy={start.y} r={5} fill={colors.weight} />
-            <Circle cx={end.x} cy={end.y} r={8} fill={`${colors.weight}33`} />
-            <Circle cx={end.x} cy={end.y} r={5} fill={colors.weight} />
+            <Rect x={start.x - 3.5} y={start.y - 3.5} width={7} height={7} rx={1} fill={colors.weight} />
+            {/* The goal: a level line across the end of the road. */}
+            <Rect x={end.x - 9} y={end.y - 1.5} width={18} height={3} rx={1} fill={colors.rim} />
           </Svg>
         ) : null}
         {width > 0 ? (
@@ -63,7 +65,7 @@ export function ProjectionChart({ projection: p, units }: { projection: Projecti
             </Text>
             <Text
               variant="caption"
-              color="weight"
+              color="text"
               tabular
               style={{ position: 'absolute', right: PAD_X, top: end.y - 26, textAlign: 'right' }}>
               {`Goal ${formatWeight(p.targetKg, units)}`}
@@ -85,7 +87,7 @@ export function ProjectionChart({ projection: p, units }: { projection: Projecti
               </View>
             ))}
             <View style={{ position: 'absolute', left: end.x - labelW / 2, width: labelW, alignItems: 'center' }}>
-              <Text variant="caption" color="weight" tabular>
+              <Text variant="caption" color="text" tabular>
                 {shortDate(p.date)}
               </Text>
             </View>

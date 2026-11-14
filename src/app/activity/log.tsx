@@ -14,9 +14,9 @@ import { INTENSITY_LABELS } from '@/lib/exercise';
 import { distanceToKm, distanceUnit, distanceValue, formatNumber, formatVolume, formatWeight, round } from '@/lib/units';
 import { useStore } from '@/store';
 import { useLive, useProfile } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { cup, useTheme } from '@/theme';
 import type { Intensity } from '@/types';
-import { Button, Card, Chip, EmptyState, Header, IconButton, NumberField, PressableScale, Screen, Text, TextField } from '@/ui';
+import { Button, Card, Chip, CupKey, EmptyState, Header, IconButton, NumberField, PressableScale, Screen, Text, TextField } from '@/ui';
 
 const INTENSITIES: Intensity[] = ['light', 'moderate', 'vigorous'];
 const PRESETS = [15, 30, 45, 60, 90];
@@ -113,7 +113,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
     <Screen
       header={
         <Header
-          title={`${activity.emoji}  ${activity.name}`}
+          title={activity.name}
           subtitle={entryId ? 'Edit session' : 'New session'}
           right={
             entryId && entry ? (
@@ -124,7 +124,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
                   deleteActivity(entry);
                   leaveFlow();
                 }}>
-                <Trash2 size={18} color={colors.danger} />
+                <Trash2 size={18} color={colors.danger} strokeWidth={1.9} />
               </IconButton>
             ) : null
           }
@@ -135,14 +135,15 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
       <Card testID="log-activity-result" style={{ gap: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md }}>
           <View>
-            <Text variant="overline" color="textSecondary">
-              ESTIMATED BURN
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-              <Text variant="numXL" tabular color={colors.exercise} testID="log-activity-gross">
-                {formatNumber(est.gross)}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <CupKey color={colors.exercise} />
+              <Text variant="overline">Estimated burn</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 5 }}>
+              <Text variant="numXL" tabular testID="log-activity-gross" style={{ fontSize: 46, lineHeight: 50, letterSpacing: -1.4 }}>
+                {`~${formatNumber(est.gross)}`}
               </Text>
-              <Text variant="label" color="textSecondary">
+              <Text variant="unit" style={{ fontSize: 15 }}>
                 kcal
               </Text>
             </View>
@@ -150,7 +151,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
               likely {formatNumber(est.grossRange[0])}–{formatNumber(est.grossRange[1])} kcal
             </Text>
           </View>
-          <View style={{ alignItems: 'flex-end', backgroundColor: `${colors.exercise}22`, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
+          <View style={{ alignItems: 'flex-end', ...cup(radius.tile, 5), backgroundColor: colors.surfaceAlt, paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
             <Text variant="numM" tabular testID="log-activity-net">
               {profile.eatBackExercise ? '+' : ''}
               {formatNumber(est.net)}
@@ -204,7 +205,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
       <View style={{ gap: spacing.sm }}>
         <Text variant="title">Duration</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-          <IconButton accessibilityLabel="5 minutes less" testID="duration-minus" size={48} tone="alt" onPress={() => setDuration(Math.max(1, minutes - 5))} disabled={minutes <= 1}>
+          <IconButton accessibilityLabel="5 minutes less" testID="duration-minus" size={48} tone="surface" style={{ borderColor: colors.borderStrong }} onPress={() => setDuration(Math.max(1, minutes - 5))} disabled={minutes <= 1}>
             <Minus size={20} color={colors.text} />
           </IconButton>
           <NumberField
@@ -217,7 +218,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
             style={{ flex: 1 }}
             error={duration !== null && duration > 24 * 60 ? 'That is longer than a day' : null}
           />
-          <IconButton accessibilityLabel="5 minutes more" testID="duration-plus" size={48} tone="alt" onPress={() => setDuration(minutes + 5)}>
+          <IconButton accessibilityLabel="5 minutes more" testID="duration-plus" size={48} tone="surface" style={{ borderColor: colors.borderStrong }} onPress={() => setDuration(minutes + 5)}>
             <Plus size={20} color={colors.text} />
           </IconButton>
         </View>
@@ -229,7 +230,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
               selected={minutes === p}
               onPress={() => setDuration(p)}
               testID={`duration-${p}`}
-              style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 4, height: 44 }}
+              style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 4 }}
             />
           ))}
         </View>
@@ -262,16 +263,16 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
                       minHeight: 104,
                       padding: spacing.md,
                       gap: spacing.xs,
-                      borderRadius: radius.md,
-                      backgroundColor: active ? `${colors.exercise}22` : colors.surface,
-                      borderWidth: 1.5,
-                      borderColor: active ? colors.exercise : colors.border,
+                      ...cup(radius.tile, 5),
+                      backgroundColor: colors.surface,
+                      borderWidth: active ? 2 : 1,
+                      borderColor: active ? colors.text : colors.border,
                     }}>
                     <Text variant="bodyStrong">{INTENSITY_LABELS[i].title}</Text>
                     <Text variant="caption" color="textSecondary" numberOfLines={3} style={{ flex: 1 }}>
                       {localiseSpeedText(activity.intensityHint?.[i] ?? INTENSITY_LABELS[i].hint, units)}
                     </Text>
-                    <Text variant="caption" color={active ? colors.exercise : 'textTertiary'} tabular>
+                    <Text variant="caption" color={active ? 'text' : 'textSecondary'} tabular>
                       {activity.met[i]} MET
                     </Text>
                   </PressableScale>

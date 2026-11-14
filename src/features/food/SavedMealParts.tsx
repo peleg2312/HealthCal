@@ -8,11 +8,12 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { MEAL_LABEL } from '@/lib/nutrition';
-import { useTheme } from '@/theme';
+import { cup, useTheme } from '@/theme';
 import type { ISODate, MealType, SavedMeal, SavedMealItem } from '@/types';
-import { Avatar, Button, Chip, ChipRow, NumberField, PressableScale, Sheet, Stepper, Text } from '@/ui';
+import { Button, Chip, ChipRow, NumberField, PressableScale, Sheet, Stepper, Text } from '@/ui';
 
 import { AmountEditor } from './AmountEditor';
+import { RowEmoji } from './components';
 import { formatPortion, mealServings, planSavedMeal, setItemAmount } from './build';
 import { dayPhrase, formatQty, kcal, matchServing, portionLabel } from './helpers';
 import { logSavedMeal } from './log';
@@ -34,7 +35,7 @@ export function itemLine(it: SavedMealItem): string {
  * fresh for each meal.
  */
 export function LogSavedMealSheet({ meal, mealType, date, onClose }: { meal: SavedMeal | null; mealType: MealType; date: ISODate; onClose: () => void }) {
-  const { colors, radius, spacing } = useTheme();
+  const { colors, spacing } = useTheme();
   const [portion, setPortion] = useState<number | null>(1);
   const [other, setOther] = useState(false);
   const [include, setInclude] = useState<boolean[]>(() => (meal ? meal.items.map(() => true) : []));
@@ -119,16 +120,16 @@ export function LogSavedMealSheet({ meal, mealType, date, onClose }: { meal: Sav
                 style={{
                   width: 24,
                   height: 24,
-                  borderRadius: radius.sm,
-                  borderWidth: 2,
-                  borderColor: on ? colors.primary : colors.borderStrong,
-                  backgroundColor: on ? colors.primary : 'transparent',
+                  ...cup(7, 3),
+                  borderWidth: 1.5,
+                  borderColor: on ? colors.text : colors.borderStrong,
+                  backgroundColor: on ? colors.text : 'transparent',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}>
-                {on ? <Check size={16} color={colors.onPrimary} strokeWidth={3} /> : null}
+                {on ? <Check size={16} color={colors.bg} strokeWidth={3} /> : null}
               </View>
-              <Text style={{ fontSize: 18, lineHeight: 24 }}>{it.emoji ?? '🍽️'}</Text>
+              <RowEmoji emoji={it.emoji} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text variant="body" numberOfLines={1} color={on ? 'text' : 'textTertiary'}>
                   {it.name}
@@ -178,7 +179,7 @@ export function ItemAmountSheet({
         </View>
       }>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-        <Avatar emoji={item.emoji ?? '🍽️'} size={38} />
+        <RowEmoji emoji={item.emoji} />
         <Text variant="caption" color="textSecondary" style={{ flex: 1 }} tabular>
           {item.kcalRange ? `Estimate, likely between ${kcal(item.kcalRange[0])} and ${kcal(item.kcalRange[1])} kcal` : itemLine(item)}
         </Text>

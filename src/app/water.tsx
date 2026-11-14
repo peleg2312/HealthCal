@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Check, GlassWater, Info, Trash2 } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Animated, View } from 'react-native';
+import { Animated, useWindowDimensions, View } from 'react-native';
 
 import { toISODate, weekdayShort } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
@@ -10,13 +10,12 @@ import { formatVolume, formatWeight, volumeToMl, volumeUnit, volumeValue } from 
 import { useToday } from '@/store/clock';
 import { DEFAULT_SETTINGS, useStore } from '@/store';
 import { useDay, useDays, useProfile } from '@/store/selectors';
-import { Figure, Note, RequireProfile, splitUnit, Tile, WaterWave } from '@/features/trackers/components';
+import { Figure, Note, RequireProfile, splitUnit, Tile } from '@/features/trackers/components';
 import { dayTitle, resolveDateParam } from '@/features/trackers/dateParam';
 import { crossedGoal, keepOrConvert, MAX_PRESET_ML, MIN_PRESET_ML, normalizePresets } from '@/features/trackers/helpers';
 import { useTheme } from '@/theme';
 import type { Beverage, WaterEntry } from '@/types';
 import {
-  Avatar,
   BarChart,
   Button,
   Card,
@@ -27,12 +26,14 @@ import {
   haptic,
   Header,
   IconButton,
+  MiniCup,
   NumberField,
   Screen,
   SectionTitle,
   Sheet,
   Text,
   toast,
+  Vessel,
 } from '@/ui';
 
 const BEVERAGES = Object.keys(BEVERAGE_LABELS) as Beverage[];
@@ -56,7 +57,9 @@ function factorLine(): string {
 }
 
 function WaterScreen() {
-  const { colors, spacing, radius } = useTheme();
+  const { colors, spacing } = useTheme();
+  const { width: screenW } = useWindowDimensions();
+  const narrow = screenW < 360;
   const profile = useProfile();
   const settings = useStore((s) => s.settings);
   const units = profile.units;
@@ -120,49 +123,89 @@ function WaterScreen() {
   const bars = week.map((d, i) => ({
     label: d.date === todayDate ? 'Today' : weekdayShort(d.date),
     value: volumeValue(d.waterMl, units),
-    color: d.waterMl >= d.waterGoalMl ? colors.water : `${colors.water}99`,
+    color: colors.water,
   }));
   const daysMet = week.filter((d) => d.waterMl >= d.waterGoalMl && d.waterGoalMl > 0).length;
 
   return (
     <Screen header={<Header title="Water" subtitle={isToday ? 'Today' : dayTitle(date)} />} backdrop={colors.water} testID="water-screen">
-      <Card padding={spacing.xl} style={{ alignItems: 'center', gap: spacing.lg }}>
-        <WaterWave progress={progress} size={224}>
-          <View style={{ alignItems: 'center', backgroundColor: `${colors.surface}CC`, borderRadius: radius.lg, paddingHorizontal: 16, paddingVertical: 6 }}>
-            <Text testID="water-percent" variant="numXL" tabular>
-              {Math.round(progress * 100)}%
-            </Text>
-            <Text variant="caption" color="textSecondary">
-              {isToday ? 'of today’s goal' : 'of the day’s goal'}
-            </Text>
-          </View>
-        </WaterWave>
+      <Card padding={18} style={{ gap: spacing.lg }} testID="water-hero">
+        <Vessel
+          value={Math.min(consumed, goal)}
+          max={goal}
+          color={colors.water}
+          width={narrow ? 76 : 96}
+          height={220}
+          labelGap={narrow ? 14 : 18}
+          accessibilityLabel={`${formatVolume(consumed, units)} of ${formatVolume(goal, units)}`}
+          labels={[
+            {
+              key: 'goal',
+              at: goal,
+              height: 20,
+              content: (
+                <Text variant="caption" color="textSecondary" numberOfLines={1}>
+                  {`Goal ${formatVolume(goal, units)}`}
+                </Text>
+              ),
+            },
+            {
+              key: 'percent',
+              at: (Math.min(consumed, goal) + goal) / 2,
+              height: 72,
+              content: (
+                <View>
+                  <Text testID="water-percent" variant="numXL" tabular style={{ fontSize: narrow ? 44 : 54, lineHeight: narrow ? 46 : 56, letterSpacing: -1.6 }}>
+                    {Math.round(progress * 100)}%
+                  </Text>
+                  <Text variant="caption" color="textSecondary">
+                    {isToday ? 'of today’s goal' : 'of the day’s goal'}
+                  </Text>
+                </View>
+              ),
+            },
+            {
+              key: 'drunk',
+              at: Math.min(consumed, goal),
+              height: 24,
+              tick: consumed > 0 ? colors.rim : undefined,
+              content: (
+                <Text variant="numM" numberOfLines={1} style={{ fontSize: 17, lineHeight: 22 }} testID="water-consumed">
+                  {consumedParts.value}
+                  <Text variant="unit">{` ${consumedParts.unit}`}</Text>
+                  <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
+                    {'  drunk'}
+                  </Text>
+                </Text>
+              ),
+            },
+          ]}
+        />
 
         {reached ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Check size={18} color={colors.success} />
-            <Text testID="water-goal-reached" variant="bodyStrong" color="success">
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Check size={18} color={colors.text} strokeWidth={2.2} />
+            <Text testID="water-goal-reached" variant="bodyStrong">
               {isToday ? 'Goal reached for today' : `Goal reached on ${dayName}`}
             </Text>
           </View>
         ) : (
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-            <Text testID="water-left" variant="numL" tabular color="water">
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+            <Text testID="water-left" variant="numL" tabular>
               {leftParts.value}
             </Text>
-            <Text variant="title" color="textSecondary">
-              {leftParts.unit} left to drink
+            <Text variant="unit" style={{ fontSize: 15 }}>
+              {`${leftParts.unit} left to drink`}
             </Text>
           </View>
         )}
 
-        <View style={{ flexDirection: 'row', alignSelf: 'stretch', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.lg }}>
-          <Figure testID="water-consumed" align="center" value={consumedParts.value} unit={consumedParts.unit} label="Drunk" />
-          <Figure align="center" value={goalParts.value} unit={goalParts.unit} label="Goal" />
+        <View style={{ flexDirection: 'row', alignSelf: 'stretch', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md }}>
+          <Figure value={goalParts.value} unit={goalParts.unit} label="Goal" />
           {reached ? (
-            <Figure align="center" value={splitUnit(formatVolume(consumed - goal, units)).value} unit={splitUnit(formatVolume(consumed - goal, units)).unit} label={isToday ? 'Extra today' : 'Extra'} color="water" />
+            <Figure value={splitUnit(formatVolume(consumed - goal, units)).value} unit={splitUnit(formatVolume(consumed - goal, units)).unit} label={isToday ? 'Extra today' : 'Extra'} color="water" />
           ) : (
-            <Figure align="center" value={String(glassesLeft(left, glassMl))} label={`× ${formatVolume(glassMl, units)} to go`} color="water" />
+            <Figure value={String(glassesLeft(left, glassMl))} label={`× ${formatVolume(glassMl, units)} to go`} color="water" />
           )}
         </View>
       </Card>
@@ -176,7 +219,7 @@ function WaterScreen() {
           <Chip
             key={b}
             testID={`water-beverage-${b}`}
-            label={`${BEVERAGE_LABELS[b].emoji} ${BEVERAGE_LABELS[b].label}`}
+            label={BEVERAGE_LABELS[b].label}
             selected={beverage === b}
             onPress={() => setBeverage(b)}
           />
@@ -190,7 +233,7 @@ function WaterScreen() {
             accessibilityLabel={`Add ${formatVolume(ml, units)} of ${BEVERAGE_LABELS[beverage].label.toLowerCase()}`}
             title={formatVolume(ml, units)}
             subtitle={i === 0 ? 'Small' : undefined}
-            icon={<GlassWater size={Math.min(28, 16 + i * 3)} color={colors.water} />}
+            icon={<GlassWater size={Math.min(26, 16 + i * 3)} color={colors.water} strokeWidth={1.9} />}
             onPress={() => add(ml)}
           />
         ))}
@@ -225,7 +268,7 @@ function WaterScreen() {
           }}
         />
       </View>
-      <Note icon={<Info size={14} color={colors.textTertiary} />}>{factorLine()}</Note>
+      <Note icon={<Info size={14} color={colors.textSecondary} />}>{factorLine()}</Note>
 
       <SectionTitle
         title={isToday ? 'Today’s log' : `Log for ${dayName}`}
@@ -244,9 +287,11 @@ function WaterScreen() {
             const counts = Math.round(effectiveMl(e.ml, e.beverage));
             return (
               <React.Fragment key={e.id}>
-                {i > 0 ? <Divider inset={56} /> : null}
+                {i > 0 ? <Divider inset={36} /> : null}
                 <View testID={`water-entry-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 6 }}>
-                  <Avatar emoji={BEVERAGE_LABELS[e.beverage].emoji} color={colors.water} size={40} />
+                  <View style={{ width: 24, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 17, lineHeight: 24 }}>{BEVERAGE_LABELS[e.beverage].emoji}</Text>
+                  </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text variant="bodyStrong" tabular>
                       {formatVolume(e.ml, units)} {BEVERAGE_LABELS[e.beverage].label.toLowerCase()}
@@ -262,7 +307,7 @@ function WaterScreen() {
                     tone="clear"
                     size={44}
                     onPress={() => removeEntry(e)}>
-                    <Trash2 size={18} color={colors.textTertiary} />
+                    <Trash2 size={18} color={colors.textSecondary} strokeWidth={1.9} />
                   </IconButton>
                 </View>
               </React.Fragment>
@@ -281,6 +326,7 @@ function WaterScreen() {
           color={colors.water}
           goal={volumeValue(goal, units)}
           highlightIndex={bars.length - 1}
+          openIndex={isToday ? bars.length - 1 : undefined}
           formatValue={(n) => (units === 'imperial' ? `${Math.round(n)}` : n >= 1000 ? `${(n / 1000).toFixed(1)} L` : `${Math.round(n)}`)}
         />
       </Card>
@@ -333,7 +379,7 @@ function GoalLine({ label, hint, value, strong }: { label: string; hint?: string
           </Text>
         ) : null}
       </View>
-      <Text variant={strong ? 'numM' : 'title'} tabular color={strong ? 'water' : 'text'}>
+      <Text variant={strong ? 'numM' : 'title'} tabular color="text">
         {value}
       </Text>
     </View>
@@ -350,9 +396,8 @@ function Celebration({ isToday, onDone }: { isToday: boolean; onDone: () => void
     <Animated.View style={{ opacity: anim, transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) }] }}>
       <Card
         testID="water-celebration"
-        gradient={[`${colors.water}33`, `${colors.success}22`]}
         style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-        <Text style={{ fontSize: 30, lineHeight: 38 }}>🌊</Text>
+        <MiniCup progress={1} over={false} color={colors.water} />
         <View style={{ flex: 1 }}>
           <Text variant="title">{isToday ? 'That’s your water goal for today' : 'That’s your water goal for the day'}</Text>
           <Text variant="caption" color="textSecondary">
