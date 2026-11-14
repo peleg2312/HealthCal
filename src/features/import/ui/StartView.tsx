@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp, FileArchive, FileSpreadsheet, FileText, Map as MapIcon, Watch } from 'lucide-react-native';
+import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 
 import { fonts, useTheme } from '@/theme';
 import { Card, Divider, PressableScale, Text } from '@/ui';
@@ -17,6 +18,15 @@ export function StartView({ failed }: { failed: { name: string; message: string 
           before anything is added, and the files are read on this device only.
         </Text>
       </View>
+
+      {Platform.OS === 'android' ? (
+        <Card tone="alt" onPress={() => router.push('/settings/health-sync')} testID="import-sync-link" accessibilityLabel="Workout sync: let workouts come in by themselves">
+          <Text variant="bodyStrong">Workouts can come in by themselves</Text>
+          <Text variant="caption" color="textSecondary" style={{ marginTop: 2 }}>
+            Workout sync reads new sessions from Health Connect, where Garmin Connect writes them. Open Workout sync
+          </Text>
+        </Card>
+      ) : null}
 
       {failed.length ? (
         <Card tone="alt" testID="import-open-failed">

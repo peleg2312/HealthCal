@@ -272,6 +272,11 @@ export default function AboutScreen() {
           server so it can sync, and nobody else can read it. Photos and descriptions are sent for analysis only when you ask for an AI estimate,
           and are not kept afterwards. No ads, no tracking, no selling of data. You can export everything or delete it at any time.
         </P>
+        <P>
+          On Android, with Workout sync switched on, HealthCal reads your workouts from Health Connect: each session with its active and total
+          calories and its distance. They are stored like sessions you log by hand. Nothing is written back to Health Connect, and that data is
+          never sent for AI analysis or to anyone else; friends see only what the Friends screen says they see.
+        </P>
       </Section>
 
       <Section icon={(c) => <Stethoscope size={20} color={c} />} color={colors.warningInk} keep title="Not medical advice">
