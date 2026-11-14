@@ -181,7 +181,8 @@ export function Vessel({
   }
 
   const zone = Math.max(0, height - (childH ? childH + 6 : 0));
-  const list = labels ?? [];
+  // Laid out from the top of the vessel down, whatever order the caller listed them in.
+  const list = [...(labels ?? [])].sort((a, b) => b.at - a.at);
   const wantY = list.map((l) => levelY(l.at, max, inner));
   const tops = placeLabels(
     list.map((l, i) => wantY[i] - l.height / 2),

@@ -325,6 +325,7 @@ function WaterScreen() {
           data={bars}
           color={colors.water}
           goal={volumeValue(goal, units)}
+          goalKind="reach"
           highlightIndex={bars.length - 1}
           openIndex={isToday ? bars.length - 1 : undefined}
           formatValue={(n) => (units === 'imperial' ? `${Math.round(n)}` : n >= 1000 ? `${(n / 1000).toFixed(1)} L` : `${Math.round(n)}`)}

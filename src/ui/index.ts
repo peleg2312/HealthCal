@@ -6,7 +6,6 @@ export * from './Field';
 export * from './List';
 export * from './Pressable';
 export * from './ProgressBar';
-export * from './Ring';
 export * from './Screen';
 export * from './Sheet';
 export * from './Text';

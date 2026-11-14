@@ -76,4 +76,4 @@ After importing, a message offers **Undo**, which takes out exactly the workouts
 - **The full account export** (Garmin account > Data Management > Export Your Data) is untested. It can be hundreds of megabytes, which may be too much for a phone. Use Export Original or the Activities CSV instead.
 - **"Export Splits to CSV"** files (one row per lap) are not recognised: they do not say which day the workout was.
 - **Mile-account CSV files** follow Garmin's documented format, but no real one was available to test.
-- **Editing an imported session** in HealthCal currently turns it into an ordinary logged session: it loses its Garmin link, and changing its duration replaces Garmin's calories with an estimate.
+- **Editing an imported session** keeps it linked to the Garmin workout, so importing the same file again still recognises it. Notes, date and distance can be changed freely. Changing the activity, the effort or the duration replaces Garmin's measured calories with the app's estimate for the new values, and the session is then shown as an estimate.

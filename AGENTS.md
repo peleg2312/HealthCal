@@ -102,7 +102,7 @@ The visual identity is "Pour": the day fills up like a cup. Every amount is a fl
 - Input: `TextField`, `NumberField` (`value: number | null`), `Stepper`, `parseNumber`.
 - Lists: `ListRow`, `ToggleRow`, `Avatar` (cup tile: `initials`, `emoji` or an icon), `EmptyState` (draws an empty dashed cup; `emoji` is ignored), `Stat` (`color` gives a cup key, the number stays text-coloured), `CupKey` (legend key and data-source mark: filled, outline, dashed).
 - Amounts: `Vessel` (the open cup: `value`, `max`, `headroom` hatched at the top, amber lip when over, `labels` at the height they describe, `children` under the labels), `MiniCup` (week strips and lists, 30 x 38), `Trough` (the sideways vessel), `ProgressBar` (flat fill with the rim tick; over target turns amber), `Hatch`.
-- Data viz: `BarChart` (slim cups with a rim, amber above `goal`, `openIndex` hatched), `LineChart`, `Sparkline`, `MacroBar`. `Ring` is deprecated and flat: replace it with `Vessel`, `MiniCup` or `ProgressBar`.
+- Data viz: `BarChart` (slim cups with a rim, amber above `goal`, `openIndex` hatched), `LineChart`, `Sparkline`, `MacroBar`. `goalKind="reach"` on `BarChart` for a goal that is not a limit (water, minutes). There is no ring: amounts are shown with `Vessel`, `MiniCup`, `Trough` or `ProgressBar`.
 - Feedback: `toast(message, { label, onPress })`, `haptic.tap/press/select/success/warn`. A `Sheet` shows toasts itself, just above its top edge, so there is one `toast-action` on screen at a time.
 - Icons: `lucide-react-native` only, stroke 1.9 (2.2 when active or on a button), 18 to 22 px, colour from the theme. A data icon takes its data colour only when it stands alone; next to a number use a `CupKey`.
 

@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Dumbbell, Plus, Timer } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
@@ -19,7 +19,7 @@ import { useStore } from '@/store';
 import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ActivityEntry } from '@/types';
-import { Button, Card, ConfirmSheet, EmptyState, LargeTitle, PressableScale, Screen, SectionTitle, Text } from '@/ui';
+import { Button, Card, Chip, ConfirmSheet, EmptyState, LargeTitle, PressableScale, Screen, SectionTitle, Text } from '@/ui';
 
 const DAYS_PER_PAGE = 14;
 
@@ -32,7 +32,10 @@ export default function TrainScreen() {
   const [pages, setPages] = useState(1);
 
   const t = useToday();
-  const weekStart = startOfWeek(t);
+  // ?week=YYYY-MM-DD shows that week (the import screen links to the week it added workouts to); otherwise this week.
+  const params = useLocalSearchParams<{ week?: string }>();
+  const asked = typeof params.week === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(params.week) && params.week <= t ? params.week : t;
+  const weekStart = startOfWeek(asked);
   const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
   const week = useMemo(() => summariseWeek(activities, weekDates), [activities, weekDates]);
 
@@ -68,6 +71,11 @@ export default function TrainScreen() {
   return (
     <Screen tabs testID="train-screen">
       <LargeTitle title="Train" subtitle={`Week of ${formatShortDate(weekStart)}`} right={<FriendsEntry />} />
+      {weekStart !== startOfWeek(t) ? (
+        <View style={{ flexDirection: 'row' }}>
+          <Chip testID="train-this-week" label="Back to this week" onPress={() => router.setParams({ week: undefined })} />
+        </View>
+      ) : null}
 
       <WeekCard week={week} dates={weekDates} today={t} />
 

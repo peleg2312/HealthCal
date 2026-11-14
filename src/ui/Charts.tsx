@@ -81,6 +81,7 @@ export function BarChart({
   color,
   height = 150,
   goal,
+  goalKind = 'limit',
   band,
   highlightIndex,
   openIndex,
@@ -95,6 +96,8 @@ export function BarChart({
   height?: number;
   /** Dashed budget line; the part of a bar above it is drawn in warning. */
   goal?: number;
+  /** 'limit' (default): the part of a bar above the goal is amber, as for calories. 'reach': the goal is something to get to (water, minutes), so going past it is not marked. */
+  goalKind?: 'limit' | 'reach';
   band?: ChartBand;
   highlightIndex?: number;
   /** A bar whose day is still open (today): hatched instead of filled. */
@@ -154,7 +157,8 @@ export function BarChart({
             const h = Math.max(v > 0 ? 3 : 0, (Math.min(v, max) / max) * chartH);
             const x = i * slot + (slot - barW) / 2;
             const on = hi === undefined || hi === null || hi === i;
-            const fillTo = goal && v > goal ? y(goal) : base - h;
+            const over = goalKind === 'limit' && !!goal && v > goal;
+            const fillTo = over ? y(goal) : base - h;
             const r = Math.min(3, barW / 3);
             const c = d.color ?? color;
             const open = openIndex === i;
@@ -187,8 +191,8 @@ export function BarChart({
                     : h > 0
                       ? <Path d={cupPath(x, fillTo, barW, base, r)} fill={c} opacity={0.42} />
                       : null}
-                {h > 0 && goal && v > goal ? <Rect x={x} y={base - h} width={barW} height={Math.max(0, fillTo - (base - h))} fill={colors.warning} /> : null}
-                {h > 0 ? <Rect x={x} y={(goal && v > goal ? fillTo : base - h) - 1.25} width={barW} height={2.5} fill={colors.rim} /> : null}
+                {h > 0 && over ? <Rect x={x} y={base - h} width={barW} height={Math.max(0, fillTo - (base - h))} fill={colors.warning} /> : null}
+                {h > 0 ? <Rect x={x} y={(over ? fillTo : base - h) - 1.25} width={barW} height={2.5} fill={colors.rim} /> : null}
                 {marks?.[i] ? (
                   <Path
                     d={`M ${x + barW / 2 - 4} ${base - h - 9} l 3 3 l 5 -6`}

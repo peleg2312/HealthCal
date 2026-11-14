@@ -192,9 +192,6 @@ export function BrandCup({ size = 200 }: { size?: number }) {
   );
 }
 
-/** @deprecated The ring mark is gone; this renders the Pour cup. */
-export const BrandRings = BrandCup;
-
 /** Thin progress indicator for the onboarding steps. */
 export function StepProgress({ index, total }: { index: number; total: number }) {
   const { colors, spacing, radius } = useTheme();
