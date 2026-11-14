@@ -62,9 +62,13 @@ export interface Draft {
   remindersOn: boolean | null;
 }
 
-export type StepId = 'basics' | 'goal' | 'about' | 'body' | 'bodyfat' | 'activity' | 'target' | 'routine' | 'plan';
+/**
+ * The questions in order. `sex` and `about` (date of birth) are one decision
+ * each; `theme` is the last question, picked while looking at the real app.
+ */
+export type StepId = 'basics' | 'goal' | 'sex' | 'about' | 'body' | 'bodyfat' | 'activity' | 'target' | 'routine' | 'theme' | 'plan';
 
-const ALL_STEPS: StepId[] = ['basics', 'goal', 'about', 'body', 'bodyfat', 'activity', 'target', 'routine', 'plan'];
+const ALL_STEPS: StepId[] = ['basics', 'goal', 'sex', 'about', 'body', 'bodyfat', 'activity', 'target', 'routine', 'theme', 'plan'];
 
 export function stepsFor(goal: GoalType | null): StepId[] {
   return goal === 'maintain' ? ALL_STEPS.filter((s) => s !== 'target') : ALL_STEPS;
@@ -275,6 +279,9 @@ export function validateStep(step: StepId, d: Draft, now: Date = new Date()): Er
     case 'goal':
       if (!d.goal) e.goal = 'Choose the goal that fits best. You can change it later.';
       break;
+    case 'sex':
+      if (!d.sex) e.sex = 'Choose one. It only selects the right equation.';
+      break;
     case 'about': {
       if (!d.sex) e.sex = 'Choose one. It only selects the right equation.';
       if (d.dobDay === null || d.dobMonth === null || d.dobYear === null) {
@@ -348,6 +355,7 @@ export function validateStep(step: StepId, d: Draft, now: Date = new Date()): Er
     case 'routine':
       Object.assign(e, validateRoutine(d.routine, d.units === 'imperial'));
       break;
+    case 'theme':
     case 'plan':
       break;
   }

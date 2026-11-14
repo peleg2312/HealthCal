@@ -29,6 +29,12 @@ describe('onboarding model', () => {
     expect(stepsFor('lose')).toContain('target');
   });
 
+  it('asks sex and date of birth one at a time', () => {
+    expect(stepsFor('lose').slice(0, 4)).toEqual(['basics', 'goal', 'sex', 'about']);
+    expect(validateStep('sex', draft({ sex: null }), NOW).sex).toBeTruthy();
+    expect(validateStep('sex', draft(), NOW)).toEqual({});
+  });
+
   it('rejects impossible dates and under-age birth dates', () => {
     expect(validateStep('about', draft({ dobDay: 31, dobMonth: 2 }), NOW).dob).toMatch(/does not exist/);
     expect(validateStep('about', draft({ dobYear: 2015 }), NOW).dob).toMatch(/aged 16/);
@@ -69,9 +75,10 @@ describe('onboarding model', () => {
     expect(buildPlan(draft({ weight: 55, target: 50, activity: 'sedentary', weeklyRateKg: 0.55 }), NOW)!.floor).toBe(1200);
   });
 
-  it('adds the routine step before the plan for every goal', () => {
-    expect(stepsFor('lose').slice(-2)).toEqual(['routine', 'plan']);
-    expect(stepsFor('maintain').slice(-2)).toEqual(['routine', 'plan']);
+  it('asks about the day, then the look, before the plan for every goal', () => {
+    expect(stepsFor('lose').slice(-3)).toEqual(['routine', 'theme', 'plan']);
+    expect(stepsFor('maintain').slice(-3)).toEqual(['routine', 'theme', 'plan']);
+    expect(validateStep('theme', draft(), NOW)).toEqual({});
     expect(validateStep('routine', draft(), NOW)).toEqual({});
   });
 

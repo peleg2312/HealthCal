@@ -1,18 +1,20 @@
-import { Activity, BellRing, CircleHelp, Droplets, Dumbbell, Info, MoonStar, Ruler, Scale, Target, TrendingDown, TrendingUp, TriangleAlert, Utensils } from 'lucide-react-native';
-import React from 'react';
-import { Switch, View } from 'react-native';
+import { Activity, ArrowRight, BellRing, ChevronDown, ChevronUp, CircleHelp, Droplets, Ruler, Scale, Target, TriangleAlert, Utensils } from 'lucide-react-native';
+import React, { useState } from 'react';
+import { View } from 'react-native';
 
 import { Group as SettingsGroup, IconTile, prefers12h, TimeRow } from '@/features/settings/components';
-import { ageFromBirthDate, formatClock, formatLongDate, toISODate } from '@/lib/dates';
+import { ageFromBirthDate, formatClock } from '@/lib/dates';
 import { ACTIVITY_LABELS, calorieFloor, KCAL_PER_KG, maxWeeklyRateKg } from '@/lib/energy';
 import { formatNumber, kgToLb, lbToKg, round, weightUnit } from '@/lib/units';
 import { remindersSupported } from '@/services/notifications';
+import { useNow, useToday } from '@/store/clock';
 import { cup, useTheme } from '@/theme';
 import type { ActivityLevel, GoalType } from '@/types';
-import { Card, MiniCup, NumberField, ProgressBar, PressableScale, Stepper, Text, TextField } from '@/ui';
+import { Card, Divider, MiniCup, PressableScale, ProgressBar, Stepper, Text, ToggleRow } from '@/ui';
 
-import { ChoiceCard, ErrorText, Note, StepTitle } from './components';
-import { birthDateOf, buildPlan, convertUnits, heightRangeText, weightRangeText, rateKgOf, tapeEstimate, toMetric, type BodyFatMode, type Draft, type Errors } from './model';
+import { BigNumberField, BigTextField, ChoiceCard, ErrorText, GoalCup, Note, StepTitle, UnitsToggle, WhyWeAsk } from './components';
+import { birthDateOf, buildPlan, heightRangeText, rateKgOf, tapeEstimate, toMetric, weightRangeText, type BodyFatMode, type Draft, type Errors } from './model';
+import { looseDate } from './projection';
 import { nudgeExamples, WEIGH_IN_TIME, type NudgeKind, type Routine } from './routine';
 
 export interface StepProps {
@@ -22,6 +24,11 @@ export interface StepProps {
   errors: Errors;
   /** Advance, used by the keyboard's return key on the last field. */
   submit: () => void;
+  /**
+   * Move on after a short beat, so the chosen tile is seen to be chosen. Used by
+   * single-choice answers; Back still works and typing screens keep Continue.
+   */
+  advance: () => void;
 }
 
 const Group = ({ children, gap }: { children: React.ReactNode; gap?: number }) => {
@@ -35,17 +42,11 @@ export function BasicsStep({ draft, set, errors, submit }: StepProps) {
   const { spacing } = useTheme();
   return (
     <Group gap={spacing.xxl}>
-      <StepTitle title="Let's set up your plan" subtitle="A few questions about you. It takes about a minute, and every answer can be changed later." />
-      <Group gap={spacing.sm}>
-        <Text variant="label" color="textSecondary">
-          Units
-        </Text>
-        <UnitsSwitch draft={draft} set={set} />
-      </Group>
-      <TextField
+      <StepTitle title="What should we call you?" subtitle="A few questions to build your plan. About a minute, and every answer can be changed later." />
+      <BigTextField
         label="First name"
         testID="onb-name-input"
-        placeholder="What should we call you?"
+        placeholder="Your first name"
         value={draft.name}
         onChangeText={(name) => set({ name })}
         autoCapitalize="words"
@@ -56,147 +57,47 @@ export function BasicsStep({ draft, set, errors, submit }: StepProps) {
         onSubmitEditing={submit}
         error={errors.name}
       />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text variant="label" color="textSecondary">
+            Units
+          </Text>
+          <Text variant="caption" color="textTertiary">
+            Set from your phone&apos;s region
+          </Text>
+        </View>
+        <UnitsToggle draft={draft} set={set} />
+      </View>
     </Group>
-  );
-}
-
-function UnitsSwitch({ draft, set }: Pick<StepProps, 'draft' | 'set'>) {
-  const { colors, radius, spacing } = useTheme();
-  const opts = [
-    { value: 'metric' as const, title: 'Metric', hint: 'kg, cm, ml' },
-    { value: 'imperial' as const, title: 'Imperial', hint: 'lb, ft/in, fl oz' },
-  ];
-  return (
-    <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-      {opts.map((o) => {
-        const active = draft.units === o.value;
-        return (
-          <View key={o.value} style={{ flex: 1 }}>
-            <ChoiceTile
-              testID={`onb-units-${o.value}`}
-              active={active}
-              onPress={() => set(convertUnits(draft, o.value))}
-              title={o.title}
-              hint={o.hint}
-              colors={colors}
-              radius={radius.tile}
-            />
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
-function ChoiceTile({
-  active,
-  onPress,
-  title,
-  hint,
-  testID,
-  colors,
-  radius,
-}: {
-  active: boolean;
-  onPress: () => void;
-  title: string;
-  hint: string;
-  testID: string;
-  colors: ReturnType<typeof useTheme>['colors'];
-  radius: number;
-}) {
-  return (
-    <ChoiceCardCompact testID={testID} active={active} onPress={onPress} colors={colors} radius={radius}>
-      <Text variant="title" color={active ? 'text' : 'textSecondary'}>
-        {title}
-      </Text>
-      <Text variant="caption" color="textSecondary">
-        {hint}
-      </Text>
-    </ChoiceCardCompact>
-  );
-}
-
-function ChoiceCardCompact({
-  active,
-  onPress,
-  children,
-  testID,
-  colors,
-  radius,
-}: {
-  active: boolean;
-  onPress: () => void;
-  children: React.ReactNode;
-  testID: string;
-  colors: ReturnType<typeof useTheme>['colors'];
-  radius: number;
-}) {
-  return (
-    <PressableScale
-      testID={testID}
-      onPress={onPress}
-      feedback="select"
-      scaleTo={0.98}
-      accessibilityRole="radio"
-      accessibilityState={{ checked: active }}
-      style={{
-        minHeight: 72,
-        justifyContent: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        gap: 2,
-        // A cup: ink edge when chosen (the selection colour in Pour), hairline otherwise.
-        ...cup(radius, 5),
-        borderWidth: active ? 2 : 1,
-        margin: active ? 0 : 1,
-        borderColor: active ? colors.text : colors.border,
-        backgroundColor: colors.surface,
-      }}>
-      {children}
-    </PressableScale>
   );
 }
 
 // -------------------------------------------------------------------- goal
 
-export function GoalStep({ draft, set, errors }: StepProps) {
-  const { colors, spacing } = useTheme();
-  const options: { value: GoalType; title: string; hint: string; icon: React.ReactNode; color: string }[] = [
-    {
-      value: 'lose',
-      title: 'Lose weight',
-      hint: 'A steady calorie deficit, protein kept high',
-      icon: <TrendingDown size={22} color={colors.text} strokeWidth={1.9} />,
-      color: colors.primary,
-    },
-    { value: 'maintain', title: 'Maintain', hint: 'Eat to match what you burn', icon: <Scale size={22} color={colors.text} strokeWidth={1.9} />, color: colors.primary },
-    {
-      value: 'gain',
-      title: 'Gain muscle',
-      hint: 'A small surplus to support training',
-      icon: <Dumbbell size={22} color={colors.text} strokeWidth={1.9} />,
-      color: colors.primary,
-    },
+export function GoalStep({ draft, set, errors, advance }: StepProps) {
+  const { spacing } = useTheme();
+  const options: { value: GoalType; title: string; hint: string }[] = [
+    { value: 'lose', title: 'Lose weight', hint: 'A steady calorie deficit, protein kept high' },
+    { value: 'maintain', title: 'Maintain', hint: 'Eat to match what you burn' },
+    { value: 'gain', title: 'Gain muscle', hint: 'A small surplus to support training' },
   ];
   const name = draft.name.trim();
   return (
     <Group gap={spacing.xxl}>
-      <StepTitle
-        title={name ? `What's your goal, ${name}?` : "What's your goal?"}
-        subtitle="This sets the direction of your calorie target and how much protein you need."
-      />
-      <Group>
+      <StepTitle title={name ? `What's your goal, ${name}?` : "What's your goal?"} subtitle="It sets the direction of your calorie target and how much protein you need." />
+      <Group gap={spacing.sm}>
         {options.map((o) => (
           <ChoiceCard
             key={o.value}
             testID={`onb-goal-${o.value}`}
             title={o.title}
             hint={o.hint}
-            icon={o.icon}
-            color={o.color}
+            icon={<GoalCup goal={o.value} />}
             selected={draft.goal === o.value}
-            onPress={() => set({ goal: o.value })}
+            onPress={() => {
+              set({ goal: o.value });
+              advance();
+            }}
           />
         ))}
         <ErrorText>{errors.goal}</ErrorText>
@@ -205,16 +106,52 @@ export function GoalStep({ draft, set, errors }: StepProps) {
   );
 }
 
+// --------------------------------------------------------------------- sex
+
+export function SexStep({ draft, set, errors, advance }: StepProps) {
+  const { spacing } = useTheme();
+  return (
+    <Group gap={spacing.xxl}>
+      <StepTitle title="Which body should the equations use?" subtitle="Resting metabolism differs between female and male bodies. Choose the one closest to yours." />
+      <Group gap={spacing.sm}>
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          {(['female', 'male'] as const).map((s) => (
+            <View key={s} style={{ flex: 1 }}>
+              <ChoiceCard
+                compact
+                testID={`onb-sex-${s}`}
+                title={s === 'female' ? 'Female' : 'Male'}
+                selected={draft.sex === s}
+                onPress={() => {
+                  set({ sex: s });
+                  advance();
+                }}
+              />
+            </View>
+          ))}
+        </View>
+        <ErrorText>{errors.sex}</ErrorText>
+      </Group>
+      <WhyWeAsk testID="onb-sex-why">
+        The standard equations for resting metabolism (Mifflin-St Jeor, or Katch-McArdle when you know your body fat) have a female and a male form. This
+        answer only picks the form; it is not shown anywhere else.
+      </WhyWeAsk>
+    </Group>
+  );
+}
+
 // ------------------------------------------------------------------- about
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
+/** Date of birth: three big fields in the order the region writes dates. */
 export function AboutStep({ draft, set, errors, submit }: StepProps) {
-  const { colors, spacing } = useTheme();
+  const { spacing } = useTheme();
+  const today = useToday();
   const iso = birthDateOf(draft);
-  const age = iso && iso <= toISODate() ? ageFromBirthDate(iso) : null;
+  const age = iso && iso <= today ? ageFromBirthDate(iso, new Date(`${today}T12:00:00`)) : null;
   const day = (
-    <NumberField
+    <BigNumberField
       key="d"
       style={{ flex: 1 }}
       label="Day"
@@ -224,11 +161,12 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
       maxLength={2}
       value={draft.dobDay}
       onChange={(dobDay) => set({ dobDay })}
+      error={!!errors.dob}
       returnKeyType="next"
     />
   );
   const month = (
-    <NumberField
+    <BigNumberField
       key="m"
       style={{ flex: 1 }}
       label="Month"
@@ -238,13 +176,14 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
       maxLength={2}
       value={draft.dobMonth}
       onChange={(dobMonth) => set({ dobMonth })}
+      error={!!errors.dob}
       returnKeyType="next"
     />
   );
   const year = (
-    <NumberField
+    <BigNumberField
       key="y"
-      style={{ flex: 1.4 }}
+      style={{ flex: 1.45 }}
       label="Year"
       placeholder="YYYY"
       testID="onb-dob-year"
@@ -252,52 +191,23 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
       maxLength={4}
       value={draft.dobYear}
       onChange={(dobYear) => set({ dobYear })}
+      error={!!errors.dob}
       returnKeyType="done"
       onSubmitEditing={submit}
     />
   );
   return (
     <Group gap={spacing.xxl}>
-      <StepTitle title="A little about you" subtitle="Resting metabolism depends on sex and age, so the energy equations need both." />
+      <StepTitle title="When were you born?" subtitle="Metabolism slows a little each decade, so age keeps the estimate current." />
       <Group gap={spacing.sm}>
-        <Text variant="label" color="textSecondary">
-          Sex
-        </Text>
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          {(['female', 'male'] as const).map((s) => (
-            <View key={s} style={{ flex: 1 }}>
-              <ChoiceCardCompact testID={`onb-sex-${s}`} active={draft.sex === s} onPress={() => set({ sex: s })} colors={colors} radius={20}>
-                <Text variant="title" color={draft.sex === s ? 'text' : 'textSecondary'}>
-                  {s === 'female' ? 'Female' : 'Male'}
-                </Text>
-              </ChoiceCardCompact>
-            </View>
-          ))}
-        </View>
-        {errors.sex ? (
-          <ErrorText>{errors.sex}</ErrorText>
-        ) : (
-          <Text variant="caption" color="textTertiary">
-            Used only to pick the right equation. Choose the one closest to your body.
-          </Text>
-        )}
-      </Group>
-      <Group gap={spacing.sm}>
-        <Text variant="label" color="textSecondary">
-          Date of birth
-        </Text>
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>{draft.units === 'imperial' ? [month, day, year] : [day, month, year]}</View>
         {errors.dob ? (
           <ErrorText testID="onb-dob-error">{errors.dob}</ErrorText>
         ) : iso && age !== null ? (
-          <Text variant="caption" color="textSecondary" testID="onb-dob-summary">
+          <Text variant="label" color="textSecondary" testID="onb-dob-summary">
             {`${Number(iso.slice(8))} ${MONTHS[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)} · ${age} years old`}
           </Text>
-        ) : (
-          <Text variant="caption" color="textTertiary">
-            Metabolism slows a little each decade; age keeps the estimate current.
-          </Text>
-        )}
+        ) : null}
       </Group>
     </Group>
   );
@@ -306,96 +216,86 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
 // -------------------------------------------------------------------- body
 
 export function BodyStep({ draft, set, errors, submit }: StepProps) {
-  const { colors, spacing } = useTheme();
+  const { spacing } = useTheme();
   const imp = draft.units === 'imperial';
   return (
     <Group gap={spacing.xxl}>
-      <StepTitle
-        title="Height and weight"
-        subtitle="The two biggest inputs to your energy needs. Weigh yourself in the morning if you can; a rough figure is fine for now."
-      />
+      <StepTitle title="Height and weight" subtitle="The two biggest inputs to your energy needs. A rough figure is fine for now; a morning weigh-in is best." />
+      <View style={{ alignItems: 'flex-end', marginTop: -spacing.md }}>
+        <UnitsToggle draft={draft} set={set} idPrefix="onb-body-units" />
+      </View>
       <Group gap={spacing.lg}>
         {imp ? (
           <View style={{ gap: 6 }}>
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <NumberField
+              <BigNumberField
                 style={{ flex: 1 }}
                 label="Height"
                 testID="onb-height-ft"
                 placeholder="5"
-                suffix="ft"
+                unit="ft"
                 decimals={0}
                 maxLength={1}
                 value={draft.heightFt}
                 onChange={(heightFt) => set({ heightFt })}
-                error={errors.height ? ' ' : undefined}
+                error={!!errors.height}
                 returnKeyType="next"
               />
-              <NumberField
+              <BigNumberField
                 style={{ flex: 1 }}
                 label=" "
                 accessibilityLabel="Height, inches"
                 testID="onb-height-in"
                 placeholder="9"
-                suffix="in"
+                unit="in"
                 decimals={1}
                 maxLength={4}
                 value={draft.heightIn}
                 onChange={(heightIn) => set({ heightIn })}
-                error={errors.height ? ' ' : undefined}
+                error={!!errors.height}
                 returnKeyType="next"
               />
             </View>
-            {errors.height ? (
-              <ErrorText>{errors.height}</ErrorText>
-            ) : (
-              <Text variant="caption" color="textTertiary">
-                {`Between ${heightRangeText('imperial')}`}
-              </Text>
-            )}
+            <ErrorText>{errors.height ? `${errors.height}${errors.height.includes('between') ? '' : ` Between ${heightRangeText('imperial')}.`}` : null}</ErrorText>
           </View>
         ) : (
-          <NumberField
+          <BigNumberField
             label="Height"
             testID="onb-height-cm"
             placeholder="175"
-            suffix="cm"
+            unit="cm"
             decimals={1}
             maxLength={5}
             value={draft.heightCm}
             onChange={(heightCm) => set({ heightCm })}
-            error={errors.height}
-            hint={`Between ${heightRangeText('metric')}`}
+            error={errors.height ? `${errors.height}${errors.height.includes('between') ? '' : ` Between ${heightRangeText('metric')}.`}` : null}
             returnKeyType="next"
           />
         )}
-        <NumberField
+        <BigNumberField
           label="Current weight"
           testID="onb-weight"
           placeholder={imp ? '165' : '75'}
-          suffix={weightUnit(draft.units)}
+          unit={weightUnit(draft.units)}
           decimals={1}
           maxLength={5}
           value={draft.weight}
           onChange={(weight) => set({ weight })}
-          error={errors.weight}
-          hint={`Between ${weightRangeText(draft.units)}`}
+          error={errors.weight ? `${errors.weight}${errors.weight.includes('between') ? '' : ` Between ${weightRangeText(draft.units)}.`}` : null}
           returnKeyType="done"
           onSubmitEditing={submit}
         />
       </Group>
-      <Note icon={<Info size={18} color={colors.textSecondary} />}>
-        <Text variant="caption" color="textSecondary">
-          Stored privately on this device in metric. Your first weigh-in is saved too, so your trend starts today.
-        </Text>
-      </Note>
+      <Text variant="caption" color="textSecondary">
+        Kept privately on this device. Today&apos;s weight is saved as your first weigh-in, so your trend starts today.
+      </Text>
     </Group>
   );
 }
 
 // ---------------------------------------------------------------- body fat
 
-export function BodyFatStep({ draft, set, errors, submit }: StepProps) {
+export function BodyFatStep({ draft, set, errors, submit, advance }: StepProps) {
   const { colors, spacing } = useTheme();
   const imp = draft.units === 'imperial';
   const lu = imp ? 'in' : 'cm';
@@ -403,16 +303,13 @@ export function BodyFatStep({ draft, set, errors, submit }: StepProps) {
   const mark = (Icon: typeof Ruler) => <Icon size={22} color={colors.text} strokeWidth={1.9} />;
   const modes: { value: BodyFatMode; title: string; hint: string; icon: React.ReactNode }[] = [
     { value: 'unknown', title: "I don't know", hint: 'Skip it. The standard equation works well for most people.', icon: mark(CircleHelp) },
-    { value: 'direct', title: 'I know my body fat %', hint: 'From a smart scale, DEXA scan or calipers', icon: mark(Target) },
-    { value: 'tape', title: 'Estimate it with a tape measure', hint: 'US Navy method, about two minutes', icon: mark(Ruler) },
+    { value: 'direct', title: 'I know my body fat %', hint: 'From a smart scale, a scan or calipers', icon: mark(Target) },
+    { value: 'tape', title: 'Estimate it with a tape measure', hint: 'Neck and waist, about two minutes', icon: mark(Ruler) },
   ];
   return (
     <Group gap={spacing.xxl}>
-      <StepTitle
-        title="Body fat, if you know it"
-        subtitle="Optional. With it, HealthCal switches to the lean-mass Katch-McArdle equation, which fits muscular and very lean bodies better than weight alone."
-      />
-      <Group>
+      <StepTitle title="Body fat, if you know it" subtitle="Optional. It makes the estimate fit muscular and very lean bodies better." />
+      <Group gap={spacing.sm}>
         {modes.map((m) => (
           <ChoiceCard
             key={m.value}
@@ -421,79 +318,86 @@ export function BodyFatStep({ draft, set, errors, submit }: StepProps) {
             hint={m.hint}
             icon={m.icon}
             selected={draft.bodyFatMode === m.value}
-            onPress={() => set({ bodyFatMode: m.value })}
+            onPress={() => {
+              set({ bodyFatMode: m.value });
+              // Only the answer that needs nothing typed moves on by itself.
+              if (m.value === 'unknown') advance();
+            }}
           />
         ))}
         <ErrorText>{errors.bodyFatMode}</ErrorText>
       </Group>
       {draft.bodyFatMode === 'direct' ? (
-        <NumberField
-          label="Body fat"
-          testID="onb-bf-input"
-          placeholder="22"
-          suffix="%"
-          decimals={1}
-          maxLength={4}
-          value={draft.bodyFatPct}
-          onChange={(bodyFatPct) => set({ bodyFatPct })}
-          error={errors.bodyFatPct}
-          hint="Between 3 and 60%. Home scales can be off by several points; that's fine, the engine allows for it."
-          returnKeyType="done"
-          onSubmitEditing={submit}
-        />
+        <View style={{ gap: 6 }}>
+          <BigNumberField
+            label="Body fat"
+            testID="onb-bf-input"
+            placeholder="22"
+            unit="%"
+            decimals={1}
+            maxLength={4}
+            value={draft.bodyFatPct}
+            onChange={(bodyFatPct) => set({ bodyFatPct })}
+            error={errors.bodyFatPct}
+            returnKeyType="done"
+            onSubmitEditing={submit}
+          />
+          {errors.bodyFatPct ? null : (
+            <Text variant="caption" color="textSecondary">
+              Home scales can be off by several points; that is fine, the plan adapts to your real trend.
+            </Text>
+          )}
+        </View>
       ) : null}
       {draft.bodyFatMode === 'tape' ? (
         <Card style={{ gap: spacing.lg }}>
-          <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-            <Ruler size={18} color={colors.fat} />
-            <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
-              {draft.sex === 'female'
-                ? 'Measure relaxed, tape level and snug: neck below the larynx, waist at the narrowest point, hips at the widest.'
-                : 'Measure relaxed, tape level and snug: neck below the larynx, waist at the navel.'}
-            </Text>
-          </View>
+          <Text variant="caption" color="textSecondary">
+            {draft.sex === 'female'
+              ? 'Measure relaxed, tape level and snug: neck below the larynx, waist at the narrowest point, hips at the widest.'
+              : 'Measure relaxed, tape level and snug: neck below the larynx, waist at the navel.'}
+          </Text>
           <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            <NumberField
+            <BigNumberField
               style={{ flex: 1 }}
               label="Neck"
               testID="onb-neck-input"
-              suffix={lu}
+              unit={lu}
               decimals={1}
               maxLength={5}
               value={draft.neck}
               onChange={(neck) => set({ neck })}
-              error={errors.neck ? ' ' : undefined}
+              error={!!errors.neck}
             />
-            <NumberField
+            <BigNumberField
               style={{ flex: 1 }}
               label="Waist"
               testID="onb-waist-input"
-              suffix={lu}
+              unit={lu}
               decimals={1}
               maxLength={5}
               value={draft.waist}
               onChange={(waist) => set({ waist })}
-              error={errors.waist ? ' ' : undefined}
+              error={!!errors.waist}
               onSubmitEditing={draft.sex === 'female' ? undefined : submit}
             />
             {draft.sex === 'female' ? (
-              <NumberField
+              <BigNumberField
                 style={{ flex: 1 }}
                 label="Hips"
                 testID="onb-hip-input"
-                suffix={lu}
+                unit={lu}
                 decimals={1}
                 maxLength={5}
                 value={draft.hip}
                 onChange={(hip) => set({ hip })}
-                error={errors.hip ? ' ' : undefined}
+                error={!!errors.hip}
                 onSubmitEditing={submit}
               />
             ) : null}
           </View>
           <ErrorText>{errors.neck ?? errors.waist ?? errors.hip ?? errors.tape}</ErrorText>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm }} testID="onb-bf-estimate">
-            <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
+            <Text variant="label" color="textSecondary" style={{ flex: 1 }}>
               Estimated body fat
             </Text>
             <Text variant="numL" color={estimate !== null ? 'text' : 'textTertiary'}>
@@ -502,10 +406,14 @@ export function BodyFatStep({ draft, set, errors, submit }: StepProps) {
             </Text>
           </View>
           <Text variant="caption" color="textTertiary">
-            Tape estimates are usually within 3 to 4 points. Re-measure any time from the Body screen.
+            An estimate, usually within 3 to 4 points. Re-measure any time from the Body screen.
           </Text>
         </Card>
       ) : null}
+      <WhyWeAsk testID="onb-bf-why">
+        With body fat, HealthCal works out resting metabolism from your lean mass (the Katch-McArdle equation) instead of from weight, height and age
+        (Mifflin-St Jeor). The tape estimate uses the US Navy method.
+      </WhyWeAsk>
     </Group>
   );
 }
@@ -515,30 +423,33 @@ export function BodyFatStep({ draft, set, errors, submit }: StepProps) {
 /** How full a normal day's movement is: each level is a small cup in the exercise colour, filled a step higher. */
 const ACTIVITY_LEVEL: Record<ActivityLevel, number> = { sedentary: 0.2, light: 0.4, moderate: 0.6, active: 0.8, athlete: 1 };
 
-export function ActivityStep({ draft, set, errors }: StepProps) {
+export function ActivityStep({ draft, set, errors, advance }: StepProps) {
   const { colors, spacing } = useTheme();
   const levels = Object.keys(ACTIVITY_LABELS) as ActivityLevel[];
   return (
     <Group gap={spacing.xxl}>
       <StepTitle title="A normal day, without workouts" subtitle="How much do you move outside of exercise? Think job, chores and getting around." />
       <Group gap={spacing.sm}>
-        {levels.map((l) => (
+        {levels.map((l, i) => (
           <ChoiceCard
             key={l}
             testID={`onb-activity-${l}`}
             title={ACTIVITY_LABELS[l].title}
             hint={ACTIVITY_LABELS[l].hint}
-            icon={<MiniCup progress={ACTIVITY_LEVEL[l]} color={colors.exercise} width={20} height={26} />}
+            icon={<MiniCup progress={ACTIVITY_LEVEL[l]} color={colors.exercise} width={20} height={26} index={i} memoryKey={`onb-activity-${l}`} />}
             selected={draft.activity === l}
-            onPress={() => set({ activity: l })}
+            onPress={() => {
+              set({ activity: l });
+              advance();
+            }}
           />
         ))}
         <ErrorText>{errors.activity}</ErrorText>
       </Group>
-      <Note icon={<Activity size={18} color={colors.exercise} />}>
+      <Note icon={<Activity size={18} color={colors.textSecondary} />}>
         <Text variant="bodyStrong">Workouts are logged separately</Text>
         <Text variant="caption" color="textSecondary">
-          Each session you log adds only the calories above resting to that day. Leaving workouts out here is how nothing gets counted twice.
+          Each session you log adds only the calories above resting to that day, so nothing is counted twice.
         </Text>
       </Note>
     </Group>
@@ -549,6 +460,7 @@ export function ActivityStep({ draft, set, errors }: StepProps) {
 
 export function TargetStep({ draft, set, errors, submit }: StepProps) {
   const { colors, spacing } = useTheme();
+  const now = useNow();
   const imp = draft.units === 'imperial';
   const unit = weightUnit(draft.units);
   const m = toMetric(draft);
@@ -556,7 +468,7 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
   const weightKg = m.weightKg ?? 70;
   const maxKg = maxWeeklyRateKg(goal, weightKg);
   const rateKg = rateKgOf(draft, weightKg);
-  const plan = buildPlan(draft);
+  const plan = buildPlan(draft, now);
 
   // The stepper works in the display unit.
   const toDisplay = (kg: number) => (imp ? kgToLb(kg) : kg);
@@ -566,37 +478,40 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
   const maxDisplay = Math.max(minDisplay, round(toDisplay(maxKg), 2));
   const rateDisplay = Math.min(maxDisplay, Math.max(minDisplay, round(toDisplay(rateKg), 2)));
   const fmtRate = (v: number) => `${formatNumber(v, 2).replace(/\.?0+$/, '')} ${unit}`;
+  const fmtW = (v: number) => `${formatNumber(v, 1).replace(/\.0$/, '')}`;
 
   const delta = plan ? plan.target.dailyDelta : (goal === 'lose' ? -1 : 1) * ((rateKg * KCAL_PER_KG) / 7);
   const requestedDelta = (rateKg * KCAL_PER_KG) / 7;
   const word = goal === 'lose' ? 'deficit' : 'surplus';
   const date = plan?.goalDate ?? null;
-  const showTargetSummary = plan && !errors.target && m.targetKg !== null;
+  const showTargetSummary = plan && !errors.target && m.targetKg !== null && draft.weight !== null && draft.target !== null;
 
   return (
     <Group gap={spacing.xxl}>
       <StepTitle
         title={goal === 'lose' ? 'Where are you heading?' : 'Set your pace'}
-        subtitle={
-          goal === 'lose'
-            ? 'A target weight and a pace you can live with. Slower is easier to keep.'
-            : 'A small surplus builds muscle with less fat gain. A target weight is optional.'
-        }
+        subtitle={goal === 'lose' ? 'A target weight and a pace you can live with. Slower is easier to keep.' : 'A small surplus builds muscle with less fat gain. A target weight is optional.'}
       />
-      <NumberField
-        label={goal === 'lose' ? 'Target weight' : 'Target weight (optional)'}
-        testID="onb-target-input"
-        placeholder={draft.weight !== null ? String(round(draft.weight + (goal === 'lose' ? -5 : 4) * (imp ? 2 : 1), 0)) : ''}
-        suffix={unit}
-        decimals={1}
-        maxLength={5}
-        value={draft.target}
-        onChange={(target) => set({ target })}
-        error={errors.target}
-        hint={draft.weight !== null ? `You're at ${formatNumber(draft.weight, 1).replace(/\.0$/, '')} ${unit} today.` : undefined}
-        returnKeyType="done"
-        onSubmitEditing={submit}
-      />
+      <View style={{ gap: 6 }}>
+        <BigNumberField
+          label={goal === 'lose' ? 'Target weight' : 'Target weight (optional)'}
+          testID="onb-target-input"
+          placeholder={draft.weight !== null ? String(round(draft.weight + (goal === 'lose' ? -5 : 4) * (imp ? 2 : 1), 0)) : ''}
+          unit={unit}
+          decimals={1}
+          maxLength={5}
+          value={draft.target}
+          onChange={(target) => set({ target })}
+          error={errors.target}
+          returnKeyType="done"
+          onSubmitEditing={submit}
+        />
+        {!errors.target && draft.weight !== null ? (
+          <Text variant="caption" color="textSecondary">
+            {`You're at ${fmtW(draft.weight)} ${unit} today.`}
+          </Text>
+        ) : null}
+      </View>
       <Card style={{ gap: spacing.lg }}>
         <View style={{ gap: 2 }}>
           <Text variant="title">Weekly pace</Text>
@@ -615,11 +530,10 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
             onChange={(v) => set({ weeklyRateKg: imp ? lbToKg(v) : v })}
           />
         </View>
-        <PaceMeter value={rateDisplay / maxDisplay} color={colors.weight} />
+        <PaceMeter value={rateDisplay / maxDisplay} />
+        <Divider />
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs }} testID="onb-pace-delta">
-          <Text variant="numM" color="caloriesInk">
-            {`${delta < 0 ? '−' : '+'}${formatNumber(Math.abs(Math.round(delta / 10) * 10))}`}
-          </Text>
+          <Text variant="numM">{`${delta < 0 ? '−' : '+'}${formatNumber(Math.abs(Math.round(delta / 10) * 10))}`}</Text>
           <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
             {`kcal a day ${word}${plan ? `, from about ${formatNumber(Math.round(plan.tdee / 10) * 10)} kcal burned` : ''}`}
           </Text>
@@ -643,34 +557,55 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
         </Note>
       ) : null}
       {showTargetSummary ? (
-        <Note tone="primary" icon={goal === 'lose' ? <TrendingDown size={18} color={colors.text} /> : <TrendingUp size={18} color={colors.text} />}>
-          <Text variant="bodyStrong">{date ? `About ${formatLongDate(toISODate(date)).replace(/^\w+, /, '')}` : 'No date yet'}</Text>
-          <Text variant="caption" color="textSecondary">
-            {date ? 'Projected at this pace. The date updates as your real trend comes in.' : 'At this pace the target is not reached; try a different pace.'}
-          </Text>
-        </Note>
+        <Card tone="alt" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }} testID="onb-target-summary">
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            <WeightCup label={fmtW(draft.weight!)} level={goal === 'lose' ? 0.8 : 0.55} />
+            <View style={{ paddingBottom: 26 }}>
+              <ArrowRight size={16} color={colors.textSecondary} strokeWidth={2.2} />
+            </View>
+            <WeightCup label={fmtW(draft.target!)} level={goal === 'lose' ? 0.55 : 0.8} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <Text variant="title">{date ? `Around ${looseDate(date, now)}` : 'No date yet'}</Text>
+            <Text variant="caption" color="textSecondary">
+              {date ? `${fmtW(draft.weight!)} to ${fmtW(draft.target!)} ${unit} at this pace. The date moves with your real trend.` : 'At this pace the target is not reached; try a different pace.'}
+            </Text>
+          </View>
+        </Card>
       ) : null}
     </Group>
   );
 }
 
+/** A weight as a small cup with its number under it (the target step's before and after). */
+function WeightCup({ label, level }: { label: string; level: number }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ alignItems: 'center', gap: 4 }}>
+      <MiniCup progress={level} color={colors.weight} width={26} height={34} animate={false} />
+      <Text variant="label" tabular>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 const MIN_KCAL = (d: Draft) => calorieFloor(d.sex ?? 'female');
 
-function PaceMeter({ value, color }: { value: number; color: string }) {
-  const { spacing } = useTheme();
+/** The pace as a level bar in the brand colour, with the rim tick (3 x 16) at the chosen pace. */
+function PaceMeter({ value }: { value: number }) {
+  const { colors, spacing } = useTheme();
   const v = Math.max(0, Math.min(1, value));
   const label = v <= 0.4 ? 'Relaxed' : v <= 0.75 ? 'Steady' : 'Ambitious';
   return (
-    <View style={{ gap: spacing.xs }}>
-      <ProgressBar progress={v} color={color} height={6} />
+    <View style={{ gap: spacing.sm }}>
+      <ProgressBar progress={v} color={colors.primary} height={8} memoryKey="onb-pace" />
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Text variant="caption" color="textTertiary">
+        <Text variant="caption" color="textSecondary">
           Relaxed
         </Text>
-        <Text variant="caption" color="text">
-          {label}
-        </Text>
-        <Text variant="caption" color="textTertiary">
+        <Text variant="label">{label}</Text>
+        <Text variant="caption" color="textSecondary">
           Max
         </Text>
       </View>
@@ -680,24 +615,25 @@ function PaceMeter({ value, color }: { value: number; color: string }) {
 
 // ----------------------------------------------------------------- routine
 
-const NUDGES: { key: NudgeKind; title: string; icon: (c: string) => React.ReactNode; color: 'water' | 'calories' | 'primary' | 'weight' }[] = [
-  { key: 'water', title: 'Water', icon: (c) => <Droplets size={20} color={c} />, color: 'water' },
-  { key: 'meals', title: 'Meals', icon: (c) => <Utensils size={20} color={c} />, color: 'calories' },
-  { key: 'checkin', title: 'Evening check-in', icon: (c) => <MoonStar size={20} color={c} />, color: 'primary' },
-  { key: 'weighIn', title: 'Weigh-in days', icon: (c) => <Scale size={20} color={c} />, color: 'weight' },
+const NUDGES: { key: Exclude<NudgeKind, 'checkin'>; title: string; icon: React.ReactNode }[] = [
+  { key: 'water', title: 'Water', icon: <Droplets size={20} /> },
+  { key: 'meals', title: 'Meals', icon: <Utensils size={20} /> },
+  { key: 'weighIn', title: 'Weigh-in', icon: <Scale size={20} /> },
 ];
 
 export function RoutineStep({ draft, set, errors }: StepProps) {
   const { colors, spacing } = useTheme();
+  const now = useNow();
+  const [showTimes, setShowTimes] = useState(false);
   const r = draft.routine;
   const hour12 = prefers12h(draft.units);
-  const plan = buildPlan(draft);
+  const plan = buildPlan(draft, now);
   const setRoutine = (patch: Partial<Routine>) => set({ routine: { ...r, ...patch } });
   const examples = plan ? nudgeExamples(r, { targetKcal: plan.target.target, waterMl: plan.waterMl, macros: plan.macros }, draft.units, hour12) : null;
   const whenFor = (key: NudgeKind): string => {
     if (key === 'weighIn') return `Mon and Thu, ${formatClock(WEIGH_IN_TIME, hour12)}`;
-    if (key === 'water') return `Every 2 hours${examples?.water ? `, like ${examples.water.time}` : ''}`;
-    if (key === 'meals') return `When a meal is not logged${examples?.meals ? `, like ${examples.meals.time}` : ''}`;
+    if (key === 'water') return 'Every 2 hours while you are awake';
+    if (key === 'meals') return 'Only when a meal is not logged';
     return examples?.checkin?.time ?? formatClock('20:30', hour12);
   };
   const exampleFor = (key: NudgeKind): string | null => {
@@ -705,49 +641,80 @@ export function RoutineStep({ draft, set, errors }: StepProps) {
     if (ex) return ex.body;
     return plan ? 'With these times this one falls while you sleep, so it stays silent.' : null;
   };
+  const timeError = errors.meals || errors.sleep;
+  const open = showTimes || !!timeError;
+  const Chevron = open ? ChevronUp : ChevronDown;
 
   return (
-    <Group gap={spacing.xxl}>
-      <StepTitle title="Your day" subtitle="Optional. Your usual times let reminders arrive when they help and stay quiet while you sleep." />
-      <SettingsGroup title="WHEN DO YOU USUALLY EAT?">
-        <TimeRow title="Breakfast" value={r.breakfast} hour12={hour12} onChange={(breakfast) => setRoutine({ breakfast })} testID="onb-routine-breakfast" />
-        <TimeRow title="Lunch" value={r.lunch} hour12={hour12} onChange={(lunch) => setRoutine({ lunch })} testID="onb-routine-lunch" />
-        <TimeRow title="Dinner" value={r.dinner} hour12={hour12} onChange={(dinner) => setRoutine({ dinner })} testID="onb-routine-dinner" />
-      </SettingsGroup>
-      <SettingsGroup title="AND YOUR WAKING HOURS?" footer="Nothing is sent between bedtime and wake-up.">
-        <TimeRow title="Wake up" value={r.wake} hour12={hour12} onChange={(wake) => setRoutine({ wake })} testID="onb-routine-wake" />
-        <TimeRow title="Bedtime" value={r.bed} hour12={hour12} onChange={(bed) => setRoutine({ bed })} testID="onb-routine-bed" />
-      </SettingsGroup>
-      {errors.meals || errors.sleep ? <ErrorText testID="onb-routine-error">{errors.sleep ?? errors.meals}</ErrorText> : null}
-      <SettingsGroup
-        title="WHICH NUDGES WOULD HELP?"
-        footer="Examples from a typical day on your plan. Real ones carry your live numbers and skip themselves once a goal is met. Change them any time in Profile, Reminders.">
+    <Group gap={spacing.xl}>
+      <StepTitle title="Nudges that help" subtitle="Optional. Each one carries your live numbers and skips itself once the goal is met." />
+      <Group gap={spacing.sm}>
         {NUDGES.map((n) => (
-          <NudgeRow
+          <NudgeCard
             key={n.key}
             title={n.title}
             when={whenFor(n.key)}
             example={exampleFor(n.key)}
             value={r.nudges[n.key]}
             onChange={(on) => setRoutine({ nudges: { ...r.nudges, [n.key]: on } })}
-            icon={<IconTile color={colors[n.color]}>{n.icon(colors[n.color])}</IconTile>}
+            icon={<IconTile>{n.icon}</IconTile>}
             testID={`onb-nudge-${n.key}`}
           />
         ))}
-      </SettingsGroup>
+      </Group>
+      <View style={{ gap: spacing.sm }}>
+        <PressableScale
+          testID="onb-routine-times"
+          onPress={() => setShowTimes(!open)}
+          feedback="tap"
+          scaleTo={0.99}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: open }}
+          accessibilityLabel={`Adjust times, ${formatClock(r.wake, hour12)} to ${formatClock(r.bed, hour12)}`}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 48, paddingHorizontal: spacing.xs }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text variant="title">Adjust times</Text>
+            <Text variant="caption" color="textSecondary" tabular>
+              {`Awake ${formatClock(r.wake, hour12)} to ${formatClock(r.bed, hour12)}, meals ${formatClock(r.breakfast, hour12)}, ${formatClock(r.lunch, hour12)}, ${formatClock(r.dinner, hour12)}`}
+            </Text>
+          </View>
+          <Chevron size={20} color={colors.textSecondary} strokeWidth={2} />
+        </PressableScale>
+        {open ? (
+          <View style={{ gap: spacing.lg }}>
+            <SettingsGroup title="Usual meal times">
+              <TimeRow title="Breakfast" value={r.breakfast} hour12={hour12} onChange={(breakfast) => setRoutine({ breakfast })} testID="onb-routine-breakfast" />
+              <TimeRow title="Lunch" value={r.lunch} hour12={hour12} onChange={(lunch) => setRoutine({ lunch })} testID="onb-routine-lunch" />
+              <TimeRow title="Dinner" value={r.dinner} hour12={hour12} onChange={(dinner) => setRoutine({ dinner })} testID="onb-routine-dinner" />
+            </SettingsGroup>
+            <SettingsGroup title="Waking hours" footer="Nothing is sent between bedtime and wake-up.">
+              <TimeRow title="Wake up" value={r.wake} hour12={hour12} onChange={(wake) => setRoutine({ wake })} testID="onb-routine-wake" />
+              <TimeRow title="Bedtime" value={r.bed} hour12={hour12} onChange={(bed) => setRoutine({ bed })} testID="onb-routine-bed" />
+            </SettingsGroup>
+            <NudgeCard
+              title="Evening check-in"
+              when={whenFor('checkin')}
+              example={exampleFor('checkin')}
+              value={r.nudges.checkin}
+              onChange={(on) => setRoutine({ nudges: { ...r.nudges, checkin: on } })}
+              icon={<IconTile>{<BellRing size={20} />}</IconTile>}
+              testID="onb-nudge-checkin"
+            />
+          </View>
+        ) : null}
+        {timeError ? <ErrorText testID="onb-routine-error">{errors.sleep ?? errors.meals}</ErrorText> : null}
+      </View>
       {!remindersSupported ? (
-        <Note icon={<BellRing size={18} color={colors.textSecondary} />}>
-          <Text variant="caption" color="textSecondary">
-            Browsers cannot schedule reminders for later. Your choices are saved, and HealthCal on your phone sends them once you sign in there.
-          </Text>
-        </Note>
+        <Text variant="caption" color="textSecondary">
+          Browsers cannot schedule reminders for later. Your choices are saved, and HealthCal on your phone sends them once you sign in there.
+        </Text>
       ) : null}
     </Group>
   );
 }
 
-/** A reminder choice with its example written out in full, so the person sees exactly what would arrive. */
-function NudgeRow({
+/** A reminder choice as a card: what it is, when it comes, and the message itself written out. */
+function NudgeCard({
   title,
   when,
   example,
@@ -766,41 +733,32 @@ function NudgeRow({
 }) {
   const { colors, radius, spacing } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.md, alignItems: 'flex-start' }}>
-      {icon}
-      <View style={{ flex: 1, minWidth: 0, gap: spacing.xs }}>
-        <View style={{ minHeight: 36, justifyContent: 'center' }}>
-          <Text variant="bodyStrong">{title}</Text>
-          <Text variant="caption" color="textSecondary">
-            {when}
+    <View
+      style={{
+        gap: spacing.sm,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.md,
+        ...cup(radius.card),
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.border,
+      }}>
+      <ToggleRow title={title} subtitle={when} value={value} onChange={onChange} left={icon} testID={testID} />
+      {example ? (
+        <View
+          testID={`${testID}-example`}
+          style={{
+            ...cup(radius.buttonSm, 4),
+            paddingHorizontal: spacing.md,
+            paddingVertical: spacing.sm,
+            backgroundColor: colors.surfaceAlt,
+            opacity: value ? 1 : 0.6,
+          }}>
+          <Text variant="caption" color={value ? 'text' : 'textSecondary'}>
+            {example}
           </Text>
         </View>
-        {example ? (
-          <View
-            testID={`${testID}-example`}
-            style={{
-              ...cup(radius.buttonSm, 4),
-              paddingHorizontal: spacing.md,
-              paddingVertical: spacing.sm,
-              backgroundColor: colors.surfaceAlt,
-              opacity: value ? 1 : 0.6,
-            }}>
-            <Text variant="caption" color={value ? 'text' : 'textSecondary'}>
-              {example}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-      <View style={{ minHeight: 44, minWidth: 44, alignItems: 'flex-end', justifyContent: 'center' }}>
-        <Switch
-          testID={testID}
-          value={value}
-          onValueChange={onChange}
-          trackColor={{ false: colors.track, true: colors.primary }}
-          thumbColor="#FFFFFF"
-          accessibilityLabel={`${title} reminders`}
-        />
-      </View>
+      ) : null}
     </View>
   );
 }
