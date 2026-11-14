@@ -62,7 +62,7 @@ export function BasicsStep({ draft, set, errors, submit }: StepProps) {
           <Text variant="label" color="textSecondary">
             Units
           </Text>
-          <Text variant="caption" color="textTertiary">
+          <Text variant="caption" color="textSecondary">
             Set from your phone&apos;s region
           </Text>
         </View>
@@ -134,8 +134,8 @@ export function SexStep({ draft, set, errors, advance }: StepProps) {
         <ErrorText>{errors.sex}</ErrorText>
       </Group>
       <WhyWeAsk testID="onb-sex-why">
-        The standard equations for resting metabolism (Mifflin-St Jeor, or Katch-McArdle when you know your body fat) have a female and a male form. This
-        answer only picks the form; it is not shown anywhere else.
+        The standard equations for resting metabolism (Mifflin-St Jeor, or Katch-McArdle when you know your body fat) have a female and a male form. The
+        answer also sets your starting water goal and the lowest calorie target HealthCal suggests. You can change it later in Goals.
       </WhyWeAsk>
     </Group>
   );

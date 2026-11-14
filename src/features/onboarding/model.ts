@@ -280,10 +280,9 @@ export function validateStep(step: StepId, d: Draft, now: Date = new Date()): Er
       if (!d.goal) e.goal = 'Choose the goal that fits best. You can change it later.';
       break;
     case 'sex':
-      if (!d.sex) e.sex = 'Choose one. It only selects the right equation.';
+      if (!d.sex) e.sex = 'Choose one, so the estimate uses the right equation.';
       break;
     case 'about': {
-      if (!d.sex) e.sex = 'Choose one. It only selects the right equation.';
       if (d.dobDay === null || d.dobMonth === null || d.dobYear === null) {
         e.dob = 'Enter your full date of birth.';
         break;

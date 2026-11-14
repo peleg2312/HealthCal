@@ -65,16 +65,13 @@ export function StepSlide({ direction, disabled, children }: { direction: 1 | -1
 }
 
 /** Step heading: a question and a short line on why it is asked. */
-export function StepTitle({ title, subtitle, right }: { title: string; subtitle?: string; right?: React.ReactNode }) {
+export function StepTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   const { spacing } = useTheme();
   return (
     <View style={{ gap: spacing.sm, marginBottom: spacing.xs }}>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
-        <Text variant="h1" accessibilityRole="header" style={{ flex: 1, minWidth: 0 }}>
-          {title}
-        </Text>
-        {right}
-      </View>
+      <Text variant="h1" accessibilityRole="header">
+        {title}
+      </Text>
       {subtitle ? (
         <Text variant="body" color="textSecondary">
           {subtitle}
@@ -190,8 +187,8 @@ export function GoalCup({ goal, index = 0 }: { goal: 'lose' | 'maintain' | 'gain
 
 /**
  * Information panel with a leading icon: an alt cup (surfaceAlt, no border).
- * `warning` adds a 3 px amber edge on the left (never red). `primary` is kept
- * for old callers and draws like neutral.
+ * `warning` wears a 3 px amber lip along its top, as a cup does when it is
+ * over (never red, and no stripe down the side).
  */
 export function Note({
   icon,
@@ -201,11 +198,10 @@ export function Note({
 }: {
   icon?: React.ReactNode;
   children: React.ReactNode;
-  tone?: 'neutral' | 'warning' | 'primary';
+  tone?: 'neutral' | 'warning';
   testID?: string;
 }) {
   const { colors, radius, spacing } = useTheme();
-  const edge = tone === 'warning' ? colors.warning : null;
   return (
     <View
       testID={testID}
@@ -215,9 +211,9 @@ export function Note({
         padding: spacing.lg,
         ...cup(radius.tile, 5),
         backgroundColor: colors.surfaceAlt,
-        borderLeftWidth: edge ? 3 : 0,
-        borderLeftColor: edge ?? 'transparent',
+        overflow: 'hidden',
       }}>
+      {tone === 'warning' ? <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 3, backgroundColor: colors.warning }} /> : null}
       {icon ? <View style={{ paddingTop: 1 }}>{icon}</View> : null}
       <View style={{ flex: 1, minWidth: 0, gap: 4 }}>{children}</View>
     </View>

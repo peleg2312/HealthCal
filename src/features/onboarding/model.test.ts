@@ -33,6 +33,8 @@ describe('onboarding model', () => {
     expect(stepsFor('lose').slice(0, 4)).toEqual(['basics', 'goal', 'sex', 'about']);
     expect(validateStep('sex', draft({ sex: null }), NOW).sex).toBeTruthy();
     expect(validateStep('sex', draft(), NOW)).toEqual({});
+    // The date of birth question no longer answers for the one before it.
+    expect(validateStep('about', draft({ sex: null }), NOW)).toEqual({});
   });
 
   it('rejects impossible dates and under-age birth dates', () => {
