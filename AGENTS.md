@@ -85,6 +85,8 @@ scripts/dev/        seed.mjs (demo data) and shot.mjs (browser screenshots).
 - Never read the clock while rendering (`today()`, `new Date()`, `Date.now()`, `mealForTime()`): the React Compiler caches a render's results, and tab screens stay mounted for the whole session, so the value would be hours or days old. Use `useToday()` and `useNow()` from `@/store/clock`; the plain functions are fine inside event handlers and effects. `useEnergyModel(date)`, `useDays(count, end)` and `useConsistency(end)` take the date explicitly for the same reason.
 - One record per day for weights and sleep: `upsert` gives them an id derived from the date, so saving a second value for a date replaces the first on every device.
 - Favourites are the synced `favorites` collection (each record holds the food); `favoriteFoodIds` is derived from it.
+- Synced collections are listed once in `COLLECTIONS` (`src/store/index.ts`). Adding one means: the type in `src/types`, the store's empty maps, the SQL check constraint in a new migration, the probe list in `supabase/tests/policies_and_sync.sql`, and a validator in `src/features/settings/exportFormat.ts`. `src/store/collections.test.ts` fails until all of them agree.
+- Shared rules live in one place: a fully logged day is `isCompleteDay` (`@/lib/trend`), minutes toward the weekly activity guideline are `guidelineMinutes` (`@/lib/exercise`), "usual foods for this meal" is `usualFoods` (`@/features/food/usuals`). Do not re-implement them in a feature.
 - Zustand v5: a selector must return a stable reference. Select raw slices (`useStore((s) => s.settings)`) and derive with `useMemo`; never return a fresh object or array from the selector itself.
 - React Compiler is on. Write plain components; do not add manual `useMemo`/`useCallback` for render performance (memoising expensive derived data is still fine).
 
@@ -146,4 +148,5 @@ Read the component source in `src/ui/` for exact props before using one. If the 
 - Unit tests: `npx vitest run` (pure logic only, files named `*.test.ts`). `react-native`, AsyncStorage and `expo-crypto` are stubbed for tests (see `test/stubs/`).
 - Browser tests read the app's live state with `await page.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())))`. Do not parse `localStorage` yourself: the store is saved as many small values (`src/store/persistence.ts`), not one.
 - `node scripts/dev/e2e.cjs` runs a new user's first day end to end; keep it passing.
+- `bash scripts/dev/test-sql.sh` applies the migrations to a throwaway local PostgreSQL and runs `supabase/tests/`. `scripts/dev/e2e-backend.cjs` exercises accounts, two-device sync, AI analysis and password reset against `scripts/dev/mock-backend.cjs` (see the README for the build it needs).
 - Do not run git commands, do not install or remove packages, do not edit `package.json` or `app.json`. If you need a package or a change to a shared file, say so in your report.

@@ -88,23 +88,44 @@ Paywalls that take away something that used to be free (barcode scanning in MyFi
 
 ## What HealthCal took from this
 
-Built in the round that followed the survey (see the commit history for each):
+Built after the survey. Each line says what exists in the app now; where a part was left out, it says so.
 
-- A week strip of day rings on Today, the four pillars above the fold, and meal rows that read at a glance.
-- "Usual for this meal" at the top of the add sheet, and a coach line with actions that do the thing.
-- Amount steppers on search rows after a one-tap add; saved meals that can be built, edited and logged by the serving.
-- Barcode scanning that checks your own foods first and confirms on a card over the camera.
-- A photo review step with swap suggestions and "what did it get wrong?" re-estimation.
-- Strength routines (repeat a workout in one tap), a rest timer and a finish summary with personal records.
-- A weekly check-in screen, an overview grid on Progress, target bands on charts, a consistency calendar.
-- An onboarding step for the user's day and reminders, and reminders that can be answered from the notification.
-- A soft per-metric colour behind each screen, a condensed face for headline numbers, and the Blossom theme.
+**Today and logging**
+
+- A week strip of day rings on Today that also switches the day, so yesterday can be reviewed or back-filled (food, water and sleep) without leaving the screen.
+- The four pillars (water, activity, sleep, weight or a running fast) in one rail under the calorie ring, above the fold on a phone, with one-tap water.
+- Meal rows that read at a glance (what was eaten, protein, a "~" when any item is an estimate) and a "Repeat" shortcut on an empty meal.
+- "Usual for this meal" in the add sheet and in food search, ranked from the user's own last 30 days, and "Repeat yesterday's dinner".
+- A coach card whose advice can be done from the card (add water, repeat a meal), that follows the user's own meal times and waking hours, and a "What fits" list of the user's own foods that fit the calories left.
+- Amount steppers on search rows after a one-tap add, with a running "kcal left today" footer.
+- Saved meals and recipes that can be built from search, edited, given a number of servings ("makes 4") and logged by the serving or item by item.
+- Barcode scanning that checks the user's own foods first and confirms on a card over the camera. The card was built and checked with typed barcodes only: a headless browser has no camera, so the live overlay has not been seen on a phone.
+- A photo review step with "could also be" swaps, "what did it get wrong?" re-estimation in a sentence, and the photo as the header of the result. Photos are not stored in the diary.
+
+**Training**
+
+- Strength routines (repeat the last workout or a saved routine in one tap; routines sync), a rest timer that starts when a set is ticked, and a finish summary with personal records. The rest timer raises a phone alert when the app is in the background; that alert has not been tested on a device.
+- Not built: a muscle map for strength sessions.
+
+**Progress**
+
+- A weekly check-in screen (/recap) announced on Today and on Progress.
+- Progress opens on an overview grid of eight tiles, each comparing with the period before; the detailed cards sit behind Nutrition, Body and Habits tabs.
+- Target bands, stacked macros and press-and-drag scrubbing on charts, and "your usual" ranges beside the targets on the calorie and weight charts.
+- A consistency page: a month calendar where runs of logged days merge into pills, the longest streak, and weekly rhythm targets (log food, train, weigh in) counted per week. A missed single day never ends a streak. Not built: pausing goals for illness or travel.
+
+**Setup, reminders, look**
+
+- An onboarding step for the user's day (meal times, wake and bed time, which reminders to switch on) and a plan reveal that draws the road to the target as a range of dates.
+- Reminders that can be answered from the notification (add a glass, repeat a meal, weigh in later). Notification buttons exist only on phones and have not been tested on a device.
+- A soft per-metric colour behind each screen, a condensed face for headline numbers, a tab bar whose active pill slides, and three themes: dark, light and Blossom.
 
 Looked at and left for later, with the reason:
 
-- **Voice logging** (MyFitnessPal, Lose It!, Bevel): needs a speech-recognition module that could not be verified in this environment.
+- **Voice logging** (MyFitnessPal, Lose It!, Bevel): needs a speech-recognition module that could not be verified in this environment. Describing a meal in text is covered by the AI screen.
 - **Scanning a nutrition label to create a food** (SnapCalorie, FoodNoms, MacroFactor): a good fit for the existing analysis function; not started.
 - **Home-screen widgets and a watch app** (WaterMinder, FoodNoms, Apple Fitness): native targets outside the shared codebase.
-- **Sync with Apple Health and Health Connect** (most of the category): needs native builds and device testing; the place where other apps double count, so it deserves care.
-- **Pausing goals for illness or travel**, **a weekly focus**, **share cards** and **badge art**: worthwhile, lower priority than getting the numbers right.
+- **Sync with Apple Health and Health Connect** (most of the category): needs native builds and device testing; it is also where other apps double count exercise, so it deserves care.
+- **A real glass (blurred) tab bar and sheet backdrop**: needs a native blur module checked on devices.
+- **Reminder times that learn from when the user actually logs**, **share cards** and **badge art**: worthwhile, lower priority than getting the numbers right.
 - **Micronutrients beyond the eight tracked** (Cronometer's strength): depends on a richer food database than the bundled one.

@@ -1,6 +1,6 @@
 import { ChevronRight } from 'lucide-react-native';
 import React from 'react';
-import { Switch, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Switch, View, type AccessibilityRole, type AccessibilityState, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useTheme } from '@/theme';
 
@@ -18,6 +18,9 @@ export function ListRow({
   chevron,
   style,
   testID,
+  accessibilityRole,
+  accessibilityState,
+  accessibilityHint,
 }: {
   title: string;
   subtitle?: string;
@@ -29,6 +32,10 @@ export function ListRow({
   chevron?: boolean;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  /** For rows that act as something other than a plain button (a radio choice, a link, a checkbox). */
+  accessibilityRole?: AccessibilityRole;
+  accessibilityState?: AccessibilityState;
+  accessibilityHint?: string;
 }) {
   const { colors, spacing } = useTheme();
   const content = (
@@ -56,7 +63,15 @@ export function ListRow({
   const rowStyle: ViewStyle = { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: spacing.sm };
   if (onPress) {
     return (
-      <PressableScale testID={testID} onPress={onPress} scaleTo={0.985} style={[rowStyle, style]} accessibilityLabel={[title, subtitle, value].filter(Boolean).join(', ')}>
+      <PressableScale
+        testID={testID}
+        onPress={onPress}
+        scaleTo={0.985}
+        style={[rowStyle, style]}
+        accessibilityRole={accessibilityRole}
+        accessibilityState={accessibilityState}
+        accessibilityHint={accessibilityHint}
+        accessibilityLabel={[title, subtitle, value].filter(Boolean).join(', ')}>
         {content}
       </PressableScale>
     );
