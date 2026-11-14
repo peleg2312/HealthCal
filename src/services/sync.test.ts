@@ -138,7 +138,7 @@ vi.mock('./supabase', () => {
 import { pendingChanges, useStore } from '@/store';
 import type { Profile } from '@/types';
 
-import { attachUser, resetRejected, startAutoSync, syncNow, useSyncState } from './sync';
+import { attachUser, canonicalTime, resetRejected, startAutoSync, syncNow, useSyncState } from './sync';
 
 const profile = (name: string): Partial<Profile> => ({
   name,
@@ -407,6 +407,29 @@ describe('sync', () => {
     expect(server.rows).toHaveLength(0);
     expect(pendingChanges(useStore.getState())).toBe(2);
     expect(useSyncState.getState()).toMatchObject({ status: 'error', rejected: 0 });
+  });
+
+  it('reads times in the format the database prints as the same instants', async () => {
+    expect(canonicalTime('2026-01-05T08:00:00.12+00:00')).toBe('2026-01-05T08:00:00.120Z');
+    expect(canonicalTime('2026-01-05T10:00:00+02:00')).toBe('2026-01-05T08:00:00.000Z');
+    expect(canonicalTime('not a time')).toBe('not a time');
+
+    await attachUser('user-a');
+    const entry = useStore.getState().upsert('water', water(250));
+    await syncNow();
+    // Another device edited it; the server hands the time back the way PostgREST prints it.
+    const row = server.rows.find((r) => r.id === entry.id)!;
+    const later = new Date(Date.parse(row.updated_at) + 60_000);
+    Object.assign(row, { data: { ...row.data, ml: 400 }, updated_at: later.toISOString().replace('.000Z', '+00:00'), server_updated_at: server.tick() });
+    await syncNow();
+    const local = useStore.getState().water[entry.id];
+    expect(local.ml).toBe(400);
+    expect(local.updatedAt).toBe(later.toISOString());
+    // A local edit after that is newer, uploads, and leaves nothing pending.
+    useStore.getState().upsert('water', { ...local, ml: 450 });
+    await syncNow();
+    expect((server.rows.find((r) => r.id === entry.id)!.data as { ml: number }).ml).toBe(450);
+    expect(pendingChanges(useStore.getState())).toBe(0);
   });
 
   it('pulls every row when a page boundary falls inside a group sharing one server timestamp', async () => {

@@ -96,7 +96,17 @@ export function resetRejected(): void {
   useSyncState.setState({ rejected: 0 });
 }
 
-const toRecord = (r: RemoteRow) => ({ collection: r.collection, record: { ...r.data, id: r.id, updatedAt: r.updated_at, deleted: r.deleted } });
+/**
+ * The database returns times as '2026-01-05T08:00:00.12+00:00'; the app stamps
+ * records as '2026-01-05T08:00:00.120Z'. Both are the same instant, but records
+ * are compared as text, so a downloaded time is rewritten in the app's own form.
+ */
+export function canonicalTime(value: string): string {
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : value;
+}
+
+const toRecord = (r: RemoteRow) => ({ collection: r.collection, record: { ...r.data, id: r.id, updatedAt: canonicalTime(r.updated_at), deleted: r.deleted } });
 const knownCollection = (r: RemoteRow) => (COLLECTIONS as string[]).includes(r.collection);
 
 /**
