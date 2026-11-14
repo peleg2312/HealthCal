@@ -51,7 +51,9 @@ export function EnergyCard({ model, useAdaptiveSetting }: { model: EnergyModel; 
   const pct = Math.round(a.confidence * 100);
   const word = confidenceWord(a.confidence);
   const delta = Math.round(model.target.dailyDelta);
-  const accent = colors.exercise;
+  // Expenditure has one key everywhere: the calorie colour, outlined because it is an estimate (as on the
+  // overview tile). The exercise colour would say this card is about workouts; it is mostly resting burn.
+  const accent = colors.calories;
 
   return (
     <SectionCard
@@ -59,6 +61,7 @@ export function EnergyCard({ model, useAdaptiveSetting }: { model: EnergyModel; 
       title="Energy expenditure"
       subtitle="Calories you burn in a typical day"
       color={accent}
+      keyVariant="outline"
       link="/settings/goals"
       linkLabel="Goals">
       <View style={{ flexDirection: 'row' }}>

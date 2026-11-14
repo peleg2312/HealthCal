@@ -2,11 +2,13 @@
  * Plain formatting and counting for the Garmin import screen. Pure: no React,
  * no storage, no clock (today's date is passed in), so it is unit-tested.
  */
+import { ACTIVITY_BY_ID } from '@/data/activities';
 import { addDays, formatDuration, fromISODate } from '@/lib/dates';
 import { kcalRange } from '@/lib/exercise';
 import { formatDistance, formatNumber } from '@/lib/units';
 import type { ISODate, UnitSystem } from '@/types';
 
+import { speedIntensity } from '../effort';
 import type { ImportCandidate } from '../plan';
 import type { ImportBatch } from '../read';
 import { recordedWallTime } from '../time';
@@ -129,6 +131,8 @@ export interface RowCounts {
   alreadyImported: number;
   /** Workouts already imported from a poorer file, which this one improves. */
   updates: number;
+  /** Workouts the person changed after importing; the file would undo that, so they are only offered. */
+  edited: number;
   /** Imported before and then deleted: can be restored. */
   deletedBefore: number;
   duplicates: number;
@@ -138,14 +142,17 @@ export interface RowCounts {
 }
 
 export function countRows(rows: ImportCandidate[]): RowCounts {
-  const c: RowCounts = { total: rows.length, selected: 0, choose: 0, alreadyImported: 0, updates: 0, deletedBefore: 0, duplicates: 0, probable: 0, locked: 0 };
+  const c: RowCounts = { total: rows.length, selected: 0, choose: 0, alreadyImported: 0, updates: 0, edited: 0, deletedBefore: 0, duplicates: 0, probable: 0, locked: 0 };
   for (const r of rows) {
     if (r.selected) c.selected += 1;
     if (r.status === 'already-imported') {
       c.alreadyImported += 1;
       if (r.match?.deleted) c.deletedBefore += 1;
     }
-    if (r.status === 'update') c.updates += 1;
+    if (r.status === 'update') {
+      if (r.edited) c.edited += 1;
+      else c.updates += 1;
+    }
     if (isDuplicate(r)) c.duplicates += 1;
     if (r.status === 'probable-duplicate') c.probable += 1;
     if (r.status === 'already-imported' || r.status === 'duplicate-in-file') c.locked += 1;
@@ -243,3 +250,9 @@ export function shiftDays(w: ImportedWorkout, days: number): ImportedWorkout {
 
 /** A safe, stable piece of a testID for a row key ('Activities.csv#12' -> 'activities-csv-12'). */
 export const slug = (key: string) => key.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+/** True when, with no effort picked, the row's estimate takes its effort from the pace (effort.ts). */
+export function paceSetsEffort(r: Pick<ImportCandidate, 'activityId' | 'workout'>): boolean {
+  const activity = r.activityId ? ACTIVITY_BY_ID[r.activityId] : undefined;
+  return !!activity && speedIntensity(activity, r.workout) !== null;
+}

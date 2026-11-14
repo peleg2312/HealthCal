@@ -1,12 +1,14 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { deleteCustomFood } from '@/features/food/actions';
 import { setFoodDraft, useFoodDraft } from '@/features/food/draft';
-import { href, kcal, param, toPer100 } from '@/features/food/helpers';
-import { atwaterKcal } from '@/lib/nutrition';
+import { href, kcal, param, parseMeal, toPer100 } from '@/features/food/helpers';
+import { logFood } from '@/features/food/log';
+import { today } from '@/lib/dates';
+import { atwaterKcal, GRAM_SERVING } from '@/lib/nutrition';
 import { useStore } from '@/store';
 import { cupFor, useTheme } from '@/theme';
 import type { CustomFood, Nutrients } from '@/types';
@@ -119,9 +121,14 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
       goBack('/food/search');
       return;
     }
+    if (meal) {
+      // Opened to log into a meal: log one serving at once (with Undo in its toast) and go back.
+      logFood({ food, serving: food.servings[0] ?? GRAM_SERVING, quantity: 1, meal: parseMeal(meal), date: date ?? today() });
+      goBack(href('/food/search', { meal, date }));
+      return;
+    }
     toast('Saved to my foods');
-    setFoodDraft(food);
-    router.replace(href('/food/detail', { meal, date }) as never);
+    goBack('/food/search');
   };
 
   return (
@@ -144,7 +151,7 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
               <Trash2 size={20} color={colors.danger} />
             </IconButton>
           ) : null}
-          <Button testID="custom-save" style={{ flex: 1 }} title={existing ? 'Save changes' : 'Save and log'} onPress={save} />
+          <Button testID="custom-save" style={{ flex: 1 }} title={existing ? 'Save changes' : meal ? 'Save and log' : 'Save'} onPress={save} />
         </View>
       }>
       <Card style={{ gap: spacing.md }}>
@@ -230,7 +237,7 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
             {impossible}
           </Text>
         ) : mismatch ? (
-          <Text testID="custom-mismatch" variant="caption" color="warning">
+          <Text testID="custom-mismatch" variant="caption" color="warningInk">
             The macros add up to about {kcal(implied)} kcal. Labels round, so small gaps are normal; a big one is usually a typo.
           </Text>
         ) : null}

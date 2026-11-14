@@ -1,15 +1,21 @@
 import { router } from 'expo-router';
-import { ChevronRight, Droplets, Flame, Plus, Repeat2 } from 'lucide-react-native';
+import { ChevronRight, Droplets, Plus, Repeat2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
 import { useRecapReady } from '@/features/progress/recapReady';
-import { coachTip, rhythmFromReminders } from '@/features/today/coach';
+import { coachTip, rhythmFromReminders, type ClosedDay } from '@/features/today/coach';
 import { DayRingStrip } from '@/features/today/DayRingStrip';
 import { FitsSheet } from '@/features/today/FitsSheet';
 import { mealLine } from '@/features/today/meals';
 import { RecapReadyCard } from '@/features/today/RecapReadyCard';
+import { FirstLogInvite } from '@/features/today/FirstLogInvite';
+import { startDate } from '@/features/today/week';
+import { ShareDayButton } from '@/features/share';
+import { MilestoneSheet } from '@/features/streak/MilestoneSheet';
+import { StreakMark } from '@/features/streak/StreakMark';
+import { useStreakMoment } from '@/features/streak/useStreakMoment';
 import { addWater, defaultGlass, StatusRail } from '@/features/today/StatusRail';
 import { useReportViewedDay } from '@/features/today/viewedDay';
 import { addDays, formatShortDate, fromISODate, greeting, weekdayShort } from '@/lib/dates';
@@ -18,9 +24,9 @@ import { formatNumber, formatVolume } from '@/lib/units';
 import { useStore } from '@/store';
 import { useNow, useToday } from '@/store/clock';
 import { useConsistency, useDay, useLive, useProfile, type DaySummary } from '@/store/selectors';
-import { cupFor, useTheme } from '@/theme';
+import { cupFor, motion, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
-import { Button, Card, Chip, CupKey, IconButton, PressableScale, ProgressBar, Screen, Text, Vessel, type VesselLabel } from '@/ui';
+import { AnimatedNumber, Button, FadeUp, Card, Chip, CupKey, IconButton, PressableScale, ProgressBar, Screen, Text, Vessel, type VesselLabel } from '@/ui';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const longDay = (date: ISODate) => `${WEEKDAYS[fromISODate(date).getDay()]}, ${formatShortDate(date)}`;
@@ -37,6 +43,11 @@ export default function TodayScreen() {
   const isToday = date === todayDate;
   const day = useDay(date);
   const consistency = useConsistency(todayDate);
+  const streak = useStreakMoment(consistency, todayDate);
+  const start = startDate(profile.onboardedAt);
+  // Day one (or a profile with nothing logged yet): one obvious first action.
+  const firstDay = isToday && day.entries.length === 0 && consistency.totalDaysLogged === 0;
+  const yesterday = useDay(addDays(todayDate, -1));
   const now = useNow();
   const recap = useRecapReady();
   // The "What fits" sheet: null when closed, else whether protein is the gap it was opened for.
@@ -51,8 +62,19 @@ export default function TodayScreen() {
           isToday={isToday}
           initial={(profile.name || 'Me').slice(0, 1).toUpperCase()}
           onJumpToday={() => setPicked(null)}
+          share={<ShareDayButton date={date} />}
         />
-        {isToday && !recap.announce ? <CoachLine day={day} onFits={() => setFits({ proteinFirst: true })} /> : null}
+        {firstDay ? (
+          <Text variant="body" color="textSecondary" testID="today-coach">
+            {`Your budget is ${formatNumber(day.budget)} kcal. Log the first thing and the cup starts to fill.`}
+          </Text>
+        ) : isToday && !recap.announce ? (
+          <CoachLine
+            day={day}
+            yesterday={yesterday.entries.length ? { eaten: yesterday.eaten.kcal, budget: yesterday.budget } : null}
+            onFits={() => setFits({ proteinFirst: true })}
+          />
+        ) : null}
       </View>
 
       <View style={{ marginTop: spacing.xxs }}>
@@ -60,12 +82,20 @@ export default function TodayScreen() {
           today={todayDate}
           selected={date}
           onSelect={(d) => setPicked(d === todayDate ? null : d)}
-          accessory={consistency.streak > 1 ? <Streak days={consistency.streak} /> : null}
+          start={start}
+          accessory={streak.streak > 1 ? <StreakMark days={streak.streak} filled={streak.filled} /> : null}
         />
+        {isToday && streak.line ? (
+          <FadeUp>
+            <Text variant="caption" color="text" testID="today-streak-line">
+              {streak.line}
+            </Text>
+          </FadeUp>
+        ) : null}
       </View>
 
-      <EnergyCard day={day} isToday={isToday} onFits={() => setFits({ proteinFirst: false })} />
-      <StatusRail day={day} isToday={isToday} />
+      <EnergyCard day={day} isToday={isToday} firstDay={firstDay} meal={mealForTime(now)} onFits={() => setFits({ proteinFirst: false })} />
+      <StatusRail day={day} isToday={isToday} quiet={firstDay} />
       {isToday && recap.announce ? <RecapReadyCard /> : null}
 
       <MealsSection day={day} />
@@ -79,6 +109,7 @@ export default function TodayScreen() {
         proteinFirst={fits?.proteinFirst ?? false}
         proteinLeft={day.macros.proteinG - day.eaten.protein}
       />
+      <MilestoneSheet milestone={streak.milestone} onClose={streak.closeMilestone} />
     </Screen>
   );
 }
@@ -91,12 +122,14 @@ function TodayHeader({
   isToday,
   initial,
   onJumpToday,
+  share,
 }: {
   overline: string;
   title: string;
   isToday: boolean;
   initial: string;
   onJumpToday: () => void;
+  share?: React.ReactNode;
 }) {
   const { colors, spacing } = useTheme();
   const { width } = useWindowDimensions();
@@ -115,6 +148,7 @@ function TodayHeader({
         {!isToday ? (
           <Chip testID="today-jump-today" label="Today" selected onPress={onJumpToday} />
         ) : null}
+        {share}
         <PressableScale
           testID="today-profile"
           onPress={() => router.push('/profile')}
@@ -127,50 +161,50 @@ function TodayHeader({
   );
 }
 
-/** The logging streak, in the week strip's caption row: a flame and the count. */
-function Streak({ days }: { days: number }) {
-  const { colors } = useTheme();
-  return (
-    <PressableScale
-      testID="today-streak"
-      onPress={() => router.push('/consistency' as never)}
-      accessibilityLabel={`${days} day logging streak`}
-      hitSlop={6}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 3, minHeight: 32, paddingHorizontal: 4 }}>
-      <Flame size={16} color={colors.caloriesInk} strokeWidth={2.2} />
-      <Text variant="numM" style={{ fontSize: 15, lineHeight: 20 }}>
-        {days}
-      </Text>
-      <Text variant="caption" color="textSecondary">
-        {days === 1 ? 'day' : 'days'}
-      </Text>
-    </PressableScale>
-  );
-}
-
 // ------------------------------------------------------------- energy hero
 
 const VESSEL_H = 212;
+/** Day one: a shorter, empty cup, so the first-log invite under it stays in the first screen. */
+const VESSEL_H_FIRST = 150;
 
-function EnergyCard({ day, isToday, onFits }: { day: DaySummary; isToday: boolean; onFits: () => void }) {
+function EnergyCard({
+  day,
+  isToday,
+  firstDay,
+  meal,
+  onFits,
+}: {
+  day: DaySummary;
+  isToday: boolean;
+  firstDay: boolean;
+  meal: MealType;
+  onFits: () => void;
+}) {
   const { colors } = useTheme();
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
   const over = day.remaining < 0;
   const eaten = day.eaten.kcal;
   const budget = Math.max(0, day.budget);
+  // A past day with no food is not an intake deficit of the whole budget: it was not logged.
+  const notLogged = !isToday && day.entries.length === 0;
   // Calories added by exercise, drawn as hatched headroom at the top of the vessel.
   const headroom = Math.max(0, day.budget - day.target);
   const left = formatNumber(Math.abs(day.remaining));
   // The big number sits in the empty space between the level and the base budget (or the brim).
-  const emptyTop = eaten < budget - headroom ? budget - headroom : budget;
-  const numSize = narrow ? 44 : left.length >= 5 ? 50 : 60;
+  const inBand = eaten > budget - headroom;
+  const emptyTop = inBand ? budget : budget - headroom;
+  const numSize = narrow ? (left.length >= 5 ? 40 : 44) : left.length >= 5 ? 50 : 60;
+  const unitWord = over ? 'over' : isToday ? 'left' : 'under';
+  const height = firstDay ? VESSEL_H_FIRST : VESSEL_H;
 
   const labels: VesselLabel[] = [];
   if (headroom > 0) {
     labels.push({
       key: 'burned',
-      at: budget - headroom / 2,
+      // Beside its hatched band: mid-band, or the very top once eaten has risen into the band,
+      // so it always reads above the eaten line.
+      at: inBand ? budget : budget - headroom / 2,
       height: 22,
       tick: colors.exercise,
       content: (
@@ -183,55 +217,98 @@ function EnergyCard({ day, isToday, onFits }: { day: DaySummary; isToday: boolea
       ),
     });
   }
-  labels.push({
-    key: 'left',
-    at: (Math.min(eaten, budget) + emptyTop) / 2,
-    height: numSize - 4,
-    content: (
-      <PressableScale
-        testID="today-remaining-open"
-        scaleTo={0.97}
-        onPress={onFits}
-        accessibilityLabel={`${left} ${over ? 'kilocalories over' : isToday ? 'kilocalories left' : 'kilocalories under'}. See which of your foods fit`}
-        style={{ flexDirection: 'row', alignItems: 'flex-end', alignSelf: 'flex-start', gap: 6 }}>
-        <Text
-          variant="numXL"
-          color={over ? 'warning' : 'caloriesInk'}
-          testID="today-remaining"
-          numberOfLines={1}
-          style={{ fontSize: numSize, lineHeight: numSize - 2, letterSpacing: -numSize * 0.035 }}>
-          {left}
-        </Text>
-        <Text variant="unit" style={{ fontSize: 14, lineHeight: 17, marginBottom: numSize * 0.08 }}>
-          {`kcal\n${over ? 'over' : isToday ? 'left' : 'under'}`}
-        </Text>
-      </PressableScale>
-    ),
-  });
-  labels.push({
-    key: 'eaten',
-    at: Math.min(eaten, budget),
-    height: 22,
-    tick: colors.rim,
-    content: (
-      <Text variant="numM" numberOfLines={1} style={{ fontSize: 17, lineHeight: 22 }}>
-        {formatNumber(eaten)}
-        <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
-          {'  eaten'}
-        </Text>
-      </Text>
-    ),
-  });
+  if (notLogged) {
+    labels.push({
+      key: 'left',
+      at: budget / 2,
+      height: 52,
+      content: (
+        <PressableScale
+          testID="today-not-logged"
+          scaleTo={0.97}
+          onPress={() => router.push(`/diary?date=${day.date}` as never)}
+          accessibilityLabel="Nothing logged for this day. Open the diary to add it"
+          style={{ alignSelf: 'flex-start', gap: 2 }}>
+          <Text variant="h2" testID="today-remaining">
+            Nothing logged
+          </Text>
+          <Text variant="label" color="primaryInk">
+            Add what you ate
+          </Text>
+        </PressableScale>
+      ),
+    });
+  } else {
+    labels.push({
+      key: 'left',
+      at: (Math.min(eaten, budget) + emptyTop) / 2,
+      height: numSize - 4,
+      content: (
+        <PressableScale
+          testID="today-remaining-open"
+          scaleTo={0.97}
+          onPress={onFits}
+          accessibilityLabel={`${left} kilocalories ${unitWord}. See which of your foods fit`}
+          style={{ flexDirection: 'row', alignItems: 'flex-end', alignSelf: 'flex-start', gap: 6 }}>
+          <AnimatedNumber
+            variant="numXL"
+            color={over ? 'warningInk' : 'caloriesInk'}
+            testID="today-remaining"
+            numberOfLines={1}
+            value={day.remaining}
+            format={(n) => formatNumber(Math.abs(Math.round(n)))}
+            duration={motion.duration.pour}
+            accessibilityLabel={`${left} kilocalories ${unitWord}`}
+            style={{ fontSize: numSize, lineHeight: numSize - 2, letterSpacing: -numSize * 0.035 }}
+          />
+          <Text variant="unit" style={{ fontSize: 14, lineHeight: 17, marginBottom: numSize * 0.08 }}>
+            {`kcal\n${unitWord}`}
+          </Text>
+        </PressableScale>
+      ),
+    });
+    if (!firstDay) {
+      labels.push({
+        key: 'eaten',
+        at: Math.min(eaten, budget),
+        height: 22,
+        tick: colors.rim,
+        content: (
+          <AnimatedNumber variant="numM" numberOfLines={1} value={eaten} format={(n) => formatNumber(Math.round(n))} style={{ fontSize: 17, lineHeight: 22 }} testID="today-eaten">
+            <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
+              {'  eaten'}
+            </Text>
+          </AnimatedNumber>
+        ),
+      });
+    }
+  }
 
   return (
     <Card testID="today-energy" padding={18}>
-      <Vessel value={eaten} max={budget} headroom={headroom} color={colors.calories} width={narrow ? 66 : 84} height={VESSEL_H} labels={labels} labelGap={narrow ? 14 : 16}>
-        <View style={{ gap: 10 }}>
-          <Macro label="Protein" value={day.eaten.protein} target={day.macros.proteinG} color={colors.protein} />
-          <Macro label="Carbs" value={day.eaten.carbs} target={day.macros.carbsG} color={colors.carbs} />
-          <Macro label="Fat" value={day.eaten.fat} target={day.macros.fatG} color={colors.fat} />
-        </View>
+      <Vessel
+        value={eaten}
+        max={budget}
+        headroom={headroom}
+        color={colors.calories}
+        width={narrow ? 66 : 84}
+        height={height}
+        labels={labels}
+        labelGap={narrow ? 14 : 16}
+        memoryKey={`hero-${day.date}`}>
+        {firstDay || notLogged ? null : (
+          <View style={{ gap: 10 }}>
+            <Macro label="Protein" value={day.eaten.protein} target={day.macros.proteinG} color={colors.protein} reach />
+            <Macro label="Carbs" value={day.eaten.carbs} target={day.macros.carbsG} color={colors.carbs} />
+            <Macro label="Fat" value={day.eaten.fat} target={day.macros.fatG} color={colors.fat} />
+          </View>
+        )}
       </Vessel>
+      {firstDay ? (
+        <View style={{ marginTop: 18 }}>
+          <FirstLogInvite meal={meal} date={day.date} budget={day.budget} />
+        </View>
+      ) : null}
       <View style={{ height: 1, backgroundColor: colors.border, marginTop: 16, marginBottom: 12 }} />
       <Text variant="caption" color="textSecondary">
         {headroom > 0 ? (
@@ -258,20 +335,19 @@ function EnergyCard({ day, isToday, onFits }: { day: DaySummary; isToday: boolea
   );
 }
 
-function Macro({ label, value, target, color }: { label: string; value: number; target: number; color: string }) {
+function Macro({ label, value, target, color, reach }: { label: string; value: number; target: number; color: string; reach?: boolean }) {
   return (
     <View style={{ gap: 5 }} accessible accessibilityLabel={`${label}, ${Math.round(value)} of ${target} grams`}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
         <CupKey color={color} />
-        <Text variant="label" style={{ flex: 1 }} numberOfLines={1}>
+        <Text variant="label" style={{ flex: 1, minWidth: 40 }} numberOfLines={1}>
           {label}
         </Text>
-        <Text variant="numM" style={{ fontSize: 14.5, lineHeight: 18 }}>
-          {Math.round(value)}
+        <AnimatedNumber variant="numM" value={Math.round(value)} style={{ fontSize: 14.5, lineHeight: 18 }}>
           <Text variant="caption" color="textSecondary">{` / ${target} g`}</Text>
-        </Text>
+        </AnimatedNumber>
       </View>
-      <ProgressBar progress={target > 0 ? value / target : 0} color={color} height={6} />
+      <ProgressBar progress={target > 0 ? value / target : 0} color={color} height={6} goalKind={reach ? 'reach' : 'limit'} />
     </View>
   );
 }
@@ -289,14 +365,14 @@ function relativeTo(date: ISODate, from: ISODate): string {
  * The coach's one line under the greeting ("On track. 941 kcal left and
  * 2.08 L of water to go."), with its quick actions under it as chips.
  */
-function CoachLine({ day, onFits }: { day: DaySummary; onFits: () => void }) {
+function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: ClosedDay | null; onFits: () => void }) {
   const { colors, spacing } = useTheme();
   const profile = useProfile();
   const now = useNow();
   const entries = useLive('foodEntries');
   const presets = useStore((s) => s.settings.waterPresets);
   const reminders = useStore((s) => s.settings.reminders);
-  const tip = coachTip(day, profile.units, now, rhythmFromReminders(reminders));
+  const tip = coachTip(day, profile.units, now, rhythmFromReminders(reminders), yesterday);
   const action = tip.action;
   const quick = tip.quick;
   const prev = quick?.kind === 'repeat' ? findPreviousMeal(entries, day.date, quick.meal, 7) : null;
@@ -406,7 +482,7 @@ function MealsSection({ day }: { day: DaySummary }) {
                       </Text>
                     ) : null}
                   </View>
-                  <Text variant="caption" color="textSecondary" numberOfLines={1}>
+                  <Text variant="caption" color="textSecondary" numberOfLines={2}>
                     {entries.length
                       ? line.detail
                       : prev

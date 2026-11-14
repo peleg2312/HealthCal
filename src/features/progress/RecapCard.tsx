@@ -27,7 +27,7 @@ export function RecapCard({ recap, earlier, unseen }: { recap: WeeklyRecap; earl
         <CalendarCheck size={22} color={colors.text} strokeWidth={1.9} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <Text variant="h3" numberOfLines={1} style={{ flexShrink: 1 }}>
+            <Text variant="h3" numberOfLines={2} style={{ flexShrink: 1 }}>
               Weekly check-in
             </Text>
             {unseen ? <Badge label="New" color={colors.primary} /> : null}

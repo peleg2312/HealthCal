@@ -1,0 +1,327 @@
+/**
+ * What a share card carries, for a given day (or week) and the person's
+ * choices. Pure: no React, no storage, no clock. The card is drawn from this
+ * (see `scene.ts`), so everything that could leave the phone passes through
+ * here, and the privacy rules are tested here:
+ *
+ * - Weight is never on a card: no input carries it.
+ * - Calories show as how full the day is (a share of its own budget). The kcal
+ *   figures appear only with `choices.kcal`.
+ * - Water, activity minutes, the streak and the week's cups are on by default.
+ * - Food names appear only with `choices.foods`.
+ */
+import { addDays, fromISODate, startOfWeek } from '@/lib/dates';
+import { formatNumber, formatVolume } from '@/lib/units';
+import type { ISODate, MealType, UnitSystem } from '@/types';
+
+export interface ShareChoices {
+  /** The kcal figures (eaten, budget). Off by default: the cup shows how full the day is instead. */
+  kcal: boolean;
+  water: boolean;
+  activity: boolean;
+  streak: boolean;
+  /** The row of the week's cups. */
+  week: boolean;
+  /** Food names. Off by default. */
+  foods: boolean;
+}
+
+export const DEFAULT_SHARE_CHOICES: ShareChoices = { kcal: false, water: true, activity: true, streak: true, week: true, foods: false };
+
+/** The choices a card kind offers, in the order the sheet lists them. A week card has no food names. */
+export const CHOICES_FOR: Record<'day' | 'week', (keyof ShareChoices)[]> = {
+  day: ['kcal', 'water', 'activity', 'streak', 'week', 'foods'],
+  week: ['kcal', 'water', 'activity', 'streak'],
+};
+
+export const CHOICE_LABEL: Record<keyof ShareChoices, string> = {
+  kcal: 'Calorie numbers',
+  water: 'Water',
+  activity: 'Activity',
+  streak: 'Streak',
+  week: 'Week',
+  foods: 'Food names',
+};
+
+export const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+/** One day as the cards need it. */
+export interface ShareDay {
+  date: ISODate;
+  /** Food logged that day. */
+  logged: boolean;
+  kcal: number;
+  budget: number;
+  /** Fully logged (the shared `isCompleteDay` rule), decided by the caller. */
+  complete: boolean;
+}
+
+export interface ShareDayInput {
+  date: ISODate;
+  today: ISODate;
+  units: UnitSystem;
+  kcal: number;
+  /** The day's own budget (exercise included when it is eaten back). */
+  budget: number;
+  /** Net exercise calories inside the budget (drawn as hatched headroom); 0 when not eaten back. */
+  exerciseInBudget: number;
+  /** kcal per meal, for the cup's bands. */
+  mealKcal: Record<MealType, number>;
+  /** Food names per meal, in logging order. Used only with `choices.foods`. */
+  mealFoods: Record<MealType, string[]>;
+  waterMl: number;
+  waterGoalMl: number;
+  waterLogged: boolean;
+  activeMinutes: number;
+  /** The forgiving streak from `useConsistency` (never re-computed here). */
+  streak: number;
+  /** Days of the week holding `date`, any order; missing days count as not logged. */
+  week: ShareDay[];
+}
+
+export type StatKey = 'water' | 'activity' | 'streak' | 'budget' | 'kcal';
+
+export interface ShareStat {
+  key: StatKey;
+  value: string;
+  unit: string;
+  label: string;
+  /** 0..1 toward a goal to reach, when the stat has one (water). */
+  progress?: number;
+}
+
+export interface WeekCup {
+  date: ISODate;
+  letter: string;
+  /** eaten / that day's own budget. */
+  ratio: number;
+  logged: boolean;
+  complete: boolean;
+  over: boolean;
+  future: boolean;
+  /** Fully logged and within 10% of its own budget. */
+  inBand: boolean;
+}
+
+export interface DayCardContent {
+  kind: 'day';
+  date: ISODate;
+  overline: string;
+  title: string;
+  /** The day is still open (today). */
+  inProgress: boolean;
+  cup: {
+    /** Cumulative tops of the meal bands, as shares of the budget, bottom first. */
+    bands: { meal: MealType; top: number }[];
+    /** eaten / budget (can pass 1). */
+    level: number;
+    over: boolean;
+    /** Exercise share at the top of the budget, hatched. */
+    headroom: number;
+  };
+  headline: { value: string; unit: string };
+  verdict: string;
+  stats: ShareStat[];
+  week: WeekCup[] | null;
+  foods: string | null;
+  /** Everything the card says, in words, for the image's accessibility label and the share text. */
+  summary: string;
+}
+
+const WEEKDAY_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MONTH_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+const BAND = 0.1;
+const plural = (n: number, one: string, many = `${one}s`) => (n === 1 ? one : many);
+
+export function weekCups(weekStart: ISODate, days: ShareDay[], today: ISODate): WeekCup[] {
+  const byDate = new Map(days.map((d) => [d.date, d]));
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = addDays(weekStart, i);
+    const d = byDate.get(date);
+    const logged = !!d?.logged && date <= today;
+    const ratio = logged && d && d.budget > 0 ? d.kcal / d.budget : 0;
+    const complete = logged && !!d?.complete;
+    return {
+      date,
+      letter: LETTERS[i],
+      ratio,
+      logged,
+      complete,
+      over: logged && ratio > 1,
+      future: date > today,
+      inBand: complete && Math.abs(ratio - 1) <= BAND,
+    };
+  });
+}
+
+/** Neutral words for how the day stands against its own budget. Over is information, never failure. */
+export function dayVerdict(kcal: number, budget: number, inProgress: boolean, logged: boolean): string {
+  if (!logged) return inProgress ? 'Nothing logged yet today' : 'Nothing logged that day';
+  const r = budget > 0 ? kcal / budget : 0;
+  if (inProgress) return r > 1 ? 'Past the budget so far today' : 'So far today';
+  if (r <= 1) return 'Within the day’s budget';
+  if (r <= 1 + BAND) return 'Within 10% of the budget';
+  return 'Above the day’s budget';
+}
+
+/** Up to `max` distinct names in meal order, each cut to a readable length. */
+export function foodList(mealFoods: Record<MealType, string[]>, max = 6): string | null {
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const meal of MEAL_ORDER) {
+    for (const raw of mealFoods[meal] ?? []) {
+      const name = raw.trim();
+      const key = name.toLowerCase();
+      if (!name || seen.has(key)) continue;
+      seen.add(key);
+      names.push(name.length > 26 ? `${name.slice(0, 25).trimEnd()}…` : name);
+    }
+  }
+  if (!names.length) return null;
+  const shown = names.slice(0, max);
+  const more = names.length - shown.length;
+  return `${shown.join(', ')}${more > 0 ? ` and ${more} more` : ''}`;
+}
+
+export function dayCardContent(input: ShareDayInput, choices: ShareChoices): DayCardContent {
+  const d = fromISODate(input.date);
+  const inProgress = input.date === input.today;
+  const budget = Math.max(0, input.budget);
+  const logged = input.kcal > 0;
+  const level = budget > 0 ? input.kcal / budget : 0;
+
+  let acc = 0;
+  const bands: { meal: MealType; top: number }[] = [];
+  for (const meal of MEAL_ORDER) {
+    const k = Math.max(0, input.mealKcal[meal] ?? 0);
+    if (k <= 0 || budget <= 0) continue;
+    acc += k;
+    bands.push({ meal, top: acc / budget });
+  }
+
+  const headline = choices.kcal
+    ? { value: formatNumber(Math.round(input.kcal)), unit: `of ${formatNumber(Math.round(budget))} kcal` }
+    : { value: `${Math.round(level * 100)}%`, unit: inProgress ? 'of today’s budget' : 'of the day’s budget' };
+
+  const stats: ShareStat[] = [];
+  if (choices.water && (input.waterLogged || input.waterMl > 0)) {
+    const reached = input.waterMl >= input.waterGoalMl && input.waterGoalMl > 0;
+    const [value, ...unit] = formatVolume(input.waterMl, input.units).split(' ');
+    stats.push({
+      key: 'water',
+      value,
+      unit: unit.join(' '),
+      label: reached ? 'water, goal met' : `water of ${formatVolume(input.waterGoalMl, input.units).replace(/ /g, '\u00A0')}`,
+      progress: input.waterGoalMl > 0 ? input.waterMl / input.waterGoalMl : 0,
+    });
+  }
+  if (choices.activity && input.activeMinutes > 0) {
+    stats.push({ key: 'activity', value: formatNumber(Math.round(input.activeMinutes)), unit: 'min', label: 'active' });
+  }
+  if (choices.streak && input.streak > 0) {
+    stats.push({ key: 'streak', value: `${input.streak}`, unit: plural(input.streak, 'day'), label: 'logging streak' });
+  }
+
+  const week = choices.week ? weekCups(startOfWeek(input.date), input.week, input.today) : null;
+  const foods = choices.foods ? foodList(input.mealFoods) : null;
+  const verdict = dayVerdict(input.kcal, budget, inProgress, logged);
+  const title = `My ${WEEKDAY_LONG[d.getDay()]}`;
+  const overline = `${WEEKDAY_LONG[d.getDay()]}, ${MONTH_LONG[d.getMonth()]} ${d.getDate()}`.toUpperCase();
+
+  const summary = [
+    `${title}, ${MONTH_SHORT[d.getMonth()]} ${d.getDate()}.`,
+    `${headline.value} ${headline.unit}.`,
+    `${verdict}.`,
+    ...stats.map((s) => `${s.value} ${s.unit} ${s.label}.`.replace(/\s+/g, ' ')),
+    foods ? `On the plate: ${foods}.` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return {
+    kind: 'day',
+    date: input.date,
+    overline,
+    title,
+    inProgress,
+    cup: { bands, level, over: level > 1, headroom: budget > 0 ? Math.min(1, Math.max(0, input.exerciseInBudget) / budget) : 0 },
+    headline,
+    verdict,
+    stats,
+    week,
+    foods,
+    summary,
+  };
+}
+
+// --------------------------------------------------------------------- week
+
+export interface ShareWeekInput {
+  weekStart: ISODate;
+  today: ISODate;
+  units: UnitSystem;
+  days: ShareDay[];
+  /** Average intake and budget over the week's fully logged days (null without any). */
+  avgKcal: number | null;
+  avgBudget: number | null;
+  waterDaysAtGoal: number;
+  waterDaysTracked: number;
+  guidelineMinutes: number;
+  sessions: number;
+  streak: number;
+}
+
+export interface WeekCardContent {
+  kind: 'week';
+  overline: string;
+  title: string;
+  headline: string;
+  cups: WeekCup[];
+  stats: ShareStat[];
+  summary: string;
+}
+
+/**
+ * A week card writes its own headline from the facts it is allowed to show,
+ * so a win about weight, or one quoting kcal when the figures are off, never
+ * reaches it.
+ */
+export function weekHeadline(input: ShareWeekInput, cups: WeekCup[], choices: ShareChoices): string {
+  const complete = cups.filter((c) => c.complete).length;
+  const inBand = cups.filter((c) => c.inBand).length;
+  const logged = cups.filter((c) => c.logged).length;
+  const lines: { score: number; text: string }[] = [];
+  if (complete >= 2 && inBand / complete >= 0.6) lines.push({ score: inBand / complete, text: `${inBand} of ${complete} full days within 10% of the budget.` });
+  if (choices.activity && input.guidelineMinutes >= 150) lines.push({ score: 0.85, text: `${formatNumber(input.guidelineMinutes)} active minutes, past the weekly 150.` });
+  if (choices.water && input.waterDaysTracked >= 2 && input.waterDaysAtGoal / input.waterDaysTracked >= 0.7)
+    lines.push({ score: input.waterDaysAtGoal / input.waterDaysTracked, text: `Water goal met on ${input.waterDaysAtGoal} of ${input.waterDaysTracked} days.` });
+  if (logged >= 6) lines.push({ score: 0.7, text: `Food logged on ${logged} of 7 days.` });
+  lines.sort((a, b) => b.score - a.score);
+  return lines[0]?.text ?? `Food logged on ${logged} ${plural(logged, 'day')}.`;
+}
+
+export function weekCardContent(input: ShareWeekInput, choices: ShareChoices): WeekCardContent {
+  const cups = weekCups(input.weekStart, input.days, input.today);
+  const start = fromISODate(input.weekStart);
+  const end = fromISODate(addDays(input.weekStart, 6));
+  const range =
+    start.getMonth() === end.getMonth()
+      ? `${MONTH_SHORT[start.getMonth()]} ${start.getDate()} – ${end.getDate()}`
+      : `${MONTH_SHORT[start.getMonth()]} ${start.getDate()} – ${MONTH_SHORT[end.getMonth()]} ${end.getDate()}`;
+  const complete = cups.filter((c) => c.complete).length;
+  const inBand = cups.filter((c) => c.inBand).length;
+
+  const stats: ShareStat[] = [{ key: 'budget', value: `${inBand}`, unit: `of ${complete}`, label: 'full days within 10%' }];
+  if (choices.kcal && input.avgKcal !== null) stats.push({ key: 'kcal', value: formatNumber(Math.round(input.avgKcal)), unit: 'kcal', label: 'a day on average' });
+  if (choices.water && input.waterDaysTracked > 0)
+    stats.push({ key: 'water', value: `${input.waterDaysAtGoal}`, unit: `of ${input.waterDaysTracked}`, label: 'days at water goal', progress: input.waterDaysAtGoal / Math.max(1, input.waterDaysTracked) });
+  if (choices.activity && input.guidelineMinutes > 0) stats.push({ key: 'activity', value: formatNumber(input.guidelineMinutes), unit: 'min', label: 'active, guideline 150' });
+  if (choices.streak && input.streak > 0) stats.push({ key: 'streak', value: `${input.streak}`, unit: plural(input.streak, 'day'), label: 'logging streak' });
+
+  const headline = weekHeadline(input, cups, choices);
+  const summary = [`My week, ${range}.`, headline, ...stats.map((s) => `${s.value} ${s.unit} ${s.label}.`)].join(' ');
+  return { kind: 'week', overline: `WEEK OF ${range.toUpperCase()}`, title: 'My week', headline, cups, stats, summary };
+}

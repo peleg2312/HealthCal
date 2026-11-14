@@ -118,8 +118,12 @@ export function rebuildActivityEntry(existing: ActivityEntry, input: Omit<BuildA
     built.kcalNet = existing.kcalNet;
     // The calories are still the ones a device measured.
     if (existing.measured) built.measured = true;
+  } else if (existing.measured) {
+    // The activity, effort or length changed, so the calories above are an estimate again.
+    // measured: false (not just absent) records that the person replaced the device's
+    // figure, so importing the same file again does not undo their change by default.
+    built.measured = false;
   }
-  // Otherwise the activity, effort or length changed, so the calories above are an estimate again.
   return built;
 }
 

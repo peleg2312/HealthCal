@@ -1,8 +1,8 @@
 import React from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { useTheme } from '@/theme';
-import { CupKey, PressableScale, Text } from '@/ui';
+import { CupKey, FadeUp, PressableScale, Text } from '@/ui';
 
 /**
  * One cell of the overview card: a cup key and title, one large value with
@@ -23,6 +23,7 @@ export function ProgressTile({
   keyVariant,
   borderRight,
   borderTop,
+  index = 0,
 }: {
   testID: string;
   title: string;
@@ -39,16 +40,21 @@ export function ProgressTile({
   keyVariant?: 'filled' | 'outline';
   borderRight?: boolean;
   borderTop?: boolean;
+  /** Position in the grid: tiles fade up in reading order. */
+  index?: number;
 }) {
   const { colors, spacing } = useTheme();
+  // At 320 px a tile is about 108 px wide: the number steps down instead of being cut.
+  const narrow = useWindowDimensions().width < 360;
   return (
+    <FadeUp index={index + 1} style={{ width: '50%' }}>
     <PressableScale
       testID={testID}
       onPress={onPress}
       scaleTo={0.98}
       accessibilityLabel={`${title}: ${value === null ? 'no data' : `${value} ${unit ?? ''}`}${caption ? `, ${caption}` : ''}. ${compare ?? ''} Open details.`}
       style={{
-        width: '50%',
+        flexGrow: 1,
         minHeight: 132,
         paddingHorizontal: spacing.lg,
         paddingTop: 14,
@@ -60,11 +66,11 @@ export function ProgressTile({
       }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
         <CupKey color={color} size={10} variant={keyVariant} />
-        <Text variant="label" color="textSecondary" numberOfLines={1} style={{ flex: 1, fontSize: 13.5 }}>
+        <Text variant="label" color="textSecondary" numberOfLines={2} style={{ flex: 1, fontSize: 13.5 }}>
           {title}
         </Text>
       </View>
-      <Text variant="numL" color={value === null ? 'textTertiary' : 'text'} numberOfLines={1} style={{ marginTop: 2 }}>
+      <Text variant="numL" color={value === null ? 'textTertiary' : 'text'} style={[{ marginTop: 2 }, narrow ? { fontSize: 24, lineHeight: 28 } : null]}>
         {value ?? '–'}
         {unit && value !== null ? <Text variant="unit">{` ${unit}`}</Text> : null}
       </Text>
@@ -78,5 +84,6 @@ export function ProgressTile({
         {compare ?? 'Nothing to compare with yet'}
       </Text>
     </PressableScale>
+    </FadeUp>
   );
 }

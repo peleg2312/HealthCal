@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { entriesToSave, netChange } from '@/features/import';
 import { ActivitySheet } from '@/features/import/ui/ActivitySheet';
 import { DoneView } from '@/features/import/ui/DoneView';
-import { countRows, fileNotes, filterRows, workouts, type RowFilter } from '@/features/import/ui/format';
+import { countRows, fileNotes, filterRows, paceSetsEffort, workouts, type RowFilter } from '@/features/import/ui/format';
 import { pickGarminFiles } from '@/features/import/ui/pickFiles';
 import { QuestionsView } from '@/features/import/ui/QuestionsView';
 import { ReadingView } from '@/features/import/ui/ReadingView';
@@ -90,7 +90,9 @@ export default function ImportScreen() {
   const updating = rows.filter((r) => r.selected && r.status === 'update').length;
   const visible = filterRows(rows, filter);
   const notes = fileNotes(batches, rows.map((r) => r.workout));
-  const estimates = rows.filter((r) => r.entry && !r.entry.measured && r.status !== 'already-imported' && r.status !== 'duplicate-in-file').length;
+  const estimateRows = rows.filter((r) => r.entry && !r.entry.measured && r.status !== 'already-imported' && r.status !== 'duplicate-in-file');
+  const estimates = estimateRows.length;
+  const paced = estimateRows.filter((r) => paceSetsEffort(r)).length;
   const choosingRow = rows.find((r) => r.key === choosing) ?? null;
   const device = deviceTimeZone();
   const csvLine = csvFiles.length
@@ -171,6 +173,7 @@ export default function ImportScreen() {
                   onFilter={setFilter}
                   onSelectAll={selectAll}
                   estimates={estimates}
+                  paced={paced}
                   intensity={answers.estimateIntensity}
                   onIntensity={setEstimateIntensity}
                 />

@@ -53,7 +53,8 @@ export function WorkoutRow({
   const title = activity ? activity.name : w.transition ? 'Transition' : 'Choose activity';
   const garminName = w.transition ? 'a change between sports' : `“${w.sport.replace(/_/g, ' ')}”`;
   const legNote = w.leg ? `Leg ${w.leg.number} of ${w.leg.of}` : null;
-  const statusLabel = STATUS_LABEL[row.status];
+  // An update that would undo the person's own change says so instead of offering itself.
+  const statusLabel = row.edited ? 'File differs from your edit' : STATUS_LABEL[row.status];
   const imported = row.status === 'already-imported';
   const meta = metaLine(w, todayDate, units, hour12);
   const replaceable = replaceHandLoggedPlan(row) !== null;

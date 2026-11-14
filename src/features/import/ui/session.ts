@@ -27,8 +27,8 @@ export interface Answers {
   csvTimeZone: string | null;
   /** Zone for FIT files whose clock was never set; null = this device's zone. */
   fitTimeZone: string | null;
-  /** Effort used to estimate files without calories (GPX). */
-  estimateIntensity: Intensity;
+  /** Effort used to estimate files without calories (GPX); null = from the pace where the activity has speed bands, else moderate. */
+  estimateIntensity: Intensity | null;
 }
 
 export interface ImportResult {
@@ -61,7 +61,7 @@ const initial = (distanceUnit: 'km' | 'mi' = 'km'): ImportSession => ({
   files: [],
   failed: [],
   progress: null,
-  answers: { distanceUnit, csvTimeZone: null, fitTimeZone: null, estimateIntensity: 'moderate' },
+  answers: { distanceUnit, csvTimeZone: null, fitTimeZone: null, estimateIntensity: null },
   dayShift: {},
   batches: [],
   rows: [],
@@ -171,7 +171,7 @@ export function toggleRow(key: string) {
 
 /** Tick every new workout that has an activity, or untick everything. */
 export function selectAll(on: boolean) {
-  set({ rows: get().rows.map((r) => ({ ...r, selected: on ? (r.status === 'new' || r.status === 'update') && isTickable(r) : false })) });
+  set({ rows: get().rows.map((r) => ({ ...r, selected: on ? (r.status === 'new' || (r.status === 'update' && !r.edited)) && isTickable(r) : false })) });
 }
 
 /**
@@ -187,13 +187,13 @@ export function pickActivity(key: string, activityId: string, alsoKeys: string[]
   // Rows given an activity in bulk become ticked when they are new (chooseActivity ticks only `key`).
   for (const k of others) {
     const r = next.find((x) => x.key === k);
-    if (r && (r.status === 'new' || r.status === 'update') && r.entry && !r.selected) next = setSelected(next, k, true);
+    if (r && (r.status === 'new' || (r.status === 'update' && !r.edited)) && r.entry && !r.selected) next = setSelected(next, k, true);
   }
   set({ rows: next });
 }
 
 /** Change the effort used for estimates (files without calories) and rebuild those entries. */
-export function setEstimateIntensity(intensity: Intensity) {
+export function setEstimateIntensity(intensity: Intensity | null) {
   setAnswers({ estimateIntensity: intensity });
   const { rows } = get();
   const any = rows.find((r) => r.activityId !== null);

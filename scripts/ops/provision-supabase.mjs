@@ -123,7 +123,9 @@ async function applyMigrations(ref) {
   const dir = join(ROOT, 'supabase', 'migrations');
   const through = args['migrations-through'];
   const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
-  const applied = new Set((await call('GET', `/v1/projects/${ref}/database/migrations`)).map((m) => m.version));
+  // The service gives each applied migration its own version stamp, so the file's name is what identifies it.
+  const history = await call('GET', `/v1/projects/${ref}/database/migrations`);
+  const applied = new Set(history.flatMap((m) => [m.version, m.name]));
   for (const file of files) {
     const [, version, name] = file.match(/^(\d+)_(.*)\.sql$/) || [];
     if (!version) throw new Error(`Migration file name not understood: ${file}`);
@@ -131,7 +133,7 @@ async function applyMigrations(ref) {
       note(`${file}: held back (later than --migrations-through ${through}).`);
       continue;
     }
-    if (applied.has(version)) {
+    if (applied.has(version) || applied.has(name)) {
       note(`${file}: already applied.`);
       continue;
     }

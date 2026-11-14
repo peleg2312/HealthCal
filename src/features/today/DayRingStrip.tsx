@@ -14,10 +14,13 @@ const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 export const STRIP_WEEKS = 8;
 
 /**
- * Monday-to-Sunday strip of mini cups, paged back over the last eight weeks.
- * Each cup is filled to that day's eaten kcal over its budget (an amber lip
- * when over, a dashed outline for a day still to come), so the strip doubles
- * as a chart. The selected day's date is an ink box; tapping a day selects it.
+ * Monday-to-Sunday strip of mini cups, paged back over the last eight weeks
+ * (never further back than the week the profile was made). Each cup is filled
+ * to that day's eaten kcal over its budget (an amber lip in proportion when
+ * over, a dashed outline for a day still to come), so the strip doubles as a
+ * chart. A day before the profile was made is a small dot, not an empty cup:
+ * it was not missed. The cups pour left to right, and a past day does not pour
+ * again when the strip remounts. The selected day's date is an ink box.
  */
 export function DayRingStrip({
   today,
@@ -25,6 +28,8 @@ export function DayRingStrip({
   onSelect,
   testIDPrefix = 'today',
   accessory,
+  start,
+  caption,
 }: {
   today: ISODate;
   selected: ISODate;
@@ -33,23 +38,28 @@ export function DayRingStrip({
   testIDPrefix?: string;
   /** Shown in the caption row before the week arrows (Today puts the streak there). */
   accessory?: React.ReactNode;
+  /** The day the profile was made: earlier days with nothing logged are drawn as a dot and cannot be picked. */
+  start?: ISODate;
+  /** Replaces the week caption (Today's streak line). */
+  caption?: string | null;
 }) {
   const { colors, spacing } = useTheme();
   const ref = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const [width, setWidth] = useState(0);
   // Page index counted back from the current week: 0 is this week.
-  const [back, setBack] = useState(() => weeksBetween(selected, today));
+  const maxBack = start ? Math.min(STRIP_WEEKS - 1, weeksBetween(start, today)) : STRIP_WEEKS - 1;
+  const [back, setBack] = useState(() => Math.min(maxBack, weeksBetween(selected, today)));
   // Every day from the first shown Monday to today; later days are drawn as future.
   const count = diffDays(weekDates(today, STRIP_WEEKS - 1)[0], today) + 1;
   const days = useDays(count, today);
   const byDate = new Map(days.map((d) => [d.date, d]));
 
   const scrollTo = (b: number, animated: boolean) => {
-    if (width > 0) ref.current?.scrollTo({ x: (STRIP_WEEKS - 1 - b) * width, animated });
+    if (width > 0) ref.current?.scrollTo({ x: (maxBack - b) * width, animated });
   };
 
   // Follow the selection whenever it changes (a tap, the Today chip, midnight), even within the same week.
-  const selectedBack = weeksBetween(selected, today);
+  const selectedBack = Math.min(maxBack, weeksBetween(selected, today));
   const [followed, setFollowed] = useState(selected);
   if (followed !== selected) {
     setFollowed(selected);
@@ -59,9 +69,9 @@ export function DayRingStrip({
   const placed = useRef(false);
   useEffect(() => {
     if (width <= 0) return;
-    ref.current?.scrollTo({ x: (STRIP_WEEKS - 1 - selectedBack) * width, animated: placed.current });
+    ref.current?.scrollTo({ x: (maxBack - selectedBack) * width, animated: placed.current });
     placed.current = true;
-  }, [selected, selectedBack, width]);
+  }, [selected, selectedBack, width, maxBack]);
 
   const onLayout = (e: LayoutChangeEvent) => {
     const w = Math.round(e.nativeEvent.layout.width);
@@ -70,10 +80,10 @@ export function DayRingStrip({
   const onScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (width <= 0) return;
     const page = Math.round(e.nativeEvent.contentOffset.x / width);
-    setBack(Math.min(STRIP_WEEKS - 1, Math.max(0, STRIP_WEEKS - 1 - page)));
+    setBack(Math.min(maxBack, Math.max(0, maxBack - page)));
   };
   const page = (b: number) => {
-    const next = Math.min(STRIP_WEEKS - 1, Math.max(0, b));
+    const next = Math.min(maxBack, Math.max(0, b));
     setBack(next);
     scrollTo(next, true);
   };
@@ -93,34 +103,37 @@ export function DayRingStrip({
             showsHorizontalScrollIndicator={false}
             onMomentumScrollEnd={onScrollEnd}
             onScrollEndDrag={onScrollEnd}
-            contentOffset={{ x: (STRIP_WEEKS - 1 - back) * width, y: 0 }}
+            contentOffset={{ x: (maxBack - back) * width, y: 0 }}
             scrollEventThrottle={16}>
-            {Array.from({ length: STRIP_WEEKS }, (_, i) => STRIP_WEEKS - 1 - i).map((b) => (
+            {Array.from({ length: maxBack + 1 }, (_, i) => maxBack - i).map((b) => (
               <View key={b} style={{ width, flexDirection: 'row', paddingTop: 2 }} accessibilityRole="tablist">
                 {weekDates(today, b).map((d, i) => {
                   const summary = byDate.get(d);
-                  const ring = summary ? dayRing(summary, today) : { date: d, state: 'future' as const, progress: 0 };
+                  const ring = summary ? dayRing(summary, today, start) : { date: d, state: 'future' as const, progress: 0, close: false };
                   const isSelected = d === selected;
                   const isToday = d === today;
                   const future = ring.state === 'future';
+                  const before = ring.state === 'before';
                   const kcal =
                     summary && summary.entries.length
-                      ? `, ${Math.round(summary.eaten.kcal)} of ${summary.budget} kilocalories`
+                      ? `, ${Math.round(summary.eaten.kcal)} of ${summary.budget} kilocalories${ring.state === 'over' ? ', over budget' : ''}`
                       : future
                         ? ''
-                        : ', nothing logged';
+                        : before
+                          ? ', before you started'
+                          : ', nothing logged';
                   return (
                     <PressableScale
                       key={d}
                       testID={`${testIDPrefix}-day-${d}`}
                       feedback="select"
                       scaleTo={0.94}
-                      disabled={future}
+                      disabled={future || before}
                       onPress={() => onSelect(d)}
                       accessibilityRole="tab"
                       accessibilityState={{
                         selected: isSelected,
-                        disabled: future,
+                        disabled: future || before,
                       }}
                       accessibilityLabel={`${formatDayLabel(d)}${kcal}`}
                       // A future day is drawn dashed; fading it as well would make its date unreadable.
@@ -129,7 +142,13 @@ export function DayRingStrip({
                       <Text variant="label" color={isSelected ? 'text' : 'textSecondary'} style={{ fontSize: 12, lineHeight: 16, fontFamily: isSelected ? fonts.bold : fonts.semibold }}>
                         {LETTERS[i]}
                       </Text>
-                      <MiniCup progress={ring.progress} over={ring.state === 'over'} future={future} color={colors.calories} />
+                      {before ? (
+                        <View style={{ width: 30, height: 38, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 4 }}>
+                          <View style={{ width: 3, height: 3, borderRadius: 1, backgroundColor: colors.textTertiary }} />
+                        </View>
+                      ) : (
+                        <MiniCup index={i} memoryKey={`cal-${d}`} progress={ring.progress} over={ring.state === 'over'} future={future} color={colors.calories} />
+                      )}
                       <View
                         style={{
                           width: 32,
@@ -143,7 +162,7 @@ export function DayRingStrip({
                         }}>
                         <Text
                           variant="numM"
-                          color={isSelected ? 'bg' : future ? 'textTertiary' : 'text'}
+                          color={isSelected ? 'bg' : future || before ? 'textTertiary' : 'text'}
                           style={{ fontSize: 14, lineHeight: 20, letterSpacing: 0 }}>
                           {fromISODate(d).getDate()}
                         </Text>
@@ -160,7 +179,7 @@ export function DayRingStrip({
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
         <Text variant="caption" color="textSecondary" style={{ flex: 1 }} numberOfLines={2} testID={`${testIDPrefix}-week-caption`}>
-          {weekCaption(shownWeek, today)}
+          {caption ?? weekCaption(shownWeek, today, start)}
         </Text>
         {accessory}
         <IconButton
@@ -168,7 +187,7 @@ export function DayRingStrip({
           accessibilityLabel="Previous week"
           size={32}
           tone="clear"
-          disabled={back >= STRIP_WEEKS - 1}
+          disabled={back >= maxBack}
           onPress={() => page(back + 1)}>
           <ChevronLeft size={20} color={colors.text} strokeWidth={2} />
         </IconButton>

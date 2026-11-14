@@ -17,9 +17,9 @@ import { searchLocal, searchOnlineWithStatus } from '@/services/foodSearch';
 import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
 import { useDay, useLive } from '@/store/selectors';
-import { cup, fonts, useTheme } from '@/theme';
+import { cup, fonts, motion, useTheme } from '@/theme';
 import type { Food, FoodEntry, MealType, SavedMeal } from '@/types';
-import { Button, Chip, ChipRow, Divider, EmptyState, Header, IconButton, PressableScale, Screen, Sheet, Text, TextField } from '@/ui';
+import { AnimatedNumber, Button, Chip, ChipRow, Divider, EmptyState, Header, IconButton, PressableScale, Screen, Sheet, Text, TextField } from '@/ui';
 
 type Tab = 'usual' | 'recent' | 'favorites' | 'mine' | 'meals';
 type Online = { query: string; status: 'idle' | 'loading' | 'done'; items: Food[] };
@@ -183,16 +183,24 @@ export default function FoodSearchScreen() {
 
   const over = left < 0;
   const budget = (
-    <Text variant={added.length > 0 ? 'caption' : 'label'} color={over ? 'text' : 'textSecondary'} tabular testID="search-budget">
-      {over ? `${kcal(-left)} kcal over` : `${kcal(left)} kcal left`} {date === todayDate ? 'today' : `on ${formatDayLabel(date)}`}
-    </Text>
+    <AnimatedNumber
+      variant={added.length > 0 ? 'caption' : 'label'}
+      color={over ? 'text' : 'textSecondary'}
+      testID="search-budget"
+      value={left}
+      format={(n) => kcal(Math.abs(n))}
+      accessibilityLabel={`${kcal(Math.abs(left))} kcal ${over ? 'over' : 'left'} ${date === todayDate ? 'today' : `on ${formatDayLabel(date)}`}`}>
+      {`${over ? ' kcal over' : ' kcal left'} ${date === todayDate ? 'today' : `on ${formatDayLabel(date)}`}`}
+    </AnimatedNumber>
   );
   const footer = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 44 }}>
       <View style={{ flex: 1 }}>
         {added.length > 0 ? (
           <Text variant="title" testID="search-added-count" tabular>
-            {added.length} added · {kcal(addedKcal)} kcal
+            {`${added.length} added · `}
+            <AnimatedNumber variant="title" value={addedKcal} format={kcal} duration={motion.duration.pourSmall} />
+            {' kcal'}
           </Text>
         ) : null}
         {budget}

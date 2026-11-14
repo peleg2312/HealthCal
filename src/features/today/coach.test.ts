@@ -61,6 +61,26 @@ describe('coachTip', () => {
     expect(coachTip(day(), 'metric', at(13)).action?.href).toContain('meal=lunch');
   });
 
+  it('says a day closed within budget the next morning, not as a pop-up', () => {
+    const tip = coachTip(day(), 'metric', at(8), DEFAULT_RHYTHM, { eaten: 1840, budget: 1990 });
+    expect(tip.id).toBe('closed');
+    expect(tip.title).toBe('Yesterday closed within budget');
+    expect(tip.body).toBe("1,840 of 1,990 kcal. Today's budget is 2,000 kcal.");
+    // The first-log action is still there.
+    expect(tip.action?.href).toContain('meal=breakfast');
+    // Over budget, or a half-logged day, is not called closed within budget.
+    expect(coachTip(day(), 'metric', at(8), DEFAULT_RHYTHM, { eaten: 2100, budget: 1990 }).id).toBe('start');
+    expect(coachTip(day(), 'metric', at(8), DEFAULT_RHYTHM, { eaten: 600, budget: 1990 }).id).toBe('start');
+    // Once today has an entry the line moves on.
+    expect(coachTip(day({ entries: [entry('breakfast')] }), 'metric', at(9), DEFAULT_RHYTHM, { eaten: 1840, budget: 1990 }).id).not.toBe('closed');
+  });
+
+  it('gives water left that adds up with the amount shown', () => {
+    const tip = coachTip(day({ entries: [entry('breakfast'), entry('lunch')], waterMl: 1225, waterGoalMl: 3300, waterRemainingMl: 2075 }), 'metric', at(16));
+    expect(tip.id).toBe('water');
+    expect(tip.title).toBe('2.07 L of water to go');
+  });
+
   it('asks about a meal only once its usual time has clearly passed and it is still missing', () => {
     const d = day({ entries: [entry('breakfast')] });
     expect(coachTip(d, 'metric', at(12, 30)).id).not.toBe('meal-lunch');

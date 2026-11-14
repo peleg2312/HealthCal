@@ -4,10 +4,11 @@
  * the screen holds it in state and calls back here when the person changes a row.
  */
 import { ACTIVITY_BY_ID } from '@/data/activities';
+import { formatDayLabel } from '@/lib/dates';
 import type { ActivityEntry } from '@/types';
 
 import { toActivityEntry, type ConvertContext, type ImportedEntry } from './convert';
-import { checkDuplicates, gainsText, type ImportStatus, type UpdateGain } from './dedupe';
+import { checkDuplicates, correctedDay, gainsText, type ImportStatus, type UpdateGain } from './dedupe';
 import { suggestActivity, type SportMatch } from './sports';
 import type { ImportedWorkout } from './types';
 
@@ -28,6 +29,8 @@ export interface ImportCandidate {
   match: ActivityEntry | null;
   /** For an update, or a deleted workout this file would restore richer: what this reading adds. */
   adds: UpdateGain[];
+  /** For an update: the person changed the stored workout after importing it, so the update is not ticked by default. */
+  edited: boolean;
   /** Key of the candidate in this import that it duplicates or overlaps. */
   sameAsKey: string | null;
   /** Ticked by default: new workouts and updates with an activity. */
@@ -51,9 +54,12 @@ function build(workout: ImportedWorkout, activityId: string | null, suggestion: 
  * The stored workout with this reading's numbers: the record's id, day and the
  * person's own note stay, everything the file measured is replaced. Used to
  * save an update and to restore a deleted import with the values on its row.
+ * The day moves only to the day the file says the workout was done, over a day
+ * that was just the phone's guess (correctedDay).
  */
-export function asReplacement(stored: ActivityEntry, entry: ImportedEntry): ImportedEntry {
-  const out: ImportedEntry = { ...entry, id: stored.id, date: stored.date, externalId: stored.externalId ?? entry.externalId };
+export function asReplacement(stored: ActivityEntry, entry: ImportedEntry, workout?: Pick<ImportedWorkout, 'startUtc' | 'utcOffsetMin'>): ImportedEntry {
+  const day = workout ? correctedDay(stored, workout) : null;
+  const out: ImportedEntry = { ...entry, id: stored.id, date: day ?? stored.date, externalId: stored.externalId ?? entry.externalId };
   if (stored.notes) out.notes = stored.notes;
   // A strength session's sets are the person's own too.
   if (stored.exercises) out.exercises = stored.exercises;
@@ -68,6 +74,7 @@ function withDuplicates(rows: ReturnType<typeof build>[], existing: ActivityEntr
       workout: r.workout,
       activityId: r.activityId,
       category: r.entry?.category ?? null,
+      suggested: r.activityId === r.suggestion.activityId,
       tracksDistance: r.activityId ? ACTIVITY_BY_ID[r.activityId]?.tracksDistance === true : false,
     })),
     existing,
@@ -81,10 +88,11 @@ function withDuplicates(rows: ReturnType<typeof build>[], existing: ActivityEntr
       // automatic match does not overrule that.
       const own = ACTIVITY_BY_ID[c.match.activityId];
       if (own && own.id !== r.activityId && r.activityId === r.suggestion.activityId) entry = toActivityEntry(r.workout, own, ctx);
-      entry = asReplacement(c.match, entry);
-      if (c.status === 'update') reason = updateReason(c.match, entry, c.adds);
+      entry = asReplacement(c.match, entry, r.workout);
+      if (c.status === 'update') reason = updateReason(c.match, entry, c.adds, c.edited === true);
     }
-    const defaultSelected = (c.status === 'new' || c.status === 'update') && entry !== null;
+    // An update that would undo the person's own change is offered, not ticked.
+    const defaultSelected = (c.status === 'new' || (c.status === 'update' && !c.edited)) && entry !== null;
     const kept = keepSelection?.get(r.key);
     return {
       ...r,
@@ -94,6 +102,7 @@ function withDuplicates(rows: ReturnType<typeof build>[], existing: ActivityEntr
       reason,
       match: c.match,
       adds: c.adds,
+      edited: c.edited === true,
       sameAsKey: c.sameAs === null ? null : rows[c.sameAs].key,
       // A row can only be selected when it has an entry, and never when it is the same workout again.
       selected: entry !== null && canTick(c.status) && (kept ?? defaultSelected),
@@ -105,11 +114,28 @@ function withDuplicates(rows: ReturnType<typeof build>[], existing: ActivityEntr
 
 const kcalText = (n: number) => Math.round(n).toLocaleString('en-US');
 
-/** "Imported before from a file with less in it. This one adds ...: +306 kcal to the day instead of the estimated +512. ..." */
-function updateReason(stored: ActivityEntry, entry: ImportedEntry, adds: UpdateGain[]): string {
-  const what = `This one adds ${gainsText(adds)}`;
-  const kcal = adds.includes('calories') ? `: +${kcalText(entry.kcalNet)} kcal to the day instead of the estimated +${kcalText(stored.kcalNet)}.` : '.';
-  return `Imported before from a file with less in it. ${what}${kcal} Importing replaces the numbers; the day and your notes stay.`;
+/**
+ * "Imported before from a file with less in it. This one adds ...: +306 kcal to the day instead of the estimated +512. ..."
+ * or, when the person changed the stored workout, what importing would undo.
+ */
+function updateReason(stored: ActivityEntry, entry: ImportedEntry, adds: UpdateGain[], edited: boolean): string {
+  const kcal = adds.includes('calories') ? `: +${kcalText(entry.kcalNet)} kcal to the day instead of the estimated +${kcalText(stored.kcalNet)}` : '';
+  const day =
+    entry.date !== stored.date
+      ? ` and moves it to ${formatDayLabel(entry.date)}, the day it was done where it was recorded; your notes stay.`
+      : '; the day and your notes stay.';
+  if (edited) {
+    const changes: string[] = [];
+    if (entry.durationMin !== stored.durationMin) changes.push(`${stored.durationMin} min here, ${entry.durationMin} min in the file`);
+    if (entry.intensity !== stored.intensity) changes.push(`${stored.intensity} effort here, ${entry.intensity} in the file`);
+    const what = changes.length ? ` (${changes.join('; ')})` : '';
+    return `You changed this workout after importing it${what}. This file has ${gainsText(adds)}${kcal}. Importing it replaces your changes with the file’s numbers, so it is left unticked.`;
+  }
+  const others = adds.filter((g) => g !== 'day');
+  const lead = others.length
+    ? `Imported before from a file with less in it. This one adds ${gainsText(others)}${kcal}.`
+    : 'Imported before from a file that does not say where it was recorded.';
+  return `${lead} Importing replaces the numbers${day}`;
 }
 
 /**

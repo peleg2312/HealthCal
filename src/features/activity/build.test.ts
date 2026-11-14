@@ -139,7 +139,8 @@ describe('editing a saved session (review activity-trackers-2)', () => {
     // A different length: still that workout, but the calories are now an estimate.
     const shorter = rebuildActivityEntry(imported, { activity: ACTIVITY_BY_ID.running, intensity: 'moderate', durationMin: 45, date: '2026-03-10' }, today);
     expect(shorter).toMatchObject({ source: 'garmin', externalId: 'garmin:abc', avgHeartRate: 151 });
-    expect(shorter.measured).toBeUndefined();
+    // No longer measured; false records that the person replaced the device's figure.
+    expect(shorter.measured).toBe(false);
     expect(shorter.kcalGross).not.toBe(700);
   });
 

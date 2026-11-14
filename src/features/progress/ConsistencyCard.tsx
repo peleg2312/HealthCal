@@ -5,7 +5,7 @@ import { addDays, startOfWeek, weekdayShort } from '@/lib/dates';
 import type { InsightDay } from '@/lib/insights';
 import type { Consistency } from '@/store/selectors';
 import { fonts, useTheme } from '@/theme';
-import { MiniCup, Text } from '@/ui';
+import { AnimatedNumber, MiniCup, Text } from '@/ui';
 
 import { BigStat, Note, SectionCard } from './parts';
 
@@ -27,14 +27,21 @@ export function ConsistencyCard({ consistency, weekDays, today }: { consistency:
       linkLabel="Calendar">
       <View style={{ flexDirection: 'row', gap: spacing.lg }}>
         <View style={{ flex: 1 }}>
-          <BigStat value={`${streak}`} unit={streak === 1 ? 'day' : 'days'} label="Current streak" />
+          <View accessible accessibilityLabel={`Current streak ${streak} ${streak === 1 ? 'day' : 'days'}`}>
+            <AnimatedNumber variant="numL" value={streak} memoryKey="progress-streak">
+              <Text variant="unit">{streak === 1 ? ' day' : ' days'}</Text>
+            </AnimatedNumber>
+            <Text variant="caption" color="textSecondary">
+              Current streak
+            </Text>
+          </View>
         </View>
         <View style={{ flex: 1 }}>
           <BigStat value={`${thisWeek}`} unit={`of ${elapsed}`} label="Days logged this week" />
         </View>
       </View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }} accessible accessibilityLabel={`Logged ${thisWeek} of ${elapsed} days this week`}>
-        {week.map((d) => {
+        {week.map((d, i) => {
           const isLogged = logged.has(d);
           const future = d > today;
           const isToday = d === today;
@@ -44,7 +51,7 @@ export function ConsistencyCard({ consistency, weekDays, today }: { consistency:
                 {weekdayShort(d).slice(0, 1)}
               </Text>
               {/* A full cup for a logged day, an empty one for a missed day, a dashed outline for days to come. */}
-              <MiniCup progress={isLogged ? 1 : 0} color={colors.calories} future={future} height={30} width={26} />
+              <MiniCup progress={isLogged ? 1 : 0} color={colors.calories} future={future} height={30} width={26} index={i} memoryKey={`logged-${d}`} />
               <View style={{ width: 8, height: 3, borderRadius: 1, backgroundColor: isToday ? colors.rim : 'transparent' }} />
             </View>
           );

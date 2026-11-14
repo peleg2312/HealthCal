@@ -49,8 +49,8 @@ function InsightRow({ insight, clamp }: { insight: Insight; clamp?: boolean }) {
     insight.tone === 'positive'
       ? { color: colors.success, Icon: CircleCheck }
       : insight.tone === 'attention'
-        ? { color: colors.warning, Icon: Lightbulb }
-        : { color: colors.water, Icon: Info };
+        ? { color: colors.warningInk, Icon: Lightbulb }
+        : { color: colors.textSecondary, Icon: Info };
   return (
     <View testID={`insight-${insight.id}`} style={{ flexDirection: 'row', gap: spacing.md }}>
       <View style={{ width: 20, alignItems: 'center', paddingTop: 1 }}>

@@ -1,16 +1,19 @@
 import { useLocalSearchParams } from 'expo-router';
-import { ArrowDown, ArrowRight, ArrowUp, CalendarCheck, ChevronRight, Star, Target } from 'lucide-react-native';
-import React, { useEffect } from 'react';
-import { View } from 'react-native';
+import { ArrowDown, ArrowRight, ArrowUp, CalendarCheck, ChevronRight, Info, Star, Target } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import { useWindowDimensions, View } from 'react-native';
 
-import { addDays, formatDayLabel, formatShortDate, weekdayShort } from '@/lib/dates';
-import { BUDGET_BAND, budgetBalanceText, inBudgetBand, isCompleteDay, weekRangeLabel, type RecapTile } from '@/lib/insights';
+import { addDays, formatDayLabel, formatShortDate } from '@/lib/dates';
+import { budgetBalanceText, weekRangeLabel, type RecapTile } from '@/lib/insights';
 import { formatNumber } from '@/lib/units';
 import { go } from '@/features/progress/parts';
+import { RecapCups } from '@/features/progress/RecapCups';
+import { recapDayCups, recapDaysVerdict } from '@/features/progress/recapDays';
 import { useRecapReady } from '@/features/progress/recapReady';
 import { useRecap } from '@/features/progress/useRecap';
+import { ShareWeekButton } from '@/features/share';
 import { useTheme } from '@/theme';
-import { BarChart, Card, CupKey, Divider, EmptyState, Header, PressableScale, Screen, Text } from '@/ui';
+import { AnimatedNumber, Card, CupKey, Divider, EmptyState, FadeUp, Header, IconButton, PressableScale, Screen, Sheet, Text } from '@/ui';
 
 function deltaText(t: RecapTile): string {
   if (t.soFar) return 'So far, week in progress';
@@ -22,8 +25,10 @@ function deltaText(t: RecapTile): string {
 }
 
 /** One cell of the week's numbers: the four share a card, divided by hairlines. */
-function Tile({ t, index }: { t: RecapTile; index: number }) {
+function Tile({ t, index, week }: { t: RecapTile; index: number; week: string }) {
   const { colors, spacing } = useTheme();
+  // At 320 px a tile is about 108 px wide: the number steps down so it and its unit are never cut.
+  const narrow = useWindowDimensions().width < 360;
   const color = {
     calories: colors.calories,
     protein: colors.protein,
@@ -49,15 +54,27 @@ function Tile({ t, index }: { t: RecapTile; index: number }) {
       }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
         <CupKey color={color} size={10} />
-        <Text variant="label" color="textSecondary" numberOfLines={1} style={{ flexShrink: 1 }}>
+        <Text variant="label" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1 }}>
           {t.label}
         </Text>
       </View>
-      <Text variant="numL" color={t.value === null ? 'textTertiary' : 'text'} numberOfLines={1}>
-        {t.value === null ? '–' : formatNumber(t.value)}
-        {t.value === null ? null : <Text variant="unit">{` ${t.unit}`}</Text>}
-      </Text>
-      <Text variant="caption" color="textSecondary" numberOfLines={1}>
+      {t.value === null ? (
+        <Text variant="numL" color="textTertiary">
+          –
+        </Text>
+      ) : (
+        // Ticks up from zero when the recap opens, once per week this session.
+        <AnimatedNumber
+          variant="numL"
+          value={t.value}
+          from={0}
+          memoryKey={`recap-${week}-${t.id}`}
+          delay={index * 60}
+          style={narrow ? { fontSize: 24, lineHeight: 28 } : undefined}>
+          <Text variant="unit">{` ${t.unit}`}</Text>
+        </AnimatedNumber>
+      )}
+      <Text variant="caption" color="textSecondary" numberOfLines={2}>
         {t.context}
       </Text>
       {deltaText(t) ? (
@@ -103,6 +120,8 @@ export default function RecapScreen() {
   const d = useRecap(weekParam);
   const ready = useRecapReady();
   const r = d.recap;
+  const [help, setHelp] = useState(false);
+  const cups = r ? recapDayCups(r.weekStart, r.days, d.today) : [];
 
   // Opening last week's check-in clears "Your week is ready" on Today.
   useEffect(() => {
@@ -114,7 +133,13 @@ export default function RecapScreen() {
 
   return (
     <Screen
-      header={<Header title={title} subtitle={r ? `${r.label === 'Week' ? 'Week of' : r.label} · ${weekRangeLabel(r.weekStart, r.weekEnd)}` : range} />}
+      header={
+        <Header
+          title={title}
+          subtitle={r ? `${r.label === 'Week' ? 'Week of' : r.label} · ${weekRangeLabel(r.weekStart, r.weekEnd)}` : range}
+          right={r ? <ShareWeekButton recap={r} /> : undefined}
+        />
+      }
       testID="recap-screen">
       {!r ? (
         <Card>
@@ -134,62 +159,33 @@ export default function RecapScreen() {
             </Text>
           </View>
 
-          <Card padding={0} style={{ flexDirection: 'row', flexWrap: 'wrap' }} testID="recap-tiles">
-            {d.tiles.map((t, i) => (
-              <Tile key={t.id} t={t} index={i} />
-            ))}
-          </Card>
+          <FadeUp index={1}>
+            <Card padding={0} style={{ flexDirection: 'row', flexWrap: 'wrap' }} testID="recap-tiles">
+              {d.tiles.map((t, i) => (
+                <Tile key={t.id} t={t} index={i} week={d.week} />
+              ))}
+            </Card>
+          </FadeUp>
 
-          <Card style={{ gap: spacing.md }} testID="recap-days">
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'baseline',
-                gap: spacing.md,
-              }}>
-              <Text variant="h3">Day by day</Text>
-              <Text variant="caption" color="textSecondary" align="right" style={{ flexShrink: 1 }}>
-                {budgetBalanceText(r.budgetBalance)}
-              </Text>
-            </View>
-            <BarChart
-              testID="recap-days-chart"
-              data={Array.from({ length: 7 }, (_, i) => {
-                const day = r.days[i];
-                const date = day?.date;
-                const kcal = day && day.entries.length ? day.eaten.kcal : 0;
-                return {
-                  label: date ? weekdayShort(date) : '',
-                  value: kcal,
-                  // Partly logged days are drawn in a neutral colour; today is hatched (openIndex).
-                  color: day && day.date !== d.today && !isCompleteDay(day, d.today) ? colors.textTertiary : undefined,
-                  detail: date
-                    ? `${formatShortDate(date)} · ${kcal ? `${formatNumber(Math.round(kcal))} of ${formatNumber(Math.round(day.budget))} kcal` : 'not logged'}`
-                    : undefined,
-                };
-              })}
-              marks={r.days.map((day) => isCompleteDay(day, d.today) && inBudgetBand(day.eaten.kcal, day.budget))}
-              color={colors.calories}
-              goal={r.summary.calories?.avgBudget}
-              openIndex={r.days.findIndex((day) => day.date === d.today) >= 0 ? r.days.findIndex((day) => day.date === d.today) : undefined}
-              band={
-                r.summary.calories
-                  ? {
-                      from: r.summary.calories.avgBudget * (1 - BUDGET_BAND),
-                      to: r.summary.calories.avgBudget * (1 + BUDGET_BAND),
-                      color: colors.textSecondary,
-                    }
-                  : undefined
-              }
-              height={170}
-              scrub
-            />
-            <Text variant="caption" color="textTertiary">
-              The dashed line is your average budget and the shaded band ±10% around it. A check marks a fully logged day inside the band; grey bars are partly
-              logged, and a hatched bar is today, still in progress.
-            </Text>
-          </Card>
+          <FadeUp index={2}>
+            <Card style={{ gap: spacing.md }} testID="recap-days">
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
+                <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                  <Text variant="h3">Day by day</Text>
+                  <Text variant="title" testID="recap-days-verdict">
+                    {recapDaysVerdict(cups)}
+                  </Text>
+                  <Text variant="caption" color="textSecondary">
+                    {budgetBalanceText(r.budgetBalance)}
+                  </Text>
+                </View>
+                <IconButton size={36} tone="clear" testID="recap-chart-help" accessibilityLabel="How to read the cups" onPress={() => setHelp(true)}>
+                  <Info size={20} color={colors.textSecondary} strokeWidth={1.9} />
+                </IconButton>
+              </View>
+              <RecapCups cups={cups} week={d.week} />
+            </Card>
+          </FadeUp>
 
           <Card style={{ gap: spacing.md }}>
             {r.bestDay ? (
@@ -263,6 +259,14 @@ export default function RecapScreen() {
           </PressableScale>
         </>
       )}
+
+      <Sheet visible={help} onClose={() => setHelp(false)} title="Reading the cups">
+        <View style={{ gap: spacing.md }} testID="recap-help">
+          <Text variant="body">Each cup is one day, filled to how much of that day&apos;s own budget you ate. The dashed line across the tops is each day&apos;s budget, so a full cup is a day right on it.</Text>
+          <Text variant="body">A check marks a fully logged day within 10% of its budget. Amber at the top marks a day above its budget. A lighter fill is a day only partly logged (under 800 kcal or half the budget), and a hatched cup is today, still in progress.</Text>
+          <Text variant="body" color="textSecondary">Budgets change with exercise and with your plan, which is why each day is measured against its own and never against the week&apos;s average.</Text>
+        </View>
+      </Sheet>
 
       {d.earlier.length ? (
         <Card style={{ gap: spacing.xs }} testID="recap-earlier">

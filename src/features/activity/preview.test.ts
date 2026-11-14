@@ -54,7 +54,7 @@ describe('G4: the edit screen of a measured session', () => {
       expect(p.net).toBe(est.net);
       // And the save agrees: no longer measured.
       const saved = rebuildActivityEntry(measured, { activity: ACTIVITY_BY_ID[f.activityId], intensity: f.intensity, durationMin: f.durationMin, date: measured.date }, basis);
-      expect(saved.measured).toBeUndefined();
+      expect(saved.measured).toBe(false);
       expect(Math.round(saved.kcalGross)).toBe(p.gross);
     }
   });

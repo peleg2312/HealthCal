@@ -2,8 +2,11 @@
  * One contextual suggestion for the Today screen: the single most useful
  * thing to do next, phrased with the user's own numbers. Pure and testable.
  */
+import { isCompleteDay } from '@/lib/trend';
 import { formatNumber, formatVolume } from '@/lib/units';
 import type { DaySummary } from '@/store/selectors';
+
+import { formatWaterLeft } from './volume';
 import type { MealType, UnitSystem } from '@/types';
 
 export interface CoachTip {
@@ -98,7 +101,24 @@ export function expectedWaterFraction(hour: number, rhythm: CoachRhythm = DEFAUL
 
 const MAIN_MEALS = ['breakfast', 'lunch', 'dinner'] as const;
 
-export function coachTip(day: DaySummary, units: UnitSystem, now: Date = new Date(), rhythm: CoachRhythm = DEFAULT_RHYTHM): CoachTip {
+/** How the day before closed, for the morning line: kcal eaten and that day's budget. */
+export interface ClosedDay {
+  eaten: number;
+  budget: number;
+}
+
+/** A day closed within budget: fully logged (the shared rule) and not past its budget. */
+export function closedWithinBudget(d: ClosedDay | null | undefined): boolean {
+  return !!d && d.budget > 0 && isCompleteDay(d.eaten, d.budget) && d.eaten <= d.budget;
+}
+
+export function coachTip(
+  day: DaySummary,
+  units: UnitSystem,
+  now: Date = new Date(),
+  rhythm: CoachRhythm = DEFAULT_RHYTHM,
+  yesterday?: ClosedDay | null,
+): CoachTip {
   const hour = now.getHours() + now.getMinutes() / 60;
   const { length, rel, awakeSoFar } = dayClock(rhythm);
   const awake = rel(hour);
@@ -115,11 +135,15 @@ export function coachTip(day: DaySummary, units: UnitSystem, now: Date = new Dat
     const current = [...meals].reverse().find((m) => awake >= m.at - 1.5);
     const dinnerAt = meals[2].at;
     const meal: MealType = awake > dinnerAt + 1.5 ? 'snack' : (current?.meal ?? 'breakfast');
+    // The morning after a day that closed within budget, say so here rather than in a pop-up.
+    const closed = closedWithinBudget(yesterday) && yesterday ? yesterday : null;
     return {
-      id: 'start',
+      id: closed ? 'closed' : 'start',
       emoji: '👋',
-      title: 'Nothing logged yet today',
-      body: `Your budget is ${formatNumber(day.budget)} kcal. Logging the first thing takes a few seconds.`,
+      title: closed ? 'Yesterday closed within budget' : 'Nothing logged yet today',
+      body: closed
+        ? `${formatNumber(closed.eaten)} of ${formatNumber(closed.budget)} kcal. Today's budget is ${formatNumber(day.budget)} kcal.`
+        : `Your budget is ${formatNumber(day.budget)} kcal. Logging the first thing takes a few seconds.`,
       action: { label: 'Log food', href: search(meal) },
       ...(meal === 'snack' ? null : { quick: { kind: 'repeat' as const, meal } }),
       tone: 'neutral',
@@ -149,7 +173,7 @@ export function coachTip(day: DaySummary, units: UnitSystem, now: Date = new Dat
     return {
       id: 'water',
       emoji: '💧',
-      title: `${formatVolume(day.waterRemainingMl, units)} of water to go`,
+      title: `${formatWaterLeft(day.waterMl, day.waterGoalMl, units)} of water to go`,
       body: `You are about ${formatVolume(Math.min(day.waterRemainingMl, Math.round(waterGap / 50) * 50), units)} behind an even pace for the day. A glass now narrows it.`,
       action: { label: 'Add water', href: '/water' },
       quick: { kind: 'water' },
@@ -198,7 +222,7 @@ export function coachTip(day: DaySummary, units: UnitSystem, now: Date = new Dat
     title: 'On track',
     body:
       day.remaining >= 0
-        ? `${formatNumber(day.remaining)} kcal left and ${day.waterRemainingMl > 0 ? `${formatVolume(day.waterRemainingMl, units)} of water to go` : 'your water goal is done'}.`
+        ? `${formatNumber(day.remaining)} kcal left and ${day.waterRemainingMl > 0 ? `${formatWaterLeft(day.waterMl, day.waterGoalMl, units)} of water to go` : 'your water goal is done'}.`
         : 'Close to your budget for the day.',
     tone: 'positive',
   };

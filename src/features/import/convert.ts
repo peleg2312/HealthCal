@@ -20,8 +20,12 @@ export interface ConvertContext {
   weightKg: number;
   /** Non-exercise daily expenditure the budget is built on (the same value a hand-logged session uses). */
   baselineKcalPerDay: number;
-  /** Effort to estimate with when the file has no calories (GPX). Default 'moderate'. */
-  estimateIntensity?: Intensity;
+  /**
+   * Effort the person chose for workouts estimated without calories (GPX). It
+   * wins over the speed: a GPX's time includes pauses, so its average speed can
+   * understate the effort. Unset: the speed band, else 'moderate'.
+   */
+  estimateIntensity?: Intensity | null;
 }
 
 /** A ready-to-save entry: pass it to `useStore.getState().upsert('activities', entry)` (or upsertMany). */
@@ -100,8 +104,8 @@ export function toActivityEntry(w: ImportedWorkout, activity: ActivityDef, ctx: 
     measured = true;
   } else {
     // No calories in the file (GPX): estimate exactly as a hand-logged session does,
-    // at the effort the speed gives, else the one the person chose for estimates.
-    intensity = bySpeed ?? ctx.estimateIntensity ?? 'moderate';
+    // at the effort the person chose, else the one the speed gives, else moderate.
+    intensity = ctx.estimateIntensity ?? bySpeed ?? 'moderate';
     const met = activity.met[intensity];
     kcalGross = grossKcal(met, weightKg, durationMin);
     kcalNet = netKcal(met, weightKg, durationMin, baselineKcalPerDay);

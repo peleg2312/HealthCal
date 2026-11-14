@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Check, Triangle } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { fonts, useTheme } from '@/theme';
 import type { Direction } from '@/lib/insights';
@@ -23,6 +23,7 @@ export function SectionCard({
   subtitle,
   icon: _icon,
   color,
+  keyVariant,
   link,
   linkLabel = 'Details',
   testID,
@@ -34,6 +35,8 @@ export function SectionCard({
   icon?: React.ReactNode;
   /** A data colour: shown as a cup key before the title. Omit for cards that are not about one measure. */
   color?: string;
+  /** An outlined key marks an estimate (expenditure), as on the overview tiles. */
+  keyVariant?: 'filled' | 'outline';
   link?: string;
   linkLabel?: string;
   testID?: string;
@@ -45,13 +48,14 @@ export function SectionCard({
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            {color ? <CupKey color={color} size={10} /> : null}
-            <Text variant="h3" numberOfLines={1} style={{ flexShrink: 1 }}>
+            {color ? <CupKey color={color} size={10} variant={keyVariant} /> : null}
+            {/* Two lines rather than an ellipsis at 320 px. */}
+            <Text variant="h3" numberOfLines={2} style={{ flexShrink: 1 }}>
               {title}
             </Text>
           </View>
           {subtitle ? (
-            <Text variant="caption" color="textSecondary" numberOfLines={1}>
+            <Text variant="caption" color="textSecondary" numberOfLines={2}>
               {subtitle}
             </Text>
           ) : null}
@@ -78,11 +82,11 @@ export function TextLink({ label, onPress, testID, accessibilityLabel }: { label
 export function BigStat({ value, unit, label, align = 'left' }: { value: string; unit?: string; label: string; color?: string; align?: 'left' | 'right' }) {
   return (
     <View style={{ alignItems: align === 'right' ? 'flex-end' : 'flex-start', flexShrink: 1 }}>
-      <Text variant="numL" numberOfLines={1}>
+      <Text variant="numL">
         {value}
         {unit ? <Text variant="unit">{` ${unit}`}</Text> : null}
       </Text>
-      <Text variant="caption" color="textSecondary" numberOfLines={1}>
+      <Text variant="caption" color="textSecondary" numberOfLines={2}>
         {label}
       </Text>
     </View>
@@ -201,6 +205,8 @@ export function SegmentSwitch<T extends string>({
   testIDPrefix: string;
 }) {
   const { colors } = useTheme();
+  // At 320 px four tabs get about 70 px each: the labels step down so the selected (bold) one is never cut.
+  const narrow = useWindowDimensions().width < 360;
   return (
     <View accessibilityRole="tablist" style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border }}>
       {options.map((o) => {
@@ -215,8 +221,8 @@ export function SegmentSwitch<T extends string>({
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             accessibilityLabel={o.label}
-            style={{ flex: 1, minWidth: 0, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
-            <Text variant="label" color={active ? 'text' : 'textSecondary'} numberOfLines={1} style={{ fontSize: 14.5, lineHeight: 20, fontFamily: active ? fonts.bold : fonts.semibold }}>
+            style={{ flex: 1, minWidth: 0, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: narrow ? 1 : 4 }}>
+            <Text variant="label" color={active ? 'text' : 'textSecondary'} numberOfLines={1} style={{ fontSize: narrow ? 13 : 14.5, lineHeight: 20, fontFamily: active ? fonts.bold : fonts.semibold }}>
               {o.label}
             </Text>
             {active ? <View pointerEvents="none" style={{ position: 'absolute', left: '18%', right: '18%', bottom: -2, height: 3, borderRadius: 1, backgroundColor: colors.rim }} /> : null}

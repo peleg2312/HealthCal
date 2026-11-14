@@ -17,7 +17,7 @@ import { RecapCard } from '@/features/progress/RecapCard';
 import { useRecapReady } from '@/features/progress/recapReady';
 import { useProgressData, type RangeDays } from '@/features/progress/useProgressData';
 import { WeightCard } from '@/features/progress/WeightCard';
-import { LargeTitle, Screen } from '@/ui';
+import { FadeUp, LargeTitle, Screen } from '@/ui';
 
 const SEGMENTS: { value: ProgressSegment; label: string }[] = [
   { value: 'overview', label: 'Overview' },
@@ -62,11 +62,22 @@ export default function ProgressScreen() {
       <SegmentSwitch options={SEGMENTS} value={segment} onChange={setSegment} testIDPrefix="progress-segment" />
       {segment === 'overview' ? (
         <>
-          <CaloriesADay days={d.days} summary={d.summary} today={d.today} onOpen={() => setSegment('nutrition')} />
+          {/* Cards fade up in reading order; the overview grid's tiles carry on the sequence inside it. */}
+          <FadeUp index={0}>
+            <CaloriesADay days={d.days} summary={d.summary} today={d.today} onOpen={() => setSegment('nutrition')} />
+          </FadeUp>
           <OverviewGrid d={d} range={range} onOpen={setSegment} />
-          <InsightsCard insights={d.insights} rangeDays={range} />
-          {d.recap ? <RecapCard recap={d.recap} earlier={d.earlierWeeks} unseen={recapReady.ready && recapReady.week === d.recap.weekStart} /> : null}
-          <MilestonesCard milestones={d.milestones} />
+          <FadeUp index={10}>
+            <InsightsCard insights={d.insights} rangeDays={range} />
+          </FadeUp>
+          {d.recap ? (
+            <FadeUp index={11}>
+              <RecapCard recap={d.recap} earlier={d.earlierWeeks} unseen={recapReady.ready && recapReady.week === d.recap.weekStart} />
+            </FadeUp>
+          ) : null}
+          <FadeUp index={12}>
+            <MilestonesCard milestones={d.milestones} />
+          </FadeUp>
         </>
       ) : null}
       {segment === 'nutrition' ? (

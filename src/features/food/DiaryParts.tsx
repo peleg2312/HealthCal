@@ -1,18 +1,18 @@
 import { router } from 'expo-router';
 import { CalendarPlus, Copy, MoreHorizontal, Plus, Repeat2, Save, Trash2, X } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { addDays, formatDayLabel, today } from '@/lib/dates';
 import { MEAL_LABEL, entriesTotal } from '@/lib/nutrition';
 import type { DaySummary } from '@/store/selectors';
 import { cup, fonts, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
-import { Button, Card, CupKey, Divider, Hatch, IconButton, ListRow, PressableScale, ProgressBar, Sheet, Text, TextField, Trough } from '@/ui';
+import { AnimatedItem, AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, Hatch, IconButton, ListRow, PressableScale, ProgressBar, Sheet, Text, TextField, Trough } from '@/ui';
 
 import { clearEntries, copyEntries, saveMeal } from './actions';
-import { DayStepper, KcalTrail, MealPicker, RowEmoji, SourceTag } from './components';
-import { dayPhrase, href, kcal, portionLabel } from './helpers';
+import { DayStepper, KcalTrail, MealPicker, RowEmoji, sourceKeyVariant } from './components';
+import { dayPhrase, href, kcal, portionLabel, sourceInfo } from './helpers';
 import { deleteEntry } from './log';
 
 /**
@@ -22,6 +22,8 @@ import { deleteEntry } from './log';
  */
 export function DaySummaryCard({ day }: { day: DaySummary }) {
   const { colors, spacing } = useTheme();
+  const { width: screenW } = useWindowDimensions();
+  const narrow = screenW < 360;
   const over = day.remaining < 0;
   const budget = Math.max(0, day.budget);
   // Calories added by exercise, drawn as hatched headroom at the right end.
@@ -31,22 +33,27 @@ export function DaySummaryCard({ day }: { day: DaySummary }) {
     <Card testID="diary-summary" padding={18}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md, flexWrap: 'wrap' }}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-          <Text variant="numXL" color={over ? 'warning' : 'caloriesInk'} testID="diary-remaining" numberOfLines={1} style={{ fontSize: 46, lineHeight: 50, letterSpacing: -1.4 }}>
-            {kcal(Math.abs(day.remaining))}
-          </Text>
+          <AnimatedNumber
+            variant="numXL"
+            color={over ? 'warningInk' : 'caloriesInk'}
+            testID="diary-remaining"
+            numberOfLines={1}
+            value={day.remaining}
+            format={(n) => kcal(Math.abs(n))}
+            accessibilityLabel={`${kcal(Math.abs(day.remaining))} kilocalories ${over ? 'over' : 'left'}`}
+            style={{ fontSize: narrow ? 40 : 46, lineHeight: narrow ? 44 : 50, letterSpacing: -1.4 }}
+          />
           <Text variant="unit" style={{ fontSize: 15 }}>{over ? 'kcal over' : 'kcal left'}</Text>
         </View>
         <Text variant="caption" color="textSecondary" style={{ paddingBottom: 4 }}>
-          <Text variant="numM" style={{ fontSize: 16, lineHeight: 20 }} testID="diary-eaten">
-            {kcal(day.eaten.kcal)}
-          </Text>
+          <AnimatedNumber variant="numM" style={{ fontSize: 16, lineHeight: 20 }} testID="diary-eaten" value={day.eaten.kcal} format={kcal} />
           {' eaten of '}
           <Text variant="numM" style={{ fontSize: 16, lineHeight: 20 }}>
             {kcal(budget)}
           </Text>
         </Text>
       </View>
-      <Trough value={day.eaten.kcal} max={budget} headroom={headroom} color={colors.calories} style={{ marginTop: spacing.md }} />
+      <Trough value={day.eaten.kcal} max={budget} headroom={headroom} color={colors.calories} memoryKey={`diary-${day.date}`} style={{ marginTop: spacing.md }} />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: 10 }}>
         <Text variant="caption" color="textSecondary" tabular>
           {`Target ${kcal(day.target)}`}
@@ -65,14 +72,14 @@ export function DaySummaryCard({ day }: { day: DaySummary }) {
         ) : null}
       </View>
       <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
-      <View style={{ flexDirection: 'row', gap: spacing.lg }}>
+      <View style={{ flexDirection: 'row', gap: narrow ? spacing.md : spacing.lg }}>
         {(
           [
-            ['Protein', day.eaten.protein, day.macros.proteinG, colors.protein],
-            ['Carbs', day.eaten.carbs, day.macros.carbsG, colors.carbs],
-            ['Fat', day.eaten.fat, day.macros.fatG, colors.fat],
+            ['Protein', day.eaten.protein, day.macros.proteinG, colors.protein, 'reach'],
+            ['Carbs', day.eaten.carbs, day.macros.carbsG, colors.carbs, 'limit'],
+            ['Fat', day.eaten.fat, day.macros.fatG, colors.fat, 'limit'],
           ] as const
-        ).map(([label, value, target, color]) => (
+        ).map(([label, value, target, color, goalKind]) => (
           <View key={label} style={{ flex: 1, minWidth: 0, gap: 8 }} accessible accessibilityLabel={`${label}, ${Math.round(value)} of ${target} grams`}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <CupKey color={color} />
@@ -80,11 +87,11 @@ export function DaySummaryCard({ day }: { day: DaySummary }) {
                 {label}
               </Text>
             </View>
-            <ProgressBar progress={target > 0 ? value / target : 0} color={color} height={6} />
-            <Text variant="numM" tabular numberOfLines={1} style={{ fontSize: 17, lineHeight: 22 }}>
-              {Math.round(value)}
-              <Text variant="caption" color="textSecondary">{` / ${Math.round(target)} g`}</Text>
-            </Text>
+            <ProgressBar progress={target > 0 ? value / target : 0} color={color} height={6} goalKind={goalKind} />
+            {/* The target may wrap under the number on a narrow phone; it is never cut. */}
+            <AnimatedNumber variant="numM" value={Math.round(value)} style={{ fontSize: narrow ? 15 : 17, lineHeight: narrow ? 20 : 22 }}>
+              <Text variant="caption" color="textSecondary">{` / ${Math.round(target)}\u00A0g`}</Text>
+            </AnimatedNumber>
           </View>
         ))}
       </View>
@@ -98,6 +105,9 @@ const TEXT_INSET = ROW_PAD + 24 + 12;
 
 function EntryRow({ entry }: { entry: FoodEntry }) {
   const { colors } = useTheme();
+  const { width } = useWindowDimensions();
+  // On a narrow phone the name and the portion may take two lines rather than be cut.
+  const narrow = width < 360;
   // Any entry that carries a range is an estimate, whatever food it was matched to afterwards.
   const ai = !!entry.kcalRange;
   const portion =
@@ -114,14 +124,14 @@ function EntryRow({ entry }: { entry: FoodEntry }) {
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: 11 }}>
         <RowEmoji emoji={entry.emoji} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Text variant="bodyStrong" numberOfLines={1} style={{ fontFamily: fonts.semibold }}>
+          <Text variant="bodyStrong" numberOfLines={narrow ? 2 : 1} style={{ fontFamily: fonts.semibold }}>
             {entry.name}
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flexShrink: 1 }}>
-              {`${portion} ·`}
+            <Text variant="caption" color="textSecondary" numberOfLines={narrow ? 2 : 1} style={{ flexShrink: 1 }}>
+              {portion}
             </Text>
-            <SourceTag source={ai ? 'ai' : entry.source} />
+            <EntrySource source={ai ? 'ai' : entry.source} />
           </View>
         </View>
         <KcalTrail value={entry.nutrients.kcal} range={entry.kcalRange} />
@@ -129,6 +139,35 @@ function EntryRow({ entry }: { entry: FoodEntry }) {
       <IconButton testID={`entry-delete-${entry.id}`} accessibilityLabel={`Delete ${entry.name}`} tone="clear" size={36} onPress={() => deleteEntry(entry)}>
         <X size={16} color={colors.textSecondary} strokeWidth={1.9} />
       </IconButton>
+    </View>
+  );
+}
+
+/**
+ * Where a diary row's numbers come from. The portion is the information that
+ * matters, so on a narrow phone the source shrinks to its mark (the label stays
+ * in the accessibility name) and elsewhere its word gives way before the
+ * portion does. An estimate always says so in words.
+ */
+function EntrySource({ source }: { source: FoodEntry['source'] | 'ai' }) {
+  const { colors } = useTheme();
+  const { width } = useWindowDimensions();
+  const info = sourceInfo(source);
+  const markOnly = width < 360 && source !== 'ai';
+  return (
+    <View
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 100, minWidth: 18 }}
+      accessible
+      accessibilityLabel={info.label}>
+      <Text variant="caption" color="textSecondary">
+        ·
+      </Text>
+      <CupKey color={colors.textSecondary} variant={sourceKeyVariant(source)} size={8} />
+      {markOnly ? null : (
+        <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flexShrink: 1 }}>
+          {info.short}
+        </Text>
+      )}
     </View>
   );
 }
@@ -168,10 +207,9 @@ export function MealCard({
             {label}
           </Text>
           {entries.length > 0 ? (
-            <Text variant="numM" color="textSecondary" tabular testID={`meal-total-${meal}`} style={{ fontSize: 15, lineHeight: 20 }}>
-              {kcal(total)}
+            <AnimatedNumber variant="numM" color="textSecondary" testID={`meal-total-${meal}`} value={total} format={kcal} style={{ fontSize: 15, lineHeight: 20 }}>
               <Text variant="unit">{' kcal'}</Text>
-            </Text>
+            </AnimatedNumber>
           ) : null}
         </View>
         <IconButton testID={`meal-menu-${meal}`} accessibilityLabel={`${label} options`} tone="clear" size={44} onPress={onMenu}>
@@ -181,16 +219,18 @@ export function MealCard({
           <Plus size={20} color={colors.text} strokeWidth={2.2} />
         </IconButton>
       </View>
-      {entries.length > 0 ? (
-        <View style={{ marginTop: 6 }}>
+      {/* Always mounted (keyed by the day), so a meal's first row slides in too; Undo brings a row back the same way. */}
+      <View style={{ marginTop: entries.length ? 6 : 0 }}>
+        <AnimatedList key={date}>
           {entries.map((e, i) => (
-            <View key={e.id}>
+            <AnimatedItem key={e.id}>
               {i > 0 ? <Divider inset={TEXT_INSET} /> : null}
               <EntryRow entry={e} />
-            </View>
+            </AnimatedItem>
           ))}
-        </View>
-      ) : (
+        </AnimatedList>
+      </View>
+      {entries.length > 0 ? null : (
         <View style={{ marginTop: spacing.sm, gap: spacing.xs, paddingHorizontal: ROW_PAD }}>
           <PressableScale
             testID={`meal-empty-${meal}`}

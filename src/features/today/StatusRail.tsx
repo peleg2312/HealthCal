@@ -1,15 +1,24 @@
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 import { Plus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
+import { startOfWeek } from '@/lib/dates';
+import { guidelineMinutes } from '@/lib/exercise';
 import { nowISO } from '@/lib/id';
+import { WEEKLY_ACTIVE_MINUTES } from '@/lib/insights';
 import { formatVolume, weightUnit, weightValue } from '@/lib/units';
+import { useFriends } from '@/services/friends';
 import { useStore } from '@/store';
+import { useNow } from '@/store/clock';
 import { useLive, useProfile, useWeightSeries, type DaySummary } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ISODate } from '@/types';
-import { Button, Card, CupKey, haptic, PressableScale, ProgressBar, Text, toast } from '@/ui';
+import { AnimatedNumber, Button, Card, CupKey, haptic, PressableScale, ProgressBar, Text, toast } from '@/ui';
+
+import { cheersLabel, recentCheerCount } from './cheers';
+import { volumeNumber, volumeUnitFor } from './volume';
+import { weightCell } from './weightCell';
 
 /** "1.23 L" -> ["1.23", "L"], "84 fl oz" -> ["84", "fl oz"]. */
 function split(s: string): [string, string] {
@@ -23,11 +32,13 @@ export function defaultGlass(presets: number[]): number {
   return sorted[1] ?? sorted[0] ?? 250;
 }
 
+/** One glass, with Undo. Reaching the goal is marked by the bar itself (its `onReached` adds the success haptic). */
 export function addWater(date: ISODate, ml: number, units: 'metric' | 'imperial') {
   const entry = useStore.getState().upsert('water', { date, ml, beverage: 'water', loggedAt: nowISO() });
-  haptic.success();
+  haptic.tap();
   toast(`Added ${formatVolume(ml, units)} of water`, {
     label: 'Undo',
+    tint: 'water',
     onPress: () => useStore.getState().remove('water', entry.id),
   });
 }
@@ -36,9 +47,14 @@ export function addWater(date: ISODate, ml: number, units: 'metric' | 'imperial'
  * Water, activity, sleep and weight (or the running fast) in one card, so
  * every pillar is visible in the first screen of Today. Water leads, with its
  * level bar and the one-tap glass; the other three share a row below a divider.
+ * Water and the week's activity minutes are goals to reach: past the goal the
+ * bar wears the brim tick, never amber, and crossing it on screen adds one
+ * calm line at the foot of the card.
  */
-export function StatusRail({ day, isToday }: { day: DaySummary; isToday: boolean }) {
+export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; isToday: boolean; /** First day: the glass is a ghost button so the first-log button is the only filled one. */ quiet?: boolean }) {
   const { colors, spacing } = useTheme();
+  const { width: screenW } = useWindowDimensions();
+  const narrow = screenW < 360;
   const profile = useProfile();
   const units = profile.units;
   const presets = useStore((s) => s.settings.waterPresets);
@@ -48,12 +64,37 @@ export function StatusRail({ day, isToday }: { day: DaySummary; isToday: boolean
   const fasting = useLive('fasting');
   const fast = isToday ? fasting.find((f) => !f.end) : undefined;
   const series = useWeightSeries();
+  const weight = weightCell(series.entries, series.trend, day.date, isToday);
+  const activities = useLive('activities');
+  const weekStart = startOfWeek(day.date);
+  const weekMinutes = Math.round(guidelineMinutes(activities.filter((a) => a.date >= weekStart && a.date <= day.date)));
+  const friendsStatus = useFriends((s) => s.status);
+  const friends = useFriends((s) => s.overview);
+  const now = useNow();
+  const cheers = isToday ? recentCheerCount(friendsStatus, friends, now.getTime()) : 0;
+  // Haptics only for the screen in front: the tab stays mounted while water is added elsewhere.
+  const focused = useIsFocused();
 
-  const [waterValue, waterUnit] = split(formatVolume(day.waterMl, units));
+  // One calm line when a goal to reach is crossed on screen; it belongs to the day it was said for.
+  const [note, setNote] = useState<{ date: ISODate; text: string } | null>(null);
+  const reached = (text: string) => {
+    if (focused) haptic.success();
+    setNote({ date: day.date, text });
+  };
+
   const goal = formatVolume(day.waterGoalMl, units);
+  const [goalValue, goalUnit] = split(goal);
+  const waterUnit = volumeUnitFor(day.waterMl, units);
   // "1.23 of 3.3 L": the unit is said once when both amounts share it ("250 ml of 2.55 L" otherwise).
-  const sameUnit = split(goal)[1] === waterUnit;
+  const sameUnit = goalUnit === waterUnit;
   const dateQuery = isToday ? '' : `?date=${day.date}`;
+  const activityLabel = [
+    day.activities.length ? `Activity, ${day.activeMinutes} minutes` : 'Activity, nothing logged',
+    weekMinutes > 0 ? `${weekMinutes} of ${WEEKLY_ACTIVE_MINUTES} guideline minutes ${isToday ? 'this' : 'that'} week` : '',
+    cheers ? `${cheersLabel(cheers)} from friends. Open friends` : day.activities.length ? '' : 'Log a session',
+  ]
+    .filter(Boolean)
+    .join('. ');
 
   return (
     <Card testID="today-rail" padding={0}>
@@ -66,39 +107,74 @@ export function StatusRail({ day, isToday }: { day: DaySummary; isToday: boolean
             scaleTo={0.98}
             style={{ flex: 1, minWidth: 0, minHeight: 44 }}>
             <KeyLabel color={colors.water} label="Water" />
-            <Text variant="numM" numberOfLines={1} style={{ marginTop: 3 }}>
-              {waterValue}
-              <Text variant="unit">{`${waterUnit && !sameUnit ? ` ${waterUnit}` : ''} of ${goal}`}</Text>
-            </Text>
+            <AnimatedNumber
+              variant="numM"
+              numberOfLines={1}
+              style={{ marginTop: 3 }}
+              value={day.waterMl}
+              format={(ml) => volumeNumber(ml, day.waterMl, units)}
+              accessibilityLabel={`${formatVolume(day.waterMl, units)} of ${goal}`}>
+              <Text variant="unit">{`${!sameUnit ? ` ${waterUnit}` : ''} of ${goalValue} ${goalUnit}`}</Text>
+            </AnimatedNumber>
           </PressableScale>
           <Button
             testID={`today-water-${glass}`}
             title={formatVolume(glass, units)}
             accessibilityLabel={`Add ${formatVolume(glass, units)} of water`}
-            variant="secondary"
-            tint={colors.water}
+            variant={quiet ? 'ghost' : 'secondary'}
+            tint={quiet ? undefined : colors.water}
             size="sm"
             full={false}
-            icon={<Plus size={16} color={colors.water} strokeWidth={2.6} />}
+            icon={<Plus size={16} color={quiet ? colors.text : colors.water} strokeWidth={2.6} />}
             onPress={() => addWater(day.date, glass, units)}
           />
         </View>
-        <ProgressBar progress={day.waterGoalMl > 0 ? day.waterMl / day.waterGoalMl : 0} color={colors.water} style={{ marginTop: 10 }} />
+        <ProgressBar
+          progress={day.waterGoalMl > 0 ? day.waterMl / day.waterGoalMl : 0}
+          color={colors.water}
+          goalKind="reach"
+          memoryKey={`rail-water-${day.date}`}
+          onReached={() => reached(isToday ? 'Water goal reached for today. Anything more is a bonus.' : 'Water goal reached for the day.')}
+          style={{ marginTop: 10 }}
+        />
       </View>
       <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: spacing.lg }} />
-      <View style={{ flexDirection: 'row', paddingHorizontal: spacing.lg, paddingTop: 12, paddingBottom: 14, gap: 12 }}>
+      <View style={{ flexDirection: 'row', paddingHorizontal: narrow ? spacing.md : spacing.lg, paddingTop: 12, paddingBottom: 14, gap: narrow ? 8 : 12 }}>
         <Cell
           testID="today-activity"
+          narrow={narrow}
           label="Activity"
           color={colors.exercise}
-          accessibilityLabel={day.activities.length ? `Activity, ${day.activeMinutes} minutes` : 'Activity, nothing logged. Log a session'}
-          onPress={() => router.push(day.activities.length ? '/train' : (`/activity/pick?date=${day.date}` as never))}
+          accessibilityLabel={activityLabel}
+          onPress={() => router.push(cheers ? ('/friends' as never) : day.activities.length ? '/train' : (`/activity/pick?date=${day.date}` as never))}
           value={day.activities.length ? String(day.activeMinutes) : null}
-          unit="min"
-        />
+          unit="min">
+          {weekMinutes > 0 ? (
+            <View style={{ marginTop: 6, gap: 5 }}>
+              <ProgressBar
+                progress={weekMinutes / WEEKLY_ACTIVE_MINUTES}
+                color={colors.exercise}
+                height={4}
+                goalKind="reach"
+                memoryKey={`rail-week-${weekStart}`}
+                onReached={() => reached(`${WEEKLY_ACTIVE_MINUTES} active minutes ${isToday ? 'this' : 'that'} week. That meets the weekly guideline.`)}
+              />
+              <Text variant="caption" color="textSecondary" numberOfLines={3} testID="today-activity-week">
+                {`${weekMinutes} of ${WEEKLY_ACTIVE_MINUTES} min ${isToday ? 'this' : 'that'} week`}
+              </Text>
+            </View>
+          ) : null}
+          {cheers ? (
+            <Text variant="label" color="text" numberOfLines={1} testID="today-cheers" style={{ marginTop: 4, fontSize: 13 }}>
+              {cheersLabel(cheers)}
+            </Text>
+          ) : null}
+        </Cell>
         <Hairline />
         <Cell
           testID="today-sleep"
+          narrow={narrow}
+          flex={0.8}
           label="Sleep"
           color={colors.sleep}
           accessibilityLabel={night ? `Sleep, ${night.hours.toFixed(1)} hours` : 'Sleep, not logged. Add a night'}
@@ -108,33 +184,42 @@ export function StatusRail({ day, isToday }: { day: DaySummary; isToday: boolean
         />
         <Hairline />
         {fast ? (
-          <FastCell start={fast.start} targetHours={fast.targetHours} />
+          <FastCell start={fast.start} targetHours={fast.targetHours} narrow={narrow} />
         ) : (
           <Cell
             testID="today-weight"
-            label="Weight"
+            narrow={narrow}
+            flex={1.2}
+            label={weight?.label ?? 'Weight trend'}
             color={colors.weight}
-            accessibilityLabel={
-              series.trendKg !== null
-                ? `Weight trend, ${weightValue(series.trendKg, units).toFixed(1)} ${weightUnit(units)}`
-                : 'Weight, no weigh-ins. Add your weight'
-            }
+            accessibilityLabel={weight ? `${weight.label}, ${weightValue(weight.kg, units).toFixed(1)} ${weightUnit(units)}` : 'Weight, no weigh-ins. Add your weight'}
             onPress={() => router.push(`/weight${dateQuery}` as never)}
-            value={series.trendKg !== null ? weightValue(series.trendKg, units).toFixed(1) : null}
+            value={weight ? weightValue(weight.kg, units).toFixed(1) : null}
             unit={weightUnit(units)}
           />
         )}
       </View>
+      {note && note.date === day.date ? (
+        <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginHorizontal: spacing.lg, paddingTop: 10, paddingBottom: 12 }}>
+          <Text variant="caption" color="textSecondary" testID="today-rail-reached">
+            {note.text}
+          </Text>
+        </View>
+      ) : null}
     </Card>
   );
 }
 
-/** A cup-key square in the data colour, then the label: data colours mark, text stays text. */
-function KeyLabel({ color, label }: { color: string; label: string }) {
+/**
+ * A cup-key square in the data colour, then the label: data colours mark, text
+ * stays text. It wraps rather than cutting a word; on a narrow phone every
+ * label in the row keeps two lines' height so the values stay level.
+ */
+function KeyLabel({ color, label, tall }: { color: string; label: string; tall?: boolean }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-      <CupKey color={color} size={10} />
-      <Text variant="label" color="textSecondary" numberOfLines={1} style={{ fontSize: 13.5, flexShrink: 1 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, minHeight: tall ? 34 : undefined }}>
+      <CupKey color={color} size={10} style={{ marginTop: 4 }} />
+      <Text variant="label" color="textSecondary" numberOfLines={2} style={{ fontSize: 13, lineHeight: 17, flexShrink: 1 }}>
         {label}
       </Text>
     </View>
@@ -158,33 +243,40 @@ function Cell({
   onPress,
   value,
   unit,
+  children,
+  narrow,
+  flex = 1,
 }: {
   testID: string;
+  narrow?: boolean;
+  flex?: number;
   label: string;
   color: string;
   accessibilityLabel: string;
   onPress: () => void;
   value: string | null;
   unit: string;
+  children?: React.ReactNode;
 }) {
   return (
-    <PressableScale testID={testID} onPress={onPress} accessibilityLabel={accessibilityLabel} scaleTo={0.96} style={{ flex: 1, minWidth: 0, minHeight: 44 }}>
-      <KeyLabel color={color} label={label} />
+    <PressableScale testID={testID} onPress={onPress} accessibilityLabel={accessibilityLabel} scaleTo={0.96} style={{ flex, minWidth: 0, minHeight: 44 }}>
+      <KeyLabel color={color} label={label} tall={narrow} />
       {value !== null ? (
         <Text variant="numM" numberOfLines={1} style={{ marginTop: 3 }}>
           {value}
           <Text variant="unit">{unit ? ` ${unit}` : ''}</Text>
         </Text>
       ) : (
-        <Text variant="label" color="primary" style={{ marginTop: 3, lineHeight: 24 }}>
+        <Text variant="label" color="primaryInk" style={{ marginTop: 3, lineHeight: 24 }}>
           Add
         </Text>
       )}
+      {children}
     </PressableScale>
   );
 }
 
-function FastCell({ start, targetHours }: { start: string; targetHours: number }) {
+function FastCell({ start, targetHours, narrow }: { start: string; targetHours: number; narrow: boolean }) {
   const { colors } = useTheme();
   // The clock lives in state so rendering stays pure; it ticks while the fast runs.
   const [now, setNow] = useState(() => Date.now());
@@ -198,6 +290,8 @@ function FastCell({ start, targetHours }: { start: string; targetHours: number }
   return (
     <Cell
       testID="today-fasting"
+      narrow={narrow}
+      flex={1.2}
       label={`Fast of ${targetHours} h`}
       color={colors.fat}
       accessibilityLabel={`Fasting, ${h} hours ${m} minutes of ${targetHours}`}

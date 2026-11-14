@@ -26,7 +26,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
   const start = d.days[0].date;
   const prevStart = p?.start ?? null;
 
-    const c = s.calories;
+  const c = s.calories;
   const protein = s.macros?.protein ?? null;
   const w = s.water;
   const a = s.activity;
@@ -35,7 +35,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
 
   const trendNow = avgTrend(d.series.trend, start, d.today);
   const trendPrev = prevStart && p ? avgTrend(d.series.trend, prevStart, p.end) : null;
-    const rate = d.series.weeklyRateKg;
+  const rate = d.series.weeklyRateKg;
 
   // Both counts include every logged day of their period (today too), matching the headline above.
   const loggedDiff = p ? s.loggedDaysInclToday - p.loggedDaysInclToday : null;
@@ -53,6 +53,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
     <Card padding={0} testID="progress-overview-grid" style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
       <ProgressTile
         testID="progress-tile-calories"
+        index={0}
         borderRight
         title="Calories"
         color={colors.calories}
@@ -64,6 +65,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
       />
       <ProgressTile
         testID="progress-tile-weight"
+        index={1}
         title="Weight trend"
         color={colors.weight}
         value={d.series.trendKg !== null ? weightValue(d.series.trendKg, units).toFixed(1) : null}
@@ -74,6 +76,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
       />
       <ProgressTile
         testID="progress-tile-protein"
+        index={2}
         borderRight
         borderTop
         title="Protein"
@@ -86,6 +89,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
       />
       <ProgressTile
         testID="progress-tile-expenditure"
+        index={3}
         borderTop
         title="Expenditure"
         color={colors.calories}
@@ -98,6 +102,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
       />
       <ProgressTile
         testID="progress-tile-water"
+        index={4}
         borderRight
         borderTop
         title="Water"
@@ -116,6 +121,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
       />
       <ProgressTile
         testID="progress-tile-activity"
+        index={5}
         borderTop
         title="Activity"
         color={colors.exercise}
@@ -127,6 +133,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
       />
       <ProgressTile
         testID="progress-tile-sleep"
+        index={6}
         borderRight
         borderTop
         title="Sleep"
@@ -139,6 +146,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
       />
       <ProgressTile
         testID="progress-tile-consistency"
+        index={7}
         borderTop
         title="Consistency"
         color={colors.text}

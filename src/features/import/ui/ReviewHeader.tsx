@@ -36,6 +36,7 @@ export function SummaryCard({ counts, addedKcal, csvLine, onChangeCsv }: { count
                   `${formatNumber(counts.selected)} ticked`,
                   counts.choose ? `${formatNumber(counts.choose)} need an activity` : '',
                   counts.updates ? `${formatNumber(counts.updates)} ${counts.updates === 1 ? 'update' : 'updates'} available` : '',
+                  counts.edited ? `${formatNumber(counts.edited)} ${counts.edited === 1 ? 'differs' : 'differ'} from your edit` : '',
                   counts.alreadyImported ? `${formatNumber(counts.alreadyImported)} already imported` : '',
                   counts.probable ? `${formatNumber(counts.probable)} possible ${counts.probable === 1 ? 'duplicate' : 'duplicates'}` : '',
                 ]
@@ -131,6 +132,7 @@ export function ListControls({
   onFilter,
   onSelectAll,
   estimates,
+  paced,
   intensity,
   onIntensity,
 }: {
@@ -140,8 +142,10 @@ export function ListControls({
   onSelectAll: (on: boolean) => void;
   /** Rows estimated without calories (GPX), which take an effort level. */
   estimates: number;
-  intensity: Intensity;
-  onIntensity: (i: Intensity) => void;
+  /** Of those, rows whose effort the pace can set (an activity with speed bands and a distance). */
+  paced: number;
+  intensity: Intensity | null;
+  onIntensity: (i: Intensity | null) => void;
 }) {
   const { spacing } = useTheme();
   const filters: { id: RowFilter; label: string; n: number }[] = [
@@ -158,10 +162,25 @@ export function ListControls({
             {estimates === 1 ? 'One workout has' : `${estimates} workouts have`} no calories in the file. Effort to estimate with:
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+            {paced > 0 ? <Chip label="From pace" selected={intensity === null} onPress={() => onIntensity(null)} testID="import-effort-pace" /> : null}
             {(['light', 'moderate', 'vigorous'] as Intensity[]).map((i) => (
-              <Chip key={i} label={INTENSITY_LABELS[i].title} selected={intensity === i} onPress={() => onIntensity(i)} testID={`import-effort-${i}`} />
+              <Chip
+                key={i}
+                label={INTENSITY_LABELS[i].title}
+                // With nothing picked and no pace to go by, the estimate is moderate, so that chip shows as chosen.
+                selected={intensity === i || (intensity === null && paced === 0 && i === 'moderate')}
+                onPress={() => onIntensity(i)}
+                testID={`import-effort-${i}`}
+              />
             ))}
           </View>
+          {paced > 0 ? (
+            <Text variant="caption" color="textSecondary" testID="import-effort-note">
+              {intensity === null
+                ? `From pace: the average pace sets the effort${paced < estimates ? ', and moderate is used where there is no pace' : ''}. The file’s time includes pauses, so a session with stops can read easier than it was.`
+                : `${INTENSITY_LABELS[intensity].title} is used for ${estimates === 1 ? 'this workout' : `all ${estimates}`}, whatever the pace.`}
+            </Text>
+          ) : null}
         </View>
       ) : null}
       {counts.total > 1 ? (

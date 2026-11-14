@@ -57,10 +57,12 @@ describe('G7: effort from speed', () => {
     expect(toActivityEntry(w({ distanceM: null }), ACTIVITY_BY_ID.running, ctx).intensity).toBe('light');
   });
 
-  it('uses the speed for a file without calories too (GPX), instead of the general effort choice', () => {
-    const e = toActivityEntry(w({ format: 'gpx', kcal: null }), ACTIVITY_BY_ID.running, { ...ctx, estimateIntensity: 'light' });
+  it('uses the speed for a file without calories too (GPX) until the person picks an effort, which then wins', () => {
+    const e = toActivityEntry(w({ format: 'gpx', kcal: null }), ACTIVITY_BY_ID.running, ctx);
     expect(e.intensity).toBe('moderate');
     expect(e.measured).toBeUndefined();
+    // A GPX's time includes pauses, so the person's pick overrides the speed (second test round).
+    expect(toActivityEntry(w({ format: 'gpx', kcal: null }), ACTIVITY_BY_ID.running, { ...ctx, estimateIntensity: 'light' }).intensity).toBe('light');
     // Without a distance the chosen effort still applies.
     expect(toActivityEntry(w({ format: 'gpx', kcal: null, distanceM: null }), ACTIVITY_BY_ID.running, { ...ctx, estimateIntensity: 'light' }).intensity).toBe('light');
   });

@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Dumbbell, Scale, Utensils } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Dumbbell, Info, Scale, Utensils } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
@@ -17,8 +17,8 @@ import {
 } from '@/features/progress/consistency';
 import { go } from '@/features/progress/parts';
 import { setRhythmTarget, useConsistencyData } from '@/features/progress/useConsistencyData';
-import { useTheme } from '@/theme';
-import { BarChart, Button, Card, CupKey, EmptyState, Header, IconButton, MiniCup, Screen, Sheet, Stepper, Text } from '@/ui';
+import { useTheme, withOpacity } from '@/theme';
+import { AnimatedNumber, BarChart, Button, Card, CupKey, EmptyState, FadeUp, Header, IconButton, MiniCup, Screen, Sheet, Stepper, Text } from '@/ui';
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const RHYTHM_WEEKS = 8;
@@ -36,8 +36,11 @@ const RHYTHM_COPY: Record<RhythmKind, { title: string; verb: string }> = {
  * day within 10% of its budget, a lighter fill a day logged outside it, an
  * empty cup a day with nothing logged and a dashed outline a day to come.
  * Below it, cup keys for the water goal and a workout. Today's date is an ink box.
+ * The month pours in a diagonal wave from the top left (`index`), and each
+ * day remembers its level for the session, so reopening the page or coming
+ * back to a month does not pour again.
  */
-function DayCell({ cell }: { cell: CalendarCell | null }) {
+function DayCell({ cell, index }: { cell: CalendarCell | null; index: number }) {
   const { colors } = useTheme();
   if (!cell) return <View style={{ flex: 1, height: 66 }} />;
   const label = [
@@ -73,8 +76,10 @@ function DayCell({ cell }: { cell: CalendarCell | null }) {
       </View>
       <MiniCup
         progress={cell.logged ? 1 : 0}
-        color={cell.onBudget ? colors.calories : `${colors.calories}6B`}
+        color={cell.onBudget ? colors.calories : withOpacity(colors.calories, 0.42)}
         future={cell.future}
+        index={index}
+        memoryKey={`consistency-${cell.date}`}
         width={22}
         height={26}
       />
@@ -104,6 +109,7 @@ export default function ConsistencyScreen() {
   const firstMonth = d.firstDate ? monthOf(d.firstDate) : thisMonth;
   const [month, setMonth] = useState(thisMonth);
   const [editing, setEditing] = useState(false);
+  const [help, setHelp] = useState(false);
 
   const rows = monthGrid(month, d.byDate, d.today);
   const tally = monthTally(month, d.sets.food, d.today);
@@ -138,40 +144,42 @@ export default function ConsistencyScreen() {
   return (
     <Screen header={<Header title="Consistency" />} testID="consistency-screen">
       <Card style={{ gap: spacing.md }} testID="consistency-summary">
-        <View style={{ flexDirection: 'row', gap: spacing.lg }}>
-          <View style={{ flex: 1 }} accessible accessibilityLabel={`Current streak ${streak} ${word(streak, 'day')}`}>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-              <Text variant="numXL" testID="consistency-streak">
-                {streak}
-              </Text>
-              <Text variant="unit">{word(streak, 'day')}</Text>
-            </View>
+        <View accessible accessibilityLabel={`Current streak ${streak} ${word(streak, 'day')}. A missed day does not break it; two in a row do.`}>
+          <Text variant="overline">Current streak</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: spacing.xs }}>
+            {/* Ticks up from zero the first time the page opens this session. */}
+            <AnimatedNumber variant="display" value={streak} from={0} memoryKey="consistency-streak" testID="consistency-streak" />
+            <Text variant="h3">{word(streak, 'day')}</Text>
+          </View>
+          <Text variant="title" style={{ marginTop: spacing.xs }}>
+            {streak ? 'A missed day will not break it; two in a row will.' : 'Log food today to start a streak.'}
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md, rowGap: spacing.md }}>
+          <View style={{ flexGrow: 1, flexBasis: 120, paddingRight: spacing.md }} accessible accessibilityLabel={`Longest streak ${longest} ${word(longest, 'day')}`}>
+            <Text variant="numL" testID="consistency-longest">
+              {longest}
+              <Text variant="unit">{` ${word(longest, 'day')}`}</Text>
+            </Text>
             <Text variant="caption" color="textSecondary">
-              Current streak
+              Longest streak
+              {d.longest.start && d.longest.end
+                ? d.longest.length <= streak
+                  ? ', your current run'
+                  : `, ${formatShortDate(d.longest.start)} to ${formatShortDate(d.longest.end)}`
+                : ''}
             </Text>
           </View>
-          <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: colors.border }} />
-          <View style={{ flex: 1 }} accessible accessibilityLabel={`Longest streak ${longest} ${word(longest, 'day')}`}>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-              <Text variant="numXL" testID="consistency-longest">
-                {longest}
-              </Text>
-              <Text variant="unit">{word(longest, 'day')}</Text>
-            </View>
-            <Text variant="caption" color="textSecondary" numberOfLines={1}>
-              Longest streak
+          <View style={{ flexGrow: 1, flexBasis: 120, paddingLeft: spacing.md, borderLeftWidth: 1, borderLeftColor: colors.border }}>
+            <Text variant="numL">
+              {tally.logged}
+              <Text variant="unit">{` of ${tally.elapsed} ${word(tally.elapsed, 'day')}`}</Text>
             </Text>
-            {d.longest.start && d.longest.end ? (
-              <Text variant="caption" color="textTertiary" numberOfLines={1}>
-                {d.longest.length <= streak ? 'Your current run' : `${formatShortDate(d.longest.start)} to ${formatShortDate(d.longest.end)}`}
-              </Text>
-            ) : null}
+            <Text variant="caption" color="textSecondary" testID="consistency-month-tally">
+              Logged {isCurrentMonth ? 'this month' : `in ${monthLabel(month)}`}
+            </Text>
           </View>
         </View>
-        <View style={{ height: 1, backgroundColor: colors.border }} />
-        <Text variant="body" color="textSecondary" testID="consistency-month-tally">
-          Logged {tally.logged} of {tally.elapsed} {word(tally.elapsed, 'day')} {isCurrentMonth ? 'this month' : `in ${monthLabel(month)}`}
-        </Text>
       </Card>
 
       <Card style={{ gap: spacing.md }} testID="consistency-calendar">
@@ -198,7 +206,7 @@ export default function ConsistencyScreen() {
             <ChevronRight size={20} color={isCurrentMonth ? colors.textTertiary : colors.text} />
           </IconButton>
         </View>
-        <View>
+        <View key={month}>
           <View style={{ flexDirection: 'row', marginBottom: spacing.xs }}>
             {WEEKDAYS.map((w, i) => (
               <Text key={i} variant="caption" color="textTertiary" align="center" style={{ flex: 1 }}>
@@ -209,20 +217,17 @@ export default function ConsistencyScreen() {
           {rows.map((row, i) => (
             <View key={i} style={{ flexDirection: 'row' }}>
               {row.map((cell, j) => (
-                <DayCell key={cell?.date ?? `pad-${i}-${j}`} cell={cell} />
+                <DayCell key={cell?.date ?? `pad-${i}-${j}`} cell={cell} index={i + j} />
               ))}
             </View>
           ))}
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.lg, rowGap: spacing.xs }}>
           <Legend swatch={<CupKey color={colors.calories} />} label="Within 10% of budget" />
-          <Legend swatch={<CupKey color={`${colors.calories}6B`} />} label="Logged" />
+          <Legend swatch={<CupKey color={withOpacity(colors.calories, 0.42)} />} label="Logged" />
           <Legend swatch={<CupKey color={colors.water} size={7} />} label="Water goal met" />
           <Legend swatch={<CupKey color={colors.exercise} size={7} />} label="Workout" />
         </View>
-        <Text variant="caption" color="textTertiary">
-          A single missed day never ends a streak, however often it happens; only two missed days in a row do.
-        </Text>
       </Card>
 
       <Card style={{ gap: spacing.lg }} testID="consistency-rhythm">
@@ -233,6 +238,9 @@ export default function ConsistencyScreen() {
               Days a week you aim to log, train and weigh in
             </Text>
           </View>
+          <IconButton size={36} tone="clear" testID="consistency-rhythm-help" accessibilityLabel="How to read the weekly bars" onPress={() => setHelp(true)}>
+            <Info size={20} color={colors.textSecondary} strokeWidth={1.9} />
+          </IconButton>
           <Button title="Edit" variant="secondary" size="sm" full={false} onPress={() => setEditing(true)} testID="consistency-rhythm-edit" />
         </View>
         <View accessible accessibilityLabel={`${total.total} ${word(total.total, 'week')} on rhythm in total`}>
@@ -286,10 +294,15 @@ export default function ConsistencyScreen() {
             </View>
           );
         })}
-        <Text variant="caption" color="textTertiary">
-          Bars show days per week, Monday to Sunday; the shaded zone starts at your target and a check marks a week that reached it. The hatched bar is this week so far.
-        </Text>
       </Card>
+
+      <Sheet visible={help} onClose={() => setHelp(false)} title="Weekly rhythm">
+        <View style={{ gap: spacing.md }} testID="consistency-rhythm-help-text">
+          <Text variant="body">Each bar is one week, Monday to Sunday, as tall as the days you logged food, trained or weighed in.</Text>
+          <Text variant="body">The shaded zone starts at your target. A check marks a week that reached it, and the hatched bar is this week so far.</Text>
+          <Text variant="body" color="textSecondary">A missed week costs nothing: it is simply not counted.</Text>
+        </View>
+      </Sheet>
 
       <Sheet
         visible={editing}

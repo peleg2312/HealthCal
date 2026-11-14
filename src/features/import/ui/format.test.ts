@@ -35,6 +35,7 @@ const row = (over: Partial<ImportCandidate> = {}): ImportCandidate => ({
   reason: null,
   match: null,
   adds: [],
+  edited: false,
   sameAsKey: null,
   selected: true,
   ...over,

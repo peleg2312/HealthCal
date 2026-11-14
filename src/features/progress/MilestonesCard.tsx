@@ -8,9 +8,22 @@ import { MiniCup, Text } from '@/ui';
 
 import { SectionCard } from './parts';
 
+type Domain = 'calories' | 'weight' | 'water' | 'exercise';
+
+/** Which measure a milestone is about, so its cup is drawn in that data colour. */
+export function milestoneDomain(id: string): Domain {
+  if (id.startsWith('water')) return 'water';
+  if (id.startsWith('sessions') || id === 'active-week') return 'exercise';
+  if (id.startsWith('weigh-ins') || id.startsWith('trend')) return 'weight';
+  return 'calories';
+}
+
 /**
- * Milestones as cups: a reached one is a full cup, one still to come is filled
- * to how close it is. Rows share the card, divided by hairlines.
+ * Milestones as cups in the colour of what they measure (logging in the
+ * calorie colour, water, workouts, weigh-ins). A reached one is brim-full with
+ * the brim line across its top (a goal to reach, never amber); one still to
+ * come is filled to how close it is, with its level line. Rows share the card,
+ * divided by hairlines.
  */
 export function MilestonesCard({ milestones }: { milestones: Milestone[] }) {
   const { colors, spacing } = useTheme();
@@ -43,7 +56,7 @@ export function MilestonesCard({ milestones }: { milestones: Milestone[] }) {
                 borderLeftWidth: i % 2 ? 1 : 0,
                 borderLeftColor: colors.border,
               }}>
-              <MiniCup progress={1} color={colors.primary} width={22} height={28} />
+              <MiniCup progress={1} goalKind="reach" index={i} memoryKey={`milestone-${m.id}`} color={colors[milestoneDomain(m.id)]} width={22} height={28} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text variant="label" numberOfLines={2}>
                   {m.title}
@@ -61,11 +74,11 @@ export function MilestonesCard({ milestones }: { milestones: Milestone[] }) {
       {next.length ? (
         <View style={{ gap: spacing.md, borderTopWidth: done.length ? 1 : 0, borderTopColor: colors.border, paddingTop: done.length ? spacing.md : 0 }}>
           <Text variant="overline">Up next</Text>
-          {next.map((m) => {
+          {next.map((m, i) => {
             const pct = Math.round((m.current / m.goal) * 100);
             return (
               <View key={m.id} testID={`milestone-${m.id}`} accessible accessibilityLabel={`${m.title}, ${pct}% of the way. ${m.detail}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-                <MiniCup progress={Math.min(0.999, m.current / m.goal)} color={colors.primary} width={22} height={28} />
+                <MiniCup progress={Math.min(0.999, m.current / m.goal)} goalKind="reach" index={done.length + i} memoryKey={`milestone-${m.id}`} color={colors[milestoneDomain(m.id)]} width={22} height={28} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text variant="label">{m.title}</Text>
                   <Text variant="caption" color="textSecondary">
