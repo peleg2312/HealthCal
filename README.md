@@ -7,14 +7,16 @@ HealthCal works fully on the device with no account. Connecting the optional Sup
 ## What it does
 
 - **Personal targets from your body data.** Resting metabolism from Mifflin-St Jeor, or the lean-mass Katch-McArdle equation when you enter body fat %. Calorie budget, protein / carbs / fat and a water goal follow from your goal and pace, with a safety floor.
-- **Food diary.** Search 341 bundled foods and Open Food Facts products, scan barcodes, quick-add calories, create your own foods, save meals, copy a previous day. Recents, favourites and "your usual for this meal" make repeat logging one tap, and the amount can be adjusted in place after adding.
+- **Food diary.** Search 341 bundled foods (321 of them checked against USDA records) and Open Food Facts products, scan barcodes, quick-add calories, create your own foods, save meals, copy a previous day. Recents, favourites and "your usual for this meal" make repeat logging one tap, and the amount can be adjusted in place after adding.
 - **AI meal analysis.** Photograph or describe a meal; Claude returns an itemised, editable estimate with a calorie range and a prompt about hidden fats.
 - **108 activities.** Volleyball, basketball, yoga, running, swimming, strength and more, with calorie burn from the 2024 Compendium of Physical Activities MET values and your weight. Only net calories (above resting) are added to the budget, so nothing is counted twice. A set-by-set strength logger with rest timer, personal records and saved routines is included.
+- **Garmin workouts.** Import the files Garmin Connect exports (FIT, TCX, GPX, the Activities CSV, or a ZIP of them): each workout arrives with its real duration, distance and the calories the watch measured, and only the part above resting is added to the day. See `docs/garmin-import.md`.
+- **Friends.** Add people by a code and see each other's week: active minutes, sessions, streak and recent workouts, with a cheer for a workout. Each of those can be switched off, and calories, weight and food are never shared. Needs an account.
 - **Hydration, weight, body composition, sleep and fasting** trackers.
 - **Weight trend and adaptive expenditure.** A smoothed trend line ignores day-to-day water noise; once enough intake and weigh-ins are logged, your real energy expenditure is estimated from your own data.
 - **Reminders that carry live numbers** ("620 ml to go, about 3 glasses"), respect quiet hours and skip themselves when the goal is met.
 - **Progress, insights and weekly recaps** built from your numbers: an overview grid, your usual ranges beside your targets, and a consistency calendar with weekly rhythm targets and a streak that forgives a missed day.
-- **Three themes:** dark, light and the pink Blossom theme (Profile, Appearance).
+- **Its own look, in three themes.** The design is called Pour: every amount is a flat colour poured into an open cup with a level line on top, so what is left is visible above it. Dark, light and the pink Blossom theme (Profile, Appearance).
 - No ads, no paywalls, full data export and import, account deletion in the app.
 
 ## Run it
@@ -70,6 +72,18 @@ The design keeps token use low without giving up accuracy:
 
 At list prices this works out to a few hundredths of a US cent per analysis on the default model and under one cent on the careful pass. These figures are estimates from the published per-token prices, not measurements: check the usage page of your Anthropic console after real use. The function enforces a daily limit per person (kept against a hash of the email, so deleting and recreating an account does not reset it) and a ceiling across all users, records usage in `ai_usage`, and gives the allowance back when a request fails without being billed.
 
+### Setting it up with the scripts
+
+Two scripts do the steps above through Supabase's management API and then check the result:
+
+```bash
+SUPABASE_ACCESS_TOKEN=sbp_... node scripts/ops/provision-supabase.mjs   # create the project, apply migrations, deploy both functions,
+                                                                         # allow the app's links, write .env (public URL and key only)
+SUPABASE_SERVICE_ROLE_KEY=... node scripts/ops/verify-backend.mjs       # two throwaway accounts: sync, isolation, friends, both functions, deletion
+```
+
+The access token comes from supabase.com, Account, Access tokens. The Anthropic key is the one thing the script cannot set: add it in the dashboard page it prints. `verify-backend.mjs` needs the service-role key only when the project confirms email addresses on sign-up (the default), to create confirmed test accounts; it deletes them again.
+
 ### Testing without a live backend
 
 Three checks run entirely on your machine:
@@ -112,16 +126,17 @@ Set a unique bundle identifier and package name in `app.json` before a store bui
 
 ```
 src/app/            screens (expo-router)
-src/ui/             design system: Text, Card, Button, Ring, charts, Sheet, ...
+src/ui/             design system: Text, Card, Button, Vessel, MiniCup, Trough, charts, Sheet, ...
 src/theme/          colour, type, spacing tokens for the dark, light and Blossom themes
 src/lib/            pure calculation code: energy, exercise, hydration, trend, body, nutrition
 src/store/          local-first store (zustand), on-device saving, derived selectors
 src/data/           bundled food list and activity catalogue
 src/services/       Supabase client, auth, sync, Open Food Facts, AI, notifications, export
-src/features/       per-feature components and helpers
+src/features/       per-feature components and helpers (food, ai, activity, import, friends, progress, ...)
 supabase/           SQL migrations, their tests, and the analyze-food and food-search edge functions
 scripts/dev/        demo data, screenshot tool, end-to-end tests, local stand-in backend
-docs/               competitive research: what 33 comparable apps do, and what HealthCal took from it
+scripts/ops/        set up a real Supabase project and check it end to end
+docs/               competitive research (33 comparable apps) and the Garmin import guide
 ```
 
 `AGENTS.md` holds the conventions for working in the codebase (data rules, the UI kit, design rules).
@@ -136,7 +151,8 @@ Signing in on a device that already has data uploads what was logged there to th
 
 ## Accuracy notes and limits
 
-- The bundled food values are transcribed from USDA FoodData Central figures but were **not** individually re-checked against the live USDA records while building (the public API key was rate-limited), so every bundled food is labelled as unverified in the data. A self-check script enforces internal consistency (`scripts/check-foods.mjs`). Re-verifying against USDA with your own free API key is the first thing to do before a public release.
+- 321 of the 341 bundled foods name the USDA FoodData Central record they were checked against (SR Legacy 2018-04 and FNDDS 2024-10-31) and carry that record's values; an independent second pass looked every record up again. The other 20 have no honest USDA equivalent (labneh, halloumi, shakshuka, shawarma, protein products and a few more) and are labelled as unverified estimates. Household serving weights were corrected where USDA lists the same portion; the rest are typical values. `scripts/check-foods.mjs` enforces internal consistency.
+- Garmin's calorie figure for an activity includes resting energy. HealthCal stores it as the session's total and adds only the part above your own resting rate to the day, the same rule as for hand-logged sessions.
 - Open Food Facts data is crowd-sourced. The app labels it as community data and drops entries whose calories and macros contradict each other.
 - Calorie burn from MET tables describes an average adult. The app shows it as an estimate with a range.
 - Photo-based calorie estimates are approximate in every app that offers them; independent tests of commercial apps found average underestimates of a few hundred kcal per meal, mostly from fat the camera cannot see. HealthCal's review step exists for that reason.

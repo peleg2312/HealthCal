@@ -118,14 +118,19 @@ Built after the survey. Each line says what exists in the app now; where a part 
 
 - An onboarding step for the user's day (meal times, wake and bed time, which reminders to switch on) and a plan reveal that draws the road to the target as a range of dates.
 - Reminders that can be answered from the notification (add a glass, repeat a meal, weigh in later). Notification buttons exist only on phones and have not been tested on a device.
-- A soft per-metric colour behind each screen, a condensed face for headline numbers, a tab bar whose active pill slides, and three themes: dark, light and Blossom.
+- A visual identity of its own, called Pour, chosen from three competing design directions: every amount is a flat colour poured into an open cup with a level line on top. It replaced the first look (near-black with a neon accent, gradient rings and glows), which read as generic. Three themes: dark, light and Blossom.
+
+**Added after the first release candidate**
+
+- Friends: add people by a code, see each other's active minutes, sessions, streak and recent workouts, and cheer a workout. Sharing is per item and never includes calories, weight or food (the complaint most often made about social features in the surveyed apps is oversharing).
+- Garmin: workouts imported from Garmin Connect's export files with the watch's measured calories; only the part above resting is added to the day, which is where the surveyed apps most often double count.
 
 Looked at and left for later, with the reason:
 
 - **Voice logging** (MyFitnessPal, Lose It!, Bevel): needs a speech-recognition module that could not be verified in this environment. Describing a meal in text is covered by the AI screen.
 - **Scanning a nutrition label to create a food** (SnapCalorie, FoodNoms, MacroFactor): a good fit for the existing analysis function; not started.
 - **Home-screen widgets and a watch app** (WaterMinder, FoodNoms, Apple Fitness): native targets outside the shared codebase.
-- **Sync with Apple Health and Health Connect** (most of the category): needs native builds and device testing; it is also where other apps double count exercise, so it deserves care.
+- **Automatic sync with Apple Health, Health Connect and Garmin's own API** (most of the category): the two health-store libraries have not been built against this Expo version by anyone we could find, so they need a device build to verify; Garmin's API needs an approved developer account. File import covers Garmin until then.
 - **A real glass (blurred) tab bar and sheet backdrop**: needs a native blur module checked on devices.
 - **Reminder times that learn from when the user actually logs**, **share cards** and **badge art**: worthwhile, lower priority than getting the numbers right.
 - **Micronutrients beyond the eight tracked** (Cronometer's strength): depends on a richer food database than the bundled one.

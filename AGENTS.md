@@ -71,8 +71,9 @@ src/data/           bundled foods.ts (341 foods) and activities.ts (108 activiti
 src/services/       supabase, auth, sync, openFoodFacts, notifications, ...
 src/features/<x>/   components and helpers private to one feature area.
 src/components/     app-level components (TabBar).
-supabase/           SQL migration and the analyze-food edge function (Claude vision).
-scripts/dev/        seed.mjs (demo data) and shot.mjs (browser screenshots).
+supabase/           SQL migrations with their tests, and the analyze-food and food-search edge functions.
+scripts/dev/        seed.mjs (demo data), shot.mjs (browser screenshots), end-to-end tests, the stand-in backend.
+scripts/ops/        provision-supabase.mjs and verify-backend.mjs for a real Supabase project.
 ```
 
 ## Data rules
@@ -88,6 +89,8 @@ scripts/dev/        seed.mjs (demo data) and shot.mjs (browser screenshots).
 - Favourites are the synced `favorites` collection (each record holds the food); `favoriteFoodIds` is derived from it.
 - Synced collections are listed once in `COLLECTIONS` (`src/store/index.ts`). Adding one means: the type in `src/types`, the store's empty maps, the SQL check constraint in a new migration, the probe list in `supabase/tests/policies_and_sync.sql`, and a validator in `src/features/settings/exportFormat.ts`. `src/store/collections.test.ts` fails until all of them agree.
 - Shared rules live in one place: a fully logged day is `isCompleteDay` (`@/lib/trend`), minutes toward the weekly activity guideline are `guidelineMinutes` (`@/lib/exercise`), "usual foods for this meal" is `usualFoods` (`@/features/food/usuals`). Do not re-implement them in a feature.
+- Friends are not a synced collection. They live on the server behind functions (`supabase/migrations/20261115000000_friends.sql`) and are read through `@/services/friends` (`useFriends`, `refreshFriends`, ...). What a friend may see is built by `buildFriendSummary` (`@/features/friends/summary`): minutes, sessions, streak and recent workouts only. Never add calories, weight, food, notes or heart rate to it.
+- Imported workouts (Garmin files) come through `@/features/import` (`readImportFile`, `prepareImport`, `entriesToSave`). They are ordinary `activities` records with `source`, `externalId`, `startedAt` and `measured` set; a device's calorie figure is the session's `kcalGross`, and `kcalNet` is that minus the resting share, as for hand-logged sessions.
 - Zustand v5: a selector must return a stable reference. Select raw slices (`useStore((s) => s.settings)`) and derive with `useMemo`; never return a fresh object or array from the selector itself.
 - React Compiler is on. Write plain components; do not add manual `useMemo`/`useCallback` for render performance (memoising expensive derived data is still fine).
 
