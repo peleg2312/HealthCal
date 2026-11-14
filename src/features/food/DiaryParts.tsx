@@ -3,8 +3,9 @@ import { CalendarPlus, Copy, MoreHorizontal, Plus, Repeat2, Save, Trash2, X } fr
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { addDays, formatDayLabel, today } from '@/lib/dates';
+import { addDays, formatDayLabel } from '@/lib/dates';
 import { MEAL_LABEL, entriesTotal } from '@/lib/nutrition';
+import { useToday } from '@/store/clock';
 import type { DaySummary } from '@/store/selectors';
 import { cup, fonts, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
@@ -112,7 +113,7 @@ function EntryRow({ entry }: { entry: FoodEntry }) {
   const ai = !!entry.kcalRange;
   const portion =
     entry.grams > 0 && entry.servingLabel !== `${Math.round(entry.grams)} g` && !/^\d+(\.\d+)?\s*g$/.test(entry.servingLabel.trim())
-      ? `${portionLabel(entry.servingLabel, entry.quantity)} · ${Math.round(entry.grams)} g`
+      ? `${portionLabel(entry.servingLabel, entry.quantity)} · ${Math.round(entry.grams)} g`
       : portionLabel(entry.servingLabel, entry.quantity);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: ROW_PAD, paddingRight: 4 }}>
@@ -124,7 +125,7 @@ function EntryRow({ entry }: { entry: FoodEntry }) {
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: 11 }}>
         <RowEmoji emoji={entry.emoji} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Text variant="bodyStrong" numberOfLines={narrow ? 2 : 1} style={{ fontFamily: fonts.semibold }}>
+          <Text variant="bodyStrong" numberOfLines={narrow ? 3 : 2} style={{ fontFamily: fonts.semibold }}>
             {entry.name}
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -262,7 +263,7 @@ export function MealCard({
               accessibilityLabel={`Repeat ${label.toLowerCase()} from ${formatDayLabel(previous.date)}`}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}>
               <Repeat2 size={16} color={colors.text} strokeWidth={2.2} />
-              <Text variant="label" color="text" style={{ flexShrink: 1, textDecorationLine: 'underline' }} numberOfLines={1}>
+              <Text variant="label" color="text" style={{ flexShrink: 1, textDecorationLine: 'underline' }} numberOfLines={2}>
                 Repeat {dayPhrase(previous.date)}: {previous.entries.map((e) => e.name.split(',')[0]).join(', ')}
               </Text>
               <Text variant="caption" color="textSecondary" tabular numberOfLines={1} style={{ marginLeft: 'auto', flexShrink: 0 }}>
@@ -295,6 +296,7 @@ export function MealMenuSheet({
   onRepeat: () => void;
 }) {
   const { colors } = useTheme();
+  const todayDate = useToday();
   const [step, setStep] = useState<MenuStep>('menu');
   const [targetDate, setTargetDate] = useState<ISODate>(addDays(date, 1));
   const [targetMeal, setTargetMeal] = useState<MealType>(meal ?? 'breakfast');
@@ -307,7 +309,7 @@ export function MealMenuSheet({
     setOpenFor(key);
     if (meal) {
       setStep('menu');
-      setTargetDate(date === today() ? addDays(date, 1) : today());
+      setTargetDate(date === todayDate ? addDays(date, 1) : todayDate);
       setTargetMeal(meal);
       setName(defaultMealName(entries, meal));
     }

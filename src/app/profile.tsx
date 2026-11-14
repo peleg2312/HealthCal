@@ -18,7 +18,7 @@ import {
   Weight,
 } from 'lucide-react-native';
 import React from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { useHealthSync } from '@/features/health-sync/store';
 import { healthAdapter } from '@/features/health-sync/sync';
@@ -61,6 +61,8 @@ export default function ProfileScreen() {
 
 function ProfileHub() {
   const { colors, spacing } = useTheme();
+  // Under 360 px the three header stats have about 70 px each: one-word labels keep them on one line.
+  const narrow = useWindowDimensions().width < 360;
   const profile = useProfile();
   const settings = useStore((s) => s.settings);
   const setSettings = useStore((s) => s.setSettings);
@@ -106,7 +108,7 @@ function ProfileHub() {
         <View style={{ flexDirection: 'row', marginTop: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border }}>
           <HeaderStat label="Weight" value={formatWeight(currentKg, u)} color={colors.weight} />
           <HeaderStat divider label={profile.goal === 'maintain' ? 'Goal' : 'Target'} value={profile.goal === 'maintain' ? 'Maintain' : goalLine.replace('Goal ', '')} />
-          <HeaderStat divider label="Daily budget" value={`${formatNumber(model.target.target)} kcal`} color={colors.calories} />
+          <HeaderStat divider label={narrow ? 'Budget' : 'Daily budget'} value={`${formatNumber(model.target.target)} kcal`} color={colors.calories} />
         </View>
       </Card>
 
@@ -275,22 +277,27 @@ function ProfileHub() {
   );
 }
 
-/** One stat of the header row: the number large with its unit small inside it; a cup key marks a data colour. */
+/**
+ * One stat of the header row: the number large with its unit small inside it; a cup key marks a data colour.
+ * Nothing is cut: under 360 px the number steps down a size, and the label or the unit wraps to a second line.
+ */
 function HeaderStat({ label, value, color, divider }: { label: string; value: string; color?: string; divider?: boolean }) {
   const { colors, spacing } = useTheme();
+  const narrow = useWindowDimensions().width < 360;
   const i = value.lastIndexOf(' ');
   const numeric = /^[−\-+]?[\d.,]/.test(value) && i > 0;
   const num = numeric ? value.slice(0, i) : value;
   const unit = numeric ? value.slice(i + 1) : '';
+  const size = narrow ? { fontSize: numeric ? 17 : 15, lineHeight: 21 } : numeric ? undefined : { fontSize: 17 };
   return (
-    <View style={{ flex: 1, minWidth: 0, paddingLeft: divider ? spacing.md : 0, borderLeftWidth: divider ? 1 : 0, borderLeftColor: colors.border }}>
+    <View style={{ flex: 1, minWidth: 0, paddingLeft: divider ? (narrow ? spacing.sm : spacing.md) : 0, borderLeftWidth: divider ? 1 : 0, borderLeftColor: colors.border }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         {color ? <CupKey color={color} /> : null}
-        <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flexShrink: 1 }}>
+        <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
           {label}
         </Text>
       </View>
-      <Text variant="numM" numberOfLines={1} style={numeric ? undefined : { fontSize: 17 }}>
+      <Text variant="numM" style={size}>
         {num}
         {unit ? <Text variant="unit">{` ${unit}`}</Text> : null}
       </Text>
@@ -347,14 +354,14 @@ function AccountRow() {
               ? `Backed up, last synced ${when}`
               : 'Signed in, not synced yet';
   } else if (sessionLost && isBackendConfigured) {
-    icon = <CloudOff size={20} color={colors.warning} />;
-    tone = colors.warning;
+    icon = <CloudOff size={20} color={colors.warningInk} />;
+    tone = colors.warningInk;
     keep = true;
     title = 'Signed out of your account';
     subtitle = 'Entries are safe here but not backed up. Sign in again';
   } else if (isBackendConfigured) {
-    icon = <Smartphone size={20} color={colors.warning} />;
-    tone = colors.warning;
+    icon = <Smartphone size={20} color={colors.warningInk} />;
+    tone = colors.warningInk;
     keep = true;
     subtitle = 'On this device only. Create a free account to back up and sync';
   } else {

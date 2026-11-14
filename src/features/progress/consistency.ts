@@ -38,6 +38,8 @@ export interface CalendarDayInput {
   date: ISODate;
   /** Food logged that day. */
   logged: boolean;
+  /** Fully logged, by the shared `isCompleteDay` rule (decided by the caller). */
+  complete: boolean;
   kcal: number;
   budget: number;
   waterMet: boolean;
@@ -50,7 +52,11 @@ export interface CalendarCell {
   future: boolean;
   isToday: boolean;
   logged: boolean;
-  /** Logged and within 10% of that day's budget. */
+  /** Eaten / that day's own budget (0 when not logged): how full its cup is. */
+  ratio: number;
+  /** Logged, closed and not fully logged: the lighter fill. */
+  partial: boolean;
+  /** Fully logged and within 10% of that day's budget: the check. */
   onBudget: boolean;
   waterMet: boolean;
   trained: boolean;
@@ -100,7 +106,9 @@ export function monthGrid(month: string, byDate: ReadonlyMap<ISODate, CalendarDa
       future,
       isToday: date === today,
       logged,
-      onBudget: logged && !!d && inBudgetBand(d.kcal, d.budget),
+      ratio: logged && d && d.budget > 0 ? d.kcal / d.budget : 0,
+      partial: logged && !!d && !d.complete && date !== today,
+      onBudget: logged && !!d && d.complete && inBudgetBand(d.kcal, d.budget),
       waterMet: !future && !!d?.waterMet,
       trained: !future && !!d?.trained,
       joinPrev: false,

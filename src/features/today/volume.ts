@@ -6,15 +6,16 @@
 import { formatVolume, ML_PER_FLOZ as ML_PER_FL_OZ } from '@/lib/units';
 import type { UnitSystem } from '@/types';
 
-/** The amount in ml that `formatVolume` prints for `ml` (what the reader sees, back in ml). */
+/**
+ * The amount in ml that `formatVolume` prints for `ml` (what the reader sees,
+ * back in ml). Read from the printed text itself, so it rounds exactly as the
+ * screen does (3,425 ml prints "3.42 L", not 3.43).
+ */
 export function shownMl(ml: number, units: UnitSystem): number {
-  const v = Math.max(0, ml);
-  if (units === 'imperial') {
-    const oz = v / ML_PER_FL_OZ;
-    const shown = oz < 10 ? Math.round(oz * 10) / 10 : Math.round(oz);
-    return shown * ML_PER_FL_OZ;
-  }
-  return v >= 1000 ? Math.round(v / 10) * 10 : Math.round(v);
+  const text = formatVolume(Math.max(0, ml), units);
+  const n = Number(text.slice(0, text.indexOf(' ')));
+  if (units === 'imperial') return n * ML_PER_FL_OZ;
+  return text.endsWith(' L') ? Math.round(n * 1000) : n;
 }
 
 function trim(n: number, decimals: number): string {

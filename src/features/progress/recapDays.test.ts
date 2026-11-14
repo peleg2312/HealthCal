@@ -51,6 +51,20 @@ describe('recap day cups', () => {
     expect(recapDaysVerdict(open)).toBe('The one full day was within 10% of its budget');
   });
 
+  it('describes each cup in words that agree with it', () => {
+    // The review's case: 2,245 of 2,050 is 109.5%, above its budget (amber lip) and within 10%.
+    const [above, near, under, far] = recapDayCups(
+      '2026-11-02',
+      [day('2026-11-02', 2245, 2050), day('2026-11-03', 2029, 2030), day('2026-11-04', 1922, 2050), day('2026-11-05', 2600, 2100)],
+      '2026-11-14',
+    );
+    expect(above.detail).toBe('Nov 2 · 2,245 of 2,050 kcal, 195 kcal above that day’s budget, within 10% of it');
+    expect(near.detail).toBe('Nov 3 · 2,029 of 2,030 kcal, 99% of that day’s budget, within 10% of it');
+    expect(under.detail).toBe('Nov 4 · 1,922 of 2,050 kcal, 93% of that day’s budget, within 10% of it');
+    expect(far.detail).toBe('Nov 5 · 2,600 of 2,100 kcal, 500 kcal above that day’s budget');
+    for (const c of [above, near, under, far]) expect(c.detail).not.toMatch(/110%|100%/);
+  });
+
   it('has nothing to judge without a full day', () => {
     expect(recapDaysVerdict(recapDayCups('2026-11-09', [], '2026-11-10'))).toBe('No fully logged days to measure yet');
   });

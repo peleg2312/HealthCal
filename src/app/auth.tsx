@@ -243,7 +243,7 @@ function AuthForm({ initial }: { initial: Mode }) {
         ) : null}
 
         {formError ? (
-          <Note tone="warning" icon={<TriangleAlert size={18} color={colors.warning} />} testID="auth-error">
+          <Note tone="warning" icon={<TriangleAlert size={18} color={colors.warningInk} />} testID="auth-error">
             <Text variant="body" accessibilityLiveRegion="polite">
               {formError}
             </Text>
@@ -319,7 +319,7 @@ function ResetPassword() {
         }>
         <FadeIn style={{ alignItems: 'center', gap: spacing.lg }}>
           <View style={{ width: 72, height: 72, alignItems: 'center', justifyContent: 'center' }}>
-            <KeyRound size={40} color={colors.warning} strokeWidth={1.6} />
+            <KeyRound size={40} color={colors.warningInk} strokeWidth={1.6} />
           </View>
           <Text variant="h1" align="center" accessibilityRole="header">
             This reset link no longer works
@@ -422,7 +422,7 @@ function ResetPassword() {
           error={errors.confirm}
         />
         {formError ? (
-          <Note tone="warning" icon={<TriangleAlert size={18} color={colors.warning} />} testID="auth-reset-error">
+          <Note tone="warning" icon={<TriangleAlert size={18} color={colors.warningInk} />} testID="auth-reset-error">
             <Text variant="body" accessibilityLiveRegion="polite">
               {formError}
             </Text>

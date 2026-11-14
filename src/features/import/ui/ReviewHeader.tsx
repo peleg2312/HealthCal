@@ -17,11 +17,13 @@ export function SummaryCard({ counts, addedKcal, csvLine, onChangeCsv }: { count
   const allKnown = counts.total > 0 && counts.locked === counts.total;
   return (
     <Card style={{ gap: spacing.md }} testID="import-summary">
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.lg }}>
-        <View style={{ flex: 1, minWidth: 0 }}>
+      {/* The count and the calories share a row when both fit; on a narrow phone the calories go under the count. */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', columnGap: spacing.lg, rowGap: spacing.md }}>
+        <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 170, minWidth: 0 }}>
           <Text variant="numL" tabular testID="import-found">
             {formatNumber(counts.total)}
-            <Text variant="unit">{counts.total === 1 ? ' workout found' : ' workouts found'}</Text>
+            {/* Non-breaking spaces: the unit stays in one piece, "workouts found", never "found" alone. */}
+            <Text variant="unit">{counts.total === 1 ? '\u00A0workout\u00A0found' : '\u00A0workouts\u00A0found'}</Text>
           </Text>
           <Text variant="caption" color="textSecondary" testID="import-summary-line">
             {allKnown
@@ -45,7 +47,7 @@ export function SummaryCard({ counts, addedKcal, csvLine, onChangeCsv }: { count
           </Text>
         </View>
         {addedKcal > 0 ? (
-          <View style={{ alignItems: 'flex-end' }}>
+          <View style={{ alignItems: 'flex-start' }}>
             <Text variant="numM" tabular testID="import-summary-kcal">
               +{formatNumber(addedKcal)}
               <Text variant="unit"> kcal</Text>
@@ -92,7 +94,7 @@ export function FileNotes({ notes }: { notes: FileNote[] }) {
       {shown.map((n, i) => (
         <View key={n.file} style={{ gap: spacing.xs, paddingVertical: spacing.sm, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: colors.border }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            {n.errors.length ? <FileWarning size={18} color={colors.warning} strokeWidth={1.9} /> : <AlertTriangle size={18} color={colors.textSecondary} strokeWidth={1.9} />}
+            {n.errors.length ? <FileWarning size={18} color={colors.warningInk} strokeWidth={1.9} /> : <AlertTriangle size={18} color={colors.textSecondary} strokeWidth={1.9} />}
             <Text variant="bodyStrong" numberOfLines={1} style={{ flex: 1 }}>
               {n.file}
             </Text>

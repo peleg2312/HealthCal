@@ -90,9 +90,10 @@ export function WeekCard({ week, dates, today }: { week: WeekSummary; dates: ISO
         />
       </View>
 
-      <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }}>
+      {/* Three totals in a row; on a phone too narrow for that the third wraps under the first two, so nothing is cut. */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: spacing.sm, marginTop: spacing.lg }}>
         <Mini label="Sessions" value={String(week.sessions)} />
-        <Mini label="Logged in total" value={week.totalMinutes > 0 ? formatDuration(week.totalMinutes) : '0 min'} testID="train-total-time" />
+        <Mini label="Total time" value={week.totalMinutes > 0 ? formatDuration(week.totalMinutes) : '0 min'} testID="train-total-time" />
         <Mini label="Net, est." value={formatNumber(week.kcalNet)} unit="kcal" color={colors.exercise} />
       </View>
 
@@ -144,16 +145,17 @@ export function WeekCard({ week, dates, today }: { week: WeekSummary; dates: ISO
 
 function Mini({ label, value, unit, color, testID }: { label: string; value: string; unit?: string; color?: string; testID?: string }) {
   return (
-    <View style={{ minWidth: 0, flex: 1 }} testID={testID}>
+    // No shrinking below the number's own width (its spaces do not break): the row wraps instead of cutting it.
+    <View style={{ flexGrow: 1, flexBasis: 92 }} testID={testID}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         {color ? <CupKey color={color} /> : null}
-        <Text variant="caption" color="textSecondary" numberOfLines={1}>
+        <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
           {label}
         </Text>
       </View>
-      <Text variant="numM" numberOfLines={1} style={{ fontSize: 18, lineHeight: 23 }}>
-        {value}
-        {unit ? <Text variant="unit">{` ${unit}`}</Text> : null}
+      <Text variant="numM" style={{ fontSize: 18, lineHeight: 23 }}>
+        {value.replace(/ /g, '\u00A0')}
+        {unit ? <Text variant="unit">{`\u00A0${unit}`}</Text> : null}
       </Text>
     </View>
   );

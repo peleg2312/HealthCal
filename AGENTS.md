@@ -167,7 +167,7 @@ Read the component source in `src/ui/` for exact props before using one. If the 
 /settings/health-sync  automatic workout sync from Health Connect (Android): the switch, permission, last synced, "Needs a look"
 /recap?week=           weekly check-in                /consistency   logging calendar
 /friends               friends, invite code, requests, cheers (needs an account)
-/friends/add?code=     add a friend by code; invite links (healthcal://friends/add?code=) open here
+/friends/add?invite=   add a friend by code; invite links (healthcal://friends/add?invite=, never ?code=, which web sign-in reads) open here; an old ?code= still works
 ```
 
 ## Working on this project

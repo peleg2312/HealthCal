@@ -7,9 +7,9 @@ import { useTheme } from '@/theme';
 import type { ISODate, UnitSystem } from '@/types';
 import { Button, Divider, Sheet, Stat, Text, toast } from '@/ui';
 
-import { AvatarPicker, CheerButton, NameField, PersonMark, SharingSwitches, WeekCups, WorkoutRow } from './components';
+import { CheerButton, NameField, PersonMark, SharingSwitches, WeekCups, WorkoutRow } from './components';
 import { dayRef } from './summary';
-import { friendWeek, isCurrentWeek, sharesAnything } from './week';
+import { cleanAvatar, friendWeek, isCurrentWeek, sharesAnything } from './week';
 
 /** A friend's detail: since when, their week, every shared workout with Cheer, a cheer for the day, and Remove. */
 export function FriendSheet({
@@ -87,16 +87,16 @@ export function FriendSheet({
   );
 }
 
-/** Settings for friends: name, how you appear, the three switches (each change is saved at once and says so), and Turn friends off. */
+/** Settings for friends: the name friends see, the three switches (each change is saved at once and says so), and Turn friends off. */
 export function SettingsSheet({ me, visible, onClose, onLeave }: { me: SocialMe; visible: boolean; onClose: () => void; onLeave: () => void }) {
   const { spacing } = useTheme();
   const [name, setName] = useState(me.displayName);
   const [sharing, setSharing] = useState<SocialSharing>(me.sharing);
-  const [avatar, setAvatar] = useState(me.avatar);
   const [saving, setSaving] = useState(false);
 
-  const save = async (patch: Partial<{ displayName: string; avatar: string; sharing: SocialSharing }>, said: string, undo: () => void) => {
-    const res = await setupSocial({ displayName: patch.displayName ?? me.displayName, avatar: patch.avatar ?? me.avatar, sharing: patch.sharing ?? me.sharing });
+  const save = async (patch: Partial<{ displayName: string; sharing: SocialSharing }>, said: string, undo: () => void) => {
+    // People show as initials: an emoji mark chosen before that rule is dropped with the next save.
+    const res = await setupSocial({ displayName: patch.displayName ?? me.displayName, avatar: cleanAvatar(me.avatar), sharing: patch.sharing ?? me.sharing });
     if (res.ok) toast(said);
     else {
       undo();
@@ -129,15 +129,6 @@ export function SettingsSheet({ me, visible, onClose, onLeave }: { me: SocialMe;
             />
           ) : null}
         </View>
-        <AvatarPicker
-          name={name}
-          value={avatar}
-          onChange={(v) => {
-            const before = avatar;
-            setAvatar(v);
-            void save({ avatar: v }, 'Saved. Friends see your new mark', () => setAvatar(before));
-          }}
-        />
         <SharingSwitches
           sharing={sharing}
           onChange={(key, on) => {

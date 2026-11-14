@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { darkColors } from '@/theme/tokens';
 
 import { DEFAULT_SHARE_CHOICES, dayCardContent, dayVerdict, foodList, weekCardContent, weekCups, type ShareDayInput, type ShareWeekInput } from './content';
-import { dayScene, weekScene, type Prim } from './scene';
+import { BAND_OPACITY, dayScene, PARTIAL_OPACITY, placeLabels, weekScene, type Prim } from './scene';
 
 const day = (over: Partial<ShareDayInput> = {}): ShareDayInput => ({
   date: '2026-11-12',
@@ -130,7 +130,7 @@ const week = (over: Partial<ShareWeekInput> = {}): ShareWeekInput => ({
 describe('week card content', () => {
   it('writes its own headline from facts it may show', () => {
     const c = weekCardContent(week(), DEFAULT_SHARE_CHOICES);
-    expect(c.headline).toBe('7 of 7 full days within 10% of the budget.');
+    expect(c.headline).toBe('Every full day within 10% of its budget.');
     expect(c.overline).toBe('WEEK OF NOV 2 – 8');
   });
 
@@ -159,6 +159,13 @@ describe('scenes', () => {
     expect(allText(s.prims)).toMatch(/HealthCal/);
   });
 
+  it('never cuts a stat label on the week card', () => {
+    for (const minutes of [90, 180, 1250]) {
+      const c = weekCardContent(week({ guidelineMinutes: minutes, waterDaysTracked: 7, waterDaysAtGoal: 1 }), { ...DEFAULT_SHARE_CHOICES, kcal: true });
+      expect(allText(weekScene(c, darkColors).prims)).not.toMatch(/…/);
+    }
+  });
+
   it('keeps the week card inside its frame with five stats', () => {
     const c = weekCardContent(week(), { ...DEFAULT_SHARE_CHOICES, kcal: true });
     const s = weekScene(c, darkColors);
@@ -174,5 +181,100 @@ describe('scene spacing', () => {
     const letters = s.prims.filter((p): p is Extract<Prim, { k: 'text' }> => p.k === 'text' && /^[MTWFS]$/.test(p.runs[0]?.text ?? ''));
     expect(letters).toHaveLength(7);
     for (const l of letters) expect(l.y).toBeLessThan(s.height - 52);
+  });
+});
+
+describe('week card, review fixes', () => {
+  // This week (Nov 9 to 15) on Saturday Nov 14, with only breakfast logged each day.
+  const partialWeek = week({
+    weekStart: '2026-11-09',
+    today: '2026-11-14',
+    days: ['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14'].map((date) => ({ date, logged: true, kcal: 400, budget: 2000, complete: false })),
+    avgKcal: null,
+    avgBudget: null,
+    waterDaysTracked: 0,
+    waterDaysAtGoal: 0,
+    guidelineMinutes: 60,
+  });
+
+  it('draws partly logged days in the lighter fill and only today hatched', () => {
+    const c = weekCardContent(partialWeek, DEFAULT_SHARE_CHOICES);
+    expect(c.cups.map((d) => d.partial)).toEqual([true, true, true, true, true, false, false]);
+    expect(c.cups.map((d) => d.isToday)).toEqual([false, false, false, false, false, true, false]);
+    const s = weekScene(c, darkColors);
+    const clips = s.prims.filter((p): p is Extract<Prim, { k: 'clip' }> => p.k === 'clip');
+    // Six drawn cups (Sunday is still to come): five lighter fills, one hatched.
+    const lighter = clips.filter((p) => p.children.some((ch) => ch.k === 'rect' && ch.opacity === PARTIAL_OPACITY));
+    const hatched = clips.filter((p) => p.children.filter((ch) => ch.k === 'path').length > 3);
+    expect(lighter).toHaveLength(5);
+    expect(hatched).toHaveLength(1);
+  });
+
+  it('leaves out "0 of 0" and says a week in progress is so far', () => {
+    const c = weekCardContent(partialWeek, DEFAULT_SHARE_CHOICES);
+    expect(c.stats.find((s) => s.key === 'budget')).toBeUndefined();
+    expect(c.inProgress).toBe(true);
+    expect(c.summary).toMatch(/^My week so far/);
+    expect(c.stats.find((s) => s.key === 'activity')?.label).toBe('active so far');
+    const text = allText(weekScene(c, darkColors).prims);
+    expect(text).not.toMatch(/0 of 0/);
+    expect(text).toMatch(/Week in progress/);
+  });
+
+  it('never prints the same figure in the headline and the stats', () => {
+    for (const over of [{}, { guidelineMinutes: 295 }, { waterDaysAtGoal: 7 }, { days: week().days.map((d) => ({ ...d, kcal: 3000 })) }]) {
+      const c = weekCardContent(week(over), DEFAULT_SHARE_CHOICES);
+      const figures = c.headline.match(/\d[\d,]*/g) ?? [];
+      for (const f of figures) expect(c.stats.map((s) => s.value)).not.toContain(f);
+    }
+    expect(weekCardContent(week({ guidelineMinutes: 295, days: week().days.map((d) => ({ ...d, kcal: 3000 })), waterDaysAtGoal: 1 }), DEFAULT_SHARE_CHOICES).headline).toBe('Past the weekly 150 active minutes.');
+  });
+
+  it('says "full day" for one', () => {
+    const c = weekCardContent(week({ days: week().days.map((d, i) => ({ ...d, complete: i === 0 })) }), DEFAULT_SHARE_CHOICES);
+    expect(c.stats[0]).toMatchObject({ value: '1', unit: 'of 1', label: 'full day within 10%' });
+  });
+});
+
+describe('day card meal bands', () => {
+  const textPrims = (prims: Prim[]) => prims.filter((p): p is Extract<Prim, { k: 'text' }> => p.k === 'text');
+
+  it('draws each meal a step lighter, bottom first', () => {
+    const s = dayScene(dayCardContent(day(), DEFAULT_SHARE_CHOICES), darkColors);
+    const clip = s.prims.find((p): p is Extract<Prim, { k: 'clip' }> => p.k === 'clip')!;
+    const fills = clip.children.filter((p): p is Extract<Prim, { k: 'rect' }> => p.k === 'rect' && p.fill === darkColors.calories);
+    expect(fills.map((f) => f.opacity)).toEqual(BAND_OPACITY);
+  });
+
+  it('names every meal, whatever the day looks like', () => {
+    const cases: Partial<ShareDayInput>[] = [
+      {},
+      { date: '2026-11-14', kcal: 1100, mealKcal: { breakfast: 400, lunch: 500, dinner: 200, snack: 0 } },
+      { kcal: 2700, mealKcal: { breakfast: 900, lunch: 900, dinner: 800, snack: 100 } },
+      { kcal: 300, mealKcal: { breakfast: 100, lunch: 100, dinner: 50, snack: 50 } },
+    ];
+    for (const over of cases) {
+      for (const kcal of [false, true]) {
+        const c = dayCardContent(day(over), { ...DEFAULT_SHARE_CHOICES, kcal });
+        const texts = textPrims(dayScene(c, darkColors).prims);
+        const names = texts.filter((t) => /^(Breakfast|Lunch|Dinner|Snacks)$/.test(t.runs[0].text));
+        expect(names).toHaveLength(c.cup.bands.length);
+        // A line apart, and clear of the headline's unit line.
+        const ys = names.map((n) => n.y).sort((a, b) => a - b);
+        for (let i = 1; i < ys.length; i++) expect(ys[i] - ys[i - 1]).toBeGreaterThanOrEqual(16);
+        const unitY = texts.find((t) => t.runs[0].text.startsWith(c.headline.unit.split(' ')[0]) && t.runs[0].size === 14)!.y;
+        expect(ys[0]).toBeGreaterThan(unitY + 8);
+        if (kcal) expect(names[0].runs[1].text).toMatch(/ kcal$/);
+        else expect(names.every((n) => !n.runs[1].text)).toBe(true);
+      }
+    }
+  });
+
+  it('places labels near their bands and never drops one', () => {
+    const l = (want: number) => ({ text: 'x', kcal: null, opacity: 1, want });
+    expect(placeLabels([l(300), l(250)], 100, 320).map((p) => p.y)).toEqual([300, 250]);
+    expect(placeLabels([l(300), l(295), l(290)], 100, 320).map((p) => p.y)).toEqual([300, 284, 268]);
+    expect(placeLabels([l(120), l(110)], 200, 320).map((p) => p.y)).toEqual([216, 200]);
+    expect(placeLabels([l(300), l(290), l(280), l(270)], 290, 300)).toHaveLength(4);
   });
 });

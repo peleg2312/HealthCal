@@ -28,6 +28,13 @@ describe('water left adds up to the goal shown', () => {
     expect(shownMl(1225, 'metric')).toBe(1230);
     expect(shownMl(225, 'metric')).toBe(225);
   });
+  it('rounds as the printed text does, so drunk, extra and goal agree', () => {
+    // 3.425 is stored just under the half, so it prints 3.42 L: the extra over 3.3 L is 120 ml, not 130.
+    expect(formatVolume(3425, 'metric')).toBe('3.42 L');
+    expect(shownMl(3425, 'metric')).toBe(3420);
+    expect(shownMl(3425, 'metric') - shownMl(3300, 'metric')).toBe(120);
+    expect(formatWaterLeft(1235, 3300, 'metric')).toBe(`${Number((3.3 - Number(formatVolume(1235, 'metric').split(' ')[0])).toFixed(3))} L`);
+  });
 });
 
 describe('volumeNumber', () => {

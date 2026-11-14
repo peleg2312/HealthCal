@@ -44,8 +44,8 @@ function SignedOut() {
       <>
         <Card testID="account-session-lost">
           <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-            <IconTile color={colors.warning}>
-              <CloudOff size={20} color={colors.warning} />
+            <IconTile color={colors.warningInk} keep>
+              <CloudOff size={20} color={colors.warningInk} />
             </IconTile>
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text variant="title">Signed out of your account</Text>
@@ -72,8 +72,8 @@ function SignedOut() {
     <>
       <Card>
         <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center', marginBottom: spacing.md }}>
-          <IconTile color={colors.warning}>
-            <Smartphone size={20} color={colors.warning} />
+          <IconTile color={colors.warningInk} keep>
+            <Smartphone size={20} color={colors.warningInk} />
           </IconTile>
           <View style={{ flex: 1 }}>
             <Text variant="title">On this device only</Text>
@@ -183,14 +183,14 @@ function SignedIn({ email }: { email: string }) {
     <>
       <Card>
         <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-          <IconTile color={sync.status === 'idle' ? colors.success : colors.warning}>
-            {sync.status === 'offline' ? <CloudOff size={20} color={colors.warning} /> : <Cloud size={20} color={sync.status === 'idle' ? colors.success : colors.warning} />}
+          <IconTile color={sync.status === 'idle' ? colors.success : colors.warningInk} keep={sync.status !== 'idle'}>
+            {sync.status === 'offline' ? <CloudOff size={20} color={colors.warningInk} /> : <Cloud size={20} color={sync.status === 'idle' ? colors.success : colors.warningInk} />}
           </IconTile>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text variant="title" numberOfLines={1} testID="account-email">
               {email}
             </Text>
-            <Text variant="caption" color={sync.status === 'error' ? 'warning' : 'textSecondary'}>
+            <Text variant="caption" color={sync.status === 'error' ? 'warningInk' : 'textSecondary'}>
               {status}
             </Text>
           </View>
@@ -199,7 +199,7 @@ function SignedIn({ email }: { email: string }) {
           {pending === 0 ? 'Everything on this device is backed up.' : `${pending} change${pending === 1 ? '' : 's'} waiting to upload.`}
         </Text>
         {sync.rejected > 0 ? (
-          <Text variant="caption" color="warning" style={{ marginTop: spacing.xs }} testID="account-sync-rejected">
+          <Text variant="caption" color="warningInk" style={{ marginTop: spacing.xs }} testID="account-sync-rejected">
             {sync.rejected === 1 ? '1 item was not accepted by the server.' : `${sync.rejected} items were not accepted by the server.`} {sync.rejected === 1 ? 'It is' : 'They are'} safe on this
             device and will be tried again. Everything else is backed up.
           </Text>

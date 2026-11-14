@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Dumbbell, Plus, Timer } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { ACTIVITY_BY_ID, POPULAR_ACTIVITY_IDS } from '@/data/activities';
 import { ActivityTile, SessionRow } from '@/features/activity/components';
@@ -32,6 +32,8 @@ export default function TrainScreen() {
   const recentIds = useStore((s) => s.recentActivityIds);
   const draft = useStrengthDrafts((s) => s.drafts.new);
   const [pages, setPages] = useState(1);
+  // Under 360 px four tiles a row leave no room for a word like "Volleyball": three a row, two rows.
+  const narrow = useWindowDimensions().width < 360;
 
   const t = useToday();
   // ?week=YYYY-MM-DD shows that week (the import screen links to the week it added workouts to); otherwise this week.
@@ -81,13 +83,14 @@ export default function TrainScreen() {
 
       <WeekCard week={week} dates={weekDates} today={t} />
 
-      <View style={{ flexDirection: 'row', gap: spacing.md }}>
+      {/* Side by side when both labels fit (150 px each); stacked on a narrow phone rather than cut. */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
         <Button
           testID="train-log-activity"
           title="Log activity"
           icon={<Plus size={18} color={colors.onPrimary} />}
           onPress={() => router.push('/activity/pick')}
-          style={{ flex: 1 }}
+          style={{ flexGrow: 1, flexBasis: 150 }}
         />
         <Button
           testID="train-start-workout"
@@ -95,7 +98,7 @@ export default function TrainScreen() {
           variant="secondary"
           icon={draftActive ? <Timer size={18} color={colors.exercise} /> : <Dumbbell size={18} color={colors.text} />}
           onPress={() => router.push('/activity/strength')}
-          style={{ flex: 1 }}
+          style={{ flexGrow: 1, flexBasis: 150 }}
         />
       </View>
       {draftActive ? (
@@ -126,7 +129,7 @@ export default function TrainScreen() {
 
       <SectionTitle title="Quick start" action="All activities" onAction={() => router.push('/activity/pick')} />
       <View style={{ gap: spacing.sm }}>
-        {[quick.slice(0, 4), quick.slice(4, 8)].map((row, i) => (
+        {(narrow ? [quick.slice(0, 3), quick.slice(3, 6)] : [quick.slice(0, 4), quick.slice(4, 8)]).map((row, i) => (
           <View key={i} style={{ flexDirection: 'row', gap: spacing.sm }}>
             {row.map((a) => (
               <ActivityTile key={a.id} emoji={a.emoji} name={a.name} testID={`quick-${a.id}`} onPress={() => router.push(`/activity/log?activityId=${a.id}`)} />

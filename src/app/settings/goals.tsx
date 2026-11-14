@@ -195,11 +195,11 @@ function GoalsForm() {
               }.`}
         </Text>
         {model.target.belowFloor && draft.goal === 'lose' && model.target.source !== 'override' ? (
-          <Text variant="caption" color="warning" style={{ marginTop: 4 }}>
+          <Text variant="caption" color="warningInk" style={{ marginTop: 4 }}>
             Your estimated expenditure is already at the recommended minimum, so the plan holds at maintenance.
           </Text>
         ) : model.target.limitedByFloor ? (
-          <Text variant="caption" color="warning" style={{ marginTop: 4 }}>
+          <Text variant="caption" color="warningInk" style={{ marginTop: 4 }}>
             Held at the {formatNumber(floor)} kcal minimum, so the pace will be slower than chosen.
           </Text>
         ) : null}
@@ -399,7 +399,7 @@ function GoalsForm() {
             />
           ) : null}
           {manualCalories && draft.calorieTargetOverride && draft.calorieTargetOverride < floor && caloriesValid ? (
-            <Text variant="caption" color="warning">
+            <Text variant="caption" color="warningInk">
               This is below {formatNumber(floor)} kcal, the lowest HealthCal recommends without medical supervision.
             </Text>
           ) : null}
@@ -451,7 +451,7 @@ function GoalsForm() {
                   onChange={(v) => setCustom((c) => ({ ...c, fat: v ?? 0 }))}
                 />
               </View>
-              <Text variant="caption" color={splitError ? 'warning' : 'textSecondary'} testID="goals-pct-total">
+              <Text variant="caption" color={splitError ? 'warningInk' : 'textSecondary'} testID="goals-pct-total">
                 {splitError ?? 'Total 100%'}
               </Text>
             </>
@@ -505,11 +505,17 @@ function GoalsForm() {
         </View>
       </Group>
 
-      <Group title="How the budget works">
+      <Group
+        title="How the budget works"
+        footer={
+          model.adaptive.observed === null
+            ? `Learn from my data compares what you log with a straight line through your weigh-ins of the last four weeks. It needs ${model.adaptive.needs ?? 'a little more data'}.`
+            : undefined
+        }>
         <ToggleRow
           testID="goals-eat-back"
           title="Add exercise to my budget"
-          subtitle="Logged workouts add the calories burned above resting, never the gross number."
+          subtitle="Workouts add only the calories burned above resting."
           value={draft.eatBackExercise}
           onChange={(eatBackExercise) => patch({ eatBackExercise })}
         />
@@ -518,8 +524,8 @@ function GoalsForm() {
           title="Learn from my data"
           subtitle={
             model.adaptive.observed !== null
-              ? `Your logs and weigh-ins suggest ${formatNumber(model.adaptive.observed)} kcal a day of expenditure.`
-              : `Compares what you log with a straight line through your weigh-ins of the last four weeks. Needs ${model.adaptive.needs ?? 'a little more data'}.`
+              ? `Your logs and weigh-ins suggest you use ${formatNumber(model.adaptive.observed)} kcal a day.`
+              : 'Compares what you log with your weight trend.'
           }
           value={draft.useAdaptiveTdee}
           onChange={(useAdaptiveTdee) => patch({ useAdaptiveTdee })}

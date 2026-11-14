@@ -1,13 +1,14 @@
 import { useLocalSearchParams } from 'expo-router';
 import { BookmarkPlus, Check, Clock, Pause, Play, Plus, Search, Trash2, Trophy, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { ACTIVITY_BY_ID } from '@/data/activities';
 import { basisFromEntry, estimateSession } from '@/features/activity/build';
 import { DateStepper } from '@/features/activity/components';
 import { EXERCISE_GROUPS, searchExercises } from '@/features/activity/exercises';
 import { RoutineCards, useRoutineTemplates } from '@/features/activity/RoutineCards';
+import { formatLiftWeight, formatPreviousSets } from '@/features/activity/strengthFormat';
 import { addRoutine, draftFromRoutine, routineExercises } from '@/features/activity/routines';
 import { deleteActivity, leaveFlow, saveActivity } from '@/features/activity/session';
 import {
@@ -121,6 +122,8 @@ interface FinishSummary {
 
 function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draft: StrengthDraft; entry?: ActivityEntry; onFinished: (s: FinishSummary) => void }) {
   const { colors, radius, spacing } = useTheme();
+  // Under 360 px the header's title shares its row with Back and Discard: one word, so it is never cut.
+  const narrow = useWindowDimensions().width < 360;
   const profile = useProfile();
   const activities = useLive('activities');
   const units = profile.units;
@@ -266,7 +269,7 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
     <Screen
       header={
         <Header
-          title={draft.entryId ? 'Edit workout' : 'Strength workout'}
+          title={draft.entryId ? 'Edit workout' : narrow ? 'Workout' : 'Strength workout'}
           subtitle={formatDayLabel(draft.date)}
           onBack={() => goBack('/train')}
           right={
@@ -306,9 +309,7 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
             <Text variant="overline">
               {manual ? 'Duration, set by you' : running ? 'Elapsed' : elapsed > 0 ? 'Paused' : 'Timer'}
             </Text>
-            <Text variant="numXL" tabular testID="strength-timer" color={running ? 'text' : 'textSecondary'} numberOfLines={1} adjustsFontSizeToFit>
-              {manual ? formatDuration(draft.manualMin!) : formatClock(elapsed)}
-            </Text>
+            <TimerText text={manual ? formatDuration(draft.manualMin!) : formatClock(elapsed)} color={running ? 'text' : 'textSecondary'} />
           </View>
           <IconButton
             accessibilityLabel={running ? 'Pause timer' : 'Start timer'}
@@ -352,7 +353,7 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
           <Metric label="Volume" value={formatNumber(round(weightValue(volume, units)))} unit={weightUnit(units)} testID="strength-volume" />
           <Metric
             label="Best est. 1RM"
-            value={best ? formatNumber(round(weightValue(best.kg, units), 1), 1).replace(/\.0$/, '') : '–'}
+            value={best ? formatLiftWeight(best.kg, units) : '–'}
             unit={best ? weightUnit(units) : undefined}
             testID="strength-e1rm"
           />
@@ -561,7 +562,7 @@ function FinishSummaryView({ summary }: { summary: FinishSummary }) {
                     {r.exercise}
                   </Text>
                   <Text variant="caption" color="textSecondary">
-                    {r.kind === 'e1rm' ? 'Best est. 1RM' : 'Heaviest set'} {fmtW(r.valueKg, units)} {weightUnit(units)}, up {fmtW(r.valueKg - r.previousKg, units)} {weightUnit(units)}
+                    {r.kind === 'e1rm' ? 'Best est. 1RM' : 'Heaviest set'} {formatLiftWeight(r.valueKg, units)} {weightUnit(units)}, up {formatLiftWeight(r.valueKg - r.previousKg, units)} {weightUnit(units)}
                   </Text>
                 </View>
               </View>
@@ -583,24 +584,36 @@ function formatClock(ms: number): string {
   return `${h > 0 ? `${h}:` : ''}${mm}:${String(s).padStart(2, '0')}`;
 }
 
+/** The live timer: as large as fits beside its two buttons, stepping down for a narrow phone or a long time, never cut. */
+function TimerText({ text, color }: { text: string; color: 'text' | 'textSecondary' }) {
+  const { width } = useWindowDimensions();
+  // Room left of the two 52 px buttons: the screen (capped at 560) less its padding, the card's and the gaps.
+  const room = Math.min(width, 560) - 40 - 36 - 2 * 52 - 2 * 12;
+  // Bricolage's tabular digits are about 0.6 em wide; a space or a colon is narrower, so this errs on the small side.
+  const size = Math.max(28, Math.min(60, Math.floor(room / (text.length * 0.6))));
+  return (
+    <Text variant="numXL" tabular testID="strength-timer" color={color} style={{ fontSize: size, lineHeight: Math.round(size * 0.97), letterSpacing: -size * 0.035 }}>
+      {text}
+    </Text>
+  );
+}
+
 function Metric({ label, value, unit, testID }: { label: string; value: string; unit?: string; testID?: string }) {
+  // Three metrics share a row: under 360 px the number steps down a size and the label may take two lines.
+  const narrow = useWindowDimensions().width < 360;
   return (
     <View style={{ flex: 1, minWidth: 0 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
-        <Text variant="numM" tabular numberOfLines={1} testID={testID}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 3 }}>
+        <Text variant="numM" tabular testID={testID} style={narrow ? { fontSize: 17, lineHeight: 21 } : undefined}>
           {value}
         </Text>
         {unit ? <Text variant="unit">{unit}</Text> : null}
       </View>
-      <Text variant="caption" color="textSecondary" numberOfLines={1}>
+      <Text variant="caption" color="textSecondary" numberOfLines={2}>
         {label}
       </Text>
     </View>
   );
-}
-
-function fmtW(kg: number, units: UnitSystem): string {
-  return formatNumber(round(weightValue(kg, units), 1), 1).replace(/\.0$/, '');
 }
 
 function ExerciseCard({
@@ -619,12 +632,7 @@ function ExerciseCard({
   const { colors, radius, spacing } = useTheme();
   const unit = weightUnit(units);
   const slug = `ex-${index}`;
-  const prevText = prev
-    ? prev.sets
-        .slice(0, 5)
-        .map((s) => (s.weightKg > 0 ? `${fmtW(s.weightKg, units)} × ${s.reps}` : `${s.reps} reps`))
-        .join(', ') + (prev.sets.length > 5 ? ` +${prev.sets.length - 5}` : '')
-    : null;
+  const prevText = prev ? formatPreviousSets(prev.sets, units) : null;
   return (
     <View testID={slug} style={{ backgroundColor: colors.surface, ...cup(radius.card), borderWidth: 1, borderColor: colors.border, padding: 18, gap: spacing.sm }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
@@ -633,7 +641,7 @@ function ExerciseCard({
             {ex.name}
           </Text>
           <Text variant="caption" color="textSecondary" numberOfLines={2} testID={`${slug}-previous`}>
-            {prevText ? `Last time, ${formatShortDate(prev!.date)}: ${prevText} ${unit}` : 'First time logging this exercise'}
+            {prevText ? `Last time, ${formatShortDate(prev!.date)}: ${prevText}` : 'First time logging this exercise'}
           </Text>
         </View>
         <IconButton accessibilityLabel={`Remove ${ex.name}`} testID={`${slug}-remove`} tone="clear" onPress={() => update((d) => edits.removeExercise(d, ex.key))}>
@@ -675,7 +683,7 @@ function ExerciseCard({
             <NumberField
               testID={`${slug}-set-${i}-weight`}
               accessibilityLabel={`Set ${i + 1} weight in ${unit}`}
-              placeholder={ref ? fmtW(ref.weightKg, units) : '0'}
+              placeholder={ref ? formatLiftWeight(ref.weightKg, units) : '0'}
               value={s.weightKg === null ? null : round(weightValue(s.weightKg, units), 2)}
               onChange={(n) => update((d) => edits.updateSet(d, ex.key, s.key, { weightKg: n === null ? null : weightToKg(Math.max(0, n), units) }))}
               decimals={2}

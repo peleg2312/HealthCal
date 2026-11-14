@@ -80,10 +80,11 @@ export function SessionRow({ entry, units, onPress, onDelete }: { entry: Activit
           <Text style={{ fontSize: 17, lineHeight: 24 }}>{entry.emoji}</Text>
         </View>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Text variant="bodyStrong" numberOfLines={1} style={{ fontFamily: fonts.semibold }}>
+          {/* Two lines for a long name and as many as the details need on a narrow phone: nothing here is cut. */}
+          <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
             {entry.name}
           </Text>
-          <Text variant="caption" color="textSecondary" numberOfLines={2}>
+          <Text variant="caption" color="textSecondary">
             {sessionSubtitle(entry, units)}
           </Text>
           {garmin ? (

@@ -89,7 +89,7 @@ export function RestoreFailed() {
       }>
       <View style={{ alignItems: 'center' }}>
         <View style={{ width: 80, height: 80, alignItems: 'center', justifyContent: 'center' }}>
-          <CloudOff size={40} color={colors.warning} strokeWidth={1.6} />
+          <CloudOff size={40} color={colors.warningInk} strokeWidth={1.6} />
         </View>
       </View>
       <FadeIn style={{ gap: spacing.sm }}>
@@ -116,7 +116,7 @@ function SwitchBlocked({ count }: { count: number }) {
 
   return (
     <Screen testID="auth-switch-blocked" contentStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.lg }}>
-      <ShieldAlert size={36} color={colors.warning} />
+      <ShieldAlert size={36} color={colors.warningInk} />
       <Text variant="body" color="textSecondary" align="center">
         Sign-in paused. Nothing on this device has been changed.
       </Text>

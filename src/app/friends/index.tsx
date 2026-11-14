@@ -4,11 +4,12 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Platform, RefreshControl, View } from 'react-native';
 
 import { CheersList, FriendCard, IncomingRequests, InviteCard, Loading, OutgoingRequests } from '@/features/friends/components';
+import { inviteFromParams, invitePath } from '@/features/friends/link';
 import { SetupForm } from '@/features/friends/SetupForm';
 import { copyText, shareInvite } from '@/features/friends/share';
 import { FriendSheet, SettingsSheet } from '@/features/friends/sheets';
-import { formatCode, normalizeCode, ownWorkoutsByRef, WORKOUT_WINDOW_DAYS } from '@/features/friends/summary';
-import { cheerTarget } from '@/features/friends/week';
+import { formatCode, ownWorkoutsByRef, WORKOUT_WINDOW_DAYS } from '@/features/friends/summary';
+import { cheerCaption, cheerTarget } from '@/features/friends/week';
 import { timeAgo } from '@/features/settings/format';
 import { addDays } from '@/lib/dates';
 import { cheerFriend, leaveSocial, refreshFriends, removeFriend, respondToRequest, undoDecline, useFriends, type Friend, type FriendRequest } from '@/services/friends';
@@ -19,7 +20,8 @@ import { Button, Card, ConfirmSheet, EmptyState, Header, IconButton, LargeTitle,
 
 export default function FriendsScreen() {
   const { colors, spacing } = useTheme();
-  const { code: codeParam } = useLocalSearchParams<{ code?: string }>();
+  // ?invite= from the add screen's "Turn on friends" (an old link may still say ?code=).
+  const invite = inviteFromParams(useLocalSearchParams<{ invite?: string; code?: string }>());
   const status = useFriends((s) => s.status);
   const overview = useFriends((s) => s.overview);
   const error = useFriends((s) => s.error);
@@ -173,8 +175,7 @@ export default function FriendsScreen() {
         defaultName={profile.name}
         onDone={() => {
           // Arrived from an invite link before turning friends on: go on to add that person.
-          const c = normalizeCode(codeParam ?? '');
-          if (c) router.replace(`/friends/add?code=${c}` as never);
+          if (invite) router.replace(invitePath(invite) as never);
         }}
       />
     );
@@ -229,7 +230,7 @@ export default function FriendsScreen() {
       {cheers.length ? (
         <View style={{ gap: spacing.md }}>
           <SectionTitle title="Cheers for you" />
-          <CheersList cheers={cheers} describe={(c) => cheerTarget(c.ref, ownWorkouts, today)} when={(c) => timeAgo(c.createdAt, now) ?? ''} />
+          <CheersList cheers={cheers} describe={(c) => cheerTarget(c.ref, ownWorkouts, today)} when={(c) => cheerCaption(c.ref, timeAgo(c.createdAt, now))} />
         </View>
       ) : null}
 

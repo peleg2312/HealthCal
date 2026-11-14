@@ -29,6 +29,7 @@ import { Card, Header, Screen, Text } from '@/ui';
 function Section({
   icon,
   color,
+  keep,
   title,
   source,
   children,
@@ -36,6 +37,8 @@ function Section({
 }: {
   icon: (c: string) => React.ReactNode;
   color: string;
+  /** Keep the icon in `color` (a status ink such as warningInk); otherwise the tile shows it neutral. */
+  keep?: boolean;
   title: string;
   source?: string;
   children: React.ReactNode;
@@ -45,7 +48,7 @@ function Section({
   return (
     <Card testID={testID}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.sm }}>
-        <IconTile color={color}>{icon(color)}</IconTile>
+        <IconTile color={color} keep={keep}>{icon(color)}</IconTile>
         <Text variant="h3" style={{ flex: 1 }}>
           {title}
         </Text>
@@ -271,7 +274,7 @@ export default function AboutScreen() {
         </P>
       </Section>
 
-      <Section icon={(c) => <Stethoscope size={20} color={c} />} color={colors.warning} title="Not medical advice">
+      <Section icon={(c) => <Stethoscope size={20} color={c} />} color={colors.warningInk} keep title="Not medical advice">
         <P>
           HealthCal is a tracking tool, not a medical device. Its numbers are estimates for healthy adults. If you are pregnant or breastfeeding,
           under 18, have diabetes, kidney disease, an eating disorder or another medical condition, talk to a doctor or registered dietitian before

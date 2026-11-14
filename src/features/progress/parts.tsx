@@ -50,12 +50,12 @@ export function SectionCard({
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             {color ? <CupKey color={color} size={10} variant={keyVariant} /> : null}
             {/* Two lines rather than an ellipsis at 320 px. */}
-            <Text variant="h3" numberOfLines={2} style={{ flexShrink: 1 }}>
+            <Text variant="h3" style={{ flexShrink: 1 }}>
               {title}
             </Text>
           </View>
           {subtitle ? (
-            <Text variant="caption" color="textSecondary" numberOfLines={2}>
+            <Text variant="caption" color="textSecondary">
               {subtitle}
             </Text>
           ) : null}
@@ -79,14 +79,14 @@ export function TextLink({ label, onPress, testID, accessibilityLabel }: { label
 }
 
 /** Large number with a small unit inside it and a caption below. Numbers stay in a text colour. */
-export function BigStat({ value, unit, label, align = 'left' }: { value: string; unit?: string; label: string; color?: string; align?: 'left' | 'right' }) {
+export function BigStat({ value, unit, label, align = 'left', ink = 'text' }: { value: string; unit?: string; label: string; color?: string; align?: 'left' | 'right'; ink?: 'text' | 'caloriesInk' }) {
   return (
     <View style={{ alignItems: align === 'right' ? 'flex-end' : 'flex-start', flexShrink: 1 }}>
-      <Text variant="numL">
+      <Text variant="numL" color={ink}>
         {value}
         {unit ? <Text variant="unit">{` ${unit}`}</Text> : null}
       </Text>
-      <Text variant="caption" color="textSecondary" numberOfLines={2}>
+      <Text variant="caption" color="textSecondary">
         {label}
       </Text>
     </View>
@@ -107,7 +107,7 @@ export function StatStrip({ items }: { items: { label: string; value: string; un
             </Text>
             <TrendMark trend={it.trend} />
           </View>
-          <Text variant="caption" color="textSecondary" numberOfLines={2}>
+          <Text variant="caption" color="textSecondary">
             {it.label}
           </Text>
         </View>

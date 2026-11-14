@@ -57,6 +57,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         borderRight
         title="Calories"
         color={colors.calories}
+        valueColor="caloriesInk"
         value={c ? formatNumber(Math.round(c.avgKcal)) : null}
         unit="kcal"
         caption={c ? `a day · budget ${formatNumber(Math.round(c.avgBudget))}` : 'No fully logged days yet'}

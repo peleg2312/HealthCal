@@ -8,15 +8,16 @@ import { Platform, Share } from 'react-native';
 
 import { toast } from '@/ui';
 
+import { INVITE_PARAM, invitePath } from './link';
 import { formatCode, normalizeCode } from './summary';
 
-/** healthcal://friends/add?code=XXXXXXXX on a phone; the same path on this site on web. */
+/** healthcal://friends/add?invite=XXXXXXXX on a phone; the same path on this site on web (see link.ts for why not ?code=). */
 export function inviteLink(code: string): string {
   const c = normalizeCode(code);
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
-    return `${window.location.origin}/friends/add?code=${c}`;
+    return `${window.location.origin}${invitePath(c)}`;
   }
-  return Linking.createURL('/friends/add', { queryParams: { code: c } });
+  return Linking.createURL('/friends/add', { queryParams: { [INVITE_PARAM]: c } });
 }
 
 export function inviteMessage(code: string): string {

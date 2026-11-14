@@ -21,6 +21,7 @@ export function ProgressTile({
   compare,
   onPress,
   keyVariant,
+  valueColor = 'text',
   borderRight,
   borderTop,
   index = 0,
@@ -38,6 +39,8 @@ export function ProgressTile({
   onPress: () => void;
   /** An outlined key marks an estimate (expenditure), as on the designer's board. */
   keyVariant?: 'filled' | 'outline';
+  /** Calorie numbers are drawn in `caloriesInk`; every other number in `text`. */
+  valueColor?: 'text' | 'caloriesInk';
   borderRight?: boolean;
   borderTop?: boolean;
   /** Position in the grid: tiles fade up in reading order. */
@@ -66,21 +69,21 @@ export function ProgressTile({
       }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
         <CupKey color={color} size={10} variant={keyVariant} />
-        <Text variant="label" color="textSecondary" numberOfLines={2} style={{ flex: 1, fontSize: 13.5 }}>
+        <Text variant="label" color="textSecondary" style={{ flex: 1, fontSize: 13.5 }}>
           {title}
         </Text>
       </View>
-      <Text variant="numL" color={value === null ? 'textTertiary' : 'text'} style={[{ marginTop: 2 }, narrow ? { fontSize: 24, lineHeight: 28 } : null]}>
+      <Text variant="numL" color={value === null ? 'textTertiary' : valueColor} style={[{ marginTop: 2 }, narrow ? { fontSize: 24, lineHeight: 28 } : null]}>
         {value ?? '–'}
         {unit && value !== null ? <Text variant="unit">{` ${unit}`}</Text> : null}
       </Text>
       {caption ? (
-        <Text variant="caption" color="textSecondary" numberOfLines={2}>
+        <Text variant="caption" color="textSecondary">
           {caption}
         </Text>
       ) : null}
       <View style={{ flex: 1 }} />
-      <Text variant="caption" color="textTertiary" numberOfLines={3} style={{ marginTop: 4 }}>
+      <Text variant="caption" color="textTertiary" style={{ marginTop: 4 }}>
         {compare ?? 'Nothing to compare with yet'}
       </Text>
     </PressableScale>

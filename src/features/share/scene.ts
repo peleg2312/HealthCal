@@ -10,6 +10,7 @@
  * the empty part in `vesselEmpty` outlined in `vesselEdge`, amber only for the
  * part over a budget, numbers in ink (calories in `caloriesInk`).
  */
+import { formatNumber } from '@/lib/units';
 import type { ThemeColors } from '@/theme/tokens';
 import { fonts } from '@/theme/tokens';
 
@@ -64,6 +65,12 @@ export const EXPORT_SCALE = 3;
 
 const PAD = 28;
 const MEAL_LABEL = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snacks' } as const;
+/** The meal bands from breakfast up: the calorie colour at 100, 85, 70 and 55%. */
+export const BAND_OPACITY = [1, 0.85, 0.7, 0.55];
+/** A partly logged day in a week row: the recap's lighter fill. */
+export const PARTIAL_OPACITY = 0.45;
+/** Height of one meal label beside the cup. */
+const LABEL_STEP = 16;
 
 
 const r1 = (n: number) => Math.round(n * 100) / 100;
@@ -106,6 +113,8 @@ function cup(
     edge?: number;
     future?: boolean;
     hatchFill?: boolean;
+    /** Width of the level line between bands (default a 1.2 px hairline). */
+    seam?: number;
   },
 ): Prim[] {
   const { x, y, w, h, base } = o;
@@ -132,8 +141,8 @@ function cup(
       if (bt >= prevTop) continue;
       if (o.hatchFill) inner.push(...hatch(x, bt, w, prevTop - bt, o.color, 4));
       else inner.push({ k: 'rect', x, y: bt, w, h: prevTop - bt, fill: o.color, opacity: b.opacity });
-      // A hairline of the level colour between meals, the full level line on top.
-      if (bt > top + 0.5) inner.push({ k: 'rect', x, y: bt - 0.6, w, h: 1.2, fill: c.rim, opacity: 0.55 });
+      // A thin level line between meals (o.seam px), the full level line on top.
+      if (bt > top + 0.5) inner.push({ k: 'rect', x, y: bt - (o.seam ?? 1.2) / 2, w, h: o.seam ?? 1.2, fill: c.rim, opacity: o.seam ? 1 : 0.55 });
       prevTop = bt;
       if (bt <= top) break;
     }
@@ -241,8 +250,9 @@ function weekRow(c: CardColors, cups: WeekCup[], x: number, y: number, width: nu
         base: Math.min(10, cupW / 3),
         level: d.ratio,
         color: c.calories,
-        // A day not fully logged (today, or partly logged) is hatched: a lighter fill turns brown on the dark paper.
-        hatchFill: !d.complete,
+        // The recap's rule: today is hatched (still open), a partly logged day is the lighter fill.
+        bands: [{ top: d.ratio, opacity: d.partial ? PARTIAL_OPACITY : 1 }],
+        hatchFill: d.isToday,
         rim: 2.5,
         edge: 1.3,
         future: d.future,
@@ -258,6 +268,48 @@ function weekRow(c: CardColors, cups: WeekCup[], x: number, y: number, width: nu
     prims.push({ k: 'text', x: x + i * slot + slot / 2, y: ly, anchor: 'middle', runs: [{ text: d.letter, font: 'bold', size: 12, fill: isDay ? c.bg : c.textSecondary }] });
   });
   return prims;
+}
+
+interface MealLabel {
+  text: string;
+  kcal: string | null;
+  opacity: number;
+  /** Baseline at the middle of the band. */
+  want: number;
+}
+
+/** One label per meal band, bottom first, wanting the middle of its band. */
+function mealLabels(content: DayCardContent, cupTop: number, cupH: number): MealLabel[] {
+  let prev = cupTop + cupH;
+  return content.cup.bands.map((b, i) => {
+    const top = cupTop + cupH - Math.min(1, b.top) * cupH;
+    const want = (top + prev) / 2 + 4;
+    prev = top;
+    return { text: MEAL_LABEL[b.meal], kcal: b.kcal ? formatKcal(b.kcal) : null, opacity: BAND_OPACITY[Math.min(i, BAND_OPACITY.length - 1)], want };
+  });
+}
+
+const formatKcal = (n: number) => `${formatNumber(n)} kcal`;
+
+/**
+ * Baselines for the meal labels between `min` and `max`: each as near the
+ * middle of its band as it can be, never closer than one line to the next,
+ * in band order. When there is not room for all of them they are spaced
+ * evenly from `min` down (a label is never dropped).
+ */
+export function placeLabels(labels: MealLabel[], min: number, max: number): (MealLabel & { y: number })[] {
+  const n = labels.length;
+  if (!n) return [];
+  if ((n - 1) * LABEL_STEP > max - min) return labels.map((l, i) => ({ ...l, y: min + (n - 1 - i) * LABEL_STEP }));
+  // Bottom first: each label as low as its band wants, but at least a line above the one below it.
+  const ys: number[] = [];
+  labels.forEach((l, i) => ys.push(Math.min(Math.max(l.want, min), max, i ? ys[i - 1] - LABEL_STEP : Infinity)));
+  // Then top down: anything pushed above `min` comes back down, a line apart.
+  for (let i = n - 1; i >= 0; i--) {
+    const floor = i === n - 1 ? min : ys[i + 1] + LABEL_STEP;
+    if (ys[i] < floor) ys[i] = floor;
+  }
+  return labels.map((l, i) => ({ ...l, y: ys[i] }));
 }
 
 export function dayScene(content: DayCardContent, c: CardColors): Scene {
@@ -280,11 +332,9 @@ export function dayScene(content: DayCardContent, c: CardColors): Scene {
   const cupH = Math.max(120, Math.min(250, H - footer - below - cupTop));
   const cupW = Math.round(cupH * 0.56);
 
-  // The hero cup, filled in meal bands.
+  // The hero cup, filled in meal bands from breakfast up, each a step lighter, with a level line between them.
   const level = content.cup.level;
-  // Meal bands from breakfast up, one flat colour split by hairlines of the level colour
-  // (strengths of the calorie colour turn brown on the dark paper).
-  const bands = content.cup.bands.map((b) => ({ top: b.top, opacity: 1 }));
+  const bands = content.cup.bands.map((b, i) => ({ top: b.top, opacity: BAND_OPACITY[Math.min(i, BAND_OPACITY.length - 1)] }));
   prims.push(
     ...cup(c, {
       x: PAD,
@@ -297,14 +347,23 @@ export function dayScene(content: DayCardContent, c: CardColors): Scene {
       bands,
       headroom: content.cup.headroom,
       hatchFill: false,
+      seam: 2,
     }),
   );
 
-  // The headline at the height it describes, beside the cup.
+  // Beside the cup: the headline at the height it describes, and every meal named
+  // at the height of its band, with a key in that band's strength.
   const lx = PAD + cupW + 22;
+  const cupBottom = cupTop + cupH;
   const levelY = cupTop + cupH - Math.min(1, level) * cupH;
-  const blockTop = Math.max(cupTop + 6, Math.min(cupTop + cupH - 62, levelY - 22));
   const valueSize = textWidth(content.headline.value, 52, 'extrabold') > W - PAD - lx ? 40 : 52;
+  const unitLines = wrap(content.headline.unit, W - PAD - lx, 14, 'semibold', 2);
+  const blockH = 66 + (unitLines.length - 1) * 18 + 8;
+  const labels = mealLabels(content, cupTop, cupH);
+  // The labels sit under the headline; when they need the room, the headline moves up (never above the title).
+  const preferred = Math.max(cupTop + 6, Math.min(cupTop + cupH - 62, levelY - 22));
+  const blockTop = labels.length ? Math.max(cupTop - 20, Math.min(preferred, cupBottom + 4 - (labels.length - 1) * LABEL_STEP - 10 - blockH)) : preferred;
+  const blockBottom = blockTop + blockH;
   prims.push({ k: 'rect', x: PAD + cupW + 4, y: Math.max(cupTop, levelY) - 0.75, w: 12, h: 1.5, fill: c.borderStrong });
   prims.push({
     k: 'text',
@@ -312,20 +371,20 @@ export function dayScene(content: DayCardContent, c: CardColors): Scene {
     y: blockTop + 44,
     runs: [{ text: content.headline.value, font: 'extrabold', size: valueSize, fill: c.caloriesInk, letterSpacing: -1.6 }],
   });
-  const unitLines = wrap(content.headline.unit, W - PAD - lx, 14, 'semibold', 2);
   unitLines.forEach((line, i) =>
     prims.push({ k: 'text', x: lx, y: blockTop + 66 + i * 18, runs: [{ text: line, font: 'semibold', size: 14, fill: c.textSecondary }] }),
   );
-  // Each meal named at the height of its band, where it does not meet the headline.
-  const blockBottom = blockTop + 66 + (unitLines.length - 1) * 18 + 8;
-  let prevTop = cupTop + cupH;
-  for (const b of content.cup.bands) {
-    const top = cupTop + cupH - Math.min(1, b.top) * cupH;
-    const mid = (top + prevTop) / 2 + 4;
-    if (prevTop - top >= 16 && (mid < blockTop - 4 || mid - 12 > blockBottom)) {
-      prims.push({ k: 'text', x: lx, y: mid, runs: [{ text: MEAL_LABEL[b.meal], font: 'semibold', size: 12, fill: c.textSecondary }] });
-    }
-    prevTop = top;
+  for (const l of placeLabels(labels, blockBottom + 10, cupBottom + 4)) {
+    prims.push({ k: 'path', d: cupShape(lx, l.y - 9, 8, 10, 3), fill: c.calories, opacity: l.opacity });
+    prims.push({
+      k: 'text',
+      x: lx + 14,
+      y: l.y,
+      runs: [
+        { text: l.text, font: 'semibold', size: 12, fill: c.textSecondary },
+        { text: l.kcal ? ` ${l.kcal}` : '', font: 'semibold', size: 12, fill: c.text },
+      ],
+    });
   }
 
   let y = cupTop + cupH + 16 + 26;
@@ -376,5 +435,8 @@ export function weekScene(content: WeekCardContent, c: CardColors): Scene {
   prims.push({ k: 'rect', x: PAD, y: statsY - 12, w: inner, h: 1, fill: c.border });
   prims.push(...statRow(c, content.stats, PAD, statsY, inner).prims);
   prims.push(...mark(c, PAD, H - 20));
+  if (content.inProgress) {
+    prims.push({ k: 'text', x: W - PAD, y: H - 21, anchor: 'end', runs: [{ text: 'Week in progress', font: 'semibold', size: 12, fill: c.textSecondary }] });
+  }
   return { width: W, height: H, prims };
 }

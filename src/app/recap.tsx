@@ -66,6 +66,7 @@ function Tile({ t, index, week }: { t: RecapTile; index: number; week: string })
         // Ticks up from zero when the recap opens, once per week this session.
         <AnimatedNumber
           variant="numL"
+          color={t.id === 'calories' ? 'caloriesInk' : 'text'}
           value={t.value}
           from={0}
           memoryKey={`recap-${week}-${t.id}`}
@@ -128,7 +129,7 @@ export default function RecapScreen() {
     if (r && ready.ready && ready.week === d.week) ready.markSeen();
   }, [r, ready, d.week]);
 
-  const title = r?.label === 'This week' ? 'This week so far' : r?.label === 'Last week' ? 'Your week' : 'Weekly check-in';
+  const title = r?.label === 'This week' ? 'This week so far' : r?.label === 'Last week' ? 'Your week' : 'Weekly check\u2011in';
   const range = weekRangeLabel(d.week, addDays(d.week, 6));
 
   return (
@@ -136,7 +137,7 @@ export default function RecapScreen() {
       header={
         <Header
           title={title}
-          subtitle={r ? `${r.label === 'Week' ? 'Week of' : r.label} · ${weekRangeLabel(r.weekStart, r.weekEnd)}` : range}
+          subtitle={r ? `${r.label === 'Week' ? 'Week of' : `${r.label} ·`} ${weekRangeLabel(r.weekStart, r.weekEnd)}` : range}
           right={r ? <ShareWeekButton recap={r} /> : undefined}
         />
       }
@@ -210,7 +211,7 @@ export default function RecapScreen() {
           <PressableScale
             testID="recap-plan"
             onPress={() => go('/settings/goals')}
-            accessibilityLabel={`Your plan: ${d.plan.before} kcal before, ${d.plan.after} kcal now. ${d.plan.reason} Open goals.`}
+            accessibilityLabel={`Your plan: ${formatNumber(d.plan.before)} kcal on ${formatShortDate(d.week)}, ${formatNumber(d.plan.after)} kcal ${d.plan.afterDate === d.today ? 'today' : `from ${formatShortDate(d.plan.afterDate)}`}. ${d.plan.reason} Open goals.`}
             scaleTo={0.985}>
             <Card style={{ gap: spacing.sm }}>
               <View
@@ -245,7 +246,7 @@ export default function RecapScreen() {
                   <Text variant="caption" color="textSecondary">
                     {d.plan.afterDate === d.today ? 'Today' : formatShortDate(d.plan.afterDate)}
                   </Text>
-                  <Text variant="numL">
+                  <Text variant="numL" color="caloriesInk">
                     {formatNumber(d.plan.after)}
                     <Text variant="unit"> kcal</Text>
                   </Text>

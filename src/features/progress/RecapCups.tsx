@@ -42,7 +42,7 @@ export function RecapCups({ cups, week }: { cups: RecapDayCup[]; week: string })
                 onPress={() => setSelected(active ? null : c.date)}
                 feedback="select"
                 scaleTo={0.96}
-                accessibilityLabel={`${c.detail}${c.inBand ? ', within 10% of its budget' : ''}`}
+                accessibilityLabel={c.detail}
                 accessibilityState={{ selected: active }}
                 style={{ flex: 1, minWidth: 0, alignItems: 'center' }}>
                 <View style={{ height: CHECK_H, justifyContent: 'flex-start' }}>

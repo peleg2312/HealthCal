@@ -88,13 +88,13 @@ export function WorkoutRow({
               {activity ? <Text style={{ fontSize: 17, lineHeight: 22 }}>{activity.emoji}</Text> : null}
               <Text
                 variant="bodyStrong"
-                numberOfLines={1}
+                numberOfLines={2}
                 style={[{ fontFamily: fonts.semibold, flexShrink: 1 }, !activity && { textDecorationLine: 'underline' }]}>
                 {title}
               </Text>
               <ChevronDown size={16} color={colors.textSecondary} strokeWidth={2.2} />
             </View>
-            <Text variant="caption" color="textSecondary" numberOfLines={2}>
+            <Text variant="caption" color="textSecondary">
               {meta}
             </Text>
             {!activity ? (
@@ -103,7 +103,7 @@ export function WorkoutRow({
                 {legNote ? ` · ${legNote}` : ''}
               </Text>
             ) : legNote || row.entry?.notes ? (
-              <Text variant="caption" color="textSecondary" numberOfLines={1}>
+              <Text variant="caption" color="textSecondary" numberOfLines={2}>
                 {[legNote, row.entry?.notes].filter(Boolean).join(' · ')}
               </Text>
             ) : null}
@@ -122,7 +122,7 @@ export function WorkoutRow({
                 –
               </Text>
             )}
-            <Text variant="caption" color="textSecondary" numberOfLines={1} testID={`import-watch-${id}`}>
+            <Text variant="caption" color="textSecondary" align="right" testID={`import-watch-${id}`}>
               {kcal.detail}
             </Text>
           </View>

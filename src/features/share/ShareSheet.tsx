@@ -3,17 +3,60 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { useTheme } from '@/theme';
-import { Button, Chip, haptic, Sheet, Text, toast } from '@/ui';
+import { Button, haptic, PressableScale, Sheet, Text, toast } from '@/ui';
 
 import { canShareImage, saveCard, SAVE_AVAILABLE, shareCard, type ExportResult } from './capture';
 import { CardArt } from './CardArt';
 import { CHOICE_LABEL, CHOICES_FOR, DEFAULT_SHARE_CHOICES, type ShareChoices } from './content';
 import type { Scene } from './scene';
 
-/** The person's choices for this session, so a second share starts where the first left off. */
-let remembered: ShareChoices = DEFAULT_SHARE_CHOICES;
-function remember(next: ShareChoices) {
-  remembered = next;
+/**
+ * The person's choices for this session, one set per card kind, so a second
+ * share of a day starts where the first left off, and turning calorie numbers
+ * on for a day card never turns them on for a week card.
+ */
+const remembered: Record<'day' | 'week', ShareChoices> = { day: DEFAULT_SHARE_CHOICES, week: DEFAULT_SHARE_CHOICES };
+function remember(kind: 'day' | 'week', next: ShareChoices) {
+  remembered[kind] = next;
+}
+
+/** A sheet ignores a close in the first moments after it opens: the second tap of a double tap lands on its backdrop. */
+const OPEN_GRACE_MS = 450;
+
+/**
+ * One choice of what the card carries: a label you can tap, ink when on. It is
+ * a checkbox to assistive technology (aria-checked on web), so a screen-reader
+ * user hears whether calorie numbers or food names will be on the image.
+ */
+function ChoiceChip({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; testID: string }) {
+  const { colors, radius } = useTheme();
+  return (
+    <PressableScale
+      testID={testID}
+      onPress={onPress}
+      feedback="select"
+      hitSlop={6}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: on }}
+      aria-checked={on}
+      accessibilityLabel={label}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        height: 32,
+        paddingHorizontal: 12,
+        borderRadius: radius.chip,
+        backgroundColor: on ? colors.text : 'transparent',
+        borderWidth: 1,
+        borderColor: on ? colors.text : colors.borderStrong,
+      }}>
+      {on ? <Check size={14} color={colors.bg} strokeWidth={2.4} /> : null}
+      <Text variant="label" color={on ? 'bg' : 'text'} numberOfLines={1} style={{ fontSize: 13.5, flexShrink: 1 }}>
+        {label}
+      </Text>
+    </PressableScale>
+  );
 }
 
 export interface SharePlan {
@@ -45,10 +88,20 @@ export function ShareSheet({
 }) {
   const { colors, spacing } = useTheme();
   const { width: winW, height: winH } = useWindowDimensions();
-  const [choices, setChoices] = useState<ShareChoices>(remembered);
+  const [choices, setChoices] = useState<ShareChoices>(() => remembered[kind]);
   const [busy, setBusy] = useState<'share' | 'save' | null>(null);
   const [canShare, setCanShare] = useState(Platform.OS !== 'web');
   const target = useRef<React.ComponentRef<typeof View>>(null);
+
+  // When the sheet last opened, read only in the close handler (never while rendering).
+  const openedAt = useRef(0);
+  useEffect(() => {
+    if (visible) openedAt.current = Date.now();
+  }, [visible]);
+  const close = () => {
+    if (Date.now() - openedAt.current < OPEN_GRACE_MS) return;
+    onClose();
+  };
 
   useEffect(() => {
     if (!visible) return;
@@ -67,7 +120,7 @@ export function ShareSheet({
 
   const toggle = (k: keyof ShareChoices) => {
     const next = { ...choices, [k]: !choices[k] };
-    remember(next);
+    remember(kind, next);
     setChoices(next);
   };
 
@@ -106,7 +159,7 @@ export function ShareSheet({
   return (
     <Sheet
       visible={visible}
-      onClose={onClose}
+      onClose={close}
       title={title}
       footer={
         <View style={{ flexDirection: 'row', gap: spacing.md }}>
@@ -128,14 +181,7 @@ export function ShareSheet({
           <Text variant="overline">On the card</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
             {CHOICES_FOR[kind].map((k) => (
-              <Chip
-                key={k}
-                label={CHOICE_LABEL[k]}
-                selected={choices[k]}
-                onPress={() => toggle(k)}
-                testID={`share-choice-${k}`}
-                icon={choices[k] ? <Check size={14} color={colors.bg} strokeWidth={2.4} /> : null}
-              />
+              <ChoiceChip key={k} label={CHOICE_LABEL[k]} on={choices[k]} onPress={() => toggle(k)} testID={`share-choice-${k}`} />
             ))}
           </View>
           <Text variant="caption" color="textSecondary">

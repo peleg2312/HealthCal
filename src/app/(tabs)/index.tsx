@@ -9,12 +9,13 @@ import { coachTip, rhythmFromReminders, type ClosedDay } from '@/features/today/
 import { DayRingStrip } from '@/features/today/DayRingStrip';
 import { FitsSheet } from '@/features/today/FitsSheet';
 import { mealLine } from '@/features/today/meals';
+import { ReadyRim } from '@/features/today/ReadyRim';
 import { RecapReadyCard } from '@/features/today/RecapReadyCard';
 import { FirstLogInvite } from '@/features/today/FirstLogInvite';
 import { startDate } from '@/features/today/week';
 import { ShareDayButton } from '@/features/share';
 import { MilestoneSheet } from '@/features/streak/MilestoneSheet';
-import { StreakMark } from '@/features/streak/StreakMark';
+import { AFTER_STRIP_MS, StreakMark } from '@/features/streak/StreakMark';
 import { useStreakMoment } from '@/features/streak/useStreakMoment';
 import { addWater, defaultGlass, StatusRail } from '@/features/today/StatusRail';
 import { useReportViewedDay } from '@/features/today/viewedDay';
@@ -86,7 +87,7 @@ export default function TodayScreen() {
           accessory={streak.streak > 1 ? <StreakMark days={streak.streak} filled={streak.filled} /> : null}
         />
         {isToday && streak.line ? (
-          <FadeUp>
+          <FadeUp delay={AFTER_STRIP_MS}>
             <Text variant="caption" color="text" testID="today-streak-line">
               {streak.line}
             </Text>
@@ -197,6 +198,7 @@ function EnergyCard({
   const numSize = narrow ? (left.length >= 5 ? 40 : 44) : left.length >= 5 ? 50 : 60;
   const unitWord = over ? 'over' : isToday ? 'left' : 'under';
   const height = firstDay ? VESSEL_H_FIRST : VESSEL_H;
+  const vesselW = narrow ? 66 : 84;
 
   const labels: VesselLabel[] = [];
   if (headroom > 0) {
@@ -286,24 +288,28 @@ function EnergyCard({
 
   return (
     <Card testID="today-energy" padding={18}>
-      <Vessel
-        value={eaten}
-        max={budget}
-        headroom={headroom}
-        color={colors.calories}
-        width={narrow ? 66 : 84}
-        height={height}
-        labels={labels}
-        labelGap={narrow ? 14 : 16}
-        memoryKey={`hero-${day.date}`}>
-        {firstDay || notLogged ? null : (
-          <View style={{ gap: 10 }}>
-            <Macro label="Protein" value={day.eaten.protein} target={day.macros.proteinG} color={colors.protein} reach />
-            <Macro label="Carbs" value={day.eaten.carbs} target={day.macros.carbsG} color={colors.carbs} />
-            <Macro label="Fat" value={day.eaten.fat} target={day.macros.fatG} color={colors.fat} />
-          </View>
-        )}
-      </Vessel>
+      <View>
+        <Vessel
+          value={eaten}
+          max={budget}
+          headroom={headroom}
+          color={colors.calories}
+          width={vesselW}
+          height={height}
+          labels={labels}
+          labelGap={narrow ? 14 : 16}
+          memoryKey={`hero-${day.date}`}>
+          {firstDay || notLogged ? null : (
+            <View style={{ gap: 10 }}>
+              <Macro label="Protein" value={day.eaten.protein} target={day.macros.proteinG} color={colors.protein} reach />
+              <Macro label="Carbs" value={day.eaten.carbs} target={day.macros.carbsG} color={colors.carbs} />
+              <Macro label="Fat" value={day.eaten.fat} target={day.macros.fatG} color={colors.fat} />
+            </View>
+          )}
+        </Vessel>
+        {/* Day one: the empty cup's open top is a dashed level line at the budget, "ready to fill". */}
+        {firstDay && headroom === 0 ? <ReadyRim width={vesselW} /> : null}
+      </View>
       {firstDay ? (
         <View style={{ marginTop: 18 }}>
           <FirstLogInvite meal={meal} date={day.date} budget={day.budget} />

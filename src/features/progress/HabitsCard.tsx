@@ -3,7 +3,7 @@ import React from 'react';
 import { View } from 'react-native';
 
 import { direction, hoursText, plural, type Direction, SLEEP_MAX_HOURS, SLEEP_TARGET_HOURS, WEEKLY_ACTIVE_MINUTES, type PeriodSummary } from '@/lib/insights';
-import { formatNumber, formatVolume, volumeUnit, volumeValue } from '@/lib/units';
+import { formatVolume } from '@/lib/units';
 import { useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
 import { Card, CupKey, Divider, PressableScale, ProgressBar, Text } from '@/ui';
@@ -40,7 +40,7 @@ function HabitRow({
         <CupKey color={color} size={10} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text variant="bodyStrong">{title}</Text>
-          <Text variant="caption" color="textSecondary" numberOfLines={2}>
+          <Text variant="caption" color="textSecondary">
             {detail}
           </Text>
         </View>
@@ -53,7 +53,8 @@ function HabitRow({
         </View>
         <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.9} />
       </View>
-      <ProgressBar progress={progress} color={color} overColor={color} height={6} style={{ marginLeft: 22, marginBottom: 4 }} />
+      {/* Water, minutes and sleep are goals to reach: at or past one the bar wears the brim tick, never amber. */}
+      <ProgressBar progress={progress} color={color} goalKind="reach" height={6} style={{ marginLeft: 22, marginBottom: 4 }} />
     </PressableScale>
   );
 }
@@ -66,6 +67,10 @@ export function HabitsCard({ summary, previous, units }: { summary: PeriodSummar
   const weekly = Math.round(a.weeklyMinutes);
   const period = `${summary.totalDays} days`;
   const p = previous;
+  // The same figure as the Overview tile (formatVolume: litres, or fl oz), split into number and unit.
+  const [waterValue, ...waterUnit] = w ? formatVolume(w.avgMl, units).split(' ') : [];
+  /** A number stays on the line of its unit. */
+  const keep = (text: string) => text.replace(/(\d) (?=[a-zA-Z])/g, '$1\u00A0');
   return (
     <Card testID="progress-habits" style={{ gap: spacing.md }}>
       <Text variant="h3">Water, activity and sleep</Text>
@@ -74,9 +79,9 @@ export function HabitsCard({ summary, previous, units }: { summary: PeriodSummar
         route="/water"
         color={colors.water}
         title="Hydration"
-        value={w ? formatNumber(Math.round(volumeValue(w.avgMl, units))) : null}
-        unit={`${volumeUnit(units)} / day`}
-        detail={w ? `Goal met on ${w.daysAtGoal} of ${w.daysTracked} days · goal ${formatVolume(w.avgGoalMl, units)}` : 'No drinks logged in this range yet'}
+        value={w ? waterValue : null}
+        unit={`${waterUnit.join(' ')} / day`}
+        detail={w ? keep(`Goal met on ${w.daysAtGoal} of ${w.daysTracked} days · goal ${formatVolume(w.avgGoalMl, units)}`) : 'No drinks logged in this range yet'}
         progress={w ? w.avgMl / w.avgGoalMl : 0}
         trend={direction(w?.avgMl, p?.water?.avgMl, 50)}
         period={period}
@@ -91,7 +96,7 @@ export function HabitsCard({ summary, previous, units }: { summary: PeriodSummar
         unit="min / wk"
         detail={
           a.minutes
-            ? `${plural(a.sessions, 'session')}, ${formatNumber(a.minutes)} min logged · hard sessions count double toward ${WEEKLY_ACTIVE_MINUTES}`
+            ? `${plural(a.sessions, 'session')} · hard ones count double toward the ${WEEKLY_ACTIVE_MINUTES}`
             : 'No workouts logged in this range yet'
         }
         progress={weekly / WEEKLY_ACTIVE_MINUTES}
@@ -106,7 +111,7 @@ export function HabitsCard({ summary, previous, units }: { summary: PeriodSummar
         title="Sleep"
         value={s ? hoursText(s.avgHours).replace(' h', '') : null}
         unit="h / night"
-        detail={s ? `${plural(s.nights, 'night')} logged · quality ${s.avgQuality.toFixed(1)} of 5 · aim for ${SLEEP_TARGET_HOURS} to ${SLEEP_MAX_HOURS} h` : 'No sleep logged in this range yet'}
+        detail={s ? keep(`${plural(s.nights, 'night')} logged · quality ${s.avgQuality.toFixed(1)} of 5 · aim for ${SLEEP_TARGET_HOURS} to ${SLEEP_MAX_HOURS} h`) : 'No sleep logged in this range yet'}
         progress={s ? Math.min(s.avgHours, SLEEP_MAX_HOURS) / SLEEP_TARGET_HOURS : 0}
         trend={direction(s?.avgHours, p?.sleep?.avgHours, 0.1)}
         period={period}

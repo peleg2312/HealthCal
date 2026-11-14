@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { activityNoun, cheerTarget, dayLabel, friendWeek, initialsFor, isCurrentWeek, isEmojiAvatar, latestWorkout, outcomeMessage, personMark, sharesAnything, sharingSentence } from './week';
+import { activityNoun, cheerCaption, cheerTarget, cleanAvatar, dayLabel, friendWeek, initialsFor, isCurrentWeek, isEmojiAvatar, latestWorkout, outcomeMessage, personMark, sharesAnything, sharingSentence } from './week';
 
 const TODAY = '2026-11-14'; // Saturday; the week starts Monday 2026-11-09
 
@@ -77,15 +77,38 @@ describe('labels', () => {
   });
 });
 
+describe('cheerCaption', () => {
+  it('says when a workout was cheered', () => {
+    expect(cheerCaption('a1b2c3', 'yesterday')).toBe('yesterday');
+    expect(cheerCaption('a1b2c3', '3 h ago')).toBe('3 h ago');
+    expect(cheerCaption('a1b2c3', null)).toBe('');
+  });
+  it('never repeats the day a day cheer already names', () => {
+    // "Maya cheered your day yesterday" with "yesterday" under it read twice.
+    expect(cheerCaption('day:2026-11-13', 'yesterday')).toBe('');
+    expect(cheerCaption('day:2026-11-10', 'Nov 11')).toBe('');
+    expect(cheerCaption('day:2026-11-13', '3 h ago')).toBe('3 h ago');
+    expect(cheerCaption('day:2026-11-14', '12 min ago')).toBe('12 min ago');
+    expect(cheerCaption('day:2026-11-14', 'just now')).toBe('just now');
+  });
+});
+
 describe('person marks', () => {
-  it('uses an emoji, chosen letters or initials', () => {
+  it('uses chosen letters or initials, never an emoji', () => {
     expect(isEmojiAvatar('🏃')).toBe(true);
     expect(isEmojiAvatar('AB')).toBe(false);
     expect(initialsFor('Sam Ortiz')).toBe('SO');
     expect(initialsFor('maya')).toBe('M');
     expect(personMark('Sam Ortiz', '')).toEqual({ kind: 'initials', text: 'SO' });
     expect(personMark('Sam', 'x')).toEqual({ kind: 'initials', text: 'X' });
-    expect(personMark('Sam', '🚴')).toEqual({ kind: 'emoji', text: '🚴' });
+    // People are initials in a cup tile, never an emoji: an emoji chosen before is ignored.
+    expect(personMark('Sam', '🚴')).toEqual({ kind: 'initials', text: 'S' });
+    expect(personMark('Jonas Berg', ' 🏊 ')).toEqual({ kind: 'initials', text: 'JB' });
+  });
+  it('drops an emoji avatar when saving, keeps letters', () => {
+    expect(cleanAvatar('🏃')).toBe('');
+    expect(cleanAvatar(' AB ')).toBe('AB');
+    expect(cleanAvatar('')).toBe('');
   });
 });
 

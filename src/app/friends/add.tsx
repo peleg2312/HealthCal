@@ -4,6 +4,8 @@ import React, { useCallback, useState } from 'react';
 import { View } from 'react-native';
 
 import { Loading } from '@/features/friends/components';
+import { inviteFromParams, invitePath } from '@/features/friends/link';
+import { clearPendingInvite, savePendingInvite } from '@/features/friends/pendingInvite';
 import { pasteText } from '@/features/friends/share';
 import { formatCode, isCompleteCode, normalizeCode } from '@/features/friends/summary';
 import { outcomeMessage } from '@/features/friends/week';
@@ -15,19 +17,21 @@ type Result = { title: string; message: string; good: boolean; outcome: string }
 
 export default function AddFriendScreen() {
   const { colors, spacing } = useTheme();
-  const params = useLocalSearchParams<{ code?: string }>();
-  const [code, setCode] = useState(() => normalizeCode(params.code ?? ''));
-  const [lastParam, setLastParam] = useState(params.code);
+  // ?invite= (links made before it was renamed carry ?code=, which still works).
+  const params = useLocalSearchParams<{ invite?: string; code?: string }>();
+  const linked = inviteFromParams(params);
+  const [code, setCode] = useState(linked);
+  const [lastParam, setLastParam] = useState(linked);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<Result>(null);
   const status = useFriends((s) => s.status);
   const overview = useFriends((s) => s.overview);
 
   // A second invite link opened while this screen is already showing.
-  if (params.code !== lastParam) {
-    setLastParam(params.code);
-    if (params.code) {
-      setCode(normalizeCode(params.code));
+  if (linked !== lastParam) {
+    setLastParam(linked);
+    if (linked) {
+      setCode(linked);
       setResult(null);
     }
   }
@@ -55,6 +59,8 @@ export default function AddFriendScreen() {
       return;
     }
     setResult({ ...outcomeMessage(res.value.outcome, res.value.displayName), outcome: res.value.outcome });
+    // A code kept through sign-up has done its job.
+    void clearPendingInvite();
   };
 
   const paste = async () => {
@@ -74,10 +80,16 @@ export default function AddFriendScreen() {
             message={
               status === 'unavailable'
                 ? 'This version of HealthCal has no accounts, so friends are not available.'
-                : `Create a free account or sign in, then come back to add ${code ? `the code ${formatCode(code)}` : 'your friend'}. Your calories, weight and food always stay private.`
+                : isCompleteCode(code)
+                  ? `Create a free account or sign in, and once you are set up this screen opens again with the code ${formatCode(code)} filled in. Your calories, weight and food always stay private.`
+                  : 'Create a free account or sign in, then come back to add your friend. Your calories, weight and food always stay private.'
             }
             action={status === 'signed-out' ? 'Create a free account' : undefined}
-            onAction={() => router.push('/auth?mode=signup')}
+            onAction={() => {
+              // Keep the code through sign-up and setup; afterwards this screen opens again with it filled in.
+              if (isCompleteCode(code)) void savePendingInvite(code);
+              router.push('/auth?mode=signup');
+            }}
           />
         </Card>
       </Screen>
@@ -99,7 +111,7 @@ export default function AddFriendScreen() {
       testID="friends-add-screen"
       footer={
         needsSetup ? (
-          <Button testID="friends-add-setup" title="Turn on friends" onPress={() => router.replace(`/friends${code ? `?code=${code}` : ''}` as never)} />
+          <Button testID="friends-add-setup" title="Turn on friends" onPress={() => router.replace(invitePath(code, '/friends') as never)} />
         ) : result?.good ? (
           <Button testID="friends-add-done" title="See your friends" onPress={() => router.replace('/friends' as never)} />
         ) : (

@@ -82,6 +82,17 @@ export function cheerTarget(ref: string, ownWorkouts: Map<string, { name: string
   return w ? `your ${activityNoun(w.name)}` : 'a workout of yours';
 }
 
+/**
+ * The line under a received cheer: when it was given ("3 h ago", "yesterday", "Nov 2"). A cheer for a
+ * day already names its day ("cheered your day yesterday"), so there it only says how long ago a cheer
+ * from today was, and otherwise nothing: never "yesterday" twice.
+ */
+export function cheerCaption(ref: string, ago: string | null): string {
+  if (!ago) return '';
+  if (!ref.startsWith('day:')) return ago;
+  return ago === 'just now' || / (min|h) ago$/.test(ago) ? ago : '';
+}
+
 /** "Running" -> "run", "Strength training" -> "strength training". Reads naturally after "your". */
 export function activityNoun(name: string): string {
   const n = name.trim().toLowerCase();
@@ -104,12 +115,20 @@ export function initialsFor(name: string): string {
   return (first + last).toUpperCase();
 }
 
-/** What a person's mark shows: their emoji, the letters they chose, or initials of their name. */
-export function personMark(name: string, avatar: string): { kind: 'emoji' | 'initials'; text: string } {
-  const a = avatar.trim();
-  if (isEmojiAvatar(a)) return { kind: 'emoji', text: a };
+/**
+ * The initials a person's cup tile shows: the letters stored as their mark, else the initials of their name.
+ * People are never shown as an emoji; an emoji chosen before that rule is ignored.
+ */
+export function personMark(name: string, avatar: string): { kind: 'initials'; text: string } {
+  const a = cleanAvatar(avatar);
   if (a) return { kind: 'initials', text: Array.from(a).slice(0, 2).join('').toUpperCase() };
   return { kind: 'initials', text: initialsFor(name) };
+}
+
+/** The avatar to keep or send: letters as they are, an emoji (no longer offered) as nothing, so initials show. */
+export function cleanAvatar(avatar: string): string {
+  const a = avatar.trim();
+  return isEmojiAvatar(a) ? '' : a;
 }
 
 export type RequestOutcomeKey = 'sent' | 'accepted' | 'already_friends' | 'not_found' | 'self' | 'too_many' | 'limit' | 'setup_needed';

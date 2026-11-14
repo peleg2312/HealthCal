@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { formatShortDate } from '@/lib/dates';
 import type { Milestone } from '@/lib/insights';
@@ -27,6 +27,8 @@ export function milestoneDomain(id: string): Domain {
  */
 export function MilestonesCard({ milestones }: { milestones: Milestone[] }) {
   const { colors, spacing } = useTheme();
+  // Two to a row from 360 px; one to a row below that, so a title is never cut.
+  const two = useWindowDimensions().width >= 360;
   const doneAll = milestones.filter((m) => m.achieved).sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
   const done = doneAll.slice(0, 4);
   const next = milestones
@@ -50,15 +52,15 @@ export function MilestonesCard({ milestones }: { milestones: Milestone[] }) {
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: spacing.md,
-                width: '50%',
-                paddingLeft: i % 2 ? spacing.md : 0,
-                paddingRight: i % 2 ? 0 : spacing.md,
-                borderLeftWidth: i % 2 ? 1 : 0,
+                width: two ? '50%' : '100%',
+                paddingLeft: two && i % 2 ? spacing.md : 0,
+                paddingRight: two && !(i % 2) ? spacing.md : 0,
+                borderLeftWidth: two && i % 2 ? 1 : 0,
                 borderLeftColor: colors.border,
               }}>
               <MiniCup progress={1} goalKind="reach" index={i} memoryKey={`milestone-${m.id}`} color={colors[milestoneDomain(m.id)]} width={22} height={28} />
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text variant="label" numberOfLines={2}>
+                <Text variant="label">
                   {m.title}
                 </Text>
                 {m.date ? (

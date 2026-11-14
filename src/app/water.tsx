@@ -419,9 +419,9 @@ function Celebration({ isToday, onDone }: { isToday: boolean; onDone: () => void
       <Card testID="water-celebration" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
         <MiniCup progress={1} goalKind="reach" animate={false} color={colors.water} />
         <View style={{ flex: 1 }}>
-          <Text variant="title">{isToday ? 'That’s your water goal for today' : 'That’s your water goal for the day'}</Text>
+          <Text variant="title">Anything more is a bonus</Text>
           <Text variant="caption" color="textSecondary">
-            Anything more is a bonus, not a requirement.
+            {isToday ? 'The goal is met for today. Drink to thirst from here.' : 'The goal was met for the day.'}
           </Text>
         </View>
         <IconButton testID="water-celebration-dismiss" accessibilityLabel="Dismiss" tone="clear" size={44} onPress={onDone}>

@@ -19,6 +19,7 @@ import { AppState, Platform, Pressable, Text as RNText, View } from 'react-nativ
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { usePendingInvite } from '@/features/friends/usePendingInvite';
 import { startHealthSync } from '@/features/health-sync/sync';
 import { handleAuthLink, initAuth } from '@/services/auth';
 import { refreshReminders } from '@/services/notifications';
@@ -164,6 +165,8 @@ export default function RootLayout() {
   // Until setup is finished nobody has picked a look, so the app shows its lead one.
   const firstRun = useStore((s) => !s.profile?.onboardedAt);
   const ready = (fontsLoaded || !!fontError) && hydrated;
+  // An invite code kept through sign-up opens the add-friend screen once the person is set up.
+  usePendingInvite(ready);
 
   useEffect(() => {
     if (!ready) return;

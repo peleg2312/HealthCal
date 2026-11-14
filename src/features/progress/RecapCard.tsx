@@ -26,16 +26,17 @@ export function RecapCard({ recap, earlier, unseen }: { recap: WeeklyRecap; earl
         style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 44 }}>
         <CalendarCheck size={22} color={colors.text} strokeWidth={1.9} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <Text variant="h3" numberOfLines={2} style={{ flexShrink: 1 }}>
-              Weekly check-in
+          {/* A no-break hyphen keeps "check-in" whole; the badge wraps under the title when there is no room beside it. */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.sm, rowGap: 2 }}>
+            <Text variant="h3" style={{ flexShrink: 1 }}>
+              Weekly check{'\u2011'}in
             </Text>
             {unseen ? <Badge label="New" color={colors.primary} /> : null}
           </View>
-          <Text variant="caption" color="textSecondary" numberOfLines={1}>
+          <Text variant="caption" color="textSecondary">
             {recap.label} · {range}
           </Text>
-          <Text variant="body" numberOfLines={2} style={{ marginTop: 2 }}>
+          <Text variant="body" style={{ marginTop: 2 }}>
             {recap.win}
           </Text>
         </View>

@@ -99,6 +99,10 @@ export interface WeekCup {
   complete: boolean;
   over: boolean;
   future: boolean;
+  /** Today: still open, drawn hatched. */
+  isToday: boolean;
+  /** Logged, closed and not fully logged: drawn in the lighter fill, as on the recap. */
+  partial: boolean;
   /** Fully logged and within 10% of its own budget. */
   inBand: boolean;
 }
@@ -111,8 +115,8 @@ export interface DayCardContent {
   /** The day is still open (today). */
   inProgress: boolean;
   cup: {
-    /** Cumulative tops of the meal bands, as shares of the budget, bottom first. */
-    bands: { meal: MealType; top: number }[];
+    /** Cumulative tops of the meal bands, as shares of the budget, bottom first. `kcal` only when the figures are chosen. */
+    bands: { meal: MealType; top: number; kcal?: number }[];
     /** eaten / budget (can pass 1). */
     level: number;
     over: boolean;
@@ -152,6 +156,8 @@ export function weekCups(weekStart: ISODate, days: ShareDay[], today: ISODate): 
       complete,
       over: logged && ratio > 1,
       future: date > today,
+      isToday: date === today,
+      partial: logged && !complete && date !== today,
       inBand: complete && Math.abs(ratio - 1) <= BAND,
     };
   });
@@ -194,12 +200,12 @@ export function dayCardContent(input: ShareDayInput, choices: ShareChoices): Day
   const level = budget > 0 ? input.kcal / budget : 0;
 
   let acc = 0;
-  const bands: { meal: MealType; top: number }[] = [];
+  const bands: { meal: MealType; top: number; kcal?: number }[] = [];
   for (const meal of MEAL_ORDER) {
     const k = Math.max(0, input.mealKcal[meal] ?? 0);
     if (k <= 0 || budget <= 0) continue;
     acc += k;
-    bands.push({ meal, top: acc / budget });
+    bands.push(choices.kcal ? { meal, top: acc / budget, kcal: Math.round(k) } : { meal, top: acc / budget });
   }
 
   const headline = choices.kcal
@@ -278,6 +284,8 @@ export interface WeekCardContent {
   kind: 'week';
   overline: string;
   title: string;
+  /** The week is still open (it holds today). */
+  inProgress: boolean;
   headline: string;
   cups: WeekCup[];
   stats: ShareStat[];
@@ -287,20 +295,25 @@ export interface WeekCardContent {
 /**
  * A week card writes its own headline from the facts it is allowed to show,
  * so a win about weight, or one quoting kcal when the figures are off, never
- * reaches it.
+ * reaches it. The headline says the fact in words; the numbers are in the
+ * stats under the cups, so the card never prints the same figure twice.
  */
 export function weekHeadline(input: ShareWeekInput, cups: WeekCup[], choices: ShareChoices): string {
   const complete = cups.filter((c) => c.complete).length;
   const inBand = cups.filter((c) => c.inBand).length;
   const logged = cups.filter((c) => c.logged).length;
+  const inProgress = cups.some((c) => c.isToday);
   const lines: { score: number; text: string }[] = [];
-  if (complete >= 2 && inBand / complete >= 0.6) lines.push({ score: inBand / complete, text: `${inBand} of ${complete} full days within 10% of the budget.` });
-  if (choices.activity && input.guidelineMinutes >= 150) lines.push({ score: 0.85, text: `${formatNumber(input.guidelineMinutes)} active minutes, past the weekly 150.` });
+  if (complete >= 2 && inBand / complete >= 0.6)
+    lines.push({ score: inBand / complete, text: inBand === complete ? 'Every full day within 10% of its budget.' : 'Most full days within 10% of their budget.' });
+  if (choices.activity && input.guidelineMinutes >= 150) lines.push({ score: 0.85, text: `Past the weekly 150 active minutes${inProgress ? ' already' : ''}.` });
   if (choices.water && input.waterDaysTracked >= 2 && input.waterDaysAtGoal / input.waterDaysTracked >= 0.7)
-    lines.push({ score: input.waterDaysAtGoal / input.waterDaysTracked, text: `Water goal met on ${input.waterDaysAtGoal} of ${input.waterDaysTracked} days.` });
-  if (logged >= 6) lines.push({ score: 0.7, text: `Food logged on ${logged} of 7 days.` });
+    lines.push({ score: input.waterDaysAtGoal / input.waterDaysTracked, text: input.waterDaysAtGoal === input.waterDaysTracked ? 'Water goal met every day it was tracked.' : 'Water goal met on most days.' });
+  if (logged >= 6) lines.push({ score: 0.7, text: logged === 7 ? 'Food logged every day of the week.' : `Food logged on ${logged} of 7 days.` });
   lines.sort((a, b) => b.score - a.score);
-  return lines[0]?.text ?? `Food logged on ${logged} ${plural(logged, 'day')}.`;
+  if (lines[0]) return lines[0].text;
+  if (!logged) return inProgress ? 'A new week, nothing logged yet.' : 'Nothing logged this week.';
+  return `Food logged on ${logged} ${plural(logged, 'day')}${inProgress ? ' so far' : ''}.`;
 }
 
 export function weekCardContent(input: ShareWeekInput, choices: ShareChoices): WeekCardContent {
@@ -313,15 +326,18 @@ export function weekCardContent(input: ShareWeekInput, choices: ShareChoices): W
       : `${MONTH_SHORT[start.getMonth()]} ${start.getDate()} – ${MONTH_SHORT[end.getMonth()]} ${end.getDate()}`;
   const complete = cups.filter((c) => c.complete).length;
   const inBand = cups.filter((c) => c.inBand).length;
+  const inProgress = cups.some((c) => c.isToday);
 
-  const stats: ShareStat[] = [{ key: 'budget', value: `${inBand}`, unit: `of ${complete}`, label: 'full days within 10%' }];
+  // With no fully logged day there is nothing to measure, so no "0 of 0".
+  const stats: ShareStat[] = complete ? [{ key: 'budget', value: `${inBand}`, unit: `of ${complete}`, label: `full ${plural(complete, 'day')} within 10%` }] : [];
   if (choices.kcal && input.avgKcal !== null) stats.push({ key: 'kcal', value: formatNumber(Math.round(input.avgKcal)), unit: 'kcal', label: 'a day on average' });
   if (choices.water && input.waterDaysTracked > 0)
     stats.push({ key: 'water', value: `${input.waterDaysAtGoal}`, unit: `of ${input.waterDaysTracked}`, label: 'days at water goal', progress: input.waterDaysAtGoal / Math.max(1, input.waterDaysTracked) });
-  if (choices.activity && input.guidelineMinutes > 0) stats.push({ key: 'activity', value: formatNumber(input.guidelineMinutes), unit: 'min', label: 'active, guideline 150' });
+  if (choices.activity && input.guidelineMinutes > 0)
+    stats.push({ key: 'activity', value: formatNumber(input.guidelineMinutes), unit: 'min', label: inProgress ? 'active so far' : 'active this week' });
   if (choices.streak && input.streak > 0) stats.push({ key: 'streak', value: `${input.streak}`, unit: plural(input.streak, 'day'), label: 'logging streak' });
 
   const headline = weekHeadline(input, cups, choices);
-  const summary = [`My week, ${range}.`, headline, ...stats.map((s) => `${s.value} ${s.unit} ${s.label}.`)].join(' ');
-  return { kind: 'week', overline: `WEEK OF ${range.toUpperCase()}`, title: 'My week', headline, cups, stats, summary };
+  const summary = [`My week${inProgress ? ' so far' : ''}, ${range}.`, headline, ...stats.map((s) => `${s.value} ${s.unit} ${s.label}.`)].join(' ');
+  return { kind: 'week', overline: `WEEK OF ${range.toUpperCase()}`, title: 'My week', inProgress, headline, cups, stats, summary };
 }

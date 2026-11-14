@@ -1,12 +1,19 @@
 import { useIsFocused } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useStore } from '@/store';
 import type { Consistency } from '@/store/selectors';
+import { useReducedMotion } from '@/theme';
 import type { ISODate } from '@/types';
 
 import { dueMilestone, justExtended, milestoneKey, streakLine, type StreakMilestone, type StreakState } from './rules';
 import { useStreakMoments } from './store';
+
+/**
+ * The milestone sheet waits this long after it becomes due, so the cup that the
+ * log poured and the streak's tick are seen first. Instant under reduced motion.
+ */
+export const MILESTONE_LEAD_MS = 900;
 
 export interface StreakMoment {
   /** The streak as last seen on screen: it only moves while Today is in front, so the pour and tick are seen. */
@@ -37,7 +44,16 @@ export function useStreakMoment(consistency: Consistency, today: ISODate): Strea
     setSeen(actual);
     setLine(justExtended(seen, actual) ? { date: today, text: streakLine(actual.streak) } : null);
   }
-  const milestone = focused && hydrated && celebrations ? dueMilestone(seen, today, shown) : null;
+  const due = focused && hydrated && celebrations ? dueMilestone(seen, today, shown) : null;
+  const dueKey = due ? milestoneKey(due, today) : null;
+  const reduced = useReducedMotion();
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (!dueKey || openKey === dueKey) return;
+    const timer = setTimeout(() => setOpenKey(dueKey), reduced ? 0 : MILESTONE_LEAD_MS);
+    return () => clearTimeout(timer);
+  }, [dueKey, openKey, reduced]);
+  const milestone = due && openKey === dueKey ? due : null;
   return {
     streak: seen.streak,
     filled: seen.loggedToday,

@@ -33,21 +33,38 @@ export function recapDayCups(weekStart: ISODate, days: InsightDay[], today: ISOD
     const budget = d?.budget ?? 0;
     const ratio = logged && budget > 0 ? kcal / budget : 0;
     const complete = !!d && isCompleteDay(d, today);
-    const pct = Math.round(ratio * 100);
+    const inBand = complete && inBudgetBand(kcal, budget);
+    const over = logged && kcal > budget;
     return {
       date,
       ratio,
       logged,
       complete,
-      inBand: complete && inBudgetBand(kcal, budget),
-      over: logged && kcal > budget,
+      inBand,
+      over,
       isToday: date === today,
       future: date > today,
       detail: logged
-        ? `${formatShortDate(date)} · ${formatNumber(Math.round(kcal))} of ${formatNumber(Math.round(budget))} kcal, ${pct}% of that day’s budget${complete ? '' : date === today ? ', still in progress' : ', partly logged'}`
+        ? `${formatShortDate(date)} · ${formatNumber(Math.round(kcal))} of ${formatNumber(Math.round(budget))} kcal, ${standing(kcal, budget, over, inBand)}${complete ? '' : date === today ? ', still in progress' : ', partly logged'}`
         : `${formatShortDate(date)} · ${date > today ? 'still to come' : 'not logged'}`,
     };
   });
+}
+
+/**
+ * How a day stands against its own budget, in words that agree with the cup:
+ * a day above it says so and by how much (the amber lip), never a rounded
+ * share that could read as on budget; a check is named only on a full day.
+ */
+function standing(kcal: number, budget: number, over: boolean, inBand: boolean): string {
+  if (budget <= 0) return 'no budget set';
+  if (over) {
+    const above = Math.max(1, Math.round(kcal - budget));
+    return `${formatNumber(above)} kcal above that day’s budget${inBand ? ', within 10% of it' : ''}`;
+  }
+  // Under the budget the share is floored, so 99.6% never reads as 100%.
+  const pct = Math.floor((kcal / budget) * 100);
+  return `${pct}% of that day’s budget${inBand ? ', within 10% of it' : ''}`;
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => (n === 1 ? one : many);

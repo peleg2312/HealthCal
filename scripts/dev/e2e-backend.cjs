@@ -44,9 +44,15 @@ async function device(browser, seedJson) {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  // Sign-in code exchanges this device sent (a reset link sends one; an invite link must not).
+  const pkce = [];
+  page.on('request', (r) => {
+    if (/\/auth\/v1\/token\?grant_type=pkce/.test(r.url())) pkce.push(r.url());
+  });
   const d = {
     page,
     errors,
+    pkce,
     go: async (route) => {
       await page.goto(BASE + route, { waitUntil: 'networkidle', timeout: 120000 });
       await page.waitForTimeout(900);
@@ -299,17 +305,19 @@ async function device(browser, seedJson) {
   check('the second person turns friends on too', !!codeD && (await server()).social[user2?.id]?.display_name === 'Sam');
 
   // Every answer is said in plain words.
-  await D.go(`/friends/add?code=${codeD}`);
+  await D.go(`/friends/add?invite=${codeD}`);
   await D.tap('friends-add-send');
   check('entering your own code says so', await waitFor(D, 'friends-add-outcome-self', 10000));
   await D.fill('friends-add-input', 'ZZZZ-ZZZZ');
   await D.tap('friends-add-send');
   check('a code nobody has says so', await waitFor(D, 'friends-add-outcome-not-found', 10000));
 
-  // The invite link opens the add screen with the code filled in.
-  await D.go(`/friends/add?code=${codeA.toLowerCase().slice(0, 4)}-${codeA.slice(4)}`);
+  // The invite link (?invite=, never ?code=, which the sign-in library would take for a sign-in code)
+  // opens the add screen with the code filled in, and sends nothing to the auth server.
+  await D.go(`/friends/add?invite=${codeA.toLowerCase().slice(0, 4)}-${codeA.slice(4)}`);
   const filled = await D.page.getByTestId('friends-add-input').first().inputValue();
   check('an invite link opens the add screen with the code filled in and normalised', filled === `${codeA.slice(0, 4)} ${codeA.slice(4)}`, filled);
+  check('opening an invite link as a signed-in web user sends no sign-in code exchange', D.pkce.length === 0, D.pkce.join(' '));
   await D.tap('friends-add-send');
   check('sending a request says it was sent', await waitFor(D, 'friends-add-outcome-sent', 10000));
   await D.shot('friends-request-sent');

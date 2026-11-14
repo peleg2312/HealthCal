@@ -64,6 +64,8 @@ export function DayRingStrip({
   }
   // The first placement jumps; later moves (a new selection) glide.
   const placed = useRef(false);
+  // Hidden until the first jump (once the pages have their size), so a slow first paint never shows the oldest week (web ignores contentOffset).
+  const [ready, setReady] = useState(false);
   useEffect(() => {
     if (width <= 0) return;
     ref.current?.scrollTo({ x: (maxBack - selectedBack) * width, animated: placed.current });
@@ -101,6 +103,12 @@ export function DayRingStrip({
             onMomentumScrollEnd={onScrollEnd}
             onScrollEndDrag={onScrollEnd}
             contentOffset={{ x: (maxBack - back) * width, y: 0 }}
+            style={{ opacity: ready ? 1 : 0 }}
+            onContentSizeChange={() => {
+              if (ready) return;
+              ref.current?.scrollTo({ x: (maxBack - selectedBack) * width, animated: false });
+              setReady(true);
+            }}
             scrollEventThrottle={16}>
             {Array.from({ length: maxBack + 1 }, (_, i) => maxBack - i).map((b) => (
               <View key={b} style={{ width, flexDirection: 'row', paddingTop: 2 }} accessibilityRole="tablist">

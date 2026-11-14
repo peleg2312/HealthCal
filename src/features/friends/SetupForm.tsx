@@ -5,17 +5,16 @@ import { setupSocial, type SocialSharing } from '@/services/friends';
 import { useTheme } from '@/theme';
 import { Button, Card, LargeTitle, Screen, Text, toast } from '@/ui';
 
-import { AvatarPicker, NameField, SharingSwitches } from './components';
+import { NameField, SharingSwitches } from './components';
 import { DEFAULT_SHARING } from './summary';
 
 /**
  * Turning friends on: the name friends will see (prefilled from the profile),
- * how you appear, what is shared, and one primary action pinned in the footer.
+ * what is shared, and one primary action pinned in the footer. Friends see your initials.
  */
 export function SetupForm({ header, defaultName, onDone }: { header: React.ReactNode; defaultName: string; onDone: () => void }) {
   const { spacing } = useTheme();
   const [name, setName] = useState(defaultName);
-  const [avatar, setAvatar] = useState('');
   const [sharing, setSharing] = useState<SocialSharing>(DEFAULT_SHARING);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +22,7 @@ export function SetupForm({ header, defaultName, onDone }: { header: React.React
   const submit = async () => {
     setSaving(true);
     setError(null);
-    const res = await setupSocial({ displayName: name, avatar, sharing });
+    const res = await setupSocial({ displayName: name, avatar: '', sharing });
     setSaving(false);
     if (!res.ok) {
       setError(res.message);
@@ -55,7 +54,6 @@ export function SetupForm({ header, defaultName, onDone }: { header: React.React
       <Card testID="friends-setup">
         <View style={{ gap: spacing.xl }}>
           <NameField testID="friends-setup-name" value={name} onChange={setName} />
-          <AvatarPicker name={name} value={avatar} onChange={setAvatar} />
           <SharingSwitches sharing={sharing} onChange={(key, on) => setSharing((s) => ({ ...s, [key]: on }))} />
         </View>
       </Card>

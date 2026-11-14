@@ -69,7 +69,8 @@ export function MacrosCard({ summary, days, today }: { summary: PeriodSummary; d
                   {Math.round(ratio * 100)}%
                 </Text>
               </View>
-              <ProgressBar progress={ratio} color={r.color} height={6} />
+              {/* Protein and fibre are targets to reach; carbs and fat are shares of the budget, so going past them is information in amber. */}
+              <ProgressBar progress={ratio} color={r.color} height={6} goalKind={r.key === 'protein' || r.key === 'fiber' ? 'reach' : 'limit'} />
             </View>
           );
         })}

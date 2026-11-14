@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import { diffDays } from '@/lib/dates';
+import { isCompleteDay } from '@/lib/insights';
 import { useStore } from '@/store';
 import { useToday } from '@/store/clock';
 import { useConsistency, useDays, useLive } from '@/store/selectors';
@@ -54,6 +55,7 @@ export function useConsistencyData() {
       byDate.set(d.date, {
         date: d.date,
         logged: d.entries.length > 0,
+        complete: isCompleteDay(d, t),
         kcal: d.eaten.kcal,
         budget: d.budget,
         waterMet: d.waterEntries.length > 0 && d.waterMl >= d.waterGoalMl,

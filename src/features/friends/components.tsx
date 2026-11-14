@@ -5,12 +5,12 @@ import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 import { formatShortDate, weekdayShort } from '@/lib/dates';
 import { formatDistance } from '@/lib/units';
 import type { CheerReceived, Friend, FriendRequest, FriendWorkout, SocialSharing } from '@/services/friends';
-import { cupFor, fonts, useTheme } from '@/theme';
+import { fonts, useTheme } from '@/theme';
 import type { ISODate, UnitSystem } from '@/types';
-import { Avatar, Button, Card, Chip, Divider, IconButton, MiniCup, PressableScale, Text, TextField, ToggleRow } from '@/ui';
+import { Avatar, Button, Card, Divider, IconButton, MiniCup, PressableScale, Text, TextField, ToggleRow } from '@/ui';
 
 import { formatCode, normalizeCode } from './summary';
-import { dayLabel, friendWeek, initialsFor, isCurrentWeek, latestWorkout, personMark, sharesAnything, sharingSentence, type FriendDay } from './week';
+import { dayLabel, friendWeek, isCurrentWeek, latestWorkout, personMark, sharesAnything, sharingSentence, type FriendDay } from './week';
 
 /** Below this width (iPhone SE) the friend screens tighten up, as Today does. */
 export function useNarrow(): boolean {
@@ -22,19 +22,9 @@ export const idFor = (userId: string) => userId.replace(/[^A-Za-z0-9-]/g, '').to
 
 // ------------------------------------------------------------------ marks
 
-/** A person: a cup tile with initials, or their emoji as a content mark in an outlined cup (never a filled emoji tile). */
+/** A person: a cup tile with their initials, always (never an emoji). */
 export function PersonMark({ name, avatar, size = 44 }: { name: string; avatar: string; size?: number }) {
-  const { colors } = useTheme();
-  const mark = personMark(name, avatar);
-  if (mark.kind === 'initials') return <Avatar initials={mark.text} size={size} />;
-  return (
-    <View
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={{ width: size, height: size, ...cupFor(size), borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ fontSize: Math.round(size * 0.42), lineHeight: Math.round(size * 0.56) }}>{mark.text}</Text>
-    </View>
-  );
+  return <Avatar initials={personMark(name, avatar).text} size={size} />;
 }
 
 /** Cheer, or the done state "Cheered". Instant: the store marks it at once and rolls it back if the server refuses. */
@@ -319,9 +309,11 @@ export function CheersList({ cheers, describe, when }: { cheers: CheerReceived[]
                 <Text variant="bodyStrong">{c.displayName}</Text>
                 {` cheered ${describe(c)}`}
               </Text>
-              <Text variant="caption" color="textSecondary">
-                {when(c)}
-              </Text>
+              {when(c) ? (
+                <Text variant="caption" color="textSecondary">
+                  {when(c)}
+                </Text>
+              ) : null}
             </View>
             <HandHeart size={18} color={colors.textSecondary} strokeWidth={1.9} />
           </View>
@@ -332,26 +324,6 @@ export function CheersList({ cheers, describe, when }: { cheers: CheerReceived[]
 }
 
 // ------------------------------------------------------------------ profile fields
-
-const EMOJI_CHOICES = ['🏃', '🚴', '🏊', '🧘', '🏋️', '🥾'];
-
-/** Initials (default, from the name) or one of a few activity emoji. */
-export function AvatarPicker({ name, value, onChange }: { name: string; value: string; onChange: (v: string) => void }) {
-  const { spacing } = useTheme();
-  return (
-    <View style={{ gap: spacing.sm }}>
-      <Text variant="label" color="textSecondary">
-        How you appear
-      </Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }} accessibilityRole="radiogroup">
-        <Chip testID="friends-avatar-initials" label={`Initials ${initialsFor(name || 'Me')}`} selected={!value} onPress={() => onChange('')} />
-        {EMOJI_CHOICES.map((e, i) => (
-          <Chip key={e} testID={`friends-avatar-${i}`} label={e} selected={value === e} onPress={() => onChange(e)} style={{ minWidth: 44, justifyContent: 'center' }} />
-        ))}
-      </View>
-    </View>
-  );
-}
 
 /** The three sharing switches, each saying exactly what it shows, and the sentence about what is never shared. */
 export function SharingSwitches({ sharing, onChange }: { sharing: SocialSharing; onChange: (key: keyof SocialSharing, on: boolean) => void }) {

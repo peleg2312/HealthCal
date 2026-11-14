@@ -40,7 +40,7 @@ describe('month helpers', () => {
   it('lays out Monday-first weeks and merges consecutive logged days into pills', () => {
     const map = new Map<string, CalendarDayInput>();
     const add = (date: string, o: Partial<CalendarDayInput> = {}) =>
-      map.set(date, { date, logged: true, kcal: 2000, budget: 2000, waterMet: false, trained: false, ...o });
+      map.set(date, { date, logged: true, complete: true, kcal: 2000, budget: 2000, waterMet: false, trained: false, ...o });
     add('2026-11-01'); // Sunday, alone at the end of row 1
     add('2026-11-02'); // Monday, starts row 2: a new pill
     add('2026-11-03', { kcal: 2600 }); // over the band: logged but not on budget
@@ -58,6 +58,23 @@ describe('month helpers', () => {
     const nov20 = rows.flat().find((c) => c?.date === '2026-11-20')!;
     expect(nov20).toMatchObject({ future: true, logged: false });
     expect(rows.every((r) => r.length === 7)).toBe(true);
+  });
+
+  it('fills each day to its own budget, with the lighter fill for a partly logged day', () => {
+    const map = new Map<string, CalendarDayInput>();
+    const add = (date: string, o: Partial<CalendarDayInput> = {}) =>
+      map.set(date, { date, logged: true, complete: true, kcal: 2000, budget: 2000, waterMet: false, trained: false, ...o });
+    add('2026-11-02', { kcal: 2300 }); // 15% above its budget
+    add('2026-11-03', { kcal: 2150 }); // 7.5% above: within 10%
+    add('2026-11-04', { kcal: 500, complete: false }); // partly logged
+    add('2026-11-13', { kcal: 900, complete: false }); // today, still open
+    const cells = new Map(monthGrid('2026-11', map, TODAY).flat().filter((c) => c).map((c) => [c!.date, c!]));
+    expect(cells.get('2026-11-02')).toMatchObject({ ratio: 1.15, onBudget: false, partial: false });
+    expect(cells.get('2026-11-03')).toMatchObject({ ratio: 1.075, onBudget: true });
+    // A partly logged day near its budget is never checked: the check is for fully logged days.
+    expect(cells.get('2026-11-04')).toMatchObject({ ratio: 0.25, onBudget: false, partial: true });
+    expect(cells.get('2026-11-13')).toMatchObject({ ratio: 0.45, partial: false, isToday: true });
+    expect(cells.get('2026-11-05')).toMatchObject({ ratio: 0, logged: false });
   });
 
   it('counts the month so far', () => {

@@ -24,7 +24,7 @@ export function InsightsCard({ insights, rangeDays }: { insights: Insight[]; ran
         {shown.map((ins, i) => (
           <React.Fragment key={ins.id}>
             {i > 0 ? <Divider /> : null}
-            <InsightRow insight={ins} clamp={!open} />
+            <InsightRow insight={ins} />
           </React.Fragment>
         ))}
       </View>
@@ -43,7 +43,7 @@ export function InsightsCard({ insights, rangeDays }: { insights: Insight[]; ran
   );
 }
 
-function InsightRow({ insight, clamp }: { insight: Insight; clamp?: boolean }) {
+function InsightRow({ insight }: { insight: Insight }) {
   const { colors, spacing } = useTheme();
   const tone =
     insight.tone === 'positive'
@@ -58,7 +58,7 @@ function InsightRow({ insight, clamp }: { insight: Insight; clamp?: boolean }) {
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         <Text variant="bodyStrong">{insight.title}</Text>
-        <Text variant="body" color="textSecondary" numberOfLines={clamp ? 2 : undefined} style={{ fontSize: 14, lineHeight: 20 }}>
+        <Text variant="body" color="textSecondary" style={{ fontSize: 14, lineHeight: 20 }}>
           {insight.body}
         </Text>
         {insight.action ? (

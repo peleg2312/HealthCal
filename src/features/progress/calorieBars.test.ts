@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import type { InsightDay } from '@/lib/insights';
 
-import { buildBars, daysVerdict } from './calorieBars';
+import { buildBars, daysVerdict, solidBar } from './calorieBars';
+
+const FILLS = { full: 'FULL', partial: 'PARTIAL', over: 'AMBER' };
 
 const day = (date: string, kcal: number, budget: number): InsightDay =>
   ({
@@ -24,16 +26,31 @@ const days = [day('2026-10-27', 2209, 2568), day('2026-11-11', 2085, 1920), day(
 
 describe('calorie bars', () => {
   it('give every daily bar its own budget, so amber means over that day', () => {
-    const { data, openIndex } = buildBars(days, '2026-11-14', 'PARTIAL');
-    expect(data.map((d) => d.goal)).toEqual([2568, 1920, 2000, 2100]);
-    const over = data.map((d) => d.value > (d.goal ?? Infinity));
-    expect(over).toEqual([false, true, false, false]);
+    const { data, openIndex } = buildBars(days, '2026-11-14', FILLS);
+    // Amber is the second segment, the part above that day's own budget.
+    const amber = data.map((d) => d.segments?.find((s) => s.color === 'AMBER')?.value ?? 0);
+    expect(amber).toEqual([0, 165, 0, 0]);
+    expect(data[1].segments).toEqual([
+      { value: 1920, color: 'FULL' },
+      { value: 165, color: 'AMBER' },
+    ]);
+    // The kit adds no amber of its own on a solid bar (its goal is never below the value), so the level line sits at the day's intake.
+    for (const d of data.slice(0, 3)) expect(d.value > (d.goal ?? Infinity)).toBe(false);
+    // Today stays the kit's hatched bar, against today's budget.
     expect(openIndex).toBe(3);
+    expect(data[3].goal).toBe(2100);
+    expect(data[3].segments).toBeUndefined();
   });
 
   it('draw a partly logged day in the partial colour, but not today', () => {
-    const { data } = buildBars(days, '2026-11-14', 'PARTIAL');
-    expect(data.map((d) => d.color)).toEqual([undefined, undefined, 'PARTIAL', undefined]);
+    const { data } = buildBars(days, '2026-11-14', FILLS);
+    expect(data.map((d) => d.segments?.[0]?.color)).toEqual(['FULL', 'FULL', 'PARTIAL', undefined]);
+  });
+
+  it('stack a solid bar: fill up to the budget, amber above, nothing for an empty day', () => {
+    expect(solidBar(2400, 2000, 'F', 'A')).toEqual({ segments: [{ value: 2000, color: 'F' }, { value: 400, color: 'A' }], goal: 2400 });
+    expect(solidBar(1500, 2000, 'F', 'A')).toEqual({ segments: [{ value: 1500, color: 'F' }], goal: 2000 });
+    expect(solidBar(0, 2000, 'F', 'A')).toEqual({});
   });
 
   it('measure a weekly bar against the average budget of the same days', () => {
@@ -42,9 +59,11 @@ describe('calorie bars', () => {
       const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       return day(iso, 2000, i % 2 ? 2200 : 1800);
     });
-    const { data, weekly } = buildBars(many, '2026-11-14');
+    const { data, weekly } = buildBars(many, '2026-11-14', FILLS);
     expect(weekly).toBe(true);
     for (const b of data) if (b.value) expect(b.goal).toBeGreaterThan(1700);
+    // 2,000 against an average budget of 2,000 or so: no amber unless the week's average was above its budget.
+    for (const b of data) for (const s of b.segments ?? []) if (s.color === 'AMBER') expect(b.value).toBeGreaterThan(s.value);
   });
 
   it('say in words what the bars show', () => {

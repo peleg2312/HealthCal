@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { confidenceWord, kcalText } from '@/lib/insights';
 import { formatNumber } from '@/lib/units';
@@ -17,6 +17,8 @@ const NEED_WEIGH_INS = 5;
 /** One estimate; the two share the card, split by a hairline. The one that sets targets carries a badge. */
 function Column({ title, value, caption, active, color, first }: { title: string; value: string | null; caption: string; active: boolean; color: string; first?: boolean }) {
   const { colors, spacing } = useTheme();
+  // At 320 px a column is about 110 px wide: the number steps down so it and its unit stay whole.
+  const narrow = useWindowDimensions().width < 360;
   return (
     <View
       style={{
@@ -28,14 +30,14 @@ function Column({ title, value, caption, active, color, first }: { title: string
         borderLeftColor: colors.border,
         gap: 4,
       }}>
-      <Text variant="caption" color="textSecondary" numberOfLines={1}>
+      <Text variant="caption" color="textSecondary">
         {title}
       </Text>
-      <Text variant="numL" color={value ? 'text' : 'textTertiary'} numberOfLines={1} style={value ? undefined : { fontSize: 22 }}>
+      <Text variant="numL" color={value ? 'text' : 'textTertiary'} style={value ? (narrow ? { fontSize: 24, lineHeight: 28 } : undefined) : { fontSize: 22 }}>
         {value ?? 'Not yet'}
         {value ? <Text variant="unit"> kcal</Text> : null}
       </Text>
-      <Text variant="caption" color="textSecondary" numberOfLines={2}>
+      <Text variant="caption" color="textSecondary">
         {caption}
       </Text>
       {active ? <Badge label="Sets your targets" color={color} style={{ marginTop: 4 }} /> : null}
