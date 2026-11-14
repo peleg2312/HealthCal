@@ -94,13 +94,23 @@ describe('planSavedMeal', () => {
     expect(line.food!.per100g.kcal * 1.75).toBeCloseTo(line.nutrients.kcal);
     expect(line.food!.servings[0]).toEqual({ label: '1 serving', grams: 175 });
   });
-  it('scales a recipe to the portion and ticked items', () => {
-    const half = planSavedMeal(chili, { portion: 0.5, include: [true, false] });
+  it('scales a whole recipe to the portion', () => {
+    const half = planSavedMeal(chili, { portion: 0.5 });
+    expect(half.items).toHaveLength(1);
     expect(half.items[0].servingLabel).toBe('½ of 4 servings');
-    expect(half.items[0].nutrients.kcal).toBeCloseTo(items[0].nutrients.kcal / 8);
-    expect(half.range).toBeNull();
-    expect(half.items[0].source).toBe('custom');
+    expect(half.items[0].nutrients.kcal).toBeCloseTo((items[0].nutrients.kcal + items[1].nutrients.kcal) / 8);
     expect(planSavedMeal(chili, { include: [false, false] }).items).toEqual([]);
+  });
+  it('logs a recipe with ingredients left out as those ingredients, not as a serving of the recipe', () => {
+    const half = planSavedMeal(chili, { portion: 0.5, include: [true, false] });
+    expect(half.items).toHaveLength(1);
+    // The ticked ingredient under its own name, scaled to half of one of four servings.
+    expect(half.items[0].name).toBe(items[0].name);
+    expect(half.items[0].servingLabel).toBe(items[0].servingLabel);
+    expect(half.items[0].nutrients.kcal).toBeCloseTo(items[0].nutrients.kcal / 8);
+    expect(half.items[0].grams).toBeCloseTo(items[0].grams / 8);
+    expect(half.kcal).toBeCloseTo(items[0].nutrients.kcal / 8);
+    expect(half.items[0].food?.id).not.toBe('meal_chili');
   });
   it('treats servings of 1 or less as a plain meal', () => {
     expect(planSavedMeal({ ...plain, servings: 1 }).items).toHaveLength(2);

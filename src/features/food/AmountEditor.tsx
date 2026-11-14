@@ -22,6 +22,9 @@ export interface AmountValue {
  * appending to it. Only a valid amount above 0 reaches `onChange`; on blur an
  * empty or invalid field shows the last valid amount again.
  */
+/** The largest amount one entry can hold. */
+const MAX_GRAMS = 20000;
+
 export function AmountEditor({
   food,
   value,
@@ -46,7 +49,8 @@ export function AmountEditor({
 
   const setTypedState = (g: number | null | undefined) => {
     setTyped(g);
-    onPendingChange?.(g !== undefined && !(g !== null && g > 0));
+    // Empty, zero or beyond the limit: the field does not match the amount that would be saved, so saving waits.
+    onPendingChange?.(g !== undefined && !(g !== null && g > 0 && g <= MAX_GRAMS));
   };
 
   const chooseServing = (s: Serving) => {
@@ -75,7 +79,7 @@ export function AmountEditor({
           value={quantity}
           step={perGram ? 10 : 0.5}
           min={perGram ? 1 : 0.25}
-          max={perGram ? 5000 : 50}
+          max={perGram ? MAX_GRAMS : Math.max(50, Math.floor(MAX_GRAMS / Math.max(serving.grams, 1)))}
           format={(v) => (perGram ? `${formatQty(v)} g` : formatQty(v))}
           onChange={(v) => {
             setTypedState(undefined);
@@ -87,7 +91,7 @@ export function AmountEditor({
           value={typed !== undefined ? typed : Math.round(totalGrams * 10) / 10}
           onChange={(g) => {
             setTypedState(g);
-            if (g !== null && g > 0 && g <= 20000) onChange({ serving, quantity: g / serving.grams });
+            if (g !== null && g > 0 && g <= MAX_GRAMS) onChange({ serving, quantity: g / serving.grams });
           }}
           onBlur={() => setTypedState(undefined)}
           suffix="g"

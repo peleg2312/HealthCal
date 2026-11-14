@@ -67,7 +67,8 @@ export function DaySummaryCard({ day }: { day: DaySummary }) {
 
 function EntryRow({ entry }: { entry: FoodEntry }) {
   const { colors, spacing } = useTheme();
-  const ai = entry.source === 'ai' && entry.kcalRange;
+  // Any entry that carries a range is an estimate, whatever food it was matched to afterwards.
+  const ai = !!entry.kcalRange;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
       <PressableScale
@@ -83,7 +84,7 @@ function EntryRow({ entry }: { entry: FoodEntry }) {
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flexShrink: 1 }}>
-              {entry.grams > 0 && entry.servingLabel !== `${Math.round(entry.grams)} g`
+              {entry.grams > 0 && entry.servingLabel !== `${Math.round(entry.grams)} g` && !/^\d+(\.\d+)?\s*g$/.test(entry.servingLabel.trim())
                 ? `${portionLabel(entry.servingLabel, entry.quantity)} · ${Math.round(entry.grams)} g`
                 : portionLabel(entry.servingLabel, entry.quantity)}
             </Text>

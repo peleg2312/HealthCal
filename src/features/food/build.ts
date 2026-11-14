@@ -180,6 +180,19 @@ export function planSavedMeal(meal: Pick<SavedMeal, 'id' | 'name' | 'items' | 's
   if (!ticked.length) return { items: [], kcal: 0, range: null };
   const portion = opts.portion !== undefined && opts.portion > 0 ? opts.portion : 1;
   const f = portion / servings;
+  if (ticked.length < meal.items.length) {
+    // Some ingredients were left out, so this is not a serving of the recipe: log what was
+    // ticked, each scaled to the portion, under its own name.
+    const items = ticked.map((it) => ({
+      ...it,
+      quantity: it.quantity * f,
+      grams: it.grams * f,
+      nutrients: scaleNutrientsBy(it.nutrients, f),
+      ...(it.kcalRange ? { kcalRange: scaleRange(it.kcalRange, f) } : null),
+    }));
+    const n = sumNutrients(items.map((it) => it.nutrients));
+    return { items, kcal: n.kcal, range: itemsRange(items) };
+  }
   const total = sumNutrients(ticked.map((it) => it.nutrients));
   const totalGrams = ticked.reduce((s, it) => s + (it.grams > 0 ? it.grams : 0), 0);
   const nutrients = scaleNutrientsBy(total, f);
