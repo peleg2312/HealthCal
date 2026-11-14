@@ -292,6 +292,11 @@ const api = http.createServer(async (req, res) => {
     if (!uid) return send(res, 401, { message: 'JWT missing or invalid', code: 'PGRST301' });
 
     if (route === 'POST /rest/v1/rpc/push_records') {
+      // The database's check constraint: an unknown collection fails the whole batch.
+      const KNOWN = ['foodEntries', 'customFoods', 'savedMeals', 'activities', 'water', 'weights', 'sleep', 'fasting', 'favorites', 'days', 'routines'];
+      if ((body.p_records || []).some((r) => !KNOWN.includes(r.collection))) {
+        return send(res, 400, { code: '23514', message: 'new row for relation "records" violates check constraint "records_collection_check"' });
+      }
       let affected = 0;
       for (const r of body.p_records || []) {
         const existing = state.records.find((x) => x.user_id === uid && x.collection === r.collection && x.id === r.id);
@@ -332,6 +337,13 @@ const api = http.createServer(async (req, res) => {
       // id=in.(a,b,c): the client asking for the server's copy of specific records.
       const idList = (url.searchParams.get('id') || '').match(/^in\.\((.*)\)$/);
       const wanted = idList ? new Set(idList[1].split(',').map((x) => x.replace(/^"|"$/g, ''))) : null;
+      const idEq = (url.searchParams.get('id') || '').match(/^eq\.(.*)$/);
+      if (idEq && !wanted) {
+        const one = state.records.filter((r) => r.user_id === uid && r.id === idEq[1]).map(({ collection, id, data, deleted, updated_at, server_updated_at }) => ({ collection, id, data, deleted, updated_at, server_updated_at }));
+        // supabase-js asks for a single object with this Accept header (.single()).
+        if (String(req.headers.accept || '').includes('vnd.pgrst.object')) return one.length === 1 ? send(res, 200, one[0]) : send(res, 406, { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' });
+        return send(res, 200, one);
+      }
       // Row-level security: only the caller's rows, whatever the query asks for.
       const rows = state.records
         .filter((r) => r.user_id === uid && (!wanted || wanted.has(r.id)) && (!after || Date.parse(r.server_updated_at) > Date.parse(after)))

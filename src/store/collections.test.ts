@@ -32,6 +32,13 @@ describe('synced collections', () => {
     expect(quoted(probe![1]).sort()).toEqual([...COLLECTIONS].sort());
   });
 
+  it('are all accepted by the local stand-in backend', () => {
+    const mock = readFileSync(join(root, 'scripts', 'dev', 'mock-backend.cjs'), 'utf8');
+    const known = mock.match(/const KNOWN = \[([^\]]*)\]/);
+    expect(known).not.toBeNull();
+    expect(quoted(known![1]).sort()).toEqual([...COLLECTIONS].sort());
+  });
+
   it('are all part of a backup, the dirty map and the initial state', () => {
     expect([...BACKUP_COLLECTIONS].sort()).toEqual([...COLLECTIONS].sort());
     expect(Object.keys(emptyDirty()).sort()).toEqual([...COLLECTIONS].sort());
