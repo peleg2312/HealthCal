@@ -43,6 +43,46 @@ export interface FriendSummary {
   workouts?: FriendWorkout[];
 }
 
+/**
+ * A friend's summary as the server sent it, made safe to draw: anything that is
+ * not the expected shape is dropped, and a workout without a name is "Workout".
+ * One malformed entry must never take the Friends screen down.
+ */
+export function cleanFriendSummary(raw: unknown): FriendSummary {
+  if (!raw || typeof raw !== 'object') return {};
+  const o = raw as Record<string, unknown>;
+  const count = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined);
+  const day = (v: unknown): ISODate | undefined => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? (v as ISODate) : undefined);
+  const out: FriendSummary = {};
+  const week = day(o.week);
+  if (week) out.week = week;
+  for (const key of ['minutes', 'sessions', 'streak'] as const) {
+    const n = count(o[key]);
+    if (n !== undefined) out[key] = n;
+  }
+  if (Array.isArray(o.workouts)) {
+    const workouts: FriendWorkout[] = [];
+    for (const item of o.workouts) {
+      if (!item || typeof item !== 'object') continue;
+      const w = item as Record<string, unknown>;
+      const date = day(w.date);
+      const minutes = count(w.minutes);
+      if (typeof w.id !== 'string' || !w.id || !date || minutes === undefined) continue;
+      const distanceKm = count(w.distanceKm);
+      workouts.push({
+        id: w.id,
+        name: typeof w.name === 'string' && w.name.trim() ? w.name.trim() : 'Workout',
+        emoji: typeof w.emoji === 'string' ? w.emoji : '',
+        minutes,
+        date,
+        ...(distanceKm ? { distanceKm } : null),
+      });
+    }
+    out.workouts = workouts;
+  }
+  return out;
+}
+
 /** Workouts older than this are not shown to friends. */
 export const WORKOUT_WINDOW_DAYS = 14;
 export const MAX_SHARED_WORKOUTS = 8;

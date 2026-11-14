@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ActivityEntry, FoodEntry } from '@/types';
 
-import { buildFriendSummary, DEFAULT_SHARING, formatCode, isCompleteCode, normalizeCode, ownWorkoutsByRef, shareRef, summarySignature } from './summary';
+import { buildFriendSummary, cleanFriendSummary, DEFAULT_SHARING, formatCode, isCompleteCode, normalizeCode, ownWorkoutsByRef, shareRef, summarySignature } from './summary';
 
 const TODAY = '2026-11-14'; // a Saturday; the week starts Monday 2026-11-09
 /** The secret the server hands only to the owner (64 hex). */
@@ -136,5 +136,27 @@ describe('friend codes', () => {
     expect(isCompleteCode('ABCD234')).toBe(false);
     expect(isCompleteCode('ABCD2340')).toBe(false); // no zero in the alphabet
     expect(isCompleteCode('ABCDI345')).toBe(false); // no I
+  });
+});
+
+describe('cleanFriendSummary', () => {
+  it('keeps a well-formed summary as it is', () => {
+    const summary = { week: '2026-11-09', minutes: 120, sessions: 3, streak: 9, workouts: [{ id: 'a'.repeat(32), name: 'Running', emoji: '🏃', minutes: 30, date: '2026-11-10', distanceKm: 5 }] };
+    expect(cleanFriendSummary(summary)).toEqual(summary);
+  });
+
+  it('gives a workout without a name a plain one, so the screen can draw it', () => {
+    const cleaned = cleanFriendSummary({ workouts: [{ id: 'x', minutes: 20, date: '2026-11-10' }, { id: 'y', name: 7, emoji: null, minutes: 10, date: '2026-11-11' }] });
+    expect(cleaned.workouts).toEqual([
+      { id: 'x', name: 'Workout', emoji: '', minutes: 20, date: '2026-11-10' },
+      { id: 'y', name: 'Workout', emoji: '', minutes: 10, date: '2026-11-11' },
+    ]);
+  });
+
+  it('drops what it cannot draw and never throws', () => {
+    expect(cleanFriendSummary(null)).toEqual({});
+    expect(cleanFriendSummary('nonsense')).toEqual({});
+    const cleaned = cleanFriendSummary({ week: 'soon', minutes: -4, sessions: 'three', streak: Number.NaN, kcal: 2100, workouts: [null, 'run', { id: '', name: 'A', minutes: 5, date: '2026-11-10' }, { id: 'ok', name: 'B', minutes: 'long', date: '2026-11-10' }, { id: 'ok2', name: 'C', minutes: 5, date: 'yesterday' }] });
+    expect(cleaned).toEqual({ workouts: [] });
   });
 });

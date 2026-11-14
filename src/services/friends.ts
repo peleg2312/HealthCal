@@ -6,7 +6,7 @@
  */
 import { create } from 'zustand';
 
-import { buildFriendSummary, DEFAULT_SHARING, normalizeCode, summarySignature, type FriendSummary, type SocialSharing } from '@/features/friends/summary';
+import { buildFriendSummary, cleanFriendSummary, DEFAULT_SHARING, normalizeCode, summarySignature, type FriendSummary, type SocialSharing } from '@/features/friends/summary';
 import { today } from '@/lib/dates';
 import { useStore } from '@/store';
 import { live } from '@/store/selectors';
@@ -121,7 +121,7 @@ export function toOverview(raw: unknown): FriendsOverview {
     friends: list(o.friends).map((f) => ({
       ...person(f),
       since: typeof f.since === 'string' ? f.since : null,
-      summary: (f.summary && typeof f.summary === 'object' ? f.summary : {}) as FriendSummary,
+      summary: cleanFriendSummary(f.summary),
       summaryUpdatedAt: typeof f.summary_updated_at === 'string' ? f.summary_updated_at : null,
       cheered: Array.isArray(f.cheered) ? f.cheered.filter((r): r is string => typeof r === 'string') : [],
     })),
@@ -180,9 +180,11 @@ export async function requestFriend(code: string): Promise<FriendsResult<{ outco
 export async function respondToRequest(userId: string, accept: boolean): Promise<FriendsResult> {
   const session = await signedInClient();
   if (!session.ok) return session;
-  const { error } = await session.client.rpc('friend_respond', { p_user: userId, p_accept: accept });
+  const { data, error } = await session.client.rpc('friend_respond', { p_user: userId, p_accept: accept });
   if (error) return failure(error.message);
   await refreshFriends();
+  // The other person may have taken the request back in the meantime: say so instead of claiming it worked.
+  if (data === 'not_found') return { ok: false, reason: 'failed', message: 'That request is no longer there.' };
   return { ok: true, value: undefined };
 }
 

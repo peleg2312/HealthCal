@@ -157,3 +157,7 @@ Signing in on a device that already has data uploads what was logged there to th
 - Calorie burn from MET tables describes an average adult. The app shows it as an estimate with a range.
 - Photo-based calorie estimates are approximate in every app that offers them; independent tests of commercial apps found average underestimates of a few hundred kcal per meal, mostly from fat the camera cannot see. HealthCal's review step exists for that reason.
 - HealthCal is not a medical device and does not give medical advice.
+
+### The project behind this repository
+
+Phone builds made with EAS point at the Supabase project `ffdttbbuwwkwlkyycpoa` (EU): its public address and public key are in `eas.json` under each build profile's `env`. Both are meant to ship in the app; nothing secret is stored in the repository. Local development and the browser tests run without a backend unless you create a `.env` (see `.env.example`). Changes to the database after the first setup go in a new file under `supabase/migrations/`, never by editing one that has been applied; `scripts/ops/provision-supabase.mjs` applies whatever is new, and `scripts/ops/verify-backend.mjs --via-management` checks the result end to end.
