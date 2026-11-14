@@ -69,9 +69,34 @@ const SESSIONS = [
   { activityId: 'walking', name: 'Walking', emoji: '🚶', category: 'cardio', intensity: 'moderate', durationMin: 45, met: 3.8, distanceKm: 3.9 },
 ];
 
-/** @param {{ days?: number, empty?: boolean, theme?: 'system'|'light'|'dark'|'blossom', onboarded?: boolean, units?: 'metric'|'imperial' }} opts */
+/**
+ * The store screenshots only (`buildSeed({ store: true })`, used by scripts/dev/store-frames.cjs).
+ * It runs after the ordinary demo data is built, so every other script gets exactly the data it
+ * always had. It shows what a real week with the app looks like at its best moment of the day:
+ *   - yesterday's session is a run imported from a Garmin watch, with the measured calories;
+ *   - today's water has reached the goal, so the water cup is brim-full.
+ */
+function tidyForStore(state, { put, weightKg, baselineTdee }) {
+  const today = iso(daysAgo(0));
+  const yesterday = iso(daysAgo(1));
+  for (const a of Object.values(state.activities)) if (a.date === yesterday) delete state.activities[a.id];
+  const startedAt = at(1, 7, 12);
+  const durationMin = 46;
+  // A Garmin file's calories are the session's total (gross); net is that minus the resting share.
+  const kcalGross = 596;
+  put('activities', {
+    date: yesterday, activityId: 'running', name: 'Running', emoji: '🏃', category: 'cardio', intensity: 'vigorous', durationMin, met: 9.8,
+    distanceKm: 8.2, avgHeartRate: 151, kcalGross, kcalNet: Math.round(kcalGross - (baselineTdee / 1440) * durationMin),
+    weightKg, baselineKcalPerDay: baselineTdee, source: 'garmin', externalId: `garmin:${startedAt}`, startedAt, measured: true, loggedAt: at(1, 8, 5),
+  });
+  // Today's water: the goal (about 3.3 L for this profile) met by the evening.
+  for (const w of Object.values(state.water)) if (w.date === today) delete state.water[w.id];
+  [500, 330, 500, 250, 500, 330, 500, 500].forEach((ml, g) => put('water', { date: today, ml, beverage: g === 1 ? 'coffee' : 'water', loggedAt: at(0, 7 + Math.floor(g * 1.5), (g % 2) * 30) }));
+}
+
+/** @param {{ days?: number, empty?: boolean, theme?: 'system'|'light'|'dark'|'blossom', onboarded?: boolean, units?: 'metric'|'imperial', store?: boolean }} opts */
 export function buildSeed(opts = {}) {
-  const { days = 35, empty = false, theme = 'dark', onboarded = true, units = 'metric' } = opts;
+  const { days = 35, empty = false, theme = 'dark', onboarded = true, units = 'metric', store = false } = opts;
   const rand = rng(20261113);
   const stamp = new Date().toISOString();
   const rec = (r) => ({ id: randomUUID(), updatedAt: stamp, deleted: false, ...r });
@@ -162,6 +187,7 @@ export function buildSeed(opts = {}) {
   // Keep the profile in step with the newest weigh-in, as the app itself does.
   const latest = Object.values(state.weights).sort((a, b) => b.date.localeCompare(a.date))[0];
   if (latest) state.profile.weightKg = latest.kg;
+  if (store) tidyForStore(state, { put, weightKg, baselineTdee });
   state.recentFoods = Object.values(FOODS).slice(0, 12);
   state.favoriteFoodIds = [FOODS.oats.id, FOODS.chicken.id];
   state.recentActivityIds = ['volleyball', 'running', 'strength_training', 'yoga'];
