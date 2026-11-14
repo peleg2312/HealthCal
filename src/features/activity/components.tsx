@@ -58,8 +58,9 @@ export function sessionSubtitle(e: ActivityEntry, units: UnitSystem): string {
   } else {
     parts.push(INTENSITY_LABELS[e.intensity].title);
   }
+  // Non-breaking spaces keep each value with its unit when the line wraps.
   if (e.distanceKm) parts.push(formatDistance(e.distanceKm, units));
-  return parts.join(' · ');
+  return parts.map((p) => p.replace(/ /g, '\u00A0')).join(' · ');
 }
 
 export function SessionRow({ entry, units, onPress, onDelete }: { entry: ActivityEntry; units: UnitSystem; onPress: () => void; onDelete: () => void }) {

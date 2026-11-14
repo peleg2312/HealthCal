@@ -8,6 +8,7 @@ import { MAX_CONTENT_WIDTH, useTheme } from '@/theme';
 
 import { AmbientGlow } from './AmbientGlow';
 import { IconButton } from './Button';
+import { PressableScale } from './Pressable';
 import { Text } from './Text';
 
 /** Height reserved at the bottom of tab screens for the floating tab bar. */
@@ -140,12 +141,22 @@ export function LargeTitle({ title, subtitle, right }: { title: string; subtitle
   );
 }
 
-export function SectionTitle({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
+export function SectionTitle({ title, action, onAction, testID }: { title: string; action?: string; onAction?: () => void; testID?: string }) {
+  const slug = (testID ?? title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-      <Text variant="h3">{title}</Text>
-      {action ? (
-        <Text variant="label" color="primary" onPress={onAction} accessibilityRole="button" suppressHighlighting>
+      <Text variant="h3" style={{ flexShrink: 1 }}>
+        {title}
+      </Text>
+      {action && onAction ? (
+        // The label is small; the pressable around it is a full-height touch target.
+        <PressableScale testID={`section-${slug}-action`} accessibilityLabel={action} onPress={onAction} hitSlop={8} style={{ minHeight: 44, justifyContent: 'center', paddingLeft: 12, marginVertical: -10 }}>
+          <Text variant="label" color="primary">
+            {action}
+          </Text>
+        </PressableScale>
+      ) : action ? (
+        <Text variant="label" color="primary">
           {action}
         </Text>
       ) : null}

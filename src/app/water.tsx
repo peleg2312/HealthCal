@@ -274,7 +274,7 @@ function WaterScreen() {
       <SectionTitle title={isToday ? 'Last 7 days' : `7 days to ${dayTitle(date)}`} />
       <Card style={{ gap: spacing.md }}>
         <Text variant="caption" color="textSecondary">
-          {week.some((d) => d.waterMl > 0) ? `Goal met on ${daysMet} of 7 days.` : 'Bars fill in as you log drinks.'} Dashed line: {isToday ? 'today’s' : 'the day’s'} goal of {formatVolume(goal, units)}.
+          {week.some((d) => d.waterMl > 0) ? `Goal met on ${daysMet} of 7 days.` : 'Bars fill in as you log drinks.'} Dashed line: {isToday ? 'today’s' : 'the day’s'} goal of {formatVolume(goal, units).replace(/ /g, '\u00A0')}.
         </Text>
         <BarChart
           data={bars}

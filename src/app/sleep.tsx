@@ -17,10 +17,10 @@ import { BarChart, Button, Card, Chip, Divider, EmptyState, Header, ListRow, Scr
 type Window = '7' | '30';
 const QUALITIES: SleepEntry['quality'][] = [1, 2, 3, 4, 5];
 
-/** 7.25 -> '7:15'. */
-function hm(hours: number): string {
+/** 7.25 -> '7 h 15' + 'min', 7 -> '7' + 'h': a duration as a figure and its unit, read the way every other duration in the app is. */
+function hm(hours: number): { value: string; unit: string } {
   const mins = Math.round(hours * 60);
-  return `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}`;
+  return mins % 60 === 0 ? { value: String(mins / 60), unit: 'h' } : { value: `${Math.floor(mins / 60)} h ${mins % 60}`, unit: 'min' };
 }
 
 function QualityDots({ quality, size = 10 }: { quality: number; size?: number }) {
@@ -65,6 +65,7 @@ function SleepScreen() {
   const entries = useLive('sleep');
   const [win, setWin] = useState<Window>('7');
   const [sheetDate, setSheetDate] = useState<ISODate | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const todayDate = useToday();
   const params = useLocalSearchParams<{ date?: string }>();
   // Opened from a past day on Today (?date=), the screen shows and logs that day's night.
@@ -73,7 +74,8 @@ function SleepScreen() {
   const lastNight = findByDate(entries, end);
   const days = win === '7' ? 7 : 30;
   const summary = sleepSummary(entries, days, end);
-  const history = [...entries].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30);
+  const allNights = [...entries].sort((a, b) => b.date.localeCompare(a.date));
+  const history = showAll ? allNights : allNights.slice(0, 14);
 
   const bars = summary.series.map((d, i) => ({
     label: days === 7 ? (d.date === todayDate ? 'Today' : weekdayShort(d.date)) : i % 5 === 4 || i === days - 1 ? String(fromISODate(d.date).getDate()) : '',
@@ -129,11 +131,11 @@ function SleepScreen() {
               onChange={setWin}
             />
             <View style={{ flexDirection: 'row', gap: spacing.md }}>
-              <Figure testID="sleep-average" value={summary.avgHours !== null ? hm(summary.avgHours) : '–'} unit={summary.avgHours !== null ? 'h' : undefined} label="Average a night" />
+              <Figure testID="sleep-average" value={summary.avgHours !== null ? hm(summary.avgHours).value : '–'} unit={summary.avgHours !== null ? hm(summary.avgHours).unit : undefined} label="Average a night" />
               <Figure testID="sleep-in-range" value={`${summary.inRange}/${summary.nights}`} unit="nights" label="Within 7–9 h" />
               <Figure
-                value={summary.spreadHours !== null ? (summary.spreadHours < 1 ? `±${Math.round(summary.spreadHours * 60)}` : `±${hm(summary.spreadHours)}`) : '–'}
-                unit={summary.spreadHours !== null ? (summary.spreadHours < 1 ? 'min' : 'h') : undefined}
+                value={summary.spreadHours !== null ? (summary.spreadHours < 1 ? `±${Math.round(summary.spreadHours * 60)}` : `±${hm(summary.spreadHours).value}`) : '–'}
+                unit={summary.spreadHours !== null ? (summary.spreadHours < 1 ? 'min' : hm(summary.spreadHours).unit) : undefined}
                 label="Night to night"
               />
             </View>
@@ -155,7 +157,12 @@ function SleepScreen() {
             </Note>
           </Card>
 
-          <SectionTitle title="History" />
+          <SectionTitle
+            title="History"
+            testID="sleep-history"
+            action={allNights.length > 14 ? (showAll ? 'Show less' : `Show all ${allNights.length}`) : undefined}
+            onAction={() => setShowAll((v) => !v)}
+          />
           <Card padding={spacing.md}>
             {history.map((e, i) => (
               <React.Fragment key={e.id}>

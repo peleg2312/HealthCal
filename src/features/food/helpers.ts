@@ -51,7 +51,11 @@ export function formatQty(q: number): string {
 export function portionLabel(servingLabel: string, quantity: number): string {
   if (servingLabel === '1 g') return `${formatQty(quantity)} g`;
   if (servingLabel === '100 g' && quantity !== 1) return `${formatQty(quantity * 100)} g`;
-  return quantity === 1 ? servingLabel : `${formatQty(quantity)} × ${servingLabel}`;
+  if (quantity === 1) return servingLabel;
+  // "1 pita" taken 1.5 times is "1.5 pita"; "2 tbsp" taken 3 times is "6 tbsp". Anything else keeps the multiplier.
+  const counted = servingLabel.match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
+  if (counted) return `${formatQty(Number(counted[1]) * quantity)} ${counted[2]}`;
+  return `${formatQty(quantity)} × ${servingLabel}`;
 }
 
 /** Step size for an amount: 10 g in gram mode, 0.5 servings otherwise. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { amountLabel, stepAmount, toPer100 } from './helpers';
+import { amountLabel, stepAmount, toPer100, portionLabel } from './helpers';
 
 describe('stepAmount', () => {
   it('steps servings by a half', () => {
@@ -39,5 +39,19 @@ describe('amountLabel', () => {
 describe('toPer100', () => {
   it('keeps the precision a low-calorie drink needs (2 kcal per 500 ml is 0.4 per 100 g, not 0)', () => {
     expect(Math.round(toPer100(2, 500) * 100) / 100).toBe(0.4);
+  });
+});
+
+describe('portionLabel', () => {
+  it('reads a multiplied serving the way a person would say it', () => {
+    expect(portionLabel('1 pita', 1.5)).toBe('1.5 pita');
+    expect(portionLabel('2 tbsp', 3)).toBe('6 tbsp');
+    expect(portionLabel('1 cup', 1)).toBe('1 cup');
+    expect(portionLabel('1 g', 150)).toBe('150 g');
+    expect(portionLabel('100 g', 1.5)).toBe('150 g');
+  });
+  it('keeps the multiplier where the label does not start with a count', () => {
+    expect(portionLabel('1/2 cup', 1.5)).toBe('1.5 × 1/2 cup');
+    expect(portionLabel('slice', 2)).toBe('2 × slice');
   });
 });

@@ -84,9 +84,9 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   const food = '{food}';
   const actions = [
     { id: 'search', label: 'Search food', hint: 'Database and your recents', icon: Search, color: colors.calories, href: `/food/search?${food}` },
-    { id: 'photo', label: 'Snap a meal', hint: 'AI estimates from a photo', icon: Camera, color: colors.fat, href: `/food/photo?${food}` },
-    { id: 'scan', label: 'Scan barcode', hint: 'Packaged products', icon: ScanBarcode, color: colors.carbs, href: `/food/scan?${food}` },
-    { id: 'describe', label: 'Describe it', hint: 'Type what you ate', icon: PenLine, color: colors.protein, href: `/food/photo?mode=text&${food}` },
+    { id: 'photo', label: 'Snap a meal', hint: 'AI estimates from a photo', icon: Camera, color: colors.calories, href: `/food/photo?${food}` },
+    { id: 'scan', label: 'Scan barcode', hint: 'Packaged products', icon: ScanBarcode, color: colors.calories, href: `/food/scan?${food}` },
+    { id: 'describe', label: 'Describe it', hint: 'Type what you ate', icon: PenLine, color: colors.calories, href: `/food/photo?mode=text&${food}` },
     { id: 'activity', label: 'Log activity', hint: 'Sport, gym, walk', icon: Activity, color: colors.exercise, href: '/activity/pick?{past}' },
     { id: 'weight', label: 'Weigh in', hint: 'Weight and body fat', icon: Scale, color: colors.weight, href: '/weight?{past}' },
   ];

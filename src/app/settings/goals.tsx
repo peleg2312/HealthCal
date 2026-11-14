@@ -190,7 +190,7 @@ function GoalsForm() {
         <Text variant="caption" color="textSecondary">
           {model.target.source === 'override'
             ? `Set by you. Estimated expenditure is ${formatNumber(Math.round(model.tdee))} kcal.`
-            : `Expenditure ${formatNumber(Math.round(model.tdee))} kcal${model.usingAdaptive ? ' (adjusted to your logs and weigh-ins)' : ''}, ${
+            : `Expenditure ${formatNumber(Math.round(model.tdee))} kcal${model.usingAdaptive ? ' (the formula blended with your logs and weigh-ins)' : ''}, ${
                 model.target.dailyDelta < -5
                   ? `${formatNumber(Math.round(-model.target.dailyDelta))} kcal below`
                   : model.target.dailyDelta > 5

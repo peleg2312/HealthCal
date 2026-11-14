@@ -88,7 +88,7 @@ export function buildSeed(opts = {}) {
         }
       : null,
     settings: {
-      theme, haptics: true, celebrations: true, waterPresets: [150, 250, 330, 500], fastingTargetHours: 16,
+      theme, haptics: true, celebrations: true, waterPresets: units === 'imperial' ? [237, 355, 473, 710] : [150, 250, 330, 500], fastingTargetHours: 16,
       reminders: {
         enabled: false, quietStart: '22:00', quietEnd: '07:30',
         water: { enabled: true, everyMinutes: 120 },

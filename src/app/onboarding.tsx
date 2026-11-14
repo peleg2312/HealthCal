@@ -187,14 +187,14 @@ function Flow({ onFinished }: { onFinished: () => void }) {
           <View style={{ gap: spacing.sm }}>
             <Button
               title="Turn on reminders"
-              variant="secondary"
+              variant="primary"
               testID="onb-reminders-on"
               loading={asking}
               disabled={!Object.values(draft.routine.nudges).some(Boolean)}
-              icon={<BellRing size={18} color={colors.text} />}
+              icon={<BellRing size={18} color={colors.onPrimary} />}
               onPress={() => void answerReminders(true)}
             />
-            <Button title="Not now" variant="secondary" testID="onb-reminders-skip" disabled={asking} onPress={() => void answerReminders(false)} />
+            <Button title="Not now" variant="ghost" testID="onb-reminders-skip" disabled={asking} onPress={() => void answerReminders(false)} />
           </View>
         ) : (
           <Button title="Continue" testID="onb-next" onPress={next} />

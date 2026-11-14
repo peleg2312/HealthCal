@@ -61,11 +61,17 @@ export const ONE_PER_DATE: Collection[] = ['weights', 'sleep', 'days'];
 type Collections = { [K in Collection]: Record<string, CollectionTypes[K]> };
 type Dirty = { [K in Collection]: Record<string, true> };
 
+/** Quick-add glass sizes people expect in each unit system, in ml (the imperial ones are 8, 12, 16 and 24 fl oz). */
+export const DEFAULT_WATER_PRESETS: Record<'metric' | 'imperial', number[]> = {
+  metric: [150, 250, 330, 500],
+  imperial: [237, 355, 473, 710],
+};
+
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   haptics: true,
   celebrations: true,
-  waterPresets: [150, 250, 330, 500],
+  waterPresets: DEFAULT_WATER_PRESETS.metric,
   fastingTargetHours: 16,
   reminders: {
     enabled: false,
@@ -151,6 +157,8 @@ function emptyCollections(): Collections {
 export function emptyDirty(): Dirty {
   return { foodEntries: {}, customFoods: {}, savedMeals: {}, activities: {}, water: {}, weights: {}, sleep: {}, fasting: {}, favorites: {}, days: {}, routines: {} };
 }
+
+const sameNumbers = (a: readonly number[], b: readonly number[]) => a.length === b.length && a.every((v, i) => v === b[i]);
 
 export function initialState(): StoreState {
   return {
@@ -256,10 +264,21 @@ export const useStore = create<Store>()((set, get) => ({
   ...initialState(),
 
   setProfile: (patch) =>
-    set((s) => ({
-      profile: { ...(s.profile ?? ({} as Profile)), ...patch, updatedAt: nextStamp(s.profile?.updatedAt) },
-      profileDirty: true,
-    })),
+    set((s) => {
+      const next: Partial<StoreState> = {
+        profile: { ...(s.profile ?? ({} as Profile)), ...patch, updatedAt: nextStamp(s.profile?.updatedAt) },
+        profileDirty: true,
+      };
+      // Changing units moves untouched glass sizes to round values in the new units
+      // (8.5 fl oz is a 250 ml glass, not a size anyone pours). Sizes the user set are left alone.
+      const from = s.profile?.units ?? 'metric';
+      const to = patch.units;
+      if (to && to !== from && sameNumbers(s.settings.waterPresets, DEFAULT_WATER_PRESETS[from])) {
+        next.settings = { ...s.settings, waterPresets: DEFAULT_WATER_PRESETS[to], updatedAt: nextStamp(s.settings.updatedAt) };
+        next.settingsDirty = true;
+      }
+      return next;
+    }),
 
   setSettings: (patch) =>
     set((s) => ({ settings: { ...s.settings, ...patch, updatedAt: nextStamp(s.settings.updatedAt) }, settingsDirty: true })),

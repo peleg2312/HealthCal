@@ -1,6 +1,6 @@
 import { ChevronRight } from 'lucide-react-native';
 import React from 'react';
-import { Switch, View, type AccessibilityRole, type AccessibilityState, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, Switch, View, type AccessibilityRole, type AccessibilityState, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useTheme } from '@/theme';
 
@@ -117,6 +117,8 @@ export function ToggleRow({
           onValueChange={onChange}
           trackColor={{ false: colors.track, true: colors.primary }}
           thumbColor="#FFFFFF"
+          // On web the "on" colours are separate props; without them the knob is the library's teal.
+          {...(Platform.OS === 'web' ? ({ activeTrackColor: colors.primary, activeThumbColor: '#FFFFFF' } as object) : null)}
           accessibilityLabel={title}
         />
       }

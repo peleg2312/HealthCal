@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 import { BACKUP_COLLECTIONS } from '@/features/settings/exportFormat';
 
-import { COLLECTIONS, emptyDirty, initialState } from './index';
+import { COLLECTIONS, DEFAULT_WATER_PRESETS, emptyDirty, initialState, useStore } from './index';
 
 const root = join(__dirname, '..', '..');
 const quoted = (text: string) => [...text.matchAll(/'([A-Za-z]+)'/g)].map((m) => m[1]);
@@ -37,5 +37,25 @@ describe('synced collections', () => {
     expect(Object.keys(emptyDirty()).sort()).toEqual([...COLLECTIONS].sort());
     const state = initialState() as unknown as Record<string, unknown>;
     for (const c of COLLECTIONS) expect(state[c]).toEqual({});
+  });
+});
+
+describe('glass sizes follow the unit system until the user sets their own', () => {
+  it('switches untouched sizes to round values of the new units and back', () => {
+    useStore.getState().resetAll();
+    useStore.getState().setProfile({ units: 'metric' });
+    expect(useStore.getState().settings.waterPresets).toEqual(DEFAULT_WATER_PRESETS.metric);
+    useStore.getState().setProfile({ units: 'imperial' });
+    expect(useStore.getState().settings.waterPresets).toEqual(DEFAULT_WATER_PRESETS.imperial);
+    expect(useStore.getState().settingsDirty).toBe(true);
+    useStore.getState().setProfile({ units: 'metric' });
+    expect(useStore.getState().settings.waterPresets).toEqual(DEFAULT_WATER_PRESETS.metric);
+  });
+  it('leaves sizes the user chose alone', () => {
+    useStore.getState().resetAll();
+    useStore.getState().setProfile({ units: 'metric' });
+    useStore.getState().setSettings({ waterPresets: [200, 400] });
+    useStore.getState().setProfile({ units: 'imperial' });
+    expect(useStore.getState().settings.waterPresets).toEqual([200, 400]);
   });
 });
