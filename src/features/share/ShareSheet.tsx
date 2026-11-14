@@ -12,6 +12,9 @@ import type { Scene } from './scene';
 
 /** The person's choices for this session, so a second share starts where the first left off. */
 let remembered: ShareChoices = DEFAULT_SHARE_CHOICES;
+function remember(next: ShareChoices) {
+  remembered = next;
+}
 
 export interface SharePlan {
   scene: Scene;
@@ -64,7 +67,7 @@ export function ShareSheet({
 
   const toggle = (k: keyof ShareChoices) => {
     const next = { ...choices, [k]: !choices[k] };
-    remembered = next;
+    remember(next);
     setChoices(next);
   };
 

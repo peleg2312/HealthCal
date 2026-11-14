@@ -29,7 +29,6 @@ export function DayRingStrip({
   testIDPrefix = 'today',
   accessory,
   start,
-  caption,
 }: {
   today: ISODate;
   selected: ISODate;
@@ -40,8 +39,6 @@ export function DayRingStrip({
   accessory?: React.ReactNode;
   /** The day the profile was made: earlier days with nothing logged are drawn as a dot and cannot be picked. */
   start?: ISODate;
-  /** Replaces the week caption (Today's streak line). */
-  caption?: string | null;
 }) {
   const { colors, spacing } = useTheme();
   const ref = useRef<React.ComponentRef<typeof ScrollView>>(null);
@@ -179,7 +176,7 @@ export function DayRingStrip({
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
         <Text variant="caption" color="textSecondary" style={{ flex: 1 }} numberOfLines={2} testID={`${testIDPrefix}-week-caption`}>
-          {caption ?? weekCaption(shownWeek, today, start)}
+          {weekCaption(shownWeek, today, start)}
         </Text>
         {accessory}
         <IconButton

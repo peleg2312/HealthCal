@@ -241,7 +241,8 @@ function weekRow(c: CardColors, cups: WeekCup[], x: number, y: number, width: nu
         base: Math.min(10, cupW / 3),
         level: d.ratio,
         color: c.calories,
-        bands: d.complete ? undefined : [{ top: d.ratio, opacity: 0.45 }],
+        // A day not fully logged (today, or partly logged) is hatched: a lighter fill turns brown on the dark paper.
+        hatchFill: !d.complete,
         rim: 2.5,
         edge: 1.3,
         future: d.future,

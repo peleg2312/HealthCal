@@ -18,7 +18,7 @@ import {
 import { go } from '@/features/progress/parts';
 import { setRhythmTarget, useConsistencyData } from '@/features/progress/useConsistencyData';
 import { useTheme, withOpacity } from '@/theme';
-import { AnimatedNumber, BarChart, Button, Card, CupKey, EmptyState, FadeUp, Header, IconButton, MiniCup, Screen, Sheet, Stepper, Text } from '@/ui';
+import { AnimatedNumber, BarChart, Button, Card, CupKey, EmptyState, Header, IconButton, MiniCup, Screen, Sheet, Stepper, Text } from '@/ui';
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const RHYTHM_WEEKS = 8;
