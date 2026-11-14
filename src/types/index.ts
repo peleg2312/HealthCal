@@ -166,6 +166,9 @@ export type ActivityCategory =
 
 export type Intensity = 'light' | 'moderate' | 'vigorous';
 
+/** 'garmin': imported from a Garmin export. 'health': read from Apple Health or Health Connect. */
+export type ActivitySource = 'manual' | 'garmin' | 'health';
+
 export interface ActivityDef {
   id: string;
   name: string;
@@ -207,6 +210,15 @@ export interface ActivityEntry extends SyncedRecord {
   /** Body weight and daily baseline the calories were calculated with, so a later edit does not use today's. */
   weightKg?: number;
   baselineKcalPerDay?: number;
+  /** Where the session came from. Absent means it was entered by hand in this app. */
+  source?: ActivitySource;
+  /** The session's identity in the app it came from, so importing the same file twice does not add it twice. */
+  externalId?: string;
+  /** When the session started, where the source knows it. */
+  startedAt?: ISODateTime;
+  /** True when the calories were measured by a device (heart rate, power) instead of estimated from a MET table. */
+  measured?: boolean;
+  avgHeartRate?: number;
   distanceKm?: number;
   notes?: string;
   exercises?: StrengthExercise[];

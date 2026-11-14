@@ -18,6 +18,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import { handleAuthLink, initAuth } from '@/services/auth';
 import { refreshReminders } from '@/services/notifications';
+import { startFriends } from '@/services/friends';
 import { startAutoSync, syncNow } from '@/services/sync';
 import { useStore } from '@/store';
 import { startDaySnapshots } from '@/store/daySnapshot';
@@ -138,6 +139,7 @@ export default function RootLayout() {
     SplashScreen.hideAsync().catch(() => {});
     initAuth();
     const stopSync = startAutoSync();
+    startFriends();
     const stopSnapshots = startDaySnapshots();
     // Reminder text carries live numbers ("620 ml left"), so it is rebuilt whenever data changes.
     void refreshReminders();

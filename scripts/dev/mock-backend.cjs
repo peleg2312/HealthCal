@@ -20,7 +20,7 @@ const crypto = require('node:crypto');
 const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith('--')).map((a) => a.slice(2).split('=')));
 const PORT = Number(flags.port || 54321);
 
-const state = { users: new Map(), records: [], profiles: new Map(), aiRequests: [], aiUsage: new Map(), recoveries: [], clock: Date.now() };
+const state = { users: new Map(), records: [], profiles: new Map(), aiRequests: [], aiUsage: new Map(), recoveries: [], social: new Map(), friendships: [], cheers: [], clock: Date.now() };
 const tick = () => new Date((state.clock += 5)).toISOString();
 
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -65,6 +65,149 @@ const readBody = (req) =>
     });
   });
 
+// ---------------------------------------------------------------- friends
+// The same rules as supabase/migrations/20261115000000_friends.sql, in memory.
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const newCode = () => Array.from(crypto.randomBytes(8), (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('');
+const cleanSharing = (p) => ({ workouts: p?.workouts !== false, streak: p?.streak !== false, minutes: p?.minutes !== false });
+const isDay = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+const bounded = (v, max) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(Math.max(Math.round(v), 0), max) : undefined);
+function cleanSummary(p) {
+  const out = {};
+  if (isDay(p?.week)) out.week = p.week;
+  for (const [k, max] of [['minutes', 100000], ['sessions', 1000], ['streak', 100000]]) {
+    const v = bounded(p?.[k], max);
+    if (v !== undefined) out[k] = v;
+  }
+  const workouts = (Array.isArray(p?.workouts) ? p.workouts : [])
+    .filter((w) => w && typeof w === 'object' && 'id' in w)
+    .slice(0, 12)
+    .map((w) => {
+      const o = { id: String(w.id).slice(0, 64) };
+      if (typeof w.name === 'string') o.name = w.name.slice(0, 60);
+      if (typeof w.emoji === 'string') o.emoji = w.emoji.slice(0, 16);
+      const m = bounded(w.minutes, 1440);
+      if (m !== undefined) o.minutes = m;
+      if (isDay(w.date)) o.date = w.date;
+      if (typeof w.distanceKm === 'number') o.distanceKm = Math.min(Math.max(w.distanceKm, 0), 1000);
+      return o;
+    });
+  if (workouts.length) out.workouts = workouts;
+  return out;
+}
+function visibleSummary(summary, sharing) {
+  const s = { ...(summary || {}) };
+  if (!sharing?.workouts) delete s.workouts;
+  if (!sharing?.streak) delete s.streak;
+  if (!sharing?.minutes) {
+    delete s.minutes;
+    delete s.sessions;
+  }
+  return s;
+}
+const areFriends = (a, b) => state.friendships.some((f) => f.status === 'accepted' && ((f.requester === a && f.addressee === b) || (f.requester === b && f.addressee === a)));
+function leaveSocial(uid) {
+  state.cheers = state.cheers.filter((c) => c.from_user !== uid && c.to_user !== uid);
+  state.friendships = state.friendships.filter((f) => f.requester !== uid && f.addressee !== uid);
+  state.social.delete(uid);
+}
+/** Returns the function's JSON answer, or undefined when the route is not a friends function. */
+function friendsRpc(route, me, body) {
+  const now = () => new Date().toISOString();
+  const card = (p) => ({ user_id: p.user_id, display_name: p.display_name, avatar: p.avatar });
+  switch (route) {
+    case 'POST /rest/v1/rpc/social_setup': {
+      const name = String(body.p_display_name || '').trim().slice(0, 40);
+      if (!name) return { __error: { status: 400, body: { code: '22023', message: 'a name is needed' } } };
+      const cur = state.social.get(me) || { user_id: me, code: newCode(), summary: {}, summary_updated_at: null, lookup_misses: 0, lookup_window: 0 };
+      Object.assign(cur, { display_name: name, avatar: String(body.p_avatar || '').trim().slice(0, 16), sharing: cleanSharing(body.p_sharing) });
+      state.social.set(me, cur);
+      return { code: cur.code, display_name: cur.display_name, avatar: cur.avatar, sharing: cur.sharing };
+    }
+    case 'POST /rest/v1/rpc/social_publish': {
+      const cur = state.social.get(me);
+      if (!cur) return false;
+      cur.summary = cleanSummary(body.p_summary);
+      cur.summary_updated_at = now();
+      return true;
+    }
+    case 'POST /rest/v1/rpc/friend_request': {
+      const mine = state.social.get(me);
+      if (!mine) return { status: 'setup_needed' };
+      if (Date.now() - mine.lookup_window > 3600000) Object.assign(mine, { lookup_window: Date.now(), lookup_misses: 0 });
+      if (mine.lookup_misses >= 20) return { status: 'too_many' };
+      const code = String(body.p_code || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+      const other = [...state.social.values()].find((p) => p.code === code);
+      if (!other) {
+        mine.lookup_misses += 1;
+        return { status: 'not_found' };
+      }
+      if (other.user_id === me) return { status: 'self' };
+      const sent = state.friendships.find((f) => f.requester === me && f.addressee === other.user_id);
+      const received = state.friendships.find((f) => f.requester === other.user_id && f.addressee === me);
+      if (sent?.status === 'accepted' || received?.status === 'accepted') return { status: 'already_friends', friend: card(other) };
+      if (received) {
+        Object.assign(received, { status: 'accepted', responded_at: now() });
+        state.friendships = state.friendships.filter((f) => f !== sent);
+        return { status: 'accepted', friend: card(other) };
+      }
+      if (sent) return { status: 'sent', friend: card(other) };
+      state.friendships.push({ requester: me, addressee: other.user_id, status: 'pending', created_at: now(), responded_at: null });
+      return { status: 'sent', friend: card(other) };
+    }
+    case 'POST /rest/v1/rpc/friend_respond': {
+      const f = state.friendships.find((x) => x.requester === body.p_user && x.addressee === me && x.status === 'pending');
+      if (!f) return 'not_found';
+      Object.assign(f, { status: body.p_accept ? 'accepted' : 'declined', responded_at: now() });
+      return f.status;
+    }
+    case 'POST /rest/v1/rpc/friend_remove': {
+      const other = body.p_user;
+      state.friendships = state.friendships.filter(
+        (f) => !((f.requester === me && f.addressee === other && f.status !== 'declined') || (f.requester === other && f.addressee === me)),
+      );
+      state.cheers = state.cheers.filter((c) => !((c.from_user === me && c.to_user === other) || (c.from_user === other && c.to_user === me)));
+      return null;
+    }
+    case 'POST /rest/v1/rpc/send_cheer': {
+      const ref = String(body.p_ref || '').trim().slice(0, 64);
+      if (!ref || !areFriends(me, body.p_to)) return 'not_friends';
+      if (!state.cheers.some((c) => c.from_user === me && c.to_user === body.p_to && c.ref === ref)) state.cheers.push({ from_user: me, to_user: body.p_to, ref, created_at: now() });
+      return 'ok';
+    }
+    case 'POST /rest/v1/rpc/friends_overview': {
+      const mine = state.social.get(me);
+      const person = (id) => state.social.get(id);
+      return {
+        me: mine ? { code: mine.code, display_name: mine.display_name, avatar: mine.avatar, sharing: mine.sharing } : null,
+        friends: state.friendships
+          .filter((f) => f.status === 'accepted' && (f.requester === me || f.addressee === me))
+          .map((f) => ({ f, p: person(f.requester === me ? f.addressee : f.requester) }))
+          .filter((x) => x.p)
+          .map(({ f, p }) => ({
+            ...card(p),
+            since: f.responded_at,
+            summary: visibleSummary(p.summary, p.sharing),
+            summary_updated_at: p.summary_updated_at,
+            cheered: state.cheers.filter((c) => c.from_user === me && c.to_user === p.user_id).map((c) => c.ref),
+          }))
+          .sort((a, b) => a.display_name.toLowerCase().localeCompare(b.display_name.toLowerCase())),
+        incoming: state.friendships.filter((f) => f.addressee === me && f.status === 'pending' && person(f.requester)).map((f) => ({ ...card(person(f.requester)), created_at: f.created_at })),
+        outgoing: state.friendships.filter((f) => f.requester === me && f.status !== 'accepted' && person(f.addressee)).map((f) => ({ ...card(person(f.addressee)), created_at: f.created_at })),
+        cheers: state.cheers
+          .filter((c) => c.to_user === me && areFriends(me, c.from_user) && person(c.from_user))
+          .map((c) => ({ from_user: c.from_user, display_name: person(c.from_user).display_name, avatar: person(c.from_user).avatar, ref: c.ref, created_at: c.created_at }))
+          .reverse(),
+      };
+    }
+    case 'POST /rest/v1/rpc/social_leave':
+      leaveSocial(me);
+      return null;
+    default:
+      return undefined;
+  }
+}
+
 const api = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
@@ -85,6 +228,9 @@ const api = http.createServer(async (req, res) => {
       aiRequests: state.aiRequests,
       // What the reset email would carry: lets a test follow the link without a mailbox.
       recoveries: state.recoveries.map((r) => ({ email: r.email, code: r.code, redirectTo: r.redirectTo })),
+      social: Object.fromEntries(state.social),
+      friendships: state.friendships,
+      cheers: state.cheers,
     });
   }
 
@@ -171,9 +317,12 @@ const api = http.createServer(async (req, res) => {
       state.profiles.set(uid, cur);
       return res.writeHead(204).end();
     }
+    const social = friendsRpc(route, uid, body);
+    if (social !== undefined) return social && social.__error ? send(res, social.__error.status, social.__error.body) : send(res, 200, social);
     if (route === 'POST /rest/v1/rpc/delete_my_account') {
       state.records = state.records.filter((r) => r.user_id !== uid);
       state.profiles.delete(uid);
+      leaveSocial(uid);
       for (const [email, u] of state.users) if (u.id === uid) state.users.delete(email);
       return res.writeHead(204).end();
     }

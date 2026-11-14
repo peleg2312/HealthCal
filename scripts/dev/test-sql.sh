@@ -23,3 +23,4 @@ for f in "$ROOT"/supabase/migrations/*.sql; do $PSQL -f "$f" healthcal; done
 # Applying the migration twice must be harmless.
 for f in "$ROOT"/supabase/migrations/*.sql; do $PSQL -f "$f" healthcal; done
 $PSQL -f "$ROOT/supabase/tests/policies_and_sync.sql" healthcal
+$PSQL -f "$ROOT/supabase/tests/friends.sql" healthcal
