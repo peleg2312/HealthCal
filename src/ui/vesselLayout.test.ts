@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { fillRatio, levelY, placeLabels } from './vesselLayout';
+import { fillRatio, goalState, levelY, placeLabels } from './vesselLayout';
 
 describe('placeLabels', () => {
   it('keeps labels where they want to be when there is room', () => {
@@ -46,5 +46,25 @@ describe('fillRatio and levelY', () => {
     expect(levelY(0, 100, 200)).toBe(200);
     expect(levelY(100, 100, 200)).toBe(0);
     expect(levelY(25, 100, 200)).toBe(150);
+  });
+});
+
+describe('goalState', () => {
+  it('keeps a limit within budget up to and at max, over only past it', () => {
+    expect(goalState(980, 1000)).toBe('under');
+    expect(goalState(1000, 1000, 'limit')).toBe('under');
+    expect(goalState(1080, 1000, 'limit')).toBe('over');
+  });
+
+  it('marks a reach goal reached from max upward, never over', () => {
+    expect(goalState(0.98, 1, 'reach')).toBe('under');
+    expect(goalState(1, 1, 'reach')).toBe('reached');
+    expect(goalState(1.08, 1, 'reach')).toBe('reached');
+  });
+
+  it('treats a missing goal or a bad value as under', () => {
+    expect(goalState(5, 0, 'reach')).toBe('under');
+    expect(goalState(Number.NaN, 10, 'reach')).toBe('under');
+    expect(goalState(5, -1, 'limit')).toBe('under');
   });
 });

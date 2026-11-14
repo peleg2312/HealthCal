@@ -4,7 +4,7 @@ import { useColorScheme } from 'react-native';
 import type { ThemePreference } from '@/types';
 
 import { resolveThemeName, type ThemeName } from './resolve';
-import { blossomColors, darkColors, lightColors, radius, spacing, typography, type ThemeColors } from './tokens';
+import { blossomColors, chartFillOpacity, darkColors, lightColors, radius, spacing, typography, type ThemeColors } from './tokens';
 
 export { resolveThemeName, type ThemeName } from './resolve';
 
@@ -14,6 +14,8 @@ export interface Theme {
   /** True for palettes with a dark background (drives status bar and similar). */
   dark: boolean;
   colors: ThemeColors;
+  /** Opacity of bar-chart cup fills in this palette (see `chartFillOpacity`). */
+  chartFill: number;
   spacing: typeof spacing;
   radius: typeof radius;
   typography: typeof typography;
@@ -25,6 +27,7 @@ const ThemeContext = createContext<Theme>({
   name: 'dark',
   dark: true,
   colors: darkColors,
+  chartFill: chartFillOpacity.dark,
   spacing,
   radius,
   typography,
@@ -43,7 +46,7 @@ export function ThemeProvider({
   const system = useColorScheme();
   const name: ThemeName = resolveThemeName(preference, system, lead);
   const value = useMemo<Theme>(
-    () => ({ name, dark: name === 'dark', colors: PALETTES[name], spacing, radius, typography }),
+    () => ({ name, dark: name === 'dark', colors: PALETTES[name], chartFill: chartFillOpacity[name], spacing, radius, typography }),
     [name],
   );
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

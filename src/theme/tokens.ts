@@ -35,12 +35,19 @@ export interface ThemeColors {
   exercise: string;
   sleep: string;
   weight: string;
+  /** Done and OK marks (checks, a done tile, a healthy-range badge). Ink, so it is never mistaken for a data colour such as exercise green. */
   success: string;
+  /** Over target: a fill, a lip or a key mark (amber, never red). Not for text: use `warningInk`. */
   warning: string;
+  /** Warning as text or a small icon beside text: 4.5:1 on bg, surface and surfaceAlt in every theme. */
+  warningInk: string;
+  /** Destructive actions. Its own red, clearly apart from the persimmon primary. */
   danger: string;
   overlay: string;
-  /** Empty inside of vessels, bars and tracks. */
+  /** Empty inside of progress-bar tracks and other horizontal bars (a tinted track). */
   track: string;
+  /** The empty part of a cup (Vessel, MiniCup, Trough, cups drawn by hand): the card colour, so a cup with room left reads as empty, not full of something pale. */
+  vesselEmpty: string;
   tabBar: string;
   /** Sheet shadow only. Nothing else in the kit casts a shadow. */
   shadow: string;
@@ -48,7 +55,7 @@ export interface ThemeColors {
   rim: string;
   /** Hatching for budget added by exercise inside a vessel (equals exercise). */
   headroom: string;
-  /** Outline of vessel sides and base (never the top: vessels are open). */
+  /** Outline of vessel sides and base (never the top: vessels are open). At least 3:1 on bg and surface, because with `vesselEmpty` the outline is what draws the cup. */
   vesselEdge: string;
   /** Calorie colour for text and large numbers (the calorie fill is too light to read in light and Blossom). */
   caloriesInk: string;
@@ -61,13 +68,14 @@ export interface ThemeColors {
 }
 
 export const darkColors: ThemeColors = {
-  bg: '#16120F',
-  bgElevated: '#1D1814',
-  surface: '#231D18',
-  surfaceAlt: '#2D2620',
-  surfacePressed: '#3A3129',
-  border: '#3A3029',
-  borderStrong: '#5C4E42',
+  // Warm black, not chocolate: neutral surfaces, the warmth lives in text and the persimmon accent.
+  bg: '#121110',
+  bgElevated: '#1A1918',
+  surface: '#1F1E1C',
+  surfaceAlt: '#292826',
+  surfacePressed: '#353331',
+  border: '#353331',
+  borderStrong: '#57534E',
   text: '#F6EEE3',
   textSecondary: '#C9BCAC',
   textTertiary: '#A09282',
@@ -82,19 +90,21 @@ export const darkColors: ThemeColors = {
   exercise: '#4FCDA3',
   sleep: '#B9A3F5',
   weight: '#B7C3C6',
-  success: '#7FD39A',
+  success: '#F6EEE3',
   warning: '#F5B83D',
-  danger: '#F2846F',
-  overlay: '#0A0705B8',
-  track: '#2E2720',
-  tabBar: '#1D1814',
+  warningInk: '#F5B83D',
+  danger: '#FF5F6D',
+  overlay: '#070606B8',
+  track: '#2A2927',
+  vesselEmpty: '#1F1E1C',
+  tabBar: '#1A1918',
   shadow: '#000000',
   rim: '#F6EEE3',
   headroom: '#4FCDA3',
-  vesselEdge: '#6A5B4E',
+  vesselEdge: '#75706A',
   caloriesInk: '#FF9466',
-  heroStart: '#231D18',
-  heroEnd: '#231D18',
+  heroStart: '#1F1E1C',
+  heroEnd: '#1F1E1C',
   ringEnd: '#FF9466',
 };
 
@@ -114,22 +124,24 @@ export const lightColors: ThemeColors = {
   primarySoft: '#BF44201A',
   calories: '#E2683F',
   protein: '#B0346F',
-  carbs: '#7A8A12',
-  fat: '#7E5236',
+  carbs: '#5E9B1F',
+  fat: '#9A6640',
   water: '#2672CC',
   exercise: '#14876C',
   sleep: '#7558C4',
   weight: '#5F6B73',
-  success: '#2E7D4A',
+  success: '#211913',
   warning: '#C98100',
+  warningInk: '#8A5A00',
   danger: '#B23A3A',
   overlay: '#211913A6',
   track: '#ECE3D6',
+  vesselEmpty: '#FFFCF8',
   tabBar: '#FFFCF8',
   shadow: '#000000',
   rim: '#211913',
   headroom: '#14876C',
-  vesselEdge: '#B9AB99',
+  vesselEdge: '#948572',
   caloriesInk: '#BF4420',
   heroStart: '#FFFCF8',
   heroEnd: '#FFFCF8',
@@ -165,27 +177,35 @@ export const blossomColors: ThemeColors = {
   primarySoft: blossom.blush,
   calories: blossom.ticklePink,
   protein: '#8A2F72',
-  carbs: '#7D8A1C',
-  fat: '#8A5634',
+  carbs: '#5E9B1F',
+  fat: '#9A6640',
   water: '#2479C2',
   exercise: '#13876F',
   sleep: '#6A5BC0',
   weight: '#5F6B73',
-  success: '#2E7D4A',
+  success: '#3B1427',
   warning: '#C98100',
+  warningInk: '#8A5A00',
   danger: '#B23A3A',
   overlay: '#3B1427A6',
   track: '#F7E6EA',
+  vesselEmpty: '#FFFDFA',
   tabBar: '#FFFDFA',
   shadow: '#000000',
   rim: blossom.raspberry,
   headroom: '#13876F',
-  vesselEdge: '#D99AB2',
+  vesselEdge: '#BC7290',
   caloriesInk: '#B42F66',
   heroStart: '#FFFDFA',
   heroEnd: '#FFFDFA',
   ringEnd: blossom.ticklePink,
 };
+
+/**
+ * Opacity of a bar-chart cup's fill (the solid rim sits on top). 42% reads as a clean tint on
+ * the light papers; on the dark surface it turns every data colour brown, so dark uses 70%.
+ */
+export const chartFillOpacity: Record<'dark' | 'light' | 'blossom', number> = { dark: 0.7, light: 0.42, blossom: 0.42 };
 
 export const spacing = {
   xxs: 2,

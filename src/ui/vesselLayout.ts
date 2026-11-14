@@ -41,3 +41,17 @@ export function fillRatio(value: number, max: number): number {
 export function levelY(value: number, max: number, inner: number): number {
   return (1 - fillRatio(value, max)) * inner;
 }
+
+/** What a goal means: 'limit' (a budget: past it is over, shown in amber) or 'reach' (a goal to get to: at or past it is reached, never amber). */
+export type GoalKind = 'limit' | 'reach';
+
+/**
+ * Where a level stands against its goal. 'limit': 'over' only when the value
+ * passes max (equal is within budget). 'reach': 'reached' from max upward, so
+ * 98% stays 'under' and 100% or 108% are 'reached'. No positive max: 'under'.
+ */
+export function goalState(value: number, max: number, kind: GoalKind = 'limit'): 'under' | 'reached' | 'over' {
+  if (!(max > 0) || !Number.isFinite(value)) return 'under';
+  if (kind === 'reach') return value >= max ? 'reached' : 'under';
+  return value > max ? 'over' : 'under';
+}

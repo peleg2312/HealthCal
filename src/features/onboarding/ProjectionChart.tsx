@@ -5,7 +5,7 @@ import Svg, { Line, Path, Polygon, Rect } from 'react-native-svg';
 import { formatWeight } from '@/lib/units';
 import { useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
-import { Text } from '@/ui';
+import { DrawReveal, Text } from '@/ui';
 
 import { shortDate, type Projection } from './projection';
 
@@ -15,12 +15,14 @@ const PAD_BOTTOM = 12;
 const PAD_X = 10;
 
 /**
- * The road from today's weight to the target: a flat 2 px line, a flat 12%
- * band for real-world pace (no gradient, no glow), square waypoint marks and
- * the goal marked by a rim tick (the level line). Drawn in the weight colour;
- * every label stays a text colour.
+ * The road from today's weight to the target, in the brand colour: a flat
+ * 2 px line, a flat 12% band for real-world pace (no gradient, no glow), the
+ * level line (rim) as today's mark, square waypoint marks and the goal as a
+ * small square-shouldered cup with the level line across it. The road draws
+ * itself left to right once (the kit's DrawReveal); axis and labels are
+ * there at once. Every label stays a text colour.
  */
-export function ProjectionChart({ projection: p, units }: { projection: Projection; units: UnitSystem }) {
+export function ProjectionChart({ projection: p, units, delay = 0 }: { projection: Projection; units: UnitSystem; delay?: number }) {
   const { colors, spacing } = useTheme();
   const [width, setWidth] = useState(0);
 
@@ -36,38 +38,48 @@ export function ProjectionChart({ projection: p, units }: { projection: Projecti
   const band = [start, { x: x(p.fastWeeks), y: end.y }, { x: x(p.slowWeeks), y: end.y }].map((pt) => `${pt.x},${pt.y}`).join(' ');
   const axisY = PLOT_H - 2;
   const labelW = 64;
+  // The goal cup: square shoulders on top, a round base, 12 px wide.
+  const gw = 12;
+  const gh = 11;
+  const gx = end.x - gw / 2;
+  const gy = end.y - 1;
+  const goalCup = `M${gx},${gy} L${gx + gw},${gy} L${gx + gw},${gy + gh - 4} Q${gx + gw},${gy + gh} ${gx + gw - 4},${gy + gh} L${gx + 4},${gy + gh} Q${gx},${gy + gh} ${gx},${gy + gh - 4} Z`;
 
   return (
     <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <View style={{ height: PLOT_H }}>
         {width > 0 ? (
-          <Svg width={width} height={PLOT_H}>
-            <Line x1={PAD_X} x2={width - PAD_X} y1={axisY} y2={axisY} stroke={colors.border} strokeWidth={1} />
-            <Polygon points={band} fill={colors.weight} fillOpacity={0.12} />
-            <Line x1={end.x} x2={x(p.slowWeeks)} y1={end.y} y2={end.y} stroke={colors.weight} strokeOpacity={0.5} strokeWidth={2} strokeDasharray="4 4" />
-            {p.waypoints.map((wp) => (
-              <Line key={`t${wp.share}`} x1={x(wp.weeks)} x2={x(wp.weeks)} y1={y(wp.kg) + 6} y2={axisY} stroke={colors.border} strokeWidth={1} strokeDasharray="2 3" />
-            ))}
-            <Line x1={end.x} x2={end.x} y1={end.y + 8} y2={axisY} stroke={colors.border} strokeWidth={1} strokeDasharray="2 3" />
-            <Path d={`M${start.x},${start.y} L${end.x},${end.y}`} stroke={colors.weight} strokeWidth={2} fill="none" />
-            {p.waypoints.map((wp) => (
-              <Rect key={`d${wp.share}`} x={x(wp.weeks) - 3.5} y={y(wp.kg) - 3.5} width={7} height={7} rx={1} fill={colors.surface} stroke={colors.weight} strokeWidth={1.75} />
-            ))}
-            <Rect x={start.x - 3.5} y={start.y - 3.5} width={7} height={7} rx={1} fill={colors.weight} />
-            {/* The goal: a level line across the end of the road. */}
-            <Rect x={end.x - 9} y={end.y - 1.5} width={18} height={3} rx={1} fill={colors.rim} />
-          </Svg>
+          <>
+            <Svg width={width} height={PLOT_H} style={{ position: 'absolute', left: 0, top: 0 }}>
+              <Line x1={PAD_X} x2={width - PAD_X} y1={axisY} y2={axisY} stroke={colors.border} strokeWidth={1} />
+              {p.waypoints.map((wp) => (
+                <Line key={`t${wp.share}`} x1={x(wp.weeks)} x2={x(wp.weeks)} y1={y(wp.kg) + 6} y2={axisY} stroke={colors.border} strokeWidth={1} strokeDasharray="2 3" />
+              ))}
+              <Line x1={end.x} x2={end.x} y1={end.y + gh + 2} y2={axisY} stroke={colors.border} strokeWidth={1} strokeDasharray="2 3" />
+            </Svg>
+            <DrawReveal width={width} height={PLOT_H} delay={delay}>
+              <Svg width={width} height={PLOT_H}>
+                <Polygon points={band} fill={colors.primary} fillOpacity={0.12} />
+                <Line x1={end.x} x2={x(p.slowWeeks)} y1={end.y} y2={end.y} stroke={colors.primary} strokeOpacity={0.5} strokeWidth={2} strokeDasharray="4 4" />
+                <Path d={`M${start.x},${start.y} L${end.x},${end.y}`} stroke={colors.primary} strokeWidth={2.5} fill="none" />
+                {p.waypoints.map((wp) => (
+                  <Rect key={`d${wp.share}`} x={x(wp.weeks) - 3.5} y={y(wp.kg) - 3.5} width={7} height={7} rx={1} fill={colors.surface} stroke={colors.primary} strokeWidth={1.75} />
+                ))}
+                <Path d={goalCup} fill={colors.primary} />
+                {/* The goal's level line across the top of its cup. */}
+                <Rect x={end.x - 9} y={end.y - 2.5} width={18} height={3} rx={1} fill={colors.rim} />
+              </Svg>
+            </DrawReveal>
+            {/* Today: the level line, where the road starts. Drawn at once. */}
+            <View pointerEvents="none" style={{ position: 'absolute', left: start.x - 1.5, top: start.y - 8, width: 3, height: 16, borderRadius: 1, backgroundColor: colors.rim }} />
+          </>
         ) : null}
         {width > 0 ? (
           <>
             <Text variant="caption" color="textSecondary" tabular style={{ position: 'absolute', left: PAD_X, top: 2 }}>
               {`${formatWeight(p.startKg, units)} today`}
             </Text>
-            <Text
-              variant="caption"
-              color="text"
-              tabular
-              style={{ position: 'absolute', right: PAD_X, top: end.y - 26, textAlign: 'right' }}>
+            <Text variant="label" color="text" tabular style={{ position: 'absolute', right: PAD_X, top: Math.max(0, end.y - 28), textAlign: 'right' }}>
               {`Goal ${formatWeight(p.targetKg, units)}`}
             </Text>
           </>
@@ -81,13 +93,13 @@ export function ProjectionChart({ projection: p, units }: { projection: Projecti
                 <Text variant="caption" color="textSecondary" tabular>
                   {shortDate(wp.date)}
                 </Text>
-                <Text variant="caption" color="textTertiary" tabular style={{ fontSize: 11, lineHeight: 14 }}>
+                <Text variant="caption" color="textSecondary" tabular style={{ fontSize: 11, lineHeight: 14 }}>
                   {formatWeight(wp.kg, units)}
                 </Text>
               </View>
             ))}
-            <View style={{ position: 'absolute', left: end.x - labelW / 2, width: labelW, alignItems: 'center' }}>
-              <Text variant="caption" color="text" tabular>
+            <View style={{ position: 'absolute', left: Math.min(end.x - labelW / 2, width - labelW), width: labelW, alignItems: 'center' }}>
+              <Text variant="label" color="text" tabular>
                 {shortDate(p.date)}
               </Text>
             </View>

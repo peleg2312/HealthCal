@@ -142,6 +142,52 @@ export function useFadeAfter(show: boolean, delay: number, instant: boolean): Sh
   return o;
 }
 
+// ---------------------------------------------------------------- reach
+
+/** Whether each `memoryKey`'s goal was last shown as reached, so a remount does not flash again. */
+const reachedShown = new Map<string, boolean>();
+
+/**
+ * A goal that is meant to be reached (water, minutes, protein): returns a 0..1
+ * opacity for the rim's one flash in the data colour. It runs once, when the
+ * level crosses the goal while the cup is on screen, after `delay` ms (the end
+ * of the pour). A cup that mounts already full does not flash, nor does a
+ * remount with the same `memoryKey`. Reduced motion: no flash, just the
+ * reached state. `onReached` runs at the crossing in either case (a haptic and
+ * a line of text are the screen's to add).
+ */
+export function useReachFlash(
+  reached: boolean,
+  { delay = 0, instant = false, memoryKey, onReached }: { delay?: number; instant?: boolean; memoryKey?: string; onReached?: () => void } = {},
+): SharedValue<number> {
+  const flash = useSharedValue(0);
+  // What this cup last showed; read and written only inside the effect.
+  const [last] = useState(() => ({ reached: memoryKey && reachedShown.has(memoryKey) ? reachedShown.get(memoryKey)! : reached }));
+  useEffect(() => {
+    const was = last.reached;
+    last.reached = reached;
+    if (memoryKey) reachedShown.set(memoryKey, reached);
+    if (!reached) {
+      cancelAnimation(flash);
+      flash.set(0);
+      return;
+    }
+    if (was) return;
+    onReached?.();
+    if (instant) return;
+    flash.set(
+      withDelay(
+        delay,
+        withSequence(
+          withTiming(1, { duration: D.fade, easing: ease.enter }),
+          withDelay(D.settle, withTiming(0, { duration: D.settle * 1.6, easing: ease.exit })),
+        ),
+      ),
+    );
+  }, [reached, delay, instant, memoryKey, onReached, flash, last]);
+  return flash;
+}
+
 // ------------------------------------------------------------------- tick
 
 export interface AnimatedNumberProps extends Omit<TextProps, 'children'> {

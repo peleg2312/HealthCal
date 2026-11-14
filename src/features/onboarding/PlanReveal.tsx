@@ -1,21 +1,36 @@
-import { CalendarRange, Sparkles } from 'lucide-react-native';
-import React from 'react';
+import { ChevronDown, ChevronUp, RotateCcw, Sparkles } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { formatNumber, formatVolume, formatWeight, round } from '@/lib/units';
-import { useTheme } from '@/theme';
-import { Card, CupKey, Divider, MacroBar, Text, Vessel } from '@/ui';
+import { motion, useTheme } from '@/theme';
+import { AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, haptic, MacroBar, PressableScale, Text, useReducedMotion, Vessel } from '@/ui';
 
-import { FadeIn } from './components';
 import { METHOD_LABEL, type Plan } from './model';
-import { projectTo, rangeText, shortDate } from './projection';
+import { looseDate, projectTo, rangeText } from './projection';
 import { ProjectionChart } from './ProjectionChart';
 
 const kcal = (n: number) => formatNumber(Math.round(n / 10) * 10);
 
-/** The payoff screen: the plan the answers produce, and how each number was reached. */
-export function PlanReveal({ plan }: { plan: Plan }) {
+/**
+ * The arrival moments (the plan reveal, the welcome cup) pour a little longer
+ * than a screen's cup: once, at a moment that deserves it. Never faster than
+ * the kit's pour.
+ */
+export const ARRIVAL_POUR = Math.round(motion.duration.pour * 1.45);
+/** The cup starts pouring once the title has faded up. */
+const POUR_DELAY = 220;
+
+/**
+ * The payoff: an arrival, not another question. The goal and its dates at
+ * the top, the cup pouring the daily budget while the number counts up, the
+ * road to the goal drawing itself, then macros and water. How it was worked
+ * out is one row that opens in place.
+ */
+export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Date; onChangeAnswers: () => void }) {
   const { colors, spacing } = useTheme();
+  const reduce = useReducedMotion();
+  const [showMath, setShowMath] = useState(false);
   const p = plan.profile;
   const units = p.units;
   const t = plan.target;
@@ -32,24 +47,46 @@ export function PlanReveal({ plan }: { plan: Plan }) {
   const wi = water.indexOf(' ');
   const waterNum = wi > 0 ? water.slice(0, wi) : water;
   const waterUnit = wi > 0 ? water.slice(wi + 1) : '';
-  const projection = p.goal !== 'maintain' ? projectTo(p.weightKg, p.targetWeightKg, t.impliedWeeklyKg) : null;
-  const range = projection ? rangeText(projection) : '';
+  const projection = p.goal !== 'maintain' ? projectTo(p.weightKg, p.targetWeightKg, t.impliedWeeklyKg, now) : null;
+  const range = projection ? rangeText(projection, now) : '';
   const methodWhy =
     plan.bmrMethod === 'katch-mcardle' && plan.leanMassKg !== null
       ? `From your lean mass of ${formatWeight(plan.leanMassKg, units)} (body fat ${round(p.bodyFatPct ?? 0, 1)}%)`
       : 'From your height, weight, age and sex';
+  const name = p.name;
+  const title = projection
+    ? `${name ? `${name}, you` : 'You'} could reach ${formatWeight(projection.targetKg, units)} ${range}`
+    : `${name ? `${name}, here's` : "Here's"} your day`;
+  // The rest arrives as the pour lands, one piece after another.
+  const landed = reduce ? 0 : POUR_DELAY + ARRIVAL_POUR;
+
+  // A light confirmation when the cup lands.
+  useEffect(() => {
+    const id = setTimeout(() => haptic.success(), reduce ? 0 : POUR_DELAY + ARRIVAL_POUR);
+    return () => clearTimeout(id);
+  }, [reduce]);
 
   return (
-    <View style={{ gap: spacing.lg }}>
-      <FadeIn style={{ gap: spacing.sm, marginBottom: spacing.xs }}>
-        <Text variant="overline">Your plan is ready</Text>
-        <Text variant="h1" accessibilityRole="header">
-          {p.name ? `Here's your plan, ${p.name}` : "Here's your plan"}
+    <View style={{ gap: spacing.lg }} testID="plan-reveal">
+      <FadeUp style={{ gap: spacing.sm, marginBottom: spacing.xs }}>
+        <Text variant="overline" color="textSecondary">
+          Your plan is ready
         </Text>
-      </FadeIn>
+        <Text variant="h1" accessibilityRole="header" testID="plan-title" style={{ fontSize: 32, lineHeight: 36 }}>
+          {title}
+        </Text>
+        {projection ? (
+          <Text variant="body" color="textSecondary">
+            An estimate at the pace you chose.
+          </Text>
+        ) : null}
+      </FadeUp>
 
-      <FadeIn delay={120}>
+      <FadeUp delay={60}>
         <Card padding={spacing.xl} style={{ gap: spacing.lg }} testID="plan-calories">
+          <Text variant="overline" color="textSecondary">
+            Your daily budget
+          </Text>
           <BudgetVessel target={t.target} tdee={plan.tdee} goal={p.goal} />
           <View style={{ gap: 2, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md }}>
             <Text variant="bodyStrong">{goalLine}</Text>
@@ -58,16 +95,37 @@ export function PlanReveal({ plan }: { plan: Plan }) {
             </Text>
           </View>
         </Card>
-      </FadeIn>
+      </FadeUp>
 
-      <FadeIn delay={240}>
+      {projection ? (
+        <FadeUp delay={landed}>
+          <Card
+            style={{ gap: spacing.md }}
+            testID="plan-projection"
+            accessible
+            accessibilityLabel={`Projected to reach ${formatWeight(projection.targetKg, units)} ${range}, around ${looseDate(projection.date, now)} at this pace. A projection, not a promise.`}>
+            <View style={{ gap: 2 }}>
+              <Text variant="caption" color="textSecondary">
+                {`Projected to reach ${formatWeight(projection.targetKg, units)}`}
+              </Text>
+              <Text variant="h2" testID="plan-date">
+                {range.charAt(0).toUpperCase() + range.slice(1)}
+              </Text>
+            </View>
+            <ProjectionChart projection={projection} units={units} delay={reduce ? 0 : 120} />
+            <Text variant="caption" color="textSecondary">
+              A projection, not a promise. It redraws from your real trend.
+            </Text>
+          </Card>
+        </FadeUp>
+      ) : null}
+
+      <FadeUp delay={landed + (projection ? 120 : 0)}>
         <Card style={{ gap: spacing.lg }} testID="plan-macros">
           <MacroBar protein={plan.macros.split.protein} carbs={plan.macros.split.carbs} fat={plan.macros.split.fat} height={10} />
           <View style={{ flexDirection: 'row' }}>
             {macros.map((m, i) => (
-              <View
-                key={m.key}
-                style={{ flex: 1, minWidth: 0, gap: 2, paddingLeft: i ? spacing.md : 0, borderLeftWidth: i ? 1 : 0, borderLeftColor: colors.border }}>
+              <View key={m.key} style={{ flex: 1, minWidth: 0, gap: 2, paddingLeft: i ? spacing.md : 0, borderLeftWidth: i ? 1 : 0, borderLeftColor: colors.border }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <CupKey color={m.color} />
                   <Text variant="label" color="textSecondary" numberOfLines={1}>
@@ -103,72 +161,75 @@ export function PlanReveal({ plan }: { plan: Plan }) {
             </View>
           </View>
         </Card>
-      </FadeIn>
+      </FadeUp>
 
-      <FadeIn delay={360}>
-        <Card style={{ gap: spacing.md }} testID="plan-math">
-          <Text variant="h3">How we worked it out</Text>
-          <MathRow label="Resting metabolism" detail={`${METHOD_LABEL[plan.bmrMethod]} equation. ${methodWhy}.`} value={kcal(plan.bmrKcal)} testID="plan-bmr" />
-          <MathRow label="Everyday movement" detail={`× ${plan.activityFactor} for your activity level, before workouts`} value={kcal(plan.tdee)} />
-          {p.goal !== 'maintain' ? (
-            <MathRow
-              label={p.goal === 'lose' ? 'Deficit' : 'Surplus'}
-              detail={
-                t.belowFloor
-                  ? 'None planned: your burn is already at the recommended minimum'
-                  : t.limitedByFloor
-                  ? `Held at the ${formatNumber(plan.floor)} kcal minimum`
-                  : `For ${formatWeight(p.weeklyRateKg, units, 2)} a week (${units === 'imperial' ? '3,500 kcal per lb' : '7,700 kcal per kg'})`
-              }
-              value={`${t.dailyDelta < 0 ? '−' : '+'}${kcal(Math.abs(t.dailyDelta))}`}
-            />
-          ) : null}
-          <Divider />
-          <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-            <Text variant="bodyStrong" style={{ flex: 1 }}>
-              Daily target
+      <FadeUp delay={landed + (projection ? 200 : 80)}>
+        <Card padding={0} style={{ paddingHorizontal: spacing.lg }}>
+          <PressableScale
+            testID="plan-math-toggle"
+            onPress={() => setShowMath(!showMath)}
+            feedback="tap"
+            scaleTo={0.99}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: showMath }}
+            accessibilityLabel="See how we worked it out"
+            style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56 }}>
+            <Text variant="title" style={{ flex: 1 }}>
+              See how we worked it out
             </Text>
-            <Text variant="numM" color="caloriesInk">
-              {formatNumber(t.target)}
-              <Text variant="unit"> kcal</Text>
-            </Text>
-          </View>
-        </Card>
-      </FadeIn>
-
-      {projection ? (
-        <FadeIn delay={480}>
-          <Card
-            style={{ gap: spacing.md }}
-            testID="plan-projection"
-            accessible
-            accessibilityLabel={`Projected to reach ${formatWeight(projection.targetKg, units)} ${range}, about ${shortDate(projection.date)} at this pace. A projection, not a promise.`}>
-            <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-              <CalendarRange size={22} color={colors.text} strokeWidth={1.9} />
-              <View style={{ flex: 1 }}>
-                <Text variant="caption" color="textSecondary">
-                  {`Projected to reach ${formatWeight(projection.targetKg, units)}`}
+            {showMath ? <ChevronUp size={20} color={colors.textSecondary} strokeWidth={2} /> : <ChevronDown size={20} color={colors.textSecondary} strokeWidth={2} />}
+          </PressableScale>
+          {showMath ? (
+            <FadeUp style={{ gap: spacing.md, paddingBottom: spacing.lg }} testID="plan-math">
+              <Divider />
+              <MathRow label="Resting metabolism" detail={`${METHOD_LABEL[plan.bmrMethod]} equation. ${methodWhy}.`} value={kcal(plan.bmrKcal)} testID="plan-bmr" />
+              <MathRow label="Everyday movement" detail={`× ${plan.activityFactor} for your activity level, before workouts`} value={kcal(plan.tdee)} />
+              {p.goal !== 'maintain' ? (
+                <MathRow
+                  label={p.goal === 'lose' ? 'Deficit' : 'Surplus'}
+                  detail={
+                    t.belowFloor
+                      ? 'None planned: your burn is already at the recommended minimum'
+                      : t.limitedByFloor
+                        ? `Held at the ${formatNumber(plan.floor)} kcal minimum`
+                        : `For ${formatWeight(p.weeklyRateKg, units, 2)} a week (${units === 'imperial' ? '3,500 kcal per lb' : '7,700 kcal per kg'})`
+                  }
+                  value={`${t.dailyDelta < 0 ? '−' : '+'}${kcal(Math.abs(t.dailyDelta))}`}
+                />
+              ) : null}
+              <Divider />
+              <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                <Text variant="bodyStrong" style={{ flex: 1 }}>
+                  Daily target
                 </Text>
-                <Text variant="h3" testID="plan-date">
-                  {range.charAt(0).toUpperCase() + range.slice(1)}
+                <Text variant="numM" color="caloriesInk">
+                  {formatNumber(t.target)}
+                  <Text variant="unit"> kcal</Text>
                 </Text>
               </View>
-            </View>
-            <ProjectionChart projection={projection} units={units} />
-            <Text variant="caption" color="textSecondary">
-              A projection, not a promise. It redraws from your real trend.
-            </Text>
-          </Card>
-        </FadeIn>
-      ) : null}
+              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                <Sparkles size={16} color={colors.textSecondary} strokeWidth={1.9} />
+                <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
+                  These are starting estimates. As your weigh-ins and food logs come in, HealthCal measures what you actually burn and adapts your targets. You can
+                  adjust any number in Goals.
+                </Text>
+              </View>
+            </FadeUp>
+          ) : null}
+        </Card>
+      </FadeUp>
 
-      <FadeIn delay={600} style={{ flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.xs }}>
-        <Sparkles size={18} color={colors.textSecondary} strokeWidth={1.9} />
-        <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
-          These are starting estimates. As your weigh-ins and food logs come in, HealthCal measures what you actually burn and adapts your targets. You can
-          adjust any number in Goals.
-        </Text>
-      </FadeIn>
+      <View style={{ alignItems: 'center' }}>
+        <Button
+          title="Change answers"
+          variant="ghost"
+          size="sm"
+          full={false}
+          testID="onb-change-answers"
+          icon={<RotateCcw size={16} color={colors.primary} strokeWidth={2.2} />}
+          onPress={onChangeAnswers}
+        />
+      </View>
     </View>
   );
 }
@@ -192,10 +253,11 @@ function MathRow({ label, detail, value, testID }: { label: string; detail: stri
 }
 
 /**
- * The plan as a cup. Its capacity is what you burn in a day; it fills to the
- * daily budget, with the level line on the budget. For weight loss the space
- * left above the level is the deficit; for gain the cup is the budget and a
- * tick marks what you burn below it. Pours in when the plan appears.
+ * The plan as a cup. Its capacity is what you burn in a day; it pours to the
+ * daily budget while the number counts up with it, and the level line lands
+ * on the budget. For weight loss the space left above the level is the gap
+ * to what you burn, labelled with what it is for; for gain the cup is the
+ * budget and a tick marks what you burn below it.
  */
 function BudgetVessel({ target, tdee, goal }: { target: number; tdee: number; goal: 'lose' | 'maintain' | 'gain' }) {
   const { colors } = useTheme();
@@ -203,13 +265,16 @@ function BudgetVessel({ target, tdee, goal }: { target: number; tdee: number; go
   const gap = Math.round(tdee - target);
   const showBurn = Math.abs(gap) >= 5;
   const narrow = useWindowDimensions().width < 360;
+  const fontSize = narrow ? 46 : 58;
   return (
     <Vessel
       value={target}
       max={top}
       color={colors.calories}
-      width={narrow ? 66 : 80}
-      height={210}
+      width={narrow ? 92 : 110}
+      height={narrow ? 236 : 260}
+      duration={ARRIVAL_POUR}
+      delay={POUR_DELAY}
       testID="plan-vessel"
       accessibilityLabel={`Daily budget ${formatNumber(target)} kcal${showBurn ? `, against about ${kcal(tdee)} kcal you burn` : ''}`}
       labels={[
@@ -222,7 +287,7 @@ function BudgetVessel({ target, tdee, goal }: { target: number; tdee: number; go
                 tick: colors.vesselEdge,
                 content: (
                   <View>
-                    <Text variant="numM" style={{ fontSize: 17, lineHeight: 21 }}>
+                    <Text variant="numM" style={{ fontSize: 18, lineHeight: 22 }}>
                       {kcal(tdee)}
                       <Text variant="unit"> kcal</Text>
                     </Text>
@@ -239,9 +304,10 @@ function BudgetVessel({ target, tdee, goal }: { target: number; tdee: number; go
               {
                 key: 'gap',
                 at: target + gap / 2,
-                height: 20,
+                height: 22,
+                tick: colors.borderStrong,
                 content: (
-                  <Text variant="caption" color="textSecondary">
+                  <Text variant="label" color="textSecondary" testID="plan-gap">
                     {`−${kcal(gap)} for your goal`}
                   </Text>
                 ),
@@ -251,13 +317,21 @@ function BudgetVessel({ target, tdee, goal }: { target: number; tdee: number; go
         {
           key: 'budget',
           at: target,
-          height: 74,
+          height: fontSize + 22,
           tick: colors.rim,
           content: (
             <View>
-              <Text variant="numXL" color="caloriesInk" testID="plan-kcal" style={narrow ? { fontSize: 44, lineHeight: 46 } : { fontSize: 52, lineHeight: 54 }}>
-                {formatNumber(target)}
-              </Text>
+              <AnimatedNumber
+                variant="numXL"
+                color="caloriesInk"
+                testID="plan-kcal"
+                value={target}
+                from={0}
+                duration={ARRIVAL_POUR}
+                delay={POUR_DELAY}
+                format={(n) => formatNumber(Math.round(n))}
+                style={{ fontSize, lineHeight: fontSize + 2 }}
+              />
               <Text variant="unit">kcal a day</Text>
             </View>
           ),
