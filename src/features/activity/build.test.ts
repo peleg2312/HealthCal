@@ -132,6 +132,17 @@ describe('editing a saved session (review activity-trackers-2)', () => {
     expect(legacy.baselineKcalPerDay).toBe(2200);
   });
 
+  it('keeps where an imported session came from, and its measured calories only while they still apply', () => {
+    const imported = { ...saved, source: 'garmin' as const, externalId: 'garmin:abc', startedAt: '2026-03-10T07:00:00.000Z', measured: true, avgHeartRate: 151, kcalGross: 700, kcalNet: 590 };
+    const sameEffort = rebuildActivityEntry(imported, { activity: ACTIVITY_BY_ID.running, intensity: 'moderate', durationMin: 60, date: '2026-03-10', notes: 'windy' }, today);
+    expect(sameEffort).toMatchObject({ source: 'garmin', externalId: 'garmin:abc', startedAt: '2026-03-10T07:00:00.000Z', avgHeartRate: 151, measured: true, kcalGross: 700, kcalNet: 590 });
+    // A different length: still that workout, but the calories are now an estimate.
+    const shorter = rebuildActivityEntry(imported, { activity: ACTIVITY_BY_ID.running, intensity: 'moderate', durationMin: 45, date: '2026-03-10' }, today);
+    expect(shorter).toMatchObject({ source: 'garmin', externalId: 'garmin:abc', avgHeartRate: 151 });
+    expect(shorter.measured).toBeUndefined();
+    expect(shorter.kcalGross).not.toBe(700);
+  });
+
   it('keeps the saved calories exactly when only notes, date or distance change', () => {
     const r = rebuildActivityEntry(saved, { activity: ACTIVITY_BY_ID.running, intensity: 'moderate', durationMin: 60, date: '2026-03-11', notes: 'typo fixed', distanceKm: 10 }, today);
     expect(r.kcalGross).toBe(saved.kcalGross);

@@ -106,11 +106,20 @@ export function basisFromEntry(
 export function rebuildActivityEntry(existing: ActivityEntry, input: Omit<BuildActivityInput, 'weightKg' | 'baselineKcalPerDay' | 'loggedAt'>, current: SessionBasis): BuiltActivity {
   const basis = basisFromEntry(existing, current);
   const built = buildActivityEntry({ ...input, ...basis, loggedAt: existing.loggedAt });
+  // Where the session came from stays with it: an imported workout that is edited is still that
+  // workout, so importing the same file again recognises it instead of adding a second copy.
+  if (existing.source) built.source = existing.source;
+  if (existing.externalId) built.externalId = existing.externalId;
+  if (existing.startedAt) built.startedAt = existing.startedAt;
+  if (existing.avgHeartRate) built.avgHeartRate = existing.avgHeartRate;
   if (existing.activityId === built.activityId && existing.intensity === built.intensity && existing.durationMin === built.durationMin) {
     built.met = existing.met;
     built.kcalGross = existing.kcalGross;
     built.kcalNet = existing.kcalNet;
+    // The calories are still the ones a device measured.
+    if (existing.measured) built.measured = true;
   }
+  // Otherwise the activity, effort or length changed, so the calories above are an estimate again.
   return built;
 }
 

@@ -55,25 +55,25 @@ function StorageWarning() {
 /** Saved data could not be read. Never leave a blank screen: offer a retry and a clean start. */
 function LoadFailed() {
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0C10', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
+    <View style={{ flex: 1, backgroundColor: '#F4EEE5', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
       <RNText style={{ fontSize: 40 }}>🗄️</RNText>
-      <RNText style={{ color: '#F4F6FA', fontSize: 20, fontWeight: '700', textAlign: 'center' }}>Could not load your saved data</RNText>
-      <RNText style={{ color: '#A3ACBB', fontSize: 15, textAlign: 'center' }}>
+      <RNText style={{ color: '#211913', fontSize: 20, fontWeight: '700', textAlign: 'center' }}>Could not load your saved data</RNText>
+      <RNText style={{ color: '#5C5046', fontSize: 15, textAlign: 'center' }}>
         Try again first. Starting fresh clears what is saved on this device; anything backed up to your account comes back when you sign in.
       </RNText>
       <Pressable
         testID="load-retry"
         accessibilityRole="button"
         onPress={() => void startPersistence()}
-        style={{ marginTop: 12, backgroundColor: '#C6F26B', paddingHorizontal: 28, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
-        <RNText style={{ color: '#0B1205', fontSize: 16, fontWeight: '700' }}>Try again</RNText>
+        style={{ marginTop: 12, backgroundColor: '#BF4420', paddingHorizontal: 28, height: 50, borderTopLeftRadius: 6, borderTopRightRadius: 6, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, alignItems: 'center', justifyContent: 'center' }}>
+        <RNText style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '700' }}>Try again</RNText>
       </Pressable>
       <Pressable
         testID="load-start-fresh"
         accessibilityRole="button"
         onPress={() => void wipePersisted().then(() => startPersistence())}
         style={{ paddingHorizontal: 28, height: 50, alignItems: 'center', justifyContent: 'center' }}>
-        <RNText style={{ color: '#A3ACBB', fontSize: 15, fontWeight: '600' }}>Start fresh on this device</RNText>
+        <RNText style={{ color: '#5C5046', fontSize: 15, fontWeight: '600' }}>Start fresh on this device</RNText>
       </Pressable>
     </View>
   );
@@ -106,17 +106,17 @@ function Navigation() {
  */
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0C10', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
+    <View style={{ flex: 1, backgroundColor: '#F4EEE5', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
       <RNText style={{ fontSize: 40 }}>🛠️</RNText>
-      <RNText style={{ color: '#F4F6FA', fontSize: 20, fontWeight: '700', textAlign: 'center' }}>Something went wrong on this screen</RNText>
-      <RNText style={{ color: '#A3ACBB', fontSize: 15, textAlign: 'center' }}>Your data is safe on this device. Try again, and if it keeps happening, restart the app.</RNText>
-      {__DEV__ ? <RNText style={{ color: '#6B7485', fontSize: 12, textAlign: 'center' }}>{error.message}</RNText> : null}
+      <RNText style={{ color: '#211913', fontSize: 20, fontWeight: '700', textAlign: 'center' }}>Something went wrong on this screen</RNText>
+      <RNText style={{ color: '#5C5046', fontSize: 15, textAlign: 'center' }}>Your data is safe on this device. Try again, and if it keeps happening, restart the app.</RNText>
+      {__DEV__ ? <RNText style={{ color: '#73665A', fontSize: 12, textAlign: 'center' }}>{error.message}</RNText> : null}
       <Pressable
         testID="error-retry"
         accessibilityRole="button"
         onPress={retry}
-        style={{ marginTop: 12, backgroundColor: '#C6F26B', paddingHorizontal: 28, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }}>
-        <RNText style={{ color: '#0B1205', fontSize: 16, fontWeight: '700' }}>Try again</RNText>
+        style={{ marginTop: 12, backgroundColor: '#BF4420', paddingHorizontal: 28, height: 50, borderTopLeftRadius: 6, borderTopRightRadius: 6, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, alignItems: 'center', justifyContent: 'center' }}>
+        <RNText style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '700' }}>Try again</RNText>
       </Pressable>
     </View>
   );
