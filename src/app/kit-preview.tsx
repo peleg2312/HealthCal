@@ -17,6 +17,8 @@ export default function KitPreview() {
   const [taps, setTaps] = useState(0);
   const [on, setOn] = useState(true);
   const [off, setOff] = useState(false);
+  const [showMem, setShowMem] = useState(false);
+  const [memCount, setMemCount] = useState(0);
   const p = ml / goal;
   return (
     <Screen header={<Header title="Kit preview" subtitle="Temporary" />} testID="kit-screen" footer={params.footer ? <Button title="Pinned footer action" testID="kit-footer" /> : undefined}>
@@ -66,6 +68,17 @@ export default function KitPreview() {
           <Button size="sm" full={false} variant="secondary" title="Back to 98%" testID="kit-reset" onPress={() => setMl(Math.round(goal * 0.98))} />
           <Button size="sm" full={false} variant="secondary" title="Plain toast" testID="kit-toast" onPress={() => toast('Saved to your diary')} />
         </View>
+      </Card>
+
+      <Card style={{ gap: spacing.md }} testID="kit-memory">
+        <Text variant="h3">Remembered cup</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, height: 70, paddingLeft: 12 }}>
+          <View testID="kit-mem-cup" style={{ width: 64, height: 70, alignItems: 'center', justifyContent: 'center' }}>
+            {showMem ? <MiniCup progress={p} goalKind="reach" memoryKey="kit-mem" onReached={() => setMemCount((n) => n + 1)} color={colors.water} width={44} height={56} /> : null}
+          </View>
+          <Text variant="label" testID="kit-mem-count">{`mem onReached ${memCount}`}</Text>
+        </View>
+        <Button size="sm" full={false} variant="secondary" title={showMem ? 'Hide cup' : 'Show cup'} testID="kit-mem-toggle" onPress={() => setShowMem((v) => !v)} />
       </Card>
 
       <Card style={{ gap: spacing.md }} testID="kit-minis">

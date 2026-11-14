@@ -75,7 +75,7 @@ export interface Pour {
   settle: SharedValue<number>;
   /** True when this pour is instant (reduced motion or animate=false). */
   instant: boolean;
-  /** When the pour ends, in ms from now: for things that appear "at the end of the pour". */
+  /** When the pour ends, in ms from now: for things that appear "at the end of the pour". 0 when there is no pour to wait for (instant, or a remount already at its level). */
   endsIn: number;
 }
 
@@ -95,6 +95,9 @@ export function usePour(to: number, { duration = D.pour, delay = 0, memoryKey, a
     if (memoryKey && shown.has(memoryKey)) return shown.get(memoryKey)!;
     return from === 'value' ? target : 0;
   });
+  // A cup that mounts already at its level (remembered by `memoryKey`) has no pour to wait for.
+  const [mounted] = useState(() => ({ target, atRest: Math.abs(initial - target) < 1e-6 }));
+  const resting = mounted.atRest && mounted.target === target;
   const level = useSharedValue(initial);
   const rim = useSharedValue(0);
   useEffect(() => {
@@ -123,7 +126,7 @@ export function usePour(to: number, { duration = D.pour, delay = 0, memoryKey, a
       );
     }
   }, [target, instant, delay, duration, memoryKey, settle, level, rim]);
-  return { level, settle: rim, instant, endsIn: instant ? 0 : delay + duration };
+  return { level, settle: rim, instant, endsIn: instant || resting ? 0 : delay + duration };
 }
 
 /**

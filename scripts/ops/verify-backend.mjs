@@ -21,7 +21,7 @@
  *     about the project's settings is changed.
  */
 import { createClient } from '@supabase/supabase-js';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -145,7 +145,14 @@ try {
   check('friends can be turned on and give a code', !cardA.error && /^[A-HJKMNP-Z2-9]{8}$/.test(cardA.data?.code ?? ''), cardA.error?.message ?? '');
   const direct = await b.client.from('social_profiles').select('code');
   check('friend codes cannot be listed', (direct.data ?? []).length === 0, `${direct.data?.length ?? 0} visible`);
-  await a.client.rpc('social_publish', { p_summary: { week: '2026-01-05', minutes: 120, sessions: 3, streak: 9, kcal: 2100, weightKg: 80, workouts: [{ id: 'w1', name: 'Running', emoji: '🏃', minutes: 30, date: '2026-01-05', kcalNet: 300 }] } });
+  // Friends never see a workout's record id: the app publishes sha256(share key + ':' + id), cut to 32 hex characters.
+  const recordId = randomUUID();
+  const workoutRef = createHash('sha256').update(`${cardA.data?.share_key ?? ''}:${recordId}`).digest('hex').slice(0, 32);
+  const summary = (id) => ({ week: '2026-01-05', minutes: 120, sessions: 3, streak: 9, kcal: 2100, weightKg: 80, workouts: [{ id, name: 'Running', emoji: '🏃', minutes: 30, date: '2026-01-05', kcalNet: 300 }] });
+  const rawId = await a.client.rpc('social_publish', { p_summary: summary(recordId) });
+  check('a summary carrying a real record id is refused', !!rawId.error, rawId.error ? `code ${rawId.error.code}` : 'it was stored');
+  const published = await a.client.rpc('social_publish', { p_summary: summary(workoutRef) });
+  check('the week can be published with opaque workout references', !published.error && /^[0-9a-f]{64}$/.test(cardA.data?.share_key ?? ''), published.error?.message ?? '');
   const before = await b.client.rpc('friends_overview');
   check('a stranger sees nothing of the other account', (before.data?.friends ?? []).length === 0);
   const request = await b.client.rpc('friend_request', { p_code: cardA.data?.code ?? '' });
@@ -156,9 +163,13 @@ try {
   const summaryText = JSON.stringify(friend?.summary ?? {});
   check('a friend sees minutes, sessions, streak and workouts', friend?.summary?.minutes === 120 && friend?.summary?.streak === 9 && friend?.summary?.workouts?.length === 1, summaryText.slice(0, 120));
   check('a friend never sees calories or weight', !/kcal|weight/i.test(summaryText));
-  const cheer = await b.client.rpc('send_cheer', { p_to: a.id, p_ref: 'w1' });
+  const friendText = JSON.stringify(overview.data ?? {});
+  check('a friend never sees the record id or the share key', !friendText.includes(recordId) && !friendText.includes(cardA.data?.share_key ?? 'no key') && friend?.summary?.workouts?.[0]?.id === workoutRef);
+  const loose = await b.client.rpc('send_cheer', { p_to: a.id, p_ref: 'hello there' });
+  check('a cheer cannot carry free text', loose.data !== 'ok', String(loose.data ?? loose.error?.message));
+  const cheer = await b.client.rpc('send_cheer', { p_to: a.id, p_ref: workoutRef });
   const cheers = await a.client.rpc('friends_overview');
-  check('a cheer reaches the friend', cheer.data === 'ok' && cheers.data?.cheers?.[0]?.ref === 'w1', String(cheer.data));
+  check('a cheer reaches the friend', cheer.data === 'ok' && cheers.data?.cheers?.[0]?.ref === workoutRef, String(cheer.data));
   if (cardB.error) check('second card', false, cardB.error.message);
 
   // ------------------------------------------------------ edge functions

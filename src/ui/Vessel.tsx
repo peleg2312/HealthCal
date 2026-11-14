@@ -99,9 +99,10 @@ export interface VesselProps {
  *   an amber lip sits across it. Amber means over, with neutral words.
  * - 'reach' (water, activity minutes, protein): at or past `max` the cup is
  *   brim-full and the level line becomes the brim line. It lies across the
- *   open top, wider than the cup (3 to 6 px past each side) and 1 px heavier,
- *   so a reached goal is told from 98% in a still picture: below the goal the
- *   line is inside the cup, at the goal it lies across it. No amber, no badge.
+ *   open top, wider than the cup (3 to 6 px past each side) and 1 to 2 px
+ *   heavier, so a reached goal is told from 98% in a still picture: below the
+ *   goal the line is inside the cup, at the goal it lies across it. No amber,
+ *   no badge.
  *   When the level crosses the goal while the cup is on screen, the brim line
  *   spreads into place as the pour lands and flashes once in the data colour
  *   (a flat band behind the line; never looped, skipped under reduced motion,
@@ -152,9 +153,10 @@ export function Vessel({
   const brimOpacity = useFadeAfter(reached, pour.endsIn, pour.instant);
   const flash = useReachFlash(reached, { delay: pour.endsIn, instant: pour.instant, memoryKey, onReached });
   const { level, settle } = pour;
-  // The brim line: the level line lying across the open top, wider than the cup and 1 px heavier.
+  // The brim line: the level line lying across the open top, wider than the cup and heavier
+  // (2 px on a big vessel, 1 px on a mini cup).
   const out = brimOverhang(width);
-  const brimH = rimWidth + 1;
+  const brimH = rimWidth + (out >= 5 ? 2 : 1);
   const brimFrom = width / (width + 2 * out);
   // Only transforms and opacity animate: the fill is full height and slides up inside the clipped cup.
   // At level 0 it is hidden outright, so no hairline of colour shows at the base of an empty cup.

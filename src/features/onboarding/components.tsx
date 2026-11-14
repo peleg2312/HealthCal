@@ -168,7 +168,9 @@ export function GoalCup({ goal, index = 0 }: { goal: 'lose' | 'maintain' | 'gain
   const h = 46;
   const level = goal === 'lose' ? 0.34 : goal === 'gain' ? 0.84 : 0.6;
   const was = goal === 'lose' ? 0.72 : goal === 'gain' ? 0.46 : null;
-  const [poured, setPoured] = useState(false);
+  const reduce = useReducedMotion();
+  // Reduced motion starts at the end state, so nothing jumps a moment after the question appears.
+  const [poured, setPoured] = useState(reduce);
   useEffect(() => {
     const id = setTimeout(() => setPoured(true), 260 + index * 80);
     return () => clearTimeout(id);
