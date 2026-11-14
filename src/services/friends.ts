@@ -75,6 +75,11 @@ interface FriendsState {
 
 export const useFriends = create<FriendsState>(() => ({ status: isBackendConfigured ? 'idle' : 'unavailable', overview: null, error: null }));
 
+// Browser tests and screenshots set this store directly to show the screens with data and no backend.
+if (typeof __DEV__ !== 'undefined' && (__DEV__ || process.env.EXPO_PUBLIC_E2E === '1')) {
+  (globalThis as { __healthcalFriends?: typeof useFriends }).__healthcalFriends = useFriends;
+}
+
 export type FriendsFailure = 'unavailable' | 'signed-out' | 'offline' | 'failed';
 export type FriendsResult<T = void> = { ok: true; value: T } | { ok: false; reason: FriendsFailure; message: string };
 
