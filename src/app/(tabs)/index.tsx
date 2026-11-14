@@ -7,6 +7,7 @@ import { copyEntries, findPreviousMeal } from '@/features/food/actions';
 import { coachTip, rhythmFromReminders } from '@/features/today/coach';
 import { useRecapReady } from '@/features/progress/recapReady';
 import { DayRingStrip } from '@/features/today/DayRingStrip';
+import { useReportViewedDay } from '@/features/today/viewedDay';
 import { FitsSheet } from '@/features/today/FitsSheet';
 import { mealLine } from '@/features/today/meals';
 import { RecapReadyCard } from '@/features/today/RecapReadyCard';
@@ -28,6 +29,8 @@ export default function TodayScreen() {
   // Null follows the clock, so the screen rolls over at midnight unless a day was picked.
   const [picked, setPicked] = useState<ISODate | null>(null);
   const date = picked && picked < todayDate ? picked : todayDate;
+  // The + sheet logs to the day being looked at.
+  useReportViewedDay(date === todayDate ? null : date);
   const isToday = date === todayDate;
   const day = useDay(date);
   const consistency = useConsistency(todayDate);

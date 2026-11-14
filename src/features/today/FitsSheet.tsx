@@ -104,7 +104,7 @@ export function FitsSheet({
         <View testID="fits-empty">
           <EmptyState
             emoji={budget > 0 ? '🔎' : '🧭'}
-            title={candidates.length === 0 ? 'No food history yet' : budget > 0 ? 'Nothing you usually eat fits' : 'No calories left today'}
+            title={candidates.length === 0 ? 'No food history yet' : budget > 0 ? 'Nothing you usually eat fits' : date === todayDate ? 'No calories left today' : 'No calories left that day'}
             message={
               candidates.length === 0
                 ? 'Foods you log, star or eat often show up here, sized to what you have left.'

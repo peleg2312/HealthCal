@@ -144,7 +144,7 @@ export function StatusRail({ day, isToday }: { day: DaySummary; isToday: boolean
               ? `Weight trend, ${weightValue(series.trendKg, units).toFixed(1)} ${weightUnit(units)}`
               : 'Weight, no weigh-ins. Add your weight'
           }
-          onPress={() => router.push('/weight')}
+          onPress={() => router.push(`/weight${dateQuery}` as never)}
           ring={
             <View
               style={{

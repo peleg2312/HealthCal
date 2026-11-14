@@ -215,6 +215,11 @@ function GoalsForm() {
             <PreviewStat label="Fat" value={`${macros.fatG} g`} color={colors.fat} />
             <PreviewStat label="Water" value={formatVolume(water, u)} color={colors.water} />
           </View>
+          <Text variant="caption" color="textSecondary" testID="goals-preview-note">
+            {effective.eatBackExercise
+              ? 'For a day without workouts. A logged workout adds its calories to that day, which raises the carbs, fat and water for it.'
+              : 'For a day without workouts. A logged workout raises that day’s water goal.'}
+          </Text>
         </View>
         {draft.goal !== 'maintain' ? (
           <Text variant="label" color="text" style={{ marginTop: spacing.md }}>

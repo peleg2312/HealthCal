@@ -7,6 +7,7 @@ import { copyPreviousDay, copyPreviousMeal, findPreviousDay, findPreviousMeal } 
 import { DaySummaryCard, MealCard, MealMenuSheet } from '@/features/food/DiaryParts';
 import { dayPhrase, href, kcal, param, parseDate } from '@/features/food/helpers';
 import { DayRingStrip } from '@/features/today/DayRingStrip';
+import { useReportViewedDay } from '@/features/today/viewedDay';
 import { addDays, formatDayLabel, formatLongDate, today } from '@/lib/dates';
 import { MEALS, entriesTotal, mealForTime } from '@/lib/nutrition';
 import { useToday } from '@/store/clock';
@@ -20,6 +21,8 @@ export default function DiaryScreen() {
   const params = useLocalSearchParams<{ date?: string; meal?: string }>();
   const t = useToday();
   const date = parseDate(params.date, t);
+  // The + sheet logs to the day being looked at.
+  useReportViewedDay(date === t ? null : date);
   const setDate = (d: ISODate) => router.setParams({ date: d === today() ? undefined : d });
 
   // Arriving with ?meal= (a meal row on Today) scrolls that meal into view once, then drops the param.

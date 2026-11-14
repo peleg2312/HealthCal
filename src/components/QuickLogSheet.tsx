@@ -8,8 +8,9 @@ import { matchServing } from '@/features/food/helpers';
 import { formatPortion, mealServings, planSavedMeal } from '@/features/food/build';
 import { logFood, logItems, logSavedMeal } from '@/features/food/log';
 import { addWater } from '@/features/today/StatusRail';
+import { quickLogDate, quickLogPastDate, useViewedDay } from '@/features/today/viewedDay';
 import { customFoodIndex, resolveUsuals, usualFoods, usualLabel, type UsualFood } from '@/features/food/usuals';
-import { addDays, formatShortDate, today } from '@/lib/dates';
+import { addDays, formatDayLabel, formatShortDate } from '@/lib/dates';
 import { MEAL_LABEL, mealForTime } from '@/lib/nutrition';
 import { formatNumber, formatVolume } from '@/lib/units';
 import { useStore } from '@/store';
@@ -55,8 +56,11 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   // Resolved against the user's own foods as they are now: an edited food logs today's values, a deleted one is not offered.
   const customFoods = useLive('customFoods');
   const usual = resolveUsuals(usualFoods(entries, meal, todayDate, { limit: 8 }), customFoodIndex(customFoods)).slice(0, 4);
-  const prev = findPreviousMeal(entries, todayDate, meal, 7);
-  const alreadyLogged = entries.some((e) => e.date === todayDate && e.meal === meal);
+  // The day the screen behind the sheet shows (a past day on Today, the diary's date), else today.
+  const viewed = useViewedDay((s) => s.date);
+  const logDate = viewed ?? todayDate;
+  const prev = findPreviousMeal(entries, logDate, meal, 7);
+  const alreadyLogged = entries.some((e) => e.date === logDate && e.meal === meal);
   const savedMeal = [...saved].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] as SavedMeal | undefined;
   const savedServings = savedMeal ? mealServings(savedMeal) : 1;
   const glasses = [...presets]
@@ -71,7 +75,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   const go = (href: string) => {
     close();
     // Read at the moment of the tap, never from a render that may be hours old.
-    const target = href.replace('{food}', `meal=${mealForTime()}&date=${today()}`);
+    const target = href.replace('{food}', `meal=${mealForTime()}&date=${quickLogDate()}`).replace('{past}', `date=${quickLogPastDate()}`);
     // Let the sheet start closing before the next screen slides in.
     setTimeout(() => router.push(target as never), 60);
   };
@@ -83,8 +87,8 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
     { id: 'photo', label: 'Snap a meal', hint: 'AI estimates from a photo', icon: Camera, color: colors.fat, href: `/food/photo?${food}` },
     { id: 'scan', label: 'Scan barcode', hint: 'Packaged products', icon: ScanBarcode, color: colors.carbs, href: `/food/scan?${food}` },
     { id: 'describe', label: 'Describe it', hint: 'Type what you ate', icon: PenLine, color: colors.protein, href: `/food/photo?mode=text&${food}` },
-    { id: 'activity', label: 'Log activity', hint: 'Sport, gym, walk', icon: Activity, color: colors.exercise, href: '/activity/pick' },
-    { id: 'weight', label: 'Weigh in', hint: 'Weight and body fat', icon: Scale, color: colors.weight, href: '/weight' },
+    { id: 'activity', label: 'Log activity', hint: 'Sport, gym, walk', icon: Activity, color: colors.exercise, href: '/activity/pick?{past}' },
+    { id: 'weight', label: 'Weigh in', hint: 'Weight and body fat', icon: Scale, color: colors.weight, href: '/weight?{past}' },
   ];
 
   const tile = {
@@ -98,7 +102,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   const showRepeat = !!prev && !alreadyLogged;
 
   return (
-    <Sheet visible={visible} onClose={close} title="Log something">
+    <Sheet visible={visible} onClose={close} title={viewed ? `Log to ${formatDayLabel(viewed)}` : 'Log something'}>
       {showUsual ? (
         <View style={{ gap: spacing.sm }} testID="quick-usual">
           <Text variant="overline" color="textSecondary">
@@ -114,7 +118,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                   feedback="none"
                   disabled={isDone}
                   onPress={() => {
-                    logUsual(u, today());
+                    logUsual(u, quickLogDate());
                     mark(u.key);
                   }}
                   accessibilityLabel={isDone ? `${u.last.name} added` : `Add ${u.last.name}, ${usualLabel(u)}, to ${mealName}`}
@@ -142,7 +146,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                 disabled={done.includes('saved')}
                 onPress={() => {
                   // A recipe logs one serving as a single line; a plain meal logs its items.
-                  logSavedMeal(savedMeal, mealForTime(), today());
+                  logSavedMeal(savedMeal, mealForTime(), quickLogDate());
                   mark('saved');
                 }}
                 accessibilityLabel={`Add saved meal ${savedMeal.name} to ${mealName}`}
@@ -169,12 +173,12 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
 
       {showRepeat && prev ? (
         <RepeatRow
-          label={`Repeat ${whenPhrase(prev.date, todayDate)}'s ${mealName}`}
+          label={`Repeat ${whenPhrase(prev.date, logDate)}'s ${mealName}`}
           entries={prev.entries}
           done={done.includes('repeat')}
           onPress={() => {
             const m = mealForTime();
-            const date = today();
+            const date = quickLogDate();
             const p = findPreviousMeal(live(useStore.getState().foodEntries), date, m, 7);
             if (p) copyEntries(p.entries, date, m, `Copied ${MEAL_LABEL[m].toLowerCase()} from ${whenPhrase(p.date, date)}`);
             mark('repeat');
@@ -229,7 +233,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                 testID={`quick-water-${ml}`}
                 feedback="none"
                 hitSlop={4}
-                onPress={() => addWater(today(), ml, profile.units)}
+                onPress={() => addWater(quickLogPastDate(), ml, profile.units)}
                 accessibilityLabel={`Add ${formatVolume(ml, profile.units)} of water`}
                 style={{ flex: 1, height: 38, borderRadius: radius.pill, backgroundColor: `${colors.water}22`, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
                 <Plus size={12} color={colors.water} strokeWidth={2.8} />

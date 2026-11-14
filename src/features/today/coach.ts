@@ -150,7 +150,7 @@ export function coachTip(day: DaySummary, units: UnitSystem, now: Date = new Dat
       id: 'water',
       emoji: '💧',
       title: `${formatVolume(day.waterRemainingMl, units)} of water to go`,
-      body: `You are about ${formatVolume(Math.round(waterGap / 50) * 50, units)} behind an even pace for the day. A glass now narrows it.`,
+      body: `You are about ${formatVolume(Math.min(day.waterRemainingMl, Math.round(waterGap / 50) * 50), units)} behind an even pace for the day. A glass now narrows it.`,
       action: { label: 'Add water', href: '/water' },
       quick: { kind: 'water' },
       tone: 'neutral',

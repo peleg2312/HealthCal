@@ -251,7 +251,7 @@ export default function ConsistencyScreen() {
             </Text>
           </View>
           <Text variant="caption" color="textSecondary">
-            Weeks that met all three targets, in total since you started, not in a row
+            Weeks that met all three of your current targets, in total, not in a row
           </Text>
         </View>
         {RHYTHM_KINDS.map((k) => {
@@ -306,7 +306,7 @@ export default function ConsistencyScreen() {
         footer={<Button title="Done" onPress={() => setEditing(false)} testID="consistency-rhythm-done" />}>
         <View style={{ gap: spacing.lg }}>
           <Text variant="body" color="textSecondary">
-            Pick a pace you can keep most weeks. Missing a target one week costs nothing; the total only counts up.
+            Pick a pace you can keep most weeks. A missed week costs nothing: it just is not counted. Past weeks are counted against the targets you set here, so raising one can lower the total.
           </Text>
           {RHYTHM_KINDS.map((k) => (
             <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }} testID={`consistency-target-${k}`}>

@@ -1,7 +1,9 @@
 import { Info, Plus } from 'lucide-react-native';
+import { useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
+import { resolveDateParam } from '@/features/trackers/dateParam';
 import { diffDays, formatDayLabel, formatShortDate } from '@/lib/dates';
 import { isPlausibleBodyFat, projectedGoalDate } from '@/lib/energy';
 import { formatWeight, weightToKg, weightUnit, weightValue } from '@/lib/units';
@@ -53,9 +55,14 @@ function WeightScreen() {
   const units = profile.units;
   const series = useWeightSeries();
   const [range, setRange] = useState<WeightRange>('3m');
-  const [sheetDate, setSheetDate] = useState<ISODate | null>(null);
-  const [showAll, setShowAll] = useState(false);
   const end = useToday();
+  // Opened for a past day (?date=): the weigh-in sheet starts on that day.
+  const params = useLocalSearchParams<{ date?: string }>();
+  const [sheetDate, setSheetDate] = useState<ISODate | null>(() => {
+    const asked = resolveDateParam(params.date, end);
+    return params.date && asked !== end ? asked : null;
+  });
+  const [showAll, setShowAll] = useState(false);
   const unit = weightUnit(units);
 
   const empty = series.entries.length === 0;
@@ -161,7 +168,7 @@ function WeightScreen() {
 
           <Card tone="alt" style={{ gap: spacing.sm }}>
             <Note icon={<Info size={14} color={colors.textTertiary} />}>
-              Why the trend differs from the scale: a day’s weight can swing by a kilo or more with water, salt, carbs and digestion. The trend averages
+              Why the trend differs from the scale: a day’s weight can swing by {units === 'imperial' ? 'two pounds' : 'a kilo'} or more with water, salt, carbs and digestion. The trend averages
               recent weigh-ins (most weight on the last few weeks), so a single high or low reading barely moves it. Watch the trend, not the daily number.
             </Note>
           </Card>
@@ -170,14 +177,16 @@ function WeightScreen() {
           <Card padding={spacing.md}>
             {shown.map((e, i) => {
               const prev = history[history.indexOf(e) + 1];
-              const delta = prev ? e.kg - prev.kg : null;
+              // From the rounded weights on screen, so the difference matches what the two rows show.
+              const shown = (kg: number) => Math.round(weightValue(kg, units) * 10) / 10;
+              const delta = prev ? shown(e.kg) - shown(prev.kg) : null;
               return (
                 <React.Fragment key={e.id}>
                   {i > 0 ? <Divider /> : null}
                   <ListRow
                     testID={`weight-row-${i}`}
                     title={formatDayLabel(e.date)}
-                    subtitle={[isPlausibleBodyFat(e.bodyFatPct) ? `${e.bodyFatPct}% body fat` : null, delta !== null ? `${signed(delta, units)} ${unit} vs previous` : null].filter(Boolean).join(' · ') || undefined}
+                    subtitle={[isPlausibleBodyFat(e.bodyFatPct) ? `${e.bodyFatPct}% body fat` : null, delta !== null ? `${Math.abs(delta) < 0.05 ? '0' : `${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(1)}`} ${unit} vs previous` : null].filter(Boolean).join(' · ') || undefined}
                     value={fixedWeight(e.kg, units)}
                     onPress={() => setSheetDate(e.date)}
                   />

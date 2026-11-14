@@ -3,6 +3,7 @@
  * Shared by the Today screen (which announces it) and the recap screen
  * (which marks it seen), so both agree on what "ready" means.
  */
+import { MIN_LOGGED_DAYS_FOR_RECAP } from '@/lib/insights';
 import { useMemo } from 'react';
 
 import { addDays, diffDays, startOfWeek } from '@/lib/dates';
@@ -12,7 +13,7 @@ import { useLive } from '@/store/selectors';
 import type { ISODate } from '@/types';
 
 /** A week needs at least this many logged days before a recap says anything useful. */
-export const MIN_LOGGED_DAYS_FOR_RECAP = 3;
+export { MIN_LOGGED_DAYS_FOR_RECAP };
 
 export interface RecapReady {
   /** Monday of the last completed week. */

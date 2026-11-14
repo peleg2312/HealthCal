@@ -78,7 +78,7 @@ export default function PickActivityScreen() {
       scroll={false}
       header={
         <View style={{ gap: spacing.md, paddingBottom: spacing.sm }}>
-          <Header title="Log activity" subtitle={date === today() ? `${ACTIVITIES.length} activities` : `For ${formatDayLabel(date).toLowerCase()}`} />
+          <Header title="Log activity" subtitle={date === today() ? `${ACTIVITIES.length} activities` : `For ${formatDayLabel(date)}`} />
           <TextField
             testID="activity-search"
             placeholder="Search volleyball, yoga, rowing..."

@@ -98,7 +98,7 @@ export default function RecapScreen() {
           <EmptyState
             emoji="🗓️"
             title="Not enough to recap yet"
-            message="A weekly check-in appears once a week has at least 2 days with food logged. It compares your calories, protein, activity and water with the week before."
+            message="A weekly check-in appears once a week has at least 3 days with food logged. It compares your calories, protein, activity and water with the week before."
             action="Open diary"
             onAction={() => go('/diary')}
           />

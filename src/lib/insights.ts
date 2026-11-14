@@ -62,6 +62,8 @@ export const WEEKLY_ACTIVE_MINUTES = 150;
 /** Sleep most adults need (AASM / Sleep Research Society): 7 to 9 hours. */
 export const SLEEP_TARGET_HOURS = 7;
 export const SLEEP_MAX_HOURS = 9;
+/** Days with food logged a week needs before it gets a recap. Every screen that mentions the recap uses this. */
+export const MIN_LOGGED_DAYS_FOR_RECAP = 3;
 /** A pace insight needs a weigh-in this recent; older rates are history, not the current pace. */
 export const STALE_WEIGH_IN_DAYS = 7;
 
@@ -930,7 +932,7 @@ export function weeklyRecap(input: {
   const weekEnd = addDays(weekStart, 6);
   const pick = (start: ISODate, end: ISODate) => days.filter((d) => d.date >= start && d.date <= end && d.date <= today);
   const weekDays = pick(weekStart, weekEnd);
-  if (weekDays.filter(isLogged).length < 2) return null;
+  if (weekDays.filter(isLogged).length < MIN_LOGGED_DAYS_FOR_RECAP) return null;
   const label: RecapLabel = weekStart === thisStart ? 'This week' : weekStart === addDays(thisStart, -7) ? 'Last week' : 'Week';
   const summary = summarizePeriod({ days: weekDays, trend: input.trend, sleep: input.sleep, today });
   const prevDays = pick(addDays(weekStart, -7), addDays(weekStart, -1));

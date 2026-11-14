@@ -225,7 +225,7 @@ export default function AboutScreen() {
         title="Weight trend and adaptive expenditure"
         source="Exponentially smoothed moving average as popularised by The Hacker's Diet (Walker); least-squares line; energy balance method.">
         <P>
-          Scale weight swings by a kilo or more from water, salt and digestion. The trend line smooths this out: each day moves 10% of the way toward
+          Scale weight swings by a kilo (about two pounds) or more from water, salt and digestion. The trend line smooths this out: each day moves 10% of the way toward
           the new weigh-in, and gaps between weigh-ins are filled in evenly. The weekly rate of change is measured on the weigh-ins themselves: the
           slope of a straight line fitted through the last three weeks of weigh-ins, because the smoothed line is slow to show a new rate.
         </P>
