@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
+import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, ClipPath, Defs, G, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import { niceTicks } from '@/lib/chart';
-import { cup, fonts, useTheme } from '@/theme';
+import { cup, fonts, motion, useReducedMotion, useTheme } from '@/theme';
 
 import { haptic } from './haptics';
+import { DrawReveal, ease } from './motion';
 import { Text } from './Text';
 
 function useWidth(): [number, (e: LayoutChangeEvent) => void] {
@@ -14,6 +16,34 @@ function useWidth(): [number, (e: LayoutChangeEvent) => void] {
 }
 
 let seq = 0;
+
+/** Room either side of a pouring column, so a value label wider than its slot is not clipped. */
+const COL_PAD = 24;
+
+/**
+ * A chart column that pours from the baseline once, when it mounts: its content
+ * rises out of a clip at the baseline (a transform only, on the UI thread).
+ */
+function PourColumn({ left, width, height, rise, delay = 0, children }: { left: number; width: number; height: number; rise: number; delay?: number; children: React.ReactNode }) {
+  const reduce = useReducedMotion();
+  const [animate] = useState(() => !reduce && rise > 0);
+  const p = useSharedValue(animate ? 0 : 1);
+  useEffect(() => {
+    if (animate) p.set(withDelay(delay, withTiming(1, { duration: motion.duration.pourSmall, easing: ease.pour })));
+  }, [animate, delay, p]);
+  useEffect(() => {
+    if (reduce) {
+      cancelAnimation(p);
+      p.set(1);
+    }
+  }, [reduce, p]);
+  const style = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - p.get()) * rise }] }));
+  return (
+    <View pointerEvents="none" style={{ position: 'absolute', left, top: 0, width, height, overflow: 'hidden' }}>
+      <Animated.View style={[{ width, height }, style]}>{children}</Animated.View>
+    </View>
+  );
+}
 
 export interface BarDatum {
   label: string;
@@ -145,87 +175,119 @@ export function BarChart({
         onResponderTerminate: () => setActive(null),
       }
     : {};
+  // Everything one bar draws, in chart coordinates: the cup, the amber over-goal part, the rim,
+  // the check mark and the highlighted value. Drawn per column so each column can pour.
+  const barParts = (d: BarDatum, i: number) => {
+    const v = Math.max(0, d.value);
+    const h = Math.max(v > 0 ? 3 : 0, (Math.min(v, max) / max) * chartH);
+    const x = i * slot + (slot - barW) / 2;
+    const on = hi === undefined || hi === null || hi === i;
+    const over = goalKind === 'limit' && !!goal && v > goal;
+    const fillTo = over ? y(goal) : base - h;
+    const r = Math.min(3, barW / 3);
+    const c = d.color ?? color;
+    const open = openIndex === i;
+    let acc = 0;
+    return (
+      <G key={`${d.label}-${i}`} opacity={on ? 1 : 0.5}>
+        {h > 0 && d.segments?.length
+          ? d.segments.map((sg, j) => {
+              const sh = (Math.min(sg.value, max) / max) * chartH;
+              const top = base - acc - sh;
+              acc += sh;
+              if (sh <= 0) return null;
+              return j === 0 ? (
+                <Path key={j} d={cupPath(x, top, barW, base, r)} fill={sg.color} />
+              ) : (
+                <Rect key={j} x={x} y={top} width={barW} height={Math.max(0, sh - 1.5)} fill={sg.color} />
+              );
+            })
+          : h > 0 && open
+            ? (
+                <>
+                  <Defs>
+                    <ClipPath id={`${uid}-${i}`}>
+                      <Path d={cupPath(x, fillTo, barW, base, r)} />
+                    </ClipPath>
+                  </Defs>
+                  <G clipPath={`url(#${uid}-${i})`}>{hatchLines(x, fillTo, barW, base - fillTo, c)}</G>
+                </>
+              )
+            : h > 0
+              ? <Path d={cupPath(x, fillTo, barW, base, r)} fill={c} opacity={0.42} />
+              : null}
+        {h > 0 && over ? <Rect x={x} y={base - h} width={barW} height={Math.max(0, fillTo - (base - h))} fill={colors.warning} /> : null}
+        {h > 0 ? <Rect x={x} y={(over ? fillTo : base - h) - 1.25} width={barW} height={2.5} fill={colors.rim} /> : null}
+        {marks?.[i] ? (
+          <Path
+            d={`M ${x + barW / 2 - 4} ${base - h - 9} l 3 3 l 5 -6`}
+            stroke={colors.success}
+            strokeWidth={2}
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ) : null}
+        {active === null && highlightIndex === i && v > 0 ? (
+          <SvgText x={x + barW / 2} y={Math.max(11, base - h - 6)} fontSize={11} fontFamily={fonts.numBold} fill={colors.text} textAnchor="middle">
+            {formatValue ? formatValue(d.value) : Math.round(d.value)}
+          </SvgText>
+        ) : null}
+      </G>
+    );
+  };
+  // How far each column rises: its bar plus the mark or value above it.
+  const riseOf = (d: BarDatum) => Math.min(base, Math.max(0, (Math.min(Math.max(0, d.value), max) / max) * chartH) + 22);
+  // Up to two weeks, columns pour one by one; longer ranges rise as one layer, which mounts
+  // as fast as the still chart (measured on Progress with the CPU throttled 4x).
+  const perColumn = data.length <= 14;
+  const stagger = Math.min(motion.duration.stagger, 360 / Math.max(1, data.length));
   return (
     <View onLayout={onLayout} style={{ height }} testID={testID}>
       {width > 0 ? (
-        <Svg width={width} height={height}>
+        <>
           {band && band.to > band.from ? (
-            <Rect x={0} y={y(band.to)} width={width} height={Math.max(1, y(band.from) - y(band.to))} fill={band.color ?? color} opacity={0.12} rx={2} />
+            <Svg width={width} height={height} style={{ position: 'absolute', left: 0, top: 0 }}>
+              <Rect x={0} y={y(band.to)} width={width} height={Math.max(1, y(band.from) - y(band.to))} fill={band.color ?? color} opacity={0.12} rx={2} />
+            </Svg>
           ) : null}
-          {data.map((d, i) => {
-            const v = Math.max(0, d.value);
-            const h = Math.max(v > 0 ? 3 : 0, (Math.min(v, max) / max) * chartH);
-            const x = i * slot + (slot - barW) / 2;
-            const on = hi === undefined || hi === null || hi === i;
-            const over = goalKind === 'limit' && !!goal && v > goal;
-            const fillTo = over ? y(goal) : base - h;
-            const r = Math.min(3, barW / 3);
-            const c = d.color ?? color;
-            const open = openIndex === i;
-            let acc = 0;
-            return (
-              <G key={`${d.label}-${i}`} opacity={on ? 1 : 0.5}>
-                {h > 0 && d.segments?.length
-                  ? d.segments.map((sg, j) => {
-                      const sh = (Math.min(sg.value, max) / max) * chartH;
-                      const top = base - acc - sh;
-                      acc += sh;
-                      if (sh <= 0) return null;
-                      return j === 0 ? (
-                        <Path key={j} d={cupPath(x, top, barW, base, r)} fill={sg.color} />
-                      ) : (
-                        <Rect key={j} x={x} y={top} width={barW} height={Math.max(0, sh - 1.5)} fill={sg.color} />
-                      );
-                    })
-                  : h > 0 && open
-                    ? (
-                        <>
-                          <Defs>
-                            <ClipPath id={`${uid}-${i}`}>
-                              <Path d={cupPath(x, fillTo, barW, base, r)} />
-                            </ClipPath>
-                          </Defs>
-                          <G clipPath={`url(#${uid}-${i})`}>{hatchLines(x, fillTo, barW, base - fillTo, c)}</G>
-                        </>
-                      )
-                    : h > 0
-                      ? <Path d={cupPath(x, fillTo, barW, base, r)} fill={c} opacity={0.42} />
-                      : null}
-                {h > 0 && over ? <Rect x={x} y={base - h} width={barW} height={Math.max(0, fillTo - (base - h))} fill={colors.warning} /> : null}
-                {h > 0 ? <Rect x={x} y={(over ? fillTo : base - h) - 1.25} width={barW} height={2.5} fill={colors.rim} /> : null}
-                {marks?.[i] ? (
-                  <Path
-                    d={`M ${x + barW / 2 - 4} ${base - h - 9} l 3 3 l 5 -6`}
-                    stroke={colors.success}
-                    strokeWidth={2}
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                ) : null}
-                {active === i ? <Line x1={x + barW / 2} x2={x + barW / 2} y1={topPad - 4} y2={base} stroke={colors.textSecondary} strokeWidth={1} /> : null}
-                {active === null && highlightIndex === i && v > 0 ? (
-                  <SvgText x={x + barW / 2} y={Math.max(11, base - h - 6)} fontSize={11} fontFamily={fonts.numBold} fill={colors.text} textAnchor="middle">
-                    {formatValue ? formatValue(d.value) : Math.round(d.value)}
-                  </SvgText>
-                ) : null}
-              </G>
-            );
-          })}
-          {goal ? <Line x1={0} x2={width} y1={y(goal)} y2={y(goal)} stroke={colors.borderStrong} strokeWidth={1.5} strokeDasharray="4 4" /> : null}
-          {data.map((d, i) => (
-            <SvgText
-              key={`l-${i}`}
-              x={i * slot + slot / 2}
-              y={height - 5}
-              fontSize={10.5}
-              fontFamily={hi === i ? fonts.bold : fonts.semibold}
-              fill={hi === i ? colors.text : colors.textSecondary}
-              textAnchor="middle">
-              {d.label}
-            </SvgText>
-          ))}
-        </Svg>
+          {/* Keyed by length: a new range pours again, a value changing within it does not. */}
+          <React.Fragment key={`bars-${data.length}`}>
+            {perColumn ? (
+              data.map((d, i) => (
+                <PourColumn key={`${d.label}-${i}`} left={i * slot - COL_PAD} width={slot + 2 * COL_PAD} height={base} rise={riseOf(d)} delay={i * stagger}>
+                  <Svg width={slot + 2 * COL_PAD} height={base}>
+                    <G transform={`translate(${COL_PAD - i * slot}, 0)`}>{barParts(d, i)}</G>
+                  </Svg>
+                </PourColumn>
+              ))
+            ) : (
+              <PourColumn left={0} width={width} height={base} rise={chartH}>
+                <Svg width={width} height={base}>
+                  {data.map(barParts)}
+                </Svg>
+              </PourColumn>
+            )}
+          </React.Fragment>
+          <Svg width={width} height={height} style={{ position: 'absolute', left: 0, top: 0 }} pointerEvents="none">
+            {active !== null && data[active] ? (
+              <Line x1={active * slot + slot / 2} x2={active * slot + slot / 2} y1={topPad - 4} y2={base} stroke={colors.textSecondary} strokeWidth={1} />
+            ) : null}
+            {goal ? <Line x1={0} x2={width} y1={y(goal)} y2={y(goal)} stroke={colors.borderStrong} strokeWidth={1.5} strokeDasharray="4 4" /> : null}
+            {data.map((d, i) => (
+              <SvgText
+                key={`l-${i}`}
+                x={i * slot + slot / 2}
+                y={height - 5}
+                fontSize={10.5}
+                fontFamily={hi === i ? fonts.bold : fonts.semibold}
+                fill={hi === i ? colors.text : colors.textSecondary}
+                textAnchor="middle">
+                {d.label}
+              </SvgText>
+            ))}
+          </Svg>
+        </>
       ) : null}
       {scrub ? <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, cursor: 'crosshair', userSelect: 'none' } as object} {...responder} /> : null}
       {active !== null && data[active] ? (
@@ -356,22 +418,6 @@ export function LineChart({
           {goal !== undefined ? (
             <Line x1={padL} x2={width - padR} y1={sy(goal)} y2={sy(goal)} stroke={colors.borderStrong} strokeWidth={1.5} strokeDasharray="4 4" />
           ) : null}
-          {area ? <Path d={area} fill={color} opacity={0.1} /> : null}
-          {(dots ?? []).map((p, i) => (
-            <Circle key={i} cx={sx(p.x)} cy={sy(p.y)} r={2.6} fill={colors.textTertiary} opacity={0.7} />
-          ))}
-          {path ? <Path d={path} stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" /> : null}
-          {pts.length ? (
-            <>
-              <Circle cx={pts[pts.length - 1].px} cy={pts[pts.length - 1].py} r={3} fill={colors.rim} stroke={colors.surface} strokeWidth={1.5} />
-            </>
-          ) : null}
-          {ap ? (
-            <>
-              <Line x1={ap.px} x2={ap.px} y1={padT} y2={padT + h} stroke={colors.textSecondary} strokeWidth={1} />
-              <Circle cx={ap.px} cy={ap.py} r={4} fill={colors.rim} stroke={colors.surface} strokeWidth={2} />
-            </>
-          ) : null}
           {(xLabels ?? []).map((label, i, arr) => (
             <SvgText
               key={`${label}-${i}`}
@@ -384,6 +430,25 @@ export function LineChart({
               {label}
             </SvgText>
           ))}
+        </Svg>
+      ) : null}
+      {width > 0 ? (
+        // The line draws left to right once, when the chart first appears.
+        <DrawReveal width={width} height={height}>
+          <Svg width={width} height={height}>
+            {area ? <Path d={area} fill={color} opacity={0.1} /> : null}
+            {(dots ?? []).map((p, i) => (
+              <Circle key={i} cx={sx(p.x)} cy={sy(p.y)} r={2.6} fill={colors.textTertiary} opacity={0.7} />
+            ))}
+            {path ? <Path d={path} stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" /> : null}
+            {pts.length ? <Circle cx={pts[pts.length - 1].px} cy={pts[pts.length - 1].py} r={3} fill={colors.rim} stroke={colors.surface} strokeWidth={1.5} /> : null}
+          </Svg>
+        </DrawReveal>
+      ) : null}
+      {ap ? (
+        <Svg width={width} height={height} style={{ position: 'absolute', left: 0, top: 0 }} pointerEvents="none">
+          <Line x1={ap.px} x2={ap.px} y1={padT} y2={padT + h} stroke={colors.textSecondary} strokeWidth={1} />
+          <Circle cx={ap.px} cy={ap.py} r={4} fill={colors.rim} stroke={colors.surface} strokeWidth={2} />
         </Svg>
       ) : null}
       {formatPoint ? <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, cursor: 'crosshair', userSelect: 'none' } as object} {...responder} /> : null}

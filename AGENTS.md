@@ -108,6 +108,14 @@ The visual identity is "Pour": the day fills up like a cup. Every amount is a fl
 - Data viz: `BarChart` (slim cups with a rim, amber above `goal`, `openIndex` hatched), `LineChart`, `Sparkline`, `MacroBar`. `goalKind="reach"` on `BarChart` for a goal that is not a limit (water, minutes). There is no ring: amounts are shown with `Vessel`, `MiniCup`, `Trough` or `ProgressBar`.
 - Feedback: `toast(message, { label, onPress })`, `haptic.tap/press/select/success/warn`. A `Sheet` shows toasts itself, just above its top edge, so there is one `toast-action` on screen at a time.
 - Icons: `lucide-react-native` only, stroke 1.9 (2.2 when active or on a button), 18 to 22 px, colour from the theme. A data icon takes its data colour only when it stands alone; next to a number use a `CupKey`.
+- Motion (three verbs: pour, settle, tick; tokens in `motion` from `@/theme`, see `src/theme/motion.ts`):
+  - `useReducedMotion()` is the one switch for the whole app (the system setting, prefers-reduced-motion on web, and any automated browser unless the page sets `window.__healthcalMotion = true` before loading). Every kit animation already obeys it; anything you animate yourself must too (`isReducedMotion()` outside components).
+  - `Vessel`, `MiniCup`, `Trough` and `ProgressBar` pour on mount and on change and the rim settles. `delay`, `duration`, `animate`, and `memoryKey` (a stable key such as `cal-${date}`, so a remount with the same level does not pour again). `MiniCup` takes `index` for a left-to-right stagger in a row.
+  - `AnimatedNumber`: a `Text` whose number ticks to each new value (`value`, `format`, `decimals`, `from` to count up on mount, `memoryKey`; children go after the number, e.g. the unit).
+  - `FadeUp` (`index` for a sequence): content fading up 8 px on mount. `Screen` does this for every screen (`enter={false}` to opt out); on web it is the page change.
+  - `AnimatedList` + `AnimatedItem` (keyed by the row's id): rows slide in, fade out and the rest move smoothly. Key the list by the day it shows.
+  - Charts pour their columns and draw their line once on mount; `Sheet` slides with a fading backdrop; tabs cross-fade; task screens (food search, quick add, scan, photo, import, add friend) rise from the bottom.
+  - Only transforms and opacity animate. The stored value changes at once; never wait for an animation in code or tests. Screenshots (`shot.mjs`) and e2e runs are reduced motion; `shot.mjs --motion --frames=8` captures an animation frame by frame.
 
 Read the component source in `src/ui/` for exact props before using one. If the kit lacks something you need, build it inside your own `src/features/<area>/` folder; do not edit `src/ui/`, `src/theme/`, `src/store/`, `src/lib/` or `src/types/` unless your brief says you own the file. Report gaps instead.
 

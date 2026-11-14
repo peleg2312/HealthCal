@@ -194,7 +194,6 @@ export function AnimatedNumber({ value, format, decimals = 0, duration = D.pour,
     if (reduce) {
       cancelAnimation(v);
       v.set(target);
-      setCurrent(target);
       return;
     }
     v.set(withDelay(delay, withTiming(target, { duration, easing: ease.pour })));
@@ -334,7 +333,7 @@ export function AnimatedList({ children, animateFirst = false }: { children: Rea
  * when removed, and moves smoothly when rows around it change (Reanimated
  * layout animations: native UI thread, CSS on web). Give it the row's stable
  * key. Instant under reduced motion. A removed row stays in the tree for
- * ~160 ms while it fades, so tests that count rows should read the store.
+ * ~120 ms while it fades, so tests that count rows should read the store.
  */
 export function AnimatedItem({ children, style, testID }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; testID?: string }) {
   const reduce = useReducedMotion();

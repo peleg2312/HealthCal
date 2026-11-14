@@ -9,6 +9,10 @@
  * read back from the app's own calculation code, so a mistake in the engine
  * or in how a screen wires it up shows as a mismatch.
  *
+ * The run uses reduced motion, so every animation is instant (the app also treats an
+ * automated browser as reduced motion). The last section turns motion on and acts while
+ * things are still pouring, to prove nothing waits on an animation finishing.
+ *
  *   node scripts/dev/e2e.cjs [--url=http://localhost:8081] [--shots=<dir>]
  */
 const { chromium } = require('playwright');
@@ -27,7 +31,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
 
 (async () => {
   const browser = await chromium.launch();
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, colorScheme: 'dark' });
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, colorScheme: 'dark', reducedMotion: 'reduce' });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -51,6 +55,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   await page.goto(BASE + '/', { waitUntil: 'networkidle', timeout: 120000 });
   await page.waitForTimeout(1500);
   check('a new user lands on the welcome screen', page.url().includes('/welcome'), page.url());
+  check('an automated browser runs with motion off by default', (await page.evaluate(() => window.__healthcalMotionOn?.())) === false);
   await tap('welcome-get-started');
 
   await tap('onb-units-metric');
@@ -171,6 +176,37 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     await page.waitForTimeout(900);
     await shot(`e2e-${tab}`);
   }
+  // ------------------------------------------------- with motion turned on
+  // A second page in the same browser (same saved data) that opts in to animation. Every
+  // action below happens while pours, fades and the sheet are still moving.
+  const mpage = await context.newPage();
+  await mpage.emulateMedia({ reducedMotion: 'no-preference' });
+  await mpage.addInitScript(() => {
+    window.__healthcalMotion = true;
+  });
+  mpage.on('pageerror', (e) => errors.push(e.message));
+  mpage.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 200)));
+  await mpage.goto(BASE + '/', { waitUntil: 'networkidle' });
+  await mpage.getByTestId('today-screen').first().waitFor({ timeout: 15000 });
+  const motionOn = await mpage.evaluate(() => typeof window.__healthcalMotionOn === 'function' && window.__healthcalMotionOn());
+  check('motion: the opted-in page runs with animation on', motionOn === true);
+  const waterBefore = live((await mpage.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())))).water).length;
+  await mpage.getByTestId('today-water-250').first().click({ timeout: 15000 });
+  // No waiting: the stored value changes at once, the drawing catches up.
+  const waterAfter = live((await mpage.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())))).water).length;
+  check('motion: a tap is stored at once, mid-animation', waterAfter === waterBefore + 1, `${waterBefore} -> ${waterAfter}`);
+  // Open the + sheet, close it and switch tab straight away, while the sheet is still sliding.
+  await mpage.getByTestId('tab-add').first().click({ timeout: 15000 });
+  await mpage.getByTestId('sheet-backdrop').first().click({ timeout: 15000, position: { x: 20, y: 20 } });
+  await mpage.getByTestId('tab-diary').first().click({ timeout: 15000 });
+  await mpage.waitForURL((u) => new URL(u).pathname === '/diary', { timeout: 5000 }).catch(() => {});
+  check('motion: the tab bar answers while a sheet is closing', new URL(mpage.url()).pathname === '/diary', mpage.url());
+  // Banana minus one more glass of water does not change calories, so the diary still agrees.
+  await mpage.waitForTimeout(900);
+  const mLeft = num((await mpage.getByTestId('diary-remaining').first().innerText({ timeout: 15000 })).trim());
+  check('motion: numbers settle on the right value', near(mLeft, expectedLeft, 1), `${mLeft} vs ${expectedLeft}`);
+  await mpage.close();
+
   const real = errors.filter((e) => !/favicon|DevTools|useNativeDriver|pointerEvents is deprecated|shadow\*/i.test(e));
   check('no runtime or console errors during the whole run', real.length === 0, real.slice(0, 3).join(' || '));
 

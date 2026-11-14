@@ -39,6 +39,8 @@ export function Sheet({
   // Stays true through the exit animation, then the modal unmounts.
   const [mounted, setMounted] = useState(visible);
   if (visible && !mounted) setMounted(true);
+  // Reduced motion: no exit animation to wait for.
+  if (!visible && mounted && reduce) setMounted(false);
   const [sheetH, setSheetH] = useState(0);
   // 0 hidden, 1 open.
   const open = useSharedValue(visible && reduce ? 1 : 0);
@@ -47,7 +49,6 @@ export function Sheet({
     if (reduce) {
       cancelAnimation(open);
       open.set(visible ? 1 : 0);
-      if (!visible) setMounted(false);
       return;
     }
     if (visible) open.set(withTiming(1, { duration: motion.duration.sheetIn, easing: ease.enter }));
@@ -69,6 +70,7 @@ export function Sheet({
         style={{ flex: 1, justifyContent: 'flex-end' }}>
         <AnimatedPressable
           accessibilityLabel="Close sheet"
+          testID="sheet-backdrop"
           onPress={onClose}
           style={[{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: colors.overlay }, backdropStyle]}
         />

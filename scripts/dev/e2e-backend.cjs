@@ -31,7 +31,8 @@ const server = async () => (await fetch(`${API}/__state`)).json();
 const liveCount = (state) => Object.keys(state.dirty).reduce((n, c) => n + Object.keys(state[c] || {}).length, 0);
 
 async function device(browser, seedJson) {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, colorScheme: 'dark' });
+  // Reduced motion: every animation is instant, so the run is deterministic.
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, colorScheme: 'dark', reducedMotion: 'reduce' });
   if (seedJson) {
     await context.addInitScript((value) => {
       if (!window.sessionStorage.getItem('__seeded')) {

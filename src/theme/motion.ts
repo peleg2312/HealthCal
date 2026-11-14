@@ -119,7 +119,7 @@ function start() {
     });
     return;
   }
-  AccessibilityInfo.isReduceMotionEnabled?.()
+  AccessibilityInfo?.isReduceMotionEnabled?.()
     .then((v) => {
       if (v !== systemReduced) {
         systemReduced = v;
@@ -127,7 +127,7 @@ function start() {
       }
     })
     .catch(() => {});
-  AccessibilityInfo.addEventListener?.('reduceMotionChanged', (v: boolean) => {
+  AccessibilityInfo?.addEventListener?.('reduceMotionChanged', (v: boolean) => {
     systemReduced = v;
     emit();
   });
@@ -144,6 +144,11 @@ export function isReducedMotion(): boolean {
   if (o === false) return true;
   if (o !== true && automated()) return true;
   return systemReduced;
+}
+
+// Lets a browser test confirm which mode the app is in: window.__healthcalMotionOn() is true when animation runs.
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
+  (window as unknown as { __healthcalMotionOn?: () => boolean }).__healthcalMotionOn = () => !isReducedMotion();
 }
 
 function subscribe(l: () => void) {
