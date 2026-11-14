@@ -10,6 +10,8 @@ export { readGarminCsv, looksLikeGarminCsv, englishActivityType, parseCsvRows, p
 export { decodeText } from './text';
 export { suggestActivity, activityFromTitle, mapFitSport, mapTcxSport, mapGarminType, sportKey, type SportMatch } from './sports';
 export { toActivityEntry, garminExternalId, importedEntryId, impliedMet, nearestIntensity, type ConvertContext, type ImportedEntry } from './convert';
-export { checkDuplicates, sameWorkout, type DuplicateCheck, type DedupeCandidate, type ImportStatus } from './dedupe';
-export { prepareImport, chooseActivity, setSelected, entriesToSave, candidateKey, type ImportCandidate } from './plan';
+export { checkDuplicates, sameWorkout, handLoggedMatch, updateGains, type DuplicateCheck, type DedupeCandidate, type ImportStatus, type UpdateGain } from './dedupe';
+export { prepareImport, chooseActivity, setSelected, entriesToSave, candidateKey, asReplacement, netChange, replaceHandLoggedPlan, type ImportCandidate, type ReplaceHandLogged } from './plan';
+export { speedIntensity, SPEED_BANDS } from './effort';
+export { recordedWallTime } from './time';
 export * from './types';

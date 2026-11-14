@@ -86,13 +86,14 @@ export function GoalStep({ draft, set, errors, advance }: StepProps) {
     <Group gap={spacing.xxl}>
       <StepTitle title={name ? `What's your goal, ${name}?` : "What's your goal?"} subtitle="It sets the direction of your calorie target and how much protein you need." />
       <Group gap={spacing.sm}>
-        {options.map((o) => (
+        {options.map((o, i) => (
           <ChoiceCard
             key={o.value}
             testID={`onb-goal-${o.value}`}
             title={o.title}
             hint={o.hint}
-            icon={<GoalCup goal={o.value} />}
+            icon={<GoalCup goal={o.value} index={i} />}
+            size="lg"
             selected={draft.goal === o.value}
             onPress={() => {
               set({ goal: o.value });
@@ -112,7 +113,7 @@ export function SexStep({ draft, set, errors, advance }: StepProps) {
   const { spacing } = useTheme();
   return (
     <Group gap={spacing.xxl}>
-      <StepTitle title="Which body should the equations use?" subtitle="Resting metabolism differs between female and male bodies. Choose the one closest to yours." />
+      <StepTitle title="Which sex should the estimate use?" subtitle="Resting metabolism differs between female and male bodies. Choose the one closest to yours." />
       <Group gap={spacing.sm}>
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
           {(['female', 'male'] as const).map((s) => (
@@ -359,9 +360,10 @@ export function BodyFatStep({ draft, set, errors, submit, advance }: StepProps) 
           <View style={{ flexDirection: 'row', gap: spacing.sm }}>
             <BigNumberField
               style={{ flex: 1 }}
-              label="Neck"
+              label={`Neck, ${lu}`}
+              accessibilityLabel={`Neck, ${imp ? 'inches' : 'centimetres'}`}
               testID="onb-neck-input"
-              unit={lu}
+              size="md"
               decimals={1}
               maxLength={5}
               value={draft.neck}
@@ -370,9 +372,10 @@ export function BodyFatStep({ draft, set, errors, submit, advance }: StepProps) 
             />
             <BigNumberField
               style={{ flex: 1 }}
-              label="Waist"
+              label={`Waist, ${lu}`}
+              accessibilityLabel={`Waist, ${imp ? 'inches' : 'centimetres'}`}
               testID="onb-waist-input"
-              unit={lu}
+              size="md"
               decimals={1}
               maxLength={5}
               value={draft.waist}
@@ -383,9 +386,10 @@ export function BodyFatStep({ draft, set, errors, submit, advance }: StepProps) 
             {draft.sex === 'female' ? (
               <BigNumberField
                 style={{ flex: 1 }}
-                label="Hips"
+                label={`Hips, ${lu}`}
+                accessibilityLabel={`Hips, ${imp ? 'inches' : 'centimetres'}`}
                 testID="onb-hip-input"
-                unit={lu}
+                size="md"
                 decimals={1}
                 maxLength={5}
                 value={draft.hip}
@@ -436,7 +440,7 @@ export function ActivityStep({ draft, set, errors, advance }: StepProps) {
             testID={`onb-activity-${l}`}
             title={ACTIVITY_LABELS[l].title}
             hint={ACTIVITY_LABELS[l].hint}
-            icon={<MiniCup progress={ACTIVITY_LEVEL[l]} color={colors.exercise} width={20} height={26} index={i} memoryKey={`onb-activity-${l}`} />}
+            icon={<MiniCup progress={ACTIVITY_LEVEL[l]} color={colors.exercise} width={24} height={30} index={i} memoryKey={`onb-activity-${l}`} />}
             selected={draft.activity === l}
             onPress={() => {
               set({ activity: l });
@@ -752,7 +756,6 @@ function NudgeCard({
             paddingHorizontal: spacing.md,
             paddingVertical: spacing.sm,
             backgroundColor: colors.surfaceAlt,
-            opacity: value ? 1 : 0.6,
           }}>
           <Text variant="caption" color={value ? 'text' : 'textSecondary'}>
             {example}

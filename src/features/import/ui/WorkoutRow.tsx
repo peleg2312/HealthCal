@@ -7,21 +7,23 @@ import { fonts, useTheme } from '@/theme';
 import type { ISODate, UnitSystem } from '@/types';
 import { Badge, CupKey, PressableScale, Text } from '@/ui';
 
-import type { ImportCandidate } from '../plan';
+import { replaceHandLoggedPlan, type ImportCandidate } from '../plan';
 
 import { calorieView, isTickable, metaLine, slug } from './format';
 
 const STATUS_LABEL: Record<ImportCandidate['status'], string> = {
   new: '',
+  update: 'Update available',
   'already-imported': 'Already imported',
   'duplicate-in-file': 'Listed twice',
   'probable-duplicate': 'Possible duplicate',
 };
 
 /**
- * One workout in the review list. Three siblings, never nested: the tick box,
- * the main area (opens the activity choice), and a Restore link for a workout
- * imported before and deleted.
+ * One workout in the review list. Siblings, never nested: the tick box, the
+ * main area (opens the activity choice), and below it a Restore link for a
+ * workout imported before and deleted, or a Replace link for a workout that
+ * looks like a session logged by hand.
  */
 export function WorkoutRow({
   row,
@@ -31,6 +33,7 @@ export function WorkoutRow({
   onToggle,
   onChoose,
   onRestore,
+  onReplace,
 }: {
   row: ImportCandidate;
   units: UnitSystem;
@@ -39,6 +42,7 @@ export function WorkoutRow({
   onToggle: (key: string) => void;
   onChoose: (key: string) => void;
   onRestore: (key: string) => void;
+  onReplace: (key: string) => void;
 }) {
   const { colors, spacing } = useTheme();
   const w = row.workout;
@@ -52,6 +56,7 @@ export function WorkoutRow({
   const statusLabel = STATUS_LABEL[row.status];
   const imported = row.status === 'already-imported';
   const meta = metaLine(w, todayDate, units, hour12);
+  const replaceable = replaceHandLoggedPlan(row) !== null;
 
   return (
     <View testID={`import-row-${id}`} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, paddingVertical: 6 }}>
@@ -129,6 +134,18 @@ export function WorkoutRow({
               <Text variant="caption" color="textSecondary">
                 {row.reason}
               </Text>
+            ) : null}
+            {replaceable ? (
+              <PressableScale
+                testID={`import-replace-${id}`}
+                accessibilityLabel="Replace my hand-logged session with this workout"
+                onPress={() => onReplace(row.key)}
+                hitSlop={8}
+                style={{ alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center' }}>
+                <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
+                  Replace my hand-logged session
+                </Text>
+              </PressableScale>
             ) : null}
             {imported && row.match?.deleted ? (
               <PressableScale testID={`import-restore-${id}`} accessibilityLabel="Restore this workout" onPress={() => onRestore(row.key)} hitSlop={8} style={{ alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center' }}>

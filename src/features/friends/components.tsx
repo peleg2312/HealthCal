@@ -361,7 +361,7 @@ export function SharingSwitches({ sharing, onChange }: { sharing: SocialSharing;
       <Text variant="label" color="textSecondary" style={{ marginBottom: spacing.xs }}>
         What friends see
       </Text>
-      <ToggleRow testID="friends-share-minutes" title="Active minutes" subtitle="Minutes and sessions this week" value={sharing.minutes} onChange={(v) => onChange('minutes', v)} />
+      <ToggleRow testID="friends-share-minutes" title="Active minutes" subtitle="Weekly total and sessions. Workout lengths show with recent workouts" value={sharing.minutes} onChange={(v) => onChange('minutes', v)} />
       <Divider />
       <ToggleRow testID="friends-share-streak" title="Logging streak" subtitle="How many days in a row you have logged" value={sharing.streak} onChange={(v) => onChange('streak', v)} />
       <Divider />

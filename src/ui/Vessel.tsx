@@ -5,8 +5,8 @@ import Svg, { Line } from 'react-native-svg';
 
 import { motion, useTheme, vesselBase } from '@/theme';
 
-import { useFadeAfter, usePour } from './motion';
-import { fillRatio, levelY, placeLabels } from './vesselLayout';
+import { useFadeAfter, usePour, useReachFlash } from './motion';
+import { brimOverhang, fillRatio, goalState, levelY, placeLabels, type GoalKind } from './vesselLayout';
 
 const EDGE = 1.5;
 
@@ -39,8 +39,20 @@ export interface VesselLabel {
 export interface VesselProps {
   /** Amount poured, in any unit. */
   value: number;
-  /** The vessel's capacity (the budget or goal) in the same unit. Past it, the fill reaches the top and an amber lip shows. */
+  /** The vessel's capacity (the budget or goal) in the same unit. Past it the fill stays at the top: amber for a limit, the brim line for a goal to reach (see `goalKind`). */
   max: number;
+  /**
+   * What `max` means. 'limit' (default): a budget, so going past it shows the amber lip.
+   * 'reach': a goal to get to (water, activity minutes, protein), so at or past it the cup is
+   * brim-full and wears the brim line, never amber. Pass the real value, not one capped at `max`.
+   */
+  goalKind?: GoalKind;
+  /**
+   * 'reach' only: called once when the level crosses the goal while this cup is on screen, in
+   * the same tick as the change (also under reduced motion). Add the haptic and the line of
+   * text here. Not called for a cup that mounts already full; see `useReachFlash` for the rule.
+   */
+  onReached?: () => void;
   /** Fill colour (a data colour). */
   color: string;
   width?: number;
@@ -49,7 +61,7 @@ export interface VesselProps {
   headroom?: number;
   /** Hatch the fill itself: a day that is not finished yet. */
   hatchFill?: boolean;
-  /** The 2 px lip line overhanging the open top. On by default for vessels 120 px or taller. */
+  /** @deprecated Pour cups are plain tumblers: no lip line overhangs the open top. Accepted and ignored. */
   lip?: boolean;
   /** Level line thickness: 3, or 2.5 in small cups. */
   rimWidth?: number;
@@ -75,12 +87,29 @@ export interface VesselProps {
 }
 
 /**
- * The open cup that replaces rings: sides and a round base in vesselEdge, no
- * top edge, a flat fill from the bottom and a rim (the level line) on the
- * fill. Optional hatched headroom at the top, an amber lip when the value
- * passes `max`, and labels beside it at the height they describe.
+ * The open cup that replaces rings. It is a tumbler: straight sides and a round
+ * base in vesselEdge, square at the open top, with no top edge and no lip. A
+ * flat fill rises from the bottom with the rim (the level line) on it. The part
+ * not filled is `vesselEmpty` (the card colour), so room left reads as empty.
+ * Optional hatched headroom at the top, and labels beside the cup at the
+ * height they describe.
+ *
+ * What happens at the goal depends on `goalKind`:
+ * - 'limit' (a budget, the default): past `max` the fill stays at the top and
+ *   an amber lip sits across it. Amber means over, with neutral words.
+ * - 'reach' (water, activity minutes, protein): at or past `max` the cup is
+ *   brim-full and the level line becomes the brim line. It lies across the
+ *   open top, wider than the cup (3 to 6 px past each side) and 1 px heavier,
+ *   so a reached goal is told from 98% in a still picture: below the goal the
+ *   line is inside the cup, at the goal it lies across it. No amber, no badge.
+ *   When the level crosses the goal while the cup is on screen, the brim line
+ *   spreads into place as the pour lands and flashes once in the data colour
+ *   (a flat band behind the line; never looped, skipped under reduced motion,
+ *   not replayed on a remount with the same `memoryKey`). `onReached` fires at
+ *   that crossing, so the screen can add `haptic.success()` and a line of text.
  *
  *   <Vessel value={eaten} max={budget} headroom={exercise} color={colors.calories} labels={...}>{macros}</Vessel>
+ *   <Vessel value={drunk} max={goal} goalKind="reach" onReached={celebrate} memoryKey={`water-${date}`} color={colors.water} />
  */
 export function Vessel({
   value,
@@ -90,12 +119,14 @@ export function Vessel({
   height = 212,
   headroom = 0,
   hatchFill,
-  lip,
+  lip: _lip,
   rimWidth = 3,
   future,
   labels,
   children,
   labelGap = 16,
+  goalKind = 'limit',
+  onReached,
   animate = true,
   duration = motion.duration.pour,
   delay = 0,
@@ -108,21 +139,31 @@ export function Vessel({
   const inner = height - EDGE;
   const innerW = width - 2 * EDGE;
   const ratio = fillRatio(value, max);
-  const over = max > 0 && value > max;
+  const state = future ? 'under' : goalState(value, max, goalKind);
+  const over = state === 'over';
+  const reached = state === 'reached';
   const base = vesselBase(height, width);
-  const showLip = lip ?? height >= 120;
   const pour = usePour(ratio, { animate: animate && !future, duration, delay, memoryKey });
   const headH = max > 0 ? Math.min(inner, (Math.max(0, headroom) / max) * inner) : 0;
   const [childH, setChildH] = useState(0);
-  // The hatched headroom fades in once the pour has landed; the over-target lip appears at its end.
+  // The hatched headroom fades in once the pour has landed; the over-target lip and the brim line appear at its end.
   const headOpacity = useFadeAfter(headH > 0, pour.endsIn, pour.instant);
   const lipOpacity = useFadeAfter(over, pour.endsIn, pour.instant);
+  const brimOpacity = useFadeAfter(reached, pour.endsIn, pour.instant);
+  const flash = useReachFlash(reached, { delay: pour.endsIn, instant: pour.instant, memoryKey, onReached });
   const { level, settle } = pour;
-  // Only transforms animate: the fill is full height and slides up inside the clipped cup.
+  // The brim line: the level line lying across the open top, wider than the cup and 1 px heavier.
+  const out = brimOverhang(width);
+  const brimH = rimWidth + 1;
+  const brimFrom = width / (width + 2 * out);
+  // Only transforms and opacity animate: the fill is full height and slides up inside the clipped cup.
   const fillStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - level.get()) * inner }] }));
   const rimStyle = useAnimatedStyle(() => ({ opacity: level.get() > 0.0005 ? 1 : 0, transform: [{ translateY: -settle.get() }] }));
   const headStyle = useAnimatedStyle(() => ({ opacity: headOpacity.get() }));
   const lipStyle = useAnimatedStyle(() => ({ opacity: lipOpacity.get() }));
+  // It spreads from the cup's own width to its full width as it appears.
+  const brimStyle = useAnimatedStyle(() => ({ opacity: brimOpacity.get(), transform: [{ scaleX: brimFrom + (1 - brimFrom) * brimOpacity.get() }] }));
+  const flashStyle = useAnimatedStyle(() => ({ opacity: flash.get() }));
 
   const cupView = future ? (
     <View
@@ -151,7 +192,7 @@ export function Vessel({
           borderColor: colors.vesselEdge,
           borderBottomLeftRadius: base,
           borderBottomRightRadius: base,
-          backgroundColor: colors.track,
+          backgroundColor: colors.vesselEmpty,
           overflow: 'hidden',
         }}>
         {headH > 0 ? (
@@ -166,8 +207,14 @@ export function Vessel({
           <Animated.View style={[{ position: 'absolute', left: 0, right: 0, top: -rimWidth / 2, height: rimWidth, backgroundColor: colors.rim }, rimStyle]} />
         </Animated.View>
       </View>
-      {showLip ? <View style={{ position: 'absolute', left: -6, right: -6, top: -1, height: 2, backgroundColor: colors.vesselEdge }} /> : null}
-      {over ? <Animated.View style={[{ position: 'absolute', left: -3, right: -3, top: showLip ? -6 : -4, height: 5, borderRadius: 2, backgroundColor: colors.warning }, lipStyle]} /> : null}
+      {over ? <Animated.View style={[{ position: 'absolute', left: -3, right: -3, top: -4, height: 5, borderRadius: 2, backgroundColor: colors.warning }, lipStyle]} /> : null}
+      {reached ? (
+        <>
+          {/* One flash in the data colour behind the brim line, at the crossing only. */}
+          <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: -out - 3, right: -out - 3, top: -brimH / 2 - 3, height: brimH + 6, borderRadius: 2, backgroundColor: color }, flashStyle]} />
+          <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: -out, right: -out, top: -brimH / 2, height: brimH, borderRadius: 1, backgroundColor: colors.rim }, brimStyle]} />
+        </>
+      ) : null}
     </View>
   );
 
@@ -222,9 +269,12 @@ export function Vessel({
 
 /**
  * A small cup for week strips and lists (30 x 38 in the week strip, 30 x 26 on
- * friend cards). 2.5 px rim, amber lip when over, dashed outline for a future day.
+ * friend cards). 2.5 px rim, dashed outline for a future day. With the default
+ * `goalKind` an amber lip shows when over; with `goalKind="reach"` a cup at or
+ * past 1 wears the brim line instead (see `Vessel`).
  *
  *   <MiniCup progress={eaten / budget} color={colors.calories} />
+ *   <MiniCup progress={minutes / goal} goalKind="reach" color={colors.exercise} />
  */
 export function MiniCup({
   progress,
@@ -234,20 +284,26 @@ export function MiniCup({
   future,
   over,
   hatchFill,
+  goalKind = 'limit',
+  onReached,
   index = 0,
   memoryKey,
   animate = true,
   style,
 }: {
-  /** 0..1 of the target; above 1 shows the amber lip. */
+  /** 0..1 of the target; above 1 shows the amber lip (or, for a goal to reach, the brim line from 1 up). */
   progress: number;
   color: string;
   width?: number;
   height?: number;
   future?: boolean;
-  /** Force the over-target lip (by default it shows when progress > 1). */
+  /** 'limit' only: force the over-target lip on or off (by default it shows when progress > 1). */
   over?: boolean;
   hatchFill?: boolean;
+  /** 'limit' (default) or 'reach': a goal to get to, shown brim-full with the brim line at or past 1, never amber. */
+  goalKind?: GoalKind;
+  /** 'reach' only: called once when the level crosses the goal while the cup is on screen (see `Vessel`). */
+  onReached?: () => void;
   /** Position in a row: cups pour left to right, `motion.duration.stagger` ms apart. */
   index?: number;
   /** Remember this cup's level for the session (e.g. `cal-${date}`), so a past day does not pour again on a revisit. */
@@ -257,18 +313,19 @@ export function MiniCup({
   style?: StyleProp<ViewStyle>;
 }) {
   const p = Number.isFinite(progress) ? Math.max(0, progress) : 0;
-  const isOver = over ?? p > 1;
+  const isOver = goalKind === 'limit' && (over ?? p > 1);
   return (
     <Vessel
-      value={isOver ? Math.max(p, 1.0001) : p}
+      value={isOver ? Math.max(p, 1.0001) : goalKind === 'limit' ? Math.min(p, 1) : p}
       max={1}
       color={color}
       width={width}
       height={height}
       rimWidth={2.5}
-      lip={false}
       future={future}
       hatchFill={hatchFill}
+      goalKind={goalKind}
+      onReached={onReached}
       animate={animate}
       duration={motion.duration.pourSmall}
       delay={index * motion.duration.stagger}
@@ -280,7 +337,11 @@ export function MiniCup({
 
 /**
  * The vessel turned sideways (diary summary): open on the left with a 2 px
- * base mark, hatched headroom at the right end, the rim tick at the fill's end.
+ * base mark, hatched headroom at the right end, the rim tick at the fill's
+ * end. The part not filled is `vesselEmpty`. Past `max` an amber lip closes
+ * the right end; with `goalKind="reach"` the tick instead becomes the brim
+ * tick at the end (taller and 1 px heavier), with one flash in the data
+ * colour at the crossing (see `Vessel`).
  *
  *   <Trough value={eaten} max={budget} headroom={exercise} color={colors.calories} />
  */
@@ -290,6 +351,8 @@ export function Trough({
   color,
   headroom = 0,
   height = 14,
+  goalKind = 'limit',
+  onReached,
   animate = true,
   duration = motion.duration.pourSmall,
   delay = 0,
@@ -302,6 +365,10 @@ export function Trough({
   color: string;
   headroom?: number;
   height?: number;
+  /** 'limit' (default): amber past `max`. 'reach': a goal to get to, shown full with the brim tick, never amber. */
+  goalKind?: GoalKind;
+  /** 'reach' only: called once when the level crosses the goal while the trough is on screen (see `Vessel`). */
+  onReached?: () => void;
   /** Pour on mount and on change (default true). */
   animate?: boolean;
   duration?: number;
@@ -314,19 +381,25 @@ export function Trough({
   const { colors } = useTheme();
   const [w, setW] = useState(0);
   const ratio = fillRatio(value, max);
-  const over = max > 0 && value > max;
+  const state = goalState(value, max, goalKind);
+  const over = state === 'over';
+  const reached = state === 'reached';
   const pour = usePour(ratio, { animate, duration, delay, memoryKey });
   const innerW = Math.max(0, w - EDGE);
   const innerH = height - 2 * EDGE;
   const headW = max > 0 ? Math.min(innerW, (Math.max(0, headroom) / max) * innerW) : 0;
   const headOpacity = useFadeAfter(headW > 0, pour.endsIn, pour.instant);
   const lipOpacity = useFadeAfter(over, pour.endsIn, pour.instant);
+  const brimOpacity = useFadeAfter(reached, pour.endsIn, pour.instant);
+  const flash = useReachFlash(reached, { delay: pour.endsIn, instant: pour.instant, memoryKey, onReached });
   const { level, settle } = pour;
   // The fill is full width and slides in from the open left end; the tick rides on its edge.
   const fillStyle = useAnimatedStyle(() => ({ transform: [{ translateX: -(1 - level.get()) * innerW }] }));
   const tickStyle = useAnimatedStyle(() => ({ opacity: level.get() > 0.0005 ? 1 : 0, transform: [{ translateX: level.get() * innerW + settle.get() }] }));
   const headStyle = useAnimatedStyle(() => ({ opacity: headOpacity.get() }));
   const lipStyle = useAnimatedStyle(() => ({ opacity: lipOpacity.get() }));
+  const brimStyle = useAnimatedStyle(() => ({ opacity: brimOpacity.get() }));
+  const flashStyle = useAnimatedStyle(() => ({ opacity: flash.get() }));
   return (
     <View
       testID={testID}
@@ -341,7 +414,7 @@ export function Trough({
           right: 0,
           top: 0,
           bottom: 0,
-          backgroundColor: colors.track,
+          backgroundColor: colors.vesselEmpty,
           borderWidth: EDGE,
           borderLeftWidth: 0,
           borderColor: colors.vesselEdge,
@@ -358,9 +431,12 @@ export function Trough({
         {innerW > 0 ? <Animated.View style={[{ position: 'absolute', top: 0, bottom: 0, left: 0, width: innerW, backgroundColor: color }, fillStyle]} /> : null}
       </View>
       <View style={{ position: 'absolute', left: 0, top: -4, bottom: -4, width: 2, backgroundColor: colors.vesselEdge }} />
+      {reached && innerW > 0 ? <Animated.View pointerEvents="none" style={[{ position: 'absolute', right: -5, top: -11, bottom: -11, width: 10, borderRadius: 2, backgroundColor: color }, flashStyle]} /> : null}
       {innerW > 0 ? (
         <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: -5, bottom: -5, left: 0, width: 0 }, tickStyle]}>
           <View style={{ position: 'absolute', left: -1.5, top: 0, bottom: 0, width: 3, borderRadius: 1, backgroundColor: colors.rim }} />
+          {/* The brim tick of a reached goal: the same line, taller and 1 px heavier, at the end. */}
+          {reached ? <Animated.View style={[{ position: 'absolute', left: -2, top: -3, bottom: -3, width: 4, borderRadius: 1, backgroundColor: colors.rim }, brimStyle]} /> : null}
         </Animated.View>
       ) : null}
       {over ? <Animated.View style={[{ position: 'absolute', right: -4, top: -3, bottom: -3, width: 5, borderRadius: 2, backgroundColor: colors.warning }, lipStyle]} /> : null}

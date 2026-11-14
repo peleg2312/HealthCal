@@ -1,11 +1,14 @@
 /**
  * What a friend is allowed to see of a week: active minutes, sessions, the
- * logging streak and recent workouts (name, length, distance). Calories,
- * weight and food are never part of it. Pure, so the rule is unit-tested;
- * the server rebuilds the summary from the same short list of fields.
+ * logging streak and recent workouts (activity, length, distance, date).
+ * Calories, weight, food, heart rate, notes, the time of day and anything
+ * naming a place are never part of it. Pure, so the rule is unit-tested; the
+ * server rebuilds the summary from the same short list of fields.
  */
+import { ACTIVITY_BY_ID } from '@/data/activities';
 import { addDays, startOfWeek } from '@/lib/dates';
 import { guidelineMinutes } from '@/lib/exercise';
+import { sha256Hex } from '@/lib/sha256';
 import { computeConsistency } from '@/store/selectors';
 import type { ActivityEntry, FoodEntry, ISODate } from '@/types';
 
@@ -21,6 +24,7 @@ export interface SocialSharing {
 export const DEFAULT_SHARING: SocialSharing = { workouts: true, streak: true, minutes: true };
 
 export interface FriendWorkout {
+  /** An opaque reference (see shareRef), never the record id. Cheers carry it. */
   id: string;
   name: string;
   emoji: string;
@@ -43,7 +47,34 @@ export interface FriendSummary {
 export const WORKOUT_WINDOW_DAYS = 14;
 export const MAX_SHARED_WORKOUTS = 8;
 
-export function buildFriendSummary(input: { activities: ActivityEntry[]; foodEntries: FoodEntry[]; today: ISODate; sharing: SocialSharing }): FriendSummary {
+/**
+ * How friends refer to one of the user's workouts: the first 32 hex characters
+ * of SHA-256(shareKey + ':' + recordId). The record id itself must never be
+ * published, because an imported workout's id is derived from its start time.
+ * shareKey is a secret the server gives only to its owner, so nobody else can
+ * work back from a reference to the id. The database accepts only this shape.
+ */
+export function shareRef(shareKey: string, recordId: string): string {
+  return sha256Hex(`${shareKey}:${recordId}`).slice(0, 32);
+}
+
+/** The user's own workouts by the reference friends cheer them with. Empty without a share key. */
+export function ownWorkoutsByRef(activities: readonly ActivityEntry[], shareKey: string | null | undefined): Map<string, { name: string }> {
+  if (!shareKey) return new Map();
+  return new Map(activities.map((a) => [shareRef(shareKey, a.id), { name: a.name }]));
+}
+
+/**
+ * The activity as friends see it: its catalogue name and emoji, never what is
+ * stored on the entry, which for an imported session could have come from the
+ * device's title ("Amsterdam Running"). An unknown activity is just a workout.
+ */
+function publicActivity(a: ActivityEntry): { name: string; emoji: string } {
+  const def = ACTIVITY_BY_ID[a.activityId];
+  return def ? { name: def.name, emoji: def.emoji } : { name: 'Workout', emoji: '' };
+}
+
+export function buildFriendSummary(input: { activities: ActivityEntry[]; foodEntries: FoodEntry[]; today: ISODate; sharing: SocialSharing; shareKey: string | null | undefined }): FriendSummary {
   const { today, sharing } = input;
   const week = startOfWeek(today);
   const live = input.activities.filter((a) => !a.deleted && a.date <= today);
@@ -58,16 +89,17 @@ export function buildFriendSummary(input: { activities: ActivityEntry[]; foodEnt
     const dates = new Set(input.foodEntries.filter((e) => !e.deleted).map((e) => e.date));
     summary.streak = computeConsistency(dates, today).streak;
   }
-  if (sharing.workouts) {
+  // Without the owner's share key there is no safe reference, so no workouts rather than real ids.
+  if (sharing.workouts && input.shareKey) {
+    const key = input.shareKey;
     const since = addDays(today, -(WORKOUT_WINDOW_DAYS - 1));
     summary.workouts = live
       .filter((a) => a.date >= since)
       .sort((a, b) => b.date.localeCompare(a.date) || b.loggedAt.localeCompare(a.loggedAt))
       .slice(0, MAX_SHARED_WORKOUTS)
       .map((a) => ({
-        id: a.id,
-        name: a.name,
-        emoji: a.emoji,
+        id: shareRef(key, a.id),
+        ...publicActivity(a),
         minutes: Math.round(a.durationMin),
         date: a.date,
         ...(a.distanceKm && a.distanceKm > 0 ? { distanceKm: Math.round(a.distanceKm * 10) / 10 } : null),

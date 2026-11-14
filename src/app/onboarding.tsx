@@ -1,14 +1,15 @@
 import { Redirect, router } from 'expo-router';
 import { ArrowRight, BellRing, ChevronLeft, CloudUpload } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
+import { useColorScheme, View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
 
-import { FadeIn, StepProgress } from '@/features/onboarding/_before/components';
-import { buildPlan, draftFromProfile, effectiveBodyFat, stepsFor, toMetric, useOnboardingDraft, validateStep, type StepId } from '@/features/onboarding/_before/model';
-import { PlanReveal } from '@/features/onboarding/_before/PlanReveal';
+import { FadeIn, StepProgress, StepSlide } from '@/features/onboarding/components';
+import { buildPlan, draftFromProfile, effectiveBodyFat, stepsFor, toMetric, useOnboardingDraft, validateStep, type StepId } from '@/features/onboarding/model';
+import { PlanReveal } from '@/features/onboarding/PlanReveal';
 import { remindersPatch } from '@/features/onboarding/routine';
 import { RestoreFailed } from '@/features/onboarding/SignInGate';
-import { AboutStep, ActivityStep, BasicsStep, BodyFatStep, BodyStep, GoalStep, RoutineStep, TargetStep, type StepProps } from '@/features/onboarding/_before/steps';
+import { AboutStep, ActivityStep, BasicsStep, BodyFatStep, BodyStep, GoalStep, RoutineStep, SexStep, TargetStep, type StepProps } from '@/features/onboarding/steps';
+import { commitThemeChoice, ThemeStep, useMatchPhone } from '@/features/onboarding/ThemeStep';
 import { today } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
 import { round } from '@/lib/units';
@@ -16,20 +17,32 @@ import { useAuth } from '@/services/auth';
 import { remindersSupported, requestReminderPermission } from '@/services/notifications';
 import { isBackendConfigured } from '@/services/supabase';
 import { useStore } from '@/store';
+import { useNow } from '@/store/clock';
 import { live } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { ThemeProvider, useTheme } from '@/theme';
 import { Button, goBack, haptic, IconButton, Screen, Text, toast } from '@/ui';
 
 const STEP_COMPONENTS: Record<Exclude<StepId, 'plan'>, (p: StepProps) => React.ReactElement> = {
   basics: BasicsStep,
   goal: GoalStep,
+  sex: SexStep,
   about: AboutStep,
   body: BodyStep,
   bodyfat: BodyFatStep,
   activity: ActivityStep,
   target: TargetStep,
   routine: RoutineStep,
+  theme: ThemeStep,
 };
+
+/** How long a chosen tile is seen as chosen before a single-choice step moves on by itself. */
+const CHOICE_BEAT = 250;
+/**
+ * After a step moved on by itself, a Continue tap this soon was aimed at the
+ * screen that just left. It is dropped, so nobody gets an error for a question
+ * they have not seen yet.
+ */
+const STRAY_TAP = 450;
 
 export default function Onboarding() {
   // Decided once on arrival, so finishing here does not bounce the account offer away.
@@ -42,7 +55,26 @@ export default function Onboarding() {
   if (arrivedOnboarded) return <Redirect href="/" />;
   if (offerAccount) return <AccountOffer />;
   if (blockedByRestore && !onboardedNow) return <RestoreFailed />;
-  return <Flow onFinished={() => setOfferAccount(true)} />;
+  return (
+    <ChosenLook>
+      <Flow onFinished={() => setOfferAccount(true)} />
+    </ChosenLook>
+  );
+}
+
+/**
+ * Until set-up ends the app shows its lead look when the stored choice is
+ * "Match my phone". Once that card was tapped on the look step, the choice is
+ * real, so set-up shows what the phone asks for: the preview is the real thing.
+ */
+function ChosenLook({ children }: { children: React.ReactNode }) {
+  const preference = useStore((s) => s.settings.theme);
+  const matchPhone = useMatchPhone((s) => s.picked);
+  return (
+    <ThemeProvider preference={preference} lead={!matchPhone}>
+      {children}
+    </ThemeProvider>
+  );
 }
 
 function Flow({ onFinished }: { onFinished: () => void }) {
@@ -51,10 +83,16 @@ function Flow({ onFinished }: { onFinished: () => void }) {
   const stepIndex = useOnboardingDraft((s) => s.step);
   const set = useOnboardingDraft((s) => s.set);
   const setStep = useOnboardingDraft((s) => s.setStep);
+  const now = useNow();
+  const scheme = useColorScheme();
   const [showErrors, setShowErrors] = useState(false);
   const [direction, setDirection] = useState<1 | -1>(1);
+  // The first step arrives with the screen's own fade-up; later ones slide.
+  const [moved, setMoved] = useState(false);
   const scrollRef = useRef<ScrollViewInstance>(null);
   const finishing = useRef(false);
+  const beat = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const movedByItselfAt = useRef(0);
   const [asking, setAsking] = useState(false);
 
   // A finished profile can arrive from a late sync while the answers are being given:
@@ -78,37 +116,80 @@ function Flow({ onFinished }: { onFinished: () => void }) {
     if (profile && state.step === 0 && !state.draft.name && !state.draft.goal) state.reset(draftFromProfile(profile));
   }, []);
 
+  useEffect(
+    () => () => {
+      if (beat.current) clearTimeout(beat.current);
+    },
+    [],
+  );
+
   const steps = stepsFor(draft.goal);
   const index = Math.min(stepIndex, steps.length - 1);
   const step = steps[index];
-  const errors = showErrors ? validateStep(step, draft) : {};
-  const plan = step === 'plan' ? buildPlan(draft) : null;
+  const questions = steps.length - 1;
+  const errors = showErrors ? validateStep(step, draft, now) : {};
+  const plan = step === 'plan' ? buildPlan(draft, now) : null;
 
-  const go = (next: number) => {
-    setDirection(next > index ? 1 : -1);
+  /** Where the flow stands right now, read from the store: handlers and timers must not use a render's copy. */
+  const where = () => {
+    const s = useOnboardingDraft.getState();
+    const list = stepsFor(s.draft.goal);
+    const at = Math.min(s.step, list.length - 1);
+    return { draft: s.draft, list, at, id: list[at] };
+  };
+
+  const go = (to: number) => {
+    if (beat.current) clearTimeout(beat.current);
+    beat.current = null;
+    const { at } = where();
+    setDirection(to > at ? 1 : -1);
+    setMoved(true);
     setShowErrors(false);
-    setStep(next);
+    setStep(to);
     scrollRef.current?.scrollTo({ y: 0, animated: false });
   };
 
-  const next = () => {
-    const errs = validateStep(step, draft);
-    if (Object.keys(errs).length > 0) {
+  const tryNext = (): boolean => {
+    const { draft: d, list, at, id } = where();
+    if (Object.keys(validateStep(id, d)).length > 0) {
       setShowErrors(true);
       haptic.warn();
-      return;
+      return false;
     }
-    if (index < steps.length - 1) go(index + 1);
+    if (at < list.length - 1) go(at + 1);
+    return true;
+  };
+
+  const next = () => {
+    if (Date.now() - movedByItselfAt.current < STRAY_TAP) return;
+    tryNext();
+  };
+
+  /** A single-choice answer was tapped: let it be seen, then move on. Back, Continue and another tap all cancel the wait. */
+  const advance = () => {
+    if (beat.current) clearTimeout(beat.current);
+    beat.current = null;
+    // A second tap that lands on the next screen picks an answer there but does not skip that screen too.
+    if (Date.now() - movedByItselfAt.current < STRAY_TAP) return;
+    const from = where().id;
+    beat.current = setTimeout(() => {
+      beat.current = null;
+      if (where().id !== from) return;
+      if (tryNext()) movedByItselfAt.current = Date.now();
+    }, CHOICE_BEAT);
   };
 
   const back = () => {
-    if (index === 0) goBack('/welcome');
-    else go(index - 1);
+    const { at } = where();
+    if (at === 0) {
+      if (beat.current) clearTimeout(beat.current);
+      goBack('/welcome');
+    } else go(at - 1);
   };
 
   /** The routine step's two equal answers: both save the times, only one turns reminders on. */
   const answerReminders = async (turnOn: boolean) => {
-    const errs = validateStep('routine', draft);
+    const errs = validateStep('routine', where().draft);
     if (Object.keys(errs).length > 0) {
       setShowErrors(true);
       haptic.warn();
@@ -127,11 +208,13 @@ function Flow({ onFinished }: { onFinished: () => void }) {
       }
     }
     set({ remindersOn: on });
-    go(index + 1);
+    const { at, id } = where();
+    if (id === 'routine') go(at + 1);
   };
 
   const finish = () => {
-    const built = buildPlan(draft);
+    const d = where().draft;
+    const built = buildPlan(d);
     if (!built || finishing.current) return;
     finishing.current = true;
     const store = useStore.getState();
@@ -141,12 +224,14 @@ function Flow({ onFinished }: { onFinished: () => void }) {
       router.replace('/');
       return;
     }
+    // The look that was on screen becomes the stored choice, whichever way the look step was left.
+    commitThemeChoice(scheme);
     store.setProfile({ ...built.profile, onboardedAt: nowISO() });
-    if (draft.remindersOn !== null) store.setReminders(remindersPatch(draft.routine, draft.remindersOn));
+    if (d.remindersOn !== null) store.setReminders(remindersPatch(d.routine, d.remindersOn));
     // The first weigh-in starts the trend; reuse today's record if one was synced down.
     const existing = live(store.weights).find((w) => w.date === today());
-    const m = toMetric(draft);
-    const tape = draft.bodyFatMode === 'tape' && effectiveBodyFat(draft) !== undefined;
+    const m = toMetric(d);
+    const tape = d.bodyFatMode === 'tape' && effectiveBodyFat(d) !== undefined;
     store.upsert('weights', {
       ...(existing ? { id: existing.id } : {}),
       date: today(),
@@ -154,7 +239,7 @@ function Flow({ onFinished }: { onFinished: () => void }) {
       ...(built.profile.bodyFatPct !== undefined ? { bodyFatPct: built.profile.bodyFatPct } : {}),
       ...(tape && m.neckCm !== null ? { neckCm: round(m.neckCm, 1) } : {}),
       ...(tape && m.waistCm !== null ? { waistCm: round(m.waistCm, 1) } : {}),
-      ...(tape && draft.sex === 'female' && m.hipCm !== null ? { hipCm: round(m.hipCm, 1) } : {}),
+      ...(tape && d.sex === 'female' && m.hipCm !== null ? { hipCm: round(m.hipCm, 1) } : {}),
     });
     haptic.success();
     useOnboardingDraft.getState().reset();
@@ -163,25 +248,29 @@ function Flow({ onFinished }: { onFinished: () => void }) {
   };
 
   const Body = step === 'plan' ? null : STEP_COMPONENTS[step];
+  const arrived = step === 'plan';
 
   return (
     <Screen
       testID="onboarding-screen"
       scrollProps={{ ref: scrollRef } as ScrollViewProps}
-      contentStyle={{ paddingTop: spacing.lg }}
+      contentStyle={{ paddingTop: arrived ? spacing.xxl : spacing.lg }}
       header={
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56 }}>
-          <IconButton accessibilityLabel={index === 0 ? 'Back to welcome' : 'Previous question'} onPress={back} testID="onb-back">
-            <ChevronLeft size={22} color={colors.text} />
-          </IconButton>
-          <StepProgress index={index} total={steps.length} />
-          <Text variant="label" color="textSecondary" tabular style={{ minWidth: 40, textAlign: 'right' }} testID="onb-step-count">
-            {`${index + 1} of ${steps.length}`}
-          </Text>
-        </View>
+        // The plan is an arrival, not a tenth question: no back chevron, no progress, no count.
+        arrived ? undefined : (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56 }}>
+            <IconButton accessibilityLabel={index === 0 ? 'Back to welcome' : 'Previous question'} onPress={back} testID="onb-back">
+              <ChevronLeft size={22} color={colors.text} />
+            </IconButton>
+            <StepProgress index={index} total={questions} />
+            <Text variant="label" color="textSecondary" tabular style={{ minWidth: 48, textAlign: 'right' }} testID="onb-step-count">
+              {`${index + 1} of ${questions}`}
+            </Text>
+          </View>
+        )
       }
       footer={
-        step === 'plan' ? (
+        arrived ? (
           <Button title="Start tracking" testID="onb-finish" onPress={finish} disabled={!plan} iconRight={<ArrowRight size={18} color={colors.onPrimary} />} />
         ) : step === 'routine' ? (
           <View style={{ gap: spacing.sm }}>
@@ -197,25 +286,17 @@ function Flow({ onFinished }: { onFinished: () => void }) {
             <Button title="Not now" variant="ghost" testID="onb-reminders-skip" disabled={asking} onPress={() => void answerReminders(false)} />
           </View>
         ) : (
-          <Button title="Continue" testID="onb-next" onPress={next} />
+          <Button title={step === 'theme' ? 'See my plan' : 'Continue'} testID="onb-next" onPress={next} />
         )
       }>
-      <StepTransition key={step} direction={direction}>
-        {Body ? <Body draft={draft} set={set} errors={errors} submit={next} /> : plan ? <PlanReveal plan={plan} /> : null}
-      </StepTransition>
+      {Body ? (
+        <StepSlide key={step} direction={direction} disabled={!moved}>
+          <Body draft={draft} set={set} errors={errors} submit={next} advance={advance} />
+        </StepSlide>
+      ) : plan ? (
+        <PlanReveal plan={plan} now={now} onChangeAnswers={back} />
+      ) : null}
     </Screen>
-  );
-}
-
-function StepTransition({ direction, children }: { direction: 1 | -1; children: React.ReactNode }) {
-  const [v] = useState(() => new Animated.Value(0));
-  useEffect(() => {
-    Animated.timing(v, { toValue: 1, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-  }, [v]);
-  return (
-    <Animated.View style={{ opacity: v, transform: [{ translateX: v.interpolate({ inputRange: [0, 1], outputRange: [direction * 28, 0] }) }] }}>
-      {children}
-    </Animated.View>
   );
 }
 

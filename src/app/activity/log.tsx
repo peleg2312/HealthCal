@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { ACTIVITY_BY_ID, MET_SOURCES } from '@/data/activities';
-import { basisFromEntry, estimateSession, formatPace, localiseSpeedText, paceModeFor, sessionWaterMl } from '@/features/activity/build';
+import { basisFromEntry, formatPace, localiseSpeedText, paceModeFor, sessionPreview, sessionWaterMl } from '@/features/activity/build';
 import { DateStepper } from '@/features/activity/components';
 import { deleteActivity, leaveFlow, saveActivity } from '@/features/activity/session';
 import { formatDayLabel, today } from '@/lib/dates';
@@ -70,7 +70,11 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
   const current = { weightKg: profile.weightKg, baselineKcalPerDay: formulaTdee(profile) };
   const basis = entry ? basisFromEntry(entry, current) : current;
   const tdee = basis.baselineKcalPerDay;
-  const est = estimateSession(met, basis.weightKg, minutes, tdee);
+  // A device-measured session shows its stored figures until something that prices it changes.
+  const preview = sessionPreview(entry, { activityId, intensity, durationMin: minutes, met }, basis);
+  const isMeasured = preview.kind === 'measured';
+  const device = entry?.source === 'garmin' ? 'Garmin' : 'your device';
+  const Device = device === 'Garmin' ? 'Garmin' : 'Your device';
   // The day's exercise water is capped as a whole, so preview this session's share of it.
   const others = activities.filter((a) => a.date === date && a.id !== entryId);
   const water = sessionWaterMl(others, { durationMin: minutes, intensity });
@@ -105,9 +109,15 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
     leaveFlow();
   };
 
+  const lead = isMeasured ? `${Device} measured ${formatNumber(preview.gross)} kcal in total` : `About ${formatNumber(preview.gross)} kcal`;
   const sentence = profile.eatBackExercise
-    ? `About ${formatNumber(est.gross)} kcal, of which ${formatNumber(est.net)} is above what your day already includes; ${formatNumber(est.net)} is added to ${dayWord} budget.`
-    : `About ${formatNumber(est.gross)} kcal, of which ${formatNumber(est.net)} is above what your day already includes. Your budget stays the same, because adding exercise calories back is turned off in your goals.`;
+    ? `${lead}, of which ${formatNumber(preview.net)} is above what your day already includes; ${formatNumber(preview.net)} is added to ${dayWord} budget.`
+    : `${lead}, of which ${formatNumber(preview.net)} is above what your day already includes. Your budget stays the same, because adding exercise calories back is turned off in your goals.`;
+  // Said before saving: the edit replaces the device's figure with an estimate.
+  const replaceNote =
+    preview.kind === 'estimate' && preview.replacesMeasured && entry
+      ? `${Device} measured ${formatNumber(Math.round(entry.kcalGross))} kcal for this session as recorded. With a different activity, effort or duration, saving replaces that with this estimate.`
+      : null;
 
   return (
     <Screen
@@ -137,24 +147,26 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
           <View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <CupKey color={colors.exercise} />
-              <Text variant="overline">Estimated burn</Text>
+              <Text variant="overline" testID="log-activity-kind">
+                {isMeasured ? `Measured by ${device}` : 'Estimated burn'}
+              </Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 5 }}>
               <Text variant="numXL" tabular testID="log-activity-gross" style={{ fontSize: 46, lineHeight: 50, letterSpacing: -1.4 }}>
-                {`~${formatNumber(est.gross)}`}
+                {isMeasured ? formatNumber(preview.gross) : `~${formatNumber(preview.gross)}`}
               </Text>
               <Text variant="unit" style={{ fontSize: 15 }}>
                 kcal
               </Text>
             </View>
             <Text variant="caption" color="textSecondary" tabular>
-              likely {formatNumber(est.grossRange[0])}–{formatNumber(est.grossRange[1])} kcal
+              {preview.kind === 'estimate' ? `likely ${formatNumber(preview.grossRange[0])}–${formatNumber(preview.grossRange[1])} kcal` : 'total burned, resting included'}
             </Text>
           </View>
           <View style={{ alignItems: 'flex-end', ...cup(radius.tile, 5), backgroundColor: colors.surfaceAlt, paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
             <Text variant="numM" tabular testID="log-activity-net">
               {profile.eatBackExercise ? '+' : ''}
-              {formatNumber(est.net)}
+              {formatNumber(preview.net)}
             </Text>
             <Text variant="caption" color="textSecondary">
               {profile.eatBackExercise ? 'to budget' : 'above resting'}
@@ -164,6 +176,11 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
         <Text variant="body" color="textSecondary" testID="log-activity-sentence">
           {sentence}
         </Text>
+        {replaceNote ? (
+          <Text variant="label" color="text" testID="log-activity-replaces-measured">
+            {replaceNote}
+          </Text>
+        ) : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
           <Droplets size={16} color={colors.water} />
           <Text variant="label" color="textSecondary" style={{ flex: 1 }}>
@@ -189,14 +206,24 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
         </PressableScale>
         {showSource ? (
           <View style={{ gap: spacing.sm, marginTop: -spacing.xs }} testID="log-activity-source-body">
-            <Text variant="caption" color="textSecondary">
-              {met} MET × 3.5 ml O₂ per kg per minute × {formatWeight(round(basis.weightKg, 1), 'metric')} × {minutes} min ÷ 200 = {formatNumber(est.gross)} kcal in total. Your
-              day already assumes {formatNumber(Math.round(tdee))} kcal for resting and daily life, {formatNumber(restingShare)} kcal of it in these minutes, so{' '}
-              {formatNumber(est.net)} kcal is extra. MET values describe an average adult, so the range allows about 20% either way.
-            </Text>
-            <Text variant="caption" color="textTertiary">
-              Source: {MET_SOURCES[activity.id] ?? 'Compendium of Physical Activities.'}
-            </Text>
+            {isMeasured ? (
+              <Text variant="caption" color="textSecondary">
+                {formatNumber(preview.gross)} kcal is the total {device} measured for this session, resting included. Your day already assumes{' '}
+                {formatNumber(Math.round(tdee))} kcal for resting and daily life, {formatNumber(restingShare)} kcal of it in these minutes, so {formatNumber(preview.net)} kcal is
+                extra. Changing the activity, the effort or the duration replaces the measured figure with an estimate.
+              </Text>
+            ) : (
+              <>
+                <Text variant="caption" color="textSecondary">
+                  {met} MET × 3.5 ml O₂ per kg per minute × {formatWeight(round(basis.weightKg, 1), 'metric')} × {minutes} min ÷ 200 = {formatNumber(preview.gross)} kcal in total.
+                  Your day already assumes {formatNumber(Math.round(tdee))} kcal for resting and daily life, {formatNumber(restingShare)} kcal of it in these minutes, so{' '}
+                  {formatNumber(preview.net)} kcal is extra. MET values describe an average adult, so the range allows about 20% either way.
+                </Text>
+                <Text variant="caption" color="textTertiary">
+                  Source: {MET_SOURCES[activity.id] ?? 'Compendium of Physical Activities.'}
+                </Text>
+              </>
+            )}
           </View>
         ) : null}
       </Card>

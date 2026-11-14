@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Checks the Garmin import readers (src/features/import) against real sample
 // files and their independently decoded values.
+// For FIT files it also checks the recording's UTC offset, from the activity
+// message's local_timestamp, which decides the day a workout is filed under.
 //
 //   node scripts/dev/check-garmin-samples.mjs <samples-folder>
 //
@@ -100,6 +102,9 @@ for (const [name, exp] of Object.entries(expected)) {
       compare(`#${i + 1} calories`, w.kcal, s.calories);
       compare(`#${i + 1} avg heart rate`, w.avgHeartRate, s.avg_hr);
       compare(`#${i + 1} max heart rate`, w.maxHeartRate, s.max_hr);
+      // The recording's UTC offset (local_timestamp minus timestamp) decides the entry's day.
+      // A clock that was never set takes the zone the person chose (here UTC), not one from the file.
+      if ('utc_offset_min' in exp && !w.startFromLocalTime) compare(`#${i + 1} recording UTC offset (min)`, w.utcOffsetMin ?? null, exp.utc_offset_min);
     });
   } else if (exp.format === 'tcx') {
     compare('workout count', ws.length, 1);

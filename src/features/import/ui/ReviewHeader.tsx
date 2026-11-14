@@ -35,6 +35,7 @@ export function SummaryCard({ counts, addedKcal, csvLine, onChangeCsv }: { count
               : [
                   `${formatNumber(counts.selected)} ticked`,
                   counts.choose ? `${formatNumber(counts.choose)} need an activity` : '',
+                  counts.updates ? `${formatNumber(counts.updates)} ${counts.updates === 1 ? 'update' : 'updates'} available` : '',
                   counts.alreadyImported ? `${formatNumber(counts.alreadyImported)} already imported` : '',
                   counts.probable ? `${formatNumber(counts.probable)} possible ${counts.probable === 1 ? 'duplicate' : 'duplicates'}` : '',
                 ]

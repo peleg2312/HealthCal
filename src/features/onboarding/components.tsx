@@ -1,10 +1,11 @@
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
-import React, { useState } from 'react';
-import { TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Text as RNText, TextInput, View, type StyleProp, type TextInputInstance, type TextInputProps, type ViewStyle } from 'react-native';
+import Animated from 'react-native-reanimated';
 
-import { cup, fonts, useTheme } from '@/theme';
+import { cup, fonts, motion, useReducedMotion, useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
-import { FadeUp, MiniCup, parseNumber, PressableScale, ProgressBar, Text, Vessel } from '@/ui';
+import { FadeUp, MiniCup, parseNumber, PressableScale, ProgressBar, Text } from '@/ui';
 
 import { convertUnits, type Draft } from './model';
 
@@ -31,6 +32,38 @@ export function FadeIn({
   );
 }
 
+/**
+ * The arrival moments (the welcome cup, the plan reveal) pour a little longer
+ * than a screen's cup: once, at a moment that deserves it. Never faster than
+ * the kit's pour.
+ */
+export const ARRIVAL_POUR = Math.round(motion.duration.pour * 1.45);
+
+/**
+ * One question arriving: it slides in 20 px from the side it comes from
+ * (the right going forward, the left going back) while it fades in. The kit's
+ * `FadeUp` turned sideways, with the same tokens: a CSS animation on web and
+ * the UI thread natively. Instant under reduced motion. It only enters;
+ * nothing waits for the question that left.
+ */
+export function StepSlide({ direction, disabled, children }: { direction: 1 | -1; disabled?: boolean; children: React.ReactNode }) {
+  const reduce = useReducedMotion();
+  // Decided once, at mount: a later change must not replay or cut the entrance.
+  const [animate] = useState(() => !reduce && !disabled);
+  if (!animate) return <View>{children}</View>;
+  return (
+    <Animated.View
+      style={{
+        animationName: { from: { opacity: 0, transform: [{ translateX: direction * 20 }] }, to: { opacity: 1, transform: [{ translateX: 0 }] } },
+        animationDuration: motion.duration.slide,
+        animationTimingFunction: `cubic-bezier(${motion.easing.enter.join(', ')})`,
+        animationFillMode: 'backwards',
+      }}>
+      {children}
+    </Animated.View>
+  );
+}
+
 /** Step heading: a question and a short line on why it is asked. */
 export function StepTitle({ title, subtitle, right }: { title: string; subtitle?: string; right?: React.ReactNode }) {
   const { spacing } = useTheme();
@@ -54,34 +87,31 @@ export function StepTitle({ title, subtitle, right }: { title: string; subtitle?
 /**
  * Large selectable option. The whole tile is the control: no checkbox. The
  * chosen one gets the selection look of Pour: an ink edge, the level line
- * (rim) along its top and a soft primary fill. `leading` takes a mini cup or
- * a Lucide icon in the text colour. Emoji never sit in buttons in Pour, so
- * `emoji` is accepted for old callers and ignored.
+ * (rim) along its top and a soft primary fill. `icon` takes a mini cup or a
+ * Lucide icon in the text colour (emoji never sit in buttons in Pour).
  */
 export function ChoiceCard({
   title,
   hint,
-  emoji: _emoji,
   icon,
-  color: _color,
   selected,
   onPress,
   testID,
   compact,
+  size = 'md',
 }: {
   title: string;
   hint?: string;
-  /** @deprecated Accepted and ignored; pass `icon`. */
-  emoji?: string;
   icon?: React.ReactNode;
-  /** @deprecated Selection is ink in Pour. Accepted and ignored. */
-  color?: string;
   selected: boolean;
   onPress: () => void;
   testID: string;
   /** Centred title only (two tiles side by side). */
   compact?: boolean;
+  /** `lg` is for a question with two or three answers: taller tiles, a heading-size title, room for a week-strip cup. */
+  size?: 'md' | 'lg';
 }) {
+  const lg = size === 'lg';
   const { colors, radius, spacing } = useTheme();
   return (
     <PressableScale
@@ -97,11 +127,11 @@ export function ChoiceCard({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: compact ? 'center' : 'flex-start',
-        gap: spacing.md,
-        minHeight: compact ? 76 : 68,
+        gap: lg ? spacing.lg : spacing.md,
+        minHeight: compact ? 96 : lg ? 92 : 68,
         paddingVertical: spacing.md,
-        paddingHorizontal: spacing.lg,
-        ...cup(radius.tile, 5),
+        paddingHorizontal: lg ? spacing.xl : spacing.lg,
+        ...cup(lg || compact ? radius.card : radius.tile, 5),
         backgroundColor: selected ? colors.primarySoft : colors.surface,
         borderWidth: selected ? 2 : 1,
         borderColor: selected ? colors.text : colors.border,
@@ -110,9 +140,9 @@ export function ChoiceCard({
         overflow: 'hidden',
       }}>
       {selected ? <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 3, backgroundColor: colors.rim }} /> : null}
-      {icon ? <View style={{ width: 28, alignItems: 'center' }}>{icon}</View> : null}
-      <View style={{ flex: compact ? 0 : 1, minWidth: 0, gap: 2 }}>
-        <Text variant="title" align={compact ? 'center' : undefined}>
+      {icon ? <View style={{ minWidth: 30, alignItems: 'center' }}>{icon}</View> : null}
+      <View style={compact ? { flexShrink: 1, minWidth: 0 } : { flex: 1, minWidth: 0, gap: 2 }}>
+        <Text variant={compact || lg ? 'h3' : 'title'} align={compact ? 'center' : undefined}>
           {title}
         </Text>
         {hint ? (
@@ -126,21 +156,30 @@ export function ChoiceCard({
 }
 
 /**
- * A goal as a cup: draining for lose (a dashed mark where the level was),
- * steady for maintain, rising for gain (the dashed mark where it started).
+ * A goal as a cup, the size of a week-strip cup. Lose: the level drains from
+ * where it was (a dashed mark stays there) to a lower one. Maintain: a steady
+ * level. Gain: it rises past the dashed mark where it started. The cup mounts
+ * at the old level and pours to the new one once, shortly after the question
+ * arrives; reduced motion shows the end state at once.
  */
-export function GoalCup({ goal }: { goal: 'lose' | 'maintain' | 'gain' }) {
+export function GoalCup({ goal, index = 0 }: { goal: 'lose' | 'maintain' | 'gain'; index?: number }) {
   const { colors } = useTheme();
-  const h = 28;
-  const level = goal === 'lose' ? 0.3 : goal === 'gain' ? 0.88 : 0.6;
-  const was = goal === 'lose' ? 0.72 : goal === 'gain' ? 0.5 : null;
+  const w = 36;
+  const h = 46;
+  const level = goal === 'lose' ? 0.34 : goal === 'gain' ? 0.84 : 0.6;
+  const was = goal === 'lose' ? 0.72 : goal === 'gain' ? 0.46 : null;
+  const [poured, setPoured] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setPoured(true), 260 + index * 80);
+    return () => clearTimeout(id);
+  }, [index]);
   return (
-    <View style={{ width: 22, height: h }}>
-      <MiniCup progress={level} color={colors.calories} width={22} height={h} animate={false} />
+    <View style={{ width: w, height: h }}>
+      <MiniCup progress={poured || was === null ? level : was} color={colors.calories} width={w} height={h} animate={poured} />
       {was !== null ? (
         <View
           pointerEvents="none"
-          style={{ position: 'absolute', left: 3, right: 3, top: (1 - was) * h - 1, height: 0, borderTopWidth: 1.5, borderStyle: 'dashed', borderColor: colors.text, opacity: 0.55 }}
+          style={{ position: 'absolute', left: 4, right: 4, top: Math.round((1 - was) * h) - 1, height: 0, borderTopWidth: 1.5, borderStyle: 'dashed', borderColor: colors.vesselEdge }}
         />
       ) : null}
     </View>
@@ -189,22 +228,6 @@ export function ErrorText({ children, testID }: { children?: string | null; test
     <Text variant="caption" color="danger" testID={testID} accessibilityLiveRegion="polite">
       {children}
     </Text>
-  );
-}
-
-/**
- * The brand mark: the Pour cup. An open vessel with a lip, filled with the
- * calorie colour to the day's level, a hatched band of exercise headroom on
- * top and the level line on the fill. It pours in on mount. No glow.
- */
-export function BrandCup({ size = 200 }: { size?: number }) {
-  const { colors } = useTheme();
-  const h = size;
-  const w = Math.round(size * 0.62);
-  return (
-    <View style={{ width: w + 16, height: h + 8, alignItems: 'center', justifyContent: 'flex-end' }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <Vessel value={0.56} max={1} headroom={0.16} color={colors.calories} width={w} height={h} lip />
-    </View>
   );
 }
 
@@ -303,9 +326,12 @@ export function WhyWeAsk({ children, testID, title = 'Why we ask' }: { children:
 const fieldFormat = (n: number | null, decimals: number) => (n === null ? '' : String(Math.round(n * 10 ** decimals) / 10 ** decimals));
 
 /**
- * A number typed big: a cup-shaped field with the value centred in large
- * Bricolage and its unit small beside it. Keeps the raw text while typing so
- * "65." is not eaten (as `NumberField` does).
+ * A number typed big: a cup-shaped field with the value in large Bricolage
+ * and its unit small beside it, centred together like a number on Today. The
+ * input is exactly as wide as what is typed (an unseen copy of the text sizes
+ * it), so the unit always sits next to the last digit. A tap anywhere in the
+ * cup focuses it. Keeps the raw text while typing so "65." is not eaten (as
+ * `NumberField` does). `size="md"` is for three fields side by side.
  */
 export function BigNumberField({
   label,
@@ -316,6 +342,8 @@ export function BigNumberField({
   error,
   testID,
   style,
+  size = 'lg',
+  placeholder,
   ...rest
 }: Omit<TextInputProps, 'value' | 'onChange' | 'style'> & {
   label: string;
@@ -327,76 +355,79 @@ export function BigNumberField({
   error?: string | boolean | null;
   testID: string;
   style?: StyleProp<ViewStyle>;
+  size?: 'lg' | 'md';
 }) {
   const { colors, radius, spacing } = useTheme();
   const [text, setText] = useState(fieldFormat(value, decimals));
   const [lastValue, setLastValue] = useState(value);
   const [focused, setFocused] = useState(false);
+  const input = useRef<TextInputInstance>(null);
   if (value !== lastValue) {
     setLastValue(value);
     if (parseNumber(text) !== value) setText(fieldFormat(value, decimals));
   }
+  const fontSize = size === 'lg' ? 32 : 24;
+  const lineHeight = size === 'lg' ? 38 : 30;
+  const type = { fontFamily: fonts.numBold, fontSize, lineHeight, letterSpacing: -0.5, fontVariant: ['tabular-nums' as const] };
   return (
     <View style={[{ gap: 6 }, style]}>
       <Text variant="label" color="textSecondary" numberOfLines={1}>
         {label}
       </Text>
       <View
+        // A tap on the cup around the number goes to the input (the input itself takes its own taps first).
+        onStartShouldSetResponder={() => true}
+        onResponderRelease={() => input.current?.focus()}
         style={{
           flexDirection: 'row',
-          alignItems: 'center',
+          alignItems: 'flex-end',
           justifyContent: 'center',
-          gap: spacing.xs,
-          minHeight: 68,
-          paddingHorizontal: spacing.md,
+          gap: 6,
+          minHeight: size === 'lg' ? 68 : 60,
+          paddingVertical: size === 'lg' ? 15 : 15,
+          paddingHorizontal: spacing.sm,
           ...cup(radius.tile, 5),
           backgroundColor: colors.surface,
           borderWidth: 1.5,
           borderColor: error ? colors.danger : focused ? colors.rim : colors.borderStrong,
+          overflow: 'hidden',
         }}>
-        <TextInput
-          testID={testID}
-          keyboardType={decimals > 0 ? 'decimal-pad' : 'number-pad'}
-          inputMode={decimals > 0 ? 'decimal' : 'numeric'}
-          placeholderTextColor={colors.textTertiary}
-          selectionColor={colors.primary}
-          {...rest}
-          accessibilityLabel={rest.accessibilityLabel ?? (unit ? `${label}, ${unit}` : label)}
-          value={text}
-          onFocus={(e) => {
-            setFocused(true);
-            rest.onFocus?.(e);
-          }}
-          onBlur={(e) => {
-            setFocused(false);
-            rest.onBlur?.(e);
-          }}
-          onChangeText={(raw) => {
-            const t = raw.replace(/-/g, '');
-            setText(t);
-            const n = parseNumber(t);
-            setLastValue(n);
-            onChange(n);
-          }}
-          style={[
-            {
-              flexShrink: 1,
-              minWidth: 0,
-              width: '100%',
-              maxWidth: 140,
-              textAlign: 'center',
-              color: colors.text,
-              fontFamily: fonts.numBold,
-              fontSize: 32,
-              lineHeight: 38,
-              paddingVertical: 10,
-              fontVariant: ['tabular-nums'],
-            },
-            { outlineStyle: 'none' } as object,
-          ]}
-        />
+        <View style={{ minWidth: 32, flexShrink: 1 }}>
+          {/* The sizer: the same text in the same type, unseen. It gives the input its width. */}
+          <RNText aria-hidden accessibilityElementsHidden importantForAccessibility="no" numberOfLines={1} style={[type, { opacity: 0, paddingHorizontal: 3, textAlign: 'center' }]}>
+            {text || placeholder || '0'}
+          </RNText>
+          <TextInput
+            ref={input}
+            testID={testID}
+            keyboardType={decimals > 0 ? 'decimal-pad' : 'number-pad'}
+            inputMode={decimals > 0 ? 'decimal' : 'numeric'}
+            placeholder={placeholder}
+            placeholderTextColor={colors.textTertiary}
+            selectionColor={colors.primary}
+            {...rest}
+            accessibilityLabel={rest.accessibilityLabel ?? (unit ? `${label}, ${unit}` : label)}
+            value={text}
+            onFocus={(e) => {
+              setFocused(true);
+              rest.onFocus?.(e);
+            }}
+            onBlur={(e) => {
+              setFocused(false);
+              rest.onBlur?.(e);
+            }}
+            onChangeText={(raw) => {
+              const t = raw.replace(/-/g, '');
+              setText(t);
+              const n = parseNumber(t);
+              setLastValue(n);
+              onChange(n);
+            }}
+            style={[type, { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, padding: 0, textAlign: 'center', color: colors.text }, { outlineStyle: 'none' } as object]}
+          />
+        </View>
         {unit ? (
-          <Text variant="unit" color="textSecondary">
+          <Text variant="unit" color="textSecondary" style={{ marginBottom: size === 'lg' ? 6 : 4 }}>
             {unit}
           </Text>
         ) : null}

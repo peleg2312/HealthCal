@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { fillRatio, goalState, levelY, placeLabels } from './vesselLayout';
+import { brimOverhang, fillRatio, goalState, levelY, placeLabels } from './vesselLayout';
 
 describe('placeLabels', () => {
   it('keeps labels where they want to be when there is room', () => {
@@ -66,5 +66,32 @@ describe('goalState', () => {
     expect(goalState(5, 0, 'reach')).toBe('under');
     expect(goalState(Number.NaN, 10, 'reach')).toBe('under');
     expect(goalState(5, -1, 'limit')).toBe('under');
+  });
+});
+
+describe('a reached goal fills to the brim', () => {
+  it('draws 100% and 108% of a reach goal at the same, full level', () => {
+    expect(fillRatio(1, 1)).toBe(1);
+    expect(fillRatio(1.08, 1)).toBe(1);
+    expect(levelY(3560, 3300, 200)).toBe(0);
+    // 98% is visibly short of the top and not reached.
+    expect(levelY(0.98, 1, 200)).toBeCloseTo(4);
+    expect(goalState(0.98, 1, 'reach')).not.toBe(goalState(1, 1, 'reach'));
+  });
+});
+
+describe('brimOverhang', () => {
+  it('is 6 px on the hero vessels and 3 px on mini cups', () => {
+    expect(brimOverhang(96)).toBe(6);
+    expect(brimOverhang(84)).toBe(6);
+    expect(brimOverhang(66)).toBe(5);
+    expect(brimOverhang(30)).toBe(3);
+    expect(brimOverhang(22)).toBe(3);
+  });
+
+  it('never returns less than 3 or a non-number', () => {
+    expect(brimOverhang(0)).toBe(3);
+    expect(brimOverhang(Number.NaN)).toBe(3);
+    expect(brimOverhang(400)).toBe(6);
   });
 });

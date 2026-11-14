@@ -34,6 +34,7 @@ const row = (over: Partial<ImportCandidate> = {}): ImportCandidate => ({
   status: 'new',
   reason: null,
   match: null,
+  adds: [],
   sameAsKey: null,
   selected: true,
   ...over,
@@ -70,6 +71,15 @@ describe('import screen formatting', () => {
     expect(calorieView(row({ status: 'already-imported' })).added).toBeNull();
     expect(calorieView(row({ status: 'duplicate-in-file' })).added).toBeNull();
     expect(calorieView(row({ entry: null, activityId: null })).detail).toBe('658 by watch');
+  });
+
+  it('G8: a file that states 0 kcal is not described as having no calories', () => {
+    // A multisport transition with total_calories 0, shown without an activity.
+    expect(calorieView(row({ workout: workout({ kcal: 0 }), entry: null, activityId: null }))).toMatchObject({ detail: '0 kcal in file', spoken: 'The file states 0 kcal' });
+    expect(calorieView(row({ workout: workout({ format: 'gpx', kcal: null }), entry: null, activityId: null })).detail).toBe('No calories in file');
+    // With an activity it is still an estimate with its range, and says why.
+    const r = row({ workout: workout({ kcal: 0 }), entry: { ...row().entry!, measured: undefined, kcalNet: 10 } });
+    expect(calorieView(r).spoken).toMatch(/^The file states 0 kcal\. About 10 kcal added, an estimate/);
   });
 
   it('counts and filters rows', () => {

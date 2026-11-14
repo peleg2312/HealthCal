@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { FlatList, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { entriesToSave } from '@/features/import';
+import { entriesToSave, netChange } from '@/features/import';
 import { ActivitySheet } from '@/features/import/ui/ActivitySheet';
 import { DoneView } from '@/features/import/ui/DoneView';
 import { countRows, fileNotes, filterRows, workouts, type RowFilter } from '@/features/import/ui/format';
@@ -15,6 +15,7 @@ import {
   commitImport,
   confirmAnswers,
   pickActivity,
+  replaceHandLogged,
   resetImport,
   restoreDeleted,
   selectAll,
@@ -84,7 +85,9 @@ export default function ImportScreen() {
 
   const counts = countRows(rows);
   const toSave = entriesToSave(rows);
-  const addedKcal = Math.round(toSave.reduce((s, e) => s + e.kcalNet, 0));
+  // An update changes a day by the difference from what is stored, not by its full figure.
+  const addedKcal = Math.round(rows.filter((r) => r.selected).reduce((s, r) => s + netChange(r).kcalNet, 0));
+  const updating = rows.filter((r) => r.selected && r.status === 'update').length;
   const visible = filterRows(rows, filter);
   const notes = fileNotes(batches, rows.map((r) => r.workout));
   const estimates = rows.filter((r) => r.entry && !r.entry.measured && r.status !== 'already-imported' && r.status !== 'duplicate-in-file').length;
@@ -117,12 +120,14 @@ export default function ImportScreen() {
       <View style={{ gap: spacing.sm }}>
         <Text variant="caption" color="textSecondary" align="center" testID="import-footer-line">
           {toSave.length
-            ? `+${formatNumber(addedKcal)} kcal above resting, across ${new Set(toSave.map((e) => e.date)).size === 1 ? 'one day' : `${new Set(toSave.map((e) => e.date)).size} days`}`
+            ? `${updating ? 'Changes the budget by ' : ''}${addedKcal < 0 ? '−' : '+'}${formatNumber(Math.abs(addedKcal))} kcal above resting, across ${new Set(toSave.map((e) => e.date)).size === 1 ? 'one day' : `${new Set(toSave.map((e) => e.date)).size} days`}`
             : allLocked
               ? 'Everything in these files is already in HealthCal.'
               : 'Tick the workouts to import.'}
         </Text>
-        <Button testID="import-submit" title={toSave.length ? `Import ${workouts(toSave.length)}` : 'Nothing to import'} disabled={!toSave.length} onPress={commitImport} />
+        <Button
+          testID="import-submit"
+          title={!toSave.length ? 'Nothing to import' : updating === toSave.length ? `Update ${workouts(updating)}` : `Import ${workouts(toSave.length)}`} disabled={!toSave.length} onPress={commitImport} />
       </View>
     );
     return (
@@ -182,7 +187,7 @@ export default function ImportScreen() {
               </View>
             }
             renderItem={({ item }) => (
-              <WorkoutRow row={item} units={profile.units} hour12={hour12} todayDate={todayDate} onToggle={toggleRow} onChoose={setChoosing} onRestore={(k) => restoreDeleted([k])} />
+              <WorkoutRow row={item} units={profile.units} hour12={hour12} todayDate={todayDate} onToggle={toggleRow} onChoose={setChoosing} onRestore={(k) => restoreDeleted([k])} onReplace={replaceHandLogged} />
             )}
           />
         )}
@@ -214,7 +219,7 @@ export default function ImportScreen() {
       {phase === 'start' ? <StartView failed={failed} /> : null}
       {phase === 'reading' ? <ReadingView progress={progress} /> : null}
       {phase === 'questions' ? <QuestionsView todayDate={todayDate} hour12={hour12} onChangeZone={setZoneFor} /> : null}
-      {phase === 'done' && result ? <DoneView entries={result.entries} undone={result.undone} todayDate={todayDate} onStartOver={resetImport} /> : null}
+      {phase === 'done' && result ? <DoneView entries={result.entries} previous={result.previous} undone={result.undone} todayDate={todayDate} onStartOver={resetImport} /> : null}
       {sheets}
     </Screen>
   );

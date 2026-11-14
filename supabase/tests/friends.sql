@@ -82,6 +82,26 @@ begin
   if n <> 0 then raise exception 'friendships readable directly'; end if;
   select count(*) into n from public.cheers;
   if n <> 0 then raise exception 'cheers readable directly'; end if;
+  select count(*) into n from public.social_limits;
+  if n <> 0 then raise exception 'social_limits readable directly'; end if;
+  select count(*) into n from public.friend_declines;
+  if n <> 0 then raise exception 'friend_declines readable directly'; end if;
+  begin
+    insert into public.friend_declines (decliner, asker)
+      values ('c3333333-3333-4333-8333-333333333333', 'c1111111-1111-4111-8111-111111111111');
+    raise exception 'a decline could be inserted directly';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform public.social_my_limits('c1111111-1111-4111-8111-111111111111');
+    raise exception 'the limits helper is callable from the API';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform public.social_lock_pair('c1111111-1111-4111-8111-111111111111', 'c2222222-2222-4222-8222-222222222222');
+    raise exception 'the pair lock is callable from the API';
+  exception when insufficient_privilege then null;
+  end;
   begin
     insert into public.friendships (requester, addressee, status)
       values ('c3333333-3333-4333-8333-333333333333', 'c1111111-1111-4111-8111-111111111111', 'accepted');

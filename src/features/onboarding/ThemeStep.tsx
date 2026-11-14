@@ -1,6 +1,7 @@
 import { Check } from 'lucide-react-native';
 import React, { useEffect } from 'react';
 import { useColorScheme, useWindowDimensions, View } from 'react-native';
+import { create } from 'zustand';
 
 import { useStore } from '@/store';
 import { blossomColors, cup, darkColors, fonts, lightColors, useTheme, vesselBase, type ThemeColors } from '@/theme';
@@ -16,17 +17,23 @@ export const THEME_CHOICES: { value: ThemePreference; title: string; hint: strin
   { value: 'system', title: 'Match my phone', hint: 'Light by day, dark at night, following your phone' },
 ];
 
-/** True once "Match my phone" was tapped here, so coming back to the step does not swap it for the lead look. */
-let pickedSystem = false;
+/**
+ * True once "Match my phone" was tapped here. The stored value for it is
+ * 'system', the same as "never chosen", so this is what tells them apart
+ * during set-up: coming back to the step keeps it selected, and the set-up
+ * screens show the phone's look instead of the lead one (see `ChosenLook` in
+ * the onboarding route). In memory only, like the answers.
+ */
+export const useMatchPhone = create<{ picked: boolean }>(() => ({ picked: false }));
 
 /**
  * The look this step shows as chosen. An explicit choice is kept. Otherwise
  * "Match my phone" on a dark phone, and Blossom (the app's lead look, the one
  * on the icon) on a light phone or one that does not say.
  */
-export function preselectedTheme(stored: ThemePreference, scheme: string | null | undefined): ThemePreference {
+export function preselectedTheme(stored: ThemePreference, scheme: string | null | undefined, matchPhone = useMatchPhone.getState().picked): ThemePreference {
   if (stored !== 'system') return stored;
-  return pickedSystem || scheme === 'dark' ? 'system' : 'blossom';
+  return matchPhone || scheme === 'dark' ? 'system' : 'blossom';
 }
 
 /** Write the shown choice, so finishing set-up always leaves an explicit look stored. */
@@ -44,8 +51,9 @@ export function commitThemeChoice(scheme: string | null | undefined) {
 export function ThemeStep() {
   const { spacing } = useTheme();
   const stored = useStore((s) => s.settings.theme);
+  const matchPhone = useMatchPhone((s) => s.picked);
   const scheme = useColorScheme();
-  const selected = preselectedTheme(stored, scheme);
+  const selected = preselectedTheme(stored, scheme, matchPhone);
 
   // Shown means chosen: store the preselected look as soon as the step appears.
   useEffect(() => {
@@ -53,7 +61,7 @@ export function ThemeStep() {
   }, [scheme]);
 
   const choose = (theme: ThemePreference) => {
-    pickedSystem = theme === 'system';
+    useMatchPhone.setState({ picked: theme === 'system' });
     useStore.getState().setSettings({ theme });
   };
 

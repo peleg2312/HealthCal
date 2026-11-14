@@ -34,12 +34,13 @@ describe('toActivityEntry with measured calories', () => {
     expect(toActivityEntry(workout({ kcal: 40 }), ACTIVITY_BY_ID.running, ctx).kcalNet).toBe(0);
   });
 
-  it('picks the effort level whose MET is nearest the MET the calories imply', () => {
-    // running METs: light 8.5, moderate 9.3, vigorous 11.8
+  it('without a distance, picks the effort level whose MET is nearest the MET the calories imply', () => {
+    // running METs: light 8.5, moderate 9.3, vigorous 11.8. With a distance the speed decides instead (effort.test.ts).
     const kcalAt = (met: number) => Math.round(grossKcal(met, 70, 50));
-    expect(toActivityEntry(workout({ kcal: kcalAt(8.0) }), ACTIVITY_BY_ID.running, ctx).intensity).toBe('light');
-    expect(toActivityEntry(workout({ kcal: kcalAt(9.6) }), ACTIVITY_BY_ID.running, ctx).intensity).toBe('moderate');
-    const hard = toActivityEntry(workout({ kcal: kcalAt(12.5) }), ACTIVITY_BY_ID.running, ctx);
+    const noDistance = { distanceM: null };
+    expect(toActivityEntry(workout({ ...noDistance, kcal: kcalAt(8.0) }), ACTIVITY_BY_ID.running, ctx).intensity).toBe('light');
+    expect(toActivityEntry(workout({ ...noDistance, kcal: kcalAt(9.6) }), ACTIVITY_BY_ID.running, ctx).intensity).toBe('moderate');
+    const hard = toActivityEntry(workout({ ...noDistance, kcal: kcalAt(12.5) }), ACTIVITY_BY_ID.running, ctx);
     expect(hard.intensity).toBe('vigorous');
     expect(hard.met).toBe(11.8);
     // Guideline minutes follow the chosen level: hard running counts double.
@@ -66,7 +67,7 @@ describe('toActivityEntry with measured calories', () => {
   });
 
   it('treats zero calories as unknown and estimates instead', () => {
-    const e = toActivityEntry(workout({ kcal: 0 }), ACTIVITY_BY_ID.running, ctx);
+    const e = toActivityEntry(workout({ kcal: 0, distanceM: null }), ACTIVITY_BY_ID.running, ctx);
     expect(e.measured).toBeUndefined();
     expect(e.intensity).toBe('moderate');
   });
@@ -74,7 +75,8 @@ describe('toActivityEntry with measured calories', () => {
 
 describe('toActivityEntry without calories (GPX)', () => {
   it('estimates exactly as a hand-logged session does and is not marked measured', () => {
-    const w = workout({ format: 'gpx', kcal: null, durationSec: 2777, elapsedSec: 2777, durationIncludesPauses: true });
+    // No distance, so the chosen effort applies (with one, the speed decides: effort.test.ts).
+    const w = workout({ format: 'gpx', kcal: null, durationSec: 2777, elapsedSec: 2777, durationIncludesPauses: true, distanceM: null });
     const e = toActivityEntry(w, ACTIVITY_BY_ID.running, ctx);
     const hand = buildActivityEntry({ activity: ACTIVITY_BY_ID.running, intensity: 'moderate', durationMin: 2777 / 60, date: e.date, weightKg: 70, baselineKcalPerDay: 2160, loggedAt: e.loggedAt });
     expect(e.kcalGross).toBeCloseTo(hand.kcalGross, 9);

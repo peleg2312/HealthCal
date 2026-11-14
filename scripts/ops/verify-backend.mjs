@@ -6,23 +6,34 @@
  * friend can and cannot see, cheering), both edge functions, and account
  * deletion. Everything it creates is deleted again at the end.
  *
- *   node scripts/ops/verify-backend.mjs [--require-ai]
+ *   node scripts/ops/verify-backend.mjs [--require-ai] [--config path] [--via-management]
  *
  * Reads EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY from the
- * environment or from .env (written by provision-supabase.mjs).
- * Projects that confirm email addresses on sign-up (the default) need
- * SUPABASE_SERVICE_ROLE_KEY in the environment so the script can create
- * confirmed test accounts; it is used for that and nothing else, and is never printed.
+ * environment, from the file given with --config, or from .env (written by
+ * provision-supabase.mjs).
+ * Projects that confirm email addresses on sign-up (the default) cannot sign a
+ * test account in by themselves. Two ways round it:
+ *   - SUPABASE_SERVICE_ROLE_KEY in the environment: the script creates confirmed
+ *     test accounts with it. It is used for that and nothing else, and never printed.
+ *   - --via-management with SUPABASE_ACCESS_TOKEN (the token provision-supabase.mjs
+ *     uses): the script asks the management API for the project's secret key,
+ *     keeps it in memory for this run only, and uses it the same way. Nothing
+ *     about the project's settings is changed.
  */
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const argAfter = (flag) => {
+  const i = process.argv.indexOf(flag);
+  return i > 0 ? process.argv[i + 1] : undefined;
+};
+const configPath = argAfter('--config') ? resolve(argAfter('--config')) : join(ROOT, '.env');
 const fromFile = Object.fromEntries(
-  (existsSync(join(ROOT, '.env')) ? readFileSync(join(ROOT, '.env'), 'utf8') : '')
+  (existsSync(configPath) ? readFileSync(configPath, 'utf8') : '')
     .split('\n')
     .map((l) => l.match(/^([A-Z0-9_]+)=(.*)$/))
     .filter(Boolean)
@@ -32,6 +43,9 @@ const URL_ = process.env.EXPO_PUBLIC_SUPABASE_URL || fromFile.EXPO_PUBLIC_SUPABA
 const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || fromFile.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const REQUIRE_AI = process.argv.includes('--require-ai');
+const VIA_MANAGEMENT = process.argv.includes('--via-management');
+// In some managed environments a proxy adds the real token; any value then satisfies this header.
+const MANAGEMENT_TOKEN = process.env.SUPABASE_ACCESS_TOKEN || `sbp_${'0'.repeat(40)}`;
 if (!URL_ || !ANON) {
   console.error('Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY (or run provision-supabase.mjs, which writes .env).');
   process.exit(2);
@@ -43,9 +57,30 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok === 'skip' ? 'SKIP' : ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  (${detail})` : ''}`);
 };
 const options = { auth: { persistSession: false, autoRefreshToken: false } };
-const admin = SERVICE ? createClient(URL_, SERVICE, options) : null;
+let admin = SERVICE ? createClient(URL_, SERVICE, options) : null;
 const stamp = Date.now().toString(36);
 const password = `Hc-${randomUUID()}`;
+
+/** One call to Supabase's management API for this project. */
+async function management(method, path, json) {
+  const ref = new URL(URL_).hostname.split('.')[0];
+  const res = await fetch(`https://api.supabase.com/v1/projects/${ref}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${MANAGEMENT_TOKEN}`, ...(json ? { 'Content-Type': 'application/json' } : null) },
+    body: json ? JSON.stringify(json) : undefined,
+  });
+  if (!res.ok) throw new Error(`management API ${method} ${path}: ${res.status}`);
+  return res.json().catch(() => null);
+}
+
+/** With --via-management and no key given: fetch the project's secret key for this run. It is never printed or stored. */
+async function adminFromManagement() {
+  if (admin || !VIA_MANAGEMENT) return;
+  const keys = await management('GET', '/api-keys?reveal=true');
+  const secret = (keys || []).find((k) => k.type === 'secret' && k.api_key) || (keys || []).find((k) => k.name === 'service_role' && k.api_key);
+  if (!secret) throw new Error('the management API returned no secret key for this project');
+  admin = createClient(URL_, secret.api_key, options);
+}
 
 async function account(label) {
   const email = `healthcal-check-${label}-${stamp}@example.com`;
@@ -56,7 +91,7 @@ async function account(label) {
   } else {
     const { data, error } = await client.auth.signUp({ email, password });
     if (error) throw new Error(`sign-up ${label}: ${error.message}`);
-    if (!data.session) throw new Error('This project confirms email addresses, so a test account cannot sign in by itself. Run again with SUPABASE_SERVICE_ROLE_KEY set.');
+    if (!data.session) throw new Error('This project confirms email addresses, so a test account cannot sign in by itself. Run again with SUPABASE_SERVICE_ROLE_KEY set, or with --via-management.');
   }
   const { data, error } = await client.auth.signInWithPassword({ email, password });
   if (error || !data.session) throw new Error(`sign-in ${label}: ${error?.message ?? 'no session'}`);
@@ -69,6 +104,7 @@ const fn = (name, init = {}) => fetch(`${URL_.replace(/\/$/, '')}/functions/v1/$
 let a = null;
 let b = null;
 try {
+  await adminFromManagement();
   a = await account('a');
   b = await account('b');
   check('two accounts can sign in', true);

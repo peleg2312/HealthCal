@@ -3,21 +3,16 @@ import React, { useEffect, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { formatNumber, formatVolume, formatWeight, round } from '@/lib/units';
-import { motion, useTheme } from '@/theme';
+import { useTheme } from '@/theme';
 import { AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, haptic, MacroBar, PressableScale, Text, useReducedMotion, Vessel } from '@/ui';
 
+import { ARRIVAL_POUR } from './components';
 import { METHOD_LABEL, type Plan } from './model';
 import { looseDate, projectTo, rangeText } from './projection';
 import { ProjectionChart } from './ProjectionChart';
 
 const kcal = (n: number) => formatNumber(Math.round(n / 10) * 10);
 
-/**
- * The arrival moments (the plan reveal, the welcome cup) pour a little longer
- * than a screen's cup: once, at a moment that deserves it. Never faster than
- * the kit's pour.
- */
-export const ARRIVAL_POUR = Math.round(motion.duration.pour * 1.45);
 /** The cup starts pouring once the title has faded up. */
 const POUR_DELAY = 220;
 

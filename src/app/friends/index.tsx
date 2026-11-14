@@ -7,9 +7,10 @@ import { CheersList, FriendCard, IncomingRequests, InviteCard, Loading, Outgoing
 import { SetupForm } from '@/features/friends/SetupForm';
 import { copyText, shareInvite } from '@/features/friends/share';
 import { FriendSheet, SettingsSheet } from '@/features/friends/sheets';
-import { formatCode, normalizeCode } from '@/features/friends/summary';
+import { formatCode, normalizeCode, ownWorkoutsByRef, WORKOUT_WINDOW_DAYS } from '@/features/friends/summary';
 import { cheerTarget } from '@/features/friends/week';
 import { timeAgo } from '@/features/settings/format';
+import { addDays } from '@/lib/dates';
 import { cheerFriend, leaveSocial, refreshFriends, removeFriend, respondToRequest, useFriends, type Friend, type FriendRequest } from '@/services/friends';
 import { useNow, useToday } from '@/store/clock';
 import { useLive, useProfile } from '@/store/selectors';
@@ -41,8 +42,14 @@ export default function FriendsScreen() {
     }, []),
   );
 
-  const ownWorkouts = useMemo(() => new Map(activities.map((a) => [a.id, { name: a.name }])), [activities]);
   const me = overview?.me ?? null;
+  // Cheers name the workout by the reference friends saw; map it back with the same key.
+  const shareKey = me?.shareKey ?? '';
+  // A cheer can only be for a workout that was shared (the last two weeks) and is shown for two weeks, so older ones need no reference.
+  const ownWorkouts = useMemo(() => {
+    const since = addDays(today, -(2 * WORKOUT_WINDOW_DAYS + 7));
+    return ownWorkoutsByRef(activities.filter((a) => a.date >= since), shareKey);
+  }, [activities, shareKey, today]);
   const open = overview?.friends.find((f) => f.userId === openId) ?? null;
 
   const pull = async () => {
@@ -66,7 +73,7 @@ export default function FriendsScreen() {
     setBusy(r.userId);
     const res = await respondToRequest(r.userId, false);
     setBusy(null);
-    toast(res.ok ? `Declined. ${r.displayName} is not told.` : res.message);
+    toast(res.ok ? `Declined. ${r.displayName} is not told. To change your mind, add them with their code.` : res.message);
   };
   const takeBack = async (r: FriendRequest) => {
     setBusy(r.userId);

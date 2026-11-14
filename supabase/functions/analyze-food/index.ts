@@ -45,9 +45,8 @@ Deno.serve(async (req) => {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!apiKey || !supabaseUrl || !serviceKey) {
-    return json(500, { error: 'not_configured', message: 'Food analysis is not set up on the server yet.' });
-  }
+  const notConfigured = () => json(500, { error: 'not_configured', message: 'Food analysis is not set up on the server yet.' });
+  if (!supabaseUrl || !serviceKey) return notConfigured();
 
   const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
@@ -58,6 +57,8 @@ Deno.serve(async (req) => {
   if (user.is_anonymous || !user.email_confirmed_at) {
     return json(403, { error: 'unauthorized', message: 'Confirm your email address to use food analysis.' });
   }
+  // Only someone who may use the feature is told whether it is set up.
+  if (!apiKey) return notConfigured();
   const userId = user.id;
   const identity = await identityOf(user.email, userId);
   let cost = 0;

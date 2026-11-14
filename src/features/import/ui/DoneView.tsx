@@ -40,7 +40,7 @@ export function DoneView({
       <Card testID="import-undone">
         <EmptyState
           title="Import undone"
-          message={`${n === 1 ? 'The workout was' : `The ${workouts(n)} were`} put back as before, and every day is as it was. To import ${n === 1 ? 'it' : 'them'} again, choose the files again.`}
+          message={`${n === 1 ? 'The workout was' : `The ${workouts(n)} were`} ${previous.length ? 'put back as before' : 'taken out again'}, and every day is as it was. To import ${n === 1 ? 'it' : 'them'} again, choose the files again.`}
           action="Import files"
           onAction={onStartOver}
         />
@@ -63,7 +63,7 @@ export function DoneView({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
           <CupKey color={colors.exercise} />
           <Text variant="label" color="textSecondary" style={{ flex: 1 }}>
-            Added to the days
+            {sum.updated ? 'Change to the days' : 'Added to the days'}
           </Text>
           <Text variant="numM" tabular testID="import-done-kcal">
             {signed(sum.kcal)}

@@ -123,6 +123,27 @@ export function rebuildActivityEntry(existing: ActivityEntry, input: Omit<BuildA
   return built;
 }
 
+export type SessionPreview =
+  | { kind: 'measured'; gross: number; net: number }
+  | { kind: 'estimate'; gross: number; net: number; grossRange: [number, number]; netRange: [number, number]; replacesMeasured: boolean };
+
+/**
+ * What the log screen shows for a session. A device-measured session whose
+ * activity, effort and duration are unchanged keeps the stored device figures
+ * (exactly what saving keeps, see rebuildActivityEntry). Once one of the three
+ * changes, the calories become an estimate, and `replacesMeasured` says the
+ * device's figure is about to be replaced.
+ */
+export function sessionPreview(
+  existing: Pick<ActivityEntry, 'activityId' | 'intensity' | 'durationMin' | 'measured' | 'kcalGross' | 'kcalNet'> | undefined,
+  form: { activityId: string; intensity: Intensity; durationMin: number; met: number },
+  basis: SessionBasis,
+): SessionPreview {
+  const unchanged = !!existing && existing.activityId === form.activityId && existing.intensity === form.intensity && existing.durationMin === Math.max(1, Math.round(form.durationMin));
+  if (existing?.measured && unchanged) return { kind: 'measured', gross: Math.round(existing.kcalGross), net: Math.round(existing.kcalNet) };
+  return { kind: 'estimate', ...estimateSession(form.met, basis.weightKg, form.durationMin, basis.baselineKcalPerDay), replacesMeasured: !!existing?.measured };
+}
+
 /** Live estimate shown while the user fills the form. */
 export function estimateSession(met: number, weightKg: number, minutes: number, baselineKcalPerDay: number) {
   const gross = grossKcal(met, weightKg, minutes);

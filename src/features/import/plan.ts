@@ -105,12 +105,11 @@ function withDuplicates(rows: ReturnType<typeof build>[], existing: ActivityEntr
 
 const kcalText = (n: number) => Math.round(n).toLocaleString('en-US');
 
-/** "Imported before from a GPX file. This one adds ...: +306 kcal measured instead of about +512 estimated." */
+/** "Imported before from a file with less in it. This one adds ...: +306 kcal to the day instead of the estimated +512. ..." */
 function updateReason(stored: ActivityEntry, entry: ImportedEntry, adds: UpdateGain[]): string {
-  const parts = [`Imported before from a file with less in it. This one adds ${gainsText(adds)}.`];
-  if (adds.includes('calories')) parts.push(`Adds +${kcalText(entry.kcalNet)} kcal to the day as measured, instead of about +${kcalText(stored.kcalNet)} estimated.`);
-  parts.push('Importing replaces the numbers; the day and your notes stay.');
-  return parts.join(' ');
+  const what = `This one adds ${gainsText(adds)}`;
+  const kcal = adds.includes('calories') ? `: +${kcalText(entry.kcalNet)} kcal to the day instead of the estimated +${kcalText(stored.kcalNet)}.` : '.';
+  return `Imported before from a file with less in it. ${what}${kcal} Importing replaces the numbers; the day and your notes stay.`;
 }
 
 /**

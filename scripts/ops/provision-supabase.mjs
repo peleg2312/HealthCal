@@ -9,6 +9,11 @@
  *   SUPABASE_ACCESS_TOKEN=sbp_... node scripts/ops/provision-supabase.mjs \
  *     [--name healthcal] [--org <organization slug>] [--region emea|americas|apac|<region code>] \
  *     [--site-url https://your.site] [--dry-run]
+ *     [--migrations-through 20261114000000]   apply migrations up to and including this version only
+ *     [--write-env path]                      write the app configuration there instead of .env
+ *
+ * In an environment where a proxy adds the token (no SUPABASE_ACCESS_TOKEN to
+ * set), run it with NODE_USE_ENV_PROXY=1 so Node's fetch goes through the proxy.
  *
  * The token comes from supabase.com > Account > Access tokens. Nothing secret
  * is printed or written: the database password is generated and discarded
@@ -20,7 +25,7 @@
  */
 import { randomBytes } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -116,11 +121,16 @@ async function waitUntilReady(ref) {
 async function applyMigrations(ref) {
   step('Database');
   const dir = join(ROOT, 'supabase', 'migrations');
+  const through = args['migrations-through'];
   const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
   const applied = new Set((await call('GET', `/v1/projects/${ref}/database/migrations`)).map((m) => m.version));
   for (const file of files) {
     const [, version, name] = file.match(/^(\d+)_(.*)\.sql$/) || [];
     if (!version) throw new Error(`Migration file name not understood: ${file}`);
+    if (through && version > through) {
+      note(`${file}: held back (later than --migrations-through ${through}).`);
+      continue;
+    }
     if (applied.has(version)) {
       note(`${file}: already applied.`);
       continue;
@@ -198,7 +208,7 @@ async function writeEnv(ref) {
   const publicKey = keys.find((k) => k.type === 'publishable' && k.api_key) || keys.find((k) => k.name === 'anon' && k.api_key);
   if (!publicKey) throw new Error('The project returned no public key.');
   const url = `https://${ref}.supabase.co`;
-  const envPath = join(ROOT, '.env');
+  const envPath = args['write-env'] ? resolve(args['write-env']) : join(ROOT, '.env');
   const lines = existsSync(envPath) ? readFileSync(envPath, 'utf8').split('\n').filter((l) => !/^EXPO_PUBLIC_SUPABASE_(URL|ANON_KEY)=/.test(l)) : [];
   const next = [...lines.filter((l, i, all) => l !== '' || i < all.length - 1), `EXPO_PUBLIC_SUPABASE_URL=${url}`, `EXPO_PUBLIC_SUPABASE_ANON_KEY=${publicKey.api_key}`, ''];
   if (DRY) {
@@ -206,7 +216,7 @@ async function writeEnv(ref) {
     return url;
   }
   writeFileSync(envPath, next.join('\n'));
-  note(`.env now points the app at ${url} (public URL and public key only).`);
+  note(`${args["write-env"] ? envPath : ".env"} now points the app at ${url} (public URL and public key only).`);
   return url;
 }
 

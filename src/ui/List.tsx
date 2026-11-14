@@ -1,8 +1,8 @@
 import { ChevronRight } from 'lucide-react-native';
-import React from 'react';
-import { Platform, Switch, View, type AccessibilityRole, type AccessibilityState, type StyleProp, type ViewStyle } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Animated, Easing, Platform, View, type AccessibilityRole, type AccessibilityState, type StyleProp, type ViewStyle } from 'react-native';
 
-import { cupFor, fonts, useTheme } from '@/theme';
+import { cup, cupFor, fonts, motion, useReducedMotion, useTheme } from '@/theme';
 
 import { Button } from './Button';
 import { CupKey } from './Chip';
@@ -89,6 +89,81 @@ export function Divider({ inset = 0 }: { inset?: number }) {
   return <View style={{ height: 1, backgroundColor: colors.border, marginLeft: inset }} />;
 }
 
+const SWITCH_W = 48;
+const SWITCH_H = 28;
+const KNOB = 20;
+const KNOB_INSET = (SWITCH_H - KNOB) / 2;
+
+/**
+ * The Pour switch, drawn the same on iOS, Android and web (no platform pill):
+ * a small cup lying across (48 x 28, corners 5 5 9 9) with a square-ish knob
+ * (20 x 20, corners 3 3 6 6). Off is an empty cup: a 1.5 px borderStrong edge
+ * and a textTertiary knob on the left. On is a full one: the primary fill and
+ * an onPrimary knob on the right. The knob slides (a transform), or jumps
+ * under reduced motion. The touch target is 48 x 44.
+ */
+export function Toggle({
+  value,
+  onChange,
+  accessibilityLabel,
+  disabled,
+  testID,
+}: {
+  value: boolean;
+  onChange: (v: boolean) => void;
+  accessibilityLabel: string;
+  disabled?: boolean;
+  testID?: string;
+}) {
+  const { colors } = useTheme();
+  const reduce = useReducedMotion();
+  // Held in state, not a ref: the value is read while rendering. 0 off, 1 on.
+  const [x] = useState(() => new Animated.Value(value ? 1 : 0));
+  useEffect(() => {
+    if (reduce) {
+      x.setValue(value ? 1 : 0);
+      return;
+    }
+    const anim = Animated.timing(x, { toValue: value ? 1 : 0, duration: motion.duration.fade, easing: Easing.bezier(...motion.easing.move), useNativeDriver: Platform.OS !== 'web' });
+    anim.start();
+    return () => anim.stop();
+  }, [value, reduce, x]);
+  return (
+    <PressableScale
+      testID={testID}
+      onPress={() => onChange(!value)}
+      disabled={disabled}
+      feedback="select"
+      scaleTo={1}
+      hitSlop={{ top: (44 - SWITCH_H) / 2, bottom: (44 - SWITCH_H) / 2 }}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value, disabled: !!disabled }}
+      aria-checked={value}
+      accessibilityLabel={accessibilityLabel}
+      style={{
+        width: SWITCH_W,
+        height: SWITCH_H,
+        ...cup(9, 5),
+        justifyContent: 'center',
+        backgroundColor: value ? colors.primary : 'transparent',
+        borderWidth: 1.5,
+        borderColor: value ? colors.primary : colors.borderStrong,
+      }}>
+      <Animated.View
+        style={{
+          width: KNOB,
+          height: KNOB,
+          // The border is inside the 48 x 28 box, so the knob's inset is measured from it.
+          marginLeft: KNOB_INSET - 1.5,
+          ...cup(6, 3),
+          backgroundColor: value ? colors.onPrimary : colors.textTertiary,
+          transform: [{ translateX: x.interpolate({ inputRange: [0, 1], outputRange: [0, SWITCH_W - KNOB - 2 * KNOB_INSET] }) }],
+        }}
+      />
+    </PressableScale>
+  );
+}
+
 export function ToggleRow({
   title,
   subtitle,
@@ -104,27 +179,7 @@ export function ToggleRow({
   left?: React.ReactNode;
   testID?: string;
 }) {
-  const { colors } = useTheme();
-  return (
-    <ListRow
-      title={title}
-      subtitle={subtitle}
-      left={left}
-      chevron={false}
-      right={
-        <Switch
-          testID={testID}
-          value={value}
-          onValueChange={onChange}
-          trackColor={{ false: colors.track, true: colors.primary }}
-          thumbColor="#FFFFFF"
-          // On web the "on" colours are separate props; without them the knob is the library's teal.
-          {...(Platform.OS === 'web' ? ({ activeTrackColor: colors.primary, activeThumbColor: '#FFFFFF' } as object) : null)}
-          accessibilityLabel={title}
-        />
-      }
-    />
-  );
+  return <ListRow title={title} subtitle={subtitle} left={left} chevron={false} right={<Toggle testID={testID} value={value} onChange={onChange} accessibilityLabel={title} />} />;
 }
 
 /**
@@ -157,25 +212,22 @@ export function Avatar({ emoji, initials, children, color, size = 44 }: { emoji?
   );
 }
 
-/** An empty dashed cup: the mark for "nothing here yet". */
+/** An empty dashed cup: the mark for "nothing here yet". A tumbler like every other cup: open top, no lip. */
 function EmptyCup() {
   const { colors } = useTheme();
   return (
-    <View style={{ width: 44, height: 54, alignItems: 'center' }}>
-      <View
-        style={{
-          width: 44,
-          height: 52,
-          borderWidth: 1.5,
-          borderTopWidth: 0,
-          borderStyle: 'dashed',
-          borderColor: colors.borderStrong,
-          borderBottomLeftRadius: 14,
-          borderBottomRightRadius: 14,
-        }}
-      />
-      <View style={{ position: 'absolute', left: -6, right: -6, top: 0, height: 2, backgroundColor: colors.borderStrong }} />
-    </View>
+    <View
+      style={{
+        width: 44,
+        height: 54,
+        borderWidth: 1.5,
+        borderTopWidth: 0,
+        borderStyle: 'dashed',
+        borderColor: colors.vesselEdge,
+        borderBottomLeftRadius: 14,
+        borderBottomRightRadius: 14,
+      }}
+    />
   );
 }
 

@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { ChevronLeft, X } from 'lucide-react-native';
-import React from 'react';
+import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View, type ScrollViewProps, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,6 +10,7 @@ import { IconButton } from './Button';
 import { FadeUp } from './motion';
 import { PressableScale } from './Pressable';
 import { Text } from './Text';
+import { useToastDock } from './Toast';
 
 /** Height of the docked tab bar above the home indicator (the + cup rises 14 px above it). */
 export const TAB_BAR_HEIGHT = 58;
@@ -52,6 +53,10 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
     paddingHorizontal: padded ? spacing.xl : 0,
   };
   const bottomPad = (tabs ? TAB_BAR_SPACE : spacing.xxl) + (footer ? 0 : insets.bottom);
+  // The toast rests 12 px above whatever this screen has at the bottom: the pinned footer,
+  // the tab bar with its + cup (14 px proud of the bar), or just the home indicator.
+  const [footerH, setFooterH] = useState(0);
+  useToastDock(footer ? footerH : insets.bottom + (tabs ? TAB_BAR_HEIGHT + 14 : 0));
   return (
     <KeyboardAvoidingView testID={testID} style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'web' ? undefined : 'padding'}>
       <FadeUp disabled={!enter} style={{ flex: 1 }}>
@@ -88,6 +93,7 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
         )}
         {footer ? (
           <View
+            onLayout={(e) => setFooterH(Math.round(e.nativeEvent.layout.height))}
             style={{
               borderTopWidth: 1,
               borderTopColor: colors.border,

@@ -347,6 +347,14 @@ async function device(browser, seedJson) {
     !/kcal|calor|\bkg\b|\blb\b|weight|food/i.test(card) && Object.keys(shared).every((k) => allowed.includes(k)) && !/kcal|weight|food/i.test(JSON.stringify(shared)),
     card.replace(/\s+/g, ' ').slice(0, 120),
   );
+  // Workouts are shared by an opaque reference, never their record id (an imported one's id gives away its start time).
+  const samRecordIds = new Set(srv.records.filter((r) => r.user_id === user2.id).map((r) => r.id));
+  const sharedIds = (shared.workouts || []).map((w) => w.id);
+  check(
+    'shared workouts carry opaque references, not record ids, and the share key stays with its owner',
+    sharedIds.length > 0 && sharedIds.every((id) => /^[0-9a-f]{32}$/.test(id) && !samRecordIds.has(id)) && !JSON.stringify(await A.page.evaluate(() => window.__healthcalFriends?.getState().overview?.friends ?? [])).includes(srv.social[user2.id]?.share_key || '-'),
+    sharedIds.slice(0, 2).join(', '),
+  );
 
   // A cheer on one device appears on the other, matched to the workout it was for.
   const latest = [...(shared.workouts || [])].sort((x, y) => String(y.date).localeCompare(String(x.date)))[0];

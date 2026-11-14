@@ -9,7 +9,7 @@
  * - Only transforms and opacity animate, on the UI thread where the platform has one.
  * - Nothing loops, bounces or glows.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -27,6 +27,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { useStore } from '@/store';
 import { motion, useReducedMotion } from '@/theme';
 
 import { Text, type TextProps } from './Text';
@@ -144,28 +145,47 @@ export function useFadeAfter(show: boolean, delay: number, instant: boolean): Sh
 
 // ---------------------------------------------------------------- reach
 
-/** Whether each `memoryKey`'s goal was last shown as reached, so a remount does not flash again. */
+/**
+ * Whether each `memoryKey`'s goal was last shown as reached in this session,
+ * so a cup that mounts again already full does not mark the moment twice.
+ */
 const reachedShown = new Map<string, boolean>();
 
+export interface ReachOptions {
+  /** When the flash starts, in ms from the crossing: the end of the pour (`pour.endsIn`). */
+  delay?: number;
+  /** True under reduced motion or `animate={false}`: no flash, the reached state just shows. */
+  instant?: boolean;
+  /** The same key the cup's pour uses. With it, a remount remembers that the goal was already reached. */
+  memoryKey?: string;
+  /** Called once at the crossing, in the same tick as the change, also under reduced motion. */
+  onReached?: () => void;
+}
+
 /**
- * A goal that is meant to be reached (water, minutes, protein): returns a 0..1
- * opacity for the rim's one flash in the data colour. It runs once, when the
- * level crosses the goal while the cup is on screen, after `delay` ms (the end
- * of the pour). A cup that mounts already full does not flash, nor does a
- * remount with the same `memoryKey`. Reduced motion: no flash, just the
- * reached state. `onReached` runs at the crossing in either case (a haptic and
- * a line of text are the screen's to add).
+ * The moment a goal that is meant to be reached (water, minutes, protein) is
+ * reached. Returns a 0..1 opacity for one flash of the rim in the data colour:
+ * it rises as the pour lands on the brim, holds for a settle and fades. It runs
+ * once per crossing and never loops.
+ *
+ * What counts as a crossing: `reached` turning true while the cup is mounted,
+ * or a cup that mounts reached when its `memoryKey` last showed it short of
+ * the goal. A cup that first mounts already full, or mounts again with the
+ * same `memoryKey` still full, does nothing. Dropping below the goal and
+ * reaching it again is a new crossing. With Celebrations off in Profile the
+ * flash is skipped; the reached state and `onReached` are not.
  */
-export function useReachFlash(
-  reached: boolean,
-  { delay = 0, instant = false, memoryKey, onReached }: { delay?: number; instant?: boolean; memoryKey?: string; onReached?: () => void } = {},
-): SharedValue<number> {
+export function useReachFlash(reached: boolean, { delay = 0, instant = false, memoryKey, onReached }: ReachOptions = {}): SharedValue<number> {
   const flash = useSharedValue(0);
-  // What this cup last showed; read and written only inside the effect.
-  const [last] = useState(() => ({ reached: memoryKey && reachedShown.has(memoryKey) ? reachedShown.get(memoryKey)! : reached }));
+  // What this cup last showed, and the latest callback: both touched only inside effects.
+  const last = useRef<boolean | null>(null);
+  const callback = useRef(onReached);
   useEffect(() => {
-    const was = last.reached;
-    last.reached = reached;
+    callback.current = onReached;
+  }, [onReached]);
+  useEffect(() => {
+    const was = last.current ?? (memoryKey && reachedShown.has(memoryKey) ? reachedShown.get(memoryKey)! : reached);
+    last.current = reached;
     if (memoryKey) reachedShown.set(memoryKey, reached);
     if (!reached) {
       cancelAnimation(flash);
@@ -173,18 +193,19 @@ export function useReachFlash(
       return;
     }
     if (was) return;
-    onReached?.();
-    if (instant) return;
+    callback.current?.();
+    // The flash is the kit's small celebration: it obeys Profile > Celebrations as well as reduced motion.
+    if (instant || !useStore.getState().settings.celebrations) return;
     flash.set(
       withDelay(
         delay,
         withSequence(
           withTiming(1, { duration: D.fade, easing: ease.enter }),
-          withDelay(D.settle, withTiming(0, { duration: D.settle * 1.6, easing: ease.exit })),
+          withDelay(D.settle, withTiming(0, { duration: D.pourSmall, easing: ease.exit })),
         ),
       ),
     );
-  }, [reached, delay, instant, memoryKey, onReached, flash, last]);
+  }, [reached, delay, instant, memoryKey, flash]);
   return flash;
 }
 

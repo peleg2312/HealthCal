@@ -44,7 +44,7 @@ describe('G3/G6: imports against sessions logged by hand', () => {
     expect(rows[0].activityId).toBe('stationary_bike');
     expect(rows[0]).toMatchObject({ status: 'probable-duplicate', selected: false });
     expect(rows[0].match?.id).toBe('hand-spinning');
-    expect(rows[0].reason).toBe('You logged a 45 min spinning session by hand on this day. If it is the same workout, leave this unticked, or import it and delete the hand-logged one.');
+    expect(rows[0].reason).toBe('You logged a 45 min spinning class by hand on this day. If it is the same workout, leave this unticked, or import it and delete the hand-logged one.');
     expect(entriesToSave(rows)).toEqual([]);
   });
 

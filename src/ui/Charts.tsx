@@ -100,11 +100,16 @@ function hatchLines(x: number, top: number, w: number, h: number, color: string,
 }
 
 /**
- * Rows of slim cups: each bar is a flat fill at about 42% of its colour with a
- * solid 2.5 px rim (the day's level) on top, so a row of bars reads as a
- * skyline of level lines. The part above the dashed `goal` line is amber. The
- * `openIndex` bar (today, not finished) is hatched. Stacked `segments` are
- * drawn solid. Press and drag scrubs when `scrub` is set.
+ * Rows of slim cups: each bar is a flat tint of its colour (the theme's
+ * `chartFill`: 42% on the light papers, 70% in dark so a bar keeps its colour
+ * instead of turning brown) with a solid 2.5 px rim (the day's level) on top,
+ * so a row of bars reads as a skyline of level lines. The part above the
+ * dashed `goal` line is amber. The `openIndex` bar (today, not finished) is
+ * hatched; it is the only bar drawn differently. `highlightIndex` prints that
+ * bar's value and bolds its label, and never dims the others: every finished
+ * bar keeps its colour and its rim. Stacked `segments` are drawn solid. Press
+ * and drag scrubs when `scrub` is set (the other bars dim only while a finger
+ * is down).
  */
 export function BarChart({
   data,
@@ -129,6 +134,7 @@ export function BarChart({
   /** 'limit' (default): the part of a bar above the goal is amber, as for calories. 'reach': the goal is something to get to (water, minutes), so going past it is not marked. */
   goalKind?: 'limit' | 'reach';
   band?: ChartBand;
+  /** Print this bar's value above it and bold its label. It does not dim the other bars. */
   highlightIndex?: number;
   /** A bar whose day is still open (today): hatched instead of filled. */
   openIndex?: number;
@@ -141,7 +147,7 @@ export function BarChart({
   maxValue?: number;
   testID?: string;
 }) {
-  const { colors } = useTheme();
+  const { colors, chartFill } = useTheme();
   const [width, onLayout] = useWidth();
   const [active, setActive] = useState<number | null>(null);
   const [uid] = useState(() => `bars-${seq++}`);
@@ -181,7 +187,8 @@ export function BarChart({
     const v = Math.max(0, d.value);
     const h = Math.max(v > 0 ? 3 : 0, (Math.min(v, max) / max) * chartH);
     const x = i * slot + (slot - barW) / 2;
-    const on = hi === undefined || hi === null || hi === i;
+    // Bars dim only while scrubbing, to point at the one under the finger.
+    const on = active === null || active === i;
     const over = goalKind === 'limit' && !!goal && v > goal;
     const fillTo = over ? y(goal) : base - h;
     const r = Math.min(3, barW / 3);
@@ -214,7 +221,7 @@ export function BarChart({
                 </>
               )
             : h > 0
-              ? <Path d={cupPath(x, fillTo, barW, base, r)} fill={c} opacity={0.42} />
+              ? <Path d={cupPath(x, fillTo, barW, base, r)} fill={c} opacity={chartFill} />
               : null}
         {h > 0 && over ? <Rect x={x} y={base - h} width={barW} height={Math.max(0, fillTo - (base - h))} fill={colors.warning} /> : null}
         {h > 0 ? <Rect x={x} y={(over ? fillTo : base - h) - 1.25} width={barW} height={2.5} fill={colors.rim} /> : null}

@@ -131,7 +131,13 @@ export function handLoggedMatch(
 }
 
 const handLoggedReason = (e: ActivityEntry) =>
-  `You logged a ${Math.round(e.durationMin)} min ${e.name.toLowerCase()} session by hand on this day. If it is the same workout, leave this unticked, or import it and delete the hand-logged one.`;
+  `You logged a ${Math.round(e.durationMin)} min ${sessionNoun(e.name)} by hand on this day. If it is the same workout, leave this unticked, or import it and delete the hand-logged one.`;
+
+/** "running session", but "spinning class" rather than "spinning class session". */
+const sessionNoun = (name: string) => {
+  const n = name.toLowerCase();
+  return /\b(class|session|workout|training)$/.test(n) ? n : `${n} session`;
+};
 
 const isGarmin = (e: ActivityEntry) => e.source === 'garmin';
 

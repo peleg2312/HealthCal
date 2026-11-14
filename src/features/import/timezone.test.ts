@@ -50,7 +50,7 @@ describe('G5: the recording zone decides the day', () => {
     const w = readFit(fitWithLocal('2026-11-11T00:30:00Z', -5), 'ny-run.fit').workouts[0];
     expect(recordedWallTime(w)).toMatchObject({ date: '2026-11-10', hour: 19, minute: 30 });
     expect(toActivityEntry(w, ACTIVITY_BY_ID.running, ctx).date).toBe('2026-11-10');
-    expect(metaLine(w, '2026-11-14', 'metric', false)).toMatch(/^Tue, Nov 10 · 19:30 · /);
+    expect(metaLine(w, '2026-11-14', 'metric', false).replace(/\u00a0/g, ' ')).toMatch(/^Tue, Nov 10 · 19:30 · /);
   });
 
   it('gives the same day whether the FIT or the CSV (read in New York time) is imported first', () => {

@@ -21,6 +21,11 @@ export interface SocialMe {
   displayName: string;
   avatar: string;
   sharing: SocialSharing;
+  /**
+   * The secret behind the references friends see for this user's workouts
+   * (see shareRef). Given by the server to its owner only; never sent anywhere.
+   */
+  shareKey: string;
 }
 
 export interface Friend {
@@ -32,7 +37,7 @@ export interface Friend {
   /** Only what this friend chose to share; any part may be missing. */
   summary: FriendSummary;
   summaryUpdatedAt: string | null;
-  /** References (workout ids or 'day:YYYY-MM-DD') this user has already cheered. */
+  /** References (opaque workout references or 'day:YYYY-MM-DD') this user has already cheered. */
   cheered: string[];
 }
 
@@ -112,7 +117,7 @@ export function toOverview(raw: unknown): FriendsOverview {
   const me = o.me && typeof o.me === 'object' ? (o.me as Json) : null;
   const person = (p: Json) => ({ userId: str(p.user_id), displayName: str(p.display_name), avatar: str(p.avatar) });
   return {
-    me: me ? { code: str(me.code), displayName: str(me.display_name), avatar: str(me.avatar), sharing: toSharing(me.sharing) } : null,
+    me: me ? { code: str(me.code), displayName: str(me.display_name), avatar: str(me.avatar), sharing: toSharing(me.sharing), shareKey: str(me.share_key) } : null,
     friends: list(o.friends).map((f) => ({
       ...person(f),
       since: typeof f.since === 'string' ? f.since : null,
@@ -191,7 +196,7 @@ export async function removeFriend(userId: string): Promise<FriendsResult> {
   return { ok: true, value: undefined };
 }
 
-/** Cheer a friend's workout (its id) or day (`dayRef(date)`). Shows at once; rolled back if it fails. */
+/** Cheer a friend's workout (the reference they published) or day (`dayRef(date)`). Shows at once; rolled back if it fails. */
 export async function cheerFriend(userId: string, ref: string): Promise<FriendsResult> {
   const session = await signedInClient();
   if (!session.ok) return session;
@@ -205,7 +210,10 @@ export async function cheerFriend(userId: string, ref: string): Promise<FriendsR
   const { data, error } = await session.client.rpc('send_cheer', { p_to: userId, p_ref: ref });
   if (error || data !== 'ok') {
     mark(false);
-    return failure(error?.message ?? (data === 'limit' ? 'That is a lot of cheering for one day. Try again tomorrow.' : 'You can only cheer your friends.'));
+    return failure(
+      error?.message ??
+        (data === 'limit' ? 'That is a lot of cheering for one day. Try again tomorrow.' : data === 'invalid' ? 'That cheer could not be sent. Refresh and try again.' : 'You can only cheer your friends.'),
+    );
   }
   return { ok: true, value: undefined };
 }
@@ -235,7 +243,7 @@ export async function publishSummary(options: { force?: boolean } = {}): Promise
   if (!me) return;
   const s = useStore.getState();
   if (s.ownerId !== session.userId) return;
-  const summary = buildFriendSummary({ activities: live(s.activities), foodEntries: live(s.foodEntries), today: today(), sharing: me.sharing ?? DEFAULT_SHARING });
+  const summary = buildFriendSummary({ activities: live(s.activities), foodEntries: live(s.foodEntries), today: today(), sharing: me.sharing ?? DEFAULT_SHARING, shareKey: me.shareKey });
   const signature = summarySignature(summary);
   if (!options.force && lastPublished?.userId === session.userId && lastPublished.signature === signature) return;
   const { error } = await session.client.rpc('social_publish', { p_summary: summary });

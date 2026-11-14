@@ -1,71 +1,127 @@
 import { Redirect, router } from 'expo-router';
 import { FileUp, HeartHandshake, ShieldCheck, TriangleAlert, Zap } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { FadeIn, Note } from '@/features/onboarding/components';
+import { ARRIVAL_POUR, CupMark, Note } from '@/features/onboarding/components';
+import { formatNumber } from '@/lib/units';
 import { pickAndImportBackup } from '@/services/export';
 import { isBackendConfigured } from '@/services/supabase';
 import { useStore } from '@/store';
 import { useTheme } from '@/theme';
-import { Button, Screen, Text, Vessel } from '@/ui';
+import { AnimatedNumber, Button, FadeUp, Screen, Text, Vessel } from '@/ui';
+
+/** The cup starts pouring as the screen opens; everything else follows it. */
+const POUR_DELAY = 120;
+const HEADLINE_AT = 160;
+const ACTIONS_AT = 420;
+const POURED_AT = POUR_DELAY + ARRIVAL_POUR;
+
+// Illustrative numbers, labelled as an example on screen.
+const BUDGET = 2160;
+const EATEN = 1219;
+const BURNED = 290;
+
+const PROMISES = [
+  { key: 'honest', Icon: ShieldCheck, title: 'Honest numbers' },
+  { key: 'fast', Icon: Zap, title: 'Fast logging' },
+  { key: 'free', Icon: HeartHandshake, title: 'No paywalls, no ads' },
+];
 
 /**
- * The idea in one picture: a day as a cup, with exercise adding hatched
- * headroom on top, what is eaten poured in, and what is left visible above
- * the level line. Illustrative numbers, labelled as an example.
+ * The idea in one picture, as the hero: a day as a cup. It pours in when the
+ * screen opens while "eaten" counts up and "left" counts down with it; the
+ * hatched headroom that exercise adds arrives when the pour lands. What the
+ * app promises sits beside the full part of the cup, so cup and words are one
+ * block. Shown once per session: coming back here does not pour again.
  */
-function DemoCup() {
-  const { colors } = useTheme();
-  const budget = 2160;
-  const eaten = 1219;
-  const burned = 290;
+function HeroCup({ height, narrow }: { height: number; narrow: boolean }) {
+  const { colors, spacing } = useTheme();
+  const width = Math.round(height * (narrow ? 0.32 : 0.4));
+  const big = narrow ? 44 : 56;
   return (
-    <View accessible accessibilityLabel="Example day: 2,160 kcal budget including 290 burned by exercise, 1,219 eaten, 941 left">
+    <View accessible accessibilityLabel="An example day: a budget of 2,160 kcal including 290 burned by exercise, 1,219 eaten, 941 left. Honest numbers. Fast logging. No paywalls, no ads.">
       <Vessel
-        value={eaten}
-        max={budget}
-        headroom={burned}
+        value={EATEN}
+        max={BUDGET}
+        headroom={BURNED}
         color={colors.calories}
-        width={76}
-        height={180}
+        width={width}
+        height={height}
+        duration={ARRIVAL_POUR}
+        delay={POUR_DELAY}
+        memoryKey="welcome-cup"
+        labelGap={narrow ? 14 : 18}
         labels={[
           {
             key: 'burned',
-            at: budget - burned / 2,
-            height: 22,
+            at: BUDGET - BURNED / 2,
+            height: 24,
             tick: colors.exercise,
             content: (
-              <Text variant="label" color="textSecondary">
-                <Text variant="numM" style={{ fontSize: 17 }}>+290</Text> burned, added
-              </Text>
+              <FadeUp delay={POURED_AT} distance={0}>
+                <Text variant="label" color="textSecondary" numberOfLines={1}>
+                  <Text variant="numM" style={{ fontSize: 17 }}>
+                    +290
+                  </Text>
+                  {' burned, added'}
+                </Text>
+              </FadeUp>
             ),
           },
           {
             key: 'left',
-            at: eaten + (budget - burned - eaten) / 2,
-            height: 40,
+            at: EATEN + (BUDGET - BURNED - EATEN) / 2,
+            height: big + 4,
             content: (
-              <Text variant="numL" color="caloriesInk">
-                941<Text variant="unit"> kcal left</Text>
-              </Text>
+              <AnimatedNumber
+                variant="numXL"
+                color="caloriesInk"
+                value={BUDGET - EATEN}
+                from={BUDGET}
+                duration={ARRIVAL_POUR}
+                delay={POUR_DELAY}
+                memoryKey="welcome-left"
+                format={(n) => formatNumber(Math.round(n))}
+                numberOfLines={1}
+                style={{ fontSize: big, lineHeight: big + 2 }}>
+                <Text variant="unit"> kcal left</Text>
+              </AnimatedNumber>
             ),
           },
           {
             key: 'eaten',
-            at: eaten,
-            height: 22,
+            at: EATEN,
+            height: 24,
             tick: colors.rim,
             content: (
-              <Text variant="label" color="textSecondary">
-                <Text variant="numM" style={{ fontSize: 17 }}>1,219</Text> eaten
+              <Text variant="label" color="textSecondary" numberOfLines={1}>
+                <AnimatedNumber
+                  variant="numM"
+                  value={EATEN}
+                  from={0}
+                  duration={ARRIVAL_POUR}
+                  delay={POUR_DELAY}
+                  memoryKey="welcome-eaten"
+                  format={(n) => formatNumber(Math.round(n))}
+                  style={{ fontSize: 17 }}
+                />
+                {' eaten'}
               </Text>
             ),
           },
         ]}>
-        <Text variant="caption" color="textTertiary">
-          An example day
-        </Text>
+        <View style={{ gap: narrow ? spacing.sm : spacing.md }}>
+          {PROMISES.map((p, i) => (
+            <FadeUp key={p.key} delay={POUR_DELAY + ARRIVAL_POUR / 2} index={i * 2} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <p.Icon size={18} color={colors.text} strokeWidth={1.9} />
+              <Text variant={narrow ? 'label' : 'bodyStrong'} style={{ flex: 1 }}>
+                {p.title}
+              </Text>
+            </FadeUp>
+          ))}
+        </View>
       </Vessel>
     </View>
   );
@@ -76,7 +132,14 @@ export default function Welcome() {
   const onboarded = useStore((s) => !!s.profile?.onboardedAt);
   const [importing, setImporting] = useState(false);
   const [importNote, setImportNote] = useState<{ tone: 'neutral' | 'warning'; text: string } | null>(null);
+  const window = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   if (onboarded) return <Redirect href="/" />;
+
+  const narrow = window.width < 360;
+  // The cup takes what the words and the actions leave, so the whole welcome fits one screen on most phones.
+  const room = window.height - insets.top - insets.bottom - (isBackendConfigured ? 500 : 444);
+  const cupHeight = Math.round(Math.max(210, Math.min(320, room)));
 
   const restore = async () => {
     setImporting(true);
@@ -102,30 +165,14 @@ export default function Welcome() {
     });
   };
 
-  const points = [
-    {
-      icon: <ShieldCheck size={22} color={colors.text} strokeWidth={1.9} />,
-      title: 'Honest numbers',
-      text: 'Targets from your own body data, estimates shown as estimates.',
-    },
-    {
-      icon: <Zap size={22} color={colors.text} strokeWidth={1.9} />,
-      title: 'Fast logging',
-      text: 'Recents, favourites and one-tap repeats are always close.',
-    },
-    {
-      icon: <HeartHandshake size={22} color={colors.text} strokeWidth={1.9} />,
-      title: 'No paywalls, no ads',
-      text: 'Every feature included, and your data exports in full.',
-    },
-  ];
-
   return (
     <Screen
       testID="welcome-screen"
-      contentStyle={{ flexGrow: 1, justifyContent: 'center', gap: spacing.xxxl, paddingTop: spacing.xxl }}
+      // The screen runs its own entrance: the cup first, then the headline, then the actions.
+      enter={false}
+      contentStyle={{ flexGrow: 1, justifyContent: 'space-between', gap: spacing.xl, paddingTop: spacing.md }}
       footer={
-        <View style={{ gap: spacing.sm }}>
+        <FadeUp delay={ACTIONS_AT} style={{ gap: spacing.sm }}>
           <Button title="Get started" testID="welcome-get-started" onPress={() => router.push('/onboarding')} />
           {isBackendConfigured ? (
             <Button title="I already have an account" variant="ghost" testID="welcome-sign-in" onPress={() => router.push('/auth?mode=signin')} />
@@ -139,18 +186,31 @@ export default function Welcome() {
             icon={<FileUp size={16} color={colors.primary} />}
             onPress={() => void restore()}
           />
-        </View>
+        </FadeUp>
       }>
-      <View style={{ gap: spacing.xxl }}>
-        <FadeIn delay={50} style={{ gap: spacing.sm }}>
-          <Text variant="display" accessibilityRole="header" style={{ fontSize: 44, lineHeight: 46, letterSpacing: -1.5 }}>
+      <View style={{ gap: spacing.xl }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <CupMark size={24} />
+          <Text variant="h3" testID="welcome-wordmark">
             HealthCal
           </Text>
-          <Text variant="h3" color="textSecondary" style={{ maxWidth: 340 }}>
-            Your day fills up like a cup. Calorie tracking you can trust, built from your own body.
+        </View>
+        <FadeUp delay={HEADLINE_AT} style={{ gap: spacing.sm }}>
+          <Text
+            variant="display"
+            accessibilityRole="header"
+            testID="welcome-headline"
+            style={narrow ? { fontSize: 34, lineHeight: 36, letterSpacing: -1.1 } : { fontSize: 42, lineHeight: 44, letterSpacing: -1.5 }}>
+            {narrow ? 'Your day fills up like a cup.' : 'Your day fills up\nlike a cup.'}
           </Text>
-        </FadeIn>
-        <DemoCup />
+          <Text variant="body" color="textSecondary" style={{ maxWidth: 340 }}>
+            Calorie tracking you can trust, built from your own body.
+          </Text>
+        </FadeUp>
+      </View>
+      <View style={{ gap: spacing.md }}>
+        <Text variant="overline">An example day</Text>
+        <HeroCup height={cupHeight} narrow={narrow} />
       </View>
       {importNote ? (
         <Note
@@ -161,20 +221,10 @@ export default function Welcome() {
             {importNote.text}
           </Text>
         </Note>
-      ) : null}
-      <View style={{ gap: spacing.lg }}>
-        {points.map((p, i) => (
-          <FadeIn key={p.title} delay={300 + i * 90} style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-            <View style={{ width: 28, alignItems: 'center' }}>{p.icon}</View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text variant="title">{p.title}</Text>
-              <Text variant="caption" color="textSecondary">
-                {p.text}
-              </Text>
-            </View>
-          </FadeIn>
-        ))}
-      </View>
+      ) : (
+        // Keeps the cup in the optical centre: a little more room under it than over it.
+        <View />
+      )}
     </Screen>
   );
 }

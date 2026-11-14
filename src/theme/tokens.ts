@@ -35,18 +35,18 @@ export interface ThemeColors {
   exercise: string;
   sleep: string;
   weight: string;
-  /** Done and OK marks (checks, a done tile, a healthy-range badge). Ink, so it is never mistaken for a data colour such as exercise green. */
+  /** Done and OK marks (checks, a done tile, a healthy-range badge). It is ink (equal to `text`), not a green: a ninth green could not be told from exercise or carbs. */
   success: string;
-  /** Over target: a fill, a lip or a key mark (amber, never red). Not for text: use `warningInk`. */
+  /** Over target: a fill, a lip or a key mark (amber, never red). Never text: use `warningInk`. */
   warning: string;
-  /** Warning as text or a small icon beside text: 4.5:1 on bg, surface and surfaceAlt in every theme. */
+  /** Warning as text, or as an icon beside text: 4.5:1 on bg, surface and surfaceAlt in every theme. */
   warningInk: string;
-  /** Destructive actions. Its own red, clearly apart from the persimmon primary. */
+  /** Destructive actions and field errors. A red of its own, at least 15 ΔE (CIEDE2000) from the primary in every theme; 4.5:1 as text on bg, surface and surfaceAlt. */
   danger: string;
   overlay: string;
-  /** Empty inside of progress-bar tracks and other horizontal bars (a tinted track). */
+  /** The unfilled part of a progress bar (a tinted track). Not for cups: see `vesselEmpty`. */
   track: string;
-  /** The empty part of a cup (Vessel, MiniCup, Trough, cups drawn by hand): the card colour, so a cup with room left reads as empty, not full of something pale. */
+  /** The unfilled part of a cup (Vessel, MiniCup, Trough, cups drawn by hand). Equal to `surface`, so room left reads as empty space, not as a cup full of something pale. */
   vesselEmpty: string;
   tabBar: string;
   /** Sheet shadow only. Nothing else in the kit casts a shadow. */
@@ -55,7 +55,7 @@ export interface ThemeColors {
   rim: string;
   /** Hatching for budget added by exercise inside a vessel (equals exercise). */
   headroom: string;
-  /** Outline of vessel sides and base (never the top: vessels are open). At least 3:1 on bg and surface, because with `vesselEmpty` the outline is what draws the cup. */
+  /** Outline of vessel sides and base (never the top: vessels are open). At least 3:1 on bg and surface: with an empty inside, the outline is what draws the cup. */
   vesselEdge: string;
   /** Calorie colour for text and large numbers (the calorie fill is too light to read in light and Blossom). */
   caloriesInk: string;
@@ -93,7 +93,7 @@ export const darkColors: ThemeColors = {
   success: '#F6EEE3',
   warning: '#F5B83D',
   warningInk: '#F5B83D',
-  danger: '#FF5F6D',
+  danger: '#FA5863',
   overlay: '#070606B8',
   track: '#2A2927',
   vesselEmpty: '#1F1E1C',
@@ -123,7 +123,7 @@ export const lightColors: ThemeColors = {
   onPrimary: '#FFFFFF',
   primarySoft: '#BF44201A',
   calories: '#E2683F',
-  protein: '#B0346F',
+  protein: '#B43872',
   carbs: '#5E9B1F',
   fat: '#9A6640',
   water: '#2672CC',
@@ -133,7 +133,7 @@ export const lightColors: ThemeColors = {
   success: '#211913',
   warning: '#C98100',
   warningInk: '#8A5A00',
-  danger: '#B23A3A',
+  danger: '#A61E33',
   overlay: '#211913A6',
   track: '#ECE3D6',
   vesselEmpty: '#FFFCF8',
@@ -186,7 +186,7 @@ export const blossomColors: ThemeColors = {
   success: '#3B1427',
   warning: '#C98100',
   warningInk: '#8A5A00',
-  danger: '#B23A3A',
+  danger: '#B3261E',
   overlay: '#3B1427A6',
   track: '#F7E6EA',
   vesselEmpty: '#FFFDFA',
@@ -202,8 +202,9 @@ export const blossomColors: ThemeColors = {
 };
 
 /**
- * Opacity of a bar-chart cup's fill (the solid rim sits on top). 42% reads as a clean tint on
- * the light papers; on the dark surface it turns every data colour brown, so dark uses 70%.
+ * Opacity of a bar-chart cup's fill (the solid rim sits on top), read as `useTheme().chartFill`.
+ * 42% is a clean tint on the light papers. On the dark surface 42% turns every data colour
+ * brown, so dark uses 70%: the bar keeps its colour and the cream rim still stands 3:1 off it.
  */
 export const chartFillOpacity: Record<'dark' | 'light' | 'blossom', number> = { dark: 0.7, light: 0.42, blossom: 0.42 };
 

@@ -46,10 +46,15 @@ describe('importing twice', () => {
     expect(csv).toMatchObject({ status: 'duplicate-in-file', selected: false, sameAsKey: fit?.key, reason: 'The same workout is also in run.fit, which is used instead.' });
     expect(entriesToSave(rows)).toHaveLength(1);
 
-    // CSV first, FIT later: the FIT is already imported.
+    // CSV first, FIT later: the same workout, and the FIT adds heart rate, so it is offered as an update of the same record.
     const store = save(entriesToSave(prepareImport(readImportFile(runCsv, 'Activities.csv', csvUtc).workouts, [], ctx)));
     const later = prepareImport(readImportFile(runFit, 'run.fit').workouts, store, ctx);
-    expect(later[0].status).toBe('already-imported');
+    expect(later[0]).toMatchObject({ status: 'update', adds: ['heart-rate'], selected: true });
+    expect(later[0].entry?.id).toBe(store[0].id);
+    // Once updated, the FIT is already imported.
+    const after = save(entriesToSave(later), store);
+    expect(after).toHaveLength(1);
+    expect(prepareImport(readImportFile(runFit, 'run.fit').workouts, after, ctx)[0].status).toBe('already-imported');
   });
 
   it('flags a CSV read in the wrong time zone as a probable duplicate', () => {
@@ -76,7 +81,11 @@ describe('sessions logged by hand', () => {
 
   it('flags a workout the person already logged by hand for the same time', () => {
     const rows = prepareImport(readImportFile(runFit, 'run.fit').workouts, [manual({})], ctx);
-    expect(rows[0]).toMatchObject({ status: 'probable-duplicate', reason: 'You already have a running session at this time.', selected: false });
+    expect(rows[0]).toMatchObject({
+      status: 'probable-duplicate',
+      reason: 'You logged a 50 min running session by hand on this day. If it is the same workout, leave this unticked, or import it and delete the hand-logged one.',
+      selected: false,
+    });
     expect(rows[0].match?.id).toBe('m1');
     // The person can still tick it.
     expect(setSelected(rows, rows[0].key, true)[0].selected).toBe(true);

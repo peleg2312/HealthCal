@@ -42,7 +42,11 @@ export function levelY(value: number, max: number, inner: number): number {
   return (1 - fillRatio(value, max)) * inner;
 }
 
-/** What a goal means: 'limit' (a budget: past it is over, shown in amber) or 'reach' (a goal to get to: at or past it is reached, never amber). */
+/**
+ * What a goal means. 'limit' is a budget (calories): past it is over, shown in
+ * amber. 'reach' is a goal to get to (water, activity minutes, protein): at or
+ * past it the goal is reached, the cup is brim-full, and amber is never used.
+ */
 export type GoalKind = 'limit' | 'reach';
 
 /**
@@ -54,4 +58,13 @@ export function goalState(value: number, max: number, kind: GoalKind = 'limit'):
   if (!(max > 0) || !Number.isFinite(value)) return 'under';
   if (kind === 'reach') return value >= max ? 'reached' : 'under';
   return value > max ? 'over' : 'under';
+}
+
+/**
+ * How far the brim line of a reached goal lies past each side of its cup, in
+ * px: about 7% of the width, at least 3 (a mini cup) and at most 6 (the hero).
+ */
+export function brimOverhang(width: number): number {
+  if (!Number.isFinite(width) || width <= 0) return 3;
+  return Math.max(3, Math.min(6, Math.round(width * 0.07)));
 }

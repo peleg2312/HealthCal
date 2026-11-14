@@ -9,14 +9,15 @@ import { PressableScale, Text } from '@/ui';
 export const THEME_OPTIONS: { value: ThemePreference; label: string; hint: string }[] = [
   { value: 'system', label: 'System', hint: 'Light or dark, following your device' },
   { value: 'light', label: 'Light', hint: 'Oat paper with a persimmon accent' },
-  { value: 'dark', label: 'Dark', hint: 'Warm espresso with a persimmon accent' },
+  { value: 'dark', label: 'Dark', hint: 'Warm black with a persimmon accent' },
   { value: 'blossom', label: 'Blossom', hint: 'Champagne, pink and raspberry' },
 ];
 
 /**
  * A miniature of a palette in its own Pour colours: the background, a card
  * (a cup) holding a small calorie vessel with that theme's level line, and a
- * water bar with its rim tick.
+ * water bar with its rim tick. The vessel is drawn like the kit's: a tumbler
+ * with no lip, sides and base in vesselEdge, and `vesselEmpty` above the fill.
  */
 function Mini({ c, half }: { c: ThemeColors; half?: 'left' | 'right' }) {
   const vh = 26;
@@ -34,7 +35,7 @@ function Mini({ c, half }: { c: ThemeColors; half?: 'left' | 'right' }) {
         borderBottomRightRadius: half === 'left' ? 0 : 10,
       }}>
       <View style={{ backgroundColor: c.surface, ...cup(9, 3), paddingHorizontal: 5, paddingVertical: 5, flexDirection: 'row', alignItems: 'flex-end', gap: 5, borderWidth: 1, borderColor: c.border }}>
-        {/* The vessel: open top, sides and base in vesselEdge, calorie fill, a rim on the fill. */}
+        {/* The vessel: open top, sides and base in vesselEdge, empty above the calorie fill, a rim on the fill. */}
         <View
           style={{
             width: 14,
@@ -44,7 +45,7 @@ function Mini({ c, half }: { c: ThemeColors; half?: 'left' | 'right' }) {
             borderColor: c.vesselEdge,
             borderBottomLeftRadius: vesselBase(vh, 14) / 2,
             borderBottomRightRadius: vesselBase(vh, 14) / 2,
-            backgroundColor: c.track,
+            backgroundColor: c.vesselEmpty,
             overflow: 'hidden',
             justifyContent: 'flex-end',
           }}>
