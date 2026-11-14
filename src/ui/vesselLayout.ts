@@ -68,3 +68,25 @@ export function brimOverhang(width: number): number {
   if (!Number.isFinite(width) || width <= 0) return 3;
   return Math.max(3, Math.min(6, Math.round(width * 0.07)));
 }
+
+/**
+ * Whether a reach goal already counted as reached before this render, so that
+ * `reached && !reachedBefore(...)` is the one moment the goal is crossed.
+ *
+ * - The cup showed the same thing last time (same `key`): what it showed then.
+ * - It is new, or now shows something else (a first mount, or a week strip that
+ *   moved to another day, so `key` changed): what was last shown for this key
+ *   in this session (`remembered`), and with no memory, what it shows now. So a
+ *   cup that mounts full, or pages onto a day that met its goal, crosses
+ *   nothing; a cup that comes back to find its goal met since it last showed
+ *   that key does.
+ *
+ * @param last what this cup showed at its previous render, or null on mount
+ * @param key the cup's `memoryKey` now
+ * @param remembered whether this key was last shown reached (undefined: never shown, or no key)
+ * @param reached whether the goal is reached now
+ */
+export function reachedBefore(last: { key: string | undefined; reached: boolean } | null, key: string | undefined, remembered: boolean | undefined, reached: boolean): boolean {
+  if (last && last.key === key) return last.reached;
+  return remembered ?? reached;
+}

@@ -1,10 +1,11 @@
 import { Redirect, router } from 'expo-router';
 import { ArrowRight, BellRing, ChevronLeft, CloudUpload } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { useColorScheme, View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
+import { BackHandler, Platform, useColorScheme, View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
 
 import { FadeIn, StepProgress, StepSlide } from '@/features/onboarding/components';
-import { buildPlan, draftFromProfile, effectiveBodyFat, stepsFor, toMetric, useOnboardingDraft, validateStep, type StepId } from '@/features/onboarding/model';
+import { deviceUnitsOnce } from '@/features/onboarding/deviceUnits';
+import { buildPlan, convertUnits, draftFromProfile, effectiveBodyFat, stepsFor, toMetric, useOnboardingDraft, validateStep, type StepId } from '@/features/onboarding/model';
 import { PlanReveal } from '@/features/onboarding/PlanReveal';
 import { remindersPatch } from '@/features/onboarding/routine';
 import { RestoreFailed } from '@/features/onboarding/SignInGate';
@@ -112,11 +113,16 @@ function Flow({ onFinished }: { onFinished: () => void }) {
     [],
   );
 
-  // A profile restored by sync without finishing onboarding pre-fills the answers.
+  // Before the first answer: a profile restored by sync without finishing onboarding pre-fills the
+  // answers, and the units start as the phone itself is set (once; a restored profile's own units win).
   useEffect(() => {
     const { profile } = useStore.getState();
     const state = useOnboardingDraft.getState();
-    if (profile && state.step === 0 && !state.draft.name && !state.draft.goal) state.reset(draftFromProfile(profile));
+    if (state.step !== 0 || state.draft.name || state.draft.goal) return;
+    let draft = profile ? draftFromProfile(profile) : state.draft;
+    const phone = profile?.units ? null : deviceUnitsOnce();
+    if (phone) draft = convertUnits(draft, phone);
+    if (draft !== state.draft) state.reset(draft);
   }, []);
 
   useEffect(
@@ -168,24 +174,51 @@ function Flow({ onFinished }: { onFinished: () => void }) {
     tryNext(Date.now() - movedByItselfAt.current < STRAY_TAP);
   };
 
+  /** An answer that needs something typed was tapped: a wait started by the tile before it is off. */
+  const hold = () => {
+    if (beat.current) clearTimeout(beat.current);
+    beat.current = null;
+  };
+
   /** A single-choice answer was tapped: let it be seen, then move on. Back, Continue and another tap all cancel the wait. */
   const advance = () => {
-    if (beat.current) clearTimeout(beat.current);
+    hold();
     const from = where().id;
     beat.current = setTimeout(() => {
       beat.current = null;
       if (where().id !== from) return;
-      if (tryNext()) movedByItselfAt.current = Date.now();
+      // Quiet: moving on by itself never raises an error, it just stays.
+      if (tryNext(true)) movedByItselfAt.current = Date.now();
     }, CHOICE_BEAT);
   };
 
   const back = () => {
     const { at } = where();
     if (at === 0) {
-      if (beat.current) clearTimeout(beat.current);
+      hold();
       goBack('/welcome');
     } else go(at - 1);
   };
+
+  // Android's own back button goes one question back, like the chevron (and like "Change
+  // answers" on the plan); on the first question it leaves, as before.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      const s = useOnboardingDraft.getState();
+      const at = Math.min(s.step, stepsFor(s.draft.goal).length - 1);
+      if (at === 0) return false;
+      if (beat.current) clearTimeout(beat.current);
+      beat.current = null;
+      setDirection(-1);
+      setMoved(true);
+      setShowErrors(false);
+      s.setStep(at - 1);
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
 
   /** The routine step's two equal answers: both save the times, only one turns reminders on. */
   const answerReminders = async (turnOn: boolean) => {
@@ -292,7 +325,7 @@ function Flow({ onFinished }: { onFinished: () => void }) {
       }>
       {Body ? (
         <StepSlide key={step} direction={direction} disabled={!moved}>
-          <Body draft={draft} set={set} errors={errors} submit={next} advance={advance} />
+          <Body draft={draft} set={set} errors={errors} submit={next} advance={advance} hold={hold} />
         </StepSlide>
       ) : plan ? (
         <PlanReveal plan={plan} now={now} onChangeAnswers={back} />

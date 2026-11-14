@@ -31,6 +31,7 @@ import { useStore } from '@/store';
 import { motion, useReducedMotion } from '@/theme';
 
 import { Text, type TextProps } from './Text';
+import { reachedBefore } from './vesselLayout';
 
 const { duration: D, distance: X } = motion;
 
@@ -177,24 +178,31 @@ export interface ReachOptions {
  * same `memoryKey` still full, does nothing. Dropping below the goal and
  * reaching it again is a new crossing. With Celebrations off in Profile the
  * flash is skipped; the reached state and `onReached` are not.
+ *
+ * A new `memoryKey` on a mounted cup means it now shows something else (the
+ * week strip moved to another day), so that is a mount, not a crossing: paging
+ * from a day short of its goal to a day that met it marks nothing. A cup that
+ * can show more than one day therefore needs a `memoryKey` with the day in it.
  */
 export function useReachFlash(reached: boolean, { delay = 0, instant = false, memoryKey, onReached }: ReachOptions = {}): SharedValue<number> {
   const flash = useSharedValue(0);
-  // What this cup last showed, and the latest callback: both touched only inside effects.
-  const last = useRef<boolean | null>(null);
+  // What this cup last showed (and for which key), and the latest callback: both touched only inside effects.
+  const last = useRef<{ key: string | undefined; reached: boolean } | null>(null);
   const callback = useRef(onReached);
   useEffect(() => {
     callback.current = onReached;
   }, [onReached]);
   useEffect(() => {
-    const was = last.current ?? (memoryKey && reachedShown.has(memoryKey) ? reachedShown.get(memoryKey)! : reached);
-    last.current = reached;
+    const prev = last.current;
+    const was = reachedBefore(prev, memoryKey, memoryKey ? reachedShown.get(memoryKey) : undefined, reached);
+    last.current = { key: memoryKey, reached };
     if (memoryKey) reachedShown.set(memoryKey, reached);
-    if (!reached) {
+    // Short of the goal, or showing something else now: a flash still running belongs to what was shown before.
+    if (!reached || (prev && prev.key !== memoryKey)) {
       cancelAnimation(flash);
       flash.set(0);
-      return;
     }
+    if (!reached) return;
     if (was) return;
     callback.current?.();
     // The flash is the kit's small celebration: it obeys Profile > Celebrations as well as reduced motion.

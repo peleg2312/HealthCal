@@ -11,6 +11,7 @@ HealthCal works fully on the device with no account. Connecting the optional Sup
 - **AI meal analysis.** Photograph or describe a meal; Claude returns an itemised, editable estimate with a calorie range and a prompt about hidden fats.
 - **108 activities.** Volleyball, basketball, yoga, running, swimming, strength and more, with calorie burn from the 2024 Compendium of Physical Activities MET values and your weight. Only net calories (above resting) are added to the budget, so nothing is counted twice. A set-by-set strength logger with rest timer, personal records and saved routines is included.
 - **Garmin workouts.** Import the files Garmin Connect exports (FIT, TCX, GPX, the Activities CSV, or a ZIP of them): each workout arrives with its real duration, distance and the calories the watch measured, and only the part above resting is added to the day. See `docs/garmin-import.md`.
+- **Automatic workout sync (Android).** With one permission, HealthCal reads the workouts that Garmin Connect and other apps save to Health Connect and adds them by themselves when you open the app, with the watch's calories and an Undo. It reads workouts, their calories and distance only, writes nothing back, and asks first about anything that might repeat a session you logged by hand. Needs an Android build of the app (not Expo Go); on iPhone and in the browser, use the file import. See `docs/health-sync.md`, which also lists what has to be declared in Play Console before release.
 - **Friends.** Add people by a code and see each other's week: active minutes, sessions, streak and recent workouts, with a cheer for a workout. Each of those can be switched off, and calories, weight and food are never shared. Needs an account.
 - **Hydration, weight, body composition, sleep and fasting** trackers.
 - **Weight trend and adaptive expenditure.** A smoothed trend line ignores day-to-day water noise; once enough intake and weigh-ins are logged, your real energy expenditure is estimated from your own data.
@@ -132,11 +133,11 @@ src/lib/            pure calculation code: energy, exercise, hydration, trend, b
 src/store/          local-first store (zustand), on-device saving, derived selectors
 src/data/           bundled food list and activity catalogue
 src/services/       Supabase client, auth, sync, Open Food Facts, AI, notifications, export
-src/features/       per-feature components and helpers (food, ai, activity, import, friends, progress, ...)
+src/features/       per-feature components and helpers (food, ai, activity, import, health-sync, friends, progress, ...)
 supabase/           SQL migrations, their tests, and the analyze-food and food-search edge functions
 scripts/dev/        demo data, screenshot tool, end-to-end tests, local stand-in backend
 scripts/ops/        set up a real Supabase project and check it end to end
-docs/               competitive research (33 comparable apps) and the Garmin import guide
+docs/               competitive research (33 comparable apps), the Garmin import guide and the Health Connect sync notes
 ```
 
 `AGENTS.md` holds the conventions for working in the codebase (data rules, the UI kit, design rules).
@@ -153,6 +154,7 @@ Signing in on a device that already has data uploads what was logged there to th
 
 - 321 of the 341 bundled foods name the USDA FoodData Central record they were checked against (SR Legacy 2018-04 and FNDDS 2024-10-31) and carry that record's values; an independent second pass looked every record up again. The other 20 have no honest USDA equivalent (labneh, halloumi, shakshuka, shawarma, protein products and a few more) and are labelled as unverified estimates. Household serving weights were corrected where USDA lists the same portion; the rest are typical values. `scripts/check-foods.mjs` enforces internal consistency.
 - Garmin's calorie figure for an activity includes resting energy. HealthCal stores it as the session's total and adds only the part above your own resting rate to the day, the same rule as for hand-logged sessions.
+- A workout synced from Health Connect uses the active calories its app recorded as the amount added to the day, and the total as the session's total. When only one of the two exists the other is worked out from your resting rate, and when neither does the session gets the app's own estimate, shown as an estimate. Automatic sync has been tested against a stand-in health store only; it has not yet run on a phone (see `docs/health-sync.md`).
 - Open Food Facts data is crowd-sourced. The app labels it as community data and drops entries whose calories and macros contradict each other.
 - Calorie burn from MET tables describes an average adult. The app shows it as an estimate with a range.
 - Photo-based calorie estimates are approximate in every app that offers them; independent tests of commercial apps found average underestimates of a few hundred kcal per meal, mostly from fat the camera cannot see. HealthCal's review step exists for that reason.

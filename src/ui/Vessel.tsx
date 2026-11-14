@@ -108,6 +108,11 @@ export interface VesselProps {
  *   (a flat band behind the line; never looped, skipped under reduced motion,
  *   not replayed on a remount with the same `memoryKey`). `onReached` fires at
  *   that crossing, so the screen can add `haptic.success()` and a line of text.
+ *   A cup that can show more than one day needs a `memoryKey` with the day in
+ *   it: a new key is a mount, so paging onto a day that met its goal marks
+ *   nothing. Every mounted cup that sees the crossing calls its `onReached`, so
+ *   a tab screen that stays mounted under another screen should react only
+ *   while it is focused.
  *
  *   <Vessel value={eaten} max={budget} headroom={exercise} color={colors.calories} labels={...}>{macros}</Vessel>
  *   <Vessel value={drunk} max={goal} goalKind="reach" onReached={celebrate} memoryKey={`water-${date}`} color={colors.water} />

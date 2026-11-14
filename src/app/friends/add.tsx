@@ -109,6 +109,9 @@ export default function AddFriendScreen() {
       <Text variant="body" color="textSecondary" style={{ marginTop: spacing.xs }}>
         Ask your friend for the 8-character code on their Friends screen, or open the link they sent. Nobody can find you by searching.
       </Text>
+      <Text variant="label" color="textSecondary" testID="friends-add-declined-note">
+        Declined someone and changed your mind? Enter their code here to add them. They were never told.
+      </Text>
 
       {needsSetup && !result ? (
         <Card tone="alt" testID="friends-add-needs-setup">
@@ -147,7 +150,7 @@ export default function AddFriendScreen() {
       {result ? (
         <Card testID="friends-add-result" accessibilityLiveRegion="polite">
           <View style={{ flexDirection: 'row', gap: spacing.md }}>
-            {result.good ? <CircleCheck size={22} color={colors.success} strokeWidth={2} /> : <Info size={22} color={colors.warning} strokeWidth={2} />}
+            {result.good ? <CircleCheck size={22} color={colors.success} strokeWidth={2} /> : <Info size={22} color={colors.warningInk} strokeWidth={2} />}
             <View style={{ flex: 1, gap: 4 }}>
               <Text variant="h3" testID={`friends-add-outcome-${result.outcome.replace(/_/g, '-')}`}>
                 {result.title}

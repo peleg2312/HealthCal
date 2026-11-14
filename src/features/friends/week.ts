@@ -3,7 +3,7 @@
  * they share, plain-words labels for days, cheers and request outcomes, and
  * how a person's mark (initials or an emoji) is shown. No React, no storage.
  */
-import { addDays, diffDays, formatShortDate, fromISODate, startOfWeek } from '@/lib/dates';
+import { addDays, diffDays, formatShortDate, fromISODate, startOfWeek, toISODate } from '@/lib/dates';
 import type { ISODate } from '@/types';
 
 import type { FriendSummary, FriendWorkout } from './summary';
@@ -71,7 +71,10 @@ export function dayLabel(date: ISODate, today: ISODate): string {
 export function cheerTarget(ref: string, ownWorkouts: Map<string, { name: string }>, today: ISODate): string {
   if (ref.startsWith('day:')) {
     const date = ref.slice(4);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return 'your day';
+    // Only a real date of the last few weeks is named (a cheer is shown for two weeks).
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || toISODate(fromISODate(date)) !== date) return 'your day';
+    const ago = diffDays(date, today);
+    if (ago < 0 || ago > 28) return 'your day';
     const label = dayLabel(date, today);
     return label === 'Today' ? 'your day today' : label === 'Yesterday' ? 'your day yesterday' : `your day on ${label}`;
   }

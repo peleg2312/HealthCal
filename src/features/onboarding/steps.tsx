@@ -29,6 +29,8 @@ export interface StepProps {
    * single-choice answers; Back still works and typing screens keep Continue.
    */
   advance: () => void;
+  /** Call off a wait started by `advance`: for a tile on the same question that needs something typed. */
+  hold: () => void;
 }
 
 const Group = ({ children, gap }: { children: React.ReactNode; gap?: number }) => {
@@ -63,7 +65,7 @@ export function BasicsStep({ draft, set, errors, submit }: StepProps) {
             Units
           </Text>
           <Text variant="caption" color="textSecondary">
-            Set from your phone&apos;s region
+            Set from your phone
           </Text>
         </View>
         <UnitsToggle draft={draft} set={set} />
@@ -297,7 +299,7 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
 
 // ---------------------------------------------------------------- body fat
 
-export function BodyFatStep({ draft, set, errors, submit, advance }: StepProps) {
+export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepProps) {
   const { colors, spacing } = useTheme();
   const imp = draft.units === 'imperial';
   const lu = imp ? 'in' : 'cm';
@@ -324,6 +326,7 @@ export function BodyFatStep({ draft, set, errors, submit, advance }: StepProps) 
               set({ bodyFatMode: m.value });
               // Only the answer that needs nothing typed moves on by itself.
               if (m.value === 'unknown') advance();
+              else hold();
             }}
           />
         ))}

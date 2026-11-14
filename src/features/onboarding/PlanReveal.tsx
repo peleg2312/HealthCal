@@ -35,10 +35,6 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
     { key: 'carbs', label: 'Carbs', grams: plan.macros.carbsG, share: plan.macros.split.carbs, color: colors.carbs },
     { key: 'fat', label: 'Fat', grams: plan.macros.fatG, share: plan.macros.split.fat, color: colors.fat },
   ];
-  const goalLine =
-    p.goal === 'maintain' || Math.abs(t.dailyDelta) < 5
-      ? 'Matched to what you burn'
-      : `${t.dailyDelta < 0 ? '−' : '+'}${kcal(Math.abs(t.dailyDelta))} kcal a day, about ${formatWeight(Math.abs(t.impliedWeeklyKg), units, 2)} a week`;
   const water = formatVolume(plan.waterMl, units);
   const wi = water.indexOf(' ');
   const waterNum = wi > 0 ? water.slice(0, wi) : water;
@@ -50,11 +46,17 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
       ? `From your lean mass of ${formatWeight(plan.leanMassKg, units)} (body fat ${round(p.bodyFatPct ?? 0, 1)}%)`
       : 'From your height, weight, age and sex';
   const name = p.name;
+  // A long name goes to the overline, so the headline stays three or four lines on a small phone.
+  const nameInTitle = name.length > 0 && name.length <= 12;
+  const overline = name && !nameInTitle ? `${name}, your plan is ready` : 'Your plan is ready';
   // The goal and its dates lead; without a road to draw (maintaining, or no target weight) the day itself does.
+  // A no-break space keeps the weight and its unit on one line.
   const title = projection
-    ? `${name ? `${name}, you` : 'You'} could reach ${formatWeight(projection.targetKg, units)} ${range}`
-    : `${name ? `${name}, here's` : "Here's"} your day`;
+    ? `${nameInTitle ? `${name}, you` : 'You'} could reach ${formatWeight(projection.targetKg, units).replace(/ /g, '\u00A0')}`
+    : `${nameInTitle ? `${name}, here's` : "Here's"} your day`;
   const pace = formatWeight(Math.abs(t.impliedWeeklyKg), units, 2);
+  // Beside the foot of the cup: what the cup cannot show. The pace is on the road card when there is a road, and a matched budget has none.
+  const budgetNote = projection || Math.abs(t.dailyDelta) < 5 ? '' : `About ${pace} a week. `;
   // The rest arrives as the pour lands, one piece after another.
   const landed = reduce ? 0 : POUR_DELAY + ARRIVAL_POUR;
 
@@ -66,16 +68,24 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
 
   return (
     <View style={{ gap: spacing.lg }} testID="plan-reveal">
-      <FadeUp style={{ gap: spacing.sm, marginBottom: spacing.xs }}>
-        <Text variant="overline" color="textSecondary">
-          Your plan is ready
+      <FadeUp style={{ gap: spacing.xs, marginBottom: spacing.xs }}>
+        <Text variant="overline" color="textSecondary" style={{ marginBottom: spacing.xs }}>
+          {overline}
         </Text>
-        <Text variant="h1" accessibilityRole="header" testID="plan-title" style={narrow ? undefined : { fontSize: 32, lineHeight: 36 }}>
-          {title}
-        </Text>
+        {/* One heading in two sizes: the claim, then its dates in the brand ink. A screen reader gets one sentence. */}
+        <View accessible accessibilityRole="header" accessibilityLabel={projection ? `${title} ${range}` : title} testID="plan-title">
+          <Text variant="h1" style={narrow ? undefined : { fontSize: 32, lineHeight: 36 }}>
+            {title}
+          </Text>
+          {projection ? (
+            <Text variant="h2" color="primaryInk" testID="plan-when" style={narrow ? undefined : { fontSize: 24, lineHeight: 30, letterSpacing: -0.4 }}>
+              {range}
+            </Text>
+          ) : null}
+        </View>
         {projection ? (
           <Text variant="body" color="textSecondary">
-            An estimate at the pace you chose.
+            {t.limitedByFloor ? 'An estimate at this budget.' : 'An estimate at the pace you chose.'}
           </Text>
         ) : null}
       </FadeUp>
@@ -85,13 +95,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
           <Text variant="overline" color="textSecondary">
             Your daily budget
           </Text>
-          <BudgetVessel target={t.target} tdee={plan.tdee} goal={p.goal} />
-          <View style={{ gap: 2, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md }}>
-            <Text variant="bodyStrong">{goalLine}</Text>
-            <Text variant="caption" color="textSecondary">
-              Logged workouts add their calories on top, as hatched headroom in the cup.
-            </Text>
-          </View>
+          <BudgetVessel target={t.target} tdee={plan.tdee} goal={p.goal} note={`${budgetNote}Workouts you log add their calories on top, as hatched headroom.`} />
         </Card>
       </FadeUp>
 
@@ -105,7 +109,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
             <View style={{ gap: spacing.xs }}>
               <Text variant="h3">{`The road to ${formatWeight(projection.targetKg, units)}`}</Text>
               <Text variant="caption" color="textSecondary" testID="plan-date">
-                {`${range.charAt(0).toUpperCase() + range.slice(1)}. The line is the pace you chose, about ${pace} a week; the band is a little faster or slower.`}
+                {`${range.charAt(0).toUpperCase() + range.slice(1)}. The line is ${t.limitedByFloor ? 'the pace this budget gives' : 'the pace you chose'}, about ${pace} a week; the band is a little faster or slower.`}
               </Text>
             </View>
             {/* The road draws once its card has arrived. */}
@@ -133,8 +137,9 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
                   {String(m.grams)}
                   <Text variant="unit"> g</Text>
                 </Text>
-                <Text variant="caption" color="textSecondary" numberOfLines={1}>
-                  {`${Math.round(m.share * 100)}% of calories`}
+                <Text variant="caption" color="textSecondary" numberOfLines={1} accessibilityLabel={`${Math.round(m.share * 100)}% of calories`}>
+                  {/* Three columns on a small phone have no room for the words; the bar above them says what the share is of. */}
+                  {narrow ? `${Math.round(m.share * 100)}%` : `${Math.round(m.share * 100)}% of calories`}
                 </Text>
               </View>
             ))}
@@ -147,12 +152,13 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
                 Water
               </Text>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.md }}>
-              <Text variant="numL" testID="plan-water">
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', columnGap: spacing.md, flexWrap: 'wrap' }}>
+              {/* The number and its unit never part; on a small phone the note drops under them. */}
+              <Text variant="numL" testID="plan-water" numberOfLines={1} style={{ flexShrink: 0 }}>
                 {waterNum}
                 {waterUnit ? <Text variant="unit">{` ${waterUnit}`}</Text> : null}
               </Text>
-              <Text variant="caption" color="textSecondary" align="right" style={{ flexShrink: 1 }}>
+              <Text variant="caption" color="textSecondary">
                 Drinks only; food covers the rest
               </Text>
             </View>
@@ -260,12 +266,16 @@ function MathRow({ label, detail, value, testID }: { label: string; detail: stri
  * line lands on the budget, and the space left above it is the gap to what
  * you burn, labelled with what it is for. For gain the cup is the budget, and
  * what you burn is a dashed mark across it with the surplus labelled above.
+ * A budget equal to the burn fills the cup and says so. `note` sits beside the
+ * foot of the cup, under the labels.
  */
-function BudgetVessel({ target, tdee, goal }: { target: number; tdee: number; goal: 'lose' | 'maintain' | 'gain' }) {
+function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: number; goal: 'lose' | 'maintain' | 'gain'; note: string }) {
   const { colors } = useTheme();
-  const top = Math.max(target, tdee);
-  const gap = Math.round(tdee - target);
-  const showBurn = Math.abs(gap) >= 5;
+  // The burn as it is printed (to the nearest 10, like the budget), so the three numbers add up on screen.
+  const burn = Math.round(tdee / 10) * 10;
+  const top = Math.max(target, burn);
+  const gap = burn - target;
+  const showBurn = gap !== 0;
   // The burn level sits inside the cup when the budget is above it (a surplus).
   const burnInside = showBurn && gap < 0;
   const narrow = useWindowDimensions().width < 360;
@@ -278,7 +288,7 @@ function BudgetVessel({ target, tdee, goal }: { target: number; tdee: number; go
       {burnInside ? <View style={{ width: 12, height: 0, marginTop: 10, borderTopWidth: 1.5, borderStyle: 'dashed', borderColor: colors.text }} /> : null}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text variant="numM" style={{ fontSize: 18, lineHeight: 22 }}>
-          {kcal(tdee)}
+          {formatNumber(burn)}
           <Text variant="unit"> kcal</Text>
         </Text>
         <Text variant="caption" color="textSecondary">
@@ -298,18 +308,18 @@ function BudgetVessel({ target, tdee, goal }: { target: number; tdee: number; go
         duration={ARRIVAL_POUR}
         delay={POUR_DELAY}
         testID="plan-vessel"
-        accessibilityLabel={`Daily budget ${formatNumber(target)} kcal${showBurn ? `, against about ${kcal(tdee)} kcal you burn` : ''}`}
+        accessibilityLabel={`Daily budget ${formatNumber(target)} kcal${showBurn ? `, against about ${formatNumber(burn)} kcal you burn` : ', matched to what you burn'}`}
         labels={[
-          ...(showBurn ? [{ key: 'burn', at: tdee, height: 40, tick: burnInside ? undefined : colors.vesselEdge, content: burnLabel }] : []),
+          ...(showBurn ? [{ key: 'burn', at: burn, height: 40, tick: burnInside ? undefined : colors.vesselEdge, content: burnLabel }] : []),
           ...(showBurn && goal !== 'maintain'
             ? [
                 {
                   key: 'gap',
-                  at: (target + tdee) / 2,
+                  at: (target + burn) / 2,
                   height: 22,
                   content: (
                     <Text variant="label" color="textSecondary" testID="plan-gap">
-                      {`${gap > 0 ? '−' : '+'}${kcal(Math.abs(gap))} for your goal`}
+                      {`${gap > 0 ? '−' : '+'}${formatNumber(Math.abs(gap))} for your goal`}
                     </Text>
                   ),
                 },
@@ -337,13 +347,32 @@ function BudgetVessel({ target, tdee, goal }: { target: number; tdee: number; go
               </View>
             ),
           },
-        ]}
-      />
+          // A budget equal to the burn fills the cup to the top; say so right under the number.
+          ...(showBurn
+            ? []
+            : [
+                {
+                  key: 'match',
+                  at: target * 0.98,
+                  height: 22,
+                  content: (
+                    <Text variant="label" color="textSecondary" testID="plan-matched">
+                      Matched to what you burn
+                    </Text>
+                  ),
+                },
+              ]),
+        ]}>
+        {/* The room beside the foot of the cup holds the one thing the cup does not show yet. */}
+        <Text variant="caption" color="textSecondary" testID="plan-budget-note">
+          {note}
+        </Text>
+      </Vessel>
       {burnInside ? (
         // What you burn, as a dashed mark across the cup at its level (the key beside the label matches it).
         <View
           pointerEvents="none"
-          style={{ position: 'absolute', left: 5, width: width - 10, top: Math.round(levelY(tdee, top, height - 1.5)), height: 0, borderTopWidth: 1.5, borderStyle: 'dashed', borderColor: colors.text }}
+          style={{ position: 'absolute', left: 5, width: width - 10, top: Math.round(levelY(burn, top, height - 1.5)), height: 0, borderTopWidth: 1.5, borderStyle: 'dashed', borderColor: colors.text }}
         />
       ) : null}
     </View>

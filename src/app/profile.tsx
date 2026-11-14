@@ -7,6 +7,7 @@ import {
   Info,
   Moon,
   PartyPopper,
+  RefreshCw,
   Ruler,
   Smartphone,
   SunMoon,
@@ -19,6 +20,9 @@ import {
 import React from 'react';
 import { View } from 'react-native';
 
+import { useHealthSync } from '@/features/health-sync/store';
+import { healthAdapter } from '@/features/health-sync/sync';
+import { profileSubtitle } from '@/features/health-sync/ui/format';
 import { Group, IconTile, InitialsAvatar } from '@/features/settings/components';
 import { THEME_OPTIONS, ThemeSwatches } from '@/features/settings/ThemeSwatches';
 import { timeAgo } from '@/features/settings/format';
@@ -29,7 +33,7 @@ import { useAuth } from '@/services/auth';
 import { remindersSupported } from '@/services/notifications';
 import { isBackendConfigured } from '@/services/supabase';
 import { useSyncState } from '@/services/sync';
-import { useToday } from '@/store/clock';
+import { useNow, useToday } from '@/store/clock';
 import { pendingChanges, useStore } from '@/store';
 import { useEnergyModel, useProfile, useWeightSeries } from '@/store/selectors';
 import { useTheme } from '@/theme';
@@ -243,6 +247,7 @@ function ProfileHub() {
           }
           onPress={() => router.push('/friends' as never)}
         />
+        <HealthSyncRow />
         <ListRow
           testID="profile-data"
           title="Your data"
@@ -290,6 +295,26 @@ function HeaderStat({ label, value, color, divider }: { label: string; value: st
         {unit ? <Text variant="unit">{` ${unit}`}</Text> : null}
       </Text>
     </View>
+  );
+}
+
+/** Automatic workout sync (Health Connect on Android): this phone's own switch, so it reads its own state. */
+function HealthSyncRow() {
+  const { colors } = useTheme();
+  const sync = useHealthSync();
+  const now = useNow();
+  return (
+    <ListRow
+      testID="profile-health-sync"
+      title="Workout sync"
+      subtitle={profileSubtitle(sync, healthAdapter.store !== null, timeAgo(sync.lastSyncedAt, now))}
+      left={
+        <IconTile color={colors.exercise}>
+          <RefreshCw size={20} color={colors.exercise} />
+        </IconTile>
+      }
+      onPress={() => router.push('/settings/health-sync' as never)}
+    />
   );
 }
 

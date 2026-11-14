@@ -37,7 +37,17 @@ export function SetupForm({ header, defaultName, onDone }: { header: React.React
     <Screen
       header={header}
       testID="friends-screen"
-      footer={<Button testID="friends-setup-save" title="Turn on friends" loading={saving} disabled={!name.trim()} onPress={() => void submit()} />}>
+      footer={
+        // The refusal sits right above the button the user just pressed, never under the pinned footer.
+        <View style={{ gap: spacing.sm }}>
+          {error ? (
+            <Text variant="label" color="danger" testID="friends-setup-error" accessibilityLiveRegion="polite">
+              {error}
+            </Text>
+          ) : null}
+          <Button testID="friends-setup-save" title="Turn on friends" loading={saving} disabled={!name.trim()} onPress={() => void submit()} />
+        </View>
+      }>
       <LargeTitle title="Friends" />
       <Text variant="body" color="textSecondary">
         Add people with a code and see each other&apos;s training week. You choose what they see, and you can change it any time.
@@ -49,11 +59,6 @@ export function SetupForm({ header, defaultName, onDone }: { header: React.React
           <SharingSwitches sharing={sharing} onChange={(key, on) => setSharing((s) => ({ ...s, [key]: on }))} />
         </View>
       </Card>
-      {error ? (
-        <Text variant="label" color="danger" testID="friends-setup-error">
-          {error}
-        </Text>
-      ) : null}
     </Screen>
   );
 }

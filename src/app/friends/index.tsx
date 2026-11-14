@@ -11,7 +11,7 @@ import { formatCode, normalizeCode, ownWorkoutsByRef, WORKOUT_WINDOW_DAYS } from
 import { cheerTarget } from '@/features/friends/week';
 import { timeAgo } from '@/features/settings/format';
 import { addDays } from '@/lib/dates';
-import { cheerFriend, leaveSocial, refreshFriends, removeFriend, respondToRequest, useFriends, type Friend, type FriendRequest } from '@/services/friends';
+import { cheerFriend, leaveSocial, refreshFriends, removeFriend, respondToRequest, undoDecline, useFriends, type Friend, type FriendRequest } from '@/services/friends';
 import { useNow, useToday } from '@/store/clock';
 import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
@@ -73,7 +73,17 @@ export default function FriendsScreen() {
     setBusy(r.userId);
     const res = await respondToRequest(r.userId, false);
     setBusy(null);
-    toast(res.ok ? `Declined. ${r.displayName} is not told. To change your mind, add them with their code.` : res.message);
+    if (!res.ok) {
+      toast(res.message);
+      return;
+    }
+    // Undo is offered for a moment (the server allows it for 15 minutes); after that,
+    // entering their code is the way back, which the Add screen says.
+    toast(`Declined. ${r.displayName} is not told.`, {
+      label: 'Undo',
+      onPress: () =>
+        void undoDecline(r.userId).then((u) => toast(u.ok ? `The request from ${r.displayName} is back` : u.message)),
+    });
   };
   const takeBack = async (r: FriendRequest) => {
     setBusy(r.userId);

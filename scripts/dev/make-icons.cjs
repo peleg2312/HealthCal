@@ -11,6 +11,7 @@
 //
 // Colours are the Blossom lead look: a raspberry tile (app.json's adaptive-icon background and
 // notification colour), a champagne glass and level line, the tickle-pink fill.
+/* global __dirname */
 const { chromium } = require('playwright');
 const fs = require('node:fs');
 const path = require('node:path');

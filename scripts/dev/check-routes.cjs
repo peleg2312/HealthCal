@@ -19,7 +19,7 @@ const ROUTES = [
   '/food/custom', '/food/meals?meal=lunch', '/food/meal-edit', '/food/meal-pick',
   '/activity/pick', '/activity/log?activityId=running', '/activity/strength', '/activity/import',
   '/water', '/weight', '/body', '/sleep', '/fasting',
-  '/profile', '/settings/goals', '/settings/reminders', '/settings/account', '/settings/data', '/settings/about',
+  '/profile', '/settings/goals', '/settings/reminders', '/settings/account', '/settings/data', '/settings/about', '/settings/health-sync',
   '/recap', '/consistency', '/friends', '/friends/add?code=ABCD2345', '/no-such-page',
 ];
 

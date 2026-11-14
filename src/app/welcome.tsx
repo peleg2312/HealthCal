@@ -2,7 +2,6 @@ import { Redirect, router } from 'expo-router';
 import { FileUp, HeartHandshake, ShieldCheck, TriangleAlert, Zap } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ARRIVAL_POUR, CupMark, Note } from '@/features/onboarding/components';
 import { formatNumber } from '@/lib/units';
@@ -29,6 +28,28 @@ const PROMISES = [
   { key: 'free', Icon: HeartHandshake, title: 'No paywalls, no ads' },
 ];
 
+/** Cup height the labels and the promises beside them need, with the regular and the small type. */
+const NEED = 206;
+const NEED_SMALL = 178;
+/** The overline above the cup with its gap, and the extra air under the cup (it sits a little above centre). */
+const OVERLINE = 26;
+const HERO_PAD = 8;
+
+/**
+ * How the hero fits the room it is given (the height between the words and
+ * the actions, measured, so it holds for every phone and every footer).
+ * Roomy: the cup takes the room up to its largest size, with a little air
+ * left. Short: smaller type, and the cup takes what there is. Only a screen
+ * too short for the small cup scrolls.
+ */
+function fitHero(room: number, narrow: boolean, wide: boolean) {
+  const small = narrow || room < NEED;
+  const need = small ? NEED_SMALL : NEED;
+  // Up to 40 px of air around the cup, once there is room to spare.
+  const air = Math.max(0, Math.min(40, room - NEED));
+  return { height: Math.round(Math.min(wide ? 380 : 340, Math.max(need, room - air))), small };
+}
+
 /**
  * The idea in one picture, as the hero: a day as a cup. It pours in when the
  * screen opens while "eaten" counts up and "left" counts down with it; the
@@ -36,10 +57,10 @@ const PROMISES = [
  * app promises sits beside the full part of the cup, so cup and words are one
  * block. Shown once per session: coming back here does not pour again.
  */
-function HeroCup({ height, narrow }: { height: number; narrow: boolean }) {
+function HeroCup({ height, narrow, small }: { height: number; narrow: boolean; small: boolean }) {
   const { colors, spacing } = useTheme();
   const width = Math.round(height * (narrow ? 0.32 : 0.4));
-  const big = narrow ? 44 : 56;
+  const big = small ? 44 : 56;
   return (
     <View accessible accessibilityLabel="An example day: a budget of 2,160 kcal including 290 burned by exercise, 1,219 eaten, 941 left. Honest numbers. Fast logging. No paywalls, no ads.">
       <Vessel
@@ -115,11 +136,11 @@ function HeroCup({ height, narrow }: { height: number; narrow: boolean }) {
             ),
           },
         ]}>
-        <View style={{ gap: narrow ? spacing.sm : spacing.md }}>
+        <View style={{ gap: small ? spacing.sm : spacing.md }}>
           {PROMISES.map((p, i) => (
             <FadeUp key={p.key} delay={POUR_DELAY + ARRIVAL_POUR / 2} index={i * 2} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
               <p.Icon size={18} color={colors.text} strokeWidth={1.9} />
-              <Text variant={narrow ? 'label' : 'bodyStrong'} style={{ flex: 1 }}>
+              <Text variant={small ? 'label' : 'bodyStrong'} style={{ flex: 1 }}>
                 {p.title}
               </Text>
             </FadeUp>
@@ -135,14 +156,15 @@ export default function Welcome() {
   const onboarded = useStore((s) => !!s.profile?.onboardedAt);
   const [importing, setImporting] = useState(false);
   const [importNote, setImportNote] = useState<{ tone: 'neutral' | 'warning'; text: string } | null>(null);
+  // Height of the hero's place, known after the first layout; the cup mounts (and pours) once it is.
+  const [room, setRoom] = useState<number | null>(null);
   const window = useWindowDimensions();
-  const insets = useSafeAreaInsets();
   if (onboarded) return <Redirect href="/" />;
 
   const narrow = window.width < 360;
-  // The cup takes what the words and the actions leave, so the whole welcome fits one screen on most phones.
-  const room = window.height - insets.top - insets.bottom - (isBackendConfigured ? 500 : 444);
-  const cupHeight = Math.round(Math.max(210, Math.min(340, room)));
+  // The cup takes the room the words and the actions leave, measured, so the whole welcome
+  // fits one screen whatever the footer holds.
+  const fit = room === null ? null : fitHero(room - HERO_PAD - OVERLINE, narrow, window.width >= 400);
 
   const restore = async () => {
     setImporting(true);
@@ -173,7 +195,7 @@ export default function Welcome() {
       testID="welcome-screen"
       // The screen runs its own entrance: the cup first, then the headline, then the actions.
       enter={false}
-      contentStyle={{ flexGrow: 1, justifyContent: 'space-between', gap: spacing.xl, paddingTop: spacing.lg }}
+      contentStyle={{ flexGrow: 1, gap: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.lg }}
       footer={
         <FadeUp delay={ACTIONS_AT} style={{ gap: spacing.sm }}>
           <Button title="Get started" testID="welcome-get-started" onPress={() => router.push('/onboarding')} />
@@ -211,9 +233,17 @@ export default function Welcome() {
           </Text>
         </FadeUp>
       </View>
-      <View style={{ gap: spacing.md }}>
-        <Text variant="overline">An example day</Text>
-        <HeroCup height={cupHeight} narrow={narrow} />
+      {/* The hero's place: everything between the words and the actions. A little more air under the cup than over it. */}
+      <View
+        testID="welcome-hero"
+        onLayout={(e) => setRoom(Math.round(e.nativeEvent.layout.height))}
+        style={{ flex: 1, minHeight: OVERLINE + NEED_SMALL + HERO_PAD, justifyContent: 'center', paddingBottom: HERO_PAD }}>
+        {fit ? (
+          <View style={{ gap: spacing.md }}>
+            <Text variant="overline">An example day</Text>
+            <HeroCup height={fit.height} narrow={narrow} small={fit.small} />
+          </View>
+        ) : null}
       </View>
       {importNote ? (
         <Note
@@ -224,10 +254,7 @@ export default function Welcome() {
             {importNote.text}
           </Text>
         </Note>
-      ) : (
-        // Keeps the cup in the optical centre: a little more room under it than over it.
-        <View />
-      )}
+      ) : null}
     </Screen>
   );
 }

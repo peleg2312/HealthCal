@@ -57,6 +57,12 @@ describe('labels', () => {
     expect(cheerTarget('gone', own, TODAY)).toBe('a workout of yours');
     expect(cheerTarget('day:2026-11-14', own, TODAY)).toBe('your day today');
     expect(cheerTarget('day:2026-11-11', own, TODAY)).toBe('your day on Wednesday');
+    // Only a real day of the last few weeks is named; anything else a friend's app sends is just "your day".
+    expect(cheerTarget('day:9999-99-99', own, TODAY)).toBe('your day');
+    expect(cheerTarget('day:2031-02-30', own, TODAY)).toBe('your day');
+    expect(cheerTarget('day:2026-11-20', own, TODAY)).toBe('your day');
+    expect(cheerTarget('day:2025-11-14', own, TODAY)).toBe('your day');
+    expect(cheerTarget('day:2026-11-02', own, TODAY)).toBe('your day on Nov 2');
     expect(activityNoun('Walking')).toBe('walk');
   });
   it('says every request outcome in plain words', () => {

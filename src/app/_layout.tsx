@@ -19,6 +19,7 @@ import { AppState, Platform, Pressable, Text as RNText, View } from 'react-nativ
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { startHealthSync } from '@/features/health-sync/sync';
 import { handleAuthLink, initAuth } from '@/services/auth';
 import { refreshReminders } from '@/services/notifications';
 import { startFriends } from '@/services/friends';
@@ -170,6 +171,7 @@ export default function RootLayout() {
     initAuth();
     const stopSync = startAutoSync();
     startFriends();
+    startHealthSync();
     const stopSnapshots = startDaySnapshots();
     // Reminder text carries live numbers ("620 ml left"), so it is rebuilt whenever data changes.
     void refreshReminders();

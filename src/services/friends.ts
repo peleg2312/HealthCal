@@ -188,6 +188,20 @@ export async function respondToRequest(userId: string, accept: boolean): Promise
   return { ok: true, value: undefined };
 }
 
+/**
+ * Undo a decline made a moment ago (the toast's Undo): the request shows again.
+ * The server allows it for 15 minutes; after that, entering their code is the way back.
+ */
+export async function undoDecline(userId: string): Promise<FriendsResult> {
+  const session = await signedInClient();
+  if (!session.ok) return session;
+  const { data, error } = await session.client.rpc('friend_undecline', { p_user: userId });
+  if (error) return failure(error.message);
+  await refreshFriends();
+  if (data !== 'restored') return { ok: false, reason: 'failed', message: 'That request is no longer there.' };
+  return { ok: true, value: undefined };
+}
+
 /** Stop being friends, or take back a request. */
 export async function removeFriend(userId: string): Promise<FriendsResult> {
   const session = await signedInClient();
@@ -241,15 +255,28 @@ let lastPublished: { userId: string; signature: string } | null = null;
 export async function publishSummary(options: { force?: boolean } = {}): Promise<void> {
   const session = await signedInClient();
   if (!session.ok) return;
-  const me = useFriends.getState().overview?.me;
-  if (!me) return;
-  const s = useStore.getState();
-  if (s.ownerId !== session.userId) return;
-  const summary = buildFriendSummary({ activities: live(s.activities), foodEntries: live(s.foodEntries), today: today(), sharing: me.sharing ?? DEFAULT_SHARING, shareKey: me.shareKey });
-  const signature = summarySignature(summary);
-  if (!options.force && lastPublished?.userId === session.userId && lastPublished.signature === signature) return;
-  const { error } = await session.client.rpc('social_publish', { p_summary: summary });
-  if (!error) lastPublished = { userId: session.userId, signature };
+  // Twice at most: once with the card this device holds, and once more after reloading
+  // it when the server says the key is old (friends were turned off and on on another
+  // device). Workout references made with an old key would match nothing anywhere.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const me = useFriends.getState().overview?.me;
+    if (!me) return;
+    const s = useStore.getState();
+    if (s.ownerId !== session.userId) return;
+    const summary = buildFriendSummary({ activities: live(s.activities), foodEntries: live(s.foodEntries), today: today(), sharing: me.sharing ?? DEFAULT_SHARING, shareKey: me.shareKey });
+    const signature = summarySignature(summary);
+    if (!options.force && lastPublished?.userId === session.userId && lastPublished.signature === signature) return;
+    const { data, error } = await session.client.rpc('social_publish', { p_summary: summary, p_share_key: me.shareKey });
+    if (error) return;
+    if (data === 'ok') {
+      lastPublished = { userId: session.userId, signature };
+      return;
+    }
+    // stale_key or no_card: this device's card is out of date. Reload it, then try again.
+    lastPublished = null;
+    await refreshFriends();
+    if (data !== 'stale_key') return;
+  }
 }
 
 let started = false;

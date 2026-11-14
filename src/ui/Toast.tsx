@@ -3,7 +3,7 @@ import { AccessibilityInfo, Animated, Easing, Platform, View } from 'react-nativ
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { create } from 'zustand';
 
-import { cup, isReducedMotion, MAX_CONTENT_WIDTH, motion, useTheme } from '@/theme';
+import { cup, isReducedMotion, MAX_CONTENT_WIDTH, motion, useTheme, type ThemeColors } from '@/theme';
 
 import { PressableScale } from './Pressable';
 import { Text } from './Text';
@@ -13,8 +13,12 @@ export interface ToastOptions {
   /** The action's label ("Undo"). Needs `onPress`. */
   label?: string;
   onPress?: () => void;
-  /** Colour of the toast's level line: the data colour of what was logged (`colors.water`, `colors.calories`). Defaults to the primary. */
-  tint?: string;
+  /**
+   * Colour of the toast's level line: the data colour of what was logged. A theme colour name
+   * ('water', 'calories', 'exercise': usable from code outside React, which has no palette) or a
+   * colour value (`colors.water`). Defaults to the primary.
+   */
+  tint?: keyof ThemeColors | (string & {});
 }
 
 interface ToastState {
@@ -44,7 +48,7 @@ const useToast = create<ToastState>((set, get) => ({
 /**
  * Show a brief confirmation, optionally with an Undo action. Callable from anywhere.
  *
- *   toast('Added 330 ml', { label: 'Undo', onPress: undo, tint: colors.water })
+ *   toast('Added 330 ml', { label: 'Undo', onPress: undo, tint: 'water' })
  */
 export function toast(message: string, options?: ToastOptions) {
   useToast.getState().show(message, options);
@@ -160,7 +164,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
         {/* The level line: what was logged, in its own colour. */}
         <View
           pointerEvents="none"
-          style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 3, borderTopLeftRadius: radius.shoulder, borderTopRightRadius: radius.shoulder, backgroundColor: tint ?? colors.primary }}
+          style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 3, borderTopLeftRadius: radius.shoulder, borderTopRightRadius: radius.shoulder, backgroundColor: tint ? ((colors as unknown as Record<string, string>)[tint] ?? tint) : colors.primary }}
         />
         <Text variant="label" color={colors.bg} style={{ flexShrink: 1 }}>
           {message}

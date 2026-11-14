@@ -18,6 +18,7 @@ export const THEME_OPTIONS: { value: ThemePreference; label: string; hint: strin
  * (a cup) holding a small calorie vessel with that theme's level line, and a
  * water bar with its rim tick. The vessel is drawn like the kit's: a tumbler
  * with no lip, sides and base in vesselEdge, and `vesselEmpty` above the fill.
+ * A `half` (one side of the System swatch) has room for the cup only.
  */
 function Mini({ c, half }: { c: ThemeColors; half?: 'left' | 'right' }) {
   const vh = 26;
@@ -34,7 +35,7 @@ function Mini({ c, half }: { c: ThemeColors; half?: 'left' | 'right' }) {
         borderBottomLeftRadius: half === 'right' ? 0 : 10,
         borderBottomRightRadius: half === 'left' ? 0 : 10,
       }}>
-      <View style={{ backgroundColor: c.surface, ...cup(9, 3), paddingHorizontal: 5, paddingVertical: 5, flexDirection: 'row', alignItems: 'flex-end', gap: 5, borderWidth: 1, borderColor: c.border }}>
+      <View style={{ backgroundColor: c.surface, ...cup(9, 3), paddingHorizontal: 5, paddingVertical: 5, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 5, borderWidth: 1, borderColor: c.border }}>
         {/* The vessel: open top, sides and base in vesselEdge, empty above the calorie fill, a rim on the fill. */}
         <View
           style={{
@@ -53,14 +54,16 @@ function Mini({ c, half }: { c: ThemeColors; half?: 'left' | 'right' }) {
             <View style={{ height: 2, backgroundColor: c.rim }} />
           </View>
         </View>
-        <View style={{ flex: 1, minWidth: 0, gap: 5, paddingBottom: 2 }}>
-          <View style={{ height: 4, width: '70%', borderRadius: 1, backgroundColor: c.text }} />
-          <View style={{ height: 4, borderRadius: 1, backgroundColor: c.track, justifyContent: 'center' }}>
-            <View style={{ width: '55%', height: 4, borderRadius: 1, backgroundColor: c.water }} />
-            <View style={{ position: 'absolute', left: '55%', width: 2, height: 8, backgroundColor: c.rim }} />
+        {half ? null : (
+          <View style={{ flex: 1, minWidth: 0, gap: 5, paddingBottom: 2 }}>
+            <View style={{ height: 4, width: '70%', borderRadius: 1, backgroundColor: c.text }} />
+            <View style={{ height: 4, borderRadius: 1, backgroundColor: c.track, justifyContent: 'center' }}>
+              <View style={{ width: '55%', height: 4, borderRadius: 1, backgroundColor: c.water }} />
+              <View style={{ position: 'absolute', left: '55%', width: 2, height: 8, backgroundColor: c.rim }} />
+            </View>
+            <View style={{ height: 6, width: 14, ...cup(3, 1), backgroundColor: c.primary }} />
           </View>
-          <View style={{ height: 6, width: 14, ...cup(3, 1), backgroundColor: c.primary }} />
-        </View>
+        )}
       </View>
     </View>
   );

@@ -12,6 +12,8 @@ import { WeekCard } from '@/features/activity/WeekCard';
 import { startRoutineDraft, type RoutineTemplate } from '@/features/activity/routines';
 import { draftHasContent, useStrengthDrafts } from '@/features/activity/strengthDraft';
 import { FriendsEntry } from '@/features/friends/FriendsEntry';
+import { SyncedFromLine } from '@/features/health-sync/ui/SyncedFromLine';
+import { TrainSyncLink } from '@/features/health-sync/ui/TrainSyncLink';
 import { addDays, formatDayLabel, formatDuration, formatShortDate, startOfWeek } from '@/lib/dates';
 import { formatNumber } from '@/lib/units';
 import { useToday } from '@/store/clock';
@@ -101,16 +103,19 @@ export default function TrainScreen() {
           A strength workout is in progress with {draft!.exercises.length} {draft!.exercises.length === 1 ? 'exercise' : 'exercises'}.
         </Text>
       ) : null}
-      <PressableScale
-        testID="train-import-garmin"
-        accessibilityLabel="Import workouts from Garmin"
-        onPress={() => router.push('/activity/import')}
-        hitSlop={6}
-        style={{ alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginTop: -spacing.sm }}>
-        <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
-          Import workouts from Garmin
-        </Text>
-      </PressableScale>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.lg, marginTop: -spacing.sm }}>
+        <PressableScale
+          testID="train-import-garmin"
+          accessibilityLabel="Import workouts from Garmin"
+          onPress={() => router.push('/activity/import')}
+          hitSlop={6}
+          style={{ minHeight: 44, justifyContent: 'center' }}>
+          <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
+            Import workouts from Garmin
+          </Text>
+        </PressableScale>
+        <TrainSyncLink />
+      </View>
 
       {routines.length > 0 ? (
         <>
@@ -163,6 +168,7 @@ export default function TrainScreen() {
                     <View key={e.id}>
                       {i > 0 ? <View style={{ height: 1, backgroundColor: colors.border, marginLeft: 18 + 24 + 12 }} /> : null}
                       <SessionRow entry={e} units={profile.units} onPress={() => openSession(e)} onDelete={() => deleteActivity(e)} />
+                      <SyncedFromLine entry={e} />
                     </View>
                   ))}
                 </Card>

@@ -14,5 +14,5 @@ export * from './Text';
 export * from './Toast';
 export { haptic } from './haptics';
 export * from './Vessel';
-export { brimOverhang, fillRatio, goalState, levelY, placeLabels, type GoalKind } from './vesselLayout';
+export { brimOverhang, fillRatio, goalState, levelY, placeLabels, reachedBefore, type GoalKind } from './vesselLayout';
 export { isReducedMotion, motion, useReducedMotion } from '@/theme/motion';

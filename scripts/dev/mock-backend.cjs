@@ -66,15 +66,19 @@ const readBody = (req) =>
   });
 
 // ---------------------------------------------------------------- friends
-// The same rules as supabase/migrations/20261115000000_friends.sql, in memory.
+// The same rules as supabase/migrations/20261115000000_friends.sql and
+// 20261116000000_friends_hardening.sql, in memory.
 // src/features/friends/mockBackend.test.ts walks the same cases as supabase/tests/friends.sql.
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const newCode = () => Array.from(crypto.randomBytes(8), (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('');
 const cleanSharing = (p) => ({ workouts: p?.workouts !== false, streak: p?.streak !== false, minutes: p?.minutes !== false });
-const isDay = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+// A real calendar date written as YYYY-MM-DD ('2031-02-30' is not).
+const isDay = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) && new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v;
+const utcDay = (offsetDays) => new Date(Date.now() + offsetDays * 86400000).toISOString().slice(0, 10);
 // A workout as friends may know it: an opaque reference, never a record id.
 const isWorkoutRef = (v) => typeof v === 'string' && /^[0-9a-f]{32}$/.test(v);
 const isCheerRef = (v) => isWorkoutRef(v) || /^day:\d{4}-\d{2}-\d{2}$/.test(v);
+const DECLINE_UNDO_MS = 15 * 60000;
 const bounded = (v, max) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(Math.max(Math.round(v), 0), max) : undefined);
 function cleanSummary(p) {
   const out = {};
@@ -84,15 +88,12 @@ function cleanSummary(p) {
     if (v !== undefined) out[k] = v;
   }
   const workouts = (Array.isArray(p?.workouts) ? p.workouts : [])
-    .filter((w) => w && typeof w === 'object' && isWorkoutRef(w.id))
+    // A workout needs a length and a real date; without a name it is "Workout".
+    .filter((w) => w && typeof w === 'object' && isWorkoutRef(w.id) && typeof w.minutes === 'number' && Number.isFinite(w.minutes) && isDay(w.date))
     .slice(0, 12)
     .map((w) => {
-      const o = { id: w.id };
-      if (typeof w.name === 'string') o.name = w.name.slice(0, 60);
-      if (typeof w.emoji === 'string') o.emoji = w.emoji.slice(0, 16);
-      const m = bounded(w.minutes, 1440);
-      if (m !== undefined) o.minutes = m;
-      if (isDay(w.date)) o.date = w.date;
+      const name = typeof w.name === 'string' ? w.name.slice(0, 60).trim() : '';
+      const o = { id: w.id, name: name || 'Workout', emoji: typeof w.emoji === 'string' ? w.emoji.slice(0, 16) : '', minutes: bounded(w.minutes, 1440), date: w.date };
       if (typeof w.distanceKm === 'number') o.distanceKm = Math.min(Math.max(w.distanceKm, 0), 1000);
       return o;
     });
@@ -141,7 +142,11 @@ function friendsRpc(route, me, body) {
         // Turning friends on is limited per day.
         const lim = limitsOf(me);
         if (Date.now() - lim.setups_window > 86400000) Object.assign(lim, { setups_window: Date.now(), setups: 0 });
-        if (lim.setups >= 5) return { __error: { status: 400, body: { code: '54000', message: 'Friends were turned on too many times today. Try again tomorrow.' } } };
+        if (lim.setups >= 5) {
+          const hours = Math.max(1, Math.ceil((lim.setups_window + 86400000 - Date.now()) / 3600000));
+          const message = `Friends were turned on 5 times in the last 24 hours. You can turn them on again in about ${hours === 1 ? 'an hour' : `${hours} hours`}.`;
+          return { __error: { status: 400, body: { code: '54000', message } } };
+        }
         lim.setups += 1;
         cur = { user_id: me, code: newCode(), share_key: crypto.randomBytes(32).toString('hex'), summary: {}, summary_updated_at: null };
       }
@@ -156,10 +161,14 @@ function friendsRpc(route, me, body) {
         return { __error: { status: 400, body: { code: '22023', message: 'summary is not valid: workouts need opaque references' } } };
       }
       const cur = state.social.get(me);
-      if (!cur) return false;
+      // With p_share_key (the current app): ok, no_card, or stale_key when the key the
+      // device built the week with is not the card's (friends turned off and on elsewhere).
+      const withKey = Object.prototype.hasOwnProperty.call(body, 'p_share_key');
+      if (!cur) return withKey ? 'no_card' : false;
+      if (withKey && body.p_share_key !== cur.share_key) return 'stale_key';
       cur.summary = cleanSummary(p);
       cur.summary_updated_at = now();
-      return true;
+      return withKey ? 'ok' : true;
     }
     case 'POST /rest/v1/rpc/friend_request': {
       const mine = state.social.get(me);
@@ -193,7 +202,7 @@ function friendsRpc(route, me, body) {
     }
     case 'POST /rest/v1/rpc/friend_respond': {
       const f = state.friendships.find((x) => x.requester === body.p_user && x.addressee === me && x.status === 'pending');
-      if (!f || declined(me, body.p_user)) return 'not_found';
+      if (!f || declined(me, body.p_user) || !state.social.get(me) || !state.social.get(body.p_user)) return 'not_found';
       if (body.p_accept) {
         Object.assign(f, { status: 'accepted', responded_at: now() });
         return 'accepted';
@@ -201,6 +210,14 @@ function friendsRpc(route, me, body) {
       // Silent: the request stays waiting for its sender and is hidden from the caller.
       state.declines.push({ decliner: me, asker: body.p_user, created_at: now() });
       return 'declined';
+    }
+    case 'POST /rest/v1/rpc/friend_undecline': {
+      // Undo of a decline the caller made in the last 15 minutes, while the request still exists.
+      const i = state.declines.findIndex((d) => d.decliner === me && d.asker === body.p_user && Date.now() - Date.parse(d.created_at) < DECLINE_UNDO_MS);
+      const pending = state.friendships.some((f) => f.requester === body.p_user && f.addressee === me && f.status === 'pending');
+      if (i < 0 || !pending) return 'not_found';
+      state.declines.splice(i, 1);
+      return 'restored';
     }
     case 'POST /rest/v1/rpc/friend_remove': {
       const other = body.p_user;
@@ -214,6 +231,14 @@ function friendsRpc(route, me, body) {
       const ref = String(body.p_ref || '').trim();
       if (!isCheerRef(ref)) return 'invalid';
       if (!areFriends(me, body.p_to)) return 'not_friends';
+      // A real day of the last two weeks, or a workout the friend publishes and shares now.
+      if (ref.startsWith('day:')) {
+        const day = ref.slice(4);
+        if (!isDay(day) || day < utcDay(-15) || day > utcDay(1)) return 'invalid';
+      } else {
+        const p = state.social.get(body.p_to);
+        if (!(visibleSummary(p?.summary, p?.sharing).workouts ?? []).some((w) => w.id === ref)) return 'invalid';
+      }
       if (!state.cheers.some((c) => c.from_user === me && c.to_user === body.p_to && c.ref === ref)) state.cheers.push({ from_user: me, to_user: body.p_to, ref, created_at: now() });
       return 'ok';
     }

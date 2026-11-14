@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { brimOverhang, fillRatio, goalState, levelY, placeLabels } from './vesselLayout';
+import { brimOverhang, fillRatio, goalState, levelY, placeLabels, reachedBefore } from './vesselLayout';
 
 describe('placeLabels', () => {
   it('keeps labels where they want to be when there is room', () => {
@@ -93,5 +93,42 @@ describe('brimOverhang', () => {
     expect(brimOverhang(0)).toBe(3);
     expect(brimOverhang(Number.NaN)).toBe(3);
     expect(brimOverhang(400)).toBe(6);
+  });
+});
+
+describe('reachedBefore: when reaching a goal counts as a crossing', () => {
+  const crossed = (...args: Parameters<typeof reachedBefore>) => args[3] && !reachedBefore(...args);
+
+  it('counts the level passing the goal while the cup is on screen', () => {
+    expect(crossed({ key: 'water-mon', reached: false }, 'water-mon', false, true)).toBe(true);
+    expect(crossed({ key: undefined, reached: false }, undefined, undefined, true)).toBe(true);
+  });
+
+  it('does not count a cup that mounts already full', () => {
+    expect(crossed(null, undefined, undefined, true)).toBe(false);
+    expect(crossed(null, 'water-mon', undefined, true)).toBe(false);
+  });
+
+  it('does not count a remount that was already shown full, and does count one that was last shown short', () => {
+    expect(crossed(null, 'water-mon', true, true)).toBe(false);
+    expect(crossed(null, 'water-mon', false, true)).toBe(true);
+  });
+
+  it('does not count staying full, or anything while short of the goal', () => {
+    expect(crossed({ key: 'water-mon', reached: true }, 'water-mon', true, true)).toBe(false);
+    expect(crossed({ key: 'water-mon', reached: false }, 'water-mon', false, false)).toBe(false);
+    expect(crossed({ key: 'water-mon', reached: true }, 'water-mon', true, false)).toBe(false);
+  });
+
+  it('counts dropping below the goal and reaching it again', () => {
+    expect(reachedBefore({ key: 'water-mon', reached: true }, 'water-mon', true, false)).toBe(true);
+    expect(crossed({ key: 'water-mon', reached: false }, 'water-mon', false, true)).toBe(true);
+  });
+
+  it('treats a new key as a mount: paging from a short day to a day that met its goal is not a crossing', () => {
+    expect(crossed({ key: 'water-mon', reached: false }, 'water-tue', undefined, true)).toBe(false);
+    expect(crossed({ key: 'water-mon', reached: false }, 'water-tue', true, true)).toBe(false);
+    // Back on a day whose goal was met while another day was shown.
+    expect(crossed({ key: 'water-tue', reached: true }, 'water-mon', false, true)).toBe(true);
   });
 });

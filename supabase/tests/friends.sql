@@ -8,7 +8,9 @@ insert into auth.users (id) values
   ('c3333333-3333-4333-8333-333333333333'),
   ('c4444444-4444-4444-8444-444444444444'),
   ('c5555555-5555-4555-8555-555555555555'),
-  ('c6666666-6666-4666-8666-666666666666');
+  ('c6666666-6666-4666-8666-666666666666'),
+  ('c7777777-7777-4777-8777-777777777777'),
+  ('c8888888-8888-4888-8888-888888888888');
 
 create or replace function pg_temp.act_as(p_user text) returns void language plpgsql as $$
 begin
@@ -25,6 +27,12 @@ grant all on codes to authenticated;
 
 -- ---------------------------------------------------------------- set up
 set role authenticated;
+
+select pg_temp.act_as('c5555555-5555-4555-8555-555555555555');
+do $$
+begin
+  if public.social_publish('{"week": "2026-11-09"}', 'no key yet') <> 'no_card' then raise exception 'publishing without a card'; end if;
+end $$;
 
 select pg_temp.act_as('c1111111-1111-4111-8111-111111111111');
 do $$
@@ -62,6 +70,7 @@ declare card jsonb;
 begin
   card := public.social_setup('Maya', 'M', '{}');
   insert into codes values ('maya', card ->> 'code');
+  insert into codes values ('maya-key', card ->> 'share_key');
 end $$;
 
 select pg_temp.act_as('c3333333-3333-4333-8333-333333333333');
@@ -218,12 +227,12 @@ declare o jsonb;
 begin
   if public.send_cheer('c1111111-1111-4111-8111-111111111111', '0123456789abcdef0123456789abcdef') <> 'ok' then raise exception 'cheer failed'; end if;
   if public.send_cheer('c1111111-1111-4111-8111-111111111111', '0123456789abcdef0123456789abcdef') <> 'ok' then raise exception 'cheering twice should be harmless'; end if;
-  if public.send_cheer('c1111111-1111-4111-8111-111111111111', 'day:2026-11-14') <> 'ok' then raise exception 'a day cheer failed'; end if;
+  if public.send_cheer('c1111111-1111-4111-8111-111111111111', 'day:' || to_char(current_date, 'YYYY-MM-DD')) <> 'ok' then raise exception 'a day cheer failed'; end if;
   if public.send_cheer('c1111111-1111-4111-8111-111111111111', '   ') <> 'invalid' then raise exception 'an empty cheer was accepted'; end if;
   -- A cheer carries a reference, not a message.
   if public.send_cheer('c1111111-1111-4111-8111-111111111111', 'see you at the park at 7') <> 'invalid' then raise exception 'free text was accepted as a cheer'; end if;
   o := public.friends_overview();
-  if not (o -> 'friends' -> 0 -> 'cheered') @> '["0123456789abcdef0123456789abcdef", "day:2026-11-14"]'::jsonb or jsonb_array_length(o -> 'friends' -> 0 -> 'cheered') <> 2 then raise exception 'cheered list: %', o -> 'friends' -> 0 -> 'cheered'; end if;
+  if not (o -> 'friends' -> 0 -> 'cheered') @> jsonb_build_array('0123456789abcdef0123456789abcdef', 'day:' || to_char(current_date, 'YYYY-MM-DD')) or jsonb_array_length(o -> 'friends' -> 0 -> 'cheered') <> 2 then raise exception 'cheered list: %', o -> 'friends' -> 0 -> 'cheered'; end if;
 end $$;
 select pg_temp.act_as('c1111111-1111-4111-8111-111111111111');
 do $$
@@ -232,6 +241,120 @@ begin
   o := public.friends_overview();
   if jsonb_array_length(o -> 'cheers') <> 2 or o -> 'cheers' -> 0 ->> 'display_name' <> 'Maya' or not (o -> 'cheers') @> '[{"ref": "0123456789abcdef0123456789abcdef"}]'::jsonb then raise exception 'received cheers: %', o -> 'cheers'; end if;
 end $$;
+
+-- A cheer is for something the friend can see: a workout they publish now, or a
+-- real day of the last two weeks. Nothing else is stored or shown to them.
+select pg_temp.act_as('c2222222-2222-4222-8222-222222222222');
+do $$
+declare r text; bad text;
+begin
+  foreach bad in array array[
+    'day:9999-99-99', 'day:2031-02-30', 'day:2026-13-01',
+    'day:' || to_char(current_date + 5, 'YYYY-MM-DD'),
+    'day:' || to_char(current_date - 40, 'YYYY-MM-DD'),
+    'abababababababababababababababab'
+  ] loop
+    r := public.send_cheer('c1111111-1111-4111-8111-111111111111', bad);
+    if r <> 'invalid' then raise exception 'cheer for % was %', bad, r; end if;
+  end loop;
+  if public.send_cheer('c1111111-1111-4111-8111-111111111111', 'day:' || to_char(current_date - 6, 'YYYY-MM-DD')) <> 'ok' then raise exception 'a day earlier this week could not be cheered'; end if;
+  if public.send_cheer('c1111111-1111-4111-8111-111111111111', 'fedcba9876543210fedcba9876543210') <> 'ok' then raise exception 'a second published workout could not be cheered'; end if;
+end $$;
+-- A workout Alex no longer shares cannot be cheered.
+select pg_temp.act_as('c1111111-1111-4111-8111-111111111111');
+select public.social_setup('Alex R', '🦊', '{"workouts": false, "streak": true, "minutes": true}');
+select pg_temp.act_as('c2222222-2222-4222-8222-222222222222');
+do $$
+begin
+  if public.send_cheer('c1111111-1111-4111-8111-111111111111', '0123456789abcdef0123456789abcdef') <> 'invalid' then raise exception 'a hidden workout could be cheered'; end if;
+end $$;
+select pg_temp.act_as('c1111111-1111-4111-8111-111111111111');
+select public.social_setup('Alex R', '🦊', '{"workouts": true, "streak": true, "minutes": true}');
+do $$
+declare o jsonb;
+begin
+  o := public.friends_overview();
+  if jsonb_array_length(o -> 'cheers') <> 4 then raise exception 'expected four cheers for Alex: %', o -> 'cheers'; end if;
+  if (o -> 'cheers')::text ~ '9999|2031-02-30|abababab' then raise exception 'an invalid cheer was stored: %', o -> 'cheers'; end if;
+end $$;
+
+-- A workout is completed or dropped on the way in, so a friend's screen never gets
+-- one without a name, a length or a real date. Publishing names the share key used:
+-- a device holding an old key (friends turned off and on elsewhere) is told so.
+select pg_temp.act_as('c2222222-2222-4222-8222-222222222222');
+do $$
+declare r text; w jsonb;
+begin
+  r := public.social_publish('{"week": "2026-11-09", "workouts": [{"id": "11111111111111111111111111111111", "minutes": 30, "date": "2026-11-14"}]}', 'an old key');
+  if r <> 'stale_key' then raise exception 'publishing with an old key: %', r; end if;
+  r := public.social_publish('{
+    "week": "2026-11-09",
+    "workouts": [
+      {"id": "11111111111111111111111111111111", "minutes": 30, "date": "2026-11-14"},
+      {"id": "22222222222222222222222222222222", "name": "  ", "emoji": 5, "minutes": 20, "date": "2026-11-13"},
+      {"id": "33333333333333333333333333333333", "name": "Running", "date": "2026-11-12"},
+      {"id": "44444444444444444444444444444444", "name": "Running", "minutes": 25, "date": "2026-02-30"},
+      {"id": "55555555555555555555555555555555", "name": "Running", "minutes": "25", "date": "2026-11-11"}
+    ]
+  }', (select code from codes where who = 'maya-key'));
+  if r <> 'ok' then raise exception 'publishing with the right key: %', r; end if;
+end $$;
+select pg_temp.act_as('c1111111-1111-4111-8111-111111111111');
+do $$
+declare w jsonb;
+begin
+  w := public.friends_overview() -> 'friends' -> 0 -> 'summary' -> 'workouts';
+  if w is null or jsonb_array_length(w) <> 2 then raise exception 'expected the two complete workouts: %', w; end if;
+  if w -> 0 ->> 'name' <> 'Workout' or w -> 1 ->> 'name' <> 'Workout' then raise exception 'a nameless workout was not named: %', w; end if;
+  if w -> 1 ->> 'emoji' <> '' then raise exception 'a non-text emoji was kept: %', w; end if;
+end $$;
+
+-- ------------------------------------------- answering a request that is no longer there
+-- Maya asks Jonas, then takes it back while his screen still shows it. Accepting or
+-- declining it then says it is gone, and nothing is recorded.
+select pg_temp.act_as('c2222222-2222-4222-8222-222222222222');
+select public.friend_request((select code from codes where who = 'jonas'));
+select public.friend_remove('c3333333-3333-4333-8333-333333333333');
+select pg_temp.act_as('c3333333-3333-4333-8333-333333333333');
+do $$
+begin
+  if public.friend_respond('c2222222-2222-4222-8222-222222222222', true) <> 'not_found' then raise exception 'a request that was taken back could be accepted'; end if;
+  if public.friend_respond('c2222222-2222-4222-8222-222222222222', false) <> 'not_found' then raise exception 'a request that was taken back could be declined'; end if;
+  if jsonb_array_length(public.friends_overview() -> 'friends') <> 0 then raise exception 'accepting a vanished request made a friendship'; end if;
+end $$;
+-- Maya asks again: Jonas sees it (the earlier "decline" recorded nothing).
+select pg_temp.act_as('c2222222-2222-4222-8222-222222222222');
+select public.friend_request((select code from codes where who = 'jonas'));
+select pg_temp.act_as('c3333333-3333-4333-8333-333333333333');
+do $$
+begin
+  if jsonb_array_length(public.friends_overview() -> 'incoming') <> 1 then raise exception 'declining a vanished request hid the next one'; end if;
+  -- Jonas declines, then undoes it straight away: the request is back, and Maya saw nothing change.
+  if public.friend_respond('c2222222-2222-4222-8222-222222222222', false) <> 'declined' then raise exception 'decline'; end if;
+  if public.friend_undecline('c2222222-2222-4222-8222-222222222222') <> 'restored' then raise exception 'undo of a decline failed'; end if;
+  if jsonb_array_length(public.friends_overview() -> 'incoming') <> 1 then raise exception 'an undone decline still hides the request'; end if;
+  if public.friend_undecline('c2222222-2222-4222-8222-222222222222') <> 'not_found' then raise exception 'undo with nothing declined'; end if;
+  -- Only the person who declined can undo, and only soon after.
+  perform public.friend_respond('c2222222-2222-4222-8222-222222222222', false);
+end $$;
+select pg_temp.act_as('c2222222-2222-4222-8222-222222222222');
+do $$
+begin
+  if public.friend_undecline('c3333333-3333-4333-8333-333333333333') <> 'not_found' then raise exception 'the asker could lift a decline'; end if;
+  if jsonb_array_length(public.friends_overview() -> 'outgoing') <> 1 then raise exception 'the asker should still see the request as waiting'; end if;
+end $$;
+reset role;
+update public.friend_declines set created_at = now() - interval '20 minutes'
+  where decliner = 'c3333333-3333-4333-8333-333333333333' and asker = 'c2222222-2222-4222-8222-222222222222';
+set role authenticated;
+select pg_temp.act_as('c3333333-3333-4333-8333-333333333333');
+do $$
+begin
+  if public.friend_undecline('c2222222-2222-4222-8222-222222222222') <> 'not_found' then raise exception 'an old decline could be undone from the toast'; end if;
+  if jsonb_array_length(public.friends_overview() -> 'incoming') <> 0 then raise exception 'the decline should hold'; end if;
+end $$;
+select pg_temp.act_as('c2222222-2222-4222-8222-222222222222');
+select public.friend_remove('c3333333-3333-4333-8333-333333333333');
 
 -- ------------------------------------------- declining, asking again, mutual requests
 -- Jonas asks Alex; Alex declines. Jonas cannot tell: his request keeps showing as
@@ -327,9 +450,31 @@ begin
   begin
     perform public.social_setup('Guesser', 'G', '{}');
     raise exception 'friends could be turned on a sixth time in a day';
-  exception when program_limit_exceeded then null;
+  exception when program_limit_exceeded then
+    -- The window is 24 hours from the first of the five: say when, not "tomorrow".
+    if sqlerrm !~ 'again in about (an hour|2[34] hours)\.$' then raise exception 'the refusal does not say when: %', sqlerrm; end if;
   end;
   if (public.friends_overview() -> 'me') <> 'null'::jsonb then raise exception 'a refused set-up left a card'; end if;
+end $$;
+reset role;
+update public.social_limits set setups_window = now() - interval '23 hours 30 minutes' where user_id = 'c4444444-4444-4444-8444-444444444444';
+set role authenticated;
+do $$
+begin
+  begin
+    perform public.social_setup('Guesser', 'G', '{}');
+    raise exception 'the day limit ended early';
+  exception when program_limit_exceeded then
+    if sqlerrm !~ 'again in about an hour\.$' then raise exception 'half an hour before the window ends: %', sqlerrm; end if;
+  end;
+end $$;
+reset role;
+update public.social_limits set setups_window = now() - interval '24 hours 1 minute' where user_id = 'c4444444-4444-4444-8444-444444444444';
+set role authenticated;
+do $$
+begin
+  if (public.social_setup('Guesser', 'G', '{}') ->> 'code') is null then raise exception 'friends could not be turned on after the window'; end if;
+  perform public.social_leave();
 end $$;
 
 -- ---------------------------------------------------------- remove and leave
@@ -401,6 +546,43 @@ begin
   end;
 end $$;
 set role authenticated;
+
+-- ------------------------------------------- a request that overlaps turning friends off
+-- Ada enters Leo's code in a second session that holds its transaction open while
+-- Leo turns friends off. Leo's new card (a new code Ada never had) must not show
+-- her request, and she must not see him as waiting.
+select pg_temp.act_as('c7777777-7777-4777-8777-777777777777');
+select public.social_setup('Ada', 'A', '{}') is not null;
+select pg_temp.act_as('c8888888-8888-4888-8888-888888888888');
+do $$ begin insert into codes values ('leo', public.social_setup('Leo', 'L', '{}') ->> 'code'); end $$;
+select code as race_leo_code from codes where who = 'leo' \gset
+\setenv RACE_CODE :race_leo_code
+\! psql -X -q -v ON_ERROR_STOP=1 -c "set role authenticated" -c "select set_config('request.jwt.claim.sub', 'c7777777-7777-4777-8777-777777777777', false)" -c "begin" -c "select public.friend_request('$RACE_CODE')" -c "select pg_sleep(2)" -c "commit" > /dev/null 2>&1 &
+select pg_sleep(0.7);
+select public.social_leave();
+select pg_sleep(2);
+do $$
+declare card jsonb;
+begin
+  card := public.social_setup('Leo', 'L', '{}');
+  if card ->> 'code' = (select code from codes where who = 'leo') then raise exception 'the new card kept the old code'; end if;
+  if jsonb_array_length(public.friends_overview() -> 'incoming') <> 0 then raise exception 'a request made with the old code reached the new card: %', public.friends_overview() -> 'incoming'; end if;
+end $$;
+select pg_temp.act_as('c7777777-7777-4777-8777-777777777777');
+do $$
+begin
+  if jsonb_array_length(public.friends_overview() -> 'outgoing') <> 0 then raise exception 'Ada still sees Leo as waiting after he turned friends off'; end if;
+end $$;
+reset role;
+do $$
+begin
+  if exists (select 1 from public.friendships where 'c8888888-8888-4888-8888-888888888888' in (requester, addressee)) then raise exception 'a request survived turning friends off'; end if;
+end $$;
+set role authenticated;
+select pg_temp.act_as('c7777777-7777-4777-8777-777777777777');
+select public.social_leave();
+select pg_temp.act_as('c8888888-8888-4888-8888-888888888888');
+select public.social_leave();
 select pg_temp.act_as('c1111111-1111-4111-8111-111111111111');
 
 -- ------------------------------------------- deleting the account removes the card
@@ -438,5 +620,73 @@ begin
   end;
 end $$;
 reset role;
+
+-- ------------------------------------- upgrading a database made with the first version
+-- A scratch database gets the first friends migration (tests/fixtures/friends_v1.sql),
+-- some use through its functions (a declined request, a cheer carrying a record id),
+-- then the current migrations. Friends must then work for everyone.
+\set main_db :DBNAME
+\c postgres
+drop database if exists friends_upgrade;
+create database friends_upgrade;
+\c friends_upgrade
+\set QUIET on
+\ir stub_auth.sql
+\ir ../migrations/20261113000000_init.sql
+\ir ../migrations/20261114000000_collections_and_ai_quota.sql
+\ir fixtures/friends_v1.sql
+insert into auth.users (id) values
+  ('d1111111-1111-4111-8111-111111111111'), ('d2222222-2222-4222-8222-222222222222'), ('d3333333-3333-4333-8333-333333333333');
+set role authenticated;
+select set_config('request.jwt.claim.sub', 'd1111111-1111-4111-8111-111111111111', false);
+select public.social_setup('Old A', '', '{}') ->> 'code' as old_a \gset
+select set_config('request.jwt.claim.sub', 'd2222222-2222-4222-8222-222222222222', false);
+select public.social_setup('Old B', '', '{}') is not null;
+select public.friend_request(:'old_a') is not null;
+select set_config('request.jwt.claim.sub', 'd3333333-3333-4333-8333-333333333333', false);
+select public.social_setup('Old C', '', '{}') is not null;
+select public.friend_request(:'old_a') is not null;
+select set_config('request.jwt.claim.sub', 'd1111111-1111-4111-8111-111111111111', false);
+select public.friend_respond('d2222222-2222-4222-8222-222222222222', false);
+select public.friend_respond('d3333333-3333-4333-8333-333333333333', true);
+select set_config('request.jwt.claim.sub', 'd3333333-3333-4333-8333-333333333333', false);
+select public.send_cheer('d1111111-1111-4111-8111-111111111111', '8b552e86-b4b0-5c91-a9b5-0267052a9b4f');
+reset role;
+\ir ../migrations/20261115000000_friends.sql
+\ir ../migrations/20261116000000_friends_hardening.sql
+\set QUIET off
+set role authenticated;
+do $$
+declare o jsonb; card jsonb;
+begin
+  perform set_config('request.jwt.claim.sub', 'd1111111-1111-4111-8111-111111111111', false);
+  o := public.friends_overview();
+  if coalesce(o -> 'me' ->> 'share_key', '') !~ '^[0-9a-f]{64}$' then raise exception 'upgrade: no share key: %', o -> 'me'; end if;
+  if jsonb_array_length(o -> 'friends') <> 1 or jsonb_array_length(o -> 'incoming') <> 0 then raise exception 'upgrade: overview %', o; end if;
+  if jsonb_array_length(o -> 'cheers') <> 0 then raise exception 'upgrade: a cheer carrying a record id survived'; end if;
+  card := public.social_setup('Old A', '', '{}');
+  if card ->> 'share_key' <> o -> 'me' ->> 'share_key' then raise exception 'upgrade: set-up changed the key'; end if;
+  if public.social_publish('{"week": "2026-11-09"}', card ->> 'share_key') <> 'ok' then raise exception 'upgrade: publish'; end if;
+  -- The old declined request is hidden from A and still waiting for B.
+  if public.friend_respond('d2222222-2222-4222-8222-222222222222', true) <> 'not_found' then raise exception 'upgrade: the old decline was lost'; end if;
+  perform set_config('request.jwt.claim.sub', 'd2222222-2222-4222-8222-222222222222', false);
+  o := public.friends_overview();
+  if jsonb_array_length(o -> 'outgoing') <> 1 then raise exception 'upgrade: B should still see the request as waiting: %', o; end if;
+  perform set_config('request.jwt.claim.sub', 'd3333333-3333-4333-8333-333333333333', false);
+  if public.send_cheer('d1111111-1111-4111-8111-111111111111', 'see you at 7') <> 'invalid' then raise exception 'upgrade: free text cheer'; end if;
+end $$;
+reset role;
+do $$
+begin
+  if exists (select 1 from public.friendships where status not in ('pending', 'accepted')) then raise exception 'upgrade: old statuses remain'; end if;
+  begin
+    insert into public.friendships (requester, addressee, status) values ('d2222222-2222-4222-8222-222222222222', 'd1111111-1111-4111-8111-111111111111', 'declined');
+    raise exception 'upgrade: the old status check remains';
+  exception when check_violation then null;
+  end;
+end $$;
+\c postgres
+drop database friends_upgrade;
+\c :main_db
 
 do $$ begin raise notice 'ALL FRIENDS TESTS PASSED'; end $$;

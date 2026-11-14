@@ -51,6 +51,9 @@ export function commitThemeChoice(scheme: string | null | undefined) {
  */
 export function ThemeStep() {
   const { spacing } = useTheme();
+  const window = useWindowDimensions();
+  // All four looks should be on screen at once, so the miniatures give way on a short or narrow phone.
+  const mini = window.height < 700 ? { w: 108, h: 72 } : window.height < 800 || window.width < 360 ? { w: 120, h: 84 } : { w: 136, h: 96 };
   const stored = useStore((s) => s.settings.theme);
   const matchPhone = useMatchPhone((s) => s.picked);
   const scheme = useColorScheme();
@@ -67,12 +70,12 @@ export function ThemeStep() {
   };
 
   return (
-    <View style={{ gap: spacing.xl }}>
-      <StepTitle title="Pick how your day looks" subtitle="Tap one and the whole app changes, so you can see it before you start." />
+    <View style={{ gap: window.height < 700 ? spacing.lg : spacing.xl }}>
+      <StepTitle title="Pick how your day looks" subtitle="Tap one to see the whole app change." />
       <View accessibilityRole="radiogroup" accessibilityLabel="Appearance" style={{ gap: spacing.sm }}>
         {THEME_CHOICES.map((o, i) => (
           <FadeUp key={o.value} index={i}>
-            <ThemeCard title={o.title} hint={o.hint} value={o.value} selected={selected === o.value} onPress={() => choose(o.value)} index={i} />
+            <ThemeCard title={o.title} hint={o.hint} value={o.value} selected={selected === o.value} onPress={() => choose(o.value)} index={i} width={mini.w} height={mini.h} />
           </FadeUp>
         ))}
       </View>
@@ -83,11 +86,27 @@ export function ThemeStep() {
   );
 }
 
-function ThemeCard({ title, hint, value, selected, onPress, index }: { title: string; hint: string; value: ThemePreference; selected: boolean; onPress: () => void; index: number }) {
+function ThemeCard({
+  title,
+  hint,
+  value,
+  selected,
+  onPress,
+  index,
+  width: w,
+  height: h,
+}: {
+  title: string;
+  hint: string;
+  value: ThemePreference;
+  selected: boolean;
+  onPress: () => void;
+  index: number;
+  /** Size of the miniature. */
+  width: number;
+  height: number;
+}) {
   const { colors, radius, spacing } = useTheme();
-  const narrow = useWindowDimensions().width < 360;
-  const w = narrow ? 112 : 136;
-  const h = narrow ? 86 : 96;
   return (
     <PressableScale
       testID={`onb-theme-${value}`}
@@ -155,6 +174,7 @@ function MiniToday({ c, width, height, index = 0 }: { c: ThemeColors; width: num
   const vw = Math.round(vh * 0.4);
   const head = Math.round(vh * 0.16);
   const fill = 0.52;
+  const num = height < 80 ? 18 : height < 90 ? 21 : 24;
   // The little cup pours once when the step arrives, each card a beat after the one above (the kit's pour: instant under reduced motion).
   const { level } = usePour(fill, { duration: motion.duration.pourSmall, delay: 120 + index * motion.duration.stagger * 2, settle: 0 });
   const pourStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - level.get() / fill) * (vh - 1) * fill }] }));
@@ -183,7 +203,7 @@ function MiniToday({ c, width, height, index = 0 }: { c: ThemeColors; width: num
         </View>
         <View style={{ flex: 1, minWidth: 0, justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
-            <Text style={{ color: c.caloriesInk, fontFamily: fonts.extrabold, fontSize: height < 90 ? 21 : 24, lineHeight: height < 90 ? 23 : 26, letterSpacing: -0.8 }}>941</Text>
+            <Text style={{ color: c.caloriesInk, fontFamily: fonts.extrabold, fontSize: num, lineHeight: num + 2, letterSpacing: -0.8 }}>941</Text>
             <Text style={{ color: c.textSecondary, fontFamily: fonts.semibold, fontSize: 7.5, lineHeight: 9 }}>{'kcal\nleft'}</Text>
           </View>
           <View style={{ gap: 5 }}>
