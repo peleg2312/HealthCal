@@ -38,14 +38,14 @@ function DaySheet({ date, visible, onClose }: { date: ISODate; visible: boolean;
  * with the person choosing what it carries (no weight, ever; calorie numbers
  * and food names only when they add them).
  */
-export function ShareDayButton({ date }: { date: string }): React.ReactElement | null {
+export function ShareDayButton({ date, testID = 'today-share' }: { date: string; testID?: string }): React.ReactElement | null {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
   // Mounted on first use only (the sheet reads a week of data), then kept so it can slide away.
   const [used, setUsed] = useState(false);
   return (
     <>
-      <IconButton testID="today-share" accessibilityLabel="Share your day as an image" onPress={() => {
+      <IconButton testID={testID} accessibilityLabel="Share your day as an image" onPress={() => {
           setUsed(true);
           setOpen(true);
         }}>

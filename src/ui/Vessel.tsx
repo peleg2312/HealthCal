@@ -166,7 +166,12 @@ export function Vessel({
   // Only transforms and opacity animate: the fill is full height and slides up inside the clipped cup.
   // At level 0 it is hidden outright, so no hairline of colour shows at the base of an empty cup.
   const fillStyle = useAnimatedStyle(() => ({ opacity: level.get() > 0.0005 ? 1 : 0, transform: [{ translateY: (1 - level.get()) * inner }] }));
-  const rimStyle = useAnimatedStyle(() => ({ opacity: level.get() > 0.0005 ? 1 : 0, transform: [{ translateY: -settle.get() }] }));
+  // A full cup has no room above the level for the settle's overshoot: the line would leave the cup's
+  // clipped box for a frame. Near the top the overshoot is scaled away, so the line never disappears.
+  const rimStyle = useAnimatedStyle(() => {
+    const room = Math.min(1, Math.max(0, (1 - level.get()) * 40));
+    return { opacity: level.get() > 0.0005 ? 1 : 0, transform: [{ translateY: -settle.get() * room }] };
+  });
   const headStyle = useAnimatedStyle(() => ({ opacity: headOpacity.get() }));
   const lipStyle = useAnimatedStyle(() => ({ opacity: lipOpacity.get() }));
   // It spreads from the cup's own width to its full width as it appears.

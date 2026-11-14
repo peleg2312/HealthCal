@@ -35,9 +35,23 @@ function lastConfidence(food: Food): number | undefined {
   return best?.confidence;
 }
 
-function announce(message: string, ids: string[]) {
+function announce(message: string, ids: string[], alsoUndo?: () => void) {
   haptic.success();
-  toast(message, { label: 'Undo', onPress: () => ids.forEach((id) => useStore.getState().remove('foodEntries', id)) });
+  toast(message, {
+    label: 'Undo',
+    onPress: () => {
+      ids.forEach((id) => useStore.getState().remove('foodEntries', id));
+      alsoUndo?.();
+    },
+  });
+}
+
+/**
+ * What Undo does to recents after a food was logged: the list goes back to how it was,
+ * unless something else has been logged since (then the newer list stands).
+ */
+export function recentsAfterUndo<T extends { id: string }>(now: readonly T[], before: readonly T[], foodId: string): readonly T[] {
+  return now[0]?.id === foodId ? before : now;
 }
 
 /** Rewrite an existing entry with a new food, serving or amount. Keeps when it was logged and scales an estimate's range. */
@@ -68,8 +82,11 @@ export function logFood(input: LogFoodInput): FoodEntry {
     return entry;
   }
   const entry = store.upsert('foodEntries', buildEntry({ ...input, confidence: lastConfidence(input.food) }));
+  const recentsBefore = store.recentFoods;
   store.rememberFood(input.food);
-  announce(`Added to ${MEAL_LABEL[input.meal].toLowerCase()}`, [entry.id]);
+  announce(`Added to ${MEAL_LABEL[input.meal].toLowerCase()}`, [entry.id], () => {
+    useStore.setState((s) => ({ recentFoods: [...recentsAfterUndo(s.recentFoods, recentsBefore, input.food.id)] }));
+  });
   return entry;
 }
 

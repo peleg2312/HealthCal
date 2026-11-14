@@ -6,6 +6,7 @@ import { type ScrollView, type ScrollViewProps, View } from 'react-native';
 import { copyPreviousDay, copyPreviousMeal, findPreviousDay, findPreviousMeal } from '@/features/food/actions';
 import { DaySummaryCard, MealCard, MealMenuSheet } from '@/features/food/DiaryParts';
 import { dayPhrase, href, kcal, param, parseDate } from '@/features/food/helpers';
+import { ShareDayButton } from '@/features/share';
 import { DayRingStrip } from '@/features/today/DayRingStrip';
 import { useReportViewedDay } from '@/features/today/viewedDay';
 import { addDays, formatDayLabel, formatLongDate, today } from '@/lib/dates';
@@ -76,6 +77,11 @@ export default function DiaryScreen() {
       <DayRingStrip today={t} selected={date} onSelect={setDate} testIDPrefix="diary" />
 
       <DaySummaryCard day={day} />
+      {date <= t ? (
+        <View style={{ alignItems: 'flex-end', marginTop: -spacing.xs }}>
+          <ShareDayButton date={date} testID="diary-share" />
+        </View>
+      ) : null}
 
       {empty ? (
         <Card testID="diary-empty" tone="alt">
