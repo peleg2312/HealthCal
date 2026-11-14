@@ -3,9 +3,10 @@ import { useColorScheme } from 'react-native';
 
 import type { ThemePreference } from '@/types';
 
+import { resolveThemeName, type ThemeName } from './resolve';
 import { blossomColors, darkColors, lightColors, radius, spacing, typography, type ThemeColors } from './tokens';
 
-export type ThemeName = 'dark' | 'light' | 'blossom';
+export { resolveThemeName, type ThemeName } from './resolve';
 
 export interface Theme {
   /** Which palette is active. */
@@ -31,13 +32,16 @@ const ThemeContext = createContext<Theme>({
 
 export function ThemeProvider({
   preference,
+  lead = false,
   children,
 }: {
   preference: ThemePreference;
+  /** True until setup is finished: nobody has picked a look yet (see resolveThemeName). */
+  lead?: boolean;
   children: React.ReactNode;
 }) {
   const system = useColorScheme();
-  const name: ThemeName = preference === 'system' ? (system === 'light' ? 'light' : 'dark') : preference;
+  const name: ThemeName = resolveThemeName(preference, system, lead);
   const value = useMemo<Theme>(
     () => ({ name, dark: name === 'dark', colors: PALETTES[name], spacing, radius, typography }),
     [name],

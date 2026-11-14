@@ -146,6 +146,8 @@ export default function RootLayout() {
   const hydration = useHydration((h) => h.status);
   const hydrated = hydration === 'ready';
   const theme = useStore((s) => s.settings.theme);
+  // Until setup is finished nobody has picked a look, so the app shows its lead one.
+  const firstRun = useStore((s) => !s.profile?.onboardedAt);
   const ready = (fontsLoaded || !!fontError) && hydrated;
 
   useEffect(() => {
@@ -202,7 +204,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ThemeProvider preference={theme}>
+        <ThemeProvider preference={theme} lead={firstRun}>
           <Navigation />
         </ThemeProvider>
       </SafeAreaProvider>
