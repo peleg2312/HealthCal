@@ -108,7 +108,8 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
                 {`${range.charAt(0).toUpperCase() + range.slice(1)}. The line is the pace you chose, about ${pace} a week; the band is a little faster or slower.`}
               </Text>
             </View>
-            <ProjectionChart projection={projection} units={units} delay={reduce ? 0 : 120} />
+            {/* The road draws once its card has arrived. */}
+            <ProjectionChart projection={projection} units={units} delay={landed + 160} />
             <Text variant="caption" color="textSecondary">
               A projection, not a promise. It redraws from your real trend.
             </Text>
@@ -203,16 +204,18 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
                   <Text variant="unit"> kcal</Text>
                 </Text>
               </View>
-              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                <Sparkles size={16} color={colors.textSecondary} strokeWidth={1.9} />
-                <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
-                  These are starting estimates. As your weigh-ins and food logs come in, HealthCal measures what you actually burn and adapts your targets. You can
-                  adjust any number in Goals.
-                </Text>
-              </View>
             </FadeUp>
           ) : null}
         </Card>
+      </FadeUp>
+
+      {/* Always in view, not folded away with the working: these numbers are where the plan starts. */}
+      <FadeUp delay={landed + (projection ? 260 : 140)} style={{ flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.xs }}>
+        <Sparkles size={16} color={colors.textSecondary} strokeWidth={1.9} />
+        <Text variant="caption" color="textSecondary" style={{ flex: 1 }} testID="plan-estimates-note">
+          These are starting estimates. As your weigh-ins and food logs come in, HealthCal measures what you actually burn and adapts your targets. You can adjust
+          any number in Goals.
+        </Text>
       </FadeUp>
 
       {/* On the page background, so an underlined text link in the text colour, not primary. */}

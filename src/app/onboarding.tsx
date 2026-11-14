@@ -71,8 +71,10 @@ export default function Onboarding() {
 function ChosenLook({ children }: { children: React.ReactNode }) {
   const preference = useStore((s) => s.settings.theme);
   const matchPhone = useMatchPhone((s) => s.picked);
+  // Once set-up is finished the lead look is over, as it is for the rest of the app.
+  const onboarded = useStore((s) => !!s.profile?.onboardedAt);
   return (
-    <ThemeProvider preference={preference} lead={!matchPhone}>
+    <ThemeProvider preference={preference} lead={!matchPhone && !onboarded}>
       {children}
     </ThemeProvider>
   );
@@ -241,6 +243,7 @@ function Flow({ onFinished }: { onFinished: () => void }) {
     });
     haptic.success();
     useOnboardingDraft.getState().reset();
+    useMatchPhone.setState({ picked: false });
     if (isBackendConfigured && !useAuth.getState().session) onFinished();
     else router.replace('/');
   };
