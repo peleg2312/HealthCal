@@ -153,12 +153,13 @@ export default function RecapScreen() {
         </Card>
       ) : (
         <>
-          <View style={{ gap: spacing.xs }}>
+          {/* The win is the week's headline, held in a card so it reads as content under the header, not a second title. */}
+          <Card style={{ gap: spacing.xs }}>
             <Text variant="overline">Win of the week</Text>
-            <Text variant="h1" testID="recap-win">
+            <Text variant="h2" testID="recap-win">
               {r.win}
             </Text>
-          </View>
+          </Card>
 
           <FadeUp index={1}>
             <Card padding={0} style={{ flexDirection: 'row', flexWrap: 'wrap' }} testID="recap-tiles">

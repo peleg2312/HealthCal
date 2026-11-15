@@ -101,7 +101,7 @@ function MealEdit() {
         </View>
       ) : null}
       <Card style={{ gap: spacing.md }}>
-        <TextField testID="meal-edit-name" label="Name" placeholder="Chili, overnight oats, work lunch" value={name} onChangeText={setDraftName} maxLength={60} autoFocus={!id} />
+        <TextField testID="meal-edit-name" label="Name" placeholder={narrow ? 'Chili, overnight oats' : 'Chili, overnight oats, work lunch'} value={name} onChangeText={setDraftName} maxLength={60} autoFocus={!id} />
         {/* The hint sits beside the field where it has room, and under it on a narrow phone rather than in a thin column. */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', columnGap: spacing.md, rowGap: spacing.sm }}>
           <NumberField

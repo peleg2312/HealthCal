@@ -528,7 +528,8 @@ function FinishSummaryView({ summary }: { summary: FinishSummary }) {
   const [lo, hi] = kcalRange(e.kcalNet);
   return (
     <Screen
-      header={<Header title={undone ? 'Workout not saved' : 'Workout saved'} subtitle={formatDayLabel(e.date)} back={false} />}
+      // The back cup leaves the finished workout the way Done does (the editor behind it is closed).
+      header={<Header title={undone ? 'Workout not saved' : 'Workout saved'} subtitle={formatDayLabel(e.date)} onBack={leaveFlow} />}
       footer={
         <View style={{ gap: spacing.sm }}>
           <Button testID="strength-summary-done" title="Done" onPress={leaveFlow} />

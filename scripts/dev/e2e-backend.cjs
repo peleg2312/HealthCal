@@ -65,7 +65,7 @@ async function device(browser, seedJson) {
       await page.getByTestId(id).first().fill(String(value), { timeout: 15000 });
       await page.waitForTimeout(150);
     },
-    text: async (id) => (await page.getByTestId(id).first().innerText({ timeout: 15000 })).trim(),
+    text: async (id) => (await page.getByTestId(id).first().innerText({ timeout: 15000 })).replace(/\u00A0/g, ' ').replace(/\u2060/g, '').trim(),
     has: async (id) => (await page.getByTestId(id).count()) > 0,
     // The app exposes its live state for tests; this does not depend on how it is laid out in storage.
     state: async () => page.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState()))),

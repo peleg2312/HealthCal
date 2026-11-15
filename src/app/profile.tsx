@@ -187,6 +187,7 @@ function ProfileHub() {
             </View>
           </View>
           <Segmented<UnitSystem>
+            testID="profile-units"
             value={u}
             onChange={(units) => setProfile({ units })}
             options={[

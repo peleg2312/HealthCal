@@ -1,7 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { deleteCustomFood } from '@/features/food/actions';
 import { setFoodDraft, useFoodDraft } from '@/features/food/draft';
@@ -45,6 +45,7 @@ export default function CustomFoodScreen() {
 
 function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { existing?: CustomFood; barcode?: string; name?: string; meal?: string; date?: string }) {
   const { colors, spacing } = useTheme();
+  const narrow = useWindowDimensions().width < 360;
   const own = existing?.servings[0];
   const [basis, setBasis] = useState<Basis>(own && Math.abs(own.grams - 100) > 0.01 ? 'serving' : existing ? 'per100' : 'serving');
   const [name, setName] = useState(existing?.name ?? initialName ?? '');
@@ -156,9 +157,10 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
       }>
       <Card style={{ gap: spacing.md }}>
         <TextField testID="custom-name" label="Name" placeholder="e.g. Protein bar, chocolate" value={name} onChangeText={setName} maxLength={80} error={tried ? errors.name : null} autoFocus={!existing && !initialName} />
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <TextField testID="custom-brand" label="Brand (optional)" value={brand} onChangeText={setBrand} maxLength={60} style={{ flex: 1 }} />
-          <TextField testID="custom-barcode" label="Barcode (optional)" value={code} onChangeText={setCode} keyboardType="number-pad" inputMode="numeric" maxLength={20} style={{ flex: 1 }} />
+        {/* Side by side, a 13-digit barcode needs about 130 px: under 360 px the two fields stack. */}
+        <View style={{ flexDirection: narrow ? 'column' : 'row', gap: narrow ? spacing.md : spacing.sm }}>
+          <TextField testID="custom-brand" label="Brand (optional)" value={brand} onChangeText={setBrand} maxLength={60} style={narrow ? undefined : { flex: 1 }} />
+          <TextField testID="custom-barcode" label="Barcode (optional)" value={code} onChangeText={setCode} keyboardType="number-pad" inputMode="numeric" maxLength={20} style={narrow ? undefined : { flex: 1 }} />
         </View>
         <View style={{ gap: 6 }}>
           <Text variant="label" color="textSecondary">

@@ -59,13 +59,18 @@ let dockSeq = 0;
 /**
  * Tells the toast how tall this screen's bottom chrome is (the tab bar with its + cup, a pinned
  * footer, or just the home indicator), so the toast rests 12 px above it instead of on top of
- * the screen's controls. `Screen` calls this; the screen mounted last (the one on top) wins.
+ * the screen's controls. `Screen` calls this with `active` set while the screen is focused: the
+ * screen that is showing wins, even while the one it replaced is still mounted (a toast raised
+ * on the sign-in screen moves above Today's tab bar the moment Today shows).
  */
-export function useToastDock(height: number) {
+export function useToastDock(height: number, active = true) {
   const [id] = useState(() => ++dockSeq);
   useEffect(() => {
-    useToast.setState((s) => ({ docks: s.docks.some((d) => d.id === id) ? s.docks.map((d) => (d.id === id ? { id, height } : d)) : [...s.docks, { id, height }] }));
-  }, [id, height]);
+    useToast.setState((s) => {
+      const others = s.docks.filter((d) => d.id !== id);
+      return { docks: active ? [...others, { id, height }] : others };
+    });
+  }, [id, height, active]);
   useEffect(() => () => useToast.setState((s) => ({ docks: s.docks.filter((d) => d.id !== id) })), [id]);
 }
 

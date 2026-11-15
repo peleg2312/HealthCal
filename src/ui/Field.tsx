@@ -137,6 +137,7 @@ export function Stepper({
   max = Number.POSITIVE_INFINITY,
   format,
   label,
+  compact,
 }: {
   value: number;
   onChange: (n: number) => void;
@@ -145,15 +146,17 @@ export function Stepper({
   max?: number;
   format?: (n: number) => string;
   label: string;
+  /** Narrower (156 px instead of 188), for a row that also holds a label on a 320 px phone. */
+  compact?: boolean;
 }) {
   const { colors } = useTheme();
   const set = (n: number) => onChange(Math.min(max, Math.max(min, Math.round(n * 1000) / 1000)));
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: compact ? 8 : 14 }}>
       <IconButton accessibilityLabel={`Decrease ${label}`} tone="surface" onPress={() => set(value - step)} disabled={value <= min}>
         <Minus size={18} color={colors.text} />
       </IconButton>
-      <Text variant="numL" align="center" style={{ minWidth: 72, fontSize: 26, lineHeight: 30 }}>
+      <Text variant="numL" align="center" style={compact ? { minWidth: 52, fontSize: 22, lineHeight: 28 } : { minWidth: 72, fontSize: 26, lineHeight: 30 }}>
         {format ? format(value) : String(value)}
       </Text>
       <IconButton accessibilityLabel={`Increase ${label}`} tone="surface" onPress={() => set(value + step)} disabled={value >= max}>

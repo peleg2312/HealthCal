@@ -48,7 +48,7 @@ export function WeekCard({ week, dates, today }: { week: WeekSummary; dates: ISO
       content: (
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 5 }}>
           <Text variant="numXL" testID="train-guideline-minutes" style={{ fontSize: 40, lineHeight: 42, letterSpacing: -1.2 }}>
-            {minutes}
+            {formatNumber(minutes)}
           </Text>
           <Text variant="unit" style={{ fontSize: 14 }}>
             min

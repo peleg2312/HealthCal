@@ -14,13 +14,27 @@
  *   hidden      content still under the tab bar or a pinned footer when the page is
  *               scrolled to its end (checked at the real window height)
  *   gaps        a card closer than 8 px to the card under it, text closer than 4 px to
- *               its card's edge, and a full-width card whose side margins differ
- *   toast       a toast, shown after a tap, that covers a control in an open sheet, a
- *               pinned footer or the tab bar, or that starts above the top of the screen
+ *               its card's edge, a full-width card whose side margins differ (a text
+ *               field's box is a field, not a card), and text closer than 12 px to the
+ *               screen's left or right edge (a title that does not shorten inside the
+ *               side padding; not in a row that scrolls sideways)
+ *   header      the top of the screen against the header rule (checked at the real window height):
+ *               a pushed screen's header without a back cup or X, a title and one short line, a
+ *               tab header without its overline, or a second screen title under either (text of
+ *               21 px or more with words, outside a card, in the first 160 px under the header)
+ *   toast       a toast that covers a control in an open sheet, a pinned footer or the tab bar, or
+ *               that starts above the top of the screen: judged after each tap and at the capture,
+ *               always at the real window height (never against the page grown to its full height)
+ * Text cut with no ellipsis is `cut`, and so is a field's placeholder wider than the field. A name
+ * that ends in an ellipsis after its allowed lines is shortened by design: listed in report.json as
+ * `shortened` and printed under its own heading, not counted as something to look at.
  * Not reported, because they are drawn that way on purpose: lines 6 px thick or less
  * (the level line, ticks, the brim line that is wider than its cup), the + cup over
  * the tab bar, labels on a corner such as the Friends count, lines a text clamp hides,
- * and anything not drawn (a hit area, an empty wrapper).
+ * miniatures hidden from screen readers (the "Match my phone" preview draws two halves),
+ * a control whose tap area is partly scrolled out of its list (under a pinned header),
+ * and anything not drawn (a hit area, an empty wrapper). Text in a drawing (the share
+ * card's SVG) is measured at the size it is drawn, its font size times the drawing's scale.
  *
  *   node scripts/dev/evidence.cjs --out=<dir> --routes=/,/diary,/water
  *        [--themes=blossom,light,dark] [--widths=390,320] [--empty] [--fresh] [--stress] [--imperial]
@@ -103,6 +117,7 @@ const ROOT = path.join(__dirname, '..', '..');
 function scan(rootSel) {
   const seen = new Set();
   const cut = [];
+  const shortened = [];
   const small = [];
   const vw = document.documentElement.clientWidth;
   const root = rootSel ? [...document.querySelectorAll(rootSel)].pop() || document.body : document.body;
@@ -122,7 +137,17 @@ function scan(rootSel) {
     const ownText = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent.trim()).join(' ').trim();
     if (ownText && (el.scrollWidth > el.clientWidth + 1 || (style.webkitLineClamp !== 'none' && el.scrollHeight > el.clientHeight + 1)) && style.overflow !== 'visible') {
       const key = ownText.slice(0, 40);
-      if (!seen.has(key)) { seen.add(key); cut.push({ text: ownText.slice(0, 60), shows: Math.round(el.clientWidth), needs: Math.round(el.scrollWidth) }); }
+      // A name that ends in an ellipsis after its allowed lines is shortened by design; "cut" is text clipped with no ellipsis.
+      const ellipsis = style.textOverflow === 'ellipsis' || style.webkitLineClamp !== 'none';
+      if (!seen.has(key)) { seen.add(key); (ellipsis ? shortened : cut).push({ text: ownText.slice(0, 60), shows: Math.round(el.clientWidth), needs: Math.round(el.scrollWidth) }); }
+    }
+    // A one-line field's placeholder wider than the field: the browser clips it mid-word with no ellipsis.
+    if (el.tagName === 'INPUT' && !el.value && el.placeholder && r.top < window.innerHeight * 3) {
+      const ctx = (scan.canvas ||= document.createElement('canvas')).getContext('2d');
+      ctx.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+      const room = el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      const needs = ctx.measureText(el.placeholder).width;
+      if (needs > room + 1 && style.textOverflow !== 'ellipsis' && !seen.has(el.placeholder)) { seen.add(el.placeholder); cut.push({ text: `placeholder "${el.placeholder.slice(0, 50)}"`, shows: Math.round(room), needs: Math.round(needs) }); }
     }
     const role = el.getAttribute('role');
     if ((el.tagName === 'BUTTON' || role === 'button' || role === 'switch' || role === 'tab' || role === 'link') && r.top < window.innerHeight * 3) {
@@ -133,12 +158,21 @@ function scan(rootSel) {
       // Not judged: a control that is switched off, or one partly scrolled out of a sideways row (its edge is off the screen).
       const off = el.disabled || el.getAttribute('aria-disabled') === 'true';
       const inside = r.left >= 0 && r.right <= vw;
-      if (!off && inside && r.top >= 0 && r.bottom + 21 <= chromeTop && (r.width < 44 || r.height < 44) && !(hits(-21, 0) && hits(21, 0) && hits(0, -21) && hits(0, 21))) {
+      // Nor one whose tap area runs past the edge of the list it scrolls in (partly under a pinned header,
+      // or past the bottom of a sheet's body): it is judged once it is scrolled into the open.
+      let open = true;
+      for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+        if (!/(auto|scroll)/.test(getComputedStyle(p).overflowY) || p.scrollHeight <= p.clientHeight + 1) continue;
+        const q = p.getBoundingClientRect();
+        if ((p.scrollTop > 0 && cy - 21 < q.top) || (p.scrollTop + p.clientHeight < p.scrollHeight - 1 && cy + 21 > q.bottom)) open = false;
+        break;
+      }
+      if (!off && inside && open && r.top >= 0 && r.bottom + 21 <= chromeTop && (r.width < 44 || r.height < 44) && !(hits(-21, 0) && hits(21, 0) && hits(0, -21) && hits(0, 21))) {
         small.push({ id: label(el) || ownText.slice(0, 30), w: Math.round(r.width), h: Math.round(r.height) });
       }
     }
   }
-  return { cut: cut.slice(0, 25), small: small.slice(0, 25), wide: document.documentElement.scrollWidth > vw + 1 ? document.documentElement.scrollWidth - vw : 0 };
+  return { cut: cut.slice(0, 25), shortened: shortened.slice(0, 25), small: small.slice(0, 25), wide: document.documentElement.scrollWidth > vw + 1 ? document.documentElement.scrollWidth - vw : 0 };
 }
 
 /**
@@ -198,7 +232,10 @@ function layoutScan(rootSel) {
     return ['Top', 'Right', 'Bottom', 'Left'].every((k) => parseFloat(s[`border${k}Width`]) > 0 && alpha(s[`border${k}Color`]) > 0);
   };
   const isControl = (el) => el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || ['button', 'link', 'switch', 'tab', 'checkbox', 'radio', 'slider'].includes(el.getAttribute('role'));
-  const onPurpose = (el) => !!el.closest('[data-testid="tab-add"], [data-testid$="-count"]');
+  // On purpose: the + cup over the tab bar, a count on a corner, and a miniature drawn for looks (hidden from
+  // screen readers, such as the "Match my phone" preview that draws two halves). A toast is judged by
+  // toastScan at the real window height, never against a page grown to its full height.
+  const onPurpose = (el) => !!el.closest('[data-testid="tab-add"], [data-testid$="-count"], [aria-hidden="true"], [data-testid="toast"]');
   const fullPage = (r) => w(r) >= vw - 2;
 
   // Text, line by line, as drawn. A line's box is the font's whole height; the letters
@@ -207,7 +244,9 @@ function layoutScan(rootSel) {
   const texts = [];
   for (const el of all) {
     if (!shown(el) || onPurpose(el)) continue;
-    const fs = parseFloat(getComputedStyle(el).fontSize) || 14;
+    // Text in a drawing (the share card) is drawn at its font size times the drawing's scale.
+    const ctm = el.closest('svg') && el.getScreenCTM ? el.getScreenCTM() : null;
+    const fs = (parseFloat(getComputedStyle(el).fontSize) || 14) * (ctm ? Math.hypot(ctm.a, ctm.b) : 1);
     for (const n of el.childNodes) {
       if (n.nodeType !== 3 || !n.textContent.trim()) continue;
       // Word by word, joined into lines: a wrapped line's own box would include the space it broke at.
@@ -229,7 +268,7 @@ function layoutScan(rootSel) {
         const mid = (line.top + line.bottom) / 2;
         const r = { left: line.left, right: line.right, top: Math.max(line.top, mid - fs * 0.42), bottom: Math.min(line.bottom, mid + fs * 0.42) };
         const v = visibleRect(el, r);
-        if (!empty(v) && w(v) > 1) texts.push({ el, r: v });
+        if (!empty(v) && w(v) > 1) texts.push({ el, r: v, fs });
       }
     }
   }
@@ -288,7 +327,8 @@ function layoutScan(rootSel) {
       if (flows(a.el) || flows(b.el)) continue;
       const vo = Math.min(a.r.b, b.r.b) - Math.max(a.r.t, b.r.t);
       const gap = b.r.l - a.r.r;
-      if (vo > Math.min(h(a.r), h(b.r)) * 0.5 && gap >= -2 && gap < 3) add('overText', `${name(a.el)} runs into ${name(b.el)} (${Math.round(gap)}px apart)`);
+      // Less than a word space apart (about a fifth of the letters' size; 3 px for body text).
+      if (vo > Math.min(h(a.r), h(b.r)) * 0.5 && gap >= -2 && gap < Math.min(3, 0.18 * Math.min(a.fs, b.fs))) add('overText', `${name(a.el)} runs into ${name(b.el)} (${Math.round(gap)}px apart)`);
     }
   }
   // 2. Text or a box reaching past what holds it (thin lines and ticks are drawn past on purpose).
@@ -321,7 +361,9 @@ function layoutScan(rootSel) {
   }
 
   // 4. Cards: painted, at least 120 x 40, not a control, not the page, not inside another card.
-  const cardLike = boxes.filter((b) => !b.art && !isControl(b.el) && !b.el.closest('button,[role="button"]') && w(b.r) >= 120 && h(b.r) >= 40 && !fullPage(b.r) && boxed(b.el));
+  // A text field's box (its border around an input) is a field, not a card.
+  const fieldBox = (el) => h(R(el.getBoundingClientRect())) < 90 && !!el.querySelector('input, textarea');
+  const cardLike = boxes.filter((b) => !b.art && !isControl(b.el) && !b.el.closest('button,[role="button"]') && w(b.r) >= 120 && h(b.r) >= 40 && !fullPage(b.r) && boxed(b.el) && !fieldBox(b.el));
   const cardSet = new Set(cardLike.map((b) => b.el));
   const cardOf = (el) => { for (let e = el.parentElement; e && e !== document.body; e = e.parentElement) if (cardSet.has(e)) return e; return null; };
   const top = cardLike.filter((b) => !cardOf(b.el));
@@ -341,6 +383,14 @@ function layoutScan(rootSel) {
       const right = vw - a.r.r;
       if (Math.abs(left - right) > 2) add('gaps', `card ${name(a.el)} sits ${Math.round(left)}px from the left, ${Math.round(right)}px from the right`);
     }
+  }
+  // Text that runs into the screen's side gutter (the content keeps 20 px): a title that does not
+  // shorten, a line wider than its column. Not in a row that scrolls sideways (it bleeds on purpose).
+  const sideways = (el) => { for (let e = el.parentElement; e && e !== document.body; e = e.parentElement) { const s = getComputedStyle(e); if (/(auto|scroll)/.test(s.overflowX) && e.scrollWidth > e.clientWidth + 1) return true; } return false; };
+  for (const t of texts) {
+    if (rootSel || t.el.closest('svg, [data-testid="tab-bar"]')) continue;
+    const d = Math.min(t.r.l, vw - t.r.r);
+    if (d < 12 && !sideways(t.el)) add('gaps', `${name(t.el)} ${Math.max(0, Math.round(d))}px from the screen's ${t.r.l < vw - t.r.r ? 'left' : 'right'} edge`);
   }
   for (const t of texts) {
     const c = cardOf(t.el) || (cardSet.has(t.el) ? t.el : null);
@@ -369,7 +419,7 @@ function hiddenAtEnd() {
   // Chrome: opaque, wide things outside the scroller in the lower half of the window (the tab bar, a footer).
   let cover = Math.min(area.bottom, vh);
   for (const el of document.querySelectorAll('body *')) {
-    if (sc.contains(el) || el.contains(sc)) continue;
+    if (sc.contains(el) || el.contains(sc) || el.closest('[data-testid="toast"]')) continue;
     const r = el.getBoundingClientRect();
     if (r.width < vw * 0.8 || r.top < vh * 0.5 || r.height < 20) continue;
     const bg = getComputedStyle(el).backgroundColor;
@@ -483,17 +533,68 @@ function sheetScan() {
     if (r.width >= sr.width - 2) continue;
     let box = r;
     if (ownText(el)) {
-      // Text: where its letters are, not its box.
-      const range = document.createRange();
-      range.selectNodeContents(el);
-      // A space where a line wraps gets its own few-pixel rect just past the text's box: not a letter.
-      const q = [...range.getClientRects()].filter((x) => x.width > 0 && !(x.width < 6 && (x.left >= r.right - 0.5 || x.right <= r.left + 0.5)));
+      // Text: where its letters are, word by word, not its box (a wrapped line's box includes the space it broke at).
+      const q = [];
+      for (const n of el.childNodes) {
+        if (n.nodeType !== 3) continue;
+        const re = /\S+/g;
+        let m;
+        while ((m = re.exec(n.textContent))) {
+          const range = document.createRange();
+          range.setStart(n, m.index);
+          range.setEnd(n, m.index + m[0].length);
+          for (const x of range.getClientRects()) if (x.width > 0) q.push(x);
+        }
+      }
       if (q.length) box = { left: Math.min(...q.map((x) => x.left)), right: Math.max(...q.map((x) => x.right)) };
     }
     const left = box.left - sr.left;
     const right = sr.right - box.right;
     const d = Math.min(left, right);
     if (d < pad - 1.5 && d > -400) add(`${name(el)} ${Math.round(d)}px from the sheet's ${left < right ? 'left' : 'right'} edge (its padding is ${Math.round(pad)}px)`);
+  }
+  return out;
+}
+
+/**
+ * Runs in the page at its real height: whether the top of the screen keeps the header rule (AGENTS.md,
+ * "The top of a screen"). A pushed screen's header (the kit's Header) has a back cup or an X, a title and
+ * one short line under it; a tab's (TabHeader) has an overline over its title. Under either, no second
+ * screen title: text of 21 px or more with words in it, in the first 160 px under the header, outside a
+ * card (a number with its unit, a heading inside a card or a section title at 18 px are content).
+ */
+function headerScan() {
+  const out = [];
+  const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && (!el.checkVisibility || el.checkVisibility({ opacityProperty: true, visibilityProperty: true })); };
+  const own = (el) => [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent.trim()).join(' ').trim();
+  const head = [...document.querySelectorAll('[data-testid="screen-header"], [data-testid="tab-header"]')].filter((el) => visible(el) && !el.closest('[data-testid="sheet"]')).pop();
+  if (!head) return out;
+  const tab = head.getAttribute('data-testid') === 'tab-header';
+  const words = [...head.querySelectorAll('*')].filter((el) => !el.closest('button, [role="button"], [role="link"]') && own(el) && visible(el));
+  const lines = new Set(words.map((el) => Math.round(el.getBoundingClientRect().top))).size;
+  if (lines < 2) out.push(tab ? 'no overline over the title' : lines ? 'no short line under the title' : 'no title');
+  if (lines > 2) out.push(`${lines} lines in the title block (a title and one short line)`);
+  if (!tab && !head.querySelector('[data-testid="header-back"], [data-testid="header-close"]')) out.push('no back cup or X');
+  const hb = head.getBoundingClientRect().bottom;
+  const alpha = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return 0; const p = m[1].split(',').map(Number); return p.length > 3 ? p[3] : 1; };
+  const inCard = (el) => {
+    for (let e = el.parentElement; e && e !== document.body; e = e.parentElement) {
+      const s = getComputedStyle(e);
+      const r = e.getBoundingClientRect();
+      if (r.width >= document.documentElement.clientWidth - 2) continue;
+      if (['Top', 'Right', 'Bottom', 'Left'].every((k) => parseFloat(s[`border${k}Width`]) > 0 && alpha(s[`border${k}Color`]) > 0) || alpha(s.backgroundColor) > 0) return true;
+    }
+    return false;
+  };
+  for (const el of document.querySelectorAll('body *')) {
+    if (head.contains(el) || !visible(el) || el.closest('[data-testid="sheet"], [data-testid="toast"], [data-testid="tab-bar"], svg, [aria-hidden="true"]')) continue;
+    const text = own(el);
+    if (!text || !/[A-Za-z]{3,}/.test(text)) continue;
+    const fs = parseFloat(getComputedStyle(el).fontSize);
+    const r = el.getBoundingClientRect();
+    if (fs < 21 || r.top < hb - 1 || r.top > hb + 160 || inCard(el)) continue;
+    out.push(`a second title under the header: "${text.slice(0, 40)}" (${Math.round(fs)} px)`);
+    break;
   }
   return out;
 }
@@ -631,7 +732,7 @@ const slug = (route) => route.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '')
 // ------------------------------------------------------------------ capture
 
 const sel = (id) => (id.startsWith('^') ? `[data-testid^="${id.slice(1)}"]` : `[data-testid="${id}"]`);
-const EMPTY_LAYOUT = () => ({ overText: [], broken: [], sticksOut: [], controls: [], gaps: [], hidden: [], sheet: [], toast: [] });
+const EMPTY_LAYOUT = () => ({ overText: [], broken: [], sticksOut: [], controls: [], gaps: [], hidden: [], header: [], sheet: [], toast: [] });
 
 /**
  * Opens one job (a route, or a state: a route plus steps) in a fresh page with its own stored data,
@@ -707,7 +808,9 @@ async function capture(page, job, file) {
   const found = await page.evaluate(scan, root);
   const layout = EMPTY_LAYOUT();
   if (sheet) layout.sheet = await page.evaluate(sheetScan);
-  else layout.hidden = await page.evaluate(hiddenAtEnd);
+  else { layout.hidden = await page.evaluate(hiddenAtEnd); layout.header = await page.evaluate(headerScan); }
+  // A toast still showing is judged here, at the real window height, as well as after each tap.
+  layout.toast = await page.evaluate(toastScan);
   await page.waitForTimeout(100);
   await page.screenshot({ path: file, fullPage: true });
   // Everything at once: grow the window until the scrolling element (the page's, or the sheet's body) fits.
@@ -767,7 +870,7 @@ async function main() {
           if (!result.problem) break;
         }
         const { page, errors, toast, problem } = result;
-        let found = { cut: [], small: [], wide: 0 };
+        let found = { cut: [], shortened: [], small: [], wide: 0 };
         let layout = EMPTY_LAYOUT();
         if (problem) {
           await page.screenshot({ path: path.join(out, `${name}.png`), fullPage: true }).catch(() => {});
@@ -778,7 +881,7 @@ async function main() {
             errors.push(`scan failed: ${String(e.message).split('\n')[0].slice(0, 100)}`);
           }
         }
-        layout.toast = toast;
+        layout.toast = [...new Set([...toast, ...(layout.toast || [])])];
         const crashed = (await page.locator('[data-testid="error-retry"]').count().catch(() => 0)) > 0;
         screens.push({
           id: job.id, kind: job.kind, ...(job.list ? { list: job.list } : null), route: job.route, data: job.data, imperial: job.imperial, sheet: !!job.sheet, theme, width,
@@ -813,7 +916,7 @@ async function main() {
   const stateIndex = Object.fromEntries(states.map((s) => [s.id, { list: s.list, route: s.route, data: s.data || 'demo', imperial: !!s.imperial, sheet: !!s.sheet, note: s.note || null }]));
   const report = { taken: new Date().toISOString(), base, sheets, checks, states: stateIndex, screens };
   fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify(report, null, 1));
-  const LAYOUT = ['overText', 'broken', 'sticksOut', 'controls', 'hidden', 'gaps', 'sheet', 'toast'];
+  const LAYOUT = ['overText', 'broken', 'sticksOut', 'controls', 'hidden', 'gaps', 'header', 'sheet', 'toast'];
   const layoutCount = (s) => LAYOUT.reduce((n, k) => n + (s.layout?.[k]?.length || 0), 0);
   const problems = screens.filter((s) => s.crashed || s.incomplete || s.errors.length || s.cut.length || s.wide || s.small.length || layoutCount(s));
   console.log(`${screens.length} screens in ${out}; ${problems.length} with something to look at; ${sheets.length} sheets`);
@@ -821,10 +924,16 @@ async function main() {
     const bits = [s.crashed ? 'ERROR SCREEN' : '', s.incomplete ? `NOT CAPTURED: ${s.incomplete}` : '', s.errors.length ? `${s.errors.length} error(s): ${s.errors[0]}` : '', s.wide ? `page ${s.wide}px too wide` : '', s.cut.length ? `cut: ${s.cut.slice(0, 3).map((c) => `"${c.text}"`).join(', ')}${s.cut.length > 3 ? ` +${s.cut.length - 3}` : ''}` : '', s.small.length ? `small targets: ${s.small.slice(0, 3).map((t) => `${t.id} ${t.w}x${t.h}`).join(', ')}` : '', ...LAYOUT.filter((k) => s.layout?.[k]?.length).map((k) => `${k}: ${s.layout[k].slice(0, 2).join('; ')}${s.layout[k].length > 2 ? ` +${s.layout[k].length - 2}` : ''}`)].filter(Boolean);
     console.log(`  ${s.kind === 'state' ? s.id : s.route} [${s.theme} ${s.width}] ${bits.join('; ')}`);
   }
+  // Shortened by design: names that end in an ellipsis after their allowed lines. Listed, not counted.
+  const short = screens.filter((s) => s.shortened && s.shortened.length);
+  if (short.length) {
+    const names = [...new Set(short.flatMap((s) => s.shortened.map((c) => c.text)))];
+    console.log(`shortened by design (an ellipsis after the allowed lines) on ${short.length} screens: ${names.slice(0, 6).map((t) => `"${t}"`).join(', ')}${names.length > 6 ? ` +${names.length - 6}` : ''}`);
+  }
   for (const c of checks) console.log(`${c.ok ? 'PASS' : 'FAIL'}  ${c.name}${c.ok ? '' : `: ${c.tail}`}`);
   process.exit(checks.some((c) => !c.ok) || screens.some((s) => s.crashed || s.incomplete) ? 1 : 0);
 }
 
 // The in-page scans are exported for scripts/dev/evidence-selftest.cjs, which proves each one against hand-made faults.
 if (require.main === module) main();
-else module.exports = { scan, layoutScan, hiddenAtEnd, sheetScan, toastScan, notReady, loadStates };
+else module.exports = { scan, layoutScan, hiddenAtEnd, headerScan, sheetScan, toastScan, notReady, loadStates };

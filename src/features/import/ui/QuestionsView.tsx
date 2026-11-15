@@ -14,6 +14,11 @@ import { deviceTimeZone, zoneLabel } from './timeZones';
  * What the files cannot say for themselves: a CSV's distance unit and time
  * zone, and the date of an old FIT file whose clock was never set.
  */
+/** The header's short line on the questions step. */
+export function questionsTitle(csvFiles: number, systemTimeFiles: number): string {
+  return csvFiles ? (systemTimeFiles ? 'A few things to check' : 'Two things to check') : 'Check the day';
+}
+
 export function QuestionsView({ todayDate, hour12, onChangeZone }: { todayDate: ISODate; hour12: boolean; onChangeZone: (which: 'csv' | 'fit') => void }) {
   const { spacing } = useTheme();
   const csvFiles = useImportSession((s) => s.csvFiles);
@@ -24,14 +29,12 @@ export function QuestionsView({ todayDate, hour12, onChangeZone }: { todayDate: 
 
   return (
     <View style={{ gap: spacing.lg }} testID="import-questions">
-      <View style={{ gap: spacing.sm }}>
-        <Text variant="h1">{csvFiles.length ? (systemTimeFiles.length ? 'A few things to check' : 'Two things to check') : 'Check the day'}</Text>
-        <Text variant="body" color="textSecondary">
-          {csvFiles.length
-            ? 'Garmin’s activities list does not say which units or time zone it uses. Check these so distances and days come out right.'
-            : 'This file needs a little help to land on the right day.'}
-        </Text>
-      </View>
+      {/* What this step is ("Two things to check") is the header's short line: questionsTitle. */}
+      <Text variant="body" color="textSecondary">
+        {csvFiles.length
+          ? 'Garmin’s activities list does not say which units or time zone it uses. Check these so distances and days come out right.'
+          : 'This file needs a little help to land on the right day.'}
+      </Text>
 
       {csvFiles.length ? (
         <Card style={{ gap: spacing.md }} testID="import-csv-questions">

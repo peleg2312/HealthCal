@@ -187,7 +187,8 @@ function FastingScreen() {
             title="Set"
             variant="secondary"
             full={false}
-            style={{ alignSelf: 'flex-end' }}
+            // As tall as the field beside it (50), so the two read as one row.
+            style={{ alignSelf: 'flex-end', height: 50 }}
             onPress={() => {
               if (custom === null || custom < MIN_FAST_HOURS || custom > MAX_FAST_HOURS) {
                 toast(`Choose between ${MIN_FAST_HOURS} and ${MAX_FAST_HOURS} hours`);

@@ -5,10 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { entriesToSave, netChange } from '@/features/import';
 import { ActivitySheet } from '@/features/import/ui/ActivitySheet';
-import { DoneView } from '@/features/import/ui/DoneView';
+import { DoneView, doneTitle } from '@/features/import/ui/DoneView';
 import { countRows, fileNotes, filterRows, paceSetsEffort, workouts, type RowFilter } from '@/features/import/ui/format';
 import { pickGarminFiles } from '@/features/import/ui/pickFiles';
-import { QuestionsView } from '@/features/import/ui/QuestionsView';
+import { QuestionsView, questionsTitle } from '@/features/import/ui/QuestionsView';
 import { ReadingView } from '@/features/import/ui/ReadingView';
 import { FileNotes, ListControls, SummaryCard, TextLink } from '@/features/import/ui/ReviewHeader';
 import {
@@ -51,6 +51,7 @@ export default function ImportScreen() {
   const rows = useImportSession((s) => s.rows);
   const batches = useImportSession((s) => s.batches);
   const csvFiles = useImportSession((s) => s.csvFiles);
+  const systemTimeFiles = useImportSession((s) => s.systemTimeFiles);
   const answers = useImportSession((s) => s.answers);
   const result = useImportSession((s) => s.result);
 
@@ -99,7 +100,18 @@ export default function ImportScreen() {
     ? `CSV read in ${answers.distanceUnit === 'km' ? 'kilometres' : 'miles'}, times in ${answers.csvTimeZone ? zoneLabel(answers.csvTimeZone) : device ? zoneLabel(device) : 'this device’s zone'}.`
     : null;
 
-  const header = <Header title="Import from Garmin" close subtitle={phase === 'review' && batches.length ? (batches.length === 1 ? batches[0].name : `${batches.length} files`) : 'FIT, TCX, GPX, CSV or ZIP files'} />;
+  // The short line under the title says where in the import you are.
+  const subtitle =
+    phase === 'review' && batches.length
+      ? batches.length === 1
+        ? batches[0].name
+        : `${batches.length} files`
+      : phase === 'questions'
+        ? questionsTitle(csvFiles.length, systemTimeFiles.length)
+        : phase === 'done' && result
+          ? doneTitle(result.entries, result.previous, result.undone)
+          : 'FIT, TCX, GPX, CSV or ZIP files';
+  const header = <Header title="Import from Garmin" close subtitle={subtitle} />;
 
   const sheets = (
     <>

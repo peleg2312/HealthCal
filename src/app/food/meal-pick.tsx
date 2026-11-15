@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Search, X } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 
 import { BUILTIN_FOODS } from '@/data/foods';
 import { savedItemFromFood, setItemAmount } from '@/features/food/build';
@@ -33,6 +33,8 @@ export default function MealPickRoute() {
  */
 function MealPick() {
   const { colors, spacing } = useTheme();
+  // At 320 px the search field holds about 26 characters, as on food search.
+  const narrow = useWindowDimensions().width < 360;
   const active = useMealDraft((s) => s.active);
   const name = useMealDraft((s) => s.name);
   const rows = useMealDraft((s) => s.rows);
@@ -133,7 +135,7 @@ function MealPick() {
       <Header title={`Add to ${name.trim() || 'new meal'}`} subtitle="Foods go into the meal, not the diary" />
       <TextField
         testID="meal-pick-input"
-        placeholder="Search foods, brands, your foods"
+        placeholder={narrow ? 'Search foods and brands' : 'Search foods, brands, your foods'}
         value={query}
         onChangeText={setQuery}
         autoFocus

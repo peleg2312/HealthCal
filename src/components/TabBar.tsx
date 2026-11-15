@@ -1,3 +1,4 @@
+import { useIsFocused } from 'expo-router';
 import type { BottomTabBarProps } from 'expo-router/build/layouts/Tabs';
 import { Activity, BookOpen, ChartLine, Dumbbell, House, Plus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
@@ -5,7 +6,7 @@ import { Animated, Easing, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { cup, fonts, MAX_CONTENT_WIDTH, motion, useReducedMotion, useTheme } from '@/theme';
-import { PressableScale, TAB_BAR_HEIGHT, Text } from '@/ui';
+import { PressableScale, TAB_BAR_HEIGHT, Text, useToastDock } from '@/ui';
 
 import { QuickLogSheet } from './QuickLogSheet';
 
@@ -57,6 +58,10 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
   // Centre x of each tab inside the row, by route index, from layout.
   const [centres, setCentres] = useState<Record<number, number>>({});
   const mark = useSlidingMark(state.index, centres);
+  // The bar docks the toast itself, from the moment it shows: a toast raised on a screen without a tab
+  // bar (signing in) moves above the bar at once, before the tab's own screen has mounted.
+  const focused = useIsFocused();
+  useToastDock(insets.bottom + TAB_BAR_HEIGHT + 14, focused);
 
   const tabs = state.routes.map((route, index) => {
     const focused = state.index === index;

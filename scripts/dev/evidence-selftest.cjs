@@ -10,7 +10,7 @@
  */
 const { chromium } = require('playwright');
 
-const { scan, layoutScan, sheetScan, toastScan, notReady } = require('./evidence.cjs');
+const { scan, layoutScan, hiddenAtEnd, headerScan, sheetScan, toastScan, notReady } = require('./evidence.cjs');
 
 const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith('--')).map((a) => { const [k, ...v] = a.slice(2).split('='); return [k, v.join('=') || true]; }));
 const base = flags.url || 'http://localhost:8081';
@@ -68,6 +68,133 @@ const cases = [
     run: 'layoutPage',
     expect: 'over',
   },
+  // The scans' own false alarms, each with the fault it must still see.
+  {
+    name: 'text in a scaled drawing is measured at its drawn size',
+    html: '<body style="margin:0"><svg width="200" height="100" viewBox="0 0 800 400"><text x="10" y="120" font-size="100">56%</text><text x="10" y="210" font-size="40">of the budget</text></svg></body>',
+    run: 'layoutPage',
+    expect: '',
+  },
+  {
+    name: 'text drawn over text in a drawing is still seen',
+    html: '<body style="margin:0"><svg width="200" height="100" viewBox="0 0 800 400"><text x="10" y="120" font-size="100">56%</text><text x="10" y="110" font-size="40">of the budget</text></svg></body>',
+    run: 'layoutPage',
+    expect: 'over',
+  },
+  {
+    name: 'a label and its value a word space apart in a small drawing are clean',
+    html: '<body style="margin:0"><svg width="200" height="100" viewBox="0 0 800 400"><text id="a" x="10" y="100" font-size="24">Breakfast</text><text id="b" y="100" font-size="24">462 kcal</text></svg><script>const a = document.getElementById("a").getBBox(); document.getElementById("b").setAttribute("x", a.x + a.width + 7);</script></body>',
+    run: 'layoutPage',
+    expect: '',
+  },
+  {
+    name: 'a label touching its value in a drawing is seen',
+    html: '<body style="margin:0"><svg width="200" height="100" viewBox="0 0 800 400"><text id="a" x="10" y="100" font-size="24">Breakfast</text><text id="b" y="100" font-size="24">462 kcal</text></svg><script>const a = document.getElementById("a").getBBox(); document.getElementById("b").setAttribute("x", a.x + a.width + 1);</script></body>',
+    run: 'layoutPage',
+    expect: '462 kcal',
+  },
+  {
+    name: 'the space where a sheet line wraps is not a letter',
+    html: sheetPage({ extra: '<p style="margin:0;text-align:justify">Weight is never on a card. Calories show only when you turn them on, and a food list only when you choose it.</p>' }),
+    run: 'sheet',
+    expect: '',
+  },
+  {
+    name: 'a toast over a card is not judged on the grown page',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div style="margin:20px;height:300px;border:1px solid #888;background:#eee">A card</div><div data-testid="toast" style="position:absolute;left:20px;right:20px;top:200px;height:44px;background:#111;color:#fff">Removed volleyball <span role="button">Undo</span></div></body>',
+    run: 'layoutPage',
+    expect: '',
+  },
+  {
+    name: 'a toast is not footer chrome at the end of the page',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div style="height:100vh;overflow-y:auto"><div style="height:1400px"></div><button style="height:48px;width:200px">Erase all data</button><div style="height:24px"></div></div><div data-testid="toast" style="position:fixed;left:10px;right:10px;bottom:20px;height:60px;background:#111;color:#fff">This backup is from a newer version</div></body>',
+    run: 'hidden',
+    expect: '',
+  },
+  {
+    name: 'content under a real footer at the end is still seen',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div style="height:100vh;overflow-y:auto"><div style="height:1400px"></div><button style="height:48px;width:200px">Erase all data</button></div><div data-testid="screen-footer" style="position:fixed;left:0;right:0;bottom:0;height:80px;background:#111"></div></body>',
+    run: 'hidden',
+    expect: 'under',
+  },
+  {
+    name: 'a control scrolled partly under the pinned header is not judged',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div data-testid="screen-header" style="height:60px;background:#eee">Header</div><div id="list" style="height:600px;overflow-y:auto"><div style="height:300px"></div><button style="width:32px;height:32px;padding:0">x</button><div style="height:1200px"></div></div><script>document.getElementById("list").scrollTop = 310;</script></body>',
+    run: 'small',
+    expect: '',
+  },
+  {
+    name: 'a small control in the open is still seen',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div data-testid="screen-header" style="height:60px;background:#eee">Header</div><div style="height:600px;overflow-y:auto"><div style="height:100px"></div><button style="width:32px;height:32px;padding:0">x</button><div style="height:1200px"></div></div></body>',
+    run: 'small',
+    expect: 'x',
+  },
+  {
+    name: 'a miniature hidden from screen readers is a picture',
+    html: '<body style="margin:0;font:24px/26px sans-serif"><div aria-hidden="true" style="position:relative;width:80px;height:40px"><div style="position:absolute;left:0;width:40px;height:40px;overflow:hidden"><span style="position:absolute;left:24px">941</span></div><div style="position:absolute;left:40px;width:40px;height:40px;overflow:hidden"><span style="position:absolute;left:-16px">941</span></div></div></body>',
+    run: 'layoutPage',
+    expect: '',
+  },
+  {
+    name: 'a name ending in an ellipsis is shortened, not cut',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div style="width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Israeli salad (tomato, cucumber, onion, oil, lemon)</div></body>',
+    run: 'cut',
+    expect: '',
+  },
+  {
+    name: 'text clipped with no ellipsis is cut',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div style="width:120px;white-space:nowrap;overflow:hidden">Israeli salad (tomato, cucumber, onion, oil, lemon)</div></body>',
+    run: 'cut',
+    expect: 'Israeli salad',
+  },
+  {
+    name: 'a placeholder wider than its field is cut',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><input style="width:140px;font:15px sans-serif;padding:0 12px" placeholder="Search a city, such as Denver or Berlin"></body>',
+    run: 'cut',
+    expect: 'placeholder',
+  },
+  {
+    name: 'a header with its title and one short line is clean',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div data-testid="screen-header" style="display:flex;gap:12px"><button data-testid="header-back" style="width:44px;height:44px">&lt;</button><div><div style="font-size:18px">Import from Garmin</div><div style="font-size:13px">1 workout added</div></div></div><p style="font-size:15px">40 min of activity on one day.</p></body>',
+    run: 'header',
+    expect: '',
+  },
+  {
+    name: 'a header title with no short line is seen',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div data-testid="screen-header" style="display:flex;gap:12px"><button data-testid="header-close" style="width:44px;height:44px">x</button><div><div style="font-size:18px">Review estimate</div></div></div><p>Rows</p></body>',
+    run: 'header',
+    expect: 'no short line',
+  },
+  {
+    name: 'a second large title under the header is seen',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div data-testid="screen-header" style="display:flex;gap:12px"><button data-testid="header-close" style="width:44px;height:44px">x</button><div><div style="font-size:18px">Import from Garmin</div><div style="font-size:13px">FIT, TCX or GPX files</div></div></div><div style="font-size:30px;line-height:34px">Two things to check</div></body>',
+    run: 'header',
+    expect: 'second title',
+  },
+  {
+    name: 'a text field box is not a card with uneven margins',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div style="display:flex;gap:8px;padding:0 20px"><div style="flex:1;height:50px;border:1px solid #888;display:flex"><input style="flex:1;border:0"></div><button style="width:74px;height:50px">Set</button></div></body>',
+    run: 'gaps',
+    expect: '',
+  },
+  {
+    name: 'a full-width card with uneven margins is still seen',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div style="margin:0 94px 0 20px;height:80px;border:1px solid #888;background:#eee">A card</div></body>',
+    run: 'gaps',
+    expect: 'from the left',
+  },
+  {
+    name: 'a header title running past the side padding is seen',
+    html: '<body style="margin:0;font:18px/24px sans-serif"><div style="padding:0 20px"><div style="display:flex;gap:12px"><button style="width:44px;height:44px;flex:none">&lt;</button><div style="flex:1"><div style="white-space:nowrap">Stand-up paddleboarding on the lake and more</div></div></div></div></body>',
+    run: 'gaps',
+    expect: "from the screen's right edge",
+  },
+  {
+    name: 'a header title that shortens inside the padding is clean',
+    html: '<body style="margin:0;font:18px/24px sans-serif"><div style="padding:0 20px"><div style="display:flex;gap:12px"><button style="width:44px;height:44px;flex:none">&lt;</button><div style="flex:1;min-width:0"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Stand-up paddleboarding on the lake and more</div></div></div></div></body>',
+    run: 'gaps',
+    expect: '',
+  },
   { name: 'a blank capture is not ready', html: '<body></body>', run: 'ready', expect: 'blank' },
   { name: 'a missing sheet is not ready', html: '<body><p>One</p><p>Two</p><p>Three</p></body>', run: 'readySheet', expect: 'no sheet is open' },
   { name: 'an undeclared sheet is not ready', html: sheetPage(), run: 'ready', expect: 'a sheet is open' },
@@ -83,6 +210,11 @@ async function runCase(page, c) {
     case 'toast': return page.evaluate(toastScan);
     case 'layoutSheet': { const r = await page.evaluate(layoutScan, SHEET); return [...r.overText, ...r.broken, ...r.sticksOut, ...r.controls, ...r.gaps, ...(await page.evaluate(scan, SHEET)).cut.map((x) => x.text)]; }
     case 'layoutPage': { const r = await page.evaluate(layoutScan, null); return [...r.overText, ...r.broken, ...r.sticksOut, ...r.controls]; }
+    case 'hidden': return page.evaluate(hiddenAtEnd);
+    case 'gaps': return (await page.evaluate(layoutScan, null)).gaps;
+    case 'header': return page.evaluate(headerScan);
+    case 'small': return (await page.evaluate(scan, null)).small.map((x) => x.id || 'unnamed');
+    case 'cut': return (await page.evaluate(scan, null)).cut.map((x) => x.text);
     case 'ready': return [await page.evaluate(notReady, { profile: true, sheet: false })].filter(Boolean);
     case 'readySheet': return [await page.evaluate(notReady, { profile: true, sheet: true })].filter(Boolean);
     default: throw new Error(c.run);

@@ -111,6 +111,8 @@ function AuthForm({ initial }: { initial: Mode }) {
         testID="auth-done"
         header={
           <Header
+            title="Check your inbox"
+            subtitle="Account and sync"
             onBack={() => {
               setDone(null);
               switchMode('signin');
@@ -132,9 +134,6 @@ function AuthForm({ initial }: { initial: Mode }) {
           <View style={{ width: 72, height: 72, alignItems: 'center', justifyContent: 'center' }}>
             <MailCheck size={40} color={colors.text} strokeWidth={1.6} />
           </View>
-          <Text variant="h1" align="center" accessibilityRole="header">
-            Check your inbox
-          </Text>
           <Text variant="body" color="textSecondary" align="center">
             {confirm
               ? `We sent a confirmation link to ${breakableEmail(email.trim())}. Open it on this device, then sign in. Your data stays on this device in the meantime.`
@@ -148,8 +147,8 @@ function AuthForm({ initial }: { initial: Mode }) {
   return (
     <Screen
       testID="auth-screen"
-      header={<Header onBack={() => (mode === 'forgot' && initial !== 'forgot' ? switchMode('signin') : goBack('/welcome'))} />}
-      contentStyle={{ gap: spacing.xxl, paddingTop: spacing.lg }}
+      header={<Header title={copy.title} subtitle="Account and sync" onBack={() => (mode === 'forgot' && initial !== 'forgot' ? switchMode('signin') : goBack('/welcome'))} />}
+      contentStyle={{ gap: spacing.xxl }}
       footer={
         <View style={{ gap: spacing.sm }}>
           <Button title={copy.submit} testID="auth-submit" onPress={submit} loading={busy} />
@@ -165,10 +164,8 @@ function AuthForm({ initial }: { initial: Mode }) {
           ) : null}
         </View>
       }>
-      <FadeIn key={mode} style={{ gap: spacing.sm }}>
-        <Text variant="h1" accessibilityRole="header">
-          {copy.title}
-        </Text>
+      {/* The title is the header's; what the form is for is the line under it here. */}
+      <FadeIn key={mode}>
         <Text variant="body" color="textSecondary">
           {copy.subtitle}
         </Text>
@@ -300,7 +297,7 @@ function ResetPassword() {
   if (!recovery) {
     if (!waited) {
       return (
-        <Screen testID="auth-reset-checking" header={<Header onBack={() => goBack('/welcome')} />} contentStyle={{ flexGrow: 1, justifyContent: 'center' }}>
+        <Screen testID="auth-reset-checking" header={<Header title="New password" subtitle="Checking your link" onBack={() => goBack('/welcome')} />} contentStyle={{ flexGrow: 1, justifyContent: 'center' }}>
           <Text variant="body" color="textSecondary" align="center">
             Checking your reset link...
           </Text>
@@ -310,7 +307,7 @@ function ResetPassword() {
     return (
       <Screen
         testID="auth-reset-expired"
-        header={<Header onBack={() => goBack('/welcome')} />}
+        header={<Header title="Link no longer works" subtitle="Password reset" onBack={() => goBack('/welcome')} />}
         contentStyle={{ flexGrow: 1, justifyContent: 'center', gap: spacing.xxl }}
         footer={
           <View style={{ gap: spacing.sm }}>
@@ -322,9 +319,6 @@ function ResetPassword() {
           <View style={{ width: 72, height: 72, alignItems: 'center', justifyContent: 'center' }}>
             <KeyRound size={40} color={colors.warningInk} strokeWidth={1.6} />
           </View>
-          <Text variant="h1" align="center" accessibilityRole="header">
-            This reset link no longer works
-          </Text>
           <Text variant="body" color="textSecondary" align="center">
             A link works once, for about an hour, and only on the device that asked for it. If you opened it somewhere else, or it is older, send a new one.
           </Text>
@@ -369,13 +363,10 @@ function ResetPassword() {
   return (
     <Screen
       testID="auth-reset"
-      header={<Header onBack={() => goBack('/welcome')} />}
-      contentStyle={{ gap: spacing.xxl, paddingTop: spacing.lg }}
+      header={<Header title="Choose a new password" subtitle="Password reset" onBack={() => goBack('/welcome')} />}
+      contentStyle={{ gap: spacing.xxl }}
       footer={<Button title="Save new password" testID="auth-reset-submit" onPress={submit} loading={busy} />}>
-      <FadeIn style={{ gap: spacing.sm }}>
-        <Text variant="h1" accessibilityRole="header">
-          Choose a new password
-        </Text>
+      <FadeIn>
         <Text variant="body" color="textSecondary">
           You are signed in from the reset link. Pick a password for next time; your plan and logs then load as usual.
         </Text>
@@ -441,7 +432,7 @@ function NotConfigured() {
   return (
     <Screen
       testID="auth-not-configured"
-      header={<Header onBack={() => goBack(onboarded ? '/' : '/welcome')} />}
+      header={<Header title="Accounts" subtitle="Not set up in this build" onBack={() => goBack(onboarded ? '/' : '/welcome')} />}
       contentStyle={{ flexGrow: 1, justifyContent: 'center', gap: spacing.xxl }}
       footer={
         <Button
@@ -455,10 +446,7 @@ function NotConfigured() {
           <Smartphone size={40} color={colors.text} strokeWidth={1.6} />
         </View>
       </View>
-      <FadeIn style={{ gap: spacing.sm }}>
-        <Text variant="h1" align="center" accessibilityRole="header">
-          Accounts are not set up in this build
-        </Text>
+      <FadeIn>
         <Text variant="body" color="textSecondary" align="center">
           HealthCal works fully on this device: logging, targets, trends and export. Your data is saved here and never leaves it.
         </Text>

@@ -302,6 +302,8 @@ function WaterScreen() {
           size="lg"
           variant="secondary"
           full={false}
+          // As tall as the field beside it (50), so the two read as one row.
+          style={{ height: 50 }}
           disabled={!(custom && custom > 0)}
           onPress={() => {
             if (!custom) return;

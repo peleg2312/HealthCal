@@ -17,6 +17,13 @@ const MAX_DAYS = 8;
 /** "+306" or "−206": an update can lower a day's figure. */
 const signed = (n: number) => `${n < 0 ? '−' : '+'}${formatNumber(Math.abs(Math.round(n)))}`;
 
+/** The header's short line after saving: "1 workout added", "2 workouts added, 1 workout updated", or "Import undone". */
+export function doneTitle(entries: ImportedEntry[], previous: ActivityEntry[], undone: boolean): string {
+  if (undone) return 'Import undone';
+  const sum = summarise(entries, previous);
+  return [sum.sessions ? `${workouts(sum.sessions)} added` : '', sum.updated ? `${workouts(sum.updated)} updated` : ''].filter(Boolean).join(', ');
+}
+
 /** After saving: what was added, to which days. */
 export function DoneView({
   entries,
@@ -51,14 +58,12 @@ export function DoneView({
   const shown = sum.days.slice(0, MAX_DAYS);
   return (
     <View style={{ gap: spacing.lg }} testID="import-done">
-      <View style={{ gap: spacing.sm }}>
-        <Text variant="h1">{[sum.sessions ? `${workouts(sum.sessions)} added` : '', sum.updated ? `${workouts(sum.updated)} updated` : ''].filter(Boolean).join(', ')}</Text>
-        <Text variant="body" color="textSecondary">
-          {sum.sessions
-            ? `${formatDuration(Math.max(0, sum.minutes))} of activity on ${sum.days.length === 1 ? 'one day' : `${sum.days.length} days`}. Each day’s budget now includes the calories above resting.`
-            : `The workouts now carry the numbers from the file. Each day’s budget follows them.`}
-        </Text>
-      </View>
+      {/* What was done ("1 workout added") is the header's short line: doneTitle. */}
+      <Text variant="body" color="textSecondary">
+        {sum.sessions
+          ? `${formatDuration(Math.max(0, sum.minutes))} of activity on ${sum.days.length === 1 ? 'one day' : `${sum.days.length} days`}. Each day’s budget now includes the calories above resting.`
+          : `The workouts now carry the numbers from the file. Each day’s budget follows them.`}
+      </Text>
       <Card style={{ gap: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
           <CupKey color={colors.exercise} />

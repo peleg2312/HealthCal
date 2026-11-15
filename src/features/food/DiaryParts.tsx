@@ -97,9 +97,9 @@ export function DaySummaryCard({ day, share }: { day: DaySummary; share?: React.
               </Text>
             </View>
             <ProgressBar progress={target > 0 ? value / target : 0} color={color} height={6} goalKind={goalKind} />
-            {/* The target may wrap under the number on a narrow phone; it is never cut. */}
+            {/* The target may wrap under the number on a narrow phone, whole ("/ 493 g"); it is never cut. */}
             <AnimatedNumber variant="numM" value={Math.round(value)} style={{ fontSize: narrow ? 15 : 17, lineHeight: narrow ? 20 : 22 }}>
-              <Text variant="caption" color="textSecondary">{` / ${Math.round(target)}\u00A0g`}</Text>
+              <Text variant="caption" color="textSecondary">{` /\u00A0${Math.round(target)}\u00A0g`}</Text>
             </AnimatedNumber>
           </View>
         ))}

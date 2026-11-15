@@ -128,7 +128,7 @@ function ThemeCard({
         borderWidth: selected ? 2.5 : 1,
         borderColor: selected ? colors.text : colors.border,
       }}>
-      <View style={{ width: w, height: h }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <View style={{ width: w, height: h }} aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         {value === 'system' ? (
           <>
             <View style={{ position: 'absolute', left: 0, top: 0, width: w / 2, height: h, overflow: 'hidden' }}>

@@ -144,7 +144,8 @@ function Hero({ name, brand, source, explain, onEdit }: { name: string; brand?: 
   return (
     <View>
       <View style={{ gap: 6 }}>
-        <Text variant="h2" numberOfLines={3} testID="detail-name">
+        {/* The food's name at a section title's size: the header above holds the screen's title. */}
+        <Text variant="h3" numberOfLines={3} testID="detail-name">
           {name}
         </Text>
         {brand ? (

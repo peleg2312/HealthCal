@@ -349,7 +349,7 @@ export default function PhotoScreen() {
 
   return (
     <Screen
-      header={<Header title={title} subtitle={step === 'review' ? undefined : 'AI estimate'} close onBack={() => goBack(`/diary?date=${date}`)} />}
+      header={<Header title={title} subtitle="AI estimate" close onBack={() => goBack(`/diary?date=${date}`)} />}
       footer={footer}
       scrollProps={{ ref: scrollRef } as ScrollViewProps}>
       {step === 'capture' ? (

@@ -231,6 +231,7 @@ function GoalsForm() {
       <Group title="Goal">
         <View style={{ paddingVertical: spacing.md, gap: spacing.md }}>
           <Segmented<GoalType>
+            testID="goals-goal"
             value={draft.goal}
             onChange={(goal) =>
               patch({
@@ -299,6 +300,7 @@ function GoalsForm() {
       <Group title="Body details" footer="These feed the resting metabolism equation. Body fat is optional; when known, lean mass is used.">
         <View style={{ paddingVertical: spacing.md, gap: spacing.md }}>
           <Segmented<Sex>
+            testID="goals-sex"
             value={draft.sex}
             onChange={(sex) => patch({ sex })}
             options={[
@@ -377,6 +379,7 @@ function GoalsForm() {
       <Group title="Calorie target">
         <View style={{ paddingVertical: spacing.md, gap: spacing.md }}>
           <Segmented
+            testID="goals-calories-mode"
             value={manualCalories ? 'manual' : 'auto'}
             onChange={(v) => {
               setManualCalories(v === 'manual');
@@ -470,6 +473,7 @@ function GoalsForm() {
       <Group title="Water">
         <View style={{ paddingVertical: spacing.md, gap: spacing.md }}>
           <Segmented
+            testID="goals-water-mode"
             value={manualWater ? 'manual' : 'auto'}
             onChange={(v) => {
               setManualWater(v === 'manual');
