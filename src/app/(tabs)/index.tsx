@@ -123,7 +123,8 @@ export default function TodayScreen() {
 
 // ------------------------------------------------------------- energy hero
 
-const VESSEL_H = 212;
+/** Tall enough for the cup's three labels with 8 px between them at any value; the macros sit under the cup, not beside it. */
+const VESSEL_H = 150;
 /** Day one: a shorter, empty cup, so the first-log invite under it stays in the first screen. */
 const VESSEL_H_FIRST = 150;
 
@@ -266,18 +267,21 @@ function EnergyCard({
           height={height}
           labels={labels}
           labelGap={narrow ? 14 : 16}
-          memoryKey={`hero-${day.date}`}>
-          {firstDay || notLogged ? null : (
-            <View style={{ gap: 10 }}>
-              <Macro label="Protein" value={day.eaten.protein} target={day.macros.proteinG} color={colors.protein} reach />
-              <Macro label="Carbs" value={day.eaten.carbs} target={day.macros.carbsG} color={colors.carbs} />
-              <Macro label="Fat" value={day.eaten.fat} target={day.macros.fatG} color={colors.fat} />
-            </View>
-          )}
-        </Vessel>
+          labelSpacing={8}
+          memoryKey={`hero-${day.date}`}
+        />
         {/* Day one: the empty cup's open top is a dashed level line at the budget, "ready to fill". */}
         {firstDay && headroom === 0 ? <ReadyRim width={vesselW} /> : null}
       </View>
+      {/* The macros sit under the cup, not in its side column: beside the cup there is room only for
+          the cup's own labels, each at the height it describes, whatever the day's numbers are. */}
+      {firstDay || notLogged ? null : (
+        <View style={{ flexDirection: 'row', gap: narrow ? spacing.md : spacing.lg, marginTop: spacing.lg }} testID="today-macros">
+          <MacroColumn label="Protein" value={day.eaten.protein} target={day.macros.proteinG} color={colors.protein} narrow={narrow} reach />
+          <MacroColumn label="Carbs" value={day.eaten.carbs} target={day.macros.carbsG} color={colors.carbs} narrow={narrow} />
+          <MacroColumn label="Fat" value={day.eaten.fat} target={day.macros.fatG} color={colors.fat} narrow={narrow} />
+        </View>
+      )}
       {firstDay ? (
         <View style={{ marginTop: 18 }}>
           <FirstLogInvite meal={meal} date={day.date} budget={day.budget} />
@@ -312,19 +316,21 @@ function EnergyCard({
   );
 }
 
-function Macro({ label, value, target, color, reach }: { label: string; value: number; target: number; color: string; reach?: boolean }) {
+/** One macro as a column: its key and name, its bar, then the amount of its target. The same shape as the diary's summary card. */
+function MacroColumn({ label, value, target, color, reach, narrow }: { label: string; value: number; target: number; color: string; reach?: boolean; narrow: boolean }) {
   return (
-    <View style={{ gap: 5 }} accessible accessibilityLabel={`${label}, ${Math.round(value)} of ${target} grams`}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+    <View style={{ flex: 1, minWidth: 0, gap: 8 }} accessible accessibilityLabel={`${label}, ${Math.round(value)} of ${target} grams`}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <CupKey color={color} />
-        <Text variant="label" style={{ flex: 1, minWidth: 40 }} numberOfLines={1}>
+        <Text variant="label" numberOfLines={1}>
           {label}
         </Text>
-        <AnimatedNumber variant="numM" value={Math.round(value)} style={{ fontSize: 14.5, lineHeight: 18 }}>
-          <Text variant="caption" color="textSecondary">{` / ${target} g`}</Text>
-        </AnimatedNumber>
       </View>
       <ProgressBar progress={target > 0 ? value / target : 0} color={color} height={6} goalKind={reach ? 'reach' : 'limit'} />
+      {/* The target may wrap under the number on a narrow phone, whole ("/ 493 g"); it is never cut. */}
+      <AnimatedNumber variant="numM" value={Math.round(value)} style={{ fontSize: narrow ? 15 : 17, lineHeight: narrow ? 20 : 22 }}>
+        <Text variant="caption" color="textSecondary">{` / ${Math.round(target)} g`}</Text>
+      </AnimatedNumber>
     </View>
   );
 }

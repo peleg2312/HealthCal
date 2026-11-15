@@ -73,6 +73,8 @@ export interface VesselProps {
   children?: React.ReactNode;
   /** Space between the vessel and its labels. */
   labelGap?: number;
+  /** Least space between two labels when their levels are close (default 2). 8 keeps them from reading as one lump. */
+  labelSpacing?: number;
   /** Pour on mount and on change (default). False jumps to the value. Reduced motion always jumps. */
   animate?: boolean;
   /** Pour length in ms (default `motion.duration.pour`). */
@@ -131,6 +133,7 @@ export function Vessel({
   labels,
   children,
   labelGap = 16,
+  labelSpacing,
   goalKind = 'limit',
   onReached,
   animate = true,
@@ -247,6 +250,7 @@ export function Vessel({
     list.map((l, i) => wantY[i] - l.height / 2),
     list.map((l) => l.height),
     zone,
+    labelSpacing,
   );
   const onChildLayout = (e: LayoutChangeEvent) => {
     const h = Math.round(e.nativeEvent.layout.height);

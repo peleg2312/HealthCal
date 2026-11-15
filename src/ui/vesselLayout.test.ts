@@ -26,6 +26,32 @@ describe('placeLabels', () => {
     expect(tops).toEqual([0, 24, 78]);
   });
 
+  it("keeps Today's three cup labels 8 px apart and inside the cup, whatever the day's numbers", () => {
+    // Today's cup is 150 tall and carries only its own labels: what exercise added (22), the big
+    // number (56 on a 360 px phone, 52 or 44 on others) and eaten (22). Where each wants to sit
+    // depends on eaten and exercise, so every combination of wishes is tried, not one day's.
+    const zone = 150;
+    const gap = 8;
+    for (const heights of [
+      [22, 56, 22],
+      [22, 52, 22],
+      [22, 44, 22],
+    ]) {
+      expect(heights[0] + heights[1] + heights[2] + 2 * gap).toBeLessThanOrEqual(zone);
+      for (let a = -12; a <= zone; a += 6) {
+        for (let b = a; b <= zone; b += 6) {
+          for (let c = b; c <= zone + 12; c += 6) {
+            const tops = placeLabels([a, b, c], heights, zone, gap);
+            expect(tops[0]).toBeGreaterThanOrEqual(0);
+            expect(tops[1] - (tops[0] + heights[0])).toBeGreaterThanOrEqual(gap);
+            expect(tops[2] - (tops[1] + heights[1])).toBeGreaterThanOrEqual(gap);
+            expect(tops[2] + heights[2]).toBeLessThanOrEqual(zone);
+          }
+        }
+      }
+    }
+  });
+
   it('never places a label above the zone even when the zone is too small', () => {
     const tops = placeLabels([0, 0, 0], [40, 40, 40], 60, 0);
     expect(Math.min(...tops)).toBe(0);
