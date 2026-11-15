@@ -75,6 +75,8 @@ export default function TodayScreen() {
         onSelect={select}
         start={start}
         jumpTestID="today-jump-today"
+        // 16 px to what follows, as on the diary, so the first card starts at the same height on both tabs.
+        style={{ marginBottom: spacing.xs }}
         accessory={streak.streak > 1 ? <StreakMark days={streak.streak} filled={streak.filled} /> : null}
         // Said in the caption's place once the streak cup has poured and its number ticked up, so
         // logging never pushes the page down and the line never runs ahead of the count.

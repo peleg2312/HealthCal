@@ -58,6 +58,10 @@ module.exports = [
   { id: 'diary-menu-stress', route: '/diary', data: 'stress', taps: ['meal-menu-lunch'], sheet: true, note: 'the menu for the 12-item lunch' },
   { id: 'diary-deleted', route: '/diary', taps: ['^entry-delete-'], note: 'a row deleted: the Undo toast over the tab bar' },
   { id: 'diary-repeat-stress', route: '/diary?date={day}', day: 1, data: 'stress', note: 'tomorrow with long names in the repeat lines' },
+  // Where a sideways day swipe lands (the swipe itself is proven by crawl.cjs's gesture checks).
+  { id: 'diary-swiped-last-day', route: '/diary?date={day}', day: 7, waitFor: 'diary-today', note: 'the furthest a swipe goes: a week ahead, the strip on next week' },
+  { id: 'diary-swiped-last-week', route: '/diary?date={day}', day: -8, waitFor: 'diary-today', note: 'swiped back into last week: the strip follows to that week' },
+  { id: 'quick-sheet-planned-day', route: '/diary?date={day}', day: 2, taps: ['tab-add'], sheet: true, note: 'the + sheet over a planned day: it logs to that day' },
 
   // ---------------------------------------------------------------- Search
   { id: 'search-results', route: '/food/search', type: { 'food-search-input': 'chicken' }, taps: [{ wait: 1200 }], note: 'results for a word' },

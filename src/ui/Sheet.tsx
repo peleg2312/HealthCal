@@ -21,6 +21,16 @@ const FLICK_MIN = 12;
 /** On web the drag zone takes the finger itself: no page scroll, pull-to-refresh or text selection starts there. */
 const DRAG_ZONE_WEB = (Platform.OS === 'web' ? { touchAction: 'none', userSelect: 'none', cursor: 'grab' } : null) as ViewStyle | null;
 
+// How many sheets are on screen. A native modal sits outside the page, but its touches still bubble
+// through the React tree to the page's own handlers (on web through the portal, natively through the
+// responder system): the page's gestures (the day swipe) ask this and leave a touch alone while one is open.
+let openSheets = 0;
+
+/** Whether any sheet is on screen (open, or still sliding away). */
+export function sheetOnScreen(): boolean {
+  return openSheets > 0;
+}
+
 /** Pure rule for the end of a drag: close, or settle back. Exported for the tests. */
 export function sheetDragCloses(dy: number, vy: number, sheetHeight: number): boolean {
   if (dy <= 0) return false;
@@ -66,6 +76,13 @@ export function Sheet({
   if (visible && !mounted) setMounted(true);
   // Reduced motion: no exit animation to wait for.
   if (!visible && mounted && reduce) setMounted(false);
+  useEffect(() => {
+    if (!mounted) return;
+    openSheets += 1;
+    return () => {
+      openSheets -= 1;
+    };
+  }, [mounted]);
   const [sheetH, setSheetH] = useState(0);
   // 0 hidden, 1 open.
   const open = useSharedValue(visible && reduce ? 1 : 0);
@@ -100,6 +117,7 @@ export function Sheet({
   });
   const [pan, setPan] = useState<PanResponderInstance | null>(null);
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const settle = () => {
       if (latest.current.reduce) drag.set(0);
       else drag.set(withTiming(0, { duration: motion.duration.settle, easing: ease.enter }));
@@ -119,13 +137,15 @@ export function Sheet({
           if (!sheetDragCloses(g.dy, g.vy, latest.current.travel)) return settle();
           latest.current.onClose();
           // A sheet that refuses to close (onClose does nothing) comes back.
-          setTimeout(() => {
+          clearTimeout(timer);
+          timer = setTimeout(() => {
             if (latest.current.visible) settle();
           }, 80);
         },
         onPanResponderTerminate: settle,
       }),
     );
+    return () => clearTimeout(timer);
   }, [drag]);
   const backdropStyle = useAnimatedStyle(() => ({ opacity: open.get() * (1 - Math.min(0.6, Math.max(0, drag.get()) / (travel + 24))) }));
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - open.get()) * (travel + 24) + drag.get() }] }));
@@ -145,6 +165,8 @@ export function Sheet({
         <ToastHost placement="sheet" />
         <Animated.View
           testID="sheet"
+          // VoiceOver's escape gesture (two-finger scrub) closes it, as the backdrop does.
+          onAccessibilityEscape={onClose}
           onLayout={(e) => setSheetH(Math.round(e.nativeEvent.layout.height))}
           style={[
             {

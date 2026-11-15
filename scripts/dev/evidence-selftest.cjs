@@ -118,6 +118,12 @@ const cases = [
     expect: '',
   },
   {
+    name: 'a sheet row shortened with an ellipsis is judged by what is drawn',
+    html: sheetPage({ extra: '<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Israeli salad, Pasta, cooked, Chicken breast, grilled, White rice</div>' }),
+    run: 'sheet',
+    expect: '',
+  },
+  {
     name: 'a toast over a card is not judged on the grown page',
     html: '<body style="margin:0;font:15px/20px sans-serif"><div style="margin:20px;height:300px;border:1px solid #888;background:#eee">A card</div><div data-testid="toast" style="position:absolute;left:20px;right:20px;top:200px;height:44px;background:#111;color:#fff">Removed volleyball <span role="button">Undo</span></div></body>',
     run: 'layoutPage',
@@ -240,6 +246,13 @@ const cases = [
   { name: 'tight: a number and its unit in one sentence', html: CARD(`<div style="font-size:17px">1,219<span style="font-size:14px"> eaten</span></div><div style="margin-top:12px">Protein</div>`), run: 'tight', expect: '' },
   { name: 'tight: a title and the single line under it, in a card with more', html: CARD(`<div style="font-size:18px;line-height:20px">Water</div><div style="font-size:13px;line-height:14px">1.2 L of 3.3 L</div><div style="margin-top:16px">A glass is 250 ml.</div><button style="margin-top:12px;height:44px">Add 250 ml</button>`), run: 'tight', expect: '' },
   { name: 'tight: a label directly above its value, in a card with more', html: CARD(`<div style="font-size:12px;line-height:13px">YOUR PLAN</div><div style="margin-top:12px;font-size:12px;line-height:13px">Target weight</div><div style="font-size:20px;line-height:21px">74 kg</div><div style="margin-top:16px">Reaching it around Feb 7.</div>`), run: 'tight', expect: '' },
+  { name: 'tight: numbers and units set as blocks side by side', html: CARD(`<div style="display:flex;align-items:baseline;gap:4px"><div style="font-size:60px;line-height:62px">7</div><div style="font-size:14px">h</div><div style="font-size:60px;line-height:62px;margin-left:8px">45</div><div style="font-size:14px">min</div></div>`), run: 'tight', expect: '' },
+  { name: 'tight: a number 4 px from the next label is still seen', html: CARD(`<div style="display:flex;align-items:baseline;gap:4px"><div>152 g</div><div>Carbs</div><div style="margin-left:24px">185 g</div><div>Fat</div></div>`), run: 'tight', expect: '"152 g" 4px left of "Carbs"' },
+  // Text and a box it is not in (a button, a badge, a dashed slot): under 6 px between the letters and the box.
+  { name: 'tight: a badge wrapped 3 px under a title', html: CARD(`<div style="font-size:20px;line-height:22px">Weekly check-in</div><div style="margin-top:2px;display:inline-block;padding:2px 8px;background:#f3d;font-size:13px">New</div><div style="margin-top:12px">Last week</div>`), run: 'tight', expect: 'above the box of "New"' },
+  { name: 'tight: a link 3 px under a dashed slot', html: CARD(`<div style="height:48px;border:1px dashed #888;display:flex;align-items:center;justify-content:center">Log dinner</div><div style="margin-top:0;line-height:15px">Repeat yesterday: Israeli salad</div>`), run: 'tight', expect: 'under the box of' },
+  { name: 'tight: an overline 7 px over its card is clean (capitals, no descender)', html: `<body style="${BODY}"><div style="padding:20px"><div style="font-size:12px;line-height:14px;text-transform:uppercase;letter-spacing:1px">Today, Nov 15</div><div style="margin-top:4px;height:60px;border:1px solid #888;background:#fafafa">Volleyball</div></div></body>`, run: 'tight', expect: '' },
+  { name: 'tight: a caption under its picture is clean', html: CARD(`<div style="display:flex;gap:12px">${['System', 'Light', 'Dark'].map((t) => `<div><div style="width:60px;height:40px;background:#ccc;border:1px solid #888"></div><div style="margin-top:2px;font-size:13px">${t}</div></div>`).join('')}</div>`), run: 'tight', expect: '' },
   { name: 'tight: a label directly above its own field', html: CARD(`<div style="font-size:13px;line-height:14px">Target weight</div><div style="display:flex;border:1px solid #888;align-items:flex-start;line-height:16px"><span style="display:block">kg</span><input style="flex:1;border:0;height:16px;padding:0" value="74"></div><div style="margin-top:12px">Now 78.8 kg.</div><div style="margin-top:12px">Weekly pace</div>`), run: 'tight', expect: '' },
   // Pinned chrome: the tab bar's labels sit over whatever content scrolls under the bar at that moment.
   { name: 'tight: text in the tab bar is not judged against content scrolled under it', html: TABBAR({ chrome: true }), run: 'tight', expect: '' },

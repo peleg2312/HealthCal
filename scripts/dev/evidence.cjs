@@ -8,7 +8,10 @@
  * WIDTHS. By default every screen is taken at 360, 390 and 320 px, in that order: 360 x 740 is the
  * most common Android phone (the owner's), 390 x 844 an iPhone, 320 x 640 the narrowest. The
  * contact sheet of a route or state has one row per theme with the widths side by side in the
- * order given to --widths.
+ * order given to --widths. Each capture is <id>__<theme>__<width>.png (the first view, at the real
+ * window height) and, when the page or the open sheet scrolls, <id>__<theme>__<width>__full.png: the
+ * window grown to the whole page, exactly what the layout scan below judged (report.json `fullImage`).
+ * Open the full image to look at a layout finding; its coordinates are the ones the scan used.
  *
  * It also lays the whole page out at once (the window grown to the page's height) and
  * reports what sits wrongly:
@@ -22,10 +25,19 @@
  *               stacked lines (the nearest element holding both holds at most three pieces of
  *               text: a header's title and its line, a list row's title and subtitle, a stat and
  *               its caption); a title or label and the single line under it, neighbouring children
- *               of the element holding both; a label directly above its own field. None of these
+ *               of the element holding both; a label directly above its own field; a number and its
+ *               unit set as two blocks side by side ("7" "h", the unit smaller). None of these
  *               excuses text that is placed (absolutely positioned below the element holding both,
  *               such as a label set at a cup's level): placed text keeps its room at every value.
- *               Text in a drawing (the share card's SVG) is left to overText.
+ *               Also under tight: text and a box it is not in (a button, a chip, a badge, a field,
+ *               a dashed slot, a card) one above the other with less than 6 px between the letters
+ *               and the box's edge ("Weekly check-in" 4px above the box of "New"), except a label
+ *               directly above its own field and a caption under a picture (a box with no text).
+ *               Letters are measured as drawn: capitals for an uppercased overline, without the tail
+ *               of a comma. Text in a drawing (the share card's SVG) is left to overText. Text in pinned chrome
+ *               (the tab bar, a screen's header or pinned footer) is judged only against text of the
+ *               same chrome, never against the page that scrolls under it (overText too); what is
+ *               left under the chrome at the end of the page is `hidden`'s.
  *   broken      a word split over two lines because its box is too narrow
  *   sticksOut   text or a painted box reaching past the card, row or button that holds it
  *   controls    two controls whose visible boxes overlap
@@ -466,23 +478,31 @@ function layoutScan(rootSel) {
    *   - a title or label and the single line under it, next to each other in the flow: the two are
    *     neighbouring children of the element holding both, each holding only that piece of text (a
    *     card's heading and its one line, a label over its value);
-   *   - a label directly above its own field (the next child holds an input and at most one piece of text).
+   *   - a label directly above its own field (the next child holds an input and at most one piece of text);
+ *   - a number and its unit set as two blocks side by side ("7" "h" "45" "min"): a number, then a short
+ *     word with no digits set smaller.
    * None of these applies when either piece is placed (an absolutely positioned element between it and
    * the element holding both, such as a label set at a cup's level): placed text must keep its room
    * whatever the value. Not judged: text in a drawing (the share card's SVG, judged by overText), and
    * what layoutScan leaves out on purpose (the + cup, corner counts, aria-hidden miniatures, toasts).
-   * Returns at most 12 descriptions with the gap in px.
+   * Then text against boxes (see the header): under 6 px between a line's letters and the edge of a painted
+   * box above or below it that it is not inside, except a label over its own field and a caption under a
+   * picture. Returns at most 12 descriptions with the gap in px.
    */
-  function tightScan({ root, shown, onPurpose, visibleRect, empty, sameLayer }) {
+  function tightScan({ root, shown, onPurpose, visibleRect, empty, sameLayer, boxesNear }) {
     const ctx = (tightScan.canvas ||= document.createElement('canvas')).getContext('2d');
     const metrics = new Map();
     const ink = (el, word) => {
       const s = getComputedStyle(el);
       const font = `${s.fontStyle} ${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;
-      const key = `${font}|${word}`;
+      const key = `${font}|${s.textTransform}|${word}`;
       if (!metrics.has(key)) {
         ctx.font = font;
-        const m = ctx.measureText(word);
+        // The letters as drawn: an overline set in capitals has no descender ("Today" is drawn "TODAY").
+        // A comma or full stop after a word dips under the line by a hair: the letters are what a person sees.
+        const tt = s.textTransform;
+        const drawn = word.replace(/[,.;:]+$/, '') || word;
+        const m = ctx.measureText(tt === 'uppercase' ? drawn.toUpperCase() : tt === 'lowercase' ? drawn.toLowerCase() : drawn);
         metrics.set(key, { asc: m.fontBoundingBoxAscent, up: m.actualBoundingBoxAscent, down: m.actualBoundingBoxDescent });
       }
       return metrics.get(key);
@@ -527,13 +547,15 @@ function layoutScan(rootSel) {
     const branch = (p, top) => { let e = p; while (e.parentElement && e.parentElement !== top) e = e.parentElement; return e; };
     const area = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
     const nextShown = (e) => { for (let s = e.nextElementSibling; s; s = s.nextElementSibling) if (area(s) && shown(s)) return s; return null; };
+    const NUMBER = /^[~+\u2212\-±]?[\d.,\u2060\u2013/]+%?$/;
     /** True when `a` (above or left) and `b` are tight by design (see the comment above). */
     const byDesign = (a, b, how) => {
       if (a.contains(b) || b.contains(a)) return true;
       const top = lca(a, b);
       if (placed(a, top) || placed(b, top)) return false;
       if (piecesIn(top) <= 3) return true;
-      if (how !== 'above') return false;
+      // A number and its unit set as two blocks side by side ("7" "h" "45" "min"): the unit smaller than the number.
+      if (how !== 'above') return NUMBER.test(a.textContent.trim()) && b.textContent.trim().length <= 8 && !/\d/.test(b.textContent) && parseFloat(getComputedStyle(b).fontSize) < parseFloat(getComputedStyle(a).fontSize);
       const ba = branch(a, top);
       const bb = branch(b, top);
       if (nextShown(ba) !== bb || piecesIn(ba) !== 1) return false;
@@ -544,6 +566,23 @@ function layoutScan(rootSel) {
       const title = lines === 1 || (lines === 2 && (parseFloat(sa.fontSize) > parseFloat(sb.fontSize) || parseFloat(sa.fontWeight) > parseFloat(sb.fontWeight)));
       if (title && piecesIn(bb) === 1 && pieces.get(b).length === 1) return true;
       return lines === 1 && piecesIn(bb) <= 2 && !!bb.querySelector('input, textarea, select');
+    };
+    const boxName = (el) => { const id = el.getAttribute('data-testid') || el.getAttribute('aria-label'); if (id) return id.slice(0, 40); const t = el.textContent.trim().replace(/\s+/g, ' '); return t ? `"${t.slice(0, 30)}"` : el.tagName.toLowerCase(); };
+    /** True when text and a box near it belong together by design. */
+    const boxByDesign = (p, box, how) => {
+      const top = lca(p, box);
+      if (placed(p, top) || placed(box, top)) return false;
+      // A caption under its picture (a theme swatch, a miniature): the box holds no text, and nothing else
+      // but the caption shares their element.
+      if (!box.textContent.trim() && piecesIn(top) <= 1) return true;
+      // A label directly above its own field: the next block holds the input (the box is the field or in it).
+      if (how === 'above the box of') {
+        const bp = branch(p, top);
+        const bb = branch(box, top);
+        const field = 'input, textarea, select';
+        if (nextShown(bp) === bb && piecesIn(bp) <= 1 && (bb.matches(field) || bb.querySelector(field))) return true;
+      }
+      return false;
     };
     const found = new Map();
     for (let i = 0; i < list.length; i++) {
@@ -576,13 +615,34 @@ function layoutScan(rootSel) {
     const out = [];
     for (const f of [...found.values()].sort((x, y) => x.gap - y.gap)) {
       if (out.length >= 12) break;
-      if (byDesign(f.pa, f.pb, f.how)) continue;
       const v = `${words(f.pa)} ${Math.max(0, Math.round(f.gap))}px ${f.how} ${words(f.pb)}`;
+      // For tuning (scripts set window.__tightWhy = []): what was left alone as tight by design.
+      if (byDesign(f.pa, f.pb, f.how)) { if (Array.isArray(window.__tightWhy) && window.__tightWhy.length < 60) window.__tightWhy.push(v); continue; }
       if (!out.includes(v)) out.push(v);
     }
+    // Text and a box it is not in (a button, a chip, a field, a dashed slot, a card) one above the other,
+    // less than 8 px between the letters and the box's edge.
+    const near = [];
+    for (const b of boxesNear) {
+      for (const p of list) {
+        if (b.el.contains(p) || p.contains(b.el) || !sameLayer(p, b.el)) continue;
+        for (const l of pieces.get(p)) {
+          const side = Math.min(l.r, b.r.r) - Math.max(l.l, b.r.l);
+          if (side <= 1) continue;
+          let gap = null;
+          let how = '';
+          if (b.r.t >= l.b - 1 && Math.round(b.r.t - l.b) < 6) { gap = b.r.t - l.b; how = 'above the box of'; }
+          else if (l.t >= b.r.b - 1 && Math.round(l.t - b.r.b) < 6) { gap = l.t - b.r.b; how = 'under the box of'; }
+          if (gap === null) continue;
+          if (boxByDesign(p, b.el, how)) { if (Array.isArray(window.__tightWhy) && window.__tightWhy.length < 120) window.__tightWhy.push(`${words(p)} ${Math.max(0, Math.round(gap))}px ${how} ${boxName(b.el)}`); continue; }
+          near.push({ gap, v: `${words(p)} ${Math.max(0, Math.round(gap))}px ${how} ${boxName(b.el)}` });
+        }
+      }
+    }
+    for (const n of near.sort((x, y) => x.gap - y.gap)) if (out.length < 12 && !out.includes(n.v)) out.push(n.v);
     return out;
   }
-  out.tight = tightScan({ root, shown, onPurpose, visibleRect, empty, sameLayer });
+  out.tight = tightScan({ root, shown, onPurpose, visibleRect, empty, sameLayer, boxesNear: boxes.filter((b) => !b.art && h(b.r) >= 12 && w(b.r) >= 24 && w(b.r) < vw - 2 && boxed(b.el)) });
   return out;
 }
 
@@ -731,7 +791,10 @@ function sheetScan() {
           for (const x of range.getClientRects()) if (x.width > 0) q.push(x);
         }
       }
-      if (q.length) box = { left: Math.min(...q.map((x) => x.left)), right: Math.max(...q.map((x) => x.right)) };
+      // Only the part that is drawn: a name shortened with an ellipsis keeps its whole text in the range,
+      // past the box that clips it.
+      const c = clipped(el);
+      if (q.length) box = { left: Math.max(c.l, Math.min(...q.map((x) => x.left))), right: Math.min(c.r, Math.max(...q.map((x) => x.right))) };
     }
     const left = box.left - sr.left;
     const right = sr.right - box.right;

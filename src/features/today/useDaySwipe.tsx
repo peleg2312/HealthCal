@@ -13,6 +13,8 @@
  *   responder, no preventDefault); natively it takes the touch only once it is clearly
  *   sideways (10 px, twice the vertical), which also keeps the page's ScrollView from
  *   taking it over half way on Android.
+ * - while a sheet is open nothing moves: the sheet covers the page, but its touches still
+ *   bubble through the React tree to this View's handlers.
  * One finger only. A move gives a select haptic and is announced to a screen reader.
  */
 import React from 'react';
@@ -20,7 +22,7 @@ import { AccessibilityInfo, Dimensions, Platform, View, type GestureResponderEve
 
 import { formatDayLabel } from '@/lib/dates';
 import type { ISODate } from '@/types';
-import { haptic } from '@/ui';
+import { haptic, sheetOnScreen } from '@/ui';
 
 import { atScreenEdge, stepDay, swipeStep } from './daySwipe';
 
@@ -140,7 +142,8 @@ export function useDaySwipe({
       guardedEvent = null;
       const p = point(e);
       if (!p) return;
-      const skip = wasGuarded || fingers(e) > 1 || atScreenEdge(p.x, Dimensions.get('window').width) || inSidewaysThing((e as unknown as { target?: unknown }).target);
+      // A sheet's touches bubble here through the React tree although the sheet covers the page.
+      const skip = wasGuarded || sheetOnScreen() || fingers(e) > 1 || atScreenEdge(p.x, Dimensions.get('window').width) || inSidewaysThing((e as unknown as { target?: unknown }).target);
       state.current = { x0: p.x, y0: p.y, x: p.x, y: p.y, skip, done: false };
     },
     onTouchMove: (e) => {
@@ -153,12 +156,14 @@ export function useDaySwipe({
         t.y = p.y;
       }
     },
-    onTouchEnd: finish,
     onTouchCancel: () => {
       if (state.current) state.current.skip = true;
     },
   };
-  if (Platform.OS !== 'web') {
+  // On web the end of the touch decides. Natively only a touch this View won as the responder does,
+  // so a touch that something inside kept (a chart's scrub, a slider) never also moves the day.
+  if (Platform.OS === 'web') Object.assign(props, { onTouchEnd: finish } satisfies ViewProps);
+  else {
     Object.assign(props, {
       onMoveShouldSetResponder: (e: GestureResponderEvent) => {
         const t = state.current;
@@ -171,6 +176,9 @@ export function useDaySwipe({
       onResponderGrant: () => true,
       onResponderTerminationRequest: () => false,
       onResponderRelease: finish,
+      onResponderTerminate: () => {
+        if (state.current) state.current.skip = true;
+      },
     } satisfies ViewProps);
   }
   return props;

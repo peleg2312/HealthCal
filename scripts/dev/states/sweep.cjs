@@ -5,7 +5,9 @@
 // eaten and protein as a share of today's budget and protein target, exercise in net kcal, water as
 // a share of today's goal, weekMinutes toward the weekly guideline, fasting as a share of the target.
 //
-//   node scripts/dev/evidence.cjs --states=sweep --themes=blossom --out=<dir> [--only=<id>,<id>]
+//   node scripts/dev/with-build.cjs --dir=<build> --port=<port> -- node scripts/dev/evidence.cjs --url={url} \
+//        --states=sweep --themes=blossom --widths=360 --out=<dir> [--only=<id>,<id>]
+// (59 states take about 4 minutes per width: one width per command, 360 first, then 390 and 320.)
 //
 // Only the combinations that can look different are here:
 //   Today's calorie cup      eaten 0, 5%, a third, 60% (the owner's case), 85%, at budget, 30% over,

@@ -14,7 +14,7 @@
 //   --wait=1500    extra milliseconds to wait before the capture
 //   --tap=a,b      testIDs to click in order before the capture
 //   --type=id:text type text into the input with that testID (repeatable)
-//   --width=360    phone width (default 390); 360 is the most common Android width, 320 the narrowest.
+//   --width=360    phone width (default 360, the most common Android width; 390 an iPhone, 320 the narrowest).
 //                  The height follows: 740 at 360, 640 at 320, 844 otherwise
 //   --values=json  today's amounts on top of the demo data, as a state's `values` (seed.mjs), e.g.
 //                  --values='{"eaten":0.6,"exercise":290}' for 60% of the budget with 290 kcal of exercise
@@ -45,7 +45,8 @@ const base = flags.url || 'http://localhost:8081';
 
 const values = flags.values ? JSON.parse(String(flags.values)) : null;
 const seed = buildSeed({ empty: !!flags.empty, stress: !!flags.stress, onboarded: !flags.fresh, theme: flags.theme || (flags.light ? 'light' : 'dark'), units: flags.imperial ? 'imperial' : 'metric', values });
-const width = Number(flags.width || 390);
+// 360 first: the most common Android width and the owner's phone (AGENTS.md, "360 px first").
+const width = Number(flags.width || 360);
 const height = { 320: 640, 360: 740 }[width] || 844;
 const browser = await chromium.launch();
 const context = await browser.newContext({

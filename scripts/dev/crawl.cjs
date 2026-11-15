@@ -24,10 +24,11 @@
  * does the same move again from a fresh load and uses the browser's back. Tabs have no back
  * control, so only the browser's back is checked for them.
  *
- * Before the taps it checks what a tap cannot show, with real touch events (gestureChecks): the
- * day swipe on Today and the diary with its limits, the week strip paging weeks, and the + sheet
- * and a confirm sheet dragged down by the handle (short: settles back; long or a flick: closes) and
- * closed with Escape. --gestures-only runs just those; --no-gestures skips them.
+ * Before the taps it checks what a tap cannot show, with real touch events (gestureChecks, whose
+ * comment lists them): the day swipe on Today and the diary with its limits and the things it must
+ * leave alone, the week strip paging weeks, and every kind of sheet following the finger, settling,
+ * closing and still scrolling, with motion on and off, and with a mouse and Escape on a desktop-size
+ * window. --gestures-only runs just those; --no-gestures skips them.
  *
  * Reported as problems: controls that do nothing, moves that end on an error or not-found
  * screen (or throw), returns that do not return, and controls that need two taps.
@@ -426,83 +427,220 @@ async function backControl(frame) {
 // ------------------------------------------------------------------ gestures
 
 /**
- * What a tap cannot show, checked with real touch events (Chrome's protocol): the day swipe on
- * Today and the diary and its limits, a swipe on the week strip paging weeks and not days, and a
- * sheet and a confirm sheet dragged down by the handle (a short drag settles back, a long one or a
- * flick closes) and closed with Escape.
+ * What a tap cannot show, checked with real touch events (Chrome's protocol) at the crawl's size:
+ * - the day swipe on Today and the diary: finger right shows the day before, finger left the next
+ *   day, Today never past today and the diary at most a week ahead; a swipe from the screen's
+ *   edge, a mostly vertical drag, a swipe on the week strip or inside an open sheet leaves the day
+ *   alone; a vertical swipe still scrolls the page; a sideways swipe across a row does not open it;
+ * - the week strip: a swipe pages weeks (right the week before, left back; the diary on to next
+ *   week, Today no further), the selected day is the one tab with aria-selected, no week arrows
+ *   on touch and "Back to today" only away from today;
+ * - sheets, with motion on: every kind (the + sheet, a long scrolling body, a pinned footer, a
+ *   confirm sheet, a field focused) follows the finger on the handle, settles back after a short
+ *   drag, closes past a quarter of its height and on a flick, and its body still scrolls; under
+ *   reduced motion it stays put under the finger but still closes; on a desktop-size window a mouse
+ *   drag on the handle and Escape close it, and the week arrows show.
+ * The pages are made with the same `load` as the taps, so --hosted runs them inside the viewer's frame.
  */
-async function gestureChecks(ctx, seeds) {
+async function gestureChecks(browser, seeds) {
   const results = [];
   const check = (name, ok, detail) => { results.push({ name, ok, detail }); console.log(`  gesture ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? `: ${detail}` : ''}`); };
-  const open = async (route, taps = []) => {
+  const phone = (motion) => browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 1, isMobile: true, hasTouch: true, reducedMotion: motion ? 'no-preference' : 'reduce', userAgent: devices['Pixel 7'].userAgent });
+  const open = async (ctx, route, taps = [], motion = false) => {
+    if (motion) await ctx.addInitScript(() => { window.__healthcalMotion = true; });
     const r = await load(ctx, { id: route, route, data: 'demo', taps }, seeds);
-    if (r.problem) throw new Error(r.problem);
+    if (r.problem) { await r.page.close(); throw new Error(`${route}: ${r.problem}`); }
     const cdp = await ctx.newCDPSession(r.page);
     const touch = async (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
-    const swipe = async (x1, y1, x2, y2, steps = 8, gap = 16) => {
-      await touch('touchStart', x1, y1);
-      for (let i = 1; i <= steps; i++) { await touch('touchMove', x1 + ((x2 - x1) * i) / steps, y1 + ((y2 - y1) * i) / steps); await r.page.waitForTimeout(gap); }
-      await touch('touchEnd');
-      await r.page.waitForTimeout(900);
-    };
-    return { ...r, swipe };
+    const move = async (x1, y1, x2, y2, steps = 10, gap = 16) => { for (let i = 1; i <= steps; i++) { await touch('touchMove', x1 + ((x2 - x1) * i) / steps, y1 + ((y2 - y1) * i) / steps); await r.page.waitForTimeout(gap); } };
+    const swipe = async (x1, y1, x2, y2, steps = 8, gap = 16) => { await touch('touchStart', x1, y1); await move(x1, y1, x2, y2, steps, gap); await touch('touchEnd'); await r.page.waitForTimeout(900); };
+    return { ...r, touch, move, swipe };
   };
   const overline = (f) => f.evaluate(() => {
     const h = [...document.querySelectorAll('[data-testid="tab-header"]')].find((e) => e.getBoundingClientRect().width > 0 && getComputedStyle(e).visibility !== 'hidden' && e.offsetParent !== null);
     return h ? h.innerText.split('\n')[0].trim() : '';
   });
-  const sheetOpen = async (f) => f.evaluate(() => [...document.querySelectorAll('[data-testid="sheet"]')].filter((e) => e.getBoundingClientRect().height > 0).length > 0);
+  // The top of the newest sheet on screen, or null when none is.
+  const sheetTop = (f) => f.evaluate((h) => {
+    const s = [...document.querySelectorAll('[data-testid="sheet"]')].filter((e) => e.getBoundingClientRect().height > 0).pop();
+    return s && s.getBoundingClientRect().top < h ? Math.round(s.getBoundingClientRect().top) : null;
+  }, H);
+  const sheetOpen = async (f) => (await sheetTop(f)) !== null;
+  const scrolled = (f) => f.evaluate(() => Math.max(0, ...[...document.querySelectorAll('*')].map((e) => e.scrollTop)));
+  const firstDayShown = (f, pre) => f.evaluate((p) => [...document.querySelectorAll(`[data-testid^="${p}-day-"]`)].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.left >= -1 && b.right <= innerWidth + 1; }).map((e) => e.getAttribute('data-testid').slice(p.length + 5))[0] || '', pre);
   const midY = Math.round(H * 0.7);
+  const guard = async (name, fn) => { try { await fn(); } catch (e) { check(name, false, String(e.message).split('\n')[0].slice(0, 120)); } };
 
-  for (const [route, name, laterOk] of [['/', 'Today', false], ['/diary', 'diary', true]]) {
-    const r = await open(route);
-    const d0 = await overline(r.frame);
-    await r.swipe(W - 60, midY, 60, midY + 10);
-    const dNext = await overline(r.frame);
-    check(`${name}: finger left on today ${laterOk ? 'shows tomorrow (the diary plans a week ahead)' : 'stays on today (the latest day)'}`, laterOk ? dNext !== d0 : dNext === d0, `${d0} -> ${dNext}`);
-    if (laterOk) await r.swipe(60, midY, W - 60, midY + 10);
-    await r.swipe(60, midY, W - 60, midY + 10);
-    const d1 = await overline(r.frame);
-    check(`${name}: finger right shows the day before`, d1 !== d0, `${d0} -> ${d1}`);
-    await r.swipe(8, midY, W - 40, midY);
-    check(`${name}: a swipe from the screen edge is left to the system`, (await overline(r.frame)) === d1);
-    await r.swipe(60, midY - 100, W - 60, midY + 60);
-    check(`${name}: a mostly vertical drag does not change the day`, (await overline(r.frame)) === d1);
-    await r.swipe(W - 60, midY, 60, midY);
-    check(`${name}: finger left goes back to the next day`, (await overline(r.frame)) === d0, `${await overline(r.frame)}`);
-    const strip = await r.frame.locator(`[data-testid="${route === '/' ? 'today' : 'diary'}-week"]`).first().boundingBox();
-    const before = await overline(r.frame);
-    await r.swipe(60, strip.y + 40, W - 60, strip.y + 40);
-    const cap = await r.frame.locator(`[data-testid="${route === '/' ? 'today' : 'diary'}-week-caption"]`).first().innerText().catch(() => '');
-    check(`${name}: a swipe on the week strip pages weeks, not days`, (await overline(r.frame)) === before && /That week|Before you started/.test(cap), cap);
+  // ---- the day swipe and the week strip (reduced motion, as the taps)
+  let ctx = await phone(false);
+  for (const [route, pre, jump, ahead] of [['/', 'today', 'today-jump-today', 0], ['/diary', 'diary', 'diary-today', 7]]) {
+    const name = pre === 'today' ? 'Today' : 'diary';
+    await guard(`${name}: day swipe`, async () => {
+      const r = await open(ctx, route);
+      const f = r.frame;
+      check(`${name}: no week arrows on touch`, (await f.locator(sel(`${pre}-week-prev`)).count()) === 0);
+      check(`${name}: no "Back to today" on today`, (await f.locator(sel(jump)).count()) === 0);
+      const selected = await f.evaluate((p) => [...document.querySelectorAll(`[data-testid^="${p}-day-"]`)].filter((e) => e.getAttribute('aria-selected') === 'true').length, pre);
+      check(`${name}: the selected day is the one tab with aria-selected`, selected === 1, `${selected}`);
+      const d0 = await overline(f);
+      const seen = [d0];
+      for (let i = 0; i <= ahead + 1; i++) { await r.swipe(W - 60, midY, 60, midY + 6); seen.push(await overline(f)); }
+      check(`${name}: finger left goes ${ahead ? `at most ${ahead} days ahead` : 'no further than today'}`, new Set(seen).size - 1 === ahead, `${seen[0]} -> ${seen[seen.length - 1]}`);
+      await r.page.close();
+      const r2 = await open(ctx, route);
+      await r2.swipe(60, midY, W - 60, midY + 6);
+      const d1 = await overline(r2.frame);
+      check(`${name}: finger right shows the day before`, d1 !== d0, `${d0} -> ${d1}`);
+      check(`${name}: away from today, "Back to today" shows`, (await r2.frame.locator(sel(jump)).count()) > 0);
+      await r2.swipe(8, midY, W - 40, midY);
+      check(`${name}: a swipe from the screen edge is left to the system`, (await overline(r2.frame)) === d1);
+      await r2.swipe(60, midY - 100, W - 60, midY + 60);
+      check(`${name}: a mostly vertical drag does not change the day`, (await overline(r2.frame)) === d1);
+      await r2.swipe(W - 60, midY, 60, midY);
+      check(`${name}: finger left comes back to today`, (await overline(r2.frame)) === d0, await overline(r2.frame));
+      check(`${name}: on today, "Back to today" is gone`, (await r2.frame.locator(sel(jump)).count()) === 0);
+      const y0 = await scrolled(r2.frame);
+      await r2.swipe(W / 2, midY, W / 2, midY - 350, 10, 20);
+      check(`${name}: a vertical swipe still scrolls the page`, (await scrolled(r2.frame)) > y0 + 100, `${y0} -> ${await scrolled(r2.frame)}`);
+      await r2.page.close();
+      // A sideways swipe across a full-width row moves the day and does not open the row.
+      const r3 = await open(ctx, route);
+      const row = await r3.frame.evaluate((h) => { const el = [...document.querySelectorAll('[role="button"]')].find((e) => { const b = e.getBoundingClientRect(); return b.width > innerWidth * 0.7 && b.top > 260 && b.bottom < h - 120; }); if (!el) return null; const b = el.getBoundingClientRect(); return { y: Math.round(b.top + b.height / 2), id: el.getAttribute('data-testid') || el.innerText.slice(0, 20) }; }, H);
+      if (row) {
+        const path0 = await r3.frame.evaluate(() => location.pathname);
+        await r3.swipe(60, row.y, W - 60, row.y + 4);
+        check(`${name}: a sideways swipe across a row (${row.id}) moves the day and does not open the row`, (await overline(r3.frame)) !== d0 && (await r3.frame.evaluate(() => location.pathname)) === path0 && !(await sheetOpen(r3.frame)));
+      }
+      await r3.page.close();
+      // The week strip pages weeks.
+      const r4 = await open(ctx, route);
+      const strip = await r4.frame.locator(sel(`${pre}-week`)).first().boundingBox();
+      const w0 = await firstDayShown(r4.frame, pre);
+      await r4.swipe(60, strip.y + 40, W - 60, strip.y + 40);
+      const w1 = await firstDayShown(r4.frame, pre);
+      const cap = await r4.frame.locator(sel(`${pre}-week-caption`)).first().innerText().catch(() => '');
+      check(`${name}: a swipe right on the week strip shows the week before, not another day`, w1 < w0 && (await overline(r4.frame)) === d0 && /That week|Before you started/.test(cap), `${w0} -> ${w1}, ${cap}`);
+      await r4.swipe(W - 60, strip.y + 40, 60, strip.y + 40);
+      check(`${name}: a swipe left on the strip comes back to this week`, (await firstDayShown(r4.frame, pre)) === w0);
+      await r4.swipe(W - 60, strip.y + 40, 60, strip.y + 40);
+      const w3 = await firstDayShown(r4.frame, pre);
+      check(`${name}: a swipe left on this week ${ahead ? 'shows next week' : 'stays (nothing after today)'}`, ahead ? w3 > w0 : w3 === w0, w3);
+      await r4.page.close();
+    });
+  }
+  // A sideways swipe inside a sheet opened from Today or the diary leaves the day behind it alone.
+  for (const [route, taps] of [['/', ['today-remaining-open']], ['/', ['today-share']], ['/diary', ['meal-menu-breakfast']]]) {
+    await guard(`swipe in the sheet from ${taps[0]}`, async () => {
+      const r = await open(ctx, route, taps);
+      const d0 = await overline(r.frame);
+      const s = await r.frame.locator(sel('sheet')).last().boundingBox();
+      await r.swipe(60, s.y + s.height / 2, W - 60, s.y + s.height / 2 + 4);
+      await r.frame.locator(sel('sheet-backdrop')).last().tap({ position: { x: 20, y: 20 } }).catch(() => {});
+      await r.page.waitForTimeout(700);
+      check(`a sideways swipe in the sheet from ${taps[0]} leaves the day behind it`, (await overline(r.frame)) === d0, `${d0} -> ${await overline(r.frame)}`);
+      await r.page.close();
+    });
+  }
+  // Under reduced motion a sheet does not follow the finger but a long drag still closes it.
+  await guard('reduced motion sheet', async () => {
+    const r = await open(ctx, '/', ['tab-add']);
+    const rest = await sheetTop(r.frame);
+    const h = await r.frame.locator(sel('sheet-drag')).last().boundingBox();
+    await r.touch('touchStart', W / 2, h.y + 10);
+    await r.move(W / 2, h.y + 10, W / 2, h.y + 110, 10, 20);
+    check('reduced motion: the sheet stays put under the finger', (await sheetTop(r.frame)) === rest);
+    await r.move(W / 2, h.y + 110, W / 2, h.y + 10 + (H - rest) * 0.4, 6, 40);
+    await r.page.waitForTimeout(200);
+    await r.touch('touchEnd');
+    await r.page.waitForTimeout(600);
+    check('reduced motion: dragged past a quarter, it still closes', !(await sheetOpen(r.frame)));
     await r.page.close();
+  });
+  await ctx.close();
+
+  // ---- every kind of sheet, with motion on
+  const SHEETS = [
+    ['+ sheet', '/', ['tab-add']],
+    ['a long scrolling body (exercise picker)', '/activity/strength', ['strength-add-first']],
+    ['a pinned footer (glass sizes)', '/water', ['section-add-a-drink-action']],
+    ['a confirm sheet (erase everything)', '/settings/data', ['data-erase']],
+    ['a field focused (exercise search)', '/activity/strength', ['strength-add-first', 'exercise-search']],
+    ['a field focused (a glass size)', '/water', ['section-add-a-drink-action', 'water-preset-0']],
+  ];
+  for (const [label, route, taps] of SHEETS) {
+    ctx = await phone(true);
+    await guard(`${label}`, async () => {
+      let r = await open(ctx, route, taps, true);
+      const rest = await sheetTop(r.frame);
+      if (rest === null) throw new Error('did not open');
+      let h = await r.frame.locator(sel('sheet-drag')).last().boundingBox();
+      const x = Math.round(h.x + h.width / 2);
+      await r.touch('touchStart', x, h.y + 10);
+      await r.move(x, h.y + 10, x, h.y + 110, 10, 20);
+      const mid = await sheetTop(r.frame);
+      check(`${label}: follows the finger on the handle`, mid - rest > 80 && mid - rest < 120, `100 px down moved it ${mid - rest} px`);
+      await r.move(x, h.y + 110, x, h.y + 40, 6, 40);
+      await r.page.waitForTimeout(150);
+      await r.touch('touchEnd');
+      await r.page.waitForTimeout(800);
+      check(`${label}: a short drag settles back`, Math.abs(((await sheetTop(r.frame)) ?? -99) - rest) <= 2);
+      const body = await r.frame.evaluate(() => { const s = [...document.querySelectorAll('[data-testid="sheet-body"]')].pop(); const b = s.getBoundingClientRect(); return { over: s.scrollHeight > s.clientHeight + 20, y: b.top, h: b.height }; });
+      if (body.over) {
+        await r.swipe(x, body.y + body.h - 30, x, body.y + 30, 10, 20);
+        const st = await r.frame.evaluate(() => [...document.querySelectorAll('[data-testid="sheet-body"]')].pop().scrollTop);
+        check(`${label}: its body still scrolls`, st > 20 && (await sheetTop(r.frame)) === rest, `scrolled ${st} px`);
+      }
+      h = await r.frame.locator(sel('sheet-drag')).last().boundingBox();
+      await r.touch('touchStart', x, h.y + 10);
+      await r.move(x, h.y + 10, x, h.y + 10 + (H - rest) * 0.35, 12, 30);
+      await r.page.waitForTimeout(200);
+      await r.touch('touchEnd');
+      await r.page.waitForTimeout(900);
+      check(`${label}: dragged slowly past a quarter of its height, it closes`, !(await sheetOpen(r.frame)));
+      await r.page.close();
+      r = await open(ctx, route, taps, true);
+      h = await r.frame.locator(sel('sheet-drag')).last().boundingBox();
+      await r.swipe(x, h.y + 10, x, h.y + 70, 3, 8);
+      check(`${label}: a flick down closes it`, !(await sheetOpen(r.frame)));
+      await r.page.close();
+    });
+    await ctx.close();
   }
 
-  // Sheets: the + sheet, and a confirm sheet (erase data).
+  // ---- a desktop-size window with a mouse
+  ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, reducedMotion: 'no-preference' });
   for (const [label, route, taps] of [['+ sheet', '/', ['tab-add']], ['confirm sheet', '/settings/data', ['data-erase']]]) {
-    const r = await open(route, taps);
-    const box = async () => r.frame.locator('[data-testid="sheet-drag"]').last().boundingBox();
-    const sheetH = async () => (await r.frame.locator('[data-testid="sheet"]').last().boundingBox()).height;
-    let b = await box();
-    await r.swipe(W / 2, b.y + 8, W / 2, b.y + 48, 6);
-    check(`${label}: a short drag on the handle settles back`, await sheetOpen(r.frame));
-    b = await box();
-    const h = await sheetH();
-    await r.swipe(W / 2, b.y + 8, W / 2, b.y + 8 + h * 0.4, 10);
-    check(`${label}: dragged down past a quarter of its height, it closes`, !(await sheetOpen(r.frame)));
-    await r.page.close();
-    const r2 = await open(route, taps);
-    b = await r2.frame.locator('[data-testid="sheet-drag"]').last().boundingBox();
-    await r2.swipe(W / 2, b.y + 8, W / 2, b.y + 68, 3, 8);
-    check(`${label}: a flick down closes it`, !(await sheetOpen(r2.frame)));
-    await r2.page.close();
-    const r3 = await open(route, taps);
-    await r3.frame.locator('[data-testid="sheet"]').last().click({ position: { x: 20, y: 60 } }).catch(() => {});
-    await r3.page.keyboard.press('Escape');
-    await r3.page.waitForTimeout(800);
-    check(`${label}: Escape closes it`, !(await sheetOpen(r3.frame)));
-    await r3.page.close();
+    await guard(`desktop ${label}`, async () => {
+      // `load` taps with touch; on this window click instead.
+      let r = await open(ctx, route, [], true);
+      for (const t of taps) { await r.frame.locator(sel(t)).first().click(); await r.page.waitForTimeout(800); }
+      const rest = await sheetTop(r.frame);
+      const h = await r.frame.locator(sel('sheet-drag')).last().boundingBox();
+      const x = h.x + h.width / 2;
+      await r.page.mouse.move(x, h.y + 10);
+      await r.page.mouse.down();
+      for (let i = 1; i <= 10; i++) { await r.page.mouse.move(x, h.y + 10 + i * 10); await r.page.waitForTimeout(20); }
+      const mid = await sheetTop(r.frame);
+      for (let i = 1; i <= 10; i++) { await r.page.mouse.move(x, h.y + 110 + i * 25); await r.page.waitForTimeout(30); }
+      await r.page.waitForTimeout(200);
+      await r.page.mouse.up();
+      await r.page.waitForTimeout(900);
+      check(`desktop ${label}: follows a mouse drag on the handle and closes`, mid - rest > 80 && !(await sheetOpen(r.frame)), `moved ${mid - rest} px`);
+      await r.page.close();
+      r = await open(ctx, route, [], true);
+      for (const t of taps) { await r.frame.locator(sel(t)).first().click(); await r.page.waitForTimeout(800); }
+      await r.page.keyboard.press('Escape');
+      await r.page.waitForTimeout(900);
+      check(`desktop ${label}: Escape closes it`, !(await sheetOpen(r.frame)));
+      await r.page.close();
+    });
   }
+  await guard('desktop arrows', async () => {
+    const r = await open(ctx, '/', [], true);
+    check('desktop: the week arrows show with a mouse', (await r.frame.locator(sel('today-week-prev')).count()) > 0);
+    await r.page.close();
+  });
+  await ctx.close();
   return results;
 }
 
@@ -634,9 +772,7 @@ async function main() {
 
   let gestures = [];
   if (!flags['no-gestures'] && !only) {
-    const ctx = await contextFor();
-    try { gestures = await gestureChecks(ctx, seeds); } catch (e) { gestures.push({ name: 'gesture checks', ok: false, detail: String(e.message).split('\n')[0] }); console.log(`  gesture checks failed: ${e.message}`); }
-    await ctx.close();
+    try { gestures = await gestureChecks(browser, seeds); } catch (e) { gestures.push({ name: 'gesture checks', ok: false, detail: String(e.message).split('\n')[0] }); console.log(`  gesture checks failed: ${e.message}`); }
   }
 
   if (flags['gestures-only']) { console.log(`Gestures: ${gestures.filter((g) => g.ok).length} of ${gestures.length} as expected`); await browser.close(); if (srv) srv.close(); process.exit(gestures.some((g) => !g.ok) ? 1 : 0); }

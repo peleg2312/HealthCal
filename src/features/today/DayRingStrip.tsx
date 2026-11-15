@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import React, { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Platform, ScrollView, useWindowDimensions, View, type AccessibilityActionEvent, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { Platform, ScrollView, useWindowDimensions, View, type AccessibilityActionEvent, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, type StyleProp, type ViewStyle } from 'react-native';
 
 import { diffDays, formatDayLabel, fromISODate, startOfWeek } from '@/lib/dates';
 import { useDays } from '@/store/selectors';
@@ -71,6 +71,7 @@ export function DayRingStrip({
   note,
   latest,
   jumpTestID,
+  style,
 }: {
   today: ISODate;
   selected: ISODate;
@@ -90,6 +91,8 @@ export function DayRingStrip({
    * it never pushes the page down. It fades in after `delay` ms (at once under reduced motion).
    */
   note?: { text: string; delay: number; testID?: string } | null;
+  /** Placement only (a margin): the block's own height never changes. */
+  style?: StyleProp<ViewStyle>;
 }) {
   const { colors, spacing } = useTheme();
   const windowW = useWindowDimensions().width;
@@ -196,7 +199,7 @@ export function DayRingStrip({
   };
 
   return (
-    <View style={{ gap: spacing.xs }} testID={`${testIDPrefix}-week`}>
+    <View style={[{ gap: spacing.xs }, style]} testID={`${testIDPrefix}-week`}>
       <DaySwipeGuard onLayout={onLayout} style={bleed ? { marginHorizontal: -bleed } : undefined}>
         {width > 0 ? (
           <ScrollView
@@ -260,6 +263,8 @@ export function DayRingStrip({
                         selected: isSelected,
                         disabled: locked,
                       }}
+                      // react-native-web reads the aria prop, not accessibilityState, for the selected tab.
+                      aria-selected={isSelected}
                       accessibilityActions={weekActions}
                       onAccessibilityAction={onWeekAction}
                       accessibilityLabel={`${formatDayLabel(d)}${kcal}`}
