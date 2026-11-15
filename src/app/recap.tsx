@@ -154,7 +154,7 @@ export default function RecapScreen() {
       ) : (
         <>
           {/* The win is the week's headline, held in a card so it reads as content under the header, not a second title. */}
-          <Card style={{ gap: spacing.xs }}>
+          <Card style={{ gap: spacing.xs }} testID="recap-win-card">
             <Text variant="overline">Win of the week</Text>
             <Text variant="h2" testID="recap-win">
               {r.win}

@@ -101,7 +101,7 @@ const DEV_SHOTS = {
   // The Garmin row is below the fold: it is lifted onto the middle of the screen (liftAt, 0 to 1).
   train: { route: '/train', lift: ['^session-source-'], liftRow: true, liftAt: 0.6 },
   // The win headline is plain text on the screen, so its lift takes a margin of the screen around it.
-  recap: { route: '/recap', lift: ['recap-win', 'recap-tiles'], liftPad: 16 },
+  recap: { route: '/recap', lift: ['recap-win-card', 'recap-tiles'], liftPad: 8 },
   'today-dark': { route: '/', theme: 'dark' },
   'today-light': { route: '/', theme: 'light' },
 };
@@ -177,8 +177,10 @@ async function captureScreen(page, name, device, spec) {
     const lp = spec.liftPad || 0;
     meta.lift = { x: box.x - lp, y: box.y - lp, width: box.width + lp * 2, height: box.height + lp * 2 };
     const vp = page.viewportSize();
-    if (box.y < 0 || box.y + box.height > vp.height) {
-      await scrollTo(page, selectorFor(spec.lift[0]), 0, box.y - 40);
+    // The header stays put while the page scrolls: a lift must end up clear of it, not under it.
+    const headerBottom = await page.evaluate(() => Math.max(0, ...[...document.querySelectorAll('[data-testid="tab-header"], [data-testid="screen-header"]')].map((h) => h.getBoundingClientRect().bottom)));
+    if (box.y < headerBottom || box.y + box.height > vp.height) {
+      await scrollTo(page, selectorFor(spec.lift[0]), 0, box.y - (headerBottom + 16));
     }
     const now = await boxOf(page, spec.lift, spec.liftRow);
     const pad = spec.liftPad || 0;
