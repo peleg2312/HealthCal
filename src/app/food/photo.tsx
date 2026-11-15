@@ -410,6 +410,7 @@ export default function PhotoScreen() {
                 onChangeText={setNote}
                 maxLength={200}
               />
+              {access.live ? <AiDataLine mode={mode} onPress={() => openConsent('review')} /> : null}
               {!photo ? <PhotoTips /> : null}
             </>
           ) : (
@@ -426,9 +427,9 @@ export default function PhotoScreen() {
                 style={{ minHeight: 120 }}
                 hint="Amounts and how it was cooked make the estimate more accurate."
               />
+              {access.live ? <AiDataLine mode={mode} onPress={() => openConsent('review')} /> : null}
             </>
           )}
-          {access.live ? <AiDataLine mode={mode} onPress={() => openConsent('review')} /> : null}
         </>
       ) : null}
 

@@ -48,7 +48,10 @@ function scan() {
       const cx = r.left + r.width / 2;
       const cy = r.top + r.height / 2;
       const hits = (dx, dy) => { const t = document.elementFromPoint(cx + dx, cy + dy); return !!t && (t === el || el.contains(t) || t.contains(el)); };
-      if (r.top >= 0 && r.bottom <= window.innerHeight && (r.width < 44 || r.height < 44) && !(hits(-21, 0) && hits(21, 0) && hits(0, -21) && hits(0, 21))) {
+      // Not judged: a control that is switched off, or one partly scrolled out of a sideways row (its edge is off the screen).
+      const off = el.disabled || el.getAttribute('aria-disabled') === 'true';
+      const inside = r.left >= 0 && r.right <= vw;
+      if (!off && inside && r.top >= 0 && r.bottom <= window.innerHeight && (r.width < 44 || r.height < 44) && !(hits(-21, 0) && hits(21, 0) && hits(0, -21) && hits(0, 21))) {
         small.push({ id: label(el) || ownText.slice(0, 30), w: Math.round(r.width), h: Math.round(r.height) });
       }
     }

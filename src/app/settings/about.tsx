@@ -279,12 +279,12 @@ export default function AboutScreen() {
           goes with it. HealthCal&apos;s server does not store the photo or the words, only how many analyses you ran and how large they were, for
           the daily allowance. Anthropic handles what it receives under Anthropic&apos;s terms.
         </P>
-        <AiConsentAbout />
         <P>
           On Android, with Workout sync switched on, HealthCal reads your workouts from Health Connect: each session with its active and total
           calories and its distance. They are stored like sessions you log by hand. Nothing is written back to Health Connect, and that data is
           never sent for AI analysis or to anyone else; friends see only what the Friends screen says they see.
         </P>
+        <AiConsentAbout />
       </Section>
 
       <Section icon={(c) => <Stethoscope size={20} color={c} />} color={colors.warningInk} keep title="Not medical advice">
