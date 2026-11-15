@@ -43,7 +43,8 @@ export function ListRow({
     <>
       {left}
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text variant="bodyStrong" numberOfLines={1} style={{ fontFamily: fonts.semibold }}>
+        {/* A long title wraps to a second line on a narrow phone rather than lose its end. */}
+        <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
           {title}
         </Text>
         {subtitle ? (

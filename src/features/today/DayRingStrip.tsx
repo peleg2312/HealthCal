@@ -241,18 +241,21 @@ export function DayRingStrip({
           </Text>
         )}
         {accessory}
-        <IconButton
-          testID={`${testIDPrefix}-week-prev`}
-          accessibilityLabel="Previous week"
-          size={32}
-          tone="clear"
-          disabled={back >= maxBack}
-          onPress={() => page(back + 1)}>
-          <ChevronLeft size={20} color={colors.text} strokeWidth={2} />
-        </IconButton>
-        <IconButton testID={`${testIDPrefix}-week-next`} accessibilityLabel="Next week" size={32} tone="clear" disabled={back <= 0} onPress={() => page(back - 1)}>
-          <ChevronRight size={20} color={colors.text} strokeWidth={2} />
-        </IconButton>
+        {/* 12 apart, so each 32 px arrow's 44 px touch area (6 px each side) ends where the other's begins. */}
+        <View style={{ flexDirection: 'row', gap: spacing.md }}>
+          <IconButton
+            testID={`${testIDPrefix}-week-prev`}
+            accessibilityLabel="Previous week"
+            size={32}
+            tone="clear"
+            disabled={back >= maxBack}
+            onPress={() => page(back + 1)}>
+            <ChevronLeft size={20} color={colors.text} strokeWidth={2} />
+          </IconButton>
+          <IconButton testID={`${testIDPrefix}-week-next`} accessibilityLabel="Next week" size={32} tone="clear" disabled={back <= 0} onPress={() => page(back - 1)}>
+            <ChevronRight size={20} color={colors.text} strokeWidth={2} />
+          </IconButton>
+        </View>
       </View>
     </View>
   );

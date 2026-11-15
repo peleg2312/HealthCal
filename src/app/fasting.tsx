@@ -19,7 +19,7 @@ import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { FastingSession } from '@/types';
-import { Button, Card, Chip, CupKey, Divider, Header, IconButton, NumberField, Screen, SectionTitle, Sheet, Text, toast, Vessel } from '@/ui';
+import { Button, Card, Chip, ChipWrap, CupKey, Divider, Header, IconButton, NumberField, Screen, SectionTitle, Sheet, Text, toast, Vessel } from '@/ui';
 
 /** Current time, ticking every second while `active`. Elapsed time is always derived from stored timestamps. */
 function useNow(active: boolean): number {
@@ -167,7 +167,7 @@ function FastingScreen() {
       </Card>
 
       <SectionTitle title="Target" />
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+      <ChipWrap>
         {FASTING_PRESETS.map((x) => (
           <Chip key={x.hours} testID={`fasting-target-${x.hours}`} label={x.label} selected={activeTarget === x.hours} onPress={() => setTarget(x.hours)} />
         ))}
@@ -180,7 +180,7 @@ function FastingScreen() {
             setCustomOpen((v) => !v);
           }}
         />
-      </View>
+      </ChipWrap>
       {customOpen ? (
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
           <NumberField testID="fasting-custom-input" style={{ flex: 1 }} label="Fasting hours" suffix="h" decimals={1} value={custom} onChange={setCustom} />

@@ -98,8 +98,9 @@ export function Figure({
   const key = color ? ((colors as unknown as Record<string, string>)[color] ?? color) : undefined;
   return (
     <View style={{ flex: 1, minWidth: 0, alignItems: align === 'center' ? 'center' : 'flex-start' }}>
-      <Text testID={testID} variant={size} tabular numberOfLines={1}>
-        {value}
+      {/* The figure itself never breaks (non-breaking spaces); on a narrow phone its unit may drop to a second line rather than be cut. */}
+      <Text testID={testID} variant={size} tabular numberOfLines={2}>
+        {value.replace(/ /g, '\u00A0')}
         {unit ? <Text variant="unit">{` ${unit}`}</Text> : null}
       </Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

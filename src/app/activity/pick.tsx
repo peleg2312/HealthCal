@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Dumbbell, Search, Timer } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
-import { FlatList, View } from 'react-native';
+import { FlatList, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ACTIVITIES, ACTIVITY_BY_ID, ACTIVITY_CATEGORIES, POPULAR_ACTIVITY_IDS, searchActivities } from '@/data/activities';
@@ -26,6 +26,8 @@ function ActivitySeparator() {
 
 export default function PickActivityScreen() {
   const { colors, spacing } = useTheme();
+  // Four tiles a row leave a 320 px phone about 40 px for a name, so 'Strength training' would break mid-word: three there.
+  const cols = useWindowDimensions().width < 340 ? 3 : 4;
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ date?: string }>();
   const date = typeof params.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : today();
@@ -56,7 +58,7 @@ export default function PickActivityScreen() {
 
   const grid = (items: ActivityDef[], prefix: string) => {
     const rows: ActivityDef[][] = [];
-    for (let i = 0; i < items.length; i += 4) rows.push(items.slice(i, i + 4));
+    for (let i = 0; i < items.length; i += cols) rows.push(items.slice(i, i + cols));
     return (
       <View style={{ gap: spacing.sm }}>
         {rows.map((row, i) => (
@@ -64,7 +66,7 @@ export default function PickActivityScreen() {
             {row.map((a) => (
               <ActivityTile key={a.id} emoji={a.emoji} name={a.name} testID={`${prefix}-${a.id}`} onPress={() => choose(a)} />
             ))}
-            {Array.from({ length: 4 - row.length }, (_, k) => (
+            {Array.from({ length: cols - row.length }, (_, k) => (
               <View key={`pad-${k}`} style={{ flex: 1 }} />
             ))}
           </View>

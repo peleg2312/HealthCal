@@ -123,6 +123,8 @@ npm run build:web                                        # host dist/ on any sta
 
 Set a unique bundle identifier and package name in `app.json` before a store build.
 
+Store listing: the name, subtitle, descriptions, keywords and the owner's checklist are in `docs/store-listing.md`. The eight App Store and Google Play screenshots are in `store/`, and `node scripts/dev/store-frames.cjs` makes them again from the running app (contact sheet: `store/_sheet.png`).
+
 ## How the code is organised
 
 ```

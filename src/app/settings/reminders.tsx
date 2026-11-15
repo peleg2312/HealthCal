@@ -9,7 +9,7 @@ import { formatDuration } from '@/lib/dates';
 import { getReminderPermission, remindersSupported, requestReminderPermission, type ReminderPermission } from '@/services/notifications';
 import { useStore } from '@/store';
 import { useTheme } from '@/theme';
-import { Button, Card, Chip, Header, Screen, Text, ToggleRow, toast } from '@/ui';
+import { Button, Card, Chip, ChipWrap, Header, Screen, Text, ToggleRow, toast } from '@/ui';
 
 const INTERVALS = [60, 90, 120, 180, 240];
 const WEEKDAYS = [
@@ -134,7 +134,7 @@ export default function RemindersScreen() {
             <Text variant="label" color="textSecondary">
               Every
             </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+            <ChipWrap>
               {INTERVALS.map((m) => (
                 <Chip
                   key={m}
@@ -144,7 +144,7 @@ export default function RemindersScreen() {
                   onPress={() => setReminders({ water: { ...r.water, everyMinutes: m } })}
                 />
               ))}
-            </View>
+            </ChipWrap>
           </View>
         ) : null}
       </Group>
@@ -209,7 +209,7 @@ export default function RemindersScreen() {
             <Text variant="label" color="textSecondary">
               Days
             </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+            <ChipWrap>
               {WEEKDAYS.map(({ day, label }) => {
                 const selected = r.weighIn.weekdays.includes(day);
                 return (
@@ -225,7 +225,7 @@ export default function RemindersScreen() {
                   />
                 );
               })}
-            </View>
+            </ChipWrap>
           </View>
         ) : null}
       </Group>

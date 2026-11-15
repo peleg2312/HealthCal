@@ -36,7 +36,10 @@ export function Chip({
       testID={testID}
       onPress={onPress}
       feedback="select"
-      hitSlop={6}
+      // 6 above and below makes the 44 px target (ChipRow keeps 6 px of room so it is not clipped).
+      // Sideways a chip is already 44 wide or more; 4 each side meets the next chip's area in the
+      // middle of the 8 px gap, so a neighbour never takes a tap that is nearer this chip.
+      hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
       accessibilityState={{ selected: !!selected }}
       accessibilityLabel={label}
       style={[
@@ -68,6 +71,15 @@ export function ChipRow({ children, style }: { children: React.ReactNode; style?
       {children}
     </ScrollView>
   );
+}
+
+/**
+ * Chips that wrap onto more lines when the screen is narrow. Lines are 12 apart
+ * (chips 8 apart), so the 44 px touch areas of a chip and the one under it meet
+ * in the middle of the gap instead of the lower chip taking the upper one's taps.
+ */
+export function ChipWrap({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
+  return <View style={[{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, rowGap: 12 }, style]}>{children}</View>;
 }
 
 /**

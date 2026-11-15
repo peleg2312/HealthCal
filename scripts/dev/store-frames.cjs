@@ -37,7 +37,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const ROOT = path.resolve(__dirname, '../..');
+// This file's folder (scripts/dev), from the command line: the lint setup does not define __dirname.
+const HERE = path.dirname(path.resolve(process.argv[1]));
+const ROOT = path.resolve(HERE, '../..');
 const OUT = path.join(ROOT, 'store');
 const CAP = path.join(os.tmpdir(), 'healthcal-store-captures');
 const BUILD = path.join(os.tmpdir(), 'healthcal-store-build');
@@ -69,7 +71,11 @@ const TARGETS = [
 const FRAMES = [
   { n: 1, slug: 'day-fills-up', shot: 'today', lift: true, head: ['Watch your day', 'fill up'], sub: 'Calories, macros and exercise in one cup' },
   { n: 2, slug: 'two-taps', shot: 'search', lift: true, head: ['Log lunch in', 'two taps'], sub: 'Your usual foods are already waiting' },
-  { n: 3, slug: 'honest-estimate', shot: 'photo', lift: true, head: ['A photo, an', 'honest estimate'], sub: 'A likely range, and you check every item' },
+  {
+    n: 3, slug: 'honest-estimate', shot: 'photo', lift: true, head: ['A photo, an', 'honest estimate'], sub: 'A likely range, and you check every item',
+    // With --describe the frame shows a typed description, so it does not promise a photo.
+    describe: { head: ['Describe a meal,', 'get a range'], sub: 'An honest estimate, and you check every item' },
+  },
   { n: 4, slug: 'water', shot: 'water', lift: true, head: ['Water goals', 'fill to the brim'], sub: 'Reminders say what is left, then stay quiet' },
   {
     n: 5, slug: 'workouts', shot: 'train', lift: true, head: ['Workouts from', 'your watch'],
@@ -243,7 +249,7 @@ async function captureBackend(browser, buildSeed) {
   const env = { ...process.env, EXPO_PUBLIC_SUPABASE_URL: `http://localhost:${API_PORT}`, EXPO_PUBLIC_SUPABASE_ANON_KEY: 'mock-anon-key-for-local-end-to-end-tests' };
   const exp = spawnSync('npx', ['expo', 'export', '--platform', 'web', '--output-dir', BUILD], { cwd: ROOT, env, encoding: 'utf8' });
   if (exp.status !== 0) throw new Error(`expo export failed:\n${(exp.stderr || exp.stdout).slice(-2000)}`);
-  const mock = spawn(process.execPath, [path.join(__dirname, 'mock-backend.cjs'), `--port=${API_PORT}`, `--static=${BUILD}`, `--static-port=${STATIC_PORT}`], { stdio: 'ignore' });
+  const mock = spawn(process.execPath, [path.join(HERE, 'mock-backend.cjs'), `--port=${API_PORT}`, `--static=${BUILD}`, `--static-port=${STATIC_PORT}`], { stdio: 'ignore' });
   const stop = () => mock.kill();
   process.on('exit', stop);
   try {
@@ -303,8 +309,10 @@ async function captureBackend(browser, buildSeed) {
     await alex.page.waitForTimeout(1200);
     const state = await alex.context.storageState();
 
-    const friendsSpec = { lift: ['^friends-friend-'] };
-    const photoSpec = { lift: [flags.describe ? 'ai-dish' : 'ai-photo-hero'] };
+    // Maya's card and the cheers received, as one piece, with the screen scrolled to them.
+    const friendsSpec = { lift: ['^friends-friend-', 'friends-cheers'], liftPad: 14, scrollTo: '^friends-friend-', scrollOffset: 250 };
+    // With --describe there is no photo hero: the card holding the dish name and the total is lifted.
+    const photoSpec = flags.describe ? { lift: ['ai-dish'], liftRow: true } : { lift: ['ai-photo-hero'] };
     const analyse = async (d) => {
       if (flags.describe) {
         await go(d, '/food/photo?meal=breakfast&mode=text');
@@ -396,6 +404,7 @@ function deviceHtml(t, shot, width, style = '', whole = false) {
 }
 
 function frameHtml(f, t) {
+  if (flags.describe && f.describe) f = { ...f, ...f.describe };
   const L = layoutFor(t);
   const sub = typeof f.sub === 'string' ? f.sub : f.sub[t.store];
   let body = '';
@@ -422,7 +431,8 @@ function frameHtml(f, t) {
       const k = (L.devW - pad * 2) / vp.width;
       const statusH = Math.round(STATUS_CSS[t.device] * k);
       const size = pngSize(capPath(f.shot, t.device, 'lift'));
-      const liftW = Math.min(L.liftW, Math.round(meta.lift.width * k * 1.25));
+      // The lift is the same card, larger: 1.25 times on a phone, more on the iPad, whose screen is drawn smaller.
+      const liftW = Math.min(L.liftW, Math.round(meta.lift.width * k * (t.device === 'tablet' ? 1.7 : 1.25)));
       const liftH = Math.round((liftW * size.h) / size.w);
       // Lift the card out where it sits on the screen, kept inside the frame.
       const centre = L.devTop + pad + statusH + (meta.liftAt != null ? meta.liftAt * vp.height : meta.lift.y + meta.lift.height / 2) * k;
@@ -465,6 +475,9 @@ async function compose(browser) {
       await page.waitForTimeout(150);
       const out = path.join(dir, `${String(f.n).padStart(2, '0')}-${f.slug}.png`);
       await page.screenshot({ path: out, clip: { x: 0, y: 0, width: t.w, height: t.h } });
+      // Both stores refuse an alpha channel and a wrong size: check the PNG header (colour type 2 is RGB).
+      const head = fs.readFileSync(out).subarray(0, 26);
+      if (head.readUInt32BE(16) !== t.w || head.readUInt32BE(20) !== t.h || head[25] !== 2) throw new Error(`${out}: not a ${t.w} x ${t.h} RGB PNG`);
       written.push(out);
     }
     log(`  composed ${t.label}`);

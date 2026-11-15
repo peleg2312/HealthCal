@@ -72,10 +72,11 @@ export default function SavedMealsScreen() {
                 {m.items.map((it, j) => (
                   <View key={j} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                     <RowEmoji emoji={it.emoji} />
-                    <Text variant="body" numberOfLines={1} style={{ flex: 1 }}>
+                    {/* Name and amount share the row and each may take two lines, so neither squeezes the other out. */}
+                    <Text variant="body" numberOfLines={2} style={{ flex: 1, minWidth: 0 }}>
                       {it.name}
                     </Text>
-                    <Text variant="caption" color="textSecondary" numberOfLines={1}>
+                    <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1, maxWidth: '55%', textAlign: 'right' }}>
                       {itemLine(it)}
                     </Text>
                   </View>

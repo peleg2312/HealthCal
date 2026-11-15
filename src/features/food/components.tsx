@@ -1,6 +1,6 @@
 import { CalendarDays, Check, ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { View, type StyleProp, type ViewStyle } from 'react-native';
+import { useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useToday } from '@/store/clock';
 import { addDays, formatDayLabel, formatLongDate, today } from '@/lib/dates';
@@ -82,6 +82,8 @@ export function KcalTrail({ value, range, approx, testID }: { value: number; ran
 /** Meal selector as an underline tab row with stable test ids (`meal-breakfast`, ...). */
 export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: MealType; onChange: (m: MealType) => void; testIDPrefix?: string }) {
   const { colors } = useTheme();
+  // Four equal cells leave about 60 px each on a 320 px phone: 'Breakfast' fits there one size down.
+  const narrow = useWindowDimensions().width < 340;
   return (
     <View accessibilityRole="tablist" style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border }}>
       {MEALS.map((m) => {
@@ -96,8 +98,8 @@ export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: 
             accessibilityRole="tab"
             accessibilityLabel={m.label}
             accessibilityState={{ selected: active }}
-            style={{ flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 }}>
-            <Text variant="label" color={active ? 'text' : 'textSecondary'} numberOfLines={1} style={{ fontSize: 14.5, lineHeight: 20, fontFamily: active ? fonts.bold : fonts.semibold }}>
+            style={{ flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: narrow ? 0 : 2 }}>
+            <Text variant="label" color={active ? 'text' : 'textSecondary'} numberOfLines={1} style={{ fontSize: narrow ? 13 : 14.5, lineHeight: 20, fontFamily: active ? fonts.bold : fonts.semibold }}>
               {m.label}
             </Text>
             {active ? <View pointerEvents="none" style={{ position: 'absolute', left: '18%', right: '18%', bottom: -2, height: 3, borderRadius: 1, backgroundColor: colors.rim }} /> : null}
