@@ -48,6 +48,13 @@ const CUP = ({ labelTop, rowsTop }) => `<body style="${BODY}"><div style="margin
     <div style="position:absolute;left:0;right:0;top:${rowsTop}px">${['Protein|75 / 152 g', 'Carbs|140 / 237 g', 'Fat|43 / 67 g'].map((r) => `<div style="display:flex;justify-content:space-between;font-size:13px;line-height:17px;margin-bottom:14px"><div>${r.split('|')[0]}</div><div>${r.split('|')[1]}</div></div>`).join('')}</div>
   </div></div></body>`;
 
+/**
+ * The real window before the page is scrolled: the tab bar is pinned at the bottom and the page's last row
+ * ("250 ml") sits under it, 5 px below the bar's "Progress" label. With `chrome: false` the same bar is
+ * an ordinary block of the page (no tab-bar testID), so the same two texts must be reported.
+ */
+const TABBAR = ({ chrome, at = 788 }) => `<body style="${BODY}"><div style="position:absolute;left:20px;top:100px">Water today</div><div style="position:absolute;left:20px;top:${at}px;font-size:13px;line-height:15px">250 ml</div><div ${chrome ? 'data-testid="tab-bar" ' : ''}style="position:fixed;left:0;right:0;bottom:0;height:80px;border-top:1px solid #888"><div style="position:absolute;left:20px;top:10px;font-size:11px;line-height:13px">Progress</div></div></body>`;
+
 const cases = [
   // name, html, what to run, what must be in the result ('' = nothing)
   { name: 'clean sheet', html: sheetPage(), run: 'sheet', expect: '' },
@@ -159,6 +166,18 @@ const cases = [
     expect: 'Israeli salad',
   },
   {
+    name: 'a clamped name in a box taller than its clamp shows its hidden lines: cut',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div style="width:120px;height:60px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">Israeli salad (tomato, cucumber, onion, oil, lemon)</div></body>',
+    run: 'cut',
+    expect: 'under its 2-line clamp',
+  },
+  {
+    name: 'a clamped name in a box of its own lines is shortened, not cut',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div style="width:120px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">Israeli salad (tomato, cucumber, onion, oil, lemon)</div></body>',
+    run: 'cut',
+    expect: '',
+  },
+  {
     name: 'a placeholder wider than its field is cut',
     html: '<body style="margin:0;font:15px/20px sans-serif"><input style="width:140px;font:15px sans-serif;padding:0 12px" placeholder="Search a city, such as Denver or Berlin"></body>',
     run: 'cut',
@@ -222,6 +241,12 @@ const cases = [
   { name: 'tight: a title and the single line under it, in a card with more', html: CARD(`<div style="font-size:18px;line-height:20px">Water</div><div style="font-size:13px;line-height:14px">1.2 L of 3.3 L</div><div style="margin-top:16px">A glass is 250 ml.</div><button style="margin-top:12px;height:44px">Add 250 ml</button>`), run: 'tight', expect: '' },
   { name: 'tight: a label directly above its value, in a card with more', html: CARD(`<div style="font-size:12px;line-height:13px">YOUR PLAN</div><div style="margin-top:12px;font-size:12px;line-height:13px">Target weight</div><div style="font-size:20px;line-height:21px">74 kg</div><div style="margin-top:16px">Reaching it around Feb 7.</div>`), run: 'tight', expect: '' },
   { name: 'tight: a label directly above its own field', html: CARD(`<div style="font-size:13px;line-height:14px">Target weight</div><div style="display:flex;border:1px solid #888;align-items:flex-start;line-height:16px"><span style="display:block">kg</span><input style="flex:1;border:0;height:16px;padding:0" value="74"></div><div style="margin-top:12px">Now 78.8 kg.</div><div style="margin-top:12px">Weekly pace</div>`), run: 'tight', expect: '' },
+  // Pinned chrome: the tab bar's labels sit over whatever content scrolls under the bar at that moment.
+  { name: 'tight: text in the tab bar is not judged against content scrolled under it', html: TABBAR({ chrome: true }), run: 'tight', expect: '' },
+  { name: 'tight: the same two texts outside the tab bar are seen', html: TABBAR({ chrome: false }), run: 'tight', expect: 'Progress" ' },
+  { name: 'text in the tab bar drawn over content scrolled under it is not overText', html: TABBAR({ chrome: true, at: 774 }), run: 'layoutPage', expect: '' },
+  { name: 'the same two texts drawn over each other outside the tab bar are overText', html: TABBAR({ chrome: false, at: 774 }), run: 'layoutPage', expect: 'over' },
+  { name: 'tight: two labels inside the tab bar 3 px apart are still seen', html: `<body style="${BODY}"><div data-testid="tab-bar" style="position:fixed;left:0;right:0;bottom:0;height:80px;background:#fff;border-top:1px solid #888"><div style="position:absolute;left:20px;top:10px;font-size:11px;line-height:13px">Progress</div><div style="position:absolute;left:20px;top:26px;font-size:11px;line-height:13px">Updated</div></div></body>`, run: 'tight', expect: 'above "Updated' },
   { name: 'a blank capture is not ready', html: '<body></body>', run: 'ready', expect: 'blank' },
   { name: 'a missing sheet is not ready', html: '<body><p>One</p><p>Two</p><p>Three</p></body>', run: 'readySheet', expect: 'no sheet is open' },
   { name: 'an undeclared sheet is not ready', html: sheetPage(), run: 'ready', expect: 'a sheet is open' },
@@ -273,7 +298,8 @@ async function runCase(page, c) {
   judge('real + sheet is ready', [await real.evaluate(notReady, { profile: true, sheet: true })].filter(Boolean), '');
   judge('real + sheet: clean', await real.evaluate(sheetScan), '');
   // A screen's own row pulled out to the sheet's edge (the kit's padding itself is fixed).
-  await real.addStyleTag({ content: '[data-testid="sheet-body"] > div > div:nth-child(2) { margin-left: -16px !important }' });
+  // Whatever the second row is (a block or a button): the selector must not depend on its tag.
+  await real.addStyleTag({ content: '[data-testid="sheet-body"] > div > :nth-child(2) { margin-left: -16px !important }' });
   await real.waitForTimeout(100);
   judge('real + sheet: a row pulled 16 px into the padding', await real.evaluate(sheetScan), "from the sheet's left edge");
   await real.addStyleTag({ content: '[data-testid="sheet"] { padding-bottom: 0 !important } [data-testid="sheet-body"] > div { padding-bottom: 0 !important }' });
@@ -294,8 +320,10 @@ async function runCase(page, c) {
   } else {
     judge('real + sheet has a 250 ml water button', [], 'a button');
   }
-  // The real Today at 360 px (the owner's phone), demo data: the "eaten" label beside the calorie cup is set
-  // at the cup's level, over the macro rows that share the cup's side column.
+  // The real Today at 360 px (the owner's phone), demo data. The calorie cup places its labels at the levels
+  // they describe (absolutely positioned); the kit keeps them 8 px apart (Vessel's labelSpacing). Real
+  // faults come and go as screens are fixed, so the positive is made by hand on the real page: the eaten
+  // label is set where a cup without that spacing would put it, its letters 4 px under those of the label above.
   const narrow = await browser.newContext({ viewport: { width: 360, height: 740 }, reducedMotion: 'reduce', isMobile: true, hasTouch: true });
   await narrow.addInitScript((value) => { if (!sessionStorage.getItem('seeded')) { localStorage.clear(); localStorage.setItem('healthcal-v1', value); sessionStorage.setItem('seeded', '1'); } }, JSON.stringify(buildSeed({ theme: 'blossom' })));
   const today = await narrow.newPage();
@@ -304,24 +332,48 @@ async function runCase(page, c) {
   await today.waitForTimeout(600);
   const asIs = (await today.evaluate(layoutScan, null)).tight;
   console.log(`INFO  real Today at 360 px as it is now: ${asIs.length ? asIs.join('; ') : 'nothing tight'}`);
+  // At the real window height the page's end is under the tab bar: the bar's labels are not judged against it.
+  const TAB_WORDS = ['"Today"', '"Diary"', '"Train"', '"Progress"'];
+  judge('real Today at 360 px: the tab bar is not judged against the page under it', asIs.filter((t) => TAB_WORDS.some((w) => t.includes(w))), '');
   judge('real Today at 360 px: the tab header (overline and title) is tight by design', (await today.evaluate(layoutScan, '[data-testid="tab-header"]')).tight, '');
-  // Set the label where the cup puts it at the owner's values: its line box 2 px into the first macro row's,
-  // which leaves about 4 px between their letters.
   const moved = await today.evaluate(() => {
+    const placedBox = (el) => { for (let e = el; e && e !== document.body; e = e.parentElement) if (getComputedStyle(e).position === 'absolute') return e; return null; };
     const label = document.querySelector('[data-testid="today-eaten"]');
-    const protein = [...document.querySelectorAll('[data-testid="today-energy"] *')].find((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim() === 'Protein'));
-    let wrap = label;
-    while (wrap && getComputedStyle(wrap).position !== 'absolute') wrap = wrap.parentElement;
-    if (!label || !protein || !wrap) return false;
-    const delta = protein.getBoundingClientRect().top + 2 - label.getBoundingClientRect().bottom;
-    wrap.style.top = `${parseFloat(getComputedStyle(wrap).top) + delta}px`;
+    const wrap = label && placedBox(label);
+    if (!wrap) return false;
+    // Ink, measured independently of the scan: a word's baseline is its range's top plus the font's ascent.
+    const ctx = document.createElement('canvas').getContext('2d');
+    const inkOf = (el) => {
+      const n = [...el.childNodes].find((x) => x.nodeType === 3 && x.textContent.trim());
+      if (!n) return null;
+      const s = getComputedStyle(el);
+      ctx.font = `${s.fontStyle} ${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;
+      const word = n.textContent.trim().split(/\s+/)[0];
+      const m = ctx.measureText(word);
+      const range = document.createRange();
+      range.selectNodeContents(n);
+      const r = range.getClientRects()[0];
+      const base = r.top + m.fontBoundingBoxAscent;
+      return { top: base - m.actualBoundingBoxAscent, bottom: base + m.actualBoundingBoxDescent, l: r.left, r: r.right };
+    };
+    const mine = inkOf(label);
+    // The lowest ink of another placed label above it in the same cup, overlapping it sideways.
+    const card = wrap.closest('[data-testid="today-energy"]') || document.body;
+    let floor = null;
+    for (const e of card.querySelectorAll('*')) {
+      if (wrap.contains(e) || !placedBox(e) || placedBox(e) === wrap) continue;
+      const k = inkOf(e);
+      if (k && k.bottom <= mine.top && Math.min(k.r, mine.r) > Math.max(k.l, mine.l) && (floor === null || k.bottom > floor)) floor = k.bottom;
+    }
+    if (floor === null) return false;
+    wrap.style.top = `${parseFloat(getComputedStyle(wrap).top) - (mine.top - floor - 4)}px`;
     return true;
   });
   if (moved) {
     await today.waitForTimeout(100);
-    judge('real Today at 360 px: the eaten label set just above the Protein row', (await today.evaluate(layoutScan, null)).tight, 'above "Protein');
+    judge('real Today at 360 px: the eaten label set 4 px under the label above it', (await today.evaluate(layoutScan, null)).tight.filter((t) => t.includes('eaten"')), '4px above "1,');
   } else {
-    judge('real Today has the eaten label (today-eaten) and a Protein row in today-energy', [], 'both');
+    judge('real Today has the eaten label (today-eaten) placed under another label in today-energy', [], 'both');
   }
   await narrow.close();
   await browser.close();

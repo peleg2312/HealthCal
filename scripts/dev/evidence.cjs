@@ -43,7 +43,8 @@
  *   toast       a toast that covers a control in an open sheet, a pinned footer or the tab bar, or
  *               that starts above the top of the screen: judged after each tap and at the capture,
  *               always at the real window height (never against the page grown to its full height)
- * Text cut with no ellipsis is `cut`, and so is a field's placeholder wider than the field. A name
+ * Text cut with no ellipsis is `cut`, and so are a field's placeholder wider than the field and a clamped
+ * name whose box is taller than its clamp (the lines after the ellipsis show under it). A name
  * that ends in an ellipsis after its allowed lines is shortened by design: listed in report.json as
  * `shortened` and printed under its own heading, not counted as something to look at.
  * Not reported, because they are drawn that way on purpose: lines 6 px thick or less
@@ -168,6 +169,20 @@ function scan(rootSel) {
       // A name that ends in an ellipsis after its allowed lines is shortened by design; "cut" is text clipped with no ellipsis.
       const ellipsis = style.textOverflow === 'ellipsis' || style.webkitLineClamp !== 'none';
       if (!seen.has(key)) { seen.add(key); (ellipsis ? shortened : cut).push({ text: ownText.slice(0, 60), shows: Math.round(el.clientWidth), needs: Math.round(el.scrollWidth) }); }
+    }
+    // A clamp whose box is taller than its lines (a clamped name given flex: 1 in a row of tiles): the lines
+    // after the ellipsis are drawn under it, "Israeli salad (tomato, …" / "cucumber, onion,".
+    const clamp = parseInt(style.webkitLineClamp, 10);
+    if (ownText && clamp > 0) {
+      const tops = new Set();
+      for (const n of el.childNodes) {
+        if (n.nodeType !== 3 || !n.textContent.trim()) continue;
+        const range = document.createRange();
+        range.selectNodeContents(n);
+        for (const q of range.getClientRects()) if (q.width > 0 && q.bottom <= r.bottom + 1) tops.add(Math.round(q.top));
+      }
+      const key = `clamp|${ownText.slice(0, 40)}`;
+      if (tops.size > clamp && !seen.has(key)) { seen.add(key); cut.push({ text: `"${ownText.slice(0, 40)}" shows ${tops.size} lines under its ${clamp}-line clamp (the ellipsis is not its last line)`, shows: tops.size, needs: clamp }); }
     }
     // A one-line field's placeholder wider than the field: the browser clips it mid-word with no ellipsis.
     if (el.tagName === 'INPUT' && !el.value && el.placeholder && r.top < window.innerHeight * 3) {
@@ -316,6 +331,14 @@ function layoutScan(rootSel) {
     return null;
   };
   const out = { overText: [], broken: [], sticksOut: [], controls: [], gaps: [] };
+  // Pinned chrome (the tab bar, a screen's header, a pinned footer) stays put while the page scrolls under it:
+  // its text is judged against its own text only. What stays under it at the end of the page is `hidden`'s.
+  const CHROME = '[data-testid="tab-bar"], [data-testid="screen-header"], [data-testid="tab-header"], [data-testid="screen-footer"]';
+  const chromeOf = new Map();
+  const sameLayer = (a, b) => {
+    for (const e of [a, b]) if (!chromeOf.has(e)) chromeOf.set(e, e.closest(CHROME));
+    return chromeOf.get(a) === chromeOf.get(b);
+  };
   const add = (k, v) => { if (out[k].length < 12 && !out[k].includes(v)) out[k].push(v); };
 
   // 1. Text over text.
@@ -323,7 +346,7 @@ function layoutScan(rootSel) {
     for (let j = i + 1; j < texts.length; j++) {
       const a = texts[i];
       const b = texts[j];
-      if (a.el === b.el || a.el.contains(b.el) || b.el.contains(a.el)) continue;
+      if (a.el === b.el || a.el.contains(b.el) || b.el.contains(a.el) || !sameLayer(a.el, b.el)) continue;
       const o = inter(a.r, b.r);
       if (w(o) > 2 && h(o) > 2) add('overText', `${name(a.el)} over ${name(b.el)} (${Math.round(w(o))}x${Math.round(h(o))})`);
     }
@@ -349,7 +372,7 @@ function layoutScan(rootSel) {
     for (let j = 0; j < texts.length; j++) {
       const a = texts[i];
       const b = texts[j];
-      if (i === j || a.el === b.el || a.el.contains(b.el) || b.el.contains(a.el)) continue;
+      if (i === j || a.el === b.el || a.el.contains(b.el) || b.el.contains(a.el) || !sameLayer(a.el, b.el)) continue;
       // Words of one sentence set in different styles (a bold lead, a number and its unit) flow together on purpose.
       const flows = (el) => !el.closest('svg') && getComputedStyle(el).display === 'inline';
       if (flows(a.el) || flows(b.el)) continue;
@@ -450,7 +473,7 @@ function layoutScan(rootSel) {
    * what layoutScan leaves out on purpose (the + cup, corner counts, aria-hidden miniatures, toasts).
    * Returns at most 12 descriptions with the gap in px.
    */
-  function tightScan({ root, shown, onPurpose, visibleRect, empty }) {
+  function tightScan({ root, shown, onPurpose, visibleRect, empty, sameLayer }) {
     const ctx = (tightScan.canvas ||= document.createElement('canvas')).getContext('2d');
     const metrics = new Map();
     const ink = (el, word) => {
@@ -528,6 +551,8 @@ function layoutScan(rootSel) {
         if (i === j) continue;
         const pa = list[i];
         const pb = list[j];
+        // Text in pinned chrome is judged against its own chrome's text only (see sameLayer).
+        if (!sameLayer(pa, pb)) continue;
         for (const la of pieces.get(pa)) {
           for (const lb of pieces.get(pb)) {
             const side = Math.min(la.r, lb.r) - Math.max(la.l, lb.l);
@@ -557,7 +582,7 @@ function layoutScan(rootSel) {
     }
     return out;
   }
-  out.tight = tightScan({ root, shown, onPurpose, visibleRect, empty });
+  out.tight = tightScan({ root, shown, onPurpose, visibleRect, empty, sameLayer });
   return out;
 }
 
@@ -990,9 +1015,16 @@ async function capture(page, job, file) {
   }, root);
   const vp = page.viewportSize();
   // A sheet is at most 88% of the window, so the window grows by a little more than what it hides.
-  if (extra > 0) { await page.setViewportSize({ width: vp.width, height: Math.min(vp.height + Math.ceil(sheet ? extra / 0.88 + 24 : extra), 8000) }); await page.waitForTimeout(400); }
+  let fullImage = null;
+  if (extra > 0) {
+    await page.setViewportSize({ width: vp.width, height: Math.min(vp.height + Math.ceil(sheet ? extra / 0.88 + 24 : extra), 8000) });
+    await page.waitForTimeout(400);
+    // What the layout scan judges: the whole page (or the sheet's whole body) at once, for the eyes too.
+    fullImage = file.replace(/\.png$/, '__full.png');
+    await page.screenshot({ path: fullImage });
+  }
   Object.assign(layout, await page.evaluate(layoutScan, root));
-  return { found, layout };
+  return { found, layout, fullImage: fullImage && path.basename(fullImage) };
 }
 
 async function main() {
@@ -1041,11 +1073,12 @@ async function main() {
         const { page, errors, toast, problem } = result;
         let found = { cut: [], shortened: [], small: [], wide: 0 };
         let layout = EMPTY_LAYOUT();
+        let fullImage = null;
         if (problem) {
           await page.screenshot({ path: path.join(out, `${name}.png`), fullPage: true }).catch(() => {});
         } else {
           try {
-            ({ found, layout } = await capture(page, job, path.join(out, `${name}.png`)));
+            ({ found, layout, fullImage } = await capture(page, job, path.join(out, `${name}.png`)));
           } catch (e) {
             errors.push(`scan failed: ${String(e.message).split('\n')[0].slice(0, 100)}`);
           }
@@ -1054,7 +1087,7 @@ async function main() {
         const crashed = (await page.locator('[data-testid="error-retry"]').count().catch(() => 0)) > 0;
         screens.push({
           id: job.id, kind: job.kind, ...(job.list ? { list: job.list } : null), route: job.route, data: job.data, imperial: job.imperial, ...(job.values ? { values: job.values } : null), sheet: !!job.sheet, theme, width,
-          image: `${name}.png`, crashed, incomplete: problem && !crashed ? `${problem} (after ${result.attempts} tries)` : null,
+          image: `${name}.png`, fullImage, crashed, incomplete: problem && !crashed ? `${problem} (after ${result.attempts} tries)` : null,
           errors: [...new Set(errors)].slice(0, 5), ...found, layout,
         });
         await page.close();
