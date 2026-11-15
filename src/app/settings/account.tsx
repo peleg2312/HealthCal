@@ -16,7 +16,7 @@ import { Button, Card, ConfirmSheet, Header, ListRow, Screen, Sheet, Text, toast
 export default function AccountScreen() {
   const session = useAuth((s) => s.session);
   return (
-    <Screen header={<Header title="Account and sync" />}>{session ? <SignedIn email={session.user.email ?? 'Signed in'} /> : <SignedOut />}</Screen>
+    <Screen header={<Header title="Account and sync" subtitle={session ? 'Signed in' : 'Not signed in'} />}>{session ? <SignedIn email={session.user.email ?? 'Signed in'} /> : <SignedOut />}</Screen>
   );
 }
 

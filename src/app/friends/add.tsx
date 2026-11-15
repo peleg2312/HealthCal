@@ -46,7 +46,7 @@ export default function AddFriendScreen() {
   // Codes are drawn from an alphabet without look-alikes, so one of these is a typo.
   const lookalike = /[ILO01]/.test(code);
   const goBackToFriends = () => (router.canGoBack() ? router.back() : router.replace('/friends' as never));
-  const header = <Header title="Add a friend" onBack={goBackToFriends} />;
+  const header = <Header title="Add a friend" subtitle="By code or invite link" close onBack={goBackToFriends} />;
 
   const send = async () => {
     if (!complete) return;

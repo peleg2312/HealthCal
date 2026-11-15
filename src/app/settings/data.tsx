@@ -83,7 +83,7 @@ export default function DataScreen() {
   const fileAction = Platform.OS === 'web' ? 'Download' : 'Share';
 
   return (
-    <Screen header={<Header title="Your data" />}>
+    <Screen header={<Header title="Your data" subtitle="Export, import or erase" />}>
       <Card tone="alt">
         <Text variant="bodyStrong">It is yours</Text>
         <Text variant="caption" color="textSecondary" style={{ marginTop: 4 }}>

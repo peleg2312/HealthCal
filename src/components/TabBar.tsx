@@ -94,6 +94,7 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
     <>
       <View
         pointerEvents="box-none"
+        testID="tab-bar"
         style={{
           position: 'absolute',
           left: 0,

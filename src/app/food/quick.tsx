@@ -35,7 +35,7 @@ export default function QuickAddScreen() {
   return (
     <Screen
       testID="food-quick-screen"
-      header={<Header title="Quick add" subtitle="When you just know the numbers" />}
+      header={<Header title="Quick add" subtitle="When you just know the numbers" close />}
       footer={<Button testID="quick-save" title={valid ? `Add ${kcal(calories!)} kcal to ${MEAL_LABEL[meal].toLowerCase()}` : `Add to ${MEAL_LABEL[meal].toLowerCase()}`} disabled={!valid} onPress={save} />}>
       <Card style={{ gap: spacing.md }}>
         <NumberField

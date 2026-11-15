@@ -153,7 +153,7 @@ export default function RecapScreen() {
         </Card>
       ) : (
         <>
-          <View style={{ gap: spacing.xs, paddingTop: spacing.xs }}>
+          <View style={{ gap: spacing.xs }}>
             <Text variant="overline">Win of the week</Text>
             <Text variant="h1" testID="recap-win">
               {r.win}

@@ -35,7 +35,7 @@ export default function CustomFoodScreen() {
   const existing = useStore((s) => (id ? s.customFoods[id] : undefined));
   if (id && (!existing || existing.deleted)) {
     return (
-      <Screen header={<Header title="Food" />}>
+      <Screen header={<Header title="Food" subtitle="Not found" />}>
         <EmptyState emoji="🗂️" title="Food not found" message="It may have been deleted." action="Back to search" onAction={() => goBack('/food/search')} />
       </Screen>
     );

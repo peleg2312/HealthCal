@@ -181,7 +181,7 @@ export function FriendCard({ friend, today, units, onOpen, onCheer }: { friend: 
 // ------------------------------------------------------------------ invite
 
 /** The user's own code, large and readable, with Share and Copy. On surfaceAlt, so text stays text or textSecondary. */
-export function InviteCard({ code, sharing, onShare, onCopy }: { code: string; sharing: SocialSharing; onShare: () => void; onCopy: () => void }) {
+export function InviteCard({ code, sharing, onShare, onCopy, onSettings }: { code: string; sharing: SocialSharing; onShare: () => void; onCopy: () => void; onSettings: () => void }) {
   const { colors, spacing } = useTheme();
   const size = useNarrow() ? 34 : 44;
   const c = normalizeCode(code);
@@ -222,6 +222,18 @@ export function InviteCard({ code, sharing, onShare, onCopy }: { code: string; s
           {sharingSentence(sharing)}
         </Text>
       </View>
+      {/* Your name, what friends see, and turning friends off. */}
+      <PressableScale
+        testID="friends-settings-open"
+        accessibilityRole="link"
+        accessibilityLabel="Friends settings"
+        onPress={onSettings}
+        hitSlop={6}
+        style={{ alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginTop: spacing.xs, marginBottom: -spacing.sm }}>
+        <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
+          Friends settings
+        </Text>
+      </PressableScale>
     </Card>
   );
 }

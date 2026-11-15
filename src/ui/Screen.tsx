@@ -93,6 +93,7 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
         )}
         {footer ? (
           <View
+            testID="screen-footer"
             onLayout={(e) => setFooterH(Math.round(e.nativeEvent.layout.height))}
             style={{
               borderTopWidth: 1,
@@ -121,6 +122,12 @@ export function goBack(fallback: string = '/') {
   else router.replace(fallback as never);
 }
 
+/**
+ * The header of every pushed screen (tab screens use TabHeader): a back cup, the screen's
+ * title, at most one short line under it and at most one action on the right. Screens that
+ * rise from the bottom as tasks pass `close` for the X; everything else goes back with the
+ * chevron. The title here is the screen's title, so there is no second large title under it.
+ */
 export function Header({
   title,
   subtitle,
@@ -142,6 +149,7 @@ export function Header({
   const handle = onBack ?? (() => goBack());
   return (
     <View
+      testID="screen-header"
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -169,33 +177,6 @@ export function Header({
             {subtitle}
           </Text>
         ) : null}
-      </View>
-      {right}
-    </View>
-  );
-}
-
-/** Large title used at the top of tab screens: an overline (the date or range) above a Bricolage h1. */
-export function LargeTitle({ title, subtitle, right }: { title: string; subtitle?: string; right?: React.ReactNode }) {
-  const { spacing } = useTheme();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-        paddingTop: spacing.sm,
-        paddingBottom: spacing.xs,
-        gap: spacing.md,
-      }}>
-      <View style={{ flex: 1, gap: 6 }}>
-        {subtitle ? (
-          <Text variant="overline" numberOfLines={1}>
-            {subtitle}
-          </Text>
-        ) : null}
-        <Text variant="h1" numberOfLines={1}>
-          {title}
-        </Text>
       </View>
       {right}
     </View>

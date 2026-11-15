@@ -122,7 +122,7 @@ function MealPick() {
 
   if (!active) {
     return (
-      <Screen header={<Header title="Add to meal" />}>
+      <Screen header={<Header title="Add to meal" subtitle="No meal open" />}>
         <EmptyState emoji="🍱" title="No meal open" message="Start a new meal or recipe from Saved meals, then add foods to it here." action="Saved meals" onAction={() => router.replace('/food/meals' as never)} />
       </Screen>
     );

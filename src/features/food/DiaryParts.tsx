@@ -22,7 +22,8 @@ import { FadeRow, useLeavingRows } from './rowMotion';
  * (eaten poured in from the left, exercise headroom hatched at the right end),
  * then the three macros with their level ticks.
  */
-export function DaySummaryCard({ day }: { day: DaySummary }) {
+/** The day's numbers at the top of the diary. `share` (the day's share button) sits at the top right, beside the big number. */
+export function DaySummaryCard({ day, share }: { day: DaySummary; share?: React.ReactNode }) {
   const { colors, spacing } = useTheme();
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
@@ -36,27 +37,30 @@ export function DaySummaryCard({ day }: { day: DaySummary }) {
   const notAdded = headroom === 0 && day.exerciseNet > 0;
   return (
     <Card testID="diary-summary" padding={18}>
-      <View style={stacked ? { gap: 2 } : { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-          <AnimatedNumber
-            variant="numXL"
-            color={over ? 'warningInk' : 'caloriesInk'}
-            testID="diary-remaining"
-            numberOfLines={1}
-            value={day.remaining}
-            format={(n) => kcal(Math.abs(n))}
-            accessibilityLabel={`${kcal(Math.abs(day.remaining))} kilocalories ${over ? 'over' : 'left'}`}
-            style={{ fontSize: narrow ? 40 : 46, lineHeight: narrow ? 44 : 50, letterSpacing: -1.4 }}
-          />
-          <Text variant="unit" style={{ fontSize: 15 }}>{over ? 'kcal over' : 'kcal left'}</Text>
-        </View>
-        <Text variant="caption" color="textSecondary" style={{ paddingBottom: stacked ? 0 : 4 }}>
-          <AnimatedNumber variant="numM" style={{ fontSize: 16, lineHeight: 20 }} testID="diary-eaten" value={day.eaten.kcal} format={kcal} />
-          {' eaten of '}
-          <Text variant="numM" style={{ fontSize: 16, lineHeight: 20 }}>
-            {kcal(budget)}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
+        <View style={stacked ? { flex: 1, minWidth: 0, gap: 2 } : { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md }}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+            <AnimatedNumber
+              variant="numXL"
+              color={over ? 'warningInk' : 'caloriesInk'}
+              testID="diary-remaining"
+              numberOfLines={1}
+              value={day.remaining}
+              format={(n) => kcal(Math.abs(n))}
+              accessibilityLabel={`${kcal(Math.abs(day.remaining))} kilocalories ${over ? 'over' : 'left'}`}
+              style={{ fontSize: narrow ? 40 : 46, lineHeight: narrow ? 44 : 50, letterSpacing: -1.4 }}
+            />
+            <Text variant="unit" style={{ fontSize: 15 }}>{over ? 'kcal over' : 'kcal left'}</Text>
+          </View>
+          <Text variant="caption" color="textSecondary" style={{ paddingBottom: stacked ? 0 : 4 }}>
+            <AnimatedNumber variant="numM" style={{ fontSize: 16, lineHeight: 20 }} testID="diary-eaten" value={day.eaten.kcal} format={kcal} />
+            {' eaten of '}
+            <Text variant="numM" style={{ fontSize: 16, lineHeight: 20 }}>
+              {kcal(budget)}
+            </Text>
           </Text>
-        </Text>
+        </View>
+        {share}
       </View>
       <Trough value={day.eaten.kcal} max={budget} headroom={headroom} color={colors.calories} memoryKey={`diary-${day.date}`} style={{ marginTop: spacing.md }} />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: 10 }}>
@@ -132,7 +136,8 @@ function EntryRow({ entry }: { entry: FoodEntry }) {
           <Text variant="bodyStrong" numberOfLines={narrow ? 3 : 2} style={{ fontFamily: fonts.semibold }}>
             {entry.name}
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {/* When the portion takes two lines, the source mark follows its last line rather than floating between them. */}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
             <Text variant="caption" color="textSecondary" numberOfLines={narrow ? 2 : 1} style={{ flexShrink: 1 }}>
               {portion}
             </Text>

@@ -43,18 +43,21 @@ export function RecapCard({ recap, earlier, unseen }: { recap: WeeklyRecap; earl
         <ChevronRight size={18} color={colors.textSecondary} strokeWidth={1.9} />
       </PressableScale>
       {earlier.length ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm, paddingLeft: 34, paddingTop: spacing.xs }}>
-          <Text variant="caption" color="textSecondary">
+        // The chips wrap under each other, never back under the word "Earlier".
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingLeft: 34, paddingTop: spacing.xs }}>
+          <Text variant="caption" color="textSecondary" style={{ lineHeight: 32 }}>
             Earlier
           </Text>
-          {earlier.slice(0, 2).map((w) => (
-            <Chip
-              key={w}
-              testID={`progress-recap-week-${w}`}
-              onPress={() => go(`/recap?week=${w}`)}
-              label={weekRangeLabel(w, addDays(w, 6))}
-            />
-          ))}
+          <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+            {earlier.slice(0, 2).map((w) => (
+              <Chip
+                key={w}
+                testID={`progress-recap-week-${w}`}
+                onPress={() => go(`/recap?week=${w}`)}
+                label={weekRangeLabel(w, addDays(w, 6))}
+              />
+            ))}
+          </View>
         </View>
       ) : null}
     </Card>

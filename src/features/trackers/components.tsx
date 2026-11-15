@@ -103,9 +103,10 @@ export function Figure({
         {value.replace(/ /g, '\u00A0')}
         {unit ? <Text variant="unit">{` ${unit}`}</Text> : null}
       </Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      {/* Never wider than the figure's column: a long label takes a second line instead of running into the next figure. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%' }}>
         {key ? <CupKey color={key} /> : null}
-        <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flexShrink: 1 }}>
+        <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1 }}>
           {label}
         </Text>
       </View>

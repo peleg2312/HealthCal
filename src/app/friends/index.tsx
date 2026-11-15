@@ -1,9 +1,10 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { RefreshCw, Settings2, UserPlus } from 'lucide-react-native';
-import React, { useCallback, useMemo, useState } from 'react';
+import { RefreshCw, UserPlus } from 'lucide-react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, RefreshControl, View } from 'react-native';
 
 import { CheersList, FriendCard, IncomingRequests, InviteCard, Loading, OutgoingRequests } from '@/features/friends/components';
+import { markFriendsSeen } from '@/features/friends/attention';
 import { inviteFromParams, invitePath } from '@/features/friends/link';
 import { SetupForm } from '@/features/friends/SetupForm';
 import { copyText, shareInvite } from '@/features/friends/share';
@@ -16,7 +17,7 @@ import { cheerFriend, leaveSocial, refreshFriends, removeFriend, respondToReques
 import { useNow, useToday } from '@/store/clock';
 import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
-import { Button, Card, ConfirmSheet, EmptyState, Header, IconButton, LargeTitle, Screen, SectionTitle, Text, toast } from '@/ui';
+import { Button, Card, ConfirmSheet, EmptyState, Header, IconButton, Screen, SectionTitle, Text, toast } from '@/ui';
 
 export default function FriendsScreen() {
   const { colors, spacing } = useTheme();
@@ -45,6 +46,11 @@ export default function FriendsScreen() {
   );
 
   const me = overview?.me ?? null;
+  // What this screen shows is no longer new: the count on the tab headers' Friends button clears.
+  const cheersShown = status === 'ready' && me ? overview?.cheers.length ?? 0 : -1;
+  useEffect(() => {
+    if (cheersShown >= 0) markFriendsSeen();
+  }, [cheersShown]);
   // Cheers name the workout by the reference friends saw; map it back with the same key.
   const shareKey = me?.shareKey ?? '';
   // A cheer can only be for a workout that was shared (the last two weeks) and is shown for two weeks, so older ones need no reference.
@@ -105,25 +111,20 @@ export default function FriendsScreen() {
     toast(res.ok ? 'Friends turned off. Your card, friendships and cheers were removed.' : res.message);
   };
 
+  // One action in the header: adding someone. Friends settings live on the invite card.
   const headerRight = me ? (
-    <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-      <IconButton testID="friends-settings-open" accessibilityLabel="Friends settings" onPress={() => setSettingsOpen(true)}>
-        <Settings2 size={20} color={colors.text} strokeWidth={2} />
-      </IconButton>
-      <IconButton testID="friends-add-open" accessibilityLabel="Add a friend" onPress={() => router.push('/friends/add' as never)}>
-        <UserPlus size={20} color={colors.text} strokeWidth={2} />
-      </IconButton>
-    </View>
+    <IconButton testID="friends-add-open" accessibilityLabel="Add a friend" onPress={() => router.push('/friends/add' as never)}>
+      <UserPlus size={20} color={colors.text} strokeWidth={1.9} />
+    </IconButton>
   ) : null;
 
-  const header = <Header right={headerRight} />;
+  const header = <Header title="Friends" subtitle="Workouts and cheers" right={headerRight} />;
   const scrollProps = Platform.OS === 'web' ? undefined : { refreshControl: <RefreshControl refreshing={refreshing} onRefresh={pull} tintColor={colors.textSecondary} /> };
 
   // ------------------------------------------------ states without a card
   if (status === 'unavailable') {
     return (
       <Screen header={header} testID="friends-screen">
-        <LargeTitle title="Friends" />
         <Card testID="friends-unavailable">
           <EmptyState
             title="Friends need an account"
@@ -136,7 +137,6 @@ export default function FriendsScreen() {
   if (status === 'signed-out') {
     return (
       <Screen header={header} testID="friends-screen">
-        <LargeTitle title="Friends" />
         <Card testID="friends-signed-out">
           <EmptyState
             title="Friends need an account"
@@ -153,7 +153,6 @@ export default function FriendsScreen() {
     if (status === 'error') {
       return (
         <Screen header={header} testID="friends-screen">
-          <LargeTitle title="Friends" />
           <Card testID="friends-error">
             <EmptyState title="Friends did not load" message={error ?? 'Something went wrong. Try again.'} action="Try again" onAction={() => void refreshFriends()} />
           </Card>
@@ -162,7 +161,6 @@ export default function FriendsScreen() {
     }
     return (
       <Screen header={header} testID="friends-screen">
-        <LargeTitle title="Friends" />
         <Loading />
       </Screen>
     );
@@ -185,7 +183,6 @@ export default function FriendsScreen() {
   const { friends, incoming, outgoing, cheers } = overview;
   return (
     <Screen header={header} testID="friends-screen" scrollProps={scrollProps}>
-      <LargeTitle title="Friends" />
 
       {status === 'error' ? (
         <Card tone="alt" testID="friends-error-banner">
@@ -198,7 +195,7 @@ export default function FriendsScreen() {
         </Card>
       ) : null}
 
-      <InviteCard code={me.code} sharing={me.sharing} onShare={() => void shareInvite(me.code)} onCopy={() => void copyText(formatCode(me.code), 'Code copied')} />
+      <InviteCard code={me.code} sharing={me.sharing} onSettings={() => setSettingsOpen(true)} onShare={() => void shareInvite(me.code)} onCopy={() => void copyText(formatCode(me.code), 'Code copied')} />
 
       {incoming.length ? <IncomingRequests requests={incoming} busy={busy} onAccept={accept} onDecline={decline} /> : null}
 

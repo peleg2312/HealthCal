@@ -91,7 +91,8 @@ export function FirstLogInvite({ meal, date, budget }: { meal: MealType; date: I
           <Text variant="caption" color="textSecondary">
             Or add one in a tap
           </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+          {/* 12 px between rows: each 32 px chip keeps its whole 44 px touch area, never shared with the chip below. */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.sm, rowGap: spacing.md }}>
             {options.map((p) => (
               <Chip
                 key={p.key}

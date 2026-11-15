@@ -3,6 +3,7 @@ import { Dumbbell, Plus, Timer } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import { TabHeader } from '@/components/TabHeader';
 import { ACTIVITY_BY_ID, POPULAR_ACTIVITY_IDS } from '@/data/activities';
 import { ActivityTile, SessionRow } from '@/features/activity/components';
 import { summariseWeek } from '@/features/activity/build';
@@ -11,7 +12,6 @@ import { RoutineCards, useRoutineTemplates } from '@/features/activity/RoutineCa
 import { WeekCard } from '@/features/activity/WeekCard';
 import { startRoutineDraft, type RoutineTemplate } from '@/features/activity/routines';
 import { draftHasContent, useStrengthDrafts } from '@/features/activity/strengthDraft';
-import { FriendsEntry } from '@/features/friends/FriendsEntry';
 import { SyncedFromLine } from '@/features/health-sync/ui/SyncedFromLine';
 import { TrainSyncLink } from '@/features/health-sync/ui/TrainSyncLink';
 import { addDays, formatDayLabel, formatDuration, formatShortDate, startOfWeek } from '@/lib/dates';
@@ -21,7 +21,7 @@ import { useStore } from '@/store';
 import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ActivityEntry } from '@/types';
-import { Button, Card, Chip, ConfirmSheet, EmptyState, LargeTitle, PressableScale, Screen, SectionTitle, Text } from '@/ui';
+import { Button, Card, Chip, ConfirmSheet, EmptyState, PressableScale, Screen, SectionTitle, Text } from '@/ui';
 
 const DAYS_PER_PAGE = 14;
 
@@ -73,8 +73,7 @@ export default function TrainScreen() {
   const startRoutine = (tpl: RoutineTemplate) => (draftActive ? setReplace(tpl) : begin(tpl));
 
   return (
-    <Screen tabs testID="train-screen">
-      <LargeTitle title="Train" subtitle={`Week of ${formatShortDate(weekStart)}`} right={<FriendsEntry />} />
+    <Screen tabs testID="train-screen" header={<TabHeader tab="train" overline={`Week of ${formatShortDate(weekStart)}`} title="Train" />}>
       {weekStart !== startOfWeek(t) ? (
         <View style={{ flexDirection: 'row' }}>
           <Chip testID="train-this-week" label="Back to this week" onPress={() => router.setParams({ week: undefined })} />

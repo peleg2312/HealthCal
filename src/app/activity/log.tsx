@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronDown, ChevronUp, Droplets, Info, Minus, Plus, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { ACTIVITY_BY_ID, MET_SOURCES } from '@/data/activities';
 import { basisFromEntry, formatPace, localiseSpeedText, paceModeFor, sessionPreview, sessionWaterMl } from '@/features/activity/build';
@@ -30,7 +30,7 @@ export default function LogActivityScreen() {
 
   if (!activity || (params.entryId && (!entry || entry.deleted))) {
     return (
-      <Screen header={<Header title="Log activity" />}>
+      <Screen header={<Header title="Log activity" subtitle="Not found" />}>
         <EmptyState
           emoji="🤷"
           title={params.entryId ? 'This session is no longer here' : 'Choose an activity first'}
@@ -46,6 +46,7 @@ export default function LogActivityScreen() {
 
 function LogForm({ activityId, entryId, dateParam }: { activityId: string; entryId?: string; dateParam?: string }) {
   const { colors, radius, spacing } = useTheme();
+  const tight = useWindowDimensions().width < 360;
   const profile = useProfile();
   const activities = useLive('activities');
   const activity = ACTIVITY_BY_ID[activityId];
@@ -300,14 +301,17 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
                     style={{
                       flex: 1,
                       minHeight: 104,
-                      padding: spacing.md,
+                      // Three tiles in 280 px leave 64 px inside at 12 px padding, too little for "Moderate".
+                      padding: tight ? spacing.sm : spacing.md,
                       gap: spacing.xs,
                       ...cup(radius.tile, 5),
                       backgroundColor: colors.surface,
                       borderWidth: active ? 2 : 1,
                       borderColor: active ? colors.text : colors.border,
                     }}>
-                    <Text variant="bodyStrong">{INTENSITY_LABELS[i].title}</Text>
+                    <Text variant="bodyStrong" style={tight ? { fontSize: 15 } : undefined}>
+                      {INTENSITY_LABELS[i].title}
+                    </Text>
                     <Text variant="caption" color="textSecondary" numberOfLines={3} style={{ flex: 1 }}>
                       {localiseSpeedText(activity.intensityHint?.[i] ?? INTENSITY_LABELS[i].hint, units)}
                     </Text>

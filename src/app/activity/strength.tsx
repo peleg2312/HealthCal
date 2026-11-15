@@ -97,13 +97,13 @@ export default function StrengthScreen() {
 
   if (entryId && (!entry || entry.deleted) && !summary) {
     return (
-      <Screen header={<Header title="Workout" />}>
+      <Screen header={<Header title="Strength workout" subtitle="Opening" />}>
         <EmptyState emoji="🤷" title="This workout is no longer here" message="It may have been deleted on this or another device." action="Back to training" onAction={() => goBack('/train')} />
       </Screen>
     );
   }
   if (summary) return <FinishSummaryView summary={summary} />;
-  if (!draft || !opened) return <Screen header={<Header title="Workout" />}>{null}</Screen>;
+  if (!draft || !opened) return <Screen header={<Header title="Strength workout" subtitle="Opening" />}>{null}</Screen>;
   return <Logger draftKey={key} draft={draft} entry={entry} onFinished={setSummary} />;
 }
 
@@ -122,8 +122,6 @@ interface FinishSummary {
 
 function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draft: StrengthDraft; entry?: ActivityEntry; onFinished: (s: FinishSummary) => void }) {
   const { colors, radius, spacing } = useTheme();
-  // Under 360 px the header's title shares its row with Back and Discard: one word, so it is never cut.
-  const narrow = useWindowDimensions().width < 360;
   const profile = useProfile();
   const activities = useLive('activities');
   const units = profile.units;
@@ -269,7 +267,7 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
     <Screen
       header={
         <Header
-          title={draft.entryId ? 'Edit workout' : narrow ? 'Workout' : 'Strength workout'}
+          title={draft.entryId ? 'Edit workout' : 'Strength workout'}
           subtitle={formatDayLabel(draft.date)}
           onBack={() => goBack('/train')}
           right={
@@ -285,7 +283,9 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
                 <Trash2 size={18} color={colors.danger} />
               </IconButton>
             ) : (
-              <Button title="Discard" variant="ghost" size="sm" full={false} testID="strength-discard" onPress={() => setConfirmDiscard(true)} />
+              <IconButton accessibilityLabel="Discard workout" testID="strength-discard" onPress={() => setConfirmDiscard(true)}>
+                <Trash2 size={18} color={colors.danger} />
+              </IconButton>
             )
           }
         />

@@ -79,7 +79,7 @@ function WeightScreen() {
   const footer = <Button testID="weight-log" title="Log weigh-in" icon={<Plus size={20} color={colors.onPrimary} />} onPress={() => setSheetDate(end)} />;
 
   return (
-    <Screen header={<Header title="Weight" subtitle={target ? `Target ${formatWeight(target, units)}` : undefined} />} footer={footer} backdrop={colors.weight} testID="weight-screen">
+    <Screen header={<Header title="Weight" subtitle={target ? `Target ${formatWeight(target, units)}` : 'Trend and weigh-ins'} />} footer={footer} backdrop={colors.weight} testID="weight-screen">
       {empty || !stats ? (
         <Card>
           <EmptyState

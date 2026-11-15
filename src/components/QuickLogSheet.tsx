@@ -224,7 +224,8 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
             </View>
             <Text variant="bodyStrong">Water</Text>
           </PressableScale>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
+          {/* Side by side when both fit; one above the other in a narrow tile rather than cut ("+ 250..."). */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
             {glasses.map((ml) => (
               <PressableScale
                 key={ml}
@@ -233,7 +234,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                 hitSlop={4}
                 onPress={() => addWater(quickLogPastDate(), ml, profile.units)}
                 accessibilityLabel={`Add ${formatVolume(ml, profile.units)} of water`}
-                style={{ flex: 1, height: 36, ...cup(radius.buttonSm, 5), borderWidth: 1.5, borderColor: colors.water, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+                style={{ flexGrow: 1, flexBasis: 24 + formatVolume(ml, profile.units).length * 7, height: 36, ...cup(radius.buttonSm, 5), borderWidth: 1.5, borderColor: colors.water, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
                 <Plus size={14} color={colors.water} strokeWidth={2.6} />
                 <Text variant="label" color="text" style={{ fontSize: 12.5 }} numberOfLines={1}>
                   {formatVolume(ml, profile.units)}

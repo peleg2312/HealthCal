@@ -6,16 +6,25 @@ import { type ScrollView, type ScrollViewProps, View } from 'react-native';
 import { copyPreviousDay, copyPreviousMeal, findPreviousDay, findPreviousMeal } from '@/features/food/actions';
 import { DaySummaryCard, MealCard, MealMenuSheet } from '@/features/food/DiaryParts';
 import { dayPhrase, href, kcal, param, parseDate } from '@/features/food/helpers';
+import { TabHeader, tabDay } from '@/components/TabHeader';
 import { ShareDayButton } from '@/features/share';
 import { DayRingStrip } from '@/features/today/DayRingStrip';
 import { useReportViewedDay } from '@/features/today/viewedDay';
-import { addDays, formatDayLabel, formatLongDate, today } from '@/lib/dates';
+import { addDays, formatShortDate, today, weekdayShort } from '@/lib/dates';
 import { MEALS, entriesTotal, mealForTime } from '@/lib/nutrition';
 import { useToday } from '@/store/clock';
 import { useDay, useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ISODate, MealType } from '@/types';
 import { Button, Card, Chip, IconButton, Screen, Text } from '@/ui';
+
+/** The day under the arrows, said the way people say it, from the clock hook's date. */
+function dayLabel(date: ISODate, t: ISODate): string {
+  if (date === t) return 'Today';
+  if (date === addDays(t, -1)) return 'Yesterday';
+  if (date === addDays(t, 1)) return 'Tomorrow';
+  return `${weekdayShort(date)}, ${formatShortDate(date)}`;
+}
 
 export default function DiaryScreen() {
   const { colors, spacing } = useTheme();
@@ -55,33 +64,26 @@ export default function DiaryScreen() {
   const empty = day.entries.length === 0;
 
   return (
-    <Screen tabs testID="diary-screen" scrollProps={{ ref: scrollRef } as ScrollViewProps}>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingTop: spacing.sm }}>
-        <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
-          <Text variant="overline" numberOfLines={1}>
-            {isToday ? formatLongDate(date) : date > t ? 'Planning ahead' : 'Looking back'}
-          </Text>
-          <Text variant="h1" numberOfLines={1} testID="diary-date-title">
-            {isToday ? 'Food diary' : formatDayLabel(date)}
-          </Text>
-        </View>
-        {!isToday ? <Chip testID="diary-today" label="Today" selected onPress={() => setDate(today())} style={{ marginTop: 6 }} /> : null}
-        <IconButton testID="diary-prev" accessibilityLabel="Previous day" onPress={() => setDate(addDays(date, -1))} style={{ borderColor: colors.borderStrong }}>
+    <Screen tabs testID="diary-screen" scrollProps={{ ref: scrollRef } as ScrollViewProps} header={<TabHeader tab="diary" overline={tabDay(date)} title="Food diary" />}>
+      {/* A day at a time: the arrows step one day, the strip under them picks any day of the week. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        <IconButton testID="diary-prev" accessibilityLabel="Previous day" onPress={() => setDate(addDays(date, -1))}>
           <ChevronLeft size={20} color={colors.text} strokeWidth={2.2} />
         </IconButton>
+        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm }}>
+          <Text variant="h3" numberOfLines={1} testID="diary-date-title" style={{ flexShrink: 1 }}>
+            {dayLabel(date, t)}
+          </Text>
+          {!isToday ? <Chip testID="diary-today" label="Today" selected onPress={() => setDate(t)} /> : null}
+        </View>
         <IconButton testID="diary-next" accessibilityLabel="Next day" onPress={() => setDate(addDays(date, 1))}>
-          <ChevronRight size={20} color={colors.textSecondary} strokeWidth={2.2} />
+          <ChevronRight size={20} color={colors.text} strokeWidth={2.2} />
         </IconButton>
       </View>
 
       <DayRingStrip today={t} selected={date} onSelect={setDate} testIDPrefix="diary" />
 
-      <DaySummaryCard day={day} />
-      {date <= t ? (
-        <View style={{ alignItems: 'flex-end', marginTop: -spacing.xs }}>
-          <ShareDayButton date={date} testID="diary-share" />
-        </View>
-      ) : null}
+      <DaySummaryCard day={day} share={date <= t ? <ShareDayButton date={date} testID="diary-share" /> : null} />
 
       {empty ? (
         <Card testID="diary-empty" tone="alt">

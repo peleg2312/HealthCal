@@ -424,7 +424,7 @@ export default function PhotoScreen() {
                 multiline
                 maxLength={500}
                 autoFocus
-                style={{ minHeight: 120 }}
+                lines={4}
                 hint="Amounts and how it was cooked make the estimate more accurate."
               />
               {access.live ? <AiDataLine mode={mode} onPress={() => openConsent('review')} /> : null}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 
+import { TabHeader } from '@/components/TabHeader';
 import { startOfWeek } from '@/lib/dates';
 import { MIN_INSIGHT_DAYS, weekRangeLabel } from '@/lib/insights';
 import { CaloriesADay } from '@/features/progress/CaloriesADay';
@@ -17,7 +18,7 @@ import { RecapCard } from '@/features/progress/RecapCard';
 import { useRecapReady } from '@/features/progress/recapReady';
 import { useProgressData, type RangeDays } from '@/features/progress/useProgressData';
 import { WeightCard } from '@/features/progress/WeightCard';
-import { FadeUp, LargeTitle, Screen } from '@/ui';
+import { FadeUp, Screen } from '@/ui';
 
 const SEGMENTS: { value: ProgressSegment; label: string }[] = [
   { value: 'overview', label: 'Overview' },
@@ -38,8 +39,7 @@ export default function ProgressScreen() {
     const weekStart = startOfWeek(d.today);
     const loggedThisWeek = d.weekDays.filter((x) => x.date >= weekStart && x.entries.length > 0).length;
     return (
-      <Screen tabs testID="progress-screen">
-        <LargeTitle title="Progress" subtitle="Trends and insights" />
+      <Screen tabs testID="progress-screen" header={<TabHeader tab="progress" overline="Trends and insights" title="Progress" />}>
         <EarlyState
           completeDays={d.completeEver}
           weighIns={d.series.entries.length}
@@ -57,8 +57,8 @@ export default function ProgressScreen() {
 
   return (
     // Keyed by section so a switch starts at the top instead of mid-way down the previous section.
-    <Screen tabs testID="progress-screen" key={segment}>
-      <LargeTitle title="Progress" subtitle={weekRangeLabel(start, d.today)} right={<RangeSwitch value={range} onChange={setRange} />} />
+    <Screen tabs testID="progress-screen" key={segment} header={<TabHeader tab="progress" overline={weekRangeLabel(start, d.today)} title="Progress" />}>
+      <RangeSwitch value={range} onChange={setRange} />
       <SegmentSwitch options={SEGMENTS} value={segment} onChange={setSegment} testIDPrefix="progress-segment" />
       {segment === 'overview' ? (
         <>

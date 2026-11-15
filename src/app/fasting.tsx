@@ -96,7 +96,7 @@ function FastingScreen() {
   );
 
   return (
-    <Screen header={<Header title="Fasting" />} footer={footer} backdrop={colors.fat} testID="fasting-screen">
+    <Screen header={<Header title="Fasting" subtitle={active ? 'Fast in progress' : 'Not fasting now'} />} footer={footer} backdrop={colors.fat} testID="fasting-screen">
       <Card padding={18} style={{ gap: spacing.lg }} testID="fasting-hero">
         <Vessel
           value={p ? Math.min(p.elapsedMs, p.targetMs) / 3_600_000 : 0}

@@ -144,13 +144,21 @@ export function Note({ children }: { children: React.ReactNode }) {
 
 const RANGES: RangeDays[] = [7, 30, 90];
 
-/** The range picker: a dropdown chip ("30 days") that opens a short sheet of choices. */
+/**
+ * The range picker, the first line of Progress under the tab header: "Show the last" and a
+ * dropdown chip ("30 days") that opens a short sheet of choices.
+ */
 export function RangeSwitch({ value, onChange }: { value: RangeDays; onChange: (v: RangeDays) => void }) {
   const { colors, spacing } = useTheme();
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Chip testID="progress-range" label={`${value} days`} dropdown onPress={() => setOpen(true)} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        <Text variant="label" color="textSecondary">
+          Show the last
+        </Text>
+        <Chip testID="progress-range" label={`${value} days`} dropdown onPress={() => setOpen(true)} />
+      </View>
       <Sheet visible={open} onClose={() => setOpen(false)} title="Show the last">
         <View accessibilityRole="radiogroup">
           {RANGES.map((r, i) => {

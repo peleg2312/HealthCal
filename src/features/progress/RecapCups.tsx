@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { weekdayShort } from '@/lib/dates';
 import { useTheme, withOpacity } from '@/theme';
@@ -9,6 +9,8 @@ import { MiniCup, PressableScale, Text } from '@/ui';
 import type { RecapDayCup } from './recapDays';
 
 const CUP_W = 34;
+/** Under 360 px seven columns are about 35 px wide: a narrower cup keeps a gap between neighbours (and their lips). */
+const CUP_W_NARROW = 28;
 const CUP_H = 76;
 const CHECK_H = 18;
 
@@ -23,6 +25,7 @@ const CHECK_H = 18;
 export function RecapCups({ cups, week }: { cups: RecapDayCup[]; week: string }) {
   const { colors, spacing } = useTheme();
   const [selected, setSelected] = useState<string | null>(null);
+  const cupW = useWindowDimensions().width < 360 ? CUP_W_NARROW : CUP_W;
   const sel = cups.find((c) => c.date === selected);
   return (
     <View style={{ gap: spacing.sm }}>
@@ -56,7 +59,7 @@ export function RecapCups({ cups, week }: { cups: RecapDayCup[]; week: string })
                   future={c.future}
                   hatchFill={c.isToday}
                   color={c.complete || c.isToday ? colors.calories : withOpacity(colors.calories, 0.45)}
-                  width={CUP_W}
+                  width={cupW}
                   height={CUP_H}
                 />
                 <View

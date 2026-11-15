@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import { setupSocial, type SocialSharing } from '@/services/friends';
 import { useTheme } from '@/theme';
-import { Button, Card, LargeTitle, Screen, Text, toast } from '@/ui';
+import { Button, Card, Screen, Text, toast } from '@/ui';
 
 import { NameField, SharingSwitches } from './components';
 import { DEFAULT_SHARING } from './summary';
@@ -47,7 +47,6 @@ export function SetupForm({ header, defaultName, onDone }: { header: React.React
           <Button testID="friends-setup-save" title="Turn on friends" loading={saving} disabled={!name.trim()} onPress={() => void submit()} />
         </View>
       }>
-      <LargeTitle title="Friends" />
       <Text variant="body" color="textSecondary">
         Add people with a code and see each other&apos;s training week. You choose what they see, and you can change it any time.
       </Text>

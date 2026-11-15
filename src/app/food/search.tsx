@@ -160,7 +160,7 @@ export default function FoodSearchScreen() {
 
   const header = (
     <View style={{ gap: spacing.sm, paddingBottom: spacing.sm }}>
-      <Header title={`Add to ${MEAL_LABEL[meal].toLowerCase()}`} subtitle={formatDayLabel(date)} />
+      <Header title={`Add to ${MEAL_LABEL[meal].toLowerCase()}`} subtitle={formatDayLabel(date)} close />
       <TextField
         testID="food-search-input"
         placeholder={narrow ? 'Search foods and brands' : 'Search foods, brands, your foods'}

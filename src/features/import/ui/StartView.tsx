@@ -11,13 +11,11 @@ export function StartView({ failed }: { failed: { name: string; message: string 
   const { spacing } = useTheme();
   return (
     <View style={{ gap: spacing.lg }}>
-      <View style={{ gap: spacing.sm }}>
-        <Text variant="h1">Bring in Garmin workouts</Text>
-        <Text variant="body" color="textSecondary">
-          Choose the files you exported from Garmin Connect and HealthCal adds each workout to Train, with Garmin’s measured calories. You check every workout
-          before anything is added, and the files are read on this device only.
-        </Text>
-      </View>
+      {/* The header carries the title; the screen opens with what it does. */}
+      <Text variant="body" color="textSecondary">
+        Choose the files you exported from Garmin Connect and HealthCal adds each workout to Train, with Garmin’s measured calories. You check every workout before
+        anything is added, and the files are read on this device only.
+      </Text>
 
       {Platform.OS === 'android' ? (
         <Card tone="alt" onPress={() => router.push('/settings/health-sync')} testID="import-sync-link" accessibilityLabel="Workout sync: let workouts come in by themselves">

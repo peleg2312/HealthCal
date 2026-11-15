@@ -44,7 +44,7 @@ function MealEdit() {
 
   if (missing) {
     return (
-      <Screen header={<Header title="Saved meal" />}>
+      <Screen header={<Header title="Saved meal" subtitle="Deleted" />}>
         <EmptyState emoji="🍱" title="This meal was deleted" message="Undo the delete from Saved meals, or build a new one." action="Saved meals" onAction={() => router.replace(back as never)} />
       </Screen>
     );
@@ -67,7 +67,7 @@ function MealEdit() {
   return (
     <Screen
       testID="meal-edit-screen"
-      header={<Header title={id ? 'Edit meal' : 'New meal or recipe'} subtitle={rows.length ? `${rows.length} ${rows.length === 1 ? 'item' : 'items'}` : undefined} />}
+      header={<Header title={id ? 'Edit meal' : 'New meal or recipe'} subtitle={rows.length ? `${rows.length} ${rows.length === 1 ? 'item' : 'items'}` : 'No items yet'} />}
       footer={
         <Button
           testID="meal-edit-save"

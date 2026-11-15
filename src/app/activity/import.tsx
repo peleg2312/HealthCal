@@ -99,7 +99,7 @@ export default function ImportScreen() {
     ? `CSV read in ${answers.distanceUnit === 'km' ? 'kilometres' : 'miles'}, times in ${answers.csvTimeZone ? zoneLabel(answers.csvTimeZone) : device ? zoneLabel(device) : 'this device’s zone'}.`
     : null;
 
-  const header = <Header title="Import from Garmin" subtitle={phase === 'review' && batches.length ? (batches.length === 1 ? batches[0].name : `${batches.length} files`) : undefined} />;
+  const header = <Header title="Import from Garmin" close subtitle={phase === 'review' && batches.length ? (batches.length === 1 ? batches[0].name : `${batches.length} files`) : 'FIT, TCX, GPX, CSV or ZIP files'} />;
 
   const sheets = (
     <>

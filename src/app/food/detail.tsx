@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { PenLine, Star, Trash2 } from 'lucide-react-native';
+import { Star, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
@@ -16,7 +16,7 @@ import { useStore } from '@/store';
 import { useDay, useLive } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
 import type { Food, FoodEntry, ISODate, MealType, Nutrients, Serving } from '@/types';
-import { Button, Card, CupKey, Divider, EmptyState, Header, IconButton, MacroBar, NumberField, Screen, Text, TextField, goBack } from '@/ui';
+import { Button, Card, CupKey, Divider, EmptyState, Header, IconButton, MacroBar, NumberField, PressableScale, Screen, Text, TextField, goBack } from '@/ui';
 
 export default function FoodDetailRoute() {
   return (
@@ -54,7 +54,7 @@ function latestConfidence(entries: FoodEntry[], foodId: string): number | undefi
 
 function Missing({ message }: { message: string }) {
   return (
-    <Screen header={<Header title="Food" />}>
+    <Screen header={<Header title="Food" subtitle="Not found" />}>
       <EmptyState emoji="🔎" title="Nothing to show" message={message} action="Search foods" onAction={() => router.replace('/food/search' as never)} />
     </Screen>
   );
@@ -140,7 +140,7 @@ function NutritionFacts({ portion, per100g, showPer100 }: { portion: Nutrients; 
   );
 }
 
-function Hero({ name, brand, source, explain }: { name: string; brand?: string; emoji?: string; source: Food['source']; explain: string }) {
+function Hero({ name, brand, source, explain, onEdit }: { name: string; brand?: string; emoji?: string; source: Food['source']; explain: string; onEdit?: () => void }) {
   return (
     <View>
       <View style={{ gap: 6 }}>
@@ -156,6 +156,14 @@ function Hero({ name, brand, source, explain }: { name: string; brand?: string; 
         <Text variant="caption" color="textTertiary">
           {explain}
         </Text>
+        {/* Your own food: its definition is yours to change (the header keeps one action, the favourite). */}
+        {onEdit ? (
+          <PressableScale testID="detail-edit-food" accessibilityRole="link" accessibilityLabel="Edit this food" onPress={onEdit} hitSlop={6} style={{ alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginVertical: -8 }}>
+            <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
+              Edit this food
+            </Text>
+          </PressableScale>
+        ) : null}
       </View>
     </View>
   );
@@ -228,19 +236,12 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
           title={entry ? 'Edit entry' : 'Add food'}
           subtitle={`${MEAL_LABEL[meal]} · ${dayPhrase(date).replace(/^./, (c) => c.toUpperCase())}`}
           right={
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              {food.source === 'custom' && !food.id.startsWith('meal_') ? (
-                <IconButton testID="detail-edit-food" accessibilityLabel="Edit this food" onPress={() => router.push(href('/food/custom', { id: food.id, meal, date }) as never)}>
-                  <PenLine size={18} color={colors.text} />
-                </IconButton>
-              ) : null}
-              <IconButton
-                testID="detail-favorite"
-                accessibilityLabel={isFav ? 'Remove from favourites' : 'Add to favourites'}
-                onPress={() => useStore.getState().toggleFavoriteFood(food)}>
-                <Star size={19} color={isFav ? colors.warning : colors.text} fill={isFav ? colors.warning : 'transparent'} />
-              </IconButton>
-            </View>
+            <IconButton
+              testID="detail-favorite"
+              accessibilityLabel={isFav ? 'Remove from favourites' : 'Add to favourites'}
+              onPress={() => useStore.getState().toggleFavoriteFood(food)}>
+              <Star size={19} color={isFav ? colors.warning : colors.text} fill={isFav ? colors.warning : 'transparent'} />
+            </IconButton>
           }
         />
       }
@@ -269,7 +270,14 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
           />
         </View>
       }>
-      <Hero name={food.name} brand={food.brand} emoji={food.emoji} source={food.source} explain={info.explain} />
+      <Hero
+        name={food.name}
+        brand={food.brand}
+        emoji={food.emoji}
+        source={food.source}
+        explain={info.explain}
+        onEdit={food.source === 'custom' && !food.id.startsWith('meal_') ? () => router.push(href('/food/custom', { id: food.id, meal, date }) as never) : undefined}
+      />
 
       <MacroSummary range={range} n={n} kcalNote={`${portionLabel(serving.label, quantity)}${perGram || serving.label === '100 g' || (quantity === 1 && /\d\s?g\)*$/.test(serving.label)) ? '' : ` · ${Math.round(totalGrams)} g`}`} />
 

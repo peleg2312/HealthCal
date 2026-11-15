@@ -132,7 +132,7 @@ export default function ConsistencyScreen() {
 
   if (!d.consistency.totalDaysLogged) {
     return (
-      <Screen header={<Header title="Consistency" />} testID="consistency-screen">
+      <Screen header={<Header title="Consistency" subtitle="Days you logged" />} testID="consistency-screen">
         <Card>
           <EmptyState
             title="Your logging rhythm shows here"
@@ -146,7 +146,7 @@ export default function ConsistencyScreen() {
   }
 
   return (
-    <Screen header={<Header title="Consistency" />} testID="consistency-screen">
+    <Screen header={<Header title="Consistency" subtitle="Days you logged" />} testID="consistency-screen">
       <Card style={{ gap: spacing.md }} testID="consistency-summary">
         <View accessible role="group" accessibilityLabel={`Current streak ${streak} ${word(streak, 'day')}. A missed day does not break it; two in a row do.`}>
           <Text variant="overline">Current streak</Text>
@@ -318,8 +318,9 @@ export default function ConsistencyScreen() {
                   .join('. ')}.`}>
                 <BarChart
                   testID={`consistency-rhythm-${k}-chart`}
-                  data={weeks.map((w) => ({
-                    label: w.partial ? 'Now' : formatShortDate(w.weekStart),
+                  data={weeks.map((w, i) => ({
+                    // Eight labels share a row as narrow as 30 px a bar: the month only where it changes ("Sep 21, 28, Oct 5").
+                    label: w.partial ? 'Now' : i > 0 && weeks[i - 1].weekStart.slice(5, 7) === w.weekStart.slice(5, 7) ? String(Number(w.weekStart.slice(8))) : formatShortDate(w.weekStart),
                     value: w.count,
                     detail: `Week of ${formatShortDate(w.weekStart)} · ${w.count} ${word(w.count, 'day')} ${RHYTHM_COPY[k].verb}${w.partial ? ' so far' : ''}`,
                     // Finished weeks are solid in the habit's own colour; this week stays hatched.

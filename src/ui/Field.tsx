@@ -15,11 +15,13 @@ export interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   left?: React.ReactNode;
   right?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
+  /** With `multiline`: the lines of text the box shows before it scrolls, so a long placeholder is never cut. */
+  lines?: number;
   /** Forwarded to the input, for moving focus between fields. */
   ref?: React.ComponentProps<typeof TextInput>['ref'];
 }
 
-export function TextField({ label, suffix, error, hint, left, right, style, onFocus, onBlur, ...rest }: TextFieldProps) {
+export function TextField({ label, suffix, error, hint, left, right, style, lines, onFocus, onBlur, ...rest }: TextFieldProps) {
   const { colors, radius } = useTheme();
   const [focused, setFocused] = useState(false);
   return (
@@ -58,6 +60,8 @@ export function TextField({ label, suffix, error, hint, left, right, style, onFo
           }}
           style={[
             { flex: 1, minWidth: 0, color: colors.text, fontFamily: fonts.medium, fontSize: 16, paddingVertical: 12 },
+            // 16 px text sets 22 px lines (web and native alike); the 12 px padding goes above and below.
+            rest.multiline && lines ? { minHeight: lines * 22 + 24, textAlignVertical: 'top' as const, alignSelf: 'stretch' as const } : null,
             // Removes the default focus outline on web; the border shows focus instead.
             { outlineStyle: 'none' } as object,
           ]}

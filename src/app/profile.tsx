@@ -46,7 +46,7 @@ export default function ProfileScreen() {
   const profile = useStore((s) => s.profile);
   if (!profile?.onboardedAt) {
     return (
-      <Screen header={<Header title="Profile" />}>
+      <Screen header={<Header title="Profile" subtitle="Settings and goals" />}>
         <EmptyState
           title="No profile yet"
           message="Set up your goals first. Your profile, targets and reminders live here afterwards."
@@ -92,7 +92,7 @@ function ProfileHub() {
     profile.goal === 'maintain' ? 'maintain' : `${profile.goal} ${formatWeight(profile.weeklyRateKg, u, 2)}/week`;
 
   return (
-    <Screen header={<Header title="Profile" />}>
+    <Screen header={<Header title="Profile" subtitle="Settings and goals" />}>
       <Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
           <InitialsAvatar name={profile.name} />

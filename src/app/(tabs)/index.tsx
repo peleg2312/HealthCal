@@ -14,23 +14,23 @@ import { RecapReadyCard } from '@/features/today/RecapReadyCard';
 import { FirstLogInvite } from '@/features/today/FirstLogInvite';
 import { startDate } from '@/features/today/week';
 import { ShareDayButton } from '@/features/share';
+import { greetingTitle } from '@/features/today/greetingTitle';
+import { TabHeader, tabDay, tabTitleRoom, tabTitleSize } from '@/components/TabHeader';
 import { MilestoneSheet } from '@/features/streak/MilestoneSheet';
 import { AFTER_STRIP_MS, StreakMark } from '@/features/streak/StreakMark';
 import { useStreakMoment } from '@/features/streak/useStreakMoment';
 import { addWater, defaultGlass, StatusRail } from '@/features/today/StatusRail';
 import { useReportViewedDay } from '@/features/today/viewedDay';
-import { addDays, formatShortDate, fromISODate, greeting, weekdayShort } from '@/lib/dates';
+import { addDays, formatShortDate, greeting } from '@/lib/dates';
 import { MEALS, MEAL_LABEL, MEAL_SHARE, mealForTime } from '@/lib/nutrition';
 import { formatNumber, formatVolume } from '@/lib/units';
 import { useStore } from '@/store';
 import { useNow, useToday } from '@/store/clock';
 import { useConsistency, useDay, useLive, useProfile, type DaySummary } from '@/store/selectors';
-import { cupFor, motion, useTheme } from '@/theme';
+import { motion, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
 import { AnimatedNumber, Button, Card, Chip, ChipWrap, CupKey, IconButton, PressableScale, ProgressBar, Screen, Text, Vessel, type VesselLabel } from '@/ui';
 
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const longDay = (date: ISODate) => `${WEEKDAYS[fromISODate(date).getDay()]}, ${formatShortDate(date)}`;
 
 export default function TodayScreen() {
   const { spacing } = useTheme();
@@ -54,44 +54,50 @@ export default function TodayScreen() {
   // The "What fits" sheet: null when closed, else whether protein is the gap it was opened for.
   const [fits, setFits] = useState<{ proteinFirst: boolean } | null>(null);
 
+  const { width } = useWindowDimensions();
+  const title = greetingTitle(greeting(now), profile.name ?? '', tabTitleRoom(width), tabTitleSize(width));
+
   return (
-    <Screen tabs testID="today-screen" contentStyle={{ gap: spacing.md }}>
-      <View style={{ gap: spacing.xs }}>
-        <TodayHeader
-          overline={isToday ? longDay(date) : 'Looking back'}
-          title={isToday ? `${greeting(now)}${profile.name ? `, ${profile.name}` : ''}` : `${weekdayShort(date)}, ${formatShortDate(date)}`}
-          isToday={isToday}
-          initial={(profile.name || 'Me').slice(0, 1).toUpperCase()}
-          onJumpToday={() => setPicked(null)}
-          share={<ShareDayButton date={date} />}
+    <Screen
+      tabs
+      testID="today-screen"
+      contentStyle={{ gap: spacing.md }}
+      header={<TabHeader tab="today" overline={tabDay(date)} title={title} />}>
+      {!isToday ? (
+        <View style={{ flexDirection: 'row' }}>
+          <Chip testID="today-jump-today" label="Back to today" selected onPress={() => setPicked(null)} />
+        </View>
+      ) : firstDay ? (
+        <Text variant="body" color="textSecondary" testID="today-coach">
+          {`Your budget is ${formatNumber(day.budget)} kcal. Log the first thing and the cup starts to fill.`}
+        </Text>
+      ) : !recap.announce ? (
+        <CoachLine
+          day={day}
+          yesterday={yesterday.entries.length ? { eaten: yesterday.eaten.kcal, budget: yesterday.budget } : null}
+          onFits={() => setFits({ proteinFirst: true })}
         />
-        {firstDay ? (
-          <Text variant="body" color="textSecondary" testID="today-coach">
-            {`Your budget is ${formatNumber(day.budget)} kcal. Log the first thing and the cup starts to fill.`}
-          </Text>
-        ) : isToday && !recap.announce ? (
-          <CoachLine
-            day={day}
-            yesterday={yesterday.entries.length ? { eaten: yesterday.eaten.kcal, budget: yesterday.budget } : null}
-            onFits={() => setFits({ proteinFirst: true })}
-          />
-        ) : null}
-      </View>
+      ) : null}
 
-      <View style={{ marginTop: spacing.xxs }}>
-        <DayRingStrip
-          today={todayDate}
-          selected={date}
-          onSelect={(d) => setPicked(d === todayDate ? null : d)}
-          start={start}
-          accessory={streak.streak > 1 ? <StreakMark days={streak.streak} filled={streak.filled} /> : null}
-          // Said in the caption's place once the streak cup has poured and its number ticked up, so
-          // logging never pushes the page down and the line never runs ahead of the count.
-          note={isToday && streak.line ? { text: streak.line, delay: AFTER_STRIP_MS + motion.duration.pourSmall, testID: 'today-streak-line' } : null}
-        />
-      </View>
+      <DayRingStrip
+        today={todayDate}
+        selected={date}
+        onSelect={(d) => setPicked(d === todayDate ? null : d)}
+        start={start}
+        accessory={streak.streak > 1 ? <StreakMark days={streak.streak} filled={streak.filled} /> : null}
+        // Said in the caption's place once the streak cup has poured and its number ticked up, so
+        // logging never pushes the page down and the line never runs ahead of the count.
+        note={isToday && streak.line ? { text: streak.line, delay: AFTER_STRIP_MS + motion.duration.pourSmall, testID: 'today-streak-line' } : null}
+      />
 
-      <EnergyCard day={day} isToday={isToday} firstDay={firstDay} meal={mealForTime(now)} onFits={() => setFits({ proteinFirst: false })} />
+      <EnergyCard
+        day={day}
+        isToday={isToday}
+        firstDay={firstDay}
+        meal={mealForTime(now)}
+        onFits={() => setFits({ proteinFirst: false })}
+        share={<ShareDayButton date={date} />}
+      />
       <StatusRail day={day} isToday={isToday} quiet={firstDay} />
       {isToday && recap.announce ? <RecapReadyCard /> : null}
 
@@ -111,53 +117,6 @@ export default function TodayScreen() {
   );
 }
 
-// ------------------------------------------------------------------ header
-
-function TodayHeader({
-  overline,
-  title,
-  isToday,
-  initial,
-  onJumpToday,
-  share,
-}: {
-  overline: string;
-  title: string;
-  isToday: boolean;
-  initial: string;
-  onJumpToday: () => void;
-  share?: React.ReactNode;
-}) {
-  const { colors, spacing } = useTheme();
-  const { width } = useWindowDimensions();
-  const size = width < 360 ? 23 : 27;
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, paddingTop: spacing.sm }}>
-      <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
-        <Text variant="overline" numberOfLines={1}>
-          {overline}
-        </Text>
-        <Text variant="h1" numberOfLines={2} style={{ fontSize: size, lineHeight: size + 5, letterSpacing: -size * 0.025 }}>
-          {title}
-        </Text>
-      </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-        {!isToday ? (
-          <Chip testID="today-jump-today" label="Today" selected onPress={onJumpToday} />
-        ) : null}
-        {share}
-        <PressableScale
-          testID="today-profile"
-          onPress={() => router.push('/profile')}
-          accessibilityLabel="Profile and settings"
-          style={{ width: 44, height: 44, ...cupFor(44), backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-          <Text variant="h3">{initial}</Text>
-        </PressableScale>
-      </View>
-    </View>
-  );
-}
-
 // ------------------------------------------------------------- energy hero
 
 const VESSEL_H = 212;
@@ -170,14 +129,17 @@ function EnergyCard({
   firstDay,
   meal,
   onFits,
+  share,
 }: {
   day: DaySummary;
   isToday: boolean;
   firstDay: boolean;
   meal: MealType;
   onFits: () => void;
+  /** The day's share button, at the end of the budget line. */
+  share: React.ReactNode;
 }) {
-  const { colors } = useTheme();
+  const { colors, spacing } = useTheme();
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
   const over = day.remaining < 0;
@@ -311,28 +273,31 @@ function EnergyCard({
           <FirstLogInvite meal={meal} date={day.date} budget={day.budget} />
         </View>
       ) : null}
-      <View style={{ height: 1, backgroundColor: colors.border, marginTop: 16, marginBottom: 12 }} />
-      <Text variant="caption" color="textSecondary">
-        {headroom > 0 ? (
-          <>
-            {'Budget '}
-            <Text variant="numM" style={{ fontSize: 14, lineHeight: 17 }}>
-              {formatNumber(day.budget)}
-            </Text>
-            {` = ${formatNumber(day.target)} target + ${formatNumber(headroom)} from exercise`}
-          </>
-        ) : (
-          <>
-            {'Daily budget '}
-            <Text variant="numM" style={{ fontSize: 14, lineHeight: 17 }}>
-              {formatNumber(day.budget)}
-            </Text>
-            {' kcal'}
-            {day.exerciseNet > 0 ? `, ${formatNumber(day.exerciseNet)} kcal burned in activity not added` : ''}
-          </>
-        )}
-        {over ? `. ${left} kcal past the budget` : ''}
-      </Text>
+      <View style={{ height: 1, backgroundColor: colors.border, marginTop: 16, marginBottom: 8 }} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+        <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
+          {headroom > 0 ? (
+            <>
+              {'Budget '}
+              <Text variant="numM" style={{ fontSize: 14, lineHeight: 17 }}>
+                {formatNumber(day.budget)}
+              </Text>
+              {` = ${formatNumber(day.target)} target + ${formatNumber(headroom)} from exercise`}
+            </>
+          ) : (
+            <>
+              {'Daily budget '}
+              <Text variant="numM" style={{ fontSize: 14, lineHeight: 17 }}>
+                {formatNumber(day.budget)}
+              </Text>
+              {' kcal'}
+              {day.exerciseNet > 0 ? `, ${formatNumber(day.exerciseNet)} kcal burned in activity not added` : ''}
+            </>
+          )}
+          {over ? `. ${left} kcal past the budget` : ''}
+        </Text>
+        {share}
+      </View>
     </Card>
   );
 }
