@@ -145,8 +145,9 @@ export function WeekCard({ week, dates, today }: { week: WeekSummary; dates: ISO
 
 function Mini({ label, value, unit, color, testID }: { label: string; value: string; unit?: string; color?: string; testID?: string }) {
   return (
-    // No shrinking below the number's own width (its spaces do not break): the row wraps instead of cutting it.
-    <View style={{ flexGrow: 1, flexBasis: 92 }} testID={testID}>
+    // No shrinking below the number's own width (its spaces do not break): each total is as wide as its number,
+    // at least 92 px, and the row wraps instead of cutting one ("20 h 40 min" is wider than a third of the card).
+    <View style={{ flexGrow: 1, flexBasis: 'auto', minWidth: 92 }} testID={testID}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         {color ? <CupKey color={color} /> : null}
         <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>

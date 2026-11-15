@@ -16,8 +16,9 @@
 // the stand-in backend: see the comment there.
 
 const settle = { wait: 700 };
-// A toast with Undo stays 4.5 s; states that are not about the toast wait for it to go.
-const toastGone = { wait: 5000 };
+// A toast with Undo stays 4.5 s, 12 s when the browser reports a screen reader (the test browser can);
+// states that are not about the toast wait for it to go.
+const toastGone = { wait: 12500 };
 const CSV = 'scripts/dev/states/files/garmin-activities.csv';
 const GPX = 'scripts/dev/states/files/morning-run.gpx';
 
@@ -214,7 +215,10 @@ const friendsLocal = [
 // week, recent workouts with distances), two requests waiting for it, one sent, and five cheers; the
 // lone account has friends on and nobody yet; the asked account has two requests waiting; the off
 // account has never turned friends on. Every password is PASSWORD. scripts/dev/states/move-friends.mjs
-// puts all of this on a running stand-in backend.
+// puts all of this on a running stand-in backend. Signing in keeps the account's saved settings, theme
+// included, and the first capture saves its own: run one theme at a time (--themes=dark), each on a
+// freshly started and seeded backend. The long names and big numbers here are the friends' (on the
+// server), so the device holds the ordinary demo data.
 const PASSWORD = 'correct horse battery';
 const signIn = (email) => [{ type: 'auth-email-input', text: email }, { type: 'auth-password-input', text: PASSWORD }, 'auth-submit', { wait: 2500 }];
 const friends = (email) => [...signIn(email), 'today-friends', { wait: 1500 }];
@@ -223,10 +227,10 @@ const friendsSignedIn = [
   { id: 'friends-signed-out', route: '/friends', waitFor: 'friends-signed-out', note: 'friends with accounts, signed out' },
   { id: 'friends-add-signed-out', route: '/friends/add?invite=ABCD2345', waitFor: 'friends-signed-out', note: 'an invite link, signed out' },
   { id: 'friends-setup', route: '/auth?mode=signin', taps: friends('move.off@example.com'), waitFor: 'friends-setup-save', note: 'signed in, friends not on: the set-up' },
-  { id: 'friends-setup-long', route: '/auth?mode=signin', data: 'stress', taps: [...friends('move.off@example.com'), { type: 'friends-setup-name', text: 'Maximiliana Vandenberghe-Okonkwo' }], waitFor: 'friends-setup-save', note: 'the set-up with a long name' },
+  { id: 'friends-setup-long', route: '/auth?mode=signin', taps: [...friends('move.off@example.com'), { type: 'friends-setup-name', text: 'Maximiliana Vandenberghe-Okonkwo' }], waitFor: 'friends-setup-save', note: 'the set-up with a long name' },
   { id: 'friends-none', route: '/auth?mode=signin', taps: friends('move.lone@example.com'), waitFor: 'friends-empty', note: 'friends on, nobody yet' },
   { id: 'friends-requests', route: '/auth?mode=signin', taps: friends('move.asked@example.com'), waitFor: 'friends-incoming', note: 'two requests waiting, one with a long name' },
-  { id: 'friends-full', route: '/auth?mode=signin', data: 'stress', taps: friends(FULL), waitFor: 'friends-cheers', note: 'four friends, requests both ways, cheers' },
+  { id: 'friends-full', route: '/auth?mode=signin', taps: friends(FULL), waitFor: 'friends-cheers', note: 'four friends, requests both ways, cheers' },
   { id: 'friends-full-imperial', route: '/auth?mode=signin', imperial: true, taps: friends(FULL), waitFor: 'friends-cheers', note: 'the same in miles' },
   { id: 'friends-friend-sheet', route: '/auth?mode=signin', taps: [...friends(FULL), '^friends-card-'], sheet: true, note: 'a friend opened: their week' },
   { id: 'friends-settings-sheet', route: '/auth?mode=signin', taps: [...friends(FULL), 'friends-settings-open'], sheet: true, note: 'friends settings' },

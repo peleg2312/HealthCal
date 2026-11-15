@@ -655,11 +655,11 @@ function ExerciseCard({
   const slug = `ex-${index}`;
   const prevText = prev ? formatPreviousSets(prev.sets, units) : null;
   // A set row holds the set number, two fields and two buttons. Under 360 px that leaves a field
-  // about 50 px, too little for "62.5" or "137.5": the card's padding, the number column and the
-  // gaps step down and the weight takes the larger share, so both values show in full.
+  // about 50 px, too little for "62.5" or "137.5": the card's padding, the gaps and the remove button
+  // step down and the weight takes the larger share, so both values show in full.
   const narrow = useWindowDimensions().width < 360;
   const gap = narrow ? 6 : spacing.sm;
-  const setCol = narrow ? 20 : 28;
+  const setCol = narrow ? 26 : 28;
   const removeSize = narrow ? 28 : 32;
   return (
     <View testID={slug} style={{ backgroundColor: colors.surface, ...cup(radius.card), borderWidth: 1, borderColor: colors.border, padding: narrow ? 16 : 18, gap: spacing.sm }}>

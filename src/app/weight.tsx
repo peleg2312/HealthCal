@@ -91,7 +91,7 @@ function WeightScreen() {
       ) : (
         <>
           <Card style={{ gap: spacing.md }}>
-            {/* The scale reading sits beside the trend, and goes under it when a three-digit weight leaves no room. */}
+            {/* The scale reading sits beside the trend, and goes under it, still at the right, when a three-digit weight leaves no room. */}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', columnGap: spacing.md, rowGap: spacing.xs }}>
               <View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -108,7 +108,7 @@ function WeightScreen() {
                 </View>
               </View>
               {latest ? (
-                <View style={{ alignItems: 'flex-end' }}>
+                <View style={{ alignItems: 'flex-end', marginLeft: 'auto' }}>
                   <Text variant="caption" color="textSecondary">
                     Scale, {latest.date === end ? 'today' : formatShortDate(latest.date)}
                   </Text>
