@@ -125,9 +125,20 @@ export async function signIn(email: string, password: string): Promise<AuthResul
 
 export async function signUp(email: string, password: string): Promise<AuthResult> {
   if (!supabase) return { ok: false, message: 'Accounts are not set up for this build yet.' };
-  const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
+  const { data, error } = await supabase.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: confirmRedirect() } });
   if (error) return { ok: false, message: friendly(error.message) };
   return { ok: true, needsEmailConfirmation: !data.session };
+}
+
+/**
+ * Where the confirmation email should bring a new person back to: the sign-in screen, on this
+ * site on web and through the app's own link on a phone. Without it the link ends on the
+ * project's default address, which is nothing a phone can open. The address must be on the
+ * project's allow list (healthcal://** is); one that is not falls back to that default.
+ */
+function confirmRedirect(): string {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') return `${window.location.origin}/auth?mode=signin`;
+  return Linking.createURL('/auth', { queryParams: { mode: 'signin' } });
 }
 
 /** Where the reset email should bring the user back to: this site on web, the app's own link on a phone. */
