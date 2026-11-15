@@ -6,13 +6,14 @@ import { useWindowDimensions, View } from 'react-native';
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
 import { useRecapReady } from '@/features/progress/recapReady';
 import { coachTip, rhythmFromReminders, type ClosedDay } from '@/features/today/coach';
-import { DayRingStrip } from '@/features/today/DayRingStrip';
+import { DayRingStrip, STRIP_WEEKS } from '@/features/today/DayRingStrip';
 import { FitsSheet } from '@/features/today/FitsSheet';
 import { mealLine } from '@/features/today/meals';
 import { ReadyRim } from '@/features/today/ReadyRim';
 import { RecapReadyCard } from '@/features/today/RecapReadyCard';
 import { FirstLogInvite } from '@/features/today/FirstLogInvite';
-import { startDate } from '@/features/today/week';
+import { useDaySwipe } from '@/features/today/useDaySwipe';
+import { startDate, weekDates } from '@/features/today/week';
 import { ShareDayButton } from '@/features/share';
 import { greetingTitle } from '@/features/today/greetingTitle';
 import { TabHeader, tabDay, tabTitleRoom, tabTitleSize } from '@/components/TabHeader';
@@ -56,18 +57,31 @@ export default function TodayScreen() {
 
   const { width } = useWindowDimensions();
   const title = greetingTitle(greeting(now), profile.name ?? '', tabTitleRoom(width), tabTitleSize(width));
+  const select = (d: ISODate) => setPicked(d === todayDate ? null : d);
+  // A sideways swipe on the page moves one day, back as far as the strip goes (never before the profile was made).
+  const stripFirst = weekDates(todayDate, STRIP_WEEKS - 1)[0];
+  const swipe = useDaySwipe({ date, onChange: select, latest: todayDate, earliest: start && start > stripFirst ? start : stripFirst });
 
   return (
     <Screen
       tabs
       testID="today-screen"
-      contentStyle={{ gap: spacing.md }}
       header={<TabHeader tab="today" overline={tabDay(date)} title={title} />}>
-      {!isToday ? (
-        <View style={{ flexDirection: 'row' }}>
-          <Chip testID="today-jump-today" label="Back to today" selected onPress={() => setPicked(null)} />
-        </View>
-      ) : firstDay ? (
+      <View testID="today-swipe" {...swipe} style={{ gap: spacing.md }}>
+      {/* The one date control, the same as the diary's: the strip, then the week's caption with the streak or "Back to today". */}
+      <DayRingStrip
+        today={todayDate}
+        selected={date}
+        onSelect={select}
+        start={start}
+        jumpTestID="today-jump-today"
+        accessory={streak.streak > 1 ? <StreakMark days={streak.streak} filled={streak.filled} /> : null}
+        // Said in the caption's place once the streak cup has poured and its number ticked up, so
+        // logging never pushes the page down and the line never runs ahead of the count.
+        note={isToday && streak.line ? { text: streak.line, delay: AFTER_STRIP_MS + motion.duration.pourSmall, testID: 'today-streak-line' } : null}
+      />
+
+      {!isToday ? null : firstDay ? (
         <Text variant="body" color="textSecondary" testID="today-coach">
           {`Your budget is ${formatNumber(day.budget)} kcal. Log the first thing and the cup starts to fill.`}
         </Text>
@@ -78,17 +92,6 @@ export default function TodayScreen() {
           onFits={() => setFits({ proteinFirst: true })}
         />
       ) : null}
-
-      <DayRingStrip
-        today={todayDate}
-        selected={date}
-        onSelect={(d) => setPicked(d === todayDate ? null : d)}
-        start={start}
-        accessory={streak.streak > 1 ? <StreakMark days={streak.streak} filled={streak.filled} /> : null}
-        // Said in the caption's place once the streak cup has poured and its number ticked up, so
-        // logging never pushes the page down and the line never runs ahead of the count.
-        note={isToday && streak.line ? { text: streak.line, delay: AFTER_STRIP_MS + motion.duration.pourSmall, testID: 'today-streak-line' } : null}
-      />
 
       <EnergyCard
         day={day}
@@ -113,6 +116,7 @@ export default function TodayScreen() {
         proteinLeft={day.macros.proteinG - day.eaten.protein}
       />
       <MilestoneSheet milestone={streak.milestone} onClose={streak.closeMilestone} />
+      </View>
     </Screen>
   );
 }

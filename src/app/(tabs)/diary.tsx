@@ -1,5 +1,5 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, ChevronRight, Copy, Search } from 'lucide-react-native';
+import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
+import { Copy, Search } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { type ScrollView, type ScrollViewProps, View } from 'react-native';
 
@@ -9,22 +9,18 @@ import { dayPhrase, href, kcal, param, parseDate } from '@/features/food/helpers
 import { TabHeader, tabDay } from '@/components/TabHeader';
 import { ShareDayButton } from '@/features/share';
 import { DayRingStrip } from '@/features/today/DayRingStrip';
+import { useDaySwipe } from '@/features/today/useDaySwipe';
 import { useReportViewedDay } from '@/features/today/viewedDay';
-import { addDays, formatShortDate, today, weekdayShort } from '@/lib/dates';
+import { addDays, today } from '@/lib/dates';
 import { MEALS, entriesTotal, mealForTime } from '@/lib/nutrition';
 import { useToday } from '@/store/clock';
 import { useDay, useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ISODate, MealType } from '@/types';
-import { Button, Card, Chip, IconButton, Screen, Text } from '@/ui';
+import { Button, Card, Screen, Text } from '@/ui';
 
-/** The day under the arrows, said the way people say it, from the clock hook's date. */
-function dayLabel(date: ISODate, t: ISODate): string {
-  if (date === t) return 'Today';
-  if (date === addDays(t, -1)) return 'Yesterday';
-  if (date === addDays(t, 1)) return 'Tomorrow';
-  return `${weekdayShort(date)}, ${formatShortDate(date)}`;
-}
+/** How far ahead the diary goes: a week, to plan meals (the strip then shows next week as well). */
+const PLAN_AHEAD_DAYS = 7;
 
 export default function DiaryScreen() {
   const { colors, spacing } = useTheme();
@@ -34,13 +30,18 @@ export default function DiaryScreen() {
   // The + sheet logs to the day being looked at.
   useReportViewedDay(date === t ? null : date);
   const setDate = (d: ISODate) => router.setParams({ date: d === today() ? undefined : d });
+  const latest = addDays(t, PLAN_AHEAD_DAYS);
+  // A sideways swipe on the page moves one day (the strip itself pages weeks).
+  const swipe = useDaySwipe({ date, onChange: setDate, latest });
 
   // Arriving with ?meal= (a meal row on Today) scrolls that meal into view once, then drops the param.
   const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const mealY = useRef<Partial<Record<MealType, number>>>({});
   const targetMeal = MEALS.find((m) => m.id === param(params.meal))?.id;
+  // Only while in front: a timer still running after the person went back would bring the diary back.
+  const focused = useIsFocused();
   useEffect(() => {
-    if (!targetMeal) return;
+    if (!targetMeal || !focused) return;
     // Wait a frame or two so the cards have their layout for this day.
     const timer = setTimeout(() => {
       const y = mealY.current[targetMeal];
@@ -48,7 +49,7 @@ export default function DiaryScreen() {
       router.setParams({ meal: undefined });
     }, 120);
     return () => clearTimeout(timer);
-  }, [targetMeal, date, spacing.sm]);
+  }, [targetMeal, date, spacing.sm, focused]);
 
   const day = useDay(date);
   const allEntries = useLive('foodEntries');
@@ -65,23 +66,9 @@ export default function DiaryScreen() {
 
   return (
     <Screen tabs testID="diary-screen" scrollProps={{ ref: scrollRef } as ScrollViewProps} header={<TabHeader tab="diary" overline={tabDay(date)} title="Food diary" />}>
-      {/* A day at a time: the arrows step one day, the strip under them picks any day of the week. */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-        <IconButton testID="diary-prev" accessibilityLabel="Previous day" onPress={() => setDate(addDays(date, -1))}>
-          <ChevronLeft size={20} color={colors.text} strokeWidth={2.2} />
-        </IconButton>
-        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm }}>
-          <Text variant="h3" numberOfLines={1} testID="diary-date-title" style={{ flexShrink: 1 }}>
-            {dayLabel(date, t)}
-          </Text>
-          {!isToday ? <Chip testID="diary-today" label="Today" selected onPress={() => setDate(t)} /> : null}
-        </View>
-        <IconButton testID="diary-next" accessibilityLabel="Next day" onPress={() => setDate(addDays(date, 1))}>
-          <ChevronRight size={20} color={colors.text} strokeWidth={2.2} />
-        </IconButton>
-      </View>
-
-      <DayRingStrip today={t} selected={date} onSelect={setDate} testIDPrefix="diary" />
+      <View testID="diary-swipe" {...swipe} style={{ gap: spacing.lg }}>
+      {/* The one date control, the same as Today's: the header's overline names the day, the strip picks one. */}
+      <DayRingStrip today={t} selected={date} onSelect={setDate} testIDPrefix="diary" latest={latest} jumpTestID="diary-today" />
 
       <DaySummaryCard day={day} share={date <= t ? <ShareDayButton date={date} testID="diary-share" /> : null} />
 
@@ -142,6 +129,7 @@ export default function DiaryScreen() {
         onClose={() => setMenuMeal(null)}
         onRepeat={() => menuMeal && copyPreviousMeal(date, menuMeal)}
       />
+      </View>
     </Screen>
   );
 }

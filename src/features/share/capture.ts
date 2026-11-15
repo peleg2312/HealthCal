@@ -11,6 +11,8 @@
 import type { ComponentRef, RefObject } from 'react';
 import type { View } from 'react-native';
 
+import { inFramedViewer, ViewerBlockedError } from '@/services/viewer';
+
 import { paintScene, sceneFonts, type Ctx2D } from './paint';
 import { EXPORT_SCALE, type Scene } from './scene';
 
@@ -59,6 +61,7 @@ export async function canShareImage(): Promise<boolean> {
 }
 
 export async function shareCard(req: CardExport): Promise<ExportResult> {
+  if (inFramedViewer()) throw new ViewerBlockedError('share');
   const blob = await renderPng(req.scene);
   const file = fileFor(blob, req.fileName);
   if (typeof navigator !== 'undefined' && navigator.canShare?.({ files: [file] })) {
@@ -75,6 +78,7 @@ export async function shareCard(req: CardExport): Promise<ExportResult> {
 }
 
 export async function saveCard(req: CardExport): Promise<ExportResult> {
+  if (inFramedViewer()) throw new ViewerBlockedError('share');
   download(await renderPng(req.scene), req.fileName);
   return 'saved';
 }

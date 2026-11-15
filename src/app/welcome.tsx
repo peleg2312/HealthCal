@@ -6,6 +6,7 @@ import { useWindowDimensions, View } from 'react-native';
 import { ARRIVAL_POUR, CupMark, Note } from '@/features/onboarding/components';
 import { formatNumber } from '@/lib/units';
 import { pickAndImportBackup } from '@/services/export';
+import { VIEWER_BLOCKED } from '@/services/viewer';
 import { isBackendConfigured } from '@/services/supabase';
 import { useStore } from '@/store';
 import { useTheme } from '@/theme';
@@ -172,7 +173,8 @@ export default function Welcome() {
     const r = await pickAndImportBackup({ forceProfile: true });
     setImporting(false);
     if (!r.ok) {
-      if (!r.canceled) setImportNote({ tone: 'warning', text: `That file could not be restored. ${r.message}` });
+      // The hosted preview's frame cannot open files at all: say that alone, not that a file failed.
+      if (!r.canceled) setImportNote({ tone: 'warning', text: r.message === VIEWER_BLOCKED.files ? r.message : `That file could not be restored. ${r.message}` });
       return;
     }
     // A backup with a finished plan opens straight onto Today.

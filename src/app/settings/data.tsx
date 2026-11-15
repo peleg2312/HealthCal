@@ -21,6 +21,7 @@ export default function DataScreen() {
   const sleep = useLive('sleep');
   const customFoods = useLive('customFoods');
   const signedIn = useAuth((s) => !!s.session);
+  const onboarded = useStore((s) => !!s.profile?.onboardedAt);
   const [busy, setBusy] = useState<ExportKind | 'import' | null>(null);
   const [confirmErase, setConfirmErase] = useState(false);
   /** An import whose backup profile was not applied because this device has a newer one. */
@@ -118,17 +119,20 @@ export default function DataScreen() {
           right={spinner('import')}
           onPress={() => void runImport()}
         />
-        <ListRow
-          testID="data-import-garmin"
-          title="Import from Garmin"
-          subtitle="Workouts from FIT, TCX, GPX or the Activities CSV"
-          left={
-            <IconTile color={colors.exercise}>
-              <Activity size={20} color={colors.exercise} />
-            </IconTile>
-          }
-          onPress={() => router.push('/activity/import')}
-        />
+        {/* Workouts need a profile (their calories come from it): before setup only a backup can be restored here. */}
+        {onboarded ? (
+          <ListRow
+            testID="data-import-garmin"
+            title="Import from Garmin"
+            subtitle="Workouts from FIT, TCX, GPX or the Activities CSV"
+            left={
+              <IconTile color={colors.exercise}>
+                <Activity size={20} color={colors.exercise} />
+              </IconTile>
+            }
+            onPress={() => router.push('/activity/import')}
+          />
+        ) : null}
       </Group>
 
       <Group title="Spreadsheets (CSV)" footer="Opens in Excel, Numbers or Google Sheets. Values are metric with the unit in each column name.">

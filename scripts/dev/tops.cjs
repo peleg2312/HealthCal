@@ -16,7 +16,12 @@
  * numbers: see "The top of a screen" in AGENTS.md. The header is the element with the
  * testID `tab-header` (tab screens) or `screen-header` (the kit's Header on pushed screens).
  *
- *   node scripts/dev/tops.cjs <outDir> [--theme=blossom|light|dark] [--width=390]
+ * Every width is measured: 360 (the most common Android width) first, then 390 and 320, each at a
+ * phone's height. With more than one width the crops are named NN-name-<n>w<width>.png, so the
+ * sheet shows each screen once per row with its widths side by side in the order asked, and
+ * tops.json has one row per screen and width.
+ *
+ *   node scripts/dev/tops.cjs <outDir> [--theme=blossom|light|dark] [--width=360,390,320]
  *        [--height=150]   pixels of each screen to keep in the sheet
  *        [--routes=/,/diary]   only these routes (default: every screen with a header)
  *        [--url=http://localhost:8081]
@@ -30,7 +35,8 @@ const args = process.argv.slice(2);
 const flags = Object.fromEntries(args.filter((a) => a.startsWith('--')).map((a) => { const [k, ...v] = a.slice(2).split('='); return [k, v.join('=') || true]; }));
 const out = path.resolve(args.find((a) => !a.startsWith('--')) || 'tops');
 const theme = String(flags.theme || 'blossom');
-const width = Number(flags.width || 390);
+const widths = String(flags.width || flags.widths || '360,390,320').split(',').map(Number).filter(Boolean);
+const HEIGHTS = { 320: 640, 360: 740, 390: 844 };
 const keep = Number(flags.height || 150);
 const base = flags.url || 'http://localhost:8081';
 
@@ -104,37 +110,44 @@ function measure() {
   const { buildSeed } = await import('./seed.mjs');
   const seed = JSON.stringify(buildSeed({ theme }));
   const browser = await chromium.launch();
-  const context = await browser.newContext({ viewport: { width, height: 844 }, reducedMotion: 'reduce', colorScheme: theme === 'dark' ? 'dark' : 'light', isMobile: true, hasTouch: true });
-  await context.addInitScript((v) => { if (!sessionStorage.getItem('seeded')) { localStorage.setItem('healthcal-v1', v); sessionStorage.setItem('seeded', '1'); } }, seed);
   const rows = [];
-  let i = 0;
-  for (const route of ROUTES) {
-    const page = await context.newPage();
-    await page.goto(base + route, { waitUntil: 'networkidle', timeout: 120000 }).catch(() => {});
-    await page.waitForSelector('[data-testid]', { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(600);
-    const name = `${String(++i).padStart(2, '0')}-${route.split('?')[0].replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'today'}`;
-    await page.screenshot({ path: path.join(out, `${name}.png`), clip: { x: 0, y: 0, width, height: keep } });
-    const m = await page.evaluate(measure).catch(() => null);
-    rows.push({ route, kind: TABS.includes(route) ? 'tab' : 'pushed', ...(m || { how: 'not found' }) });
-    await page.close();
+  for (const [w, width] of widths.entries()) {
+    const context = await browser.newContext({ viewport: { width, height: HEIGHTS[width] || 844 }, reducedMotion: 'reduce', colorScheme: theme === 'dark' ? 'dark' : 'light', isMobile: true, hasTouch: true });
+    await context.addInitScript((v) => { if (!sessionStorage.getItem('seeded')) { localStorage.setItem('healthcal-v1', v); sessionStorage.setItem('seeded', '1'); } }, seed);
+    let i = 0;
+    for (const route of ROUTES) {
+      const page = await context.newPage();
+      await page.goto(base + route, { waitUntil: 'networkidle', timeout: 120000 }).catch(() => {});
+      await page.waitForSelector('[data-testid]', { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(600);
+      const name = `${String(++i).padStart(2, '0')}-${route.split('?')[0].replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'today'}${widths.length > 1 ? `-${w}w${width}` : ''}`;
+      await page.screenshot({ path: path.join(out, `${name}.png`), clip: { x: 0, y: 0, width, height: keep } });
+      const m = await page.evaluate(measure).catch(() => null);
+      rows.push({ route, width, kind: TABS.includes(route) ? 'tab' : 'pushed', ...(m || { how: 'not found' }) });
+      await page.close();
+    }
+    await context.close();
   }
   await browser.close();
-  fs.writeFileSync(path.join(out, 'tops.json'), JSON.stringify({ theme, width, rows }, null, 1));
+  fs.writeFileSync(path.join(out, 'tops.json'), JSON.stringify({ theme, widths, ...(widths.length === 1 ? { width: widths[0] } : null), rows }, null, 1));
   try {
-    execSync(`node ${JSON.stringify(path.join(__dirname, 'contact-sheet.cjs'))} ${JSON.stringify(out)} ${JSON.stringify(path.join(out, '_sheet.png'))} 4 ${width} ${keep}`, { stdio: 'ignore' });
+    const tile = Math.max(...widths);
+    execSync(`node ${JSON.stringify(path.join(__dirname, 'contact-sheet.cjs'))} ${JSON.stringify(out)} ${JSON.stringify(path.join(out, '_sheet.png'))} ${widths.length > 1 ? widths.length : 4} ${tile} ${keep}`, { stdio: 'ignore' });
   } catch { /* the single crops are still there */ }
 
-  console.log(`${theme} at ${width} px: ${path.join(out, '_sheet.png')}`);
-  console.log('route'.padEnd(38) + 'kind    top    h  gap title lines  header');
   const col = (v, n) => String(v ?? '-').padStart(n);
-  for (const r of rows) console.log(`${r.route.padEnd(38)}${r.kind.padEnd(7)}${col(r.top, 4)} ${col(r.h, 4)} ${col(r.gap, 4)} ${col(r.title, 5)} ${col(r.lines, 5)}  ${r.how}`);
-  // A kind with more than one value for any of these numbers is reported, so it can be put right.
-  for (const kind of ['tab', 'pushed']) {
-    const mine = rows.filter((r) => r.kind === kind && r.top !== undefined);
-    for (const k of ['top', 'h', 'gap', 'title', 'lines']) {
-      const values = [...new Set(mine.map((r) => r[k]))];
-      if (values.length > 1) console.log(`  ${kind} screens differ in ${k}: ${values.join(', ')}`);
+  for (const width of widths) {
+    const mineW = rows.filter((r) => r.width === width);
+    console.log(`\n${theme} at ${width} px: ${path.join(out, '_sheet.png')}`);
+    console.log('route'.padEnd(38) + 'kind    top    h  gap title lines  header');
+    for (const r of mineW) console.log(`${r.route.padEnd(38)}${r.kind.padEnd(7)}${col(r.top, 4)} ${col(r.h, 4)} ${col(r.gap, 4)} ${col(r.title, 5)} ${col(r.lines, 5)}  ${r.how}`);
+    // A kind with more than one value for any of these numbers is reported, so it can be put right.
+    for (const kind of ['tab', 'pushed']) {
+      const mine = mineW.filter((r) => r.kind === kind && r.top !== undefined);
+      for (const k of ['top', 'h', 'gap', 'title', 'lines']) {
+        const values = [...new Set(mine.map((r) => r[k]))];
+        if (values.length > 1) console.log(`  ${kind} screens differ in ${k} at ${width} px: ${values.join(', ')}`);
+      }
     }
   }
 })();

@@ -11,6 +11,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
+import { inFramedViewer, ViewerBlockedError } from '@/services/viewer';
+
 export interface PickedFile {
   name: string;
   size: number;
@@ -28,6 +30,8 @@ const WEB_TYPES = ['.fit', '.tcx', '.gpx', '.csv', '.zip', '.gz'];
 
 /** Null when the person cancelled. */
 export async function pickGarminFiles(): Promise<PickResult | null> {
+  // The hosted preview's frame blocks the file picker: say so rather than open nothing.
+  if (inFramedViewer()) throw new ViewerBlockedError('files');
   const res = await DocumentPicker.getDocumentAsync({
     type: Platform.OS === 'web' ? WEB_TYPES : '*/*',
     multiple: true,

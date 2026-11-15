@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { KeyboardAvoidingView, Modal, PanResponder, type PanResponderInstance, Platform, Pressable, ScrollView, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -13,11 +13,36 @@ import { ToastHost } from './Toast';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
+/** Released past this share of the sheet's height, the drag closes it. */
+const CLOSE_SHARE = 0.25;
+/** A flick: released moving down at least this fast (px/ms), after at least FLICK_MIN px. */
+const FLICK_SPEED = 0.5;
+const FLICK_MIN = 12;
+/** On web the drag zone takes the finger itself: no page scroll, pull-to-refresh or text selection starts there. */
+const DRAG_ZONE_WEB = (Platform.OS === 'web' ? { touchAction: 'none', userSelect: 'none', cursor: 'grab' } : null) as ViewStyle | null;
+
+/** Pure rule for the end of a drag: close, or settle back. Exported for the tests. */
+export function sheetDragCloses(dy: number, vy: number, sheetHeight: number): boolean {
+  if (dy <= 0) return false;
+  return dy > sheetHeight * CLOSE_SHARE || (vy > FLICK_SPEED && dy > FLICK_MIN);
+}
+
 /**
  * Bottom sheet for short, focused tasks (pick a value, confirm, quick add).
  * It slides up while its backdrop fades in, and slides down with the backdrop
  * fading out when closed; reduced motion makes both instant. The sheet stays
  * mounted for the ~200 ms of its exit, with touches passing through it.
+ *
+ * The handle means what it shows: dragging down on the handle or the title
+ * (the drag zone) moves the sheet with the finger, and letting go past a
+ * quarter of its height, or flicking down, closes it through `onClose` (the
+ * same as the backdrop, the back button and Escape on web); otherwise it
+ * settles back. The body still scrolls: only the drag zone takes the drag.
+ * Under reduced motion the sheet does not follow the finger, but a drag past
+ * the threshold still closes it. Built on PanResponder, not a gesture library:
+ * it runs inside the native Modal (where react-native-gesture-handler would
+ * need a root of its own on Android) and, through react-native-web's responder
+ * system, with a finger or a mouse in a browser.
  */
 export function Sheet({
   visible,
@@ -60,8 +85,50 @@ export function Sheet({
       );
   }, [visible, mounted, reduce, open]);
   const travel = sheetH || winH;
-  const backdropStyle = useAnimatedStyle(() => ({ opacity: open.get() }));
-  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - open.get()) * (travel + 24) }] }));
+  // How far the finger has pulled the sheet down (0 at rest). Reset each time the sheet opens.
+  const drag = useSharedValue(0);
+  useEffect(() => {
+    if (visible) {
+      cancelAnimation(drag);
+      drag.set(0);
+    }
+  }, [visible, drag]);
+  // The latest props for the drag handlers, which are made once, after the first render.
+  const latest = useRef({ onClose, visible, reduce, travel });
+  useEffect(() => {
+    latest.current = { onClose, visible, reduce, travel };
+  });
+  const [pan, setPan] = useState<PanResponderInstance | null>(null);
+  useEffect(() => {
+    const settle = () => {
+      if (latest.current.reduce) drag.set(0);
+      else drag.set(withTiming(0, { duration: motion.duration.settle, easing: ease.enter }));
+    };
+    setPan(
+      PanResponder.create({
+        // The zone holds no controls, so it can take the touch at once (before the browser starts anything).
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 4 && Math.abs(g.dy) > Math.abs(g.dx),
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderGrant: () => cancelAnimation(drag),
+        onPanResponderMove: (_, g) => {
+          // Down follows the finger; up gives a little, never more than 12 px.
+          if (!latest.current.reduce) drag.set(g.dy >= 0 ? g.dy : -Math.min(12, -g.dy / 4));
+        },
+        onPanResponderRelease: (_, g) => {
+          if (!sheetDragCloses(g.dy, g.vy, latest.current.travel)) return settle();
+          latest.current.onClose();
+          // A sheet that refuses to close (onClose does nothing) comes back.
+          setTimeout(() => {
+            if (latest.current.visible) settle();
+          }, 80);
+        },
+        onPanResponderTerminate: settle,
+      }),
+    );
+  }, [drag]);
+  const backdropStyle = useAnimatedStyle(() => ({ opacity: open.get() * (1 - Math.min(0.6, Math.max(0, drag.get()) / (travel + 24))) }));
+  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - open.get()) * (travel + 24) + drag.get() }] }));
   return (
     <Modal visible={mounted} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <KeyboardAvoidingView
@@ -97,14 +164,17 @@ export function Sheet({
             },
             sheetStyle,
           ]}>
-          <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 8 }}>
-            <View style={{ width: 36, height: 4, borderRadius: 1, backgroundColor: colors.borderStrong }} />
+          {/* The drag zone: the handle and the title. */}
+          <View testID="sheet-drag" {...pan?.panHandlers} style={DRAG_ZONE_WEB}>
+            <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 8 }}>
+              <View testID="sheet-handle" style={{ width: 36, height: 4, borderRadius: 1, backgroundColor: colors.borderStrong }} />
+            </View>
+            {title ? (
+              <Text variant="h2" style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.md }}>
+                {title}
+              </Text>
+            ) : null}
           </View>
-          {title ? (
-            <Text variant="h2" style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.md }}>
-              {title}
-            </Text>
-          ) : null}
           <ScrollView testID="sheet-body" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.md }}>
             {children}
           </ScrollView>

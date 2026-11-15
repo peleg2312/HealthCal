@@ -2,6 +2,7 @@ import { Check, Share2 } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Platform, useWindowDimensions, View } from 'react-native';
 
+import { ViewerBlockedError } from '@/services/viewer';
 import { useTheme } from '@/theme';
 import { Button, haptic, PressableScale, Sheet, Text, toast } from '@/ui';
 
@@ -134,8 +135,8 @@ export function ShareSheet({
         haptic.success();
         toast('Image saved', { tint: colors.calories });
       } else if (result === 'shared') onClose();
-    } catch {
-      toast('Could not make the image. Try again in a moment.');
+    } catch (e) {
+      toast(e instanceof ViewerBlockedError ? e.message : 'Could not make the image. Try again in a moment.');
     } finally {
       setBusy(null);
     }

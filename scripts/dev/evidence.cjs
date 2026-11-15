@@ -5,9 +5,27 @@
  * error, and a scan for text that is cut off, content wider than the screen and touch
  * targets under 44 px. Writes PNGs, one contact sheet per route or state, and report.json.
  *
+ * WIDTHS. By default every screen is taken at 360, 390 and 320 px, in that order: 360 x 740 is the
+ * most common Android phone (the owner's), 390 x 844 an iPhone, 320 x 640 the narrowest. The
+ * contact sheet of a route or state has one row per theme with the widths side by side in the
+ * order given to --widths.
+ *
  * It also lays the whole page out at once (the window grown to the page's height) and
  * reports what sits wrongly:
  *   overText    text drawn over other text, or side by side with less than 3 px between
+ *   tight       two pieces of text from different blocks that almost touch: one above the other
+ *               (their letters overlapping sideways) less than 8 px apart, or side by side on one
+ *               line less than 6 px apart, with the gap in px. Measured between the letters' ink
+ *               (the font's real ascent and descent), not the line boxes. Left alone on purpose,
+ *               decided from the page's structure: the lines of one paragraph, a number and its
+ *               unit and other words of one text (nested text is one piece); one component's
+ *               stacked lines (the nearest element holding both holds at most three pieces of
+ *               text: a header's title and its line, a list row's title and subtitle, a stat and
+ *               its caption); a title or label and the single line under it, neighbouring children
+ *               of the element holding both; a label directly above its own field. None of these
+ *               excuses text that is placed (absolutely positioned below the element holding both,
+ *               such as a label set at a cup's level): placed text keeps its room at every value.
+ *               Text in a drawing (the share card's SVG) is left to overText.
  *   broken      a word split over two lines because its box is too narrow
  *   sticksOut   text or a painted box reaching past the card, row or button that holds it
  *   controls    two controls whose visible boxes overlap
@@ -37,7 +55,7 @@
  * card's SVG) is measured at the size it is drawn, its font size times the drawing's scale.
  *
  *   node scripts/dev/evidence.cjs --out=<dir> --routes=/,/diary,/water
- *        [--themes=blossom,light,dark] [--widths=390,320] [--empty] [--fresh] [--stress] [--imperial]
+ *        [--themes=blossom,light,dark] [--widths=360,390,320] [--empty] [--fresh] [--stress] [--imperial]
  *        [--states=<list>[,<list>]] [--only=<state id>[,<id>]]
  *        [--checks]   also run type-check, lint, unit tests, e2e and the route check
  *        [--tries=3]  attempts at a capture before it is reported as not captured
@@ -56,6 +74,13 @@
  *                                  stored: welcome and onboarding) | stress (long names, big numbers:
  *                                  buildSeed({ stress: true }) in seed.mjs)
  *     imperial: true,              the profile in lb, ft in, fl oz and mi
+ *     values: { eaten: 0.6, exercise: 290 },   today's amounts on top of the demo (or stress) data,
+ *                                  as ordinary records (buildSeed's `values` in seed.mjs, which uses the
+ *                                  app's own budget and goals): eaten and protein as a share of today's
+ *                                  budget and protein target, exercise in net kcal, water as a share of
+ *                                  today's goal, weekMinutes toward the weekly guideline, fasting as a
+ *                                  share of the fasting target. scripts/dev/states/sweep.cjs uses it to
+ *                                  take every labelled cup and bar at the values that stress it.
  *     type: { 'food-search-input': 'banana' },   typed after the screen opens, before the taps
  *     taps: [                      done in order, ~0.7 s apart:
  *       'tab-add',                   tap the element with this testID ('^prefix-' taps the first
@@ -107,7 +132,10 @@ const base = flags.url || 'http://localhost:8081';
 // Without --routes: the Today screen, unless states were asked for (then only the states).
 const routes = String(flags.routes || (flags.states ? '' : '/')).split(',').filter(Boolean);
 const themes = String(flags.themes || 'blossom,light,dark').split(',');
-const widths = String(flags.widths || '390,320').split(',').map(Number);
+// 360 first: the most common Android width, and the owner's phone. Each width has a phone's height.
+const widths = String(flags.widths || '360,390,320').split(',').map(Number);
+const HEIGHTS = { 320: 640, 360: 740, 390: 844 };
+const heightFor = (width) => HEIGHTS[width] || (width < 360 ? 640 : 844);
 const ROOT = path.join(__dirname, '..', '..');
 
 /**
@@ -399,8 +427,140 @@ function layoutScan(rootSel) {
     const d = Math.min(t.r.l - cr.l, cr.r - t.r.r, t.r.t - cr.t, cr.b - t.r.b);
     if (d >= -1.5 && d < 4) add('gaps', `${name(t.el)} ${Math.max(0, Math.round(d))}px from the edge of ${name(c)}`);
   }
+  /**
+   * Inside layoutScan (so it goes to the page with it): two
+   * pieces of text that belong to different blocks and almost touch. A piece of text is one text
+   * component with the words nested in it (a number with its unit span, a bold lead in a sentence),
+   * measured by its ink: the letters' real top and bottom from the font (canvas metrics), not the
+   * line box. Reported:
+   *   - one above the other, their ink overlapping sideways, less than 8 px apart;
+   *   - side by side on one line, less than 6 px apart (closer than a word space is overText).
+   * Tight by design, and left alone, decided from the page's structure:
+   *   - the lines of one paragraph, a number and its unit, words of one sentence (one piece of text);
+   *   - one component's stacked lines: the nearest element holding both holds at most three pieces of
+   *     text (a header's title and its line, a list row's title and subtitle, a stat and its caption,
+   *     a number beside its "kcal left");
+   *   - a title or label and the single line under it, next to each other in the flow: the two are
+   *     neighbouring children of the element holding both, each holding only that piece of text (a
+   *     card's heading and its one line, a label over its value);
+   *   - a label directly above its own field (the next child holds an input and at most one piece of text).
+   * None of these applies when either piece is placed (an absolutely positioned element between it and
+   * the element holding both, such as a label set at a cup's level): placed text must keep its room
+   * whatever the value. Not judged: text in a drawing (the share card's SVG, judged by overText), and
+   * what layoutScan leaves out on purpose (the + cup, corner counts, aria-hidden miniatures, toasts).
+   * Returns at most 12 descriptions with the gap in px.
+   */
+  function tightScan({ root, shown, onPurpose, visibleRect, empty }) {
+    const ctx = (tightScan.canvas ||= document.createElement('canvas')).getContext('2d');
+    const metrics = new Map();
+    const ink = (el, word) => {
+      const s = getComputedStyle(el);
+      const font = `${s.fontStyle} ${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;
+      const key = `${font}|${word}`;
+      if (!metrics.has(key)) {
+        ctx.font = font;
+        const m = ctx.measureText(word);
+        metrics.set(key, { asc: m.fontBoundingBoxAscent, up: m.actualBoundingBoxAscent, down: m.actualBoundingBoxDescent });
+      }
+      return metrics.get(key);
+    };
+    // The piece of text an element's words belong to: up through inline (nested) text.
+    const pieceOf = (el) => { let e = el; while (e.parentElement && e !== root && getComputedStyle(e).display === 'inline') e = e.parentElement; return e; };
+    const pieces = new Map();
+    for (const el of root.querySelectorAll('*')) {
+      if (el.closest('svg') || !shown(el) || onPurpose(el)) continue;
+      for (const n of el.childNodes) {
+        if (n.nodeType !== 3 || !n.textContent.trim()) continue;
+        const fs = parseFloat(getComputedStyle(el).fontSize) || 14;
+        const re = /\S+/g;
+        let m;
+        while ((m = re.exec(n.textContent))) {
+          const range = document.createRange();
+          range.setStart(n, m.index);
+          range.setEnd(n, m.index + m[0].length);
+          const k = ink(el, m[0]);
+          for (const q of range.getClientRects()) {
+            if (q.width <= 0) continue;
+            // The range's box is the font's content area, so its top plus the font's ascent is the baseline.
+            const base = q.top + k.asc;
+            const v = visibleRect(el, { left: q.left, right: q.right, top: base - k.up, bottom: base + k.down });
+            if (empty(v)) continue;
+            const p = pieceOf(el);
+            if (!pieces.has(p)) pieces.set(p, []);
+            const lines = pieces.get(p);
+            // Words whose baselines are within half a letter of each other are on one line.
+            const line = lines.find((l) => Math.abs(l.base - base) < fs * 0.5);
+            if (line) Object.assign(line, { l: Math.min(line.l, v.l), r: Math.max(line.r, v.r), t: Math.min(line.t, v.t), b: Math.max(line.b, v.b), fs: Math.min(line.fs, fs) });
+            else lines.push({ base, fs, ...v });
+          }
+        }
+      }
+    }
+    const list = [...pieces.keys()];
+    const words = (p) => `"${p.textContent.trim().replace(/\s+/g, ' ').slice(0, 30)}"`;
+    const lca = (a, b) => { for (let e = a; e; e = e.parentElement) if (e.contains(b)) return e; return document.body; };
+    const placed = (p, top) => { for (let e = p; e && e !== top; e = e.parentElement) { const pos = getComputedStyle(e).position; if (pos === 'absolute' || pos === 'fixed') return true; } return false; };
+    const piecesIn = (el) => list.filter((p) => el === p || el.contains(p)).length;
+    const branch = (p, top) => { let e = p; while (e.parentElement && e.parentElement !== top) e = e.parentElement; return e; };
+    const area = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const nextShown = (e) => { for (let s = e.nextElementSibling; s; s = s.nextElementSibling) if (area(s) && shown(s)) return s; return null; };
+    /** True when `a` (above or left) and `b` are tight by design (see the comment above). */
+    const byDesign = (a, b, how) => {
+      if (a.contains(b) || b.contains(a)) return true;
+      const top = lca(a, b);
+      if (placed(a, top) || placed(b, top)) return false;
+      if (piecesIn(top) <= 3) return true;
+      if (how !== 'above') return false;
+      const ba = branch(a, top);
+      const bb = branch(b, top);
+      if (nextShown(ba) !== bb || piecesIn(ba) !== 1) return false;
+      // A title or label: one line, or two lines set larger or bolder than the line under it (not a paragraph).
+      const sa = getComputedStyle(a);
+      const sb = getComputedStyle(b);
+      const lines = pieces.get(a).length;
+      const title = lines === 1 || (lines === 2 && (parseFloat(sa.fontSize) > parseFloat(sb.fontSize) || parseFloat(sa.fontWeight) > parseFloat(sb.fontWeight)));
+      if (title && piecesIn(bb) === 1 && pieces.get(b).length === 1) return true;
+      return lines === 1 && piecesIn(bb) <= 2 && !!bb.querySelector('input, textarea, select');
+    };
+    const found = new Map();
+    for (let i = 0; i < list.length; i++) {
+      for (let j = 0; j < list.length; j++) {
+        if (i === j) continue;
+        const pa = list[i];
+        const pb = list[j];
+        for (const la of pieces.get(pa)) {
+          for (const lb of pieces.get(pb)) {
+            const side = Math.min(la.r, lb.r) - Math.max(la.l, lb.l);
+            const vo = Math.min(la.b, lb.b) - Math.max(la.t, lb.t);
+            let gap = null;
+            let how = '';
+            // One above the other: b's ink starts under a's (letters overlapping by more than 2 px are overText).
+            if (side > 1 && lb.t >= la.t && lb.t - la.b > -2 && Math.round(lb.t - la.b) < 8) { gap = lb.t - la.b; how = 'above'; }
+            // Side by side: on one line, b to the right of a, a word space or more but under 6 px apart.
+            else if (vo > Math.min(la.b - la.t, lb.b - lb.t) * 0.5 && lb.l >= la.l) {
+              const g = lb.l - la.r;
+              if (g >= Math.min(3, 0.18 * Math.min(la.fs, lb.fs)) && Math.round(g) < 6) { gap = g; how = 'left of'; }
+            }
+            if (gap === null) continue;
+            const key = `${i}|${j}`;
+            if (!found.has(key) || found.get(key).gap > gap) found.set(key, { pa, pb, gap, how });
+          }
+        }
+      }
+    }
+    const out = [];
+    for (const f of [...found.values()].sort((x, y) => x.gap - y.gap)) {
+      if (out.length >= 12) break;
+      if (byDesign(f.pa, f.pb, f.how)) continue;
+      const v = `${words(f.pa)} ${Math.max(0, Math.round(f.gap))}px ${f.how} ${words(f.pb)}`;
+      if (!out.includes(v)) out.push(v);
+    }
+    return out;
+  }
+  out.tight = tightScan({ root, shown, onPurpose, visibleRect, empty });
   return out;
 }
+
 
 /** Runs in the page at its real height: scrolls the page to its end and reports what is still under the tab bar or a pinned footer. */
 function hiddenAtEnd() {
@@ -682,7 +842,8 @@ function runChecks() {
 
 // ------------------------------------------------------------------ states
 
-const STATE_FIELDS = ['id', 'route', 'data', 'imperial', 'day', 'type', 'taps', 'waitFor', 'sheet', 'note'];
+const STATE_FIELDS = ['id', 'route', 'data', 'imperial', 'day', 'values', 'type', 'taps', 'waitFor', 'sheet', 'note'];
+const VALUES = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting'];
 const DATA = ['demo', 'empty', 'fresh', 'stress'];
 
 /** Loads scripts/dev/states/<list>.cjs for each list and checks every state is well formed. */
@@ -703,6 +864,13 @@ function loadStates(lists) {
       if (s.data !== undefined && !DATA.includes(s.data)) problems.push(`${where}: data must be one of ${DATA.join(', ')}`);
       if (s.route && s.route.includes('{day}') !== (s.day !== undefined)) problems.push(`${where}: a route with {day} needs day, and day needs {day} in the route`);
       if (s.type !== undefined && (typeof s.type !== 'object' || Array.isArray(s.type))) problems.push(`${where}: type is { testID: text }`);
+      if (s.values !== undefined) {
+        if (!s.values || typeof s.values !== 'object' || Array.isArray(s.values)) problems.push(`${where}: values is { ${VALUES.join(', ')} }`);
+        else {
+          for (const [k, v] of Object.entries(s.values)) if (!VALUES.includes(k) || typeof v !== 'number' || !(v >= 0)) problems.push(`${where}: values.${k} must be one of ${VALUES.join(', ')}, a number of 0 or more`);
+          if (!['demo', 'stress', undefined].includes(s.data)) problems.push(`${where}: values go on the demo or stress data`);
+        }
+      }
       for (const t of s.taps || []) {
         const ok = typeof t === 'string' || (t && typeof t === 'object' && ((typeof t.type === 'string' && typeof t.text === 'string') || typeof t.wait === 'number' || (typeof t.choose === 'string' && Array.isArray(t.files))));
         if (!ok) problems.push(`${where}: a step is a testID, { type, text }, { wait } or { choose, files }; got ${JSON.stringify(t)}`);
@@ -732,7 +900,7 @@ const slug = (route) => route.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '')
 // ------------------------------------------------------------------ capture
 
 const sel = (id) => (id.startsWith('^') ? `[data-testid^="${id.slice(1)}"]` : `[data-testid="${id}"]`);
-const EMPTY_LAYOUT = () => ({ overText: [], broken: [], sticksOut: [], controls: [], gaps: [], hidden: [], header: [], sheet: [], toast: [] });
+const EMPTY_LAYOUT = () => ({ overText: [], tight: [], broken: [], sticksOut: [], controls: [], gaps: [], hidden: [], header: [], sheet: [], toast: [] });
 
 /**
  * Opens one job (a route, or a state: a route plus steps) in a fresh page with its own stored data,
@@ -846,10 +1014,11 @@ async function main() {
   ];
   const seeds = new Map();
   const seedFor = (theme, job) => {
-    const key = `${theme}|${job.data}|${job.imperial}`;
-    if (!seeds.has(key)) {
-      seeds.set(key, job.data === 'fresh' ? null : JSON.stringify(buildSeed({ theme, empty: job.data === 'empty', stress: job.data === 'stress', units: job.imperial ? 'imperial' : 'metric' })));
-    }
+    const key = `${theme}|${job.data}|${job.imperial}|${JSON.stringify(job.values || null)}`;
+    const make = () => (job.data === 'fresh' ? null : JSON.stringify(buildSeed({ theme, empty: job.data === 'empty', stress: job.data === 'stress', units: job.imperial ? 'imperial' : 'metric', values: job.values || null })));
+    // An open fast is measured from now, so a seed with one is built fresh for every capture.
+    if (job.values && job.values.fasting !== undefined) return make();
+    if (!seeds.has(key)) seeds.set(key, make());
     return seeds.get(key);
   };
   const tries = Number(flags.tries || 3);
@@ -858,7 +1027,7 @@ async function main() {
   for (const theme of themes) {
     for (const width of widths) {
       // One browser context per theme and width keeps the app's bundle cached; every page clears and seeds its own storage.
-      const context = await browser.newContext({ viewport: { width, height: width < 360 ? 640 : 844 }, deviceScaleFactor: 1, reducedMotion: 'reduce', colorScheme: theme === 'dark' ? 'dark' : 'light', isMobile: true, hasTouch: true });
+      const context = await browser.newContext({ viewport: { width, height: heightFor(width) }, deviceScaleFactor: 1, reducedMotion: 'reduce', colorScheme: theme === 'dark' ? 'dark' : 'light', isMobile: true, hasTouch: true });
       for (const job of jobs) {
         const name = `${job.stem}__${theme}__${width}${job.tag}`;
         let result = null;
@@ -884,7 +1053,7 @@ async function main() {
         layout.toast = [...new Set([...toast, ...(layout.toast || [])])];
         const crashed = (await page.locator('[data-testid="error-retry"]').count().catch(() => 0)) > 0;
         screens.push({
-          id: job.id, kind: job.kind, ...(job.list ? { list: job.list } : null), route: job.route, data: job.data, imperial: job.imperial, sheet: !!job.sheet, theme, width,
+          id: job.id, kind: job.kind, ...(job.list ? { list: job.list } : null), route: job.route, data: job.data, imperial: job.imperial, ...(job.values ? { values: job.values } : null), sheet: !!job.sheet, theme, width,
           image: `${name}.png`, crashed, incomplete: problem && !crashed ? `${problem} (after ${result.attempts} tries)` : null,
           errors: [...new Set(errors)].slice(0, 5), ...found, layout,
         });
@@ -895,17 +1064,18 @@ async function main() {
   }
   await browser.close();
 
-  // One sheet per route or state: every theme and width side by side, large enough to read.
+  // One sheet per route or state: one row per theme, the widths side by side in the order asked (360, 390, 320).
   const sheets = [];
   const tmp = path.join(out, `_tmp-${process.pid}`);
   for (const job of jobs) {
     const mine = screens.filter((s) => s.id === job.id);
     fs.rmSync(tmp, { recursive: true, force: true });
     fs.mkdirSync(tmp);
-    for (const s of mine) if (fs.existsSync(path.join(out, s.image))) fs.copyFileSync(path.join(out, s.image), path.join(tmp, s.image));
+    // The contact sheet tiles files by name: number them in theme and width order.
+    mine.forEach((s, i) => { if (fs.existsSync(path.join(out, s.image))) fs.copyFileSync(path.join(out, s.image), path.join(tmp, `${String(i).padStart(3, '0')}-${s.image}`)); });
     const sheet = `sheet-${job.stem}${job.tag.replace(/__/g, '-')}.png`;
     try {
-      execSync(`node ${JSON.stringify(path.join(__dirname, 'contact-sheet.cjs'))} ${JSON.stringify(tmp)} ${JSON.stringify(path.join(out, sheet))} ${mine.length} 330 1100`, { stdio: 'ignore' });
+      execSync(`node ${JSON.stringify(path.join(__dirname, 'contact-sheet.cjs'))} ${JSON.stringify(tmp)} ${JSON.stringify(path.join(out, sheet))} ${Math.min(mine.length, widths.length)} 330 1100`, { stdio: 'ignore' });
       sheets.push(sheet);
       for (const s of mine) s.sheetImage = sheet;
     } catch { /* the single screenshots are still there */ }
@@ -913,13 +1083,16 @@ async function main() {
   fs.rmSync(tmp, { recursive: true, force: true });
 
   const checks = flags.checks ? runChecks() : [];
-  const stateIndex = Object.fromEntries(states.map((s) => [s.id, { list: s.list, route: s.route, data: s.data || 'demo', imperial: !!s.imperial, sheet: !!s.sheet, note: s.note || null }]));
+  const stateIndex = Object.fromEntries(states.map((s) => [s.id, { list: s.list, route: s.route, data: s.data || 'demo', imperial: !!s.imperial, ...(s.values ? { values: s.values } : null), sheet: !!s.sheet, note: s.note || null }]));
   const report = { taken: new Date().toISOString(), base, sheets, checks, states: stateIndex, screens };
   fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify(report, null, 1));
-  const LAYOUT = ['overText', 'broken', 'sticksOut', 'controls', 'hidden', 'gaps', 'header', 'sheet', 'toast'];
+  const LAYOUT = ['overText', 'tight', 'broken', 'sticksOut', 'controls', 'hidden', 'gaps', 'header', 'sheet', 'toast'];
   const layoutCount = (s) => LAYOUT.reduce((n, k) => n + (s.layout?.[k]?.length || 0), 0);
   const problems = screens.filter((s) => s.crashed || s.incomplete || s.errors.length || s.cut.length || s.wide || s.small.length || layoutCount(s));
   console.log(`${screens.length} screens in ${out}; ${problems.length} with something to look at; ${sheets.length} sheets`);
+  const kinds = [['cut', (s) => s.cut.length], ['small', (s) => s.small.length], ['wide', (s) => (s.wide ? 1 : 0)], ...LAYOUT.map((k) => [k, (s) => s.layout?.[k]?.length || 0])]
+    .map(([k, f]) => [k, screens.filter((s) => f(s) > 0).length]).filter(([, n]) => n);
+  if (kinds.length) console.log(`  screens with each kind: ${kinds.map(([k, n]) => `${k} ${n}`).join(', ')}`);
   for (const s of problems.slice(0, Number(flags.show || 40))) {
     const bits = [s.crashed ? 'ERROR SCREEN' : '', s.incomplete ? `NOT CAPTURED: ${s.incomplete}` : '', s.errors.length ? `${s.errors.length} error(s): ${s.errors[0]}` : '', s.wide ? `page ${s.wide}px too wide` : '', s.cut.length ? `cut: ${s.cut.slice(0, 3).map((c) => `"${c.text}"`).join(', ')}${s.cut.length > 3 ? ` +${s.cut.length - 3}` : ''}` : '', s.small.length ? `small targets: ${s.small.slice(0, 3).map((t) => `${t.id} ${t.w}x${t.h}`).join(', ')}` : '', ...LAYOUT.filter((k) => s.layout?.[k]?.length).map((k) => `${k}: ${s.layout[k].slice(0, 2).join('; ')}${s.layout[k].length > 2 ? ` +${s.layout[k].length - 2}` : ''}`)].filter(Boolean);
     console.log(`  ${s.kind === 'state' ? s.id : s.route} [${s.theme} ${s.width}] ${bits.join('; ')}`);

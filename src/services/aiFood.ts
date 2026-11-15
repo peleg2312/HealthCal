@@ -19,6 +19,7 @@ import { DEMO_DELAY_MS, demoResult } from '@/features/ai/demo';
 import { fitWithin, IMAGE_EDGE, JPEG_QUALITY } from '@/features/ai/image';
 
 import { FUNCTIONS_URL, isBackendConfigured, supabase } from './supabase';
+import { inFramedViewer, VIEWER_BLOCKED } from './viewer';
 
 export { AiError, type AiErrorCode, type AnalyzeResponse } from '@/features/ai/api';
 
@@ -65,6 +66,8 @@ export async function pickPhoto(source: 'camera' | 'library'): Promise<PickedPho
     quality: 1,
     exif: false,
   };
+  // The hosted preview's frame blocks the camera and the file picker.
+  if (inFramedViewer()) throw new PhotoError('unreadable', VIEWER_BLOCKED.camera);
   if (source === 'camera') {
     if (Platform.OS !== 'web') {
       const perm = await ImagePicker.requestCameraPermissionsAsync();

@@ -31,6 +31,7 @@ import { deviceTimeZone, zoneLabel } from '@/features/import/ui/timeZones';
 import { WorkoutRow } from '@/features/import/ui/WorkoutRow';
 import { prefers12h } from '@/features/settings/components';
 import { startOfWeek } from '@/lib/dates';
+import { ViewerBlockedError } from '@/services/viewer';
 import { formatNumber } from '@/lib/units';
 import { useToday } from '@/store/clock';
 import { useProfile } from '@/store/selectors';
@@ -77,8 +78,8 @@ export default function ImportScreen() {
       }
       setFilter('all');
       await startWithFiles(picked.files, picked.failed);
-    } catch {
-      toast('The files could not be opened. Try again.');
+    } catch (e) {
+      toast(e instanceof ViewerBlockedError ? e.message : 'The files could not be opened. Try again.');
     } finally {
       setPicking(false);
     }

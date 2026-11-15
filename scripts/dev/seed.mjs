@@ -1,6 +1,10 @@
 // Builds a realistic persisted store for local development and screenshots.
 // Output matches the zustand `persist` format under the key `healthcal-v1`.
 import { randomUUID } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 function rng(seed) {
   let s = seed >>> 0;
@@ -198,9 +202,170 @@ function stressUp(state, { put, baselineTdee }) {
   state.favoriteFoodIds = [foods[0].id, custom[0].id, ...state.favoriteFoodIds];
 }
 
-/** @param {{ days?: number, empty?: boolean, theme?: 'system'|'light'|'dark'|'blossom', onboarded?: boolean, units?: 'metric'|'imperial', store?: boolean, stress?: boolean }} opts */
+// ------------------------------------------------------------------ values
+// `buildSeed({ values })` sets the day's amounts on top of the demo (or stress) data, so a screen
+// can be looked at with its cups and bars at the values that stress their layout (a label at the
+// cup's level, a tick, the brim line). Every amount is ordinary records, as if logged by hand:
+//
+//   eaten        today's food as a share of today's calorie budget (0 = nothing eaten, 1 = exactly
+//                at budget, 1.3 = 30% over). The budget is the app's own: computeDay from
+//                src/store/selectors.ts, run here on the seeded records (target + exercise added back).
+//   protein      today's protein as a share of its target (default: the same share as `eaten`).
+//                Two demo foods are mixed so kcal and protein both land; a share no real mix can
+//                reach (much protein from almost no food) is clamped to the nearest one that can.
+//   exercise     today's exercise in net kcal (what the budget gains): 0 removes today's sessions,
+//                290 is one volleyball session, 900 a long run.
+//   water        today's drinks as a share of today's water goal (the app's goal, exercise included).
+//   weekMinutes  minutes toward the weekly activity guideline this week (Monday to today), the
+//                number Train's week cup shows; today's sessions count, walks on the earlier days
+//                of the week make up the rest (on a Monday the rest is a walk today).
+//   fasting      an open fast as a share of the fasting target (0.5 = 8 h into a 16 h fast,
+//                1.3 = past the target); 0 means no fast running.
+// Only what is named changes; everything else stays the demo's. Applied in that order: exercise and
+// the week first (they move the budget and the water goal), then food, water and the fast.
+
+const APP = new URL('../../src/', import.meta.url);
+let appCache = null;
+/**
+ * The app's own pure maths (src/store/selectors.ts and the src/lib files it imports), compiled
+ * with TypeScript's transpiler and loaded here, so the budget, the protein target and the water
+ * goal are exactly the ones the screens will show. React and the store are not loaded: selectors.ts
+ * only needs them for its hooks.
+ */
+function appMaths() {
+  if (appCache) return appCache;
+  const require = createRequire(import.meta.url);
+  const ts = require('typescript');
+  const stubs = { react: {}, './clock': {}, './index': {} };
+  const cache = new Map();
+  const load = (file) => {
+    if (cache.has(file)) return cache.get(file).exports;
+    const module = { exports: {} };
+    cache.set(file, module);
+    const code = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }).outputText;
+    const req = (spec) => {
+      if (spec in stubs) return stubs[spec];
+      const base = spec.startsWith('@/') ? fileURLToPath(new URL(spec.slice(2), APP)) : spec.startsWith('.') ? path.resolve(path.dirname(file), spec) : null;
+      if (!base) return require(spec);
+      const found = [`${base}.ts`, `${base}.tsx`, path.join(base, 'index.ts')].find((f) => existsSync(f));
+      if (!found) throw new Error(`seed values: cannot find ${spec} from ${file}`);
+      return load(found);
+    };
+    new Function('require', 'module', 'exports', code)(req, module, module.exports);
+    return module.exports;
+  };
+  const lib = (f) => load(fileURLToPath(new URL(f, APP)));
+  appCache = { ...lib('lib/dates.ts'), ...lib('lib/exercise.ts'), ...lib('store/selectors.ts') };
+  return appCache;
+}
+
+const VALUE_KEYS = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting'];
+
+/** Sets the day's amounts (see above). `put` writes a record the way buildSeed does. */
+function applyValues(state, values, { put, weightKg, baselineTdee }) {
+  const unknown = Object.keys(values).filter((k) => !VALUE_KEYS.includes(k));
+  if (unknown.length) throw new Error(`seed values: unknown ${unknown.join(', ')} (known: ${VALUE_KEYS.join(', ')})`);
+  for (const [k, v] of Object.entries(values)) if (typeof v !== 'number' || !(v >= 0)) throw new Error(`seed values: ${k} must be a number of 0 or more`);
+  const m = appMaths();
+  const day = iso(daysAgo(0));
+  const live = (c) => Object.values(state[c] || {}).filter((r) => !r.deleted);
+  const drop = (c, keep) => { for (const r of Object.values(state[c])) if (!keep(r)) delete state[c][r.id]; };
+  const kg = state.profile.weightKg || weightKg;
+  const restPerMin = baselineTdee / 1440;
+  // A session with exactly `net` kcal above resting (what the budget gains), at this activity's MET.
+  const session = (n, s, net, hour) => {
+    const perMin = (s.met * 3.5 * kg) / 200 - restPerMin;
+    const durationMin = Math.max(1, Math.round(net / perMin));
+    const gross = net + restPerMin * durationMin;
+    return put('activities', { date: iso(daysAgo(n)), ...s, durationMin, ...(s.distanceKm ? { distanceKm: Math.round((s.distanceKm / s.durationMin) * durationMin * 10) / 10 } : null), kcalGross: gross, kcalNet: net, weightKg: kg, baselineKcalPerDay: baselineTdee, loggedAt: at(n, hour) });
+  };
+  const walk = SESSIONS.find((s) => s.activityId === 'walking');
+  const walkFor = (n, durationMin, hour) => {
+    const gross = (walk.met * 3.5 * kg * durationMin) / 200;
+    put('activities', { date: iso(daysAgo(n)), ...walk, durationMin, distanceKm: Math.round((walk.distanceKm / walk.durationMin) * durationMin * 10) / 10, kcalGross: gross, kcalNet: Math.max(0, gross - restPerMin * durationMin), weightKg: kg, baselineKcalPerDay: baselineTdee, loggedAt: at(n, hour) });
+  };
+
+  if (values.exercise !== undefined) {
+    drop('activities', (a) => a.date !== day);
+    const kcal = Math.round(values.exercise);
+    // Up to 400 kcal is one volleyball session; more adds a run in the morning.
+    if (kcal > 400) { session(0, SESSIONS.find((s) => s.activityId === 'running'), kcal - 290, 7); session(0, SESSIONS[0], 290, 18); }
+    else if (kcal > 0) session(0, SESSIONS[0], kcal, 7);
+  }
+  if (values.weekMinutes !== undefined) {
+    const monday = m.startOfWeek(day);
+    const before = Math.abs(m.diffDays(day, monday));
+    drop('activities', (a) => a.date < monday || a.date >= day);
+    let left = Math.max(0, Math.round(values.weekMinutes) - m.guidelineMinutes(live('activities').filter((a) => a.date === day)));
+    // Walks of at most 90 minutes, from yesterday back to Monday; what is left over goes on the last day reached.
+    for (let n = 1; n <= before && left > 0; n++) {
+      const mins = n === before ? left : Math.min(90, left);
+      walkFor(n, mins, 18);
+      left -= mins;
+    }
+    if (left > 0) walkFor(0, left, 19);
+  }
+
+  const profile = state.profile;
+  const food = () => live('foodEntries');
+  const summary = () => {
+    const model = m.computeEnergyModel(profile, food(), live('weights'), day, live('activities'));
+    return m.computeDay(day, profile, model, food(), live('activities'), live('water'), live('days'));
+  };
+  if (values.eaten !== undefined || values.protein !== undefined) {
+    const d = summary();
+    const kcal = values.eaten !== undefined ? values.eaten * d.budget : d.eaten.kcal;
+    const protein = (values.protein !== undefined ? values.protein : kcal / d.budget) * d.macros.proteinG;
+    drop('foodEntries', (e) => e.date !== day);
+    if (kcal > 0) {
+      // Two foods, mixed so that both the calories and the protein land: a lean one and a plain one.
+      const per = (f) => f.per100g.protein / f.per100g.kcal;
+      const ratio = Math.min(per(FOODS.shake), Math.max(per(FOODS.apple), protein / kcal));
+      const lean = ratio > per(FOODS.chicken) ? FOODS.shake : FOODS.chicken;
+      const plain = ratio < per(FOODS.oats) ? FOODS.apple : FOODS.oats;
+      const leanKcal = Math.max(0, Math.min(kcal, (kcal * (ratio - per(plain))) / (per(lean) - per(plain))));
+      const add = (meal, f, k, hour) => {
+        if (k < 0.5) return;
+        const grams = (k / f.per100g.kcal) * 100;
+        const g = grams / 100;
+        put('foodEntries', {
+          date: day, meal, name: f.name, emoji: f.emoji, foodId: f.id, source: 'builtin', verified: false, servingLabel: f.servings[0].label,
+          quantity: Math.round((grams / f.servings[0].grams) * 100) / 100, grams: Math.round(grams * 10) / 10,
+          nutrients: { kcal: f.per100g.kcal * g, protein: f.per100g.protein * g, carbs: f.per100g.carbs * g, fat: f.per100g.fat * g, fiber: f.per100g.fiber * g },
+          food: f, loggedAt: at(0, hour, 10),
+        });
+      };
+      const plainKcal = kcal - leanKcal;
+      add('breakfast', plain, plainKcal * 0.7, 8);
+      add('lunch', lean, leanKcal, 13);
+      add('snack', plain, plainKcal * 0.3, 16);
+    }
+  }
+  if (values.water !== undefined) {
+    const goal = summary().waterGoalMl;
+    drop('water', (w) => w.date !== day);
+    let left = Math.round(values.water * goal);
+    for (let g = 0; left > 0; g++) {
+      const ml = Math.min(250, left);
+      put('water', { date: day, ml, beverage: 'water', loggedAt: new Date(new Date(at(0, 7)).getTime() + g * 50 * 60000).toISOString() });
+      left -= ml;
+    }
+  }
+  if (values.fasting !== undefined) {
+    drop('fasting', () => false);
+    if (values.fasting > 0) {
+      const hours = state.settings.fastingTargetHours || 16;
+      put('fasting', { start: new Date(Date.now() - values.fasting * hours * 3600000).toISOString(), targetHours: hours });
+    }
+  }
+}
+
+/**
+ * @param {{ days?: number, empty?: boolean, theme?: 'system'|'light'|'dark'|'blossom', onboarded?: boolean, units?: 'metric'|'imperial', store?: boolean, stress?: boolean,
+ *   values?: { eaten?: number, protein?: number, exercise?: number, water?: number, weekMinutes?: number, fasting?: number } }} opts
+ */
 export function buildSeed(opts = {}) {
-  const { days = 35, empty = false, theme = 'dark', onboarded = true, units = 'metric', store = false, stress = false } = opts;
+  const { days = 35, empty = false, theme = 'dark', onboarded = true, units = 'metric', store = false, stress = false, values = null } = opts;
   const rand = rng(20261113);
   const stamp = new Date().toISOString();
   const rec = (r) => ({ id: randomUUID(), updatedAt: stamp, deleted: false, ...r });
@@ -307,6 +472,7 @@ export function buildSeed(opts = {}) {
     }),
   });
   if (stress) stressUp(state, { put, baselineTdee });
+  if (values) applyValues(state, values, { put, weightKg, baselineTdee });
   return { state, version: 1 };
 }
 

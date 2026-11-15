@@ -22,6 +22,7 @@ import {
   type BackupSource,
 } from '@/features/settings/exportFormat';
 import { toISODate } from '@/lib/dates';
+import { inFramedViewer, VIEWER_BLOCKED } from '@/services/viewer';
 import { COLLECTIONS, ONE_PER_DATE, collapseDateDuplicates, favoriteRecordId, nextStamp, useStore, withSettingsDefaults, type Store } from '@/store';
 import { live } from '@/store/selectors';
 import type { Collection, Food, Profile } from '@/types';
@@ -80,6 +81,7 @@ export async function exportData(kind: ExportKind): Promise<ExportResult> {
     // A byte order mark lets Excel open UTF-8 CSV files with accents and emoji intact.
     const content = file.mime === 'text/csv' ? `﻿${file.content}` : file.content;
     if (Platform.OS === 'web') {
+      if (inFramedViewer()) return { ok: false, message: VIEWER_BLOCKED.save };
       downloadOnWeb(file.name, content, file.mime);
       return { ok: true, fileName: file.name, rows: file.rows };
     }
@@ -209,6 +211,7 @@ export function applyLastBackupProfile(): ImportResult {
 
 /** Let the user pick a JSON backup and merge it. */
 export async function pickAndImportBackup(options: { forceProfile?: boolean } = {}): Promise<ImportResult> {
+  if (inFramedViewer()) return { ok: false, message: VIEWER_BLOCKED.files };
   try {
     const res = await DocumentPicker.getDocumentAsync({ type: ['application/json', 'text/plain', '*/*'], copyToCacheDirectory: true, multiple: false });
     if (res.canceled || !res.assets?.length) return { ok: false, message: 'No file chosen.', canceled: true };

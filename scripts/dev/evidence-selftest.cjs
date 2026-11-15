@@ -37,6 +37,17 @@ const sheetPage = ({ top = null, pad = 20, bottomPad = 16, scrolls = true, tall 
   </div>
 </body>`;
 
+const BODY = 'margin:0;font:15px/20px sans-serif;color:#222;background:#fff';
+/** A card holding more than three pieces of text, so only the structure under test decides. */
+const CARD = (inner) => `<body style="${BODY}"><div style="margin:20px;padding:16px;border:1px solid #888;background:#fafafa"><div style="font-size:12px;margin-bottom:16px">Card heading</div>${inner}<div style="margin-top:16px">Card footer</div></div></body>`;
+/** Today's calorie cup: a cup, labels placed beside it at its level (absolute), the macro rows under them. */
+const CUP = ({ labelTop, rowsTop }) => `<body style="${BODY}"><div style="margin:20px;padding:16px;border:1px solid #888;display:flex;gap:12px">
+  <div style="width:90px;height:220px;border:2px solid #888"></div>
+  <div style="position:relative;flex:1;height:220px">
+    <div style="position:absolute;left:0;right:0;top:${labelTop}px"><div style="font-size:17px;line-height:22px">1,219<span style="font-size:14px">  eaten</span></div></div>
+    <div style="position:absolute;left:0;right:0;top:${rowsTop}px">${['Protein|75 / 152 g', 'Carbs|140 / 237 g', 'Fat|43 / 67 g'].map((r) => `<div style="display:flex;justify-content:space-between;font-size:13px;line-height:17px;margin-bottom:14px"><div>${r.split('|')[0]}</div><div>${r.split('|')[1]}</div></div>`).join('')}</div>
+  </div></div></body>`;
+
 const cases = [
   // name, html, what to run, what must be in the result ('' = nothing)
   { name: 'clean sheet', html: sheetPage(), run: 'sheet', expect: '' },
@@ -195,6 +206,22 @@ const cases = [
     run: 'gaps',
     expect: '',
   },
+  // tight: two pieces of text from different blocks closer than 8 px (above) or 6 px (side by side).
+  { name: 'tight: a label placed at a cup level 5 px above the rows beside the cup', html: CUP({ labelTop: 0, rowsTop: 21 }), run: 'tight', expect: 'eaten" 5px above "Protein' },
+  { name: 'tight: the same label 16 px above the rows is clean', html: CUP({ labelTop: 0, rowsTop: 38 }), run: 'tight', expect: '' },
+  { name: 'tight: two placed labels in a two-label cup 3 px apart', html: `<body style="${BODY}"><div style="position:relative;height:200px;width:200px"><div style="position:absolute;top:40px;left:0">1.2 L drunk</div><div style="position:absolute;top:56px;left:0">2.1 L to go</div></div></body>`, run: 'tight', expect: 'above "2.1 L to go' },
+  { name: 'tight: a section label 2 px above the next row', html: CARD(`<div style="font-size:12px;line-height:14px">MEALS</div><div style="display:flex;justify-content:space-between"><span style="display:block">Breakfast</span><span style="display:block">462 kcal</span></div>`), run: 'tight', expect: 'MEALS" ' },
+  { name: 'tight: two paragraphs 2 px apart', html: CARD(`<p style="margin:0;line-height:16px">Your budget grows with each workout you log, so a run adds room.</p><p style="margin:2px 0 0;line-height:16px">Weigh in once a week, at the same time of day and before breakfast, for a steady trend line.</p>`), run: 'tight', expect: 'above "Weigh in' },
+  { name: 'tight: two labels 4 px apart on one line', html: CARD(`<div style="display:flex;gap:4px"><div>Protein</div><div>Carbs</div><div>Fat</div><div>Water</div></div>`), run: 'tight', expect: 'left of' },
+  { name: 'tight: the lines of one paragraph are one piece', html: CARD(`<p style="margin:0;line-height:15px">One long paragraph that wraps over three lines at this width, set with a tight line height on purpose.</p>`), run: 'tight', expect: '' },
+  { name: 'tight: a header title and its short line', html: `<body style="${BODY}"><div data-testid="screen-header" style="display:flex;gap:12px;padding:8px 20px"><button style="width:44px;height:44px">&lt;</button><div><div style="font-size:20px;line-height:22px">Goals and targets</div><div style="font-size:13px;line-height:14px">Budget, macros and water</div></div><button style="width:44px;height:44px">x</button></div>${CARD('<div>More</div><div>Content</div>')}</body>`, run: 'tight', expect: '' },
+  { name: "tight: a list row's title and subtitle", html: CARD(['Oats, rolled, dry', 'Banana', 'Latte, whole milk'].map((t) => `<div style="display:flex;gap:12px;padding:6px 0"><span style="display:block">🥣</span><div style="flex:1"><div style="line-height:16px">${t}</div><div style="font-size:12px;line-height:13px">1/2 cup · 152 kcal</div></div><div>152</div></div>`).join('')), run: 'tight', expect: '' },
+  { name: 'tight: a stat and its caption, among other stats', html: CARD(`<div style="display:flex;gap:24px">${['152 g|Protein', '185 g|Carbs', '58 g|Fat'].map((x) => `<div><div style="font-size:24px;line-height:24px">${x.split('|')[0].split(' ')[0]}<span style="font-size:12px"> g</span></div><div style="font-size:12px;line-height:13px">${x.split('|')[1]}</div></div>`).join('')}</div>`), run: 'tight', expect: '' },
+  { name: 'tight: a number and its unit beside it', html: CARD(`<div style="display:flex;align-items:center;gap:4px"><div style="font-size:60px;line-height:62px">941</div><div style="font-size:13px;line-height:15px"><div>kcal</div><div>left</div></div></div><div>Budget 2,160</div>`), run: 'tight', expect: '' },
+  { name: 'tight: a number and its unit in one sentence', html: CARD(`<div style="font-size:17px">1,219<span style="font-size:14px"> eaten</span></div><div style="margin-top:12px">Protein</div>`), run: 'tight', expect: '' },
+  { name: 'tight: a title and the single line under it, in a card with more', html: CARD(`<div style="font-size:18px;line-height:20px">Water</div><div style="font-size:13px;line-height:14px">1.2 L of 3.3 L</div><div style="margin-top:16px">A glass is 250 ml.</div><button style="margin-top:12px;height:44px">Add 250 ml</button>`), run: 'tight', expect: '' },
+  { name: 'tight: a label directly above its value, in a card with more', html: CARD(`<div style="font-size:12px;line-height:13px">YOUR PLAN</div><div style="margin-top:12px;font-size:12px;line-height:13px">Target weight</div><div style="font-size:20px;line-height:21px">74 kg</div><div style="margin-top:16px">Reaching it around Feb 7.</div>`), run: 'tight', expect: '' },
+  { name: 'tight: a label directly above its own field', html: CARD(`<div style="font-size:13px;line-height:14px">Target weight</div><div style="display:flex;border:1px solid #888;align-items:flex-start;line-height:16px"><span style="display:block">kg</span><input style="flex:1;border:0;height:16px;padding:0" value="74"></div><div style="margin-top:12px">Now 78.8 kg.</div><div style="margin-top:12px">Weekly pace</div>`), run: 'tight', expect: '' },
   { name: 'a blank capture is not ready', html: '<body></body>', run: 'ready', expect: 'blank' },
   { name: 'a missing sheet is not ready', html: '<body><p>One</p><p>Two</p><p>Three</p></body>', run: 'readySheet', expect: 'no sheet is open' },
   { name: 'an undeclared sheet is not ready', html: sheetPage(), run: 'ready', expect: 'a sheet is open' },
@@ -212,6 +239,7 @@ async function runCase(page, c) {
     case 'layoutPage': { const r = await page.evaluate(layoutScan, null); return [...r.overText, ...r.broken, ...r.sticksOut, ...r.controls]; }
     case 'hidden': return page.evaluate(hiddenAtEnd);
     case 'gaps': return (await page.evaluate(layoutScan, null)).gaps;
+    case 'tight': return (await page.evaluate(layoutScan, null)).tight;
     case 'header': return page.evaluate(headerScan);
     case 'small': return (await page.evaluate(scan, null)).small.map((x) => x.id || 'unnamed');
     case 'cut': return (await page.evaluate(scan, null)).cut.map((x) => x.text);
@@ -266,6 +294,36 @@ async function runCase(page, c) {
   } else {
     judge('real + sheet has a 250 ml water button', [], 'a button');
   }
+  // The real Today at 360 px (the owner's phone), demo data: the "eaten" label beside the calorie cup is set
+  // at the cup's level, over the macro rows that share the cup's side column.
+  const narrow = await browser.newContext({ viewport: { width: 360, height: 740 }, reducedMotion: 'reduce', isMobile: true, hasTouch: true });
+  await narrow.addInitScript((value) => { if (!sessionStorage.getItem('seeded')) { localStorage.clear(); localStorage.setItem('healthcal-v1', value); sessionStorage.setItem('seeded', '1'); } }, JSON.stringify(buildSeed({ theme: 'blossom' })));
+  const today = await narrow.newPage();
+  await today.goto(`${base}/`, { waitUntil: 'networkidle', timeout: 120000 });
+  await today.getByTestId('today-eaten').first().waitFor({ timeout: 15000 });
+  await today.waitForTimeout(600);
+  const asIs = (await today.evaluate(layoutScan, null)).tight;
+  console.log(`INFO  real Today at 360 px as it is now: ${asIs.length ? asIs.join('; ') : 'nothing tight'}`);
+  judge('real Today at 360 px: the tab header (overline and title) is tight by design', (await today.evaluate(layoutScan, '[data-testid="tab-header"]')).tight, '');
+  // Set the label where the cup puts it at the owner's values: its line box 2 px into the first macro row's,
+  // which leaves about 4 px between their letters.
+  const moved = await today.evaluate(() => {
+    const label = document.querySelector('[data-testid="today-eaten"]');
+    const protein = [...document.querySelectorAll('[data-testid="today-energy"] *')].find((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim() === 'Protein'));
+    let wrap = label;
+    while (wrap && getComputedStyle(wrap).position !== 'absolute') wrap = wrap.parentElement;
+    if (!label || !protein || !wrap) return false;
+    const delta = protein.getBoundingClientRect().top + 2 - label.getBoundingClientRect().bottom;
+    wrap.style.top = `${parseFloat(getComputedStyle(wrap).top) + delta}px`;
+    return true;
+  });
+  if (moved) {
+    await today.waitForTimeout(100);
+    judge('real Today at 360 px: the eaten label set just above the Protein row', (await today.evaluate(layoutScan, null)).tight, 'above "Protein');
+  } else {
+    judge('real Today has the eaten label (today-eaten) and a Protein row in today-energy', [], 'both');
+  }
+  await narrow.close();
   await browser.close();
   console.log(failed ? `\n${failed} failed` : '\nall passed');
   process.exit(failed ? 1 : 0);

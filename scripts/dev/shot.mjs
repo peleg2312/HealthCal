@@ -14,6 +14,10 @@
 //   --wait=1500    extra milliseconds to wait before the capture
 //   --tap=a,b      testIDs to click in order before the capture
 //   --type=id:text type text into the input with that testID (repeatable)
+//   --width=360    phone width (default 390); 360 is the most common Android width, 320 the narrowest.
+//                  The height follows: 740 at 360, 640 at 320, 844 otherwise
+//   --values=json  today's amounts on top of the demo data, as a state's `values` (seed.mjs), e.g.
+//                  --values='{"eaten":0.6,"exercise":290}' for 60% of the budget with 290 kcal of exercise
 //   --desktop      1280x800 viewport instead of a phone
 //   --2x           render at double density (for screenshots people will look at)
 //   --url=...      base URL (default http://localhost:8081)
@@ -39,10 +43,13 @@ const types = args.filter((a) => a.startsWith('--type=')).map((a) => a.slice(7))
 const [route = '/', out = 'shot.png'] = args.filter((a) => !a.startsWith('--'));
 const base = flags.url || 'http://localhost:8081';
 
-const seed = buildSeed({ empty: !!flags.empty, stress: !!flags.stress, onboarded: !flags.fresh, theme: flags.theme || (flags.light ? 'light' : 'dark'), units: flags.imperial ? 'imperial' : 'metric' });
+const values = flags.values ? JSON.parse(String(flags.values)) : null;
+const seed = buildSeed({ empty: !!flags.empty, stress: !!flags.stress, onboarded: !flags.fresh, theme: flags.theme || (flags.light ? 'light' : 'dark'), units: flags.imperial ? 'imperial' : 'metric', values });
+const width = Number(flags.width || 390);
+const height = { 320: 640, 360: 740 }[width] || 844;
 const browser = await chromium.launch();
 const context = await browser.newContext({
-  viewport: flags.desktop ? { width: 1280, height: 800 } : { width: 390, height: 844 },
+  viewport: flags.desktop ? { width: 1280, height: 800 } : { width, height },
   deviceScaleFactor: flags['2x'] ? 2 : 1,
   isMobile: !flags.desktop,
   hasTouch: !flags.desktop,
