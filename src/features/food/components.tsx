@@ -185,6 +185,7 @@ export function FoodRow({
   amount?: RowAmount;
 }) {
   const { colors, spacing } = useTheme();
+  const { width } = useWindowDimensions();
   const [added, setAdded] = useState(false);
   // The + turns into a stepper whose own + sits under the same finger. A second tap of a
   // double tap must not land on it and change the amount that was just logged.
@@ -201,8 +202,10 @@ export function FoodRow({
     const t = setTimeout(() => setAdded(false), 1400);
     return () => clearTimeout(t);
   }, [added]);
+  // On a narrow phone the stepper (about 130 px) would leave the name a few words: it goes under the row instead.
+  const stack = !!amount && width < 360;
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+    <View style={stack ? { paddingBottom: spacing.sm } : { flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
       <PressableScale
         testID={testID}
         onPress={onPress}
@@ -211,24 +214,29 @@ export function FoodRow({
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>
         <RowEmoji emoji={food.emoji} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          {/* Two lines, as in the diary: a long name ("Israeli salad (tomato, cucumber, onion, ...)") is read, not cut. */}
-          <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
+          {/* Up to three lines, as in the diary: a long name ("Israeli salad (tomato, cucumber, onion, ...)") is read, not cut. */}
+          <Text variant="bodyStrong" numberOfLines={3} style={{ fontFamily: fonts.semibold }}>
             {food.name}
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flexShrink: 1 }}>
-              {/* Once added, the live kcal leads so a narrower line still shows it. */}
+          {/* The source's mark leads the line and its word ends it, so a long portion or brand wraps
+              to a second line instead of cutting the calories, and the mark never floats. */}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+            <CupKey color={colors.textSecondary} variant={sourceKeyVariant(food.source)} size={8} style={{ marginTop: 5 }} />
+            <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1 }}>
+              {/* Once added, the live kcal leads. */}
               {amount ? `${kcal(kcalValue)} kcal · ` : food.brand ? `${food.brand} · ` : ''}
               {subtitle}
               {amount ? '' : ` · ${kcal(kcalValue)} kcal`}
+              {` · ${sourceInfo(food.source).short}`}
             </Text>
-            <SourceTag source={food.source} />
           </View>
         </View>
       </PressableScale>
       {trailing}
       {amount ? (
-        <AmountStepper amount={guarded ?? amount} name={food.name} testID={testID} />
+        <View style={stack ? { alignSelf: 'flex-end' } : undefined}>
+          <AmountStepper amount={guarded ?? amount} name={food.name} testID={testID} />
+        </View>
       ) : onQuickAdd ? (
         <IconButton
           testID={testID ? `${testID}-add` : undefined}
@@ -253,7 +261,7 @@ function AmountStepper({ amount, name, testID }: { amount: RowAmount; name: stri
     <View
       testID={testID ? `${testID}-stepper` : undefined}
       style={{ flexDirection: 'row', alignItems: 'center', ...cup(radius.buttonSm, 5), borderWidth: 1.5, borderColor: colors.borderStrong }}>
-      <IconButton testID={testID ? `${testID}-less` : undefined} accessibilityLabel={`Less ${name}`} tone="clear" size={42} onPress={() => amount.onStep(-1)}>
+      <IconButton testID={testID ? `${testID}-less` : undefined} accessibilityLabel={`Less ${name}`} tone="clear" size={44} onPress={() => amount.onStep(-1)}>
         <Minus size={18} color={colors.text} strokeWidth={2.2} />
       </IconButton>
       <PressableScale
@@ -261,12 +269,12 @@ function AmountStepper({ amount, name, testID }: { amount: RowAmount; name: stri
         onPress={amount.onOpen}
         feedback="select"
         accessibilityLabel={`${name}, ${amount.label}. Change amount`}
-        style={{ minWidth: 40, minHeight: 42, alignItems: 'center', justifyContent: 'center' }}>
+        style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
         <Text variant="numM" tabular numberOfLines={1} style={{ fontSize: 14.5, lineHeight: 18 }}>
           {amount.label}
         </Text>
       </PressableScale>
-      <IconButton testID={testID ? `${testID}-more` : undefined} accessibilityLabel={`More ${name}`} tone="clear" size={42} onPress={() => amount.onStep(1)}>
+      <IconButton testID={testID ? `${testID}-more` : undefined} accessibilityLabel={`More ${name}`} tone="clear" size={44} onPress={() => amount.onStep(1)}>
         <Plus size={18} color={colors.text} strokeWidth={2.2} />
       </IconButton>
     </View>

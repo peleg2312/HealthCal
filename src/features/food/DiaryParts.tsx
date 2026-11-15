@@ -119,6 +119,7 @@ function EntryRow({ entry }: { entry: FoodEntry }) {
   const narrow = width < 360;
   // Any entry that carries a range is an estimate, whatever food it was matched to afterwards.
   const ai = !!entry.kcalRange;
+  const source = sourceInfo(ai ? 'ai' : entry.source);
   const portion =
     entry.grams > 0 && entry.servingLabel !== `${Math.round(entry.grams)} g` && !/^\d+(\.\d+)?\s*g$/.test(entry.servingLabel.trim())
       ? `${portionLabel(entry.servingLabel, entry.quantity)} · ${Math.round(entry.grams)} g`
@@ -133,51 +134,26 @@ function EntryRow({ entry }: { entry: FoodEntry }) {
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: 11 }}>
         <RowEmoji emoji={entry.emoji} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Text variant="bodyStrong" numberOfLines={narrow ? 3 : 2} style={{ fontFamily: fonts.semibold }}>
+          <Text variant="bodyStrong" numberOfLines={3} style={{ fontFamily: fonts.semibold }}>
             {entry.name}
           </Text>
-          {/* When the portion takes two lines, the source mark follows its last line rather than floating between them. */}
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
-            <Text variant="caption" color="textSecondary" numberOfLines={narrow ? 2 : 1} style={{ flexShrink: 1 }}>
-              {portion}
-            </Text>
-            <EntrySource source={ai ? 'ai' : entry.source} />
+          {/* On a narrow phone the calories move to the end of the portion line, so the name has the row's width. */}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+            {/* The source's mark leads the line and its word ends it, so a portion that wraps never leaves the mark floating. */}
+            <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: 6 }} accessible accessibilityLabel={`${portion}, ${source.label}`}>
+              <CupKey color={colors.textSecondary} variant={sourceKeyVariant(ai ? 'ai' : entry.source)} size={8} style={{ marginTop: 5 }} />
+              <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1 }}>
+                {`${portion} · ${source.short}`}
+              </Text>
+            </View>
+            {narrow ? <KcalTrail value={entry.nutrients.kcal} range={entry.kcalRange} /> : null}
           </View>
         </View>
-        <KcalTrail value={entry.nutrients.kcal} range={entry.kcalRange} />
+        {narrow ? null : <KcalTrail value={entry.nutrients.kcal} range={entry.kcalRange} />}
       </PressableScale>
       <IconButton testID={`entry-delete-${entry.id}`} accessibilityLabel={`Delete ${entry.name}`} tone="clear" size={36} onPress={() => deleteEntry(entry)}>
         <X size={16} color={colors.textSecondary} strokeWidth={1.9} />
       </IconButton>
-    </View>
-  );
-}
-
-/**
- * Where a diary row's numbers come from. The portion is the information that
- * matters, so on a narrow phone the source shrinks to its mark (the label stays
- * in the accessibility name) and elsewhere its word gives way before the
- * portion does. An estimate always says so in words.
- */
-function EntrySource({ source }: { source: FoodEntry['source'] | 'ai' }) {
-  const { colors } = useTheme();
-  const { width } = useWindowDimensions();
-  const info = sourceInfo(source);
-  const markOnly = width < 360 && source !== 'ai';
-  return (
-    <View
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 100, minWidth: 18 }}
-      accessible
-      accessibilityLabel={info.label}>
-      <Text variant="caption" color="textSecondary">
-        ·
-      </Text>
-      <CupKey color={colors.textSecondary} variant={sourceKeyVariant(source)} size={8} />
-      {markOnly ? null : (
-        <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flexShrink: 1 }}>
-          {info.short}
-        </Text>
-      )}
     </View>
   );
 }
@@ -214,7 +190,8 @@ export function MealCard({
   return (
     <Card testID={`meal-card-${meal}`} padding={0} style={{ paddingTop: 12, paddingBottom: rows.length ? 4 : previous ? 6 : ROW_PAD }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingLeft: ROW_PAD, paddingRight: 14 }}>
-        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'baseline', gap: 10 }}>
+        {/* A big total ("1,450 kcal") goes under the meal's name on a narrow phone rather than cutting it. */}
+        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10 }}>
           <Text variant="h3" numberOfLines={1} style={{ flexShrink: 1 }}>
             {label}
           </Text>
@@ -273,8 +250,11 @@ export function MealCard({
               scaleTo={0.985}
               accessibilityLabel={`Repeat ${label.toLowerCase()} from ${formatDayLabel(previous.date)}`}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}>
-              <Repeat2 size={16} color={colors.text} strokeWidth={2.2} />
-              <Text variant="label" color="text" style={{ flexShrink: 1, textDecorationLine: 'underline' }} numberOfLines={2}>
+              {/* A fixed box, so a two-line label never squeezes the icon. */}
+              <View style={{ width: 16, height: 16 }}>
+                <Repeat2 size={16} color={colors.text} strokeWidth={2.2} />
+              </View>
+              <Text variant="label" color="text" style={{ flexShrink: 1, textDecorationLine: 'underline' }} numberOfLines={3}>
                 Repeat {dayPhrase(previous.date)}: {previous.entries.map((e) => e.name.split(',')[0]).join(', ')}
               </Text>
               <Text variant="caption" color="textSecondary" tabular numberOfLines={1} style={{ marginLeft: 'auto', flexShrink: 0 }}>

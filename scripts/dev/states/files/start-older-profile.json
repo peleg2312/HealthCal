@@ -1,0 +1,84 @@
+{
+ "format": "healthcal-backup",
+ "version": 1,
+ "exportedAt": "2020-01-02T00:00:00.000Z",
+ "app": "HealthCal",
+ "units": "metric",
+ "profile": {
+  "name": "Sam",
+  "sex": "male",
+  "birthDate": "1994-05-12",
+  "heightCm": 178,
+  "weightKg": 81.8,
+  "bodyFatPct": 18,
+  "activityLevel": "light",
+  "goal": "lose",
+  "targetWeightKg": 74,
+  "weeklyRateKg": 0.4,
+  "units": "metric",
+  "eatBackExercise": true,
+  "useAdaptiveTdee": true,
+  "onboardedAt": "2026-10-11T09:00:00.000Z",
+  "updatedAt": "2020-01-01T00:00:00.000Z"
+ },
+ "settings": {
+  "theme": "dark",
+  "haptics": true,
+  "celebrations": true,
+  "waterPresets": [
+   150,
+   250,
+   330,
+   500
+  ],
+  "fastingTargetHours": 16,
+  "reminders": {
+   "enabled": false,
+   "quietStart": "22:00",
+   "quietEnd": "07:30",
+   "water": {
+    "enabled": true,
+    "everyMinutes": 120
+   },
+   "meals": {
+    "enabled": true,
+    "breakfast": "08:30",
+    "lunch": "13:00",
+    "dinner": "19:30"
+   },
+   "dailySummary": {
+    "enabled": true,
+    "time": "20:30"
+   },
+   "weighIn": {
+    "enabled": false,
+    "time": "07:45",
+    "weekdays": [
+     1,
+     4
+    ]
+   },
+   "movement": {
+    "enabled": false,
+    "time": "17:30"
+   }
+  },
+  "updatedAt": "2020-01-01T00:00:00.000Z"
+ },
+ "collections": {
+  "foodEntries": [],
+  "customFoods": [],
+  "savedMeals": [],
+  "activities": [],
+  "water": [],
+  "weights": [],
+  "sleep": [],
+  "fasting": [],
+  "favorites": [],
+  "days": [],
+  "routines": []
+ },
+ "favoriteFoodIds": [],
+ "recentFoods": [],
+ "recentActivityIds": []
+}

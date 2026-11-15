@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Camera, Droplet, FlaskConical, ImagePlus, Info, Lightbulb, MessageSquareText, RefreshCw, Sparkles } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
+import { useWindowDimensions, View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
 
 import { AddMissingItem } from '@/features/ai/AddMissingItem';
 import { AiConsentSheet } from '@/features/ai/AiConsentSheet';
@@ -36,6 +36,7 @@ import { ItemRow } from '@/features/ai/ItemRow';
 import { matchFoods } from '@/features/ai/localMatch';
 import { PhotoHero } from '@/features/ai/PhotoHero';
 import { SampleNotice } from '@/features/ai/SampleNotice';
+import { MealPicker } from '@/features/food/components';
 import { logItems } from '@/features/food/log';
 import { BUILTIN_FOODS } from '@/data/foods';
 import { today } from '@/lib/dates';
@@ -66,6 +67,8 @@ const isAbort = (e: unknown) => e instanceof Error && e.name === 'AbortError';
 export default function PhotoScreen() {
   const params = useLocalSearchParams<{ meal?: string; date?: string; mode?: string; demoError?: string }>();
   const { colors, radius, spacing } = useTheme();
+  // A 320 px phone gets the short forms of the longest labels, so none is cut.
+  const narrow = useWindowDimensions().width < 360;
   const session = useAuth((s) => s.session);
   const access = availability(isBackendConfigured, !!session);
   const date = typeof params.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : today();
@@ -336,7 +339,8 @@ export default function PhotoScreen() {
     footer = (
       <Button
         testID="ai-add-to-diary"
-        title={`${isDemo ? 'Add sample to' : 'Add to'} ${MEALS.find((m) => m.id === meal)?.label.toLowerCase()} · ${sum.kcal} kcal`}
+        // A 320 px phone fits "Add sample · 507 kcal"; the meal is picked just above.
+        title={narrow && isDemo ? `Add sample · ${sum.kcal} kcal` : `${isDemo ? 'Add sample to' : 'Add to'} ${MEALS.find((m) => m.id === meal)?.label.toLowerCase()} · ${sum.kcal} kcal`}
         disabled={items.length === 0}
         onPress={add}
       />
@@ -527,9 +531,9 @@ export default function PhotoScreen() {
           </Card>
 
           <View style={{ gap: spacing.sm }} onLayout={(e) => (layout.current.section = e.nativeEvent.layout.y)}>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.md }}>
               <Text variant="h3">Items</Text>
-              <Text variant="caption" color="textSecondary">
+              <Text variant="caption" color="textSecondary" align="right" style={{ flexShrink: 1 }}>
                 Tap a name or weight to correct it
               </Text>
             </View>
@@ -593,7 +597,7 @@ export default function PhotoScreen() {
             </View>
             <TextField
               testID="ai-correction-input"
-              placeholder="e.g. it's cauliflower rice, and no cheese"
+              placeholder={narrow ? 'e.g. no cheese' : "e.g. it's cauliflower rice, and no cheese"}
               value={correction}
               onChangeText={setCorrection}
               maxLength={300}
@@ -614,7 +618,8 @@ export default function PhotoScreen() {
 
           <View style={{ gap: spacing.sm }}>
             <Text variant="h3">Meal</Text>
-            <Segmented options={MEALS.map((m) => ({ value: m.id, label: m.label }))} value={meal} onChange={setMeal} />
+            {/* The diary's meal tabs: "Breakfast" fits whole in a quarter of a 320 px phone. */}
+            <MealPicker value={meal} onChange={setMeal} testIDPrefix="ai-meal" />
           </View>
 
           <Card tone="alt" style={{ gap: spacing.sm }}>
@@ -627,7 +632,7 @@ export default function PhotoScreen() {
             {!precisePass ? (
               <Button
                 testID="ai-check-again"
-                title="Check again more carefully"
+                title={narrow ? 'Check more carefully' : 'Check again more carefully'}
                 variant="secondary"
                 size="md"
                 icon={<RefreshCw size={16} color={colors.text} />}

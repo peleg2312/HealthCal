@@ -145,6 +145,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
           : { position: 'absolute', left: 0, right: 0, bottom: dock + TOAST_GAP, alignItems: 'center', paddingHorizontal: 20 }
       }>
       <Animated.View
+        testID="toast"
         accessibilityLiveRegion="polite"
         style={{
           maxWidth: MAX_CONTENT_WIDTH - 40,

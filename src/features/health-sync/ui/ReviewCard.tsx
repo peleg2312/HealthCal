@@ -48,9 +48,10 @@ export function ReviewCard({
     <Card testID={`health-review-${item.id}`} padding={16} style={{ gap: spacing.md }}>
       <View accessible accessibilityLabel={v.spoken} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {/* A workout's own title can be a sentence: two lines before it shortens, the emoji on the first. */}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
             {v.emoji ? <Text style={{ fontSize: 17, lineHeight: 22 }}>{v.emoji}</Text> : null}
-            <Text variant="bodyStrong" numberOfLines={1} style={{ fontFamily: fonts.semibold, flexShrink: 1 }}>
+            <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold, flexShrink: 1 }}>
               {v.title}
             </Text>
           </View>

@@ -1,6 +1,6 @@
 import { Check, ChevronLeft, ChevronRight, Dumbbell, Info, Scale, Utensils } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { formatDayLabel, formatShortDate, startOfWeek } from '@/lib/dates';
 import { formatNumber } from '@/lib/units';
@@ -110,6 +110,8 @@ export default function ConsistencyScreen() {
   const [month, setMonth] = useState(thisMonth);
   const [editing, setEditing] = useState(false);
   const [help, setHelp] = useState(false);
+  // At 320 px the steppers leave the names about 55 px: a tighter gap and "5/wk" keep "Weigh in" on one line.
+  const narrow = useWindowDimensions().width < 360;
 
   const rows = monthGrid(month, d.byDate, d.today);
   const tally = monthTally(month, d.sets.food, d.today);
@@ -362,14 +364,14 @@ export default function ConsistencyScreen() {
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: spacing.md,
+                gap: narrow ? spacing.sm : spacing.md,
               }}
               testID={`consistency-target-${k}`}>
               {kindIcon[k]}
               <Text variant="bodyStrong" style={{ flex: 1 }}>
                 {RHYTHM_COPY[k].title}
               </Text>
-              <Stepper label={`${RHYTHM_COPY[k].title} days a week`} value={d.targets[k]} min={1} max={7} format={(n) => `${n} / wk`} onChange={(n) => setRhythmTarget(k, n)} />
+              <Stepper label={`${RHYTHM_COPY[k].title} days a week`} value={d.targets[k]} min={1} max={7} format={(n) => (narrow ? `${n}/wk` : `${n} / wk`)} onChange={(n) => setRhythmTarget(k, n)} />
             </View>
           ))}
         </View>

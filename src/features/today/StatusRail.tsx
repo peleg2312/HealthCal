@@ -7,7 +7,7 @@ import { startOfWeek } from '@/lib/dates';
 import { guidelineMinutes } from '@/lib/exercise';
 import { nowISO } from '@/lib/id';
 import { WEEKLY_ACTIVE_MINUTES } from '@/lib/insights';
-import { formatVolume, weightUnit, weightValue } from '@/lib/units';
+import { formatNumber, formatVolume, weightUnit, weightValue } from '@/lib/units';
 import { useFriends } from '@/services/friends';
 import { useStore } from '@/store';
 import { useNow } from '@/store/clock';
@@ -178,7 +178,7 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
                 onReached={() => reached(`${WEEKLY_ACTIVE_MINUTES} active minutes ${isToday ? 'this' : 'that'} week. That meets the weekly guideline.`)}
               />
               <Text variant="caption" color="textSecondary" numberOfLines={3} testID="today-activity-week">
-                {`${weekMinutes} of ${WEEKLY_ACTIVE_MINUTES} min ${isToday ? 'this' : 'that'} week`}
+                {`${formatNumber(weekMinutes)} of ${WEEKLY_ACTIVE_MINUTES} min ${isToday ? 'this' : 'that'} week`}
               </Text>
             </View>
           ) : null}

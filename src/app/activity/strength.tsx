@@ -325,10 +325,11 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
           </IconButton>
         </View>
         {editTime ? (
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm }}>
+          // The overline above already says "Duration": no label here, so the field and "Use timer" share a top edge and an error goes under the field alone.
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
             <NumberField
               testID="strength-duration-input"
-              label="Duration"
+              accessibilityLabel="Duration in minutes"
               value={draft.manualMin ?? (minutes > 0 ? minutes : null)}
               onChange={(n) => update((d) => ({ ...edits.pause(d), manualMin: n && n > 0 ? Math.round(n) : null }))}
               decimals={0}
@@ -342,7 +343,7 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
                 variant="secondary"
                 size="md"
                 full={false}
-                style={{ alignSelf: 'flex-end' }}
+                style={{ height: 50 }}
                 onPress={() => update((d) => ({ ...d, manualMin: null }))}
               />
             ) : null}
@@ -370,6 +371,7 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
 
       <View style={{ gap: spacing.sm }}>
         <Segmented
+          testID="strength-effort"
           value={draft.intensity}
           onChange={(v: Intensity) => update((d) => ({ ...d, intensity: v }))}
           options={(['light', 'moderate', 'vigorous'] as Intensity[]).map((i) => ({ value: i, label: INTENSITY_LABELS[i].title }))}
@@ -393,6 +395,7 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
             title="Add your first exercise"
             message="Log weight and reps set by set. Your numbers from last time show up as a guide."
             action="Add exercise"
+            actionTestID="strength-add-first"
             onAction={() => setPicker(true)}
           />
         </View>
@@ -491,14 +494,15 @@ function RestBar({ draft, now, update }: { draft: StrengthDraft; now: number; up
       testID="strength-rest"
       accessibilityLiveRegion="polite"
       style={{ gap: 10, ...cup(radius.tile, 5), backgroundColor: colors.surfaceAlt, paddingVertical: spacing.sm, paddingHorizontal: spacing.md }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+      {/* The label has the bar's whole width, so a long exercise name is not cut down to "Rest afte…" beside the buttons. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <CupKey color={colors.exercise} />
+        <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flexShrink: 1 }}>
+          Rest{name ? ` after ${name.toLowerCase()}` : ''}
+        </Text>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: -6 }}>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <CupKey color={colors.exercise} />
-            <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flexShrink: 1 }}>
-              Rest{name ? ` after ${name.toLowerCase()}` : ''}
-            </Text>
-          </View>
           <Text variant="numL" tabular testID="strength-rest-left">
             {formatClock(Math.ceil(left / 1000) * 1000)}
           </Text>
@@ -584,16 +588,33 @@ function formatClock(ms: number): string {
   return `${h > 0 ? `${h}:` : ''}${mm}:${String(s).padStart(2, '0')}`;
 }
 
-/** The live timer: as large as fits beside its two buttons, stepping down for a narrow phone or a long time, never cut. */
+/**
+ * The live timer: as large as fits beside its two buttons, stepping down for a narrow phone or a long time, never cut.
+ * A duration typed in ("1 h 30 min") is numbers with their units small beside them, so it stays on one line.
+ */
 function TimerText({ text, color }: { text: string; color: 'text' | 'textSecondary' }) {
   const { width } = useWindowDimensions();
   // Room left of the two 52 px buttons: the screen (capped at 560) less its padding, the card's and the gaps.
   const room = Math.min(width, 560) - 40 - 36 - 2 * 52 - 2 * 12;
+  const parts = /[a-z]/.test(text) ? text.split(/(\d+)/).filter(Boolean) : null;
   // Bricolage's tabular digits are about 0.6 em wide; a space or a colon is narrower, so this errs on the small side.
-  const size = Math.max(28, Math.min(60, Math.floor(room / (text.length * 0.6))));
+  // Units are 15 px text, about 8 px a character with their spaces.
+  const digits = parts ? parts.filter((p) => /^\d+$/.test(p)).join('').length : text.length;
+  const unitWidth = parts ? parts.filter((p) => !/^\d+$/.test(p)).join('').length * 8 : 0;
+  const size = Math.max(24, Math.min(60, Math.floor((room - unitWidth) / (digits * 0.6))));
   return (
-    <Text variant="numXL" tabular testID="strength-timer" color={color} style={{ fontSize: size, lineHeight: Math.round(size * 0.97), letterSpacing: -size * 0.035 }}>
-      {text}
+    <Text variant="numXL" tabular numberOfLines={1} testID="strength-timer" color={color} style={{ fontSize: size, lineHeight: Math.round(size * 0.97), letterSpacing: -size * 0.035 }}>
+      {parts
+        ? parts.map((p, i) =>
+            /^\d+$/.test(p) ? (
+              p
+            ) : (
+              <Text key={i} variant="unit" style={{ fontSize: 15, letterSpacing: 0 }}>
+                {p}
+              </Text>
+            ),
+          )
+        : text}
     </Text>
   );
 }
@@ -633,11 +654,18 @@ function ExerciseCard({
   const unit = weightUnit(units);
   const slug = `ex-${index}`;
   const prevText = prev ? formatPreviousSets(prev.sets, units) : null;
+  // A set row holds the set number, two fields and two buttons. Under 360 px that leaves a field
+  // about 50 px, too little for "62.5" or "137.5": the card's padding, the number column and the
+  // gaps step down and the weight takes the larger share, so both values show in full.
+  const narrow = useWindowDimensions().width < 360;
+  const gap = narrow ? 6 : spacing.sm;
+  const setCol = narrow ? 20 : 28;
+  const removeSize = narrow ? 28 : 32;
   return (
-    <View testID={slug} style={{ backgroundColor: colors.surface, ...cup(radius.card), borderWidth: 1, borderColor: colors.border, padding: 18, gap: spacing.sm }}>
+    <View testID={slug} style={{ backgroundColor: colors.surface, ...cup(radius.card), borderWidth: 1, borderColor: colors.border, padding: narrow ? 16 : 18, gap: spacing.sm }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text variant="h3" numberOfLines={1}>
+          <Text variant="h3" numberOfLines={2}>
             {ex.name}
           </Text>
           <Text variant="caption" color="textSecondary" numberOfLines={2} testID={`${slug}-previous`}>
@@ -649,17 +677,17 @@ function ExerciseCard({
         </IconButton>
       </View>
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingTop: spacing.xs }}>
-        <Text variant="overline" color="textTertiary" style={{ width: 28, textAlign: 'center' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap, paddingTop: spacing.xs }}>
+        <Text variant="overline" color="textTertiary" style={{ width: setCol, textAlign: 'center' }}>
           SET
         </Text>
-        <Text variant="overline" color="textTertiary" style={{ flex: 1 }}>
+        <Text variant="overline" color="textTertiary" style={{ flex: narrow ? 1.5 : 1 }}>
           {unit.toUpperCase()}
         </Text>
         <Text variant="overline" color="textTertiary" style={{ flex: 1 }}>
           REPS
         </Text>
-        <View style={{ width: 44 + 32 + spacing.sm }} />
+        <View style={{ width: 44 + removeSize + gap }} />
       </View>
 
       {ex.sets.map((s, i) => {
@@ -670,14 +698,14 @@ function ExerciseCard({
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              gap: spacing.sm,
+              gap,
               marginHorizontal: -spacing.sm,
               paddingHorizontal: spacing.sm,
               paddingVertical: 2,
               ...cup(radius.buttonSm, 5),
               backgroundColor: s.done ? colors.surfaceAlt : 'transparent',
             }}>
-            <Text variant="bodyStrong" color="textSecondary" tabular style={{ width: 28, textAlign: 'center' }}>
+            <Text variant="bodyStrong" color="textSecondary" tabular style={{ width: setCol, textAlign: 'center' }}>
               {i + 1}
             </Text>
             <NumberField
@@ -687,7 +715,7 @@ function ExerciseCard({
               value={s.weightKg === null ? null : round(weightValue(s.weightKg, units), 2)}
               onChange={(n) => update((d) => edits.updateSet(d, ex.key, s.key, { weightKg: n === null ? null : weightToKg(Math.max(0, n), units) }))}
               decimals={2}
-              style={{ flex: 1 }}
+              style={{ flex: narrow ? 1.5 : 1 }}
             />
             <NumberField
               testID={`${slug}-set-${i}-reps`}
@@ -733,7 +761,7 @@ function ExerciseCard({
               accessibilityLabel={`Remove set ${i + 1}`}
               testID={`${slug}-set-${i}-remove`}
               tone="clear"
-              size={32}
+              size={removeSize}
               onPress={() => update((d) => edits.removeSet(d, ex.key, s.key))}>
               <X size={16} color={colors.textSecondary} strokeWidth={1.9} />
             </IconButton>

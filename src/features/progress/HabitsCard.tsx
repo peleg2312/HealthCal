@@ -36,20 +36,26 @@ function HabitRow({
   const { colors, spacing } = useTheme();
   return (
     <PressableScale testID={testID} onPress={() => go(route)} scaleTo={0.985} accessibilityLabel={`${title}: ${value ?? 'no data'} ${unit ?? ''}. ${detail}`} style={{ gap: spacing.sm, paddingVertical: spacing.xs }}>
+      {/* The number shares the title's line and the detail runs the full width under both, so on a
+          320 px phone the detail is not squeezed into a narrow column beside the number. */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
         <CupKey color={color} size={10} />
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text variant="bodyStrong">{title}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.sm }}>
+            <Text variant="bodyStrong" style={{ flexShrink: 1 }}>
+              {title}
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+              <Text variant="numM" color={value ? 'text' : 'textTertiary'}>
+                {value ?? '–'}
+                {unit && value ? <Text variant="unit">{`\u00A0${unit.replace(/ /g, '\u00A0')}`}</Text> : null}
+              </Text>
+              {value ? <TrendMark trend={trend} period={period} /> : null}
+            </View>
+          </View>
           <Text variant="caption" color="textSecondary">
             {detail}
           </Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-          <Text variant="numM" color={value ? 'text' : 'textTertiary'}>
-            {value ?? '–'}
-            {unit && value ? <Text variant="unit">{` ${unit}`}</Text> : null}
-          </Text>
-          {value ? <TrendMark trend={trend} period={period} /> : null}
         </View>
         <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.9} />
       </View>

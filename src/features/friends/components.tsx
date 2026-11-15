@@ -7,7 +7,7 @@ import { formatDistance } from '@/lib/units';
 import type { CheerReceived, Friend, FriendRequest, FriendWorkout, SocialSharing } from '@/services/friends';
 import { fonts, useTheme } from '@/theme';
 import type { ISODate, UnitSystem } from '@/types';
-import { Avatar, Button, Card, Divider, IconButton, MiniCup, PressableScale, Text, TextField, ToggleRow } from '@/ui';
+import { Avatar, Button, Card, Divider, IconButton, MiniCup, PressableScale, Text, TextField, Toggle } from '@/ui';
 
 import { formatCode, normalizeCode } from './summary';
 import { dayLabel, friendWeek, isCurrentWeek, latestWorkout, personMark, sharesAnything, sharingSentence, type FriendDay } from './week';
@@ -79,24 +79,29 @@ export function workoutMeta(w: FriendWorkout, today: ISODate): string {
 export function WorkoutRow({ w, friend, today, units, onCheer }: { w: FriendWorkout; friend: Friend; today: ISODate; units: UnitSystem; onCheer: () => void }) {
   const { spacing } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 6 }}>
-      <Text style={{ fontSize: 17, lineHeight: 22, width: 22, textAlign: 'center' }} accessibilityElementsHidden importantForAccessibility="no">
-        {w.emoji || '·'}
-      </Text>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text variant="bodyStrong" numberOfLines={1} style={{ fontFamily: fonts.semibold }}>
-          {workoutTitle(w, units)}
+    // Cheer sits beside the workout; a name too long for that line takes the row and Cheer goes under it, at the right.
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.xs, minHeight: 56, paddingVertical: 6 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 }}>
+        <Text style={{ fontSize: 17, lineHeight: 22, width: 22, textAlign: 'center' }} accessibilityElementsHidden importantForAccessibility="no">
+          {w.emoji || '·'}
         </Text>
-        <Text variant="caption" color="textSecondary" numberOfLines={1}>
-          {workoutMeta(w, today)}
-        </Text>
+        <View style={{ flexShrink: 1, minWidth: 0 }}>
+          <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
+            {workoutTitle(w, units)}
+          </Text>
+          <Text variant="caption" color="textSecondary" numberOfLines={1}>
+            {workoutMeta(w, today)}
+          </Text>
+        </View>
       </View>
-      <CheerButton
-        testID={`friends-cheer-${w.id}`}
-        cheered={friend.cheered.includes(w.id)}
-        label={`${friend.displayName}'s ${w.name.toLowerCase()}`}
-        onPress={onCheer}
-      />
+      <View style={{ marginLeft: 'auto' }}>
+        <CheerButton
+          testID={`friends-cheer-${w.id}`}
+          cheered={friend.cheered.includes(w.id)}
+          label={`${friend.displayName}'s ${w.name.toLowerCase()}`}
+          onPress={onCheer}
+        />
+      </View>
     </View>
   );
 }
@@ -107,7 +112,7 @@ function StreakLine({ days }: { days: number }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
       <Flame size={14} color={colors.caloriesInk} strokeWidth={2.2} />
-      <Text variant="caption" color="textSecondary" numberOfLines={1}>
+      <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
         {days === 1 ? '1 day streak' : `${days} day streak`}
       </Text>
     </View>
@@ -136,20 +141,23 @@ export function FriendCard({ friend, today, units, onOpen, onCheer }: { friend: 
         scaleTo={0.99}
         accessibilityLabel={`${friend.displayName}. ${hasMinutes ? `${s.minutes} active minutes ${current ? 'this week' : 'in their last shared week'}. ` : ''}${typeof s.streak === 'number' ? `${s.streak} day streak. ` : ''}Open details`}
         style={{ gap: spacing.lg }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-          <PersonMark name={friend.displayName} avatar={friend.avatar} />
-          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-            <Text variant="h3" numberOfLines={1}>
-              {friend.displayName}
-            </Text>
-            {typeof s.streak === 'number' ? <StreakLine days={s.streak} /> : !sharesAnything(s) ? (
-              <Text variant="caption" color="textSecondary" numberOfLines={2}>
-                Not sharing their week right now
+        {/* The minutes sit beside the name; a name too long for that line takes the row and the minutes go under it, at the right. */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.xs }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 }}>
+            <PersonMark name={friend.displayName} avatar={friend.avatar} />
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <Text variant="h3" numberOfLines={3}>
+                {friend.displayName}
               </Text>
-            ) : null}
+              {typeof s.streak === 'number' ? <StreakLine days={s.streak} /> : !sharesAnything(s) ? (
+                <Text variant="caption" color="textSecondary" numberOfLines={2}>
+                  Not sharing their week right now
+                </Text>
+              ) : null}
+            </View>
           </View>
           {hasMinutes ? (
-            <View style={{ alignItems: 'flex-end', flexShrink: 0 }}>
+            <View style={{ alignItems: 'flex-end', flexShrink: 0, marginLeft: 'auto' }}>
               <Text variant="numL" testID={`friends-minutes-${slug}`}>
                 {s.minutes}
                 <Text variant="unit"> min</Text>
@@ -252,7 +260,7 @@ export function IncomingRequests({ requests, busy, onAccept, onDecline }: { requ
           <View style={{ flexDirection: 'row', flexWrap: narrow ? 'wrap' : 'nowrap', alignItems: 'center', gap: spacing.md, minHeight: 64, paddingVertical: spacing.sm }}>
             <PersonMark name={r.displayName} avatar={r.avatar} />
             <View style={{ flex: 1, minWidth: narrow ? 160 : 0 }}>
-              <Text variant="h3" numberOfLines={1}>
+              <Text variant="h3" numberOfLines={3}>
                 {r.displayName}
               </Text>
               <Text variant="caption" color="textSecondary" numberOfLines={2}>
@@ -279,26 +287,31 @@ export function OutgoingRequests({ requests, busy, onCancel }: { requests: Frien
       {requests.map((r, i) => (
         <React.Fragment key={r.userId}>
           {i > 0 ? <Divider /> : null}
-          <View testID={`friends-outgoing-${idFor(r.userId)}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: spacing.sm }}>
-            <PersonMark name={r.displayName} avatar={r.avatar} size={36} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text variant="bodyStrong" numberOfLines={1} style={{ fontFamily: fonts.semibold }}>
-                {r.displayName}
-              </Text>
-              <Text variant="caption" color="textSecondary" numberOfLines={1}>
-                Waiting for them to accept
-              </Text>
+          {/* "Take back" sits beside the name; a name too long for that line takes the row and the button goes under it, at the right. */}
+          <View testID={`friends-outgoing-${idFor(r.userId)}`} style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.xs, minHeight: 56, paddingVertical: spacing.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 }}>
+              <PersonMark name={r.displayName} avatar={r.avatar} size={36} />
+              <View style={{ flexShrink: 1, minWidth: 0 }}>
+                <Text variant="bodyStrong" numberOfLines={3} style={{ fontFamily: fonts.semibold }}>
+                  {r.displayName}
+                </Text>
+                <Text variant="caption" color="textSecondary">
+                  Waiting for them to accept
+                </Text>
+              </View>
             </View>
-            <Button
-              testID={`friends-cancel-${idFor(r.userId)}`}
-              title="Take back"
-              variant="secondary"
-              size="sm"
-              full={false}
-              loading={busy === r.userId}
-              accessibilityLabel={`Take back your request to ${r.displayName}`}
-              onPress={() => onCancel(r)}
-            />
+            <View style={{ marginLeft: 'auto' }}>
+              <Button
+                testID={`friends-cancel-${idFor(r.userId)}`}
+                title="Take back"
+                variant="secondary"
+                size="sm"
+                full={false}
+                loading={busy === r.userId}
+                accessibilityLabel={`Take back your request to ${r.displayName}`}
+                onPress={() => onCancel(r)}
+              />
+            </View>
           </View>
         </React.Fragment>
       ))}
@@ -317,7 +330,7 @@ export function CheersList({ cheers, describe, when }: { cheers: CheerReceived[]
           <View testID={`friends-cheer-received-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: spacing.sm }}>
             <PersonMark name={c.displayName} avatar={c.avatar} size={36} />
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text variant="body" numberOfLines={2}>
+              <Text variant="body">
                 <Text variant="bodyStrong">{c.displayName}</Text>
                 {` cheered ${describe(c)}`}
               </Text>
@@ -337,6 +350,27 @@ export function CheersList({ cheers, describe, when }: { cheers: CheerReceived[]
 
 // ------------------------------------------------------------------ profile fields
 
+/**
+ * A sharing switch as the kit's ToggleRow lays it out, but with its whole sentence: what a switch
+ * shares is the point of the row, so it wraps to a third line in the set-up card rather than end in "…".
+ */
+function SharingRow({ title, subtitle, value, onChange, testID }: { title: string; subtitle: string; value: boolean; onChange: (v: boolean) => void; testID: string }) {
+  const { spacing } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text variant="bodyStrong" style={{ fontFamily: fonts.semibold }}>
+          {title}
+        </Text>
+        <Text variant="caption" color="textSecondary">
+          {subtitle}
+        </Text>
+      </View>
+      <Toggle testID={testID} value={value} onChange={onChange} accessibilityLabel={title} />
+    </View>
+  );
+}
+
 /** The three sharing switches, each saying exactly what it shows, and the sentence about what is never shared. */
 export function SharingSwitches({ sharing, onChange }: { sharing: SocialSharing; onChange: (key: keyof SocialSharing, on: boolean) => void }) {
   const { spacing } = useTheme();
@@ -345,11 +379,11 @@ export function SharingSwitches({ sharing, onChange }: { sharing: SocialSharing;
       <Text variant="label" color="textSecondary" style={{ marginBottom: spacing.xs }}>
         What friends see
       </Text>
-      <ToggleRow testID="friends-share-minutes" title="Active minutes" subtitle="Weekly total and sessions. Workout lengths show with recent workouts" value={sharing.minutes} onChange={(v) => onChange('minutes', v)} />
+      <SharingRow testID="friends-share-minutes" title="Active minutes" subtitle="Weekly total and sessions. Workout lengths show with recent workouts" value={sharing.minutes} onChange={(v) => onChange('minutes', v)} />
       <Divider />
-      <ToggleRow testID="friends-share-streak" title="Logging streak" subtitle="How many days in a row you have logged" value={sharing.streak} onChange={(v) => onChange('streak', v)} />
+      <SharingRow testID="friends-share-streak" title="Logging streak" subtitle="How many days in a row you have logged" value={sharing.streak} onChange={(v) => onChange('streak', v)} />
       <Divider />
-      <ToggleRow testID="friends-share-workouts" title="Recent workouts" subtitle="Name, length and distance from the last two weeks" value={sharing.workouts} onChange={(v) => onChange('workouts', v)} />
+      <SharingRow testID="friends-share-workouts" title="Recent workouts" subtitle="Name, length and distance from the last two weeks" value={sharing.workouts} onChange={(v) => onChange('workouts', v)} />
       <NeverShared />
     </View>
   );

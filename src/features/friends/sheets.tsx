@@ -5,7 +5,8 @@ import { formatShortDate, toISODate } from '@/lib/dates';
 import { setupSocial, type Friend, type SocialMe, type SocialSharing } from '@/services/friends';
 import { useTheme } from '@/theme';
 import type { ISODate, UnitSystem } from '@/types';
-import { Button, Divider, Sheet, Stat, Text, toast } from '@/ui';
+import { Figure } from '@/features/trackers/components';
+import { Button, Divider, Sheet, Text, toast } from '@/ui';
 
 import { CheerButton, NameField, PersonMark, SharingSwitches, WeekCups, WorkoutRow } from './components';
 import { dayRef } from './summary';
@@ -51,9 +52,10 @@ export function FriendSheet({
           </View>
           {typeof s.minutes === 'number' || typeof s.streak === 'number' ? (
             <View style={{ flexDirection: 'row', gap: spacing.md }}>
-              {typeof s.minutes === 'number' ? <Stat label={current ? 'Active this week' : 'Last shared week'} value={String(s.minutes)} unit="min" /> : null}
-              {typeof s.sessions === 'number' ? <Stat label="Sessions" value={String(s.sessions)} /> : null}
-              {typeof s.streak === 'number' ? <Stat label="Logging streak" value={String(s.streak)} unit={s.streak === 1 ? 'day' : 'days'} /> : null}
+              {/* Figures, not Stat: their labels take a second line in a third of a narrow sheet instead of ending in "…". */}
+              {typeof s.minutes === 'number' ? <Figure label={current ? 'Active this week' : 'Last shared week'} value={String(s.minutes)} unit="min" /> : null}
+              {typeof s.sessions === 'number' ? <Figure label="Sessions" value={String(s.sessions)} /> : null}
+              {typeof s.streak === 'number' ? <Figure label="Logging streak" value={String(s.streak)} unit={s.streak === 1 ? 'day' : 'days'} /> : null}
             </View>
           ) : null}
           {days ? <WeekCups days={days} today={today} /> : null}

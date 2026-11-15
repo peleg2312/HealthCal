@@ -6,7 +6,7 @@ import { SourceTag } from '@/features/food/components';
 import { formatMacro } from '@/lib/nutrition';
 import { cup, fonts, useTheme } from '@/theme';
 import type { Food } from '@/types';
-import { Badge, Chip, CupKey, IconButton, parseNumber, Text } from '@/ui';
+import { Badge, CupKey, IconButton, parseNumber, PressableScale, Text } from '@/ui';
 
 import { confidenceLevel, gramStep, type ReviewRow } from './estimate';
 import { itemFromFood } from './localMatch';
@@ -76,27 +76,28 @@ export function ItemRow({
             <Plus size={16} color={colors.text} />
           </IconButton>
         </View>
-        <View style={{ flex: 1, alignItems: 'flex-end', minWidth: 0 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
-            <Text variant="numM" tabular testID={`${id}-kcal`} style={{ fontSize: 17, lineHeight: 22 }}>
-              {item.kcal}
-            </Text>
-            <Text variant="unit">kcal</Text>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Macro letter="P" value={item.protein} color={colors.protein} />
-            <Macro letter="C" value={item.carbs} color={colors.carbs} />
-            <Macro letter="F" value={item.fat} color={colors.fat} />
-          </View>
+        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'flex-end', gap: 3 }}>
+          <Text variant="numM" tabular testID={`${id}-kcal`} style={{ fontSize: 17, lineHeight: 22 }}>
+            {item.kcal}
+          </Text>
+          <Text variant="unit">kcal</Text>
         </View>
       </View>
-      <View testID={`${id}-source`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-        <SourceTag source={row.food ? row.food.source : 'ai'} />
-        {row.food && row.estimate ? (
-          <Text variant="caption" color="textSecondary">
-            · portion still estimated
-          </Text>
-        ) : null}
+      {/* The source on the left, the macros on the right; on a narrow phone the macros wrap under the source rather than run over the stepper. */}
+      <View testID={`${id}-source`} style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: spacing.sm, rowGap: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1 }}>
+          <SourceTag source={row.food ? row.food.source : 'ai'} />
+          {row.food && row.estimate ? (
+            <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
+              · portion still estimated
+            </Text>
+          ) : null}
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Macro letter="P" value={item.protein} color={colors.protein} />
+          <Macro letter="C" value={item.carbs} color={colors.carbs} />
+          <Macro letter="F" value={item.fat} color={colors.fat} />
+        </View>
       </View>
       {onSwap && (matches.length > 0 || row.food) ? (
         <View style={{ gap: 6 }}>
@@ -108,10 +109,11 @@ export function ItemRow({
               const selected = row.food?.id === food.id;
               const kcal = itemFromFood(food, item.grams, item.confidence).kcal;
               return (
-                <Chip
+                <SwapChip
                   key={food.id}
                   testID={`${id}-swap-${i}`}
-                  label={`${food.name} · ${kcal} kcal`}
+                  name={food.name}
+                  kcal={kcal}
                   selected={selected}
                   onPress={() => (selected ? onUnswap?.() : onSwap(food))}
                 />
@@ -126,6 +128,40 @@ export function ItemRow({
         </View>
       ) : null}
     </View>
+  );
+}
+
+/**
+ * A food this item could be. Drawn as a chip, but a long reference name ("Chicken thigh, with skin,
+ * COOKED (roasted)") takes a second line instead of running past the card, and the calories stay.
+ */
+function SwapChip({ name, kcal, selected, onPress, testID }: { name: string; kcal: number; selected: boolean; onPress: () => void; testID: string }) {
+  const { colors, radius } = useTheme();
+  const fg = selected ? 'bg' : 'text';
+  return (
+    <PressableScale
+      testID={testID}
+      onPress={onPress}
+      feedback="select"
+      hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+      accessibilityState={{ selected }}
+      accessibilityLabel={`${name}, ${kcal} kcal`}
+      style={{
+        maxWidth: '100%',
+        minHeight: 32,
+        justifyContent: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: radius.chip,
+        backgroundColor: selected ? colors.text : 'transparent',
+        borderWidth: 1,
+        borderColor: selected ? colors.text : colors.borderStrong,
+      }}>
+      <Text variant="label" color={fg} numberOfLines={2} style={{ fontSize: 13.5, lineHeight: 18 }}>
+        {name}
+        <Text variant="label" color={selected ? 'bg' : 'textSecondary'} style={{ fontSize: 13.5 }}>{` · ${kcal}\u00A0kcal`}</Text>
+      </Text>
+    </PressableScale>
   );
 }
 

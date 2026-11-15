@@ -97,7 +97,8 @@ function ProfileHub() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
           <InitialsAvatar name={profile.name} />
           <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-            <Text variant="h2" numberOfLines={1}>
+            {/* A long name wraps to a second line (at its hyphen, say) rather than lose its end. */}
+            <Text variant="h2" numberOfLines={2}>
               {profile.name || 'You'}
             </Text>
             <Text variant="label" color="textSecondary" numberOfLines={1}>
@@ -363,7 +364,7 @@ function AccountRow() {
     icon = <Smartphone size={20} color={colors.warningInk} />;
     tone = colors.warningInk;
     keep = true;
-    subtitle = 'On this device only. Create a free account to back up and sync';
+    subtitle = 'On this device only. A free account backs up and syncs';
   } else {
     icon = <Smartphone size={20} color={colors.textSecondary} />;
     subtitle = 'On this device only. Use Your data to export a backup';

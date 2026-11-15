@@ -77,6 +77,7 @@ export function Sheet({
         {/* A native modal covers the app's own toast layer, so the sheet shows toasts itself, just above its top edge. */}
         <ToastHost placement="sheet" />
         <Animated.View
+          testID="sheet"
           onLayout={(e) => setSheetH(Math.round(e.nativeEvent.layout.height))}
           style={[
             {
@@ -104,10 +105,10 @@ export function Sheet({
               {title}
             </Text>
           ) : null}
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.md }}>
+          <ScrollView testID="sheet-body" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.md }}>
             {children}
           </ScrollView>
-          {footer ? <View style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.sm }}>{footer}</View> : null}
+          {footer ? <View testID="sheet-footer" style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.sm }}>{footer}</View> : null}
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>

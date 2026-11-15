@@ -189,7 +189,7 @@ export default function TrainScreen() {
       <ConfirmSheet
         visible={replace !== null}
         title="Replace the workout in progress?"
-        message={`The workout you started has ${draft?.exercises.length ?? 0} ${draft?.exercises.length === 1 ? 'exercise' : 'exercises'} that are not saved yet. Starting ${replace?.name.toLowerCase() ?? 'this routine'} clears them.`}
+        message={`The workout you started has ${draft?.exercises.length ?? 0} ${draft?.exercises.length === 1 ? 'exercise that is' : 'exercises that are'} not saved yet. Starting ${replace?.name.toLowerCase() ?? 'this routine'} clears them.`}
         confirmLabel="Start routine"
         cancelLabel="Keep my workout"
         destructive

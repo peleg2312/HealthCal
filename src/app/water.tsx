@@ -61,6 +61,25 @@ function factorLine(): string {
   return `Some drinks count slightly less toward your goal: ${less}. Water, tea and sports drinks count in full.`;
 }
 
+/**
+ * The glass tiles in even rows: as many a row as fit at 72 px or more, spread over as few rows as
+ * that needs and balanced, so four glasses on a 320 px phone are two and two rather than three and
+ * one stretched across the screen. A short last row is padded (-1) so every tile keeps one width.
+ */
+function tileRows(count: number, screenW: number): number[][] {
+  const content = Math.min(screenW, 560) - 40;
+  const fit = Math.max(1, Math.floor((content + 8) / (72 + 8)));
+  const rows = Math.ceil(count / fit);
+  const perRow = Math.ceil(count / Math.max(1, rows));
+  const out: number[][] = [];
+  for (let i = 0; i < count; i += perRow) {
+    const row = Array.from({ length: Math.min(perRow, count - i) }, (_, k) => i + k);
+    while (row.length < perRow) row.push(-1 - row.length);
+    out.push(row);
+  }
+  return out;
+}
+
 function WaterScreen() {
   const { colors, spacing } = useTheme();
   const { width: screenW } = useWindowDimensions();
@@ -245,17 +264,25 @@ function WaterScreen() {
           />
         ))}
       </ChipRow>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-        {settings.waterPresets.map((ml, i) => (
-          <Tile
-            key={`${ml}-${i}`}
-            testID={`water-add-${i}`}
-            accessibilityLabel={`Add ${formatVolume(ml, units)} of ${BEVERAGE_LABELS[beverage].label.toLowerCase()}`}
-            title={formatVolume(ml, units)}
-            subtitle={i === 0 ? 'Small' : undefined}
-            icon={<GlassWater size={Math.min(26, 16 + i * 3)} color={colors.water} strokeWidth={1.9} />}
-            onPress={() => add(ml)}
-          />
+      <View style={{ gap: spacing.sm }}>
+        {tileRows(settings.waterPresets.length, screenW).map((row, r) => (
+          <View key={r} style={{ flexDirection: 'row', gap: spacing.sm }}>
+            {row.map((i) => {
+              if (i < 0) return <View key={`pad-${r}-${i}`} style={{ flex: 1 }} />;
+              const ml = settings.waterPresets[i];
+              return (
+                <Tile
+                  key={`${ml}-${i}`}
+                  testID={`water-add-${i}`}
+                  accessibilityLabel={`Add ${formatVolume(ml, units)} of ${BEVERAGE_LABELS[beverage].label.toLowerCase()}`}
+                  title={formatVolume(ml, units)}
+                  subtitle={i === 0 ? 'Small' : undefined}
+                  icon={<GlassWater size={Math.min(26, 16 + i * 3)} color={colors.water} strokeWidth={1.9} />}
+                  onPress={() => add(ml)}
+                />
+              );
+            })}
+          </View>
         ))}
       </View>
       <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-end' }}>

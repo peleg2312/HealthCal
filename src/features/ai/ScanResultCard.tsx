@@ -1,6 +1,6 @@
 import { X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Animated, Platform, View } from 'react-native';
+import { Animated, Platform, useWindowDimensions, View } from 'react-native';
 
 import { SourceTag } from '@/features/food/components';
 import { dayPhrase, formatQty, kcal, lastPortions, portionFor } from '@/features/food/helpers';
@@ -43,6 +43,7 @@ export function ScanResultCard({
   onClose: () => void;
 }) {
   const { colors, radius, spacing } = useTheme();
+  const narrow = useWindowDimensions().width < 360;
   const entries = useLive('foodEntries');
   const [portion, setPortion] = useState(() => portionFor(food, lastPortions(entries)));
   const [enter] = useState(() => new Animated.Value(0));
@@ -93,7 +94,8 @@ export function ScanResultCard({
         </IconButton>
       </View>
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md }}>
+      {/* The stepper goes under the number when both do not fit (a narrow phone, a four-digit number). */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: spacing.md, rowGap: spacing.sm }}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
           <Text variant="numL" tabular color="caloriesInk" testID="scan-result-kcal">
             {kcal(n.kcal)}
@@ -126,12 +128,13 @@ export function ScanResultCard({
       <Impact date={date} kcalValue={n.kcal} grams={grams} />
 
       <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-        <Button testID="scan-result-details" title="Details" variant="ghost" size="md" full={false} onPress={onDetails} />
+        {/* Tighter side padding on a narrow phone, so "Add to breakfast" is never cut. */}
+        <Button testID="scan-result-details" title="Details" variant="ghost" size="md" full={false} onPress={onDetails} style={narrow ? { paddingHorizontal: 12 } : undefined} />
         <Button
           testID="scan-result-add"
           title={`Add to ${MEAL_LABEL[meal].toLowerCase()}`}
           size="md"
-          style={{ flex: 1 }}
+          style={narrow ? { flex: 1, paddingHorizontal: 12 } : { flex: 1 }}
           disabled={!(grams > 0)}
           onPress={() => onAdd(portion.serving, portion.quantity)}
         />

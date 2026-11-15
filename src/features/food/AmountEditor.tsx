@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { servingsFor } from '@/lib/nutrition';
 import { useTheme } from '@/theme';
 import type { Food, Serving } from '@/types';
-import { Chip, ChipRow, NumberField, Stepper } from '@/ui';
+import { Chip, ChipWrap, NumberField, Stepper } from '@/ui';
 
 import { formatQty } from './helpers';
 
@@ -61,8 +61,9 @@ export function AmountEditor({
   };
 
   return (
-    <View>
-      <ChipRow style={{ paddingVertical: spacing.md }}>
+    <View style={{ gap: spacing.md }}>
+      {/* Wrapped, not a sideways row: inside a card or sheet a scrolling row would run past the card's edge. */}
+      <ChipWrap>
         {servingList.map((s, i) => (
           <Chip
             key={`${s.label}-${i}`}
@@ -72,7 +73,7 @@ export function AmountEditor({
             onPress={() => chooseServing(s)}
           />
         ))}
-      </ChipRow>
+      </ChipWrap>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, flexWrap: 'wrap' }}>
         <Stepper
           label="quantity"

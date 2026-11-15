@@ -444,6 +444,10 @@ export function BigTextField({
 }: Omit<TextInputProps, 'style'> & { label: string; error?: string | null; testID: string }) {
   const { colors, radius } = useTheme();
   const [focused, setFocused] = useState(false);
+  // A long answer (a double-barrelled name) steps the type down so it still fits a 320 px phone
+  // whole; the field keeps its height.
+  const length = typeof rest.value === 'string' ? rest.value.length : 0;
+  const fontSize = length > 18 ? 18 : length > 14 ? 21 : 24;
   return (
     <View style={{ gap: 6 }}>
       <Text variant="label" color="textSecondary">
@@ -474,7 +478,7 @@ export function BigTextField({
             rest.onBlur?.(e);
           }}
           style={[
-            { color: colors.text, fontFamily: fonts.display, fontSize: 24, lineHeight: 30, paddingVertical: 12, letterSpacing: -0.3 },
+            { color: colors.text, fontFamily: fonts.display, fontSize, lineHeight: 30, paddingVertical: 12, letterSpacing: -0.3 },
             { outlineStyle: 'none' } as object,
           ]}
         />

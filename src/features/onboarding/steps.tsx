@@ -690,7 +690,8 @@ export function RoutineStep({ draft, set, errors }: StepProps) {
           <Chevron size={20} color={colors.textSecondary} strokeWidth={2} />
         </PressableScale>
         {open ? (
-          <View style={{ gap: spacing.lg }}>
+          // 16 px from the row that opened it, the same as between the groups inside.
+          <View style={{ gap: spacing.lg, paddingTop: spacing.sm }}>
             <SettingsGroup title="Usual meal times">
               <TimeRow title="Breakfast" value={r.breakfast} hour12={hour12} onChange={(breakfast) => setRoutine({ breakfast })} testID="onb-routine-breakfast" />
               <TimeRow title="Lunch" value={r.lunch} hour12={hour12} onChange={(lunch) => setRoutine({ lunch })} testID="onb-routine-lunch" />

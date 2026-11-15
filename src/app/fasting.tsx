@@ -146,17 +146,15 @@ function FastingScreen() {
                 ? `Target reached ${formatDuration(Math.max(1, minutes(p.elapsedMs - p.targetMs)))} ago`
                 : `${formatDuration(Math.max(1, minutes(p.remainingMs)))} to go`}
             </Text>
-            <View style={{ flexDirection: 'row', alignSelf: 'stretch', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.lg, alignItems: 'center' }}>
-              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {/* One line each: side by side, "Tomorrow 03:14 PM" beside the edit button had about 60 px and was cut. */}
+            <View style={{ alignSelf: 'stretch', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md, gap: spacing.sm }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
                 <TimeBlock testID="fasting-started" label="Started" value={relativeDayTime(new Date(active.start), new Date(now))} />
                 <IconButton testID="fasting-adjust" accessibilityLabel="Change start time" tone="surface" size={44} style={{ borderColor: colors.borderStrong }} onPress={() => setAdjusting(true)}>
                   <Pencil size={16} color={colors.text} />
                 </IconButton>
               </View>
-              <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: colors.border, marginHorizontal: spacing.md }} />
-              <View style={{ flex: 1 }}>
-                <TimeBlock label="Target time" value={relativeDayTime(p.endsAt, new Date(now))} />
-              </View>
+              <TimeBlock label="Target time" value={relativeDayTime(p.endsAt, new Date(now))} />
             </View>
           </>
         ) : (
@@ -189,6 +187,7 @@ function FastingScreen() {
             title="Set"
             variant="secondary"
             full={false}
+            style={{ alignSelf: 'flex-end' }}
             onPress={() => {
               if (custom === null || custom < MIN_FAST_HOURS || custom > MAX_FAST_HOURS) {
                 toast(`Choose between ${MIN_FAST_HOURS} and ${MAX_FAST_HOURS} hours`);
@@ -229,7 +228,7 @@ function FastingScreen() {
                       <Text variant="bodyStrong" tabular>
                         {formatDuration(minutes(fp.elapsedMs))}
                       </Text>
-                      <Text variant="caption" color="textSecondary" numberOfLines={1}>
+                      <Text variant="caption" color="textSecondary" numberOfLines={2}>
                         {relativeDayTime(new Date(s.start), new Date(now))} to {relativeDayTime(new Date(s.end!), new Date(now))} · target {fastingLabel(s.targetHours)}
                       </Text>
                     </View>
@@ -263,6 +262,7 @@ function AdjustStartSheet({ visible, session, onClose }: { visible: boolean; ses
     if (visible) setDraft(Date.parse(session.start));
   }
   const shift = (mins: number) => setDraft((d) => clampFastStart(d + mins * 60_000, Date.now()));
+  const narrow = useWindowDimensions().width < 360;
   const steps = [-60, -15, 15, 60];
   return (
     <Sheet
@@ -286,7 +286,8 @@ function AdjustStartSheet({ visible, session, onClose }: { visible: boolean; ses
       <Text testID="fasting-adjust-value" variant="numL" align="center" tabular>
         {relativeDayTime(new Date(draft))}
       </Text>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
+      {/* Four in a row; under 360 px "−15 min" does not fit a quarter of the sheet, so two rows of two. */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {steps.map((m) => (
           <Button
             key={m}
@@ -294,7 +295,8 @@ function AdjustStartSheet({ visible, session, onClose }: { visible: boolean; ses
             title={`${m < 0 ? '−' : '+'}${Math.abs(m) >= 60 ? `${Math.abs(m) / 60} h` : `${Math.abs(m)} min`}`}
             variant="secondary"
             size="md"
-            style={{ flex: 1, paddingHorizontal: 4 }}
+            full={false}
+            style={{ flexGrow: 1, flexBasis: narrow ? '40%' : 0, paddingHorizontal: 4 }}
             onPress={() => shift(m)}
           />
         ))}

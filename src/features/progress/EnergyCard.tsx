@@ -40,7 +40,8 @@ function Column({ title, value, caption, active, color, first }: { title: string
       <Text variant="caption" color="textSecondary">
         {caption}
       </Text>
-      {active ? <Badge label="Sets your targets" color={color} style={{ marginTop: 4 }} /> : null}
+      {/* The badge is one line high: at 320 px the column only holds the short label. */}
+      {active ? <Badge label={narrow ? 'Sets targets' : 'Sets your targets'} color={color} style={{ marginTop: 4 }} /> : null}
     </View>
   );
 }

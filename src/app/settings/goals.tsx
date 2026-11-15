@@ -26,7 +26,7 @@ import { useToday } from '@/store/clock';
 import { computeEnergyModel, useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ActivityLevel, GoalType, MacroSplit, Profile, Sex } from '@/types';
-import { Button, Card, Chip, CupKey, goBack, Header, MacroBar, NumberField, Screen, Segmented, Stepper, Text, TextField, ToggleRow, toast } from '@/ui';
+import { Button, Card, Chip, ChipWrap, CupKey, goBack, Header, MacroBar, NumberField, Screen, Segmented, Stepper, Text, TextField, ToggleRow, toast } from '@/ui';
 
 type MacroMode = 'auto' | 'balanced' | 'protein' | 'lowcarb' | 'custom';
 
@@ -413,13 +413,14 @@ function GoalsForm() {
 
       <Group title="Macros">
         <View style={{ paddingVertical: spacing.md, gap: spacing.md }}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+          {/* The kit's chip rows: 12 px between rows, so each chip keeps a 44 px tap area the row below does not take. */}
+          <ChipWrap>
             <Chip testID="goals-macro-auto" label="Automatic" selected={macroMode === 'auto'} onPress={() => setMacroMode('auto')} />
             {(Object.keys(PRESETS) as (keyof typeof PRESETS)[]).map((k) => (
               <Chip key={k} testID={`goals-macro-${k}`} label={PRESETS[k].label} selected={macroMode === k} onPress={() => setMacroMode(k)} />
             ))}
             <Chip testID="goals-macro-custom" label="Custom" selected={macroMode === 'custom'} onPress={() => setMacroMode('custom')} />
-          </View>
+          </ChipWrap>
           {macroMode === 'custom' ? (
             <>
               <View style={{ flexDirection: 'row', gap: spacing.sm }}>

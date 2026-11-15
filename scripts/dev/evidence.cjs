@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
  * Gathers the facts a reviewer needs about a set of screens, with no judgement:
- * a screenshot of each route in each theme and width, every runtime error, and a
- * scan of the page for text that is cut off, content wider than the screen and
- * touch targets under 44 px. Writes PNGs, contact sheets and report.json.
+ * a screenshot of each route (or state, below) in each theme and width, every runtime
+ * error, and a scan for text that is cut off, content wider than the screen and touch
+ * targets under 44 px. Writes PNGs, one contact sheet per route or state, and report.json.
  *
  * It also lays the whole page out at once (the window grown to the page's height) and
  * reports what sits wrongly:
@@ -15,17 +15,72 @@
  *               scrolled to its end (checked at the real window height)
  *   gaps        a card closer than 8 px to the card under it, text closer than 4 px to
  *               its card's edge, and a full-width card whose side margins differ
+ *   toast       a toast, shown after a tap, that covers a control in an open sheet, a
+ *               pinned footer or the tab bar, or that starts above the top of the screen
  * Not reported, because they are drawn that way on purpose: lines 6 px thick or less
  * (the level line, ticks, the brim line that is wider than its cup), the + cup over
- * the tab bar, labels on a corner such as the Friends count, and anything not drawn
- * (a hit area, an empty wrapper). Sheets are closed during the scan.
+ * the tab bar, labels on a corner such as the Friends count, lines a text clamp hides,
+ * and anything not drawn (a hit area, an empty wrapper).
  *
  *   node scripts/dev/evidence.cjs --out=<dir> --routes=/,/diary,/water
- *        [--themes=blossom,light,dark] [--widths=390,320] [--empty] [--fresh]
+ *        [--themes=blossom,light,dark] [--widths=390,320] [--empty] [--fresh] [--stress] [--imperial]
+ *        [--states=<list>[,<list>]] [--only=<state id>[,<id>]]
  *        [--checks]   also run type-check, lint, unit tests, e2e and the route check
- *        [--url=http://localhost:8081]
+ *        [--tries=3]  attempts at a capture before it is reported as not captured
+ *        [--show=40]  problems to print; [--url=http://localhost:8081]
  *
+ * STATES. A route shows a screen as it first opens; a state opens it and then does what a
+ * person would: taps, types, picks a file, opens a sheet. --states=<list> loads
+ * scripts/dev/states/<list>.cjs, which exports an array of plain objects:
+ *
+ *   {
+ *     id: 'diary-imperial',        kebab-case, unique; names the PNGs (<id>__<theme>__<width>.png),
+ *                                  the contact sheet (sheet-<id>.png) and the report entries
+ *     route: '/diary?date={day}',  where it starts; {day} is replaced by `day`
+ *     day: -2,                     days from today for {day} (local calendar), e.g. a past diary day
+ *     data: 'demo',                demo (default) | empty (profile, nothing logged) | fresh (nothing
+ *                                  stored: welcome and onboarding) | stress (long names, big numbers:
+ *                                  buildSeed({ stress: true }) in seed.mjs)
+ *     imperial: true,              the profile in lb, ft in, fl oz and mi
+ *     type: { 'food-search-input': 'banana' },   typed after the screen opens, before the taps
+ *     taps: [                      done in order, ~0.7 s apart:
+ *       'tab-add',                   tap the element with this testID ('^prefix-' taps the first
+ *                                    whose testID starts with prefix-)
+ *       { type: 'onb-name-input', text: 'Dana' },   type into an input between taps
+ *       { choose: 'import-choose-files', files: ['scripts/dev/states/files/morning-run.gpx'] },
+ *                                    tap a control that opens the file picker and pick these files
+ *                                    (paths from the repository root)
+ *       { wait: 800 },               wait this many milliseconds
+ *     ],
+ *     waitFor: 'import-list',      a testID that must be visible before the capture
+ *     sheet: true,                 a sheet is open at the end (and must be: a capture with a
+ *                                  sheet open when the state does not say so is not captured)
+ *     note: 'what it shows',       for people; copied to report.json
+ *   }
+ *
+ * Every state is captured in every theme and width, each in a fresh page with its own stored
+ * data. A capture that is blank, half-loaded (fonts, data), whose step failed, whose waitFor
+ * never showed or whose sheet is missing is tried again (--tries) and then reported as
+ * NOT CAPTURED, never as clean, and the run exits 1. report.json has `states` (each state's
+ * fields) and one `screens` entry per capture with `id`, `kind` ('route' | 'state'), theme,
+ * width, image, sheetImage and the findings.
+ *
+ * OPEN SHEETS. With a sheet open, the sheet is scanned instead of the page (which is covered
+ * and not judged): the same scans as a page inside the sheet (with the window grown until the
+ * sheet's body no longer scrolls), plus, at the real window height, under `sheet`:
+ *   - its top above the top of the screen;
+ *   - content cut by the bottom of the screen where nothing scrolls to reach it;
+ *   - its last control, with the sheet scrolled to its end, closer than 12 px to the bottom
+ *     of the screen;
+ *   - text, a control or a painted box closer to the sheet's left or right edge than the
+ *     sheet's own side padding (read from the kit's sheet body, 20 px).
+ * Left out of the sheet scan on purpose: anything in a sideways-scrolling row (its edges are
+ * wherever it was scrolled to), boxes as wide as the sheet (its own surface, dividers), the
+ * drag handle and the backdrop. `hidden` is not checked in a sheet.
+ *
+ * Two runs at once are safe: each has its own browser and writes only into its own --out.
  * The page runs with reduced motion, so every screenshot is the resting state.
+ * scripts/dev/evidence-selftest.cjs proves the scans against hand-made faults.
  */
 const { chromium } = require('playwright');
 const { execSync } = require('node:child_process');
@@ -35,24 +90,31 @@ const path = require('node:path');
 const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith('--')).map((a) => { const [k, ...v] = a.slice(2).split('='); return [k, v.join('=') || true]; }));
 const out = path.resolve(flags.out || 'evidence');
 const base = flags.url || 'http://localhost:8081';
-const routes = String(flags.routes || '/').split(',').filter(Boolean);
+// Without --routes: the Today screen, unless states were asked for (then only the states).
+const routes = String(flags.routes || (flags.states ? '' : '/')).split(',').filter(Boolean);
 const themes = String(flags.themes || 'blossom,light,dark').split(',');
 const widths = String(flags.widths || '390,320').split(',').map(Number);
 const ROOT = path.join(__dirname, '..', '..');
 
-/** Runs in the page: what is visibly cut, too wide or too small to tap. */
-function scan() {
+/**
+ * Runs in the page: what is visibly cut, too wide or too small to tap. With `rootSel`
+ * (an open sheet) only what is inside the newest element it matches.
+ */
+function scan(rootSel) {
   const seen = new Set();
   const cut = [];
   const small = [];
   const vw = document.documentElement.clientWidth;
+  const root = rootSel ? [...document.querySelectorAll(rootSel)].pop() || document.body : document.body;
   // A control partly under the tab bar or a pinned footer is judged once it is scrolled into the open, not here.
   let chromeTop = window.innerHeight;
-  const bar = document.querySelector('[data-testid="tab-bar"]');
-  if (bar) chromeTop = Math.min(chromeTop, bar.getBoundingClientRect().top);
-  for (const f of document.querySelectorAll('[data-testid="screen-footer"]')) chromeTop = Math.min(chromeTop, f.getBoundingClientRect().top);
+  if (!rootSel) {
+    const bar = document.querySelector('[data-testid="tab-bar"]');
+    if (bar) chromeTop = Math.min(chromeTop, bar.getBoundingClientRect().top);
+    for (const f of document.querySelectorAll('[data-testid="screen-footer"]')) chromeTop = Math.min(chromeTop, f.getBoundingClientRect().top);
+  }
   const label = (el) => (el.getAttribute('data-testid') || el.getAttribute('aria-label') || '').slice(0, 40);
-  for (const el of document.querySelectorAll('body *')) {
+  for (const el of root.querySelectorAll('*')) {
     const r = el.getBoundingClientRect();
     if (r.width === 0 || r.height === 0 || r.bottom < 0 || r.top > window.innerHeight * 4) continue;
     const style = getComputedStyle(el);
@@ -81,12 +143,14 @@ function scan() {
 
 /**
  * Runs in the page, laid out at full height: what is drawn over, past or too close to
- * something else. Returns short descriptions, at most 12 of each kind.
+ * something else. Returns short descriptions, at most 12 of each kind. With `rootSel`
+ * (an open sheet) only what is inside it; the page behind is covered and not judged.
  */
-function layoutScan() {
+function layoutScan(rootSel) {
   const vw = document.documentElement.clientWidth;
   const vh = window.innerHeight;
-  const all = [...document.querySelectorAll('body *')];
+  const root = rootSel ? [...document.querySelectorAll(rootSel)].pop() || document.body : document.body;
+  const all = [...root.querySelectorAll('*')];
   const shown = (el) => (el.checkVisibility ? el.checkVisibility({ opacityProperty: true, visibilityProperty: true }) : true);
   const R = (r) => ({ l: r.left, t: r.top, r: r.right, b: r.bottom });
   const inter = (a, b) => ({ l: Math.max(a.l, b.l), t: Math.max(a.t, b.t), r: Math.min(a.r, b.r), b: Math.min(a.b, b.b) });
@@ -116,7 +180,9 @@ function layoutScan() {
     clips.set(el, c);
     return c;
   };
-  const visibleRect = (el, r = el.getBoundingClientRect()) => inter(R(r), clipOf(el));
+  // A box that hides its own overflow clips its own text too: the lines a clamp hides are not drawn.
+  const ownClip = (el) => { const s = getComputedStyle(el); return s.overflowX !== 'visible' || s.overflowY !== 'visible' ? R(el.getBoundingClientRect()) : { l: -1e6, t: -1e6, r: 1e6, b: 1e6 }; };
+  const visibleRect = (el, r = el.getBoundingClientRect()) => inter(inter(R(r), clipOf(el)), ownClip(el));
   const alpha = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return 0; const p = m[1].split(',').map(Number); return p.length > 3 ? p[3] : 1; };
   const painted = (el) => {
     const s = getComputedStyle(el);
@@ -324,6 +390,176 @@ function hiddenAtEnd() {
   return found;
 }
 
+/**
+ * Runs in the page at its real height, with a sheet open: what only a sheet can get wrong.
+ *   its top above the top of the screen;
+ *   content cut by the bottom of the screen where nothing scrolls to reach it;
+ *   its last control (with the sheet scrolled to its end) closer than 12 px to the bottom of the screen;
+ *   content closer to the sheet's left or right edge than the sheet's own side padding.
+ */
+function sheetScan() {
+  const vh = window.innerHeight;
+  const sheet = [...document.querySelectorAll('[data-testid="sheet"]')].pop();
+  const out = [];
+  if (!sheet) return out;
+  const add = (v) => { if (out.length < 12 && !out.includes(v)) out.push(v); };
+  const sr = sheet.getBoundingClientRect();
+  if (sr.top < -0.5) add(`sheet top ${Math.round(-sr.top)}px above the screen`);
+  const shown = (el) => (el.checkVisibility ? el.checkVisibility({ opacityProperty: true, visibilityProperty: true }) : true);
+  const name = (el) => {
+    for (let e = el; e && e !== document.body; e = e.parentElement) {
+      const id = e.getAttribute('data-testid') || e.getAttribute('aria-label');
+      if (id) return id.slice(0, 40);
+      const own = [...e.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent.trim()).join(' ').trim();
+      if (own) return `"${own.slice(0, 30)}"`;
+    }
+    return el.tagName.toLowerCase();
+  };
+  const alpha = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return 0; const p = m[1].split(',').map(Number); return p.length > 3 ? p[3] : 1; };
+  const painted = (el) => {
+    const s = getComputedStyle(el);
+    if (alpha(s.backgroundColor) > 0) return true;
+    return ['Top', 'Right', 'Bottom', 'Left'].some((k) => parseFloat(s[`border${k}Width`]) > 0 && alpha(s[`border${k}Color`]) > 0);
+  };
+  const isControl = (el) => el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || ['button', 'link', 'switch', 'tab', 'checkbox', 'radio', 'slider'].includes(el.getAttribute('role'));
+  const ownText = (el) => [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+  const scrollsY = (el) => /(auto|scroll)/.test(getComputedStyle(el).overflowY) && el.scrollHeight > el.clientHeight + 1;
+  const scrollsX = (el) => /(auto|scroll)/.test(getComputedStyle(el).overflowX) && el.scrollWidth > el.clientWidth + 1;
+  const all = [...sheet.querySelectorAll('*')].filter(shown);
+  // The part of an element that is not clipped by a scroller (or other clipping box) inside the sheet.
+  const clipped = (el) => {
+    const r = el.getBoundingClientRect();
+    let c = { l: r.left, t: r.top, r: r.right, b: r.bottom };
+    for (let p = el.parentElement; p && p !== sheet.parentElement; p = p.parentElement) {
+      const s = getComputedStyle(p);
+      if (s.overflowX === 'visible' && s.overflowY === 'visible') continue;
+      const q = p.getBoundingClientRect();
+      c = { l: Math.max(c.l, q.left), t: Math.max(c.t, q.top), r: Math.min(c.r, q.right), b: Math.min(c.b, q.bottom) };
+    }
+    return c;
+  };
+  const content = all.filter((el) => ownText(el) || isControl(el) || el.tagName === 'svg');
+
+  // Cut by the bottom of the screen with no scroller to bring it up.
+  for (const el of content) {
+    const r = el.getBoundingClientRect();
+    if (r.height < 1 || r.bottom <= vh + 0.5) continue;
+    let reachable = false;
+    for (let p = el.parentElement; p && p !== sheet.parentElement; p = p.parentElement) if (scrollsY(p)) { reachable = true; break; }
+    if (!reachable) add(`${name(el)} cut by the bottom of the screen (${Math.round(r.bottom - vh)}px below)`);
+  }
+
+  // The last control, with every scroller in the sheet at its end.
+  const scrollers = [sheet, ...sheet.querySelectorAll('*')].filter(scrollsY);
+  const before = scrollers.map((el) => el.scrollTop);
+  for (const el of scrollers) el.scrollTop = el.scrollHeight;
+  let last = null;
+  for (const el of all) {
+    if (!isControl(el)) continue;
+    const c = clipped(el);
+    if (c.r - c.l < 1 || c.b - c.t < 1) continue;
+    if (!last || c.b > last.b) last = { el, b: c.b };
+  }
+  if (last && vh - last.b < 12) add(`last control ${name(last.el)} ${Math.max(0, Math.round(vh - last.b))}px from the bottom of the screen`);
+  scrollers.forEach((el, i) => { el.scrollTop = before[i]; });
+
+  // Side padding: what the sheet's body sets (the kit's is 20 px).
+  const body = sheet.querySelector('[data-testid="sheet-body"]');
+  const inner = body && body.firstElementChild;
+  const pad = inner ? parseFloat(getComputedStyle(inner).paddingLeft) || 20 : 20;
+  for (const el of all) {
+    if (el === body || el === inner) continue;
+    const thin = (r) => Math.min(r.width, r.height) <= 6;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) continue;
+    const isArt = el.tagName === 'svg' || el.tagName === 'IMG';
+    if (el.closest('svg') && !isArt) continue;
+    if (!(ownText(el) || isControl(el) || isArt || (painted(el) && !thin(r)))) continue;
+    // Scrolled partly out of a sideways row: its edge is not where it rests.
+    let sideways = false;
+    for (let p = el.parentElement; p && p !== sheet; p = p.parentElement) if (scrollsX(p)) { sideways = true; break; }
+    if (sideways) continue;
+    // A box as wide as the sheet is the sheet's own surface (a divider, a backdrop strip), not content at its edge.
+    if (r.width >= sr.width - 2) continue;
+    let box = r;
+    if (ownText(el)) {
+      // Text: where its letters are, not its box.
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      // A space where a line wraps gets its own few-pixel rect just past the text's box: not a letter.
+      const q = [...range.getClientRects()].filter((x) => x.width > 0 && !(x.width < 6 && (x.left >= r.right - 0.5 || x.right <= r.left + 0.5)));
+      if (q.length) box = { left: Math.min(...q.map((x) => x.left)), right: Math.max(...q.map((x) => x.right)) };
+    }
+    const left = box.left - sr.left;
+    const right = sr.right - box.right;
+    const d = Math.min(left, right);
+    if (d < pad - 1.5 && d > -400) add(`${name(el)} ${Math.round(d)}px from the sheet's ${left < right ? 'left' : 'right'} edge (its padding is ${Math.round(pad)}px)`);
+  }
+  return out;
+}
+
+/**
+ * Runs in the page: whether a toast now on screen covers a control. With a sheet open the
+ * sheet's controls are judged; otherwise those in a pinned footer and the tab bar (content
+ * that scrolls under a toast is not, it moves).
+ */
+function toastScan() {
+  const t = document.querySelector('[data-testid="toast"]');
+  if (!t) return [];
+  const tr = t.getBoundingClientRect();
+  if (tr.width < 1 || tr.height < 1) return [];
+  const msg = t.textContent.trim().slice(0, 40);
+  const out = [];
+  if (tr.top < -0.5) out.push(`toast "${msg}" ${Math.round(-tr.top)}px above the screen`);
+  const sheet = [...document.querySelectorAll('[data-testid="sheet"]')].pop();
+  const roots = sheet ? [sheet] : [...document.querySelectorAll('[data-testid="screen-footer"], [data-testid="tab-bar"]')];
+  const isControl = (el) => el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || ['button', 'link', 'switch', 'tab', 'checkbox', 'radio', 'slider'].includes(el.getAttribute('role'));
+  for (const root of roots) {
+    for (const el of root.querySelectorAll('*')) {
+      if (!isControl(el) || t.contains(el) || el.contains(t)) continue;
+      if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
+      const r = el.getBoundingClientRect();
+      const w = Math.min(r.right, tr.right) - Math.max(r.left, tr.left);
+      const h = Math.min(r.bottom, tr.bottom) - Math.max(r.top, tr.top);
+      const id = (el.getAttribute('data-testid') || el.getAttribute('aria-label') || el.textContent.trim()).slice(0, 40);
+      if (w > 1 && h > 1 && out.length < 6) out.push(`toast "${msg}" covers ${id} (${Math.round(w)}x${Math.round(h)})`);
+    }
+  }
+  return out;
+}
+
+/**
+ * Runs in the page: is this a finished drawing of the screen, or a blank or half-loaded one?
+ * Returns null when it is ready, else the reason.
+ */
+function notReady({ profile, sheet }) {
+  if (document.fonts && document.fonts.status !== 'loaded') return 'fonts still loading';
+  if (document.querySelector('[data-testid="error-retry"]')) return null; // an error screen is a result, reported as such
+  const vh = window.innerHeight;
+  const vw = window.innerWidth;
+  let words = 0;
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n && words < 3; n = walker.nextNode()) {
+    if (!n.textContent.trim()) continue;
+    const range = document.createRange();
+    range.selectNodeContents(n);
+    const r = range.getBoundingClientRect();
+    if (r.width > 0 && r.bottom > 0 && r.top < vh && r.right > 0 && r.left < vw && (!n.parentElement.checkVisibility || n.parentElement.checkVisibility({ opacityProperty: true, visibilityProperty: true }))) words += 1;
+  }
+  if (words < 2) return 'blank: almost no text on screen';
+  const state = window.__healthcal && window.__healthcal.getState();
+  if (!state) return 'the app has not started';
+  if (profile && !state.profile) return 'the demo data did not load';
+  const open = [...document.querySelectorAll('[data-testid="sheet"]')].pop();
+  if (sheet && !open) return 'no sheet is open';
+  if (!sheet && open) return 'a sheet is open: set sheet: true on the state';
+  if (open) {
+    const r = open.getBoundingClientRect();
+    if (r.height < 40 || r.top >= vh - 20) return 'the sheet has not risen';
+  }
+  return null;
+}
+
 function runChecks() {
   const run = (name, cmd, timeout = 600000) => {
     try {
@@ -343,44 +579,212 @@ function runChecks() {
   ];
 }
 
-(async () => {
+// ------------------------------------------------------------------ states
+
+const STATE_FIELDS = ['id', 'route', 'data', 'imperial', 'day', 'type', 'taps', 'waitFor', 'sheet', 'note'];
+const DATA = ['demo', 'empty', 'fresh', 'stress'];
+
+/** Loads scripts/dev/states/<list>.cjs for each list and checks every state is well formed. */
+function loadStates(lists) {
+  const states = [];
+  const problems = [];
+  for (const list of lists) {
+    const file = path.join(__dirname, 'states', `${list}.cjs`);
+    if (!fs.existsSync(file)) { problems.push(`no state list ${path.relative(ROOT, file)}`); continue; }
+    const items = require(file);
+    if (!Array.isArray(items)) { problems.push(`${list}: module.exports must be an array of states`); continue; }
+    for (const s of items) {
+      const where = `${list}: ${s && s.id ? s.id : JSON.stringify(s).slice(0, 60)}`;
+      const unknown = Object.keys(s || {}).filter((k) => !STATE_FIELDS.includes(k));
+      if (unknown.length) problems.push(`${where}: unknown field ${unknown.join(', ')} (fields: ${STATE_FIELDS.join(', ')})`);
+      if (!s.id || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(s.id)) problems.push(`${where}: id must be kebab-case`);
+      if (typeof s.route !== 'string' || !s.route.startsWith('/')) problems.push(`${where}: route must start with /`);
+      if (s.data !== undefined && !DATA.includes(s.data)) problems.push(`${where}: data must be one of ${DATA.join(', ')}`);
+      if (s.route && s.route.includes('{day}') !== (s.day !== undefined)) problems.push(`${where}: a route with {day} needs day, and day needs {day} in the route`);
+      if (s.type !== undefined && (typeof s.type !== 'object' || Array.isArray(s.type))) problems.push(`${where}: type is { testID: text }`);
+      for (const t of s.taps || []) {
+        const ok = typeof t === 'string' || (t && typeof t === 'object' && ((typeof t.type === 'string' && typeof t.text === 'string') || typeof t.wait === 'number' || (typeof t.choose === 'string' && Array.isArray(t.files))));
+        if (!ok) problems.push(`${where}: a step is a testID, { type, text }, { wait } or { choose, files }; got ${JSON.stringify(t)}`);
+        if (t && t.files) for (const f of t.files) if (!fs.existsSync(path.resolve(ROOT, f))) problems.push(`${where}: no file ${f}`);
+      }
+      if (states.some((x) => x.id === s.id)) problems.push(`${where}: id used twice`);
+      states.push({ list, ...s });
+    }
+  }
+  if (problems.length) {
+    console.error(problems.map((p) => `state error: ${p}`).join('\n'));
+    process.exit(2);
+  }
+  return states;
+}
+
+/** A local-calendar YYYY-MM-DD `n` days from today (the page runs in the same time zone). */
+function isoDay(n) {
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const slug = (route) => route.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'today';
+
+// ------------------------------------------------------------------ capture
+
+const sel = (id) => (id.startsWith('^') ? `[data-testid^="${id.slice(1)}"]` : `[data-testid="${id}"]`);
+const EMPTY_LAYOUT = () => ({ overText: [], broken: [], sticksOut: [], controls: [], gaps: [], hidden: [], sheet: [], toast: [] });
+
+/**
+ * Opens one job (a route, or a state: a route plus steps) in a fresh page with its own stored data,
+ * then checks the capture is finished: the app started, its data loaded, text is drawn, every step
+ * worked, the testID waited for is there, and a sheet is open exactly when the state says so.
+ * Returns { page, errors, toast, problem }; problem is null when the screen is ready to be scanned.
+ */
+async function open(context, job, seed) {
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message.split('\n')[0].slice(0, 140)));
+  page.on('console', (m) => { if (m.type() === 'error' && !/Download the React DevTools|favicon/.test(m.text())) errors.push(`console: ${m.text().slice(0, 140)}`); });
+  // Each page starts from its own stored data: every key of the origin is cleared once, on the first load of this tab.
+  await page.addInitScript((value) => {
+    if (sessionStorage.getItem('__evidence')) return;
+    localStorage.clear();
+    if (value) localStorage.setItem('healthcal-v1', value);
+    sessionStorage.setItem('__evidence', '1');
+  }, seed);
+  const toast = [];
+  const step = async (what, fn) => {
+    try { await fn(); return null; } catch (e) { return `${what}: ${String(e.message).split('\n')[0].slice(0, 120)}`; }
+  };
+  const tapped = async () => {
+    await page.waitForTimeout(350);
+    for (const t of await page.evaluate(toastScan).catch(() => [])) if (!toast.includes(t)) toast.push(t);
+  };
+  let problem = await step('did not load', async () => {
+    await page.goto(base + job.route, { waitUntil: 'networkidle', timeout: 120000 });
+    await page.waitForSelector('[data-testid]', { timeout: 15000 });
+    await page.waitForTimeout(700);
+  });
+  for (const [id, text] of Object.entries(job.type || {})) {
+    problem = problem || (await step(`type ${id}`, () => page.locator(sel(id)).first().fill(text, { timeout: 10000 })));
+    if (!problem) await page.waitForTimeout(300);
+  }
+  for (const t of job.taps || []) {
+    if (problem) break;
+    if (typeof t === 'string') {
+      problem = await step(`tap ${t}`, () => page.locator(sel(t)).first().click({ timeout: 10000 }));
+      if (!problem) { await tapped(); await page.waitForTimeout(350); }
+    } else if (t.type) {
+      problem = await step(`type ${t.type}`, () => page.locator(sel(t.type)).first().fill(t.text, { timeout: 10000 }));
+      await page.waitForTimeout(300);
+    } else if (t.wait) {
+      await page.waitForTimeout(t.wait);
+    } else if (t.choose) {
+      problem = await step(`choose files with ${t.choose}`, async () => {
+        const chooser = page.waitForEvent('filechooser', { timeout: 15000 });
+        await page.locator(sel(t.choose)).first().click({ timeout: 10000 });
+        await (await chooser).setFiles(t.files.map((f) => path.resolve(ROOT, f)));
+      });
+      if (!problem) { await page.waitForTimeout(1500); await tapped(); }
+    }
+  }
+  if (!problem && job.waitFor) problem = await step(`wait for ${job.waitFor}`, () => page.locator(sel(job.waitFor)).first().waitFor({ state: 'visible', timeout: 15000 }));
+  if (!problem) {
+    // Give the screen up to 10 s to finish drawing (fonts, data, the sheet rising).
+    const until = Date.now() + 10000;
+    for (;;) {
+      problem = await page.evaluate(notReady, { profile: job.data !== 'fresh', sheet: !!job.sheet }).catch((e) => `could not read the page: ${e.message.split('\n')[0]}`);
+      if (!problem || Date.now() > until) break;
+      await page.waitForTimeout(400);
+    }
+  }
+  return { page, errors, toast, problem };
+}
+
+/** Scans what is open: the sheet when one is (the page behind it is covered), else the whole page. */
+async function capture(page, job, file) {
+  const sheet = !!job.sheet;
+  const root = sheet ? '[data-testid="sheet"]' : null;
+  const found = await page.evaluate(scan, root);
+  const layout = EMPTY_LAYOUT();
+  if (sheet) layout.sheet = await page.evaluate(sheetScan);
+  else layout.hidden = await page.evaluate(hiddenAtEnd);
+  await page.waitForTimeout(100);
+  await page.screenshot({ path: file, fullPage: true });
+  // Everything at once: grow the window until the scrolling element (the page's, or the sheet's body) fits.
+  const extra = await page.evaluate((r) => {
+    const scope = r ? [...document.querySelectorAll(r)].pop() : document.body;
+    let m = 0;
+    for (const el of [scope, ...scope.querySelectorAll('*')]) m = Math.max(m, el.scrollHeight - el.clientHeight);
+    return m;
+  }, root);
+  const vp = page.viewportSize();
+  // A sheet is at most 88% of the window, so the window grows by a little more than what it hides.
+  if (extra > 0) { await page.setViewportSize({ width: vp.width, height: Math.min(vp.height + Math.ceil(sheet ? extra / 0.88 + 24 : extra), 8000) }); await page.waitForTimeout(400); }
+  Object.assign(layout, await page.evaluate(layoutScan, root));
+  return { found, layout };
+}
+
+async function main() {
   fs.mkdirSync(out, { recursive: true });
   const { buildSeed } = await import('./seed.mjs');
+  const lists = String(flags.states || '').split(',').filter(Boolean);
+  let states = loadStates(lists);
+  if (flags.only) {
+    const only = String(flags.only).split(',').filter(Boolean);
+    const missing = only.filter((id) => !states.some((s) => s.id === id));
+    if (missing.length) { console.error(`--only: no state ${missing.join(', ')} in ${lists.join(', ') || '(no --states)'}`); process.exit(2); }
+    states = states.filter((s) => only.includes(s.id));
+  }
+  const routeData = flags.fresh ? 'fresh' : flags.empty ? 'empty' : flags.stress ? 'stress' : 'demo';
+  const routeTag = flags.empty ? '__empty' : flags.fresh ? '__fresh' : flags.stress ? '__stress' : '';
+  const jobs = [
+    ...routes.map((route) => ({ kind: 'route', id: `${slug(route)}${routeTag ? `-${routeData}` : ''}`, stem: `${slug(route)}`, tag: routeTag, route, data: routeData, imperial: !!flags.imperial })),
+    ...states.map((s) => ({ kind: 'state', stem: s.id, tag: '', ...s, data: s.data || 'demo', imperial: !!s.imperial, route: s.route.replace('{day}', s.day !== undefined ? isoDay(s.day) : '') })),
+  ];
+  const seeds = new Map();
+  const seedFor = (theme, job) => {
+    const key = `${theme}|${job.data}|${job.imperial}`;
+    if (!seeds.has(key)) {
+      seeds.set(key, job.data === 'fresh' ? null : JSON.stringify(buildSeed({ theme, empty: job.data === 'empty', stress: job.data === 'stress', units: job.imperial ? 'imperial' : 'metric' })));
+    }
+    return seeds.get(key);
+  };
+  const tries = Number(flags.tries || 3);
   const browser = await chromium.launch();
   const screens = [];
   for (const theme of themes) {
-    const seed = JSON.stringify(buildSeed({ theme, empty: !!flags.empty, onboarded: !flags.fresh }));
     for (const width of widths) {
+      // One browser context per theme and width keeps the app's bundle cached; every page clears and seeds its own storage.
       const context = await browser.newContext({ viewport: { width, height: width < 360 ? 640 : 844 }, deviceScaleFactor: 1, reducedMotion: 'reduce', colorScheme: theme === 'dark' ? 'dark' : 'light', isMobile: true, hasTouch: true });
-      await context.addInitScript((value) => {
-        if (!sessionStorage.getItem('seeded')) { localStorage.setItem('healthcal-v1', value); sessionStorage.setItem('seeded', '1'); }
-      }, seed);
-      for (const route of routes) {
-        const page = await context.newPage();
-        const errors = [];
-        page.on('pageerror', (e) => errors.push(e.message.split('\n')[0].slice(0, 140)));
-        page.on('console', (m) => { if (m.type() === 'error' && !/Download the React DevTools|favicon/.test(m.text())) errors.push(`console: ${m.text().slice(0, 140)}`); });
-        const name = `${(route.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'today')}__${theme}__${width}${flags.empty ? '__empty' : ''}`;
-        let found = { cut: [], small: [], wide: 0 };
-        let layout = { overText: [], broken: [], sticksOut: [], controls: [], gaps: [], hidden: [] };
-        try {
-          await page.goto(base + route, { waitUntil: 'networkidle', timeout: 120000 });
-          // Wait until the app has drawn something, so a slow start is not photographed as a blank page.
-          await page.waitForSelector('[data-testid]', { timeout: 15000 }).catch(() => errors.push('nothing was drawn within 15 s'));
-          await page.waitForTimeout(700);
-          found = await page.evaluate(scan);
-          const hidden = await page.evaluate(hiddenAtEnd);
-          await page.waitForTimeout(100);
-          await page.screenshot({ path: path.join(out, `${name}.png`), fullPage: true });
-          // The whole page at once: grow the window until the scrolling element fits (React Native Web scrolls an inner element).
-          const extra = await page.evaluate(() => { let m = 0; for (const el of document.querySelectorAll('*')) m = Math.max(m, el.scrollHeight - el.clientHeight); return m; });
-          const vp = page.viewportSize();
-          if (extra > 0) { await page.setViewportSize({ width: vp.width, height: Math.min(vp.height + extra, 8000) }); await page.waitForTimeout(400); }
-          layout = { ...(await page.evaluate(layoutScan)), hidden };
-        } catch (e) {
-          errors.push(`did not load: ${String(e.message).split('\n')[0].slice(0, 100)}`);
+      for (const job of jobs) {
+        const name = `${job.stem}__${theme}__${width}${job.tag}`;
+        let result = null;
+        // A blank, half-loaded or unfinished capture is tried again, and never reported as clean.
+        for (let attempt = 1; attempt <= tries; attempt++) {
+          if (result) await result.page.close();
+          result = await open(context, job, seedFor(theme, job));
+          result.attempts = attempt;
+          if (!result.problem) break;
         }
-        screens.push({ route, theme, width, image: `${name}.png`, crashed: (await page.getByTestId('error-retry').count().catch(() => 0)) > 0, errors: [...new Set(errors)].slice(0, 5), ...found, layout });
+        const { page, errors, toast, problem } = result;
+        let found = { cut: [], small: [], wide: 0 };
+        let layout = EMPTY_LAYOUT();
+        if (problem) {
+          await page.screenshot({ path: path.join(out, `${name}.png`), fullPage: true }).catch(() => {});
+        } else {
+          try {
+            ({ found, layout } = await capture(page, job, path.join(out, `${name}.png`)));
+          } catch (e) {
+            errors.push(`scan failed: ${String(e.message).split('\n')[0].slice(0, 100)}`);
+          }
+        }
+        layout.toast = toast;
+        const crashed = (await page.locator('[data-testid="error-retry"]').count().catch(() => 0)) > 0;
+        screens.push({
+          id: job.id, kind: job.kind, ...(job.list ? { list: job.list } : null), route: job.route, data: job.data, imperial: job.imperial, sheet: !!job.sheet, theme, width,
+          image: `${name}.png`, crashed, incomplete: problem && !crashed ? `${problem} (after ${result.attempts} tries)` : null,
+          errors: [...new Set(errors)].slice(0, 5), ...found, layout,
+        });
         await page.close();
       }
       await context.close();
@@ -388,33 +792,39 @@ function runChecks() {
   }
   await browser.close();
 
-  // One sheet per route: every theme and width side by side, large enough to read.
+  // One sheet per route or state: every theme and width side by side, large enough to read.
   const sheets = [];
-  for (const route of routes) {
-    const mine = screens.filter((s) => s.route === route);
-    const dir = path.join(out, '_tmp');
-    fs.rmSync(dir, { recursive: true, force: true });
-    fs.mkdirSync(dir);
-    for (const s of mine) if (fs.existsSync(path.join(out, s.image))) fs.copyFileSync(path.join(out, s.image), path.join(dir, s.image));
-    const sheet = `sheet-${(route.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'today')}${flags.empty ? '-empty' : ''}.png`;
+  const tmp = path.join(out, `_tmp-${process.pid}`);
+  for (const job of jobs) {
+    const mine = screens.filter((s) => s.id === job.id);
+    fs.rmSync(tmp, { recursive: true, force: true });
+    fs.mkdirSync(tmp);
+    for (const s of mine) if (fs.existsSync(path.join(out, s.image))) fs.copyFileSync(path.join(out, s.image), path.join(tmp, s.image));
+    const sheet = `sheet-${job.stem}${job.tag.replace(/__/g, '-')}.png`;
     try {
-      execSync(`node ${JSON.stringify(path.join(__dirname, 'contact-sheet.cjs'))} ${JSON.stringify(dir)} ${JSON.stringify(path.join(out, sheet))} ${mine.length} 330 1100`, { stdio: 'ignore' });
+      execSync(`node ${JSON.stringify(path.join(__dirname, 'contact-sheet.cjs'))} ${JSON.stringify(tmp)} ${JSON.stringify(path.join(out, sheet))} ${mine.length} 330 1100`, { stdio: 'ignore' });
       sheets.push(sheet);
+      for (const s of mine) s.sheetImage = sheet;
     } catch { /* the single screenshots are still there */ }
-    fs.rmSync(dir, { recursive: true, force: true });
   }
+  fs.rmSync(tmp, { recursive: true, force: true });
 
   const checks = flags.checks ? runChecks() : [];
-  const report = { taken: new Date().toISOString(), base, sheets, checks, screens };
+  const stateIndex = Object.fromEntries(states.map((s) => [s.id, { list: s.list, route: s.route, data: s.data || 'demo', imperial: !!s.imperial, sheet: !!s.sheet, note: s.note || null }]));
+  const report = { taken: new Date().toISOString(), base, sheets, checks, states: stateIndex, screens };
   fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify(report, null, 1));
-  const LAYOUT = ['overText', 'broken', 'sticksOut', 'controls', 'hidden', 'gaps'];
+  const LAYOUT = ['overText', 'broken', 'sticksOut', 'controls', 'hidden', 'gaps', 'sheet', 'toast'];
   const layoutCount = (s) => LAYOUT.reduce((n, k) => n + (s.layout?.[k]?.length || 0), 0);
-  const problems = screens.filter((s) => s.crashed || s.errors.length || s.cut.length || s.wide || s.small.length || layoutCount(s));
+  const problems = screens.filter((s) => s.crashed || s.incomplete || s.errors.length || s.cut.length || s.wide || s.small.length || layoutCount(s));
   console.log(`${screens.length} screens in ${out}; ${problems.length} with something to look at; ${sheets.length} sheets`);
   for (const s of problems.slice(0, Number(flags.show || 40))) {
-    const bits = [s.crashed ? 'ERROR SCREEN' : '', s.errors.length ? `${s.errors.length} error(s): ${s.errors[0]}` : '', s.wide ? `page ${s.wide}px too wide` : '', s.cut.length ? `cut: ${s.cut.slice(0, 3).map((c) => `"${c.text}"`).join(', ')}${s.cut.length > 3 ? ` +${s.cut.length - 3}` : ''}` : '', s.small.length ? `small targets: ${s.small.slice(0, 3).map((t) => `${t.id} ${t.w}x${t.h}`).join(', ')}` : '', ...LAYOUT.filter((k) => s.layout?.[k]?.length).map((k) => `${k}: ${s.layout[k].slice(0, 2).join('; ')}${s.layout[k].length > 2 ? ` +${s.layout[k].length - 2}` : ''}`)].filter(Boolean);
-    console.log(`  ${s.route} [${s.theme} ${s.width}] ${bits.join('; ')}`);
+    const bits = [s.crashed ? 'ERROR SCREEN' : '', s.incomplete ? `NOT CAPTURED: ${s.incomplete}` : '', s.errors.length ? `${s.errors.length} error(s): ${s.errors[0]}` : '', s.wide ? `page ${s.wide}px too wide` : '', s.cut.length ? `cut: ${s.cut.slice(0, 3).map((c) => `"${c.text}"`).join(', ')}${s.cut.length > 3 ? ` +${s.cut.length - 3}` : ''}` : '', s.small.length ? `small targets: ${s.small.slice(0, 3).map((t) => `${t.id} ${t.w}x${t.h}`).join(', ')}` : '', ...LAYOUT.filter((k) => s.layout?.[k]?.length).map((k) => `${k}: ${s.layout[k].slice(0, 2).join('; ')}${s.layout[k].length > 2 ? ` +${s.layout[k].length - 2}` : ''}`)].filter(Boolean);
+    console.log(`  ${s.kind === 'state' ? s.id : s.route} [${s.theme} ${s.width}] ${bits.join('; ')}`);
   }
   for (const c of checks) console.log(`${c.ok ? 'PASS' : 'FAIL'}  ${c.name}${c.ok ? '' : `: ${c.tail}`}`);
-  process.exit(checks.some((c) => !c.ok) || screens.some((s) => s.crashed) ? 1 : 0);
-})();
+  process.exit(checks.some((c) => !c.ok) || screens.some((s) => s.crashed || s.incomplete) ? 1 : 0);
+}
+
+// The in-page scans are exported for scripts/dev/evidence-selftest.cjs, which proves each one against hand-made faults.
+if (require.main === module) main();
+else module.exports = { scan, layoutScan, hiddenAtEnd, sheetScan, toastScan, notReady, loadStates };

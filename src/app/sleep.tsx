@@ -124,6 +124,7 @@ function SleepScreen() {
 
           <Card style={{ gap: spacing.md }}>
             <Segmented
+              testID="sleep-window"
               options={[
                 { value: '7', label: '7 days' },
                 { value: '30', label: '30 days' },
@@ -131,10 +132,12 @@ function SleepScreen() {
               value={win}
               onChange={setWin}
             />
-            <View style={{ flexDirection: 'row', gap: spacing.md }}>
-              <Figure testID="sleep-average" value={summary.avgHours !== null ? hm(summary.avgHours).value : '–'} unit={summary.avgHours !== null ? hm(summary.avgHours).unit : undefined} label="Average a night" />
-              <Figure testID="sleep-in-range" value={`${summary.inRange}/${summary.nights}`} unit="nights" label="Within 7–9 h" />
+            {/* Three in a row; on a narrow phone the third goes under the first, so "6 h 56 min" keeps its unit beside it. */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: spacing.md }}>
+              <Figure basis={92} testID="sleep-average" value={summary.avgHours !== null ? hm(summary.avgHours).value : '–'} unit={summary.avgHours !== null ? hm(summary.avgHours).unit : undefined} label="Average a night" />
+              <Figure basis={92} testID="sleep-in-range" value={`${summary.inRange}/${summary.nights}`} unit="nights" label="Within 7–9 h" />
               <Figure
+                basis={92}
                 value={summary.spreadHours !== null ? (summary.spreadHours < 1 ? `±${Math.round(summary.spreadHours * 60)}` : `±${hm(summary.spreadHours).value}`) : '–'}
                 unit={summary.spreadHours !== null ? (summary.spreadHours < 1 ? 'min' : hm(summary.spreadHours).unit) : undefined}
                 label="Night to night"

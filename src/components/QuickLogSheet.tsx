@@ -128,10 +128,11 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                     <Text style={{ fontSize: 17, lineHeight: 24 }}>{u.last.emoji || '🍽️'}</Text>
                     <AddMark done={isDone} />
                   </View>
-                  <Text variant="label" numberOfLines={1}>
+                  {/* Two lines, so a name like "Greek yogurt, plain, 2%" reads whole; the tiles in the row share the tallest height. */}
+                  <Text variant="label" numberOfLines={2} style={{ flex: 1 }}>
                     {u.last.name}
                   </Text>
-                  <Text variant="caption" color="textSecondary" numberOfLines={1}>
+                  <Text variant="caption" color="textSecondary" numberOfLines={2}>
                     {usualLabel(u)}
                   </Text>
                 </PressableScale>
@@ -154,10 +155,10 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                   <Text style={{ fontSize: 17, lineHeight: 24 }}>🍱</Text>
                   <AddMark done={done.includes('saved')} />
                 </View>
-                <Text variant="label" numberOfLines={1}>
+                <Text variant="label" numberOfLines={2} style={{ flex: 1 }}>
                   {savedMeal.name}
                 </Text>
-                <Text variant="caption" color="textSecondary" numberOfLines={1}>
+                <Text variant="caption" color="textSecondary" numberOfLines={2}>
                   {savedServings > 1
                     ? `1 of ${formatPortion(savedServings)} servings, ${formatNumber(planSavedMeal(savedMeal).kcal)} kcal`
                     : `${savedMeal.items.length} ${savedMeal.items.length === 1 ? 'item' : 'items'}, ${formatNumber(planSavedMeal(savedMeal).kcal)} kcal`}
@@ -225,7 +226,9 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
             <Text variant="bodyStrong">Water</Text>
           </PressableScale>
           {/* Side by side when both fit; one above the other in a narrow tile rather than cut ("+ 250..."). */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+          {/* 12 apart: each glass's touch area reaches 6 px past its edge (4 of slop and the border), so when they
+              stack the two areas meet in the middle of the gap and neither takes the other's taps. */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             {glasses.map((ml) => (
               <PressableScale
                 key={ml}

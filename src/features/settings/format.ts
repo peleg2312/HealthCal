@@ -20,3 +20,12 @@ export function timeAgo(iso: string | null | undefined, now: Date = new Date()):
 export function formatMonthDayYear(d: Date): string {
   return `${formatShortDate(toISODate(d))}, ${d.getFullYear()}`;
 }
+
+/**
+ * An email address that may wrap on a narrow screen: a zero-width space after the @ and
+ * after each dot lets a long address break there instead of running past the screen's edge.
+ * For display only, never for a value that is sent or stored.
+ */
+export function breakableEmail(email: string): string {
+  return email.replace(/([@.])/g, '$1​');
+}

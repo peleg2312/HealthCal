@@ -165,7 +165,8 @@ export function TimeSheet({
       onClose={onClose}
       title={title}
       footer={<Button title="Set time" testID="time-save" onPress={() => onSave(formatHHmm(minutes))} />}>
-      <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: spacing.lg, paddingVertical: spacing.sm }}>
+      {/* With the AM/PM switch the row needs 12 px gaps to stay inside the sheet's padding on a 320 px phone. */}
+      <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: hour12 ? spacing.md : spacing.lg, paddingVertical: spacing.sm }}>
         <Spinner label="hour" format={hourLabel} onChange={(d) => set(minutes + d * 60)} />
         <Text variant="numXL" color="textTertiary" style={{ marginBottom: 24 }}>
           :

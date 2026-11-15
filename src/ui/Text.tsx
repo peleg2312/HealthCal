@@ -14,6 +14,13 @@ export interface TextProps extends RNTextProps {
   tabular?: boolean;
 }
 
+/**
+ * The most the phone's text-size setting may scale the kit's type (Text and the text fields).
+ * Large text still grows by up to 30%, but a row built for one line does not break apart.
+ * Web ignores it: the browser's own zoom scales the whole page instead.
+ */
+export const MAX_FONT_SCALE = 1.3;
+
 const SECONDARY_BY_DEFAULT: Partial<Record<TextVariant, true>> = { overline: true, unit: true };
 
 /**
@@ -27,6 +34,7 @@ export function Text({ variant = 'body', color, align, tabular, style, ...rest }
   const resolved = (colors as unknown as Record<string, string>)[name] ?? name;
   return (
     <RNText
+      maxFontSizeMultiplier={MAX_FONT_SCALE}
       {...rest}
       style={[
         typography[variant],

@@ -94,9 +94,113 @@ function tidyForStore(state, { put, weightKg, baselineTdee }) {
   [500, 330, 500, 250, 500, 330, 500, 500].forEach((ml, g) => put('water', { date: today, ml, beverage: g === 1 ? 'coffee' : 'water', loggedAt: at(0, 7 + Math.floor(g * 1.5), (g % 2) * 30) }));
 }
 
-/** @param {{ days?: number, empty?: boolean, theme?: 'system'|'light'|'dark'|'blossom', onboarded?: boolean, units?: 'metric'|'imperial', store?: boolean }} opts */
+// ------------------------------------------------------------------ stress
+// Long content at the far end of what real people enter (`buildSeed({ stress: true })`, shot.mjs
+// --stress, a state's data: 'stress'). Not absurd: every value is something a real diary holds.
+const LONG_BRAND = 'Hollowbrook Mountain Organic Creamery';
+const LONG = [
+  // name (50 to 60 characters), emoji, kcal / protein / carbs / fat / fibre per 100 g, serving, grams
+  ['Grilled chicken breast with lemon, garlic and rosemary', '🍗', 168, 30, 1, 4.2, 0, '1 breast', 172],
+  ['Roasted sweet potato wedges with smoked paprika and thyme', '🍠', 128, 1.8, 21, 4.1, 3.2, '1 bowl', 180],
+  ['Mixed leaf salad with cherry tomatoes, cucumber and feta', '🥗', 96, 3.6, 4.1, 7.4, 1.4, '1 bowl', 160],
+  ['Wholegrain basmati and wild rice with toasted almonds', '🍚', 162, 4.2, 28, 3.6, 2.1, '1 cup', 170],
+  ['Steamed broccoli, green beans and sugar snap peas, buttered', '🥦', 61, 2.6, 6.4, 2.9, 2.8, '1 cup', 120],
+  ['Hummus with roasted red pepper and a drizzle of olive oil', '🧆', 244, 7, 13.5, 18, 5, '3 tbsp', 45],
+  ['Toasted sourdough with salted butter and chopped chives', '🍞', 318, 8.4, 44, 12, 2.4, '1 slice', 55],
+  ['Greek-style strained yogurt with honey and toasted walnuts', '🥛', 148, 7.9, 12.6, 7.8, 0.4, '1 pot', 170, LONG_BRAND],
+  ['Sparkling elderflower and cucumber lemonade, no added sugar', '🥤', 4, 0, 0.9, 0, 0, '1 bottle', 330],
+  ['Dark chocolate with sea salt and caramelised almonds', '🍫', 562, 7.2, 45, 38, 9, '4 squares', 40],
+  ['Fresh fruit salad with mango, kiwi, pineapple and mint', '🍍', 58, 0.8, 13.4, 0.3, 1.9, '1 bowl', 200],
+  ['Oat and raisin cookie, bakery style, large, from the cafe', '🍪', 436, 5.6, 64, 17, 3.1, '1 cookie', 90],
+];
+const longFood = ([name, emoji, kcal, protein, carbs, fat, fiber, label, grams, brand], i) => ({
+  id: brand ? `stress_custom_${i}` : `b_stress_${i}`, name, emoji, ...(brand ? { brand } : null), source: brand ? 'custom' : 'builtin', verified: !brand, category: 'seed',
+  per100g: { kcal, protein, carbs, fat, fiber }, servings: [{ label, grams }],
+});
+const itemOf = (food, qty = 1) => {
+  const grams = food.servings[0].grams * qty;
+  const f = grams / 100;
+  return {
+    name: food.name, ...(food.brand ? { brand: food.brand } : null), emoji: food.emoji, servingLabel: food.servings[0].label, quantity: qty, grams, food, source: food.source, verified: food.verified,
+    nutrients: { kcal: food.per100g.kcal * f, protein: food.per100g.protein * f, carbs: food.per100g.carbs * f, fat: food.per100g.fat * f, fiber: food.per100g.fiber * f },
+  };
+};
+
+/**
+ * Turns the five demo weeks into the long end of real use: a 22-character first name, food and
+ * saved-meal names of 50 to 60 characters, a long brand, a two-sentence activity note, a meal of
+ * 12 items, a day at 11,480 kcal and one at 0, 1,240 active minutes in the last seven days,
+ * 12.5 L of water today, 142.6 kg body weight and a 412-day logging streak.
+ */
+function stressUp(state, { put, baselineTdee }) {
+  const day = (n) => iso(daysAgo(n));
+  const dropDay = (collection, date, meal) => {
+    for (const r of Object.values(state[collection])) if (r.date === date && (!meal || r.meal === meal)) delete state[collection][r.id];
+  };
+  state.profile.name = 'Bartholomew-Christophe';
+  // Body weight: the same curve, moved so the newest weigh-in is 142.6 kg.
+  const weights = Object.values(state.weights).sort((a, b) => b.date.localeCompare(a.date));
+  const shift = 142.6 - weights[0].kg;
+  for (const w of weights) w.kg = Math.round((w.kg + shift) * 10) / 10;
+  state.profile.weightKg = 142.6;
+  state.profile.targetWeightKg = 118;
+  state.profile.bodyFatPct = 34;
+
+  const foods = LONG.map(longFood);
+  const custom = foods.filter((f) => f.source === 'custom');
+  for (const f of custom) state.customFoods[f.id] = { ...f, updatedAt: new Date().toISOString(), deleted: false };
+  const logItem = (n, meal, it, hour, minute = 0) => put('foodEntries', { date: day(n), meal, ...it, foodId: it.food?.id, loggedAt: at(n, hour, minute) });
+
+  // Today's lunch: twelve items, every one with a long name, one from a long-named brand.
+  dropDay('foodEntries', day(0), 'lunch');
+  foods.forEach((f, i) => logItem(0, 'lunch', itemOf(f), 13, i));
+  // Two days ago: a feast of 11,480 kcal. Three days ago: logged, and 0 kcal.
+  dropDay('foodEntries', day(2));
+  const feast = [
+    ['Full cooked breakfast with sausages, bacon, eggs and beans', 'breakfast', 1450, 9],
+    ['Wedding reception buffet: lamb, roast potatoes and gravy', 'lunch', 2380, 13],
+    ['Three-tier chocolate wedding cake with buttercream icing', 'snack', 3120, 16],
+    ['Late-night pepperoni pizza, large, shared with nobody else', 'dinner', 1890, 22],
+    ['Craft beer, India pale ale, six pints over the evening', 'dinner', 1640, 21],
+    ['Salted caramel ice cream, a whole tub straight from the freezer', 'snack', 1000, 23],
+  ];
+  for (const [name, meal, kcal, hour] of feast) {
+    put('foodEntries', { date: day(2), meal, name, emoji: '⚡', source: 'quick', verified: false, servingLabel: '1 serving', quantity: 1, grams: 0, nutrients: { kcal, protein: Math.round((kcal * 0.15) / 4), carbs: Math.round((kcal * 0.45) / 4), fat: Math.round((kcal * 0.4) / 9) }, loggedAt: at(2, hour) });
+  }
+  dropDay('foodEntries', day(3));
+  logItem(3, 'breakfast', { ...itemOf(foods[8]), nutrients: { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 } }, 9);
+
+  // A logging streak of 412 days: one breakfast on each day before the five weeks.
+  const oats = FOODS.oats;
+  for (let n = 36; n < 412; n++) logItem(n, 'breakfast', itemOf(oats, 1.5), 8);
+
+  // The last seven days: 1,240 active minutes, one session with a two-sentence note.
+  for (let n = 0; n < 7; n++) dropDay('activities', day(n));
+  const plan = [[['running', 95], ['strength_training', 145]], [['walking', 150]], [['basketball', 90], ['yoga', 95]], [['volleyball', 200]], [['running', 70], ['walking', 95]], [['yoga', 120]], [['strength_training', 80], ['walking', 100]]];
+  plan.forEach((sessions, n) => sessions.forEach(([id, durationMin], k) => {
+    const s = SESSIONS.find((x) => x.activityId === id);
+    const kcalGross = (s.met * 3.5 * 142.6 * durationMin) / 200;
+    put('activities', {
+      date: day(n), ...s, durationMin, ...(s.distanceKm ? { distanceKm: Math.round((s.distanceKm / s.durationMin) * durationMin * 10) / 10 } : null),
+      kcalGross, kcalNet: Math.max(0, kcalGross - (baselineTdee / 1440) * durationMin), weightKg: 142.6, baselineKcalPerDay: baselineTdee,
+      ...(n === 0 && k === 0 ? { notes: 'Easy recovery run along the river with the Thursday club. Legs felt heavy for the first two kilometres, then loosened up nicely.' } : null),
+      loggedAt: at(n, 7 + k * 10),
+    });
+  }));
+
+  // Today's water: 12.5 L in 25 glasses.
+  dropDay('water', day(0));
+  for (let g = 0; g < 25; g++) put('water', { date: day(0), ml: 500, beverage: g % 5 === 1 ? 'tea' : 'water', loggedAt: at(0, 6 + Math.floor(g / 2), (g % 2) * 30) });
+
+  // A saved meal with a long name and the twelve items.
+  put('savedMeals', { name: "Sunday brunch with the whole family at grandma's house", items: foods.map((f) => itemOf(f)) });
+  state.recentFoods = [...foods.slice(0, 8), ...state.recentFoods].slice(0, 12);
+  state.favoriteFoodIds = [foods[0].id, custom[0].id, ...state.favoriteFoodIds];
+}
+
+/** @param {{ days?: number, empty?: boolean, theme?: 'system'|'light'|'dark'|'blossom', onboarded?: boolean, units?: 'metric'|'imperial', store?: boolean, stress?: boolean }} opts */
 export function buildSeed(opts = {}) {
-  const { days = 35, empty = false, theme = 'dark', onboarded = true, units = 'metric', store = false } = opts;
+  const { days = 35, empty = false, theme = 'dark', onboarded = true, units = 'metric', store = false, stress = false } = opts;
   const rand = rng(20261113);
   const stamp = new Date().toISOString();
   const rec = (r) => ({ id: randomUUID(), updatedAt: stamp, deleted: false, ...r });
@@ -150,7 +254,8 @@ export function buildSeed(opts = {}) {
   };
 
   for (let n = days; n >= 0; n--) {
-    const skip = n > 0 && rand() < 0.08; // a few unlogged days, like real life
+    // A few unlogged days, like real life (none with stress data, whose streak runs unbroken).
+    const skip = n > 0 && rand() < 0.08 && !stress;
     if (!skip) {
       const pick = (list) => list[Math.floor(rand() * list.length)];
       for (const [k, q] of pick(MENUS.breakfast)) addFood(n, 'breakfast', k, q, 8);
@@ -201,6 +306,7 @@ export function buildSeed(opts = {}) {
         nutrients: { kcal: food.per100g.kcal * f, protein: food.per100g.protein * f, carbs: food.per100g.carbs * f, fat: food.per100g.fat * f, fiber: food.per100g.fiber * f } };
     }),
   });
+  if (stress) stressUp(state, { put, baselineTdee });
   return { state, version: 1 };
 }
 

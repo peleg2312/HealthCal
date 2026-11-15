@@ -82,7 +82,9 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
   // The day's exercise water is capped as a whole, so preview this session's share of it.
   const others = activities.filter((a) => a.date === date && a.id !== entryId);
   const water = sessionWaterMl(others, { durationMin: minutes, intensity });
-  const dayWord = date === today() ? "today's" : `${formatDayLabel(date).toLowerCase()}'s`;
+  // "yesterday's", but "Tue, Nov 10's": only the relative words are lowercased.
+  const dayLabel = formatDayLabel(date);
+  const dayWord = date === today() ? "today's" : `${/,/.test(dayLabel) ? dayLabel : dayLabel.toLowerCase()}'s`;
   const restingShare = Math.round((tdee / 1440) * minutes);
 
   const unit = distanceUnit(units);
@@ -147,7 +149,8 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
       footer={<Button testID="log-activity-save" title={entryId ? 'Save changes' : 'Log session'} onPress={save} disabled={!canSave} />}>
       {/* Live result */}
       <Card testID="log-activity-result" style={{ gap: spacing.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md }}>
+        {/* The net figure sits beside the burn; a five-digit burn on a narrow phone sends it under, never past the card. */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', columnGap: spacing.md, rowGap: spacing.sm }}>
           <View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <CupKey color={colors.exercise} />
@@ -287,9 +290,12 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
           </Card>
         ) : (
           <>
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            {/* Three tiles side by side; under 360 px a tile is about 70 px inside, too narrow for a word like
+                "Powerlifting", so the three stack as rows with the hint beside the name. */}
+            <View style={{ flexDirection: tight ? 'column' : 'row', gap: spacing.sm }}>
               {INTENSITIES.map((i) => {
                 const active = intensity === i;
+                const hint = localiseSpeedText(activity.intensityHint?.[i] ?? INTENSITY_LABELS[i].hint, units);
                 return (
                   <PressableScale
                     key={i}
@@ -299,25 +305,35 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
                     accessibilityLabel={`${INTENSITY_LABELS[i].title} effort`}
                     onPress={() => setIntensity(i)}
                     style={{
-                      flex: 1,
-                      minHeight: 104,
-                      // Three tiles in 280 px leave 64 px inside at 12 px padding, too little for "Moderate".
-                      padding: tight ? spacing.sm : spacing.md,
-                      gap: spacing.xs,
+                      ...(tight ? { flexDirection: 'row', alignItems: 'center', minHeight: 56, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.md } : { flex: 1, minHeight: 104, padding: spacing.md, gap: spacing.xs }),
                       ...cup(radius.tile, 5),
                       backgroundColor: colors.surface,
                       borderWidth: active ? 2 : 1,
                       borderColor: active ? colors.text : colors.border,
                     }}>
-                    <Text variant="bodyStrong" style={tight ? { fontSize: 15 } : undefined}>
-                      {INTENSITY_LABELS[i].title}
-                    </Text>
-                    <Text variant="caption" color="textSecondary" numberOfLines={3} style={{ flex: 1 }}>
-                      {localiseSpeedText(activity.intensityHint?.[i] ?? INTENSITY_LABELS[i].hint, units)}
-                    </Text>
-                    <Text variant="caption" color={active ? 'text' : 'textSecondary'} tabular>
-                      {activity.met[i]} MET
-                    </Text>
+                    {tight ? (
+                      <>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text variant="bodyStrong">{INTENSITY_LABELS[i].title}</Text>
+                          <Text variant="caption" color="textSecondary" numberOfLines={2}>
+                            {hint}
+                          </Text>
+                        </View>
+                        <Text variant="caption" color={active ? 'text' : 'textSecondary'} tabular>
+                          {activity.met[i]} MET
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text variant="bodyStrong">{INTENSITY_LABELS[i].title}</Text>
+                        <Text variant="caption" color="textSecondary" numberOfLines={3} style={{ flex: 1 }}>
+                          {hint}
+                        </Text>
+                        <Text variant="caption" color={active ? 'text' : 'textSecondary'} tabular>
+                          {activity.met[i]} MET
+                        </Text>
+                      </>
+                    )}
                   </PressableScale>
                 );
               })}

@@ -51,7 +51,7 @@ export default function SavedMealsScreen() {
             <Card key={m.id} testID={`saved-meal-card-${i}`} style={{ gap: spacing.md }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text variant="h3" numberOfLines={1}>
+                  <Text variant="h3" numberOfLines={2}>
                     {m.name}
                   </Text>
                   <Text variant="caption" color="textSecondary" tabular numberOfLines={2}>
@@ -68,17 +68,19 @@ export default function SavedMealsScreen() {
                 </IconButton>
               </View>
               <MacroBar protein={n.protein * 4} carbs={n.carbs * 4} fat={n.fat * 9} height={6} />
-              <View style={{ gap: 6 }}>
+              {/* Each item's amount goes under its name, as in the diary, so neither squeezes the other into a few letters. */}
+              <View style={{ gap: spacing.sm }}>
                 {m.items.map((it, j) => (
                   <View key={j} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                     <RowEmoji emoji={it.emoji} />
-                    {/* Name and amount share the row and each may take two lines, so neither squeezes the other out. */}
-                    <Text variant="body" numberOfLines={2} style={{ flex: 1, minWidth: 0 }}>
-                      {it.name}
-                    </Text>
-                    <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1, maxWidth: '55%', textAlign: 'right' }}>
-                      {itemLine(it).replace(/(\d) (g|kcal|ml)\b/g, '$1\u00A0$2')}
-                    </Text>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text variant="body" numberOfLines={2}>
+                        {it.name}
+                      </Text>
+                      <Text variant="caption" color="textSecondary" numberOfLines={2} tabular>
+                        {itemLine(it)}
+                      </Text>
+                    </View>
                   </View>
                 ))}
               </View>

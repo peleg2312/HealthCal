@@ -79,7 +79,8 @@ export function ProgressTile({
       </Text>
       {caption ? (
         <Text variant="caption" color="textSecondary">
-          {caption}
+          {/* A number keeps its unit on its line ("152 g", "2.29 L"), so a unit never sits alone below. */}
+          {caption.replace(/(\d) (?=[a-zA-Z%])/g, '$1\u00A0')}
         </Text>
       ) : null}
       <View style={{ flex: 1 }} />

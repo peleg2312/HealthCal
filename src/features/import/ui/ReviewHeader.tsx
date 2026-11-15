@@ -163,7 +163,7 @@ export function ListControls({
           <Text variant="label" color="textSecondary">
             {estimates === 1 ? 'One workout has' : `${estimates} workouts have`} no calories in the file. Effort to estimate with:
           </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.sm, rowGap: spacing.md }}>
             {paced > 0 ? <Chip label="From pace" selected={intensity === null} onPress={() => onIntensity(null)} testID="import-effort-pace" /> : null}
             {(['light', 'moderate', 'vigorous'] as Intensity[]).map((i) => (
               <Chip
@@ -186,7 +186,8 @@ export function ListControls({
         </View>
       ) : null}
       {counts.total > 1 ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+        // Rows of chips 12 px apart, as ChipWrap: closer, the touch areas of two rows overlap.
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.sm, rowGap: spacing.md }}>
           {filters
             .filter((f) => f.id === 'all' || f.n > 0)
             .map((f) => (

@@ -239,6 +239,7 @@ export function EmptyState({
   message,
   action,
   onAction,
+  actionTestID,
 }: {
   /** @deprecated Emoji are content marks only in Pour; the empty state shows an empty cup. Accepted and ignored. */
   emoji?: string;
@@ -246,6 +247,7 @@ export function EmptyState({
   message?: string;
   action?: string;
   onAction?: () => void;
+  actionTestID?: string;
 }) {
   return (
     <View style={{ alignItems: 'center', paddingVertical: 28, paddingHorizontal: 12, gap: 8 }}>
@@ -258,7 +260,7 @@ export function EmptyState({
           {message}
         </Text>
       ) : null}
-      {action ? <Button title={action} onPress={onAction} size="md" full={false} style={{ marginTop: 8, alignSelf: 'center' }} /> : null}
+      {action ? <Button testID={actionTestID} title={action} onPress={onAction} size="md" full={false} style={{ marginTop: 8, alignSelf: 'center' }} /> : null}
     </View>
   );
 }

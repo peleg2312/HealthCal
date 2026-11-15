@@ -91,7 +91,8 @@ function WeightScreen() {
       ) : (
         <>
           <Card style={{ gap: spacing.md }}>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md }}>
+            {/* The scale reading sits beside the trend, and goes under it when a three-digit weight leaves no room. */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', columnGap: spacing.md, rowGap: spacing.xs }}>
               <View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <CupKey color={colors.weight} />
@@ -117,7 +118,7 @@ function WeightScreen() {
                 </View>
               ) : null}
             </View>
-            <Segmented options={RANGES} value={range} onChange={setRange} />
+            <Segmented testID="weight-range" options={RANGES} value={range} onChange={setRange} />
             <LineChart
               line={chart.line}
               dots={chart.dots}
@@ -234,7 +235,8 @@ function WeighInSheet({
   const display = (kg: number) => Math.round(weightValue(kg, units) * 10) / 10;
   const [weight, setWeight] = useState<number | null>(null);
   const [fat, setFat] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Each error shows under the field it is about.
+  const [error, setError] = useState<{ field: 'weight' | 'fat'; message: string } | null>(null);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   // Load the record for the chosen date whenever the date (or its record) changes.
   const key = date ? `${date}:${existing?.id ?? 'new'}` : null;
@@ -248,11 +250,11 @@ function WeighInSheet({
 
   const save = () => {
     if (!date) return;
-    if (weight === null || weight <= 0) return setError('Enter your weight');
+    if (weight === null || weight <= 0) return setError({ field: 'weight', message: 'Enter your weight' });
     // An untouched prefilled field keeps the stored kg instead of a value rounded through lb.
     const kg = keepOrConvert(weight, existing ? existing.kg : fallbackKg, display, (v) => weightToKg(v, units)) ?? 0;
-    if (kg < 20 || kg > 400) return setError(`That looks off. Enter a weight between ${formatWeight(20, units, 0)} and ${formatWeight(400, units, 0)}.`);
-    if (fat !== null && !isPlausibleBodyFat(fat)) return setError('Body fat should be between 3 and 60%');
+    if (kg < 20 || kg > 400) return setError({ field: 'weight', message: `That looks off. Enter a weight between ${formatWeight(20, units, 0)} and ${formatWeight(400, units, 0)}.` });
+    if (fat !== null && !isPlausibleBodyFat(fat)) return setError({ field: 'fat', message: 'Body fat should be between 3 and 60%' });
     saveWeightRecord(date, { kg: Math.round(kg * 100) / 100, ...(fat !== null ? { bodyFatPct: fat } : existing?.bodyFatPct !== undefined ? { bodyFatPct: undefined } : {}) });
     onClose();
   };
@@ -288,6 +290,7 @@ function WeighInSheet({
           setWeight(n);
           setError(null);
         }}
+        error={error?.field === 'weight' ? error.message : null}
         autoFocus
         selectTextOnFocus
       />
@@ -301,7 +304,7 @@ function WeighInSheet({
           setFat(n);
           setError(null);
         }}
-        error={error}
+        error={error?.field === 'fat' ? error.message : null}
         hint={existing ? 'One weigh-in per day. Saving replaces this day’s entry.' : 'One weigh-in per day. A second one for the same day updates it.'}
       />
     </Sheet>

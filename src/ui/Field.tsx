@@ -5,7 +5,7 @@ import { TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } 
 import { cup, fonts, useTheme } from '@/theme';
 
 import { IconButton } from './Button';
-import { Text } from './Text';
+import { MAX_FONT_SCALE, Text } from './Text';
 
 export interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   label?: string;
@@ -48,6 +48,7 @@ export function TextField({ label, suffix, error, hint, left, right, style, line
         <TextInput
           placeholderTextColor={colors.textTertiary}
           selectionColor={colors.primary}
+          maxFontSizeMultiplier={MAX_FONT_SCALE}
           {...rest}
           accessibilityLabel={rest.accessibilityLabel ?? label ?? rest.placeholder}
           onFocus={(e) => {

@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { Group, IconTile } from '@/features/settings/components';
-import { timeAgo } from '@/features/settings/format';
+import { breakableEmail, timeAgo } from '@/features/settings/format';
 import { deleteAccount, signOut, useAuth } from '@/services/auth';
 import { cancelAllReminders } from '@/services/notifications';
 import { isBackendConfigured } from '@/services/supabase';
@@ -187,8 +187,9 @@ function SignedIn({ email }: { email: string }) {
             {sync.status === 'offline' ? <CloudOff size={20} color={colors.warningInk} /> : <Cloud size={20} color={sync.status === 'idle' ? colors.success : colors.warningInk} />}
           </IconTile>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text variant="title" numberOfLines={1} testID="account-email">
-              {email}
+            {/* A long address wraps at its @ and dots rather than losing its end. */}
+            <Text variant="title" numberOfLines={3} testID="account-email" accessibilityLabel={email}>
+              {breakableEmail(email)}
             </Text>
             <Text variant="caption" color={sync.status === 'error' ? 'warningInk' : 'textSecondary'}>
               {status}

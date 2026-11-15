@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Check, Plus, Search } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { lastPortions, matchServing } from '@/features/food/helpers';
 import { logFood } from '@/features/food/log';
@@ -47,6 +47,7 @@ export function FitsSheet({
   proteinLeft: number;
 }) {
   const { colors, spacing } = useTheme();
+  const narrow = useWindowDimensions().width < 360;
   const todayDate = useToday();
   const entries = useLive('foodEntries');
   const favourites = useLive('favorites');
@@ -127,25 +128,42 @@ export function FitsSheet({
                   {/* Emoji are content marks only: 17 px, no tile. */}
                   <Text style={{ fontSize: 17, lineHeight: 22, width: 22, textAlign: 'center' }}>{f.food.emoji || '🍽️'}</Text>
                   <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                    <Text variant="bodyStrong" numberOfLines={1} style={{ fontFamily: fonts.semibold }}>
+                    <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
                       {f.food.name}
                     </Text>
-                    <Text variant="caption" color="textSecondary" numberOfLines={1}>
+                    {/* A narrow phone has no room for a numbers column: they lead the line under the name. */}
+                    {narrow ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 8 }}>
+                        <Text variant="numM" style={{ fontSize: 15, lineHeight: 20 }}>
+                          {formatNumber(Math.round(f.kcal))}
+                          <Text variant="unit">{' kcal'}</Text>
+                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                          <CupKey color={colors.protein} size={8} />
+                          <Text variant="caption" color="textSecondary">
+                            {`${Math.round(f.protein)} g protein`}
+                          </Text>
+                        </View>
+                      </View>
+                    ) : null}
+                    <Text variant="caption" color="textSecondary" numberOfLines={2}>
                       {`${portionLabel(f)} · ${SOURCE_LABEL[f.from]}`}
                     </Text>
                   </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text variant="numM" style={{ fontSize: 17, lineHeight: 22 }}>
-                      {formatNumber(Math.round(f.kcal))}
-                      <Text variant="unit">{' kcal'}</Text>
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                      <CupKey color={colors.protein} size={8} />
-                      <Text variant="caption" color="textSecondary">
-                        {`${Math.round(f.protein)} g protein`}
+                  {narrow ? null : (
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text variant="numM" style={{ fontSize: 17, lineHeight: 22 }}>
+                        {formatNumber(Math.round(f.kcal))}
+                        <Text variant="unit">{' kcal'}</Text>
                       </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                        <CupKey color={colors.protein} size={8} />
+                        <Text variant="caption" color="textSecondary">
+                          {`${Math.round(f.protein)} g protein`}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
+                  )}
                   <IconButton
                     testID={`fits-add-${i}`}
                     accessibilityLabel={isAdded ? `${f.food.name} added` : `Add ${f.food.name}, ${portionLabel(f)}, ${Math.round(f.kcal)} kilocalories, to ${mealName}`}

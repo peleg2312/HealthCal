@@ -202,7 +202,7 @@ function MiniToday({ c, width, height, index = 0 }: { c: ThemeColors; width: num
           </View>
         </View>
         <View style={{ flex: 1, minWidth: 0, justifyContent: 'space-between' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
             <Text style={{ color: c.caloriesInk, fontFamily: fonts.extrabold, fontSize: num, lineHeight: num + 2, letterSpacing: -0.8 }}>941</Text>
             <Text style={{ color: c.textSecondary, fontFamily: fonts.semibold, fontSize: 7.5, lineHeight: 9 }}>{'kcal\nleft'}</Text>
           </View>

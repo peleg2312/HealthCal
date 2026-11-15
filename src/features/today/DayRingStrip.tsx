@@ -1,10 +1,10 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Platform, ScrollView, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { Platform, ScrollView, useWindowDimensions, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 
 import { diffDays, formatDayLabel, fromISODate, startOfWeek } from '@/lib/dates';
 import { useDays } from '@/store/selectors';
-import { cup, fonts, useTheme } from '@/theme';
+import { cup, fonts, MAX_CONTENT_WIDTH, useTheme } from '@/theme';
 import type { ISODate } from '@/types';
 import { FadeUp, IconButton, MiniCup, PressableScale, Text, useReducedMotion } from '@/ui';
 
@@ -12,6 +12,18 @@ import { dayRing, weekCaption, weekDates } from './week';
 
 const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 export const STRIP_WEEKS = 8;
+/** Each day is a whole touch target, 44 px wide at least. */
+const DAY_MIN_W = 44;
+
+/**
+ * How far the row of days reaches into the screen's side margins: nothing where seven 44 px days
+ * fit between them, else just enough (14 px a side on a 320 px phone), as a phone's own calendar
+ * strip runs edge to edge. The caption and arrows under it stay in the margins.
+ */
+function stripBleed(windowW: number, gutter: number): number {
+  const inner = Math.min(windowW, MAX_CONTENT_WIDTH) - 2 * gutter;
+  return Math.max(0, Math.min(gutter - 4, Math.ceil((7 * DAY_MIN_W - inner) / 2)));
+}
 
 /**
  * Monday-to-Sunday strip of mini cups, paged back over the last eight weeks
@@ -47,6 +59,7 @@ export function DayRingStrip({
   note?: { text: string; delay: number; testID?: string } | null;
 }) {
   const { colors, spacing } = useTheme();
+  const bleed = stripBleed(useWindowDimensions().width, spacing.xl);
   const ref = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const [width, setWidth] = useState(0);
   // Page index counted back from the current week: 0 is this week.
@@ -131,7 +144,7 @@ export function DayRingStrip({
 
   return (
     <View style={{ gap: spacing.xs }} testID={`${testIDPrefix}-week`}>
-      <View onLayout={onLayout}>
+      <View onLayout={onLayout} style={bleed ? { marginHorizontal: -bleed } : undefined}>
         {width > 0 ? (
           <ScrollView
             ref={ref}
@@ -236,7 +249,9 @@ export function DayRingStrip({
             </Text>
           </FadeUp>
         ) : (
-          <Text variant="caption" color="textSecondary" style={{ flex: 1 }} numberOfLines={2} testID={`${testIDPrefix}-week-caption`}>
+          // Never clamped: beside the streak mark and the arrows on a narrow phone a long week ("1,060 kcal a day over
+          // budget, 4 full days") takes four lines rather than lose its end.
+          <Text variant="caption" color="textSecondary" style={{ flex: 1 }} testID={`${testIDPrefix}-week-caption`}>
             {weekCaption(shownWeek, today, start)}
           </Text>
         )}

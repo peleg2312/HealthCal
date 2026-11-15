@@ -38,6 +38,13 @@ export function ProjectionChart({ projection: p, units, delay = 0 }: { projectio
   const band = [start, { x: x(p.fastWeeks), y: end.y }, { x: x(p.slowWeeks), y: end.y }].map((pt) => `${pt.x},${pt.y}`).join(' ');
   const axisY = PLOT_H - 2;
   const labelW = 64;
+  // Each waypoint's date and weight keep clear of the next label; on a narrow phone only the
+  // halfway one is labelled (its dot and the others' stay on the line).
+  const minLabelGap = 58;
+  const xs = p.waypoints.map((wp) => x(wp.weeks));
+  const roomy = xs.every((at, i) => (i === 0 ? true : at - xs[i - 1] >= minLabelGap)) && end.x - xs[xs.length - 1] >= minLabelGap;
+  const middle = p.waypoints[Math.floor(p.waypoints.length / 2)];
+  const labelled = new Set<number>(roomy ? p.waypoints.map((wp) => wp.share) : middle && end.x - x(middle.weeks) >= minLabelGap ? [middle.share] : []);
   // The goal cup: square shoulders on top, a round base, 12 px wide.
   const gw = 12;
   const gh = 11;
@@ -88,7 +95,7 @@ export function ProjectionChart({ projection: p, units, delay = 0 }: { projectio
       <View style={{ height: 34, marginTop: spacing.xs }}>
         {width > 0 ? (
           <>
-            {p.waypoints.map((wp) => (
+            {p.waypoints.filter((wp) => labelled.has(wp.share)).map((wp) => (
               <View key={wp.share} style={{ position: 'absolute', left: x(wp.weeks) - labelW / 2, width: labelW, alignItems: 'center' }}>
                 <Text variant="caption" color="textSecondary" tabular>
                   {shortDate(wp.date)}

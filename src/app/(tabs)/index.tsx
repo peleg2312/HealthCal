@@ -202,28 +202,31 @@ function EnergyCard({
     labels.push({
       key: 'left',
       at: (Math.min(eaten, budget) + emptyTop) / 2,
-      height: numSize - 4,
+      // At least 44 tall, so the number is a whole touch target even at its smallest (40 px type on a narrow phone).
+      height: Math.max(44, numSize - 4),
       content: (
         <PressableScale
           testID="today-remaining-open"
           scaleTo={0.97}
           onPress={onFits}
           accessibilityLabel={`${left} kilocalories ${unitWord}. See which of your foods fit`}
-          style={{ flexDirection: 'row', alignItems: 'flex-end', alignSelf: 'flex-start', gap: 6 }}>
-          <AnimatedNumber
-            variant="numXL"
-            color={over ? 'warningInk' : 'caloriesInk'}
-            testID="today-remaining"
-            numberOfLines={1}
-            value={day.remaining}
-            format={(n) => formatNumber(Math.abs(Math.round(n)))}
-            duration={motion.duration.pour}
-            accessibilityLabel={`${left} kilocalories ${unitWord}`}
-            style={{ fontSize: numSize, lineHeight: numSize - 2, letterSpacing: -numSize * 0.035 }}
-          />
-          <Text variant="unit" style={{ fontSize: 14, lineHeight: 17, marginBottom: numSize * 0.08 }}>
-            {`kcal\n${unitWord}`}
-          </Text>
+          style={{ alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
+            <AnimatedNumber
+              variant="numXL"
+              color={over ? 'warningInk' : 'caloriesInk'}
+              testID="today-remaining"
+              numberOfLines={1}
+              value={day.remaining}
+              format={(n) => formatNumber(Math.abs(Math.round(n)))}
+              duration={motion.duration.pour}
+              accessibilityLabel={`${left} kilocalories ${unitWord}`}
+              style={{ fontSize: numSize, lineHeight: numSize - 2, letterSpacing: -numSize * 0.035 }}
+            />
+            <Text variant="unit" style={{ fontSize: 14, lineHeight: 17, marginBottom: numSize * 0.08 }}>
+              {`kcal\n${unitWord}`}
+            </Text>
+          </View>
         </PressableScale>
       ),
     });
@@ -234,11 +237,14 @@ function EnergyCard({
         height: 22,
         tick: colors.rim,
         content: (
-          <AnimatedNumber variant="numM" numberOfLines={1} value={eaten} format={(n) => formatNumber(Math.round(n))} style={{ fontSize: 17, lineHeight: 22 }} testID="today-eaten">
-            <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
-              {'  eaten'}
-            </Text>
-          </AnimatedNumber>
+          // Text only: it never takes a tap meant for the big number above it.
+          <View pointerEvents="none">
+            <AnimatedNumber variant="numM" numberOfLines={1} value={eaten} format={(n) => formatNumber(Math.round(n))} style={{ fontSize: 17, lineHeight: 22 }} testID="today-eaten">
+              <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
+                {'  eaten'}
+              </Text>
+            </AnimatedNumber>
+          </View>
         ),
       });
     }
@@ -485,7 +491,7 @@ function RepeatButton({ meal, date, prev }: { meal: MealType; date: ISODate; pre
       full={false}
       icon={<Repeat2 size={16} color={colors.text} strokeWidth={2.2} />}
       onPress={() => copyEntries(prev.entries, date, meal, `Copied ${label} from ${when}`)}
-      style={{ paddingHorizontal: 10 }}
+      style={{ paddingHorizontal: 10, alignSelf: 'center' }}
     />
   );
 }

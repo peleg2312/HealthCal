@@ -81,10 +81,11 @@ export function TextLink({ label, onPress, testID, accessibilityLabel }: { label
 /** Large number with a small unit inside it and a caption below. Numbers stay in a text colour. */
 export function BigStat({ value, unit, label, align = 'left', ink = 'text' }: { value: string; unit?: string; label: string; color?: string; align?: 'left' | 'right'; ink?: 'text' | 'caloriesInk' }) {
   return (
-    <View style={{ alignItems: align === 'right' ? 'flex-end' : 'flex-start', flexShrink: 1 }}>
+    // The number and its unit never part: the words beside a big stat wrap instead.
+    <View style={{ alignItems: align === 'right' ? 'flex-end' : 'flex-start', flexShrink: 0 }}>
       <Text variant="numL" color={ink}>
         {value}
-        {unit ? <Text variant="unit">{` ${unit}`}</Text> : null}
+        {unit ? <Text variant="unit">{`\u00A0${keepTogether(unit)}`}</Text> : null}
       </Text>
       <Text variant="caption" color="textSecondary">
         {label}
@@ -96,24 +97,37 @@ export function BigStat({ value, unit, label, align = 'left', ink = 'text' }: { 
 /** A row of small stats separated by hairlines, under a hairline (stats share the card, not tiles of their own). */
 export function StatStrip({ items }: { items: { label: string; value: string; unit?: string; color?: string; trend?: Direction | null }[] }) {
   const { colors, spacing } = useTheme();
+  // Under 360 px three columns have about 70 px each: a smaller number, narrower gutters and the
+  // trend mark beside the label keep each number on one line with its unit ("2,171 kcal", "19 of 27").
+  const narrow = useWindowDimensions().width < 360;
   return (
     <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md }}>
       {items.map((it, i) => (
-        <View key={it.label} style={{ flex: 1, minWidth: 0, paddingLeft: i ? spacing.md : 0, paddingRight: spacing.sm, borderLeftWidth: i ? 1 : 0, borderLeftColor: colors.border }}>
+        <View
+          key={it.label}
+          style={{ flex: 1, minWidth: 0, paddingLeft: i ? (narrow ? spacing.sm : spacing.md) : 0, paddingRight: narrow ? spacing.xs : spacing.sm, borderLeftWidth: i ? 1 : 0, borderLeftColor: colors.border }}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-            <Text variant="numM" style={{ flexShrink: 1, fontSize: 18, lineHeight: 22 }}>
+            <Text variant="numM" style={{ flexShrink: 1, fontSize: narrow ? 16 : 18, lineHeight: narrow ? 20 : 22 }}>
               {it.value}
-              {it.unit ? <Text variant="unit">{` ${it.unit}`}</Text> : null}
+              {it.unit ? <Text variant="unit">{`\u00A0${keepTogether(it.unit)}`}</Text> : null}
             </Text>
-            <TrendMark trend={it.trend} />
+            {narrow ? null : <TrendMark trend={it.trend} />}
           </View>
-          <Text variant="caption" color="textSecondary">
-            {it.label}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
+              {it.label}
+            </Text>
+            {narrow ? <TrendMark trend={it.trend} /> : null}
+          </View>
         </View>
       ))}
     </View>
   );
+}
+
+/** A unit such as "of 27" or "lb / wk" with no-break spaces, so it stays on its number's line. */
+function keepTogether(unit: string): string {
+  return unit.replace(/ /g, '\u00A0');
 }
 
 /** A chart legend entry: a cup key, a dashed rule (budget) or a short rim bar (the day's level). */

@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Plus, X } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { storeSavedMeal } from '@/features/food/actions';
 import { formatPortion, itemsRange, mealServings } from '@/features/food/build';
@@ -25,6 +25,8 @@ export default function MealEditRoute() {
 
 function MealEdit() {
   const { colors, spacing } = useTheme();
+  // Below about 375 px the hint no longer fits beside the 150 px field (with the card's padding) and wraps under it.
+  const narrow = useWindowDimensions().width < 375;
   const params = useLocalSearchParams<{ id?: string; meal?: string; date?: string }>();
   const id = param(params.id);
   const saved = useStore((s) => (id ? s.savedMeals[id] : undefined));
@@ -100,7 +102,8 @@ function MealEdit() {
       ) : null}
       <Card style={{ gap: spacing.md }}>
         <TextField testID="meal-edit-name" label="Name" placeholder="Chili, overnight oats, work lunch" value={name} onChangeText={setDraftName} maxLength={60} autoFocus={!id} />
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md }}>
+        {/* The hint sits beside the field where it has room, and under it on a narrow phone rather than in a thin column. */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', columnGap: spacing.md, rowGap: spacing.sm }}>
           <NumberField
             testID="meal-edit-servings"
             label="Makes"
@@ -110,7 +113,7 @@ function MealEdit() {
             decimals={1}
             style={{ width: 150 }}
           />
-          <Text variant="caption" color="textSecondary" style={{ flex: 1, paddingBottom: 12 }}>
+          <Text variant="caption" color="textSecondary" style={{ flexGrow: 1, flexShrink: 1, flexBasis: 140, paddingBottom: narrow ? 0 : 12 }}>
             {count > 1 ? `Logs as one line, a share of the whole recipe.` : 'Leave at 1 for a meal you eat whole. A pot that feeds four makes 4.'}
           </Text>
         </View>
@@ -167,10 +170,10 @@ function MealEdit() {
                   style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>
                   <RowEmoji emoji={r.item.emoji} />
                   <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                    <Text variant="bodyStrong" numberOfLines={1} style={{ fontFamily: fonts.semibold }}>
+                    <Text variant="bodyStrong" numberOfLines={3} style={{ fontFamily: fonts.semibold }}>
                       {r.item.name}
                     </Text>
-                    <Text variant="caption" color="textSecondary" numberOfLines={1} tabular>
+                    <Text variant="caption" color="textSecondary" numberOfLines={2} tabular>
                       {itemLine(r.item)}
                     </Text>
                   </View>

@@ -1,6 +1,6 @@
 import { Plus, Sparkles } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { useTheme } from '@/theme';
 import type { AiFoodItem, Food } from '@/types';
@@ -29,6 +29,8 @@ export function AddMissingItem({
   aiBusy?: boolean;
 }) {
   const { colors, spacing } = useTheme();
+  // A 320 px phone cuts the example mid-word; it keeps the words that matter.
+  const narrow = useWindowDimensions().width < 360;
   const [query, setQuery] = useState('');
   const q = query.trim();
   const matches = q.length >= 2 ? matchFoods(q, foods, 3) : [];
@@ -41,7 +43,7 @@ export function AddMissingItem({
     <View style={{ gap: spacing.sm }}>
       <TextField
         testID="ai-add-item-input"
-        placeholder="Add a missed item, e.g. 1 banana"
+        placeholder={narrow ? 'Add a missed item' : 'Add a missed item, e.g. 1 banana'}
         value={query}
         onChangeText={setQuery}
         returnKeyType="done"

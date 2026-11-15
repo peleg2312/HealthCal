@@ -5,6 +5,7 @@ import { View, type TextInputInstance } from 'react-native';
 
 import { FadeIn, Note } from '@/features/onboarding/components';
 import { SignInGate } from '@/features/onboarding/SignInGate';
+import { breakableEmail } from '@/features/settings/format';
 import { sendPasswordReset, signIn, signUp, updatePassword, useAuth, validateEmail, validatePassword } from '@/services/auth';
 import { isBackendConfigured } from '@/services/supabase';
 import { useStore } from '@/store';
@@ -136,8 +137,8 @@ function AuthForm({ initial }: { initial: Mode }) {
           </Text>
           <Text variant="body" color="textSecondary" align="center">
             {confirm
-              ? `We sent a confirmation link to ${email.trim()}. Open it on this device, then sign in. Your data stays on this device in the meantime.`
-              : `If an account exists for ${email.trim()}, a link to choose a new password is on its way. It can take a minute; check spam too.`}
+              ? `We sent a confirmation link to ${breakableEmail(email.trim())}. Open it on this device, then sign in. Your data stays on this device in the meantime.`
+              : `If an account exists for ${breakableEmail(email.trim())}, a link to choose a new password is on its way. It can take a minute; check spam too.`}
           </Text>
         </FadeIn>
       </Screen>

@@ -92,11 +92,14 @@ export function Segmented<T extends string>({
   value,
   onChange,
   style,
+  testID,
 }: {
   options: { value: T; label: string }[];
   value: T;
   onChange: (v: T) => void;
   style?: StyleProp<ViewStyle>;
+  /** Each option gets `${testID}-${value}`. */
+  testID?: string;
 }) {
   const { colors } = useTheme();
   return (
@@ -106,6 +109,7 @@ export function Segmented<T extends string>({
         return (
           <PressableScale
             key={o.value}
+            testID={testID ? `${testID}-${o.value}` : undefined}
             onPress={() => onChange(o.value)}
             feedback="select"
             scaleTo={0.98}

@@ -281,7 +281,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
 
       <MacroSummary range={range} n={n} kcalNote={`${portionLabel(serving.label, quantity)}${perGram || serving.label === '100 g' || (quantity === 1 && /\d\s?g\)*$/.test(serving.label)) ? '' : ` · ${Math.round(totalGrams)} g`}`} />
 
-      <Card>
+      <Card style={{ gap: spacing.md }}>
         <Text variant="h3">Amount</Text>
         <AmountEditor food={food} value={portion} onChange={setPortion} onPendingChange={setGramsInvalid} testIDPrefix="detail" />
       </Card>

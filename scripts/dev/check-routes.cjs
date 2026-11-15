@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * Opens every route three ways and fails if any of them lands on the error screen
+ * Opens every route four ways and fails if any of them lands on the error screen
  * or throws: with nothing stored (a link opened before setup must go to the welcome
- * screen, not crash), with a profile and no data (empty states), and with demo data.
+ * screen, not crash), with a profile and no data (empty states), with demo data, and
+ * with the long-content demo data (buildSeed({ stress: true }): long names, big numbers).
  *
- *   node scripts/dev/check-routes.cjs [--url=http://localhost:8081] [--only=none|empty|demo]
+ *   node scripts/dev/check-routes.cjs [--url=http://localhost:8081] [--only=none|empty|demo|stress]
  *
  * Add a route here when you add one to src/app.
  */
@@ -32,6 +33,7 @@ const OPEN_WITHOUT_PROFILE = ['/welcome', '/auth', '/onboarding', '/friends/add'
     { key: 'none', seed: null },
     { key: 'empty', seed: buildSeed({ empty: true, theme: 'light' }) },
     { key: 'demo', seed: buildSeed({ theme: 'light' }) },
+    { key: 'stress', seed: buildSeed({ theme: 'light', stress: true }) },
   ].filter((m) => !flags.only || flags.only === m.key);
 
   const browser = await chromium.launch();

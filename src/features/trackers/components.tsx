@@ -85,6 +85,7 @@ export function Figure({
   size = 'numM',
   align = 'left',
   testID,
+  basis,
 }: {
   value: string;
   unit?: string;
@@ -93,11 +94,13 @@ export function Figure({
   size?: 'numM' | 'numL';
   align?: 'left' | 'center';
   testID?: string;
+  /** In a row that wraps: the narrowest the figure may be before it moves to the next line, so its unit stays beside the number. */
+  basis?: number;
 }) {
   const { colors } = useTheme();
   const key = color ? ((colors as unknown as Record<string, string>)[color] ?? color) : undefined;
   return (
-    <View style={{ flex: 1, minWidth: 0, alignItems: align === 'center' ? 'center' : 'flex-start' }}>
+    <View style={{ ...(basis ? { flexGrow: 1, flexBasis: basis } : { flex: 1 }), minWidth: 0, alignItems: align === 'center' ? 'center' : 'flex-start' }}>
       {/* The figure itself never breaks (non-breaking spaces); on a narrow phone its unit may drop to a second line rather than be cut. */}
       <Text testID={testID} variant={size} tabular numberOfLines={2}>
         {value.replace(/ /g, '\u00A0')}

@@ -107,7 +107,7 @@ export function SessionRow({ entry, units, onPress, onDelete }: { entry: Activit
           </Text>
         </View>
       </PressableScale>
-      <IconButton accessibilityLabel={`Delete ${entry.name}`} tone="clear" testID={`delete-${entry.activityId}`} onPress={onDelete} size={40}>
+      <IconButton accessibilityLabel={`Delete ${entry.name}`} tone="clear" testID={`delete-${entry.activityId}`} onPress={onDelete} size={44}>
         <Trash2 size={18} color={colors.textSecondary} strokeWidth={1.9} />
       </IconButton>
     </View>

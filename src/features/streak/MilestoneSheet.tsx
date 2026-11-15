@@ -17,13 +17,17 @@ const SHEET_LEAD = 6;
  */
 export function MilestoneSheet({ milestone, onClose }: { milestone: StreakMilestone | null; onClose: () => void }) {
   const { colors, spacing } = useTheme();
-  const { width: screenW } = useWindowDimensions();
+  const { width: screenW, height: screenH } = useWindowDimensions();
   const n = milestone ?? 0;
   const copy = milestone ? milestoneCopy(milestone) : null;
   // Rows of at most 10 cups that fit the sheet (40 px of padding each side, 6 px gaps).
   const perRow = n <= 7 ? n : 10;
   const inner = Math.min(screenW, 560) - 40 - 2;
-  const cupW = Math.max(12, Math.min(30, Math.floor((inner - (perRow - 1) * 6) / Math.max(1, perRow))));
+  // ...and short enough that the whole moment fits on a short phone without scrolling: the sheet
+  // is at most 88% of the window, and about 260 px of it is the handle, count, words and Done.
+  const rows = Math.ceil(n / Math.max(1, perRow));
+  const tallest = Math.floor((screenH * 0.88 - 260 - (rows - 1) * 8) / Math.max(1, rows) / 1.27);
+  const cupW = Math.max(12, Math.min(30, tallest, Math.floor((inner - (perRow - 1) * 6) / Math.max(1, perRow))));
   const cupH = Math.round(cupW * 1.27);
   return (
     <Sheet visible={milestone !== null} onClose={onClose} footer={<Button testID="streak-milestone-done" title="Done" variant="secondary" onPress={onClose} />}>

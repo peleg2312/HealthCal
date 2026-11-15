@@ -6,7 +6,7 @@ import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 import { AmountEditor } from '@/features/food/AmountEditor';
 import { FoodRow, MealPicker } from '@/features/food/components';
 import { setFoodDraft } from '@/features/food/draft';
-import { amountLabel, href, kcal, lastPortions, matchServing, parseDate, parseMeal, portionFor, portionKcal, portionLabel, stepAmount } from '@/features/food/helpers';
+import { amountLabel, dayPhrase, href, kcal, lastPortions, matchServing, parseDate, parseMeal, portionFor, portionKcal, portionLabel, stepAmount } from '@/features/food/helpers';
 import { formatPortion, itemsRange, mealServings } from '@/features/food/build';
 import { deleteEntry, logFood, setEntryAmount } from '@/features/food/log';
 import { LogSavedMealSheet } from '@/features/food/SavedMealParts';
@@ -184,6 +184,9 @@ export default function FoodSearchScreen() {
   );
 
   const over = left < 0;
+  // "today", "yesterday", or "on Fri, Nov 13".
+  const phrase = dayPhrase(date);
+  const when = date === todayDate ? 'today' : phrase === 'yesterday' || phrase === 'tomorrow' ? phrase : `on ${phrase}`;
   const budget = (
     <AnimatedNumber
       variant={added.length > 0 ? 'caption' : 'label'}
@@ -191,8 +194,8 @@ export default function FoodSearchScreen() {
       testID="search-budget"
       value={left}
       format={(n) => kcal(Math.abs(n))}
-      accessibilityLabel={`${kcal(Math.abs(left))} kcal ${over ? 'over' : 'left'} ${date === todayDate ? 'today' : `on ${formatDayLabel(date)}`}`}>
-      {`${over ? ' kcal over' : ' kcal left'} ${date === todayDate ? 'today' : `on ${formatDayLabel(date)}`}`}
+      accessibilityLabel={`${kcal(Math.abs(left))} kcal ${over ? 'over' : 'left'} ${when}`}>
+      {`${over ? ' kcal over' : ' kcal left'} ${when}`}
     </AnimatedNumber>
   );
   const footer = (
@@ -300,7 +303,7 @@ export default function FoodSearchScreen() {
                           <Utensils size={19} color={colors.textSecondary} strokeWidth={1.9} />
                         </View>
                         <View style={{ flex: 1, minWidth: 0 }}>
-                          <Text variant="bodyStrong" numberOfLines={1} style={{ fontFamily: fonts.semibold }}>
+                          <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
                             {m.name}
                           </Text>
                           <Text variant="caption" color="textSecondary" numberOfLines={1}>
@@ -316,6 +319,7 @@ export default function FoodSearchScreen() {
                         size="sm"
                         variant="secondary"
                         full={false}
+                        style={{ alignSelf: 'center' }}
                         onPress={() => setLogging(m)}
                       />
                     </View>
@@ -409,16 +413,19 @@ export default function FoodSearchScreen() {
           ) : null
         }>
         {amountEntry?.food ? (
-          <AmountEditor
-            key={amountEntry.id}
-            food={amountEntry.food}
-            value={{
-              serving: matchServing(amountEntry.food, amountEntry.servingLabel, amountEntry.quantity > 0 ? amountEntry.grams / amountEntry.quantity : amountEntry.grams),
-              quantity: amountEntry.quantity,
-            }}
-            onChange={(v) => setEntryAmount(amountEntry, v.quantity, v.serving)}
-            testIDPrefix="search-amount"
-          />
+          // 6 px of room above the serving chips, so the top of their 44 px touch area is not cut off by the sheet's scroll edge.
+          <View style={{ paddingTop: 6 }}>
+            <AmountEditor
+              key={amountEntry.id}
+              food={amountEntry.food}
+              value={{
+                serving: matchServing(amountEntry.food, amountEntry.servingLabel, amountEntry.quantity > 0 ? amountEntry.grams / amountEntry.quantity : amountEntry.grams),
+                quantity: amountEntry.quantity,
+              }}
+              onChange={(v) => setEntryAmount(amountEntry, v.quantity, v.serving)}
+              testIDPrefix="search-amount"
+            />
+          </View>
         ) : null}
       </Sheet>
     </Screen>

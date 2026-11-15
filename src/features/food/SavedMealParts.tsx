@@ -10,7 +10,7 @@ import { View } from 'react-native';
 import { MEAL_LABEL } from '@/lib/nutrition';
 import { cup, useTheme } from '@/theme';
 import type { ISODate, MealType, SavedMeal, SavedMealItem } from '@/types';
-import { Button, Chip, ChipRow, NumberField, PressableScale, Sheet, Stepper, Text } from '@/ui';
+import { Button, Chip, ChipWrap, NumberField, PressableScale, Sheet, Stepper, Text } from '@/ui';
 
 import { AmountEditor } from './AmountEditor';
 import { RowEmoji } from './components';
@@ -71,7 +71,8 @@ export function LogSavedMealSheet({ meal, mealType, date, onClose }: { meal: Sav
       {recipe ? (
         <View style={{ gap: spacing.sm }}>
           <Text variant="label">How much did you have?</Text>
-          <ChipRow>
+          {/* Wrapped, so all four choices show in a narrow sheet rather than scrolling one out of sight. */}
+          <ChipWrap>
             {PORTIONS.map((p) => (
               <Chip
                 key={p}
@@ -85,7 +86,7 @@ export function LogSavedMealSheet({ meal, mealType, date, onClose }: { meal: Sav
               />
             ))}
             <Chip testID="log-meal-portion-other" label="Other" selected={other} onPress={() => setOther(true)} />
-          </ChipRow>
+          </ChipWrap>
           {other ? (
             <NumberField
               testID="log-meal-portion-input"
@@ -131,10 +132,10 @@ export function LogSavedMealSheet({ meal, mealType, date, onClose }: { meal: Sav
               </View>
               <RowEmoji emoji={it.emoji} />
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text variant="body" numberOfLines={1} color={on ? 'text' : 'textTertiary'}>
+                <Text variant="body" numberOfLines={2} color={on ? 'text' : 'textTertiary'}>
                   {it.name}
                 </Text>
-                <Text variant="caption" color="textSecondary" numberOfLines={1} tabular>
+                <Text variant="caption" color="textSecondary" numberOfLines={2} tabular>
                   {itemLine(it)}
                 </Text>
               </View>
