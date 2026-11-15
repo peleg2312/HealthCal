@@ -16,6 +16,7 @@ import {
 import React from 'react';
 import { View } from 'react-native';
 
+import { AiConsentAbout } from '@/features/ai/AiConsentAbout';
 import { IconTile } from '@/features/settings/components';
 import { ACTIVITY_FACTORS, ACTIVITY_LABELS, calorieFloor } from '@/lib/energy';
 import { formatNumber } from '@/lib/units';
@@ -269,9 +270,16 @@ export default function AboutScreen() {
       <Section icon={(c) => <Lock size={20} color={c} />} color={colors.success} title="Privacy" testID="about-privacy">
         <P>
           Your data stays on this device unless you create an account. With an account it is stored in your private space on HealthCal&apos;s
-          server so it can sync, and nobody else can read it. Photos and descriptions are sent for analysis only when you ask for an AI estimate,
-          and are not kept afterwards. No ads, no tracking, no selling of data. You can export everything or delete it at any time.
+          server so it can sync, and no other account can read it. No ads, no tracking, no selling of data. You can export everything or delete
+          it at any time.
         </P>
+        <P>
+          A meal photo or description leaves this device only when you ask for an AI estimate, and only after you have agreed once on this device.
+          It goes to HealthCal&apos;s server, which passes it to Anthropic, the maker of Claude, to estimate the food; nothing else from your diary
+          goes with it. HealthCal&apos;s server does not store the photo or the words, only how many analyses you ran and how large they were, for
+          the daily allowance. Anthropic handles what it receives under Anthropic&apos;s terms.
+        </P>
+        <AiConsentAbout />
         <P>
           On Android, with Workout sync switched on, HealthCal reads your workouts from Health Connect: each session with its active and total
           calories and its distance. They are stored like sessions you log by hand. Nothing is written back to Health Connect, and that data is

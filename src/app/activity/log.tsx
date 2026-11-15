@@ -6,6 +6,7 @@ import { View } from 'react-native';
 import { ACTIVITY_BY_ID, MET_SOURCES } from '@/data/activities';
 import { basisFromEntry, formatPace, localiseSpeedText, paceModeFor, sessionPreview, sessionWaterMl } from '@/features/activity/build';
 import { DateStepper } from '@/features/activity/components';
+import { syncedFrom } from '@/features/health-sync/origins';
 import { deleteActivity, leaveFlow, saveActivity } from '@/features/activity/session';
 import { formatDayLabel, today } from '@/lib/dates';
 import { formulaTdee } from '@/lib/energy';
@@ -73,8 +74,10 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
   // A device-measured session shows its stored figures until something that prices it changes.
   const preview = sessionPreview(entry, { activityId, intensity, durationMin: minutes, met }, basis);
   const isMeasured = preview.kind === 'measured';
-  const device = entry?.source === 'garmin' ? 'Garmin' : 'your device';
-  const Device = device === 'Garmin' ? 'Garmin' : 'Your device';
+  // Where an imported or synced session came from: a Garmin file, or the app Health Connect names.
+  const origin = !entry ? null : entry.source === 'garmin' ? 'Garmin' : syncedFrom(entry);
+  const device = origin ?? 'your device';
+  const Device = origin ?? 'Your device';
   // The day's exercise water is capped as a whole, so preview this session's share of it.
   const others = activities.filter((a) => a.date === date && a.id !== entryId);
   const water = sessionWaterMl(others, { durationMin: minutes, intensity });
@@ -173,6 +176,15 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
             </Text>
           </View>
         </View>
+        {origin && !isMeasured ? (
+          // A measured session already names its source above; an estimated one says it here.
+          <View testID="log-activity-origin" style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <CupKey color={colors.textSecondary} variant="outline" size={8} />
+            <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
+              {entry?.source === 'garmin' ? 'Imported from Garmin' : `From ${origin}`}
+            </Text>
+          </View>
+        ) : null}
         <Text variant="body" color="textSecondary" testID="log-activity-sentence">
           {sentence}
         </Text>

@@ -5,8 +5,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
 
 import { AddMissingItem } from '@/features/ai/AddMissingItem';
+import { AiConsentSheet } from '@/features/ai/AiConsentSheet';
+import { AiDataLine } from '@/features/ai/AiDataLine';
 import { AiError, aiError, type AiErrorCode } from '@/features/ai/api';
 import { AnalysingView } from '@/features/ai/AnalysingView';
+import { agreeToAi, checkAiConsent, loadAiConsent, useAiConsent, withdrawAiConsent } from '@/features/ai/consent';
 import { availability, DEMO_ERROR_CODES } from '@/features/ai/demo';
 import { ErrorView, type ErrorAction, type ScreenErrorCode } from '@/features/ai/ErrorView';
 import {
@@ -87,12 +90,51 @@ export default function PhotoScreen() {
   const [correction, setCorrection] = useState('');
   const [highlight, setHighlight] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Before the first live estimate on this device, ask (see @/features/ai/consent).
+  const agreed = useAiConsent();
+  const [consentOpen, setConsentOpen] = useState(false);
+  // Kept while the sheet slides away, so its buttons do not change on the way out.
+  const [consentMode, setConsentMode] = useState<'ask' | 'review'>('ask');
+  const openConsent = (m: 'ask' | 'review') => {
+    setConsentMode(m);
+    setConsentOpen(true);
+  };
+  const afterConsent = useRef<(() => void) | null>(null);
   const scrollRef = useRef<ScrollViewInstance>(null);
   // Where the item rows sit in the scroll content, so a hero pill can scroll to one.
   const layout = useRef<{ section: number; card: number; rows: Record<string, number> }>({ section: 0, card: 0, rows: {} });
   const customFoods = useLive('customFoods');
   // The person's own foods first, then the bundled reference foods.
   const matchPool: Food[] = [...customFoods, ...BUILTIN_FOODS];
+
+  useEffect(() => {
+    void loadAiConsent();
+  }, []);
+
+  /**
+   * True when an estimate may run now. A live estimate sends the photo or words
+   * out, so a device that has not agreed is asked first, and `retry` runs once
+   * it agrees. Sample mode sends nothing and never asks.
+   */
+  async function mayEstimate(retry: () => void): Promise<boolean> {
+    if (!access.live || (await checkAiConsent())) return true;
+    afterConsent.current = retry;
+    openConsent('ask');
+    return false;
+  }
+
+  async function agree() {
+    const next = afterConsent.current;
+    afterConsent.current = null;
+    setConsentOpen(false);
+    await agreeToAi();
+    next?.();
+  }
+
+  function closeConsent() {
+    afterConsent.current = null;
+    setConsentOpen(false);
+  }
 
   useEffect(() => {
     if (!highlight) return;
@@ -157,6 +199,7 @@ export default function PhotoScreen() {
   }, []);
 
   async function analyse(precise: boolean, fix?: string) {
+    if (!(await mayEstimate(() => void analyse(precise, fix)))) return;
     const controller = new AbortController();
     abortRef.current = controller;
     setPendingPrecise(precise);
@@ -196,6 +239,7 @@ export default function PhotoScreen() {
   }
 
   async function askAiForItem(text: string): Promise<boolean> {
+    if (!(await mayEstimate(() => void askAiForItem(text)))) return false;
     setAddingAi(true);
     try {
       const res = await analyzeFood({ text });
@@ -384,6 +428,7 @@ export default function PhotoScreen() {
               />
             </>
           )}
+          {access.live ? <AiDataLine mode={mode} onPress={() => openConsent('review')} /> : null}
         </>
       ) : null}
 
@@ -596,6 +641,18 @@ export default function PhotoScreen() {
           </Card>
         </>
       ) : null}
+      <AiConsentSheet
+        visible={consentOpen}
+        mode={consentMode}
+        agreed={agreed}
+        onAgree={() => void agree()}
+        onClose={closeConsent}
+        onWithdraw={() => {
+          closeConsent();
+          void withdrawAiConsent();
+          toast('Agreement withdrawn. HealthCal asks again before the next estimate.');
+        }}
+      />
     </Screen>
   );
 

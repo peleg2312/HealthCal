@@ -27,7 +27,7 @@ import { useNow, useToday } from '@/store/clock';
 import { useConsistency, useDay, useLive, useProfile, type DaySummary } from '@/store/selectors';
 import { cupFor, motion, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
-import { AnimatedNumber, Button, Card, Chip, CupKey, IconButton, PressableScale, ProgressBar, Screen, Text, Vessel, type VesselLabel } from '@/ui';
+import { AnimatedNumber, Button, Card, Chip, ChipWrap, CupKey, IconButton, PressableScale, ProgressBar, Screen, Text, Vessel, type VesselLabel } from '@/ui';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const longDay = (date: ISODate) => `${WEEKDAYS[fromISODate(date).getDay()]}, ${formatShortDate(date)}`;
@@ -429,7 +429,7 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
         {line}
         {open ? <ChevronRight size={18} color={colors.textSecondary} /> : null}
       </PressableScale>
-      {chips.length ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>{chips}</View> : null}
+      {chips.length ? <ChipWrap>{chips}</ChipWrap> : null}
     </View>
   );
 }

@@ -217,10 +217,10 @@ The stores will ask for these, and only you can provide them:
 2. **Apple: App Privacy answers** (the "nutrition label"). Data linked to the user when an account exists:
    - Health and Fitness: food, water, weight, sleep and workouts;
    - Contact Info: the email address;
-   - User Content: meal photos and descriptions, sent for analysis and not kept;
+   - User Content: meal photos and descriptions, sent for analysis; HealthCal's server does not store them;
    - Identifiers: the user ID.
 
-   No tracking and no ads. Apple's guideline 5.1.2 also asks that people are told, and agree, before personal data goes to a third-party AI service. The photo and describe screen (`src/app/food/photo.tsx`) does not say this today, so add a line there before you submit.
+   No tracking and no ads. Declare Photos (or Other User Content) as shared with a third-party AI provider, Anthropic, for app functionality only and not used for tracking. Apple's guideline 5.1.2 also asks that people are told, and agree, before personal data goes to a third-party AI service: the app asks once per device before the first estimate (`src/features/ai/AiConsentSheet.tsx`), says on the estimate screen where the photo or description goes, and lets people withdraw in About HealthCal, under Privacy.
 3. **Google Play: Health Connect declaration and Data safety form.**
    - In App content, the Health Connect permissions declaration: read access to exercise, active calories, total calories and distance only, as `READ_PERMISSIONS` and docs/health-sync.md list them, with the reason for each and a link to the privacy policy.
    - The Health apps declaration.

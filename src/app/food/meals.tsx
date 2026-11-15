@@ -77,7 +77,7 @@ export default function SavedMealsScreen() {
                       {it.name}
                     </Text>
                     <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1, maxWidth: '55%', textAlign: 'right' }}>
-                      {itemLine(it)}
+                      {itemLine(it).replace(/(\d) (g|kcal|ml)\b/g, '$1\u00A0$2')}
                     </Text>
                   </View>
                 ))}

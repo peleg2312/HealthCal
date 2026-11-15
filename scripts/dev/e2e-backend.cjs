@@ -154,6 +154,9 @@ async function device(browser, seedJson) {
   await A.go('/food/photo?mode=text&meal=snack');
   await A.fill('ai-description', 'two scrambled eggs on sourdough toast');
   await A.tap('ai-analyse');
+  // The first live estimate on a device asks before anything is sent.
+  check('nothing is sent before agreeing to the AI estimate', (await A.has('ai-consent-agree')) && (await server()).aiRequests.length === srv.aiRequests.length);
+  await A.tap('ai-consent-agree');
   await A.page.waitForSelector('[data-testid="ai-add-to-diary"]', { timeout: 20000 }).catch(() => {});
   await A.shot('backend-ai-review');
   srv = await server();

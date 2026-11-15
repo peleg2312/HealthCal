@@ -325,6 +325,8 @@ async function captureBackend(browser, buildSeed) {
         await d.page.waitForTimeout(1500);
       }
       if (await d.page.getByTestId('ai-analyse').count()) await tap(d, '[data-testid="ai-analyse"]');
+      // The first live estimate on a device asks before anything is sent.
+      await d.page.getByTestId('ai-consent-agree').first().waitFor({ timeout: 5000 }).then(() => tap(d, '[data-testid="ai-consent-agree"]')).catch(() => {});
       await until(d, '[data-testid="ai-add-to-diary"]');
       await d.page.waitForTimeout(1200);
       if (await d.page.getByText(/Sample mode|Sample result/).count()) throw new Error('photo: the sample result is showing, not a real analysis');

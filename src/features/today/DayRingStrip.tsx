@@ -241,8 +241,8 @@ export function DayRingStrip({
           </Text>
         )}
         {accessory}
-        {/* 12 apart, so each 32 px arrow's 44 px touch area (6 px each side) ends where the other's begins. */}
-        <View style={{ flexDirection: 'row', gap: spacing.md }}>
+        {/* 12 apart, and 12 from the accessory (the streak mark), so each 32 px arrow's 44 px touch area (6 px each side) ends where its neighbour's begins. */}
+        <View style={{ flexDirection: 'row', gap: spacing.md, marginLeft: spacing.sm }}>
           <IconButton
             testID={`${testIDPrefix}-week-prev`}
             accessibilityLabel="Previous week"
