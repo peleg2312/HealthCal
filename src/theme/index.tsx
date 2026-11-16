@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useMemo } from 'react';
-import { useColorScheme } from 'react-native';
+import React, { createContext, useContext, useEffect, useMemo } from 'react';
+import { Platform, useColorScheme } from 'react-native';
 
 import type { ThemePreference } from '@/types';
 
@@ -49,6 +49,22 @@ export function ThemeProvider({
     () => ({ name, dark: name === 'dark', colors: PALETTES[name], chartFill: chartFillOpacity[name], spacing, radius, typography }),
     [name],
   );
+  // On web the browser draws around the app: the status bar of an app added to a phone's home
+  // screen, the strip by the home indicator, the page behind an overscroll. Keep them the colour
+  // of the active look (public/index.html starts them at the Blossom paper).
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const bg = PALETTES[name].bg;
+    document.documentElement.style.backgroundColor = bg;
+    document.body.style.backgroundColor = bg;
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'theme-color');
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute('content', bg);
+  }, [name]);
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
