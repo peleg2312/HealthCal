@@ -4,13 +4,18 @@
  *
  * Cost design, in order of impact:
  *  1. The client downsizes the photo before upload. Vision input is billed by
- *     pixel area (about one token per 28x28 px patch), so a 768 px image costs
- *     roughly 750 input tokens instead of several thousand for a camera original.
+ *     pixel area (one token per 28x28 px patch), so a 768 px image costs 300 to
+ *     800 input tokens instead of several thousand for a camera original.
  *  2. The smallest current model answers by default; a stronger one runs only
  *     when the user asks for a second, more careful pass.
  *  3. Structured output with a compact schema: no prose, no markdown, no retries
  *     for malformed JSON.
  *  4. A short system prompt and `effort: "low"` keep reasoning tokens small.
+ *
+ * Measured, not assumed: scripts/ops/eval-food-ai.mjs runs this file against the
+ * API on typed meals and photos and prints tokens, cost and how many estimates
+ * land inside their accepted range. Run it after changing SYSTEM, SCHEMA, the
+ * model or the effort (the README has the last figures and what was tried).
  */
 import Anthropic from '@anthropic-ai/sdk';
 
@@ -73,7 +78,7 @@ export class AnalyzeError extends Error {
 const SYSTEM = `You estimate nutrition for a food diary from a photo and/or a short description.
 List each distinct food or drink as its own item with your best estimate of the edible weight in grams as served, and its calories and macros for that weight.
 Judge portions from plate, cutlery, hands and packaging for scale. Use the user's text when it gives amounts or cooking method.
-Photos hide fat: include the cooking oil, butter, dressing or sauce that the dish normally contains in the relevant item instead of assuming none.
+Photos hide fat: give each fried, sautéed, dressed or sauced item the calories it has as normally cooked or served, fat included. Fold that fat into the item's own numbers; list oil, butter or dressing as its own item only when you can see it or the user names it.
 confidence is 0 to 1 for how sure you are of that item's identity and portion together.
 hidden_fat_question: one short question about added fat or sauce the photo cannot show, when the answer would change the estimate by more than about 50 kcal; otherwise null.
 note: at most one short sentence about what limits accuracy (for example no scale reference), or null.

@@ -59,7 +59,7 @@ Without these steps the app keeps everything on the device, and the AI screen ru
    supabase functions deploy food-search
    ```
    `food-search` is a small proxy the web build needs for searching packaged products by name (the Open Food Facts search service does not allow direct browser calls; phones call it directly).
-   Optional secrets: `AI_DAILY_LIMIT` (analysis units per person per day, default 40; a careful pass counts as 5), `AI_GLOBAL_DAILY_LIMIT` (a ceiling across all users per day, default 3000, so a bug or abuse cannot run up an unbounded bill), `FOOD_MODEL` (default `claude-haiku-5-5`), `FOOD_MODEL_PRECISE` (default `claude-sonnet-5-5`).
+   Optional secrets: `AI_DAILY_LIMIT` (analysis units per person per day, default 40; a careful pass counts as 5), `AI_GLOBAL_DAILY_LIMIT` (a ceiling across all users per day, default 3000, so a bug or abuse cannot run up an unbounded bill; for one person and a few friends 400 is plenty and caps a day at about half a dollar at the measured costs), `FOOD_MODEL` (default `claude-haiku-5-5`), `FOOD_MODEL_PRECISE` (default `claude-sonnet-5-5`).
    In the Supabase dashboard (Authentication, URL Configuration) add your site URL and the app's link scheme to the allowed redirect URLs, so password-reset links can return to the app.
 4. Copy `.env.example` to `.env` and fill in the project URL and anon key from the Supabase dashboard (Project Settings, API), then restart the dev server.
 
@@ -67,11 +67,24 @@ Without these steps the app keeps everything on the device, and the AI screen ru
 
 The design keeps token use low without giving up accuracy:
 
-- The app resizes each photo to 768 px on its long edge before upload. Vision input is billed by pixel area, so this is roughly 750 input tokens instead of several thousand for a camera original.
+- The app resizes each photo to 768 px on its long edge before upload. Vision input is billed by pixel area, so this is 300 to 800 input tokens instead of several thousand for a camera original.
 - The smallest current Claude model answers by default with a compact structured (JSON schema) response. A stronger model runs only when the user taps "Check again more carefully".
 - The server validates every number (macros cannot outweigh the food, calories must agree with macros) before the app sees it.
 
-At list prices this works out to a few hundredths of a US cent per analysis on the default model and under one cent on the careful pass. These figures are estimates from the published per-token prices, not measurements: check the usage page of your Anthropic console after real use. The function enforces a daily limit per person (kept against a hash of the email, so deleting and recreating an account does not reset it) and a ceiling across all users, records usage in `ai_usage`, and gives the allowance back when a request fails without being billed.
+Measured on 16 November 2026 with `scripts/ops/eval-food-ai.mjs` (the function's own code against the API: 20 typed meals and 5 photos, three rounds), at the published per-token prices:
+
+| Analysis | Model | Tokens in / out | Each | Per 1,000 |
+| --- | --- | --- | --- | --- |
+| Typed meal | `claude-haiku-5-5`, effort low | about 970 / 205 | $0.0002 | $0.20 |
+| Photo, 768 px | the same | about 1,460 / 365 | $0.0003 | $0.33 |
+| Careful pass, typed | `claude-sonnet-5-5`, effort medium | about 930 / 190 | $0.004 | $3.74 |
+| Careful pass, photo at 1024 px | the same | about 1,675 / 350 | $0.007 | $6.82 |
+
+On that small set the default put 59 of 60 typed rounds and 15 of 15 photo rounds inside the calorie range a careful person would accept (typically within 4% of its middle for typed meals and 9% for photos). What it gets wrong is what a photo cannot show: the size of a whole dish with nothing beside it for scale, and look-alikes (lentils read as minced meat). The careful pass does better on both for about twenty times the price, which is why it is a button and not the default.
+
+Tried and not adopted, because they cost more or saved nothing a person would notice: effort medium on the small model (35 to 70% more per analysis, no measurable gain), thinking switched off (5% less), prompt caching (the fixed part of the request is small and requests are minutes or hours apart, so it would mostly pay for cache writes) and smaller photos (three cents per 1,000 analyses, at a risk to portion judgement). Run the script again after changing the prompt, the model or the photo size: `ANTHROPIC_API_KEY=... node --experimental-transform-types scripts/ops/eval-food-ai.mjs` (40 requests, about one cent).
+
+The function enforces a daily limit per person (kept against a hash of the email, so deleting and recreating an account does not reset it) and a ceiling across all users, records usage in `ai_usage`, and gives the allowance back when a request fails without being billed.
 
 ### Setting it up with the scripts
 

@@ -1,0 +1,25 @@
+{
+  "about": "Typed meals with the calorie range a careful person would accept (standard reference values, plus or minus about a fifth). Used by eval-food-ai.mjs. expect 'not_food' means the analysis should refuse.",
+  "cases": [
+    { "id": "eggs-toast", "text": "2 scrambled eggs cooked in butter and 1 slice of white toast", "min": 240, "max": 360 },
+    { "id": "rice", "text": "200 g cooked white rice", "min": 220, "max": 300 },
+    { "id": "banana", "text": "1 medium banana", "min": 85, "max": 125 },
+    { "id": "chicken", "text": "150 g grilled chicken breast, no skin", "min": 210, "max": 290 },
+    { "id": "olive-oil", "text": "1 tablespoon of olive oil", "min": 105, "max": 135 },
+    { "id": "big-mac", "text": "a Big Mac", "min": 500, "max": 650 },
+    { "id": "milk", "text": "250 ml whole milk", "min": 135, "max": 180 },
+    { "id": "hummus-pita", "text": "100 g hummus with one pita bread", "min": 300, "max": 480 },
+    { "id": "oatmeal", "text": "50 g rolled oats cooked in water with 1 tablespoon of honey", "min": 220, "max": 300 },
+    { "id": "pizza-slices", "text": "2 slices of pepperoni pizza", "min": 480, "max": 720 },
+    { "id": "apple-almonds", "text": "1 medium apple and 30 g almonds", "min": 230, "max": 310 },
+    { "id": "cola", "text": "a 330 ml can of regular cola", "min": 125, "max": 155 },
+    { "id": "falafel", "text": "falafel in pita with tahini and salad", "min": 450, "max": 900 },
+    { "id": "hebrew", "text": "שתי ביצים קשות וסלט ירקות קטן בלי שמן", "min": 160, "max": 260 },
+    { "id": "steak-potato", "text": "200 g grilled sirloin steak with a medium baked potato and a teaspoon of butter", "min": 520, "max": 760 },
+    { "id": "salmon", "text": "150 g baked salmon with 150 g steamed broccoli", "min": 300, "max": 420 },
+    { "id": "latte", "text": "a large latte with whole milk (400 ml)", "min": 160, "max": 280 },
+    { "id": "sandwich", "text": "a sandwich", "min": 200, "max": 650 },
+    { "id": "yogurt-granola", "text": "200 g plain Greek yogurt 2% with 40 g granola", "min": 270, "max": 390 },
+    { "id": "not-food", "text": "my car keys and a wallet", "expect": "not_food" }
+  ]
+}
