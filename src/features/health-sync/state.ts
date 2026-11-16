@@ -5,6 +5,8 @@
  * so the switch does too. It is kept in on-device storage under its own key
  * (store.ts) and never leaves the device.
  */
+import type { ActivityEntry } from '@/types';
+
 import type { Handled, OriginSeen, ReviewItem } from './plan';
 import { NO_STEPS, type FileSteps, type StepDays, type StepsMemory } from './steps';
 import type { HealthAccess, HealthAvailability, HealthErrorCode } from './types';
@@ -147,6 +149,43 @@ export function pruneHandled(handled: Record<string, Handled>, now: number): Rec
     if (!Number.isFinite(at) || at >= cutoff) out[id] = h;
   }
   return out;
+}
+
+/**
+ * The workouts from a health store that the diary holds, live or as a deletion
+ * marker, and that this phone does not remember yet: what is to be remembered
+ * as 'saved' once the diary is confirmed on the device (engine.ts,
+ * `rememberSaved`). This is how a workout is first remembered after a sync adds
+ * it, and how the memory heals when the two were not written together (the app
+ * was closed between the diary reaching the device and the memory): a workout
+ * the person deletes later then stays deleted after its marker is cleared from
+ * the phone. Left out: workouts still waiting in "Needs a look" (`waiting`),
+ * records from elsewhere (hand-logged, a Garmin file), and those older than
+ * the memory keeps (pruneHandled would drop them again at once).
+ */
+export function unremembered(
+  handled: Record<string, Handled>,
+  existing: readonly Pick<ActivityEntry, 'id' | 'source' | 'startedAt'>[],
+  now: number,
+  waiting: ReadonlySet<string> = new Set(),
+): Record<string, Handled> {
+  const cutoff = now - HANDLED_DAYS * DAY_MS;
+  const out: Record<string, Handled> = {};
+  for (const e of existing) {
+    if (e.source !== 'health' || !e.startedAt || handled[e.id] || waiting.has(e.id)) continue;
+    const at = Date.parse(e.startedAt);
+    if (Number.isFinite(at) && at >= cutoff) out[e.id] = { how: 'saved', at: e.startedAt };
+  }
+  return out;
+}
+
+/**
+ * `handled` with these marks added where it has none: what the person said
+ * since (a skip, an Undo) always wins. The same object when nothing is added.
+ */
+export function rememberMarks(handled: Record<string, Handled>, marks: Record<string, Handled>): Record<string, Handled> {
+  const add = Object.entries(marks).filter(([id]) => !handled[id]);
+  return add.length ? { ...handled, ...Object.fromEntries(add) } : handled;
 }
 
 const workouts = (n: number) => `${n} ${n === 1 ? 'workout' : 'workouts'}`;

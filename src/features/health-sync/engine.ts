@@ -8,6 +8,12 @@
  * and say what was added in one message with an Undo. A run that fails changes
  * nothing in the diary and leaves a note for the sync screen; it never shows
  * anything by itself.
+ *
+ * What was added is remembered (`handled`) only once the diary is confirmed on
+ * the device (`rememberSaved`): the diary and this memory are saved apart, and
+ * a memory that ran ahead of the diary would turn a workout lost to a closed
+ * app into one "the person deleted", never added again. Until then the sync
+ * is saving (`onSaving`), which the updater waits for as it waits for a run.
  */
 import { ACTIVITY_BY_ID } from '@/data/activities';
 import type { ImportedEntry } from '@/features/import/convert';
@@ -17,7 +23,7 @@ import type { ActivityEntry } from '@/types';
 
 import { recordIdFor, workoutSpan, type HealthContext, type HealthEntry } from './convert';
 import { choiceKey, planSync, workoutKey, type Handled, type ReviewItem, type SyncPlan } from './plan';
-import { pruneHandled, readRange, RECHECK_DAYS, shouldAutoSync, syncMessage, type HealthSyncState, type SyncError, type SyncErrorCode } from './state';
+import { pruneHandled, readRange, RECHECK_DAYS, rememberMarks, shouldAutoSync, syncMessage, unremembered, type HealthSyncState, type SyncError, type SyncErrorCode } from './state';
 import { localClock, mergeStepDays, NO_STEPS, pruneStepDays, stepDaysFromTotals, stepsReadRange, type StepClock, type StepsMemory } from './steps';
 import { HealthError, storeName, type HealthAccess, type HealthAdapter, type HealthWorkout, type StepDayTotal } from './types';
 
@@ -42,6 +48,12 @@ export interface Diary {
   save(entries: (HealthEntry | ActivityEntry)[]): void;
   /** Soft delete. */
   remove(id: string): void;
+  /**
+   * Write what the diary holds to the device now. True once it is there; false
+   * when the save failed or cannot be confirmed. A workout is remembered as
+   * saved only after this said true (`rememberSaved`).
+   */
+  flush(): Promise<boolean>;
 }
 
 export interface SyncDeps {
@@ -51,8 +63,17 @@ export interface SyncDeps {
   diary: Diary;
   /** One confirmation with an Undo. */
   announce(message: string, undo: () => void): void;
-  /** Called when a run starts and ends, for the screen's "Syncing". */
+  /**
+   * Called when a run starts and when it is done, for the screen's "Syncing"
+   * and for the updater, which restarts only at rest.
+   */
   onBusy?(busy: boolean): void;
+  /**
+   * Called when the sync starts waiting for what it saved to be confirmed on
+   * the device (`rememberSaved`) and when it is done waiting. The screen shows
+   * nothing for it; the updater waits for it as it waits for a run.
+   */
+  onSaving?(saving: boolean): void;
   /** How long the health store may take to answer. Default 45 s. */
   timeoutMs?: number;
   /** Which calendar day an instant is in, for steps. Default: the phone's own zone. */
@@ -60,6 +81,8 @@ export interface SyncDeps {
 }
 
 const DAY_MS = 86_400_000;
+/** How long the diary's save may take to be confirmed (less than the health store's limit: nothing waits on it but the memory). */
+const FLUSH_LIMIT_MS = 10_000;
 
 function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -89,7 +112,23 @@ export function createHealthSync(deps: SyncDeps) {
   const clock = deps.stepClock ?? localClock;
   // Asked each time: a development build can swap the adapter after this is made.
   const storeLabel = () => storeName(adapter.store);
+  const flushLimit = Math.min(timeout, FLUSH_LIMIT_MS);
   let running: Promise<SyncOutcome> | null = null;
+  /** Runs reading and saving now (busy), and saves waiting to be confirmed on the device (saving). */
+  let runs = 0;
+  let confirming = 0;
+  let shownBusy = false;
+  let shownSaving = false;
+  const showBusy = () => {
+    if (runs > 0 !== shownBusy) {
+      shownBusy = runs > 0;
+      deps.onBusy?.(shownBusy);
+    }
+    if (confirming > 0 !== shownSaving) {
+      shownSaving = confirming > 0;
+      deps.onSaving?.(shownSaving);
+    }
+  };
 
   const startOf = (w: HealthWorkout) => workoutSpan(w)?.startUtc ?? w.startTime;
   const mark = (handled: Record<string, Handled>, id: string, how: Handled['how'], at: string) => ({ ...handled, [id]: { how, at } });
@@ -105,17 +144,55 @@ export function createHealthSync(deps: SyncDeps) {
     return { status: 'failed', error };
   }
 
-  /** Save what the plan adds by itself, remember it, and say so once. Returns how many were added and updated. */
-  function apply(plan: SyncPlan, more: Partial<HealthSyncState> = {}): { added: number; updated: number } {
+  /**
+   * Remember as 'saved' the synced workouts the diary holds (live or deleted)
+   * that this phone does not remember yet, but only once the diary has really
+   * been written to the device. The diary's store saves a moment after a change
+   * and this memory is saved under its own key: marking first would leave a
+   * workout remembered as saved that the device never got if the app was closed
+   * in between, and the next sync would take it for one the person deleted and
+   * never bring it back. When the save cannot be confirmed nothing is marked;
+   * the next sync tries again (and heals a memory that missed a workout the
+   * other way round). A skip or Undo made while waiting is kept (rememberMarks).
+   */
+  async function rememberSaved(): Promise<boolean> {
     const s = state.get();
+    const marks = unremembered(s.handled, diary.all(), deps.now(), new Set(s.review.map((r) => r.id)));
+    if (!Object.keys(marks).length) return true;
+    confirming += 1;
+    showBusy();
+    try {
+      // A flush that throws, rejects or never answers is a save that was not confirmed.
+      let flushing: Promise<boolean>;
+      try {
+        flushing = diary.flush();
+      } catch {
+        flushing = Promise.resolve(false);
+      }
+      const saved = await withTimeout(flushing, flushLimit).catch(() => false);
+      if (!saved) return false;
+      // Only what is still there and not waiting again (an Undo put it back in "Needs a look", or the data was erased).
+      const latest = state.get();
+      const present = new Set(diary.all().map((e) => e.id));
+      const waiting = new Set(latest.review.map((r) => r.id));
+      const keep = Object.fromEntries(Object.entries(marks).filter(([id]) => present.has(id) && !waiting.has(id)));
+      const handled = rememberMarks(latest.handled, keep);
+      if (handled !== latest.handled) state.set({ handled });
+      return true;
+    } finally {
+      confirming -= 1;
+      showBusy();
+    }
+  }
+
+  /** Save what the plan adds by itself and say so once (rememberSaved remembers it once it is on the device). Returns how many were added and updated. */
+  function apply(plan: SyncPlan, more: Partial<HealthSyncState> = {}): { added: number; updated: number } {
     const saves = [...plan.add, ...plan.update, ...plan.replace];
     if (saves.length) diary.save(saves.map((p) => p.entry));
     for (const r of plan.replace) diary.remove(r.remove.id);
-    let handled = s.handled;
-    for (const p of [...plan.add, ...plan.replace]) handled = mark(handled, p.entry.id, 'saved', p.entry.startedAt);
     const added = plan.add.length;
     const updated = plan.update.length + plan.replace.length;
-    state.set({ ...more, handled });
+    state.set(more);
     if (added + updated > 0) {
       deps.announce(syncMessage(added, updated, saves.map((p) => p.from), storeLabel()), () => {
         // Take out exactly what was added, and put changed workouts back as they were.
@@ -126,6 +203,9 @@ export function createHealthSync(deps: SyncDeps) {
         let h = state.get().handled;
         for (const u of plan.update) h = mark(h, recordIdFor(u.entry.startedAt), 'skipped', u.entry.startedAt);
         for (const r of plan.replace) h = mark(h, r.entry.id, 'skipped', r.entry.startedAt);
+        // What was added and taken out again is remembered at once, so it stays out even if the app is closed
+        // before the diary is saved (the person asked for it out, so this can never hide one they want).
+        h = rememberMarks(h, Object.fromEntries(plan.add.map((p) => [p.entry.id, { how: 'saved' as const, at: p.entry.startedAt }])));
         state.set({ handled: h });
       });
     }
@@ -139,14 +219,29 @@ export function createHealthSync(deps: SyncDeps) {
     return next.map((r) => (picked[workoutKey(r.workout)] && !r.picked ? { ...r, picked: picked[workoutKey(r.workout)] } : r));
   };
 
-  async function run(trigger: SyncTrigger): Promise<SyncOutcome> {
+  /** `done` is called once the reading and saving is over, before the wait for the device (the screen's "Syncing" ends there). */
+  async function run(trigger: SyncTrigger, done: () => void): Promise<SyncOutcome> {
     const now = deps.now();
     const s = state.get();
     if (!s.enabled) return { status: 'skipped', why: 'off' };
-    if (trigger === 'auto' && !shouldAutoSync(s, now)) return { status: 'skipped', why: 'too-soon' };
+    if (trigger === 'auto' && !shouldAutoSync(s, now)) {
+      // Not a run, but the memory still heals (a reopen soon after a closed app is too soon), before the person can delete
+      // the workout. Not waited for, so a "Sync now" pressed meanwhile is a run of its own, not this skip.
+      void rememberSaved();
+      return { status: 'skipped', why: 'too-soon' };
+    }
     if (!diary.context()) return { status: 'skipped', why: 'no-profile' };
     state.set({ lastAttemptAt: new Date(now).toISOString() });
+    const outcome = await readAndApply(trigger, now, s);
+    // Within the run, so a second trigger shares it (or is skipped) until what it saved is on the device.
+    // After a failed read too: the memory heals whether or not the health store answered.
+    const saving = rememberSaved();
+    done();
+    await saving;
+    return outcome;
+  }
 
+  async function readAndApply(trigger: SyncTrigger, now: number, s: HealthSyncState): Promise<SyncOutcome> {
     let access: HealthAccess;
     let read: HealthWorkout[];
     let steps: StepsMemory | null = null;
@@ -233,8 +328,16 @@ export function createHealthSync(deps: SyncDeps) {
   /** Run a sync. Two triggers at once share one run. */
   function sync(trigger: SyncTrigger): Promise<SyncOutcome> {
     if (running) return trigger === 'manual' ? running : Promise.resolve({ status: 'skipped', why: 'busy' });
-    deps.onBusy?.(true);
-    running = run(trigger)
+    runs += 1;
+    showBusy();
+    let working = true;
+    const done = () => {
+      if (!working) return;
+      working = false;
+      runs -= 1;
+      showBusy();
+    };
+    running = run(trigger, done)
       .catch((e): SyncOutcome => {
         const error = asSyncError(e, deps.now());
         state.set({ lastError: error });
@@ -242,7 +345,7 @@ export function createHealthSync(deps: SyncDeps) {
       })
       .finally(() => {
         running = null;
-        deps.onBusy?.(false);
+        done();
       });
     return running;
   }
@@ -289,7 +392,8 @@ export function createHealthSync(deps: SyncDeps) {
     const entry = item.entry;
     const before = diary.all().find((e) => e.id === entry.id);
     diary.save([entry]);
-    state.set({ review: without(id), handled: mark(state.get().handled, id, 'saved', entry.startedAt) });
+    state.set({ review: without(id) });
+    void rememberSaved();
     deps.announce(`${entry.name} added from ${item.from}`, () => {
       if (before) {
         diary.save([before]);
@@ -320,7 +424,8 @@ export function createHealthSync(deps: SyncDeps) {
     const before = diary.all().find((e) => e.id === save.id);
     diary.save([save]);
     diary.remove(match.id);
-    state.set({ review: without(id), handled: mark(state.get().handled, id, 'saved', save.startedAt) });
+    state.set({ review: without(id) });
+    void rememberSaved();
     deps.announce(byHand ? `Replaced your hand-logged ${match.name.toLowerCase()}` : `Replaced the ${match.name.toLowerCase()} you had`, () => {
       diary.save([match]);
       if (before) {
@@ -347,6 +452,7 @@ export function createHealthSync(deps: SyncDeps) {
     const review = s.review.map((r) => (r.id === id ? { ...r, picked: activityId } : r));
     const plan = planSync({ workouts: review.map((r) => r.workout), existing: diary.all(), ctx, handled: s.handled, choices, picks: picksOf(review) });
     apply(plan, { choices, review: carryPicks(plan.review, review) });
+    void rememberSaved();
     return true;
   }
 

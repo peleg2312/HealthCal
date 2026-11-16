@@ -4,13 +4,16 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import type { ActivityEntry } from '@/types';
+
 import { createHealthSync, type SyncDeps } from './engine';
 import { createFakeAdapter, FULL_ACCESS, type FakeHealth } from './fake';
+import type { HealthSyncState } from './state';
 import { CTX, GARMIN, handLogged, memoryDiary, memoryState, restingKcal, SAMSUNG, totalFromActive, TYPE, workout, type MemoryDiary } from './testing';
+import { HealthError, NO_ACCESS, type HealthWorkout } from './types';
 
 /** The net figure of the morning run (552 kcal in total over 45 min). */
 const RUN_NET = expect.closeTo(552 - restingKcal(45), 0);
-import { HealthError, NO_ACCESS, type HealthWorkout } from './types';
 
 const NOON = Date.parse('2026-11-14T12:00:00Z');
 const MIN = 60_000;
@@ -434,5 +437,428 @@ describe('health sync', () => {
     r.toasts[0].undo();
     expect(r.diary.live()).toEqual([]);
     expect(CTX.weightKg).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * The diary (the app's store, saved a moment after a change) and the sync's
+ * memory (saved under its own key) reach the device apart. A phone here is a
+ * sync whose memory is on the device the moment it is written (the worst case)
+ * and whose diary is on the device only once a flush got through
+ * (`diary.disk`); `restart` is the app closed and opened again from what the
+ * device holds.
+ */
+describe('the diary and the sync memory reach the device apart', () => {
+  const tz = process.env.TZ;
+  beforeEach(() => {
+    process.env.TZ = 'Europe/Amsterdam';
+  });
+  afterEach(() => {
+    process.env.TZ = tz;
+  });
+
+  interface Phone extends Rig {
+    busy: boolean[];
+    saving: boolean[];
+  }
+
+  function phone(o: { workouts?: HealthWorkout[]; existing?: ActivityEntry[]; state?: Partial<HealthSyncState>; now?: number } = {}): Phone {
+    const { adapter, health } = createFakeAdapter({ access: FULL_ACCESS, workouts: o.workouts ?? [] });
+    const diary = memoryDiary(o.existing ?? []);
+    const state = memoryState({ enabled: true, ...o.state });
+    const toasts: Rig['toasts'] = [];
+    const busy: boolean[] = [];
+    const saving: boolean[] = [];
+    const clock = { now: o.now ?? NOON };
+    const sync = createHealthSync({
+      adapter,
+      now: () => clock.now,
+      state,
+      diary,
+      announce: (message, undo) => toasts.push({ message, undo }),
+      onBusy: (b) => busy.push(b),
+      onSaving: (b) => saving.push(b),
+    });
+    return { sync, health, diary, state, toasts, clock, busy, saving };
+  }
+
+  /** The app is closed now and opened again later: only what reached the device is there. */
+  const restart = (p: Phone, later = 16 * MIN) => phone({ workouts: p.health.workouts, existing: [...p.diary.disk.values()], state: p.state.get(), now: p.clock.now + later });
+
+  /** Let every promise that can move, move. */
+  const settle = async () => {
+    for (let i = 0; i < 10; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+  };
+
+  const hand = () => handLogged('running', 45, '2026-11-13', '2026-11-13T09:00:00');
+
+  describe('closed after the memory is written and before the diary is: the workout is not lost', () => {
+    it('a sync that adds workouts', async () => {
+      const p = phone({ workouts: [morningRun(), eveningRide()] });
+      p.diary.flushMode = 'hold';
+      void p.sync.sync('auto');
+      await settle();
+      // The person sees the same as ever: one message with Undo, the workouts in the diary.
+      expect(p.toasts.map((t) => t.message)).toEqual(['2 workouts added from Garmin Connect']);
+      expect(p.diary.live()).toHaveLength(2);
+      // Not remembered before the diary is on the device.
+      expect(p.diary.held()).toBe(1);
+      expect(p.state.get().handled).toEqual({});
+
+      const q = restart(p);
+      expect(q.diary.all()).toEqual([]);
+      expect(await q.sync.sync('auto')).toMatchObject({ status: 'done', added: 2 });
+      expect(q.diary.live()).toHaveLength(2);
+      expect(Object.values(q.state.get().handled).map((h) => h.how)).toEqual(['saved', 'saved']);
+    });
+
+    it('"Add" in Needs a look', async () => {
+      const p = phone({ workouts: [morningRun()], existing: [hand()] });
+      await p.sync.sync('auto');
+      const id = p.state.get().review[0].id;
+      p.diary.flushMode = 'hold';
+      expect(p.sync.addItem(id)).toBe(true);
+      await settle();
+      expect(p.diary.live()).toHaveLength(2);
+      expect(p.state.get().handled[id]).toBeUndefined();
+
+      const q = restart(p);
+      expect(await q.sync.sync('auto')).toMatchObject({ status: 'done', review: 1 });
+      expect(q.state.get().review.map((r) => r.id)).toEqual([id]);
+    });
+
+    it('"Replace" in Needs a look', async () => {
+      const mine = hand();
+      const p = phone({ workouts: [morningRun()], existing: [mine] });
+      await p.sync.sync('auto');
+      const id = p.state.get().review[0].id;
+      p.diary.flushMode = 'hold';
+      expect(p.sync.replaceItem(id)).toBe(true);
+      await settle();
+      expect(p.state.get().handled[id]).toBeUndefined();
+
+      const q = restart(p);
+      expect(q.diary.live()).toEqual([expect.objectContaining({ id: mine.id })]);
+      expect(await q.sync.sync('auto')).toMatchObject({ status: 'done', review: 1 });
+      expect(q.state.get().review.map((r) => r.id)).toEqual([id]);
+    });
+
+    it('choosing the activity of a waiting workout', async () => {
+      const p = phone({ workouts: [workout({ start: '2026-11-12T16:00:00Z', minutes: 60, exerciseType: TYPE.paddling })] });
+      await p.sync.sync('auto');
+      const id = p.state.get().review[0].id;
+      p.diary.flushMode = 'hold';
+      p.sync.chooseActivity(id, 'kayaking');
+      await settle();
+      expect(p.state.get().handled[id]).toBeUndefined();
+
+      const q = restart(p);
+      // The choice was remembered, so the next sync adds it by itself.
+      expect(await q.sync.sync('auto')).toMatchObject({ status: 'done', added: 1 });
+      expect(q.diary.live().map((e) => e.activityId)).toEqual(['kayaking']);
+    });
+  });
+
+  describe('the diary reached the device and the memory did not: it heals at the next sync', () => {
+    it('closed while the save was being confirmed', async () => {
+      const p = phone({ workouts: [morningRun()] });
+      p.diary.flushMode = 'hold';
+      void p.sync.sync('auto');
+      await settle();
+      p.diary.write();
+      const q = restart(p);
+      const id = q.diary.live()[0].id;
+      expect(q.state.get().handled).toEqual({});
+
+      expect(await q.sync.sync('auto')).toMatchObject({ added: 0 });
+      expect(q.state.get().handled[id]).toMatchObject({ how: 'saved' });
+      q.diary.remove(id);
+      q.diary.purge(id);
+      q.clock.now += 26 * 60 * MIN;
+      expect(await q.sync.sync('auto')).toMatchObject({ added: 0, review: 0 });
+      expect(q.diary.all()).toEqual([]);
+    });
+
+    it('deleted before the next sync, and the deletion marker cleared after it: it stays deleted', async () => {
+      const first = phone({ workouts: [morningRun()] });
+      await first.sync.sync('auto');
+      const saved = first.diary.live()[0];
+      // The half state: the workout on the device, the memory without it.
+      const p = phone({ workouts: first.health.workouts, existing: [saved], now: NOON + 16 * MIN });
+      p.diary.remove(saved.id);
+      expect(await p.sync.sync('auto')).toMatchObject({ added: 0 });
+      expect(p.state.get().handled[saved.id]).toMatchObject({ how: 'saved' });
+
+      p.diary.purge(saved.id);
+      p.clock.now += 26 * 60 * MIN;
+      expect(await p.sync.sync('auto')).toMatchObject({ added: 0, review: 0 });
+      expect(p.diary.all()).toEqual([]);
+    });
+
+    it('reopened within 15 minutes (a too-soon sync), deleted, and the marker cleared a day later: it stays deleted', async () => {
+      const p = phone({ workouts: [morningRun()] });
+      p.diary.flushMode = 'hold';
+      void p.sync.sync('auto');
+      await settle();
+      p.diary.write();
+      const q = restart(p, 5 * MIN);
+      const id = q.diary.live()[0].id;
+      expect(await q.sync.sync('auto')).toEqual({ status: 'skipped', why: 'too-soon' });
+      await settle();
+      expect(q.health.calls.reads).toBe(0);
+      expect(q.state.get().handled[id]).toMatchObject({ how: 'saved' });
+      q.diary.remove(id);
+      q.diary.purge(id);
+      q.clock.now += 25 * 60 * MIN;
+      expect(await q.sync.sync('auto')).toMatchObject({ status: 'done', added: 0, review: 0 });
+      expect(q.diary.all()).toEqual([]);
+    });
+
+    it('a "Sync now" pressed while a too-soon sync heals is a run of its own', async () => {
+      const p = phone({ workouts: [morningRun()] });
+      p.diary.flushMode = 'hold';
+      void p.sync.sync('auto');
+      await settle();
+      p.diary.write();
+      const q = restart(p, 5 * MIN);
+      q.diary.flushMode = 'hold';
+      expect(await q.sync.sync('auto')).toEqual({ status: 'skipped', why: 'too-soon' });
+      const manual = q.sync.sync('manual');
+      await settle();
+      q.diary.release(true);
+      expect(await manual).toMatchObject({ status: 'done', added: 0 });
+      expect(q.health.calls.reads).toBe(1);
+    });
+
+    for (const action of ['Add', 'Replace', 'choosing the activity'] as const) {
+      it(`after "${action}" in Needs a look: the next sync remembers it, and a delete stays a delete`, async () => {
+        const paddle = workout({ start: '2026-11-12T16:00:00Z', minutes: 60, exerciseType: TYPE.paddling });
+        const p = phone(action === 'choosing the activity' ? { workouts: [paddle] } : { workouts: [morningRun()], existing: [hand()] });
+        await p.sync.sync('auto');
+        const id = p.state.get().review[0].id;
+        const memoryBefore = p.state.get();
+        p.diary.flushMode = 'hold';
+        if (action === 'Add') p.sync.addItem(id);
+        else if (action === 'Replace') p.sync.replaceItem(id);
+        else p.sync.chooseActivity(id, 'kayaking');
+        await settle();
+        // The diary reached the device; the memory still holds the item as waiting.
+        p.diary.write();
+        const q = phone({ workouts: p.health.workouts, existing: [...p.diary.disk.values()], state: memoryBefore, now: p.clock.now + 16 * MIN });
+        expect(await q.sync.sync('auto')).toMatchObject({ status: 'done', added: 0, review: 0 });
+        expect(q.state.get().handled[id]).toMatchObject({ how: 'saved' });
+        q.diary.remove(id);
+        q.diary.purge(id);
+        q.clock.now += 25 * 60 * MIN;
+        expect(await q.sync.sync('auto')).toMatchObject({ added: 0, review: 0 });
+        expect(q.diary.records.has(id)).toBe(false);
+      });
+    }
+
+    it('a failed read heals the memory too', async () => {
+      const first = phone({ workouts: [morningRun()] });
+      await first.sync.sync('auto');
+      const saved = first.diary.live()[0];
+      const p = phone({ workouts: first.health.workouts, existing: [saved] });
+      p.health.availability = 'update-required';
+      expect(await p.sync.sync('auto')).toMatchObject({ status: 'failed' });
+      expect(p.state.get().handled[saved.id]).toMatchObject({ how: 'saved' });
+    });
+  });
+
+  describe('a save that fails', () => {
+    it('is not remembered; the person sees the same; the next sync with a working save remembers it', async () => {
+      const p = phone({ workouts: [morningRun()] });
+      p.diary.flushMode = 'fail';
+      expect(await p.sync.sync('auto')).toEqual({ status: 'done', added: 1, updated: 0, review: 0 });
+      expect(p.toasts).toHaveLength(1);
+      expect(p.diary.live()).toHaveLength(1);
+      expect(p.state.get().handled).toEqual({});
+      expect(p.state.get().lastError).toBeNull();
+
+      p.diary.flushMode = 'ok';
+      p.clock.now += 16 * MIN;
+      expect(await p.sync.sync('auto')).toMatchObject({ added: 0 });
+      expect(Object.keys(p.state.get().handled)).toEqual([p.diary.live()[0].id]);
+    });
+
+    it('closed after a failed save: the next start adds the workout again', async () => {
+      const p = phone({ workouts: [morningRun()] });
+      p.diary.flushMode = 'fail';
+      await p.sync.sync('auto');
+      const q = restart(p);
+      expect(await q.sync.sync('auto')).toMatchObject({ added: 1 });
+    });
+
+    it('Undo after a failed save still keeps the workouts out', async () => {
+      const p = phone({ workouts: [morningRun()] });
+      p.diary.flushMode = 'fail';
+      await p.sync.sync('auto');
+      p.toasts[0].undo();
+      expect(p.diary.live()).toEqual([]);
+      p.diary.flushMode = 'ok';
+      p.clock.now += 16 * MIN;
+      expect(await p.sync.sync('auto')).toMatchObject({ added: 0 });
+      expect(p.diary.live()).toEqual([]);
+    });
+
+    it('a save that never answers is given up on, and the sync comes to rest', async () => {
+      const { adapter } = createFakeAdapter({ access: FULL_ACCESS, workouts: [morningRun()] });
+      const diary = memoryDiary();
+      diary.flushMode = 'hold';
+      const state = memoryState({ enabled: true });
+      const sync = createHealthSync({ adapter, now: () => NOON, state, diary, announce: () => {}, timeoutMs: 20 });
+      expect(await sync.sync('auto')).toMatchObject({ status: 'done', added: 1 });
+      expect(state.get().handled).toEqual({});
+    });
+  });
+
+  describe('Undo before the save is confirmed', () => {
+    it('takes the workouts out, and they stay out', async () => {
+      const p = phone({ workouts: [morningRun(), eveningRide()] });
+      p.diary.flushMode = 'hold';
+      const run = p.sync.sync('auto');
+      await settle();
+      p.toasts[0].undo();
+      expect(p.diary.live()).toEqual([]);
+      // Remembered at once: the person asked for them out.
+      expect(Object.values(p.state.get().handled).map((h) => h.how)).toEqual(['saved', 'saved']);
+      p.diary.release(true);
+      expect(await run).toMatchObject({ added: 2 });
+      expect(Object.values(p.state.get().handled).map((h) => h.how)).toEqual(['saved', 'saved']);
+      p.clock.now += 16 * MIN;
+      p.diary.flushMode = 'ok';
+      expect(await p.sync.sync('auto')).toMatchObject({ added: 0 });
+      expect(p.diary.live()).toEqual([]);
+    });
+
+    it('closed right after the Undo, before the diary was saved: the next start does not add them again', async () => {
+      const p = phone({ workouts: [morningRun(), eveningRide()] });
+      p.diary.flushMode = 'hold';
+      void p.sync.sync('auto');
+      await settle();
+      p.toasts[0].undo();
+      const q = restart(p);
+      expect(q.diary.all()).toEqual([]);
+      expect(await q.sync.sync('auto')).toMatchObject({ status: 'done', added: 0, review: 0 });
+      expect(q.diary.live()).toEqual([]);
+    });
+
+    it("an undone change stays skipped: the confirmation never turns it into 'saved'", async () => {
+      const p = phone({ workouts: [workout({ start: '2026-11-13T06:02:00Z', minutes: 40, origin: SAMSUNG })] });
+      await p.sync.sync('auto');
+      const phoneId = p.diary.live()[0].id;
+      p.health.workouts.push(morningRun());
+      p.clock.now += 16 * MIN;
+      p.diary.flushMode = 'hold';
+      const run = p.sync.sync('auto');
+      await settle();
+      expect(p.toasts[1].message).toBe('1 workout updated from Garmin Connect');
+      const watchId = p.diary.live()[0].id;
+      expect(watchId).not.toBe(phoneId);
+      p.toasts[1].undo();
+      p.diary.release(true);
+      await run;
+      expect(p.state.get().handled[watchId]).toMatchObject({ how: 'skipped' });
+      expect(p.diary.live()).toMatchObject([{ id: phoneId }]);
+      p.diary.flushMode = 'ok';
+      p.clock.now += 16 * MIN;
+      await p.sync.sync('auto');
+      expect(p.diary.live()).toMatchObject([{ id: phoneId }]);
+    });
+
+    it('"Add" undone before the save is confirmed waits in the list again, not remembered', async () => {
+      const p = phone({ workouts: [morningRun()], existing: [hand()] });
+      await p.sync.sync('auto');
+      const id = p.state.get().review[0].id;
+      p.diary.flushMode = 'hold';
+      p.sync.addItem(id);
+      p.toasts[0].undo();
+      p.diary.release(true);
+      await settle();
+      expect(p.state.get().review.map((r) => r.id)).toEqual([id]);
+      expect(p.state.get().handled[id]).toBeUndefined();
+    });
+  });
+
+  describe('a sync waiting for its save is busy', () => {
+    it('a second trigger meanwhile shares it or is skipped, and the sync is at rest only once the save is confirmed', async () => {
+      const p = phone({ workouts: [morningRun()] });
+      p.diary.flushMode = 'hold';
+      const first = p.sync.sync('auto');
+      await settle();
+      // The screen's "Syncing" ends when the reading and saving is done; the wait for the device is 'saving' (the updater waits for both).
+      expect(p.busy).toEqual([true, false]);
+      expect(p.saving).toEqual([true]);
+      p.clock.now += 16 * MIN;
+      expect(await p.sync.sync('auto')).toEqual({ status: 'skipped', why: 'busy' });
+      const manual = p.sync.sync('manual');
+      expect(p.health.calls.reads).toBe(1);
+      p.diary.release(true);
+      const [a, b] = await Promise.all([first, manual]);
+      expect(a).toEqual(b);
+      expect(a).toMatchObject({ status: 'done', added: 1 });
+      expect(p.busy).toEqual([true, false]);
+      expect(p.saving).toEqual([true, false]);
+      expect(p.diary.live()).toHaveLength(1);
+    });
+
+    it('"Add" is saving until what it saved is confirmed, and the screen shows no sync for it', async () => {
+      const p = phone({ workouts: [morningRun()], existing: [hand()] });
+      await p.sync.sync('auto');
+      expect(p.busy).toEqual([true, false]);
+      p.diary.flushMode = 'hold';
+      p.sync.addItem(p.state.get().review[0].id);
+      expect(p.saving).toEqual([true]);
+      p.diary.release(true);
+      await settle();
+      expect(p.saving).toEqual([true, false]);
+      expect(p.busy).toEqual([true, false]);
+    });
+
+    it('two syncs: one waiting for its save, the next one ("Sync now" after it) adds nothing twice', async () => {
+      const p = phone({ workouts: [morningRun()] });
+      p.diary.flushMode = 'hold';
+      const first = p.sync.sync('auto');
+      await settle();
+      p.diary.release(true);
+      await first;
+      p.diary.flushMode = 'hold';
+      p.health.workouts.push(eveningRide());
+      const second = p.sync.sync('manual');
+      await settle();
+      expect(p.diary.live()).toHaveLength(2);
+      // The second run's heal confirms only what is still to be remembered; the first workout is already.
+      p.diary.release(true);
+      expect(await second).toMatchObject({ status: 'done', added: 1 });
+      expect(Object.values(p.state.get().handled).map((h) => h.how)).toEqual(['saved', 'saved']);
+      expect(p.saving.at(-1)).toBe(false);
+    });
+
+    it('a flush that throws at once is a save not confirmed: nothing escapes and nothing is marked', async () => {
+      const p = phone({ workouts: [morningRun()], existing: [hand()] });
+      await p.sync.sync('auto');
+      const id = p.state.get().review[0].id;
+      p.diary.flush = () => {
+        throw new Error('storage gone');
+      };
+      expect(p.sync.addItem(id)).toBe(true);
+      await settle();
+      expect(p.state.get().handled[id]).toBeUndefined();
+      expect(p.saving).toEqual([true, false]);
+      p.clock.now += 16 * MIN;
+      expect(await p.sync.sync('auto')).toMatchObject({ status: 'done', added: 0 });
+      expect(p.state.get().lastError).toBeNull();
+    });
+
+    it('a run that saves nothing new does not wait for the device', async () => {
+      const p = phone({ workouts: [morningRun()] });
+      await p.sync.sync('auto');
+      const flushes = p.diary.flushes;
+      p.diary.flushMode = 'hold';
+      p.clock.now += 16 * MIN;
+      expect(await p.sync.sync('auto')).toMatchObject({ status: 'done', added: 0 });
+      expect(p.diary.flushes).toBe(flushes);
+    });
   });
 });

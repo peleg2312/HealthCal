@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { AUTO_SYNC_INTERVAL_MS, errorText, INITIAL_STATE, pruneHandled, readRange, restoreState, shouldAutoSync, syncMessage } from './state';
+import { AUTO_SYNC_INTERVAL_MS, errorText, INITIAL_STATE, pruneHandled, readRange, rememberMarks, restoreState, shouldAutoSync, syncMessage, unremembered } from './state';
 
 const NOON = Date.parse('2026-11-14T12:00:00Z');
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -65,5 +65,30 @@ describe('sync state', () => {
     expect(out.choices).toEqual({ 'health-connect:46': 'kayaking' });
     expect(out.review).toHaveLength(1);
     expect('extra' in out).toBe(false);
+  });
+
+  describe('what is to be remembered once the diary is on the device', () => {
+    const rec = (id: string, over: { source?: 'health' | 'garmin'; startedAt?: string; deleted?: boolean } = {}) => ({ id, source: 'health' as const, startedAt: '2026-11-13T06:00:00Z', ...over });
+
+    it('every synced workout the diary holds, live or deleted, that is not remembered yet', () => {
+      const out = unremembered({ kept: { how: 'skipped', at: '2026-11-12T06:00:00Z' } }, [rec('a'), rec('b', { deleted: true }), rec('kept')], NOON);
+      expect(out).toEqual({ a: { how: 'saved', at: '2026-11-13T06:00:00Z' }, b: { how: 'saved', at: '2026-11-13T06:00:00Z' } });
+    });
+
+    it('leaves out hand logs, Garmin files, what waits in "Needs a look" and what the memory no longer keeps', () => {
+      const old = iso(NOON - 46 * 86_400_000);
+      const items = [{ id: 'hand' }, rec('file', { source: 'garmin' }), rec('no-start', { startedAt: undefined }), rec('waiting'), rec('old', { startedAt: old }), rec('bad', { startedAt: 'garbage' })];
+      expect(unremembered({}, items, NOON, new Set(['waiting']))).toEqual({});
+      // What it adds is never dropped again at once by pruneHandled.
+      const edge = unremembered({}, [rec('edge', { startedAt: iso(NOON - 45 * 86_400_000) })], NOON);
+      expect(pruneHandled(edge, NOON)).toEqual(edge);
+    });
+
+    it('a mark never replaces what is remembered already: a skip or an Undo made while the save was waiting wins', () => {
+      const handled = { a: { how: 'skipped' as const, at: 'x' } };
+      expect(rememberMarks(handled, { a: { how: 'saved', at: 'y' } })).toBe(handled);
+      expect(rememberMarks(handled, {})).toBe(handled);
+      expect(rememberMarks(handled, { a: { how: 'saved', at: 'y' }, b: { how: 'saved', at: 'z' } })).toEqual({ a: { how: 'skipped', at: 'x' }, b: { how: 'saved', at: 'z' } });
+    });
   });
 });

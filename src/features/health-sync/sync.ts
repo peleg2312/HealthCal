@@ -11,6 +11,7 @@ import { AppState } from 'react-native';
 
 import { bmr, formulaTdee } from '@/lib/energy';
 import { useStore } from '@/store';
+import { flushPersistence, useHydration } from '@/store/persistence';
 import { toast } from '@/ui';
 
 import { adapter as platformAdapter } from './adapter';
@@ -56,10 +57,19 @@ export const healthSync = createHealthSync({
       useStore.getState().upsertMany('activities', entries);
     },
     remove: (id) => useStore.getState().remove('activities', id),
+    // The same check the updater makes before a restart: saved now, and the save did not fail.
+    // Before the saved data is loaded there is nothing to save to, so nothing is confirmed.
+    flush: async () => {
+      if (useHydration.getState().status !== 'ready') return false;
+      await flushPersistence();
+      return !useHydration.getState().saveFailed;
+    },
   },
   // The level line of the toast takes the exercise colour: these are workouts.
   announce: (message, undo) => toast(message, { label: 'Undo', onPress: undo, tint: 'exercise' }),
   onBusy: (busy) => useHealthSync.setState({ busy }),
+  // Waiting for what a sync saved to be confirmed on the device: the updater waits for it as for a run (updates.ts).
+  onSaving: (saving) => useHealthSync.setState({ saving }),
 });
 
 /** A sync that may be skipped: the switch is off, or the last one was under 15 minutes ago. */

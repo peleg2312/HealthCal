@@ -72,18 +72,35 @@ export const stored = (entry: HealthEntry | ActivityEntry, over: Partial<Activit
 
 export interface MemoryDiary extends Diary {
   records: Map<string, ActivityEntry>;
+  /** What has reached the device: the records as of the last write that got through. A restarted app starts from this. */
+  disk: Map<string, ActivityEntry>;
   /** Live records only. */
   live(): ActivityEntry[];
   /** Drop a soft-deleted record for good, as the store does once its marker is old. */
   purge(id: string): void;
+  /**
+   * How `flush` answers: 'ok' writes and says true at once, 'fail' writes
+   * nothing and says false (storage full), 'hold' waits for `release`.
+   */
+  flushMode: 'ok' | 'fail' | 'hold';
+  /** Flushes waiting for `release` (flushMode 'hold'). */
+  held(): number;
+  /** Answer every waiting flush: write and say true, or write nothing and say false. */
+  release(ok?: boolean): void;
+  /** Copy the records to the device without answering anyone (the write landed, the answer has not come back yet). */
+  write(): void;
+  /** How many times flush was asked. */
+  flushes: number;
 }
 
 export function memoryDiary(initial: ActivityEntry[] = [], profile = true): MemoryDiary {
   const records = new Map(initial.map((e) => [e.id, e]));
   let stamp = 0;
   const next = () => new Date(Date.UTC(2026, 10, 14, 12, 0, (stamp += 1))).toISOString();
-  return {
+  const waiting: ((ok: boolean) => void)[] = [];
+  const diary: MemoryDiary = {
     records,
+    disk: new Map(records),
     all: () => [...records.values()],
     live: () => [...records.values()].filter((e) => !e.deleted),
     context: () => (profile ? CTX : null),
@@ -95,7 +112,27 @@ export function memoryDiary(initial: ActivityEntry[] = [], profile = true): Memo
       if (e) records.set(id, { ...e, deleted: true, updatedAt: next() });
     },
     purge: (id) => void records.delete(id),
+    flushMode: 'ok',
+    flushes: 0,
+    held: () => waiting.length,
+    write: () => {
+      diary.disk = new Map(records);
+    },
+    release: (ok = true) => {
+      for (const answer of waiting.splice(0)) {
+        if (ok) diary.write();
+        answer(ok);
+      }
+    },
+    flush: () => {
+      diary.flushes += 1;
+      if (diary.flushMode === 'hold') return new Promise<boolean>((resolve) => waiting.push(resolve));
+      if (diary.flushMode === 'fail') return Promise.resolve(false);
+      diary.write();
+      return Promise.resolve(true);
+    },
   };
+  return diary;
 }
 
 export function memoryState(initial: Partial<HealthSyncState> = {}) {

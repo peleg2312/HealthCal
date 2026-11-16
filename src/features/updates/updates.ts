@@ -79,7 +79,7 @@ function adopt(port: UpdatesPort): void {
     // A tab is in front when the screen in front is the tab group and setup is done; unknown is not a tab.
     onTab: () => frontIsTab(frontSegment, !!useStore.getState().profile?.onboardedAt),
     sheetOpen: sheetOnScreen,
-    busy: () => useHealthSync.getState().busy || useSyncState.getState().status === 'syncing',
+    busy: () => useHealthSync.getState().busy || useHealthSync.getState().saving || useSyncState.getState().status === 'syncing',
     revision: () => writeMarks(useStore.getState()),
     flush: async () => {
       await flushPersistence();

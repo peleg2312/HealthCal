@@ -16,17 +16,19 @@ export const STORAGE_KEY = 'healthcal-health-sync';
 interface Live {
   /** A sync is running now. Never saved. */
   busy: boolean;
+  /** What a sync saved is waiting to be confirmed on the device (engine.ts, `rememberSaved`). Never saved; not shown. */
+  saving: boolean;
 }
 
 const KEYS = Object.keys(INITIAL_STATE) as (keyof HealthSyncState)[];
 
-/** Only the remembered part, without `busy`. */
+/** Only the remembered part, without `busy` and `saving`. */
 export function remembered(s: HealthSyncState & Partial<Live>): HealthSyncState {
   return Object.fromEntries(KEYS.map((k) => [k, s[k]])) as unknown as HealthSyncState;
 }
 
 export const useHealthSync = create<HealthSyncState & Live>()(
-  persist((): HealthSyncState & Live => ({ ...INITIAL_STATE, busy: false }), {
+  persist((): HealthSyncState & Live => ({ ...INITIAL_STATE, busy: false, saving: false }), {
     name: STORAGE_KEY,
     version: 1,
     storage: createJSONStorage(() => AsyncStorage),
@@ -48,5 +50,6 @@ export function whenLoaded(): Promise<void> {
 
 /** Forget everything, switch included (the phone's data was erased). */
 export function resetHealthSync(): void {
+  // `saving` is left to the engine: a confirmation still waiting ends by itself (and keeps nothing that was erased).
   useHealthSync.setState({ ...INITIAL_STATE, busy: false });
 }
