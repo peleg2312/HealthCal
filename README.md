@@ -116,12 +116,25 @@ The stand-in follows the same rules as the SQL, but it is not Supabase: run thro
 ## Ship it
 
 ```bash
-npx eas-cli build --profile preview --platform android   # installable APK
+npx eas-cli build --profile preview --platform android   # installable APK, built in Expo's cloud
 npx eas-cli build --profile production --platform all    # store builds
 npm run build:web                                        # host dist/ on any static host
 ```
 
 Set a unique bundle identifier and package name in `app.json` before a store build.
+
+### Getting it onto a phone today
+
+The repository is linked to an Expo project (`app.json`: `owner`, `extra.eas.projectId`); the commands below need an Expo access token for that account in `EXPO_TOKEN`.
+
+| Phone | How | Command | Limits |
+|---|---|---|---|
+| Android | An APK installed by hand | `bash scripts/ops/build-android-apk.sh` (builds on this machine, about 40 minutes the first time, 15 after) or the `preview` profile above | Signed with the template's debug key; a Play Store release needs its own key |
+| iPhone, free, no computer | The web app added to the Home Screen from Safari | `node scripts/ops/deploy-web.mjs` publishes it to https://healthcal.expo.app | No reminders and no Health sync; the camera goes through Safari |
+| iPhone, free, with a computer | An unsigned `.ipa` signed with the person's own Apple ID by Sideloadly or AltStore | `npx eas-cli@latest build -p ios --profile ios-unsigned` (`.eas/build/ios-unsigned.yml`) | Must be signed again every 7 days; three such apps per Apple ID |
+| iPhone, TestFlight or the App Store | A signed build | `npx eas-cli@latest build -p ios --profile production` | Needs an Apple Developer account |
+
+`public/` holds what makes the web app installable (the manifest, the icons, the full-screen tags in `index.html`). The backend must allow the published address as a return address for sign-up and reset emails (Supabase: Authentication, URL configuration).
 
 Store listing: the name, subtitle, descriptions, keywords and the owner's checklist are in `docs/store-listing.md`. The eight App Store and Google Play screenshots are in `store/`, and `node scripts/dev/store-frames.cjs` makes them again from the running app (contact sheet: `store/_sheet.png`).
 
