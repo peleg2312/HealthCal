@@ -3,7 +3,7 @@ import { ArrowRight, BellRing, ChevronLeft, CloudUpload } from 'lucide-react-nat
 import React, { useEffect, useRef, useState } from 'react';
 import { BackHandler, Platform, useColorScheme, View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
 
-import { FadeIn, StepProgress, StepSlide } from '@/features/onboarding/components';
+import { FadeIn, focusNextEmptyField, StepProgress, StepSlide } from '@/features/onboarding/components';
 import { deviceUnitsOnce } from '@/features/onboarding/deviceUnits';
 import { buildPlan, convertUnits, draftFromProfile, effectiveBodyFat, stepsFor, toMetric, useOnboardingDraft, validateStep, type StepId } from '@/features/onboarding/model';
 import { PlanReveal } from '@/features/onboarding/PlanReveal';
@@ -171,6 +171,8 @@ function Flow({ onFinished }: { onFinished: () => void }) {
   };
 
   const next = () => {
+    // With a field in hand and another still empty, Continue means "the next field", not "check the step".
+    if (focusNextEmptyField()) return;
     tryNext(Date.now() - movedByItselfAt.current < STRAY_TAP);
   };
 

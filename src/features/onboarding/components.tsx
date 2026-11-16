@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Platform, Text as RNText, TextInput, View, type LayoutChangeEvent, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -7,6 +7,7 @@ import { cup, fonts, motion, useReducedMotion, useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
 import { cssBezier, FadeUp, MiniCup, parseNumber, PressableScale, ProgressBar, Text } from '@/ui';
 
+import { inHand, nextEmptyField } from './fieldChain';
 import { convertUnits, type Draft } from './model';
 
 /**
@@ -343,6 +344,76 @@ function drawnWidth(e: LayoutChangeEvent): number {
 /** The space between the number and its unit. */
 const UNIT_GAP = 6;
 
+/** A mounted text input (what a ref to `TextInput` holds). */
+type InputHandle = React.ComponentRef<typeof TextInput>;
+
+// The step on screen registers its fields here, so the footer's Continue can ask it where to go.
+let activeChain: (() => boolean) | null = null;
+
+/**
+ * Continue was pressed. If a field of this step is in hand and another one is still empty, the
+ * focus goes there (the keyboard stays up) and this returns true; otherwise false, and the step
+ * is checked as usual.
+ */
+export function focusNextEmptyField(): boolean {
+  return activeChain ? activeChain() : false;
+}
+
+/**
+ * The fields of one step in the order they are read, `values` being what each holds now. Spread
+ * `field(i)` on the i-th `BigNumberField`: the keyboard's Next key then moves to the following
+ * field without closing the keyboard, the last field's Done key calls `submit`, and Continue goes
+ * to a field that is still empty before it checks anything (`focusNextEmptyField`). With the
+ * keyboard up a phone shows little more than the field in hand, so without this the next field
+ * can only be reached by closing the keyboard first.
+ */
+export function useFieldChain(values: readonly (number | null)[], submit: () => void) {
+  const inputs = useRef<(InputHandle | null)[]>([]);
+  const empty = useRef<boolean[]>([]);
+  const focus = useRef({ index: -1, on: false, at: 0 });
+  const count = values.length;
+  useEffect(() => {
+    empty.current = values.map((v) => v === null);
+  });
+  useEffect(() => {
+    const ask = () => {
+      if (!inHand(focus.current, Date.now())) return false;
+      const to = nextEmptyField(focus.current.index, empty.current);
+      const input = to === null ? null : inputs.current[to];
+      if (!input) return false;
+      input.focus();
+      return true;
+    };
+    activeChain = ask;
+    return () => {
+      if (activeChain === ask) activeChain = null;
+    };
+  }, []);
+  return (i: number) => {
+    const last = i >= count - 1;
+    return {
+      inputRef: (node: InputHandle | null) => {
+        inputs.current[i] = node;
+      },
+      onFocus: () => {
+        focus.current = { index: i, on: true, at: Date.now() };
+      },
+      onBlur: () => {
+        if (focus.current.index === i) focus.current = { index: i, on: false, at: Date.now() };
+      },
+      returnKeyType: last ? ('done' as const) : ('next' as const),
+      // Next keeps the keyboard up while the focus moves on (blurOnSubmit is what the web build reads).
+      submitBehavior: last ? ('blurAndSubmit' as const) : ('submit' as const),
+      blurOnSubmit: last,
+      onSubmitEditing: () => {
+        const next = last ? null : inputs.current[i + 1];
+        if (next) next.focus();
+        else submit();
+      },
+    };
+  };
+}
+
 /**
  * A number typed big: a cup-shaped field with the value in large Bricolage
  * and its unit small beside it, centred together like a number on Today.
@@ -369,11 +440,14 @@ export function BigNumberField({
   style,
   size = 'lg',
   placeholder,
+  inputRef,
   ...rest
 }: Omit<TextInputProps, 'value' | 'onChange' | 'style'> & {
   label: string;
   value: number | null;
   onChange: (n: number | null) => void;
+  /** The input itself, for a step that moves the focus from field to field (`useFieldChain`). */
+  inputRef?: React.Ref<InputHandle>;
   unit?: string;
   decimals?: number;
   /** Any truthy value draws the error edge; a string is shown under the field. */
@@ -437,6 +511,7 @@ export function BigNumberField({
         {/* The real field, over the whole cup (last, so it is on top): the sizer's centre is
             (cup - unit - gap) / 2, and so is this input's with the unit and the gap as right padding. */}
         <TextInput
+          ref={inputRef}
           testID={testID}
           keyboardType={decimals > 0 ? 'decimal-pad' : 'number-pad'}
           inputMode={decimals > 0 ? 'decimal' : 'numeric'}

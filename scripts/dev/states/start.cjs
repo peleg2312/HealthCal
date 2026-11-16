@@ -43,6 +43,8 @@ const onboarding = [
   { id: 'onb-body-empty-imperial', ...F, taps: about('imperial'), waitFor: 'onb-height-ft', note: 'the same in ft, in and lb' },
   { id: 'onb-body-empty-error', ...F, taps: [...about('imperial'), 'onb-next'], waitFor: 'onb-height-ft', note: 'Continue with nothing typed: the errors sit under fields that are plainly empty' },
   { id: 'onb-target-empty', ...F, taps: activity('metric'), waitFor: 'onb-target-input', note: 'goal weight before anything is typed' },
+  { id: 'onb-body-wide-metric', ...F, taps: [...about('metric'), { type: 'onb-height-cm', text: '178.5' }, { type: 'onb-weight', text: '142.6' }], waitFor: 'onb-height-cm', note: 'height and weight side by side with the longest numbers a person types' },
+  { id: 'onb-body-wide-imperial', ...F, taps: [...about('imperial'), { type: 'onb-height-ft', text: '5' }, { type: 'onb-height-in', text: '10.5' }, { type: 'onb-weight', text: '250.5' }], waitFor: 'onb-height-ft', note: 'three cups in a row with the longest numbers' },
   { id: 'onb-body-error', ...F, taps: [...about('imperial'), { type: 'onb-height-ft', text: '9' }, { type: 'onb-weight', text: '20' }, 'onb-next'], waitFor: 'onb-height-ft', note: 'height and weight out of range, imperial' },
   { id: 'onb-bodyfat-tape', ...F, taps: [...body('imperial'), 'onb-bf-tape', { type: 'onb-neck-input', text: '13' }, { type: 'onb-waist-input', text: '31' }, { type: 'onb-hip-input', text: '39' }], waitFor: 'onb-bf-estimate', note: 'body fat by tape measure, imperial, with the estimate' },
   { id: 'onb-bodyfat-direct-error', ...F, taps: [...body('metric'), 'onb-bf-direct', { type: 'onb-bf-input', text: '80' }, 'onb-next'], waitFor: 'onb-bf-input', note: 'body fat typed out of range' },

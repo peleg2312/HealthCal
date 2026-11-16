@@ -1,6 +1,6 @@
 import { ArrowRight, BellRing, ChevronDown, ChevronUp, CircleHelp, Droplets, Ruler, Scale, Target, TriangleAlert, Utensils } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { Group as SettingsGroup, IconTile, prefers12h, TimeRow } from '@/features/settings/components';
 import { ageFromBirthDate, formatClock } from '@/lib/dates';
@@ -12,7 +12,7 @@ import { cup, useTheme } from '@/theme';
 import type { ActivityLevel, GoalType } from '@/types';
 import { Card, Divider, MiniCup, PressableScale, ProgressBar, Stepper, Text, ToggleRow } from '@/ui';
 
-import { BigNumberField, BigTextField, ChoiceCard, ErrorText, GoalCup, Note, StepTitle, UnitsToggle, WhyWeAsk } from './components';
+import { BigNumberField, BigTextField, ChoiceCard, ErrorText, GoalCup, Note, StepTitle, UnitsToggle, useFieldChain, WhyWeAsk } from './components';
 import { birthDateOf, buildPlan, heightRangeText, rateKgOf, tapeEstimate, toMetric, weightRangeText, type BodyFatMode, type Draft, type Errors } from './model';
 import { looseDate } from './projection';
 import { nudgeExamples, WEIGH_IN_TIME, type NudgeKind, type Routine } from './routine';
@@ -154,6 +154,9 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
   const today = useToday();
   const iso = birthDateOf(draft);
   const age = iso && iso <= today ? ageFromBirthDate(iso, new Date(`${today}T12:00:00`)) : null;
+  // The keyboard's Next key follows the order on screen.
+  const monthFirst = draft.units === 'imperial';
+  const field = useFieldChain(monthFirst ? [draft.dobMonth, draft.dobDay, draft.dobYear] : [draft.dobDay, draft.dobMonth, draft.dobYear], submit);
   const day = (
     <BigNumberField
       key="d"
@@ -166,7 +169,7 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
       value={draft.dobDay}
       onChange={(dobDay) => set({ dobDay })}
       error={!!errors.dob}
-      returnKeyType="next"
+      {...field(monthFirst ? 1 : 0)}
     />
   );
   const month = (
@@ -181,7 +184,7 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
       value={draft.dobMonth}
       onChange={(dobMonth) => set({ dobMonth })}
       error={!!errors.dob}
-      returnKeyType="next"
+      {...field(monthFirst ? 0 : 1)}
     />
   );
   const year = (
@@ -196,8 +199,7 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
       value={draft.dobYear}
       onChange={(dobYear) => set({ dobYear })}
       error={!!errors.dob}
-      returnKeyType="done"
-      onSubmitEditing={submit}
+      {...field(2)}
     />
   );
   return (
@@ -219,76 +221,105 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
 
 // -------------------------------------------------------------------- body
 
+/**
+ * Height and weight side by side, like the date of birth: with the keyboard up a phone shows
+ * about one row of fields above the Continue bar, and a weight field under the height field was
+ * out of sight (and out of reach) until the keyboard was closed again.
+ */
 export function BodyStep({ draft, set, errors, submit }: StepProps) {
   const { spacing } = useTheme();
+  const { width } = useWindowDimensions();
   const imp = draft.units === 'imperial';
+  // Inches may stay empty (5 ft is 5 ft 0 in), so Continue never sends anyone back to them.
+  const field = useFieldChain(imp ? [draft.heightFt, draft.heightIn ?? 0, draft.weight] : [draft.heightCm, draft.weight], submit);
+  const heightError = errors.height ? `${errors.height}${errors.height.includes('between') ? '' : ` Between ${heightRangeText(draft.units)}.`}` : null;
+  const weightError = errors.weight ? `${errors.weight}${errors.weight.includes('between') ? '' : ` Between ${weightRangeText(draft.units)}.`}` : null;
   return (
     <Group gap={spacing.xl}>
       <StepTitle title="Height and weight" subtitle="A rough figure is fine for now." />
       <View style={{ alignItems: 'flex-end', marginTop: -spacing.md }}>
         <UnitsToggle draft={draft} set={set} idPrefix="onb-body-units" />
       </View>
-      <Group gap={spacing.lg}>
+      <Group gap={spacing.sm}>
         {imp ? (
-          <View style={{ gap: 6 }}>
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <BigNumberField
-                style={{ flex: 1 }}
-                label="Height"
-                testID="onb-height-ft"
-                unit="ft"
-                decimals={0}
-                maxLength={1}
-                value={draft.heightFt}
-                onChange={(heightFt) => set({ heightFt })}
-                error={!!errors.height}
-                returnKeyType="next"
-              />
-              <BigNumberField
-                style={{ flex: 1 }}
-                // A no-break space keeps this field level with the one beside it.
-                label={'\u00A0'}
-                accessibilityLabel="Height, inches"
-                testID="onb-height-in"
-                unit="in"
-                decimals={1}
-                maxLength={4}
-                value={draft.heightIn}
-                onChange={(heightIn) => set({ heightIn })}
-                error={!!errors.height}
-                returnKeyType="next"
-              />
-            </View>
-            <ErrorText>{errors.height ? `${errors.height}${errors.height.includes('between') ? '' : ` Between ${heightRangeText('imperial')}.`}` : null}</ErrorText>
+          // Three in a row: the unit is in each label, so "10.5" and "250.5" fit their cups at 320 px.
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            <BigNumberField
+              style={{ flex: 1 }}
+              size="md"
+              label="Height, ft"
+              accessibilityLabel="Height, feet"
+              testID="onb-height-ft"
+              decimals={0}
+              maxLength={1}
+              value={draft.heightFt}
+              onChange={(heightFt) => set({ heightFt })}
+              error={!!errors.height}
+              {...field(0)}
+            />
+            <BigNumberField
+              style={{ flex: 1 }}
+              size="md"
+              label="in"
+              accessibilityLabel="Height, inches"
+              testID="onb-height-in"
+              decimals={1}
+              maxLength={4}
+              value={draft.heightIn}
+              onChange={(heightIn) => set({ heightIn })}
+              error={!!errors.height}
+              {...field(1)}
+            />
+            <BigNumberField
+              style={{ flex: 1.25 }}
+              size="md"
+              label="Weight, lb"
+              accessibilityLabel="Current weight, pounds"
+              testID="onb-weight"
+              decimals={1}
+              maxLength={5}
+              value={draft.weight}
+              onChange={(weight) => set({ weight })}
+              error={!!errors.weight}
+              {...field(2)}
+            />
           </View>
         ) : (
-          <BigNumberField
-            label="Height"
-            testID="onb-height-cm"
-            unit="cm"
-            decimals={1}
-            maxLength={5}
-            value={draft.heightCm}
-            onChange={(heightCm) => set({ heightCm })}
-            error={errors.height ? `${errors.height}${errors.height.includes('between') ? '' : ` Between ${heightRangeText('metric')}.`}` : null}
-            returnKeyType="next"
-          />
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            <BigNumberField
+              style={{ flex: 1 }}
+              size={width < 360 ? 'md' : 'lg'}
+              label="Height"
+              testID="onb-height-cm"
+              unit="cm"
+              decimals={1}
+              maxLength={5}
+              value={draft.heightCm}
+              onChange={(heightCm) => set({ heightCm })}
+              error={!!errors.height}
+              {...field(0)}
+            />
+            <BigNumberField
+              style={{ flex: 1 }}
+              size={width < 360 ? 'md' : 'lg'}
+              label="Weight"
+              accessibilityLabel={`Current weight, ${weightUnit(draft.units)}`}
+              testID="onb-weight"
+              unit={weightUnit(draft.units)}
+              decimals={1}
+              maxLength={5}
+              value={draft.weight}
+              onChange={(weight) => set({ weight })}
+              error={!!errors.weight}
+              {...field(1)}
+            />
+          </View>
         )}
-        <BigNumberField
-          label="Current weight"
-          testID="onb-weight"
-          unit={weightUnit(draft.units)}
-          decimals={1}
-          maxLength={5}
-          value={draft.weight}
-          onChange={(weight) => set({ weight })}
-          error={errors.weight ? `${errors.weight}${errors.weight.includes('between') ? '' : ` Between ${weightRangeText(draft.units)}.`}` : null}
-          returnKeyType="done"
-          onSubmitEditing={submit}
-        />
+        <ErrorText testID="onb-height-error">{heightError}</ErrorText>
+        <ErrorText testID="onb-weight-error">{weightError}</ErrorText>
       </Group>
       <Text variant="caption" color="textSecondary">
-        Saved on this device as your first weigh-in.
+        Your weight is saved on this device as your first weigh-in.
       </Text>
     </Group>
   );
@@ -298,6 +329,8 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
 
 export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepProps) {
   const { colors, spacing } = useTheme();
+  // The tape's fields, in order, for the keyboard's Next key and for Continue.
+  const tape = useFieldChain(draft.sex === 'female' ? [draft.neck, draft.waist, draft.hip] : [draft.neck, draft.waist], submit);
   const imp = draft.units === 'imperial';
   const lu = imp ? 'in' : 'cm';
   const estimate = draft.bodyFatMode === 'tape' ? tapeEstimate(draft) : null;
@@ -371,6 +404,7 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
               value={draft.neck}
               onChange={(neck) => set({ neck })}
               error={!!errors.neck}
+              {...tape(0)}
             />
             <BigNumberField
               style={{ flex: 1 }}
@@ -383,7 +417,7 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
               value={draft.waist}
               onChange={(waist) => set({ waist })}
               error={!!errors.waist}
-              onSubmitEditing={draft.sex === 'female' ? undefined : submit}
+              {...tape(1)}
             />
             {draft.sex === 'female' ? (
               <BigNumberField
@@ -397,7 +431,7 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
                 value={draft.hip}
                 onChange={(hip) => set({ hip })}
                 error={!!errors.hip}
-                onSubmitEditing={submit}
+                {...tape(2)}
               />
             ) : null}
           </View>
