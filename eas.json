@@ -28,6 +28,16 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://ffdttbbuwwkwlkyycpoa.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_25MYwKi2EhhwjuxfrYPQ1A_bQkbzfsC"
       }
+    },
+    "ios-unsigned": {
+      "ios": {
+        "config": "ios-unsigned.yml",
+        "withoutCredentials": true
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ffdttbbuwwkwlkyycpoa.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_25MYwKi2EhhwjuxfrYPQ1A_bQkbzfsC"
+      }
     }
   },
   "submit": {

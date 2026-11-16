@@ -1,0 +1,43 @@
+# An iPhone build with no Apple signing, for installing with a free Apple ID.
+# Sideloadly or AltStore (on a computer) sign the .ipa with the person's own Apple ID when they
+# install it; such an install lasts 7 days and is then signed again. A store or TestFlight build
+# uses the normal profiles in eas.json and needs an Apple Developer account instead.
+#
+#   npx eas-cli@latest build -p ios --profile ios-unsigned
+build:
+  name: Unsigned iPhone app for sideloading
+  steps:
+    - eas/checkout
+    - eas/install_node_modules
+    - eas/prebuild
+    - run:
+        name: Install pods
+        working_directory: ./ios
+        command: pod install
+    - run:
+        name: Build for iPhone without signing
+        working_directory: ./ios
+        command: |
+          set -eo pipefail
+          WORKSPACE=$(ls -d *.xcworkspace | head -1)
+          SCHEME="${WORKSPACE%.xcworkspace}"
+          echo "workspace $WORKSPACE, scheme $SCHEME"
+          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build > xcodebuild.log 2>&1 || { grep -n "error:" xcodebuild.log | head -60; tail -80 xcodebuild.log; exit 1; }
+          tail -5 xcodebuild.log
+    - run:
+        name: Package the .ipa
+        working_directory: ./ios
+        command: |
+          set -eo pipefail
+          APP=$(ls -d build/Build/Products/Release-iphoneos/*.app | head -1)
+          rm -rf Payload && mkdir Payload && cp -R "$APP" Payload/
+          zip -qry HealthCal-unsigned.ipa Payload
+          ls -la HealthCal-unsigned.ipa
+    - eas/upload_artifact:
+        name: Upload the .ipa
+        inputs:
+          type: application-archive
+          path: ios/HealthCal-unsigned.ipa
