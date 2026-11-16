@@ -1,13 +1,20 @@
 # An iPhone build with no Apple signing, for installing with a free Apple ID.
-# Sideloadly or AltStore (on a computer) sign the .ipa with the person's own Apple ID when they
-# install it; such an install lasts 7 days and is then signed again. A store or TestFlight build
-# uses the normal profiles in eas.json and needs an Apple Developer account instead.
+# A sideloading tool on a computer signs the .ipa with the person's own Apple ID when it installs
+# it; such an install lasts 7 days and is then signed again. A store or TestFlight build uses the
+# normal profiles in eas.json and needs an Apple Developer account instead.
 #
-# Apple Health: an install signed this way cannot read Apple Health. Both tools sign with the
-# entitlements of the free provisioning profile they fetch, which has no HealthKit (AltStore only
-# enables App Groups and Inter-App Audio; Sideloadly keeps custom entitlements for paid accounts
-# only), so an ad-hoc signature with the HealthKit entitlement here would be replaced. The app's
-# sync screen says "Apple Health is not available in this install" (docs/health-sync.md).
+# Apple Health: Apple allows HealthKit for a free account, but a signing tool has to ask for it,
+# and a tool can only know to ask from the app itself. So the last step gives the app an ad-hoc
+# signature (no identity, no account) whose only entitlement is com.apple.developer.healthkit:
+#   - Impactor and xtool read the app's entitlements, switch HealthKit on for the App ID they
+#     register, and sign with it. Whether Apple's free profile then carries HealthKit is not yet
+#     proved on a phone (docs/health-sync.md, "Installing on an iPhone with a free Apple ID").
+#   - Sideloadly and AltStore replace the signature with the entitlements of the free profile they
+#     fetch, which has no HealthKit; with them the app's sync screen says "Apple Health is not
+#     available in this install", as before. The ad-hoc signature changes nothing for them.
+# The push entitlement that prebuild writes (aps-environment) is left out on purpose: a free
+# account cannot have it, the app's reminders are local and do not need it, and a tool that tried
+# to switch it on would fail.
 #
 #   npx eas-cli@latest build -p ios --profile ios-unsigned
 build:
@@ -34,12 +41,30 @@ build:
             build > xcodebuild.log 2>&1 || { grep -n "error:" xcodebuild.log | head -60; tail -80 xcodebuild.log; exit 1; }
           tail -5 xcodebuild.log
     - run:
-        name: Package the .ipa
+        name: Package the .ipa with the Health permission request
         working_directory: ./ios
         command: |
           set -eo pipefail
           APP=$(ls -d build/Build/Products/Release-iphoneos/*.app | head -1)
           rm -rf Payload && mkdir Payload && cp -R "$APP" Payload/
+          APPDIR=$(ls -d Payload/*.app | head -1)
+          echo "--- what prebuild asked for"
+          cat */*.entitlements
+          grep -q com.apple.developer.healthkit */*.entitlements
+          grep -q NSHealthShareUsageDescription "$APPDIR/Info.plist" || plutil -p "$APPDIR/Info.plist" | grep -q NSHealthShareUsageDescription
+          # The one entitlement a free Apple ID can be given and this app needs.
+          rm -f sideload.entitlements
+          /usr/libexec/PlistBuddy -c "Add :com.apple.developer.healthkit bool true" sideload.entitlements
+          # Inner code first, then the app: a signature covers what is inside it.
+          find "$APPDIR" -depth \( -name '*.framework' -o -name '*.dylib' -o -name '*.appex' \) -print0 \
+            | xargs -0 -n 1 codesign --force --sign - --timestamp=none
+          codesign --force --sign - --timestamp=none --entitlements sideload.entitlements "$APPDIR"
+          echo "--- what the app carries"
+          codesign -d --entitlements - "$APPDIR" > carried.txt 2>&1 || true
+          cat carried.txt
+          grep -q com.apple.developer.healthkit carried.txt
+          if grep -q aps-environment carried.txt; then echo "the push entitlement must not be carried"; exit 1; fi
+          codesign --verify --deep --strict "$APPDIR" && echo "the ad-hoc signature verifies" || echo "the ad-hoc signature does not verify (a signing tool replaces it anyway)"
           zip -qry HealthCal-unsigned.ipa Payload
           ls -la HealthCal-unsigned.ipa
     - eas/upload_artifact:
