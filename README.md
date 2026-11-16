@@ -138,6 +138,20 @@ The repository is linked to an Expo project (`app.json`: `owner`, `extra.eas.pro
 
 Store listing: the name, subtitle, descriptions, keywords and the owner's checklist are in `docs/store-listing.md`. The eight App Store and Google Play screenshots are in `store/`, and `node scripts/dev/store-frames.cjs` makes them again from the running app (contact sheet: `store/_sheet.png`).
 
+### Testing on a phone
+
+The scripts under `scripts/dev` test the web build in a browser. `.maestro/first-day.yml` is the same first day on a real Android or iPhone build, driven by testID with [Maestro](https://maestro.mobile.dev): setup with the keyboard on every field, food added to lunch and opened again, the four tabs and the sync screen, with a screenshot at each step.
+
+```bash
+# On Expo's cloud phones (an Android Emulator, an iOS Simulator; no Mac or Apple account needed).
+# Expo runs these test jobs on its paid plans only; the free plan refuses them.
+npx eas-cli@latest workflow:run .eas/workflows/phone-test-android.yml
+npx eas-cli@latest workflow:run .eas/workflows/phone-test-ios.yml
+
+# On a phone or emulator connected to your own computer, with the app installed.
+maestro test .maestro/first-day.yml
+```
+
 ## How the code is organised
 
 ```
