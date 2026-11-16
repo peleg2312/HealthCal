@@ -93,6 +93,12 @@
         "NSCameraUsageDescription": "HealthCal uses the camera to scan barcodes and photograph meals for nutrition estimates.",
         "NSPhotoLibraryUsageDescription": "HealthCal reads the photos you pick to estimate the nutrition of a meal."
       }
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "a39efd68-9624-4740-8749-999371098d89"
+      }
+    },
+    "owner": "pelegy"
   }
 }
