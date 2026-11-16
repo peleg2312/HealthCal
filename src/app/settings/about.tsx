@@ -1,8 +1,6 @@
-import Constants from 'expo-constants';
 import {
   Activity,
   BookOpen,
-  Brain,
   Droplets,
   Flame,
   Gauge,
@@ -19,6 +17,7 @@ import { View } from 'react-native';
 import { AiConsentAbout } from '@/features/ai/AiConsentAbout';
 import { storesRead } from '@/features/health-sync/reach';
 import { IconTile } from '@/features/settings/components';
+import { AboutVersion } from '@/features/updates/AboutVersion';
 import { ACTIVITY_FACTORS, ACTIVITY_LABELS, calorieFloor } from '@/lib/energy';
 import { formatNumber } from '@/lib/units';
 import { useToday } from '@/store/clock';
@@ -112,8 +111,7 @@ function MyTarget() {
 export default function AboutScreen() {
   const { colors, spacing } = useTheme();
   const mine = useMine();
-  const version = Constants.expoConfig?.version ?? '1.0.0';
-  // Apple Health is named only once a build can read it (reach.ts).
+  // Which stores are named comes from reach.ts (Apple Health, since adapter.ios.ts loads the library).
   const stores = storesRead();
 
   return (
@@ -299,12 +297,7 @@ export default function AboutScreen() {
         </P>
       </Section>
 
-      <View style={{ alignItems: 'center', gap: 4, paddingVertical: spacing.md }}>
-        <Brain size={18} color={colors.textTertiary} />
-        <Text variant="caption" color="textTertiary">
-          HealthCal {version}
-        </Text>
-      </View>
+      <AboutVersion />
     </Screen>
   );
 }

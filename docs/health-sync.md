@@ -2,11 +2,11 @@
 
 Garmin Connect, and other apps such as Samsung Health, Strava or Polar Flow, can write each workout to Android's **Health Connect** or to **Apple Health** on an iPhone (where an Apple Watch writes its workouts by itself). With one permission, HealthCal reads them from there and adds them to Train by themselves, with the calories the watch measured. No file export is needed. It also reads the day's **steps** and shows them on Train; steps are never added to the calorie budget (see "Steps").
 
-Open it from **Profile > Workout sync** or **Train > Sync automatically** (route `/settings/health-sync`). The screen names Apple Health on an iPhone and Health Connect on Android. In the browser, and in an iPhone build that cannot read Apple Health, it says that automatic sync is in the Android app ("the iPhone and Android apps" once the iPhone side is finished, `reach.ts`) and offers one way forward: **Import your Health export** (the Health app's own export file, see "The Health app's export file"), with the Garmin file import (`docs/garmin-import.md`) as a link under it; the browser never loads either native module.
+Open it from **Profile > Workout sync** or **Train > Sync automatically** (route `/settings/health-sync`). The screen names Apple Health on an iPhone and Health Connect on Android. In the browser (and on an iPad without Apple Health) it says that automatic sync is in the iPhone and Android apps (`reach.ts`), that an iPhone copy installed with a sideloading tool cannot read Apple Health, and offers one way forward: **Import your Health export** (the Health app's own export file, see "The Health app's export file"), with the Garmin file import (`docs/garmin-import.md`) as a link under it; the browser never loads either native module. An iPhone copy signed without the HealthKit entitlement says so on the sync screen itself and offers the same import (see "Installing on an iPhone with a free Apple ID").
 
 The person has to switch sharing on in Garmin Connect too (Garmin Connect > settings > Health Connect, or > Connected apps > Apple Health on an iPhone). Only workouts recorded on a Garmin device are shared, according to Garmin's support pages as reported by the press.
 
-**State of the iPhone side.** The Apple Health adapter, its mapping and every rule are built and tested, but the native library, `@kingstinct/react-native-healthkit`, is not installed in this repository yet (the install was refused by this session's permission settings), so an iPhone build still shows "This version of the iPhone app cannot read Apple Health yet". "Finishing the iPhone side" below lists the four steps that turn it on. Until then no screen says Apple Health sync exists: the Profile row, the sync screen in the browser and on the iPhone, and the privacy paragraph on About read one flag, `APPLE_HEALTH_IN_APP` in `src/features/health-sync/reach.ts`, and `reach.test.ts` fails when that flag and `adapter.ios.ts` disagree. Steps from Health Connect on Android work now.
+**State of the iPhone side.** The native library is installed and bound: `@kingstinct/react-native-healthkit` 16.2.0 (with `@react-native-healthkit/core` 16.2.0) and `react-native-nitro-modules` 0.37.2, its config plugin in `app.json` with the read text only, and `adapter.ios.ts` as the binding (see "How the iPhone side is bound"). So the Profile row, the sync screen and the privacy paragraph on About name Apple Health: they read one flag, `APPLE_HEALTH_IN_APP` in `src/features/health-sync/reach.ts`, now `true`, and `reach.test.ts` fails when that flag and `adapter.ios.ts` disagree. To read Apple Health, a person needs an iPhone build signed with the HealthKit entitlement: one signed through the paid Apple Developer Program (TestFlight, the App Store, or EAS internal distribution with a registered device), or one built with Xcode on a Mac with the person's own free account. The unsigned `.ipa` sideloaded with a free Apple ID is signed without it and shows "Apple Health is not available in this install" (see "Installing on an iPhone with a free Apple ID"). Checked: `npx tsc --noEmit`, the health-sync unit tests and `npx expo-doctor` (20 of 20) pass; the iPhone project that `npx expo prebuild --platform ios` generates has the `com.apple.developer.healthkit` entitlement and no background-delivery entitlement, `NSHealthShareUsageDescription` with the app's text and no `NSHealthUpdateUsageDescription`; the exported iPhone JavaScript bundle contains the HealthKit module, and the Android and web bundles contain neither it nor Nitro Modules' JavaScript. Not checked yet: that the iPhone app compiles with the library on Expo's Mac, that the Android app still builds with `react-native-nitro-modules` autolinked, and anything on a real iPhone (see "Not yet proven on iPhone"). Steps from Health Connect on Android work now.
 
 ## What is read
 
@@ -51,7 +51,7 @@ Workouts from Apple's own devices carry the person's device name ("Dana's Apple 
 
 ## The Health app's export file (iPhone, no HealthKit needed)
 
-An iPhone reaches HealthCal today in two free ways, the web app on the Home Screen and an `.ipa` sideloaded with a free Apple ID, and neither can ask HealthKit for anything (a website has no access; a sideloaded copy is signed without the HealthKit entitlement). The Health app can still hand over its data itself: **Health app > your picture > Export All Health Data** saves `export.zip`. The import screen (`/activity/import`, "Import workouts", the same flow as Garmin files and the same "Choose files" button) recognises it by its content and reads its workouts and daily steps.
+An iPhone reaches HealthCal without a paid Apple account or a Mac in two ways, the web app on the Home Screen and an `.ipa` sideloaded with a free Apple ID, and neither can ask HealthKit for anything (a website has no access; a sideloaded copy is signed without the HealthKit entitlement). Only a build signed with the entitlement can (see "State of the iPhone side"). The Health app can still hand over its data itself: **Health app > your picture > Export All Health Data** saves `export.zip`. The import screen (`/activity/import`, "Import workouts", the same flow as Garmin files and the same "Choose files" button) recognises it by its content and reads its workouts and daily steps.
 
 ### What is read, and what never is
 
@@ -166,12 +166,12 @@ Switch it off on the sync screen: nothing more is read, and the "Needs a look" l
 
 4. **App Store (iPhone).** The HealthKit lines App Review asks for (usage text, the list of what is read, no ads or data mining, no iCloud, nothing written) are in `docs/store-listing.md`, under "Apple Health (HealthKit), for the review".
 
-## Finishing the iPhone side
+## How the iPhone side is bound
 
-Everything below `adapter.ios.ts` exists and is tested against fixtures in the library's own shapes. Four steps remain, all blocked here only because this session may not install packages:
+Everything below `adapter.ios.ts` is plain TypeScript tested against fixtures in the library's own shapes; `adapter.ios.ts` hands it the real library. What is in place:
 
-1. Install the library: `npx expo install @kingstinct/react-native-healthkit react-native-nitro-modules`. Written against 16.2.0 (with `@react-native-healthkit/core` 16.2.0 as its dependency and `react-native-nitro-modules` 0.37.2 for the peer, `>=0.35`).
-2. Add its config plugin to `app.json` `plugins` (it adds the `com.apple.developer.healthkit` entitlement and the usage text; `false` leaves out the write text and the background-delivery entitlement):
+1. The packages, installed with `npx expo install`: `@kingstinct/react-native-healthkit` 16.2.0 (with `@react-native-healthkit/core` 16.2.0 as its dependency) and `react-native-nitro-modules` 0.37.2 for its peer (`>=0.35`).
+2. Its config plugin in `app.json` `plugins`. It adds the `com.apple.developer.healthkit` entitlement and the read text; `false` leaves out the write text and the background-delivery entitlement:
    ```json
    ["@kingstinct/react-native-healthkit", {
      "NSHealthShareUsageDescription": "HealthCal reads the workouts and steps you choose from Apple Health to fill your training week. It never writes to Apple Health and never sends this data to the AI functions.",
@@ -179,37 +179,16 @@ Everything below `adapter.ios.ts` exists and is tested against fixtures in the l
      "background": false
    }]
    ```
-3. Replace `src/features/health-sync/adapter.ios.ts` with the binding (type-checked against the library's published declarations, 16.2.0):
-   ```ts
-   /**
-    * iPhone: workouts and steps from Apple Health, through @kingstinct/react-native-healthkit.
-    * Only this file loads the native module (Metro picks it by its .ios extension; Android and
-    * the browser get the files beside it). Everything it does is in healthKitAdapter.ts.
-    */
-   import {
-     getRequestStatusForAuthorization,
-     isHealthDataAvailable,
-     queryStatisticsCollectionForQuantity,
-     queryWorkoutSamples,
-     requestAuthorization,
-   } from '@kingstinct/react-native-healthkit';
-   import { Linking } from 'react-native';
+3. `src/features/health-sync/adapter.ios.ts`, the binding: it imports `isHealthDataAvailable`, `getRequestStatusForAuthorization`, `requestAuthorization`, `queryWorkoutSamples` and `queryStatisticsCollectionForQuantity` from the library and passes them to `createHealthKitAdapter` (`healthKitAdapter.ts`), with `openHealth` opening the Health app (`x-apple-health://`, else the app's own settings). It is the only file that imports the module; Metro picks it by its `.ios` extension, so Android and the browser never load it.
+4. `APPLE_HEALTH_IN_APP` is `true` in `src/features/health-sync/reach.ts`, so the Profile row, the sync screen and About name Apple Health; `reach.test.ts` fails when the flag and `adapter.ios.ts` disagree.
 
-   import { createHealthKitAdapter } from './healthKitAdapter';
+After an upgrade of the library (or of Expo), check in this order:
 
-   /** The Health app, where Sharing > Apps > HealthCal lists what may be read; the app's own settings if it cannot be opened. */
-   function openHealth(): void {
-     Linking.openURL('x-apple-health://').catch(() => Linking.openSettings().catch(() => {}));
-   }
-
-   export const adapter = createHealthKitAdapter(
-     { isHealthDataAvailable, getRequestStatusForAuthorization, requestAuthorization, queryWorkoutSamples, queryStatisticsCollectionForQuantity },
-     { openHealth },
-   );
-   ```
-4. Set `APPLE_HEALTH_IN_APP` to `true` in `src/features/health-sync/reach.ts` (`reach.test.ts` fails until it matches `adapter.ios.ts`), so the Profile row, the sync screen and About start naming Apple Health.
-
-Then `npx tsc --noEmit`, `npx expo-doctor`, `npx expo export --platform ios` and `--platform web` (the web bundle must not contain the module), and an EAS iOS build.
+- `npx tsc --noEmit`: `adapter.ios.ts` passes the real functions to `createHealthKitAdapter`, so a changed call fails here. The shapes in `healthKit.ts` are written out by hand, so compare them with the declarations listed below as well.
+- `npx vitest run src/features/health-sync` and `npx expo-doctor`.
+- `npx expo prebuild --platform ios` in a scratch copy of the repository (never in this one: `ios/` is generated): the entitlements file has `com.apple.developer.healthkit` and no `com.apple.developer.healthkit.background-delivery`; `Info.plist` has `NSHealthShareUsageDescription` with the text above and no `NSHealthUpdateUsageDescription`.
+- `npx expo export --platform ios`, `--platform android` and `--platform web`: only the iPhone bundle contains the HealthKit module; the Android and web bundles contain neither it nor Nitro Modules' JavaScript.
+- An EAS iOS build (it compiles) and an Android build (`react-native-nitro-modules` is autolinked there too), then a signed build on an iPhone (see "Not yet proven on iPhone").
 
 The calls relied on, with where they are declared in the package: `isHealthDataAvailable`, `getRequestStatusForAuthorization`, `requestAuthorization` (src/specs/CoreModule.nitro.ts), `queryWorkoutSamples({ limit: 0, ascending, filter: { date } })` (src/specs/WorkoutsModule.nitro.ts; `limit` 0 means all), `workout.getStatistic(type, unit)` and `workout.dispose()` (src/specs/WorkoutProxy.nitro.ts and nitro-core's HybridObject), `queryStatisticsCollectionForQuantity('HKQuantityTypeIdentifierStepCount', ['cumulativeSum'], anchorDate, { day: 1 }, { unit: 'count', filter: { date } })` (src/specs/QuantityTypeModule.nitro.ts; ios/QuantityTypeModule.swift runs an `HKStatisticsCollectionQuery` and serialises each interval's `sumQuantity`, `startDate` and `endDate`), `sourceRevision.productType` (core src/types/Source.ts, passed through by ios/Serializers.swift), and the exports in src/healthkit.ios.ts.
 
@@ -225,9 +204,9 @@ What was checked, 16 November 2026:
 - **What would work.** A build signed through an Apple Developer Program account (TestFlight, the App Store, or EAS internal distribution with a registered device), or Xcode on a Mac with the person's own free account and the HealthKit capability added (7-day signing, as for any free install).
 - **Unknown until tried.** Whether a later Sideloadly honours HealthKit for free accounts (v0.71.0's "Support for free Apple Accounts is coming in the next version" is about Apple Watch apps, not entitlements), and whether HealthKit already refuses `getRequestStatusForAuthorization` without the entitlement (the screen then shows the message at once) or only `requestAuthorization` (it shows it when the switch is turned on). Both paths are handled and tested.
 
-## Not yet proven on iPhone (needs the library installed, a signed build and a phone)
+## Not yet proven on iPhone (needs a build signed with the HealthKit entitlement and a phone)
 
-- That the library (16.2.0, Nitro 0.37.2) compiles in this app on Expo SDK 58 / React Native 0.88. Its peer dependencies (`react >=19`, `react-native >=0.79`) allow it; its own example is on React Native 0.81.
+- That the library (16.2.0, Nitro 0.37.2), now installed, compiles in this app on Expo SDK 58 / React Native 0.88: no iPhone build with it has finished yet. Its peer dependencies (`react >=19`, `react-native >=0.79`) allow it; its own example is on React Native 0.81.
 - The permission sheet, what `getRequestStatusForAuthorization` answers before and after it, and that a refused type returns empty.
 - What Garmin Connect writes to Apple Health: the bundle id (`com.garmin.connect.mobile` is what Apple's App Store lookup gives for Garmin Connect, app 583446403), whether it writes a workout's active energy and distance as statistics or only as `totalEnergyBurned`/`totalDistance`, and whether the workout's start matches the FIT file's to the second (the shared record id depends on it, as on Android).
 - The metadata's shapes as serialised by the library: `HKIndoorWorkout` as `true` or `1`, `HKSwimmingLocationType` as `2`, `HKTimeZone` as an IANA name. Each is read defensively; a different shape only loses the indoor or open-water variant or the zone.
@@ -237,6 +216,7 @@ What was checked, 16 November 2026:
 ## Not yet proven on Android (needs an Android build and a phone)
 
 - That `react-native-health-connect` 4.1.3 compiles with Expo SDK 58 / React Native 0.88 (its own example is one SDK behind). The JavaScript bundles for Android and web, `expo config --type introspect` shows the five permissions (steps included), the rationale intent filter, the permission-usage alias and `minSdkVersion 26`, and `expo-doctor` passes; the Gradle build has not run.
+- That the Android app still builds with `react-native-nitro-modules` autolinked (installed for the iPhone library; Android's JavaScript never loads it).
 - The permission sheet and the refused and revoked paths on a real device.
 - What Garmin Connect actually writes: the data origin string (`com.garmin.android.apps.connectmobile` is the Play Store package id), whether it writes active calories, total calories or both inside the session, the exercise type numbers it uses for each sport, and the zone offset.
 - Behaviour after long stretches in the background (sync only runs when the app is opened; there is no background delivery).
@@ -250,7 +230,7 @@ What was checked, 16 November 2026:
 |---|---|
 | `types.ts` | The adapter interface: availability, what is granted, ask, read workouts in a range and the store's step totals per day. |
 | `adapter.android.ts` | Health Connect through `react-native-health-connect`. The only file that loads that native module. |
-| `adapter.ios.ts` | iPhone. "Not available here" until the HealthKit library is installed; then the binding above, the only file that loads that module. |
+| `adapter.ios.ts` | iPhone. The binding ("How the iPhone side is bound"): loads `@kingstinct/react-native-healthkit` and hands it to `createHealthKitAdapter`; the only file that loads that module. |
 | `adapter.ts`, `unsupported.ts` | "Not available here" for the browser. |
 | `healthConnect.ts` | Health Connect's shapes to plain ones (pure, typed against the library). |
 | `healthKit.ts` | HealthKit's shapes (written out from the library's types) to plain ones: workouts, step totals per day, what may be read, errors (pure). |
@@ -259,7 +239,7 @@ What was checked, 16 November 2026:
 | `steps.ts` | The store's step totals as kept, the 35-day window and re-reads, the line on Train; steps from an export file (`FileSteps`, `mergeFileSteps`, `shownSteps`). |
 | `exportFile.ts` | The Health app's export: workouts as HealthWorkouts (units, both generations, the source kind), the step tally rule. |
 | `exportRead.ts` | Finding the export in a picked file and reading it as a stream (with `src/features/import/zip.ts` and `appleExport.ts`). |
-| `reach.ts` | Where sync works today, in the words the Profile row, the sync screen and About use; names Apple Health only once `adapter.ios.ts` loads the library. |
+| `reach.ts` | Where sync works, in the words the Profile row, the sync screen and About use; names Apple Health because `adapter.ios.ts` loads the library (`APPLE_HEALTH_IN_APP`, held to that file by `reach.test.ts`). |
 | `energy.ts` | The calorie rule above. |
 | `convert.ts` | A Health Connect workout as the file import's `ImportedWorkout`; the record id. |
 | `merge.ts` | Two apps, one workout. |

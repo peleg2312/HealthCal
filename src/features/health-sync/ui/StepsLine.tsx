@@ -14,13 +14,15 @@ import { useHealthSync } from '../store';
  * One line in Train's week card: "8,432 steps today, 7,950 a day this week"
  * ("8,432 steps today, 7,950 a day" under 360 px, where the long form wraps).
  * Steps come from the phone's health store with automatic sync on, or from the
- * Health app's export file (on web and iPhone, where nothing syncs): a file is
+ * Health app's export file (on web, and on an iPhone with sync off or a copy
+ * that cannot read Apple Health): a file is
  * a snapshot, so then a second line says where they are from and as of when
  * ("From your Health export, Nov 16"). A synced day wins over the file's.
  * Steps are shown only: never added to the calorie budget (steps.ts says why).
  *
- * With no steps at all, on web and iPhone, one quiet link leads to the import
- * instead; on Android, where sync reads them, nothing is drawn.
+ * With no steps at all, on web and on an iPhone with sync off, one quiet link
+ * leads to the import instead; on Android, and on an iPhone with sync on,
+ * where sync reads them, nothing is drawn.
  */
 export function StepsLine({ dates, today }: { dates: ISODate[]; today: ISODate }) {
   const { colors, spacing } = useTheme();

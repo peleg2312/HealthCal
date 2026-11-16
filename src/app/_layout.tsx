@@ -21,6 +21,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import { usePendingInvite } from '@/features/friends/usePendingInvite';
 import { startHealthSync } from '@/features/health-sync/sync';
+import { startUpdates } from '@/features/updates/updates';
 import { handleAuthLink, initAuth } from '@/services/auth';
 import { refreshReminders } from '@/services/notifications';
 import { startFriends } from '@/services/friends';
@@ -191,6 +192,7 @@ export default function RootLayout() {
     const stopSync = startAutoSync();
     startFriends();
     startHealthSync();
+    startUpdates();
     const stopSnapshots = startDaySnapshots();
     // Reminder text carries live numbers ("620 ml left"), so it is rebuilt whenever data changes.
     void refreshReminders();

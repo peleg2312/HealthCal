@@ -74,7 +74,7 @@ describe('sync screen wording', () => {
     expect(switchSubtitle({ ...on, lastError: { code: 'timeout', at: 'x' } }, false, false, '5 min ago')).toBe('On, but the last sync did not finish');
 
     expect(profileSubtitle(off, false, null)).toBe('In the Android app');
-    expect(profileSubtitle(off, false, null, 'Not in the iPhone app yet')).toBe('Not in the iPhone app yet');
+    expect(profileSubtitle(off, false, null, 'In the iPhone and Android apps')).toBe('In the iPhone and Android apps');
     expect(switchSubtitle(off, false, true, null, 'Apple Health')).toBe('Waiting for Apple Health');
     expect(profileSubtitle(off, true, null)).toBe('Off. Add Garmin and other workouts by themselves');
     expect(profileSubtitle(on, true, '5 min ago')).toBe('On, last synced 5 min ago');

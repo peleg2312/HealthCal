@@ -1,7 +1,7 @@
 /**
  * The adapter for a platform without a health store this build can read: the
- * browser, and an iPhone build without the Apple Health module. It answers
- * "not available here" and never touches a native module.
+ * browser (adapter.ts). It answers "not available here" and never touches a
+ * native module.
  */
 import { HealthError, NO_ACCESS, type HealthAdapter } from './types';
 

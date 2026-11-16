@@ -1,16 +1,16 @@
 /**
  * Where automatic sync works today, in the words every screen uses for it.
  *
- * The iPhone app can read Apple Health only once its native library is
- * installed and `adapter.ios.ts` is the binding (docs/health-sync.md,
- * "Finishing the iPhone side"). Until then no build reads Apple Health, so no
- * screen may say that it does: the Profile row, the sync screen where there is
- * no health store, and the privacy paragraph on About all read this one flag.
- * reach.test.ts fails when the flag and adapter.ios.ts disagree, so turning the
- * iPhone side on changes the words in the same change. Pure.
+ * The iPhone app reads Apple Health because its native library is installed
+ * and `adapter.ios.ts` is the binding (docs/health-sync.md, "How the iPhone
+ * side is bound"); a copy signed without the HealthKit entitlement says so on
+ * the sync screen itself ('not-entitled'). The Profile row, the sync screen
+ * where there is no health store, and the privacy paragraph on About all read
+ * this one flag. reach.test.ts fails when the flag and adapter.ios.ts disagree,
+ * so no screen names Apple Health unless a build can load it. Pure.
  */
 
-/** True once adapter.ios.ts loads @kingstinct/react-native-healthkit. */
+/** True while adapter.ios.ts loads @kingstinct/react-native-healthkit (reach.test.ts holds the two together). */
 export const APPLE_HEALTH_IN_APP = true;
 
 export interface SyncReach {
@@ -26,9 +26,10 @@ export interface SyncReach {
 }
 
 /**
- * The words for a build that cannot sync. `os` is Platform.OS; `hasStore` is
- * whether this build has a health-store adapter at all (an iPhone build with
- * the library, on an iPad without Apple Health, has one but cannot use it).
+ * The words for a build that cannot sync: the browser, and an iPad without
+ * Apple Health (the iPhone build has the adapter, `hasStore`, but cannot use
+ * it there). `os` is Platform.OS; `hasStore` is whether this build has a
+ * health-store adapter at all.
  */
 export function syncReach(os: string, hasStore: boolean, appleReady: boolean = APPLE_HEALTH_IN_APP): SyncReach {
   // What works everywhere: the Health app's export (a snapshot, imported again whenever wanted) and Garmin's files.
@@ -37,17 +38,21 @@ export function syncReach(os: string, hasStore: boolean, appleReady: boolean = A
     os === 'ios'
       ? hasStore
         ? `Apple Health is not available on this device. ${files}`
-        : `This version of the iPhone app cannot read Apple Health yet. ${files}`
+        : // Not reached since adapter.ios.ts is the binding (every iPhone build has a store); kept for an iPhone build without the library, and reach.test.ts still checks it.
+          `This version of the iPhone app cannot read Apple Health yet. ${files}`
       : `A browser has no health data. ${files}`;
   if (appleReady) {
     return {
       profile: 'In the iPhone and Android apps',
       header: 'Automatic, in the phone apps',
       heading: 'Automatic on iPhone and Android',
-      body: 'There, workouts from Garmin Connect and other apps arrive by themselves through Apple Health or Health Connect, with your watch’s calories.',
+      // "iPhone" means a build signed with the HealthKit entitlement; a copy sideloaded with a free Apple ID is not, so the body says so.
+      body: 'There, workouts from Garmin Connect and other apps arrive by themselves through Apple Health or Health Connect, with your watch’s calories. An iPhone copy installed with a sideloading tool cannot read Apple Health.',
       here,
     };
   }
+  // The words for an app whose iPhone build does not load the library (APPLE_HEALTH_IN_APP false). Not shown
+  // since the binding; kept so turning the flag off stays one change, and reach.test.ts still checks them.
   return {
     profile: os === 'ios' ? 'Not in the iPhone app yet' : 'In the Android app',
     header: 'Automatic, in the Android app',
@@ -57,7 +62,7 @@ export function syncReach(os: string, hasStore: boolean, appleReady: boolean = A
   };
 }
 
-/** The privacy paragraph's first part on About: which stores are read. */
+/** The privacy paragraph's first part on About: which stores are read (the `false` words are not shown since the binding; reach.test.ts checks them). */
 export function storesRead(appleReady: boolean = APPLE_HEALTH_IN_APP): { from: string; notBack: string } {
   return appleReady
     ? { from: 'Health Connect on Android or Apple Health on iPhone', notBack: 'Health Connect or Apple Health' }

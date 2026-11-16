@@ -37,7 +37,7 @@ export default function HealthSyncScreen() {
 
   const store = storeName(healthAdapter.store);
   const apple = healthAdapter.store === 'apple-health';
-  // Known at once where there is no health store at all (the browser, an iPhone build without Apple Health).
+  // Known at once where there is no health store at all (the browser); an iPad without Apple Health says so once asked.
   const supported = healthAdapter.store !== null && status.availability !== 'unsupported';
   const ago = timeAgo(state.lastSyncedAt, now);
   const hour12 = profile.units === 'imperial';
@@ -101,8 +101,9 @@ export default function HealthSyncScreen() {
   };
 
   if (!supported) {
-    // The browser has no health data; an iPhone build without the Apple Health module, or an iPad without Health, cannot read it.
-    // Where it does work is said by reach.ts, which names Apple Health only once a build can read it.
+    // The browser has no health data, and an iPad without Health cannot read it (an iPhone copy without the
+    // HealthKit entitlement is 'not-entitled' and gets the ProblemCard below instead). Where it does work is said
+    // by reach.ts, which names Apple Health because adapter.ios.ts loads the library.
     const reach = syncReach(Platform.OS, healthAdapter.store !== null);
     return (
       <Screen header={<Header title="Workout sync" subtitle={reach.header} />} testID="health-sync-screen">

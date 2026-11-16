@@ -9,9 +9,9 @@
  * src/types/Workouts.ts `WorkoutSample`, src/specs/WorkoutProxy.nitro.ts,
  * src/types/QuantityType.ts, src/specs/QuantityTypeModule.nitro.ts and
  * @react-native-healthkit/core src/types/{Shared,Source,Device}.ts). The iPhone
- * binding (docs/health-sync.md, "Finishing the iPhone side") hands the real
- * module to `createHealthKitAdapter`, and the type checker then holds the
- * module to these shapes.
+ * binding, adapter.ios.ts (docs/health-sync.md, "How the iPhone side is
+ * bound"), hands the real module to `createHealthKitAdapter`, and the type
+ * checker holds the module to these shapes.
  *
  * Calories: HKWorkout.totalEnergyBurned is "the total active energy burned
  * during the workout" (Apple's documentation; deprecated in iOS 18 for the

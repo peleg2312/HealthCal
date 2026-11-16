@@ -169,7 +169,7 @@ module.exports = [
     route: '/settings/health-sync',
     health: { demo: iphone({ availability: 'not-entitled', access: { workouts: false, activeEnergy: false, totalEnergy: false, distance: false, steps: false } }) },
     waitFor: 'health-sync-problem-not-entitled',
-    note: 'iPhone: a copy signed with a free Apple ID, which HealthKit refuses',
+    note: 'iPhone: a copy sideloaded with a free Apple ID (no HealthKit entitlement), which HealthKit refuses',
   },
   {
     id: 'health-sync-android-steps-off',
