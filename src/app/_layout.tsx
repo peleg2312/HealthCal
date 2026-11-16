@@ -132,12 +132,28 @@ function Navigation() {
  * Native elements on purpose: the theme or fonts may be what failed.
  */
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  // What failed, in the app's own words: shown small so a screenshot of this screen is enough to
+  // find the fault, and written to the device log. It is code text, never anything the person entered.
+  const detail = `${error?.name && error.name !== 'Error' ? `${error.name}: ` : ''}${String(error?.message ?? error)}`.replace(/\s+/g, ' ').slice(0, 400);
+  const where = String(error?.stack ?? '')
+    .split('\n')
+    .slice(1, 4)
+    .map((l) => l.trim().replace(/^at\s+/, '').replace(/\s*\(.*$/, ''))
+    .filter(Boolean)
+    .join(' < ')
+    .slice(0, 160);
+  useEffect(() => {
+    console.error('[HealthCal] screen error:', detail, where);
+  }, [detail, where]);
   return (
     <View style={{ flex: 1, backgroundColor: '#F4EEE5', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
       <RNText style={{ fontSize: 40 }}>🛠️</RNText>
       <RNText style={{ color: '#211913', fontSize: 20, fontWeight: '700', textAlign: 'center' }}>Something went wrong on this screen</RNText>
       <RNText style={{ color: '#5C5046', fontSize: 15, textAlign: 'center' }}>Your data is safe on this device. Try again, and if it keeps happening, restart the app.</RNText>
-      {__DEV__ ? <RNText style={{ color: '#73665A', fontSize: 12, textAlign: 'center' }}>{error.message}</RNText> : null}
+      <RNText testID="error-detail" selectable style={{ color: '#73665A', fontSize: 12, textAlign: 'center' }}>
+        {detail}
+        {where ? `\n${where}` : ''}
+      </RNText>
       <Pressable
         testID="error-retry"
         accessibilityRole="button"
