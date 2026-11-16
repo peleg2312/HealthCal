@@ -14,10 +14,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [macos-26, macos-15, macos-latest]
+        image: [macos-26, xcode-27, macos-15]
     name: ${{ matrix.image }}
     runs-on: ${{ matrix.image }}
     timeout-minutes: 10
+    continue-on-error: true
     steps:
       - name: What this machine is
         shell: bash
