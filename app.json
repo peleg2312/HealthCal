@@ -81,6 +81,14 @@
             "minSdkVersion": 26
           }
         }
+      ],
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "HealthCal reads the workouts and steps you choose from Apple Health to fill your training week. It never writes to Apple Health and never sends this data to the AI functions.",
+          "NSHealthUpdateUsageDescription": false,
+          "background": false
+        }
       ]
     ],
     "experiments": {

@@ -11,7 +11,7 @@
  */
 
 /** True once adapter.ios.ts loads @kingstinct/react-native-healthkit. */
-export const APPLE_HEALTH_IN_APP = false;
+export const APPLE_HEALTH_IN_APP = true;
 
 export interface SyncReach {
   /** The Profile row's line where this build cannot sync. */
