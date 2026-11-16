@@ -3,7 +3,7 @@ import { Eye, EyeOff, KeyRound, Lock, MailCheck, Smartphone, TriangleAlert } fro
 import React, { useEffect, useRef, useState } from 'react';
 import { View, type TextInputInstance } from 'react-native';
 
-import { FadeIn, Note } from '@/features/onboarding/components';
+import { FadeIn } from '@/features/onboarding/components';
 import { SignInGate } from '@/features/onboarding/SignInGate';
 import { breakableEmail } from '@/features/settings/format';
 import { sendPasswordReset, signIn, signUp, updatePassword, useAuth, validateEmail, validatePassword } from '@/services/auth';
@@ -15,23 +15,38 @@ import { Button, goBack, haptic, Header, IconButton, Screen, Text, TextField, to
 type Mode = 'signin' | 'signup' | 'forgot';
 
 const COPY: Record<Mode, { title: string; subtitle: string; submit: string }> = {
-  signin: { title: 'Welcome back', subtitle: 'Sign in to pick up your plan and logs on this device.', submit: 'Sign in' },
-  signup: { title: 'Create your account', subtitle: 'Free, and only used to back up and sync your data. No marketing email.', submit: 'Create account' },
-  forgot: { title: 'Reset your password', subtitle: "Enter your account email and we'll send a link to choose a new password.", submit: 'Send reset link' },
+  signin: { title: 'Welcome back', subtitle: 'Your plan and logs come back on this device.', submit: 'Sign in' },
+  signup: { title: 'Create your account', subtitle: 'Free, and used only to back up and sync.', submit: 'Create account' },
+  forgot: { title: 'Reset your password', subtitle: "We'll email you a link to choose a new one.", submit: 'Send reset link' },
 };
 
+/**
+ * How this screen was opened from an email. The sign-up confirmation link comes back to
+ * /auth?mode=signin: with `code` once the address is confirmed (on web the backend client then
+ * signs in by itself when this browser asked for the link), or with `error_code` when the link
+ * expired or was used. Read once on arrival, before the client tidies the address.
+ */
+type FromEmail = 'confirmed' | 'failed' | null;
+function fromEmailOf(params: Record<string, string | string[] | undefined>): FromEmail {
+  const hash = typeof window !== 'undefined' && typeof window.location?.hash === 'string' ? window.location.hash : '';
+  if (params.error_code || params.error_description || /error_code=/.test(hash)) return 'failed';
+  if (params.code) return 'confirmed';
+  return null;
+}
+
 export default function Auth() {
-  const params = useLocalSearchParams<{ mode?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; code?: string; error_code?: string; error_description?: string }>();
+  const [fromEmail] = useState<FromEmail>(() => fromEmailOf(params));
   const initial: Mode = params.mode === 'signup' ? 'signup' : params.mode === 'forgot' ? 'forgot' : 'signin';
   // Someone already signed in has nothing to do here.
   const [arrivedSignedIn, setArrivedSignedIn] = useState(() => !!useAuth.getState().session && params.mode !== 'reset');
   if (!isBackendConfigured) return <NotConfigured />;
   if (params.mode === 'reset') return <ResetPassword />;
   if (arrivedSignedIn) return <SignInGate waitFirst={useAuth.getState().restoring} onCancelled={() => setArrivedSignedIn(false)} />;
-  return <AuthForm initial={initial} />;
+  return <AuthForm initial={initial} fromEmail={initial === 'signin' ? fromEmail : null} />;
 }
 
-function AuthForm({ initial }: { initial: Mode }) {
+function AuthForm({ initial, fromEmail }: { initial: Mode; fromEmail: FromEmail }) {
   const { colors, spacing } = useTheme();
   const [mode, setMode] = useState<Mode>(initial);
   const [email, setEmail] = useState('');
@@ -43,8 +58,17 @@ function AuthForm({ initial }: { initial: Mode }) {
   const [signedIn, setSignedIn] = useState(false);
   const [done, setDone] = useState<null | 'confirm' | 'reset'>(null);
   const passwordRef = useRef<TextInputInstance>(null);
+  // Opened from the confirmation email in the browser that asked for it: the backend client signs in by itself.
+  const signedInByLink = useAuth((s) => !!s.session) && !!fromEmail && !signedIn && done === null;
 
-  const copy = COPY[mode];
+  // Arriving from the confirmation email says so, in the title and the line under it.
+  const arrival = mode === 'signin' && fromEmail ? fromEmail : null;
+  const copy =
+    arrival === 'confirmed'
+      ? { ...COPY.signin, title: 'Email confirmed', subtitle: 'Sign in to finish. Your plan then syncs here.' }
+      : arrival === 'failed'
+        ? { ...COPY.signin, subtitle: 'That link no longer works. Sign in, or sign up again for a new one.' }
+        : COPY[mode];
 
   const switchMode = (m: Mode) => {
     setMode(m);
@@ -92,7 +116,7 @@ function AuthForm({ initial }: { initial: Mode }) {
     }
   };
 
-  if (signedIn) {
+  if (signedIn || signedInByLink) {
     return (
       <SignInGate
         onCancelled={() => {
@@ -134,11 +158,15 @@ function AuthForm({ initial }: { initial: Mode }) {
           <View style={{ width: 72, height: 72, alignItems: 'center', justifyContent: 'center' }}>
             <MailCheck size={40} color={colors.text} strokeWidth={1.6} />
           </View>
-          <Text variant="body" color="textSecondary" align="center">
-            {confirm
-              ? `We sent a confirmation link to ${breakableEmail(email.trim())}. Open it on this device, then sign in. Your data stays on this device in the meantime.`
-              : `If an account exists for ${breakableEmail(email.trim())}, a link to choose a new password is on its way. It can take a minute; check spam too.`}
-          </Text>
+          {/* Two lines: where the link went, and what to do with it. */}
+          <View style={{ gap: spacing.xs }}>
+            <Text variant="bodyStrong" align="center" testID="auth-done-sent">
+              {confirm ? `We sent a link to ${breakableEmail(email.trim())}.` : `If ${breakableEmail(email.trim())} has an account, a link is on its way.`}
+            </Text>
+            <Text variant="body" color="textSecondary" align="center" testID="auth-done-next">
+              {confirm ? 'Open it to confirm your email, then sign in here.' : 'Open it on this device to choose a new password.'}
+            </Text>
+          </View>
         </FadeIn>
       </Screen>
     );
@@ -148,22 +176,8 @@ function AuthForm({ initial }: { initial: Mode }) {
     <Screen
       testID="auth-screen"
       header={<Header title={copy.title} subtitle="Account and sync" onBack={() => (mode === 'forgot' && initial !== 'forgot' ? switchMode('signin') : goBack('/welcome'))} />}
-      contentStyle={{ gap: spacing.xxl }}
-      footer={
-        <View style={{ gap: spacing.sm }}>
-          <Button title={copy.submit} testID="auth-submit" onPress={submit} loading={busy} />
-          {mode !== 'forgot' ? (
-            <Button
-              title={mode === 'signin' ? 'New here? Create an account' : 'Already have an account? Sign in'}
-              variant="ghost"
-              size="md"
-              testID="auth-switch-mode"
-              disabled={busy}
-              onPress={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}
-            />
-          ) : null}
-        </View>
-      }>
+      contentStyle={{ gap: spacing.xl }}
+      footer={<Button title={copy.submit} testID="auth-submit" onPress={submit} loading={busy} />}>
       {/* The title is the header's; what the form is for is the line under it here. */}
       <FadeIn key={mode}>
         <Text variant="body" color="textSecondary">
@@ -214,7 +228,7 @@ function AuthForm({ initial }: { initial: Mode }) {
               onSubmitEditing={() => void submit()}
               editable={!busy}
               error={fieldErrors.password}
-              hint={mode === 'signup' ? 'At least 8 characters. A short phrase is easy to remember.' : undefined}
+              hint={mode === 'signup' ? 'A short phrase is easy to remember.' : undefined}
               right={
                 <IconButton
                   tone="clear"
@@ -226,6 +240,8 @@ function AuthForm({ initial }: { initial: Mode }) {
                 </IconButton>
               }
             />
+            {/* An error from the server sits right under the fields it is about, not in a box of its own. */}
+            <FormError message={formError} testID="auth-error" />
             {mode === 'signin' ? (
               <Text
                 variant="label"
@@ -238,17 +254,22 @@ function AuthForm({ initial }: { initial: Mode }) {
               </Text>
             ) : null}
           </View>
-        ) : null}
-
-        {formError ? (
-          <Note tone="warning" icon={<TriangleAlert size={18} color={colors.warningInk} />} testID="auth-error">
-            <Text variant="body" accessibilityLiveRegion="polite">
-              {formError}
-            </Text>
-          </Note>
-        ) : null}
-
+        ) : (
+          <FormError message={formError} testID="auth-error" />
+        )}
       </View>
+
+      {mode !== 'forgot' ? (
+        // The other way in, below the form: the footer holds the one action.
+        <Button
+          title={mode === 'signin' ? 'New here? Create an account' : 'Already have an account? Sign in'}
+          variant="ghost"
+          size="md"
+          testID="auth-switch-mode"
+          disabled={busy}
+          onPress={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}
+        />
+      ) : null}
 
       {mode === 'signup' ? (
         <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
@@ -261,6 +282,22 @@ function AuthForm({ initial }: { initial: Mode }) {
         </View>
       ) : null}
     </Screen>
+  );
+}
+
+/** A server's answer about the form, right under the fields it is about: a field error's colour, with a mark for those who cannot tell colours apart. */
+function FormError({ message, testID }: { message: string | null; testID: string }) {
+  const { colors, spacing } = useTheme();
+  if (!message) return null;
+  return (
+    <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }} testID={testID}>
+      <View style={{ paddingTop: 1 }}>
+        <TriangleAlert size={16} color={colors.danger} strokeWidth={2.2} />
+      </View>
+      <Text variant="caption" color="danger" accessibilityLiveRegion="polite" style={{ flex: 1 }}>
+        {message}
+      </Text>
+    </View>
   );
 }
 
@@ -320,7 +357,7 @@ function ResetPassword() {
             <KeyRound size={40} color={colors.warningInk} strokeWidth={1.6} />
           </View>
           <Text variant="body" color="textSecondary" align="center">
-            A link works once, for about an hour, and only on the device that asked for it. If you opened it somewhere else, or it is older, send a new one.
+            A link works once, for about an hour, on the device that asked for it. Send a new one.
           </Text>
         </FadeIn>
       </Screen>
@@ -368,7 +405,7 @@ function ResetPassword() {
       footer={<Button title="Save new password" testID="auth-reset-submit" onPress={submit} loading={busy} />}>
       <FadeIn>
         <Text variant="body" color="textSecondary">
-          You are signed in from the reset link. Pick a password for next time; your plan and logs then load as usual.
+          Pick a password for next time. Your plan and logs then load as usual.
         </Text>
       </FadeIn>
       <View style={{ gap: spacing.lg }}>
@@ -390,7 +427,7 @@ function ResetPassword() {
           onSubmitEditing={() => confirmRef.current?.focus()}
           editable={!busy}
           error={errors.password}
-          hint="At least 8 characters. A short phrase is easy to remember."
+          hint="A short phrase is easy to remember."
           right={eye}
         />
         <TextField
@@ -413,13 +450,7 @@ function ResetPassword() {
           editable={!busy}
           error={errors.confirm}
         />
-        {formError ? (
-          <Note tone="warning" icon={<TriangleAlert size={18} color={colors.warningInk} />} testID="auth-reset-error">
-            <Text variant="body" accessibilityLiveRegion="polite">
-              {formError}
-            </Text>
-          </Note>
-        ) : null}
+        <FormError message={formError} testID="auth-reset-error" />
       </View>
     </Screen>
   );

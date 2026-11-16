@@ -183,16 +183,13 @@ function GoalsForm() {
           </Text>
           <Text variant="unit">kcal a day</Text>
         </View>
-        <Text variant="caption" color="textSecondary">
+        {/* The explanation, said once: how the number relates to what you burn. 8 px under the big number. */}
+        <Text variant="caption" color="textSecondary" style={{ marginTop: spacing.sm }} testID="goals-preview-why">
           {model.target.source === 'override'
-            ? `Set by you. Estimated expenditure is ${formatNumber(Math.round(model.tdee))} kcal.`
-            : `Expenditure ${formatNumber(Math.round(model.tdee))} kcal${model.usingAdaptive ? ' (the formula blended with your logs and weigh-ins)' : ''}, ${
-                model.target.dailyDelta < -5
-                  ? `${formatNumber(Math.round(-model.target.dailyDelta))} kcal below`
-                  : model.target.dailyDelta > 5
-                    ? `${formatNumber(Math.round(model.target.dailyDelta))} kcal above`
-                    : 'matched'
-              }.`}
+            ? `Set by you. You burn about ${formatNumber(Math.round(model.tdee))} kcal a day.`
+            : Math.abs(model.target.dailyDelta) <= 5
+              ? `Matched to the ${formatNumber(Math.round(model.tdee))} kcal you burn a day.`
+              : `${formatNumber(Math.round(Math.abs(model.target.dailyDelta)))} kcal ${model.target.dailyDelta < 0 ? 'below' : 'above'} the ${formatNumber(Math.round(model.tdee))} kcal you burn a day.`}
         </Text>
         {model.target.belowFloor && draft.goal === 'lose' && model.target.source !== 'override' ? (
           <Text variant="caption" color="warningInk" style={{ marginTop: 4 }}>
@@ -212,15 +209,14 @@ function GoalsForm() {
             <PreviewStat label="Water" value={formatVolume(water, u)} color={colors.water} />
           </View>
           <Text variant="caption" color="textSecondary" testID="goals-preview-note">
-            {effective.eatBackExercise
-              ? 'For a day without workouts. A logged workout adds its calories to that day, which raises the carbs, fat and water for it.'
-              : 'For a day without workouts. A logged workout raises that day’s water goal.'}
+            {effective.eatBackExercise ? 'On a day without workouts. A logged workout raises that day.' : 'On a day without workouts. A workout raises that day’s water.'}
           </Text>
         </View>
         {draft.goal !== 'maintain' ? (
           <Text variant="label" color="text" style={{ marginTop: spacing.md }}>
             {projected
-              ? `Reaching ${formatWeight(effective.targetWeightKg ?? 0, u)} around ${formatMonthDayYear(projected)}, at ${formatWeight(Math.abs(model.target.impliedWeeklyKg), u, 2)} a week.`
+              ? // The pace is the stepper's below, unless the calorie minimum slows it.
+                `Reaching ${formatWeight(effective.targetWeightKg ?? 0, u)} around ${formatMonthDayYear(projected)}${model.target.limitedByFloor || model.target.source === 'override' ? `, at ${formatWeight(Math.abs(model.target.impliedWeeklyKg), u, 2)} a week` : ''}.`
               : effective.targetWeightKg
                 ? 'At this target the weight would not move toward your goal.'
                 : 'Add a target weight to see a projected date.'}
@@ -250,7 +246,7 @@ function GoalsForm() {
                 value={draft.targetWeightKg ? Math.round(weightValue(draft.targetWeightKg, u) * 10) / 10 : null}
                 onChange={(v) => patch({ targetWeightKg: v ? weightToKg(v, u) : undefined })}
                 error={targetMessage}
-                hint={`Now ${formatWeight(draft.weightKg, u)}. Log new weigh-ins on the weight screen.`}
+                hint={`Now ${formatWeight(draft.weightKg, u)}`}
               />
               <View style={{ gap: spacing.sm }}>
                 <Text variant="label" color="textSecondary">
@@ -273,18 +269,17 @@ function GoalsForm() {
                   />
                 </View>
                 <Hint>
-                  Safe maximum {formatWeight(maxRate, u, 2)} a week ({draft.goal === 'lose' ? '1%' : '0.5%'} of body weight). Slower is easier to keep
-                  {draft.goal === 'lose' ? ' and protects muscle' : ' and limits fat gain'}.
+                  Safe maximum {formatWeight(maxRate, u, 2)} a week ({draft.goal === 'lose' ? '1%' : '0.5%'} of body weight)
                 </Hint>
               </View>
             </>
           ) : (
-            <Hint>Your budget matches your estimated expenditure, so weight stays steady.</Hint>
+            <Hint>Your budget matches what you burn, so weight stays steady.</Hint>
           )}
         </View>
       </Group>
 
-      <Group title="Everyday activity" footer="Movement outside logged workouts. Workouts are added on top, so do not count them here.">
+      <Group title="Everyday activity" footer="Outside workouts, which are added on top.">
         {(Object.keys(ACTIVITY_LABELS) as ActivityLevel[]).map((level) => (
           <OptionRow
             key={level}
@@ -297,7 +292,7 @@ function GoalsForm() {
         ))}
       </Group>
 
-      <Group title="Body details" footer="These feed the resting metabolism equation. Body fat is optional; when known, lean mass is used.">
+      <Group title="Body details" footer="Used to estimate your resting metabolism.">
         <View style={{ paddingVertical: spacing.md, gap: spacing.md }}>
           <Segmented<Sex>
             testID="goals-sex"
@@ -371,7 +366,7 @@ function GoalsForm() {
             value={draft.bodyFatPct ?? null}
             onChange={(v) => patch({ bodyFatPct: v ?? undefined })}
             error={bodyFatValid ? null : 'Enter a value between 3 and 60 %, or leave it empty.'}
-            hint="Smart scales and tape estimates vary by a few points. The result stays close to the standard equation either way."
+            hint="A rough figure is fine"
           />
         </View>
       </Group>
@@ -409,7 +404,7 @@ function GoalsForm() {
           <Hint>
             {manualCalories
               ? 'Use this if a dietitian or coach gave you a number.'
-              : 'Worked out from your body, activity and pace. Updates as your weight changes.'}
+              : 'Follows your weight as it changes.'}
           </Hint>
         </View>
       </Group>
@@ -462,7 +457,7 @@ function GoalsForm() {
           ) : null}
           <Hint>
             {macroMode === 'auto'
-              ? `Protein from your body weight and goal (${macros.proteinG} g), fat at about 28%, the rest from carbs.`
+              ? 'Protein from your weight and goal, fat about 28%, the rest carbs.'
               : macroMode === 'custom'
                 ? 'Your own split of daily calories.'
                 : `${pct(PRESETS[macroMode].split.protein)}% protein, ${pct(PRESETS[macroMode].split.carbs)}% carbs, ${pct(PRESETS[macroMode].split.fat)}% fat.`}
@@ -505,7 +500,7 @@ function GoalsForm() {
           <Hint>
             {manualWater
               ? 'A fixed goal; workouts no longer add to it.'
-              : `From your body weight, ${formatVolume(baseWaterGoalMl(draft.weightKg, draft.sex), u)} on rest days, more on days you log exercise.`}
+              : `From your body weight. More on days you log exercise.`}
           </Hint>
         </View>
       </Group>
@@ -514,7 +509,7 @@ function GoalsForm() {
         title="How the budget works"
         footer={
           model.adaptive.observed === null
-            ? `Learn from my data compares what you log with a straight line through your weigh-ins of the last four weeks. It needs ${model.adaptive.needs ?? 'a little more data'}.`
+            ? `Learning starts after ${model.adaptive.needs ?? 'a little more data'}.`
             : undefined
         }>
         <ToggleRow

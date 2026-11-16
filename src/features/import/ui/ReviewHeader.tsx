@@ -61,10 +61,17 @@ export function SummaryCard({ counts, addedKcal, csvLine, onChangeCsv }: { count
           </View>
         ) : null}
       </View>
-      <Divider />
-      <Text variant="caption" color="textSecondary" testID="import-net-note">
-        Garmin’s calories include what your body burns at rest anyway. Only the part above resting is added to each day’s budget, so nothing is counted twice.
-      </Text>
+      {allKnown ? null : <Divider />}
+      {/* One line; the reason (Garmin's total includes resting) is in its accessibility label. */}
+      {allKnown ? null : (
+        <Text
+          variant="caption"
+          color="textSecondary"
+          testID="import-net-note"
+          accessibilityLabel="Garmin’s calories include what your body burns at rest anyway. Only the part above resting is added to each day’s budget, so nothing is counted twice.">
+          Only the part above resting is added, so nothing counts twice.
+        </Text>
+      )}
       {csvLine ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
           <Text variant="caption" color="textSecondary" style={{ flex: 1 }} testID="import-csv-line">
@@ -179,7 +186,7 @@ export function ListControls({
           {paced > 0 ? (
             <Text variant="caption" color="textSecondary" testID="import-effort-note">
               {intensity === null
-                ? `From pace: the average pace sets the effort${paced < estimates ? ', and moderate is used where there is no pace' : ''}. The file’s time includes pauses, so a session with stops can read easier than it was.`
+                ? `The average pace sets the effort${paced < estimates ? ', moderate where there is none' : ''}. Pauses count as time, so a stop-start session can read easier.`
                 : `${INTENSITY_LABELS[intensity].title} is used for ${estimates === 1 ? 'this workout' : `all ${estimates}`}, whatever the pace.`}
             </Text>
           ) : null}

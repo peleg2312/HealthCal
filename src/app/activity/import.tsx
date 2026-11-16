@@ -129,16 +129,16 @@ export default function ImportScreen() {
   if (phase === 'review') {
     const nothing = rows.length === 0;
     const allLocked = !nothing && counts.locked === counts.total;
-    const footer = nothing ? (
+    // Nothing to import (no workouts, or every one already in HealthCal): the one useful action is other files.
+    const footer = nothing || allLocked ? (
       <Button testID="import-choose-again" title="Choose other files" onPress={() => void choose()} loading={picking} />
     ) : (
       <View style={{ gap: spacing.sm }}>
         <Text variant="caption" color="textSecondary" align="center" testID="import-footer-line">
+          {/* The kcal is the summary's large number; the footer says only where it goes (and an update's change, which the summary does not show). */}
           {toSave.length
-            ? `${updating ? 'Changes the budget by ' : ''}${addedKcal < 0 ? '−' : '+'}${formatNumber(Math.abs(addedKcal))} kcal above resting, across ${new Set(toSave.map((e) => e.date)).size === 1 ? 'one day' : `${new Set(toSave.map((e) => e.date)).size} days`}`
-            : allLocked
-              ? 'Everything in these files is already in HealthCal.'
-              : 'Tick the workouts to import.'}
+            ? `${updating && addedKcal <= 0 ? `Changes the budget by ${addedKcal < 0 ? '−' : '+'}${formatNumber(Math.abs(addedKcal))} kcal, across ` : 'Goes to '}${new Set(toSave.map((e) => e.date)).size === 1 ? 'one day' : `${new Set(toSave.map((e) => e.date)).size} days`}`
+            : 'Tick the workouts to import.'}
         </Text>
         <Button
           testID="import-submit"
@@ -152,7 +152,7 @@ export default function ImportScreen() {
             <Card testID="import-nothing">
               <EmptyState
                 title="No workouts in these files"
-                message="Nothing here could be imported. The notes below say why for each file. Garmin’s Export Original, TCX, GPX and the Activities list CSV all work."
+                message="The notes below say why for each file."
               />
             </Card>
             <FileNotes notes={notes} />
@@ -198,9 +198,11 @@ export default function ImportScreen() {
               </Text>
             }
             ListFooterComponent={
-              <View style={{ paddingTop: spacing.lg, alignItems: 'flex-start' }}>
-                <TextLink testID="import-other-files" label="Choose other files" onPress={() => void choose()} />
-              </View>
+              allLocked ? undefined : (
+                <View style={{ paddingTop: spacing.lg, alignItems: 'flex-start' }}>
+                  <TextLink testID="import-other-files" label="Choose other files" onPress={() => void choose()} />
+                </View>
+              )
             }
             renderItem={({ item }) => (
               <WorkoutRow row={item} units={profile.units} hour12={hour12} todayDate={todayDate} onToggle={toggleRow} onChoose={setChoosing} onRestore={(k) => restoreDeleted([k])} onReplace={replaceHandLogged} />

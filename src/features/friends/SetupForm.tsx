@@ -48,7 +48,7 @@ export function SetupForm({ header, defaultName, onDone }: { header: React.React
         </View>
       }>
       <Text variant="body" color="textSecondary">
-        Add people with a code and see each other&apos;s training week. You choose what they see, and you can change it any time.
+        See each other&apos;s training week. You choose what friends see, and can change it any time.
       </Text>
       <Card testID="friends-setup">
         <View style={{ gap: spacing.xl }}>

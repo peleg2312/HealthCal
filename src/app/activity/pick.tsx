@@ -5,12 +5,11 @@ import { FlatList, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ACTIVITIES, ACTIVITY_BY_ID, ACTIVITY_CATEGORIES, POPULAR_ACTIVITY_IDS, searchActivities } from '@/data/activities';
-import { ActivityTile } from '@/features/activity/components';
 import { formatDayLabel, today } from '@/lib/dates';
 import { useStore } from '@/store';
-import { useTheme } from '@/theme';
+import { cup, useTheme } from '@/theme';
 import type { ActivityCategory, ActivityDef } from '@/types';
-import { Chip, ChipRow, Divider, EmptyState, Header, ListRow, Screen, SectionTitle, Sheet, Text, TextField } from '@/ui';
+import { Chip, ChipRow, Divider, EmptyState, Header, ListRow, PressableScale, Screen, SectionTitle, Sheet, Text, TextField } from '@/ui';
 
 const CATEGORY_LABEL = Object.fromEntries(ACTIVITY_CATEGORIES.map((c) => [c.id, c.label])) as Record<ActivityCategory, string>;
 
@@ -25,10 +24,8 @@ function ActivitySeparator() {
 }
 
 export default function PickActivityScreen() {
-  const { colors, spacing } = useTheme();
-  // Four tiles a row leave a 320 px phone about 40 px for a name, so 'Strength training' would break mid-word: three there.
+  const { colors, radius, spacing } = useTheme();
   const width = useWindowDimensions().width;
-  const cols = width < 340 ? 3 : 4;
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ date?: string }>();
   const date = typeof params.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : today();
@@ -57,24 +54,39 @@ export default function PickActivityScreen() {
     .slice(0, 8);
   const showShortcuts = !searching && category === 'all';
 
-  const grid = (items: ActivityDef[], prefix: string) => {
-    const rows: ActivityDef[][] = [];
-    for (let i = 0; i < items.length; i += cols) rows.push(items.slice(i, i + cols));
-    return (
-      <View style={{ gap: spacing.sm }}>
-        {rows.map((row, i) => (
-          <View key={i} style={{ flexDirection: 'row', gap: spacing.sm }}>
-            {row.map((a) => (
-              <ActivityTile key={a.id} emoji={a.emoji} name={a.name} testID={`${prefix}-${a.id}`} onPress={() => choose(a)} />
-            ))}
-            {Array.from({ length: cols - row.length }, (_, k) => (
-              <View key={`pad-${k}`} style={{ flex: 1 }} />
-            ))}
-          </View>
-        ))}
-      </View>
-    );
-  };
+  // Train's Quick start rule (QuickStartTiles): each tile is as wide as its emoji and its whole name and
+  // the tiles wrap, so a name never breaks inside a word ("Volleyba/ll") at any width.
+  const grid = (items: ActivityDef[], prefix: string) => (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }} testID={`${prefix}-tiles`}>
+      {items.map((a) => (
+        <PressableScale
+          key={a.id}
+          testID={`${prefix}-${a.id}`}
+          accessibilityLabel={a.name}
+          onPress={() => choose(a)}
+          scaleTo={0.96}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.sm,
+            minHeight: 48,
+            maxWidth: '100%',
+            paddingVertical: 8,
+            paddingLeft: 12,
+            paddingRight: 14,
+            ...cup(radius.tile, 5),
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}>
+          <Text style={{ fontSize: 17, lineHeight: 22 }}>{a.emoji}</Text>
+          <Text variant="label" style={{ flexShrink: 1 }}>
+            {a.name}
+          </Text>
+        </PressableScale>
+      ))}
+    </View>
+  );
 
   return (
     <Screen
@@ -131,7 +143,7 @@ export default function PickActivityScreen() {
           <EmptyState
             emoji="🔎"
             title="No activity matches"
-            message={`Nothing found for "${query.trim()}"${category === 'all' ? '' : ` in ${CATEGORY_LABEL[category].toLowerCase()}`}. Try a broader word like "ball", "swim" or "dance", or pick the closest activity with a similar effort.`}
+            message={`Nothing found for "${query.trim()}"${category === 'all' ? '' : ` in ${CATEGORY_LABEL[category].toLowerCase()}`}. Try a broader word like "ball", "swim" or "dance".`}
             action={category === 'all' ? 'Clear search' : 'Search all categories'}
             onAction={() => (category === 'all' ? setQuery('') : setCategory('all'))}
           />

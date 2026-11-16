@@ -10,7 +10,7 @@ import { formatVolume, formatWeight, volumeToMl, volumeUnit, volumeValue } from 
 import { useToday } from '@/store/clock';
 import { DEFAULT_SETTINGS, useStore } from '@/store';
 import { useDay, useDays, useProfile } from '@/store/selectors';
-import { Figure, Note, RequireProfile, splitUnit, Tile } from '@/features/trackers/components';
+import { Note, RequireProfile, splitUnit, Tile } from '@/features/trackers/components';
 import { dayTitle, resolveDateParam } from '@/features/trackers/dateParam';
 import { keepOrConvert, MAX_PRESET_ML, MIN_PRESET_ML, normalizePresets } from '@/features/trackers/helpers';
 import { FadeRow, useLeavingRows } from '@/features/food/rowMotion';
@@ -25,6 +25,7 @@ import {
   Card,
   Chip,
   ChipRow,
+  CupKey,
   Divider,
   EmptyState,
   FadeUp,
@@ -53,12 +54,16 @@ function loggedLabel(e: WaterEntry): string {
   return toISODate(new Date(e.loggedAt)) === e.date ? clockTime(e.loggedAt) : 'Added later';
 }
 
-/** One line on drinks that count less, built from the factors so it never drifts from the maths. */
-function factorLine(): string {
-  const less = BEVERAGES.filter((b) => HYDRATION_FACTOR[b] < 1)
-    .map((b) => `${BEVERAGE_LABELS[b].label.toLowerCase()} ${Math.round(HYDRATION_FACTOR[b] * 100)}%`)
-    .join(', ');
-  return `Some drinks count slightly less toward your goal: ${less}. Water, tea and sports drinks count in full.`;
+/** One line on how the chosen drink counts, built from the factors so it never drifts from the maths. */
+function factorLine(beverage: Beverage): string {
+  const factor = HYDRATION_FACTOR[beverage];
+  if (factor < 1) {
+    const name = beverage === 'other' ? 'Other drinks count' : `${BEVERAGE_LABELS[beverage].label} counts`;
+    return `${name} as ${Math.round(factor * 100)}% toward your goal.`;
+  }
+  const full = BEVERAGES.filter((b) => HYDRATION_FACTOR[b] >= 1).map((b) => BEVERAGE_LABELS[b].label.toLowerCase().replace(/drink$/, 'drinks'));
+  const list = `${full.slice(0, -1).join(', ')} and ${full[full.length - 1]}`;
+  return `${list[0].toUpperCase()}${list.slice(1)} count in full.`;
 }
 
 /**
@@ -141,7 +146,6 @@ function WaterScreen() {
   const entries = showAllLog ? allEntries : allEntries.slice(0, 6);
   // A removed drink fades where it is before the rows below glide up into its place.
   const rows = useLeavingRows(entries);
-  const goalParts = splitUnit(formatVolume(goal, units));
   const extraParts = splitUnit(formatVolume(Math.max(0, shownMl(consumed, units) - shownMl(goal, units)), units));
 
   const baseMl = baseWaterGoalMl(profile.weightKg, profile.sex);
@@ -168,6 +172,8 @@ function WaterScreen() {
           width={narrow ? 76 : 96}
           height={220}
           labelGap={narrow ? 14 : 18}
+          // Labels that meet at some level keep 8 px between them, at every value.
+          labelSpacing={8}
           accessibilityLabel={`${formatVolume(consumed, units)} of ${formatVolume(goal, units)}`}
           labels={[
             {
@@ -223,28 +229,30 @@ function WaterScreen() {
           ]}
         />
 
-        {reached ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Check size={18} color={colors.text} strokeWidth={2.2} />
-            <Text testID="water-goal-reached" variant="bodyStrong">
-              {isToday ? 'Goal reached for today' : `Goal reached on ${dayName}`}
-            </Text>
-          </View>
-        ) : (
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
-            <AnimatedNumber testID="water-left" variant="numL" value={left} format={(ml) => volumeNumber(ml, left, units, leftLitreDecimals(left))} accessibilityLabel={`${formatVolume(left, units)} left to drink`} />
-            <Text variant="unit" style={{ fontSize: 15 }}>
-              {`${volumeUnitFor(left, units)} left to drink`}
-            </Text>
-          </View>
-        )}
-
-        <View style={{ flexDirection: 'row', alignSelf: 'stretch', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md }}>
-          <Figure value={goalParts.value} unit={goalParts.unit} label="Goal" />
+        {/* The goal is the cup's top label; under the cup only what is left (or the extra), said once. */}
+        <View style={{ gap: 2 }}>
           {reached ? (
-            <Figure value={extraParts.value} unit={extraParts.unit} label={isToday ? 'Extra today' : 'Extra'} color="water" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Check size={18} color={colors.text} strokeWidth={2.2} />
+              <Text testID="water-goal-reached" variant="bodyStrong">
+                {isToday ? 'Goal reached for today' : `Goal reached on ${dayName}`}
+              </Text>
+            </View>
           ) : (
-            <Figure value={String(glassesLeft(left, glassMl))} label={`× ${formatVolume(glassMl, units)} to go`} color="water" />
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+              <AnimatedNumber testID="water-left" variant="numL" value={left} format={(ml) => volumeNumber(ml, left, units, leftLitreDecimals(left))} accessibilityLabel={`${formatVolume(left, units)} left to drink`} />
+              <Text variant="unit" style={{ fontSize: 15 }}>
+                {`${volumeUnitFor(left, units)} left to drink`}
+              </Text>
+            </View>
+          )}
+          {reached && extraParts.value === '0' ? null : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} testID="water-glasses">
+              <CupKey color={colors.water} />
+              <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
+                {reached ? `${extraParts.value} ${extraParts.unit} past the goal` : `About ${glassesLeft(left, glassMl)} × ${formatVolume(glassMl, units)} to go`}
+              </Text>
+            </View>
           )}
         </View>
       </Card>
@@ -317,7 +325,7 @@ function WaterScreen() {
           }}
         />
       </View>
-      <Note icon={<Info size={14} color={colors.textSecondary} />}>{factorLine()}</Note>
+      <Note icon={<Info size={14} color={colors.textSecondary} />}>{factorLine(beverage)}</Note>
 
       <SectionTitle
         title={isToday ? 'Today’s log' : `Log for ${dayName}`}
@@ -370,7 +378,7 @@ function WaterScreen() {
       <SectionTitle title={isToday ? 'Last 7 days' : `7 days to ${dayTitle(date)}`} />
       <Card style={{ gap: spacing.md }}>
         <Text variant="caption" color="textSecondary">
-          {week.some((d) => d.waterMl > 0) ? `Goal met on ${daysMet} of 7 days.` : 'Bars fill in as you log drinks.'} Dashed line: {isToday ? 'today’s' : 'the day’s'} goal of {formatVolume(goal, units).replace(/ /g, '\u00A0')}.
+          {week.some((d) => d.waterMl > 0) ? `Goal met on ${daysMet} of 7 days.` : 'Bars fill in as you log drinks.'} Dashed line: the goal.
         </Text>
         <BarChart
           data={bars}

@@ -17,7 +17,7 @@ import { cheerFriend, leaveSocial, refreshFriends, removeFriend, respondToReques
 import { useNow, useToday } from '@/store/clock';
 import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
-import { Button, Card, ConfirmSheet, EmptyState, Header, IconButton, Screen, SectionTitle, Text, toast } from '@/ui';
+import { Button, Card, ConfirmSheet, EmptyState, goBack, Header, IconButton, Screen, SectionTitle, Text, toast } from '@/ui';
 
 export default function FriendsScreen() {
   const { colors, spacing } = useTheme();
@@ -126,9 +126,13 @@ export default function FriendsScreen() {
     return (
       <Screen header={header} testID="friends-screen">
         <Card testID="friends-unavailable">
+          {/* Two lines and the one thing left to do here: go back to the day. */}
           <EmptyState
             title="Friends need an account"
-            message="This version of HealthCal has no accounts, so friends are not available. Everything else works on this device."
+            message="This version has no accounts. Everything else works on this device."
+            action="Back to Today"
+            actionTestID="friends-back-today"
+            onAction={() => goBack('/')}
           />
         </Card>
       </Screen>
@@ -138,13 +142,14 @@ export default function FriendsScreen() {
     return (
       <Screen header={header} testID="friends-screen">
         <Card testID="friends-signed-out">
+          {/* Two lines and one action: the account screen also signs in ("Already have an account?"). */}
           <EmptyState
             title="Friends need an account"
-            message="Add friends with a code and see each other's training week: active minutes, streak and workouts. Your calories, weight and food always stay private."
+            message="See each other's training week. Calories, weight and food stay private."
             action="Create a free account"
+            actionTestID="friends-create-account"
             onAction={() => router.push('/auth?mode=signup')}
           />
-          <Button testID="friends-sign-in" title="I have an account" variant="ghost" size="md" onPress={() => router.push('/auth?mode=signin')} />
         </Card>
       </Screen>
     );
@@ -181,6 +186,7 @@ export default function FriendsScreen() {
 
   // ------------------------------------------------ the full screen
   const { friends, incoming, outgoing, cheers } = overview;
+  const inviteCard = <InviteCard code={me.code} sharing={me.sharing} onSettings={() => setSettingsOpen(true)} onShare={() => void shareInvite(me.code)} onCopy={() => void copyText(formatCode(me.code), 'Code copied')} />;
   return (
     <Screen header={header} testID="friends-screen" scrollProps={scrollProps}>
 
@@ -195,9 +201,16 @@ export default function FriendsScreen() {
         </Card>
       ) : null}
 
-      <InviteCard code={me.code} sharing={me.sharing} onSettings={() => setSettingsOpen(true)} onShare={() => void shareInvite(me.code)} onCopy={() => void copyText(formatCode(me.code), 'Code copied')} />
+      {/* What needs an answer first, then the friends' week, then cheers. The invite card comes next only while
+          there is nobody yet; with friends it moves to the end (the header's + also adds someone). */}
+      {incoming.length ? (
+        <View style={{ gap: spacing.md }}>
+          <SectionTitle title="Requests" />
+          <IncomingRequests requests={incoming} busy={busy} onAccept={accept} onDecline={decline} />
+        </View>
+      ) : null}
 
-      {incoming.length ? <IncomingRequests requests={incoming} busy={busy} onAccept={accept} onDecline={decline} /> : null}
+      {friends.length ? null : inviteCard}
 
       {friends.length ? (
         <View style={{ gap: spacing.md }}>
@@ -210,12 +223,19 @@ export default function FriendsScreen() {
         <Card testID="friends-empty">
           <EmptyState
             title="No friends yet"
-            message="Share your code, or enter a friend's. Once they accept, their week shows here: active minutes, streak and workouts to cheer."
+            message="Share your code or enter a friend's. Their week shows here once they accept."
             action="Add a friend"
             onAction={() => router.push('/friends/add' as never)}
           />
         </Card>
       )}
+
+      {cheers.length ? (
+        <View style={{ gap: spacing.md }}>
+          <SectionTitle title="Cheers for you" />
+          <CheersList cheers={cheers} describe={(c) => cheerTarget(c.ref, ownWorkouts, today)} when={(c) => cheerCaption(c.ref, timeAgo(c.createdAt, now))} />
+        </View>
+      ) : null}
 
       {outgoing.length ? (
         <View style={{ gap: spacing.md }}>
@@ -224,12 +244,7 @@ export default function FriendsScreen() {
         </View>
       ) : null}
 
-      {cheers.length ? (
-        <View style={{ gap: spacing.md }}>
-          <SectionTitle title="Cheers for you" />
-          <CheersList cheers={cheers} describe={(c) => cheerTarget(c.ref, ownWorkouts, today)} when={(c) => cheerCaption(c.ref, timeAgo(c.createdAt, now))} />
-        </View>
-      ) : null}
+      {friends.length ? inviteCard : null}
 
       <FriendSheet
         friend={open}

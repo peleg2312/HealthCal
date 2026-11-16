@@ -1,4 +1,3 @@
-import { Info, Ruler } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
@@ -7,12 +6,12 @@ import { formatDayLabel, today } from '@/lib/dates';
 import { isPlausibleBodyFat, leanMassKg } from '@/lib/energy';
 import { formatHeight, lengthToCm, lengthUnit, lengthValue, weightToKg, weightUnit, weightValue } from '@/lib/units';
 import { saveWeightRecord } from '@/features/trackers/actions';
-import { Figure, Note, RequireProfile } from '@/features/trackers/components';
+import { Explain, ExplainText, Figure, RequireProfile } from '@/features/trackers/components';
 import { findByDate, hasMeasurements, keepOrConvert, NAVY_ERROR_PCT, WHTR_GUIDELINE } from '@/features/trackers/helpers';
 import { useLive, useProfile } from '@/store/selectors';
-import { cup, useTheme } from '@/theme';
+import { cup, useTheme, withOpacity } from '@/theme';
 import type { UnitSystem } from '@/types';
-import { Badge, Button, Card, Divider, EmptyState, haptic, Header, ListRow, NumberField, Screen, SectionTitle, Text, toast, ToggleRow } from '@/ui';
+import { Badge, Button, Card, Divider, EmptyState, haptic, Header, ListRow, NumberField, Screen, SectionTitle, Text, ToggleRow } from '@/ui';
 
 function w1(kg: number, units: UnitSystem) {
   return `${weightValue(kg, units).toFixed(1)} ${weightUnit(units)}`;
@@ -115,10 +114,9 @@ function BodyScreen() {
         weightIn === null || weightIn <= 0
           ? 'Enter today’s weight to save measurements'
           : `Enter a weight between ${weightValue(20, units).toFixed(0)} and ${weightValue(400, units).toFixed(0)} ${weightUnit(units)}`;
+      // Said once, under the field: it sits in the same card as the measurements just typed, near the top.
       setWeightError(message);
-      // The field can sit above the fold when the footer button is tapped.
       haptic.warn();
-      toast(message);
       return;
     }
     saveWeightRecord(
@@ -138,7 +136,8 @@ function BodyScreen() {
 
   return (
     <Screen header={<Header title="Body" subtitle={`${formatHeight(profile.heightCm, units)} · ${w1(weightKg, units)}`} />} footer={footer} backdrop={colors.weight} testID="body-screen">
-      <Card style={{ gap: spacing.md }}>
+      {/* First the number, then the tape fields that the footer's button saves; the "why" sits behind info controls. */}
+      <Card style={{ gap: spacing.md }} testID="body-bmi-card">
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View>
             <Text variant="overline" color="textSecondary">
@@ -157,7 +156,7 @@ function BodyScreen() {
           value={bmiValue}
           zones={[
             { to: 18.5, color: colors.track },
-            { to: 25, color: `${colors.success}88` },
+            { to: 25, color: withOpacity(colors.success, 0.53) },
             { to: 30, color: colors.track },
             { to: 35, color: colors.track },
           ]}
@@ -166,43 +165,24 @@ function BodyScreen() {
         <Text variant="body">
           Healthy range for your height: <Text variant="bodyStrong">{`${weightValue(lo, units).toFixed(0)}–${weightValue(hi, units).toFixed(0)} ${weightUnit(units)}`}</Text>
         </Text>
-        <Note icon={<Info size={14} color={colors.textTertiary} />}>
-          BMI only compares weight with height. It cannot tell muscle from fat, so muscular people often read above the range. Waist size and body fat say more.
-        </Note>
-      </Card>
-
-      <Card style={{ gap: spacing.md }}>
-        <Text variant="overline" color="textSecondary">
-          BODY FAT AND LEAN MASS
-        </Text>
-        {bf !== null && lean !== null && ffmiValue !== null ? (
-          <>
-            <View style={{ flexDirection: 'row', gap: spacing.md }}>
-              <Figure testID="body-fat" value={bf.toFixed(1)} unit="%" label="Body fat" color="weight" />
-              <Figure value={weightValue(lean, units).toFixed(1)} unit={weightUnit(units)} label="Lean mass" />
-              <Figure value={ffmiValue.toFixed(1)} label="FFMI" />
-            </View>
-            <Text variant="caption" color="textSecondary">
-              Lean mass is everything that is not fat: muscle, bone, organs and water. FFMI is lean mass for your height; most adults sit between about 15 and 22. Your calorie and protein targets use lean mass when body fat is known.
-            </Text>
-          </>
-        ) : (
-          <Text variant="body" color="textSecondary">
-            Add a body fat reading from a smart scale on the weight screen, or estimate it with a tape measure below. With it, the app shows lean mass and uses it for more accurate targets.
-          </Text>
-        )}
+        <Explain label="What BMI leaves out" testID="body-bmi-help" style={{ marginTop: -spacing.xs, marginBottom: -spacing.sm }}>
+          <ExplainText>BMI only compares weight with height. It cannot tell muscle from fat, so muscular people often read above the range. Waist size and body fat say more.</ExplainText>
+        </Explain>
       </Card>
 
       <SectionTitle title="Tape measure estimate" />
-      <Card style={{ gap: spacing.md }}>
-        <Note icon={<Ruler size={14} color={colors.textTertiary} />}>
-          Measure on bare skin, tape snug but not pressing. Neck just below the Adam’s apple; waist at the navel{female ? ' (or the narrowest point)' : ''}; hips at the widest point.
-        </Note>
+      <Card style={{ gap: spacing.md }} testID="body-tape">
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
           <NumberField testID="body-neck-input" style={{ flex: 1 }} label="Neck" suffix={unit} value={neck} onChange={setNeck} />
           <NumberField testID="body-waist-input" style={{ flex: 1 }} label="Waist" suffix={unit} value={waist} onChange={setWaist} />
           <NumberField testID="body-hip-input" style={{ flex: 1 }} label={female ? 'Hips' : 'Hips (opt.)'} suffix={unit} value={hip} onChange={setHip} />
         </View>
+        <Explain label="How to measure" testID="body-measure-help" style={{ marginTop: -spacing.xs, marginBottom: -spacing.xs }}>
+          <ExplainText>
+            Measure on bare skin, tape snug but not pressing. Neck just below the Adam’s apple; waist at the navel{female ? ' (or the narrowest point)' : ''}; hips at the widest point.
+          </ExplainText>
+          <ExplainText>The US Navy tape method is usually within 3 to 4 percentage points of a lab scan, so use it to follow change over time.</ExplainText>
+        </Explain>
         {todays ? null : (
           <NumberField
             testID="body-weight-input"
@@ -214,7 +194,7 @@ function BodyScreen() {
               setWeightError(null);
             }}
             error={weightError}
-            hint="No weigh-in today yet. Measurements are saved with today’s weight."
+            hint="Measurements are saved with today’s weight."
           />
         )}
         <View style={{ backgroundColor: colors.surfaceAlt, ...cup(radius.tile, 5), padding: spacing.lg, gap: 4 }}>
@@ -229,7 +209,7 @@ function BodyScreen() {
                 </Text>
               </View>
               <Text variant="caption" color="textSecondary">
-                Likely between {Math.max(2, estimate - NAVY_ERROR_PCT).toFixed(0)} and {(estimate + NAVY_ERROR_PCT).toFixed(0)}%. The US Navy tape method is usually within 3 to 4 percentage points of a lab scan, so use it to follow change over time.
+                Likely between {Math.max(2, estimate - NAVY_ERROR_PCT).toFixed(0)} and {(estimate + NAVY_ERROR_PCT).toFixed(0)}%
               </Text>
             </>
           ) : (
@@ -251,6 +231,29 @@ function BodyScreen() {
         ) : null}
       </Card>
 
+      <SectionTitle title="Body fat and lean mass" />
+      <Card style={{ gap: spacing.md }} testID="body-lean">
+        {bf !== null && lean !== null && ffmiValue !== null ? (
+          <>
+            <View style={{ flexDirection: 'row', gap: spacing.md }}>
+              <Figure testID="body-fat" value={bf.toFixed(1)} unit="%" label="Body fat" color="weight" />
+              <Figure value={weightValue(lean, units).toFixed(1)} unit={weightUnit(units)} label="Lean mass" />
+              <Figure value={ffmiValue.toFixed(1)} label="FFMI" />
+            </View>
+            <Explain label="What lean mass and FFMI mean" testID="body-lean-help" style={{ marginTop: -spacing.xs, marginBottom: -spacing.sm }}>
+              <ExplainText>
+                Lean mass is everything that is not fat: muscle, bone, organs and water. FFMI is lean mass for your height; most adults sit between about 15 and 22. Your calorie and
+                protein targets use lean mass when body fat is known.
+              </ExplainText>
+            </Explain>
+          </>
+        ) : (
+          <Text variant="body" color="textSecondary">
+            Add body fat from a smart scale on the weight screen, or with the tape estimate above, to see lean mass and get more accurate targets.
+          </Text>
+        )}
+      </Card>
+
       <SectionTitle title="Waist to height" />
       <Card style={{ gap: spacing.md }}>
         {whtr !== null ? (
@@ -267,7 +270,7 @@ function BodyScreen() {
               max={0.7}
               value={whtr}
               zones={[
-                { to: WHTR_GUIDELINE, color: `${colors.success}88` },
+                { to: WHTR_GUIDELINE, color: withOpacity(colors.success, 0.53) },
                 { to: 0.7, color: colors.track },
               ]}
             />

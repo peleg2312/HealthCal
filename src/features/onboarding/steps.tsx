@@ -1,4 +1,4 @@
-import { Activity, ArrowRight, BellRing, ChevronDown, ChevronUp, CircleHelp, Droplets, Ruler, Scale, Target, TriangleAlert, Utensils } from 'lucide-react-native';
+import { ArrowRight, BellRing, ChevronDown, ChevronUp, CircleHelp, Droplets, Ruler, Scale, Target, TriangleAlert, Utensils } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
@@ -43,8 +43,8 @@ const Group = ({ children, gap }: { children: React.ReactNode; gap?: number }) =
 export function BasicsStep({ draft, set, errors, submit }: StepProps) {
   const { spacing } = useTheme();
   return (
-    <Group gap={spacing.xxl}>
-      <StepTitle title="What should we call you?" subtitle="A few questions to build your plan. About a minute, and every answer can be changed later." />
+    <Group gap={spacing.xl}>
+      <StepTitle title="What should we call you?" subtitle="About a minute. You can change any answer later." />
       <BigTextField
         label="First name"
         testID="onb-name-input"
@@ -85,8 +85,8 @@ export function GoalStep({ draft, set, errors, advance }: StepProps) {
   ];
   const name = draft.name.trim();
   return (
-    <Group gap={spacing.xxl}>
-      <StepTitle title={name ? `What's your goal, ${name}?` : "What's your goal?"} subtitle="It sets the direction of your calorie target and how much protein you need." />
+    <Group gap={spacing.xl}>
+      <StepTitle title={name ? `What's your goal, ${name}?` : "What's your goal?"} subtitle="It sets your calorie target and protein." />
       <Group gap={spacing.sm}>
         {options.map((o, i) => (
           <ChoiceCard
@@ -114,8 +114,8 @@ export function GoalStep({ draft, set, errors, advance }: StepProps) {
 export function SexStep({ draft, set, errors, advance }: StepProps) {
   const { spacing } = useTheme();
   return (
-    <Group gap={spacing.xxl}>
-      <StepTitle title="Which sex should the estimate use?" subtitle="Resting metabolism differs between female and male bodies. Choose the one closest to yours." />
+    <Group gap={spacing.xl}>
+      <StepTitle title="Which sex should the estimate use?" subtitle="The one closest to your body." />
       <Group gap={spacing.sm}>
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
           {(['female', 'male'] as const).map((s) => (
@@ -136,8 +136,9 @@ export function SexStep({ draft, set, errors, advance }: StepProps) {
         <ErrorText>{errors.sex}</ErrorText>
       </Group>
       <WhyWeAsk testID="onb-sex-why">
-        The standard equations for resting metabolism (Mifflin-St Jeor, or Katch-McArdle when you know your body fat) have a female and a male form. The
-        answer also sets your starting water goal and the lowest calorie target HealthCal suggests. You can change it later in Goals.
+        Resting metabolism differs between female and male bodies, so the standard equations (Mifflin-St Jeor, or Katch-McArdle when you know your body fat)
+        have a female and a male form. The answer also sets your starting water goal and the lowest calorie target HealthCal suggests. You can change it later
+        in Goals.
       </WhyWeAsk>
     </Group>
   );
@@ -200,8 +201,8 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
     />
   );
   return (
-    <Group gap={spacing.xxl}>
-      <StepTitle title="When were you born?" subtitle="Metabolism slows a little each decade, so age keeps the estimate current." />
+    <Group gap={spacing.xl}>
+      <StepTitle title="When were you born?" subtitle="Age keeps the metabolism estimate current." />
       <Group gap={spacing.sm}>
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>{draft.units === 'imperial' ? [month, day, year] : [day, month, year]}</View>
         {errors.dob ? (
@@ -222,8 +223,8 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
   const { spacing } = useTheme();
   const imp = draft.units === 'imperial';
   return (
-    <Group gap={spacing.xxl}>
-      <StepTitle title="Height and weight" subtitle="The two biggest inputs to your energy needs. A rough figure is fine for now; a morning weigh-in is best." />
+    <Group gap={spacing.xl}>
+      <StepTitle title="Height and weight" subtitle="A rough figure is fine for now." />
       <View style={{ alignItems: 'flex-end', marginTop: -spacing.md }}>
         <UnitsToggle draft={draft} set={set} idPrefix="onb-body-units" />
       </View>
@@ -291,7 +292,7 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
         />
       </Group>
       <Text variant="caption" color="textSecondary">
-        Kept privately on this device. Today&apos;s weight is saved as your first weigh-in, so your trend starts today.
+        Saved on this device as your first weigh-in.
       </Text>
     </Group>
   );
@@ -304,15 +305,17 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
   const imp = draft.units === 'imperial';
   const lu = imp ? 'in' : 'cm';
   const estimate = draft.bodyFatMode === 'tape' ? tapeEstimate(draft) : null;
+  // A mode that needs typing, picked here: its first field takes the focus, which also brings it into view.
+  const [picked, setPicked] = useState(false);
   const mark = (Icon: typeof Ruler) => <Icon size={22} color={colors.text} strokeWidth={1.9} />;
   const modes: { value: BodyFatMode; title: string; hint: string; icon: React.ReactNode }[] = [
-    { value: 'unknown', title: "I don't know", hint: 'Skip it. The standard equation works well for most people.', icon: mark(CircleHelp) },
-    { value: 'direct', title: 'I know my body fat %', hint: 'From a smart scale, a scan or calipers', icon: mark(Target) },
-    { value: 'tape', title: 'Estimate it with a tape measure', hint: 'Neck and waist, about two minutes', icon: mark(Ruler) },
+    { value: 'unknown', title: "I don't know", hint: 'Most people skip this', icon: mark(CircleHelp) },
+    { value: 'direct', title: 'I know my body fat %', hint: 'From a smart scale or a scan', icon: mark(Target) },
+    { value: 'tape', title: 'Measure with a tape', hint: 'Neck and waist, about two minutes', icon: mark(Ruler) },
   ];
   return (
-    <Group gap={spacing.xxl}>
-      <StepTitle title="Body fat, if you know it" subtitle="Optional. It makes the estimate fit muscular and very lean bodies better." />
+    <Group gap={spacing.xl}>
+      <StepTitle title="Body fat" subtitle="Optional. It helps for muscular or lean bodies." />
       <Group gap={spacing.sm}>
         {modes.map((m) => (
           <ChoiceCard
@@ -326,7 +329,10 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
               set({ bodyFatMode: m.value });
               // Only the answer that needs nothing typed moves on by itself.
               if (m.value === 'unknown') advance();
-              else hold();
+              else {
+                hold();
+                setPicked(true);
+              }
             }}
           />
         ))}
@@ -337,6 +343,7 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
           <BigNumberField
             label="Body fat"
             testID="onb-bf-input"
+            autoFocus={picked}
             placeholder="22"
             unit="%"
             decimals={1}
@@ -349,24 +356,20 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
           />
           {errors.bodyFatPct ? null : (
             <Text variant="caption" color="textSecondary">
-              Home scales can be off by several points; that is fine, the plan adapts to your real trend.
+              A rough figure is fine; the plan adapts to your real trend.
             </Text>
           )}
         </View>
       ) : null}
       {draft.bodyFatMode === 'tape' ? (
         <Card style={{ gap: spacing.lg }}>
-          <Text variant="caption" color="textSecondary">
-            {draft.sex === 'female'
-              ? 'Measure relaxed, tape level and snug: neck below the larynx, waist at the narrowest point, hips at the widest.'
-              : 'Measure relaxed, tape level and snug: neck below the larynx, waist at the navel.'}
-          </Text>
           <View style={{ flexDirection: 'row', gap: spacing.sm }}>
             <BigNumberField
               style={{ flex: 1 }}
               label={`Neck, ${lu}`}
               accessibilityLabel={`Neck, ${imp ? 'inches' : 'centimetres'}`}
               testID="onb-neck-input"
+              autoFocus={picked}
               size="md"
               decimals={1}
               maxLength={5}
@@ -413,9 +416,12 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
               <Text variant="unit"> %</Text>
             </Text>
           </View>
-          <Text variant="caption" color="textTertiary">
-            An estimate, usually within 3 to 4 points. Re-measure any time from the Body screen.
-          </Text>
+          <WhyWeAsk testID="onb-bf-how" title="How to measure">
+            {draft.sex === 'female'
+              ? 'Relaxed, tape level and snug: neck below the larynx, waist at the narrowest point, hips at the widest. '
+              : 'Relaxed, tape level and snug: neck below the larynx, waist at the navel. '}
+            The result is usually within 3 to 4 points. Re-measure any time from the Body screen.
+          </WhyWeAsk>
         </Card>
       ) : null}
       <WhyWeAsk testID="onb-bf-why">
@@ -435,8 +441,8 @@ export function ActivityStep({ draft, set, errors, advance }: StepProps) {
   const { colors, spacing } = useTheme();
   const levels = Object.keys(ACTIVITY_LABELS) as ActivityLevel[];
   return (
-    <Group gap={spacing.xxl}>
-      <StepTitle title="A normal day, without workouts" subtitle="How much do you move outside of exercise? Think job, chores and getting around." />
+    <Group gap={spacing.xl}>
+      <StepTitle title="A normal day, without workouts" subtitle="Your job, chores and getting around." />
       <Group gap={spacing.sm}>
         {levels.map((l, i) => (
           <ChoiceCard
@@ -454,12 +460,9 @@ export function ActivityStep({ draft, set, errors, advance }: StepProps) {
         ))}
         <ErrorText>{errors.activity}</ErrorText>
       </Group>
-      <Note icon={<Activity size={18} color={colors.textSecondary} />}>
-        <Text variant="bodyStrong">Workouts are logged separately</Text>
-        <Text variant="caption" color="textSecondary">
-          Each session you log adds only the calories above resting to that day, so nothing is counted twice.
-        </Text>
-      </Note>
+      <WhyWeAsk testID="onb-activity-why" title="What about workouts?">
+        They are logged separately. Each session you log adds only the calories above resting to that day, so nothing is counted twice.
+      </WhyWeAsk>
     </Group>
   );
 }
@@ -495,10 +498,10 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
   const showTargetSummary = plan && !errors.target && m.targetKg !== null && draft.weight !== null && draft.target !== null;
 
   return (
-    <Group gap={spacing.xxl}>
+    <Group gap={spacing.xl}>
       <StepTitle
         title={goal === 'lose' ? 'Where are you heading?' : 'Set your pace'}
-        subtitle={goal === 'lose' ? 'A target weight and a pace you can live with. Slower is easier to keep.' : 'A small surplus builds muscle with less fat gain. A target weight is optional.'}
+        subtitle={goal === 'lose' ? 'A pace you can live with. Slower is easier to keep.' : 'A small surplus limits fat gain.'}
       />
       <View style={{ gap: 6 }}>
         <BigNumberField
@@ -640,8 +643,8 @@ export function RoutineStep({ draft, set, errors }: StepProps) {
   const examples = plan ? nudgeExamples(r, { targetKcal: plan.target.target, waterMl: plan.waterMl, macros: plan.macros }, draft.units, hour12) : null;
   const whenFor = (key: NudgeKind): string => {
     if (key === 'weighIn') return `Mon and Thu, ${formatClock(WEIGH_IN_TIME, hour12)}`;
-    if (key === 'water') return 'Every 2 hours while you are awake';
-    if (key === 'meals') return 'Only when a meal is not logged';
+    if (key === 'water') return 'Every 2 hours while awake';
+    if (key === 'meals') return 'When a meal is not logged';
     return examples?.checkin?.time ?? formatClock('20:30', hour12);
   };
   const exampleFor = (key: NudgeKind): string | null => {
@@ -655,7 +658,7 @@ export function RoutineStep({ draft, set, errors }: StepProps) {
 
   return (
     <Group gap={spacing.xl}>
-      <StepTitle title="Nudges that help" subtitle="Optional. Each one carries your live numbers and skips itself once the goal is met." />
+      <StepTitle title="Nudges that help" subtitle="Optional. Each skips itself once the goal is met." />
       <Group gap={spacing.sm}>
         {NUDGES.map((n) => (
           <NudgeCard
@@ -678,13 +681,13 @@ export function RoutineStep({ draft, set, errors }: StepProps) {
           scaleTo={0.99}
           accessibilityRole="button"
           accessibilityState={{ expanded: open }}
-          accessibilityLabel={`Adjust times and the evening check-in. Awake ${formatClock(r.wake, hour12)} to ${formatClock(r.bed, hour12)}`}
+          accessibilityLabel={`Adjust times and the evening check-in. Awake ${formatClock(r.wake, hour12)} to ${formatClock(r.bed, hour12)}, meals ${formatClock(r.breakfast, hour12)}, ${formatClock(r.lunch, hour12)} and ${formatClock(r.dinner, hour12)}, check-in ${r.nudges.checkin ? whenFor('checkin') : 'off'}`}
           style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 48, paddingHorizontal: spacing.xs }}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text variant="title">Adjust times</Text>
             <Text variant="caption" color="textSecondary" tabular>
               {/* The evening check-in lives behind this row, so the row says whether it is on. */}
-              {`Awake ${formatClock(r.wake, hour12)} to ${formatClock(r.bed, hour12)}, meals ${formatClock(r.breakfast, hour12)}, ${formatClock(r.lunch, hour12)} and ${formatClock(r.dinner, hour12)}. Evening check-in ${r.nudges.checkin ? `at ${whenFor('checkin')}` : 'off'}.`}
+              {`Meals, awake ${formatClock(r.wake, hour12)} to ${formatClock(r.bed, hour12)}, check-in ${r.nudges.checkin ? whenFor('checkin') : 'off'}`}
             </Text>
           </View>
           <Chevron size={20} color={colors.textSecondary} strokeWidth={2} />
@@ -716,7 +719,7 @@ export function RoutineStep({ draft, set, errors }: StepProps) {
       </View>
       {!remindersSupported ? (
         <Text variant="caption" color="textSecondary">
-          Browsers cannot schedule reminders for later. Your choices are saved, and HealthCal on your phone sends them once you sign in there.
+          A browser cannot send reminders; HealthCal on your phone sends them with these choices.
         </Text>
       ) : null}
     </Group>

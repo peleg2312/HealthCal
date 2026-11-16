@@ -22,6 +22,19 @@ const RHYTHM_COPY: Record<RhythmKind, { title: string; verb: string }> = {
   weigh: { title: 'Weigh in', verb: 'with a weigh-in' },
 };
 
+/**
+ * A week's label under its bar: the day of the month, with the month where it changes ("Sep 21, 28,
+ * Oct 5"). Under 360 px a bar is about 30 px wide, so two month labels side by side would run into
+ * each other: there the first bar gives up its month when the next bar starts a new one ("28, Oct 5").
+ */
+function rhythmLabel(starts: string[], i: number, narrow: boolean): string {
+  const month = (k: number) => starts[k].slice(5, 7);
+  const day = String(Number(starts[i].slice(8)));
+  if (i > 0 && month(i - 1) === month(i)) return day;
+  if (narrow && i === 0 && starts.length > 1 && month(1) !== month(0)) return day;
+  return formatShortDate(starts[i]);
+}
+
 /** The lighter fill of a partly logged day, as on the recap and Progress. */
 const PARTIAL = 0.45;
 
@@ -119,6 +132,7 @@ export default function ConsistencyScreen() {
   const total = weeksOnRhythm(d.sets, d.targets, d.firstDate, d.today);
   const streak = d.consistency.streak;
   const longest = Math.max(d.longest.length, streak);
+  const longestIsCurrent = streak > 0 && d.longest.length <= streak;
   const startWeek = startOfWeek(d.firstDate ?? d.today);
 
   const kindColor: Record<RhythmKind, string> = {
@@ -138,7 +152,7 @@ export default function ConsistencyScreen() {
         <Card>
           <EmptyState
             title="Your logging rhythm shows here"
-            message="Once you log food, this page shows your streak, a month calendar of logged days and how many days a week you log, train and weigh in."
+            message="Your streak, a calendar of logged days and how often you train and weigh in, from your first logged meal."
             action="Open diary"
             onAction={() => go('/diary')}
           />
@@ -150,7 +164,7 @@ export default function ConsistencyScreen() {
   return (
     <Screen header={<Header title="Consistency" subtitle="Days you logged" />} testID="consistency-screen">
       <Card style={{ gap: spacing.md }} testID="consistency-summary">
-        <View accessible role="group" accessibilityLabel={`Current streak ${streak} ${word(streak, 'day')}. A missed day does not break it; two in a row do.`}>
+        <View accessible role="group" accessibilityLabel={`Current streak ${streak} ${word(streak, 'day')}${longestIsCurrent ? ', your longest yet' : ''}. A missed day does not break it; two in a row do.`}>
           <Text variant="overline">Current streak</Text>
           <View
             style={{
@@ -166,7 +180,7 @@ export default function ConsistencyScreen() {
             </Text>
           </View>
           <Text variant="title" style={{ marginTop: spacing.xs }}>
-            {streak ? 'A missed day will not break it; two in a row will.' : 'Log food today to start a streak.'}
+            {streak ? (longestIsCurrent ? 'Your longest yet. A missed day will not break it.' : 'A missed day will not break it; two in a row will.') : 'Log food today to start a streak.'}
           </Text>
         </View>
         <View
@@ -178,23 +192,24 @@ export default function ConsistencyScreen() {
             paddingTop: spacing.md,
             rowGap: spacing.md,
           }}>
-          <View style={{ flexGrow: 1, flexBasis: 120, paddingRight: spacing.md }} accessible role="group" accessibilityLabel={`Longest streak ${longest} ${word(longest, 'day')}`}>
-            <Text variant="numL" testID="consistency-longest">
-              {longest}
-              <Text variant="unit">{` ${word(longest, 'day')}`}</Text>
-            </Text>
-            <Text variant="caption" color="textSecondary">
-              Longest streak
-              {d.longest.start && d.longest.end ? (d.longest.length <= streak ? ', your current run' : `, ${formatShortDate(d.longest.start)} to ${formatShortDate(d.longest.end)}`) : ''}
-            </Text>
-          </View>
+          {/* The longest streak only when it is not the one above, so the number is never shown twice. */}
+          {longestIsCurrent ? null : (
+            <View style={{ flexGrow: 1, flexBasis: 120, paddingRight: spacing.md }} accessible role="group" accessibilityLabel={`Longest streak ${longest} ${word(longest, 'day')}`}>
+              <Text variant="numL" testID="consistency-longest">
+                {longest}
+                <Text variant="unit">{` ${word(longest, 'day')}`}</Text>
+              </Text>
+              <Text variant="caption" color="textSecondary">
+                Longest streak
+                {d.longest.start && d.longest.end ? `, ${formatShortDate(d.longest.start)} to ${formatShortDate(d.longest.end)}` : ''}
+              </Text>
+            </View>
+          )}
           <View
             style={{
               flexGrow: 1,
               flexBasis: 120,
-              paddingLeft: spacing.md,
-              borderLeftWidth: 1,
-              borderLeftColor: colors.border,
+              ...(longestIsCurrent ? null : { paddingLeft: spacing.md, borderLeftWidth: 1, borderLeftColor: colors.border }),
             }}>
             <Text variant="numL">
               {tally.logged}
@@ -282,7 +297,7 @@ export default function ConsistencyScreen() {
             <Text variant="unit">{word(total.total, 'week')} on rhythm</Text>
           </View>
           <Text variant="caption" color="textSecondary">
-            Weeks that met all three of your current targets, in total, not in a row
+            Weeks that met all three targets
           </Text>
         </View>
         {RHYTHM_KINDS.map((k) => {
@@ -307,7 +322,7 @@ export default function ConsistencyScreen() {
                     {RHYTHM_COPY[k].title} {target} {word(target, 'day')} a week
                   </Text>
                   <Text variant="caption" color="textSecondary">
-                    {closed.length ? `On target ${met} of the last ${closed.length} ${word(closed.length, 'week')}` : 'First week'} · {current.count} so far this week
+                    {closed.length ? `On target ${met} of ${closed.length} ${word(closed.length, 'week')}` : 'First week'} · {current.count} this week
                   </Text>
                 </View>
               </View>
@@ -322,7 +337,7 @@ export default function ConsistencyScreen() {
                   testID={`consistency-rhythm-${k}-chart`}
                   data={weeks.map((w, i) => ({
                     // Eight labels share a row as narrow as 30 px a bar: the month only where it changes ("Sep 21, 28, Oct 5").
-                    label: w.partial ? 'Now' : i > 0 && weeks[i - 1].weekStart.slice(5, 7) === w.weekStart.slice(5, 7) ? String(Number(w.weekStart.slice(8))) : formatShortDate(w.weekStart),
+                    label: w.partial ? 'Now' : rhythmLabel(weeks.map((x) => x.weekStart), i, narrow),
                     value: w.count,
                     detail: `Week of ${formatShortDate(w.weekStart)} · ${w.count} ${word(w.count, 'day')} ${RHYTHM_COPY[k].verb}${w.partial ? ' so far' : ''}`,
                     // Finished weeks are solid in the habit's own colour; this week stays hatched.
@@ -347,6 +362,7 @@ export default function ConsistencyScreen() {
         <View style={{ gap: spacing.md }} testID="consistency-rhythm-help-text">
           <Text variant="body">Each bar is one week, Monday to Sunday, as tall as the days you logged food, trained or weighed in.</Text>
           <Text variant="body">The shaded zone starts at your target. A check marks a week that reached it, and the hatched bar is this week so far.</Text>
+          <Text variant="body">Weeks on rhythm met all three of your current targets. They are counted in total, not in a row.</Text>
           <Text variant="body" color="textSecondary">
             A missed week costs nothing: it is simply not counted.
           </Text>
@@ -356,7 +372,7 @@ export default function ConsistencyScreen() {
       <Sheet visible={editing} onClose={() => setEditing(false)} title="Weekly rhythm" footer={<Button title="Done" onPress={() => setEditing(false)} testID="consistency-rhythm-done" />}>
         <View style={{ gap: spacing.lg }}>
           <Text variant="body" color="textSecondary">
-            Pick a pace you can keep most weeks. A missed week costs nothing: it just is not counted. Past weeks are counted against the targets you set here, so raising one can lower the total.
+            A pace you can keep most weeks. Past weeks count against these targets too.
           </Text>
           {RHYTHM_KINDS.map((k) => (
             <View

@@ -49,6 +49,7 @@ const log = [
   { id: 'log-new-running', route: '/activity/log?activityId=running', waitFor: 'log-activity-result', note: 'a new run, starting from the last one' },
   { id: 'log-light', route: '/activity/log?activityId=volleyball', taps: ['intensity-light'], note: 'light effort selected' },
   { id: 'log-vigorous', route: '/activity/log?activityId=paddleboarding', taps: ['intensity-vigorous'], note: 'vigorous, the longest activity name' },
+  { id: 'log-competitive', route: '/activity/log?activityId=volleyball', note: 'effort hints with long words ("Recreational", "Competitive"): rows, never a split word' },
   { id: 'log-single-met', route: '/activity/log?activityId=beach_volleyball', waitFor: 'intensity-single', note: 'one MET value: no effort tiles' },
   { id: 'log-distance-km', route: '/activity/log?activityId=running', type: { 'distance-input': '12.45' }, waitFor: 'distance-pace', note: 'distance and pace in km' },
   { id: 'log-distance-mi', route: '/activity/log?activityId=cycling', imperial: true, type: { 'distance-input': '24.8' }, waitFor: 'distance-pace', note: 'distance and speed in miles' },
@@ -162,6 +163,7 @@ const weight = [
   { id: 'weight-sheet', route: '/weight', taps: ['weight-log'], sheet: true, note: 'log a weigh-in' },
   { id: 'weight-sheet-imperial', route: '/weight', data: 'stress', imperial: true, taps: ['weight-log'], sheet: true, note: 'log a weigh-in in lb, 314 lb' },
   { id: 'weight-sheet-edit', route: '/weight', taps: ['weight-row-0'], sheet: true, note: 'an existing weigh-in: update and delete' },
+  { id: 'weight-help-open', route: '/weight', taps: ['weight-trend-help'], waitFor: 'weight-trend-help-body', note: 'why the trend differs from the scale, open' },
   { id: 'weight-sheet-error', route: '/weight', taps: ['weight-log', { type: 'weight-input', text: '900' }, 'weight-save'], sheet: true, note: 'a weight out of range' },
 ];
 
@@ -173,6 +175,7 @@ const body = [
   { id: 'body-empty', route: '/body', data: 'empty', note: 'nothing measured yet' },
   { id: 'body-filled', route: '/body', data: 'empty', type: { 'body-neck-input': '38', 'body-waist-input': '84', 'body-hip-input': '99' }, waitFor: 'body-estimate', note: 'measurements typed: the estimate' },
   { id: 'body-filled-imperial', route: '/body', data: 'empty', imperial: true, type: { 'body-neck-input': '15', 'body-waist-input': '33', 'body-hip-input': '39' }, waitFor: 'body-estimate', note: 'measurements in inches' },
+  { id: 'body-help-open', route: '/body', data: 'stress', taps: ['body-bmi-help', 'body-measure-help', 'body-lean-help'], waitFor: 'body-lean-help-body', note: 'every explanation open, long content' },
   { id: 'body-weight-error', route: '/body', data: 'empty', type: { 'body-neck-input': '38', 'body-waist-input': '84', 'body-weight-input': '900' }, taps: ['body-save'], note: 'no weigh-in today, and a weight out of range' },
 ];
 
@@ -183,6 +186,7 @@ const sleep = [
   { id: 'sleep-sheet', route: '/sleep', taps: ['sleep-log'], sheet: true, note: 'log or edit last night' },
   { id: 'sleep-sheet-empty', route: '/sleep', data: 'empty', taps: ['sleep-log'], sheet: true, note: 'log the first night' },
   { id: 'sleep-sheet-row', route: '/sleep', taps: ['sleep-row-3'], sheet: true, note: 'an earlier night opened' },
+  { id: 'sleep-help-open', route: '/sleep', taps: ['sleep-help'], waitFor: 'sleep-help-body', note: 'why 7 to 9 hours, open' },
   { id: 'sleep-past-day', route: '/sleep?date={day}', day: -4, note: 'four nights ago' },
 ];
 
@@ -205,6 +209,7 @@ const fasting = [
 // ------------------------------------------------------------------ friends, no account here
 const friendsLocal = [
   { id: 'friends-add-local', route: '/friends/add?invite=ABCD2345', note: 'an invite link opened with no accounts' },
+  { id: 'friends-local', route: '/friends', waitFor: 'friends-unavailable', note: 'friends in a build with no accounts: two lines and Back to Today' },
 ];
 
 // ------------------------------------------------------------------ friends with accounts

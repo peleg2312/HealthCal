@@ -99,12 +99,16 @@ function FastingScreen() {
     <Screen header={<Header title="Fasting" subtitle={active ? 'Fast in progress' : 'Not fasting now'} />} footer={footer} backdrop={colors.fat} testID="fasting-screen">
       <Card padding={18} style={{ gap: spacing.lg }} testID="fasting-hero">
         <Vessel
-          value={p ? Math.min(p.elapsedMs, p.targetMs) / 3_600_000 : 0}
+          value={p ? p.elapsedMs / 3_600_000 : 0}
           max={activeTarget}
+          // A target to reach: at it the level line becomes the brim line, never amber.
+          goalKind="reach"
           color={colors.primary}
           width={narrow ? 72 : 88}
           height={210}
           labelGap={narrow ? 14 : 18}
+          // The target label and the timer keep 8 px between them at every level, near the top too.
+          labelSpacing={8}
           accessibilityLabel={active ? `Fasting for ${formatDuration(minutes(p?.elapsedMs ?? 0))} of ${activeTarget} hours` : 'Not fasting'}
           labels={[
             {

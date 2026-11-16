@@ -109,7 +109,8 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
             <View style={{ gap: spacing.xs }}>
               <Text variant="h3">{`The road to ${formatWeight(projection.targetKg, units)}`}</Text>
               <Text variant="caption" color="textSecondary" testID="plan-date">
-                {`${range.charAt(0).toUpperCase() + range.slice(1)}. The line is ${t.limitedByFloor ? 'the pace this budget gives' : 'the pace you chose'}, about ${pace} a week; the band is a little faster or slower.`}
+                {/* The dates are the title's; this line says what the line and the band are. */}
+                {`About ${pace} a week, ${t.limitedByFloor ? 'the pace this budget gives' : 'the pace you chose'}. The band is a little faster or slower.`}
               </Text>
             </View>
             {/* The road draws once its card has arrived. */}
@@ -219,8 +220,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
       <FadeUp delay={landed + (projection ? 260 : 140)} style={{ flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.xs }}>
         <Sparkles size={16} color={colors.textSecondary} strokeWidth={1.9} />
         <Text variant="caption" color="textSecondary" style={{ flex: 1 }} testID="plan-estimates-note">
-          These are starting estimates. As your weigh-ins and food logs come in, HealthCal measures what you actually burn and adapts your targets. You can adjust
-          any number in Goals.
+          Starting estimates: they adapt to what you really burn as you log. Change any number in Goals.
         </Text>
       </FadeUp>
 
@@ -308,6 +308,9 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
         duration={ARRIVAL_POUR}
         delay={POUR_DELAY}
         testID="plan-vessel"
+        // 10 px between labels keeps 8 px between their letters at every plan (keeping weight puts
+        // "Matched to what you burn" right under the number; gaining puts the surplus over the burn).
+        labelSpacing={10}
         accessibilityLabel={`Daily budget ${formatNumber(target)} kcal${showBurn ? `, against about ${formatNumber(burn)} kcal you burn` : ', matched to what you burn'}`}
         labels={[
           ...(showBurn ? [{ key: 'burn', at: burn, height: 40, tick: burnInside ? undefined : colors.vesselEdge, content: burnLabel }] : []),

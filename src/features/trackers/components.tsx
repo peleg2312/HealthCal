@@ -1,5 +1,5 @@
 import { Redirect } from 'expo-router';
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Info } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { AccessibilityInfo, View, type StyleProp, type ViewStyle } from 'react-native';
 
@@ -114,6 +114,48 @@ export function Figure({
         </Text>
       </View>
     </View>
+  );
+}
+
+/**
+ * Help behind an info control: one line that says what it explains, with the paragraph(s)
+ * folded under it until asked for. The screen says one thing first; the "why" waits here.
+ */
+export function Explain({ label, children, testID, style }: { label: string; children: React.ReactNode; testID: string; style?: StyleProp<ViewStyle> }) {
+  const { colors, spacing } = useTheme();
+  const [open, setOpen] = useState(false);
+  const Chevron = open ? ChevronUp : ChevronDown;
+  return (
+    <View style={style}>
+      <PressableScale
+        testID={testID}
+        onPress={() => setOpen((v) => !v)}
+        feedback="select"
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={label}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 }}>
+        <Info size={16} color={colors.textSecondary} strokeWidth={1.9} />
+        <Text variant="label" color="textSecondary" style={{ flex: 1 }}>
+          {label}
+        </Text>
+        <Chevron size={16} color={colors.textSecondary} strokeWidth={1.9} />
+      </PressableScale>
+      {open ? (
+        <View testID={`${testID}-body`} style={{ gap: spacing.sm, paddingBottom: spacing.xs }}>
+          {children}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/** A paragraph inside `Explain`. */
+export function ExplainText({ children }: { children: React.ReactNode }) {
+  return (
+    <Text variant="caption" color="textSecondary" style={{ fontSize: 13, lineHeight: 19 }}>
+      {children}
+    </Text>
   );
 }
 

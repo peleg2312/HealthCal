@@ -61,21 +61,26 @@ export function DoneView({
       {/* What was done ("1 workout added") is the header's short line: doneTitle. */}
       <Text variant="body" color="textSecondary">
         {sum.sessions
-          ? `${formatDuration(Math.max(0, sum.minutes))} of activity on ${sum.days.length === 1 ? 'one day' : `${sum.days.length} days`}. Each day’s budget now includes the calories above resting.`
+          ? 'Each day’s budget now includes the calories above resting.'
           : `The workouts now carry the numbers from the file. Each day’s budget follows them.`}
       </Text>
       <Card style={{ gap: spacing.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-          <CupKey color={colors.exercise} />
-          <Text variant="label" color="textSecondary" style={{ flex: 1 }}>
-            {sum.updated ? 'Change to the days' : 'Added to the days'}
-          </Text>
-          <Text variant="numM" tabular testID="import-done-kcal">
-            {signed(sum.kcal)}
-            <Text variant="unit"> kcal</Text>
-          </Text>
-        </View>
-        <Divider />
+        {/* The total only when there is more than one day: with one, the day's own row is the total. */}
+        {sum.days.length > 1 ? (
+          <>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <CupKey color={colors.exercise} />
+              <Text variant="label" color="textSecondary" style={{ flex: 1 }}>
+                {sum.updated ? 'Change to the days' : 'Added to the days'}
+              </Text>
+              <Text variant="numM" tabular testID="import-done-kcal">
+                {signed(sum.kcal)}
+                <Text variant="unit"> kcal</Text>
+              </Text>
+            </View>
+            <Divider />
+          </>
+        ) : null}
         {shown.map((d) => (
           <View key={d.date} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }} testID={`import-done-day-${d.date}`}>
             <MiniCup progress={Math.max(0, d.kcal) / maxKcal} color={colors.exercise} width={22} height={26} />
@@ -87,7 +92,7 @@ export function DoneView({
                 {[d.sessions ? `${workouts(d.sessions)} · ${formatDuration(d.minutes)}` : '', d.updated ? `${workouts(d.updated)} updated` : ''].filter(Boolean).join(' · ')}
               </Text>
             </View>
-            <Text variant="bodyStrong" tabular>
+            <Text variant="bodyStrong" tabular testID={sum.days.length === 1 ? 'import-done-kcal' : undefined}>
               {signed(d.kcal)}
               <Text variant="unit"> kcal</Text>
             </Text>

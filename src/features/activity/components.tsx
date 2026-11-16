@@ -114,48 +114,6 @@ export function SessionRow({ entry, units, onPress, onDelete }: { entry: Activit
   );
 }
 
-/** Quick-start tile: a cup with the activity's emoji as a small content mark and its name. */
-export function ActivityTile({
-  emoji,
-  name,
-  onPress,
-  testID,
-  width,
-}: {
-  emoji: string;
-  name: string;
-  onPress: () => void;
-  testID?: string;
-  width?: number;
-}) {
-  const { colors, radius, spacing } = useTheme();
-  return (
-    <PressableScale
-      testID={testID}
-      accessibilityLabel={name}
-      onPress={onPress}
-      scaleTo={0.96}
-      style={{
-        width,
-        flex: width ? undefined : 1,
-        minHeight: 76,
-        justifyContent: 'space-between',
-        gap: spacing.xs,
-        paddingVertical: 10,
-        paddingHorizontal: 10,
-        ...cup(radius.tile, 5),
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.border,
-      }}>
-      <Text style={{ fontSize: 17, lineHeight: 22 }}>{emoji}</Text>
-      <Text variant="label" numberOfLines={2} style={{ fontSize: 12.5, lineHeight: 16 }}>
-        {name}
-      </Text>
-    </PressableScale>
-  );
-}
-
 /**
  * Train's Quick start: one tile per activity, each as wide as its emoji and its whole name, in rows
  * that wrap. A name is never broken inside a word ("Volleyba/ll") at any width, because no tile is

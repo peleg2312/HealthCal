@@ -32,7 +32,7 @@ export function QuestionsView({ todayDate, hour12, onChangeZone }: { todayDate: 
       {/* What this step is ("Two things to check") is the header's short line: questionsTitle. */}
       <Text variant="body" color="textSecondary">
         {csvFiles.length
-          ? 'Garmin’s activities list does not say which units or time zone it uses. Check these so distances and days come out right.'
+          ? 'Garmin’s list does not say its units or time zone.'
           : 'This file needs a little help to land on the right day.'}
       </Text>
 
@@ -48,13 +48,13 @@ export function QuestionsView({ todayDate, hour12, onChangeZone }: { todayDate: 
               <Chip label="Miles" selected={answers.distanceUnit === 'mi'} onPress={() => setAnswers({ distanceUnit: 'mi' })} testID="import-unit-mi" />
             </View>
             <Text variant="caption" color="textSecondary">
-              The same as the units in your Garmin Connect account settings when you exported.
+              As set in your Garmin Connect account when you exported.
             </Text>
           </View>
           <Divider />
           <ZoneLine title={`Times in ${csvFiles.length > 1 ? 'these files' : 'this file'} are local time in`} value={zoneText(answers.csvTimeZone)} onChange={() => onChangeZone('csv')} testID="import-csv-zone" />
           <Text variant="caption" color="textSecondary">
-            Change this only if you exported while travelling or your workouts were in another zone. A wrong zone moves every workout by whole hours.
+            Change it only if the workouts were in another zone.
           </Text>
         </Card>
       ) : null}

@@ -78,22 +78,19 @@ export default function HealthSyncScreen() {
   if (!supported) {
     return (
       <Screen header={<Header title="Workout sync" subtitle="Automatic, in the Android app" />} testID="health-sync-screen">
-        <Card testID="health-sync-unsupported" style={{ gap: spacing.sm }}>
-          <Text variant="h3">Automatic sync is in the Android app</Text>
+        <Card testID="health-sync-unsupported" style={{ gap: spacing.xs }}>
+          <Text variant="h3">Automatic in the Android app</Text>
           <Text variant="body" color="textSecondary">
-            On an Android phone, HealthCal reads the workouts that Garmin Connect and other apps save to Health Connect and adds them to your training by themselves, with the calories your watch
-            measured.
-          </Text>
-          <Text variant="body" color="textSecondary">
-            {Platform.OS === 'ios'
-              ? 'On iPhone, Apple Health is not read yet. Until it is, bring workouts in from the files Garmin Connect exports.'
-              : 'A browser has no health data to read. Here, bring workouts in from the files Garmin Connect exports.'}
+            There, workouts from Garmin Connect and other apps arrive by themselves through Health Connect, with your watch&apos;s calories.
           </Text>
         </Card>
-        <Button testID="health-sync-import-files" title="Import Garmin files" onPress={() => router.push('/activity/import')} />
-        <Text variant="caption" color="textSecondary" style={{ paddingHorizontal: spacing.xs }}>
-          Workouts you import here reach your other devices through your account, like everything else you log.
-        </Text>
+        {/* What works here, with the one action under it. */}
+        <View style={{ gap: spacing.sm }}>
+          <Text variant="body" color="textSecondary" style={{ paddingHorizontal: spacing.xs }}>
+            {Platform.OS === 'ios' ? 'Apple Health is not read yet. Here, import the files Garmin Connect exports.' : 'A browser has no health data. Here, import the files Garmin Connect exports.'}
+          </Text>
+          <Button testID="health-sync-import-files" title="Import Garmin files" onPress={() => router.push('/activity/import')} />
+        </View>
       </Screen>
     );
   }

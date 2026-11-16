@@ -146,7 +146,7 @@ export default function RecapScreen() {
         <Card>
           <EmptyState
             title="Not enough to recap yet"
-            message="A weekly check-in appears once a week has at least 3 days with food logged. It compares your calories, protein, activity and water with the week before."
+            message="It appears once a week has 3 days with food logged, and compares it with the week before."
             action="Open diary"
             onAction={() => go('/diary')}
           />
@@ -212,7 +212,7 @@ export default function RecapScreen() {
           <PressableScale
             testID="recap-plan"
             onPress={() => go('/settings/goals')}
-            accessibilityLabel={`Your plan: ${formatNumber(d.plan.before)} kcal on ${formatShortDate(d.week)}, ${formatNumber(d.plan.after)} kcal ${d.plan.afterDate === d.today ? 'today' : `from ${formatShortDate(d.plan.afterDate)}`}. ${d.plan.reason} Open goals.`}
+            accessibilityLabel={`Your plan: ${formatNumber(d.plan.before)} kcal on ${formatShortDate(d.week)}, ${formatNumber(d.plan.after)} kcal ${d.plan.afterDate === d.today ? 'today' : `from ${formatShortDate(d.plan.afterDate)}`}. ${d.plan.reason} Daily budget before exercise${d.eatBack ? '; logged workouts add their own calories on the day' : ''}. Open goals.`}
             scaleTo={0.985}>
             <Card style={{ gap: spacing.sm }}>
               <View
@@ -254,8 +254,7 @@ export default function RecapScreen() {
                 </View>
               </View>
               <Text variant="caption" color="textSecondary">
-                {d.plan.reason} Daily budget before exercise
-                {d.eatBack ? '; logged workouts add their own calories on the day' : ''}.
+                {d.plan.reason}
               </Text>
             </Card>
           </PressableScale>

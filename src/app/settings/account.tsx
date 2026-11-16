@@ -221,7 +221,7 @@ function SignedIn({ email }: { email: string }) {
         <ListRow
           testID="account-sign-out"
           title="Sign out"
-          subtitle="Removes your data from this device. It stays in your account."
+          subtitle="Clears this device; your account keeps it"
           left={
             <IconTile color={colors.textSecondary}>
               <LogOut size={20} color={colors.textSecondary} />
@@ -231,11 +231,11 @@ function SignedIn({ email }: { email: string }) {
         />
       </Group>
 
-      <Group title="Delete" footer="Want a copy first? Export a backup from Your data before deleting.">
+      <Group title="Delete" footer="Want a copy first? Export it from Your data.">
         <ListRow
           testID="account-delete"
           title="Delete account"
-          subtitle="Erases your account and everything in it"
+          subtitle="Erases the account and its data"
           left={
             <IconTile color={colors.danger}>
               <Trash2 size={20} color={colors.danger} />

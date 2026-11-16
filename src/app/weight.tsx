@@ -1,4 +1,4 @@
-import { Info, Plus } from 'lucide-react-native';
+import { Plus } from 'lucide-react-native';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import { View } from 'react-native';
@@ -8,7 +8,7 @@ import { diffDays, formatDayLabel, formatShortDate } from '@/lib/dates';
 import { isPlausibleBodyFat, projectedGoalDate } from '@/lib/energy';
 import { formatWeight, weightToKg, weightUnit, weightValue } from '@/lib/units';
 import { deleteWeightRecord, saveWeightRecord } from '@/features/trackers/actions';
-import { DayStepper, Figure, Note, RequireProfile } from '@/features/trackers/components';
+import { DayStepper, Explain, ExplainText, Figure, RequireProfile } from '@/features/trackers/components';
 import { findByDate, keepOrConvert, weightChartData, weightStats, type WeightRange } from '@/features/trackers/helpers';
 import { useToday } from '@/store/clock';
 import { useProfile, useWeightSeries } from '@/store/selectors';
@@ -85,7 +85,7 @@ function WeightScreen() {
           <EmptyState
             emoji="⚖️"
             title="Start your weight trend"
-            message="Weigh yourself in the morning, after the bathroom and before breakfast. Day-to-day jumps are mostly water, so the app draws a smoothed trend that shows where your weight is really heading."
+            message="Weigh in each morning before breakfast. Daily jumps are mostly water, so a smoothed trend shows where you are heading."
           />
         </Card>
       ) : (
@@ -135,6 +135,12 @@ function WeightScreen() {
                 <Legend swatch={<View style={{ width: 16, borderTopWidth: 2, borderStyle: 'dashed', borderColor: colors.borderStrong }} />} label="Target" />
               ) : null}
             </View>
+            <Explain label="Why the trend differs from the scale" testID="weight-trend-help" style={{ marginTop: -spacing.xs, marginBottom: -spacing.sm }}>
+              <ExplainText>
+                A day’s weight can swing by {units === 'imperial' ? 'two pounds' : 'a kilo'} or more with water, salt, carbs and digestion. The trend averages recent weigh-ins (most
+                weight on the last few weeks), so a single high or low reading barely moves it. Watch the trend, not the daily number.
+              </ExplainText>
+            </Explain>
           </Card>
 
           <Card style={{ gap: spacing.lg }}>
@@ -167,13 +173,6 @@ function WeightScreen() {
                 label={projected ? 'Projected at this rate' : target ? 'No projection at this rate' : 'Set a target to project'}
               />
             </View>
-          </Card>
-
-          <Card tone="alt" style={{ gap: spacing.sm }}>
-            <Note icon={<Info size={14} color={colors.textTertiary} />}>
-              Why the trend differs from the scale: a day’s weight can swing by {units === 'imperial' ? 'two pounds' : 'a kilo'} or more with water, salt, carbs and digestion. The trend averages
-              recent weigh-ins (most weight on the last few weeks), so a single high or low reading barely moves it. Watch the trend, not the daily number.
-            </Note>
           </Card>
 
           <SectionTitle title="History" action={history.length > 14 ? (showAll ? 'Show less' : `Show all ${history.length}`) : undefined} onAction={() => setShowAll((v) => !v)} />

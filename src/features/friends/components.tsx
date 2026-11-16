@@ -3,7 +3,7 @@ import React from 'react';
 import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 
 import { formatShortDate, weekdayShort } from '@/lib/dates';
-import { formatDistance } from '@/lib/units';
+import { formatDistance, formatNumber } from '@/lib/units';
 import type { CheerReceived, Friend, FriendRequest, FriendWorkout, SocialSharing } from '@/services/friends';
 import { fonts, useTheme } from '@/theme';
 import type { ISODate, UnitSystem } from '@/types';
@@ -80,7 +80,7 @@ export function WorkoutRow({ w, friend, today, units, onCheer }: { w: FriendWork
   const { spacing } = useTheme();
   return (
     // Cheer sits beside the workout; a name too long for that line takes the row and Cheer goes under it, at the right.
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.xs, minHeight: 56, paddingVertical: 6 }}>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.sm, minHeight: 56, paddingVertical: 6 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 }}>
         <Text style={{ fontSize: 17, lineHeight: 22, width: 22, textAlign: 'center' }} accessibilityElementsHidden importantForAccessibility="no">
           {w.emoji || '·'}
@@ -159,7 +159,7 @@ export function FriendCard({ friend, today, units, onOpen, onCheer }: { friend: 
           {hasMinutes ? (
             <View style={{ alignItems: 'flex-end', flexShrink: 0, marginLeft: 'auto' }}>
               <Text variant="numL" testID={`friends-minutes-${slug}`}>
-                {s.minutes}
+                {formatNumber(s.minutes ?? 0)}
                 <Text variant="unit"> min</Text>
               </Text>
               <Text variant="caption" color="textSecondary" numberOfLines={1}>
@@ -212,13 +212,14 @@ export function InviteCard({ code, sharing, onShare, onCopy, onSettings }: { cod
         {c.slice(4)}
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md }}>
-        <Button testID="friends-share" title="Share link" size="md" full={false} icon={<ShareIcon size={18} color={colors.onPrimary} strokeWidth={2.2} />} onPress={onShare} />
+        <Button testID="friends-share" title="Share link" size="md" full={false} style={{ flexGrow: 1 }} icon={<ShareIcon size={18} color={colors.onPrimary} strokeWidth={2.2} />} onPress={onShare} />
         <Button
           testID="friends-copy"
           title="Copy code"
           variant="secondary"
           size="md"
           full={false}
+          style={{ flexGrow: 1 }}
           accessibilityLabel={`Copy code ${formatCode(c)}`}
           icon={<Copy size={18} color={colors.text} strokeWidth={2.2} />}
           onPress={onCopy}
@@ -251,27 +252,33 @@ export function InviteCard({ code, sharing, onShare, onCopy, onSettings }: { cod
 /** Requests sent to the user: Accept, and a quiet decline (the other person is never told). */
 export function IncomingRequests({ requests, busy, onAccept, onDecline }: { requests: FriendRequest[]; busy: string | null; onAccept: (r: FriendRequest) => void; onDecline: (r: FriendRequest) => void }) {
   const { colors, spacing } = useTheme();
-  const narrow = useNarrow();
   return (
-    <Card padding={spacing.lg} style={{ paddingVertical: spacing.sm }} testID="friends-incoming">
+    <Card padding={spacing.lg} style={{ paddingVertical: spacing.xs }} testID="friends-incoming">
       {requests.map((r, i) => (
         <React.Fragment key={r.userId}>
           {i > 0 ? <Divider /> : null}
-          <View style={{ flexDirection: 'row', flexWrap: narrow ? 'wrap' : 'nowrap', alignItems: 'center', gap: spacing.md, minHeight: 64, paddingVertical: spacing.sm }}>
-            <PersonMark name={r.displayName} avatar={r.avatar} />
-            <View style={{ flex: 1, minWidth: narrow ? 160 : 0 }}>
-              <Text variant="h3" numberOfLines={3}>
-                {r.displayName}
-              </Text>
-              <Text variant="caption" color="textSecondary" numberOfLines={2}>
-                Wants to be friends
-              </Text>
+          {/* The buttons sit beside the name; a name too long for that line takes the row and the buttons go
+              under it, at the right, so a name is never squeezed into a narrow column and split mid-word. */}
+          <View
+            testID={`friends-incoming-${idFor(r.userId)}`}
+            style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.sm, minHeight: 64, paddingVertical: spacing.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 }}>
+              <PersonMark name={r.displayName} avatar={r.avatar} size={36} />
+              <View style={{ flexShrink: 1, minWidth: 0 }}>
+                <Text variant="bodyStrong" numberOfLines={3} style={{ fontFamily: fonts.semibold }}>
+                  {r.displayName}
+                </Text>
+                <Text variant="caption" color="textSecondary">
+                  Wants to be friends
+                </Text>
+              </View>
             </View>
-            {narrow ? <View style={{ flexBasis: 44, flexGrow: 1 }} /> : null}
-            <IconButton testID={`friends-decline-${idFor(r.userId)}`} size={36} accessibilityLabel={`Decline ${r.displayName}'s request`} disabled={busy === r.userId} onPress={() => onDecline(r)}>
-              <X size={18} color={colors.text} strokeWidth={2.2} />
-            </IconButton>
-            <Button testID={`friends-accept-${idFor(r.userId)}`} title="Accept" size="sm" full={false} loading={busy === r.userId} accessibilityLabel={`Accept ${r.displayName}`} onPress={() => onAccept(r)} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginLeft: 'auto' }}>
+              <IconButton testID={`friends-decline-${idFor(r.userId)}`} size={36} accessibilityLabel={`Decline ${r.displayName}'s request`} disabled={busy === r.userId} onPress={() => onDecline(r)}>
+                <X size={18} color={colors.text} strokeWidth={2.2} />
+              </IconButton>
+              <Button testID={`friends-accept-${idFor(r.userId)}`} title="Accept" size="sm" full={false} loading={busy === r.userId} accessibilityLabel={`Accept ${r.displayName}`} onPress={() => onAccept(r)} />
+            </View>
           </View>
         </React.Fragment>
       ))}
@@ -288,7 +295,7 @@ export function OutgoingRequests({ requests, busy, onCancel }: { requests: Frien
         <React.Fragment key={r.userId}>
           {i > 0 ? <Divider /> : null}
           {/* "Take back" sits beside the name; a name too long for that line takes the row and the button goes under it, at the right. */}
-          <View testID={`friends-outgoing-${idFor(r.userId)}`} style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.xs, minHeight: 56, paddingVertical: spacing.sm }}>
+          <View testID={`friends-outgoing-${idFor(r.userId)}`} style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.sm, minHeight: 56, paddingVertical: spacing.sm }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 }}>
               <PersonMark name={r.displayName} avatar={r.avatar} size={36} />
               <View style={{ flexShrink: 1, minWidth: 0 }}>

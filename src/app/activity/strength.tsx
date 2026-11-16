@@ -362,7 +362,7 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
         </View>
         <Text variant="caption" color="textSecondary" testID="strength-kcal">
           {minutes > 0
-            ? `About ${formatNumber(est.gross)} kcal in ${minutes} min (likely ${formatNumber(est.grossRange[0])}–${formatNumber(est.grossRange[1])}), of which ${formatNumber(est.net)} is above resting. Based on ${STRENGTH.met[draft.intensity]} MET.`
+            ? `About ${formatNumber(est.net)} kcal above resting, likely ${formatNumber(kcalRange(est.net)[0])}–${formatNumber(kcalRange(est.net)[1])}`
             : running
               ? 'Calories show after the first minute.'
               : 'Start the timer or set a duration to estimate calories.'}
@@ -493,15 +493,16 @@ function RestBar({ draft, now, update }: { draft: StrengthDraft; now: number; up
     <View
       testID="strength-rest"
       accessibilityLiveRegion="polite"
-      style={{ gap: 10, ...cup(radius.tile, 5), backgroundColor: colors.surfaceAlt, paddingVertical: spacing.sm, paddingHorizontal: spacing.md }}>
-      {/* The label has the bar's whole width, so a long exercise name is not cut down to "Rest afte…" beside the buttons. */}
+      style={{ gap: spacing.sm, ...cup(radius.tile, 5), backgroundColor: colors.surfaceAlt, paddingVertical: spacing.sm, paddingHorizontal: spacing.md }}>
+      {/* The label has the bar's whole width, so a long exercise name is not cut down to "Rest afte…" beside the buttons,
+          and keeps 8 px above them. */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <CupKey color={colors.exercise} />
         <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flexShrink: 1 }}>
           Rest{name ? ` after ${name.toLowerCase()}` : ''}
         </Text>
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: -6 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text variant="numL" tabular testID="strength-rest-left">
             {formatClock(Math.ceil(left / 1000) * 1000)}

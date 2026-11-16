@@ -88,8 +88,9 @@ function ProfileHub() {
       ? 'Off'
       : 'Arrive in the phone app';
 
+  // The budget is in the card above; the row says what else is inside.
   const paceText =
-    profile.goal === 'maintain' ? 'maintain' : `${profile.goal} ${formatWeight(profile.weeklyRateKg, u, 2)}/week`;
+    profile.goal === 'maintain' ? 'Pace, macros and water' : `${profile.goal === 'lose' ? 'Lose' : 'Gain'} ${formatWeight(profile.weeklyRateKg, u, 2)} a week, macros, water`;
 
   return (
     <Screen header={<Header title="Profile" subtitle="Settings and goals" />}>
@@ -108,16 +109,33 @@ function ProfileHub() {
         </View>
         <View style={{ flexDirection: 'row', marginTop: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border }}>
           <HeaderStat label="Weight" value={formatWeight(currentKg, u)} color={colors.weight} />
-          <HeaderStat divider label={profile.goal === 'maintain' ? 'Goal' : 'Target'} value={profile.goal === 'maintain' ? 'Maintain' : goalLine.replace('Goal ', '')} />
+          {/* Keeping weight has no target; the line under the name already says so. */}
+          {profile.goal === 'maintain' || !profile.targetWeightKg ? null : <HeaderStat divider label="Target" value={goalLine.replace('Goal ', '')} />}
           <HeaderStat divider label={narrow ? 'Budget' : 'Daily budget'} value={`${formatNumber(model.target.target)} kcal`} color={colors.calories} />
         </View>
       </Card>
+
+      {/* Four groups in the order a new person looks for things: you, your plan, what you track, the app. */}
+      <Group title="You">
+        <AccountRow />
+        <ListRow
+          testID="profile-friends"
+          title="Friends"
+          subtitle="Share your training week"
+          left={
+            <IconTile color={colors.exercise}>
+              <Users size={20} color={colors.exercise} />
+            </IconTile>
+          }
+          onPress={() => router.push('/friends' as never)}
+        />
+      </Group>
 
       <Group title="Your plan">
         <ListRow
           testID="profile-goals"
           title="Goals and targets"
-          subtitle={`${formatNumber(model.target.target)} kcal a day, ${paceText}`}
+          subtitle={paceText}
           left={
             <IconTile color={colors.calories}>
               <Target size={20} color={colors.calories} />
@@ -138,7 +156,7 @@ function ProfileHub() {
         />
       </Group>
 
-      <Group title="Body and recovery">
+      <Group title="Trackers">
         <ListRow
           testID="profile-body"
           title="Body and measurements"
@@ -153,6 +171,7 @@ function ProfileHub() {
         <ListRow
           testID="profile-sleep"
           title="Sleep"
+          subtitle="Hours slept each night"
           left={
             <IconTile color={colors.sleep}>
               <Moon size={20} color={colors.sleep} />
@@ -171,9 +190,10 @@ function ProfileHub() {
           }
           onPress={() => router.push('/fasting' as never)}
         />
+        <HealthSyncRow />
       </Group>
 
-      <Group title="Preferences">
+      <Group title="App">
         <View style={{ paddingVertical: spacing.md, gap: spacing.sm }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
             <IconTile color={colors.primary}>
@@ -215,7 +235,7 @@ function ProfileHub() {
         <ToggleRow
           testID="profile-haptics"
           title="Haptics"
-          subtitle="A light tap when you log or confirm"
+          subtitle="A light tap when you log"
           value={settings.haptics}
           onChange={(haptics) => setSettings({ haptics })}
           left={
@@ -227,7 +247,7 @@ function ProfileHub() {
         <ToggleRow
           testID="profile-celebrations"
           title="Celebrations"
-          subtitle="A small animation when you reach a goal"
+          subtitle="A flash when you reach a goal"
           value={settings.celebrations}
           onChange={(celebrations) => setSettings({ celebrations })}
           left={
@@ -236,22 +256,6 @@ function ProfileHub() {
             </IconTile>
           }
         />
-      </Group>
-
-      <Group title="Account and data">
-        <AccountRow />
-        <ListRow
-          testID="profile-friends"
-          title="Friends"
-          subtitle="Share your training week with people you choose"
-          left={
-            <IconTile color={colors.exercise}>
-              <Users size={20} color={colors.exercise} />
-            </IconTile>
-          }
-          onPress={() => router.push('/friends' as never)}
-        />
-        <HealthSyncRow />
         <ListRow
           testID="profile-data"
           title="Your data"
@@ -266,7 +270,7 @@ function ProfileHub() {
         <ListRow
           testID="profile-about"
           title="About and how it works"
-          subtitle="The science behind your numbers, privacy"
+          subtitle="How the numbers work, privacy"
           left={
             <IconTile color={colors.textSecondary}>
               <Info size={20} color={colors.textSecondary} />
@@ -353,22 +357,22 @@ function AccountRow() {
           : sync.status === 'error'
             ? 'Sync paused, open to retry'
             : when
-              ? `Backed up, last synced ${when}`
+              ? `Backed up ${when}`
               : 'Signed in, not synced yet';
   } else if (sessionLost && isBackendConfigured) {
     icon = <CloudOff size={20} color={colors.warningInk} />;
     tone = colors.warningInk;
     keep = true;
     title = 'Signed out of your account';
-    subtitle = 'Entries are safe here but not backed up. Sign in again';
+    subtitle = 'Not backed up. Sign in again';
   } else if (isBackendConfigured) {
     icon = <Smartphone size={20} color={colors.warningInk} />;
     tone = colors.warningInk;
     keep = true;
-    subtitle = 'On this device only. A free account backs up and syncs';
+    subtitle = 'On this device only. Back it up free';
   } else {
     icon = <Smartphone size={20} color={colors.textSecondary} />;
-    subtitle = 'On this device only. Use Your data to export a backup';
+    subtitle = 'On this device only';
   }
   return (
     <ListRow

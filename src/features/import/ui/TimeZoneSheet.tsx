@@ -28,7 +28,7 @@ export function TimeZoneSheet({ visible, value, onClose, onPick }: { visible: bo
     <Sheet visible={visible} onClose={close} title="Time zone">
       <TextField
         testID="import-zone-search"
-        placeholder={narrow ? 'Search a city' : 'Search a city, such as Denver or Berlin'}
+        placeholder={narrow ? 'Search a city' : 'Search a city, e.g. Berlin'}
         value={query}
         onChangeText={setQuery}
         autoCorrect={false}

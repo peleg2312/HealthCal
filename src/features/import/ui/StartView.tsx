@@ -6,15 +6,14 @@ import { Platform, View } from 'react-native';
 import { fonts, useTheme } from '@/theme';
 import { Card, Divider, PressableScale, Text } from '@/ui';
 
-/** The first state: what this does, what can be picked, and how to get the files out of Garmin Connect. */
+/** The first state: one line on what happens, and how to get the files out of Garmin Connect folded under one control. */
 export function StartView({ failed }: { failed: { name: string; message: string }[] }) {
   const { spacing } = useTheme();
   return (
     <View style={{ gap: spacing.lg }}>
       {/* The header carries the title; the screen opens with what it does. */}
-      <Text variant="body" color="textSecondary">
-        Choose the files you exported from Garmin Connect and HealthCal adds each workout to Train, with Garmin’s measured calories. You check every workout before
-        anything is added, and the files are read on this device only.
+      <Text variant="body" color="textSecondary" testID="import-intro">
+        Workouts go to Train with Garmin’s calories once you have checked them. Files stay on this device.
       </Text>
 
       {Platform.OS === 'android' ? (
@@ -40,12 +39,12 @@ export function StartView({ failed }: { failed: { name: string; message: string 
       ) : null}
 
       <Guide />
-      <FormatsCard />
     </View>
   );
 }
 
-function FormatsCard() {
+/** The five kinds of file, inside the guide: what each one holds. */
+function FormatsList() {
   const { colors, spacing } = useTheme();
   const rows = [
     { icon: <Watch size={20} color={colors.text} strokeWidth={1.9} />, name: 'FIT', text: 'The original file from the watch. The most complete: measured calories, heart rate, every leg of a triathlon.' },
@@ -55,22 +54,19 @@ function FormatsCard() {
     { icon: <FileArchive size={20} color={colors.text} strokeWidth={1.9} />, name: 'ZIP', text: 'As Garmin downloads it. No need to unzip.' },
   ];
   return (
-    <Card padding={0} style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.xs }} testID="import-formats">
-      {rows.map((r, i) => (
-        <React.Fragment key={r.name}>
-          {i > 0 ? <Divider inset={32} /> : null}
-          <View style={{ flexDirection: 'row', gap: spacing.md, paddingVertical: 11, alignItems: 'flex-start' }}>
-            <View style={{ paddingTop: 1 }}>{r.icon}</View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text variant="bodyStrong">{r.name}</Text>
-              <Text variant="caption" color="textSecondary">
-                {r.text}
-              </Text>
-            </View>
+    <View testID="import-formats" style={{ gap: spacing.md }}>
+      {rows.map((r) => (
+        <View key={r.name} style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
+          <View style={{ paddingTop: 1 }}>{r.icon}</View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text variant="bodyStrong">{r.name}</Text>
+            <Text variant="caption" color="textSecondary">
+              {r.text}
+            </Text>
           </View>
-        </React.Fragment>
+        </View>
       ))}
-    </Card>
+    </View>
   );
 }
 
@@ -89,7 +85,7 @@ function Guide() {
         scaleTo={0.99}
         style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.lg }}>
         <Text variant="title" style={{ flex: 1 }}>
-          How to get your files from Garmin Connect
+          How to export from Garmin
         </Text>
         <Chevron size={20} color={colors.textSecondary} strokeWidth={1.9} />
       </PressableScale>
@@ -111,6 +107,9 @@ function Guide() {
             The CSV does not say whether its distances are in kilometres or miles, or which time zone it is in, so you will be asked. It follows the units set in
             Garmin Connect’s account settings.
           </Text>
+          <Divider />
+          <Text variant="title">Which files work</Text>
+          <FormatsList />
         </View>
       ) : null}
     </Card>

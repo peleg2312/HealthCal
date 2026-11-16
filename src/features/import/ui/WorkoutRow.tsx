@@ -83,7 +83,8 @@ export function WorkoutRow({
           accessibilityLabel={activity ? `${activity.name}. Change activity` : `Choose the activity for ${garminName}`}
           accessibilityHint={kcal.spoken}
           style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, minHeight: 44, paddingTop: 10 }}>
-          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          {/* 4 px between the row's own lines, so the date line and the note never read as touching. */}
+          <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               {activity ? <Text style={{ fontSize: 17, lineHeight: 22 }}>{activity.emoji}</Text> : null}
               <Text
@@ -129,7 +130,8 @@ export function WorkoutRow({
         </PressableScale>
 
         {statusLabel ? (
-          <View style={{ gap: 4, paddingBottom: 4 }}>
+          // The badge keeps 8 px or more from the row's text above it.
+          <View style={{ gap: spacing.sm, paddingTop: spacing.xs, paddingBottom: 4 }}>
             <Badge label={statusLabel} color={row.status === 'probable-duplicate' ? colors.warning : colors.textSecondary} />
             {row.reason && row.reason.replace(/\.$/, '') !== statusLabel ? (
               <Text variant="caption" color="textSecondary">

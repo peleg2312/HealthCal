@@ -11,7 +11,7 @@ import { formatCode, isCompleteCode, normalizeCode } from '@/features/friends/su
 import { outcomeMessage } from '@/features/friends/week';
 import { refreshFriends, requestFriend, useFriends } from '@/services/friends';
 import { useTheme } from '@/theme';
-import { Button, Card, EmptyState, Header, IconButton, Screen, Text, TextField, toast } from '@/ui';
+import { Button, Card, EmptyState, goBack, Header, IconButton, Screen, Text, TextField, toast } from '@/ui';
 
 type Result = { title: string; message: string; good: boolean; outcome: string } | null;
 
@@ -79,13 +79,15 @@ export default function AddFriendScreen() {
             title="Friends need an account"
             message={
               status === 'unavailable'
-                ? 'This version of HealthCal has no accounts, so friends are not available.'
+                ? 'This version has no accounts. Everything else works on this device.'
                 : isCompleteCode(code)
-                  ? `Create a free account or sign in, and once you are set up this screen opens again with the code ${formatCode(code)} filled in. Your calories, weight and food always stay private.`
-                  : 'Create a free account or sign in, then come back to add your friend. Your calories, weight and food always stay private.'
+                  ? `Once you are signed in, this opens again with ${formatCode(code)} filled in.`
+                  : 'Sign in or create a free account, then add your friend here.'
             }
-            action={status === 'signed-out' ? 'Create a free account' : undefined}
+            action={status === 'signed-out' ? 'Create a free account' : 'Back to Today'}
+            actionTestID={status === 'signed-out' ? 'friends-create-account' : 'friends-back-today'}
             onAction={() => {
+              if (status !== 'signed-out') return goBack('/');
               // Keep the code through sign-up and setup; afterwards this screen opens again with it filled in.
               if (isCompleteCode(code)) void savePendingInvite(code);
               router.push('/auth?mode=signup');
@@ -118,11 +120,8 @@ export default function AddFriendScreen() {
           <Button testID="friends-add-send" title="Send request" disabled={!complete} loading={sending} onPress={() => void send()} />
         )
       }>
-      <Text variant="body" color="textSecondary" style={{ marginTop: spacing.xs }}>
-        Ask your friend for the 8-character code on their Friends screen, or open the link they sent. Nobody can find you by searching.
-      </Text>
-      <Text variant="label" color="textSecondary" testID="friends-add-declined-note">
-        Declined someone and changed your mind? Enter their code here to add them. They were never told.
+      <Text variant="body" color="textSecondary">
+        Enter the 8-character code from their Friends screen.
       </Text>
 
       {needsSetup && !result ? (
@@ -174,6 +173,16 @@ export default function AddFriendScreen() {
           </View>
         </Card>
       ) : null}
+
+      {/* The rarer facts sit under the field, one line each. */}
+      <View style={{ gap: spacing.sm }}>
+        <Text variant="caption" color="textSecondary">
+          Nobody can find you by searching.
+        </Text>
+        <Text variant="caption" color="textSecondary" testID="friends-add-declined-note">
+          Declined someone? Their code adds them back. They were never told.
+        </Text>
+      </View>
     </Screen>
   );
 }

@@ -92,9 +92,8 @@ export default function RemindersScreen() {
       {!remindersSupported ? (
         <Card tone="alt">
           <Text variant="bodyStrong">Reminders arrive in the phone app</Text>
-          <Text variant="body" color="textSecondary" style={{ marginTop: 4 }}>
-            Browsers cannot schedule notifications for later, so reminders are sent by HealthCal on your iPhone or Android phone. The settings here
-            are saved with your profile and the preview below shows exactly what you would receive.
+          <Text variant="caption" color="textSecondary" style={{ marginTop: 4 }}>
+            A browser cannot send them. These settings are saved for your phone.
           </Text>
         </Card>
       ) : null}
@@ -117,7 +116,7 @@ export default function RemindersScreen() {
         </Card>
       ) : null}
 
-      <Group title="Water" footer={`Every reminder says how much is left today in your units, with ${waterButtons} buttons to log a drink from the notification. None once the goal is met.`}>
+      <Group title="Water" footer={`Says what is left, with ${waterButtons} buttons. None once the goal is met.`}>
         <ToggleRow
           testID="reminders-water"
           title="Water reminders"
@@ -149,7 +148,7 @@ export default function RemindersScreen() {
         ) : null}
       </Group>
 
-      <Group title="Meals" footer="Only when nothing is logged for that meal yet. Tapping one opens that meal, and if you logged it yesterday you can repeat it from the notification.">
+      <Group title="Meals" footer="Only when that meal is not logged. Tap to open it or repeat yesterday's.">
         <ToggleRow
           testID="reminders-meals"
           title="Meal reminders"
@@ -172,7 +171,7 @@ export default function RemindersScreen() {
         ) : null}
       </Group>
 
-      <Group title="Daily check-in" footer="Calories, protein and water left, or a short note when the day is on track.">
+      <Group title="Daily check-in" footer="What is left today, or a note when on track.">
         <ToggleRow
           testID="reminders-checkin"
           title="Evening check-in"
@@ -189,7 +188,7 @@ export default function RemindersScreen() {
         ) : null}
       </Group>
 
-      <Group title="Weigh-in" footer="Only on the days you choose, and only if no weight is logged yet that day. Later today moves it two hours on, outside quiet hours.">
+      <Group title="Weigh-in" footer="Only on your days, and only if no weight is logged yet.">
         <ToggleRow
           testID="reminders-weighin"
           title="Weigh-in reminder"
@@ -247,7 +246,7 @@ export default function RemindersScreen() {
         ) : null}
       </Group>
 
-      <Group title="Quiet hours" footer="Nothing is sent in this window, even if a reminder falls inside it. At most 6 reminders a day, at least 45 minutes apart.">
+      <Group title="Quiet hours" footer="Nothing is sent then. At most 6 a day, 45 min apart.">
         <TimeRow
           testID="reminders-quiet-start"
           title="From"
@@ -289,7 +288,7 @@ function Preview({ plan, now, hour12, off }: { plan: PlannedReminder[]; now: Dat
       <Card>
         {off ? (
           <Text variant="caption" color="textSecondary" style={{ marginBottom: spacing.md }}>
-            Reminders are off. This is what you would receive with them on.
+            Reminders are off. With them on, you would get these.
           </Text>
         ) : null}
         {plan.length === 0 ? (

@@ -46,7 +46,7 @@ export default function LogActivityScreen() {
 
 function LogForm({ activityId, entryId, dateParam }: { activityId: string; entryId?: string; dateParam?: string }) {
   const { colors, radius, spacing } = useTheme();
-  const tight = useWindowDimensions().width < 360;
+  const width = useWindowDimensions().width;
   const profile = useProfile();
   const activities = useLive('activities');
   const activity = ACTIVITY_BY_ID[activityId];
@@ -86,6 +86,14 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
   const dayLabel = formatDayLabel(date);
   const dayWord = date === today() ? "today's" : `${/,/.test(dayLabel) ? dayLabel : dayLabel.toLowerCase()}'s`;
   const restingShare = Math.round((tdee / 1440) * minutes);
+
+  // Effort tiles sit three in a row while every word of their hints fits a tile; a word like
+  // "strokes/min" or "Recreational" would break mid-word there, so the three become rows, the hint
+  // beside the name. About 7 px a character at the caption size errs on the safe side.
+  const hints = INTENSITIES.map((i) => localiseSpeedText(activity.intensityHint?.[i] ?? INTENSITY_LABELS[i].hint, units));
+  const tileInner = (Math.min(width, 560) - 40 - 2 * spacing.sm) / 3 - 2 * spacing.md - 4;
+  const longestWord = Math.max(...hints.flatMap((h) => h.split(/[\s-]+/)).map((w) => w.length), ...INTENSITIES.map((i) => INTENSITY_LABELS[i].title.length));
+  const tight = width < 360 || longestWord * 7 > tileInner;
 
   const unit = distanceUnit(units);
   const mode = paceModeFor(activity);
@@ -189,9 +197,6 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
             </Text>
           </View>
         ) : null}
-        <Text variant="body" color="textSecondary" testID="log-activity-sentence">
-          {sentence}
-        </Text>
         {replaceNote ? (
           <Text variant="label" color="text" testID="log-activity-replaces-measured">
             {replaceNote}
@@ -213,7 +218,8 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
           testID="log-activity-source"
           accessibilityLabel="Where this number comes from"
           onPress={() => setShowSource((v) => !v)}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 }}>
+          // The row's 44 px touch height reaches into the card's bottom padding, so the card ends as close under it as under text.
+          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, marginBottom: showSource ? 0 : -spacing.sm }}>
           <Info size={16} color={colors.textTertiary} />
           <Text variant="label" color="textTertiary" style={{ flex: 1 }}>
             Where this number comes from
@@ -222,6 +228,9 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
         </PressableScale>
         {showSource ? (
           <View style={{ gap: spacing.sm, marginTop: -spacing.xs }} testID="log-activity-source-body">
+            <Text variant="caption" color="textSecondary" testID="log-activity-sentence">
+              {sentence}
+            </Text>
             {isMeasured ? (
               <Text variant="caption" color="textSecondary">
                 {formatNumber(preview.gross)} kcal is the total {device} measured for this session, resting included. Your day already assumes{' '}
@@ -290,12 +299,11 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
           </Card>
         ) : (
           <>
-            {/* Three tiles side by side; under 360 px a tile is about 70 px inside, too narrow for a word like
-                "Powerlifting", so the three stack as rows with the hint beside the name. */}
+            {/* Three tiles side by side, or three rows when a hint's word would not fit a tile (see `tight`). */}
             <View style={{ flexDirection: tight ? 'column' : 'row', gap: spacing.sm }}>
               {INTENSITIES.map((i) => {
                 const active = intensity === i;
-                const hint = localiseSpeedText(activity.intensityHint?.[i] ?? INTENSITY_LABELS[i].hint, units);
+                const hint = hints[INTENSITIES.indexOf(i)];
                 return (
                   <PressableScale
                     key={i}

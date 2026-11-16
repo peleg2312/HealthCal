@@ -1,12 +1,12 @@
 import { useLocalSearchParams } from 'expo-router';
-import { Info, Moon, Plus } from 'lucide-react-native';
+import { Moon, Plus } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { formatDayLabel, fromISODate, weekdayShort } from '@/lib/dates';
 import { deleteSleep, saveSleep } from '@/features/trackers/actions';
 import { dayTitle, resolveDateParam } from '@/features/trackers/dateParam';
-import { DayStepper, Figure, Note, RequireProfile } from '@/features/trackers/components';
+import { DayStepper, Explain, ExplainText, Figure, RequireProfile } from '@/features/trackers/components';
 import { findByDate, formatHours, QUALITY_LABELS, SLEEP_RANGE, sleepSummary } from '@/features/trackers/helpers';
 import { useToday } from '@/store/clock';
 import { useLive } from '@/store/selectors';
@@ -92,7 +92,7 @@ function SleepScreen() {
           <EmptyState
             emoji="🌙"
             title="See how you sleep"
-            message="Log how long you slept and how it felt. After a few nights you will see your average and how often you land in the 7 to 9 hour range."
+            message="Log how long you slept and how it felt. After a few nights your average shows here."
           />
         </Card>
       ) : (
@@ -144,21 +144,21 @@ function SleepScreen() {
               />
             </View>
             <BarChart data={bars} color={colors.sleep} band={{ from: SLEEP_RANGE[0], to: SLEEP_RANGE[1] }} height={160} formatValue={(n) => `${n.toFixed(1)}`} />
-            <Text variant="caption" color="textSecondary">
+            <Text variant="caption" color="textSecondary" testID="sleep-chart-note">
               {[
-                'The shaded band marks 7 to 9 hours, the range most adults need.',
+                'Shaded: 7 to 9 h.',
                 summary.nights < days ? `${days - summary.nights} of ${days} nights not logged.` : null,
-                summary.avgQuality !== null ? `Average quality: ${QUALITY_LABELS[Math.round(summary.avgQuality) as SleepEntry['quality']].toLowerCase()}.` : null,
+                summary.avgQuality !== null ? `Average quality ${QUALITY_LABELS[Math.round(summary.avgQuality) as SleepEntry['quality']].toLowerCase()}.` : null,
               ]
                 .filter(Boolean)
                 .join(' ')}
             </Text>
-          </Card>
-
-          <Card tone="alt">
-            <Note icon={<Info size={14} color={colors.textTertiary} />}>
-              Most adults need 7 to 9 hours (American Academy of Sleep Medicine). A steady schedule matters too: a smaller night-to-night spread usually means steadier energy and appetite.
-            </Note>
+            <Explain label="Why 7 to 9 hours" testID="sleep-help" style={{ marginTop: -spacing.xs, marginBottom: -spacing.sm }}>
+              <ExplainText>
+                Most adults need 7 to 9 hours (American Academy of Sleep Medicine). A steady schedule matters too: a smaller night-to-night spread usually means steadier energy and
+                appetite.
+              </ExplainText>
+            </Explain>
           </Card>
 
           <SectionTitle
