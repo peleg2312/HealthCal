@@ -1,4 +1,4 @@
-import { AlertTriangle, FileWarning } from 'lucide-react-native';
+import { AlertTriangle, FileText, FileWarning } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
@@ -101,7 +101,14 @@ export function FileNotes({ notes }: { notes: FileNote[] }) {
       {shown.map((n, i) => (
         <View key={n.file} style={{ gap: spacing.xs, paddingVertical: spacing.sm, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: colors.border }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            {n.errors.length ? <FileWarning size={18} color={colors.warningInk} strokeWidth={1.9} /> : <AlertTriangle size={18} color={colors.textSecondary} strokeWidth={1.9} />}
+            {n.errors.length ? (
+              <FileWarning size={18} color={colors.warningInk} strokeWidth={1.9} />
+            ) : n.warnings.every((w) => w.code.startsWith('apple-')) ? (
+              // A Health export's notes are information (steps saved, a session listed once), not a problem.
+              <FileText size={18} color={colors.textSecondary} strokeWidth={1.9} />
+            ) : (
+              <AlertTriangle size={18} color={colors.textSecondary} strokeWidth={1.9} />
+            )}
             <Text variant="bodyStrong" numberOfLines={1} style={{ flex: 1 }}>
               {n.file}
             </Text>
@@ -192,22 +199,36 @@ export function ListControls({
           ) : null}
         </View>
       ) : null}
-      {counts.total > 1 ? (
-        // Rows of chips 12 px apart, as ChipWrap: closer, the touch areas of two rows overlap.
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.sm, rowGap: spacing.md }}>
-          {filters
-            .filter((f) => f.id === 'all' || f.n > 0)
-            .map((f) => (
-              <Chip key={f.id} label={`${f.label} ${formatNumber(f.n)}`} selected={filter === f.id} onPress={() => onFilter(f.id)} testID={`import-filter-${f.id}`} />
-            ))}
-        </View>
-      ) : null}
+      {counts.total > 1 ? <FilterChips filters={filters.filter((f) => f.id === 'all' || f.n > 0)} filter={filter} onFilter={onFilter} /> : null}
       {counts.total > 1 ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
           <TextLink testID="import-tick-all" label="Tick all new" onPress={() => onSelectAll(true)} />
           <TextLink testID="import-untick-all" label="Untick all" onPress={() => onSelectAll(false)} />
         </View>
       ) : null}
+    </View>
+  );
+}
+
+/**
+ * The filter chips. Up to three wrap as they fit (at worst two, then one). All
+ * four never fit one line on a phone, and wrapping them leaves the last alone
+ * under three, so four go two by two. Rows are 12 px apart, as ChipWrap:
+ * closer, the touch areas of two rows overlap.
+ */
+function FilterChips({ filters, filter, onFilter }: { filters: { id: RowFilter; label: string; n: number }[]; filter: RowFilter; onFilter: (f: RowFilter) => void }) {
+  const { spacing } = useTheme();
+  const chip = (f: { id: RowFilter; label: string; n: number }) => (
+    <Chip key={f.id} label={`${f.label} ${formatNumber(f.n)}`} selected={filter === f.id} onPress={() => onFilter(f.id)} testID={`import-filter-${f.id}`} />
+  );
+  const lines = filters.length === 4 ? [filters.slice(0, 2), filters.slice(2)] : [filters];
+  return (
+    <View style={{ gap: spacing.md }} testID="import-filters">
+      {lines.map((line, i) => (
+        <View key={i} style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.sm, rowGap: spacing.md }}>
+          {line.map(chip)}
+        </View>
+      ))}
     </View>
   );
 }

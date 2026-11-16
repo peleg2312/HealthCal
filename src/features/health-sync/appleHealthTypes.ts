@@ -148,3 +148,36 @@ export function appleHealthSport(type: number): HealthSport {
     alternatives: row.alternatives.filter(known),
   };
 }
+
+/**
+ * The same types by the names the Health app's export file writes
+ * ('HKWorkoutActivityTypeRunning'): HKWorkoutActivityType's case names, as
+ * Apple's headers spell them, after the prefix. Kept beside the number table
+ * and tested against the library's enum (appleHealthTypes.test.ts), so a type
+ * reads the same from the file as from HealthKit.
+ */
+export const HK_ACTIVITY_TYPE_NAMES: Record<string, number> = {
+  AmericanFootball: 1, Archery: 2, AustralianFootball: 3, Badminton: 4, Baseball: 5, Basketball: 6, Bowling: 7, Boxing: 8, Climbing: 9, Cricket: 10,
+  CrossTraining: 11, Curling: 12, Cycling: 13, Dance: 14, DanceInspiredTraining: 15, Elliptical: 16, EquestrianSports: 17, Fencing: 18, Fishing: 19,
+  FunctionalStrengthTraining: 20, Golf: 21, Gymnastics: 22, Handball: 23, Hiking: 24, Hockey: 25, Hunting: 26, Lacrosse: 27, MartialArts: 28, MindAndBody: 29,
+  MixedMetabolicCardioTraining: 30, PaddleSports: 31, Play: 32, PreparationAndRecovery: 33, Racquetball: 34, Rowing: 35, Rugby: 36, Running: 37, Sailing: 38,
+  SkatingSports: 39, SnowSports: 40, Soccer: 41, Softball: 42, Squash: 43, StairClimbing: 44, SurfingSports: 45, Swimming: 46, TableTennis: 47, Tennis: 48,
+  TrackAndField: 49, TraditionalStrengthTraining: 50, Volleyball: 51, Walking: 52, WaterFitness: 53, WaterPolo: 54, WaterSports: 55, Wrestling: 56, Yoga: 57,
+  Barre: 58, CoreTraining: 59, CrossCountrySkiing: 60, DownhillSkiing: 61, Flexibility: 62, HighIntensityIntervalTraining: 63, JumpRope: 64, Kickboxing: 65,
+  Pilates: 66, Snowboarding: 67, Stairs: 68, StepTraining: 69, WheelchairWalkPace: 70, WheelchairRunPace: 71, TaiChi: 72, MixedCardio: 73, HandCycling: 74,
+  DiscSports: 75, FitnessGaming: 76, CardioDance: 77, SocialDance: 78, Pickleball: 79, Cooldown: 80, SwimBikeRun: 82, Transition: 83, UnderwaterDiving: 84,
+  Rest: 2998, Group: 2999, Other: 3000,
+};
+
+const NAME_PREFIX = 'HKWorkoutActivityType';
+
+/**
+ * The type number for an export's activity type name, or null for a name the
+ * table does not know (a newer iOS): the import then lists it as "Workout" and
+ * the review list asks which activity it was.
+ */
+export function appleTypeFromName(name: string | null | undefined): number | null {
+  const n = (name ?? '').trim();
+  const bare = n.startsWith(NAME_PREFIX) ? n.slice(NAME_PREFIX.length) : n;
+  return Object.prototype.hasOwnProperty.call(HK_ACTIVITY_TYPE_NAMES, bare) ? HK_ACTIVITY_TYPE_NAMES[bare] : null;
+}

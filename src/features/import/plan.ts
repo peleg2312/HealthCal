@@ -60,6 +60,8 @@ function build(workout: ImportedWorkout, activityId: string | null, suggestion: 
 export function asReplacement(stored: ActivityEntry, entry: ImportedEntry, workout?: Pick<ImportedWorkout, 'startUtc' | 'utcOffsetMin'>): ImportedEntry {
   const day = workout ? correctedDay(stored, workout) : null;
   const out: ImportedEntry = { ...entry, id: stored.id, date: day ?? stored.date, externalId: stored.externalId ?? entry.externalId };
+  // A workout keeps where it first came from (a Garmin file stays one when a Health export improves it).
+  if (stored.source === 'garmin' || stored.source === 'health') out.source = stored.source;
   if (stored.notes) out.notes = stored.notes;
   // A strength session's sets are the person's own too.
   if (stored.exercises) out.exercises = stored.exercises;

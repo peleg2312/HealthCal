@@ -107,12 +107,12 @@ export default function TrainScreen() {
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.lg, marginTop: -spacing.sm }}>
         <PressableScale
           testID="train-import-garmin"
-          accessibilityLabel="Import workouts from Garmin"
+          accessibilityLabel="Import workouts from a Garmin file or a Health export"
           onPress={() => router.push('/activity/import')}
           hitSlop={6}
           style={{ minHeight: 44, justifyContent: 'center' }}>
           <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
-            Import workouts from Garmin
+            Import workouts
           </Text>
         </PressableScale>
         <TrainSyncLink />

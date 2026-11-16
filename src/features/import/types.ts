@@ -6,7 +6,8 @@
  * plain objects, so they run in unit tests and on iOS, Android and web alike.
  */
 
-export type ImportFormat = 'fit' | 'tcx' | 'gpx' | 'csv';
+/** 'apple': a workout from the Health app's export file (export.zip or export.xml; health-sync/exportFile.ts). */
+export type ImportFormat = 'fit' | 'tcx' | 'gpx' | 'csv' | 'apple';
 
 /** One workout as read from a file, before it is matched to an app activity. */
 export interface ImportedWorkout {
@@ -55,6 +56,18 @@ export interface ImportedWorkout {
   leg?: { number: number; of: number };
   /** True for a multisport transition leg (changing between sports). */
   transition?: boolean;
+  /**
+   * Apple Health export only: HKWorkoutActivityType's number (with the indoor
+   * and open-water variants, appleHealthTypes.ts), which decides the activity.
+   */
+  appleType?: number;
+  /**
+   * Apple Health export only: the identity the record is saved with, in the
+   * scheme a synced workout uses ('health:com.apple.health.watch:<start>', or
+   * 'garmin:<start>' for Garmin Connect; origins.ts), so it reads "From Apple
+   * Watch" however it arrived. The record id still comes from the start instant.
+   */
+  externalId?: string;
 }
 
 /** Something a person should know about a file that was still read. */
@@ -81,7 +94,10 @@ export type ImportWarningCode =
   | 'csv-elapsed-time'
   | 'csv-date-order'
   | 'zip-skipped-files'
-  | 'zip-nested-depth';
+  | 'zip-nested-depth'
+  | 'apple-steps'
+  | 'apple-merged'
+  | 'apple-not-exercise';
 
 export type ImportErrorCode =
   | 'empty'
@@ -98,7 +114,9 @@ export type ImportErrorCode =
   | 'csv-options-needed'
   | 'bad-time-zone'
   | 'not-zip'
-  | 'zip-empty';
+  | 'zip-empty'
+  | 'apple-not-export'
+  | 'apple-damaged';
 
 /** A file that cannot be read. `message` is written for the person, not the developer. */
 export class ImportError extends Error {

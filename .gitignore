@@ -44,3 +44,6 @@ example
 
 # local secrets
 .env
+
+# Output of scripts/dev/crawl.cjs when no --out is given
+crawl-out/

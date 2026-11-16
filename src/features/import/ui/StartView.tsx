@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, FileArchive, FileSpreadsheet, FileText, Map as MapIcon, Watch } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, FileArchive, FileSpreadsheet, FileText, HeartPulse, Map as MapIcon, Watch } from 'lucide-react-native';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Platform, View } from 'react-native';
@@ -6,16 +6,21 @@ import { Platform, View } from 'react-native';
 import { fonts, useTheme } from '@/theme';
 import { Card, Divider, PressableScale, Text } from '@/ui';
 
-/** The first state: one line on what happens, and how to get the files out of Garmin Connect folded under one control. */
+/**
+ * The first state: one line on what happens, then the two kinds of file: the
+ * Health app's export (how to get it, in one short paragraph) and Garmin
+ * Connect's files (how to get them folded under one control).
+ */
 export function StartView({ failed }: { failed: { name: string; message: string }[] }) {
   const { spacing } = useTheme();
   return (
     <View style={{ gap: spacing.lg }}>
       {/* The header carries the title; the screen opens with what it does. */}
       <Text variant="body" color="textSecondary" testID="import-intro">
-        Workouts go to Train with Garmin’s calories once you have checked them. Files stay on this device.
+        Workouts go to Train with your watch’s calories once you have checked them. Files stay on this device.
       </Text>
 
+      {/* On Android the way that needs no file comes first; the iPhone's export (a phone switched from) after it. */}
       {Platform.OS === 'android' ? (
         <Card tone="alt" onPress={() => router.push('/settings/health-sync')} testID="import-sync-link" accessibilityLabel="Workout sync: let workouts come in by themselves">
           <Text variant="bodyStrong">Workouts can come in by themselves</Text>
@@ -24,6 +29,8 @@ export function StartView({ failed }: { failed: { name: string; message: string 
           </Text>
         </Card>
       ) : null}
+
+      <AppleHealthGuide />
 
       {failed.length ? (
         <Card tone="alt" testID="import-open-failed">
@@ -40,6 +47,27 @@ export function StartView({ failed }: { failed: { name: string; message: string 
 
       <Guide />
     </View>
+  );
+}
+
+/** The Health app's export: what it brings and how to get it, in one card. */
+function AppleHealthGuide() {
+  const { colors, spacing } = useTheme();
+  return (
+    <Card testID="import-apple-guide" style={{ gap: spacing.sm }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+        <HeartPulse size={20} color={colors.text} strokeWidth={1.9} />
+        <Text variant="title" style={{ flex: 1 }}>
+          From an iPhone’s Health app
+        </Text>
+      </View>
+      <Text variant="body" color="textSecondary">
+        Workouts and daily steps. In the Health app, tap your picture, then Export All Health Data. Save it to Files, then choose export.zip here.
+      </Text>
+      <Text variant="caption" color="textSecondary">
+        A large export takes a minute or two to read. Heart rate, sleep and the rest are skipped, and nothing leaves this device.
+      </Text>
+    </Card>
   );
 }
 

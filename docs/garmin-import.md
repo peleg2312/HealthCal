@@ -2,7 +2,7 @@
 
 HealthCal can read the workout files you export from Garmin Connect. Each workout becomes a session in Train, with the calories your watch measured. You see every workout before anything is added, and the files are read on your device: nothing is uploaded.
 
-Open it from **Train > Import workouts from Garmin**, or **Profile > Your data > Import from Garmin**.
+Open it from **Train > Import workouts**, or **Profile > Your data > Import from Garmin**. The same screen (titled "Import workouts") also takes the Health app's export from an iPhone, recognised by its content; that file is described in `docs/health-sync.md`, "The Health app's export file".
 
 ## 1. Get your files out of Garmin Connect
 

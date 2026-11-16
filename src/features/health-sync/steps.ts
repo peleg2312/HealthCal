@@ -185,3 +185,101 @@ export function stepsLine(w: StepsWeek, short = false): string {
   if (w.today !== null) return `${n(w.today)} ${w.today === 1 ? 'step' : 'steps'} today`;
   return `${n(w.average as number)} steps a day ${when}`;
 }
+
+// ---------------------------------------------------------------- steps from the Health app's export file
+
+/**
+ * Steps read from the Health app's export file (exportFile.ts adds them up),
+ * kept beside the synced ones in this phone's memory. A file is a snapshot:
+ * Train says where they are from and as of when.
+ */
+export interface FileSteps {
+  days: StepDays;
+  /** When the export was made (its ExportDate), ISO instant. */
+  asOf: string;
+  /** The phone's calendar day of `asOf`: that day was cut off by the export, so it is not a full day unless it is today. */
+  asOfDay: ISODate;
+}
+
+/**
+ * A file's days, merged with what an earlier import left.
+ *
+ * A file made at the same time as the one kept or later replaces the days it
+ * covers (`fromDay` to `asOfDay`; a covered day with no steps is dropped), and
+ * the kept file's days outside that stay until they leave the 35-day window,
+ * except the kept file's own cut-off day, which was never a whole day.
+ *
+ * A file made before the one kept (an older export picked after a newer one)
+ * replaces nothing: the newer file has every sample the older one had, and
+ * more for the days the older one ended on or that a watch handed over late.
+ * It only fills days the kept file has no steps for, never with its own cut-off
+ * day, and the kept file stays the one Train names ("as of").
+ */
+export function mergeFileSteps(before: FileSteps | null, read: FileSteps & { fromDay: ISODate }, today: ISODate): FileSteps {
+  const oldest = oldestStepDay(today);
+  const inWindow = (day: ISODate, n: number) => day >= oldest && day <= today && n > 0;
+  const days: StepDays = {};
+  const newer = !before || read.asOf >= before.asOf;
+  if (newer) {
+    if (before) {
+      for (const [day, n] of Object.entries(before.days)) {
+        if (!inWindow(day, n) || (day >= read.fromDay && day <= read.asOfDay)) continue;
+        if (day === before.asOfDay && day < today) continue;
+        days[day] = n;
+      }
+    }
+    for (const [day, n] of Object.entries(read.days)) if (inWindow(day, n)) days[day] = n;
+  } else {
+    for (const [day, n] of Object.entries(before.days)) if (inWindow(day, n)) days[day] = n;
+    for (const [day, n] of Object.entries(read.days)) if (inWindow(day, n) && !(day in days) && day !== read.asOfDay) days[day] = n;
+  }
+  const sorted: StepDays = {};
+  for (const day of Object.keys(days).sort()) sorted[day] = days[day];
+  return newer ? { days: sorted, asOf: read.asOf, asOfDay: read.asOfDay } : { days: sorted, asOf: before.asOf, asOfDay: before.asOfDay };
+}
+
+export interface ShownSteps {
+  days: StepDays;
+  /** The days whose figure came from the export file. */
+  fromFile: ISODate[];
+  /** When that file was made, when any day shown came from it. */
+  asOf: string | null;
+}
+
+/**
+ * What Train shows: the synced days (when automatic sync is on) and the file's,
+ * where a synced day wins over the file's for the same day (it is live, the
+ * file is a snapshot). The file's own last day, cut off by the export, is left
+ * out once it is no longer today.
+ */
+export function shownSteps(synced: StepDays | null, file: FileSteps | null, today: ISODate): ShownSteps {
+  const oldest = oldestStepDay(today);
+  const days: StepDays = {};
+  const fromFile: ISODate[] = [];
+  if (file) {
+    for (const [day, n] of Object.entries(file.days)) {
+      if (day < oldest || day > today || n <= 0) continue;
+      if (day === file.asOfDay && day < today) continue;
+      days[day] = n;
+      fromFile.push(day);
+    }
+  }
+  if (synced) {
+    for (const [day, n] of Object.entries(synced)) {
+      if (day < oldest || day > today || n <= 0) continue;
+      days[day] = n;
+      const i = fromFile.indexOf(day);
+      if (i >= 0) fromFile.splice(i, 1);
+    }
+  }
+  fromFile.sort();
+  return { days, fromFile, asOf: fromFile.length && file ? file.asOf : null };
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** "From your Health export, Nov 16" (the export's day, in the phone's calendar). */
+export function fileStepsNote(asOfDay: ISODate): string {
+  const [, m, d] = asOfDay.split('-').map(Number);
+  return `From your Health export, ${MONTHS[m - 1]} ${d}`;
+}

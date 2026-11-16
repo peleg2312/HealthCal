@@ -26,14 +26,14 @@ describe('where sync works', () => {
     }
     expect(web.profile).toBe('In the Android app');
     expect(phone.profile).toBe('Not in the iPhone app yet');
-    expect(phone.here).toBe('This version of the iPhone app cannot read Apple Health yet. Here, import the files Garmin Connect exports.');
-    expect(web.here).toBe('A browser has no health data. Here, import the files Garmin Connect exports.');
+    expect(phone.here).toBe('This version of the iPhone app cannot read Apple Health yet. Here, import the Health app’s export or the files Garmin Connect exports.');
+    expect(web.here).toBe('A browser has no health data. Here, import the Health app’s export or the files Garmin Connect exports.');
     expect(storesRead(false)).toEqual({ from: 'Health Connect on Android', notBack: 'Health Connect' });
   });
 
   it('with the iPhone side: both phones, and an iPad without Health says so', () => {
     expect(syncReach('web', false, true)).toMatchObject({ profile: 'In the iPhone and Android apps', heading: 'Automatic on iPhone and Android' });
-    expect(syncReach('ios', true, true).here).toBe('Apple Health is not available on this device. Here, import the files Garmin Connect exports.');
+    expect(syncReach('ios', true, true).here).toBe('Apple Health is not available on this device. Here, import the Health app’s export or the files Garmin Connect exports.');
     expect(storesRead(true).from).toBe('Health Connect on Android or Apple Health on iPhone');
   });
 });

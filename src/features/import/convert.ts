@@ -31,7 +31,8 @@ export interface ConvertContext {
 /** A ready-to-save entry: pass it to `useStore.getState().upsert('activities', entry)` (or upsertMany). */
 export type ImportedEntry = Omit<ActivityEntry, 'updatedAt'> & {
   id: string;
-  source: 'garmin';
+  /** 'garmin' for a file from Garmin Connect; 'health' for a workout from the Health app's export, as a synced one is. */
+  source: 'garmin' | 'health';
   externalId: string;
   startedAt: string;
 };
@@ -85,7 +86,9 @@ export function toActivityEntry(w: ImportedWorkout, activity: ActivityDef, ctx: 
   const durationMin = Math.max(1, Math.round(exactMinutes));
   const startMs = Date.parse(w.startUtc);
   const endMs = startMs + (w.elapsedSec ?? w.durationSec) * 1000;
-  const externalId = garminExternalId(w);
+  // The record id is always the start instant's; an Apple Health export keeps where it came from in externalId.
+  const id = importedEntryId(garminExternalId(w));
+  const externalId = w.format === 'apple' && w.externalId ? w.externalId : garminExternalId(w);
   const { weightKg, baselineKcalPerDay } = ctx;
 
   // For activities whose effort levels are described by speed, the speed decides
@@ -112,7 +115,7 @@ export function toActivityEntry(w: ImportedWorkout, activity: ActivityDef, ctx: 
   }
 
   const entry: ImportedEntry = {
-    id: importedEntryId(externalId),
+    id,
     // The day where the workout was done (the file's own offset when it states one).
     date: recordedWallTime(w).date,
     activityId: activity.id,
@@ -126,7 +129,7 @@ export function toActivityEntry(w: ImportedWorkout, activity: ActivityDef, ctx: 
     kcalNet,
     weightKg,
     baselineKcalPerDay,
-    source: 'garmin',
+    source: w.format === 'apple' ? 'health' : 'garmin',
     externalId,
     startedAt: w.startUtc,
     loggedAt: new Date(endMs).toISOString(),

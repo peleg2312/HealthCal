@@ -75,6 +75,9 @@ export function readAs(format: ImportFormat, bytes: Uint8Array, name: string, op
     case 'csv':
       if (!looksLikeText(bytes)) throw new ImportError('not-csv', 'This file is not a CSV text file.', name);
       return readGarminCsv(decodeText(bytes), name, options.csv);
+    case 'apple':
+      // The Health export is read as a stream from the file itself (health-sync/exportRead.ts), never from bytes in memory.
+      throw new ImportError('apple-not-export', 'A Health export is read on its own, from the file.', name);
   }
 }
 

@@ -7,6 +7,8 @@
  */
 import { ACTIVITIES, ACTIVITY_BY_ID } from '@/data/activities';
 
+import { appleHealthSport } from '@/features/health-sync/appleHealthTypes';
+
 import { englishActivityType } from './csv';
 import { normalizeText } from './text';
 import type { ImportedWorkout } from './types';
@@ -200,10 +202,16 @@ export function activityFromTitle(title: string | null | undefined): string | nu
  * decide it, a title that names an activity is offered first among the
  * alternatives (never chosen silently: titles are free text).
  */
-export function suggestActivity(w: Pick<ImportedWorkout, 'format' | 'sport' | 'subSport' | 'distanceM' | 'durationSec' | 'transition' | 'title'>): SportMatch {
+export function suggestActivity(w: Pick<ImportedWorkout, 'format' | 'sport' | 'subSport' | 'distanceM' | 'durationSec' | 'transition' | 'title' | 'appleType'>): SportMatch {
   if (w.transition) return ask();
   let m: SportMatch;
   switch (w.format) {
+    case 'apple': {
+      // The Health export names the type the way HealthKit does: Apple Health's own table decides.
+      const sport = appleHealthSport(w.appleType ?? -1);
+      m = match(sport.activityId, sport.alternatives);
+      break;
+    }
     case 'fit':
       m = mapFitSport(w.sport, w.subSport, w.distanceM, w.durationSec);
       break;

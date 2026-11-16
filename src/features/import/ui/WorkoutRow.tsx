@@ -100,7 +100,7 @@ export function WorkoutRow({
             </Text>
             {!activity ? (
               <Text variant="caption" color="textSecondary" numberOfLines={2}>
-                Garmin calls it {garminName}
+                {w.format === 'apple' ? 'Apple Health' : 'Garmin'} calls it {garminName}
                 {legNote ? ` · ${legNote}` : ''}
               </Text>
             ) : legNote || row.entry?.notes ? (

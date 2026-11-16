@@ -12,8 +12,10 @@ import { QuestionsView, questionsTitle } from '@/features/import/ui/QuestionsVie
 import { ReadingView } from '@/features/import/ui/ReadingView';
 import { FileNotes, ListControls, SummaryCard, TextLink } from '@/features/import/ui/ReviewHeader';
 import {
+  cancelImport,
   commitImport,
   confirmAnswers,
+  leaveImport,
   pickActivity,
   replaceHandLogged,
   resetImport,
@@ -22,6 +24,7 @@ import {
   setAnswers,
   setEstimateIntensity,
   startWithFiles,
+  stepDayCount,
   toggleRow,
   useImportSession,
 } from '@/features/import/ui/session';
@@ -38,7 +41,7 @@ import { useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import { Button, Card, Divider, EmptyState, Header, Screen, Text, toast } from '@/ui';
 
-/** /activity/import: bring workouts exported from Garmin Connect into the app. */
+/** /activity/import: bring in workouts from files: Garmin Connect's exports, or the Health app's export (workouts and steps). */
 export default function ImportScreen() {
   const { spacing } = useTheme();
   const insets = useSafeAreaInsets();
@@ -55,16 +58,17 @@ export default function ImportScreen() {
   const systemTimeFiles = useImportSession((s) => s.systemTimeFiles);
   const answers = useImportSession((s) => s.answers);
   const result = useImportSession((s) => s.result);
+  const exports = useImportSession((s) => s.exports);
 
   const [picking, setPicking] = useState(false);
   const [filter, setFilter] = useState<RowFilter>('all');
   const [choosing, setChoosing] = useState<string | null>(null);
   const [zoneFor, setZoneFor] = useState<'csv' | 'fit' | null>(null);
 
-  // Every visit starts fresh; the picked bytes are dropped when the screen closes.
+  // Every visit starts fresh. Leaving (X, back, another screen) stops a read under way and drops what it read: nothing is saved but by Import.
   useEffect(() => {
     resetImport();
-    return () => resetImport();
+    return () => leaveImport();
   }, []);
 
   const choose = async () => {
@@ -92,6 +96,13 @@ export default function ImportScreen() {
   const updating = rows.filter((r) => r.selected && r.status === 'update').length;
   const visible = filterRows(rows, filter);
   const notes = fileNotes(batches, rows.map((r) => r.workout));
+  // A Health export's own notes (steps to save, a session listed once, a rest left out) are information: under the list, so the workouts to check come first.
+  const infoOnly = (n: (typeof notes)[number]) => n.errors.length === 0 && n.warnings.length > 0 && n.warnings.every((w) => w.code.startsWith('apple-'));
+  const topNotes = notes.filter((n) => !infoOnly(n));
+  const bottomNotes = notes.filter(infoOnly);
+  // Days of steps a Health export read here would save with the import (0: none).
+  const stepDays = stepDayCount(exports);
+  const stepsPart = stepDays ? `steps for ${stepDays === 1 ? '1 day' : `${stepDays} days`}` : '';
   const estimateRows = rows.filter((r) => r.entry && !r.entry.measured && r.status !== 'already-imported' && r.status !== 'duplicate-in-file');
   const estimates = estimateRows.length;
   const paced = estimateRows.filter((r) => paceSetsEffort(r)).length;
@@ -101,6 +112,8 @@ export default function ImportScreen() {
     ? `CSV read in ${answers.distanceUnit === 'km' ? 'kilometres' : 'miles'}, times in ${answers.csvTimeZone ? zoneLabel(answers.csvTimeZone) : device ? zoneLabel(device) : 'this device’s zone'}.`
     : null;
 
+  // The share read is on the screen beside the cup, once; the header only says what is happening.
+  const readingLine = progress?.share !== undefined ? 'Reading the export' : 'Reading the files';
   // The short line under the title says where in the import you are.
   const subtitle =
     phase === 'review' && batches.length
@@ -110,9 +123,11 @@ export default function ImportScreen() {
       : phase === 'questions'
         ? questionsTitle(csvFiles.length, systemTimeFiles.length)
         : phase === 'done' && result
-          ? doneTitle(result.entries, result.previous, result.undone)
-          : 'FIT, TCX, GPX, CSV or ZIP files';
-  const header = <Header title="Import from Garmin" close subtitle={subtitle} />;
+          ? doneTitle(result.entries, result.previous, result.undone, result.steps?.days ?? 0)
+          : phase === 'reading'
+            ? readingLine
+            : 'Garmin files or Health export';
+  const header = <Header title="Import workouts" close subtitle={subtitle} />;
 
   const sheets = (
     <>
@@ -129,22 +144,39 @@ export default function ImportScreen() {
   if (phase === 'review') {
     const nothing = rows.length === 0;
     const allLocked = !nothing && counts.locked === counts.total;
-    // Nothing to import (no workouts, or every one already in HealthCal): the one useful action is other files.
-    const footer = nothing || allLocked ? (
-      <Button testID="import-choose-again" title="Choose other files" onPress={() => void choose()} loading={picking} />
-    ) : (
-      <View style={{ gap: spacing.sm }}>
-        <Text variant="caption" color="textSecondary" align="center" testID="import-footer-line">
-          {/* The kcal is the summary's large number; the footer says only where it goes (and an update's change, which the summary does not show). */}
-          {toSave.length
-            ? `${updating && addedKcal <= 0 ? `Changes the budget by ${addedKcal < 0 ? '−' : '+'}${formatNumber(Math.abs(addedKcal))} kcal, across ` : 'Goes to '}${new Set(toSave.map((e) => e.date)).size === 1 ? 'one day' : `${new Set(toSave.map((e) => e.date)).size} days`}`
-            : 'Tick the workouts to import.'}
-        </Text>
-        <Button
-          testID="import-submit"
-          title={!toSave.length ? 'Nothing to import' : updating === toSave.length ? `Update ${workouts(updating)}` : `Import ${workouts(toSave.length)}`} disabled={!toSave.length} onPress={commitImport} />
-      </View>
-    );
+    const dayCount = new Set(toSave.map((e) => e.date)).size;
+    // Nothing to import (no workouts, or every one already in HealthCal) and no steps: the one useful action is other files.
+    const footer =
+      (nothing || allLocked) && !stepDays ? (
+        <Button testID="import-choose-again" title="Choose other files" onPress={() => void choose()} loading={picking} />
+      ) : (
+        <View style={{ gap: spacing.sm }}>
+          <Text variant="caption" color="textSecondary" align="center" testID="import-footer-line">
+            {/* The kcal is the summary's large number; the footer says only where it goes (and an update's change, which the summary does not show), and the steps that go in with it. */}
+            {toSave.length
+              ? `${updating && addedKcal <= 0 ? `Changes the budget by ${addedKcal < 0 ? '−' : '+'}${formatNumber(Math.abs(addedKcal))} kcal, across ` : 'Goes to '}${dayCount === 1 ? 'one day' : `${dayCount} days`}${stepsPart ? `, with ${stepsPart}` : ''}`
+              : stepDays
+                ? nothing || allLocked
+                  ? 'Steps show on Train and are never added to your calories.'
+                  : 'No workouts ticked: only the steps are saved.'
+                : 'Tick the workouts to import.'}
+          </Text>
+          <Button
+            testID="import-submit"
+            title={
+              toSave.length
+                ? updating === toSave.length
+                  ? `Update ${workouts(updating)}`
+                  : `Import ${workouts(toSave.length)}`
+                : stepDays
+                  ? `Save ${stepsPart}`
+                  : 'Nothing to import'
+            }
+            disabled={!toSave.length && !stepDays}
+            onPress={commitImport}
+          />
+        </View>
+      );
     return (
       <Screen scroll={false} header={header} footer={footer} testID="import-screen">
         {nothing ? (
@@ -152,10 +184,15 @@ export default function ImportScreen() {
             <Card testID="import-nothing">
               <EmptyState
                 title="No workouts in these files"
-                message="The notes below say why for each file."
+                message={stepDays ? 'The steps in them can still be saved; they show on Train. The notes below say more for each file.' : 'The notes below say why for each file.'}
               />
             </Card>
             <FileNotes notes={notes} />
+            {stepDays ? (
+              <View style={{ alignItems: 'flex-start' }}>
+                <TextLink testID="import-other-files" label="Choose other files" onPress={() => void choose()} />
+              </View>
+            ) : null}
           </ScrollView>
         ) : (
           <FlatList
@@ -171,7 +208,7 @@ export default function ImportScreen() {
             ListHeaderComponent={
               <View style={{ gap: spacing.lg, paddingBottom: spacing.sm }}>
                 <SummaryCard counts={counts} addedKcal={addedKcal} csvLine={csvLine} onChangeCsv={() => useImportSession.setState({ phase: 'questions' })} />
-                <FileNotes notes={notes} />
+                <FileNotes notes={topNotes} />
                 {counts.deletedBefore > 1 ? (
                   <Card tone="alt" style={{ gap: spacing.xs }}>
                     <Text variant="body" color="text">
@@ -198,9 +235,14 @@ export default function ImportScreen() {
               </Text>
             }
             ListFooterComponent={
-              allLocked ? undefined : (
-                <View style={{ paddingTop: spacing.lg, alignItems: 'flex-start' }}>
-                  <TextLink testID="import-other-files" label="Choose other files" onPress={() => void choose()} />
+              allLocked && !bottomNotes.length && !stepDays ? undefined : (
+                <View style={{ paddingTop: spacing.lg, gap: spacing.lg }}>
+                  <FileNotes notes={bottomNotes} />
+                  {allLocked && !stepDays ? null : (
+                    <View style={{ alignItems: 'flex-start' }}>
+                      <TextLink testID="import-other-files" label="Choose other files" onPress={() => void choose()} />
+                    </View>
+                  )}
                 </View>
               )
             }
@@ -217,6 +259,8 @@ export default function ImportScreen() {
   const footer =
     phase === 'start' ? (
       <Button testID="import-choose-files" title="Choose files" onPress={() => void choose()} loading={picking} />
+) : phase === 'reading' && progress?.share !== undefined ? (
+      <Button testID="import-cancel" title="Cancel" variant="secondary" onPress={cancelImport} />
     ) : phase === 'questions' ? (
       <Button testID="import-continue" title="Continue" onPress={() => void confirmAnswers()} />
     ) : phase === 'done' && result ? (
@@ -225,6 +269,8 @@ export default function ImportScreen() {
           testID="import-see-train"
           title="See them in Train"
           onPress={() => {
+            // Steps only: this week's card, where today's steps show.
+            if (!result.entries.length) return router.replace('/train' as never);
             const newest = result.entries.reduce((m, e) => (e.date > m ? e.date : m), result.entries[0].date);
             router.replace(`/train?week=${startOfWeek(newest)}` as never);
           }}
@@ -237,7 +283,7 @@ export default function ImportScreen() {
       {phase === 'start' ? <StartView failed={failed} /> : null}
       {phase === 'reading' ? <ReadingView progress={progress} /> : null}
       {phase === 'questions' ? <QuestionsView todayDate={todayDate} hour12={hour12} onChangeZone={setZoneFor} /> : null}
-      {phase === 'done' && result ? <DoneView entries={result.entries} previous={result.previous} undone={result.undone} todayDate={todayDate} onStartOver={resetImport} /> : null}
+      {phase === 'done' && result ? <DoneView entries={result.entries} previous={result.previous} undone={result.undone} stepsDays={result.steps?.days ?? 0} todayDate={todayDate} onStartOver={resetImport} /> : null}
       {sheets}
     </Screen>
   );

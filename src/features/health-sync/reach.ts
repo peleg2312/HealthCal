@@ -31,7 +31,8 @@ export interface SyncReach {
  * the library, on an iPad without Apple Health, has one but cannot use it).
  */
 export function syncReach(os: string, hasStore: boolean, appleReady: boolean = APPLE_HEALTH_IN_APP): SyncReach {
-  const files = 'Here, import the files Garmin Connect exports.';
+  // What works everywhere: the Health app's export (a snapshot, imported again whenever wanted) and Garmin's files.
+  const files = 'Here, import the Health app’s export or the files Garmin Connect exports.';
   const here =
     os === 'ios'
       ? hasStore

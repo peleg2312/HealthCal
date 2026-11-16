@@ -123,7 +123,7 @@ export function gainsText(gains: UpdateGain[]): string {
 }
 
 /** Richer formats win when the same workout arrives twice in one import. */
-const FORMAT_RANK: Record<ImportedWorkout['format'], number> = { fit: 0, tcx: 1, csv: 2, gpx: 3 };
+const FORMAT_RANK: Record<ImportedWorkout['format'], number> = { fit: 0, tcx: 1, apple: 2, csv: 3, gpx: 4 };
 
 /** Two readings of one workout start within 90 s of each other (less for very short sessions). */
 const START_TOLERANCE_MS = 90_000;

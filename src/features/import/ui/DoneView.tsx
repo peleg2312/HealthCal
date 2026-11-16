@@ -17,9 +17,10 @@ const MAX_DAYS = 8;
 /** "+306" or "−206": an update can lower a day's figure. */
 const signed = (n: number) => `${n < 0 ? '−' : '+'}${formatNumber(Math.abs(Math.round(n)))}`;
 
-/** The header's short line after saving: "1 workout added", "2 workouts added, 1 workout updated", or "Import undone". */
-export function doneTitle(entries: ImportedEntry[], previous: ActivityEntry[], undone: boolean): string {
+/** The header's short line after saving: "1 workout added", "2 workouts added, 1 workout updated", "Steps saved", or "Import undone". */
+export function doneTitle(entries: ImportedEntry[], previous: ActivityEntry[], undone: boolean, stepsDays = 0): string {
   if (undone) return 'Import undone';
+  if (!entries.length) return stepsDays ? 'Steps saved' : 'Nothing imported';
   const sum = summarise(entries, previous);
   return [sum.sessions ? `${workouts(sum.sessions)} added` : '', sum.updated ? `${workouts(sum.updated)} updated` : ''].filter(Boolean).join(', ');
 }
@@ -29,9 +30,12 @@ export function DoneView({
   entries,
   previous,
   undone,
+  stepsDays = 0,
   todayDate,
   onStartOver,
 }: {
+  /** Days of steps a Health export saved on this phone (0: none). */
+  stepsDays?: number;
   entries: ImportedEntry[];
   /** Stored versions of the workouts this import updated. */
   previous: ActivityEntry[];
@@ -42,16 +46,30 @@ export function DoneView({
   const { colors, spacing } = useTheme();
   const sum = summarise(entries, previous);
   const n = entries.length;
+  const stepsLine = stepsDays ? `Steps for ${stepsDays} ${stepsDays === 1 ? 'day' : 'days'} saved on this phone. They show on Train and are never added to your calories.` : null;
   if (undone) {
+    const what = n ? `${n === 1 ? 'The workout was' : `The ${workouts(n)} were`} ${previous.length ? 'put back as before' : 'taken out again'}, and every day is as it was.` : '';
+    const steps = stepsDays ? `${n ? 'The steps are' : 'The steps were'} taken off this phone again.` : '';
     return (
       <Card testID="import-undone">
         <EmptyState
           title="Import undone"
-          message={`${n === 1 ? 'The workout was' : `The ${workouts(n)} were`} ${previous.length ? 'put back as before' : 'taken out again'}, and every day is as it was. To import ${n === 1 ? 'it' : 'them'} again, choose the files again.`}
+          message={`${[what, steps].filter(Boolean).join(' ')} To import ${n === 1 && !stepsDays ? 'it' : 'them'} again, choose the files again.`}
           action="Import files"
           onAction={onStartOver}
         />
       </Card>
+    );
+  }
+  if (!n) {
+    // Only steps were saved (no workouts ticked, or every one already in HealthCal).
+    return (
+      <View style={{ gap: spacing.lg }} testID="import-done">
+        <Text variant="body" color="textSecondary" testID="import-done-steps">
+          {stepsLine}
+        </Text>
+        <TextLink testID="import-more" label="Import more files" onPress={onStartOver} />
+      </View>
     );
   }
   const maxKcal = Math.max(1, ...sum.days.map((d) => d.kcal));
@@ -64,6 +82,11 @@ export function DoneView({
           ? 'Each day’s budget now includes the calories above resting.'
           : `The workouts now carry the numbers from the file. Each day’s budget follows them.`}
       </Text>
+      {stepsLine ? (
+        <Text variant="body" color="textSecondary" testID="import-done-steps">
+          {stepsLine}
+        </Text>
+      ) : null}
       <Card style={{ gap: spacing.md }}>
         {/* The total only when there is more than one day: with one, the day's own row is the total. */}
         {sum.days.length > 1 ? (

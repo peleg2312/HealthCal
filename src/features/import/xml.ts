@@ -23,7 +23,7 @@ export class XmlSyntaxError extends Error {}
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
 
-function decodeEntities(s: string): string {
+export function decodeEntities(s: string): string {
   if (s.indexOf('&') === -1) return s;
   return s.replace(/&(#x[0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);/g, (m, body: string) => {
     if (body[0] === '#') {

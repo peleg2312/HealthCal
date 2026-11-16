@@ -20,7 +20,7 @@ export function TrainSyncLink() {
   const enabled = useHealthSync((s) => s.enabled);
   const waiting = useHealthSync((s) => s.review.length);
   const attention = useHealthSync((s) => s.enabled && s.lastError !== null);
-  // Short enough to sit beside "Import workouts from Garmin" on a phone; the spoken label says it in full.
+  // Short enough to sit beside "Import workouts" on a phone; the spoken label says it in full.
   const label = !enabled ? (healthAdapter.store ? 'Sync automatically' : 'Automatic sync') : waiting ? `Sync, ${waiting} to look at` : attention ? 'Check sync' : 'Workout sync';
   const spoken = !enabled
     ? 'Automatic workout sync'

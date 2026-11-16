@@ -6,7 +6,7 @@
  * (store.ts) and never leaves the device.
  */
 import type { Handled, OriginSeen, ReviewItem } from './plan';
-import { NO_STEPS, type StepDays, type StepsMemory } from './steps';
+import { NO_STEPS, type FileSteps, type StepDays, type StepsMemory } from './steps';
 import type { HealthAccess, HealthAvailability, HealthErrorCode } from './types';
 
 /** Why the last sync did not finish. */
@@ -41,6 +41,12 @@ export interface HealthSyncState {
   lastResult: { at: string; added: number; updated: number } | null;
   /** Steps per day for the last 35 days (steps.ts): shown on Train, never counted as calories. */
   steps: StepsMemory;
+  /**
+   * Steps from the Health app's export file, imported on /activity/import
+   * (steps.ts, FileSteps): kept apart from the synced ones because a synced day
+   * wins over a file's, and because switching sync off clears only what sync read.
+   */
+  fileSteps: FileSteps | null;
 }
 
 export const INITIAL_STATE: HealthSyncState = {
@@ -55,6 +61,7 @@ export const INITIAL_STATE: HealthSyncState = {
   choices: {},
   lastResult: null,
   steps: NO_STEPS,
+  fileSteps: null,
 };
 
 const isRecord = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
@@ -88,6 +95,12 @@ export function restoreState(saved: unknown): HealthSyncState {
   if (savedSteps && isRecord(savedSteps.days)) {
     for (const [day, n] of Object.entries(savedSteps.days)) if (/^\d{4}-\d{2}-\d{2}$/.test(day) && typeof n === 'number' && Number.isFinite(n) && n > 0) days[day] = Math.round(n);
   }
+  let fileSteps: FileSteps | null = null;
+  if (isRecord(saved.fileSteps) && isRecord(saved.fileSteps.days) && typeof saved.fileSteps.asOf === 'string' && typeof saved.fileSteps.asOfDay === 'string') {
+    const fd: StepDays = {};
+    for (const [day, n] of Object.entries(saved.fileSteps.days)) if (/^\d{4}-\d{2}-\d{2}$/.test(day) && typeof n === 'number' && Number.isFinite(n) && n > 0) fd[day] = Math.round(n);
+    fileSteps = { days: fd, asOf: saved.fileSteps.asOf, asOfDay: saved.fileSteps.asOfDay };
+  }
   return {
     enabled: saved.enabled === true,
     lastAttemptAt: text(saved.lastAttemptAt),
@@ -100,6 +113,7 @@ export function restoreState(saved: unknown): HealthSyncState {
     choices,
     lastResult: result,
     steps: { days, readAt: savedSteps ? text(savedSteps.readAt) : null },
+    fileSteps,
   };
 }
 

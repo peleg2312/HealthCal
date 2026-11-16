@@ -117,7 +117,11 @@ export default function HealthSyncScreen() {
           <Text variant="body" color="textSecondary" style={{ paddingHorizontal: spacing.xs }}>
             {reach.here}
           </Text>
-          <Button testID="health-sync-import-files" title="Import Garmin files" onPress={() => router.push('/activity/import')} />
+          <Text variant="body" color="textSecondary" style={{ paddingHorizontal: spacing.xs }} testID="health-sync-export-note">
+            The Health app’s export brings workouts and daily steps from an iPhone. It is a snapshot: import a new one whenever you like.
+          </Text>
+          {/* One way in: Garmin files and the Health export open the same screen. */}
+          <Button testID="health-sync-import-export" title="Import workouts" onPress={() => router.push('/activity/import')} />
         </View>
       </Screen>
     );
@@ -373,8 +377,8 @@ function ProblemCard({
   let action: React.ReactNode;
   if (problem === 'not-entitled') {
     title = `${store} is not available in this install`;
-    body = 'This copy was signed without Apple\'s Health permission, which sideloading tools leave out. Import Garmin files instead.';
-    action = <Button testID="health-sync-problem-import" title="Import Garmin files" variant="secondary" size="md" full={false} onPress={onImport} />;
+    body = 'This copy was signed without Apple\'s Health permission, which sideloading tools leave out. Import the Health app’s export instead: it brings workouts and daily steps, and is a snapshot you can repeat.';
+    action = <Button testID="health-sync-problem-import" title="Import your Health export" variant="secondary" size="md" full={false} onPress={onImport} />;
   } else if (problem === 'not-installed') {
     title = `${store} is not on this phone`;
     body = 'Install it from Google Play, open it once, then turn sync on here.';
