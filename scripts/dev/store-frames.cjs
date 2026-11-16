@@ -15,7 +15,7 @@
  * Where the pictures come from:
  *   - Today, food search, water, Train, the weekly recap and the three looks: the dev server
  *     (--url, default http://localhost:8081) with scripts/dev/seed.mjs `buildSeed({ store: true })`,
- *     the clock held at 7:30 pm so the greeting and the day agree.
+ *     the clock held at 7:30 pm on the latest Sunday, so the greeting and the day agree and the week is full.
  *   - The photo estimate and friends need a backend, so the script exports a web build pointed at the
  *     local stand-in (scripts/dev/mock-backend.cjs, ports 54391 and 8091, separate from the e2e ports),
  *     signs up two people, makes them friends, sends a cheer and analyses a meal photo. The stand-in
@@ -111,10 +111,37 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const capPath = (name, device, part = 'screen') => path.join(CAP, `${name}-${device}-${part}.png`);
 const metaPath = (name, device) => path.join(CAP, `${name}-${device}.json`);
 
-function localTime(h, m) {
+/**
+ * The moment the store pictures show: 7:30 pm on the latest Sunday (today, when today is one).
+ * The week runs Monday to Sunday, so that is when the week strip, the training week and the
+ * recap are at their fullest, whatever day this script runs on.
+ */
+function storeMoment() {
   const d = new Date();
-  d.setHours(h, m, 0, 0);
+  d.setDate(d.getDate() - d.getDay());
+  d.setHours(19, 30, 0, 0);
   return d;
+}
+
+/** Runs `fn` with this process's clock at `at`, so the demo data is built for that day (seed.mjs reads the clock). */
+function withClock(at, fn) {
+  const Real = Date;
+  const ms = at.getTime();
+  class Fixed extends Real {
+    constructor(...args) {
+      if (args.length) super(...args);
+      else super(ms);
+    }
+    static now() {
+      return ms;
+    }
+  }
+  global.Date = Fixed;
+  try {
+    return fn();
+  } finally {
+    global.Date = Real;
+  }
 }
 
 /** Testids to find: 'x' exact, '^x' prefix. */
@@ -218,11 +245,11 @@ async function newDevice(browser, device, { seedJson, theme = 'light', fixedTime
 
 async function captureDev(browser, buildSeed) {
   log(`Capturing from ${DEV}`);
-  const evening = localTime(19, 30);
+  const evening = storeMoment();
   for (const device of ['phone', 'tablet']) {
     for (const [name, spec] of Object.entries(DEV_SHOTS)) {
       const theme = spec.theme || 'blossom';
-      const seedJson = JSON.stringify(buildSeed({ theme, store: true }));
+      const seedJson = JSON.stringify(withClock(evening, () => buildSeed({ theme, store: true })));
       const d = await newDevice(browser, device, { seedJson, theme, fixedTime: evening });
       await d.page.goto(DEV + spec.route, { waitUntil: 'networkidle', timeout: 120_000 });
       await settle(d.page);
@@ -283,10 +310,13 @@ async function captureBackend(browser, buildSeed) {
     };
 
     // Alex: the store demo data. Maya: the ordinary demo data under another name.
-    const alex = await newDevice(browser, 'phone', { seedJson: JSON.stringify(buildSeed({ theme: 'blossom', store: true })), theme: 'blossom' });
-    const mayaSeed = buildSeed({ theme: 'blossom' });
+    // The same Sunday evening as the other pictures, on both phones (the stand-in keeps the real clock,
+    // which is at most six days later: inside every window it checks).
+    const evening = storeMoment();
+    const alex = await newDevice(browser, 'phone', { seedJson: JSON.stringify(withClock(evening, () => buildSeed({ theme: 'blossom', store: true }))), theme: 'blossom', fixedTime: evening });
+    const mayaSeed = withClock(evening, () => buildSeed({ theme: 'blossom' }));
     mayaSeed.state.profile.name = 'Maya';
-    const maya = await newDevice(browser, 'phone', { seedJson: JSON.stringify(mayaSeed), theme: 'blossom' });
+    const maya = await newDevice(browser, 'phone', { seedJson: JSON.stringify(mayaSeed), theme: 'blossom', fixedTime: evening });
     log('  signing up two people');
     await signUp(alex, `alex+${stamp}@example.com`);
     await signUp(maya, `maya+${stamp}@example.com`);
@@ -335,7 +365,7 @@ async function captureBackend(browser, buildSeed) {
     };
 
     for (const device of ['phone', 'tablet']) {
-      const d = device === 'phone' ? alex : await newDevice(browser, device, { storageState: state, theme: 'blossom' });
+      const d = device === 'phone' ? alex : await newDevice(browser, device, { storageState: state, theme: 'blossom', fixedTime: evening });
       await go(d, '/friends');
       await until(d, '[data-testid="friends-cheers"]').catch(() => log('  ! friends: no cheers card'));
       await d.page.waitForTimeout(800);
