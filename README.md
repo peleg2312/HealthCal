@@ -11,7 +11,7 @@ HealthCal works fully on the device with no account. Connecting the optional Sup
 - **AI meal analysis.** Photograph or describe a meal; Claude returns an itemised, editable estimate with a calorie range and a prompt about hidden fats.
 - **108 activities.** Volleyball, basketball, yoga, running, swimming, strength and more, with calorie burn from the 2024 Compendium of Physical Activities MET values and your weight. Only net calories (above resting) are added to the budget, so nothing is counted twice. A set-by-set strength logger with rest timer, personal records and saved routines is included.
 - **Garmin workouts.** Import the files Garmin Connect exports (FIT, TCX, GPX, the Activities CSV, or a ZIP of them): each workout arrives with its real duration, distance and the calories the watch measured, and only the part above resting is added to the day. See `docs/garmin-import.md`.
-- **Automatic workout sync (Android).** With one permission, HealthCal reads the workouts that Garmin Connect and other apps save to Health Connect and adds them by themselves when you open the app, with the watch's calories and an Undo. It reads workouts, their calories and distance only, writes nothing back, and asks first about anything that might repeat a session you logged by hand. Needs an Android build of the app (not Expo Go); on iPhone and in the browser, use the file import. See `docs/health-sync.md`, which also lists what has to be declared in Play Console before release.
+- **Automatic workout sync (Health Connect on Android, Apple Health on iPhone).** With one permission, HealthCal reads the workouts that Garmin Connect and other apps save to Health Connect or Apple Health and adds them by themselves when you open the app, with the watch's calories and an Undo. It reads workouts, their calories and distance, and daily steps only, writes nothing back, and asks first about anything that might repeat a session you logged by hand. Needs a build of the app (not Expo Go); on iPhone, one signed with Apple's HealthKit permission (through the paid Apple Developer Program, or from Xcode on a Mac with your own Apple ID), and the iPhone side has not yet run on a phone. In the browser and in an iPhone copy sideloaded with a free Apple ID, use the file import (Garmin files or the Health app's export). See `docs/health-sync.md`, which also lists what has to be declared in Play Console before release.
 - **Friends.** Add people by a code and see each other's week: active minutes, sessions, streak and recent workouts, with a cheer for a workout. Each of those can be switched off, and calories, weight and food are never shared. Needs an account.
 - **Hydration, weight, body composition, sleep and fasting** trackers.
 - **Weight trend and adaptive expenditure.** A smoothed trend line ignores day-to-day water noise; once enough intake and weigh-ins are logged, your real energy expenditure is estimated from your own data.
@@ -155,24 +155,59 @@ The repository is linked to an Expo project (`app.json`: `owner`, `extra.eas.pro
 | Android | An APK installed by hand | `bash scripts/ops/build-android-apk.sh` (builds on this machine, about 40 minutes the first time, 15 after) or the `preview` profile above | Signed with the template's debug key; a Play Store release needs its own key |
 | iPhone, free, no computer | The web app added to the Home Screen from Safari | `node scripts/ops/deploy-web.mjs` publishes it to https://healthcal.expo.app | No reminders and no Health sync; the camera goes through Safari. Workouts and steps come in from the Health app's own export (Health app, your picture, Export All Health Data; then Train > Import, docs/health-sync.md) |
 | iPhone, free, with a computer | An unsigned `.ipa` signed with the person's own Apple ID by Sideloadly or AltStore | `npx eas-cli@latest build -p ios --profile ios-unsigned` (`.eas/build/ios-unsigned.yml`) | Must be signed again every 7 days; three such apps per Apple ID; no Apple Health sync (both tools sign without the HealthKit entitlement, and the sync screen says so and offers the Health export import instead; docs/health-sync.md) |
-| iPhone, TestFlight or the App Store | A signed build | `npx eas-cli@latest build -p ios --profile production` | Needs an Apple Developer account; the one route with Apple Health sync (once `@kingstinct/react-native-healthkit` is installed, docs/health-sync.md) |
+| iPhone, TestFlight or the App Store | A signed build | `npx eas-cli@latest build -p ios --profile production` | Needs an Apple Developer account; signed with the HealthKit entitlement, so this is the route for Apple Health sync (the library is installed and bound; not yet run on a phone; Xcode on a Mac with a free Apple ID can also sign a copy with it; docs/health-sync.md) |
 
 `public/` holds what makes the web app installable (the manifest, the icons, the full-screen tags in `index.html`). The backend must allow the published address as a return address for sign-up and reset emails (Supabase: Authentication, URL configuration).
 
 Store listing: the name, subtitle, descriptions, keywords and the owner's checklist are in `docs/store-listing.md`. The eight App Store and Google Play screenshots are in `store/`, and `node scripts/dev/store-frames.cjs` makes them again from the running app (contact sheet: `store/_sheet.png`).
 
-### Testing on a phone
+### Fixes without reinstalling
 
-The scripts under `scripts/dev` test the web build in a browser. `.maestro/first-day.yml` is the same first day on a real Android or iPhone build, driven by testID with [Maestro](https://maestro.mobile.dev): setup with the keyboard on every field, food added to lunch and opened again, the four tabs and the sync screen, with a screenshot at each step.
+The Android and iPhone apps take over-the-air updates through EAS Update (`expo-updates`, channel `production`). An update replaces the JavaScript, the screens and the bundled images; it cannot add a package with native code, a permission, an entitlement or any other native setting in `app.json`, which need a new build. An app downloads an update in the background when it starts and starts it at the next cold start, or when it comes back to the front after five minutes away while a tab is showing with nothing open and everything saved; Profile, About shows "Updated Nov 17" under the version and has a "Check for updates" button. The web app is not affected (publish it with `deploy-web.mjs`).
 
 ```bash
-# On Expo's cloud phones (an Android Emulator, an iOS Simulator; no Mac or Apple account needed).
+EXPO_TOKEN=... node scripts/ops/publish-update.mjs --message "Fix the water total"   # --dry-run to see what it would do
+```
+
+It publishes the current commit and refuses when the working tree has uncommitted changes, when `EXPO_TOKEN` is missing, or when the runtime-version tripwire fails. It takes the `EXPO_PUBLIC_*` values from `eas.json` (`build.production.env`).
+
+The runtime version is the fixed string `expo.runtimeVersion` in `app.json`. An update reaches only installed apps built with the same one. Whenever a package with native code is added or upgraded, or a native setting in `app.json` changes, raise it, rebuild and reinstall both apps, and record the new pair (`HEALTHCAL_RECORD_NATIVE=1 npx vitest run src/features/updates/nativeSurface.test.ts`) before the next update; `nativeSurface.test.ts` fails until you do. An app installed before updates were added has no updater and has to be replaced once by a build that has it. Expo's free plan covers updates for 1,000 monthly active users.
+
+### Testing on a phone
+
+The scripts under `scripts/dev` test the web build in a browser. The flows in `.maestro/` do the same on a real Android or iPhone build, driven by testID with [Maestro](https://maestro.mobile.dev), with a screenshot at each step:
+
+- `first-day.yml`: setup with the keyboard on every field, food added to lunch and opened again, the four tabs and the sync screen.
+- `health-and-about.yml` (after first-day): Workout sync turned on, the app's explanation, the system's permission screen (Apple Health or Health Connect), the sync screen and Train's steps line, then About and its version block with "Check for updates".
+- `health-data-ios.yml` (iPhone only, best effort, not yet seen to pass): tries to type steps into the simulator's Health app, sync, and show them on Train.
+
+**On GitHub's machines, free.** The repository is public, so GitHub Actions' standard runners, macOS included, cost nothing. `.github/workflows/phone-test.yml` builds the app in Release (the JavaScript inside, no Metro; the Supabase settings from `eas.json`'s `build.production.env`) and runs the flows on an iPhone simulator (macOS 26, Xcode 26.4 or later) and an Android emulator (Android 15, x86_64; Health Connect is expected on this image, and the job log lists the health packages it found). It starts only by hand.
+
+It has not run on GitHub yet: the first run will show what still needs fixing. health-and-about's taps on the system permission screens and all of health-data-ios are written from guessed labels and are optional, and health-data-ios never fails the job.
+
+```bash
+# Actions tab > Phone test > Run workflow (choose the branch, platform, flows), or:
+gh workflow run phone-test.yml --ref claude/health-fitness-app-17mku3 -f platform=both -f flows=all
+# or the API (a token with Actions: write; the answer is HTTP 204 with no body):
+gh api -X POST repos/peleg2312/HealthCal/actions/workflows/phone-test.yml/dispatches \
+  -f ref=claude/health-fitness-app-17mku3 -f 'inputs[platform]=ios' -f 'inputs[flows]=first-day,health-and-about'
+# (with curl: -H 'Authorization: Bearer <token>' -H 'Accept: application/vnd.github+json' and the same JSON body)
+
+# Changed only a flow? Reuse the app an earlier run built (the number in its URL) and skip the 20 to 30 minute build.
+# That run must have built the platform asked for (platform=both, or the same platform):
+gh workflow run phone-test.yml --ref claude/health-fitness-app-17mku3 -f platform=android -f app_run_id=<run id>
+```
+
+Each run leaves, per phone, an artifact `phone-test-ios` / `phone-test-android`: every flow's screenshots, Maestro's output and debug files, on a failure the screen and its view hierarchy at that moment, the app's own log (the simulator's log for HealthCal and React Native, or logcat for the app's process), and `contact-<platform>.jpg`, one picture with every screenshot in a grid. The job log ends with one line per flow (passed, or failed with the step that failed), and the run's summary page shows the same table. Results and the built apps (`app-ios` and `app-android`, for `app_run_id`) are kept for 14 days. The iPhone build is signed to run locally on the simulator and is meant to fail if the HealthKit entitlement is missing from it. The test builds ask the update server for the channel `phone-test`, which has no updates, so they always run the commit's own JavaScript. Starting a run cancels a run of the same branch and platform that is still going.
+
+```bash
+# On Expo's cloud phones instead (an Android Emulator, an iOS Simulator; first-day only).
 # Expo runs these test jobs on its paid plans only; the free plan refuses them.
 npx eas-cli@latest workflow:run .eas/workflows/phone-test-android.yml
 npx eas-cli@latest workflow:run .eas/workflows/phone-test-ios.yml
 
 # On a phone or emulator connected to your own computer, with the app installed.
-maestro test .maestro/first-day.yml
+maestro test .maestro/first-day.yml .maestro/health-and-about.yml
 ```
 
 ## How the code is organised

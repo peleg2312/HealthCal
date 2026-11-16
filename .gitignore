@@ -47,3 +47,6 @@ example
 
 # Output of scripts/dev/crawl.cjs when no --out is given
 crawl-out/
+
+# Python bytecode from the CI helper scripts
+__pycache__/

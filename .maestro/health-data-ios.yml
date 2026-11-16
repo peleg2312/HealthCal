@@ -1,0 +1,197 @@
+# iPhone only, best effort: put some steps (and, if the Health app allows it, a workout) into the
+# simulator's Health app by hand, then let HealthCal sync and show them. Run after first-day.yml and
+# health-and-about.yml, which set the app up and gave it access to Apple Health.
+#
+# Everything in the Health app is tapped by its words, which Apple changes between iOS versions,
+# so every such tap is optional and a screenshot follows each step: the first run's pictures and the
+# workflow's hierarchy dumps say which words to use next time. The workflow runs this flow in its own
+# step that may fail without failing the job.
+#
+#   GitHub (free):  Actions > Phone test > Run workflow, platform ios
+appId: app.healthcal.mobile
+name: Steps from the Health app on an iPhone simulator
+tags:
+  - ios-only
+---
+- launchApp:
+    appId: com.apple.Health
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: 40-health-first-open
+
+# The Health app's first-run screens: whichever of these appear, a few times over.
+- repeat:
+    times: 4
+    commands:
+      - tapOn:
+          text: '(?i)(continue|get started|next|not now|skip|set up later|done|ok)'
+          optional: true
+      - waitForAnimationToEnd:
+          timeout: 3000
+- takeScreenshot: 41-health-after-welcome
+
+# Browse > Activity > Steps > Add Data.
+- tapOn:
+    text: '(?i)browse'
+    optional: true
+- tapOn:
+    text: '(?i)browse'
+    optional: true
+- takeScreenshot: 42-health-browse
+- tapOn:
+    text: '(?i)activity'
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 43-health-activity
+- scrollUntilVisible:
+    element:
+      text: '(?i)steps'
+    direction: DOWN
+    timeout: 10000
+    optional: true
+- tapOn:
+    text: '(?i)steps'
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 44-health-steps
+- tapOn:
+    text: '(?i)add data'
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 45-health-add-steps-form
+# The value field is usually focused when the form opens; if it is not, a tap on its row focuses it.
+- tapOn:
+    text: '(?i)steps'
+    index: 1
+    optional: true
+- inputText:
+    text: '8432'
+    optional: true
+- takeScreenshot: 46-health-steps-typed
+- tapOn:
+    text: '(?i)add'
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 47-health-steps-added
+
+# A workout, if the Health app lets one be added by hand: Browse > Activity > Workouts > Add Data.
+- tapOn:
+    text: '(?i)browse'
+    optional: true
+- tapOn:
+    text: '(?i)browse'
+    optional: true
+- tapOn:
+    text: '(?i)activity'
+    optional: true
+- scrollUntilVisible:
+    element:
+      text: '(?i)workouts'
+    direction: DOWN
+    timeout: 10000
+    optional: true
+- tapOn:
+    text: '(?i)workouts'
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 48-health-workouts
+- tapOn:
+    text: '(?i)add data'
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 49-health-add-workout-form
+- tapOn:
+    text: '(?i)add'
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 50-health-workout-added
+
+# Back to HealthCal: Profile > Workout sync > Sync now, then Train.
+- launchApp:
+    appId: app.healthcal.mobile
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: today-energy
+    timeout: 120000
+- tapOn:
+    id: today-profile
+- scrollUntilVisible:
+    element:
+      id: profile-health-sync
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: profile-health-sync
+- extendedWaitUntil:
+    visible:
+      id: health-sync-switch
+    timeout: 20000
+- takeScreenshot: 51-sync-before
+# Sync is on after health-and-about.yml; if it is not, turn it on and allow, as that flow does.
+# Decided by the switch's own status line ("Off" exactly, switchSubtitle in
+# src/features/health-sync/ui/format.ts), never by whether Sync now is on screen: a card above it can
+# push it below the fold, and tapping the switch while sync is on would turn it off.
+- extendedWaitUntil:
+    notVisible:
+      id: health-sync-status
+      text: 'Checking'
+    timeout: 10000
+    optional: true
+- runFlow:
+    when:
+      visible:
+        id: health-sync-status
+        text: 'Off'
+    commands:
+      - tapOn:
+          id: health-sync-switch
+      - tapOn:
+          id: health-sync-continue
+          optional: true
+      - tapOn:
+          text: '(?i)turn on all.*'
+          optional: true
+      - tapOn:
+          text: '(?i)allow'
+          optional: true
+- scrollUntilVisible:
+    element:
+      id: health-sync-now
+    direction: DOWN
+    timeout: 8000
+    optional: true
+- tapOn:
+    id: health-sync-now
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 10000
+- takeScreenshot: 52-sync-after
+- scrollUntilVisible:
+    element:
+      id: health-sync-steps
+    direction: DOWN
+    timeout: 15000
+    optional: true
+- takeScreenshot: 53-sync-steps-row
+- tapOn:
+    id: header-back
+- tapOn:
+    id: header-back
+- tapOn:
+    id: tab-train
+- extendedWaitUntil:
+    visible:
+      id: train-week-card
+    timeout: 20000
+- assertVisible:
+    id: train-steps
+    optional: true
+- takeScreenshot: 54-train-steps

@@ -1,0 +1,765 @@
+# Phone test: builds HealthCal and runs the Maestro flows in .maestro/ on an iPhone simulator and an
+# Android emulator on GitHub's machines (free for a public repository), and keeps the screenshots,
+# Maestro's output, the app's own log and one contact sheet per phone as the run's artifacts.
+#
+# Started by hand only:
+#   Actions tab > Phone test > Run workflow
+#   gh workflow run phone-test.yml --ref claude/health-fitness-app-17mku3 -f platform=both -f flows=all
+#   gh api -X POST repos/{owner}/{repo}/actions/workflows/phone-test.yml/dispatches \
+#     -f ref=claude/health-fitness-app-17mku3 -f 'inputs[platform]=both' -f 'inputs[flows]=all'
+#     (a token with Actions: write; the answer is HTTP 204 with no body)
+#
+# A change to a flow only: pass app_run_id (the number in an earlier run's URL, .../actions/runs/<id>)
+# and the app that run built is downloaded instead of built again (apps are kept 14 days). That run must
+# have built the platform asked for (platform=both, or the same one).
+#
+# Starting a run cancels a run of the same branch and platform that is still going.
+#
+# Not yet run on GitHub when this was written: the labels of the system permission screens and of the
+# Health app are guesses, tapped as optional, and health-data-ios never fails the job.
+#
+# On an Expo SDK, React Native or runner-image upgrade, change: the Xcode list and minimum in both
+# "Select Xcode" steps (Expo's version table, docs.expo.dev/versions/v<major>.0.0/); the sdkmanager
+# packages in build-android (node_modules/react-native/gradle/libs.versions.toml); SYSTEM_IMAGE;
+# NODE_VERSION; JAVA_HOME_21_X64; MAESTRO_VERSION and MAESTRO_SHA256 (the release's
+# checksums_sha256.txt); PILLOW_VERSION.
+#
+# Artifacts of a run:
+#   phone-test-ios / phone-test-android   per flow: screenshots, console.txt, report.xml, debug/,
+#                                         and on a failure failure-hierarchy.json and zz-failure-screen.png;
+#                                         the app's log; contact-<platform>.jpg with every screenshot
+#   app-ios / app-android                 the built app (simulator .app as .tgz, x86_64 .apk), for app_run_id
+#   build-logs-ios / build-logs-android   only when a build failed
+# Each test job's log ends with one line per flow (passed, or failed with the step that failed), and the
+# run's summary page shows the same table.
+#
+# The Expo workflows in .eas/workflows/ do the same on Expo's machines, on a paid Expo plan.
+name: Phone test
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Which phone
+        type: choice
+        options: [both, ios, android]
+        default: both
+      flows:
+        description: "Flows in .maestro/ to run, without .yml, separated by commas (all = first-day, health-and-about, and on iPhone health-data-ios)"
+        type: string
+        default: all
+      app_run_id:
+        description: "Optional: id of an earlier Phone test run whose built app to reuse (skips the build)"
+        type: string
+        default: ''
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phone-test-${{ github.ref }}-${{ inputs.platform }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+  MAESTRO_VERSION: 2.12.1
+  # sha256 of maestro.zip for MAESTRO_VERSION, from the release's checksums_sha256.txt
+  MAESTRO_SHA256: 54dbb0716425626604973cbb374c585ca30272375d9ce15177a1152765ddd9d7
+  PILLOW_VERSION: 12.3.0
+  APP_ID: app.healthcal.mobile
+  EXPO_NO_TELEMETRY: '1'
+  MAESTRO_CLI_NO_ANALYTICS: '1'
+  MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: 'true'
+  # The first start of Maestro's driver on a fresh simulator or emulator is slow on a shared machine.
+  MAESTRO_DRIVER_STARTUP_TIMEOUT: '300000'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # ---------------------------------------------------------------- iPhone ----
+  build-ios:
+    name: Build for the iPhone simulator
+    if: inputs.app_run_id == '' && inputs.platform != 'android'
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode (Expo SDK 58 needs 26.4 or later)
+        run: |
+          set -euo pipefail
+          for x in /Applications/Xcode_26.6.app /Applications/Xcode_26.5.app /Applications/Xcode_26.4.1.app; do
+            if [ -d "$x" ]; then sudo xcode-select -s "$x/Contents/Developer"; picked="$x"; break; fi
+          done
+          [ -n "${picked:-}" ] || echo "::warning::none of the listed Xcode versions is on this runner; using the image's default $(xcode-select -p)"
+          xcodebuild -version
+          v=$(xcodebuild -version | awk 'NR==1{print $2}')
+          major=${v%%.*}; rest=${v#*.}; minor=${rest%%.*}; [ "$rest" = "$v" ] && minor=0
+          if [ "$major" -lt 26 ] || { [ "$major" -eq 26 ] && [ "$minor" -lt 4 ]; }; then
+            echo "::error::Expo SDK 58 needs Xcode 26.4 or later; this runner selected $v"; exit 1
+          fi
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install packages
+        run: npm ci --no-audit --no-fund
+
+      - name: Supabase settings from eas.json (build.production.env)
+        run: |
+          set -euo pipefail
+          node -e '
+            const env = require("./eas.json").build.production.env || {};
+            for (const k of ["EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_ANON_KEY"]) {
+              if (!env[k]) { console.error("eas.json build.production.env has no " + k); process.exit(1); }
+              console.log(k + "=" + env[k]);
+            }' >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_E2E is ${EXPO_PUBLIC_E2E:-unset}"
+
+      - name: Generate the native project (expo prebuild)
+        run: |
+          set -euo pipefail
+          unset EXPO_PUBLIC_E2E
+          npx expo prebuild --platform ios --no-install
+          echo "--- entitlements file from prebuild"
+          ls ios/*/*.entitlements
+          cat ios/*/*.entitlements
+          grep -q com.apple.developer.healthkit ios/*/*.entitlements || echo "::warning::prebuild wrote no HealthKit entitlement"
+
+      # The test app asks the update server for the channel "phone-test", which has no updates, so a
+      # relaunch between flows always runs this commit's embedded JavaScript, never a published
+      # production update ("Check for updates" still talks to the server).
+      - name: Point expo-updates at an empty channel
+        run: |
+          set -euo pipefail
+          PLIST=$(ls ios/*/Supporting/Expo.plist 2> /dev/null | head -1 || true)
+          if [ -z "$PLIST" ]; then echo "::warning::prebuild wrote no ios/*/Supporting/Expo.plist"; exit 0; fi
+          if /usr/libexec/PlistBuddy -c 'Print :EXUpdatesRequestHeaders:expo-channel-name' "$PLIST" > /dev/null 2>&1; then
+            /usr/libexec/PlistBuddy -c 'Set :EXUpdatesRequestHeaders:expo-channel-name phone-test' "$PLIST"
+          else
+            echo "::warning::$PLIST has no EXUpdatesRequestHeaders:expo-channel-name; left as it is"
+          fi
+          echo "--- $PLIST"
+          /usr/libexec/PlistBuddy -c 'Print' "$PLIST"
+
+      # Only CocoaPods' download cache: ios/Pods is made fresh by every prebuild, so it is not reused.
+      # No restore-keys: a new lockfile starts a clean cache instead of growing the old one.
+      - uses: actions/cache@v6
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: cocoapods-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.json') }}
+
+      - name: pod install
+        working-directory: ios
+        run: |
+          set -eo pipefail
+          pod --version
+          pod install 2>&1 | tee ../pod-install.log
+
+      - name: Build Release for the simulator (arm64 only, signed to run locally)
+        working-directory: ios
+        run: |
+          set -eo pipefail
+          unset EXPO_PUBLIC_E2E
+          WORKSPACE=$(ls -d *.xcworkspace | head -1)
+          SCHEME="${WORKSPACE%.xcworkspace}"
+          echo "workspace $WORKSPACE, scheme $SCHEME"
+          # CODE_SIGN_IDENTITY=- is Xcode's "Sign to Run Locally": no Apple account, and the entitlements
+          # in ios/<app>/<app>.entitlements are embedded, which HealthKit needs to answer on a simulator.
+          SETTINGS=(-workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release -sdk iphonesimulator
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath build
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY=- AD_HOC_CODE_SIGNING_ALLOWED=YES
+            COMPILER_INDEX_STORE_ENABLE=NO)
+          echo "--- signing settings of the app target"
+          xcodebuild "${SETTINGS[@]}" -showBuildSettings 2> /dev/null \
+            | grep -E '^ *(CODE_SIGN[A-Z_]*|DEVELOPMENT_TEAM|PRODUCT_BUNDLE_IDENTIFIER|IPHONEOS_DEPLOYMENT_TARGET|ARCHS) =' | sort -u || true
+          echo "--- build (full log in the build-logs-ios artifact if it fails)"
+          export NODE_ENV=production
+          set +e
+          xcodebuild "${SETTINGS[@]}" build > ../xcodebuild.log 2>&1
+          code=$?
+          set -e
+          if [ $code -ne 0 ]; then
+            grep -nE "error:|\*\* BUILD FAILED|Command .* failed" ../xcodebuild.log | head -80
+            tail -60 ../xcodebuild.log
+            exit $code
+          fi
+          grep -E "\*\* BUILD SUCCEEDED" ../xcodebuild.log
+          ls -d build/Build/Products/Release-iphonesimulator/*.app
+
+      - name: Check the HealthKit entitlement
+        run: bash scripts/ci/check-ios-entitlements.sh "$(ls -d ios/build/Build/Products/Release-iphonesimulator/*.app | head -1)"
+
+      - name: Pack the app
+        run: |
+          set -euo pipefail
+          APP=$(ls -d ios/build/Build/Products/Release-iphonesimulator/*.app | head -1)
+          # A tar keeps the executable's permissions and the signature intact (an artifact zip does not).
+          tar -czf "$RUNNER_TEMP/HealthCal-simulator.app.tgz" -C "$(dirname "$APP")" "$(basename "$APP")"
+          ls -la "$RUNNER_TEMP/HealthCal-simulator.app.tgz"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: app-ios
+          path: ${{ runner.temp }}/HealthCal-simulator.app.tgz
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Keep the build logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-logs-ios
+          path: |
+            xcodebuild.log
+            pod-install.log
+            ios/Podfile.lock
+            ios/Podfile.properties.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  test-ios:
+    name: Flows on the iPhone simulator
+    needs: build-ios
+    if: ${{ !cancelled() && inputs.platform != 'android' && (needs.build-ios.result == 'success' || (needs.build-ios.result == 'skipped' && inputs.app_run_id != '')) }}
+    runs-on: macos-26
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      actions: read # actions/download-artifact from another run (app_run_id)
+    env:
+      RESULTS: ${{ github.workspace }}/results/ios
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Which flows
+        id: flows
+        env:
+          FLOWS_INPUT: ${{ inputs.flows }}
+          APP_RUN_ID: ${{ inputs.app_run_id }}
+        run: |
+          set -euo pipefail
+          case "$APP_RUN_ID" in
+            '') ;;
+            *[!0-9]*) echo "::error::app_run_id must be the number of an earlier run (…/actions/runs/<number>), not '$APP_RUN_ID'"; exit 1;;
+          esac
+          main=""; extra=""
+          if [ -z "${FLOWS_INPUT// /}" ] || [ "$FLOWS_INPUT" = all ]; then
+            main="first-day health-and-about"; extra="health-data-ios"
+          else
+            set -f # no glob expansion of the words below
+            for f in $(echo "$FLOWS_INPUT" | tr ',' ' '); do
+              f=${f#.maestro/}; f=${f%.yml}
+              case "$f" in *[!a-z0-9-]*|'') echo "::error::bad flow name '$f' (letters, digits and - only)"; exit 1;; esac
+              [ -f ".maestro/$f.yml" ] || { echo "::error::no flow .maestro/$f.yml (have: $(set +f; cd .maestro && ls *.yml | tr '\n' ' '))"; exit 1; }
+              if [ "$f" = health-data-ios ]; then extra="$f"; else main="$main $f"; fi
+            done
+            set +f
+          fi
+          echo "main=$(echo $main)" >> "$GITHUB_OUTPUT"
+          echo "extra=$extra" >> "$GITHUB_OUTPUT"
+          echo "flows: ${main:-none}; in their own step: ${extra:-none}"
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          picked=""
+          for x in /Applications/Xcode_26.6.app /Applications/Xcode_26.5.app /Applications/Xcode_26.4.1.app; do
+            if [ -d "$x" ]; then sudo xcode-select -s "$x/Contents/Developer"; picked="$x"; break; fi
+          done
+          [ -n "$picked" ] || echo "::warning::none of the listed Xcode versions is on this runner; using the image's default $(xcode-select -p)"
+          xcodebuild -version
+
+      - name: Download the app built by this run
+        if: inputs.app_run_id == ''
+        uses: actions/download-artifact@v8
+        with:
+          name: app-ios
+          path: ${{ runner.temp }}/app
+      - name: Download the app built by run ${{ inputs.app_run_id }}
+        if: inputs.app_run_id != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: app-ios
+          path: ${{ runner.temp }}/app
+          run-id: ${{ inputs.app_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Unpack the app
+        run: |
+          set -euo pipefail
+          tar -xzf "$RUNNER_TEMP/app/HealthCal-simulator.app.tgz" -C "$RUNNER_TEMP/app"
+          APP=$(ls -d "$RUNNER_TEMP"/app/*.app | head -1)
+          echo "APP=$APP" >> "$GITHUB_ENV"
+          echo "APP_EXE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")" >> "$GITHUB_ENV"
+          bash scripts/ci/check-ios-entitlements.sh "$APP" || echo "::warning::this app has no HealthKit entitlement: the sync screen will say Apple Health is not available"
+
+      - uses: actions/setup-python@v7
+        continue-on-error: true
+        with:
+          python-version: '3.12'
+      - name: Pillow for the contact sheet
+        continue-on-error: true
+        run: python3 -m pip install --quiet "pillow==$PILLOW_VERSION"
+
+      # Only the installed CLI is cached (bin and lib), saved right after a fresh install, so nothing
+      # Maestro writes under ~/.maestro while the flows run ends up in the cache.
+      - name: Restore Maestro ${{ env.MAESTRO_VERSION }}
+        id: maestro-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.maestro/bin
+            ~/.maestro/lib
+          key: maestro-${{ runner.os }}-${{ runner.arch }}-${{ env.MAESTRO_VERSION }}
+      - name: Install Maestro ${{ env.MAESTRO_VERSION }}
+        run: |
+          set -euo pipefail
+          # What the documented installer (get.maestro.mobile.dev) does with MAESTRO_VERSION set, without
+          # running a script fetched at run time: the release's maestro.zip, checked against its sha256.
+          if [ ! -x "$HOME/.maestro/bin/maestro" ]; then
+            curl -fsSL --retry 3 -o "$RUNNER_TEMP/maestro.zip" \
+              "https://github.com/mobile-dev-inc/maestro/releases/download/cli-${MAESTRO_VERSION}/maestro.zip"
+            echo "${MAESTRO_SHA256}  $RUNNER_TEMP/maestro.zip" | shasum -a 256 -c -
+            rm -rf "$RUNNER_TEMP/maestro-unzip"
+            unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP/maestro-unzip"
+            mkdir -p "$HOME/.maestro"
+            rm -rf "$HOME/.maestro/bin" "$HOME/.maestro/lib"
+            cp -R "$RUNNER_TEMP/maestro-unzip/maestro/." "$HOME/.maestro/"
+            rm -rf "$RUNNER_TEMP/maestro.zip" "$RUNNER_TEMP/maestro-unzip"
+          fi
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          java -version 2>&1 | head -1
+          "$HOME/.maestro/bin/maestro" --version
+      - name: Save Maestro ${{ env.MAESTRO_VERSION }}
+        if: steps.maestro-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/.maestro/bin
+            ~/.maestro/lib
+          key: maestro-${{ runner.os }}-${{ runner.arch }}-${{ env.MAESTRO_VERSION }}
+
+      - name: Boot an iPhone simulator
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          # No hardware keyboard, so iOS shows its on-screen keyboard as on a phone (first-day pictures it).
+          # Harmless if Simulator.app is never opened.
+          defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool false
+          # The newest iOS runtime, and on it an "iPhone 17" if there is one, else the first iPhone.
+          read -r UDID NAME_RT < <(xcrun simctl list devices available -j | python3 -c '
+          import json, re, sys
+          devices = json.load(sys.stdin)["devices"]
+          best = None
+          for runtime, items in devices.items():
+              m = re.search(r"iOS-(\d+)-(\d+)(?:-(\d+))?$", runtime)
+              if not m:
+                  continue
+              version = tuple(int(x or 0) for x in m.groups())
+              for d in items:
+                  if not d["name"].startswith("iPhone"):
+                      continue
+                  rank = (version, d["name"] == "iPhone 17", d["name"].startswith("iPhone 17"))
+                  if best is None or rank > best[0]:
+                      best = (rank, d["udid"], d["name"].replace(" ", "_") + "@" + runtime.split(".")[-1])
+          if not best:
+              sys.exit("no iPhone simulator available")
+          print(best[1], best[2])
+          ')
+          echo "simulator $NAME_RT $UDID"
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl get_app_container "$UDID" "$APP_ID" app
+
+      - name: Start the app's log
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          mkdir -p "$RESULTS"
+          # Only HealthCal's own process and React Native's JavaScript console (info and above).
+          nohup xcrun simctl spawn "$UDID" log stream --style compact --level info \
+            --predicate "process == \"$APP_EXE\" OR subsystem == \"com.facebook.react.log\"" \
+            > "$RESULTS/app-log.txt" 2>&1 &
+          echo $! > "$RUNNER_TEMP/log-stream.pid"
+
+      - name: Run the flows
+        if: steps.flows.outputs.main != ''
+        timeout-minutes: 35
+        env:
+          FLOWS: ${{ steps.flows.outputs.main }}
+        run: bash scripts/ci/run-flows.sh ios "$UDID" "$RESULTS" $FLOWS
+
+      # Best effort: the Health app's words are guesses until a run shows them (never fails the job).
+      - name: Steps from the Health app (best effort)
+        if: ${{ !cancelled() && steps.flows.outputs.extra != '' }}
+        continue-on-error: true
+        timeout-minutes: 15
+        env:
+          FLOWS: ${{ steps.flows.outputs.extra }}
+        run: bash scripts/ci/run-flows.sh ios "$UDID" "$RESULTS" $FLOWS
+
+      - name: Collect the app's log and crash reports
+        if: always()
+        run: |
+          set +e
+          mkdir -p "$RESULTS"
+          [ -f "$RUNNER_TEMP/log-stream.pid" ] && kill "$(cat "$RUNNER_TEMP/log-stream.pid")" 2> /dev/null
+          if [ -n "${UDID:-}" ] && [ -n "${APP_EXE:-}" ]; then
+            # The same filter over the system's stored log, in case the stream missed the start.
+            xcrun simctl spawn "$UDID" log show --last 2h --style compact --info \
+              --predicate "process == \"$APP_EXE\" OR subsystem == \"com.facebook.react.log\"" > "$RESULTS/app-log-show.txt" 2>&1
+          fi
+          for f in "$RESULTS/app-log.txt" "$RESULTS/app-log-show.txt"; do
+            [ -f "$f" ] && [ "$(wc -c < "$f")" -gt 40000000 ] && { tail -c 40000000 "$f" > "$f.tail" && mv "$f.tail" "$f"; }
+          done
+          mkdir -p "$RESULTS/crash-reports"
+          cp ~/Library/Logs/DiagnosticReports/*"${APP_EXE:-HealthCal}"* "$RESULTS/crash-reports/" 2> /dev/null
+          ls -la "$RESULTS" "$RESULTS/crash-reports"
+          true
+
+      - name: Report (one line per flow, contact sheet)
+        if: always()
+        run: python3 scripts/ci/phone-test-report.py ios "$RESULTS"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: phone-test-ios
+          path: results/ios
+          if-no-files-found: warn
+          retention-days: 14
+
+  # --------------------------------------------------------------- Android ----
+  build-android:
+    name: Build the Android app (x86_64)
+    if: inputs.app_run_id == '' && inputs.platform != 'ios'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install packages
+        run: npm ci --no-audit --no-fund
+
+      - name: Supabase settings from eas.json (build.production.env)
+        run: |
+          set -euo pipefail
+          node -e '
+            const env = require("./eas.json").build.production.env || {};
+            for (const k of ["EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_ANON_KEY"]) {
+              if (!env[k]) { console.error("eas.json build.production.env has no " + k); process.exit(1); }
+              console.log(k + "=" + env[k]);
+            }' >> "$GITHUB_ENV"
+          # The same JDK the Android build has been made with on the lead's machine (21).
+          echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
+
+      - name: Android SDK parts the build uses
+        run: |
+          set -uo pipefail
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          (yes | "$SDKM" --licenses > /dev/null 2>&1) || true
+          # React Native 0.88's catalog: compileSdk 37, buildTools 37.0.0, NDK 27.1.12297006; CMake 3.22.1
+          # as the local build used. The Android Gradle plugin downloads whatever is still missing.
+          "$SDKM" --install "platforms;android-37.0" "build-tools;37.0.0" "ndk;27.1.12297006" "cmake;3.22.1" > "$RUNNER_TEMP/sdkmanager.log" 2>&1 \
+            || { tail -20 "$RUNNER_TEMP/sdkmanager.log"; echo "::warning::sdkmanager could not install everything; Gradle will try"; }
+          ls "$ANDROID_HOME/platforms" "$ANDROID_HOME/ndk" "$ANDROID_HOME/build-tools"
+          df -h / | tail -1
+
+      - name: Generate the native project (expo prebuild)
+        run: |
+          set -euo pipefail
+          unset EXPO_PUBLIC_E2E
+          npx expo prebuild --platform android --no-install
+          grep -n "distributionUrl" android/gradle/wrapper/gradle-wrapper.properties
+          grep -n "minSdkVersion\|reactNativeArchitectures\|newArchEnabled" android/gradle.properties
+
+      # The test app asks the update server for the channel "phone-test", which has no updates, so a
+      # relaunch between flows always runs this commit's embedded JavaScript, never a published
+      # production update ("Check for updates" still talks to the server).
+      - name: Point expo-updates at an empty channel
+        run: |
+          set -euo pipefail
+          M=android/app/src/main/AndroidManifest.xml
+          KEY=expo.modules.updates.UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY
+          if grep -q "$KEY" "$M"; then
+            sed -i "/$KEY/s/production/phone-test/" "$M"
+            if grep "$KEY" "$M" | grep -q production; then echo "::error::the channel in $M is still production"; exit 1; fi
+          else
+            echo "::warning::$M has no $KEY; left as it is"
+          fi
+          echo "--- expo-updates settings in $M"
+          grep -n "expo.modules.updates" "$M" || true
+
+      # Only Gradle's downloads (dependencies and the wrapper's distribution), not its build outputs and
+      # transforms, and no restore-keys: a new lockfile starts a clean cache instead of growing the old one.
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.gradle/caches/modules-2
+            ~/.gradle/wrapper/dists
+          key: gradle-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.json') }}
+
+      - name: Gradle assembleRelease (x86_64 only)
+        working-directory: android
+        run: |
+          set -eo pipefail
+          unset EXPO_PUBLIC_E2E
+          export NODE_ENV=production
+          java -version 2>&1 | head -1
+          ./gradlew assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon --console=plain \
+            -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g" 2>&1 | tee ../gradle.log \
+            | grep -E "^> Task .*(bundle|createBundle|assemble)|BUILD SUCCESSFUL|BUILD FAILED|What went wrong|^e: |error:" || true
+          grep -q "BUILD SUCCESSFUL" ../gradle.log || { echo "::error::Gradle build failed"; grep -A30 "What went wrong" ../gradle.log | head -60; tail -40 ../gradle.log; exit 1; }
+          APK=app/build/outputs/apk/release/app-release.apk
+          ls -la "$APK"
+          echo "x86_64 libraries in the APK: $(unzip -l "$APK" | grep -c 'lib/x86_64/')"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: app-android
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Keep the build log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-logs-android
+          path: |
+            gradle.log
+            ${{ runner.temp }}/sdkmanager.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  test-android:
+    name: Flows on the Android emulator
+    needs: build-android
+    if: ${{ !cancelled() && inputs.platform != 'ios' && (needs.build-android.result == 'success' || (needs.build-android.result == 'skipped' && inputs.app_run_id != '')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    permissions:
+      contents: read
+      actions: read # actions/download-artifact from another run (app_run_id)
+    env:
+      RESULTS: ${{ github.workspace }}/results/android
+      # Android 15 (API 35): Health Connect is part of the system from Android 14.
+      SYSTEM_IMAGE: system-images;android-35;google_apis;x86_64
+      DEVICE: emulator-5554
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Which flows
+        id: flows
+        env:
+          FLOWS_INPUT: ${{ inputs.flows }}
+          APP_RUN_ID: ${{ inputs.app_run_id }}
+        run: |
+          set -euo pipefail
+          case "$APP_RUN_ID" in
+            '') ;;
+            *[!0-9]*) echo "::error::app_run_id must be the number of an earlier run (…/actions/runs/<number>), not '$APP_RUN_ID'"; exit 1;;
+          esac
+          main=""
+          if [ -z "${FLOWS_INPUT// /}" ] || [ "$FLOWS_INPUT" = all ]; then
+            main="first-day health-and-about"
+          else
+            set -f # no glob expansion of the words below
+            for f in $(echo "$FLOWS_INPUT" | tr ',' ' '); do
+              f=${f#.maestro/}; f=${f%.yml}
+              case "$f" in *[!a-z0-9-]*|'') echo "::error::bad flow name '$f' (letters, digits and - only)"; exit 1;; esac
+              [ -f ".maestro/$f.yml" ] || { echo "::error::no flow .maestro/$f.yml (have: $(set +f; cd .maestro && ls *.yml | tr '\n' ' '))"; exit 1; }
+              if [ "$f" = health-data-ios ]; then echo "$f is for the iPhone only: not run here"; else main="$main $f"; fi
+            done
+            set +f
+          fi
+          echo "main=$(echo $main)" >> "$GITHUB_OUTPUT"
+          echo "flows: ${main:-none}"
+
+      - name: Switch on KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -la /dev/kvm
+
+      - name: Download the app built by this run
+        if: inputs.app_run_id == ''
+        uses: actions/download-artifact@v8
+        with:
+          name: app-android
+          path: ${{ runner.temp }}/app
+      - name: Download the app built by run ${{ inputs.app_run_id }}
+        if: inputs.app_run_id != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: app-android
+          path: ${{ runner.temp }}/app
+          run-id: ${{ inputs.app_run_id }}
+          github-token: ${{ github.token }}
+
+      - uses: actions/setup-python@v7
+        continue-on-error: true
+        with:
+          python-version: '3.12'
+      - name: Pillow for the contact sheet
+        continue-on-error: true
+        run: python3 -m pip install --quiet "pillow==$PILLOW_VERSION"
+
+      # Only the installed CLI is cached (bin and lib), saved right after a fresh install, so nothing
+      # Maestro writes under ~/.maestro while the flows run ends up in the cache.
+      - name: Restore Maestro ${{ env.MAESTRO_VERSION }}
+        id: maestro-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.maestro/bin
+            ~/.maestro/lib
+          key: maestro-${{ runner.os }}-${{ runner.arch }}-${{ env.MAESTRO_VERSION }}
+      - name: Install Maestro ${{ env.MAESTRO_VERSION }}
+        run: |
+          set -euo pipefail
+          # What the documented installer (get.maestro.mobile.dev) does with MAESTRO_VERSION set, without
+          # running a script fetched at run time: the release's maestro.zip, checked against its sha256.
+          if [ ! -x "$HOME/.maestro/bin/maestro" ]; then
+            curl -fsSL --retry 3 -o "$RUNNER_TEMP/maestro.zip" \
+              "https://github.com/mobile-dev-inc/maestro/releases/download/cli-${MAESTRO_VERSION}/maestro.zip"
+            echo "${MAESTRO_SHA256}  $RUNNER_TEMP/maestro.zip" | shasum -a 256 -c -
+            rm -rf "$RUNNER_TEMP/maestro-unzip"
+            unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP/maestro-unzip"
+            mkdir -p "$HOME/.maestro"
+            rm -rf "$HOME/.maestro/bin" "$HOME/.maestro/lib"
+            cp -R "$RUNNER_TEMP/maestro-unzip/maestro/." "$HOME/.maestro/"
+            rm -rf "$RUNNER_TEMP/maestro.zip" "$RUNNER_TEMP/maestro-unzip"
+          fi
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          java -version 2>&1 | head -1
+          "$HOME/.maestro/bin/maestro" --version
+      - name: Save Maestro ${{ env.MAESTRO_VERSION }}
+        if: steps.maestro-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/.maestro/bin
+            ~/.maestro/lib
+          key: maestro-${{ runner.os }}-${{ runner.arch }}-${{ env.MAESTRO_VERSION }}
+
+      - name: Start the emulator
+        timeout-minutes: 20
+        run: |
+          set -uo pipefail
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          AVDM="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
+          (yes | "$SDKM" --licenses > /dev/null 2>&1) || true
+          "$SDKM" --install emulator platform-tools "$SYSTEM_IMAGE" > "$RUNNER_TEMP/sdkmanager.log" 2>&1 \
+            || { tail -30 "$RUNNER_TEMP/sdkmanager.log"; exit 1; }
+          echo no | "$AVDM" create avd --force -n phone -k "$SYSTEM_IMAGE" -d pixel_6 || exit 1
+          CFG="${ANDROID_AVD_HOME:-$HOME/.android/avd}/phone.avd/config.ini"
+          [ -f "$CFG" ] || { echo "::error::no AVD config at $CFG"; "$AVDM" list avd; exit 1; }
+          set_cfg() { if grep -q "^$1=" "$CFG"; then sed -i "s|^$1=.*|$1=$2|" "$CFG"; else echo "$1=$2" >> "$CFG"; fi; }
+          set_cfg hw.ramSize 4096
+          set_cfg hw.cpu.ncore 3
+          set_cfg disk.dataPartition.size 6G
+          set_cfg hw.keyboard no   # the on-screen keyboard, as on a phone (first-day screenshots it)
+          nohup "$ANDROID_HOME/emulator/emulator" -avd phone -no-window -gpu swiftshader_indirect -no-snapshot \
+            -noaudio -no-boot-anim -camera-back none -camera-front none > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          timeout 300 adb -s "$DEVICE" wait-for-device || { echo "::error::no emulator after 5 minutes"; tail -50 "$RUNNER_TEMP/emulator.log"; exit 1; }
+          booted=""
+          for i in $(seq 1 120); do
+            if [ "$(adb -s "$DEVICE" shell getprop sys.boot_completed 2> /dev/null | tr -d '\r')" = 1 ]; then booted=1; break; fi
+            sleep 5
+          done
+          if [ -z "$booted" ]; then echo "::error::the emulator did not boot in 10 minutes"; tail -50 "$RUNNER_TEMP/emulator.log"; exit 1; fi
+          adb -s "$DEVICE" shell settings put global window_animation_scale 0
+          adb -s "$DEVICE" shell settings put global transition_animation_scale 0
+          adb -s "$DEVICE" shell settings put global animator_duration_scale 0
+          adb -s "$DEVICE" shell input keyevent 82
+          echo "Android $(adb -s "$DEVICE" shell getprop ro.build.version.release | tr -d '\r'), API $(adb -s "$DEVICE" shell getprop ro.build.version.sdk | tr -d '\r')"
+          echo "Health Connect packages:"; adb -s "$DEVICE" shell pm list packages | grep -i health || echo "(none found)"
+
+      - name: Install the app and start its log
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          APK=$(ls "$RUNNER_TEMP"/app/*.apk | head -1)
+          adb -s "$DEVICE" install -r "$APK"
+          mkdir -p "$RESULTS"
+          adb -s "$DEVICE" logcat -c || true
+          nohup adb -s "$DEVICE" logcat -v threadtime -b main,system,crash > "$RUNNER_TEMP/logcat-full.txt" 2>&1 &
+          echo $! > "$RUNNER_TEMP/logcat.pid"
+
+      - name: Run the flows
+        if: steps.flows.outputs.main != ''
+        timeout-minutes: 35
+        env:
+          FLOWS: ${{ steps.flows.outputs.main }}
+        run: bash scripts/ci/run-flows.sh android "$DEVICE" "$RESULTS" $FLOWS
+
+      - name: Collect the app's log
+        if: always()
+        run: |
+          set +e
+          mkdir -p "$RESULTS"
+          [ -f "$RUNNER_TEMP/logcat.pid" ] && kill "$(cat "$RUNNER_TEMP/logcat.pid")" 2> /dev/null
+          if [ -f "$RUNNER_TEMP/logcat-full.txt" ]; then
+            # The app's own processes (every pid ActivityManager started for it) and the tags that matter.
+            python3 - "$RUNNER_TEMP/logcat-full.txt" "$RESULTS/app-logcat.txt" "$APP_ID" <<'PY'
+          import re, sys
+          src, dst, app = sys.argv[1:4]
+          line_re = re.compile(r"^\S+\s+\S+\s+(\d+)\s+\d+\s+[VDIWEFA]\s+(.*?)\s*: ")
+          start_re = re.compile(r"Start proc (\d+):" + re.escape(app) + r"[/ ]")
+          tags = {"ReactNativeJS", "ReactNative", "AndroidRuntime", "dev.expo.updates", "HealthConnect"}
+          with open(src, errors="replace") as f:
+              lines = f.read().splitlines()
+          pids = {m.group(1) for l in lines for m in [start_re.search(l)] if m}
+          kept = 0
+          with open(dst, "w") as out:
+              for l in lines:
+                  m = line_re.match(l)
+                  if (m and (m.group(1) in pids or m.group(2) in tags)) or app in l:
+                      out.write(l + "\n")
+                      kept += 1
+          print(f"app log: {kept} of {len(lines)} lines, pids {sorted(pids)}")
+          PY
+            gzip -c "$RUNNER_TEMP/logcat-full.txt" > "$RESULTS/logcat-full.txt.gz"
+          fi
+          cp "$RUNNER_TEMP/emulator.log" "$RESULTS/emulator.log" 2> /dev/null
+          ls -la "$RESULTS"
+          true
+
+      - name: Report (one line per flow, contact sheet)
+        if: always()
+        run: python3 scripts/ci/phone-test-report.py android "$RESULTS"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: phone-test-android
+          path: results/android
+          if-no-files-found: warn
+          retention-days: 14
