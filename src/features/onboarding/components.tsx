@@ -5,7 +5,7 @@ import Animated from 'react-native-reanimated';
 
 import { cup, fonts, motion, useReducedMotion, useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
-import { FadeUp, MiniCup, parseNumber, PressableScale, ProgressBar, Text } from '@/ui';
+import { cssBezier, FadeUp, MiniCup, parseNumber, PressableScale, ProgressBar, Text } from '@/ui';
 
 import { convertUnits, type Draft } from './model';
 
@@ -56,7 +56,7 @@ export function StepSlide({ direction, disabled, children }: { direction: 1 | -1
       style={{
         animationName: { from: { opacity: 0, transform: [{ translateX: direction * 20 }] }, to: { opacity: 1, transform: [{ translateX: 0 }] } },
         animationDuration: motion.duration.slide,
-        animationTimingFunction: `cubic-bezier(${motion.easing.enter.join(', ')})`,
+        animationTimingFunction: cssBezier(motion.easing.enter),
         animationFillMode: 'backwards',
       }}>
       {children}

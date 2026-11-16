@@ -4,7 +4,7 @@ export * from './Charts';
 export * from './Chip';
 export * from './Field';
 export * from './List';
-export { AnimatedItem, AnimatedList, AnimatedNumber, DrawReveal, ease, FadeUp, useFadeAfter, usePour, useReachFlash } from './motion';
+export { AnimatedItem, AnimatedList, AnimatedNumber, cssBezier, DrawReveal, ease, FadeUp, useFadeAfter, usePour, useReachFlash } from './motion';
 export type { AnimatedNumberProps, Pour, PourOptions, ReachOptions } from './motion';
 export * from './Pressable';
 export * from './ProgressBar';

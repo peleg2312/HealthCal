@@ -23,6 +23,7 @@ import Animated, {
   withDelay,
   withSequence,
   withTiming,
+  cubicBezier,
   type SharedValue,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -43,7 +44,13 @@ export const ease = {
   move: Easing.bezier(...motion.easing.move),
 };
 
-const cssBezier = (b: readonly number[]) => `cubic-bezier(${b.join(', ')})`;
+/**
+ * An easing curve for a CSS-style animation (`animationTimingFunction`). It must be Reanimated's own
+ * `cubicBezier(...)`, never the string "cubic-bezier(...)": a browser takes the string, but on a phone
+ * Reanimated accepts only its named curves as strings and throws on anything else, which took down
+ * every screen (each one enters through `FadeUp`).
+ */
+export const cssBezier = (b: readonly number[]) => cubicBezier(b[0], b[1], b[2], b[3]);
 
 // ------------------------------------------------------------------- pour
 
