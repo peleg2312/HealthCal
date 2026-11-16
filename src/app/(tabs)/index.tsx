@@ -6,14 +6,14 @@ import { useWindowDimensions, View } from 'react-native';
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
 import { useRecapReady } from '@/features/progress/recapReady';
 import { coachTip, rhythmFromReminders, type ClosedDay } from '@/features/today/coach';
-import { DayRingStrip, STRIP_WEEKS } from '@/features/today/DayRingStrip';
+import { DayRingStrip } from '@/features/today/DayRingStrip';
 import { FitsSheet } from '@/features/today/FitsSheet';
 import { mealLine } from '@/features/today/meals';
 import { ReadyRim } from '@/features/today/ReadyRim';
 import { RecapReadyCard } from '@/features/today/RecapReadyCard';
 import { FirstLogInvite } from '@/features/today/FirstLogInvite';
-import { useDaySwipe } from '@/features/today/useDaySwipe';
-import { startDate, weekDates } from '@/features/today/week';
+import { useBackToToday } from '@/features/today/useBackToToday';
+import { startDate } from '@/features/today/week';
 import { ShareDayButton } from '@/features/share';
 import { greetingTitle } from '@/features/today/greetingTitle';
 import { TabHeader, tabDay, tabTitleRoom, tabTitleSize } from '@/components/TabHeader';
@@ -58,16 +58,17 @@ export default function TodayScreen() {
   const { width } = useWindowDimensions();
   const title = greetingTitle(greeting(now), profile.name ?? '', tabTitleRoom(width), tabTitleSize(width));
   const select = (d: ISODate) => setPicked(d === todayDate ? null : d);
-  // A sideways swipe on the page moves one day, back as far as the strip goes (never before the profile was made).
-  const stripFirst = weekDates(todayDate, STRIP_WEEKS - 1)[0];
-  const swipe = useDaySwipe({ date, onChange: select, latest: todayDate, earliest: start && start > stripFirst ? start : stripFirst });
+  // The day changes only from the week strip: no page swipe here, so scrolling or reaching for a
+  // row never moves Today to another day. Back in front after five minutes or more away, or on
+  // another day, it shows today again.
+  useBackToToday(() => setPicked(null));
 
   return (
     <Screen
       tabs
       testID="today-screen"
       header={<TabHeader tab="today" overline={tabDay(date)} title={title} />}>
-      <View testID="today-swipe" {...swipe} style={{ gap: spacing.md }}>
+      <View testID="today-swipe" style={{ gap: spacing.md }}>
       {/* The one date control, the same as the diary's: the strip, then the week's caption with the streak or "Back to today". */}
       <DayRingStrip
         today={todayDate}

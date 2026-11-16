@@ -9,6 +9,13 @@
  * read back from the app's own calculation code, so a mistake in the engine
  * or in how a screen wires it up shows as a mismatch.
  *
+ * The fields of onboarding (and one kit field, food search) are first tapped with a finger at
+ * the left, the middle and the right of their cup, as a person does, and must take the focus
+ * each time; only then is the value typed. With the on-screen keyboard faked (a visualViewport
+ * that shrinks, as in a phone browser, where the layout does not), the pinned footer must rise
+ * above it and the focused field must be in view above the footer, and all of it must go back
+ * when the keyboard closes. No real keyboard is raised: a phone still has to confirm that part.
+ *
  * The run uses reduced motion, so every animation is instant (the app also treats an
  * automated browser as reduced motion). The last section turns motion on and acts while
  * things are still pouring, to prove nothing waits on an animation finishing.
@@ -32,6 +39,27 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
 (async () => {
   const browser = await chromium.launch();
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, colorScheme: 'dark', reducedMotion: 'reduce' });
+  // A visualViewport the test controls: the same as the real one until __keyboard(px) "opens" a
+  // keyboard of that height. Like a phone browser, the layout viewport does not shrink.
+  await context.addInitScript(() => {
+    const fake = new EventTarget();
+    let kb = 0;
+    const num = (get) => ({ configurable: true, get });
+    Object.defineProperties(fake, {
+      height: num(() => window.innerHeight - kb),
+      width: num(() => window.innerWidth),
+      offsetTop: num(() => 0),
+      offsetLeft: num(() => 0),
+      pageTop: num(() => window.scrollY),
+      pageLeft: num(() => window.scrollX),
+      scale: num(() => 1),
+    });
+    Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => fake });
+    window.__keyboard = (h) => {
+      kb = h;
+      fake.dispatchEvent(new Event('resize'));
+    };
+  });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -47,6 +75,62 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   };
   const text = async (id) => (await page.getByTestId(id).first().innerText({ timeout: 15000 })).replace(/\u00A0/g, ' ').replace(/\u2060/g, '').trim();
   const shot = async (name) => SHOTS && page.screenshot({ path: `${SHOTS}/${name}.png` });
+  const focusedId = () => page.evaluate(() => document.activeElement?.getAttribute('data-testid') || document.activeElement?.tagName || 'nothing');
+  const blur = () => page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
+  // The cup a field sits in: the nearest box around the input that draws an edge.
+  const cupOf = (id) => page.evaluate((id) => {
+    const input = [...document.querySelectorAll(`[data-testid="${id}"]`)].find((e) => e.getBoundingClientRect().width > 0);
+    let e = input?.parentElement;
+    while (e && parseFloat(getComputedStyle(e).borderTopWidth) < 1) e = e.parentElement;
+    if (!e) return null;
+    const r = e.getBoundingClientRect();
+    return { x: r.x, y: r.y, w: r.width, h: r.height };
+  }, id);
+  // A finger, not typing: a tap at the cup's left, middle and right must each put the focus in the field.
+  const tapsFocus = async (id, extra = []) => {
+    await page.getByTestId(id).first().scrollIntoViewIfNeeded();
+    const c = await cupOf(id);
+    if (!c) return check(`a tap anywhere in ${id} focuses it`, false, 'no cup found');
+    const misses = [];
+    for (const [where, x] of [['left', c.x + 6], ['middle', c.x + c.w / 2], ['right', c.x + c.w - 6], ...extra.map(([w, dx]) => [w, c.x + dx])]) {
+      await blur();
+      // The finger must land on the field itself (or its <label> on web): a wrapper that catches the
+      // touch and focuses the field from code works in this browser but may not raise an iPhone's keyboard.
+      const hit = await page.evaluate(([id, x, y]) => {
+        const input = [...document.querySelectorAll(`[data-testid="${id}"]`)].find((e) => e.getBoundingClientRect().width > 0);
+        const el = document.elementFromPoint(x, y);
+        const label = el && el.closest('label');
+        return el === input || (label && label.contains(input)) ? 'field' : (el?.getAttribute('data-testid') || el?.tagName || 'nothing');
+      }, [id, x, c.y + c.h / 2]);
+      if (hit !== 'field') misses.push(`${where} lands on ${hit}, not the field`);
+      await page.touchscreen.tap(x, c.y + c.h / 2);
+      await page.waitForTimeout(120);
+      const got = await focusedId();
+      if (got !== id) misses.push(`${where} -> ${got}`);
+    }
+    check(`a tap at the left, middle and right of ${id} focuses it`, misses.length === 0, misses.join('; ') || `${Math.round(c.w)} x ${Math.round(c.h)} cup`);
+  };
+  // With the faked keyboard open over the focused field: the footer above it, the field above the footer.
+  const keyboardRoom = async (id, kb) => {
+    await blur();
+    const c = await cupOf(id);
+    await page.touchscreen.tap(c.x + c.w / 2, c.y + c.h / 2);
+    await page.evaluate((h) => window.__keyboard(h), kb);
+    await page.waitForTimeout(400);
+    const m = await page.evaluate((id) => {
+      const vis = (sel) => [...document.querySelectorAll(sel)].find((e) => e.getBoundingClientRect().height > 0);
+      const f = vis('[data-testid="screen-footer"]').getBoundingClientRect();
+      const i = vis(`[data-testid="${id}"]`).getBoundingClientRect();
+      return { visible: window.visualViewport.height, footerTop: f.top, footerBottom: f.bottom, fieldTop: i.top, fieldBottom: i.bottom, focused: document.activeElement?.getAttribute('data-testid'), scrollY: window.scrollY };
+    }, id);
+    const ok = Math.abs(m.footerBottom - m.visible) <= 1 && m.fieldBottom <= m.footerTop && m.fieldTop >= 0 && m.focused === id && m.scrollY === 0;
+    check(`keyboard (faked, ${kb} px): the footer sits on it and ${id} is in view above the footer`, ok, `visible ${Math.round(m.visible)}, footer ${Math.round(m.footerTop)}-${Math.round(m.footerBottom)}, field ${Math.round(m.fieldTop)}-${Math.round(m.fieldBottom)}, focus ${m.focused}`);
+    await page.evaluate(() => window.__keyboard(0));
+    await page.waitForTimeout(400);
+    const back = await page.evaluate(() => [...document.querySelectorAll('[data-testid="screen-footer"]')].find((e) => e.getBoundingClientRect().height > 0).getBoundingClientRect().bottom);
+    check(`keyboard closed: the footer is back at the bottom (${id})`, Math.abs(back - (await page.evaluate(() => window.innerHeight))) <= 1, `footer bottom ${Math.round(back)}`);
+    await blur();
+  };
   // The app exposes its live state for tests; this does not depend on how it is laid out in storage.
   const stored = async () => page.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())));
   const live = (map) => Object.values(map).filter((r) => !r.deleted);
@@ -59,22 +143,44 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   await tap('welcome-get-started');
 
   await tap('onb-units-metric');
+  await tapsFocus('onb-name-input');
   await fill('onb-name-input', 'Dana');
   await tap('onb-next');
   await tap('onb-goal-lose');
   await tap('onb-next');
   await tap('onb-sex-female');
+  for (const id of ['onb-dob-day', 'onb-dob-month', 'onb-dob-year']) await tapsFocus(id);
   await fill('onb-dob-day', '15');
   await fill('onb-dob-month', '6');
   await fill('onb-dob-year', '1990');
   await tap('onb-next');
+  // Every number field of the body step, in both unit systems, then back to metric to answer.
+  await tap('onb-body-units-imperial');
+  for (const id of ['onb-height-ft', 'onb-height-in', 'onb-weight']) await tapsFocus(id);
+  await tap('onb-body-units-metric');
+  await tapsFocus('onb-height-cm');
+  // On the unit itself ("kg"), not only the cup's sides.
+  const unitX = await page.evaluate(() => {
+    const i = [...document.querySelectorAll('[data-testid="onb-weight"]')].find((e) => e.getBoundingClientRect().width > 0);
+    const unit = [...i.parentElement.querySelectorAll('div[dir], div')].find((e) => e !== i && e.textContent === 'kg');
+    return unit ? unit.getBoundingClientRect().x + unit.getBoundingClientRect().width / 2 - i.parentElement.getBoundingClientRect().x : null;
+  });
+  await tapsFocus('onb-weight', unitX === null ? [] : [['on the unit', unitX]]);
   await fill('onb-height-cm', '165');
   await fill('onb-weight', '68');
+  await keyboardRoom('onb-weight', 320);
   await tap('onb-next');
+  // The body fat fields: typed directly, and the three tape measures (the last one low on the page).
+  await tap('onb-bf-direct');
+  await tapsFocus('onb-bf-input');
+  await tap('onb-bf-tape');
+  for (const id of ['onb-neck-input', 'onb-waist-input', 'onb-hip-input']) await tapsFocus(id);
+  await keyboardRoom('onb-hip-input', 340);
   await tap('onb-bf-unknown');
   await tap('onb-next');
   await tap('onb-activity-light');
   await tap('onb-next');
+  await tapsFocus('onb-target-input');
   await fill('onb-target-input', '62');
   await tap('onb-next');
   // "Your day": reminders are offered once; the first-day flow declines them.
@@ -109,6 +215,8 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   // ------------------------------------------------------------- log food
   await page.goto(`${BASE}/food/search?meal=breakfast`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(800);
+  // A kit field: on the search icon and in the side room as well as the middle.
+  await tapsFocus('food-search-input', [['on the search icon', 23]]);
   await fill('food-search-input', 'banana');
   await page.waitForTimeout(700);
   await shot('e2e-search');

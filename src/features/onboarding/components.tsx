@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
-import React, { useEffect, useRef, useState } from 'react';
-import { Text as RNText, TextInput, View, type StyleProp, type TextInputInstance, type TextInputProps, type ViewStyle } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Platform, Text as RNText, TextInput, View, type LayoutChangeEvent, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { cup, fonts, motion, useReducedMotion, useTheme } from '@/theme';
@@ -324,11 +324,38 @@ export function WhyWeAsk({ children, testID, title = 'Why we ask' }: { children:
 const fieldFormat = (n: number | null, decimals: number) => (n === null ? '' : String(Math.round(n * 10 ** decimals) / 10 ** decimals));
 
 /**
+ * On web the whole field (its label and its cup) is a `<label>`, so a tap on the label text
+ * focuses the input the browser's own way, which raises the keyboard on every phone browser.
+ * Natively a label is never a control.
+ */
+const FIELD_LABEL = Platform.OS === 'web' ? ({ role: 'label' } as object) : null;
+
+/**
+ * A view's drawn width. On web the layout event rounds to whole px; the element's own box does not,
+ * and the input's centre must match the sizer's to the fraction or the digits move by a hair.
+ */
+function drawnWidth(e: LayoutChangeEvent): number {
+  const target = (e.nativeEvent as unknown as { target?: { getBoundingClientRect?: () => { width: number } } }).target;
+  const w = Platform.OS === 'web' && typeof target?.getBoundingClientRect === 'function' ? target.getBoundingClientRect().width : NaN;
+  return Number.isFinite(w) && w > 0 ? w : e.nativeEvent.layout.width;
+}
+
+/** The space between the number and its unit. */
+const UNIT_GAP = 6;
+
+/**
  * A number typed big: a cup-shaped field with the value in large Bricolage
- * and its unit small beside it, centred together like a number on Today. The
- * input is exactly as wide as what is typed (an unseen copy of the text sizes
- * it), so the unit always sits next to the last digit. A tap anywhere in the
- * cup focuses it. Keeps the raw text while typing so "65." is not eaten (as
+ * and its unit small beside it, centred together like a number on Today.
+ *
+ * The real input covers the whole cup, so every tap anywhere in it is the
+ * platform's own tap on a text field: the keyboard opens the native way on
+ * iOS Safari, a Home Screen web app, Android Chrome and the apps (focusing
+ * from code after a tap on a wrapper does not reliably raise the keyboard on
+ * iOS). What the eye sees is laid out by an unseen copy of the text (the
+ * sizer) followed by the unit; the input is centred on the same point by
+ * padding its right side with the unit's measured width plus the gap, so the
+ * digits and the caret sit exactly where that layout puts them at every
+ * length. Keeps the raw text while typing so "65." is not eaten (as
  * `NumberField` does). `size="md"` is for three fields side by side.
  */
 export function BigNumberField({
@@ -359,7 +386,8 @@ export function BigNumberField({
   const [text, setText] = useState(fieldFormat(value, decimals));
   const [lastValue, setLastValue] = useState(value);
   const [focused, setFocused] = useState(false);
-  const input = useRef<TextInputInstance>(null);
+  // The unit's drawn width, so the input's centre is the sizer's centre.
+  const [unitW, setUnitW] = useState(0);
   if (value !== lastValue) {
     setLastValue(value);
     if (parseNumber(text) !== value) setText(fieldFormat(value, decimals));
@@ -367,75 +395,101 @@ export function BigNumberField({
   const fontSize = size === 'lg' ? 32 : 24;
   const lineHeight = size === 'lg' ? 38 : 30;
   const type = { fontFamily: fonts.numBold, fontSize, lineHeight, letterSpacing: -0.5, fontVariant: ['tabular-nums' as const] };
+  const padX = spacing.sm;
   return (
-    <View style={[{ gap: 6 }, style]}>
+    <View {...FIELD_LABEL} style={[{ gap: 6 }, style]}>
       <Text variant="label" color="textSecondary" numberOfLines={1}>
         {label}
       </Text>
       <View
-        // A tap on the cup around the number goes to the input (the input itself takes its own taps first).
-        onStartShouldSetResponder={() => true}
-        onResponderRelease={() => input.current?.focus()}
         style={{
           flexDirection: 'row',
           alignItems: 'flex-end',
           justifyContent: 'center',
-          gap: 6,
+          gap: UNIT_GAP,
           minHeight: size === 'lg' ? 68 : 60,
           paddingVertical: size === 'lg' ? 15 : 15,
-          paddingHorizontal: spacing.sm,
+          paddingHorizontal: padX,
           ...cup(radius.tile, 5),
           backgroundColor: colors.surface,
           borderWidth: 1.5,
           borderColor: error ? colors.danger : focused ? colors.rim : colors.borderStrong,
           overflow: 'hidden',
         }}>
+        {/* The sizer: the same text in the same type, unseen. With the unit it sets where the number is drawn. */}
         <View style={{ minWidth: 32, flexShrink: 1 }}>
-          {/* The sizer: the same text in the same type, unseen. It gives the input its width. */}
           <RNText aria-hidden accessibilityElementsHidden importantForAccessibility="no" numberOfLines={1} style={[type, { opacity: 0, paddingHorizontal: 3, textAlign: 'center' }]}>
             {text || placeholder || '0'}
           </RNText>
-          <TextInput
-            ref={input}
-            testID={testID}
-            keyboardType={decimals > 0 ? 'decimal-pad' : 'number-pad'}
-            inputMode={decimals > 0 ? 'decimal' : 'numeric'}
-            placeholder={placeholder}
-            placeholderTextColor={colors.textTertiary}
-            selectionColor={colors.primary}
-            {...rest}
-            accessibilityLabel={rest.accessibilityLabel ?? (unit ? `${label}, ${unit}` : label)}
-            value={text}
-            onFocus={(e) => {
-              setFocused(true);
-              rest.onFocus?.(e);
-            }}
-            onBlur={(e) => {
-              setFocused(false);
-              rest.onBlur?.(e);
-            }}
-            onChangeText={(raw) => {
-              const t = raw.replace(/-/g, '');
-              setText(t);
-              const n = parseNumber(t);
-              setLastValue(n);
-              onChange(n);
-            }}
-            style={[type, { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, padding: 0, textAlign: 'center', color: colors.text }, { outlineStyle: 'none' } as object]}
-          />
         </View>
         {unit ? (
-          <Text variant="unit" color="textSecondary" style={{ marginBottom: size === 'lg' ? 6 : 4 }}>
+          <Text
+            variant="unit"
+            color="textSecondary"
+            aria-hidden
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            onLayout={(e) => setUnitW(drawnWidth(e))}
+            style={{ marginBottom: size === 'lg' ? 6 : 4 }}>
             {unit}
           </Text>
         ) : null}
+        {/* The real field, over the whole cup (last, so it is on top): the sizer's centre is
+            (cup - unit - gap) / 2, and so is this input's with the unit and the gap as right padding. */}
+        <TextInput
+          testID={testID}
+          keyboardType={decimals > 0 ? 'decimal-pad' : 'number-pad'}
+          inputMode={decimals > 0 ? 'decimal' : 'numeric'}
+          placeholder={placeholder}
+          placeholderTextColor={colors.textTertiary}
+          selectionColor={colors.primary}
+          {...rest}
+          accessibilityLabel={rest.accessibilityLabel ?? (unit ? `${label}, ${unit}` : label)}
+          value={text}
+          onFocus={(e) => {
+            setFocused(true);
+            rest.onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setFocused(false);
+            rest.onBlur?.(e);
+          }}
+          onChangeText={(raw) => {
+            const t = raw.replace(/-/g, '');
+            setText(t);
+            const n = parseNumber(t);
+            setLastValue(n);
+            onChange(n);
+          }}
+          style={[
+            type,
+            {
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
+              paddingVertical: 0,
+              paddingLeft: padX,
+              paddingRight: padX + (unit ? unitW + UNIT_GAP : 0),
+              textAlign: 'center',
+              color: colors.text,
+            },
+            Platform.OS === 'android' ? { textAlignVertical: 'center' as const } : null,
+            { outlineStyle: 'none' } as object,
+          ]}
+        />
       </View>
       {typeof error === 'string' && error.trim() ? <ErrorText>{error}</ErrorText> : null}
     </View>
   );
 }
 
-/** One large text field (the name): h2-size type in a cup, the rim edge on focus. */
+/**
+ * One large text field (the name): h2-size type in a cup, the rim edge on focus. The input
+ * fills the cup, its 16 px side room is the input's own padding, so a tap anywhere in the cup
+ * is a tap on the field.
+ */
 export function BigTextField({
   label,
   error,
@@ -449,7 +503,7 @@ export function BigTextField({
   const length = typeof rest.value === 'string' ? rest.value.length : 0;
   const fontSize = length > 18 ? 18 : length > 14 ? 21 : 24;
   return (
-    <View style={{ gap: 6 }}>
+    <View {...FIELD_LABEL} style={{ gap: 6 }}>
       <Text variant="label" color="textSecondary">
         {label}
       </Text>
@@ -457,7 +511,6 @@ export function BigTextField({
         style={{
           minHeight: 64,
           justifyContent: 'center',
-          paddingHorizontal: 16,
           ...cup(radius.tile, 5),
           backgroundColor: colors.surface,
           borderWidth: 1.5,
@@ -478,7 +531,9 @@ export function BigTextField({
             rest.onBlur?.(e);
           }}
           style={[
-            { color: colors.text, fontFamily: fonts.display, fontSize, lineHeight: 30, paddingVertical: 12, letterSpacing: -0.3 },
+            // 64 less the 1.5 px edges: the input is the whole inside of the cup.
+            { color: colors.text, fontFamily: fonts.display, fontSize, lineHeight: 30, paddingVertical: 12, paddingHorizontal: 16, minHeight: 61, letterSpacing: -0.3 },
+            Platform.OS === 'android' ? { textAlignVertical: 'center' as const } : null,
             { outlineStyle: 'none' } as object,
           ]}
         />

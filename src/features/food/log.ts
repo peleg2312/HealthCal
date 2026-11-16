@@ -3,13 +3,14 @@
  * instead of touching the store directly so every entry is built the same way,
  * recents stay up to date, and every add or delete can be undone.
  */
+import { today } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
-import { MEAL_LABEL } from '@/lib/nutrition';
 import { useStore } from '@/store';
 import { live } from '@/store/selectors';
 import type { Food, FoodEntry, ISODate, MealType, Nutrients, SavedMeal, SavedMealItem, Serving } from '@/types';
 import { haptic, toast } from '@/ui';
 
+import { mealOnDay } from './addedTo';
 import { buildEntry, planSavedMeal } from './build';
 
 export { buildEntry } from './build';
@@ -33,6 +34,11 @@ function lastConfidence(food: Food): number | undefined {
     if (!best || e.loggedAt > best.loggedAt) best = e;
   }
   return best?.confidence;
+}
+
+/** The meal and, when it is not today, the day: read at the moment of the log (an event handler), never while rendering. */
+function where(meal: MealType, date: ISODate): string {
+  return mealOnDay(meal, date, today());
 }
 
 function announce(message: string, ids: string[], alsoUndo?: () => void) {
@@ -84,7 +90,7 @@ export function logFood(input: LogFoodInput): FoodEntry {
   const entry = store.upsert('foodEntries', buildEntry({ ...input, confidence: lastConfidence(input.food) }));
   const recentsBefore = store.recentFoods;
   store.rememberFood(input.food);
-  announce(`Added to ${MEAL_LABEL[input.meal].toLowerCase()}`, [entry.id], () => {
+  announce(`Added to ${where(input.meal, input.date)}`, [entry.id], () => {
     useStore.setState((s) => ({ recentFoods: [...recentsAfterUndo(s.recentFoods, recentsBefore, input.food.id)] }));
   });
   return entry;
@@ -121,7 +127,7 @@ export function logQuickAdd(input: { name: string; nutrients: Nutrients; meal: M
     nutrients: input.nutrients,
     loggedAt: nowISO(),
   });
-  announce(`Added to ${MEAL_LABEL[input.meal].toLowerCase()}`, [entry.id]);
+  announce(`Added to ${where(input.meal, input.date)}`, [entry.id]);
   return entry;
 }
 
@@ -149,7 +155,7 @@ export function logItems(items: (SavedMealItem | FoodEntry)[], meal: MealType, d
       loggedAt: nowISO(),
     })),
   );
-  announce(label ?? `${entries.length} ${entries.length === 1 ? 'item' : 'items'} added to ${MEAL_LABEL[meal].toLowerCase()}`, entries.map((e) => e.id));
+  announce(label ?? `${entries.length} ${entries.length === 1 ? 'item' : 'items'} added to ${where(meal, date)}`, entries.map((e) => e.id));
   return entries;
 }
 
@@ -165,7 +171,7 @@ export function logSavedMeal(
   opts: { portion?: number; include?: boolean[] } = {},
 ): FoodEntry[] {
   const plan = planSavedMeal(meal, opts);
-  return logItems(plan.items, mealType, date, `${meal.name} added to ${MEAL_LABEL[mealType].toLowerCase()}`);
+  return logItems(plan.items, mealType, date, `${meal.name} added to ${where(mealType, date)}`);
 }
 
 export function deleteEntry(entry: FoodEntry): void {

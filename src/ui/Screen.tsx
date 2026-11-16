@@ -1,12 +1,13 @@
 import { router, useIsFocused } from 'expo-router';
 import { ChevronLeft, X } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View, type ScrollViewProps, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MAX_CONTENT_WIDTH, useTheme } from '@/theme';
 
 import { IconButton } from './Button';
+import { keyboardCover, revealDelta } from './keyboardInset';
 import { FadeUp } from './motion';
 import { PressableScale } from './Pressable';
 import { Text } from './Text';
@@ -58,8 +59,29 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
   const [footerH, setFooterH] = useState(0);
   const focused = useIsFocused();
   useToastDock(footer ? footerH : insets.bottom + (tabs ? TAB_BAR_HEIGHT + 14 : 0), focused);
+  // An id for this screen's element on web, so the keyboard handling only moves its own fields.
+  const [domId] = useState(() => `screen-${++screenSeq}`);
+  const webKeyboard = useWebKeyboard(domId, focused);
   return (
-    <KeyboardAvoidingView testID={testID} style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'web' ? undefined : 'padding'}>
+    // The keyboard, natively: KeyboardAvoidingView with "padding" on both platforms. On iOS the keyboard
+    // covers the app and "padding" lifts the content (and a pinned footer) above it. On Android the app is
+    // edge-to-edge (Expo SDK 58 default, edgeToEdgeEnabled in the generated gradle.properties), so the
+    // window no longer resizes for the keyboard (adjustResize has no effect) and without a behaviour the
+    // keyboard covers the footer and the lower fields. React Native 0.88's ReactRootView reports the
+    // keyboard's top as the window's visible display frame bottom (keyboardDidShow, screenY), and
+    // KeyboardAvoidingView pads by frame.y + frame.height - screenY: exactly the part under the keyboard,
+    // with the navigation bar's share included, since an edge-to-edge window runs under it. "height" would
+    // also work but changes the view's flex; "position" would move the footer off its own layout.
+    // softwareKeyboardLayoutMode must stay "resize" (the default; app.json does not set it): with "pan"
+    // the window pans and this pads, and a field moves up twice (Expo's keyboard-handling guide).
+    // ScrollView then keeps the focused field in view: Android's ScrollView.onSizeChanged scrolls a focused
+    // child that was visible back into view when the padding shrinks it. Web has no keyboard events:
+    // useWebKeyboard below pads by what the visual viewport says the keyboard covers.
+    <KeyboardAvoidingView
+      nativeID={domId}
+      testID={testID}
+      style={[{ flex: 1, backgroundColor: colors.bg }, webKeyboard ? { paddingBottom: webKeyboard } : null]}
+      behavior={Platform.OS === 'web' ? undefined : 'padding'}>
       <FadeUp disabled={!enter} style={{ flex: 1 }}>
         <View style={{ paddingTop: noTopInset ? 0 : insets.top }} />
         {header ? <View style={inner}>{header}</View> : null}
@@ -116,6 +138,81 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
       </FadeUp>
     </KeyboardAvoidingView>
   );
+}
+
+let screenSeq = 0;
+
+/** The browser's VisualViewport, where there is one (web only). */
+function visualViewport(): VisualViewport | null {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  return window.visualViewport ?? null;
+}
+
+/** The nearest element above `el` that scrolls vertically. */
+function scrollerOf(el: Element | null): HTMLElement | null {
+  for (let e = el?.parentElement ?? null; e && e !== document.body; e = e.parentElement) {
+    const oy = getComputedStyle(e).overflowY;
+    if ((oy === 'auto' || oy === 'scroll') && e.scrollHeight > e.clientHeight + 1) return e;
+  }
+  return null;
+}
+
+/**
+ * Phone browsers (web only): the px the on-screen keyboard covers at the bottom of the page
+ * while this screen is in front, 0 otherwise. The page's layout does not shrink for the keyboard
+ * on iOS (Safari and a Home Screen web app) nor by default in Android Chrome; only the visual
+ * viewport does. So the screen pads its bottom by that much (the pinned footer rises above the
+ * keyboard and the scroll area ends where the keyboard starts), puts back the page scroll the
+ * browser leaves behind when it pans to the field, and scrolls the focused field into the space
+ * that is left. When the keyboard closes the padding goes. The arithmetic is in ./keyboardInset.
+ * Proven in a browser with a faked visualViewport (scripts/dev/e2e.cjs); not yet on an iPhone.
+ */
+function useWebKeyboard(domId: string, active: boolean): number {
+  const [cover, setCover] = useState(0);
+  useEffect(() => {
+    const vv = visualViewport();
+    if (!vv || !active) return;
+    const measure = () => {
+      const next = keyboardCover({ layoutHeight: window.innerHeight, viewportHeight: vv.height, scale: vv.scale });
+      setCover(next);
+      // The browser panned the page to the field; the padding now makes room, so pan it back.
+      if (next > 0 && (window.scrollY > 0 || vv.offsetTop > 0)) window.scrollTo(0, 0);
+    };
+    measure();
+    vv.addEventListener('resize', measure);
+    vv.addEventListener('scroll', measure);
+    return () => {
+      vv.removeEventListener('resize', measure);
+      vv.removeEventListener('scroll', measure);
+      setCover(0);
+    };
+  }, [active]);
+  // With the keyboard open, keep the focused field (in this screen) inside what is visible: after the
+  // padding has been laid out, and again whenever the focus moves to another field.
+  useEffect(() => {
+    if (!cover || typeof document === 'undefined') return;
+    const reveal = () => {
+      const el = document.activeElement;
+      const host = document.getElementById(domId);
+      if (!el || !host || !host.contains(el) || !(el instanceof HTMLElement)) return;
+      if (!/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && !el.isContentEditable) return;
+      if (window.scrollY > 0) window.scrollTo(0, 0);
+      const scroller = scrollerOf(el);
+      if (!scroller) return;
+      const r = el.getBoundingClientRect();
+      const v = scroller.getBoundingClientRect();
+      const delta = revealDelta({ top: r.top, bottom: r.bottom }, { top: v.top, bottom: Math.min(v.bottom, window.innerHeight - cover) });
+      if (delta) scroller.scrollTop += delta;
+    };
+    const frame = requestAnimationFrame(reveal);
+    const onFocus = () => requestAnimationFrame(reveal);
+    document.addEventListener('focusin', onFocus);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener('focusin', onFocus);
+    };
+  }, [cover, domId]);
+  return cover;
 }
 
 export function goBack(fallback: string = '/') {

@@ -1,30 +1,35 @@
 /**
- * A sideways swipe on Today or the diary moves one day: finger left shows the
- * next day (never past `latest`), finger right the day before (never before
- * `earliest`). The rules are pure, in ./daySwipe.
+ * The diary's day swipe: a quick sideways flick on the page moves one day, finger
+ * right to the day before, finger left to the next day but never past today
+ * (planning ahead is a tap in the strip). The rules are pure, in ./daySwipe.
+ * Today has no page swipe: its day changes only from the week strip.
  *
- * So that it never fights anything else on the page:
- * - it needs SWIPE_MIN (56) px of sideways travel, at least twice the vertical travel;
+ * A day never changes without the person meaning it, and never silently:
+ * - it needs a flick: SWIPE_MIN (96) px of sideways travel, at least three times the
+ *   vertical, with the finger down at most SWIPE_MAX_MS (500 ms). A slow sideways drag
+ *   while scrolling or reaching for a row does nothing;
+ * - every move shows a toast naming the day it landed on, with "Today" to go back
+ *   (the toast is also what a screen reader hears);
  * - a touch that starts within EDGE (24) px of the screen's left or right edge is the
  *   system's back gesture, not ours;
  * - a touch that starts inside a sideways scroller (the week strip, a chip row), on a
  *   chart (on web, an SVG 120 px wide or more), or inside a `DaySwipeGuard` is left alone;
  * - vertical scrolling is untouched: on web the hook only listens (touch events, no
  *   responder, no preventDefault); natively it takes the touch only once it is clearly
- *   sideways (10 px, twice the vertical), which also keeps the page's ScrollView from
- *   taking it over half way on Android.
+ *   sideways (10 px, three times the vertical), which also keeps the page's ScrollView
+ *   from taking it over half way on Android;
  * - while a sheet is open nothing moves: the sheet covers the page, but its touches still
  *   bubble through the React tree to this View's handlers.
- * One finger only. A move gives a select haptic and is announced to a screen reader.
+ * One finger only. A move gives a select haptic.
  */
 import React from 'react';
-import { AccessibilityInfo, Dimensions, Platform, View, type GestureResponderEvent, type ViewProps } from 'react-native';
+import { Dimensions, Platform, View, type GestureResponderEvent, type ViewProps } from 'react-native';
 
-import { formatDayLabel } from '@/lib/dates';
+import { today } from '@/lib/dates';
 import type { ISODate } from '@/types';
-import { haptic, sheetOnScreen } from '@/ui';
+import { haptic, sheetOnScreen, toast } from '@/ui';
 
-import { atScreenEdge, stepDay, swipeStep } from './daySwipe';
+import { atScreenEdge, stepDay, swipeDayLabel, swipeStep, SWIPE_RATIO } from './daySwipe';
 
 /** Natively, the sideways travel at which the page takes the touch from the scroll view. */
 const CLAIM = 10;
@@ -64,30 +69,13 @@ function inSidewaysThing(target: unknown): boolean {
   return false;
 }
 
-/** Web: one polite live region for the whole app, so the new day is read out. */
-function announce(text: string) {
-  if (Platform.OS !== 'web') {
-    AccessibilityInfo.announceForAccessibility(text);
-    return;
-  }
-  if (typeof document === 'undefined') return;
-  let el = document.getElementById('day-swipe-live');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'day-swipe-live';
-    el.setAttribute('role', 'status');
-    el.setAttribute('aria-live', 'polite');
-    el.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;';
-    document.body.appendChild(el);
-  }
-  el.textContent = text;
-}
-
 interface Track {
   x0: number;
   y0: number;
   x: number;
   y: number;
+  /** When the finger went down (Date.now()). */
+  t0: number;
   /** Left alone: an edge, a guard, a sideways scroller, a second finger. */
   skip: boolean;
   done: boolean;
@@ -107,8 +95,9 @@ function fingers(e: GestureResponderEvent): number {
 }
 
 /**
- * Props for the View that holds a screen's content: a sideways swipe on it
- * moves one day. `date` is the day shown, `onChange` shows another.
+ * Props for the View that holds the diary's content: a quick sideways flick on it
+ * moves one day. `date` is the day shown, `onChange` shows another; `latest` and
+ * `earliest` are the furthest a swipe may go.
  */
 export function useDaySwipe({
   date,
@@ -128,13 +117,15 @@ export function useDaySwipe({
     if (!t || t.skip || t.done) return;
     t.done = true;
     const p = point(e) ?? { x: t.x, y: t.y };
-    const step = swipeStep(p.x - t.x0, p.y - t.y0);
+    const step = swipeStep(p.x - t.x0, p.y - t.y0, Date.now() - t.t0);
     if (!step) return;
     const next = stepDay(date, step, { latest, earliest });
     if (!next) return;
     haptic.select();
     onChange(next);
-    announce(formatDayLabel(next));
+    // Never silent: the day it landed on, and the way back.
+    const now = today();
+    toast(swipeDayLabel(next, now), next === now ? undefined : { label: 'Today', onPress: () => onChange(today()) });
   };
   const props: ViewProps = {
     onTouchStart: (e) => {
@@ -144,7 +135,7 @@ export function useDaySwipe({
       if (!p) return;
       // A sheet's touches bubble here through the React tree although the sheet covers the page.
       const skip = wasGuarded || sheetOnScreen() || fingers(e) > 1 || atScreenEdge(p.x, Dimensions.get('window').width) || inSidewaysThing((e as unknown as { target?: unknown }).target);
-      state.current = { x0: p.x, y0: p.y, x: p.x, y: p.y, skip, done: false };
+      state.current = { x0: p.x, y0: p.y, x: p.x, y: p.y, t0: Date.now(), skip, done: false };
     },
     onTouchMove: (e) => {
       const t = state.current;
@@ -170,7 +161,7 @@ export function useDaySwipe({
         const p = point(e);
         if (!t || t.skip || !p) return false;
         const dx = Math.abs(p.x - t.x0);
-        return dx > CLAIM && dx > 2 * Math.abs(p.y - t.y0);
+        return dx > CLAIM && dx > SWIPE_RATIO * Math.abs(p.y - t.y0);
       },
       // Returning true keeps the page's ScrollView from taking the touch over (Android).
       onResponderGrant: () => true,

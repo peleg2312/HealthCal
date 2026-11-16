@@ -1,4 +1,4 @@
-import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
+import { router, useIsFocused, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Copy, Search } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { type ScrollView, type ScrollViewProps, View } from 'react-native';
@@ -9,6 +9,7 @@ import { dayPhrase, href, kcal, param, parseDate } from '@/features/food/helpers
 import { TabHeader, tabDay } from '@/components/TabHeader';
 import { ShareDayButton } from '@/features/share';
 import { DayRingStrip } from '@/features/today/DayRingStrip';
+import { useBackToToday } from '@/features/today/useBackToToday';
 import { useDaySwipe } from '@/features/today/useDaySwipe';
 import { useReportViewedDay } from '@/features/today/viewedDay';
 import { addDays, today } from '@/lib/dates';
@@ -31,8 +32,13 @@ export default function DiaryScreen() {
   useReportViewedDay(date === t ? null : date);
   const setDate = (d: ISODate) => router.setParams({ date: d === today() ? undefined : d });
   const latest = addDays(t, PLAN_AHEAD_DAYS);
-  // A sideways swipe on the page moves one day (the strip itself pages weeks).
-  const swipe = useDaySwipe({ date, onChange: setDate, latest });
+  // A quick sideways flick on the page moves one day, never past today (planning ahead is a tap
+  // in the strip), and says so with a toast; the strip itself pages weeks.
+  const swipe = useDaySwipe({ date, onChange: setDate, latest: t });
+  // Back in front after five minutes or more away, or on another day: today again. This route's own
+  // params, so it also works while another tab is in front.
+  const navigation = useNavigation();
+  useBackToToday(() => navigation.setParams({ date: undefined, meal: undefined } as never));
 
   // Arriving with ?meal= (a meal row on Today) scrolls that meal into view once, then drops the param.
   const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);

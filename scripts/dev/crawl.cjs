@@ -25,8 +25,9 @@
  * control, so only the browser's back is checked for them.
  *
  * Before the taps it checks what a tap cannot show, with real touch events (gestureChecks, whose
- * comment lists them): the day swipe on Today and the diary with its limits and the things it must
- * leave alone, the week strip paging weeks, and every kind of sheet following the finger, settling,
+ * comment lists them): that the day never changes by accident on Today and the diary (Today has no
+ * page swipe; the diary's is a quick flick, never into the future, said in a toast), coming back to
+ * today after time away, the week strip paging weeks, and every kind of sheet following the finger, settling,
  * closing and still scrolling, with motion on and off, and with a mouse and Escape on a desktop-size
  * window. --gestures-only runs just those; --no-gestures skips them.
  *
@@ -428,10 +429,15 @@ async function backControl(frame) {
 
 /**
  * What a tap cannot show, checked with real touch events (Chrome's protocol) at the crawl's size:
- * - the day swipe on Today and the diary: finger right shows the day before, finger left the next
- *   day, Today never past today and the diary at most a week ahead; a swipe from the screen's
- *   edge, a mostly vertical drag, a swipe on the week strip or inside an open sheet leaves the day
- *   alone; a vertical swipe still scrolls the page; a sideways swipe across a row does not open it;
+ * - the day never changes by accident: a slow sideways drag (70 px, or across the page) changes
+ *   nothing on Today or the diary; Today has no page swipe at all (a flick does nothing, a tap in
+ *   the strip and "Back to today" do); on the diary a fast flick (120 px in about 60 ms) right shows
+ *   the day before and says so in a toast naming the day whose "Today" goes back, a flick toward
+ *   the future, from the screen's edge or on a slant does nothing, a flick left comes back to today;
+ *   a vertical swipe still scrolls the page; a flick across a row moves the day and does not open
+ *   the row; a sideways swipe on the week strip or inside an open sheet leaves the day alone;
+ * - coming back: a day picked a minute before the page was hidden stays; after six minutes away
+ *   (the page hidden, the clock moved on) Today and the diary show today again;
  * - the week strip: a swipe pages weeks (right the week before, left back; the diary on to next
  *   week, Today no further), the selected day is the one tab with aria-selected, no week arrows
  *   on touch and "Back to today" only away from today;
@@ -472,6 +478,30 @@ async function gestureChecks(browser, seeds) {
   const guard = async (name, fn) => { try { await fn(); } catch (e) { check(name, false, String(e.message).split('\n')[0].slice(0, 120)); } };
 
   // ---- the day swipe and the week strip (reduced motion, as the taps)
+  // A flick is 120 px in about 60 ms; a slow drag holds the finger down for about a second.
+  const flick = (r, x1, x2, y) => r.swipe(x1, y, x2, y + 4, 4, 8);
+  const drag = (r, x1, x2, y) => r.swipe(x1, y, x2, y + 4, 10, 90);
+  const toastText = (f) => f.evaluate(() => { const t = [...document.querySelectorAll('[data-testid="toast"]')].find((e) => e.getBoundingClientRect().height > 0); return t ? t.innerText.replace(/ /g, ' ').replace(/⁠/g, '').trim() : ''; });
+  // Tap yesterday in the strip (on a Monday it is in the week before: page the strip back first).
+  const tapYesterday = async (r, pre) => {
+    const id = await r.frame.evaluate((p) => { const d = new Date(); d.setDate(d.getDate() - 1); return `${p}-day-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }, pre);
+    const shown = () => r.frame.evaluate((id) => { const e = [...document.querySelectorAll(`[data-testid="${id}"]`)].find((x) => { const b = x.getBoundingClientRect(); return b.width > 0 && b.left >= -1 && b.right <= innerWidth + 1; }); return !!e; }, id);
+    if (!(await shown())) {
+      const strip = await r.frame.locator(sel(`${pre}-week`)).first().boundingBox();
+      await r.swipe(60, strip.y + 40, W - 60, strip.y + 40);
+    }
+    const l = r.frame.locator(sel(id));
+    for (let i = 0; i < (await l.count()); i++) if (await l.nth(i).isVisible()) { await l.nth(i).tap(); break; }
+    await r.page.waitForTimeout(600);
+  };
+  // The app goes to the background (the page hidden) for `ms` and comes back.
+  const awayFor = (f, ms) => f.evaluate((ms) => {
+    const set = (v) => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => v }); Object.defineProperty(document, 'hidden', { configurable: true, get: () => v === 'hidden' }); document.dispatchEvent(new Event('visibilitychange')); };
+    set('hidden');
+    const now = Date.now.bind(Date);
+    Date.now = () => now() + ms;
+    set('visible');
+  }, ms);
   let ctx = await phone(false);
   for (const [route, pre, jump, ahead] of [['/', 'today', 'today-jump-today', 0], ['/diary', 'diary', 'diary-today', 7]]) {
     const name = pre === 'today' ? 'Today' : 'diary';
@@ -483,35 +513,58 @@ async function gestureChecks(browser, seeds) {
       const selected = await f.evaluate((p) => [...document.querySelectorAll(`[data-testid^="${p}-day-"]`)].filter((e) => e.getAttribute('aria-selected') === 'true').length, pre);
       check(`${name}: the selected day is the one tab with aria-selected`, selected === 1, `${selected}`);
       const d0 = await overline(f);
-      const seen = [d0];
-      for (let i = 0; i <= ahead + 1; i++) { await r.swipe(W - 60, midY, 60, midY + 6); seen.push(await overline(f)); }
-      check(`${name}: finger left goes ${ahead ? `at most ${ahead} days ahead` : 'no further than today'}`, new Set(seen).size - 1 === ahead, `${seen[0]} -> ${seen[seen.length - 1]}`);
-      await r.page.close();
-      const r2 = await open(ctx, route);
-      await r2.swipe(60, midY, W - 60, midY + 6);
-      const d1 = await overline(r2.frame);
-      check(`${name}: finger right shows the day before`, d1 !== d0, `${d0} -> ${d1}`);
-      check(`${name}: away from today, "Back to today" shows`, (await r2.frame.locator(sel(jump)).count()) > 0);
-      await r2.swipe(8, midY, W - 40, midY);
-      check(`${name}: a swipe from the screen edge is left to the system`, (await overline(r2.frame)) === d1);
-      await r2.swipe(60, midY - 100, W - 60, midY + 60);
-      check(`${name}: a mostly vertical drag does not change the day`, (await overline(r2.frame)) === d1);
-      await r2.swipe(W - 60, midY, 60, midY);
-      check(`${name}: finger left comes back to today`, (await overline(r2.frame)) === d0, await overline(r2.frame));
-      check(`${name}: on today, "Back to today" is gone`, (await r2.frame.locator(sel(jump)).count()) === 0);
-      const y0 = await scrolled(r2.frame);
-      await r2.swipe(W / 2, midY, W / 2, midY - 350, 10, 20);
-      check(`${name}: a vertical swipe still scrolls the page`, (await scrolled(r2.frame)) > y0 + 100, `${y0} -> ${await scrolled(r2.frame)}`);
-      await r2.page.close();
-      // A sideways swipe across a full-width row moves the day and does not open the row.
-      const r3 = await open(ctx, route);
-      const row = await r3.frame.evaluate((h) => { const el = [...document.querySelectorAll('[role="button"]')].find((e) => { const b = e.getBoundingClientRect(); return b.width > innerWidth * 0.7 && b.top > 260 && b.bottom < h - 120; }); if (!el) return null; const b = el.getBoundingClientRect(); return { y: Math.round(b.top + b.height / 2), id: el.getAttribute('data-testid') || el.innerText.slice(0, 20) }; }, H);
-      if (row) {
-        const path0 = await r3.frame.evaluate(() => location.pathname);
-        await r3.swipe(60, row.y, W - 60, row.y + 4);
-        check(`${name}: a sideways swipe across a row (${row.id}) moves the day and does not open the row`, (await overline(r3.frame)) !== d0 && (await r3.frame.evaluate(() => location.pathname)) === path0 && !(await sheetOpen(r3.frame)));
+      // The owner's fault: a slow sideways drag while scrolling or reaching for a row moved the day.
+      await drag(r, W / 2 - 35, W / 2 + 35, midY);
+      check(`${name}: a slow 70 px sideways drag does not change the day`, (await overline(f)) === d0, `${d0} -> ${await overline(f)}`);
+      await drag(r, 60, W - 60, midY);
+      check(`${name}: a slow drag across the page does not change the day either`, (await overline(f)) === d0, `${d0} -> ${await overline(f)}`);
+      await flick(r, W - 60, W - 180, midY);
+      check(`${name}: a flick toward the future changes nothing`, (await overline(f)) === d0 && !(await toastText(f)), `${d0} -> ${await overline(f)}`);
+      if (pre === 'today') {
+        await flick(r, 100, 220, midY);
+        check('Today: a fast flick does not change the day (Today changes day only from the strip)', (await overline(f)) === d0, `${d0} -> ${await overline(f)}`);
+        // The strip is the way: a tap on the day before, then "Back to today".
+        await tapYesterday(r, pre);
+        const d1 = await overline(f);
+        check('Today: a tap on a day in the strip shows that day, with "Back to today"', d1 !== d0 && (await f.locator(sel(jump)).count()) > 0, `${d0} -> ${d1}`);
+        await f.locator(sel(jump)).first().tap();
+        await r.page.waitForTimeout(600);
+        check('Today: "Back to today" shows today again', (await overline(f)) === d0 && (await f.locator(sel(jump)).count()) === 0);
+      } else {
+        await flick(r, 100, 220, midY);
+        const d1 = await overline(f);
+        const said = await toastText(f);
+        check('diary: a fast 120 px flick right shows the day before', d1 !== d0, `${d0} -> ${d1}`);
+        check('diary: the move is said in a toast naming the day, with "Today"', /^(Yesterday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), [A-Z][a-z]{2} \d{1,2}/.test(said) && /Today$/.test(said), said.replace(/\n/g, ' | '));
+        check('diary: away from today, "Back to today" shows', (await f.locator(sel(jump)).count()) > 0);
+        await f.locator(sel('toast-action')).first().tap();
+        await r.page.waitForTimeout(600);
+        check('diary: the toast\'s "Today" goes back to today', (await overline(f)) === d0, await overline(f));
+        await flick(r, 100, 220, midY);
+        await flick(r, 8, 128, midY);
+        check('diary: a flick from the screen edge is left to the system', (await overline(f)) !== d0 && (await f.evaluate(() => location.search)).length > 0);
+        const d2 = await overline(f);
+        await r.swipe(100, midY - 60, 220, midY + 20, 4, 8);
+        check('diary: a quick slanted move (120 across, 80 down) does not change the day', (await overline(f)) === d2);
+        await flick(r, W - 100, W - 220, midY);
+        check('diary: a flick left comes back to today', (await overline(f)) === d0, await overline(f));
+        check('diary: on today, "Back to today" is gone', (await f.locator(sel(jump)).count()) === 0);
       }
-      await r3.page.close();
+      const y0 = await scrolled(f);
+      await r.swipe(W / 2, midY, W / 2, midY - 350, 10, 20);
+      check(`${name}: a vertical swipe still scrolls the page`, (await scrolled(f)) > y0 + 100, `${y0} -> ${await scrolled(f)}`);
+      await r.page.close();
+      if (pre === 'diary') {
+        // A flick across a full-width row moves the day and does not open the row.
+        const r3 = await open(ctx, route);
+        const row = await r3.frame.evaluate((h) => { const el = [...document.querySelectorAll('[role="button"]')].find((e) => { const b = e.getBoundingClientRect(); return b.width > innerWidth * 0.7 && b.top > 260 && b.bottom < h - 120; }); if (!el) return null; const b = el.getBoundingClientRect(); return { y: Math.round(b.top + b.height / 2), id: el.getAttribute('data-testid') || el.innerText.slice(0, 20) }; }, H);
+        if (row) {
+          const path0 = await r3.frame.evaluate(() => location.pathname);
+          await flick(r3, 100, 220, row.y);
+          check(`diary: a flick across a row (${row.id}) moves the day and does not open the row`, (await overline(r3.frame)) !== d0 && (await r3.frame.evaluate(() => location.pathname)) === path0 && !(await sheetOpen(r3.frame)));
+        }
+        await r3.page.close();
+      }
       // The week strip pages weeks.
       const r4 = await open(ctx, route);
       const strip = await r4.frame.locator(sel(`${pre}-week`)).first().boundingBox();
@@ -526,6 +579,17 @@ async function gestureChecks(browser, seeds) {
       const w3 = await firstDayShown(r4.frame, pre);
       check(`${name}: a swipe left on this week ${ahead ? 'shows next week' : 'stays (nothing after today)'}`, ahead ? w3 > w0 : w3 === w0, w3);
       await r4.page.close();
+      // Coming back: a day picked a minute ago stays; after five minutes or more away, today again.
+      const r5 = await open(ctx, route);
+      await tapYesterday(r5, pre);
+      const dp = await overline(r5.frame);
+      await awayFor(r5.frame, 60_000);
+      await r5.page.waitForTimeout(600);
+      check(`${name}: back after a minute away, the picked day stays`, (await overline(r5.frame)) === dp && dp !== d0, `${dp} -> ${await overline(r5.frame)}`);
+      await awayFor(r5.frame, 6 * 60_000);
+      await r5.page.waitForTimeout(800);
+      check(`${name}: back after six minutes away, it shows today again`, (await overline(r5.frame)) === d0 && (await r5.frame.locator(sel(jump)).count()) === 0, `${dp} -> ${await overline(r5.frame)}`);
+      await r5.page.close();
     });
   }
   // A sideways swipe inside a sheet opened from Today or the diary leaves the day behind it alone.
