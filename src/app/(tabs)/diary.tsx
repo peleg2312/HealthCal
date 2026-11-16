@@ -22,6 +22,9 @@ import { Button, Card, Screen, Text } from '@/ui';
 
 /** How far ahead the diary goes: a week, to plan meals (the strip then shows next week as well). */
 const PLAN_AHEAD_DAYS = 7;
+/** How often and how many times the diary looks for the meal it was asked to show before giving up (two seconds). */
+const MEAL_LOOK_MS = 100;
+const MEAL_LOOKS = 20;
 
 export default function DiaryScreen() {
   const { colors, spacing } = useTheme();
@@ -48,12 +51,22 @@ export default function DiaryScreen() {
   const focused = useIsFocused();
   useEffect(() => {
     if (!targetMeal || !focused) return;
-    // Wait a frame or two so the cards have their layout for this day.
-    const timer = setTimeout(() => {
+    // The cards need their layout for this day first. On a phone the diary's first mount can take
+    // well over a frame or two, so this waits until the meal has been measured (up to two seconds)
+    // instead of giving up after one look: giving up left the person at the top of the diary with
+    // the meal they tapped below the screen.
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const look = () => {
       const y = mealY.current[targetMeal];
+      if (y === undefined && ++tries < MEAL_LOOKS) {
+        timer = setTimeout(look, MEAL_LOOK_MS);
+        return;
+      }
       if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing.sm), animated: true });
       router.setParams({ meal: undefined });
-    }, 120);
+    };
+    timer = setTimeout(look, MEAL_LOOK_MS);
     return () => clearTimeout(timer);
   }, [targetMeal, date, spacing.sm, focused]);
 
