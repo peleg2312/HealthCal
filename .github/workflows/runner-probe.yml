@@ -1,0 +1,38 @@
+# Which of GitHub's Mac images gives this repository a machine, and which Xcode and simulators it has.
+# Started by hand only; each job takes about a minute. It exists because the first Phone test run's
+# iPhone job waited 15 minutes for a macos-26 machine and was cancelled without starting.
+name: Runner probe
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [macos-26, macos-15, macos-latest]
+    name: ${{ matrix.image }}
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 10
+    steps:
+      - name: What this machine is
+        shell: bash
+        run: |
+          sw_vers
+          uname -m
+          sysctl -n hw.ncpu hw.memsize
+          echo "--- Xcode installed"
+          ls -d /Applications/Xcode*.app
+          echo "--- Xcode selected"
+          xcodebuild -version
+          echo "--- simulator runtimes"
+          xcrun simctl list runtimes
+          echo "--- iPhone simulators"
+          xcrun simctl list devices available | grep -i iphone | head -20
+          echo "--- tools"
+          for t in pod node python3 java codesign; do printf '%s: ' "$t"; command -v "$t" || echo missing; done
+          pod --version || true

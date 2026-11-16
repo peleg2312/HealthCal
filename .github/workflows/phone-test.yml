@@ -678,8 +678,13 @@ jobs:
           (yes | "$SDKM" --licenses > /dev/null 2>&1) || true
           "$SDKM" --install emulator platform-tools "$SYSTEM_IMAGE" > "$RUNNER_TEMP/sdkmanager.log" 2>&1 \
             || { tail -30 "$RUNNER_TEMP/sdkmanager.log"; exit 1; }
+          # avdmanager and the emulator must agree on where AVDs live: on the runner avdmanager's
+          # default is under ~/.config, which the first run of this workflow did not look in.
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
           echo no | "$AVDM" create avd --force -n phone -k "$SYSTEM_IMAGE" -d pixel_6 || exit 1
-          CFG="${ANDROID_AVD_HOME:-$HOME/.android/avd}/phone.avd/config.ini"
+          CFG="$ANDROID_AVD_HOME/phone.avd/config.ini"
           [ -f "$CFG" ] || { echo "::error::no AVD config at $CFG"; "$AVDM" list avd; exit 1; }
           set_cfg() { if grep -q "^$1=" "$CFG"; then sed -i "s|^$1=.*|$1=$2|" "$CFG"; else echo "$1=$2" >> "$CFG"; fi; }
           set_cfg hw.ramSize 4096
