@@ -6,6 +6,7 @@
  *
  *   ANTHROPIC_API_KEY=... node --experimental-transform-types scripts/ops/eval-food-ai.mjs
  *        [--configs=current,json,medium,no-thinking,precise] [--trials=2] [--photos=<dir>] [--kind=all|text|photo] [--out=<file.json>]
+ *        [--only=<case id>,...] [--show-misfits]
  *
  *   current      what the app sends by default: the small model, effort low
  *   json         the same, answered as schema-checked JSON instead of the plain lines (the fallback form)
@@ -24,7 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { AnalyzeError, analyzeFood } from '../../supabase/functions/analyze-food/analyze.ts';
+import { AnalyzeError, analyzeFood, parseAnswer } from '../../supabase/functions/analyze-food/analyze.ts';
 
 /** US dollars per million tokens (input, output), from the pricing page on 2026-11-16. */
 const RATES = { 'claude-haiku-5-5': [0.1, 0.5], 'claude-sonnet-5-5': [2, 10] };
@@ -36,8 +37,10 @@ const trials = Number(flag('trials', '2'));
 const photosDir = flag('photos', '');
 const out = flag('out', '');
 const kind = flag('kind', 'all');
+const showMisfits = process.argv.includes('--show-misfits');
+const only = flag('only', '');
 
-const textCases = kind === 'photo' ? [] : JSON.parse(fs.readFileSync(path.join(here, 'food-ai-cases.json'), 'utf8')).cases;
+const textCases = (kind === 'photo' ? [] : JSON.parse(fs.readFileSync(path.join(here, 'food-ai-cases.json'), 'utf8')).cases).filter((c) => !only || only.split(',').includes(c.id));
 const photoCases = photosDir && kind !== 'text' ? JSON.parse(fs.readFileSync(path.join(photosDir, 'cases.json'), 'utf8')).cases : [];
 
 const real = new Anthropic();
@@ -49,9 +52,18 @@ function clientFor(config) {
       : config === 'no-thinking'
         ? { ...params, thinking: { type: 'disabled' } }
         : params;
+  // --show-misfits prints every first answer that did not keep the plain-lines form (and so cost a second request).
+  const watch = async (params, sending) => {
+    const response = await sending;
+    if (showMisfits && !params.output_config?.format) {
+      const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+      if (!parseAnswer(text)) console.log(`--- an answer that did not keep the form (${config}):\n${text}\n---`);
+    }
+    return response;
+  };
   return {
-    messages: { create: (params, options) => real.messages.create(change(params), options) },
-    beta: { messages: { create: (params, options) => real.beta.messages.create(change(params), options) } },
+    messages: { create: (params, options) => watch(params, real.messages.create(change(params), options)) },
+    beta: { messages: { create: (params, options) => watch(params, real.beta.messages.create(change(params), options)) } },
   };
 }
 

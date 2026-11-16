@@ -68,28 +68,31 @@ Without these steps the app keeps everything on the device, and the AI screen ru
 The design keeps token use low without giving up accuracy:
 
 - The app resizes each photo to 768 px on its long edge before upload. Vision input is billed by pixel area, so this is 300 to 800 input tokens instead of several thousand for a camera original.
-- The smallest current Claude model answers by default, in a few plain lines the server parses and checks. A stronger model runs only when the user taps "Check again more carefully".
+- The smallest current Claude model answers by default, in the most compact form that measured accurate (below). A stronger model runs only when the user taps "Check again more carefully".
 - The server validates every number (macros cannot outweigh the food, calories must agree with macros) before the app sees it.
 
-Measured on 16 November 2026 with `scripts/ops/eval-food-ai.mjs` (the function's own code against the API: 20 typed meals and 5 photos, three rounds), at the published per-token prices. These are averages: most answers use fewer tokens and about one in six, where the model stops to think, several times more.
+Measured on 16 November 2026 with `scripts/ops/eval-food-ai.mjs` (the function's own code against the API: 20 typed meals and 5 photos, several rounds), at the published per-token prices. These are averages: most answers use fewer tokens and about one in six, where the model stops to think, several times more.
 
 | Analysis | Model | Tokens in / out | Each | Per 1,000 |
 | --- | --- | --- | --- | --- |
-| Typed meal | `claude-haiku-5-5`, effort low | about 490 / 235 | $0.00017 | $0.17 |
-| Photo, 768 px | the same | about 985 / 350 | $0.00027 | $0.27 |
-| Careful pass, typed | `claude-sonnet-5-5`, effort medium | about 490 / 115 | $0.002 | $2.13 |
-| Careful pass, photo at 1024 px | the same | about 1,240 / 215 | $0.005 | $4.63 |
+| Typed meal | `claude-haiku-5-5`, effort low | about 500 / 270 | $0.00018 | $0.18 |
+| Photo, 768 px | the same | about 1,480 / 240 | $0.00027 | $0.27 |
+| Careful pass, typed | `claude-sonnet-5-5`, effort medium | about 540 / 130 | $0.002 | $2.39 |
+| Careful pass, photo at 1024 px | the same | about 1,730 / 280 | $0.006 | $6.28 |
 
-The answer comes back as a few plain lines (`I name | grams | kcal | ...`) instead of JSON: no schema has to be sent with each request, which halves the input. If an answer does not keep that form it is asked for once more as schema-checked JSON; in 175 measured requests that never happened.
+Two answer forms are in use, each where it measured better:
 
-On that small set the default put 59 of 60 typed rounds and 14 of 15 photo rounds inside the calorie range a careful person would accept (typically within 4% of its middle for typed meals and 6% for photos). What it gets wrong is what a photo cannot show: the size of a whole dish with nothing beside it for scale, and look-alikes (lentils read as minced meat). The careful pass does better on both (20 of 20 and 5 of 5) for about fifteen times the price, which is why it is a button and not the default.
+- A typed meal is answered in a few plain lines (`I name | grams | kcal | ...`), so no schema is sent: $0.18 per 1,000 against $0.22 as JSON, with every round in range either way. The lines are read strictly: a bulleted line, a missing cell or a number with a unit means the whole answer is asked for once more as schema-checked JSON (about one answer in twenty-five), capped at 900 tokens and counted in the figures above. Nothing is guessed from a line that is nearly right.
+- A photo is answered as schema-checked JSON with one-letter field names ($0.27 per 1,000; $0.30 with full names). The plain lines cost the same on photos once their second tries were counted, and judged a whole pizza a quarter smaller.
+
+On that small set the default put 60 of 60 typed rounds and 30 of 30 photo rounds inside the calorie range a careful person would accept (typically within 3% of its middle for typed meals and 6% for photos). What it gets wrong is what a photo cannot show: the size of a whole dish with nothing beside it for scale, and look-alikes (lentils read as minced meat). The careful pass is better at look-alikes, for ten to twenty times the price, which is why it is a button and not the default.
 
 Two switches, as function secrets, change the trade without a deploy:
 
-- `FOOD_THINKING=off` is the cheapest setting: $0.11 per 1,000 typed meals and $0.21 per 1,000 photos. It is also measurably less accurate (54 of 60 typed rounds and 13 of 15 photo rounds in range: eggs counted twice, a cooked weight priced as dry), so it is not the default.
-- `FOOD_FORMAT=json` goes back to schema-checked JSON for every request: the same accuracy for about a fifth more ($0.20 and $0.33 per 1,000).
+- `FOOD_THINKING=off` is the cheapest setting for typed meals: $0.11 per 1,000. It is also measurably less accurate (54 of 60 typed rounds in range: eggs counted twice, a cooked weight priced as dry), so it is not the default.
+- `FOOD_FORMAT=json` or `FOOD_FORMAT=lines` forces one answer form for everything.
 
-Tried and not adopted, because they cost more or saved nothing a person would notice: effort medium on the small model (35 to 70% more per analysis, no measurable gain), prompt caching (the fixed part of the request is small and requests are minutes or hours apart, so it would mostly pay for cache writes) and smaller photos (three cents per 1,000 analyses, at a risk to portion judgement). Run the script again after changing the prompt, the model or the photo size: `ANTHROPIC_API_KEY=... node --experimental-transform-types scripts/ops/eval-food-ai.mjs` (40 requests, about one cent).
+Tried and not adopted, because they cost more or saved nothing a person would notice: effort medium on the small model (35 to 70% more per analysis, no measurable gain), prompt caching (the fixed part of the request is small and requests are minutes or hours apart, so it would mostly pay for cache writes) and smaller photos (three cents per 1,000 analyses, at a risk to portion judgement). Run the script again after changing the prompt, the model or the photo size: `ANTHROPIC_API_KEY=... node --experimental-transform-types scripts/ops/eval-food-ai.mjs` (40 requests, about one cent; `--show-misfits` prints any answer that did not keep the plain-lines form).
 
 The function enforces a daily limit per person (kept against a hash of the email, so deleting and recreating an account does not reset it) and a ceiling across all users, records usage in `ai_usage`, and gives the allowance back when a request fails without being billed.
 

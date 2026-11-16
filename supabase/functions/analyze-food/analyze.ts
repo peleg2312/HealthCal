@@ -8,11 +8,12 @@
  *     800 input tokens instead of several thousand for a camera original.
  *  2. The smallest current model answers by default; a stronger one runs only
  *     when the user asks for a second, more careful pass.
- *  3. The answer is a few plain lines (`I name | grams | kcal | ...`), not JSON: a
- *     third of the output tokens, and no schema to send with every request, which
- *     together are more than half of what an analysis costs. An answer that does
- *     not keep the form is asked for once more as schema-checked JSON, so a reply
- *     always parses.
+ *  3. A typed description is answered in a few plain lines (`I name | grams | kcal
+ *     | ...`): no schema to send, about a tenth cheaper. The lines are read strictly,
+ *     and an answer that does not keep the form is asked for once more as
+ *     schema-checked JSON, so nothing is guessed. A photo is answered as
+ *     schema-checked JSON from the start, which measured more accurate there for
+ *     the same money.
  *  4. A short system prompt and `effort: "low"` keep reasoning tokens small.
  *
  * Measured, not assumed: scripts/ops/eval-food-ai.mjs runs this file against the
@@ -74,6 +75,8 @@ export class AnalyzeError extends Error {
 
   /** True when the provider was never reached or refused before producing output, so nothing was billed. */
   get unbilled(): boolean {
+    // A photo the provider cannot read (bad_request) keeps its unit although nothing was billed:
+    // the daily allowance is also what bounds junk sent on purpose.
     return !this.usage && (this.code === 'rate_limited' || this.code === 'upstream');
   }
 }
@@ -99,7 +102,7 @@ If there is no food or drink, write no I line and say so in N.`;
 
 /** The second try, when the lines did not parse: the same guidance, answered as schema-checked JSON. */
 const SYSTEM_JSON = `${GUIDE}
-confidence is 0 to 1 for how sure you are of that item's identity and portion together.
+Each item: n its name, g grams, k kcal, p protein g, c carbs g, f fat g, b fiber g, q confidence, 0 to 1 for how sure you are of that item's identity and portion together.
 hidden_fat_question: one short question about added fat or sauce the photo cannot show, when the answer would change the estimate by more than about 50 kcal; otherwise null.
 note: at most one short sentence about what limits accuracy (for example no scale reference), or null.
 If there is no food or drink, return an empty items array and say so in note.`;
@@ -116,16 +119,17 @@ const SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['name', 'grams', 'kcal', 'protein', 'carbs', 'fat', 'fiber', 'confidence'],
+        // One letter each: these names are written out again for every item of every answer.
+        required: ['n', 'g', 'k', 'p', 'c', 'f', 'b', 'q'],
         properties: {
-          name: { type: 'string' },
-          grams: { type: 'integer' },
-          kcal: { type: 'integer' },
-          protein: { type: 'number' },
-          carbs: { type: 'number' },
-          fat: { type: 'number' },
-          fiber: { type: 'number' },
-          confidence: { type: 'number' },
+          n: { type: 'string' },
+          g: { type: 'integer' },
+          k: { type: 'integer' },
+          p: { type: 'number' },
+          c: { type: 'number' },
+          f: { type: 'number' },
+          b: { type: 'number' },
+          q: { type: 'number' },
         },
       },
     },
@@ -134,6 +138,10 @@ const SCHEMA = {
   },
 } as const;
 
+/** How long one analysis may take on the server, inside the 45 s and 90 s the app waits (src/features/ai/api.ts). */
+export const TIME_BUDGET_MS = { fast: 40_000, precise: 85_000 };
+/** The second try's cap: a schema-checked answer with no reasoning is well under this. */
+export const RETRY_MAX_TOKENS = 900;
 const MAX_IMAGE_BASE64 = 1_400_000; // about 1 MB of image data
 const MAX_TEXT = 500;
 const MAX_ITEMS = 15;
@@ -212,54 +220,88 @@ interface RawAnswer {
   note: string | null;
 }
 
-/** A number as written in a column: "110", "110 g", "0,9", "1,200". NaN when there is none. */
-function column(cell: string | undefined): number {
-  if (cell === undefined) return NaN;
-  // A comma before exactly three digits groups thousands; any other comma is a decimal comma.
-  const plain = cell.replace(/(\d),(?=\d{3}(\D|$))/g, '$1').replace(',', '.');
-  const m = /\d+(\.\d+)?/.exec(plain);
-  return m ? Number(m[0]) : NaN;
+/** Marks a right-to-left script puts around text; they mean nothing to the form. */
+const BIDI_MARKS = /[‎‏‪-‮⁦-⁩]/g;
+const NUMBER_KEYS = ['grams', 'kcal', 'protein', 'carbs', 'fat', 'fiber', 'confidence'] as const;
+
+/**
+ * A number exactly as the form asks for it: digits, with at most one decimal mark and one or two
+ * digits after it ("110", "0.9", "2,5"). Anything else is NaN: a unit, a range, a sign, a space or
+ * a dot grouping thousands ("1 200", "1.200", "2,125") could each be read two ways, and a wrong
+ * guess becomes a 1 g pizza in someone's diary.
+ */
+function column(cell: string): number {
+  const m = /^(\d{1,5})(?:[.,](\d{1,2}))?$/.exec(cell);
+  return m ? Number(`${m[1]}.${m[2] ?? '0'}`) : NaN;
 }
 
 const blank = (text: string): string | null => (/^(-+|–|—|none|null|n\/a)\.?$/i.test(text) ? null : text);
 
 /**
- * Reads the plain-lines answer (see SYSTEM_LINES). Null when the text does not keep the form:
- * no line of it at all, an item without a name, a weight and calories, or neither an item
- * nor a note. The caller then asks again as JSON, so nothing is ever guessed from a broken line.
+ * Reads the plain-lines answer (see SYSTEM_LINES), strictly. Null unless every line keeps the
+ * form: only D, I, Q and N lines, one D, Q and N at most, and every item with its name and all
+ * seven plain numbers. A bulleted or numbered line, a missing or extra cell, a number written
+ * with a unit: any of these means the answer is asked for again as schema-checked JSON, so
+ * nothing is ever guessed from a line that is nearly right.
  */
 export function parseLines(text: string): RawAnswer | null {
   const answer: RawAnswer = { dish: null, items: [], hidden_fat_question: null, note: null };
-  let seen = false;
-  for (const line of text.split('\n')) {
-    const m = /^\s*([DIQN])[ \t:]+(.*\S)\s*$/.exec(line);
-    if (!m) continue;
-    seen = true;
-    const rest = m[2];
+  const seen = new Set<string>();
+  for (const raw of text.replace(BIDI_MARKS, '').split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    const m = /^([DIQN]):?[ \t]+(.+)$/.exec(line);
+    if (!m) return null;
+    const rest = m[2].trim();
+    if (m[1] === 'I') {
+      const cells = rest.split('|').map((c) => c.trim());
+      if (cells.length !== 8 || !cells[0]) return null;
+      const n = cells.slice(1).map(column);
+      if (n.some(Number.isNaN) || !(n[0] > 0) || n[6] > 1) return null;
+      answer.items.push({ name: cells[0], grams: n[0], kcal: n[1], protein: n[2], carbs: n[3], fat: n[4], fiber: n[5], confidence: n[6] });
+      continue;
+    }
+    if (seen.has(m[1])) return null;
+    seen.add(m[1]);
     if (m[1] === 'D') answer.dish = blank(rest);
     else if (m[1] === 'Q') answer.hidden_fat_question = blank(rest);
-    else if (m[1] === 'N') answer.note = blank(rest);
-    else {
-      const [name, ...cells] = rest.split('|').map((c) => c.trim());
-      const n = cells.map(column);
-      if (!name || !(n[0] > 0) || !(n[1] >= 0)) return null;
-      const or = (v: number | undefined, fallback: number) => (v === undefined || Number.isNaN(v) ? fallback : v);
-      answer.items.push({ name, grams: n[0], kcal: n[1], protein: or(n[2], 0), carbs: or(n[3], 0), fat: or(n[4], 0), fiber: or(n[5], 0), confidence: or(n[6], 0.5) });
-    }
+    else answer.note = blank(rest);
   }
-  if (!seen || (answer.items.length === 0 && !answer.note)) return null;
+  if (answer.items.length === 0 && !answer.note) return null;
   return answer;
 }
 
-/** Either form of answer: JSON when the text is an object, the plain lines otherwise. */
-export function parseAnswer(text: string): RawAnswer | null {
-  if (!text.trimStart().startsWith('{')) return parseLines(text);
+/** An item as the schema spells it (one letter a field) under the names the rest of the code uses. */
+function spelledOut(item: unknown): unknown {
+  if (!item || typeof item !== 'object' || 'name' in item) return item;
+  const i = item as Record<string, unknown>;
+  return { name: i.n, grams: i.g, kcal: i.k, protein: i.p, carbs: i.c, fat: i.f, fiber: i.b, confidence: i.q };
+}
+
+/**
+ * Either form of answer: JSON when the text is an object, the plain lines otherwise.
+ * `held` says the request carried the schema, so the object's shape is already guaranteed. JSON
+ * that came back from a request for lines was held to nothing: it is used only when every item
+ * has its name and numbers and the answer has an item or a note; otherwise null, like any other
+ * answer that did not keep the form.
+ */
+export function parseAnswer(text: string, held = false): RawAnswer | null {
+  if (!text.trimStart().startsWith('{')) return held ? null : parseLines(text);
   try {
     const value: unknown = JSON.parse(text);
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const o = value as Record<string, unknown>;
     const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null);
-    return { dish: str(o.dish), items: Array.isArray(o.items) ? o.items : [], hidden_fat_question: str(o.hidden_fat_question), note: str(o.note) };
+    const items = Array.isArray(o.items) ? o.items : null;
+    if (!held) {
+      const whole = (v: unknown) => {
+        if (!v || typeof v !== 'object') return false;
+        const i = v as Record<string, unknown>;
+        return typeof i.name === 'string' && NUMBER_KEYS.every((k) => typeof i[k] === 'number' && Number.isFinite(i[k]));
+      };
+      if (!items || !items.every(whole) || (items.length === 0 && !str(o.note))) return null;
+    }
+    return { dish: str(o.dish), items: (items ?? []).map(spelledOut), hidden_fat_question: str(o.hidden_fat_question), note: str(o.note) };
   } catch {
     return null;
   }
@@ -274,12 +316,15 @@ function userText(input: AnalyzeInput): string {
 export interface AnalyzeOptions {
   fastModel?: string;
   preciseModel?: string;
-  /** 'json' asks for schema-checked JSON straight away (about a fifth dearer); the default is the plain lines. */
+  /**
+   * The answer's form. By default a typed description is answered in plain lines (about a tenth
+   * cheaper, the same accuracy) and a photo as schema-checked JSON: on photos the lines cost the
+   * same once their second tries are counted, and judged a large dish smaller (measured).
+   */
   format?: 'lines' | 'json';
   /**
-   * 'off' switches the small model's thinking off: about 40% cheaper again, and measurably less
-   * accurate (in the last run 54 of 60 typed meals inside their range instead of 59). The careful
-   * pass always thinks.
+   * 'off' switches the small model's thinking off: about 40% cheaper on typed meals, and measurably
+   * less accurate (54 of 60 typed meals inside their range instead of 60). The careful pass always thinks.
    */
   thinking?: 'off';
 }
@@ -294,13 +339,21 @@ export async function analyzeFood(client: Anthropic, input: AnalyzeInput, option
   const effort = (input.precise ? 'medium' : 'low') as 'low' | 'medium';
 
   const usage = { inputTokens: 0, outputTokens: 0 };
-  /** One request in one answer form. Returns the answer's text; what it used is added to `usage`. */
-  const ask = async (format: 'lines' | 'json'): Promise<string> => {
+  const started = Date.now();
+  // The app gives up after 45 s (90 s for the careful pass): answer, or fail, before it does.
+  const budgetMs = input.precise ? TIME_BUDGET_MS.precise : TIME_BUDGET_MS.fast;
+  let servedBy = model;
+  /**
+   * One request in one answer form. Returns the answer's text; what it used is added to `usage`.
+   * `again` marks the second try: it is the schema-checked form, which needs no thinking and no
+   * long answer, so it is capped tightly and cannot be turned into a second full-price request.
+   */
+  const ask = async (format: 'lines' | 'json', again = false): Promise<string> => {
     const base = {
       model,
       // Reasoning counts toward this cap, so it leaves room for both; a typical answer uses 60 to 400 tokens.
-      max_tokens: 2000,
-      ...(options.thinking === 'off' && !input.precise ? { thinking: { type: 'disabled' as const } } : null),
+      max_tokens: again ? RETRY_MAX_TOKENS : 2000,
+      ...(!input.precise && (again || options.thinking === 'off') ? { thinking: { type: 'disabled' as const } } : null),
       system: format === 'lines' ? SYSTEM_LINES : SYSTEM_JSON,
       messages: [{ role: 'user' as const, content }],
       output_config:
@@ -308,23 +361,26 @@ export async function analyzeFood(client: Anthropic, input: AnalyzeInput, option
           ? { effort }
           : { effort, format: { type: 'json_schema' as const, schema: SCHEMA as unknown as Record<string, unknown> } },
     };
+    // The first request may be retried once by the SDK; the second try gets what time is left and no retries.
+    // Whole milliseconds: the SDK refuses a fractional timeout, and 85,000 x 0.7 is not a whole number in floating point.
+    const limits = again ? { timeout: Math.max(5_000, Math.round(started + budgetMs - Date.now())), maxRetries: 0 } : { timeout: Math.round(budgetMs * 0.7), maxRetries: 1 };
     let response: Anthropic.Message | Anthropic.Beta.BetaMessage;
     try {
       response = input.precise
         ? // The stronger model can decline a request through its safety classifiers;
           // the server-side fallback re-runs it on another model inside the same call.
-          await client.beta.messages.create({ ...base, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' })
-        : await client.messages.create(base);
+          await client.beta.messages.create({ ...base, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }, limits)
+        : await client.messages.create(base, limits);
     } catch (error) {
-      // What an earlier request of this analysis used is still billed: pass it on.
+      // What an earlier request of this analysis used is still billed: every failure after it carries that.
       const spent = usage.inputTokens + usage.outputTokens > 0 ? { ...usage } : undefined;
       if (error instanceof Anthropic.RateLimitError) {
         throw new AnalyzeError('rate_limited', 'The analysis service is busy. Try again in a moment.', 429, spent);
       }
-      if (error instanceof Anthropic.BadRequestError) {
-        throw new AnalyzeError('bad_request', 'That image could not be read. Try another photo.', 400, spent);
+      if (error instanceof Anthropic.BadRequestError && !spent) {
+        throw new AnalyzeError('bad_request', 'That image could not be read. Try another photo.', 400);
       }
-      if (error instanceof Anthropic.APIError) {
+      if (error instanceof Anthropic.APIError || spent) {
         throw new AnalyzeError('upstream', 'The analysis service is unavailable right now.', 502, spent);
       }
       throw error;
@@ -344,10 +400,11 @@ export async function analyzeFood(client: Anthropic, input: AnalyzeInput, option
     return text;
   };
 
-  let servedBy = model;
-  let parsed = options.format === 'json' ? null : parseAnswer(await ask('lines'));
-  // The lines did not keep their form (rare): ask once more, this time held to the schema.
-  if (!parsed) parsed = parseAnswer(await ask('json'));
+  const first = options.format ?? (input.image ? 'json' : 'lines');
+  let parsed = first === 'json' ? parseAnswer(await ask('json'), true) : parseAnswer(await ask('lines'));
+  // The lines did not keep their form (about one answer in twenty-five): ask once more, this time
+  // held to the schema, unless the first try already used most of the time the app will wait.
+  if (!parsed && first !== 'json' && Date.now() - started < budgetMs / 2) parsed = parseAnswer(await ask('json', true), true);
   if (!parsed) throw new AnalyzeError('upstream', 'The analysis came back in an unexpected format. Try again.', 502, { ...usage });
 
   const items = sanitizeItems(parsed.items);
