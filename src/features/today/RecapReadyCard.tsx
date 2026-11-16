@@ -59,10 +59,10 @@ export function RecapReadyCard() {
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text variant="bodyStrong" numberOfLines={1}>
             Your week is ready
-            <Text variant="caption" color="textSecondary">{`  ${range}`}</Text>
           </Text>
+          {/* The week's dates lead the line under the title, so they are never cut at the end of the title. */}
           <Text variant="caption" color="textSecondary" numberOfLines={2}>
-            {line}
+            {`${range} · ${line}`}
           </Text>
         </View>
         <ChevronRight size={18} color={colors.textSecondary} />

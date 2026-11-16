@@ -1,11 +1,12 @@
-import React from 'react';
+import { Info } from 'lucide-react-native';
+import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { formatDayLabel, formatDuration, weekdayShort } from '@/lib/dates';
 import { formatNumber } from '@/lib/units';
 import { cup, fonts, useTheme } from '@/theme';
 import type { ISODate } from '@/types';
-import { Card, CupKey, levelY, MiniCup, Text, Vessel, type VesselLabel } from '@/ui';
+import { Card, CupKey, IconButton, levelY, MiniCup, Sheet, Text, Vessel, type VesselLabel } from '@/ui';
 
 import { WHO_WEEKLY_MINUTES, type WeekSummary } from './build';
 
@@ -27,6 +28,8 @@ export function WeekCard({ week, dates, today }: { week: WeekSummary; dates: ISO
   const max = Math.max(WHO_WEEKLY_MINUTES * 2, minutes);
   const reached = minutes >= WHO_WEEKLY_MINUTES;
   const guideY = levelY(WHO_WEEKLY_MINUTES, max, VESSEL_H - 1.5);
+  // How the guideline counts minutes: one line on the card, the whole rule behind the info cup.
+  const [help, setHelp] = useState(false);
 
   const labels: VesselLabel[] = [
     {
@@ -136,9 +139,23 @@ export function WeekCard({ week, dates, today }: { week: WeekSummary; dates: ISO
       <Text variant="caption" color="textSecondary" align="center" style={{ marginTop: 4 }}>
         Minutes each day
       </Text>
-      <Text variant="caption" color="textSecondary" style={{ marginTop: spacing.md }}>
-        WHO suggests 150 minutes of moderate activity a week. Minutes of a session logged as hard (and 6 MET or more) count double; light ones (under 3 MET) are logged but not counted.
-      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm, marginBottom: -spacing.sm }}>
+        <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flex: 1 }} testID="train-guideline-line">
+          Hard minutes count double
+        </Text>
+        <IconButton size={36} tone="clear" testID="train-guideline-help" accessibilityLabel="How minutes count toward the guideline" onPress={() => setHelp(true)}>
+          <Info size={20} color={colors.textSecondary} strokeWidth={1.9} />
+        </IconButton>
+      </View>
+      <Sheet visible={help} onClose={() => setHelp(false)} title="How minutes count">
+        <View style={{ gap: spacing.md }} testID="train-guideline-sheet">
+          <Text variant="body">{`WHO suggests ${WHO_WEEKLY_MINUTES} minutes of moderate activity a week.`}</Text>
+          <Text variant="body">Minutes of a session logged as hard (and 6 MET or more) count double.</Text>
+          <Text variant="body" color="textSecondary">
+            Light sessions (under 3 MET) are logged but not counted toward the guideline.
+          </Text>
+        </View>
+      </Sheet>
     </Card>
   );
 }
@@ -146,8 +163,8 @@ export function WeekCard({ week, dates, today }: { week: WeekSummary; dates: ISO
 function Mini({ label, value, unit, color, testID }: { label: string; value: string; unit?: string; color?: string; testID?: string }) {
   return (
     // No shrinking below the number's own width (its spaces do not break): each total is as wide as its number,
-    // at least 92 px, and the row wraps instead of cutting one ("20 h 40 min" is wider than a third of the card).
-    <View style={{ flexGrow: 1, flexBasis: 'auto', minWidth: 92 }} testID={testID}>
+    // at least 64 px, and the row wraps instead of cutting one ("20 h 40 min" is wider than a third of the card).
+    <View style={{ flexGrow: 1, flexBasis: 'auto', minWidth: 64 }} testID={testID}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         {color ? <CupKey color={color} /> : null}
         <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>

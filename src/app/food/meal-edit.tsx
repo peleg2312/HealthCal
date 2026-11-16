@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { storeSavedMeal } from '@/features/food/actions';
-import { formatPortion, itemsRange, mealServings } from '@/features/food/build';
+import { itemsRange, mealServings } from '@/features/food/build';
 import { href, kcal, param } from '@/features/food/helpers';
 import { RowEmoji } from '@/features/food/components';
 import { closeMealDraft, openMealDraft, removeDraftItem, setDraftName, setDraftServings, updateDraftItem, useMealDraft } from '@/features/food/mealDraft';
@@ -86,7 +86,7 @@ function MealEdit() {
       {resumed ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }} testID="meal-edit-resumed">
           <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
-            Picked up where you left off. Nothing is saved until you tap {id ? 'Save changes' : 'Save meal'}.
+            Picked up where you left off, not saved yet.
           </Text>
           <Button
             title="Start over"
@@ -114,7 +114,7 @@ function MealEdit() {
             style={{ width: 150 }}
           />
           <Text variant="caption" color="textSecondary" style={{ flexGrow: 1, flexShrink: 1, flexBasis: 140, paddingBottom: narrow ? 0 : 12 }}>
-            {count > 1 ? `Logs as one line, a share of the whole recipe.` : 'Leave at 1 for a meal you eat whole. A pot that feeds four makes 4.'}
+            {count > 1 ? 'Logs a share of the recipe.' : 'A pot that feeds four makes 4.'}
           </Text>
         </View>
       </Card>
@@ -135,7 +135,7 @@ function MealEdit() {
               </View>
             </View>
             <Text variant="caption" color="textSecondary" align="right" tabular style={{ flexShrink: 1, paddingBottom: 6 }}>
-              {count > 1 ? `Whole recipe ${kcal(n.kcal)} kcal · ${formatPortion(count)} servings` : `P ${Math.round(n.protein)} g · C ${Math.round(n.carbs)} g · F ${Math.round(n.fat)} g`}
+              {count > 1 ? `Whole recipe ${kcal(n.kcal)} kcal` : `P ${Math.round(n.protein)} g · C ${Math.round(n.carbs)} g · F ${Math.round(n.fat)} g`}
             </Text>
           </View>
           {range ? (
@@ -155,7 +155,7 @@ function MealEdit() {
         </Text>
         {rows.length === 0 ? (
           <Text variant="body" color="textSecondary" style={{ paddingVertical: spacing.sm }}>
-            Add what goes in, at the amount you make it. Tap an item later to change its amount.
+            Add each food at the amount you make.
           </Text>
         ) : (
           rows.map((r, i) => (

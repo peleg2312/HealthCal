@@ -75,7 +75,9 @@ export function AmountEditor({
         ))}
       </ChipWrap>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, flexWrap: 'wrap' }}>
+        {/* Compact, so the stepper and the grams field share one row in a card at 360 px; at 320 the field wraps under it, full width. */}
         <Stepper
+          compact
           label="quantity"
           value={quantity}
           step={perGram ? 10 : 0.5}
@@ -97,7 +99,7 @@ export function AmountEditor({
           onBlur={() => setTypedState(undefined)}
           suffix="g"
           accessibilityLabel="Amount in grams"
-          style={{ width: 120 }}
+          style={{ flexGrow: 1, flexBasis: 104, maxWidth: 200 }}
         />
       </View>
     </View>

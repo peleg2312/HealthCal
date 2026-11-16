@@ -1,4 +1,4 @@
-import { Minus, Plus, X } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Minus, Plus, X } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { TextInput, View } from 'react-native';
 
@@ -34,6 +34,8 @@ export function ItemRow({
 }) {
   const { colors, spacing } = useTheme();
   const { item } = row;
+  // The reference foods it could be stay folded under one line until asked for; a matched item shows its match.
+  const [showAlt, setShowAlt] = useState(false);
   const step = gramStep(item.grams);
   const unsure = row.kind === 'detected' && confidenceLevel(item.confidence) === 'low';
   const id = `ai-item-${index}`;
@@ -99,11 +101,28 @@ export function ItemRow({
           <Macro letter="F" value={item.fat} color={colors.fat} />
         </View>
       </View>
-      {onSwap && (matches.length > 0 || row.food) ? (
-        <View style={{ gap: 6 }}>
-          <Text variant="caption" color="textSecondary">
-            {row.food ? 'Matched to' : 'Could also be'}
+      {onSwap && !row.food && matches.length > 0 ? (
+        <PressableScale
+          testID={`${id}-alternatives`}
+          onPress={() => setShowAlt((v) => !v)}
+          feedback="select"
+          accessibilityRole="button"
+          accessibilityState={{ expanded: showAlt }}
+          accessibilityLabel={`${showAlt ? 'Hide' : 'Show'} ${matches.length} foods from the food list it could be`}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', minHeight: 44, marginVertical: -8 }}>
+          <Text variant="label" color="text">
+            {`Could also be (${matches.length})`}
           </Text>
+          {showAlt ? <ChevronUp size={16} color={colors.text} strokeWidth={1.9} /> : <ChevronDown size={16} color={colors.text} strokeWidth={1.9} />}
+        </PressableScale>
+      ) : null}
+      {onSwap && (row.food || (showAlt && matches.length > 0)) ? (
+        <View style={{ gap: 6 }}>
+          {row.food ? (
+            <Text variant="caption" color="textSecondary">
+              Matched to
+            </Text>
+          ) : null}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
             {(row.food && !matches.some((m) => m.id === row.food?.id) ? [row.food, ...matches.slice(0, 2)] : matches).map((food, i) => {
               const selected = row.food?.id === food.id;

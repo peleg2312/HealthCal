@@ -6,7 +6,7 @@ import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 import { AmountEditor } from '@/features/food/AmountEditor';
 import { FoodRow, MealPicker } from '@/features/food/components';
 import { setFoodDraft } from '@/features/food/draft';
-import { amountLabel, dayPhrase, href, kcal, lastPortions, matchServing, parseDate, parseMeal, portionFor, portionKcal, portionLabel, stepAmount } from '@/features/food/helpers';
+import { amountLabel, href, kcal, lastPortions, matchServing, parseDate, parseMeal, portionFor, portionKcal, portionLabel, stepAmount } from '@/features/food/helpers';
 import { formatPortion, itemsRange, mealServings } from '@/features/food/build';
 import { deleteEntry, logFood, setEntryAmount } from '@/features/food/log';
 import { LogSavedMealSheet } from '@/features/food/SavedMealParts';
@@ -43,9 +43,10 @@ export default function FoodSearchScreen() {
   const [existing] = useState(() => new Set(Object.keys(useStore.getState().foodEntries)));
 
   const recentFoods = useStore((s) => s.recentFoods);
+  // Declared here: the header's short line shows it.
+  const left = Math.round(useDay(date).remaining);
   const favoriteIds = useStore((s) => s.favoriteFoodIds);
   const favoriteRecords = useLive('favorites');
-  const day = useDay(date);
   const customFoods = useLive('customFoods');
   const savedMeals = useLive('savedMeals');
   const entries = useLive('foodEntries');
@@ -109,7 +110,6 @@ export default function FoodSearchScreen() {
     if (!prev || e.loggedAt > prev.loggedAt) addedByFood.set(e.foodId, e);
   }
   const amountEntry = amountEntryId ? added.find((e) => e.id === amountEntryId) : undefined;
-  const left = Math.round(day.remaining);
 
   const open = (food: Food) => {
     setFoodDraft(food);
@@ -149,10 +149,10 @@ export default function FoodSearchScreen() {
 
   const escapes = (
     <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-      <ActionTile testID="search-scan" icon={<ScanBarcode size={22} color={colors.text} strokeWidth={1.9} />} label="Scan barcode" onPress={() => go('/food/scan')} />
-      <ActionTile testID="search-photo" icon={<Camera size={22} color={colors.text} strokeWidth={1.9} />} label="Photo or describe" onPress={() => go('/food/photo', { mode: 'photo' })} />
-      <ActionTile testID="search-quick" icon={<Zap size={22} color={colors.text} strokeWidth={1.9} />} label="Quick add" onPress={() => go('/food/quick')} />
-      <ActionTile testID="search-create" icon={<PenLine size={22} color={colors.text} strokeWidth={1.9} />} label="Create food" onPress={() => go('/food/custom', q ? { name: q } : {})} />
+      <ActionTile testID="search-scan" icon={<ScanBarcode size={20} color={colors.text} strokeWidth={1.9} />} label="Scan barcode" onPress={() => go('/food/scan')} />
+      <ActionTile testID="search-photo" icon={<Camera size={20} color={colors.text} strokeWidth={1.9} />} label="Photo or describe" onPress={() => go('/food/photo', { mode: 'photo' })} />
+      <ActionTile testID="search-quick" icon={<Zap size={20} color={colors.text} strokeWidth={1.9} />} label="Quick add" onPress={() => go('/food/quick')} />
+      <ActionTile testID="search-create" icon={<PenLine size={20} color={colors.text} strokeWidth={1.9} />} label="Create food" onPress={() => go('/food/custom', q ? { name: q } : {})} />
     </View>
   );
 
@@ -160,7 +160,8 @@ export default function FoodSearchScreen() {
 
   const header = (
     <View style={{ gap: spacing.sm, paddingBottom: spacing.sm }}>
-      <Header title={`Add to ${MEAL_LABEL[meal].toLowerCase()}`} subtitle={formatDayLabel(date)} close />
+      {/* The day and what is left of its budget: one short line, so the list starts higher (logging speed). */}
+      <Header title={`Add to ${MEAL_LABEL[meal].toLowerCase()}`} subtitle={`${formatDayLabel(date)} · ${kcal(Math.abs(left))} kcal ${left < 0 ? 'over' : 'left'}`} close />
       <TextField
         testID="food-search-input"
         placeholder={narrow ? 'Search foods and brands' : 'Search foods, brands, your foods'}
@@ -183,38 +184,18 @@ export default function FoodSearchScreen() {
     </View>
   );
 
-  const over = left < 0;
-  // "today", "yesterday", or "on Fri, Nov 13".
-  const phrase = dayPhrase(date);
-  const when = date === todayDate ? 'today' : phrase === 'yesterday' || phrase === 'tomorrow' ? phrase : `on ${phrase}`;
-  const budget = (
-    <AnimatedNumber
-      variant={added.length > 0 ? 'caption' : 'label'}
-      color={over ? 'text' : 'textSecondary'}
-      testID="search-budget"
-      value={left}
-      format={(n) => kcal(Math.abs(n))}
-      accessibilityLabel={`${kcal(Math.abs(left))} kcal ${over ? 'over' : 'left'} ${when}`}>
-      {`${over ? ' kcal over' : ' kcal left'} ${when}`}
-    </AnimatedNumber>
-  );
-  const footer = (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 44 }}>
-      <View style={{ flex: 1 }}>
-        {added.length > 0 ? (
-          <Text variant="title" testID="search-added-count" tabular>
-            {`${added.length} added · `}
-            <AnimatedNumber variant="title" value={addedKcal} format={kcal} duration={motion.duration.pourSmall} />
-            {' kcal'}
-          </Text>
-        ) : null}
-        {budget}
-      </View>
-      {added.length > 0 ? (
+  // Only once something is added: the running count and Done. The budget is in the header's short line.
+  const footer =
+    added.length > 0 ? (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 44 }}>
+        <Text variant="title" testID="search-added-count" tabular style={{ flex: 1 }}>
+          {`${added.length} added · `}
+          <AnimatedNumber variant="title" value={addedKcal} format={kcal} duration={motion.duration.pourSmall} />
+          {' kcal'}
+        </Text>
         <Button testID="search-done" title="Done" size="md" full={false} onPress={() => (router.canGoBack() ? router.back() : router.replace(href('/diary', { date }) as never))} />
-      ) : null}
-    </View>
-  );
+      </View>
+    ) : undefined;
 
   return (
     <Screen header={header} footer={footer} testID="food-search-screen">
@@ -235,7 +216,7 @@ export default function FoodSearchScreen() {
           {tab === 'usual' && usuals.length ? (
             <View style={{ gap: spacing.xs }}>
               <Text variant="caption" color="textSecondary" testID="search-usual-note">
-                What you log most at {MEAL_LABEL[meal].toLowerCase()}, from your last 30 days
+                Most logged at {MEAL_LABEL[meal].toLowerCase()}, last 30 days
               </Text>
               <List>{usuals.map((f, i) => row(f, `usual-${i}`))}</List>
             </View>
@@ -359,7 +340,7 @@ export default function FoodSearchScreen() {
                 <View style={{ flex: 1 }}>
                   <Text variant="h3">Online products</Text>
                   <Text variant="caption" color="textSecondary">
-                    Community data from Open Food Facts. Check against the label.
+                    Community data from Open Food Facts
                   </Text>
                 </View>
                 {online.status === 'loading' ? <ActivityIndicator color={colors.textSecondary} /> : null}
@@ -369,9 +350,9 @@ export default function FoodSearchScreen() {
               ) : online.status === 'done' ? (
                 <Text variant="body" color="textTertiary" testID="search-online-empty" style={{ paddingVertical: spacing.sm }}>
                   {onlineResult.unavailable
-                    ? 'Searching packaged products by name works in the phone app. Here in the browser you can still scan or type a barcode, or create the food yourself.'
+                    ? 'Product search by name works in the phone app. Here, scan or type a barcode, or create the food.'
                     : onlineResult.failed
-                      ? 'Could not reach the online product database. Your own and bundled foods still work, and you can try again in a moment.'
+                      ? 'Could not reach the online products. Your own and bundled foods still work.'
                       : 'No online products match that search.'}
                 </Text>
               ) : (
@@ -460,14 +441,14 @@ function ActionTile({ icon, label, onPress, testID }: { icon: React.ReactNode; l
       accessibilityLabel={label}
       style={{
         flex: 1,
-        minHeight: 80,
+        minHeight: 72,
         ...cup(radius.tile, 5),
         backgroundColor: colors.surface,
         borderWidth: 1,
         borderColor: colors.border,
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
+        gap: 6,
         paddingVertical: spacing.sm,
         // Narrow side padding, so "barcode" and "describe" fit whole in a quarter of a 320 px screen.
         paddingHorizontal: spacing.xs,

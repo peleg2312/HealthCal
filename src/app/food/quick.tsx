@@ -36,7 +36,7 @@ export default function QuickAddScreen() {
     <Screen
       testID="food-quick-screen"
       header={<Header title="Quick add" subtitle="When you just know the numbers" close />}
-      footer={<Button testID="quick-save" title={valid ? `Add ${kcal(calories!)} kcal to ${MEAL_LABEL[meal].toLowerCase()}` : `Add to ${MEAL_LABEL[meal].toLowerCase()}`} disabled={!valid} onPress={save} />}>
+      footer={<Button testID="quick-save" title={`Add to ${MEAL_LABEL[meal].toLowerCase()}`} disabled={!valid} onPress={save} />}>
       <Card style={{ gap: spacing.md }}>
         <NumberField
           testID="quick-kcal"
@@ -57,7 +57,7 @@ export default function QuickAddScreen() {
         <View>
           <Text variant="h3">Macros</Text>
           <Text variant="caption" color="textSecondary">
-            Optional. Leave calories empty and they are worked out from these.
+            Optional, and enough on their own.
           </Text>
         </View>
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
@@ -69,7 +69,7 @@ export default function QuickAddScreen() {
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
             <CupKey color={colors.warning} style={{ marginTop: 4 }} />
             <Text testID="quick-mismatch" variant="caption" color="text" style={{ flex: 1 }}>
-              These macros add up to about {kcal(implied)} kcal, not {kcal(kcalV!)}. Labels round, so both can be fine; worth a second look if it is a typo.
+              These macros add up to about {kcal(implied)} kcal, not {kcal(kcalV!)}. Labels round; check for a typo.
             </Text>
           </View>
         ) : null}

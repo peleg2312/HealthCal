@@ -1,6 +1,9 @@
 /**
  * One contextual suggestion for the Today screen: the single most useful
  * thing to do next, phrased with the user's own numbers. Pure and testable.
+ * The title and body are one short sentence pair (at most two lines at 320 px,
+ * about 76 characters) and never repeat a number the screen already shows
+ * (kcal left, the budget, the macro amounts): the line sits under the calorie card.
  */
 import { isCompleteDay } from '@/lib/trend';
 import { formatNumber, formatVolume } from '@/lib/units';
@@ -142,8 +145,8 @@ export function coachTip(
       emoji: '👋',
       title: closed ? 'Yesterday closed within budget' : 'Nothing logged yet today',
       body: closed
-        ? `${formatNumber(closed.eaten)} of ${formatNumber(closed.budget)} kcal. Today's budget is ${formatNumber(day.budget)} kcal.`
-        : `Your budget is ${formatNumber(day.budget)} kcal. Logging the first thing takes a few seconds.`,
+        ? `${formatNumber(closed.eaten)} of ${formatNumber(closed.budget)} kcal.`
+        : 'Logging the first thing takes a few seconds.',
       action: { label: 'Log food', href: search(meal) },
       ...(meal === 'snack' ? null : { quick: { kind: 'repeat' as const, meal } }),
       tone: 'neutral',
@@ -161,7 +164,7 @@ export function coachTip(
       id: `meal-${due.meal}`,
       emoji: '🍽️',
       title: `Had ${due.label} yet?`,
-      body: `It is not in today's log. You have ${formatNumber(Math.max(0, day.remaining))} kcal left.`,
+      body: "It is not in today's log.",
       action: { label: `Log ${due.label}`, href: search(due.meal) },
       quick: { kind: 'repeat', meal: due.meal },
       tone: 'neutral',
@@ -174,7 +177,7 @@ export function coachTip(
       id: 'water',
       emoji: '💧',
       title: `${formatWaterLeft(day.waterMl, day.waterGoalMl, units)} of water to go`,
-      body: `You are about ${formatVolume(Math.min(day.waterRemainingMl, Math.round(waterGap / 50) * 50), units)} behind an even pace for the day. A glass now narrows it.`,
+      body: `About ${formatVolume(Math.min(day.waterRemainingMl, Math.round(waterGap / 50) * 50), units)} behind an even pace for the day.`,
       action: { label: 'Add water', href: '/water' },
       quick: { kind: 'water' },
       tone: 'neutral',
@@ -187,7 +190,7 @@ export function coachTip(
       id: 'protein',
       emoji: '🥚',
       title: `${proteinLeft} g of protein to go`,
-      body: `You are at ${Math.round(day.eaten.protein)} of ${day.macros.proteinG} g. A few of your own foods would close most of the gap.`,
+      body: 'A few of your own foods would close most of it.',
       action: { label: 'See what fits', href: search('dinner') },
       quick: { kind: 'fits' },
       tone: 'neutral',
@@ -198,8 +201,8 @@ export function coachTip(
     return {
       id: 'over',
       emoji: '🧭',
-      title: `${formatNumber(Math.abs(day.remaining))} kcal over today's budget`,
-      body: 'One day does not move the trend much. Weekly averages are what count, and tomorrow starts fresh.',
+      title: "Over today's budget",
+      body: 'One day does not move the trend much.',
       action: { label: 'See your week', href: '/progress' },
       tone: 'neutral',
     };
@@ -210,7 +213,7 @@ export function coachTip(
       id: 'move',
       emoji: '🚶',
       title: 'No activity logged today',
-      body: 'A brisk 20 minute walk counts toward your weekly 150 active minutes.',
+      body: 'A brisk 20 minute walk counts toward the week.',
       action: { label: 'Log activity', href: '/activity/pick' },
       tone: 'neutral',
     };
@@ -222,7 +225,9 @@ export function coachTip(
     title: 'On track',
     body:
       day.remaining >= 0
-        ? `${formatNumber(day.remaining)} kcal left and ${day.waterRemainingMl > 0 ? `${formatWaterLeft(day.waterMl, day.waterGoalMl, units)} of water to go` : 'your water goal is done'}.`
+        ? day.waterRemainingMl > 0
+          ? 'Within budget so far, with water still to go.'
+          : 'Within budget, and the water goal is done.'
         : 'Close to your budget for the day.',
     tone: 'positive',
   };

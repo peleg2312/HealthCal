@@ -64,7 +64,7 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
   const errors = {
     name: !name.trim() ? 'Give it a name' : null,
     kcal: values.kcal === null ? 'Calories are needed' : null,
-    grams: basis === 'serving' && !(servingGrams && servingGrams > 0) ? 'Serving size in grams is needed to scale it' : null,
+    grams: basis === 'serving' && !(servingGrams && servingGrams > 0) ? 'Size in grams is needed' : null,
   };
   const macroSum100 = (per100(values.protein) ?? 0) + (per100(values.carbs) ?? 0) + (per100(values.fat) ?? 0);
   const impossible = factor > 0 && macroSum100 > 101 ? 'Per 100 g these macros add up to more than 100 g. Check the serving size.' : null;
@@ -218,7 +218,7 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
           onChange={switchBasis}
         />
         <Text variant="caption" color="textSecondary">
-          Copy the column as printed on the label. {basis === 'serving' ? 'It is stored per 100 g using the serving size.' : ''}
+          Copy the column from the label.
         </Text>
         <NumberField testID="custom-kcal" label="Calories" suffix="kcal" decimals={0} value={values.kcal} onChange={set('kcal')} error={tried ? errors.kcal : null} />
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>

@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Camera, Droplet, FlaskConical, ImagePlus, Info, Lightbulb, MessageSquareText, RefreshCw, Sparkles } from 'lucide-react-native';
+import { Camera, ChevronDown, ChevronUp, Droplet, FlaskConical, ImagePlus, Info, Lightbulb, MessageSquareText, RefreshCw, Sparkles } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { useWindowDimensions, View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
 
@@ -49,7 +49,7 @@ import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
 import type { AiFoodResult, Food, MealType } from '@/types';
-import { Button, Card, Chip, CupKey, Divider, goBack, haptic, Header, MacroBar, Screen, Segmented, Text, TextField, toast } from '@/ui';
+import { Button, Card, Chip, CupKey, Divider, goBack, haptic, Header, MacroBar, PressableScale, Screen, Segmented, Text, TextField, toast } from '@/ui';
 
 type InputMode = 'photo' | 'text';
 type Step = 'capture' | 'analysing' | 'review' | 'error';
@@ -339,8 +339,8 @@ export default function PhotoScreen() {
     footer = (
       <Button
         testID="ai-add-to-diary"
-        // A 320 px phone fits "Add sample · 507 kcal"; the meal is picked just above.
-        title={narrow && isDemo ? `Add sample · ${sum.kcal} kcal` : `${isDemo ? 'Add sample to' : 'Add to'} ${MEALS.find((m) => m.id === meal)?.label.toLowerCase()} · ${sum.kcal} kcal`}
+        // The total is the large number at the top: the button names where it goes, not the number again.
+        title={`${isDemo ? 'Add sample to' : 'Add to'} ${MEALS.find((m) => m.id === meal)?.label.toLowerCase()}`}
         disabled={items.length === 0}
         onPress={add}
       />
@@ -398,7 +398,7 @@ export default function PhotoScreen() {
                     Photograph your meal
                   </Text>
                   <Text variant="body" color="textSecondary" align="center">
-                    You get a list of foods with portions you can correct before anything is added.
+                    Nothing is added until you check it.
                   </Text>
                   <View style={{ alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.xs }}>
                     <Button testID="ai-take-photo" title="Take photo" icon={<Camera size={18} color={colors.onPrimary} />} onPress={() => void choose('camera')} />
@@ -429,7 +429,7 @@ export default function PhotoScreen() {
                 maxLength={500}
                 autoFocus
                 lines={4}
-                hint="Amounts and how it was cooked make the estimate more accurate."
+                hint="Amounts and cooking method help."
               />
               {access.live ? <AiDataLine mode={mode} onPress={() => openConsent('review')} /> : null}
             </>
@@ -484,7 +484,8 @@ export default function PhotoScreen() {
                 {isDemo ? <FlaskConical size={24} color={colors.text} strokeWidth={1.9} /> : <Sparkles size={24} color={colors.text} strokeWidth={1.9} />}
                 <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                   <Text variant="h3" numberOfLines={2} testID="ai-dish">
-                    {isDemo ? `Sample: ${result.dish}` : result.dish}
+                    {/* The notice above already says it is a sample. */}
+                    {result.dish}
                   </Text>
                   <Text variant="caption" color="textSecondary">
                     {isDemo ? 'Example data' : `AI estimate · ${CONFIDENCE_WORDS[conf]}${precisePass ? ' · checked carefully' : ''}`}
@@ -519,7 +520,7 @@ export default function PhotoScreen() {
               <View style={{ flex: 1, gap: 2 }}>
                 <Text variant="title">{result.hiddenFatQuestion ?? 'Cooked or dressed with fat?'}</Text>
                 <Text variant="caption" color="textSecondary">
-                  Oil, butter and dressing rarely show in a photo and are the most common thing estimates miss. 1 tsp is about 40 kcal.
+                  Rarely visible. 1 tsp is about 40 kcal.
                 </Text>
               </View>
             </View>
@@ -533,8 +534,8 @@ export default function PhotoScreen() {
           <View style={{ gap: spacing.sm }} onLayout={(e) => (layout.current.section = e.nativeEvent.layout.y)}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.md }}>
               <Text variant="h3">Items</Text>
-              <Text variant="caption" color="textSecondary" align="right" style={{ flexShrink: 1 }}>
-                Tap a name or weight to correct it
+              <Text variant="caption" color="textSecondary" align="right" style={{ flexShrink: 1 }} numberOfLines={1}>
+                {narrow ? 'Tap to correct' : 'Tap a name or weight to correct'}
               </Text>
             </View>
             <Card padding={spacing.lg} style={{ paddingVertical: spacing.xs }} onLayout={(e) => (layout.current.card = e.nativeEvent.layout.y)}>
@@ -585,19 +586,26 @@ export default function PhotoScreen() {
             </View>
           ) : null}
 
+          <View style={{ gap: spacing.sm }}>
+            <Text variant="h3">Meal</Text>
+            {/* The diary's meal tabs: "Breakfast" fits whole in a quarter of a 320 px phone. */}
+            <MealPicker value={meal} onChange={setMeal} testIDPrefix="ai-meal" />
+          </View>
+
+          {/* Second tries, below the meal: say what it got wrong, or run the careful check. Each uses one analysis. */}
           <Card style={{ gap: spacing.md }} testID="ai-correction">
             <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
               <MessageSquareText size={18} color={colors.text} strokeWidth={1.9} style={{ marginTop: 2 }} />
               <View style={{ flex: 1, gap: 2 }}>
-                <Text variant="title">What did it get wrong?</Text>
+                <Text variant="title">Not quite right?</Text>
                 <Text variant="caption" color="textSecondary">
-                  {`Say it in a few words and the ${mode === 'photo' ? 'photo' : 'description'} is estimated again with your correction. Uses one analysis; items you added stay.`}
+                  Each try uses one analysis.
                 </Text>
               </View>
             </View>
             <TextField
               testID="ai-correction-input"
-              placeholder={narrow ? 'e.g. no cheese' : "e.g. it's cauliflower rice, and no cheese"}
+              placeholder={narrow ? 'e.g. no cheese' : 'e.g. cauliflower rice, no cheese'}
               value={correction}
               onChangeText={setCorrection}
               maxLength={300}
@@ -614,28 +622,14 @@ export default function PhotoScreen() {
               icon={<RefreshCw size={16} color={colors.text} />}
               onPress={() => void analyse(precisePass, correction)}
             />
-          </Card>
-
-          <View style={{ gap: spacing.sm }}>
-            <Text variant="h3">Meal</Text>
-            {/* The diary's meal tabs: "Breakfast" fits whole in a quarter of a 320 px phone. */}
-            <MealPicker value={meal} onChange={setMeal} testIDPrefix="ai-meal" />
-          </View>
-
-          <Card tone="alt" style={{ gap: spacing.sm }}>
-            <Text variant="title">{precisePass ? 'Checked with the stronger model' : 'Not quite right?'}</Text>
-            <Text variant="caption" color="textSecondary">
-              {precisePass
-                ? 'This estimate already used the careful check. Correct the items above if something is still off.'
-                : `Check again more carefully with a stronger model${mode === 'photo' ? ' and a sharper copy of the photo' : ''}. It counts as another analysis and replaces the items found, keeping the ones you added.`}
-            </Text>
             {!precisePass ? (
               <Button
                 testID="ai-check-again"
                 title={narrow ? 'Check more carefully' : 'Check again more carefully'}
-                variant="secondary"
+                variant="ghost"
                 size="md"
-                icon={<RefreshCw size={16} color={colors.text} />}
+                icon={<Sparkles size={16} color={colors.text} />}
+                accessibilityLabel={`Check again more carefully with a stronger model${mode === 'photo' ? ' and a sharper copy of the photo' : ''}. Uses one analysis and keeps the items you added`}
                 onPress={() => void analyse(true)}
               />
             ) : null}
@@ -725,27 +719,39 @@ function MacroStat({ label, value, color }: { label: string; value: number; colo
   );
 }
 
+/** Tips for a better photo, folded under one line until asked for. */
 function PhotoTips() {
   const { colors, spacing } = useTheme();
+  const [open, setOpen] = useState(false);
   const tips = ['The whole plate in frame, shot from above', 'Good light, no strong shadows', 'Something for scale, such as a fork or your hand', 'Separate photos for separate plates'];
   return (
     <View style={{ gap: spacing.sm }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+      <PressableScale
+        testID="ai-photo-tips"
+        onPress={() => setOpen((v) => !v)}
+        feedback="select"
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={`${open ? 'Hide' : 'Show'} tips for a better estimate`}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, alignSelf: 'flex-start' }}>
         <Lightbulb size={16} color={colors.textSecondary} />
         <Text variant="label" color="textSecondary">
-          For a better estimate
+          Tips for a better estimate
         </Text>
-      </View>
-      {tips.map((t) => (
-        <View key={t} style={{ flexDirection: 'row', gap: spacing.sm, paddingLeft: 4 }}>
-          <Text variant="body" color="textTertiary">
-            ·
-          </Text>
-          <Text variant="body" color="textSecondary" style={{ flex: 1 }}>
-            {t}
-          </Text>
-        </View>
-      ))}
+        {open ? <ChevronUp size={16} color={colors.textSecondary} /> : <ChevronDown size={16} color={colors.textSecondary} />}
+      </PressableScale>
+      {open
+        ? tips.map((t) => (
+            <View key={t} style={{ flexDirection: 'row', gap: spacing.sm, paddingLeft: 4 }}>
+              <Text variant="body" color="textTertiary">
+                ·
+              </Text>
+              <Text variant="body" color="textSecondary" style={{ flex: 1 }}>
+                {t}
+              </Text>
+            </View>
+          ))
+        : null}
     </View>
   );
 }

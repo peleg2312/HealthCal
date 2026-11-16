@@ -199,7 +199,7 @@ function MealPick() {
                 <View style={{ flex: 1 }}>
                   <Text variant="h3">Online products</Text>
                   <Text variant="caption" color="textSecondary">
-                    Community data from Open Food Facts. Check against the label.
+                    Community data from Open Food Facts
                   </Text>
                 </View>
                 {loading ? <ActivityIndicator color={colors.textSecondary} /> : null}

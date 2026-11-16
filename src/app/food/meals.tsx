@@ -6,7 +6,7 @@ import { View } from 'react-native';
 import { deleteSavedMeal } from '@/features/food/actions';
 import { formatPortion, itemsRange, mealServings } from '@/features/food/build';
 import { DayStepper, MealPicker, RowEmoji } from '@/features/food/components';
-import { dayPhrase, href, kcal, parseDate, parseMeal } from '@/features/food/helpers';
+import { href, kcal, parseDate, parseMeal } from '@/features/food/helpers';
 import { LogSavedMealSheet, itemLine } from '@/features/food/SavedMealParts';
 import { MEAL_LABEL, sumNutrients } from '@/lib/nutrition';
 import { useLive } from '@/store/selectors';
@@ -25,13 +25,17 @@ export default function SavedMealsScreen() {
   const build = (id?: string) => router.push(href('/food/meal-edit', { id, meal, date }) as never);
 
   return (
-    <Screen testID="food-meals-screen" header={<Header title="Saved meals" subtitle={`Log to ${MEAL_LABEL[meal].toLowerCase()}, ${dayPhrase(date)}`} />}>
+    <Screen
+      testID="food-meals-screen"
+      header={<Header title="Saved meals" subtitle="Meals and recipes you saved" />}
+      // The one primary action, pinned. With no meals yet the empty state offers it instead.
+      footer={meals.length > 0 ? <Button testID="meals-new" title="New meal or recipe" icon={<Plus size={18} color={colors.onPrimary} />} onPress={() => build()} /> : undefined}>
       {meals.length > 0 ? (
-        <>
+        <View style={{ gap: spacing.sm }}>
+          {/* Where a meal is logged to: the meal and the day. */}
           <MealPicker value={meal} onChange={setMeal} testIDPrefix="meals-meal" />
           <DayStepper value={date} onChange={setDate} testIDPrefix="meals-day" />
-          <Button testID="meals-new" variant="secondary" size="md" title="New meal or recipe" icon={<Plus size={18} color={colors.text} />} onPress={() => build()} />
-        </>
+        </View>
       ) : null}
 
       {meals.length === 0 ? (
@@ -49,23 +53,15 @@ export default function SavedMealsScreen() {
           const approx = itemsRange(m.items) ? '~' : '';
           return (
             <Card key={m.id} testID={`saved-meal-card-${i}`} style={{ gap: spacing.md }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text variant="h3" numberOfLines={2}>
-                    {m.name}
-                  </Text>
-                  <Text variant="caption" color="textSecondary" tabular numberOfLines={2}>
-                    {count > 1
-                      ? `${approx}${kcal(n.kcal / count)} kcal per serving · makes ${formatPortion(count)}`
-                      : `${approx}${kcal(n.kcal)} kcal · P ${Math.round(n.protein)} g · C ${Math.round(n.carbs)} g · F ${Math.round(n.fat)} g`}
-                  </Text>
-                </View>
-                <IconButton testID={`saved-meal-edit-${i}`} accessibilityLabel={`Edit ${m.name}`} tone="clear" onPress={() => build(m.id)}>
-                  <PenLine size={18} color={colors.textSecondary} />
-                </IconButton>
-                <IconButton testID={`saved-meal-delete-${i}`} accessibilityLabel={`Delete ${m.name}`} tone="clear" onPress={() => deleteSavedMeal(m)}>
-                  <Trash2 size={18} color={colors.textSecondary} />
-                </IconButton>
+              <View>
+                <Text variant="h3" numberOfLines={2}>
+                  {m.name}
+                </Text>
+                <Text variant="caption" color="textSecondary" tabular numberOfLines={2}>
+                  {count > 1
+                    ? `${approx}${kcal(n.kcal / count)} kcal per serving · makes ${formatPortion(count)}`
+                    : `${approx}${kcal(n.kcal)} kcal · P ${Math.round(n.protein)} g · C ${Math.round(n.carbs)} g · F ${Math.round(n.fat)} g`}
+                </Text>
               </View>
               <MacroBar protein={n.protein * 4} carbs={n.carbs * 4} fat={n.fat * 9} height={6} />
               {/* Each item's amount goes under its name, as in the diary, so neither squeezes the other into a few letters. */}
@@ -84,13 +80,24 @@ export default function SavedMealsScreen() {
                   </View>
                 ))}
               </View>
-              <Button
-                testID={`saved-meal-log-${i}`}
-                title={`Log to ${MEAL_LABEL[meal].toLowerCase()}`}
-                size="md"
-                variant="secondary"
-                onPress={() => setLogging(m)}
-              />
+              {/* Log leads; changing and deleting (soft, with Undo) sit beside it, smaller. */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                <Button
+                  testID={`saved-meal-log-${i}`}
+                  title={`Log to ${MEAL_LABEL[meal].toLowerCase()}`}
+                  size="md"
+                  variant="secondary"
+                  full={false}
+                  style={{ flex: 1 }}
+                  onPress={() => setLogging(m)}
+                />
+                <IconButton testID={`saved-meal-edit-${i}`} accessibilityLabel={`Edit ${m.name}`} tone="clear" onPress={() => build(m.id)}>
+                  <PenLine size={18} color={colors.textSecondary} />
+                </IconButton>
+                <IconButton testID={`saved-meal-delete-${i}`} accessibilityLabel={`Delete ${m.name}`} tone="clear" onPress={() => deleteSavedMeal(m)}>
+                  <Trash2 size={18} color={colors.textSecondary} />
+                </IconButton>
+              </View>
             </Card>
           );
         })

@@ -155,3 +155,43 @@ export function ActivityTile({
     </PressableScale>
   );
 }
+
+/**
+ * Train's Quick start: one tile per activity, each as wide as its emoji and its whole name, in rows
+ * that wrap. A name is never broken inside a word ("Volleyba/ll") at any width, because no tile is
+ * narrower than its longest word; a name longer than a row (never in the catalogue) wraps at a space.
+ */
+export function QuickStartTiles({ items, onPick }: { items: { id: string; emoji: string; name: string }[]; onPick: (id: string) => void }) {
+  const { colors, radius, spacing } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }} testID="train-quick-start">
+      {items.map((a) => (
+        <PressableScale
+          key={a.id}
+          testID={`quick-${a.id}`}
+          accessibilityLabel={a.name}
+          onPress={() => onPick(a.id)}
+          scaleTo={0.96}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.sm,
+            minHeight: 48,
+            maxWidth: '100%',
+            paddingVertical: 8,
+            paddingLeft: 12,
+            paddingRight: 14,
+            ...cup(radius.tile, 5),
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}>
+          <Text style={{ fontSize: 17, lineHeight: 22 }}>{a.emoji}</Text>
+          <Text variant="label" style={{ flexShrink: 1 }}>
+            {a.name}
+          </Text>
+        </PressableScale>
+      ))}
+    </View>
+  );
+}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { View } from 'react-native';
 
 import { formatShortDate } from '@/lib/dates';
 import type { InsightDay, PeriodSummary } from '@/lib/insights';
@@ -19,7 +19,6 @@ import { LegendDot } from './parts';
  */
 export function CaloriesADay({ days, summary, today, onOpen }: { days: InsightDay[]; summary: PeriodSummary; today: string; onOpen: () => void }) {
   const { colors, spacing } = useTheme();
-  const narrow = useWindowDimensions().width < 360;
   const c = summary.calories;
   if (!c) return null;
   const first = days.findIndex((d) => d.entries.length > 0);
@@ -38,18 +37,8 @@ export function CaloriesADay({ days, summary, today, onOpen }: { days: InsightDa
       accessibilityLabel={`Calories a day, average ${formatNumber(Math.round(c.avgKcal))} kcal against an average budget of ${formatNumber(Math.round(c.avgBudget))}. ${verdict}. Open nutrition`}
       style={{ gap: spacing.md }}>
       <View style={{ gap: 2 }}>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', columnGap: spacing.md, rowGap: 2 }}>
-          <Text variant="h3" style={{ flexShrink: 1 }}>
-            {weekly ? 'Calories a day, by week' : 'Calories a day'}
-          </Text>
-          <Text variant="caption" color="textSecondary">
-            Average{' '}
-            <Text variant="numM" color="caloriesInk" style={{ fontSize: narrow ? 15 : 16, lineHeight: 20 }}>
-              {formatNumber(Math.round(c.avgKcal))}
-            </Text>
-            <Text variant="unit"> kcal</Text>
-          </Text>
-        </View>
+        {/* The average is the Calories tile's number just below, so it is said once there (and read out here). */}
+        <Text variant="h3">{weekly ? 'Calories a day, by week' : 'Calories a day'}</Text>
         <Text variant="title" testID="progress-calories-verdict">
           {verdict}
         </Text>

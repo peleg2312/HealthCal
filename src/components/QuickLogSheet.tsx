@@ -128,11 +128,12 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                     <Text style={{ fontSize: 17, lineHeight: 24 }}>{u.last.emoji || '🍽️'}</Text>
                     <AddMark done={isDone} />
                   </View>
-                  {/* Two lines, so a name like "Greek yogurt, plain, 2%" reads whole; the tiles in the row share the tallest height. */}
-                  <Text variant="label" numberOfLines={2} style={{ flex: 1 }}>
+                  {/* Two lines, so a name like "Greek yogurt, plain, 2%" reads whole. The name never grows with the row
+                      (a taller neighbour would show the line after its ellipsis); the caption sits at the foot instead. */}
+                  <Text variant="label" numberOfLines={2}>
                     {u.last.name}
                   </Text>
-                  <Text variant="caption" color="textSecondary" numberOfLines={2}>
+                  <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ marginTop: 'auto' }}>
                     {usualLabel(u)}
                   </Text>
                 </PressableScale>
@@ -155,10 +156,10 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                   <Text style={{ fontSize: 17, lineHeight: 24 }}>🍱</Text>
                   <AddMark done={done.includes('saved')} />
                 </View>
-                <Text variant="label" numberOfLines={2} style={{ flex: 1 }}>
+                <Text variant="label" numberOfLines={2}>
                   {savedMeal.name}
                 </Text>
-                <Text variant="caption" color="textSecondary" numberOfLines={2}>
+                <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ marginTop: 'auto' }}>
                   {savedServings > 1
                     ? `1 of ${formatPortion(savedServings)} servings, ${formatNumber(planSavedMeal(savedMeal).kcal)} kcal`
                     : `${savedMeal.items.length} ${savedMeal.items.length === 1 ? 'item' : 'items'}, ${formatNumber(planSavedMeal(savedMeal).kcal)} kcal`}

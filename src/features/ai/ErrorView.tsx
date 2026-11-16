@@ -5,7 +5,7 @@ import { View } from 'react-native';
 import { useTheme } from '@/theme';
 import { Button, Card, Text } from '@/ui';
 
-import type { AiErrorCode } from './api';
+import { aiError, type AiErrorCode } from './api';
 
 export type ScreenErrorCode = AiErrorCode | 'camera_denied' | 'unreadable';
 
@@ -25,6 +25,24 @@ const TITLE: Record<ScreenErrorCode, string> = {
   camera_denied: 'Camera access is off',
   unreadable: 'That photo could not be read',
 };
+
+/**
+ * What follows the title when the message is the app's own: the stock message starts by saying
+ * what the title already says ("No connection. Check your internet..."). A server's own message is shown as sent.
+ */
+const AFTER_TITLE: Partial<Record<AiErrorCode, string>> = {
+  daily_limit: 'They reset at midnight UTC.',
+  network: 'Check your internet and try again.',
+  not_food: 'Try a clearer photo or describe the meal.',
+  unauthorized: 'Your session has expired.',
+  bad_request: 'Try another photo.',
+};
+
+function bodyFor(code: ScreenErrorCode, message: string): string {
+  if (code === 'camera_denied' || code === 'unreadable') return message;
+  const short = AFTER_TITLE[code];
+  return short && message === aiError(code).message ? short : message;
+}
 
 function Icon({ code, color }: { code: ScreenErrorCode; color: string }) {
   const p = { size: 28, color, strokeWidth: 1.9 };
@@ -68,7 +86,7 @@ export function ErrorView({ code, message, actions, footnote }: { code: ScreenEr
       <Icon code={code} color={tone} />
       <Text variant="h3">{TITLE[code]}</Text>
       <Text variant="body" color="textSecondary">
-        {message}
+        {bodyFor(code, message)}
       </Text>
       <View style={{ gap: spacing.sm, marginTop: spacing.xs }}>
         {actions.map((a, i) => (

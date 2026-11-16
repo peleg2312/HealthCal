@@ -1,11 +1,11 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Dumbbell, Plus, Timer } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { View } from 'react-native';
 
 import { TabHeader } from '@/components/TabHeader';
 import { ACTIVITY_BY_ID, POPULAR_ACTIVITY_IDS } from '@/data/activities';
-import { ActivityTile, SessionRow } from '@/features/activity/components';
+import { QuickStartTiles, SessionRow } from '@/features/activity/components';
 import { summariseWeek } from '@/features/activity/build';
 import { deleteActivity, openSession } from '@/features/activity/session';
 import { RoutineCards, useRoutineTemplates } from '@/features/activity/RoutineCards';
@@ -32,8 +32,6 @@ export default function TrainScreen() {
   const recentIds = useStore((s) => s.recentActivityIds);
   const draft = useStrengthDrafts((s) => s.drafts.new);
   const [pages, setPages] = useState(1);
-  // Under 360 px four tiles a row leave no room for a word like "Volleyball": three a row, two rows.
-  const narrow = useWindowDimensions().width < 360;
 
   const t = useToday();
   // ?week=YYYY-MM-DD shows that week (the import screen links to the week it added workouts to); otherwise this week.
@@ -127,15 +125,7 @@ export default function TrainScreen() {
       ) : null}
 
       <SectionTitle title="Quick start" action="All activities" onAction={() => router.push('/activity/pick')} />
-      <View style={{ gap: spacing.sm }}>
-        {(narrow ? [quick.slice(0, 3), quick.slice(3, 6)] : [quick.slice(0, 4), quick.slice(4, 8)]).map((row, i) => (
-          <View key={i} style={{ flexDirection: 'row', gap: spacing.sm }}>
-            {row.map((a) => (
-              <ActivityTile key={a.id} emoji={a.emoji} name={a.name} testID={`quick-${a.id}`} onPress={() => router.push(`/activity/log?activityId=${a.id}`)} />
-            ))}
-          </View>
-        ))}
-      </View>
+      <QuickStartTiles items={quick} onPick={(id) => router.push(`/activity/log?activityId=${id}`)} />
 
       <SectionTitle title="History" />
       {history.length === 0 ? (
@@ -143,9 +133,8 @@ export default function TrainScreen() {
           <EmptyState
             emoji="🏐"
             title="Your sessions will show up here"
-            message="Log a game of volleyball, a yoga class or a run, and see your week fill up. Calories are estimated from your weight and the activity's MET value."
-            action="Log your first activity"
-            onAction={() => router.push('/activity/pick')}
+            // The action that fills it is "Log activity" above: one primary button on the screen, not two.
+            message="Log a game of volleyball, a yoga class or a run, and see your week fill up."
           />
         </Card>
       ) : (

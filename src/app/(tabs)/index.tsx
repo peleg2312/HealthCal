@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ChevronRight, Droplets, Plus, Repeat2 } from 'lucide-react-native';
+import { Plus, Repeat2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
@@ -30,7 +30,7 @@ import { useNow, useToday } from '@/store/clock';
 import { useConsistency, useDay, useLive, useProfile, type DaySummary } from '@/store/selectors';
 import { motion, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
-import { AnimatedNumber, Button, Card, Chip, ChipWrap, CupKey, IconButton, PressableScale, ProgressBar, Screen, Text, Vessel, type VesselLabel } from '@/ui';
+import { AnimatedNumber, Button, Card, CupKey, IconButton, PressableScale, ProgressBar, Screen, Text, Vessel, type VesselLabel } from '@/ui';
 
 
 export default function TodayScreen() {
@@ -83,18 +83,6 @@ export default function TodayScreen() {
         note={isToday && streak.line ? { text: streak.line, delay: AFTER_STRIP_MS + motion.duration.pourSmall, testID: 'today-streak-line' } : null}
       />
 
-      {!isToday ? null : firstDay ? (
-        <Text variant="body" color="textSecondary" testID="today-coach">
-          {`Your budget is ${formatNumber(day.budget)} kcal. Log the first thing and the cup starts to fill.`}
-        </Text>
-      ) : !recap.announce ? (
-        <CoachLine
-          day={day}
-          yesterday={yesterday.entries.length ? { eaten: yesterday.eaten.kcal, budget: yesterday.budget } : null}
-          onFits={() => setFits({ proteinFirst: true })}
-        />
-      ) : null}
-
       <EnergyCard
         day={day}
         isToday={isToday}
@@ -103,8 +91,18 @@ export default function TodayScreen() {
         onFits={() => setFits({ proteinFirst: false })}
         share={<ShareDayButton date={date} />}
       />
+      {/* The coach's one line and its one action, under the card whose numbers it talks about; early in
+          the week "Your week is ready" takes its place. Day one has neither: the invite in the card is the one thing to do. */}
+      {!isToday || firstDay ? null : recap.announce ? (
+        <RecapReadyCard />
+      ) : (
+        <CoachLine
+          day={day}
+          yesterday={yesterday.entries.length ? { eaten: yesterday.eaten.kcal, budget: yesterday.budget } : null}
+          onFits={() => setFits({ proteinFirst: true })}
+        />
+      )}
       <StatusRail day={day} isToday={isToday} quiet={firstDay} />
-      {isToday && recap.announce ? <RecapReadyCard /> : null}
 
       <MealsSection day={day} />
 
@@ -164,6 +162,10 @@ function EnergyCard({
   const unitWord = over ? 'over' : isToday ? 'left' : 'under';
   const height = firstDay ? VESSEL_H_FIRST : VESSEL_H;
   const vesselW = narrow ? 66 : 84;
+  const budgetLabel =
+    headroom > 0
+      ? `Budget ${formatNumber(day.budget)} kilocalories: ${formatNumber(day.target)} target plus ${formatNumber(headroom)} from exercise`
+      : `Daily budget ${formatNumber(day.budget)} kilocalories${day.exerciseNet > 0 ? `, ${formatNumber(day.exerciseNet)} burned in activity not added` : ''}`;
 
   const labels: VesselLabel[] = [];
   if (headroom > 0) {
@@ -291,26 +293,19 @@ function EnergyCard({
       ) : null}
       <View style={{ height: 1, backgroundColor: colors.border, marginTop: 16, marginBottom: 8 }} />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-        <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
-          {headroom > 0 ? (
+        {/* One short line: the hatching and its label already say what exercise added; the whole sum is read out. */}
+        <Text variant="caption" color="textSecondary" style={{ flex: 1 }} testID="today-budget" accessibilityLabel={budgetLabel}>
+          {firstDay ? (
+            'Log the first thing and the cup starts to fill.'
+          ) : (
             <>
               {'Budget '}
               <Text variant="numM" style={{ fontSize: 14, lineHeight: 17 }}>
                 {formatNumber(day.budget)}
               </Text>
-              {` = ${formatNumber(day.target)} target + ${formatNumber(headroom)} from exercise`}
-            </>
-          ) : (
-            <>
-              {'Daily budget '}
-              <Text variant="numM" style={{ fontSize: 14, lineHeight: 17 }}>
-                {formatNumber(day.budget)}
-              </Text>
               {' kcal'}
-              {day.exerciseNet > 0 ? `, ${formatNumber(day.exerciseNet)} kcal burned in activity not added` : ''}
             </>
           )}
-          {over ? `. ${left} kcal past the budget` : ''}
         </Text>
         {share}
       </View>
@@ -347,8 +342,10 @@ function relativeTo(date: ISODate, from: ISODate): string {
 }
 
 /**
- * The coach's one line under the greeting ("On track. 941 kcal left and
- * 2.08 L of water to go."), with its quick actions under it as chips.
+ * The coach's line under the calorie card: one sentence pair in at most two lines ("Had dinner
+ * yet? It is not in today's log.") and its one action as a small button directly under it
+ * (a glass of water, repeat a meal, see what fits, or where the tip points). No chevron, no chips:
+ * one thing to read, one thing to tap.
  */
 function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: ClosedDay | null; onFits: () => void }) {
   const { colors, spacing } = useTheme();
@@ -362,57 +359,53 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
   const quick = tip.quick;
   const prev = quick?.kind === 'repeat' ? findPreviousMeal(entries, day.date, quick.meal, 7) : null;
   const glass = defaultGlass(presets);
-  const open = quick?.kind === 'fits' ? onFits : action ? () => router.push(action.href as never) : undefined;
 
-  const chips: React.ReactNode[] = [];
+  const small = { size: 'sm' as const, variant: 'secondary' as const, full: false, style: { alignSelf: 'flex-start' as const } };
+  let button: React.ReactNode = null;
   if (quick?.kind === 'water') {
-    chips.push(
-      <Chip
-        key="water"
+    button = (
+      <Button
+        {...small}
         testID="today-coach-water"
-        icon={<Droplets size={15} color={colors.water} strokeWidth={2.2} />}
-        label={`Add ${formatVolume(glass, profile.units)}`}
+        tint={colors.water}
+        icon={<Plus size={16} color={colors.water} strokeWidth={2.6} />}
+        title={`Add ${formatVolume(glass, profile.units)}`}
+        accessibilityLabel={`Add ${formatVolume(glass, profile.units)} of water`}
         onPress={() => addWater(day.date, glass, profile.units, day.waterGoalMl)}
-      />,
+      />
     );
-  }
-  if (quick?.kind === 'repeat' && prev) {
-    const kcal = prev.entries.reduce((s, e) => s + e.nutrients.kcal, 0);
+  } else if (quick?.kind === 'repeat' && prev) {
+    const kcal = prev.entries.reduce((sum, e) => sum + e.nutrients.kcal, 0);
     const meal = MEAL_LABEL[quick.meal].toLowerCase();
-    chips.push(
-      <Chip
-        key="repeat"
+    const when = relativeTo(prev.date, day.date);
+    button = (
+      <Button
+        {...small}
         testID="today-coach-repeat"
-        icon={<Repeat2 size={15} color={colors.text} strokeWidth={2.2} />}
-        label={`Repeat ${relativeTo(prev.date, day.date)}'s ${meal}, ${formatNumber(kcal)} kcal`}
-        onPress={() => copyEntries(prev.entries, day.date, quick.meal, `Copied ${meal} from ${relativeTo(prev.date, day.date)}`)}
-      />,
+        icon={<Repeat2 size={16} color={colors.text} strokeWidth={2.2} />}
+        title={`Repeat ${when}'s ${meal}`}
+        accessibilityLabel={`Repeat ${when}'s ${meal}, ${formatNumber(kcal)} kilocalories`}
+        onPress={() => copyEntries(prev.entries, day.date, quick.meal, `Copied ${meal} from ${when}`)}
+      />
     );
-    if (open) chips.push(<Chip key="else" testID="today-coach-else" label="Something else" onPress={open} />);
+  } else if (quick?.kind === 'fits' || action) {
+    button = (
+      <Button
+        {...small}
+        testID="today-coach-open"
+        title={action?.label ?? 'See what fits'}
+        onPress={quick?.kind === 'fits' ? onFits : () => router.push(action!.href as never)}
+      />
+    );
   }
-
-  const line = (
-    <Text variant="body" style={{ flex: 1 }}>
-      <Text variant="bodyStrong">{/[.!?]$/.test(tip.title) ? tip.title : `${tip.title}.`}</Text>
-      <Text variant="body" color="textSecondary">{` ${tip.body}`}</Text>
-    </Text>
-  );
 
   return (
-    <View testID="today-coach" style={{ gap: spacing.sm }}>
-      <PressableScale
-        testID="today-coach-open"
-        scaleTo={0.99}
-        disabled={!open}
-        dimDisabled={false}
-        feedback={open ? 'tap' : 'none'}
-        onPress={open}
-        accessibilityLabel={action ? `${tip.title}. ${tip.body} ${action.label}` : `${tip.title}. ${tip.body}`}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: open ? 44 : undefined }}>
-        {line}
-        {open ? <ChevronRight size={18} color={colors.textSecondary} /> : null}
-      </PressableScale>
-      {chips.length ? <ChipWrap>{chips}</ChipWrap> : null}
+    <View testID="today-coach" style={{ gap: spacing.sm, marginVertical: spacing.xs }}>
+      <Text variant="body" accessibilityLabel={`${tip.title}. ${tip.body}`}>
+        <Text variant="bodyStrong">{/[.!?]$/.test(tip.title) ? tip.title : `${tip.title}.`}</Text>
+        <Text variant="body" color="textSecondary">{` ${tip.body}`}</Text>
+      </Text>
+      {button}
     </View>
   );
 }
@@ -430,14 +423,11 @@ function MealsSection({ day }: { day: DaySummary }) {
         <PressableScale
           testID="section-meals-action"
           onPress={() => router.push(`/diary?date=${day.date}` as never)}
-          accessibilityLabel={`Open diary, ${formatNumber(day.eaten.kcal)} kilocalories logged`}
+          accessibilityLabel="Open diary"
           hitSlop={8}
           style={{ minHeight: 44, justifyContent: 'center', marginVertical: -12, paddingLeft: 12 }}>
-          <Text variant="caption" color="textSecondary">
-            <Text variant="numM" style={{ fontSize: 14, lineHeight: 17 }} color="textSecondary">
-              {formatNumber(day.eaten.kcal)}
-            </Text>
-            {' kcal · Open diary'}
+          <Text variant="label" color="textSecondary">
+            Open diary
           </Text>
         </PressableScale>
       </View>

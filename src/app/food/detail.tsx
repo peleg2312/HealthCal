@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Star, Trash2 } from 'lucide-react-native';
+import { Info, Star, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
@@ -140,40 +140,66 @@ function NutritionFacts({ portion, per100g, showPer100 }: { portion: Nutrients; 
   );
 }
 
-function Hero({ name, brand, source, explain, onEdit }: { name: string; brand?: string; emoji?: string; source: Food['source']; explain: string; onEdit?: () => void }) {
+/**
+ * The food's name, brand and where its numbers come from. The source's one-sentence explanation
+ * sits behind the badge (tap it), so the amount and its button stay in the first view; `note` is
+ * shown always (an estimate's range is part of the honest number, not help text).
+ */
+function Hero({ name, brand, source, explain, note, onEdit }: { name: string; brand?: string; source: Food['source']; explain: string; note?: string; onEdit?: () => void }) {
+  const { colors, spacing } = useTheme();
+  const [open, setOpen] = useState(false);
   return (
-    <View>
-      <View style={{ gap: 6 }}>
-        {/* The food's name at a section title's size: the header above holds the screen's title. */}
-        <Text variant="h3" numberOfLines={3} testID="detail-name">
-          {name}
+    <View style={{ gap: 6 }}>
+      {/* The food's name at a section title's size: the header above holds the screen's title. */}
+      <Text variant="h3" numberOfLines={3} testID="detail-name">
+        {name}
+      </Text>
+      {brand ? (
+        <Text variant="label" color="textSecondary" numberOfLines={2}>
+          {brand}
         </Text>
-        {brand ? (
-          <Text variant="label" color="textSecondary">
-            {brand}
-          </Text>
-        ) : null}
-        <SourceBadge source={source} />
-        <Text variant="caption" color="textTertiary">
-          {explain}
-        </Text>
+      ) : null}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: 2 }}>
+        <PressableScale
+          testID="detail-source-info"
+          onPress={() => setOpen((v) => !v)}
+          feedback="select"
+          hitSlop={9}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: open }}
+          accessibilityLabel={`Data source: ${sourceInfo(source).label}. ${open ? 'Hide' : 'Show'} where the numbers come from`}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <SourceBadge source={source} />
+          <Info size={16} color={colors.textSecondary} strokeWidth={1.9} />
+        </PressableScale>
         {/* Your own food: its definition is yours to change (the header keeps one action, the favourite). */}
         {onEdit ? (
-          <PressableScale testID="detail-edit-food" accessibilityRole="link" accessibilityLabel="Edit this food" onPress={onEdit} hitSlop={6} style={{ alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', marginVertical: -8 }}>
+          <PressableScale testID="detail-edit-food" accessibilityRole="link" accessibilityLabel="Edit this food" onPress={onEdit} hitSlop={6} style={{ marginLeft: 'auto', minHeight: 44, justifyContent: 'center', marginVertical: -9 }}>
             <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
               Edit this food
             </Text>
           </PressableScale>
         ) : null}
       </View>
+      {open ? (
+        <Text variant="caption" color="textSecondary" testID="detail-source-explain">
+          {explain}
+        </Text>
+      ) : null}
+      {note ? (
+        <Text variant="caption" color="textSecondary" testID="detail-note">
+          {note}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
+/** Calories (large) with the portion beside them, the macro bar and the three macros: the top of the portion card. */
 function MacroSummary({ n, kcalNote, range }: { n: Nutrients; kcalNote: string; range?: [number, number] | null }) {
   const { colors, spacing } = useTheme();
   return (
-    <Card>
+    <View>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md }}>
         <View testID="detail-kcal">
           <KcalValue value={n.kcal} variant="numXL" color="caloriesInk" />
@@ -195,7 +221,7 @@ function MacroSummary({ n, kcalNote, range }: { n: Nutrients; kcalNote: string; 
         <MacroStat label="Carbs" value={n.carbs} color={colors.carbs} />
         <MacroStat label="Fat" value={n.fat} color={colors.fat} />
       </View>
-    </Card>
+    </View>
   );
 }
 
@@ -274,16 +300,15 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
       <Hero
         name={food.name}
         brand={food.brand}
-        emoji={food.emoji}
         source={food.source}
         explain={info.explain}
         onEdit={food.source === 'custom' && !food.id.startsWith('meal_') ? () => router.push(href('/food/custom', { id: food.id, meal, date }) as never) : undefined}
       />
 
-      <MacroSummary range={range} n={n} kcalNote={`${portionLabel(serving.label, quantity)}${perGram || serving.label === '100 g' || (quantity === 1 && /\d\s?g\)*$/.test(serving.label)) ? '' : ` · ${Math.round(totalGrams)} g`}`} />
-
-      <Card style={{ gap: spacing.md }}>
-        <Text variant="h3">Amount</Text>
+      {/* One card for the portion: what it holds, then how much. The amount stays in the first view at 360 x 740. */}
+      <Card style={{ gap: spacing.lg }} testID="detail-portion">
+        <MacroSummary range={range} n={n} kcalNote={`${portionLabel(serving.label, quantity)}${perGram || serving.label === '100 g' || (quantity === 1 && /\d\s?g\)*$/.test(serving.label)) ? '' : ` · ${Math.round(totalGrams)} g`}`} />
+        <Divider />
         <AmountEditor food={food} value={portion} onChange={setPortion} onPendingChange={setGramsInvalid} testIDPrefix="detail" />
       </Card>
 
@@ -347,23 +372,24 @@ function ManualEditor({ entry }: { entry: FoodEntry }) {
       }>
       <Hero
         name={name || entry.name}
-        emoji={entry.emoji}
         source={entry.source}
-        explain={
+        explain={info.explain}
+        note={
           rangeKept && entry.kcalRange
-            ? `Likely between ${kcal(entry.kcalRange[0])} and ${kcal(entry.kcalRange[1])} kcal${entry.confidence !== undefined ? ` (${Math.round(entry.confidence * 100)}% confidence)` : ''}. Adjust if you know better.`
-            : info.explain
+            ? `Likely between ${kcal(entry.kcalRange[0])} and ${kcal(entry.kcalRange[1])} kcal${entry.confidence !== undefined ? ` (${Math.round(entry.confidence * 100)}% confidence)` : ''}`
+            : undefined
         }
       />
-      <MacroSummary n={n} kcalNote={entry.grams > 0 ? `about ${Math.round(entry.grams)} g` : entry.servingLabel} />
+      {/* The fields are the numbers: no summary above them repeating the same values. */}
       <Card style={{ gap: spacing.md }}>
         <TextField testID="manual-name" label="Name" value={name} onChangeText={setName} maxLength={80} />
-        <NumberField testID="manual-kcal" label="Calories" suffix="kcal" value={kcalV} onChange={setKcal} decimals={0} />
+        <NumberField testID="manual-kcal" label="Calories" suffix="kcal" value={kcalV} onChange={setKcal} decimals={0} hint={entry.grams > 0 ? `About ${Math.round(entry.grams)} g` : undefined} />
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
           <NumberField testID="manual-protein" label="Protein" suffix="g" value={protein} onChange={setProtein} style={{ flex: 1 }} />
           <NumberField testID="manual-carbs" label="Carbs" suffix="g" value={carbs} onChange={setCarbs} style={{ flex: 1 }} />
           <NumberField testID="manual-fat" label="Fat" suffix="g" value={fat} onChange={setFat} style={{ flex: 1 }} />
         </View>
+        <MacroBar protein={n.protein * 4} carbs={n.carbs * 4} fat={n.fat * 9} height={6} />
         {implied > 40 && kcalV !== null && Math.abs(implied - kcalV) > Math.max(60, kcalV * 0.25) ? (
           <Text variant="caption" color="textSecondary">
             The macros add up to about {kcal(implied)} kcal. Both can be right (labels round), but it may be worth a second look.

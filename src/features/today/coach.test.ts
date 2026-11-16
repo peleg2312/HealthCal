@@ -65,7 +65,7 @@ describe('coachTip', () => {
     const tip = coachTip(day(), 'metric', at(8), DEFAULT_RHYTHM, { eaten: 1840, budget: 1990 });
     expect(tip.id).toBe('closed');
     expect(tip.title).toBe('Yesterday closed within budget');
-    expect(tip.body).toBe("1,840 of 1,990 kcal. Today's budget is 2,000 kcal.");
+    expect(tip.body).toBe('1,840 of 1,990 kcal.');
     // The first-log action is still there.
     expect(tip.action?.href).toContain('meal=breakfast');
     // Over budget, or a half-logged day, is not called closed within budget.
@@ -120,7 +120,7 @@ describe('coachTip', () => {
     });
     const tip = coachTip(d, 'metric', at(22));
     expect(tip.id).toBe('over');
-    expect(tip.title).toBe("320 kcal over today's budget");
+    expect(tip.title).toBe("Over today's budget");
     expect(`${tip.title} ${tip.body}`).not.toMatch(/fail|bad|cheat|guilt|!/i);
   });
 
@@ -132,6 +132,28 @@ describe('coachTip', () => {
     const tip = coachTip(d, 'metric', at(22));
     expect(tip.id).toBe('on-track');
     expect(tip.tone).toBe('positive');
+  });
+});
+
+describe('coachTip length', () => {
+  it('keeps every line short enough for two lines at 320 px, without the kcal left the card shows', () => {
+    const three = [entry('breakfast', 20), entry('lunch', 25), entry('dinner', 10)];
+    const tips = [
+      coachTip(day(), 'metric', at(8)),
+      coachTip(day(), 'metric', at(8), DEFAULT_RHYTHM, { eaten: 11840, budget: 11990 }),
+      coachTip(day({ entries: [entry('breakfast')] }), 'metric', at(14)),
+      coachTip(day({ entries: [entry('breakfast'), entry('lunch')], waterMl: 225, waterGoalMl: 3300, waterRemainingMl: 3075 }), 'metric', at(16)),
+      coachTip(day({ entries: [entry('breakfast'), entry('lunch')], waterMl: 225, waterGoalMl: 3300, waterRemainingMl: 3075 }), 'imperial', at(16)),
+      coachTip(day({ entries: three }), 'metric', at(21, 30)),
+      coachTip(day({ entries: three, remaining: -1320 }), 'metric', at(22)),
+      coachTip(day({ entries: [entry('breakfast', 60), entry('lunch', 60), entry('dinner', 60)] }), 'metric', at(21)),
+      coachTip(day({ entries: [entry('breakfast', 60), entry('lunch', 60), entry('dinner', 60)], activities: [{} as never], waterRemainingMl: 400 }), 'metric', at(22)),
+    ];
+    expect(tips.map((t) => t.id)).toEqual(['start', 'closed', 'meal-lunch', 'water', 'water', 'protein', 'over', 'move', 'on-track']);
+    for (const t of tips) {
+      expect(`${t.title} ${t.body}`.length).toBeLessThanOrEqual(76);
+      expect(`${t.title} ${t.body}`).not.toMatch(/kcal left/);
+    }
   });
 });
 
