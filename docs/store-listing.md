@@ -175,7 +175,7 @@ Play only: add this paragraph at the end of WORKOUTS.
 - On Android, sync workouts automatically from Health Connect: exercise sessions with their calories and distance from Garmin Connect, Samsung Health, Fitbit and other apps. Your daily steps show on your training week; they are never added to your calories.
 ```
 
-App Store only, once an iPhone build with Apple Health (the library is bound since November 2026: docs/health-sync.md, "How the iPhone side is bound") has been checked on a phone and is the one submitted: add this paragraph at the end of WORKOUTS. Apple's review asks that an app using HealthKit says so in its description and in the app (the sync screen and the Profile row are named "Workout sync" and say "From Apple Health").
+App Store only, once an iPhone build with Apple Health (the library is bound since November 2026: docs/health-sync.md, "How the iPhone side is bound") has been checked on a phone and is the one submitted: add this paragraph at the end of WORKOUTS. Apple's review asks that an app using HealthKit says so in its description and in the app (the sync screen is named "Workout sync" and says "From Apple Health"; the Profile row opens it).
 
 ```
 - Works with Apple Health: workouts from your Apple Watch, Garmin Connect and other apps arrive by themselves, with their calories and distance. Your daily steps show on your training week; they are never added to your calories. HealthCal only reads from Apple Health and never writes to it.
@@ -218,7 +218,7 @@ The stores will ask for these, and only you can provide them:
    - the app works on the device without an account;
    - with an account, data syncs to your Supabase project;
    - a meal photo or description is sent to the analyse-food function and on to the AI model provider to make an estimate;
-   - with Workout sync on, workouts, their active and total calories and distance, and daily steps are read from Health Connect (and from Apple Health once the iPhone app can read it: until then no build does, docs/health-sync.md); workouts are kept like hand-logged sessions, steps only on the phone; none of it goes to the AI provider, advertisers or anyone else, and nothing is written back;
+   - with Workout sync on, workouts, their active and total calories and distance, and daily steps are read from Health Connect on Android or Apple Health on iPhone (the iPhone side is built but has not yet run on a phone; docs/health-sync.md, "State of the iPhone side"); workouts are kept like hand-logged sessions, steps only on the phone; none of it goes to the AI provider, advertisers or anyone else, and nothing is written back;
    - friends see only minutes, sessions, streak and recent workouts;
    - how export and deletion work.
 2. **Apple: App Privacy answers** (the "nutrition label"). Data linked to the user when an account exists:

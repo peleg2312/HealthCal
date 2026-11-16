@@ -73,14 +73,27 @@ describe('sync screen wording', () => {
     expect(switchSubtitle(on, false, false, '5 min ago')).toBe('On, last synced 5 min ago');
     expect(switchSubtitle({ ...on, lastError: { code: 'timeout', at: 'x' } }, false, false, '5 min ago')).toBe('On, but the last sync did not finish');
 
-    expect(profileSubtitle(off, false, null)).toBe('In the Android app');
-    expect(profileSubtitle(off, false, null, 'In the iPhone and Android apps')).toBe('In the iPhone and Android apps');
+    expect(profileSubtitle(off, 'unsupported', null)).toBe('In the Android app');
+    expect(profileSubtitle(off, 'unsupported', null, 'In the iPhone and Android apps')).toBe('In the iPhone and Android apps');
     expect(switchSubtitle(off, false, true, null, 'Apple Health')).toBe('Waiting for Apple Health');
-    expect(profileSubtitle(off, true, null)).toBe('Off. Add Garmin and other workouts by themselves');
-    expect(profileSubtitle(on, true, '5 min ago')).toBe('On, last synced 5 min ago');
-    expect(profileSubtitle({ ...on, lastError: { code: 'permission', at: 'x' } }, true, null)).toBe('Needs attention');
+    expect(profileSubtitle(off, 'available', null)).toBe('Off. Add Garmin and other workouts by themselves');
+    // Until the store answers, and where Android can install or update Health Connect, turning it on is still the way.
+    expect(profileSubtitle(off, 'checking', null)).toBe('Off. Add Garmin and other workouts by themselves');
+    expect(profileSubtitle(off, 'not-installed', null)).toBe('Off. Add Garmin and other workouts by themselves');
+    expect(profileSubtitle(on, 'available', '5 min ago')).toBe('On, last synced 5 min ago');
+    expect(profileSubtitle({ ...on, lastError: { code: 'permission', at: 'x' } }, 'available', null)).toBe('Needs attention');
     const waiting = planSync({ workouts: [workout({ start: '2026-11-13T16:00:00Z', minutes: 90, exerciseType: TYPE.paddling })], existing: [], ctx: CTX }).review;
-    expect(profileSubtitle({ ...on, review: waiting }, true, '5 min ago')).toBe('On, 1 workout needs a look');
+    expect(profileSubtitle({ ...on, review: waiting }, 'available', '5 min ago')).toBe('On, 1 workout needs a look');
+  });
+
+  it('never invites turning on sync where this install cannot use it', () => {
+    const off = { enabled: false, lastSyncedAt: null, lastError: null, review: [] };
+    // An iPhone copy signed without the HealthKit entitlement: what is true there, and the way that works.
+    expect(profileSubtitle(off, 'not-entitled', null, 'In the iPhone and Android apps')).toBe('Not available in this install. Import your Health export');
+    expect(profileSubtitle({ ...off, enabled: true }, 'not-entitled', null)).toBe('Not available in this install. Import your Health export');
+    // An iPad without Apple Health: where sync does work.
+    expect(profileSubtitle(off, 'unsupported', null, 'In the iPhone and Android apps')).toBe('In the iPhone and Android apps');
+    for (const a of ['not-entitled', 'unsupported'] as const) expect(profileSubtitle(off, a, null)).not.toMatch(/^Off/);
   });
 
   it('says what is not shared', () => {

@@ -169,7 +169,14 @@ module.exports = [
     route: '/settings/health-sync',
     health: { demo: iphone({ availability: 'not-entitled', access: { workouts: false, activeEnergy: false, totalEnergy: false, distance: false, steps: false } }) },
     waitFor: 'health-sync-problem-not-entitled',
-    note: 'iPhone: a copy sideloaded with a free Apple ID (no HealthKit entitlement), which HealthKit refuses',
+    note: 'iPhone: a copy signed without the HealthKit entitlement (AltStore, Sideloadly), which HealthKit refuses',
+  },
+  {
+    id: 'profile-iphone-not-entitled',
+    route: '/profile',
+    health: { demo: iphone({ availability: 'not-entitled', access: { workouts: false, activeEnergy: false, totalEnergy: false, distance: false, steps: false } }) },
+    waitFor: 'profile-health-sync',
+    note: 'Profile on an iPhone copy without the HealthKit entitlement: the Workout sync row says it is not available here, never "Off. Add ..."',
   },
   {
     id: 'health-sync-android-steps-off',

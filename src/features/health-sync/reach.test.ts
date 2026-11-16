@@ -33,10 +33,10 @@ describe('where sync works', () => {
     expect(storesRead(false)).toEqual({ from: 'Health Connect on Android', notBack: 'Health Connect' });
   });
 
-  it('with the iPhone side bound (what the app shows): both phones, not a sideloaded copy, and an iPad without Health says so', () => {
+  it('with the iPhone side bound (what the app shows): both phones, a sideloaded copy may lack the permission, and an iPad without Health says so', () => {
     expect(syncReach('web', false, true)).toMatchObject({ profile: 'In the iPhone and Android apps', heading: 'Automatic on iPhone and Android' });
     expect(syncReach('web', false).body).toBe(
-      'There, workouts from Garmin Connect and other apps arrive by themselves through Apple Health or Health Connect, with your watch’s calories. An iPhone copy installed with a sideloading tool cannot read Apple Health.',
+      'There, workouts from Garmin Connect and other apps arrive by themselves through Apple Health or Health Connect, with your watch’s calories. An iPhone copy installed with a sideloading tool may be signed without Apple’s Health permission; its Workout sync screen says so.',
     );
     expect(syncReach('ios', true, true).here).toBe('Apple Health is not available on this device. Here, import the Health app’s export or the files Garmin Connect exports.');
     expect(storesRead(true).from).toBe('Health Connect on Android or Apple Health on iPhone');

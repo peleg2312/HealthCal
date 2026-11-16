@@ -10,20 +10,23 @@
  * shows, which a phone does on its own whenever it closes an app left in the background.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
+import { useSegments } from 'expo-router';
+import { useEffect } from 'react';
 import { Appearance, AppState, Platform } from 'react-native';
 import { create } from 'zustand';
 
+import { useHealthSync } from '@/features/health-sync/store';
 import { today } from '@/lib/dates';
 import { useStore } from '@/store';
 import { flushPersistence, useHydration } from '@/store/persistence';
+import { useSyncState } from '@/services/sync';
 import { blossomColors, darkColors, lightColors, resolveThemeName } from '@/theme';
 import { sheetOnScreen } from '@/ui';
 
 import { createFakePort, DEMO_PRESETS, type FakeUpdates } from './fake';
 import { platformPort } from './platform';
 import type { RunningInfo, UpdatesPort } from './port';
-import type { CheckPhase, RestartAttempt } from './rules';
+import { frontIsTab, phaseAfterRestart, writeMarks, type CheckPhase, type RestartAttempt } from './rules';
 import { createUpdater, type Updater } from './updater';
 
 export interface UpdatesStatus {
@@ -45,6 +48,21 @@ let current: UpdatesPort | null = null;
 let stopPort: (() => void) | null = null;
 let started = false;
 
+/** The first segment of the screen in front ('(tabs)' on a tab), reported by useReportScreen; null until known. */
+let frontSegment: string | null = null;
+
+/**
+ * Mounted once in the root layout: tells the updater which screen is in front. A tab counts only
+ * when the screen in front is the tab group itself, not merely a stack with one screen (a reset
+ * link or a deep link can replace the tabs with a single pushed screen).
+ */
+export function useReportScreen(): void {
+  const first = useSegments()[0] ?? null;
+  useEffect(() => {
+    frontSegment = first;
+  }, [first]);
+}
+
 function background(): string {
   const s = useStore.getState();
   const name = resolveThemeName(s.settings.theme, Appearance.getColorScheme(), !s.profile?.onboardedAt);
@@ -58,9 +76,11 @@ function adopt(port: UpdatesPort): void {
     port,
     now: () => Date.now(),
     today,
-    // A tab is in front when nothing is pushed over the tabs (no stack can go back) and setup is done.
-    onTab: () => !!useStore.getState().profile?.onboardedAt && !router.canDismiss(),
+    // A tab is in front when the screen in front is the tab group and setup is done; unknown is not a tab.
+    onTab: () => frontIsTab(frontSegment, !!useStore.getState().profile?.onboardedAt),
     sheetOpen: sheetOnScreen,
+    busy: () => useHealthSync.getState().busy || useSyncState.getState().status === 'syncing',
+    revision: () => writeMarks(useStore.getState()),
     flush: async () => {
       await flushPersistence();
       return !useHydration.getState().saveFailed;
@@ -69,11 +89,11 @@ function adopt(port: UpdatesPort): void {
       const raw = await AsyncStorage.getItem(ATTEMPT_KEY);
       return raw ? (JSON.parse(raw) as RestartAttempt) : null;
     },
-    writeAttempt: (a) => AsyncStorage.setItem(ATTEMPT_KEY, JSON.stringify(a)),
+    writeAttempt: (a) => (a ? AsyncStorage.setItem(ATTEMPT_KEY, JSON.stringify(a)) : AsyncStorage.removeItem(ATTEMPT_KEY)),
     background,
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     warn: (...args) => console.warn(...args),
   });
-  const sync = () => useUpdatesStatus.setState({ pending: port.pending().pending });
   stopPort = port.onChange(sync);
   useUpdatesStatus.setState({ enabled: true, running: port.running, pending: port.pending().pending, phase: 'idle' });
   if (port.running.emergency) {
@@ -96,7 +116,7 @@ export function startUpdates(): void {
         return;
       }
       void updater?.returned().then((r) => {
-        if (r === 'looked') useUpdatesStatus.setState({ pending: portPending() });
+        if (r === 'looked') sync();
       });
     });
   } catch (error) {
@@ -105,6 +125,16 @@ export function startUpdates(): void {
 }
 
 const portPending = () => current?.pending().pending ?? false;
+
+/**
+ * Brings the store's pending in line with the library: an update that arrives by itself (the
+ * launch download, the return to the front) replaces an older check's result, so "Up to date"
+ * never shows beside a waiting update.
+ */
+function sync(): void {
+  const pending = portPending();
+  useUpdatesStatus.setState((s) => ({ pending, phase: pending && (s.phase === 'current' || s.phase === 'failed') ? 'ready' : s.phase }));
+}
 
 /** About's "Check for updates". */
 export async function checkForUpdatesNow(): Promise<void> {
@@ -117,9 +147,17 @@ export async function checkForUpdatesNow(): Promise<void> {
 /** About's "Restart to update". */
 export async function restartToUpdate(): Promise<void> {
   if (!updater) return;
-  const ok = await updater.restartNow();
-  if (!ok) useUpdatesStatus.setState({ phase: 'restart-failed' });
-  else useUpdatesStatus.setState({ pending: portPending(), phase: portPending() ? 'ready' : 'current' });
+  const r = await updater.restartNow();
+  const pending = portPending();
+  useUpdatesStatus.setState({ pending, phase: phaseAfterRestart(r, pending) });
+}
+
+/**
+ * About opened or closed: a result from an earlier visit is old news, so it is not shown again.
+ * A restart that failed stays failed for this run of the app (the updater refuses it again anyway).
+ */
+export function forgetCheckResult(): void {
+  useUpdatesStatus.setState((s) => (s.phase === 'checking' || s.phase === 'restart-failed' ? s : { phase: 'idle' }));
 }
 
 /**

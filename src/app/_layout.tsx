@@ -21,7 +21,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import { usePendingInvite } from '@/features/friends/usePendingInvite';
 import { startHealthSync } from '@/features/health-sync/sync';
-import { startUpdates } from '@/features/updates/updates';
+import { startUpdates, useReportScreen } from '@/features/updates/updates';
 import { handleAuthLink, initAuth } from '@/services/auth';
 import { refreshReminders } from '@/services/notifications';
 import { startFriends } from '@/services/friends';
@@ -105,6 +105,8 @@ function ProfileGate({ name, children }: { name: string; children: React.ReactNo
 function Navigation() {
   const { colors, dark } = useTheme();
   const reduce = useReducedMotion();
+  // Which screen is in front, for over-the-air updates (they restart only on a tab).
+  useReportScreen();
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar style={dark ? 'light' : 'dark'} />

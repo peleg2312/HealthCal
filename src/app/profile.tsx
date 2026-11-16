@@ -22,7 +22,7 @@ import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { syncReach } from '@/features/health-sync/reach';
 import { useHealthSync } from '@/features/health-sync/store';
-import { healthAdapter } from '@/features/health-sync/sync';
+import { healthAdapter, useHealthStatus } from '@/features/health-sync/sync';
 import { profileSubtitle } from '@/features/health-sync/ui/format';
 import { Group, IconTile, InitialsAvatar } from '@/features/settings/components';
 import { THEME_OPTIONS, ThemeSwatches } from '@/features/settings/ThemeSwatches';
@@ -317,11 +317,15 @@ function HealthSyncRow() {
   const { colors } = useTheme();
   const sync = useHealthSync();
   const now = useNow();
+  // The same availability the sync screen reads, so an iPhone copy without the HealthKit entitlement or an
+  // iPad without Apple Health is not invited to turn on what it cannot use.
+  const status = useHealthStatus();
+  const availability = healthAdapter.store === null ? 'unsupported' : status.availability;
   return (
     <ListRow
       testID="profile-health-sync"
       title="Workout sync"
-      subtitle={profileSubtitle(sync, healthAdapter.store !== null, timeAgo(sync.lastSyncedAt, now), syncReach(Platform.OS, false).profile)}
+      subtitle={profileSubtitle(sync, availability, timeAgo(sync.lastSyncedAt, now), syncReach(Platform.OS, false).profile)}
       left={
         <IconTile color={colors.exercise}>
           <RefreshCw size={20} color={colors.exercise} />

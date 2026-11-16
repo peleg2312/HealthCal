@@ -16,6 +16,8 @@ export interface FakeUpdates {
   failReload?: boolean;
   /** How long a check takes, in ms. */
   delay?: number;
+  /** The library's own download finishes this long after start (ms): an update arrives by itself. */
+  arriveAfterMs?: { ms: number; id: string };
 }
 
 export interface FakePort extends UpdatesPort {
@@ -29,6 +31,13 @@ export function createFakePort(o: FakeUpdates = {}): FakePort {
   const listeners = new Set<() => void>();
   const calls = { check: 0, fetch: 0, reload: 0 };
   const wait = () => (o.delay ? new Promise((r) => setTimeout(r, o.delay)) : Promise.resolve());
+  if (o.arriveAfterMs) {
+    const { ms, id } = o.arriveAfterMs;
+    setTimeout(() => {
+      pending = { pending: true, id };
+      for (const l of listeners) l();
+    }, ms);
+  }
   return {
     calls,
     running: { ...INSTALLED, ...o.running },
@@ -61,14 +70,25 @@ export function createFakePort(o: FakeUpdates = {}): FakePort {
   };
 }
 
+/** The running update in the demos: published a few days before the demo's today (Nov 16). */
+const DEMO_RUNNING = { embedded: false, updateId: 'demo-update-1', createdAt: new Date(2026, 10, 12, 9, 30) };
+
 /** The demo presets About's browser states use. */
 export const DEMO_PRESETS: Record<string, FakeUpdates> = {
   /** The code the app was installed with; a check finds nothing. */
   installed: { delay: 500 },
-  /** An update from Nov 17 is running; a check finds nothing. */
-  updated: { delay: 500, running: { embedded: false, updateId: 'demo-update-1', createdAt: new Date(2026, 10, 17, 9, 30) } },
+  /** An update from Nov 12 is running; a check finds nothing. */
+  updated: { delay: 500, running: DEMO_RUNNING },
   /** An update is running and a newer one is downloaded. */
-  ready: { running: { embedded: false, updateId: 'demo-update-1', createdAt: new Date(2026, 10, 17, 9, 30) }, pending: { pending: true, id: 'demo-update-2' } },
+  ready: { running: DEMO_RUNNING, pending: { pending: true, id: 'demo-update-2' } },
   /** The last update did not start; the installed code runs. */
   emergency: { delay: 500, running: { emergency: true, emergencyReason: 'demo: the update failed to launch' } },
+  /** A check that takes a long time: About shows that it is checking. */
+  slow: { delay: 60_000, running: DEMO_RUNNING },
+  /** No network: a check fails. */
+  offline: { delay: 500, failCheck: true, running: DEMO_RUNNING },
+  /** A newer update is waiting but the restart into it fails. */
+  'restart-fails': { running: DEMO_RUNNING, pending: { pending: true, id: 'demo-update-2' }, failReload: true },
+  /** A check finds nothing, then the library's own download brings an update while About is open. */
+  arrives: { delay: 300, running: DEMO_RUNNING, arriveAfterMs: { ms: 2500, id: 'demo-update-2' } },
 };

@@ -378,7 +378,7 @@ function ProblemCard({
   let action: React.ReactNode;
   if (problem === 'not-entitled') {
     title = `${store} is not available in this install`;
-    body = 'This copy was signed without Apple\'s Health permission, which sideloading tools leave out. Import the Health app’s export instead: it brings workouts and daily steps, and is a snapshot you can repeat.';
+    body = 'This copy was signed without Apple’s Health permission, which most sideloading tools leave out. Import the Health app’s export instead: it brings workouts and daily steps, and is a snapshot you can repeat.';
     action = <Button testID="health-sync-problem-import" title="Import your Health export" variant="secondary" size="md" full={false} onPress={onImport} />;
   } else if (problem === 'not-installed') {
     title = `${store} is not on this phone`;

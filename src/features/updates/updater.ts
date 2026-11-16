@@ -7,7 +7,7 @@ import type { Away } from '@/features/today/backToToday';
 import type { ISODate } from '@/types';
 
 import type { UpdatesPort } from './port';
-import { checkDue, restartOnReturn, type RestartAttempt, type ReturnFacts } from './rules';
+import { checkDue, CHECK_EVERY_MS, QUIET_MS, restartOnReturn, RETRY_AFTER_FAIL_MS, SETTLE_MAX_MS, wroteSince, type RestartAttempt, type RestartResult, type ReturnFacts } from './rules';
 
 export interface UpdaterEnv {
   port: UpdatesPort;
@@ -16,12 +16,22 @@ export interface UpdaterEnv {
   /** One of the four tabs is the screen in front. */
   onTab: () => boolean;
   sheetOpen: () => boolean;
+  /** Something is writing now (Health Connect's sync, the cloud sync): never restart under it. */
+  busy: () => boolean;
+  /**
+   * What the person or this phone has written and not yet sent, one mark per change (writeMarks in
+   * ./rules). Compared from the moment the app left to just before the restart: a new mark in
+   * between (a reminder's "Add 250 ml", a synced workout) means no restart this time.
+   */
+  revision: () => readonly string[];
   /** Writes whatever the store has not saved yet; true when it is all on the device. */
   flush: () => Promise<boolean>;
   readAttempt: () => Promise<RestartAttempt | null>;
-  writeAttempt: (a: RestartAttempt) => Promise<void>;
+  /** null removes the record. */
+  writeAttempt: (a: RestartAttempt | null) => Promise<void>;
   /** The screen colour shown for the moment the restart takes. */
   background: () => string;
+  sleep: (ms: number) => Promise<void>;
   warn: (...args: unknown[]) => void;
 }
 
@@ -37,8 +47,8 @@ export interface Updater {
   returned: () => Promise<ReturnResult>;
   /** Ask the server now and download what it has (About's check, and the return to the front). */
   look: () => Promise<LookResult>;
-  /** Start the downloaded update now, after saving (About's "Restart to update"). False when it could not. */
-  restartNow: () => Promise<boolean>;
+  /** Start the downloaded update now, after saving (About's "Restart to update"); says why when it did not. */
+  restartNow: () => Promise<RestartResult>;
 }
 
 export function createUpdater(env: UpdaterEnv): Updater {
@@ -48,6 +58,19 @@ export function createUpdater(env: UpdaterEnv): Updater {
   let reloadFailed = false;
   let looking: Promise<LookResult> | null = null;
   let away: Away | null = null;
+  /** What was written when the app left: any write since then (in the background or on the way back) means no restart. */
+  let leftRevision: readonly string[] | null = null;
+  /** Counts the times the app left the front, so a wait can tell it left again meanwhile. */
+  let leaves = 0;
+
+  const safely = <T>(fn: () => T, fallback: T): T => {
+    try {
+      return fn();
+    } catch (error) {
+      env.warn('[updates] could not read the app state', error);
+      return fallback;
+    }
+  };
 
   const facts = (was: Away | null, now: number, saved: boolean, attempt: RestartAttempt | null): ReturnFacts => {
     const p = port.pending();
@@ -67,45 +90,61 @@ export function createUpdater(env: UpdaterEnv): Updater {
     };
   };
 
-  const safely = <T>(fn: () => T, fallback: T): T => {
-    try {
-      return fn();
-    } catch (error) {
-      env.warn('[updates] could not read the app state', error);
-      return fallback;
-    }
-  };
+  const busy = () => safely(env.busy, true);
+  const revision = () => safely<readonly string[] | null>(env.revision, null);
 
-  /** Saves, records the attempt (so it is never repeated), then reloads. */
-  const restart = async (target: string | null): Promise<boolean> => {
+  /**
+   * Records the attempt (so it is never repeated), checks once more that nothing was written since
+   * `since` and nothing is running, then reloads. `still` re-checks whatever else must hold.
+   */
+  const restart = async (target: string | null, since: readonly string[] | null, previous: RestartAttempt | null, still: () => boolean): Promise<RestartResult> => {
     try {
       await env.writeAttempt({ target, at: env.now() });
     } catch (error) {
       // Without the record a restart that does not stick could repeat: wait for the next cold start.
       env.warn('[updates] could not record the restart, leaving it for the next start', error);
-      return false;
+      return 'failed';
+    }
+    // The record took a moment to write: the last look, in the same tick as the reload.
+    if (busy() || wroteSince(since, revision()) || !still()) {
+      await env.writeAttempt(previous).catch((error) => env.warn('[updates] could not put the restart record back', error));
+      return 'busy';
     }
     try {
       await port.reload(env.background());
-      return true;
+      return 'restarted';
     } catch (error) {
       reloadFailed = true;
       env.warn('[updates] restarting into the update failed; it starts at the next cold start', error);
-      return false;
+      return 'failed';
     }
+  };
+
+  /** Waits for a running sync to end; false when it did not in time or the app left meanwhile. */
+  const settle = async (leftAt: number): Promise<boolean> => {
+    await env.sleep(QUIET_MS);
+    for (let waited = 0; busy(); waited += 500) {
+      if (waited >= SETTLE_MAX_MS || leaves !== leftAt) return false;
+      await env.sleep(500);
+    }
+    return leaves === leftAt;
   };
 
   const look = (): Promise<LookResult> => {
     if (looking) return looking;
     looking = (async (): Promise<LookResult> => {
-      lastCheckAt = env.now();
+      const startedAt = env.now();
       try {
-        if (port.pending().pending) return 'ready';
-        if (!(await port.check())) return 'current';
-        const got = await port.fetch();
-        return got || port.pending().pending ? 'ready' : 'current';
+        let result: LookResult;
+        if (port.pending().pending) result = 'ready';
+        else if (!(await port.check())) result = 'current';
+        else result = (await port.fetch()) || port.pending().pending ? 'ready' : 'current';
+        lastCheckAt = startedAt;
+        return result;
       } catch (error) {
         env.warn('[updates] looking for an update failed', error);
+        // Offline: look again on a return RETRY_AFTER_FAIL_MS from now, not hours later.
+        lastCheckAt = startedAt - CHECK_EVERY_MS + RETRY_AFTER_FAIL_MS;
         return 'failed';
       } finally {
         looking = null;
@@ -116,22 +155,33 @@ export function createUpdater(env: UpdaterEnv): Updater {
 
   return {
     left: () => {
+      leaves += 1;
       // iOS passes through 'inactive' on the way to 'background': the first one counts.
-      if (!away) away = { at: env.now(), day: env.today() };
+      if (!away) {
+        away = { at: env.now(), day: env.today() };
+        leftRevision = revision();
+      }
     },
     returned: async () => {
       const was = away;
+      // What was unsent when the app left (null when it could not be read: then nothing restarts).
+      const since = was ? leftRevision : revision();
       away = null;
+      leftRevision = null;
+      const leftAt = leaves;
       try {
         const now = env.now();
         // Cheap facts first (saving assumed); only when they allow a restart is anything awaited.
-        if (restartOnReturn(facts(was, now, true, null))) {
+        if (restartOnReturn(facts(was, now, true, null)) && (await settle(leftAt))) {
           const [saved, attempt] = await Promise.all([env.flush().catch(() => false), env.readAttempt().catch(() => null)]);
           // Read the screen again: a sheet may have opened while the save ran.
           const f = facts(was, now, saved, attempt);
-          if (restartOnReturn(f) && (await restart(f.pendingId))) return 'restarted';
+          if (restartOnReturn(f) && leaves === leftAt) {
+            const still = () => leaves === leftAt && restartOnReturn(facts(was, now, saved, attempt));
+            if ((await restart(f.pendingId, since, attempt, still)) === 'restarted') return 'restarted';
+          }
         }
-        if (was && checkDue(lastCheckAt, now)) {
+        if (was && leaves === leftAt && checkDue(lastCheckAt, env.now())) {
           // Downloaded now, started at the next qualifying return or cold start: never under the person's finger.
           await look();
           return 'looked';
@@ -143,13 +193,17 @@ export function createUpdater(env: UpdaterEnv): Updater {
     },
     look,
     restartNow: async () => {
-      if (!port.pending().pending) return false;
-      const saved = await env.flush().catch(() => false);
+      if (!port.pending().pending) return 'nothing-waiting';
+      // This run of the app could not reload once: it will not now either. The next cold start takes it.
+      if (reloadFailed) return 'failed';
+      if (busy()) return 'busy';
+      const since = revision();
+      const [saved, previous] = await Promise.all([env.flush().catch(() => false), env.readAttempt().catch(() => null)]);
       if (!saved) {
         env.warn('[updates] not restarting: the last save did not reach the device');
-        return false;
+        return 'unsaved';
       }
-      return restart(port.pending().id);
+      return restart(port.pending().id, since, previous, () => port.pending().pending);
     },
   };
 }

@@ -54,7 +54,7 @@ export interface HealthWorkout {
  * 'not-installed': this phone could have it but does not (Android 13 and lower without the Health Connect app).
  * 'unsupported': there is no health store this build can read (the browser, an iPad without Apple Health).
  * 'not-entitled': the health store is there but this install of the app may not use it at all (an
- *   iPhone app signed without Apple's HealthKit permission, as a free Apple ID's sideloaded copy is).
+ *   iPhone app signed without Apple's HealthKit permission, as a copy sideloaded with AltStore or Sideloadly is).
  */
 export type HealthAvailability = 'available' | 'update-required' | 'not-installed' | 'unsupported' | 'not-entitled';
 

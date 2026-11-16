@@ -13,7 +13,7 @@ import type { ISODate, UnitSystem } from '@/types';
 import { workoutSpan } from '../convert';
 import type { OriginSeen, ReviewItem } from '../plan';
 import type { HealthSyncState } from '../state';
-import type { HealthAccess } from '../types';
+import type { HealthAccess, HealthAvailability } from '../types';
 
 export interface ReviewView {
   /** The activity's name, or the health store's word for the type while the activity is unknown. */
@@ -115,11 +115,20 @@ export function switchSubtitle(state: Pick<HealthSyncState, 'enabled' | 'lastSyn
 }
 
 /**
- * The row on Profile: what a glance should say. `elsewhere` is what to say
- * where this build cannot sync (`syncReach(...).profile`, reach.ts).
+ * The row on Profile: what a glance should say. `availability` is what the sync
+ * screen reads (`useHealthStatus`, 'unsupported' where this build has no health
+ * store at all), so the row never invites turning on what this install cannot
+ * use. `elsewhere` is what to say where this build cannot sync
+ * (`syncReach(...).profile`, reach.ts).
  */
-export function profileSubtitle(state: Pick<HealthSyncState, 'enabled' | 'lastSyncedAt' | 'lastError' | 'review'>, supported: boolean, ago: string | null, elsewhere = 'In the Android app'): string {
-  if (!supported) return elsewhere;
+export function profileSubtitle(
+  state: Pick<HealthSyncState, 'enabled' | 'lastSyncedAt' | 'lastError' | 'review'>,
+  availability: HealthAvailability | 'checking',
+  ago: string | null,
+  elsewhere = 'In the Android app',
+): string {
+  if (availability === 'unsupported') return elsewhere;
+  if (availability === 'not-entitled') return 'Not available in this install. Import your Health export';
   if (!state.enabled) return 'Off. Add Garmin and other workouts by themselves';
   if (state.lastError) return 'Needs attention';
   if (state.review.length) return `On, ${state.review.length} ${state.review.length === 1 ? 'workout needs' : 'workouts need'} a look`;
