@@ -9,9 +9,10 @@
 #   - Impactor and xtool read the app's entitlements, switch HealthKit on for the App ID they
 #     register, and sign with it. Whether Apple's free profile then carries HealthKit is not yet
 #     proved on a phone (docs/health-sync.md, "Installing on an iPhone with a free Apple ID").
-#   - Sideloadly and AltStore replace the signature with the entitlements of the free profile they
-#     fetch, which has no HealthKit; with them the app's sync screen says "Apple Health is not
-#     available in this install", as before. The ad-hoc signature changes nothing for them.
+#   - AltStore and SideStore sign with the entitlements of the free profile they fetch, which has
+#     no HealthKit, and Sideloadly keeps custom entitlements for paid accounts; with them the app's
+#     sync screen says "Apple Health is not available in this install", as before. The ad-hoc
+#     signature changes nothing for them.
 # The push entitlement that prebuild writes (aps-environment) is left out on purpose: a free
 # account cannot have it, the app's reminders are local and do not need it, and a tool that tried
 # to switch it on would fail.
