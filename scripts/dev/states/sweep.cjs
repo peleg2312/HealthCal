@@ -31,6 +31,9 @@ const today = [
     id: `sweep-today-eaten-${pct}-ex-${exercise}`, route: '/', values: { eaten, exercise },
     note: `Today, ${pct}% of the budget eaten, ${exercise} kcal of exercise`,
   }))),
+  // Exercise not added to the budget: the card's last row says what was burned and left out.
+  { id: 'sweep-today-not-added', route: '/', values: { eatBack: 0, exercise: 290, eaten: 0.6 }, note: 'Today, 60% eaten, 290 kcal burned and not added to the budget' },
+  { id: 'sweep-today-not-added-big', route: '/', values: { eatBack: 0, exercise: 900, eaten: 1.3 }, note: 'Today over budget, 900 kcal burned and not added' },
   { id: 'sweep-today-protein-low', route: '/', values: { eaten: 0.6, exercise: 290, protein: 0.05 }, note: 'Today, 60% eaten with almost no protein' },
   { id: 'sweep-today-protein-over', route: '/', values: { eaten: 0.6, exercise: 290, protein: 1.3 }, note: 'Today, 60% eaten, protein 30% past its target' },
   ...WATER.map(([water, pct]) => ({ id: `sweep-today-water-${pct}`, route: '/', values: { eaten: 0.6, exercise: 290, water }, note: `Today with ${pct}% of the water goal` })),

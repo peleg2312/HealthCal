@@ -162,10 +162,12 @@ function EnergyCard({
   const unitWord = over ? 'over' : isToday ? 'left' : 'under';
   const height = firstDay ? VESSEL_H_FIRST : VESSEL_H;
   const vesselW = narrow ? 66 : 84;
+  // Burned in activity but left out of the budget (exercise is not added in Goals).
+  const notAdded = headroom > 0 ? 0 : Math.max(0, day.exerciseNet);
   const budgetLabel =
     headroom > 0
       ? `Budget ${formatNumber(day.budget)} kilocalories: ${formatNumber(day.target)} target plus ${formatNumber(headroom)} from exercise`
-      : `Daily budget ${formatNumber(day.budget)} kilocalories${day.exerciseNet > 0 ? `, ${formatNumber(day.exerciseNet)} burned in activity not added` : ''}`;
+      : `Daily budget ${formatNumber(day.budget)} kilocalories`;
 
   const labels: VesselLabel[] = [];
   if (headroom > 0) {
@@ -293,20 +295,28 @@ function EnergyCard({
       ) : null}
       <View style={{ height: 1, backgroundColor: colors.border, marginTop: 16, marginBottom: 8 }} />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-        {/* One short line: the hatching and its label already say what exercise added; the whole sum is read out. */}
-        <Text variant="caption" color="textSecondary" style={{ flex: 1 }} testID="today-budget" accessibilityLabel={budgetLabel}>
-          {firstDay ? (
-            'Log the first thing and the cup starts to fill.'
-          ) : (
-            <>
-              {'Budget '}
-              <Text variant="numM" style={{ fontSize: 14, lineHeight: 17 }}>
-                {formatNumber(day.budget)}
-              </Text>
-              {' kcal'}
-            </>
-          )}
-        </Text>
+        {/* One short line: the hatching and its label already say what exercise added; the whole sum is read out.
+            When exercise is not added to the budget, a second short line says what was burned and left out. */}
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Text variant="caption" color="textSecondary" testID="today-budget" accessibilityLabel={budgetLabel}>
+            {firstDay ? (
+              'Log the first thing and the cup starts to fill.'
+            ) : (
+              <>
+                {'Budget '}
+                <Text variant="numM" style={{ fontSize: 14, lineHeight: 17 }}>
+                  {formatNumber(day.budget)}
+                </Text>
+                {' kcal'}
+              </>
+            )}
+          </Text>
+          {notAdded > 0 && !firstDay ? (
+            <Text variant="caption" color="textSecondary" testID="today-not-added">
+              {`${formatNumber(notAdded)} kcal burned, not added`}
+            </Text>
+          ) : null}
+        </View>
         {share}
       </View>
     </Card>

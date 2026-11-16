@@ -13,6 +13,7 @@ describe('keepTogether', () => {
     expect(show(keepTogether('1,293 / 493 g'))).toBe('1,293_/_493_g');
     expect(show(keepTogether('Yesterday · 07:12 · 1 h 1 min · 10.33 km'))).toBe('Yesterday · 07:12 · 1_h_1_min · 10.33_km');
     expect(show(keepTogether('5 ft 5 in'))).toBe('5_ft_5_in');
+    expect(show(keepTogether('Between 1 fl oz and 68 fl oz.'))).toBe('Between 1_fl_oz and 68_fl_oz.');
   });
   it('joins a range so it never breaks at its dash', () => {
     expect(keepTogether('59-79 kg')).toBe(`59${WJ}-${WJ}79${NBSP}kg`);

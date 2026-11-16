@@ -44,7 +44,7 @@ export function BasicsStep({ draft, set, errors, submit }: StepProps) {
   const { spacing } = useTheme();
   return (
     <Group gap={spacing.xl}>
-      <StepTitle title="What should we call you?" subtitle="About a minute. You can change any answer later." />
+      <StepTitle title="What should we call you?" subtitle="About a minute. Change any answer later." />
       <BigTextField
         label="First name"
         testID="onb-name-input"
@@ -315,7 +315,7 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
   ];
   return (
     <Group gap={spacing.xl}>
-      <StepTitle title="Body fat" subtitle="Optional. It helps for muscular or lean bodies." />
+      <StepTitle title="Body fat" subtitle="Optional. Helps for lean or muscular bodies." />
       <Group gap={spacing.sm}>
         {modes.map((m) => (
           <ChoiceCard
@@ -501,7 +501,7 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
     <Group gap={spacing.xl}>
       <StepTitle
         title={goal === 'lose' ? 'Where are you heading?' : 'Set your pace'}
-        subtitle={goal === 'lose' ? 'A pace you can live with. Slower is easier to keep.' : 'A small surplus limits fat gain.'}
+        subtitle={goal === 'lose' ? 'A pace you can keep. Slower is easier.' : 'A small surplus limits fat gain.'}
       />
       <View style={{ gap: 6 }}>
         <BigNumberField
@@ -658,7 +658,7 @@ export function RoutineStep({ draft, set, errors }: StepProps) {
 
   return (
     <Group gap={spacing.xl}>
-      <StepTitle title="Nudges that help" subtitle="Optional. Each skips itself once the goal is met." />
+      <StepTitle title="Nudges that help" subtitle="Optional. Silent once the goal is met." />
       <Group gap={spacing.sm}>
         {NUDGES.map((n) => (
           <NudgeCard

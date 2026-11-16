@@ -70,14 +70,17 @@ export function LogSavedMealSheet({ meal, mealType, date, onClose }: { meal: Sav
       </Text>
       {recipe ? (
         <View style={{ gap: spacing.sm }}>
-          <Text variant="label">How much did you have?</Text>
-          {/* Wrapped, so all four choices show in a narrow sheet rather than scrolling one out of sight. */}
+          <Text variant="label">How many servings did you have?</Text>
+          {/* The question names the unit, so the choices are short and all four sit on one line at 320 px
+              ("½ serving  1 serving  2 servings" left "Other" alone on a second line at 360). */}
           <ChipWrap>
             {PORTIONS.map((p) => (
               <Chip
                 key={p}
                 testID={`log-meal-portion-${p}`}
-                label={`${formatPortion(p)} ${p > 1 ? 'servings' : 'serving'}`}
+                label={formatPortion(p)}
+                // A one-character label still makes a 48 px wide target, and the four read as one set.
+                style={{ minWidth: 52, justifyContent: 'center' }}
                 selected={!other && portion === p}
                 onPress={() => {
                   setOther(false);
@@ -85,7 +88,7 @@ export function LogSavedMealSheet({ meal, mealType, date, onClose }: { meal: Sav
                 }}
               />
             ))}
-            <Chip testID="log-meal-portion-other" label="Other" selected={other} onPress={() => setOther(true)} />
+            <Chip testID="log-meal-portion-other" label="Other" selected={other} onPress={() => setOther(true)} style={{ minWidth: 52, justifyContent: 'center' }} />
           </ChipWrap>
           {other ? (
             <NumberField

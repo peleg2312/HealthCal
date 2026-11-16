@@ -136,6 +136,9 @@ export function QuickStartTiles({ items, onPick }: { items: { id: string; emoji:
             gap: spacing.sm,
             minHeight: 48,
             maxWidth: '100%',
+            // Each line of tiles is filled edge to edge, so the block reads as a set, not a ragged cloud with a
+            // short line (or one tile) left at the end.
+            flexGrow: 1,
             paddingVertical: 8,
             paddingLeft: 12,
             paddingRight: 14,

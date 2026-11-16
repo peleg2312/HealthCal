@@ -526,7 +526,15 @@ export default function PhotoScreen() {
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
               {ADDED_FAT_OPTIONS.map((o) => (
-                <Chip key={o.value} testID={`ai-fat-${o.value}`} label={o.label} selected={fat === o.value} onPress={() => chooseFat(o.value)} />
+                <Chip
+                  key={o.value}
+                  testID={`ai-fat-${o.value}`}
+                  label={o.label}
+                  selected={fat === o.value}
+                  onPress={() => chooseFat(o.value)}
+                  // At 320 px the four do not fit one line: two by two, rather than "2 tbsp" alone on a second line.
+                  style={narrow ? { flexBasis: '40%', flexGrow: 1, justifyContent: 'center' } : undefined}
+                />
               ))}
             </View>
           </Card>

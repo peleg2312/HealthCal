@@ -22,6 +22,8 @@ export function keepTogether(text: string): string {
       .replace(/(\d) (?=[A-Za-z%°µ×/])/g, `$1${NBSP}`)
       // A compound measure: "1 h 20 min", "5 ft 5 in", "11 st 4 lb".
       .replace(/(\d\u00A0(?:h|ft|st|lb|kg|m|min)) (?=\d)/g, `$1${NBSP}`)
+      // A two-word unit: "68 fl oz" never leaves "oz" alone on the next line.
+      .replace(/(\d\u00A0fl) (?=oz\b)/g, `$1${NBSP}`)
       // The app's counted unit "full days": "4 full days", "5 of 6 full days".
       .replace(/(\d\u00A0full) (?=days?\b)/g, `$1${NBSP}`)
       // A sign and the number after it: "× 1/2 cup", "/ 493 g".

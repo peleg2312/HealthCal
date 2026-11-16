@@ -230,7 +230,9 @@ function stressUp(state, { put, baselineTdee }) {
 //                of the week make up the rest (on a Monday the rest is a walk today).
 //   fasting      an open fast as a share of the fasting target (0.5 = 8 h into a 16 h fast,
 //                1.3 = past the target); 0 means no fast running.
-// Only what is named changes; everything else stays the demo's. Applied in that order: exercise and
+//   eatBack      1 adds exercise to the budget (the demo's setting), 0 leaves it out (Goals, "Add
+//                exercise to my budget" off): Today then says what was burned and not added.
+// Only what is named changes; everything else stays the demo's. Applied in that order: eatBack, exercise and
 // the week first (they move the budget and the water goal), then food, water and the fast.
 
 const APP = new URL('../../src/', import.meta.url);
@@ -268,7 +270,7 @@ function appMaths() {
   return appCache;
 }
 
-const VALUE_KEYS = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting'];
+const VALUE_KEYS = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack'];
 
 /** Sets the day's amounts (see above). `put` writes a record the way buildSeed does. */
 function applyValues(state, values, { put, weightKg, baselineTdee }) {
@@ -294,6 +296,7 @@ function applyValues(state, values, { put, weightKg, baselineTdee }) {
     put('activities', { date: iso(daysAgo(n)), ...walk, durationMin, distanceKm: Math.round((walk.distanceKm / walk.durationMin) * durationMin * 10) / 10, kcalGross: gross, kcalNet: Math.max(0, gross - restPerMin * durationMin), weightKg: kg, baselineKcalPerDay: baselineTdee, loggedAt: at(n, hour) });
   };
 
+  if (values.eatBack !== undefined) state.profile.eatBackExercise = values.eatBack > 0;
   if (values.exercise !== undefined) {
     drop('activities', (a) => a.date !== day);
     const kcal = Math.round(values.exercise);

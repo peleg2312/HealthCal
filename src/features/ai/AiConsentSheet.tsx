@@ -74,12 +74,14 @@ export function AiConsentSheet({
           )}
         </View>
       }>
-      <View testID="ai-consent-sheet" style={{ gap: spacing.md }}>
+      {/* 8 px between the parts: at 360 x 740 the whole text then fits above Done, rather than its last line
+          showing half cut at the edge (a body that scrolls by a few pixels reads as the end of the text). */}
+      <View testID="ai-consent-sheet" style={{ gap: spacing.sm }}>
         <Text variant="body" color="textSecondary">
           An AI estimate needs your meal to leave this device. This is exactly what happens.
         </Text>
         {AI_CONSENT_PARTS.map((p) => (
-          <View key={p.title} style={{ gap: 2 }}>
+          <View key={p.title}>
             <Text variant="bodyStrong">{p.title}</Text>
             <Text variant="body" color="textSecondary">
               {p.body}

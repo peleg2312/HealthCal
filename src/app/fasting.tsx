@@ -19,7 +19,7 @@ import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { FastingSession } from '@/types';
-import { Button, Card, Chip, ChipWrap, CupKey, Divider, Header, IconButton, NumberField, Screen, SectionTitle, Sheet, Text, toast, Vessel } from '@/ui';
+import { Button, Card, CupKey, Divider, Header, IconButton, NumberField, Screen, SectionTitle, Segmented, Sheet, Text, toast, Vessel } from '@/ui';
 
 /** Current time, ticking every second while `active`. Elapsed time is always derived from stored timestamps. */
 function useNow(active: boolean): number {
@@ -124,7 +124,9 @@ function FastingScreen() {
             {
               key: 'elapsed',
               at: p ? Math.min(p.elapsedMs, p.targetMs) / 3_600_000 : 0,
-              height: 64,
+              // The share of the target is the timer's third line, so it reads with the time and never sits
+              // at the foot of the cup right over "… to go" under it.
+              height: active ? 84 : 64,
               tick: p && p.elapsedMs > 0 ? colors.rim : undefined,
               content: (
                 <View style={{ gap: 2 }}>
@@ -132,16 +134,16 @@ function FastingScreen() {
                   <Text testID="fasting-elapsed" variant="numL" tabular numberOfLines={1} style={{ fontSize: narrow ? 30 : 36, lineHeight: narrow ? 34 : 40 }}>
                     {p ? formatClockDuration(p.elapsedMs) : '0:00:00'}
                   </Text>
+                  {active ? (
+                    <Text variant="caption" color="textSecondary" testID="fasting-share">
+                      {`${Math.round((p?.progress ?? 0) * 100)}% of ${activeTarget} h`}
+                    </Text>
+                  ) : null}
                 </View>
               ),
             },
-          ]}>
-          {active ? (
-            <Text variant="caption" color="textSecondary">
-              {`${Math.round((p?.progress ?? 0) * 100)}% of ${activeTarget} h`}
-            </Text>
-          ) : null}
-        </Vessel>
+          ]}
+        />
 
         {active && p ? (
           <>
@@ -169,20 +171,21 @@ function FastingScreen() {
       </Card>
 
       <SectionTitle title="Target" />
-      <ChipWrap>
-        {FASTING_PRESETS.map((x) => (
-          <Chip key={x.hours} testID={`fasting-target-${x.hours}`} label={x.label} selected={activeTarget === x.hours} onPress={() => setTarget(x.hours)} />
-        ))}
-        <Chip
-          testID="fasting-target-custom"
-          label={isPreset ? 'Custom' : `Custom ${fastingLabel(activeTarget)}`}
-          selected={!isPreset || customOpen}
-          onPress={() => {
-            setCustom(activeTarget);
-            setCustomOpen((v) => !v);
-          }}
-        />
-      </ChipWrap>
+      {/* One row of five at every width: as wrapping chips, "Custom" was left alone on a second line. */}
+      <Segmented
+        testID="fasting-target"
+        options={[...FASTING_PRESETS.map((x) => ({ value: String(x.hours), label: x.label })), { value: 'custom', label: isPreset ? 'Other' : fastingLabel(activeTarget) }]}
+        value={!isPreset || customOpen ? 'custom' : String(activeTarget)}
+        onChange={(v) => {
+          if (v !== 'custom') {
+            setCustomOpen(false);
+            setTarget(Number(v));
+            return;
+          }
+          setCustom(activeTarget);
+          setCustomOpen((open) => !open);
+        }}
+      />
       {customOpen ? (
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
           <NumberField testID="fasting-custom-input" style={{ flex: 1 }} label="Fasting hours" suffix="h" decimals={1} value={custom} onChange={setCustom} />

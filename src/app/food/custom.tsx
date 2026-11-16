@@ -45,7 +45,8 @@ export default function CustomFoodScreen() {
 
 function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { existing?: CustomFood; barcode?: string; name?: string; meal?: string; date?: string }) {
   const { colors, spacing } = useTheme();
-  const narrow = useWindowDimensions().width < 360;
+  const winW = useWindowDimensions().width;
+  const stackCodes = winW < 440;
   const own = existing?.servings[0];
   const [basis, setBasis] = useState<Basis>(own && Math.abs(own.grams - 100) > 0.01 ? 'serving' : existing ? 'per100' : 'serving');
   const [name, setName] = useState(existing?.name ?? initialName ?? '');
@@ -157,10 +158,11 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
       }>
       <Card style={{ gap: spacing.md }}>
         <TextField testID="custom-name" label="Name" placeholder="e.g. Protein bar, chocolate" value={name} onChangeText={setName} maxLength={80} error={tried ? errors.name : null} autoFocus={!existing && !initialName} />
-        {/* Side by side, a 13-digit barcode needs about 130 px: under 360 px the two fields stack. */}
-        <View style={{ flexDirection: narrow ? 'column' : 'row', gap: narrow ? spacing.md : spacing.sm }}>
-          <TextField testID="custom-brand" label="Brand (optional)" value={brand} onChangeText={setBrand} maxLength={60} style={narrow ? undefined : { flex: 1 }} />
-          <TextField testID="custom-barcode" label="Barcode (optional)" value={code} onChangeText={setCode} keyboardType="number-pad" inputMode="numeric" maxLength={20} style={narrow ? undefined : { flex: 1 }} />
+        {/* A 13-digit barcode needs about 125 px of text plus the field's padding: side by side only on a wide
+            screen (at 360 and 390 px its last digits were cut at the field's edge). */}
+        <View style={{ flexDirection: stackCodes ? 'column' : 'row', gap: stackCodes ? spacing.md : spacing.sm }}>
+          <TextField testID="custom-brand" label="Brand (optional)" value={brand} onChangeText={setBrand} maxLength={60} style={stackCodes ? undefined : { flex: 1 }} />
+          <TextField testID="custom-barcode" label="Barcode (optional)" value={code} onChangeText={setCode} keyboardType="number-pad" inputMode="numeric" maxLength={20} style={stackCodes ? undefined : { flex: 1 }} />
         </View>
         <View style={{ gap: 6 }}>
           <Text variant="label" color="textSecondary">

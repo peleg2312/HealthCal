@@ -5,13 +5,14 @@ import { Linking, Platform, View } from 'react-native';
 import { Group, IconTile, prefers12h, TimeRow } from '@/features/settings/components';
 import { reminderTimeLabel, waterCategory, type PlannedReminder, type ReminderKind } from '@/features/settings/reminderPlanner';
 import { usePlannedReminders } from '@/features/settings/usePlannedReminders';
-import { formatDuration } from '@/lib/dates';
 import { getReminderPermission, remindersSupported, requestReminderPermission, type ReminderPermission } from '@/services/notifications';
 import { useStore } from '@/store';
 import { useTheme } from '@/theme';
-import { Button, Card, Chip, ChipWrap, Header, Screen, Text, ToggleRow, toast } from '@/ui';
+import { Button, Card, Chip, ChipWrap, Header, Screen, Segmented, Text, ToggleRow, toast } from '@/ui';
 
 const INTERVALS = [60, 90, 120, 180, 240];
+/** "1 h", "1.5 h": short enough for five in one row on a 320 px phone. */
+const intervalLabel = (m: number) => `${Math.round((m / 60) * 10) / 10} h`;
 const WEEKDAYS = [
   { day: 1, label: 'Mon' },
   { day: 2, label: 'Tue' },
@@ -133,17 +134,13 @@ export default function RemindersScreen() {
             <Text variant="label" color="textSecondary">
               Every
             </Text>
-            <ChipWrap>
-              {INTERVALS.map((m) => (
-                <Chip
-                  key={m}
-                  testID={`reminders-interval-${m}`}
-                  label={formatDuration(m)}
-                  selected={r.water.everyMinutes === m}
-                  onPress={() => setReminders({ water: { ...r.water, everyMinutes: m } })}
-                />
-              ))}
-            </ChipWrap>
+            {/* One row of five at every width (as chips, "4 h" wrapped alone onto a second line at 360). */}
+            <Segmented
+              testID="reminders-interval"
+              options={INTERVALS.map((m) => ({ value: String(m), label: intervalLabel(m) }))}
+              value={String(r.water.everyMinutes)}
+              onChange={(v) => setReminders({ water: { ...r.water, everyMinutes: Number(v) } })}
+            />
           </View>
         ) : null}
       </Group>

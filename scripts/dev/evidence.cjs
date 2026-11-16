@@ -39,7 +39,10 @@
  *               (the tab bar, a screen's header or pinned footer) is judged only against text of the
  *               same chrome, never against the page that scrolls under it (overText too); what is
  *               left under the chrome at the end of the page is `hidden`'s.
- *   broken      a word split over two lines because its box is too narrow
+ *   broken      a word split over two lines because its box is too narrow, a number split from
+ *               its unit ("68 fl" / "oz"), or an overline (a one-line label in capitals) wrapped so
+ *               its last word is alone on a second line, or a wrapping row of chips or tiles that
+ *               leaves one alone on its last line under a line of three or more
  *   sticksOut   text or a painted box reaching past the card, row or button that holds it
  *   controls    two controls whose visible boxes overlap
  *   hidden      content still under the tab bar or a pinned footer when the page is
@@ -56,7 +59,8 @@
  *   toast       a toast that covers a control in an open sheet, a pinned footer or the tab bar, or
  *               that starts above the top of the screen: judged after each tap and at the capture,
  *               always at the real window height (never against the page grown to its full height)
- * Text cut with no ellipsis is `cut`, and so are a field's placeholder wider than the field and a clamped
+ * Text cut with no ellipsis is `cut`, and so are a field's placeholder wider than the field, a number
+ * field's value wider than the field (a long name in a text field scrolls as fields do), and a clamped
  * name whose box is taller than its clamp (the lines after the ellipsis show under it). A name
  * that ends in an ellipsis after its allowed lines is shortened by design: listed in report.json as
  * `shortened` and printed under its own heading, not counted as something to look at.
@@ -95,7 +99,8 @@
  *                                  app's own budget and goals): eaten and protein as a share of today's
  *                                  budget and protein target, exercise in net kcal, water as a share of
  *                                  today's goal, weekMinutes toward the weekly guideline, fasting as a
- *                                  share of the fasting target. scripts/dev/states/sweep.cjs uses it to
+ *                                  share of the fasting target, eatBack 0 to leave exercise out of the
+ *                                  budget. scripts/dev/states/sweep.cjs uses it to
  *                                  take every labelled cup and bar at the values that stress it.
  *     type: { 'food-search-input': 'banana' },   typed after the screen opens, before the taps
  *     taps: [                      done in order, ~0.7 s apart:
@@ -127,6 +132,8 @@
  *   - content cut by the bottom of the screen where nothing scrolls to reach it;
  *   - its last control, with the sheet scrolled to its end, closer than 12 px to the bottom
  *     of the screen;
+ *   - a body that almost fits: it scrolls by 80 px or less (beyond its bottom padding), so at rest
+ *     its last line shows half cut at the bottom edge with nothing to say there is more;
  *   - text, a control or a painted box closer to the sheet's left or right edge than the
  *     sheet's own side padding (read from the kit's sheet body, 20 px).
  * Left out of the sheet scan on purpose: anything in a sideways-scrolling row (its edges are
@@ -206,6 +213,17 @@ function scan(rootSel) {
       const room = el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
       const needs = ctx.measureText(el.placeholder).width;
       if (needs > room + 1 && style.textOverflow !== 'ellipsis' && !seen.has(el.placeholder)) { seen.add(el.placeholder); cut.push({ text: `placeholder "${el.placeholder.slice(0, 50)}"`, shows: Math.round(room), needs: Math.round(needs) }); }
+    }
+    // A number field whose value is wider than the field (a 13-digit barcode in a half-width field): its last
+    // digits are clipped with nothing to say so. A long name in a text field scrolls as text fields do; a
+    // number has to be read whole.
+    if (el.tagName === 'INPUT' && el.value && /^(numeric|decimal|tel)$/.test(el.getAttribute('inputmode') || '') && r.top < window.innerHeight * 3) {
+      const ctx = (scan.canvas ||= document.createElement('canvas')).getContext('2d');
+      ctx.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+      const room = el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      const needs = ctx.measureText(el.value).width;
+      const key = `value|${el.value}`;
+      if (needs > room + 1 && !seen.has(key)) { seen.add(key); cut.push({ text: `value "${el.value.slice(0, 30)}" in ${label(el) || 'a number field'}`, shows: Math.round(room), needs: Math.round(needs) }); }
     }
     const role = el.getAttribute('role');
     if ((el.tagName === 'BUTTON' || role === 'button' || role === 'switch' || role === 'tab' || role === 'link') && r.top < window.innerHeight * 3) {
@@ -380,7 +398,46 @@ function layoutScan(rootSel) {
         const lines = new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top)));
         if (lines.size > 1) add('broken', `"${m[0]}" split over two lines in ${name(el)}`);
       }
+      // An overline is a one-line label: wrapped so one word is left alone on its second line
+      // ("BARTHOLOMEW-CHRISTOPHE, YOUR PLAN IS" / "READY"), it reads as two labels.
+      if (n === [...el.childNodes].find((x) => x.nodeType === 3 && x.textContent.trim()) && getComputedStyle(el).textTransform === 'uppercase') {
+        const words = [];
+        const wr = /\S+/g;
+        let w;
+        while ((w = wr.exec(n.textContent))) {
+          const range = document.createRange();
+          range.setStart(n, w.index);
+          range.setEnd(n, w.index + w[0].length);
+          const q = [...range.getClientRects()].find((r) => r.width > 0);
+          if (q) words.push(Math.round(q.top));
+        }
+        const tops = [...new Set(words)];
+        if (tops.length === 2 && words.filter((t) => t === tops[1]).length === 1 && words.length >= 4) add('broken', `overline ${name(el)} leaves its last word alone on a second line`);
+      }
+      // A number and its unit on two lines ("68 fl" / "oz."): the kit's Text keeps them together, so a split
+      // means a unit it does not know or text drawn outside it.
+      const unit = /\d[\d,.]*[ \u00A0]+(?:fl[ \u00A0]+oz|kcal|kg|lb|ml|km|mi|min|cm|ft|in|oz|g|h|L)(?![A-Za-z])/g;
+      while ((m = unit.exec(n.textContent))) {
+        const range = document.createRange();
+        range.setStart(n, m.index);
+        range.setEnd(n, m.index + m[0].length);
+        const lines = new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top)));
+        if (lines.size > 1) add('broken', `"${m[0].replace(/\u00A0/g, ' ')}" split from its unit over two lines in ${name(el)}`);
+      }
     }
+  }
+  // 1a'. A row of chips that wraps so one chip is left alone on its last line, right under a line of three or
+  // more ("1 h  1 h 30 min  2 h  3 h" / "4 h"): it reads as a separate control. A cloud of tiles of many widths
+  // that thins out line by line (3, 2, then 1) is left alone, and so is a last tile that grows to the whole
+  // width (a row of its own, as in Train's Quick start). Rows that scroll sideways do not wrap.
+  for (const el of all) {
+    if (out.broken.length >= 12 || !shown(el) || onPurpose(el) || getComputedStyle(el).flexWrap !== 'wrap') continue;
+    const kids = [...el.children].filter((k) => shown(k) && k.getBoundingClientRect().width > 0 && (isControl(k) || k.querySelector('button, [role="button"], [role="checkbox"], [role="radio"], [role="tab"]')));
+    if (kids.length < 4 || kids.length !== [...el.children].filter((k) => shown(k) && k.getBoundingClientRect().width > 0).length) continue;
+    const rows = new Map();
+    for (const k of kids) { const t = Math.round(k.getBoundingClientRect().top); rows.set(t, (rows.get(t) || 0) + 1); }
+    const counts = [...rows.entries()].sort((x, y) => x[0] - y[0]).map((x) => x[1]);
+    if (counts.length >= 2 && counts[counts.length - 1] === 1 && counts[counts.length - 2] >= 3 && kids[kids.length - 1].getBoundingClientRect().width < el.getBoundingClientRect().width * 0.9) add('broken', `${name(kids[kids.length - 1])} left alone on the last line of its row (${counts.join(' + ')})`);
   }
   // 1b. Text side by side with less than 4 px between (one label running into the next).
   for (let i = 0; i < texts.length; i++) {
@@ -750,6 +807,29 @@ function sheetScan() {
     if (!reachable) add(`${name(el)} cut by the bottom of the screen (${Math.round(r.bottom - vh)}px below)`);
   }
 
+  // Almost fits: the body scrolls by only a little, so at rest its last line shows half cut at the bottom
+  // edge (above a pinned footer) with nothing to say there is more. Either make it fit or let it clearly
+  // scroll. Counted beyond the body's own bottom padding; a long body (a list, a long text) is not judged.
+  const body0 = sheet.querySelector('[data-testid="sheet-body"]');
+  if (body0 && scrollsY(body0) && body0.scrollTop < 1) {
+    const inner0 = body0.firstElementChild;
+    const padB = inner0 ? parseFloat(getComputedStyle(inner0).paddingBottom) || 0 : 0;
+    const hidden = body0.scrollHeight - body0.clientHeight - padB;
+    // Only when a line of text is drawn across that edge: a list that ends between two rows shows nothing cut.
+    const edge = body0.getBoundingClientRect().bottom;
+    let across = null;
+    for (const el of body0.querySelectorAll('*')) {
+      if (across || !shown(el)) continue;
+      for (const n of el.childNodes) {
+        if (n.nodeType !== 3 || !n.textContent.trim()) continue;
+        const range = document.createRange();
+        range.selectNodeContents(n);
+        for (const q of range.getClientRects()) if (q.width > 0 && q.top < edge - 3 && q.bottom > edge + 3) across = el;
+      }
+    }
+    if (across && hidden > 2 && hidden <= 80) add(`sheet body almost fits: ${Math.round(hidden)}px hidden under its bottom edge at rest, and ${name(across)} shows cut there`);
+  }
+
   // The last control, with every scroller in the sheet at its end.
   const scrollers = [sheet, ...sheet.querySelectorAll('*')].filter(scrollsY);
   const before = scrollers.map((el) => el.scrollTop);
@@ -937,7 +1017,7 @@ function runChecks() {
 // ------------------------------------------------------------------ states
 
 const STATE_FIELDS = ['id', 'route', 'data', 'imperial', 'day', 'values', 'type', 'taps', 'waitFor', 'sheet', 'note'];
-const VALUES = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting'];
+const VALUES = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack'];
 const DATA = ['demo', 'empty', 'fresh', 'stress'];
 
 /** Loads scripts/dev/states/<list>.cjs for each list and checks every state is well formed. */

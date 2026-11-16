@@ -25,7 +25,8 @@ const POUR_DELAY = 220;
 export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Date; onChangeAnswers: () => void }) {
   const { colors, spacing } = useTheme();
   const reduce = useReducedMotion();
-  const narrow = useWindowDimensions().width < 360;
+  const winW = useWindowDimensions().width;
+  const narrow = winW < 360;
   const [showMath, setShowMath] = useState(false);
   const p = plan.profile;
   const units = p.units;
@@ -48,7 +49,10 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
   const name = p.name;
   // A long name goes to the overline, so the headline stays three or four lines on a small phone.
   const nameInTitle = name.length > 0 && name.length <= 12;
-  const overline = name && !nameInTitle ? `${name}, your plan is ready` : 'Your plan is ready';
+  // The overline keeps the name only while it fits one line (about 8.6 px a capital at 11.5 px with its
+  // letter spacing), so no word of it is left alone on a second line ("… YOUR PLAN IS" / "READY").
+  const withName = `${name}, your plan is ready`;
+  const overline = name && !nameInTitle && withName.length * 8.6 <= Math.min(winW, 560) - 40 ? withName : 'Your plan is ready';
   // The goal and its dates lead; without a road to draw (maintaining, or no target weight) the day itself does.
   // A no-break space keeps the weight and its unit on one line.
   const title = projection
@@ -309,7 +313,7 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
         delay={POUR_DELAY}
         testID="plan-vessel"
         // 10 px between labels keeps 8 px between their letters at every plan (keeping weight puts
-        // "Matched to what you burn" right under the number; gaining puts the surplus over the burn).
+        // "Matches your burn" right under the number; gaining puts the surplus over the burn).
         labelSpacing={10}
         accessibilityLabel={`Daily budget ${formatNumber(target)} kcal${showBurn ? `, against about ${formatNumber(burn)} kcal you burn` : ', matched to what you burn'}`}
         labels={[
@@ -360,7 +364,7 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
                   height: 22,
                   content: (
                     <Text variant="label" color="textSecondary" testID="plan-matched">
-                      Matched to what you burn
+                      Matches your burn
                     </Text>
                   ),
                 },

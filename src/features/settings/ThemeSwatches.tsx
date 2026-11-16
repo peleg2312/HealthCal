@@ -1,6 +1,5 @@
-import { Check } from 'lucide-react-native';
 import React from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { blossomColors, cup, darkColors, fonts, lightColors, radius, useTheme, vesselBase, type ThemeColors } from '@/theme';
 import type { ThemePreference } from '@/types';
@@ -69,9 +68,13 @@ function Mini({ c, half }: { c: ThemeColors; half?: 'left' | 'right' }) {
   );
 }
 
-/** Appearance picker: one cup per palette that previews it. The chosen one has an ink edge and an ink check. */
+/**
+ * Appearance picker: one cup per palette that previews it. The chosen one has a 2 px ink edge and its
+ * name in bold ink. The name stays inside its tile's width (a check beside "Blossom" ran past the tile).
+ */
 export function ThemeSwatches({ value, onChange }: { value: ThemePreference; onChange: (v: ThemePreference) => void }) {
   const { colors, spacing } = useTheme();
+  const narrow = useWindowDimensions().width < 360;
   return (
     <View accessibilityRole="radiogroup" accessibilityLabel="Appearance" style={{ flexDirection: 'row', gap: spacing.sm }}>
       {THEME_OPTIONS.map((o) => {
@@ -107,12 +110,13 @@ export function ThemeSwatches({ value, onChange }: { value: ThemePreference; onC
                 )}
               </View>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              {selected ? <Check size={14} color={colors.text} strokeWidth={2.6} /> : null}
-              <Text variant="label" color={selected ? 'text' : 'textSecondary'} numberOfLines={1} style={{ fontFamily: selected ? fonts.bold : fonts.semibold }}>
-                {o.label}
-              </Text>
-            </View>
+            <Text
+              variant="label"
+              color={selected ? 'text' : 'textSecondary'}
+              numberOfLines={1}
+              style={{ maxWidth: '100%', fontFamily: selected ? fonts.bold : fonts.semibold, ...(narrow ? { fontSize: 13 } : null) }}>
+              {o.label}
+            </Text>
           </PressableScale>
         );
       })}

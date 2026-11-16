@@ -242,7 +242,8 @@ function SleepSheet({ date, onDate, onClose, entries }: { date: ISODate | null; 
       </View>
       <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
         {[6, 7, 7.5, 8, 9].map((h) => (
-          <Chip key={h} testID={`sleep-hours-${h}`} label={formatHours(h)} selected={hours === h} onPress={() => setHours(h)} />
+          // "7.5 h", not "7 h 30 min": the five then fit one line at 320 px rather than leaving "9 h" alone on a second.
+          <Chip key={h} testID={`sleep-hours-${h}`} label={`${h} h`} selected={hours === h} onPress={() => setHours(h)} />
         ))}
       </View>
       <Text variant="label" color="textSecondary" style={{ marginTop: spacing.sm }}>

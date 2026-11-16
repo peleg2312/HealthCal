@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Activity, Camera, Check, Droplets, PenLine, Plus, Repeat2, Scale, ScanBarcode, Search } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { ScrollView, useWindowDimensions, View } from 'react-native';
 
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
 import { matchServing } from '@/features/food/helpers';
@@ -63,6 +63,8 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   const alreadyLogged = entries.some((e) => e.date === logDate && e.meal === meal);
   const savedMeal = [...saved].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] as SavedMeal | undefined;
   const savedServings = savedMeal ? mealServings(savedMeal) : 1;
+  // Under 360 px a half tile has no room for the icon beside its name ("Snap a" / "meal"): the icon goes above it.
+  const narrow = useWindowDimensions().width < 360;
   const glasses = [...presets]
     .filter((p) => p > 0)
     .sort((a, b) => a - b)
@@ -84,7 +86,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   const food = '{food}';
   const actions = [
     { id: 'search', label: 'Search food', hint: 'Database and your recents', icon: Search, color: colors.calories, href: `/food/search?${food}` },
-    { id: 'photo', label: 'Snap a meal', hint: 'AI estimates from a photo', icon: Camera, color: colors.calories, href: `/food/photo?${food}` },
+    { id: 'photo', label: 'Snap a meal', hint: 'Photo, AI estimate', icon: Camera, color: colors.calories, href: `/food/photo?${food}` },
     { id: 'scan', label: 'Scan barcode', hint: 'Packaged products', icon: ScanBarcode, color: colors.calories, href: `/food/scan?${food}` },
     { id: 'describe', label: 'Describe it', hint: 'Type what you ate', icon: PenLine, color: colors.calories, href: `/food/photo?mode=text&${food}` },
     { id: 'activity', label: 'Log activity', hint: 'Sport, gym, walk', icon: Activity, color: colors.exercise, href: '/activity/pick?{past}' },
@@ -186,50 +188,70 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
       ) : null}
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-        {actions.map((a, i) => (
-          <PressableScale
-            key={a.id}
-            testID={`quick-${a.id}`}
-            onPress={() => go(a.href)}
-            accessibilityLabel={a.label}
-            style={[
-              tile,
-              {
-                flexBasis: i === 0 ? '100%' : '47%',
-                flexGrow: 1,
-                flexDirection: i === 0 ? 'row' : 'column',
-                alignItems: i === 0 ? 'center' : 'flex-start',
-                padding: 14,
-                minHeight: i === 0 ? 64 : 92,
-                gap: i === 0 ? 14 : 10,
-              },
-            ]}>
-            <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
-              <a.icon size={22} color={a.color} strokeWidth={1.9} />
-            </View>
-            <View>
-              <Text variant="bodyStrong">{a.label}</Text>
-              <Text variant="caption" color="textSecondary">
-                {a.hint}
-              </Text>
-            </View>
-          </PressableScale>
-        ))}
-        <View style={[tile, { flexBasis: '47%', flexGrow: 1, padding: 14, gap: 10 }]} testID="quick-water-tile">
+        {actions.map((a) => {
+          // Search and Weigh in are whole rows (icon, name, hint beside); the four between are half-width tiles
+          // with the icon beside the name and the hint under both, so the sheet fits a 360 x 740 phone whole.
+          const wide = a.id === 'search' || a.id === 'weight';
+          return (
+            <PressableScale
+              key={a.id}
+              testID={`quick-${a.id}`}
+              onPress={() => go(a.href)}
+              accessibilityLabel={wide || !narrow ? a.label : `${a.label}. ${a.hint}`}
+              style={[
+                tile,
+                wide
+                  ? { flexBasis: '100%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', padding: 14, minHeight: 64, gap: 14 }
+                  : { flexBasis: '47%', flexGrow: 1, padding: 14, gap: 4 },
+              ]}>
+              {wide ? (
+                <>
+                  <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+                    <a.icon size={22} color={a.color} strokeWidth={1.9} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text variant="bodyStrong">{a.label}</Text>
+                    <Text variant="caption" color="textSecondary">
+                      {a.hint}
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <View style={{ flexDirection: narrow ? 'column' : 'row', alignItems: narrow ? 'flex-start' : 'center', gap: narrow ? 6 : 8, minHeight: 24 }}>
+                    <View style={{ width: 20, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+                      <a.icon size={20} color={a.color} strokeWidth={1.9} />
+                    </View>
+                    <Text variant="bodyStrong" style={{ flexShrink: 1 }}>
+                      {a.label}
+                    </Text>
+                  </View>
+                  {/* Under 360 px the icon sits above the name and the hint is read out only, so the sheet still fits. */}
+                  {narrow ? null : (
+                    <Text variant="caption" color="textSecondary">
+                      {a.hint}
+                    </Text>
+                  )}
+                </>
+              )}
+            </PressableScale>
+          );
+        })}
+        {/* Water is a whole row too: its name on the left (opens the water screen), the one-tap glasses on the right. */}
+        <View style={[tile, { flexBasis: '100%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', paddingHorizontal: 14, paddingVertical: 10, gap: 12 }]} testID="quick-water-tile">
           <PressableScale
             testID="quick-water"
             onPress={() => go('/water')}
             accessibilityLabel="Water, open hydration"
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 }}>
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 44, flexGrow: 1 }}>
             <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
               <Droplets size={22} color={colors.water} strokeWidth={1.9} />
             </View>
             <Text variant="bodyStrong">Water</Text>
           </PressableScale>
-          {/* Side by side when both fit; one above the other in a narrow tile rather than cut ("+ 250..."). */}
-          {/* 12 apart: each glass's touch area reaches 6 px past its edge (4 of slop and the border), so when they
-              stack the two areas meet in the middle of the gap and neither takes the other's taps. */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+          {/* 12 apart: each glass's touch area reaches 6 px past its edge (4 of slop and the border), so the two
+              areas meet in the middle of the gap and neither takes the other's taps. */}
+          <View style={{ flexDirection: 'row', gap: 12 }}>
             {glasses.map((ml) => (
               <PressableScale
                 key={ml}
@@ -238,7 +260,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                 hitSlop={4}
                 onPress={() => addWater(quickLogPastDate(), ml, profile.units)}
                 accessibilityLabel={`Add ${formatVolume(ml, profile.units)} of water`}
-                style={{ flexGrow: 1, flexBasis: 24 + formatVolume(ml, profile.units).length * 7, height: 36, ...cup(radius.buttonSm, 5), borderWidth: 1.5, borderColor: colors.water, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+                style={{ minWidth: 30 + formatVolume(ml, profile.units).length * 7, paddingHorizontal: 10, height: 36, ...cup(radius.buttonSm, 5), borderWidth: 1.5, borderColor: colors.water, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
                 <Plus size={14} color={colors.water} strokeWidth={2.6} />
                 <Text variant="label" color="text" style={{ fontSize: 12.5 }} numberOfLines={1}>
                   {formatVolume(ml, profile.units)}
