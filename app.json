@@ -3,6 +3,7 @@
     "name": "HealthCal",
     "slug": "healthcal",
     "version": "1.0.0",
+    "runtimeVersion": "1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "healthcal",
@@ -108,6 +109,14 @@
         "projectId": "a39efd68-9624-4740-8749-999371098d89"
       }
     },
-    "owner": "pelegy"
+    "owner": "pelegy",
+    "updates": {
+      "url": "https://u.expo.dev/a39efd68-9624-4740-8749-999371098d89",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      },
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    }
   }
 }
