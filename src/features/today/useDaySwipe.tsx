@@ -16,8 +16,9 @@
  *   chart (on web, an SVG 120 px wide or more), or inside a `DaySwipeGuard` is left alone;
  * - vertical scrolling is untouched: on web the hook only listens (touch events, no
  *   responder, no preventDefault); natively it takes the touch only once it is clearly
- *   sideways (10 px, three times the vertical), which also keeps the page's ScrollView
- *   from taking it over half way on Android;
+ *   sideways (SWIPE_CLAIM, 24 px, and three times the vertical: a tap that wanders a
+ *   little stays the row's tap), which also keeps the page's ScrollView from taking it
+ *   over half way on Android;
  * - while a sheet is open nothing moves: the sheet covers the page, but its touches still
  *   bubble through the React tree to this View's handlers.
  * One finger only. A move gives a select haptic.
@@ -29,10 +30,8 @@ import { today } from '@/lib/dates';
 import type { ISODate } from '@/types';
 import { haptic, sheetOnScreen, toast } from '@/ui';
 
-import { atScreenEdge, stepDay, swipeDayLabel, swipeStep, SWIPE_RATIO } from './daySwipe';
+import { atScreenEdge, claimsTouch, stepDay, swipeDayLabel, swipeStep } from './daySwipe';
 
-/** Natively, the sideways travel at which the page takes the touch from the scroll view. */
-const CLAIM = 10;
 /** On web, an SVG at least this wide is a chart: a finger on it scrubs the chart, not the day. */
 const CHART_MIN_W = 120;
 
@@ -160,8 +159,7 @@ export function useDaySwipe({
         const t = state.current;
         const p = point(e);
         if (!t || t.skip || !p) return false;
-        const dx = Math.abs(p.x - t.x0);
-        return dx > CLAIM && dx > SWIPE_RATIO * Math.abs(p.y - t.y0);
+        return claimsTouch(p.x - t.x0, p.y - t.y0);
       },
       // Returning true keeps the page's ScrollView from taking the touch over (Android).
       onResponderGrant: () => true,

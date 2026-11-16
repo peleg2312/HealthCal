@@ -20,6 +20,16 @@ export const SWIPE_RATIO = 3;
 export const SWIPE_MAX_MS = 500;
 /** A touch that starts this close to the screen's left or right edge is the system's back gesture. */
 export const EDGE = 24;
+/**
+ * Natively the page has to take the touch from whatever is under the finger (a food's row, the
+ * scroll view) to see a flick through. It does so only once the finger has clearly left a tap:
+ * this far sideways, in px. A thumb's tap wanders 10 to 20 px, and taking the touch that early
+ * cancelled the press on the row under it; since such a touch is no flick either, the tap did
+ * nothing at all and the food would not open. 24 is also the furthest the claim can wait: with
+ * the three-to-one rule the finger is then under 8 px off its line, Android's own scroll
+ * threshold, so the page's scroll view has not taken the touch first.
+ */
+export const SWIPE_CLAIM = 24;
 
 /**
  * -1 (the day before), 1 (the next day) or 0 (not a day swipe) for a finished touch:
@@ -29,6 +39,11 @@ export function swipeStep(dx: number, dy: number, ms: number): -1 | 0 | 1 {
   if (!(ms >= 0) || ms > SWIPE_MAX_MS) return 0;
   if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) < SWIPE_RATIO * Math.abs(dy)) return 0;
   return dx < 0 ? 1 : -1;
+}
+
+/** Natively: whether a touch that has travelled this far takes over from the row or scroller under the finger. */
+export function claimsTouch(dx: number, dy: number): boolean {
+  return Math.abs(dx) > SWIPE_CLAIM && Math.abs(dx) > SWIPE_RATIO * Math.abs(dy);
 }
 
 /** The day a step lands on, or null when it would pass the screen's first or last day. */

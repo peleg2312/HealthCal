@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { atScreenEdge, EDGE, stepDay, swipeDayLabel, swipeStep, SWIPE_MAX_MS, SWIPE_MIN } from './daySwipe';
+import { atScreenEdge, claimsTouch, EDGE, stepDay, swipeDayLabel, swipeStep, SWIPE_CLAIM, SWIPE_MAX_MS, SWIPE_MIN } from './daySwipe';
 
 describe('swipeStep', () => {
   it('moves to the next day on a quick flick left', () => {
@@ -69,5 +69,34 @@ describe('atScreenEdge', () => {
     expect(atScreenEdge(EDGE, 360)).toBe(false);
     expect(atScreenEdge(360 - EDGE, 360)).toBe(false);
     expect(atScreenEdge(360 - EDGE + 1, 360)).toBe(true);
+  });
+});
+
+describe('claimsTouch', () => {
+  it("leaves a tap that wanders sideways to the row under the finger", () => {
+    // A thumb's tap travels 10 to 20 px: taking the touch there cancelled the press and the food did not open.
+    for (const dx of [4, 10, 15, 20, SWIPE_CLAIM]) {
+      expect(claimsTouch(dx, 0)).toBe(false);
+      expect(claimsTouch(-dx, 2)).toBe(false);
+    }
+  });
+  it('takes a touch that is clearly sideways, either way', () => {
+    expect(claimsTouch(SWIPE_CLAIM + 1, 0)).toBe(true);
+    expect(claimsTouch(-(SWIPE_CLAIM + 1), 5)).toBe(true);
+    expect(claimsTouch(60, -12)).toBe(true);
+  });
+  it('never takes a scroll: the travel must be three times the vertical', () => {
+    expect(claimsTouch(30, 11)).toBe(false);
+    expect(claimsTouch(40, 40)).toBe(false);
+    expect(claimsTouch(0, 80)).toBe(false);
+  });
+  it('claims before the scroll view would: under 8 px off its line at the claim distance', () => {
+    // Android's scroll view takes a touch 8 px off the line; a flick at exactly three to one must be claimed before that.
+    expect(SWIPE_CLAIM / 3).toBeLessThanOrEqual(8);
+    expect(claimsTouch(SWIPE_CLAIM + 0.5, 7.9)).toBe(true);
+  });
+  it('every real flick is claimed on its way', () => {
+    // A flick that swipeStep accepts passes the claim distance long before it ends.
+    expect(SWIPE_CLAIM).toBeLessThan(SWIPE_MIN / 2);
   });
 });
