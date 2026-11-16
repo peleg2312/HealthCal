@@ -1,0 +1,166 @@
+# A new person's first day on a real Android or iPhone build, driven by testID:
+# setup with the keyboard on every field, a food added to lunch and opened again, the four tabs
+# and the sync screen. Screenshots land in the run's "Maestro Test Results" artifact.
+#
+#   Expo's cloud phones:  npx eas-cli@latest workflow:run .eas/workflows/phone-test-android.yml
+#   A phone or emulator on your desk:  maestro test .maestro/first-day.yml
+appId: app.healthcal.mobile
+name: First day on a phone
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: welcome-get-started
+    timeout: 180000
+- takeScreenshot: 01-welcome
+- tapOn:
+    id: welcome-get-started
+
+# 1 of 10: name, with the keyboard up and Continue on top of it.
+- tapOn:
+    id: onb-units-metric
+- tapOn:
+    id: onb-name-input
+- inputText: Dana
+- takeScreenshot: 02-name-keyboard
+- tapOn:
+    id: onb-next
+- tapOn:
+    id: onb-goal-lose
+- tapOn:
+    id: onb-sex-female
+
+# 4 of 10: date of birth, three number fields.
+- tapOn:
+    id: onb-dob-day
+- inputText: '15'
+- tapOn:
+    id: onb-dob-month
+- inputText: '6'
+- tapOn:
+    id: onb-dob-year
+- inputText: '1990'
+- assertVisible:
+    id: onb-dob-summary
+- takeScreenshot: 03-born-keyboard
+- tapOn:
+    id: onb-next
+
+# 5 of 10: height and weight. Empty fields look empty; a tap opens the keyboard; the typed number shows.
+- extendedWaitUntil:
+    visible:
+      id: onb-height-cm
+    timeout: 20000
+- takeScreenshot: 04-height-weight-empty
+- tapOn:
+    id: onb-height-cm
+- inputText: '178'
+- takeScreenshot: 05-height-keyboard
+- tapOn:
+    id: onb-weight
+- inputText: '82'
+- takeScreenshot: 06-weight-keyboard
+- tapOn:
+    id: onb-next
+- tapOn:
+    id: onb-bf-unknown
+- tapOn:
+    id: onb-activity-light
+- tapOn:
+    id: onb-target-input
+- inputText: '76'
+- takeScreenshot: 07-goal-weight-keyboard
+- tapOn:
+    id: onb-next
+- tapOn:
+    id: onb-reminders-skip
+- takeScreenshot: 08-look
+- tapOn:
+    id: onb-next
+- extendedWaitUntil:
+    visible:
+      id: plan-reveal
+    timeout: 20000
+- takeScreenshot: 09-plan
+- tapOn:
+    id: onb-finish
+- runFlow:
+    when:
+      visible:
+        id: onb-account-skip
+    commands:
+      - tapOn:
+          id: onb-account-skip
+- extendedWaitUntil:
+    visible:
+      id: today-energy
+    timeout: 30000
+- takeScreenshot: 10-today
+
+# Lunch: add two foods from the diary, see them in the meal, open one, come back.
+- tapOn:
+    id: tab-diary
+- scrollUntilVisible:
+    element:
+      id: meal-add-lunch
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: meal-add-lunch
+- tapOn:
+    id: food-search-input
+- inputText: rice
+- extendedWaitUntil:
+    visible:
+      id: result-0-add
+    timeout: 20000
+- takeScreenshot: 11-search-keyboard
+- tapOn:
+    id: result-0-add
+- tapOn:
+    id: result-1-add
+- takeScreenshot: 12-two-added
+- tapOn:
+    id: search-done
+- extendedWaitUntil:
+    visible:
+      id: meal-total-lunch
+    timeout: 20000
+- takeScreenshot: 13-diary-lunch
+- tapOn:
+    id: 'entry-(?!delete-).*'
+    index: 0
+- assertVisible:
+    id: detail-name
+- takeScreenshot: 14-food-opened
+- tapOn:
+    id: header-back
+- assertVisible:
+    id: meal-total-lunch
+
+# The other tabs, then Profile and the sync screen.
+- tapOn:
+    id: tab-train
+- takeScreenshot: 15-train
+- tapOn:
+    id: tab-progress
+- takeScreenshot: 16-progress
+- tapOn:
+    id: tab-index
+- assertVisible:
+    id: today-energy
+- takeScreenshot: 17-today-after-lunch
+- tapOn:
+    id: today-profile
+- scrollUntilVisible:
+    element:
+      id: profile-health-sync
+    direction: DOWN
+    timeout: 20000
+- takeScreenshot: 18-profile
+- tapOn:
+    id: profile-health-sync
+- takeScreenshot: 19-sync
+- tapOn:
+    id: header-back

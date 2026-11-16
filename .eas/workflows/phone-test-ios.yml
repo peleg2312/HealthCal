@@ -1,0 +1,21 @@
+# Builds the app for the iOS Simulator (no Apple account needed) and runs .maestro/first-day.yml on
+# one of Expo's Macs. Started by hand only:  npx eas-cli@latest workflow:run .eas/workflows/phone-test-ios.yml
+name: Phone test on iPhone
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build_ios:
+    type: build
+    params:
+      platform: ios
+      profile: e2e-test
+
+  first_day_ios:
+    needs: [build_ios]
+    type: maestro
+    runs_on: macos-medium
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      flow_path: ['.maestro/first-day.yml']

@@ -1,0 +1,21 @@
+# Builds the app and runs .maestro/first-day.yml on an Android Emulator on Expo's machines.
+# Started by hand only:  npx eas-cli@latest workflow:run .eas/workflows/phone-test-android.yml
+name: Phone test on Android
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build_android:
+    type: build
+    params:
+      platform: android
+      profile: e2e-test
+
+  first_day_android:
+    needs: [build_android]
+    type: maestro
+    runs_on: linux-medium-nested-virtualization
+    params:
+      build_id: ${{ needs.build_android.outputs.build_id }}
+      flow_path: ['.maestro/first-day.yml']

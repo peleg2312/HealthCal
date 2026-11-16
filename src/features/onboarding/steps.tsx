@@ -236,7 +236,6 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
                 style={{ flex: 1 }}
                 label="Height"
                 testID="onb-height-ft"
-                placeholder="5"
                 unit="ft"
                 decimals={0}
                 maxLength={1}
@@ -251,7 +250,6 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
                 label={'\u00A0'}
                 accessibilityLabel="Height, inches"
                 testID="onb-height-in"
-                placeholder="9"
                 unit="in"
                 decimals={1}
                 maxLength={4}
@@ -267,7 +265,6 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
           <BigNumberField
             label="Height"
             testID="onb-height-cm"
-            placeholder="175"
             unit="cm"
             decimals={1}
             maxLength={5}
@@ -280,7 +277,6 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
         <BigNumberField
           label="Current weight"
           testID="onb-weight"
-          placeholder={imp ? '165' : '75'}
           unit={weightUnit(draft.units)}
           decimals={1}
           maxLength={5}
@@ -344,7 +340,6 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
             label="Body fat"
             testID="onb-bf-input"
             autoFocus={picked}
-            placeholder="22"
             unit="%"
             decimals={1}
             maxLength={4}
@@ -507,7 +502,6 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
         <BigNumberField
           label={goal === 'lose' ? 'Target weight' : 'Target weight (optional)'}
           testID="onb-target-input"
-          placeholder={draft.weight !== null ? String(round(draft.weight + (goal === 'lose' ? -5 : 4) * (imp ? 2 : 1), 0)) : ''}
           unit={unit}
           decimals={1}
           maxLength={5}
