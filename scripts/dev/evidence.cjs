@@ -102,6 +102,13 @@
  *                                  share of the fasting target, eatBack 0 to leave exercise out of the
  *                                  budget. scripts/dev/states/sweep.cjs uses it to
  *                                  take every labelled cup and bar at the values that stress it.
+ *     now: Date.parse('2026-11-19T18:00:00'),   the page's clock (Playwright's clock.setFixedTime: Date.now
+ *                                  and new Date() return it, timers still run), for a screen whose words depend on
+ *                                  the weekday; the stored data is still built around the real today
+ *     health: { demo: { store: 'apple-health', workouts: [...], steps: [{ day, count }] }, state: { enabled: true } },
+ *                                  the phone's health store in memory (window.__healthcalHealthDemo: the options of
+ *                                  createFakeAdapter in src/features/health-sync/fake.ts) and this phone's sync memory
+ *                                  (stored under healthcal-health-sync before the first load); development and E2E builds only
  *     type: { 'food-search-input': 'banana' },   typed after the screen opens, before the taps
  *     taps: [                      done in order, ~0.7 s apart:
  *       'tab-add',                   tap the element with this testID ('^prefix-' taps the first
@@ -1016,7 +1023,7 @@ function runChecks() {
 
 // ------------------------------------------------------------------ states
 
-const STATE_FIELDS = ['id', 'route', 'data', 'imperial', 'day', 'values', 'type', 'taps', 'waitFor', 'sheet', 'note'];
+const STATE_FIELDS = ['id', 'route', 'data', 'imperial', 'day', 'values', 'health', 'type', 'taps', 'waitFor', 'sheet', 'note', 'now'];
 const VALUES = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack'];
 const DATA = ['demo', 'empty', 'fresh', 'stress'];
 
@@ -1038,6 +1045,8 @@ function loadStates(lists) {
       if (s.data !== undefined && !DATA.includes(s.data)) problems.push(`${where}: data must be one of ${DATA.join(', ')}`);
       if (s.route && s.route.includes('{day}') !== (s.day !== undefined)) problems.push(`${where}: a route with {day} needs day, and day needs {day} in the route`);
       if (s.type !== undefined && (typeof s.type !== 'object' || Array.isArray(s.type))) problems.push(`${where}: type is { testID: text }`);
+      if (s.health !== undefined && (!s.health || typeof s.health !== 'object' || Object.keys(s.health).some((k) => !['demo', 'state'].includes(k)))) problems.push(`${where}: health is { demo, state }`);
+      if (s.now !== undefined && (typeof s.now !== 'number' || !Number.isFinite(s.now))) problems.push(`${where}: now is a time in milliseconds`);
       if (s.values !== undefined) {
         if (!s.values || typeof s.values !== 'object' || Array.isArray(s.values)) problems.push(`${where}: values is { ${VALUES.join(', ')} }`);
         else {
@@ -1094,6 +1103,16 @@ async function open(context, job, seed) {
     if (value) localStorage.setItem('healthcal-v1', value);
     sessionStorage.setItem('__evidence', '1');
   }, seed);
+  // A health store in memory instead of the phone's (development and E2E builds only, sync.ts), and this phone's sync memory.
+  if (job.health) {
+    await page.addInitScript((h) => {
+      if (h.demo) window.__healthcalHealthDemo = h.demo;
+      if (h.state && !sessionStorage.getItem('__evidenceHealth')) {
+        localStorage.setItem('healthcal-health-sync', JSON.stringify({ state: h.state, version: 1 }));
+        sessionStorage.setItem('__evidenceHealth', '1');
+      }
+    }, job.health);
+  }
   const toast = [];
   const step = async (what, fn) => {
     try { await fn(); return null; } catch (e) { return `${what}: ${String(e.message).split('\n')[0].slice(0, 120)}`; }
@@ -1102,6 +1121,7 @@ async function open(context, job, seed) {
     await page.waitForTimeout(350);
     for (const t of await page.evaluate(toastScan).catch(() => [])) if (!toast.includes(t)) toast.push(t);
   };
+  if (job.now !== undefined) await page.clock.setFixedTime(new Date(job.now));
   let problem = await step('did not load', async () => {
     await page.goto(base + job.route, { waitUntil: 'networkidle', timeout: 120000 });
     await page.waitForSelector('[data-testid]', { timeout: 15000 });

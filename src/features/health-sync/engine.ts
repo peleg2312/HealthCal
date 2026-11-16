@@ -18,7 +18,8 @@ import type { ActivityEntry } from '@/types';
 import { recordIdFor, workoutSpan, type HealthContext, type HealthEntry } from './convert';
 import { choiceKey, planSync, workoutKey, type Handled, type ReviewItem, type SyncPlan } from './plan';
 import { pruneHandled, readRange, RECHECK_DAYS, shouldAutoSync, syncMessage, type HealthSyncState, type SyncError, type SyncErrorCode } from './state';
-import { HealthError, storeName, type HealthAccess, type HealthAdapter, type HealthWorkout } from './types';
+import { localClock, mergeStepDays, NO_STEPS, pruneStepDays, stepDaysFromTotals, stepsReadRange, type StepClock, type StepsMemory } from './steps';
+import { HealthError, storeName, type HealthAccess, type HealthAdapter, type HealthWorkout, type StepDayTotal } from './types';
 
 export type SyncTrigger = 'auto' | 'manual';
 
@@ -54,6 +55,8 @@ export interface SyncDeps {
   onBusy?(busy: boolean): void;
   /** How long the health store may take to answer. Default 45 s. */
   timeoutMs?: number;
+  /** Which calendar day an instant is in, for steps. Default: the phone's own zone. */
+  stepClock?: StepClock;
 }
 
 const DAY_MS = 86_400_000;
@@ -83,7 +86,9 @@ function asSyncError(e: unknown, now: number): SyncError {
 export function createHealthSync(deps: SyncDeps) {
   const { adapter, diary, state } = deps;
   const timeout = deps.timeoutMs ?? 45_000;
-  const store = storeName(adapter.store);
+  const clock = deps.stepClock ?? localClock;
+  // Asked each time: a development build can swap the adapter after this is made.
+  const storeLabel = () => storeName(adapter.store);
   let running: Promise<SyncOutcome> | null = null;
 
   const startOf = (w: HealthWorkout) => workoutSpan(w)?.startUtc ?? w.startTime;
@@ -112,7 +117,7 @@ export function createHealthSync(deps: SyncDeps) {
     const updated = plan.update.length + plan.replace.length;
     state.set({ ...more, handled });
     if (added + updated > 0) {
-      deps.announce(syncMessage(added, updated, saves.map((p) => p.from), store), () => {
+      deps.announce(syncMessage(added, updated, saves.map((p) => p.from), storeLabel()), () => {
         // Take out exactly what was added, and put changed workouts back as they were.
         for (const p of [...plan.add, ...plan.replace]) diary.remove(p.entry.id);
         const back = [...plan.update.map((u) => u.before), ...plan.replace.map((r) => r.remove)];
@@ -144,6 +149,7 @@ export function createHealthSync(deps: SyncDeps) {
 
     let access: HealthAccess;
     let read: HealthWorkout[];
+    let steps: StepsMemory | null = null;
     try {
       const availability = await withTimeout(adapter.availability(), timeout);
       if (availability !== 'available') return fail(availability);
@@ -167,6 +173,7 @@ export function createHealthSync(deps: SyncDeps) {
         return !s.handled[id];
       };
       read = await withTimeout(adapter.readWorkouts(readRange(now), access, { needsDetail }), timeout);
+      steps = await readSteps(access, s.steps, now);
     } catch (e) {
       const error = asSyncError(e, deps.now());
       state.set({ lastError: error });
@@ -196,8 +203,31 @@ export function createHealthSync(deps: SyncDeps) {
       origins: plan.origins,
       review: carryPicks(plan.review, current.review),
     });
-    state.set({ handled: pruneHandled(state.get().handled, deps.now()), lastResult: added + updated > 0 ? { at, added, updated } : state.get().lastResult });
+    state.set({
+      handled: pruneHandled(state.get().handled, deps.now()),
+      lastResult: added + updated > 0 ? { at, added, updated } : state.get().lastResult,
+      // Steps the store would not give (not allowed, or the read failed) leave what was kept; old days drop out.
+      steps: steps ?? { ...current.steps, days: pruneStepDays(current.steps.days, clock.dayOf(deps.now())) },
+    });
     return { status: 'done', added, updated, review: plan.review.length };
+  }
+
+  /**
+   * Steps since the last read (steps.ts), or null when they may not be read or
+   * the read failed: steps are extra, so a failure here never fails the sync.
+   */
+  async function readSteps(access: HealthAccess, before: StepsMemory, now: number): Promise<StepsMemory | null> {
+    if (!access.steps) return null;
+    const range = stepsReadRange(before.readAt, now, clock);
+    const today = clock.dayOf(now);
+    let totals: StepDayTotal[];
+    try {
+      totals = await withTimeout(adapter.readStepDays({ from: range.from, to: range.to, fromDay: range.fromDay, toDay: today }, access), timeout);
+    } catch {
+      return null;
+    }
+    const read = stepDaysFromTotals(totals);
+    return { days: mergeStepDays(before.days, read, range.fromDay, today), readAt: new Date(now).toISOString() };
   }
 
   /** Run a sync. Two triggers at once share one run. */
@@ -236,9 +266,12 @@ export function createHealthSync(deps: SyncDeps) {
     return { ok: true, sync: await sync('manual') };
   }
 
-  /** Switch off: nothing more is read. What was added stays; so does the memory of what was deleted or skipped. */
+  /**
+   * Switch off: nothing more is read. What was added stays; so does the memory of what was deleted or skipped.
+   * The steps go: they are only a copy of the health store's, shown while sync is on.
+   */
   function disable(): void {
-    state.set({ enabled: false, review: [], lastError: null });
+    state.set({ enabled: false, review: [], lastError: null, steps: NO_STEPS });
   }
 
   const itemOf = (id: string) => state.get().review.find((r) => r.id === id);

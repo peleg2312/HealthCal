@@ -12,6 +12,7 @@ import { RoutineCards, useRoutineTemplates } from '@/features/activity/RoutineCa
 import { WeekCard } from '@/features/activity/WeekCard';
 import { startRoutineDraft, type RoutineTemplate } from '@/features/activity/routines';
 import { draftHasContent, useStrengthDrafts } from '@/features/activity/strengthDraft';
+import { StepsLine } from '@/features/health-sync/ui/StepsLine';
 import { SyncedFromLine } from '@/features/health-sync/ui/SyncedFromLine';
 import { TrainSyncLink } from '@/features/health-sync/ui/TrainSyncLink';
 import { addDays, formatDayLabel, formatDuration, formatShortDate, startOfWeek } from '@/lib/dates';
@@ -78,7 +79,7 @@ export default function TrainScreen() {
         </View>
       ) : null}
 
-      <WeekCard week={week} dates={weekDates} today={t} />
+      <WeekCard week={week} dates={weekDates} today={t} extra={<StepsLine dates={weekDates} today={t} />} />
 
       {/* Side by side when both labels fit (150 px each); stacked on a narrow phone rather than cut. */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>

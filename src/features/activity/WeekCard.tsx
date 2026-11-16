@@ -18,7 +18,7 @@ const VESSEL_H = 168;
  * so there is no "over"), the week's totals, then a cup per day filled with
  * that day's minutes.
  */
-export function WeekCard({ week, dates, today }: { week: WeekSummary; dates: ISODate[]; today: ISODate }) {
+export function WeekCard({ week, dates, today, extra }: { week: WeekSummary; dates: ISODate[]; today: ISODate; /** A line under the totals (Train's steps). */ extra?: React.ReactNode }) {
   const { colors, spacing } = useTheme();
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
@@ -99,6 +99,7 @@ export function WeekCard({ week, dates, today }: { week: WeekSummary; dates: ISO
         <Mini label="Total time" value={week.totalMinutes > 0 ? formatDuration(week.totalMinutes) : '0 min'} testID="train-total-time" />
         <Mini label="Net, est." value={formatNumber(week.kcalNet)} unit="kcal" color={colors.exercise} />
       </View>
+      {extra}
 
       <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
 

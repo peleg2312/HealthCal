@@ -12,7 +12,7 @@ import { healthAdapter, useSyncOnFocus } from '../sync';
  * automatically" while it is off, "Workout sync" once it is on, and a small
  * count ("Sync, 2 to look at") when workouts wait in "Needs a look". Mounting it is also what makes
  * Train sync when the tab is opened. Where there is no health store (the
- * browser, iPhone for now) the link still leads to the screen that says so.
+ * browser, an iPhone build without Apple Health) the link still leads to the screen that says so.
  */
 export function TrainSyncLink() {
   const { colors } = useTheme();

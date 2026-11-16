@@ -1,7 +1,7 @@
 /**
  * The adapter for a platform without a health store this build can read: the
- * browser, and iPhone until its Apple Health adapter exists. It answers "not
- * available here" and never touches a native module.
+ * browser, and an iPhone build without the Apple Health module. It answers
+ * "not available here" and never touches a native module.
  */
 import { HealthError, NO_ACCESS, type HealthAdapter } from './types';
 
@@ -13,6 +13,9 @@ export const unsupportedAdapter: HealthAdapter = {
   access: async () => NO_ACCESS,
   requestAccess: async () => NO_ACCESS,
   readWorkouts: async () => {
+    throw unavailable();
+  },
+  readStepDays: async () => {
     throw unavailable();
   },
   openSettings: () => {},

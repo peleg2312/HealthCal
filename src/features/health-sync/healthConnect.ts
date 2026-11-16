@@ -4,18 +4,25 @@
  * nothing native is loaded): the Android adapter only makes the calls and
  * passes the answers through here.
  */
-import type { AggregateResult, Permission, RecordResult } from 'react-native-health-connect';
+import type { AggregateResult, AggregationGroupResult, Permission, RecordResult } from 'react-native-health-connect';
 
-import { HealthError, NO_ACCESS, type HealthAccess, type HealthWorkout } from './types';
+import { HealthError, NO_ACCESS, type HealthAccess, type HealthWorkout, type StepDayTotal } from './types';
 
 export type SessionRecord = RecordResult<'ExerciseSession'>;
+/** One day's steps from `aggregateGroupByPeriod({ recordType: 'Steps', timeRangeSlicer: { period: 'DAYS', length: 1 } })`. */
+export type StepsDayGroup = AggregationGroupResult<'Steps'>;
 
-/** The four things the app reads. Nothing else is ever requested. */
+/**
+ * The five things the app reads. Nothing else is ever requested. Adding one
+ * means app.json (android.permissions), this list, the explanation sheet,
+ * docs/health-sync.md and the Play Console declaration together.
+ */
 export const READ_PERMISSIONS: Permission[] = [
   { accessType: 'read', recordType: 'ExerciseSession' },
   { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
   { accessType: 'read', recordType: 'TotalCaloriesBurned' },
   { accessType: 'read', recordType: 'Distance' },
+  { accessType: 'read', recordType: 'Steps' },
 ];
 
 /** What a list of granted permissions lets the app read. */
@@ -27,7 +34,26 @@ export function accessFrom(granted: readonly { accessType: string; recordType: s
     activeEnergy: can('ActiveCaloriesBurned'),
     totalEnergy: can('TotalCaloriesBurned'),
     distance: can('Distance'),
+    steps: can('Steps'),
   };
+}
+
+/**
+ * Health Connect's steps per day as day totals. `aggregateGroupByPeriod` cuts
+ * the range into calendar days in the phone's zone and answers each with
+ * `COUNT_TOTAL`, already one count where apps overlap (Health Connect's own
+ * data-source priority). `startTime` is a local date-time ('2026-11-12T00:00'):
+ * its date is the day. A day with nothing is 0 and left out.
+ */
+export function stepDaysFromPeriods(groups: readonly StepsDayGroup[]): StepDayTotal[] {
+  const out: StepDayTotal[] = [];
+  for (const g of groups) {
+    const day = typeof g?.startTime === 'string' ? /^(\d{4}-\d{2}-\d{2})/.exec(g.startTime)?.[1] : undefined;
+    const count = g?.result?.COUNT_TOTAL;
+    if (!day || typeof count !== 'number' || !Number.isFinite(count) || count <= 0) continue;
+    out.push({ day, count: Math.round(count) });
+  }
+  return out;
 }
 
 /** Health Connect's getSdkStatus numbers (SdkAvailabilityStatus): 1 unavailable, 2 provider update required, 3 available. */

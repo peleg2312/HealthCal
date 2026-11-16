@@ -1,10 +1,12 @@
 /**
  * Health Connect's records, typed with the library's own types, into plain workouts.
  */
-import type { AggregateResult, RecordResult } from 'react-native-health-connect';
+import type { AggregateResult, AggregationGroupResult, RecordResult } from 'react-native-health-connect';
 import { describe, expect, it } from 'vitest';
 
-import { accessFrom, availabilityFrom, ownFigure, READ_PERMISSIONS, sessionRef, sessionToWorkout, toHealthError } from './healthConnect';
+import { addDays } from '@/lib/dates';
+
+import { accessFrom, availabilityFrom, ownFigure, READ_PERMISSIONS, sessionRef, sessionToWorkout, stepDaysFromPeriods, toHealthError } from './healthConnect';
 import { HealthError } from './types';
 
 const GARMIN = 'com.garmin.android.apps.connectmobile';
@@ -28,24 +30,44 @@ const distance = (m: number, dataOrigins = [GARMIN]): AggregateResult<'Distance'
 });
 
 describe('Health Connect mapping', () => {
-  it('asks for four read permissions and nothing else', () => {
+  it('asks for five read permissions and nothing else', () => {
     expect(READ_PERMISSIONS).toEqual([
       { accessType: 'read', recordType: 'ExerciseSession' },
       { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
       { accessType: 'read', recordType: 'TotalCaloriesBurned' },
       { accessType: 'read', recordType: 'Distance' },
+      { accessType: 'read', recordType: 'Steps' },
     ]);
   });
 
   it('reads what is granted from the permission list', () => {
-    expect(accessFrom([])).toEqual({ workouts: false, activeEnergy: false, totalEnergy: false, distance: false });
+    expect(accessFrom([])).toEqual({ workouts: false, activeEnergy: false, totalEnergy: false, distance: false, steps: false });
     expect(accessFrom([{ accessType: 'read', recordType: 'ExerciseSession' }, { accessType: 'read', recordType: 'Distance' }, { accessType: 'write', recordType: 'ActiveCaloriesBurned' }])).toEqual({
       workouts: true,
       activeEnergy: false,
       totalEnergy: false,
       distance: true,
+      steps: false,
     });
-    expect(accessFrom(READ_PERMISSIONS)).toEqual({ workouts: true, activeEnergy: true, totalEnergy: true, distance: true });
+    expect(accessFrom(READ_PERMISSIONS)).toEqual({ workouts: true, activeEnergy: true, totalEnergy: true, distance: true, steps: true });
+  });
+
+  it('takes the steps per day from Health Connect\'s own day totals', () => {
+    // The shape aggregateGroupByPeriod resolves with (ReactStepsRecord.parseAggregationResultGroupedByPeriod):
+    // LocalDateTime strings for the period, the de-duplicated COUNT_TOTAL and the apps that went into it.
+    const day = (start: string, count: number, dataOrigins = ['com.sec.android.app.shealth', 'com.google.android.apps.fitness']): AggregationGroupResult<'Steps'> => ({
+      result: { COUNT_TOTAL: count, dataOrigins },
+      startTime: `${start}T00:00`,
+      endTime: `${addDays(start, 1)}T00:00`,
+    });
+    expect(stepDaysFromPeriods([day('2026-11-12', 7950.4), day('2026-11-13', 0, []), day('2026-11-14', 1520)])).toEqual([
+      { day: '2026-11-12', count: 7950 },
+      { day: '2026-11-14', count: 1520 },
+    ]);
+    // The last period ends now, not at midnight; a period that starts at a time other than midnight still names its day.
+    expect(stepDaysFromPeriods([{ result: { COUNT_TOTAL: 300, dataOrigins: [] }, startTime: '2026-11-15T00:00', endTime: '2026-11-15T09:12:03' }])).toEqual([{ day: '2026-11-15', count: 300 }]);
+    expect(stepDaysFromPeriods([{ result: { COUNT_TOTAL: Number.NaN, dataOrigins: [] }, startTime: '2026-11-15T00:00', endTime: '2026-11-15T09:00' }])).toEqual([]);
+    expect(stepDaysFromPeriods([{ result: { COUNT_TOTAL: 10, dataOrigins: [] }, startTime: 'garbage', endTime: '' }])).toEqual([]);
   });
 
   it('reads the SDK status numbers', () => {

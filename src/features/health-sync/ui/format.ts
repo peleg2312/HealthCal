@@ -106,21 +106,36 @@ export function originLine(o: OriginSeen): string {
 }
 
 /** The line under the switch. `ago` is "5 min ago" for the last successful sync, or null. */
-export function switchSubtitle(state: Pick<HealthSyncState, 'enabled' | 'lastSyncedAt' | 'lastError'>, busy: boolean, asking: boolean, ago: string | null): string {
-  if (asking) return 'Waiting for Health Connect';
+export function switchSubtitle(state: Pick<HealthSyncState, 'enabled' | 'lastSyncedAt' | 'lastError'>, busy: boolean, asking: boolean, ago: string | null, store = 'Health Connect'): string {
+  if (asking) return `Waiting for ${store}`;
   if (!state.enabled) return 'Off';
   if (busy) return 'Syncing now';
   if (state.lastError) return 'On, but the last sync did not finish';
   return ago ? `On, last synced ${ago}` : 'On';
 }
 
-/** The row on Profile: what a glance should say. */
-export function profileSubtitle(state: Pick<HealthSyncState, 'enabled' | 'lastSyncedAt' | 'lastError' | 'review'>, supported: boolean, ago: string | null): string {
-  if (!supported) return 'In the Android app';
+/**
+ * The row on Profile: what a glance should say. `elsewhere` is what to say
+ * where this build cannot sync (`syncReach(...).profile`, reach.ts).
+ */
+export function profileSubtitle(state: Pick<HealthSyncState, 'enabled' | 'lastSyncedAt' | 'lastError' | 'review'>, supported: boolean, ago: string | null, elsewhere = 'In the Android app'): string {
+  if (!supported) return elsewhere;
   if (!state.enabled) return 'Off. Add Garmin and other workouts by themselves';
   if (state.lastError) return 'Needs attention';
   if (state.review.length) return `On, ${state.review.length} ${state.review.length === 1 ? 'workout needs' : 'workouts need'} a look`;
   return ago ? `On, last synced ${ago}` : 'On';
+}
+
+/**
+ * The steps row on the sync screen: what Train shows, or why it shows none.
+ * `today` is today's count when there is one.
+ */
+export function stepsRowText(access: HealthAccess | null, steps: { days: Record<string, number>; readAt: string | null }, today: ISODate, store: string): string {
+  if (access && !access.steps) return 'Not shared yet. Allow steps to see them on Train';
+  const n = steps.days[today];
+  if (n > 0) return `${formatNumber(n)} today, shown on Train`;
+  if (!steps.readAt) return 'Shown on Train once they are read';
+  return Object.keys(steps.days).length ? 'None yet today. Shown on Train' : `None in ${store} in the last 35 days`;
 }
 
 /** What is missing when calories or distance may not be read; null when everything may. */

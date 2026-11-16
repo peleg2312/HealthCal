@@ -17,7 +17,7 @@ import { adapter as platformAdapter } from './adapter';
 import { createHealthSync, type SyncOutcome } from './engine';
 import { createFakeAdapter, type FakeHealth } from './fake';
 import { remembered, resetHealthSync, useHealthSync, whenLoaded } from './store';
-import type { HealthAccess, HealthAdapter, HealthAvailability } from './types';
+import { HealthError, type HealthAccess, type HealthAdapter, type HealthAvailability } from './types';
 
 let active: HealthAdapter = platformAdapter;
 
@@ -30,6 +30,7 @@ const liveAdapter: HealthAdapter = {
   access: () => active.access(),
   requestAccess: () => active.requestAccess(),
   readWorkouts: (range, access, options) => active.readWorkouts(range, access, options),
+  readStepDays: (range, access) => active.readStepDays(range, access),
   openSettings: () => active.openSettings(),
   openInstall: () => active.openInstall(),
 };
@@ -116,9 +117,11 @@ export function useHealthStatus(): HealthStatus {
       try {
         availability = await liveAdapter.availability();
         if (availability === 'available') access = await liveAdapter.access();
-      } catch {
-        // The health store did not answer: treated as not there for now; the next look asks again.
-        availability = liveAdapter.store ? 'not-installed' : 'unsupported';
+      } catch (e) {
+        // The health store did not answer: for now Health Connect counts as not there, and Apple Health
+        // (part of iOS) as there, so turning sync on says what went wrong. The next look asks again.
+        if (e instanceof HealthError && e.code === 'not-entitled') availability = 'not-entitled';
+        else availability = liveAdapter.store === 'apple-health' ? 'available' : liveAdapter.store ? 'not-installed' : 'unsupported';
       }
       if (current) setStatus({ availability, access });
     })();
@@ -137,7 +140,8 @@ export function useHealthStatus(): HealthStatus {
 
 /**
  * Development and browser tests only: swap in the in-memory health store so
- * the sync screen's states can be seen and driven without an Android phone.
+ * the sync screen's states can be seen and driven without a phone (`store:
+ * 'apple-health'` shows the iPhone's screen, with Apple Health's words).
  * `window.__healthcalHealthDemo = { ...options }` before the app loads does the
  * same from a test's init script. A release build never sets the handle, so
  * nothing can swap the adapter there.

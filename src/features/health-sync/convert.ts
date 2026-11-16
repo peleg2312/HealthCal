@@ -8,8 +8,8 @@
  * health store's figures allow (energy.ts).
  *
  * One workout is one record wherever it arrives from: the record id is the one
- * the file import derives from the start instant, so a FIT file, a CSV row and
- * Health Connect on any of the person's phones all write the same record.
+ * the file import derives from the start instant, so a FIT file, a CSV row,
+ * Health Connect and Apple Health on any of the person's phones all write the same record.
  */
 import { garminExternalId, importedEntryId, type ConvertContext, type ImportedEntry } from '@/features/import/convert';
 import { isoSeconds, plausibleOffsetMin } from '@/features/import/time';
@@ -17,6 +17,7 @@ import type { ImportedWorkout } from '@/features/import/types';
 import type { ActivityEntry, ActivitySource } from '@/types';
 
 import { workoutEnergy, type EnergyContext, type WorkoutEnergy } from './energy';
+import { appleHealthSport } from './appleHealthTypes';
 import { healthConnectSport, type HealthSport } from './exerciseTypes';
 import { healthExternalId, originName } from './origins';
 import type { HealthWorkout } from './types';
@@ -50,10 +51,9 @@ export function workoutSpan(w: Pick<HealthWorkout, 'startTime' | 'endTime'>): Wo
   return { startMs, endMs, durationSec, startUtc: isoSeconds(startMs) };
 }
 
-/** The app activity for a workout's exercise type. Apple Health's own table joins here when its adapter exists. */
+/** The app activity for a workout's exercise type, from its own store's table. */
 export function sportOf(w: Pick<HealthWorkout, 'store' | 'exerciseType'>): HealthSport {
-  if (w.store === 'health-connect') return healthConnectSport(w.exerciseType);
-  return { name: 'Workout', activityId: null, alternatives: [] };
+  return w.store === 'apple-health' ? appleHealthSport(w.exerciseType) : healthConnectSport(w.exerciseType);
 }
 
 /** The record id this workout is saved under: the file import's id for the same start instant. */

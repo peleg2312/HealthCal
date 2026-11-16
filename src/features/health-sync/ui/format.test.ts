@@ -4,7 +4,7 @@ import { planSync } from '../plan';
 import { CTX, handLogged, TYPE, workout } from '../testing';
 import { NO_ACCESS } from '../types';
 
-import { accessNote, originLine, profileSubtitle, reviewLabels, reviewView, switchSubtitle } from './format';
+import { accessNote, stepsRowText, originLine, profileSubtitle, reviewLabels, reviewView, switchSubtitle } from './format';
 
 const plain = (s: string) => s.replace(/ /g, ' ');
 
@@ -74,6 +74,8 @@ describe('sync screen wording', () => {
     expect(switchSubtitle({ ...on, lastError: { code: 'timeout', at: 'x' } }, false, false, '5 min ago')).toBe('On, but the last sync did not finish');
 
     expect(profileSubtitle(off, false, null)).toBe('In the Android app');
+    expect(profileSubtitle(off, false, null, 'Not in the iPhone app yet')).toBe('Not in the iPhone app yet');
+    expect(switchSubtitle(off, false, true, null, 'Apple Health')).toBe('Waiting for Apple Health');
     expect(profileSubtitle(off, true, null)).toBe('Off. Add Garmin and other workouts by themselves');
     expect(profileSubtitle(on, true, '5 min ago')).toBe('On, last synced 5 min ago');
     expect(profileSubtitle({ ...on, lastError: { code: 'permission', at: 'x' } }, true, null)).toBe('Needs attention');
@@ -83,9 +85,19 @@ describe('sync screen wording', () => {
 
   it('says what is not shared', () => {
     expect(accessNote(null)).toBeNull();
-    expect(accessNote({ workouts: true, activeEnergy: true, totalEnergy: false, distance: true })).toBeNull();
+    expect(accessNote({ workouts: true, activeEnergy: true, totalEnergy: false, distance: true, steps: true })).toBeNull();
     expect(accessNote({ ...NO_ACCESS, workouts: true })).toMatch(/^Calories and distance are not shared/);
     expect(accessNote({ ...NO_ACCESS, workouts: true, distance: true })).toMatch(/^Calories are not shared/);
-    expect(accessNote({ workouts: true, activeEnergy: true, totalEnergy: true, distance: false })).toMatch(/^Distance is not shared/);
+    expect(accessNote({ workouts: true, activeEnergy: true, totalEnergy: true, distance: false, steps: true })).toMatch(/^Distance is not shared/);
+  });
+
+  it('says what happens to steps', () => {
+    const none = { days: {}, readAt: null };
+    const read = { days: { '2026-11-13': 9100, '2026-11-14': 8432 }, readAt: '2026-11-14T11:00:00Z' };
+    expect(stepsRowText({ ...NO_ACCESS, workouts: true }, read, '2026-11-14', 'Health Connect')).toBe('Not shared yet. Allow steps to see them on Train');
+    expect(stepsRowText({ ...NO_ACCESS, workouts: true, steps: true }, read, '2026-11-14', 'Apple Health')).toBe('8,432 today, shown on Train');
+    expect(stepsRowText({ ...NO_ACCESS, workouts: true, steps: true }, read, '2026-11-15', 'Apple Health')).toBe('None yet today. Shown on Train');
+    expect(stepsRowText({ ...NO_ACCESS, workouts: true, steps: true }, none, '2026-11-14', 'Apple Health')).toBe('Shown on Train once they are read');
+    expect(stepsRowText({ ...NO_ACCESS, workouts: true, steps: true }, { days: {}, readAt: 'x' }, '2026-11-14', 'Apple Health')).toBe('None in Apple Health in the last 35 days');
   });
 });

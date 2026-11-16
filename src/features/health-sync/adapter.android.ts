@@ -5,16 +5,16 @@
  * extension; iOS and web get the files beside it). It makes the calls and
  * nothing else: every rule about what the answers mean is in the pure modules.
  *
- * Read only, four record types, no background reads and no history beyond
- * Health Connect's default 30 days (app.json lists the same four permissions).
+ * Read only, five record types, no background reads and no history beyond
+ * Health Connect's default 30 days (app.json lists the same five permissions).
  * None of this can run outside an Android build; see docs/health-sync.md for
  * what still has to be checked on a phone.
  */
 import { Linking } from 'react-native';
-import { aggregateRecord, getGrantedPermissions, getSdkStatus, initialize, openHealthConnectSettings, readRecords, requestPermission } from 'react-native-health-connect';
+import { aggregateGroupByPeriod, aggregateRecord, getGrantedPermissions, getSdkStatus, initialize, openHealthConnectSettings, readRecords, requestPermission } from 'react-native-health-connect';
 
-import { accessFrom, availabilityFrom, READ_PERMISSIONS, sessionRef, sessionToWorkout, toHealthError, type SessionDetails, type SessionRecord } from './healthConnect';
-import { HealthError, type HealthAccess, type HealthAdapter, type HealthAvailability, type HealthWorkout, type ReadOptions } from './types';
+import { accessFrom, availabilityFrom, READ_PERMISSIONS, sessionRef, sessionToWorkout, stepDaysFromPeriods, toHealthError, type SessionDetails, type SessionRecord } from './healthConnect';
+import { HealthError, type HealthAccess, type HealthAdapter, type HealthAvailability, type HealthWorkout, type ReadOptions, type StepDayTotal, type StepsRange } from './types';
 
 const PROVIDER = 'com.google.android.apps.healthdata';
 /** Sessions per page, and a ceiling on pages so a misbehaving token cannot loop for ever. */
@@ -111,6 +111,27 @@ async function readWorkouts(range: { from: string; to: string }, allowed: Health
   }
 }
 
+/**
+ * Steps per day, totalled by Health Connect itself: one count where apps
+ * overlap, by its own data-source priority, so the figure matches what Health
+ * Connect reports for the day. The library turns the two instants into local
+ * date-times in the phone's zone, which is how the days are cut.
+ */
+async function readStepDays(range: StepsRange, allowed: HealthAccess): Promise<StepDayTotal[]> {
+  if (!allowed.steps) return [];
+  try {
+    await ready();
+    const groups = await aggregateGroupByPeriod({
+      recordType: 'Steps',
+      timeRangeFilter: { operator: 'between', startTime: range.from, endTime: range.to },
+      timeRangeSlicer: { period: 'DAYS', length: 1 },
+    });
+    return stepDaysFromPeriods(groups);
+  } catch (e) {
+    throw toHealthError(e);
+  }
+}
+
 function openSettings(): void {
   try {
     openHealthConnectSettings();
@@ -126,4 +147,4 @@ function openInstall(): void {
   );
 }
 
-export const adapter: HealthAdapter = { store: 'health-connect', availability, access, requestAccess, readWorkouts, openSettings, openInstall };
+export const adapter: HealthAdapter = { store: 'health-connect', availability, access, requestAccess, readWorkouts, readStepDays, openSettings, openInstall };

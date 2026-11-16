@@ -28,6 +28,7 @@ import type { ActivityEntry } from '@/types';
 
 import { finishEntry, recordIdFor, sportOf, toImportedWorkout, workoutSpan, type HealthContext, type HealthEntry } from './convert';
 import { wholeMinutes, workoutEnergy } from './energy';
+import { APPLE_HEALTH_TYPES, HK_TYPE } from './appleHealthTypes';
 import { HEALTH_CONNECT_TYPES } from './exerciseTypes';
 import { mergeOrigins } from './merge';
 import { originName, syncedFrom } from './origins';
@@ -121,7 +122,9 @@ export const workoutKey = (w: Pick<HealthWorkout, 'origin' | 'id'>): string => `
 
 /** Types that can be anything ("Other workout", "Exercise class", a type newer than the table). */
 const isCatchAll = (w: Pick<HealthWorkout, 'store' | 'exerciseType'>) =>
-  w.store !== 'health-connect' || w.exerciseType === 0 || w.exerciseType === 26 || !(w.exerciseType in HEALTH_CONNECT_TYPES);
+  w.store === 'apple-health'
+    ? w.exerciseType === HK_TYPE.other || w.exerciseType === 2999 || !(w.exerciseType in APPLE_HEALTH_TYPES)
+    : w.exerciseType === 0 || w.exerciseType === 26 || !(w.exerciseType in HEALTH_CONNECT_TYPES);
 
 /**
  * The key under which a chosen activity is remembered for later workouts of the

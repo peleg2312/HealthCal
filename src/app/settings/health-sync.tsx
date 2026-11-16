@@ -7,12 +7,13 @@ import { Group } from '@/features/settings/components';
 import { timeAgo } from '@/features/settings/format';
 import type { EnableOutcome } from '@/features/health-sync/engine';
 import { errorText, type SyncError } from '@/features/health-sync/state';
+import { syncReach } from '@/features/health-sync/reach';
 import { useHealthSync } from '@/features/health-sync/store';
 import { healthAdapter, healthSync, useHealthStatus } from '@/features/health-sync/sync';
 import { storeName } from '@/features/health-sync/types';
 import { ActivityPickSheet } from '@/features/health-sync/ui/ActivityPickSheet';
 import { ExplainSheet } from '@/features/health-sync/ui/ExplainSheet';
-import { accessNote, originLine, switchSubtitle } from '@/features/health-sync/ui/format';
+import { accessNote, originLine, stepsRowText, switchSubtitle } from '@/features/health-sync/ui/format';
 import { ReviewCard } from '@/features/health-sync/ui/ReviewCard';
 import { useNow, useToday } from '@/store/clock';
 import { useProfile } from '@/store/selectors';
@@ -35,7 +36,8 @@ export default function HealthSyncScreen() {
   const [pickFor, setPickFor] = useState<string | null>(null);
 
   const store = storeName(healthAdapter.store);
-  // Known at once where there is no health store at all (the browser, iPhone for now).
+  const apple = healthAdapter.store === 'apple-health';
+  // Known at once where there is no health store at all (the browser, an iPhone build without Apple Health).
   const supported = healthAdapter.store !== null && status.availability !== 'unsupported';
   const ago = timeAgo(state.lastSyncedAt, now);
   const hour12 = profile.units === 'imperial';
@@ -60,13 +62,36 @@ export default function HealthSyncScreen() {
       toast('Sync is off. Workouts already added stay');
       return;
     }
-    if (status.availability === 'not-installed' || status.availability === 'update-required') {
+    if (status.availability === 'not-installed' || status.availability === 'update-required' || status.availability === 'not-entitled') {
       setProblem(status.availability);
       return;
     }
     // With permission already given there is nothing to explain or ask.
     if (status.access?.workouts) void turnOn();
     else setExplain(true);
+  };
+
+  /** Steps were added after some people allowed the first four types: ask for what is missing, and say how it went. */
+  const allowSteps = async () => {
+    setAsking(true);
+    let allowed: boolean | null = null;
+    try {
+      allowed = (await healthAdapter.requestAccess()).steps;
+    } catch {
+      allowed = null;
+    }
+    setAsking(false);
+    status.refresh();
+    if (allowed) {
+      haptic.success();
+      toast('Steps are shared. They show on Train after this sync');
+      void healthSync.sync('manual');
+    } else if (allowed === false) {
+      // Refused, or Android no longer shows its sheet after two refusals: only the store's own settings can change it now.
+      toast(`Steps are still not shared. Allow them in ${store}`, { label: `Open`, onPress: () => healthAdapter.openSettings() });
+    } else {
+      toast(`${store} did not answer. Try again in a moment`);
+    }
   };
 
   const syncNow = async () => {
@@ -76,18 +101,21 @@ export default function HealthSyncScreen() {
   };
 
   if (!supported) {
+    // The browser has no health data; an iPhone build without the Apple Health module, or an iPad without Health, cannot read it.
+    // Where it does work is said by reach.ts, which names Apple Health only once a build can read it.
+    const reach = syncReach(Platform.OS, healthAdapter.store !== null);
     return (
-      <Screen header={<Header title="Workout sync" subtitle="Automatic, in the Android app" />} testID="health-sync-screen">
+      <Screen header={<Header title="Workout sync" subtitle={reach.header} />} testID="health-sync-screen">
         <Card testID="health-sync-unsupported" style={{ gap: spacing.xs }}>
-          <Text variant="h3">Automatic in the Android app</Text>
+          <Text variant="h3">{reach.heading}</Text>
           <Text variant="body" color="textSecondary">
-            There, workouts from Garmin Connect and other apps arrive by themselves through Health Connect, with your watch&apos;s calories.
+            {reach.body}
           </Text>
         </Card>
         {/* What works here, with the one action under it. */}
         <View style={{ gap: spacing.sm }}>
           <Text variant="body" color="textSecondary" style={{ paddingHorizontal: spacing.xs }}>
-            {Platform.OS === 'ios' ? 'Apple Health is not read yet. Here, import the files Garmin Connect exports.' : 'A browser has no health data. Here, import the files Garmin Connect exports.'}
+            {reach.here}
           </Text>
           <Button testID="health-sync-import-files" title="Import Garmin files" onPress={() => router.push('/activity/import')} />
         </View>
@@ -95,7 +123,7 @@ export default function HealthSyncScreen() {
     );
   }
 
-  const unavailable = status.availability === 'not-installed' || status.availability === 'update-required' ? status.availability : null;
+  const unavailable = status.availability === 'not-installed' || status.availability === 'update-required' || status.availability === 'not-entitled' ? status.availability : null;
   const note = state.enabled ? accessNote(status.access ?? state.access) : null;
   const pickItem = state.review.find((r) => r.id === pickFor) ?? null;
   // One thing at a time: what stops it from being turned on, else what stopped the last sync.
@@ -106,10 +134,14 @@ export default function HealthSyncScreen() {
     <Screen header={<Header title="Workout sync" subtitle={`From ${store}`} />} testID="health-sync-screen">
       <Card style={{ gap: spacing.sm }}>
         <Text variant="body">
-          Workouts that Garmin Connect and other apps save to {store} are added to your training by themselves, with the calories your watch measured.
+          Workouts that {apple ? 'your Apple Watch, Garmin Connect' : 'Garmin Connect'} and other apps save to {store} are added to your training by themselves, with the calories your
+          watch measured.
+        </Text>
+        <Text variant="body" color="textSecondary" testID="health-sync-steps-note">
+          Your daily steps show on Train. They are never added to your calories: your activity level already counts everyday walking.
         </Text>
         <Text variant="body" color="textSecondary">
-          HealthCal only reads workouts, their calories and their distance. It writes nothing back.
+          HealthCal only reads workouts, their calories and distance, and steps. It writes nothing back.
         </Text>
       </Card>
 
@@ -120,7 +152,7 @@ export default function HealthSyncScreen() {
               Sync workouts from {store}
             </Text>
             <Text variant="caption" color="textSecondary" testID="health-sync-status">
-              {status.availability === 'checking' ? 'Checking' : switchSubtitle(state, state.busy, asking, ago)}
+              {status.availability === 'checking' ? 'Checking' : switchSubtitle(state, state.busy, asking, ago, store)}
             </Text>
           </View>
           <Toggle
@@ -137,6 +169,8 @@ export default function HealthSyncScreen() {
         <ProblemCard
           problem={shown}
           store={store}
+          apple={apple}
+          onImport={() => router.push('/activity/import')}
           busy={asking}
           onInstall={() => healthAdapter.openInstall()}
           onOpen={() => healthAdapter.openSettings()}
@@ -225,6 +259,23 @@ export default function HealthSyncScreen() {
             </Text>
           </Card>
 
+          <Group title="Daily steps">
+            <ListRow
+              testID="health-sync-steps"
+              title="Steps"
+              subtitle={stepsRowText(status.access ?? state.access, state.steps, todayDate, store)}
+              chevron={false}
+              onPress={(status.access ?? state.access)?.steps === false ? () => void allowSteps() : undefined}
+              right={
+                (status.access ?? state.access)?.steps === false ? (
+                  <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
+                    Allow
+                  </Text>
+                ) : undefined
+              }
+            />
+          </Group>
+
           <Group title={`Found in ${store}`} footer={note ?? undefined}>
             {state.origins.length ? (
               state.origins.map((o) => <ListRow key={o.origin} testID={`health-sync-origin-${o.origin}`} title={o.name} subtitle={originLine(o)} chevron={false} />)
@@ -232,7 +283,9 @@ export default function HealthSyncScreen() {
               <View style={{ paddingVertical: spacing.md, gap: 4 }} testID="health-sync-none-found">
                 <Text variant="bodyStrong">{state.lastSyncedAt ? 'No workouts in the last 30 days' : 'Nothing read yet'}</Text>
                 <Text variant="caption" color="textSecondary">
-                  Apps share workouts with {store} only after you switch that on in each app. In Garmin Connect, look for {store} in its settings; workouts recorded after that appear here.
+                  {apple
+                    ? 'Apple Watch workouts arrive by themselves. Other apps share with Apple Health only after you switch that on in each app; in Garmin Connect, look for Apple Health in its settings. If you turned a type off when Apple asked, allow it in the Health app under Sharing, Apps, HealthCal.'
+                    : `Apps share workouts with ${store} only after you switch that on in each app. In Garmin Connect, look for ${store} in its settings; workouts recorded after that appear here.`}
                 </Text>
               </View>
             )}
@@ -244,8 +297,9 @@ export default function HealthSyncScreen() {
         <View style={{ paddingVertical: spacing.md, gap: 4 }}>
           <Text variant="bodyStrong">Stop at any time with the switch</Text>
           <Text variant="caption" color="textSecondary">
-            Once it is off, nothing more is read. Workouts already added stay in Train, where you can delete any of them; a workout you delete is not brought back by a later sync. To take the
-            permission away as well, open {store} and remove HealthCal under app permissions.
+            Once it is off, nothing more is read and the steps kept on this phone are cleared. Workouts already added stay in Train, where you can delete any of them; a workout you
+            delete is not brought back by a later sync. To take the permission away as well,{' '}
+            {apple ? 'open the Health app and turn HealthCal off under Sharing, Apps.' : `open ${store} and remove HealthCal under app permissions.`}
           </Text>
         </View>
         <ListRow testID="health-sync-open-store" title={`Open ${store}`} subtitle="See or change what HealthCal may read" onPress={() => healthAdapter.openSettings()} />
@@ -254,12 +308,15 @@ export default function HealthSyncScreen() {
       <Group title="What happens to this data">
         <View style={{ paddingVertical: spacing.md, gap: spacing.sm }} testID="health-sync-privacy">
           <Text variant="caption" color="textSecondary">
-            HealthCal reads workouts and, for each, its active and total calories and distance. Nothing is written back to {store}.
+            HealthCal reads workouts and, for each, its {apple ? 'active calories' : 'active and total calories'} and distance, and your daily steps. Nothing is written back to {store}.
           </Text>
           <Text variant="caption" color="textSecondary">
             A synced workout is kept like a session you log yourself: on this phone, and in your account if you have one, so your other devices show it. It is never sent to the
             AI food analysis. Friends, if you share with any, see what they see for every workout: its name, length, distance and date, and your weekly minutes, sessions and
             streak. Never its calories.
+          </Text>
+          <Text variant="caption" color="textSecondary">
+            Steps stay on this phone only, for the last 35 days: they are not added to your account, never sent to the AI food analysis and never shown to friends.
           </Text>
         </View>
       </Group>
@@ -276,7 +333,7 @@ export default function HealthSyncScreen() {
         </Text>
       </PressableScale>
 
-      <ExplainSheet visible={explain} busy={asking} onClose={() => (asking ? undefined : setExplain(false))} onContinue={() => void turnOn()} />
+      <ExplainSheet store={healthAdapter.store ?? 'health-connect'} visible={explain} busy={asking} onClose={() => (asking ? undefined : setExplain(false))} onContinue={() => void turnOn()} />
       <ActivityPickSheet
         item={pickItem}
         onClose={() => setPickFor(null)}
@@ -290,23 +347,47 @@ export default function HealthSyncScreen() {
 
 const changeText = (r: { added: number; updated: number }) => [r.added ? `${r.added} added` : '', r.updated ? `${r.updated} updated` : ''].filter(Boolean).join(', ');
 
-/** Why sync could not be turned on, with the one thing that fixes it. */
-function ProblemCard({ problem, store, busy, onInstall, onOpen, onRetry }: { problem: Problem; store: string; busy: boolean; onInstall: () => void; onOpen: () => void; onRetry: () => void }) {
+/** Why sync could not be turned on, in two lines (what happened, what to do), with the one thing that fixes it. */
+function ProblemCard({
+  problem,
+  store,
+  apple,
+  busy,
+  onInstall,
+  onOpen,
+  onRetry,
+  onImport,
+}: {
+  problem: Problem;
+  store: string;
+  apple: boolean;
+  busy: boolean;
+  onInstall: () => void;
+  onOpen: () => void;
+  onRetry: () => void;
+  onImport: () => void;
+}) {
   const { colors, spacing } = useTheme();
   let title: string;
   let body: string;
   let action: React.ReactNode;
-  if (problem === 'not-installed') {
+  if (problem === 'not-entitled') {
+    title = `${store} is not available in this install`;
+    body = 'This copy was signed without Apple\'s Health permission, which sideloading tools leave out. Import Garmin files instead.';
+    action = <Button testID="health-sync-problem-import" title="Import Garmin files" variant="secondary" size="md" full={false} onPress={onImport} />;
+  } else if (problem === 'not-installed') {
     title = `${store} is not on this phone`;
-    body = `On Android 13 and earlier, ${store} is an app from Google Play. Install it, open it once, then come back and turn sync on.`;
+    body = 'Install it from Google Play, open it once, then turn sync on here.';
     action = <Button testID="health-sync-install" title={`Get ${store}`} variant="secondary" size="md" full={false} onPress={onInstall} />;
   } else if (problem === 'update-required') {
     title = `${store} needs an update`;
-    body = `The version on this phone is too old to share workouts. Update it in Google Play, then come back and turn sync on.`;
+    body = 'Update it in Google Play, then turn sync on here.';
     action = <Button testID="health-sync-install" title={`Update ${store}`} variant="secondary" size="md" full={false} onPress={onInstall} />;
   } else if (problem === 'refused') {
     title = 'HealthCal was not given access to workouts';
-    body = `Without it nothing can be synced, and nothing was turned on. Android stops showing its screen once it has been declined twice; you can still allow HealthCal in ${store}, under app permissions.`;
+    body = apple
+      ? 'Allow it in the Health app under Sharing, Apps, HealthCal, then turn sync on.'
+      : `Allow it in ${store} under app permissions, then turn sync on. Android stops asking after two refusals.`;
     action = (
       <>
         <Button testID="health-sync-open-permissions" title={`Open ${store}`} variant="secondary" size="sm" full={false} onPress={onOpen} />
@@ -315,7 +396,7 @@ function ProblemCard({ problem, store, busy, onInstall, onOpen, onRetry }: { pro
     );
   } else {
     title = `${store} did not answer`;
-    body = 'Sync was not turned on. It may be updating or busy; try again in a moment.';
+    body = 'Sync was not turned on. Try again in a moment.';
     action = <Button testID="health-sync-ask-again" title="Try again" variant="secondary" size="md" full={false} loading={busy} onPress={onRetry} />;
   }
   return (

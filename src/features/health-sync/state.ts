@@ -6,6 +6,7 @@
  * (store.ts) and never leaves the device.
  */
 import type { Handled, OriginSeen, ReviewItem } from './plan';
+import { NO_STEPS, type StepDays, type StepsMemory } from './steps';
 import type { HealthAccess, HealthAvailability, HealthErrorCode } from './types';
 
 /** Why the last sync did not finish. */
@@ -38,6 +39,8 @@ export interface HealthSyncState {
   choices: Record<string, string>;
   /** What the last successful sync changed. */
   lastResult: { at: string; added: number; updated: number } | null;
+  /** Steps per day for the last 35 days (steps.ts): shown on Train, never counted as calories. */
+  steps: StepsMemory;
 }
 
 export const INITIAL_STATE: HealthSyncState = {
@@ -51,6 +54,7 @@ export const INITIAL_STATE: HealthSyncState = {
   handled: {},
   choices: {},
   lastResult: null,
+  steps: NO_STEPS,
 };
 
 const isRecord = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
@@ -64,7 +68,8 @@ const text = (x: unknown): string | null => (typeof x === 'string' ? x : null);
 export function restoreState(saved: unknown): HealthSyncState {
   if (!isRecord(saved)) return INITIAL_STATE;
   const error = isRecord(saved.lastError) && typeof saved.lastError.code === 'string' && typeof saved.lastError.at === 'string' ? (saved.lastError as unknown as SyncError) : null;
-  const access = isRecord(saved.access) && typeof saved.access.workouts === 'boolean' ? (saved.access as unknown as HealthAccess) : null;
+  // A build before steps saved no `steps` flag: steps were not asked for then.
+  const access = isRecord(saved.access) && typeof saved.access.workouts === 'boolean' ? ({ ...(saved.access as unknown as HealthAccess), steps: saved.access.steps === true } as HealthAccess) : null;
   const result = isRecord(saved.lastResult) && typeof saved.lastResult.at === 'string' ? (saved.lastResult as HealthSyncState['lastResult']) : null;
   const review = Array.isArray(saved.review)
     ? (saved.review.filter((r) => isRecord(r) && typeof r.id === 'string' && isRecord(r.workout) && typeof r.workout.startTime === 'string' && typeof r.reason === 'string') as ReviewItem[])
@@ -78,6 +83,11 @@ export function restoreState(saved: unknown): HealthSyncState {
   }
   const choices: Record<string, string> = {};
   if (isRecord(saved.choices)) for (const [k, v] of Object.entries(saved.choices)) if (typeof v === 'string') choices[k] = v;
+  const days: StepDays = {};
+  const savedSteps = isRecord(saved.steps) ? saved.steps : null;
+  if (savedSteps && isRecord(savedSteps.days)) {
+    for (const [day, n] of Object.entries(savedSteps.days)) if (/^\d{4}-\d{2}-\d{2}$/.test(day) && typeof n === 'number' && Number.isFinite(n) && n > 0) days[day] = Math.round(n);
+  }
   return {
     enabled: saved.enabled === true,
     lastAttemptAt: text(saved.lastAttemptAt),
@@ -89,6 +99,7 @@ export function restoreState(saved: unknown): HealthSyncState {
     handled,
     choices,
     lastResult: result,
+    steps: { days, readAt: savedSteps ? text(savedSteps.readAt) : null },
   };
 }
 
@@ -146,6 +157,8 @@ export function errorText(error: SyncError, store: string): string {
       return `${store} needs an update before workouts can be read.`;
     case 'unsupported':
       return `${store} is not available on this device.`;
+    case 'not-entitled':
+      return `${store} is not available in this install of HealthCal. Apple lets only a copy signed with HealthKit access read it.`;
     case 'unavailable':
       return `${store} did not answer. It may be updating; try again in a moment.`;
     case 'timeout':

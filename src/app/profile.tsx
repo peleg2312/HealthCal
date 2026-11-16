@@ -18,8 +18,9 @@ import {
   Weight,
 } from 'lucide-react-native';
 import React from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { Platform, useWindowDimensions, View } from 'react-native';
 
+import { syncReach } from '@/features/health-sync/reach';
 import { useHealthSync } from '@/features/health-sync/store';
 import { healthAdapter } from '@/features/health-sync/sync';
 import { profileSubtitle } from '@/features/health-sync/ui/format';
@@ -311,7 +312,7 @@ function HeaderStat({ label, value, color, divider }: { label: string; value: st
   );
 }
 
-/** Automatic workout sync (Health Connect on Android): this phone's own switch, so it reads its own state. */
+/** Automatic workout sync (Health Connect on Android, Apple Health on iPhone): this phone's own switch, so it reads its own state. */
 function HealthSyncRow() {
   const { colors } = useTheme();
   const sync = useHealthSync();
@@ -320,7 +321,7 @@ function HealthSyncRow() {
     <ListRow
       testID="profile-health-sync"
       title="Workout sync"
-      subtitle={profileSubtitle(sync, healthAdapter.store !== null, timeAgo(sync.lastSyncedAt, now))}
+      subtitle={profileSubtitle(sync, healthAdapter.store !== null, timeAgo(sync.lastSyncedAt, now), syncReach(Platform.OS, false).profile)}
       left={
         <IconTile color={colors.exercise}>
           <RefreshCw size={20} color={colors.exercise} />

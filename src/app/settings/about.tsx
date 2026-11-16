@@ -17,6 +17,7 @@ import React from 'react';
 import { View } from 'react-native';
 
 import { AiConsentAbout } from '@/features/ai/AiConsentAbout';
+import { storesRead } from '@/features/health-sync/reach';
 import { IconTile } from '@/features/settings/components';
 import { ACTIVITY_FACTORS, ACTIVITY_LABELS, calorieFloor } from '@/lib/energy';
 import { formatNumber } from '@/lib/units';
@@ -112,6 +113,8 @@ export default function AboutScreen() {
   const { colors, spacing } = useTheme();
   const mine = useMine();
   const version = Constants.expoConfig?.version ?? '1.0.0';
+  // Apple Health is named only once a build can read it (reach.ts).
+  const stores = storesRead();
 
   return (
     <Screen header={<Header title="About HealthCal" subtitle="How your numbers are calculated" />}>
@@ -280,9 +283,10 @@ export default function AboutScreen() {
           the daily allowance. Anthropic handles what it receives under Anthropic&apos;s terms.
         </P>
         <P>
-          On Android, with Workout sync switched on, HealthCal reads your workouts from Health Connect: each session with its active and total
-          calories and its distance. They are stored like sessions you log by hand. Nothing is written back to Health Connect, and that data is
-          never sent for AI analysis or to anyone else; friends see only what the Friends screen says they see.
+          With Workout sync switched on, HealthCal reads your workouts from {stores.from}: each session with its calories and its distance. They
+          are stored like sessions you log by hand. It also reads your daily steps, which stay on this phone only, for 35 days, and are never
+          added to your calories. Nothing is written back to {stores.notBack}, and this data is never sent for AI analysis, used for ads or shared
+          with anyone else; friends see only what the Friends screen says they see.
         </P>
         <AiConsentAbout />
       </Section>

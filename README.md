@@ -131,8 +131,8 @@ The repository is linked to an Expo project (`app.json`: `owner`, `extra.eas.pro
 |---|---|---|---|
 | Android | An APK installed by hand | `bash scripts/ops/build-android-apk.sh` (builds on this machine, about 40 minutes the first time, 15 after) or the `preview` profile above | Signed with the template's debug key; a Play Store release needs its own key |
 | iPhone, free, no computer | The web app added to the Home Screen from Safari | `node scripts/ops/deploy-web.mjs` publishes it to https://healthcal.expo.app | No reminders and no Health sync; the camera goes through Safari |
-| iPhone, free, with a computer | An unsigned `.ipa` signed with the person's own Apple ID by Sideloadly or AltStore | `npx eas-cli@latest build -p ios --profile ios-unsigned` (`.eas/build/ios-unsigned.yml`) | Must be signed again every 7 days; three such apps per Apple ID |
-| iPhone, TestFlight or the App Store | A signed build | `npx eas-cli@latest build -p ios --profile production` | Needs an Apple Developer account |
+| iPhone, free, with a computer | An unsigned `.ipa` signed with the person's own Apple ID by Sideloadly or AltStore | `npx eas-cli@latest build -p ios --profile ios-unsigned` (`.eas/build/ios-unsigned.yml`) | Must be signed again every 7 days; three such apps per Apple ID; no Apple Health sync (both tools sign without the HealthKit entitlement, and the sync screen says so; docs/health-sync.md) |
+| iPhone, TestFlight or the App Store | A signed build | `npx eas-cli@latest build -p ios --profile production` | Needs an Apple Developer account; the one route with Apple Health sync (once `@kingstinct/react-native-healthkit` is installed, docs/health-sync.md) |
 
 `public/` holds what makes the web app installable (the manifest, the icons, the full-screen tags in `index.html`). The backend must allow the published address as a return address for sign-up and reset emails (Supabase: Authentication, URL configuration).
 

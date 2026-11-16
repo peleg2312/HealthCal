@@ -3,6 +3,12 @@
 # install it; such an install lasts 7 days and is then signed again. A store or TestFlight build
 # uses the normal profiles in eas.json and needs an Apple Developer account instead.
 #
+# Apple Health: an install signed this way cannot read Apple Health. Both tools sign with the
+# entitlements of the free provisioning profile they fetch, which has no HealthKit (AltStore only
+# enables App Groups and Inter-App Audio; Sideloadly keeps custom entitlements for paid accounts
+# only), so an ad-hoc signature with the HealthKit entitlement here would be replaced. The app's
+# sync screen says "Apple Health is not available in this install" (docs/health-sync.md).
+#
 #   npx eas-cli@latest build -p ios --profile ios-unsigned
 build:
   name: Unsigned iPhone app for sideloading
