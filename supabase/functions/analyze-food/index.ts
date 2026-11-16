@@ -91,6 +91,10 @@ Deno.serve(async (req) => {
     const result = await analyzeFood(client, input, {
       fastModel: Deno.env.get('FOOD_MODEL') ?? undefined,
       preciseModel: Deno.env.get('FOOD_MODEL_PRECISE') ?? undefined,
+      // FOOD_FORMAT=json goes back to schema-checked JSON on every request (about a fifth dearer) without a deploy.
+      format: Deno.env.get('FOOD_FORMAT') === 'json' ? 'json' : undefined,
+      // FOOD_THINKING=off is the cheapest setting and the least accurate (the README has both measured).
+      thinking: Deno.env.get('FOOD_THINKING') === 'off' ? 'off' : undefined,
     });
 
     await recordTokens(admin, userId, result.usage);

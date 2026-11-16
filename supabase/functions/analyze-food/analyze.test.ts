@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it, vi } from 'vitest';
 
-import { AnalyzeError, analyzeFood, costOf, FAST_MODEL, mailboxOf, PRECISE_MODEL, sanitizeItems, validateInput } from './analyze';
+import { AnalyzeError, analyzeFood, costOf, FAST_MODEL, mailboxOf, parseAnswer, parseLines, PRECISE_MODEL, sanitizeItems, validateInput } from './analyze';
 
 const err = (fn: () => unknown): AnalyzeError => {
   try {
@@ -180,7 +180,7 @@ const msg = (over: object = {}) => ({
 });
 
 describe('analyzeFood request construction', () => {
-  it('fast mode: haiku, effort low, json_schema output, image block before text', async () => {
+  it('fast mode: haiku, effort low, plain-lines answer (no schema sent), image block before text', async () => {
     const { client, make, beta } = fakeClient(msg());
     await analyzeFood(client, { image: 'QUJD', mediaType: 'image/png', text: 'large plate' });
     expect(beta).not.toHaveBeenCalled();
@@ -188,11 +188,11 @@ describe('analyzeFood request construction', () => {
     const req = (make.mock.calls[0] as unknown as [Record<string, any>])[0];
     expect(req.model).toBe(FAST_MODEL);
     expect(req.max_tokens).toBe(2000);
-    expect(req.output_config.effort).toBe('low');
-    expect(req.output_config.format.type).toBe('json_schema');
-    expect(req.output_config.format.schema.required).toEqual(['dish', 'items', 'hidden_fat_question', 'note']);
-    expect(req.output_config.format.schema.additionalProperties).toBe(false);
+    // The schema is most of a request's input tokens: it is sent only on the second try.
+    expect(req.output_config).toEqual({ effort: 'low' });
+    expect('thinking' in req).toBe(false);
     expect(typeof req.system).toBe('string');
+    expect(req.system).toContain('I <item name> | <grams> | <kcal>');
     expect(req.messages).toHaveLength(1);
     expect(req.messages[0].role).toBe('user');
     const c = req.messages[0].content;
@@ -208,8 +208,7 @@ describe('analyzeFood request construction', () => {
     expect(make).not.toHaveBeenCalled();
     const req = (beta.mock.calls[0] as unknown as [Record<string, any>])[0];
     expect(req.model).toBe(PRECISE_MODEL);
-    expect(req.output_config.effort).toBe('medium');
-    expect(req.output_config.format.type).toBe('json_schema');
+    expect(req.output_config).toEqual({ effort: 'medium' });
     expect(req.betas).toEqual(['server-side-fallback-2026-07-01']);
     expect(req.fallbacks).toBe('default');
     expect(req.messages[0].content[0].type).toBe('image');
@@ -234,6 +233,114 @@ describe('analyzeFood request construction', () => {
     const p = fakeClient(msg());
     await analyzeFood(p.client, { text: 'x', precise: true }, { preciseModel: 'precise-x' });
     expect((p.beta.mock.calls[0] as unknown as [Record<string, any>])[0].model).toBe('precise-x');
+  });
+});
+
+describe('the plain-lines answer', () => {
+  const lines = ['D Rice bowl', 'I Rice | 200 | 260 | 5 | 56 | 0.5 | 1 | 0.8', 'I Fried egg | 50 | 100 | 6.5 | 0.5 | 8 | 0 | 0.9', 'Q Was it cooked in oil?', 'N No scale reference'].join('\n');
+  it('reads the dish, every item, the question and the note', () => {
+    expect(parseLines(lines)).toEqual({
+      dish: 'Rice bowl',
+      items: [
+        { name: 'Rice', grams: 200, kcal: 260, protein: 5, carbs: 56, fat: 0.5, fiber: 1, confidence: 0.8 },
+        { name: 'Fried egg', grams: 50, kcal: 100, protein: 6.5, carbs: 0.5, fat: 8, fiber: 0, confidence: 0.9 },
+      ],
+      hidden_fat_question: 'Was it cooked in oil?',
+      note: 'No scale reference',
+    });
+  });
+  it('takes the question and the note as absent when their lines are left out or dashed', () => {
+    expect(parseLines('D Banana\nI Banana | 118 | 105 | 1.3 | 27 | 0.4 | 3.1 | 0.9')).toMatchObject({ hidden_fat_question: null, note: null });
+    expect(parseLines('D Banana\nI Banana | 118 | 105 | 1.3 | 27 | 0.4 | 3.1 | 0.9\nQ -\nN none')).toMatchObject({ hidden_fat_question: null, note: null });
+  });
+  it('reads numbers however they were written: units, a decimal comma, grouped thousands, a colon after the letter', () => {
+    const a = parseLines('D: Pizza\nI: Whole pizza | 850 g | 2,150 kcal | 95,5 | 240 | 88 | 12 | 0,7');
+    expect(a?.dish).toBe('Pizza');
+    expect(a?.items[0]).toEqual({ name: 'Whole pizza', grams: 850, kcal: 2150, protein: 95.5, carbs: 240, fat: 88, fiber: 12, confidence: 0.7 });
+  });
+  it('fills columns that are missing: no macros is zero, no confidence is a coin toss', () => {
+    expect(parseLines('I Cola | 330 | 139')?.items[0]).toEqual({ name: 'Cola', grams: 330, kcal: 139, protein: 0, carbs: 0, fat: 0, fiber: 0, confidence: 0.5 });
+  });
+  it('keeps names in any script and a zero-calorie drink', () => {
+    const a = parseLines('D ביצים קשות וסלט\nI ביצה קשה | 100 | 155 | 13 | 1 | 11 | 0 | 0.9\nI מים | 250 | 0 | 0 | 0 | 0 | 0 | 0.9');
+    expect(a?.items.map((i) => (i as { name: string }).name)).toEqual(['ביצה קשה', 'מים']);
+  });
+  it('ignores a stray line of prose around the form', () => {
+    expect(parseLines(`Here is the estimate:\n${lines}\nHope that helps.`)?.items).toHaveLength(2);
+  });
+  it('no item and a note is a "no food here" answer', () => {
+    expect(parseLines('N No food or drink in the photo, only a set of keys.')).toEqual({ dish: null, items: [], hidden_fat_question: null, note: 'No food or drink in the photo, only a set of keys.' });
+  });
+  it('does not guess from an answer that did not keep the form', () => {
+    expect(parseLines('The meal looks like about 500 calories of rice and chicken.')).toBeNull();
+    expect(parseLines('')).toBeNull();
+    // An item without its weight and calories.
+    expect(parseLines('D Rice bowl\nI Rice')).toBeNull();
+    expect(parseLines('D Rice bowl\nI Rice | about a cup | 260')).toBeNull();
+    // A sentence that happens to start with the letter I.
+    expect(parseLines('I think this is a rice bowl.')).toBeNull();
+    // A dish and nothing else.
+    expect(parseLines('D Rice bowl')).toBeNull();
+  });
+  it('parseAnswer reads either form', () => {
+    expect(parseAnswer(lines)?.items).toHaveLength(2);
+    expect(parseAnswer(JSON.stringify(goodJson))).toEqual({ dish: 'Rice bowl', items: goodJson.items, hidden_fat_question: 'Was it cooked in oil?', note: 'No scale reference' });
+    expect(parseAnswer('{"dish": "x", "items": [')).toBeNull();
+    expect(parseAnswer('[1, 2]')).toBeNull();
+  });
+
+  const text = (t: string, usage = { input_tokens: 500, output_tokens: 90 }) => msg({ content: [{ type: 'text', text: t }], usage });
+  it('an answer in lines is one request', async () => {
+    const { client, make } = fakeClient(text(lines));
+    const out = await analyzeFood(client, { text: 'rice bowl with a fried egg' });
+    expect(make).toHaveBeenCalledTimes(1);
+    expect(out.dish).toBe('Rice bowl');
+    expect(out.items.map((i) => i.name)).toEqual(['Rice', 'Fried egg']);
+    expect(out.hiddenFatQuestion).toBe('Was it cooked in oil?');
+    expect(out.usage).toEqual({ inputTokens: 500, outputTokens: 90 });
+  });
+  it('an answer that did not keep the form is asked for again as schema-checked JSON, and both requests are counted', async () => {
+    const replies = [text('It looks like a rice bowl, roughly 500 kcal.'), msg()];
+    const { client, make } = fakeClient(() => replies.shift());
+    const out = await analyzeFood(client, { text: 'rice bowl' });
+    expect(make).toHaveBeenCalledTimes(2);
+    const second = (make.mock.calls[1] as unknown as [Record<string, any>])[0];
+    expect(second.output_config.format.type).toBe('json_schema');
+    expect(second.output_config.format.schema.required).toEqual(['dish', 'items', 'hidden_fat_question', 'note']);
+    expect(second.output_config.format.schema.additionalProperties).toBe(false);
+    expect(second.system).toContain('hidden_fat_question');
+    expect(out.items[0].name).toBe('Rice');
+    // 500 + 90 for the first try, 800 + 200 for the second: all of it was billed.
+    expect(out.usage).toEqual({ inputTokens: 1300, outputTokens: 290 });
+  });
+  it('gives up, with everything it used, when the second try does not parse either', async () => {
+    const replies = [text('no idea'), text('still no idea')];
+    const { client } = fakeClient(() => replies.shift());
+    const e = (await analyzeFood(client, { text: 'x' }).catch((x: unknown) => x)) as AnalyzeError;
+    expect(e).toBeInstanceOf(AnalyzeError);
+    expect(e.code).toBe('upstream');
+    expect(e.usage).toEqual({ inputTokens: 1000, outputTokens: 180 });
+  });
+  it('a note and no item is "not food", in one request', async () => {
+    const { client, make } = fakeClient(text('N No food or drink here, only a set of keys.'));
+    const e = (await analyzeFood(client, { text: 'my keys' }).catch((x: unknown) => x)) as AnalyzeError;
+    expect(make).toHaveBeenCalledTimes(1);
+    expect(e.code).toBe('not_food');
+    expect(e.message).toBe('No food or drink here, only a set of keys.');
+  });
+  it("format 'json' skips the lines and sends the schema at once", async () => {
+    const { client, make } = fakeClient(msg());
+    await analyzeFood(client, { text: 'rice' }, { format: 'json' });
+    expect(make).toHaveBeenCalledTimes(1);
+    expect((make.mock.calls[0] as unknown as [Record<string, any>])[0].output_config.format.type).toBe('json_schema');
+  });
+  it("thinking 'off' reaches the small model only", async () => {
+    const f = fakeClient(text(lines));
+    await analyzeFood(f.client, { text: 'rice' }, { thinking: 'off' });
+    expect((f.make.mock.calls[0] as unknown as [Record<string, any>])[0].thinking).toEqual({ type: 'disabled' });
+    const p = fakeClient(text(lines));
+    await analyzeFood(p.client, { text: 'rice', precise: true }, { thinking: 'off' });
+    expect('thinking' in (p.beta.mock.calls[0] as unknown as [Record<string, any>])[0]).toBe(false);
   });
 });
 

@@ -5,9 +5,10 @@
  * Every run spends real money: the default run below is 40 requests, about one US cent.
  *
  *   ANTHROPIC_API_KEY=... node --experimental-transform-types scripts/ops/eval-food-ai.mjs
- *        [--configs=current,medium,no-thinking,precise] [--trials=2] [--photos=<dir>] [--kind=all|text|photo] [--out=<file.json>]
+ *        [--configs=current,json,medium,no-thinking,precise] [--trials=2] [--photos=<dir>] [--kind=all|text|photo] [--out=<file.json>]
  *
  *   current      what the app sends by default: the small model, effort low
+ *   json         the same, answered as schema-checked JSON instead of the plain lines (the fallback form)
  *   medium       the small model at its own default effort
  *   no-thinking  the small model, effort low, thinking switched off
  *   precise      the "check again more carefully" pass: the bigger model (and the 1024 px photo)
@@ -64,7 +65,7 @@ async function runOne(config, c, trial) {
   const started = Date.now();
   const row = { config, id: c.id, photo: !!c.file, trial };
   try {
-    const r = await analyzeFood(clientFor(config), input);
+    const r = await analyzeFood(clientFor(config), input, config === 'json' ? { format: 'json' } : {});
     Object.assign(row, {
       ok: true,
       model: r.model,
