@@ -41,6 +41,8 @@ export function Chip({
       // middle of the 8 px gap, so a neighbour never takes a tap that is nearer this chip.
       hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
       accessibilityState={{ selected: !!selected }}
+      // react-native-web drops accessibilityState, so the browser is told directly.
+      aria-pressed={!!selected}
       accessibilityLabel={label}
       style={[
         {
@@ -115,6 +117,7 @@ export function Segmented<T extends string>({
             scaleTo={0.98}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
+            aria-selected={active}
             accessibilityLabel={o.label}
             style={{ flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
             <Text variant="label" color={active ? 'text' : 'textSecondary'} numberOfLines={1} style={{ fontSize: 14.5, lineHeight: 20, fontFamily: active ? fonts.bold : fonts.semibold }}>

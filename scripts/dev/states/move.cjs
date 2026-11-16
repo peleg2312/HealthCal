@@ -11,9 +11,9 @@
 // "Cardio", which the import asks about, and long titles), morning-run.gpx, broken.fit and notes.csv
 // (neither holds a workout).
 //
-// The signed-in friends states need accounts on a backend, which the shared dev server does not
-// have. They are listed separately, in FRIENDS_SIGNED_IN at the end, and run against a build with
-// the stand-in backend: see the comment there.
+// The signed-in friends states need accounts on a backend, which builds from with-build.cjs do not
+// have. They are listed separately, in friendsSignedIn at the end, only when the run is given
+// --backend, and run against a build with the stand-in backend: see the comment there.
 
 const settle = { wait: 700 };
 // A toast with Undo stays 4.5 s, 12 s when the browser reports a screen reader (the test browser can);
@@ -242,5 +242,6 @@ const friendsSignedIn = [
 
 module.exports = [
   ...train, ...pick, ...log, ...imports, ...strength, ...water, ...weight, ...body, ...sleep, ...fasting, ...friendsLocal,
-  ...(process.argv.some((a) => a.startsWith('--url=')) ? friendsSignedIn : []),
+  // Only with --backend: every run passes --url now, and builds from with-build.cjs have no accounts.
+  ...(process.argv.includes('--backend') ? friendsSignedIn : []),
 ];

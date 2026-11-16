@@ -26,7 +26,8 @@
  *               text: a header's title and its line, a list row's title and subtitle, a stat and
  *               its caption); a title or label and the single line under it, neighbouring children
  *               of the element holding both; a label directly above its own field; a number and its
- *               unit set as two blocks side by side ("7" "h", the unit smaller). None of these
+ *               unit set as two blocks side by side ("7" "h", the unit smaller); an emoji alone (a
+ *               content mark beside a name, part of the name's line). None of these
  *               excuses text that is placed (absolutely positioned below the element holding both,
  *               such as a label set at a cup's level): placed text keeps its room at every value.
  *               Also under tight: text and a box it is not in (a button, a chip, a badge, a field,
@@ -70,6 +71,8 @@
  *   node scripts/dev/evidence.cjs --out=<dir> --routes=/,/diary,/water
  *        [--themes=blossom,light,dark] [--widths=360,390,320] [--empty] [--fresh] [--stress] [--imperial]
  *        [--states=<list>[,<list>]] [--only=<state id>[,<id>]]
+ *        [--backend]  also the states that need accounts (start.cjs's "accounts"): only against a build
+ *                     with a backend; with-build.cjs builds have none
  *        [--checks]   also run type-check, lint, unit tests, e2e and the route check
  *        [--tries=3]  attempts at a capture before it is reported as not captured
  *        [--show=40]  problems to print; [--url=http://localhost:8081]
@@ -549,8 +552,11 @@ function layoutScan(rootSel) {
     const nextShown = (e) => { for (let s = e.nextElementSibling; s; s = s.nextElementSibling) if (area(s) && shown(s)) return s; return null; };
     const NUMBER = /^[~+\u2212\-±]?[\d.,\u2060\u2013/]+%?$/;
     /** True when `a` (above or left) and `b` are tight by design (see the comment above). */
+    // An emoji alone is a content mark beside its name (AGENTS.md: emoji in food and activity rows), part of
+    // the name's line: what is under it is under the name, and judged there.
+    const markOnly = (p) => !/[\p{L}\p{N}]/u.test(p.textContent);
     const byDesign = (a, b, how) => {
-      if (a.contains(b) || b.contains(a)) return true;
+      if (a.contains(b) || b.contains(a) || markOnly(a) || markOnly(b)) return true;
       const top = lca(a, b);
       if (placed(a, top) || placed(b, top)) return false;
       if (piecesIn(top) <= 3) return true;

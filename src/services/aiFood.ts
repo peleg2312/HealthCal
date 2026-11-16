@@ -161,6 +161,7 @@ async function analyzeDemo(opts: AnalyzeOptions): Promise<AnalyzeResponse> {
       reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
     });
   });
-  if (__DEV__ && opts.demoError) throw aiError(opts.demoError, undefined, opts.demoError === 'daily_limit' ? 0 : null);
+  // A test build (EXPO_PUBLIC_E2E) may ask for a sample error, as the dev build can; a shipped build never does.
+  if ((__DEV__ || process.env.EXPO_PUBLIC_E2E === '1') && opts.demoError) throw aiError(opts.demoError, undefined, opts.demoError === 'daily_limit' ? 0 : null);
   return { result: demoResult(), remaining: null };
 }

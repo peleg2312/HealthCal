@@ -132,7 +132,7 @@ const itemOf = (food, qty = 1) => {
 
 /**
  * Turns the five demo weeks into the long end of real use: a 22-character first name, food and
- * saved-meal names of 50 to 60 characters, a long brand, a two-sentence activity note, a meal of
+ * saved-meal names of 50 to 60 characters (a long-named food is usual at every meal), a long brand, a two-sentence activity note, a meal of
  * 12 items, a day at 11,480 kcal and one at 0, 1,240 active minutes in the last seven days,
  * 12.5 L of water today, 142.6 kg body weight and a 412-day logging streak.
  */
@@ -173,6 +173,15 @@ function stressUp(state, { put, baselineTdee }) {
   }
   dropDay('foodEntries', day(3));
   logItem(3, 'breakfast', { ...itemOf(foods[8]), nutrients: { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 } }, 9);
+
+  // Long names are usual at every meal (the + sheet and food search show the usual foods for the meal
+  // of the hour the page is opened, so a capture at any time of day meets them): one long-named food
+  // in each meal on most of the last three weeks, more often than any demo food.
+  const USUAL = { breakfast: [foods[6], 8], lunch: [foods[0], 12], dinner: [foods[1], 19], snack: [foods[9], 16] };
+  for (let n = 1; n <= 21; n++) {
+    if (n === 2 || n === 3) continue;
+    for (const [meal, [food, hour]] of Object.entries(USUAL)) logItem(n, meal, itemOf(food), hour, 30);
+  }
 
   // A logging streak of 412 days: one breakfast on each day before the five weeks.
   const oats = FOODS.oats;

@@ -5,10 +5,10 @@
 //
 //   node scripts/dev/evidence.cjs --states=start --out=<dir> [--only=<id>]
 //
-// Accounts are not configured on the shared dev server, so the sign-in forms, the sign-in gate
-// and the account screen's sheets need a build with a backend (see the README, "Testing accounts
-// and sync locally"; export it with EXPO_PUBLIC_E2E=1 as well, or the runner never sees the app
-// start), then run this list with --url=<that build> and --only=<the ids under "accounts">.
+// Builds made by with-build.cjs have no accounts, so the sign-in forms, the sign-in gate and the
+// account screen's sheets need a build with a backend (see the README, "Testing accounts and sync
+// locally"; export it with EXPO_PUBLIC_E2E=1 as well, or the runner never sees the app start), then
+// run this list with --backend --url=<that build> and --only=<the ids under "accounts">.
 
 // ------------------------------------------------------------------ onboarding, step by step
 // Single-choice tiles move on by themselves 250 ms after the tap, so no Continue after them.
@@ -119,9 +119,9 @@ const weeks = [
 ];
 
 // ------------------------------------------------------------------ accounts (a build with a backend)
-// Only listed when the run is given --url (a build made with EXPO_PUBLIC_SUPABASE_URL set and
-// scripts/dev/mock-backend.cjs serving it), so a run against the shared dev server, which has no
-// accounts, does not report them as not captured. The signed-in states need this account on the
+// Only listed when the run is given --backend (a build made with EXPO_PUBLIC_SUPABASE_URL set and
+// scripts/dev/mock-backend.cjs serving it), so a run against a build without accounts (every
+// with-build.cjs build, which every run now passes as --url) does not report them as not captured. The signed-in states need this account on the
 // stand-in backend first (POST /auth/v1/signup with the same email and password).
 const EMAIL = 'bartholomew.christophe.longname@example-family-mail.com';
 const PASSWORD = 'correct horse battery';
@@ -142,4 +142,4 @@ const backend = [
   { id: 'profile-signed-out', route: '/profile', data: 'stress', waitFor: 'profile-account', note: 'profile with the account row, signed out' },
 ];
 
-module.exports = [...firstRun, ...onboarding, ...settings, ...progress, ...weeks, ...(process.argv.some((a) => a.startsWith('--url=')) ? backend : [])];
+module.exports = [...firstRun, ...onboarding, ...settings, ...progress, ...weeks, ...(process.argv.includes('--backend') ? backend : [])];

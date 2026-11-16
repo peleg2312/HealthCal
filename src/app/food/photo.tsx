@@ -72,7 +72,7 @@ export default function PhotoScreen() {
   const session = useAuth((s) => s.session);
   const access = availability(isBackendConfigured, !!session);
   const date = typeof params.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : today();
-  const demoError = __DEV__ && DEMO_ERROR_CODES.includes(params.demoError as AiErrorCode) ? (params.demoError as AiErrorCode) : undefined;
+  const demoError = (__DEV__ || process.env.EXPO_PUBLIC_E2E === '1') && DEMO_ERROR_CODES.includes(params.demoError as AiErrorCode) ? (params.demoError as AiErrorCode) : undefined;
 
   const [mode, setMode] = useState<InputMode>(params.mode === 'text' ? 'text' : 'photo');
   const [step, setStep] = useState<Step>('capture');
