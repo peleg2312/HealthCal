@@ -5,7 +5,7 @@
  * start, or when the app comes back to the front after five minutes away on a tab
  * (src/features/updates). The web app is published separately (deploy-web.mjs).
  *
- *   EXPO_TOKEN=... node scripts/ops/publish-update.mjs [--message "What changed"] [--dry-run]
+ *   EXPO_TOKEN=... node scripts/ops/publish-update.mjs [--message "What changed"] [--dry-run] [--channel <name>]
  *
  * Refuses, with the reason, when:
  *   - the working tree has uncommitted changes (an update must be a commit someone can find again);
@@ -22,6 +22,10 @@
  * itself) nor a .env or .env.local file can reach the phones. eas-cli is pinned (EAS_CLI below).
  * --message defaults to the commit's subject line. --dry-run makes the same checks, the export
  * included, prints the command it would run, and exits without publishing.
+ * --channel is "production" unless given: installed apps ask for that one (app.json,
+ * updates.requestHeaders). Another name reaches only a build made for it: the Phone test workflow's
+ * update_channel input builds such an app, which is how an update is watched arriving on GitHub's
+ * emulator without touching anyone's phone.
  */
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
@@ -95,12 +99,15 @@ function main() {
   const dryRun = args.includes('--dry-run');
   const messageAt = args.findIndex((a) => a === '--message' || a.startsWith('--message='));
   const messageArg = messageAt < 0 ? null : args[messageAt].includes('=') ? args[messageAt].slice('--message='.length) : args[messageAt + 1];
+  const channelAt = args.findIndex((a) => a === '--channel' || a.startsWith('--channel='));
+  const channel = channelAt < 0 ? 'production' : args[channelAt].includes('=') ? args[channelAt].slice('--channel='.length) : (args[channelAt + 1] ?? '');
 
   const blocked = [];
   const fatal = (reason) => {
     console.error(`Not publishing: ${reason}`);
     process.exit(1);
   };
+  if (!/^[a-z][a-z0-9-]{1,39}$/.test(channel)) fatal(`--channel must be a short lower-case name (letters, digits, hyphens), not "${channel}"`);
   /** A real run stops here; --dry-run notes it and goes on, so it shows everything at once. */
   const refuse = (reason) => {
     if (!dryRun) fatal(reason);
@@ -160,7 +167,7 @@ function main() {
 
     // --environment is still required for SDK 55+ in non-interactive mode; with --skip-bundler the
     // server's variables it fetches are not used to build anything.
-    const command = [EAS_CLI, 'update', '--skip-bundler', '--input-dir', outDir, '--channel', 'production', '--environment', 'production', '--platform', 'all', '--message', message, '--non-interactive'];
+    const command = [EAS_CLI, 'update', '--skip-bundler', '--input-dir', outDir, '--channel', channel, '--environment', 'production', '--platform', 'all', '--message', message, '--non-interactive'];
     if (dryRun) {
       console.log(`Would run: npx ${command.map((a) => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')}`);
       if (blocked.length) console.log(`\nA real run would refuse:\n${blocked.map((b) => `- ${b}`).join('\n')}`);
@@ -179,7 +186,7 @@ function main() {
       .map((label) => out.match(new RegExp(`^\\s*${label}\\s+(.+)$`, 'm')))
       .filter(Boolean)
       .map((m) => m[0].trim());
-    console.log(`\nPublished commit ${commit}.`);
+    console.log(`\nPublished commit ${commit} to the ${channel} channel.`);
     for (const line of ids) console.log(`  ${line}`);
   } finally {
     rmSync(outDir, { recursive: true, force: true });

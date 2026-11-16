@@ -53,6 +53,10 @@ on:
         type: string
         default: ''
         required: false
+      update_channel:
+        description: "Update channel the test app asks. phone-test has no updates, so the commit's own JavaScript runs. Give a channel an update was published to (publish-update.mjs --channel) to watch it arrive: first-day downloads it, health-and-about then runs it and About says Updated"
+        type: string
+        default: phone-test
       ios_runner:
         description: "Mac image for the iPhone jobs. macos-26 has the Xcode Expo asks for; macos-15 (Xcode 26.3 at most) is the fallback when no macos-26 machine is free"
         type: choice
@@ -144,13 +148,17 @@ jobs:
       # The test app asks the update server for the channel "phone-test", which has no updates, so a
       # relaunch between flows always runs this commit's embedded JavaScript, never a published
       # production update ("Check for updates" still talks to the server).
-      - name: Point expo-updates at an empty channel
+      - name: Point expo-updates at the test channel
+        env:
+          UPDATE_CHANNEL: ${{ inputs.update_channel }}
         run: |
           set -euo pipefail
+          [[ "$UPDATE_CHANNEL" =~ ^[a-z][a-z0-9-]{1,39}$ ]] || { echo "::error::update_channel must be a short lower-case name"; exit 1; }
+          [ "$UPDATE_CHANNEL" != production ] || { echo "::error::the test app must not ask the production channel"; exit 1; }
           PLIST=$(ls ios/*/Supporting/Expo.plist 2> /dev/null | head -1 || true)
           if [ -z "$PLIST" ]; then echo "::warning::prebuild wrote no ios/*/Supporting/Expo.plist"; exit 0; fi
           if /usr/libexec/PlistBuddy -c 'Print :EXUpdatesRequestHeaders:expo-channel-name' "$PLIST" > /dev/null 2>&1; then
-            /usr/libexec/PlistBuddy -c 'Set :EXUpdatesRequestHeaders:expo-channel-name phone-test' "$PLIST"
+            /usr/libexec/PlistBuddy -c "Set :EXUpdatesRequestHeaders:expo-channel-name $UPDATE_CHANNEL" "$PLIST"
           else
             echo "::warning::$PLIST has no EXUpdatesRequestHeaders:expo-channel-name; left as it is"
           fi
@@ -504,13 +512,17 @@ jobs:
       # The test app asks the update server for the channel "phone-test", which has no updates, so a
       # relaunch between flows always runs this commit's embedded JavaScript, never a published
       # production update ("Check for updates" still talks to the server).
-      - name: Point expo-updates at an empty channel
+      - name: Point expo-updates at the test channel
+        env:
+          UPDATE_CHANNEL: ${{ inputs.update_channel }}
         run: |
           set -euo pipefail
+          [[ "$UPDATE_CHANNEL" =~ ^[a-z][a-z0-9-]{1,39}$ ]] || { echo "::error::update_channel must be a short lower-case name"; exit 1; }
+          [ "$UPDATE_CHANNEL" != production ] || { echo "::error::the test app must not ask the production channel"; exit 1; }
           M=android/app/src/main/AndroidManifest.xml
           KEY=expo.modules.updates.UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY
           if grep -q "$KEY" "$M"; then
-            sed -i "/$KEY/s/production/phone-test/" "$M"
+            sed -i "/$KEY/s/production/$UPDATE_CHANNEL/" "$M"
             if grep "$KEY" "$M" | grep -q production; then echo "::error::the channel in $M is still production"; exit 1; fi
           else
             echo "::warning::$M has no $KEY; left as it is"
