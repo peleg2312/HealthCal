@@ -237,6 +237,7 @@ On GitHub's iPhone 17 simulator (iOS 26.5; `.github/workflows/phone-test.yml`, r
 - The library (16.2.0, Nitro 0.37.2) compiles in this app on Expo SDK 58 / React Native 0.88, for the simulator (Xcode 26.6) and for a device (Expo's build 31254f82, Xcode 27.1), and the app starts with it.
 - Turning Workout sync on shows the app's explanation and then Apple's Health access sheet, which lists only what is read (Active Energy, Cycling Distance, Steps, Walking + Running Distance, Workouts). After "Turn On All" and "Allow" the screen reads "On, last synced just now", with "None in Apple Health" for an empty store.
 - 8,432 steps typed into the simulator's Health app are read through the statistics collection and shown on the sync screen ("8,432 today, shown on Train") and on Train ("8,432 steps today").
+- With sleep added (run 44181867538, 17 November 2026, runtime version 2): Apple's Health access sheet lists Sleep among the types to read; after "Turn On All" and "Allow" the sync screen reads "On, last synced just now" and its Sleep section says "No night from Apple Health for last night yet". The simulator's Health app held no sleep, so `queryCategorySamples` has returned only an empty list on a phone.
 
 ## Not yet proven on iPhone (needs a build signed with the HealthKit entitlement and a phone)
 
@@ -253,12 +254,14 @@ On GitHub's iPhone 17 simulator (iOS 26.5; `.github/workflows/phone-test.yml`, r
 
 On GitHub's Android 15 emulator (runs 43966387322 and 43983509309): turning Workout sync on shows the app's explanation, Health Connect's first-use screen and its permission screen with the five read permissions; after "Allow all" and "Allow" the sync screen reads "On, last synced just now", with "None in Health Connect" for an empty store. No workout or step data was in that store, so nothing was read from one.
 
+With sleep added (run 44181867538, 17 November 2026, runtime version 2): Health Connect's permission screen lists Sleep beside the other read permissions; after "Allow all" and "Allow" the sync screen reads "On, last synced just now" and its Sleep section says "No night from Health Connect for last night yet". The store held no sleep session, so no night was read from one.
+
 ## Not yet proven on Android (needs an Android build and a phone)
 
 - Not in doubt any more: `react-native-health-connect` 4.1.3 compiles with Expo SDK 58 / React Native 0.88: the APKs from `scripts/ops/build-android-apk.sh` (before the HealthKit and Nitro install) were built with it, and the Android app also builds with `react-native-nitro-modules` autolinked (installed for the iPhone library; Android's JavaScript never loads it). Whether Health Connect's permission sheet and reads work on a phone is below.
 - The permission sheet and the refused and revoked paths on a real device.
 - What Garmin Connect actually writes: the data origin string (`com.garmin.android.apps.connectmobile` is the Play Store package id), whether it writes active calories, total calories or both inside the session, the exercise type numbers it uses for each sport, and the zone offset.
-- Sleep: what Garmin Connect writes as `SleepSession` (stages or one block, the zone offsets, `metadata.device.type`), the `READ_SLEEP` permission on the sheet, and that the sleep session list follows `between` as overlapping. Only fixtures in the library's shapes (`ReactSleepSessionRecord.kt`) so far: neither library nor Garmin documents which stages Garmin Connect writes to Health Connect (the unstaged and only-unknown cases are covered by `sleepFromSession`). On the first run with the owner's watch, log one session's stage numbers and its `metadata.device.type`.
+- Sleep: what Garmin Connect writes as `SleepSession` (stages or one block, the zone offsets, `metadata.device.type`), the `READ_SLEEP` permission on a real phone's sheet (seen on the emulator, above), and that the sleep session list follows `between` as overlapping. Only fixtures in the library's shapes (`ReactSleepSessionRecord.kt`) so far: neither library nor Garmin documents which stages Garmin Connect writes to Health Connect (the unstaged and only-unknown cases are covered by `sleepFromSession`). On the first run with the owner's watch, log one session's stage numbers and its `metadata.device.type`.
 - Behaviour after long stretches in the background (sync only runs when the app is opened; there is no background delivery).
 - `aggregateGroupByPeriod` for steps on a real phone: that its days match Samsung Health's or Google Fit's day figures, and how many of the 35 days come back (without `READ_HEALTH_DATA_HISTORY`, Health Connect gives only the 30 days before the permission was first granted, so a new install shows at most about 30).
 
