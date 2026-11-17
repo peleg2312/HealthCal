@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { Moon, Plus } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { formatDayLabel, fromISODate, weekdayShort } from '@/lib/dates';
@@ -67,9 +67,16 @@ function SleepScreen() {
   const [sheetDate, setSheetDate] = useState<ISODate | null>(null);
   const [showAll, setShowAll] = useState(false);
   const todayDate = useToday();
-  const params = useLocalSearchParams<{ date?: string }>();
+  const params = useLocalSearchParams<{ date?: string; log?: string }>();
   // Opened from a past day on Today (?date=), the screen shows and logs that day's night.
   const end = resolveDateParam(params.date, todayDate);
+  // ?log=1 (the morning page's "Add"): open the sheet for this night once, so one tap logs it.
+  const logOpened = useRef(false);
+  useEffect(() => {
+    if (params.log !== '1' || logOpened.current) return;
+    logOpened.current = true;
+    setSheetDate(end);
+  }, [params.log, end]);
   const isToday = end === todayDate;
   const lastNight = findByDate(entries, end);
   const days = win === '7' ? 7 : 30;

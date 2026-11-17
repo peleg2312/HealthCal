@@ -45,7 +45,7 @@ const PUSHED = [
   '/profile', '/friends', '/water', '/weight', '/body', '/sleep', '/fasting', '/recap', '/consistency',
   '/settings/goals', '/settings/reminders', '/settings/account', '/settings/data', '/settings/about', '/settings/health-sync',
   '/food/search?meal=lunch', '/food/quick?meal=lunch', '/food/custom?meal=lunch', '/food/meals?meal=lunch', '/food/photo?meal=lunch&mode=text',
-  '/activity/pick', '/activity/log?activityId=running', '/activity/strength', '/activity/import', '/friends/add?invite=ABCD2345',
+  '/activity/pick', '/activity/log?activityId=running', '/activity/strength', '/activity/import', '/friends/add?invite=ABCD2345', '/morning',
 ];
 const ROUTES = flags.routes ? String(flags.routes).split(',').filter(Boolean) : [...TABS, ...PUSHED];
 

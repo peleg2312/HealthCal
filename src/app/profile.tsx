@@ -4,12 +4,14 @@ import {
   Cloud,
   CloudOff,
   Database,
+  History,
   Info,
   Moon,
   PartyPopper,
   RefreshCw,
   Ruler,
   Smartphone,
+  Sunrise,
   SunMoon,
   Target,
   Timer,
@@ -256,6 +258,29 @@ function ProfileHub() {
               <PartyPopper size={20} color={colors.carbs} />
             </IconTile>
           }
+        />
+        <ToggleRow
+          testID="profile-morning"
+          title="Morning summary"
+          subtitle="Yesterday at a glance, first visit each morning"
+          value={settings.morningSummary !== false}
+          onChange={(morningSummary) => setSettings({ morningSummary })}
+          left={
+            <IconTile color={colors.calories}>
+              <Sunrise size={20} color={colors.calories} />
+            </IconTile>
+          }
+        />
+        <ListRow
+          testID="profile-morning-open"
+          title="See yesterday"
+          subtitle="Open the morning summary"
+          left={
+            <IconTile color={colors.calories}>
+              <History size={20} color={colors.calories} />
+            </IconTile>
+          }
+          onPress={() => router.push('/morning' as never)}
         />
         <ListRow
           testID="profile-data"

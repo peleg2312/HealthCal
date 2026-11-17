@@ -4,6 +4,7 @@
  * the running web app (default http://localhost:8081):
  *
  *   welcome -> onboarding -> plan -> Today -> log food -> log a run -> add water -> reload
+ *   -> the next morning: the morning page opens by itself once, closes onto Today, not again
  *
  * The expected numbers are recomputed here from the published formulas, not
  * read back from the app's own calculation code, so a mistake in the engine
@@ -316,6 +317,50 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   const mLeft = num((await mpage.getByTestId('diary-remaining').first().innerText({ timeout: 15000 })).trim());
   check('motion: numbers settle on the right value', near(mLeft, expectedLeft, 1), `${mLeft} vs ${expectedLeft}`);
   await mpage.close();
+
+  // ------------------------------------------------------- the next morning
+  // The same saved data, seen at 08:10 tomorrow: today's food, run and water are then yesterday, and the
+  // morning page (/morning, src/features/morning) opens by itself on the first visit, once. An automated
+  // browser never sees it unless the window carries __healthcalMorning before the app starts. Playwright's
+  // clock belongs to the whole context, so this runs in a context of its own with the stored data copied over.
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(8, 10, 0, 0);
+  const tomorrowDay = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+  const morningContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, colorScheme: 'dark', reducedMotion: 'reduce', storageState: await context.storageState() });
+  await morningContext.addInitScript(() => {
+    window.__healthcalMorning = true;
+  });
+  await morningContext.clock.setFixedTime(tomorrow);
+  const morning = await morningContext.newPage();
+  morning.on('pageerror', (e) => errors.push(e.message));
+  morning.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 200)));
+  const mstored = async () => morning.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())));
+  await morning.goto(BASE + '/', { waitUntil: 'networkidle' });
+  const opened = await morning.getByTestId('morning-card').first().waitFor({ state: 'visible', timeout: 15000 }).then(() => true, () => false);
+  const at = new URL(morning.url());
+  check('morning: the page opens by itself on the first visit of the morning', opened && at.pathname === '/morning', morning.url());
+  check('morning: the first showing says how to turn it off', at.searchParams.get('first') === '1' && (await morning.getByTestId('morning-first').count()) > 0, morning.url());
+  // Marked on this device under its own key (src/features/morning/seen.ts), not in the synced settings: without
+  // an account there is no pull to wait for, and a settings write would only be a write the updater sees.
+  const seenHere = await morning.evaluate(() => localStorage.getItem('healthcal-morning/seen'));
+  check('morning: it is marked as seen today on this device, before anything else', seenHere === tomorrowDay, `${seenHere} vs ${tomorrowDay}`);
+  check('morning: without an account the synced settings are not written', (await mstored()).settings.morningSeenDay === undefined, String((await mstored()).settings.morningSeenDay));
+  if (opened) {
+    const line = (await morning.getByTestId('morning-line').first().innerText().catch(() => '')).replace(/\u00A0/g, ' ').replace(/\u2060/g, '').trim();
+    check('morning: yesterday is described in one neutral sentence', line.length > 0 && !/!|fail|cheat|great|over budget/i.test(line), line);
+    // The X at the top left: morning-close if the screen names it, else the kit Header's own X (header-close).
+    await morning.locator('[data-testid="morning-close"], [data-testid="header-close"]').first().click({ timeout: 15000 });
+    await morning.waitForURL((u) => new URL(u).pathname === '/', { timeout: 8000 }).catch(() => {});
+    const onToday = new URL(morning.url()).pathname === '/' && (await morning.getByTestId('today-screen').first().isVisible().catch(() => false));
+    check('morning: the X closes it onto Today in one tap', onToday, morning.url());
+  }
+  await morning.reload({ waitUntil: 'networkidle' });
+  await morning.getByTestId('today-screen').first().waitFor({ timeout: 15000 }).catch(() => {});
+  // The page decides 900 ms after the app settles: wait well past that.
+  await morning.waitForTimeout(2500);
+  check('morning: it does not open again the same morning after a reload', new URL(morning.url()).pathname === '/' && (await morning.getByTestId('morning-card').count()) === 0, morning.url());
+  await morningContext.close();
 
   const real = errors.filter((e) => !/favicon|DevTools|useNativeDriver|pointerEvents is deprecated|shadow\*/i.test(e));
   check('no runtime or console errors during the whole run', real.length === 0, real.slice(0, 3).join(' || '));

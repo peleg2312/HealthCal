@@ -10,7 +10,7 @@
  */
 const { chromium } = require('playwright');
 
-const { scan, layoutScan, hiddenAtEnd, headerScan, sheetScan, toastScan, notReady } = require('./evidence.cjs');
+const { scan, layoutScan, hiddenAtEnd, headerScan, sheetScan, toastScan, notReady, stateProblems, applyFlags, open: openJob } = require('./evidence.cjs');
 
 const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith('--')).map((a) => { const [k, ...v] = a.slice(2).split('='); return [k, v.join('=') || true]; }));
 const base = flags.url || 'http://localhost:8081';
@@ -377,6 +377,51 @@ async function runCase(page, c) {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   for (const c of cases) judge(c.name, await runCase(page, c), c.expect);
   await page.close();
+
+  // A state's `flags`: window booleans the app's first script already sees (the morning page's gate reads
+  // window.__healthcalMorning while the app starts), on the first load and on a reload. Without them it is unset.
+  const flagsSeen = async (flags) => {
+    const p = await browser.newPage();
+    await p.route('http://selftest.invalid/**', (r) => r.fulfill({ contentType: 'text/html', body: '<!doctype html><script>document.title = String(window.__healthcalMorning) + "," + String(navigator.webdriver)</script><p>flags</p>' }));
+    await applyFlags(p, flags);
+    await p.goto('http://selftest.invalid/');
+    const first = await p.title();
+    await p.reload();
+    const again = await p.title();
+    await p.close();
+    return [first, again];
+  };
+  const withFlag = await flagsSeen({ __healthcalMorning: true });
+  judge('flags: set before the first script, and again after a reload', withFlag.filter((t) => t !== 'true,true'), '');
+  judge('flags: without them the window has none (and the browser says it is automated)', (await flagsSeen(undefined)).filter((t) => t !== 'undefined,true'), '');
+  // The state format accepts window booleans only.
+  const form = (extra) => stateProblems({ id: 'x', route: '/', ...extra }, 'x');
+  judge('flags: { __healthcalMorning: true } is a well-formed state', form({ flags: { __healthcalMorning: true } }), '');
+  judge('flags: a value that is not a boolean is refused', form({ flags: { __healthcalMorning: 'yes' } }), 'flags is');
+  judge('flags: a name that is not a window flag is refused', form({ flags: { 'document.cookie': true } }), 'flags is');
+  judge('flags: a list is refused', form({ flags: ['__healthcalMorning'] }), 'flags is');
+  judge('absent: a list of testIDs is a well-formed state', form({ absent: ['morning-card'] }), '');
+  judge('absent: a single string is refused', form({ absent: 'morning-card' }), 'absent is');
+  judge('an unknown field is still refused', form({ flag: { __healthcalMorning: true } }), 'unknown field flag');
+  // Through evidence.cjs's own open(), as a state runs: a stub page under the build's address draws
+  // "morning-card" only when the app's first script sees the flag. With the flag and absent: ['morning-card'],
+  // open() must report it (proving open() applies the flags and checks absent); without the flag, nothing.
+  const throughOpen = async (job) => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await ctx.route(`${base}/__selftest-flags*`, (r) => r.fulfill({ contentType: 'text/html', body:
+      '<!doctype html><body><p>a stub page</p><script>window.__healthcal = { getState: () => ({ profile: {} }) };' +
+      'document.write(\'<p data-testid="flag-seen">flag \' + String(window.__healthcalMorning) + \' seen here</p>\');' +
+      'if (window.__healthcalMorning === true) document.write(\'<p data-testid="morning-card">morning card drawn</p>\');</script></body>' }));
+    const r = await openJob(ctx, { id: 'selftest-flags', route: '/__selftest-flags', data: 'fresh', waitFor: 'flag-seen', ...job }, null);
+    const seen = await r.page.locator('[data-testid="flag-seen"]').first().innerText().catch(() => '');
+    await ctx.close();
+    return { problem: r.problem || '', seen };
+  };
+  const flagged = await throughOpen({ flags: { __healthcalMorning: true }, absent: ['morning-card'] });
+  judge("open(): a state's flags reach the page, and absent reports a testID that is there", [flagged.problem], 'morning-card is on the page and must not be (absent)');
+  judge("open(): the flag was seen by the page's first script", flagged.seen.includes('flag true') ? [] : [flagged.seen], '');
+  const plain = await throughOpen({ absent: ['morning-card'] });
+  judge('open(): without flags the page sees none and absent passes', [plain.problem, plain.seen.includes('flag undefined') ? '' : plain.seen].filter(Boolean), '');
 
   // The real + sheet: clean, then with one style broken at a time.
   const { buildSeed } = await import('./seed.mjs');

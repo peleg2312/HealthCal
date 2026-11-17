@@ -272,7 +272,14 @@ export function isValidProfile(x: unknown): x is Profile {
 }
 
 function isValidSettings(x: unknown): x is Settings {
-  return isObj(x) && isTime(x.updatedAt) && (x.reminders === undefined || isObj(x.reminders)) && (x.waterPresets === undefined || (Array.isArray(x.waterPresets) && x.waterPresets.every(isNum)));
+  return (
+    isObj(x) &&
+    isTime(x.updatedAt) &&
+    (x.reminders === undefined || isObj(x.reminders)) &&
+    (x.waterPresets === undefined || (Array.isArray(x.waterPresets) && x.waterPresets.every(isNum))) &&
+    (x.morningSummary === undefined || typeof x.morningSummary === 'boolean') &&
+    (x.morningSeenDay === undefined || isDayKey(x.morningSeenDay))
+  );
 }
 
 /** Validate an imported file. Unknown fields are kept; malformed records are skipped and counted. */

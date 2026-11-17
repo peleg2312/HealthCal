@@ -109,11 +109,19 @@ async function snoozeReminder(content: Notifications.NotificationContent, data: 
   toast(`Reminder moved to ${clock}`);
 }
 
+// When a reminder (or one of its buttons) was last answered. The water and repeat-meal buttons
+// do not navigate, so the morning page asks this rather than the route to stay out of their way.
+let lastResponse: number | null = null;
+
+/** When a reminder was last answered on this device (ms), or null. */
+export const lastReminderResponseAt = (): number | null => lastResponse;
+
 function handleResponse(response: Notifications.NotificationResponse | null | undefined, delayMs: number) {
   if (!response) return;
   const { content, identifier } = response.notification.request;
   const data = content.data as ReminderData | undefined;
   if (!data || (data.source !== SOURCE && data.source !== SNOOZE_SOURCE)) return;
+  lastResponse = Date.now();
   const key = `${identifier}|${response.notification.date}|${response.actionIdentifier}`;
   if (handled.has(key)) return;
   handled.add(key);

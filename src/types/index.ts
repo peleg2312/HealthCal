@@ -309,6 +309,13 @@ export interface Settings {
   recapSeenWeek?: ISODate;
   /** Weekly rhythm on the consistency page: days a week the user aims to log food, train and weigh in. */
   rhythmTargets?: { food: number; train: number; weigh: number };
+  /** The morning page (a summary of yesterday on the first visit each morning). Undefined means on. */
+  morningSummary?: boolean;
+  /**
+   * The last day the morning page opened by itself, for the person's other devices. Written only after
+   * that morning's pull (src/features/morning/useMorningPage.ts); each device also keeps its own (seen.ts).
+   */
+  morningSeenDay?: ISODate;
   updatedAt: ISODateTime;
 }
 

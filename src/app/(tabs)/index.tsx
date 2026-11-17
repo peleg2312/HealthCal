@@ -12,6 +12,7 @@ import { mealLine } from '@/features/today/meals';
 import { ReadyRim } from '@/features/today/ReadyRim';
 import { RecapReadyCard } from '@/features/today/RecapReadyCard';
 import { FirstLogInvite } from '@/features/today/FirstLogInvite';
+import { MorningWatcher } from '@/features/morning/useMorningPage';
 import { useBackToToday } from '@/features/today/useBackToToday';
 import { startDate } from '@/features/today/week';
 import { ShareDayButton } from '@/features/share';
@@ -69,6 +70,8 @@ export default function TodayScreen() {
       testID="today-screen"
       header={<TabHeader tab="today" overline={tabDay(date)} title={title} />}>
       <View testID="today-swipe" style={{ gap: spacing.md }}>
+      {/* The first visit on a new morning opens yesterday's summary (rule in @/features/morning/rule). Draws nothing. */}
+      <MorningWatcher />
       {/* The one date control, the same as the diary's: the strip, then the week's caption with the streak or "Back to today". */}
       <DayRingStrip
         today={todayDate}

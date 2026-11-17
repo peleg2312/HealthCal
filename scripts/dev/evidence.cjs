@@ -105,6 +105,12 @@
  *     now: Date.parse('2026-11-19T18:00:00'),   the page's clock (Playwright's clock.setFixedTime: Date.now
  *                                  and new Date() return it, timers still run), for a screen whose words depend on
  *                                  the weekday; the stored data is still built around the real today
+ *     flags: { __healthcalMorning: true },   window booleans set before the app loads (addInitScript), for
+ *                                  a test hook that an automated browser leaves off unless asked: the morning
+ *                                  page (src/features/morning/allowed.ts) opens by itself only with
+ *                                  __healthcalMorning, together with a `now` in the morning of a day after one with data
+ *     absent: ['morning-card'],    testIDs that must not be on the page once the steps and waitFor are done
+ *                                  (checked after a 1.5 s settle): a capture that shows one is NOT CAPTURED
  *     health: { demo: { store: 'apple-health', workouts: [...], steps: [{ day, count }] }, state: { enabled: true } },
  *                                  the phone's health store in memory (window.__healthcalHealthDemo: the options of
  *                                  createFakeAdapter in src/features/health-sync/fake.ts) and this phone's sync memory
@@ -1023,9 +1029,43 @@ function runChecks() {
 
 // ------------------------------------------------------------------ states
 
-const STATE_FIELDS = ['id', 'route', 'data', 'imperial', 'day', 'values', 'health', 'type', 'taps', 'waitFor', 'sheet', 'note', 'now'];
+const STATE_FIELDS = ['id', 'route', 'data', 'imperial', 'day', 'values', 'health', 'type', 'taps', 'waitFor', 'sheet', 'note', 'now', 'flags', 'absent'];
 const VALUES = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack'];
 const DATA = ['demo', 'empty', 'fresh', 'stress'];
+
+/** What is wrong with one state's form (empty when nothing), `where` naming it in each message. */
+function stateProblems(s, where) {
+  const problems = [];
+  const unknown = Object.keys(s || {}).filter((k) => !STATE_FIELDS.includes(k));
+  if (unknown.length) problems.push(`${where}: unknown field ${unknown.join(', ')} (fields: ${STATE_FIELDS.join(', ')})`);
+  if (!s.id || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(s.id)) problems.push(`${where}: id must be kebab-case`);
+  if (typeof s.route !== 'string' || !s.route.startsWith('/')) problems.push(`${where}: route must start with /`);
+  if (s.data !== undefined && !DATA.includes(s.data)) problems.push(`${where}: data must be one of ${DATA.join(', ')}`);
+  if (s.route && s.route.includes('{day}') !== (s.day !== undefined)) problems.push(`${where}: a route with {day} needs day, and day needs {day} in the route`);
+  if (s.type !== undefined && (typeof s.type !== 'object' || Array.isArray(s.type))) problems.push(`${where}: type is { testID: text }`);
+  if (s.health !== undefined && (!s.health || typeof s.health !== 'object' || Object.keys(s.health).some((k) => !['demo', 'state'].includes(k)))) problems.push(`${where}: health is { demo, state }`);
+  if (s.now !== undefined && (typeof s.now !== 'number' || !Number.isFinite(s.now))) problems.push(`${where}: now is a time in milliseconds`);
+  if (s.flags !== undefined && (!s.flags || typeof s.flags !== 'object' || Array.isArray(s.flags) || !Object.keys(s.flags).length || Object.entries(s.flags).some(([k, v]) => !/^__[A-Za-z][A-Za-z0-9]*$/.test(k) || typeof v !== 'boolean'))) problems.push(`${where}: flags is { __windowName: true | false }, at least one`);
+  if (s.absent !== undefined && (!Array.isArray(s.absent) || !s.absent.length || s.absent.some((id) => typeof id !== 'string' || !id))) problems.push(`${where}: absent is a list of testIDs`);
+  if (s.values !== undefined) {
+    if (!s.values || typeof s.values !== 'object' || Array.isArray(s.values)) problems.push(`${where}: values is { ${VALUES.join(', ')} }`);
+    else {
+      for (const [k, v] of Object.entries(s.values)) if (!VALUES.includes(k) || typeof v !== 'number' || !(v >= 0)) problems.push(`${where}: values.${k} must be one of ${VALUES.join(', ')}, a number of 0 or more`);
+      if (!['demo', 'stress', undefined].includes(s.data)) problems.push(`${where}: values go on the demo or stress data`);
+    }
+  }
+  for (const t of s.taps || []) {
+    const ok = typeof t === 'string' || (t && typeof t === 'object' && ((typeof t.type === 'string' && typeof t.text === 'string') || typeof t.wait === 'number' || (typeof t.choose === 'string' && Array.isArray(t.files))));
+    if (!ok) problems.push(`${where}: a step is a testID, { type, text }, { wait } or { choose, files }; got ${JSON.stringify(t)}`);
+    if (t && t.files) for (const f of t.files) if (!fs.existsSync(path.resolve(ROOT, f))) problems.push(`${where}: no file ${f}`);
+  }
+  return problems;
+}
+
+/** Sets a state's window booleans before any of the app's code runs, on every load of the page. */
+async function applyFlags(page, values) {
+  if (values) await page.addInitScript((f) => { for (const [k, v] of Object.entries(f)) window[k] = v; }, values);
+}
 
 /** Loads scripts/dev/states/<list>.cjs for each list and checks every state is well formed. */
 function loadStates(lists) {
@@ -1038,27 +1078,7 @@ function loadStates(lists) {
     if (!Array.isArray(items)) { problems.push(`${list}: module.exports must be an array of states`); continue; }
     for (const s of items) {
       const where = `${list}: ${s && s.id ? s.id : JSON.stringify(s).slice(0, 60)}`;
-      const unknown = Object.keys(s || {}).filter((k) => !STATE_FIELDS.includes(k));
-      if (unknown.length) problems.push(`${where}: unknown field ${unknown.join(', ')} (fields: ${STATE_FIELDS.join(', ')})`);
-      if (!s.id || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(s.id)) problems.push(`${where}: id must be kebab-case`);
-      if (typeof s.route !== 'string' || !s.route.startsWith('/')) problems.push(`${where}: route must start with /`);
-      if (s.data !== undefined && !DATA.includes(s.data)) problems.push(`${where}: data must be one of ${DATA.join(', ')}`);
-      if (s.route && s.route.includes('{day}') !== (s.day !== undefined)) problems.push(`${where}: a route with {day} needs day, and day needs {day} in the route`);
-      if (s.type !== undefined && (typeof s.type !== 'object' || Array.isArray(s.type))) problems.push(`${where}: type is { testID: text }`);
-      if (s.health !== undefined && (!s.health || typeof s.health !== 'object' || Object.keys(s.health).some((k) => !['demo', 'state'].includes(k)))) problems.push(`${where}: health is { demo, state }`);
-      if (s.now !== undefined && (typeof s.now !== 'number' || !Number.isFinite(s.now))) problems.push(`${where}: now is a time in milliseconds`);
-      if (s.values !== undefined) {
-        if (!s.values || typeof s.values !== 'object' || Array.isArray(s.values)) problems.push(`${where}: values is { ${VALUES.join(', ')} }`);
-        else {
-          for (const [k, v] of Object.entries(s.values)) if (!VALUES.includes(k) || typeof v !== 'number' || !(v >= 0)) problems.push(`${where}: values.${k} must be one of ${VALUES.join(', ')}, a number of 0 or more`);
-          if (!['demo', 'stress', undefined].includes(s.data)) problems.push(`${where}: values go on the demo or stress data`);
-        }
-      }
-      for (const t of s.taps || []) {
-        const ok = typeof t === 'string' || (t && typeof t === 'object' && ((typeof t.type === 'string' && typeof t.text === 'string') || typeof t.wait === 'number' || (typeof t.choose === 'string' && Array.isArray(t.files))));
-        if (!ok) problems.push(`${where}: a step is a testID, { type, text }, { wait } or { choose, files }; got ${JSON.stringify(t)}`);
-        if (t && t.files) for (const f of t.files) if (!fs.existsSync(path.resolve(ROOT, f))) problems.push(`${where}: no file ${f}`);
-      }
+      problems.push(...stateProblems(s || {}, where));
       if (states.some((x) => x.id === s.id)) problems.push(`${where}: id used twice`);
       states.push({ list, ...s });
     }
@@ -1113,6 +1133,7 @@ async function open(context, job, seed) {
       }
     }, job.health);
   }
+  await applyFlags(page, job.flags);
   const toast = [];
   const step = async (what, fn) => {
     try { await fn(); return null; } catch (e) { return `${what}: ${String(e.message).split('\n')[0].slice(0, 120)}`; }
@@ -1121,6 +1142,7 @@ async function open(context, job, seed) {
     await page.waitForTimeout(350);
     for (const t of await page.evaluate(toastScan).catch(() => [])) if (!toast.includes(t)) toast.push(t);
   };
+  // The context's clock (the caller gives a job with `now` a context of its own).
   if (job.now !== undefined) await page.clock.setFixedTime(new Date(job.now));
   let problem = await step('did not load', async () => {
     await page.goto(base + job.route, { waitUntil: 'networkidle', timeout: 120000 });
@@ -1151,6 +1173,11 @@ async function open(context, job, seed) {
     }
   }
   if (!problem && job.waitFor) problem = await step(`wait for ${job.waitFor}`, () => page.locator(sel(job.waitFor)).first().waitFor({ state: 'visible', timeout: 15000 }));
+  if (!problem && job.absent) {
+    // Long enough for something that opens by itself after a settle (the morning page waits 900 ms).
+    await page.waitForTimeout(1500);
+    for (const id of job.absent) if (!problem && (await page.locator(sel(id)).count()) > 0) problem = `${id} is on the page and must not be (absent)`;
+  }
   if (!problem) {
     // Give the screen up to 10 s to finish drawing (fonts, data, the sheet rising).
     const until = Date.now() + 10000;
@@ -1228,14 +1255,18 @@ async function main() {
   for (const theme of themes) {
     for (const width of widths) {
       // One browser context per theme and width keeps the app's bundle cached; every page clears and seeds its own storage.
-      const context = await browser.newContext({ viewport: { width, height: heightFor(width) }, deviceScaleFactor: 1, reducedMotion: 'reduce', colorScheme: theme === 'dark' ? 'dark' : 'light', isMobile: true, hasTouch: true });
+      const options = { viewport: { width, height: heightFor(width) }, deviceScaleFactor: 1, reducedMotion: 'reduce', colorScheme: theme === 'dark' ? 'dark' : 'light', isMobile: true, hasTouch: true };
+      const context = await browser.newContext(options);
       for (const job of jobs) {
         const name = `${job.stem}__${theme}__${width}${job.tag}`;
+        // Playwright's clock belongs to the whole context, so a state with its own `now` gets a context of its own:
+        // the clock would otherwise stay fixed for every later job of this theme and width.
+        const jobContext = job.now !== undefined ? await browser.newContext(options) : context;
         let result = null;
         // A blank, half-loaded or unfinished capture is tried again, and never reported as clean.
         for (let attempt = 1; attempt <= tries; attempt++) {
           if (result) await result.page.close();
-          result = await open(context, job, seedFor(theme, job));
+          result = await open(jobContext, job, seedFor(theme, job));
           result.attempts = attempt;
           if (!result.problem) break;
         }
@@ -1260,6 +1291,7 @@ async function main() {
           errors: [...new Set(errors)].slice(0, 5), ...found, layout,
         });
         await page.close();
+        if (jobContext !== context) await jobContext.close();
       }
       await context.close();
     }
@@ -1285,7 +1317,7 @@ async function main() {
   fs.rmSync(tmp, { recursive: true, force: true });
 
   const checks = flags.checks ? runChecks() : [];
-  const stateIndex = Object.fromEntries(states.map((s) => [s.id, { list: s.list, route: s.route, data: s.data || 'demo', imperial: !!s.imperial, ...(s.values ? { values: s.values } : null), sheet: !!s.sheet, note: s.note || null }]));
+  const stateIndex = Object.fromEntries(states.map((s) => [s.id, { list: s.list, route: s.route, data: s.data || 'demo', imperial: !!s.imperial, ...(s.values ? { values: s.values } : null), ...(s.flags ? { flags: s.flags } : null), ...(s.now !== undefined ? { now: new Date(s.now).toString() } : null), sheet: !!s.sheet, note: s.note || null }]));
   const report = { taken: new Date().toISOString(), base, sheets, checks, states: stateIndex, screens };
   fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify(report, null, 1));
   const LAYOUT = ['overText', 'tight', 'broken', 'sticksOut', 'controls', 'hidden', 'gaps', 'header', 'sheet', 'toast'];
@@ -1311,4 +1343,4 @@ async function main() {
 
 // The in-page scans are exported for scripts/dev/evidence-selftest.cjs, which proves each one against hand-made faults.
 if (require.main === module) main();
-else module.exports = { scan, layoutScan, hiddenAtEnd, headerScan, sheetScan, toastScan, notReady, loadStates };
+else module.exports = { scan, layoutScan, hiddenAtEnd, headerScan, sheetScan, toastScan, notReady, loadStates, stateProblems, applyFlags, open };

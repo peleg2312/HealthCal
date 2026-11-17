@@ -28,6 +28,13 @@ name: Workout sync and About on a phone
     visible:
       id: today-energy
     timeout: 120000
+# A run that crosses midnight (first-day set up yesterday) opens the morning page ("Yesterday") over
+# Today about a second after the start, between 04:00 and 12:00: close it with its "Today" button
+# (morning-today, which closes exactly as the X does; the kit's X is header-close, not a morning testID).
+# On the setup day it never opens, so this tap finds nothing and goes on.
+- tapOn:
+    id: morning-today
+    optional: true
 - takeScreenshot: 20-today-again
 
 # About: Profile > About and how it works, down to the version block at the foot.

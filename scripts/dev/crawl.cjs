@@ -5,7 +5,9 @@
  *
  * Targets: every route in scripts/dev/check-routes.cjs (with demo data; the first-run ones,
  * those that open without a profile, also with nothing stored) and every state in
- * scripts/dev/states/start.cjs, food.cjs and move.cjs (the format is in evidence.cjs).
+ * scripts/dev/states/start.cjs, food.cjs, move.cjs and morning.cjs (the format is in evidence.cjs;
+ * of a state's fields the crawler uses route, data, imperial, day, values, now, flags, type, taps and
+ * waitFor, so the morning page is reached at yesterday's values and by itself on the morning clock).
  *
  * For each target it lists the visible, enabled controls (buttons, links, tabs, switches,
  * checkboxes; by testID, else role and label). With a sheet open only the sheet's controls
@@ -29,14 +31,19 @@
  * page swipe; the diary's is a quick flick, never into the future, said in a toast), coming back to
  * today after time away, the week strip paging weeks, and every kind of sheet following the finger, settling,
  * closing and still scrolling, with motion on and off, and with a mouse and Escape on a desktop-size
- * window. --gestures-only runs just those; --no-gestures skips them.
+ * window, and the morning page's way back (opened by itself, each way out lands on Today or its tab and
+ * the browser's back never shows it again). --gestures-only runs just those; --no-gestures skips them.
+ * The morning page's controls all start with "morning-", so the tap phase reaches only three of them
+ * (--group) and its moves out (dismissTo) replace the page, which the browser-back check leaves alone:
+ * its "Today" and "Log <meal>" buttons and every back return are proven by that way-back check. Run the
+ * morning list with the gestures, or with --all when it must run with --no-gestures.
  *
  * Reported as problems: controls that do nothing, moves that end on an error or not-found
  * screen (or throw), returns that do not return, and controls that need two taps.
  *
  *   node scripts/dev/crawl.cjs [--url=http://localhost:8081] [--out=<dir>]
  *        [--only=<route or state id>[,...]]   one or a few targets (a route is matched by its path)
- *        [--routes-only] [--states-only] [--lists=start,food,move]
+ *        [--routes-only] [--states-only] [--lists=start,food,move,morning]
  *        [--hosted=<page.html>] [--port=8125]  crawl the hosted preview's single page instead: it is
  *                                              served on --port inside a sandboxed iframe (scripts,
  *                                              same origin and forms only), as the preview viewer
@@ -69,7 +76,7 @@ const MAX = Number(flags.max || 60);
 /** Controls of one list (same testID but its last part) tapped per screen. */
 const GROUP_MAX = Number(flags.group || 3);
 const only = flags.only ? String(flags.only).split(',') : null;
-const lists = String(flags.lists || 'start,food,move').split(',').filter(Boolean);
+const lists = String(flags.lists || 'start,food,move,morning').split(',').filter(Boolean);
 
 // ------------------------------------------------------------------ targets
 
@@ -276,20 +283,30 @@ function snapshot() {
 
 // ------------------------------------------------------------------ driving one page
 
+/** The phone every target is opened in: a finger in a 360 x 740 browser, reduced motion. */
+const PHONE = { viewport: { width: W, height: H }, deviceScaleFactor: 1, isMobile: true, hasTouch: true, reducedMotion: 'reduce', userAgent: devices['Pixel 7'].userAgent };
+
 /** Screens a flow starts or ends on, with no back control by design. */
 const ROOTS = ['/', '/welcome', '/onboarding'];
 
 const sel = (id) => (id.startsWith('^') ? `[data-testid^="${id.slice(1)}"]` : `[data-testid="${id}"]`);
 
 async function newPage(ctx, target, seeds) {
-  const page = await ctx.newPage();
+  // Playwright's clock belongs to the whole context: a target with its own `now` gets a context of its
+  // own (the same phone), closed with its page, so the clock never stays fixed for the targets after it.
+  let page;
+  if (target.now !== undefined) {
+    const own = await ctx.browser().newContext(PHONE);
+    page = await own.newPage();
+    page.on('close', () => { own.close().catch(() => {}); });
+  } else page = await ctx.newPage();
   const ev = { errors: [], popups: [], downloads: [], choosers: [], dialogs: [] };
   page.on('pageerror', (e) => ev.errors.push(e.message.split('\n')[0].slice(0, 140)));
   page.on('popup', (p) => { ev.popups.push(p.url()); p.close().catch(() => {}); });
   page.on('download', (d) => { ev.downloads.push(d.suggestedFilename()); d.cancel().catch(() => {}); });
   page.on('filechooser', (f) => ev.choosers.push(f.isMultiple() ? 'many' : 'one'));
   page.on('dialog', (d) => { ev.dialogs.push(d.message().slice(0, 80)); d.dismiss().catch(() => {}); });
-  const seed = seeds[`${target.data}${target.imperial ? '-imperial' : ''}`];
+  const seed = seeds[seedKey(target)];
   await page.addInitScript((value) => {
     if (sessionStorage.getItem('__crawl')) return;
     localStorage.clear();
@@ -299,8 +316,24 @@ async function newPage(ctx, target, seeds) {
     sessionStorage.setItem('__crawl', '1');
   }, seed);
   await page.addInitScript(instrument);
+  // A state's window booleans (the morning page's test flag) before the app starts, and its clock.
+  if (target.flags) await page.addInitScript((f) => { for (const [k, v] of Object.entries(f)) window[k] = v; }, target.flags);
+  // A state's health store in memory and this phone's sync memory, as evidence.cjs loads them (once per page).
+  if (target.health) {
+    await page.addInitScript((h) => {
+      if (h.demo) window.__healthcalHealthDemo = h.demo;
+      if (h.state && !sessionStorage.getItem('__crawlHealth')) {
+        localStorage.setItem('healthcal-health-sync', JSON.stringify({ state: h.state, version: 1 }));
+        sessionStorage.setItem('__crawlHealth', '1');
+      }
+    }, target.health);
+  }
+  if (target.now !== undefined) await page.clock.setFixedTime(new Date(target.now));
   return { page, ev };
 }
+
+/** The stored data a target starts from: its data and units, and a state's `values` on top. */
+const seedKey = (target) => `${target.data}${target.imperial ? '-imperial' : ''}${target.values ? `|${JSON.stringify(target.values)}` : ''}`;
 
 /** The frame the app runs in: the page itself, or the viewer's iframe for the hosted build. */
 async function appFrame(page) {
@@ -705,6 +738,45 @@ async function gestureChecks(browser, seeds) {
     await r.page.close();
   });
   await ctx.close();
+
+  // ---- the morning page's way back (src/features/morning): opened by itself over Today (the test flag and
+  // tomorrow 08:10, as states/morning.cjs's morning-auto), every way out lands on Today or the tab it
+  // leads to, and neither the move nor the browser's back afterwards ever shows the page again.
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(8, 10, 0, 0);
+  const auto = { id: 'morning-auto (way back)', route: '/', data: 'demo', now: tomorrow.getTime(), flags: { __healthcalMorning: true }, waitFor: 'morning-card' };
+  const where = (f) => f.evaluate(() => location.pathname);
+  const morningShown = async (f) => (await f.locator(sel('morning-card')).count()) > 0;
+  ctx = await phone(false);
+  for (const [control, label, lands, back] of [
+    ['header-close', 'the X', ['/'], false],
+    ['morning-today', '"Today"', ['/'], false],
+    ['morning-log', '"Log <meal>"', ['/food/search'], true],
+    ['morning-cal', 'the calorie cup', ['/diary'], true],
+    ['morning-move', 'the movement row', ['/train'], true],
+  ]) {
+    await guard(`morning: ${label}`, async () => {
+      const r = await load(ctx, auto, seeds);
+      if (r.problem) { await r.page.close(); throw new Error(r.problem); }
+      check('morning: opens by itself over Today', (await where(r.frame)) === '/morning');
+      await r.frame.locator(sel(control)).first().click({ timeout: 10000 });
+      await r.page.waitForTimeout(1200);
+      const at = await where(r.frame);
+      check(`morning: ${label} goes to ${lands.join(' or ')}`, lands.includes(at) && !(await morningShown(r.frame)), at);
+      if (back) {
+        await r.page.goBack().catch(() => {});
+        await r.page.waitForTimeout(1500);
+        const after = await where(r.frame);
+        // Leaving the app (about:blank, the page the test started from) is not landing on Today.
+        const page = await r.page.evaluate(() => location.href).catch(() => '');
+        const inApp = page.startsWith(base);
+        check(`morning: the browser's back after ${label} lands on Today or that tab, never the page again`, inApp && ['/', ...lands].includes(after) && !(await morningShown(r.frame)) && (await r.frame.locator(sel('error-retry')).count()) === 0, inApp ? after : `left the app (${page || 'no page'})`);
+      }
+      await r.page.close();
+    });
+  }
+  await ctx.close();
   return results;
 }
 
@@ -723,6 +795,8 @@ async function main() {
   }
   const all = targets();
   if (!all.length) { console.log('No targets match.'); process.exit(1); }
+  // A state's values (today's amounts, buildSeed's `values`) on its own copy of the demo or stress data.
+  for (const t of all) if (t.values && !(seedKey(t) in seeds)) seeds[seedKey(t)] = JSON.stringify(buildSeed({ theme: 'blossom', stress: t.data === 'stress', units: t.imperial ? 'imperial' : 'metric', values: t.values }));
   const srv = hosted ? await serveHosted() : null;
   const browser = await chromium.launch();
   const done = new Set();
@@ -733,14 +807,7 @@ async function main() {
   let taps = 0;
   const t0 = Date.now();
 
-  const contextFor = async () => browser.newContext({
-    viewport: { width: W, height: H },
-    deviceScaleFactor: 1,
-    isMobile: true,
-    hasTouch: true,
-    reducedMotion: 'reduce',
-    userAgent: devices['Pixel 7'].userAgent,
-  });
+  const contextFor = async () => browser.newContext(PHONE);
 
   // Phase one lists each target's controls; phase two taps them, every tap from a fresh load,
   // spread over the workers as one queue.

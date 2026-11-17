@@ -172,6 +172,19 @@ describe('backup validation', () => {
     expect(parsed.skipped).toBe(1);
   });
 
+  it('accepts the morning page settings as optional and drops malformed ones', () => {
+    const base = { theme: 'system', haptics: true, updatedAt: '2026-11-10T10:00:00Z' };
+    const settingsOf = (extra: Record<string, unknown>) => {
+      const parsed = parseBackup(wrap({}, { settings: { ...base, ...extra } }));
+      return parsed.ok ? parsed.backup.settings : 'not ok';
+    };
+    expect(settingsOf({})).toEqual(base);
+    expect(settingsOf({ morningSummary: false, morningSeenDay: '2026-11-16' })).toEqual({ ...base, morningSummary: false, morningSeenDay: '2026-11-16' });
+    expect(settingsOf({ morningSummary: 'yes' })).toBeNull();
+    expect(settingsOf({ morningSeenDay: '2026-02-30' })).toBeNull();
+    expect(settingsOf({ morningSeenDay: 20261116 })).toBeNull();
+  });
+
   it('keeps a valid profile', () => {
     const profile = {
       name: 'A', sex: 'female', birthDate: '1990-04-21', heightCm: 170, weightKg: 70, activityLevel: 'light', goal: 'lose', weeklyRateKg: 0.5,

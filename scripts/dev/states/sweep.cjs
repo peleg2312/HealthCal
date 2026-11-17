@@ -19,7 +19,10 @@
 //   the fasting cup          not running, 5%, 37%, 85%, at target, 30% past
 //   the share card           nothing eaten, 60%, 30% over, with the calories shown
 //   the plan reveal          a gain, a small loss and a big loss (start.cjs has the usual loss and keeping weight)
+//   the morning shelf        yesterday within the budget with protein and water reached, 30% over with
+//                            400 kcal of exercise, and logged in part (morning.cjs: the clock at tomorrow 08:10)
 const start = require('./start.cjs');
+const morning = require('./morning.cjs');
 
 const EATEN = [[0, '0'], [0.05, '5'], [0.33, '33'], [0.6, '60'], [0.85, '85'], [1, '100'], [1.3, '130']];
 const EXERCISE = [0, 290, 900];
@@ -71,4 +74,12 @@ const plan = [
   { id: 'sweep-plan-big-loss', route: '/onboarding', data: 'fresh', taps: withPlan('lose', '52'), waitFor: 'plan-reveal', note: 'the plan reveal for losing 16 kg' },
 ];
 
-module.exports = [...today, ...diary, ...water, ...train, ...fasting, ...share, ...plan];
+// ------------------------------------------------------------------ the morning shelf
+// The four cups of /morning at yesterday's values (the states of morning.cjs, under their own ids).
+const shelf = ['morning-within', 'morning-over', 'morning-partial'].map((id) => {
+  const s = morning.find((m) => m.id === id);
+  if (!s) throw new Error(`sweep: no state ${id} in morning.cjs`);
+  return { ...s, id: `sweep-${id}` };
+});
+
+module.exports = [...today, ...diary, ...water, ...train, ...fasting, ...share, ...plan, ...shelf];

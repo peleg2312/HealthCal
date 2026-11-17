@@ -31,6 +31,8 @@ import { startDaySnapshots } from '@/store/daySnapshot';
 import { startPersistence, useHydration, wipePersisted } from '@/store/persistence';
 import { ThemeProvider, useReducedMotion, useTheme } from '@/theme';
 import { ToastHost } from '@/ui';
+// Read once at the start, before the router draws a screen or changes the address (the morning page's start facts).
+import '@/features/morning/launch';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -83,11 +85,11 @@ function LoadFailed() {
 }
 
 /**
- * Task screens (search, quick add, import, add a friend) rise from the bottom like a sheet;
+ * Task screens (search, quick add, import, add a friend, the morning page) rise from the bottom like a sheet;
  * everything else keeps the platform's push. On web the native stack does not animate, so
  * `Screen`'s fade-up is the page change there. Reduced motion turns every transition off.
  */
-const TASK_SCREENS = ['food/search', 'food/quick', 'food/scan', 'food/photo', 'activity/import', 'friends/add'] as const;
+const TASK_SCREENS = ['food/search', 'food/quick', 'food/scan', 'food/photo', 'activity/import', 'friends/add', 'morning'] as const;
 
 /**
  * The only screens someone without a finished setup may open. Every other screen reads the
