@@ -62,7 +62,7 @@ function AppleHealthGuide() {
         </Text>
       </View>
       <Text variant="body" color="textSecondary">
-        Workouts and daily steps. In the Health app, tap your picture, then Export All Health Data. Save it to Files, then choose export.zip here.
+        Workouts, daily steps and sleep. In the Health app, tap your picture, then Export All Health Data. Save it to Files, then choose export.zip here.
       </Text>
       <Text variant="caption" color="textSecondary">
         A large export takes a minute or two to read. Heart rate, sleep and the rest are skipped, and nothing leaves this device.

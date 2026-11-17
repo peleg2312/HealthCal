@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { exportXml, heartRecord, newWorkout, oldWorkout, stepRecord } from '@/features/health-sync/exportFixture';
+import { DEVICES, exportXml, heartRecord, newWorkout, oldWorkout, sleepRecord, stepRecord } from '@/features/health-sync/exportFixture';
 
-import { createHealthScanner, looksLikeHealthXml, type ScanResult, type StepRecord } from './appleExport';
+import { createHealthScanner, looksLikeHealthXml, type ScanResult, type SleepRecord, type StepRecord } from './appleExport';
 import { utf8 } from './zipBuilder';
 
 const body =
@@ -54,7 +54,7 @@ describe('Health export scanner', () => {
     expect(cur.stats.find((s) => s.nested)).toMatchObject({ type: 'HKQuantityTypeIdentifierActiveEnergyBurned', sum: 610, nested: true });
     expect(cur.stats.find((s) => s.type.endsWith('HeartRate'))?.sum).toBeNull();
     // Everything that is not a step count is counted, never kept.
-    expect(result.counts).toEqual({ records: 5, stepRecords: 3 });
+    expect(result.counts).toEqual({ records: 5, stepRecords: 3, sleepRecords: 1 });
     expect(JSON.stringify(result)).not.toMatch(/HeartRateMotionContext|DateOfBirth|1990-04-02|Sleep/);
   });
 
@@ -99,5 +99,75 @@ describe('Health export scanner', () => {
     expect(looksLikeHealthXml(xml)).toBe(true);
     expect(looksLikeHealthXml(utf8('<?xml version="1.0"?><gpx></gpx>'))).toBe(false);
     expect(scan([utf8('<?xml version="1.0"?><TrainingCenterDatabase/>')]).result.isHealthExport).toBe(false);
+  });
+});
+
+describe('Health export scanner: sleep', () => {
+  const sleepBody =
+    heartRecord('2026-11-14 22:00:00 +0100') +
+    // Before the window: counted, never decoded.
+    sleepRecord({ source: 'Dana’s Apple Watch', start: '2026-10-01 23:00:00 +0100', end: '2026-10-02 06:00:00 +0100', value: 'AsleepCore' }) +
+    // The watch writes HKTimeZone as a child: the record ends at its own </Record>.
+    sleepRecord({ source: 'Dana’s Apple Watch', start: '2026-11-14 23:10:00 +0100', end: '2026-11-15 01:00:00 +0100', value: 'AsleepCore', timeZone: 'Europe/Berlin' }) +
+    heartRecord('2026-11-15 01:00:00 +0100') +
+    sleepRecord({ source: 'Dana’s Apple Watch', start: '2026-11-15 01:00:00 +0100', end: '2026-11-15 02:30:00 +0100', value: 'AsleepDeep', timeZone: 'Europe/Berlin' }) +
+    sleepRecord({ source: 'Dana’s iPhone', device: DEVICES.phone, start: '2026-11-14 22:45:00 +0100', end: '2026-11-15 07:00:00 +0100', value: 'InBed' }) +
+    sleepRecord({ source: 'Sleep &amp; Co', device: '', start: '2026-11-15 13:00:00 +0100', end: '2026-11-15 13:40:00 +0100', value: 'Asleep' }) +
+    stepRecord({ source: 'Dana’s iPhone', start: '2026-11-15 09:00:00 +0100', end: '2026-11-15 09:10:00 +0100', value: 812 });
+  const sleepXml = utf8(exportXml(sleepBody));
+
+  function scanSleep(chunks: Uint8Array[], from = '2026-11-01') {
+    const nights: SleepRecord[] = [];
+    const steps: StepRecord[] = [];
+    const s = createHealthScanner({ stepsFromDay: from, onStep: (r) => steps.push(r), sleepFromDay: from, onSleep: (r) => nights.push(r) });
+    for (const c of chunks) s.push(c);
+    return { result: s.finish(), sleep: nights, steps };
+  }
+  const whole = scanSleep([sleepXml]);
+
+  it('keeps sleep records of the window with their time zone, and nothing else of them', () => {
+    // The fixture's own record of the night before the export is the last one.
+    expect(whole.sleep.map((r) => r.value.replace('HKCategoryValueSleepAnalysis', ''))).toEqual(['AsleepCore', 'AsleepDeep', 'InBed', 'Asleep', 'AsleepCore']);
+    expect(whole.sleep[0]).toEqual({
+      sourceName: 'Dana’s Apple Watch',
+      device: expect.stringContaining('model:Watch'),
+      startDate: '2026-11-14 23:10:00 +0100',
+      endDate: '2026-11-15 01:00:00 +0100',
+      value: 'HKCategoryValueSleepAnalysisAsleepCore',
+      timeZone: 'Europe/Berlin',
+    });
+    expect(whole.sleep[2].timeZone).toBeNull();
+    expect(whole.sleep[3]).toMatchObject({ sourceName: 'Sleep & Co', device: '' });
+    expect(whole.result.counts).toEqual({ records: 9, stepRecords: 1, sleepRecords: 6 });
+    // A kept record's children never leak into what follows: the step after them is still read.
+    expect(whole.steps).toHaveLength(1);
+    expect(JSON.stringify(whole.sleep)).not.toMatch(/HeartRate|SyncVersion|2026-10-0/);
+  });
+
+  it('skips sleep before its own window, and reads none without onSleep', () => {
+    expect(scanSleep([sleepXml], '2026-01-01').sleep).toHaveLength(6);
+    expect(scanSleep([sleepXml], '2026-11-16').sleep).toHaveLength(0);
+    const plain = createHealthScanner({ stepsFromDay: '2026-11-01', onStep: () => {} });
+    plain.push(sleepXml);
+    expect(plain.finish().counts.sleepRecords).toBe(6);
+  });
+
+  it('gives the same sleep records whatever the chunk boundaries', () => {
+    const expected = JSON.stringify(whole);
+    for (let cut = 1; cut < sleepXml.length; cut++) {
+      const got = scanSleep([sleepXml.subarray(0, cut), sleepXml.subarray(cut)]);
+      if (JSON.stringify(got) !== expected) throw new Error(`differs when split at byte ${cut}`);
+    }
+    const bytes: Uint8Array[] = [];
+    for (let i = 0; i < sleepXml.length; i++) bytes.push(sleepXml.subarray(i, i + 1));
+    expect(JSON.stringify(scanSleep(bytes))).toBe(expected);
+  });
+
+  it('hands on no half-read sleep record from a file cut inside it', () => {
+    // Inside the first kept record's metadata: the record is open, its </Record> never comes.
+    const at = Buffer.from(sleepXml).indexOf('HKTimeZone') + 4;
+    const r = scanSleep([sleepXml.subarray(0, at)]);
+    expect(r.sleep).toHaveLength(0);
+    expect(r.result.complete).toBe(false);
   });
 });

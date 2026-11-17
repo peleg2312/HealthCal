@@ -5,16 +5,29 @@
  * extension; iOS and web get the files beside it). It makes the calls and
  * nothing else: every rule about what the answers mean is in the pure modules.
  *
- * Read only, five record types, no background reads and no history beyond
- * Health Connect's default 30 days (app.json lists the same five permissions).
+ * Read only, six record types (exercise, active and total calories, distance,
+ * steps, sleep), no background reads and no history beyond Health Connect's
+ * default 30 days before the first permission (app.json lists the same six).
  * None of this can run outside an Android build; see docs/health-sync.md for
  * what still has to be checked on a phone.
  */
 import { Linking } from 'react-native';
 import { aggregateGroupByPeriod, aggregateRecord, getGrantedPermissions, getSdkStatus, initialize, openHealthConnectSettings, readRecords, requestPermission } from 'react-native-health-connect';
 
-import { accessFrom, availabilityFrom, READ_PERMISSIONS, sessionRef, sessionToWorkout, stepDaysFromPeriods, toHealthError, type SessionDetails, type SessionRecord } from './healthConnect';
-import { HealthError, type HealthAccess, type HealthAdapter, type HealthAvailability, type HealthWorkout, type ReadOptions, type StepDayTotal, type StepsRange } from './types';
+import {
+  accessFrom,
+  availabilityFrom,
+  READ_PERMISSIONS,
+  sessionRef,
+  sessionToWorkout,
+  sleepFromSession,
+  stepDaysFromPeriods,
+  toHealthError,
+  type SessionDetails,
+  type SessionRecord,
+  type SleepSessionRaw,
+} from './healthConnect';
+import { HealthError, type HealthAccess, type HealthAdapter, type HealthAvailability, type HealthWorkout, type ReadOptions, type SleepSample, type StepDayTotal, type StepsRange } from './types';
 
 const PROVIDER = 'com.google.android.apps.healthdata';
 /** Sessions per page, and a ceiling on pages so a misbehaving token cannot loop for ever. */
@@ -147,4 +160,33 @@ function openInstall(): void {
   );
 }
 
-export const adapter: HealthAdapter = { store: 'health-connect', availability, access, requestAccess, readWorkouts, readStepDays, openSettings, openInstall };
+/**
+ * Every sleep session overlapping the range, from every app, paged like the
+ * workouts, as raw stage samples (healthConnect.ts, sleepFromSession). Never
+ * the SLEEP_DURATION_TOTAL aggregate: it is the session's length, time awake
+ * included. Empty when sleep may not be read.
+ */
+async function readSleep(range: { from: string; to: string }, allowed: HealthAccess): Promise<SleepSample[]> {
+  if (!allowed.sleep) return [];
+  try {
+    await ready();
+    const out: SleepSample[] = [];
+    let pageToken: string | undefined;
+    for (let page = 0; page < MAX_PAGES; page += 1) {
+      const result = await readRecords('SleepSession', {
+        timeRangeFilter: { operator: 'between', startTime: range.from, endTime: range.to },
+        ascendingOrder: true,
+        pageSize: PAGE_SIZE,
+        ...(pageToken ? { pageToken } : null),
+      });
+      for (const session of result.records) out.push(...sleepFromSession(session as SleepSessionRaw));
+      if (!result.pageToken || result.records.length === 0) break;
+      pageToken = result.pageToken;
+    }
+    return out;
+  } catch (e) {
+    throw toHealthError(e);
+  }
+}
+
+export const adapter: HealthAdapter = { store: 'health-connect', availability, access, requestAccess, readWorkouts, readStepDays, readSleep, openSettings, openInstall };

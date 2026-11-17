@@ -12,7 +12,7 @@ import { prepareImport } from '@/features/import/plan';
 import { readImportFile } from '@/features/import/read';
 
 import { sessionToWorkout } from './healthConnect';
-import { accessFromRequestStatus, distanceTypeFor, HK, kcalOf, metresOf, READ_TYPES, stepDaysFromStatistics, toHealthKitError, workoutFromHealthKit, zoneOffsetSecAt, type HKStatistics, type HKWorkoutSample } from './healthKit';
+import { accessFromRequestStatus, distanceTypeFor, HK, kcalOf, metresOf, READ_TYPES, SLEEP_READ_TYPES, sleepFromHealthKit, sleepStageFromValue, stepDaysFromStatistics, toHealthKitError, workoutFromHealthKit, zoneOffsetSecAt, type HKStatistics, type HKWorkoutSample } from './healthKit';
 import { originName, syncedFrom } from './origins';
 import { planSync } from './plan';
 import { zoneClock } from './steps';
@@ -248,9 +248,13 @@ describe('Apple Health permission and errors', () => {
   });
 
   it('counts everything as readable once asked, since HealthKit never says what was refused', () => {
-    expect(accessFromRequestStatus(2)).toEqual({ workouts: true, activeEnergy: true, totalEnergy: false, distance: true, steps: true });
+    expect(accessFromRequestStatus(2)).toEqual({ workouts: true, activeEnergy: true, totalEnergy: false, distance: true, steps: true, sleep: false });
     expect(accessFromRequestStatus(1)).toEqual(NO_ACCESS);
     expect(accessFromRequestStatus(0)).toEqual(NO_ACCESS);
+    // Sleep is its own question: allowed only when that one was asked.
+    expect(accessFromRequestStatus(2, 2).sleep).toBe(true);
+    expect(accessFromRequestStatus(2, 1)).toEqual({ workouts: true, activeEnergy: true, totalEnergy: false, distance: true, steps: true, sleep: false });
+    expect(accessFromRequestStatus(1, 2)).toEqual({ ...NO_ACCESS, sleep: true });
   });
 
   it('knows a copy without the HealthKit entitlement from any other refusal', () => {
@@ -261,5 +265,32 @@ describe('Apple Health permission and errors', () => {
     expect(toHealthKitError('boom')).toMatchObject({ code: 'failed', message: 'boom' });
     const own = new HealthError('timeout', 'slow');
     expect(toHealthKitError(own)).toBe(own);
+  });
+});
+
+describe('Apple Health sleep values', () => {
+  it('keeps sleep out of READ_TYPES and asks it on its own', () => {
+    expect(READ_TYPES).not.toContain(HK.sleep);
+    expect(SLEEP_READ_TYPES).toEqual(['HKCategoryTypeIdentifierSleepAnalysis']);
+  });
+
+  it('maps CategoryValueSleepAnalysis 0 to 5', () => {
+    expect([0, 1, 2, 3, 4, 5, 6, undefined].map(sleepStageFromValue)).toEqual(['inBed', 'asleep', 'awake', 'light', 'deep', 'rem', 'unknown', 'unknown']);
+  });
+
+  it('reads the zone from HKTimeZone at the sample\'s end, and none without it', () => {
+    const base = {
+      uuid: 'u',
+      startDate: new Date('2026-03-29T00:30:00Z'),
+      endDate: new Date('2026-03-29T05:30:00Z'),
+      value: 3,
+      sourceRevision: { source: { name: 'Connect', bundleIdentifier: 'com.garmin.connect.mobile' } },
+      metadata: { HKTimeZone: 'Europe/Amsterdam' },
+    };
+    // The clocks went forward at 01:00 UTC that night: the end is in summer time.
+    expect(sleepFromHealthKit(base)).toMatchObject({ origin: 'com.garmin.connect.mobile', kind: 'watch', zoneOffsetSec: 7200, stage: 'light' });
+    expect(sleepFromHealthKit({ ...base, metadata: {} })?.zoneOffsetSec).toBeNull();
+    expect(sleepFromHealthKit({ ...base, endDate: base.startDate })).toBeNull();
+    expect(sleepFromHealthKit({ ...base, sourceRevision: { source: { name: 'x', bundleIdentifier: '' } } })).toBeNull();
   });
 });

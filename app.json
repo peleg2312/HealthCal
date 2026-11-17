@@ -3,7 +3,7 @@
     "name": "HealthCal",
     "slug": "healthcal",
     "version": "1.0.0",
-    "runtimeVersion": "1",
+    "runtimeVersion": "2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "healthcal",
@@ -24,7 +24,8 @@
         "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
         "android.permission.health.READ_TOTAL_CALORIES_BURNED",
         "android.permission.health.READ_DISTANCE",
-        "android.permission.health.READ_STEPS"
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_SLEEP"
       ]
     },
     "web": {
@@ -86,7 +87,7 @@
       [
         "@kingstinct/react-native-healthkit",
         {
-          "NSHealthShareUsageDescription": "HealthCal reads the workouts and steps you choose from Apple Health to fill your training week. It never writes to Apple Health and never sends this data to the AI functions.",
+          "NSHealthShareUsageDescription": "HealthCal reads the workouts, steps and sleep you choose from Apple Health to fill your training week and sleep log. It never writes to Apple Health and never sends this data to the AI functions.",
           "NSHealthUpdateUsageDescription": false,
           "background": false
         }

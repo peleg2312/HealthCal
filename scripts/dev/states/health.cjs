@@ -66,24 +66,52 @@ const appleWorkouts = [
   workout('apple-health', 'w-garmin-ride', 'com.garmin.connect.mobile', 13, atLocal(2, 17, 30), 64, { activeKcal: 610, distanceM: 24800, device: 'Garmin Edge 540' }),
   // "Other workout": the screen asks which activity it was.
   workout('apple-health', 'w-other', 'com.apple.health.watch', 3000, atLocal(3, 18), 35, { activeKcal: 240, device: 'Apple Watch' }),
-  {
-    id: 'health-sync-android-steps-refused',
-    route: '/settings/health-sync',
-    health: {
-      demo: {
-        store: 'health-connect',
-        availability: 'available',
-        access: { workouts: true, activeEnergy: true, totalEnergy: true, distance: true, steps: false },
-        grant: { workouts: true, activeEnergy: true, totalEnergy: true, distance: true, steps: false },
-        workouts: [],
-      },
-      state: { enabled: true },
-    },
-    waitFor: 'health-sync-steps',
-    taps: ['health-sync-steps'],
-    note: 'Android: Allow tapped on the steps row and steps refused again: a toast says so and opens Health Connect',
-  },
 ];
+
+/**
+ * One night of raw sleep samples (SleepSample in types.ts), as an adapter lists them: woken `daysAgo`
+ * days before today (or before `from`) at 06:35 local, asleep from 23:10 the evening before, with light,
+ * deep, REM and two short wakings; `staged: false` is one unstaged block, as an app without stages writes.
+ * `store` 'healthConnect' or 'healthKit'; offsets left out, so the phone's own calendar is used.
+ */
+function sleepNight(store, origin, kind, daysAgo, { from = now, staged = true } = {}) {
+  const bed = atLocal(daysAgo + 1, 23, 10, from);
+  if (!staged) return [{ store, origin, kind, start: iso(bed), end: iso(bed + 445 * 60_000), zoneOffsetSec: null, stage: 'asleep' }];
+  const parts = [
+    ['light', 95],
+    ['deep', 70],
+    ['light', 40],
+    ['awake', 6],
+    ['rem', 45],
+    ['light', 60],
+    ['deep', 25],
+    ['rem', 50],
+    ['awake', 4],
+    ['light', 30],
+  ];
+  const out = [];
+  let t = bed;
+  for (const [stage, minutes] of parts) {
+    out.push({ store, origin, kind, start: iso(t), end: iso(t + minutes * 60_000), zoneOffsetSec: null, stage });
+    t += minutes * 60_000;
+  }
+  return out;
+}
+const GARMIN_ANDROID = 'com.garmin.android.apps.connectmobile';
+const garminNights = [...sleepNight('healthConnect', GARMIN_ANDROID, 'watch', 0), ...sleepNight('healthConnect', GARMIN_ANDROID, 'watch', 1)];
+const watchNights = [...sleepNight('healthKit', 'com.apple.health.watch', 'watch', 0), ...sleepNight('healthKit', 'com.apple.health.watch', 'watch', 1)];
+const ALL_ANDROID = { workouts: true, activeEnergy: true, totalEnergy: true, distance: true, steps: true, sleep: true };
+/** Health Connect with sleep allowed and these samples, sync on (and this phone's memory on top). */
+const syncedSleep = (sleep, state = {}) => ({ demo: { store: 'health-connect', availability: 'available', access: ALL_ANDROID, grant: ALL_ANDROID, workouts: [], steps: [], sleep }, state: { enabled: true, ...state } });
+/** Tomorrow at 08:10 local: the morning page's yesterday is the seed's today (morning.cjs). */
+const tomorrowMorning = (() => {
+  const d = new Date(now);
+  d.setDate(d.getDate() + 1);
+  d.setHours(8, 10, 0, 0);
+  return d.getTime();
+})();
+/** Synced Garmin nights for the last week, the one three days ago unstaged. */
+const garminWeek = [0, 1, 2, 3, 4, 5, 6].flatMap((d) => sleepNight('healthConnect', GARMIN_ANDROID, 'watch', d, { staged: d !== 3 }));
 
 const iphone = (over = {}) => ({ store: 'apple-health', availability: 'available', access: FULL, grant: FULL, workouts: appleWorkouts, steps, ...over });
 
@@ -95,12 +123,13 @@ function fileSteps(from, counts) {
 }
 
 /**
- * A synthetic Health export made now by make-health-export.mjs (steps relative to today), kept in the
- * system temp folder and made again on another day. `mb`: export.xml's size.
+ * A synthetic Health export made now by make-health-export.mjs (steps and nights relative to today), kept in the
+ * system temp folder and made again on another day. `mb`: export.xml's size. ('-sleep': files made before the
+ * generator wrote nights are not reused.)
  */
 function exportFile(name, mb, workouts = 24) {
   const dir = path.join(os.tmpdir(), 'healthcal-states-health');
-  const file = path.join(dir, `${name}-${new Date().toISOString().slice(0, 10)}.zip`);
+  const file = path.join(dir, `${name}-sleep-${new Date().toISOString().slice(0, 10)}.zip`);
   if (!fs.existsSync(file)) {
     fs.mkdirSync(dir, { recursive: true });
     const run = spawnSync('node', [path.join(__dirname, '..', 'make-health-export.mjs'), `--out=${file}`, `--mb=${mb}`, `--workouts=${workouts}`], { encoding: 'utf8' });
@@ -211,6 +240,92 @@ module.exports = [
     note: 'Android: Allow tapped on the steps row and steps refused again: a toast says so and opens Health Connect',
   },
 
+
+  // ---------------------------------------------------------------- sleep (the Sleep row on the sync screen)
+  {
+    id: 'health-sync-android-sleep',
+    route: '/settings/health-sync',
+    // A profile and no diary: the demo data has a night entered by hand for today, which a sync never replaces.
+    data: 'empty',
+    health: { demo: { store: 'health-connect', availability: 'available', access: ALL_ANDROID, grant: ALL_ANDROID, workouts: [], steps, sleep: garminNights }, state: { enabled: true } },
+    waitFor: 'health-sync-sleep',
+    note: 'Android: sleep allowed, two Garmin nights synced; the Sleep row says last night and where it came from',
+  },
+  {
+    id: 'health-sync-iphone-sleep-not-asked',
+    route: '/settings/health-sync',
+    health: { demo: iphone({ access: { ...FULL, sleep: false }, sleep: watchNights }), state: { enabled: true } },
+    waitFor: 'health-sync-sleep',
+    note: 'iPhone: sync on from before sleep was read; the five are allowed, sleep was never asked: the Sleep row offers Allow',
+  },
+  {
+    id: 'health-sync-iphone-sleep-allowed',
+    route: '/settings/health-sync',
+    // A profile and no diary: the demo data has a night entered by hand for today, which a sync never replaces.
+    data: 'empty',
+    health: { demo: iphone({ access: { ...FULL, sleep: false }, sleep: watchNights, grant: { ...FULL, sleep: true } }), state: { enabled: true } },
+    waitFor: 'health-sync-sleep',
+    taps: ['health-sync-sleep'],
+    note: 'iPhone: Allow tapped on the Sleep row, sleep allowed: a toast says so and the sync brings in the Apple Watch nights',
+  },
+  {
+    id: 'health-sync-android-sleep-refused',
+    route: '/settings/health-sync',
+    health: {
+      demo: { store: 'health-connect', availability: 'available', access: { ...ALL_ANDROID, sleep: false }, grant: { ...ALL_ANDROID, sleep: false }, workouts: [], steps, sleep: garminNights },
+      state: { enabled: true },
+    },
+    waitFor: 'health-sync-sleep',
+    taps: ['health-sync-sleep'],
+    note: 'Android: Allow tapped on the Sleep row and sleep refused: a toast says so and opens Health Connect; no night is read',
+  },
+  {
+    id: 'health-sync-android-explain-sleep',
+    route: '/settings/health-sync',
+    health: { demo: { store: 'health-connect', availability: 'available', access: { workouts: false, activeEnergy: false, totalEnergy: false, distance: false, steps: false, sleep: false }, grant: ALL_ANDROID, workouts: [] } },
+    taps: ['health-sync-switch'],
+    sheet: true,
+    note: 'Android: what will be asked before Health Connect\'s own screen, with the Sleep line',
+  },
+
+  // ---------------------------------------------------------------- synced nights where they show (a sync runs at start on any route)
+  {
+    id: 'sleep-synced',
+    route: '/sleep',
+    // A profile and no diary: the demo data has its own nights entered by hand, which a sync never replaces.
+    data: 'empty',
+    health: syncedSleep(garminWeek),
+    waitFor: 'sleep-last-night-from',
+    note: 'the sleep log with a week of Garmin nights from Health Connect, one without stages, none rated: "From Garmin Connect" and the stages line',
+  },
+  {
+    id: 'sleep-synced-sheet',
+    route: '/sleep',
+    data: 'empty',
+    health: syncedSleep(garminWeek),
+    waitFor: 'sleep-last-night-from',
+    taps: ['sleep-log'],
+    sheet: true,
+    note: 'a synced night opened to edit: where it came from, no quality yet, Delete',
+  },
+  {
+    id: 'morning-synced',
+    route: '/morning',
+    now: tomorrowMorning,
+    health: syncedSleep(sleepNight('healthConnect', GARMIN_ANDROID, 'watch', 0, { from: tomorrowMorning })),
+    waitFor: 'morning-card',
+    note: 'the morning page with last night synced from Garmin Connect (no quality): the sleep cup against 7 h',
+  },
+  {
+    id: 'health-sync-sleep-deleted',
+    route: '/settings/health-sync',
+    data: 'empty',
+    // Last night was deleted (or its sync undone) on this phone: the memory says so and the sync leaves it out.
+    health: syncedSleep(garminNights, { handled: { [`sleep:${localDay(0, now)}`]: { how: 'skipped', at: iso(atLocal(1, 23, 10)) } } }),
+    waitFor: 'health-sync-sleep',
+    note: 'Android: last night deleted: the Sleep row says a sync does not add it again, never "not yet"',
+  },
+
   // ---------------------------------------------------------------- the Health app's export file (import)
   { id: 'import-health-start', route: '/activity/import', waitFor: 'import-apple-guide', note: 'the import start: the Health export and Garmin files, what each is and how to get it' },
   {
@@ -226,7 +341,7 @@ module.exports = [
     data: 'empty',
     taps: [{ choose: 'import-choose-files', files: [exportFile('small', 2)] }, { wait: 2500 }],
     waitFor: 'import-list',
-    note: 'a Health export read: its workouts to review first, the steps that go in with the import in the footer, the file notes under the list',
+    note: 'a Health export read: its workouts to review first, the steps and nights that go in with the import in the footer, the file notes (steps, sleep) under the list',
   },
   {
     id: 'import-health-review-big',
@@ -235,7 +350,7 @@ module.exports = [
     data: 'demo',
     taps: [{ choose: 'import-choose-files', files: [exportFile('large', 40, 200)] }, { wait: 9000 }],
     waitFor: 'import-list',
-    note: 'a real-size export (200 workouts, some to choose, a duplicate): four filter chips, two by two',
+    note: 'a real-size export (200 workouts, some to choose, a duplicate): four filter chips, two by two; the demo has its own nights, so the sleep note says the file’s are already in the sleep log and the footer names only the steps',
   },
   {
     id: 'import-health-steps-only',
@@ -243,7 +358,7 @@ module.exports = [
     data: 'empty',
     taps: [{ choose: 'import-choose-files', files: [exportFile('small', 2)] }, { wait: 2500 }, 'import-untick-all'],
     waitFor: 'import-list',
-    note: 'every workout unticked: the button saves only the steps',
+    note: 'every workout unticked: the button saves only the steps and sleep ("Save steps and sleep")',
   },
   {
     id: 'import-health-done-steps-only',
@@ -251,7 +366,15 @@ module.exports = [
     data: 'empty',
     taps: [{ choose: 'import-choose-files', files: [exportFile('small', 2)] }, { wait: 2500 }, 'import-untick-all', 'import-submit', { wait: 700 }, { wait: 12500 }],
     waitFor: 'import-done-steps',
-    note: 'only the steps saved: "Steps saved", what that means, and Import more files',
+    note: 'only the steps and nights saved: "Steps and sleep saved", what each means, and Import more files',
+  },
+  {
+    id: 'import-health-done-sleep-undone',
+    route: '/activity/import',
+    data: 'empty',
+    taps: [{ choose: 'import-choose-files', files: [exportFile('small', 2)] }, { wait: 2500 }, 'import-untick-all', 'import-submit', { wait: 700 }, 'toast-action', { wait: 1500 }],
+    waitFor: 'import-undone',
+    note: 'steps and nights saved, then Undo: the steps off this phone, the nights out of the sleep log and not added from a file again',
   },
   {
     id: 'import-health-done',
@@ -259,7 +382,7 @@ module.exports = [
     data: 'empty',
     taps: [{ choose: 'import-choose-files', files: [exportFile('small', 2)] }, { wait: 2500 }, 'import-submit', { wait: 700 }, { wait: 12500 }],
     waitFor: 'import-done-steps',
-    note: 'imported: the days, and "Steps for 35 days saved on this phone" (saved with the workouts, by Import)',
+    note: 'imported: the days, "Steps for 35 days saved on this phone" and "Sleep for 25 nights added to your sleep log" (about 25 of the 28-day window) (saved with the workouts, by Import)',
   },
   { id: 'health-sync-web-export', route: '/settings/health-sync', waitFor: 'health-sync-import-export', note: 'the browser: no health store, and the way forward is the Health export' },
   {

@@ -96,6 +96,7 @@ export type ImportWarningCode =
   | 'zip-skipped-files'
   | 'zip-nested-depth'
   | 'apple-steps'
+  | 'apple-sleep'
   | 'apple-merged'
   | 'apple-not-exercise';
 

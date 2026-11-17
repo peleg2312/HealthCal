@@ -6,7 +6,9 @@ import { describe, expect, it } from 'vitest';
 
 import { addDays } from '@/lib/dates';
 
-import { accessFrom, availabilityFrom, ownFigure, READ_PERMISSIONS, sessionRef, sessionToWorkout, stepDaysFromPeriods, toHealthError } from './healthConnect';
+import { accessFrom, availabilityFrom, ownFigure, READ_PERMISSIONS, sessionRef, sessionToWorkout, sleepFromSession, sleepStageOf, stepDaysFromPeriods, toHealthError, type SleepSessionRaw } from './healthConnect';
+import { nightsFrom } from './sleep';
+import { zoneClock } from './steps';
 import { HealthError } from './types';
 
 const GARMIN = 'com.garmin.android.apps.connectmobile';
@@ -30,26 +32,30 @@ const distance = (m: number, dataOrigins = [GARMIN]): AggregateResult<'Distance'
 });
 
 describe('Health Connect mapping', () => {
-  it('asks for five read permissions and nothing else', () => {
+  it('asks for six read permissions and nothing else', () => {
     expect(READ_PERMISSIONS).toEqual([
       { accessType: 'read', recordType: 'ExerciseSession' },
       { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
       { accessType: 'read', recordType: 'TotalCaloriesBurned' },
       { accessType: 'read', recordType: 'Distance' },
       { accessType: 'read', recordType: 'Steps' },
+      { accessType: 'read', recordType: 'SleepSession' },
     ]);
   });
 
   it('reads what is granted from the permission list', () => {
-    expect(accessFrom([])).toEqual({ workouts: false, activeEnergy: false, totalEnergy: false, distance: false, steps: false });
+    expect(accessFrom([])).toEqual({ workouts: false, activeEnergy: false, totalEnergy: false, distance: false, steps: false, sleep: false });
     expect(accessFrom([{ accessType: 'read', recordType: 'ExerciseSession' }, { accessType: 'read', recordType: 'Distance' }, { accessType: 'write', recordType: 'ActiveCaloriesBurned' }])).toEqual({
       workouts: true,
       activeEnergy: false,
       totalEnergy: false,
       distance: true,
       steps: false,
+      sleep: false,
     });
-    expect(accessFrom(READ_PERMISSIONS)).toEqual({ workouts: true, activeEnergy: true, totalEnergy: true, distance: true, steps: true });
+    expect(accessFrom(READ_PERMISSIONS)).toEqual({ workouts: true, activeEnergy: true, totalEnergy: true, distance: true, steps: true, sleep: true });
+    // A phone that allowed the first five before sleep was read: sleep is not shared until asked.
+    expect(accessFrom(READ_PERMISSIONS.slice(0, 5)).sleep).toBe(false);
   });
 
   it('takes the steps per day from Health Connect\'s own day totals', () => {
@@ -130,5 +136,94 @@ describe('Health Connect mapping', () => {
     expect(toHealthError('boom').code).toBe('failed');
     const own = new HealthError('timeout', 't');
     expect(toHealthError(own)).toBe(own);
+  });
+});
+
+/**
+ * A SleepSession as react-native-health-connect 4.1.3 hands it back
+ * (ReactSleepSessionRecord.kt parseRecord): times as Instant strings, stages
+ * with `stage` as a number, the zone offsets as { id, totalSeconds } or null,
+ * metadata with the app's package and the device.
+ */
+const sleepSession = (over: Partial<SleepSessionRaw> = {}): SleepSessionRaw => ({
+  startTime: '2026-11-11T22:40:00Z',
+  endTime: '2026-11-12T06:10:00Z',
+  startZoneOffset: { id: '+01:00', totalSeconds: 3600 },
+  endZoneOffset: { id: '+01:00', totalSeconds: 3600 },
+  title: undefined,
+  notes: undefined,
+  stages: [
+    { startTime: '2026-11-11T22:40:00Z', endTime: '2026-11-11T22:55:00Z', stage: 1 },
+    { startTime: '2026-11-11T22:55:00Z', endTime: '2026-11-12T01:00:00Z', stage: 4 },
+    { startTime: '2026-11-12T01:00:00Z', endTime: '2026-11-12T02:30:00Z', stage: 5 },
+    { startTime: '2026-11-12T02:30:00Z', endTime: '2026-11-12T02:40:00Z', stage: 7 },
+    { startTime: '2026-11-12T02:40:00Z', endTime: '2026-11-12T04:40:00Z', stage: 6 },
+    { startTime: '2026-11-12T04:40:00Z', endTime: '2026-11-12T06:10:00Z', stage: 4 },
+  ],
+  metadata: { id: 'sleep-1', dataOrigin: GARMIN, device: { manufacturer: 'Garmin', model: 'Forerunner 265' } },
+  ...over,
+});
+
+describe('Health Connect sleep', () => {
+  const clock = zoneClock('Europe/Amsterdam');
+  const now = Date.parse('2026-11-12T12:00:00Z');
+
+  it('maps every stage number, 7 (awake in bed) included', () => {
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 8, undefined].map(sleepStageOf)).toEqual(['unknown', 'awake', 'asleep', 'awake', 'light', 'deep', 'rem', 'awake', 'unknown', 'unknown']);
+  });
+
+  it('lists a staged session as one sample per stage, with the app, the end offset and the session id', () => {
+    const samples = sleepFromSession(sleepSession());
+    expect(samples).toHaveLength(6);
+    expect(samples[0]).toEqual({
+      store: 'healthConnect',
+      origin: GARMIN,
+      kind: 'watch',
+      zoneOffsetSec: 3600,
+      sessionId: 'sleep-1',
+      start: '2026-11-11T22:40:00.000Z',
+      end: '2026-11-11T22:55:00.000Z',
+      stage: 'awake',
+    });
+    expect(samples.map((x) => x.stage)).toEqual(['awake', 'light', 'deep', 'awake', 'rem', 'light']);
+    // Through the rules: awake (stage 1 and stage 7) is not sleep.
+    const [night] = nightsFrom(samples, { now, clock });
+    expect(night).toMatchObject({ date: '2026-11-12', store: 'healthConnect', origin: GARMIN, hours: 7.08, stages: { light: 215, deep: 90, rem: 120, awake: 10 } });
+    // (The 15 min awake before falling asleep is outside the night, so only the 10 min of stage 7 count as awake.)
+  });
+
+  it('makes a session without stages one unstaged block over its whole span', () => {
+    const samples = sleepFromSession(sleepSession({ stages: [] }));
+    expect(samples).toEqual([expect.objectContaining({ stage: 'asleep', start: '2026-11-11T22:40:00.000Z', end: '2026-11-12T06:10:00.000Z' })]);
+    expect(nightsFrom(samples, { now, clock })[0]).toMatchObject({ hours: 7.5, stages: null });
+  });
+
+  it('counts a session of only unknown and awake stages as sleep apart from its awake time', () => {
+    const samples = sleepFromSession(
+      sleepSession({
+        stages: [
+          { startTime: '2026-11-11T22:40:00Z', endTime: '2026-11-12T03:00:00Z', stage: 0 },
+          { startTime: '2026-11-12T03:00:00Z', endTime: '2026-11-12T03:30:00Z', stage: 1 },
+          { startTime: '2026-11-12T03:30:00Z', endTime: '2026-11-12T06:10:00Z', stage: 0 },
+        ],
+      }),
+    );
+    expect(samples.map((x) => x.stage)).toEqual(['asleep', 'awake']);
+    expect(nightsFrom(samples, { now, clock })[0]).toMatchObject({ hours: 7, stages: null });
+  });
+
+  it('falls back to the start offset, then to none, and finds the kind from the device type', () => {
+    expect(sleepFromSession(sleepSession({ endZoneOffset: null }))[0].zoneOffsetSec).toBe(3600);
+    expect(sleepFromSession(sleepSession({ endZoneOffset: undefined, startZoneOffset: null }))[0].zoneOffsetSec).toBeNull();
+    const other = (type: number | undefined) =>
+      sleepFromSession(sleepSession({ metadata: { id: 's', dataOrigin: 'com.example.sleep', device: type === undefined ? undefined : { type } } }))[0].kind;
+    expect([other(1), other(2), other(0), other(undefined)]).toEqual(['watch', 'phone', 'other', 'other']);
+  });
+
+  it('skips a session without an app or with no length, and stages with no length', () => {
+    expect(sleepFromSession(sleepSession({ metadata: { id: 'x' } }))).toEqual([]);
+    expect(sleepFromSession(sleepSession({ endTime: '2026-11-11T22:40:00Z' }))).toEqual([]);
+    const samples = sleepFromSession(sleepSession({ stages: [{ startTime: '2026-11-12T01:00:00Z', endTime: '2026-11-12T01:00:00Z', stage: 4 }, { startTime: 'x', endTime: 'y', stage: 4 }] }));
+    expect(samples).toEqual([expect.objectContaining({ stage: 'asleep' })]);
   });
 });

@@ -6,6 +6,7 @@ import {
   BACKUP_COLLECTIONS,
   csvCell,
   foodCsv,
+  isValidRecord,
   mergeCollections,
   parseBackup,
   waterCsv,
@@ -183,6 +184,36 @@ describe('backup validation', () => {
     expect(settingsOf({ morningSummary: 'yes' })).toBeNull();
     expect(settingsOf({ morningSeenDay: '2026-02-30' })).toBeNull();
     expect(settingsOf({ morningSeenDay: 20261116 })).toBeNull();
+  });
+
+  it('checks a night\'s rating and the fields of a synced night', () => {
+    const night = (extra: Record<string, unknown> = {}) => ({ id: U1, updatedAt: '2026-11-10T10:00:00Z', date: '2026-11-10', hours: 7.25, ...extra });
+    const synced = {
+      source: 'health',
+      store: 'healthConnect',
+      origin: 'com.garmin.android.apps.connectmobile',
+      startedAt: '2026-11-09T22:41:00.000Z',
+      endedAt: '2026-11-10T06:12:00.000Z',
+      stages: { light: 230, deep: 75, rem: 110, awake: 16 },
+    };
+    const ok = (extra: Record<string, unknown>) => isValidRecord('sleep', night(extra));
+    expect(ok({ quality: 4 })).toBe(true);
+    expect(ok({})).toBe(true); // a synced night has no rating until the person gives one
+    expect(ok(synced)).toBe(true);
+    expect(ok({ ...synced, stages: null, quality: 2 })).toBe(true);
+    expect(ok({ ...synced, store: 'file' })).toBe(true);
+    expect(ok({ quality: 0 })).toBe(false);
+    expect(ok({ quality: 6 })).toBe(false);
+    expect(ok({ quality: 3.5 })).toBe(false);
+    expect(ok({ quality: '3' })).toBe(false);
+    expect(ok({ source: 'garmin' })).toBe(false);
+    expect(ok({ store: 'fitbit' })).toBe(false);
+    expect(ok({ origin: 42 })).toBe(false);
+    expect(ok({ startedAt: 'last night' })).toBe(false);
+    expect(ok({ endedAt: 1731218000 })).toBe(false);
+    expect(ok({ stages: { light: 230, deep: 75, rem: 110 } })).toBe(false);
+    expect(ok({ stages: { light: -1, deep: 75, rem: 110, awake: 0 } })).toBe(false);
+    expect(ok({ stages: [230, 75, 110, 16] })).toBe(false);
   });
 
   it('keeps a valid profile', () => {

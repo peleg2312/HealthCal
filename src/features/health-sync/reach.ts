@@ -48,7 +48,7 @@ export function syncReach(os: string, hasStore: boolean, appleReady: boolean = A
       heading: 'Automatic on iPhone and Android',
       // "iPhone" means a copy with the HealthKit entitlement: AltStore and Sideloadly leave it out, and Impactor or xtool may keep
       // it (not yet tried; docs/health-sync.md, "Installing on an iPhone with a free Apple ID"), so the body says "may".
-      body: 'There, workouts from Garmin Connect and other apps arrive by themselves through Apple Health or Health Connect, with your watch’s calories. An iPhone copy installed with a sideloading tool may be signed without Apple’s Health permission; its Workout sync screen says so.',
+      body: 'There, workouts and nights of sleep from Garmin Connect and other apps arrive by themselves through Apple Health or Health Connect, with your watch’s calories. An iPhone copy installed with a sideloading tool may be signed without Apple’s Health permission; its Workout sync screen says so.',
       here,
     };
   }

@@ -1,7 +1,7 @@
 /**
  * Automatic workout sync, wired to the real app: the platform's adapter, the
  * store, the toast and the phone's own memory. The rules are in plan.ts, the
- * run itself in engine.ts; this file only connects them and decides when a
+ * run itself in engine.ts (with the nights of sleep, sleep.ts); this file only connects them and decides when a
  * sync starts: when the app comes to the foreground and when Train opens
  * (engine.ts keeps that to once every 15 minutes), and on "Sync now".
  */
@@ -29,9 +29,10 @@ const liveAdapter: HealthAdapter = {
   },
   availability: () => active.availability(),
   access: () => active.access(),
-  requestAccess: () => active.requestAccess(),
+  requestAccess: (what) => active.requestAccess(what),
   readWorkouts: (range, access, options) => active.readWorkouts(range, access, options),
   readStepDays: (range, access) => active.readStepDays(range, access),
+  readSleep: (range, access) => active.readSleep(range, access),
   openSettings: () => active.openSettings(),
   openInstall: () => active.openInstall(),
 };
@@ -65,8 +66,16 @@ export const healthSync = createHealthSync({
       return !useHydration.getState().saveFailed;
     },
   },
-  // The level line of the toast takes the exercise colour: these are workouts.
-  announce: (message, undo) => toast(message, { label: 'Undo', onPress: undo, tint: 'exercise' }),
+  // Nights of sleep (sleep.ts): ordinary 'sleep' records, one per wake day (upsert derives the id from the date).
+  sleep: {
+    all: () => Object.values(useStore.getState().sleep),
+    save: (nights) => {
+      useStore.getState().upsertMany('sleep', nights);
+    },
+    remove: (id) => useStore.getState().remove('sleep', id),
+  },
+  // The level line of the toast takes the exercise colour for workouts, the sleep colour for nights alone.
+  announce: (message, undo, tint = 'exercise') => toast(message, { label: 'Undo', onPress: undo, tint }),
   onBusy: (busy) => useHealthSync.setState({ busy }),
   // Waiting for what a sync saved to be confirmed on the device: the updater waits for it as for a run (updates.ts).
   onSaving: (saving) => useHealthSync.setState({ saving }),

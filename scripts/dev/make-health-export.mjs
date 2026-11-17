@@ -13,7 +13,11 @@
  *                  before 2022, WorkoutStatistics after), every few a second reading of the same session
  *                  from "Garmin Connect", a few "Other" that the review list asks about, and rests.
  *   --now          the export's date (default: now). Steps cover the 40 days before it, from an iPhone
- *                  and an Apple Watch that count the same walks.
+ *                  and an Apple Watch that count the same walks. Sleep covers the 41 nights before it:
+ *                  the watch's stages (core, deep, REM, short spells awake, with HKTimeZone Europe/Berlin
+ *                  and its dates written in Berlin's offset, so the night of 25 October crosses the clock
+ *                  change), the iPhone's "in bed" block around each night, a 30-minute nap every sixth
+ *                  day, and every ninth night the watch was charging (only the iPhone's in bed: no night).
  *   --zip64        write zip64 records for every entry (an archive over 4 GB has them anyway).
  *   --no-descriptors  write sizes in the local headers instead of data descriptors after the data
  *                  (the Health app writes descriptors, so they are the default).
@@ -21,7 +25,10 @@
  *
  * Beside the output it writes <out>.expected.json: the workouts the import should save (by start),
  * the step total per day by the import's rule (per clock hour, the source with more steps over the
- * window, else the other; in UTC: the browser test runs in UTC), and the export date.
+ * window, else the other; in UTC: the browser test runs in UTC), the nights the import should save
+ * (`nights`: wake day in Berlin, hours asleep with time awake left out, inside the import's 28-day
+ * window and finished 15 minutes before the export), the wake days of the charging nights and the
+ * naps (`noNight`, `naps`), and the export date.
  *
  * Decoys in the ZIP, which the import must never read: apple_health_export/export_cda.xml (clinical),
  * workout-routes/*.gpx (routes of workouts already in the XML) and electrocardiograms/*.csv.
@@ -59,6 +66,25 @@ function stamp(ms) {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} +0100`;
 }
 const utcDay = (ms) => new Date(ms).toISOString().slice(0, 10);
+
+// Sleep is written the way the watch writes it: in the zone it was slept in, Berlin, whose offset changes on 25 October.
+const BERLIN = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' });
+function berlinOffsetMin(ms) {
+  const p = Object.fromEntries(BERLIN.formatToParts(new Date(ms)).map((x) => [x.type, Number(x.value)]));
+  return Math.round((Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(ms / 1000) * 1000) / 60_000);
+}
+function stampBerlin(ms) {
+  const off = berlinOffsetMin(ms);
+  const d = new Date(ms + off * 60_000);
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} +${pad(off / 60)}00`;
+}
+const berlinDay = (ms) => new Date(ms + berlinOffsetMin(ms) * 60_000).toISOString().slice(0, 10);
+/** Berlin's midnight that starts `day`, as an instant. */
+function berlinMidnight(day) {
+  const [y, m, d] = day.split('-').map(Number);
+  const wall = Date.UTC(y, m - 1, d);
+  return wall - berlinOffsetMin(wall - 60 * 60_000) * 60_000;
+}
 const iso = (ms) => new Date(ms).toISOString().replace('.000Z', 'Z');
 
 const WATCH = '&lt;&lt;HKDevice: 0x283a1c0f0&gt;, name:Apple Watch, manufacturer:Apple Inc., model:Watch, hardware:Watch6,1, software:10.1&gt;';
@@ -123,6 +149,57 @@ function* xmlPieces(expected) {
   }
   expected.stepDays = days;
 
+  // Sleep: the 41 nights before now. The import keeps wake days from today − 27 (SLEEP_DAYS, 28; UTC, the browser's calendar) on.
+  const sleepLines = [];
+  const minute = 60_000;
+  const sleepRec = (source, device, start, end, value, zone) =>
+    ` <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="${source}" sourceVersion="10.1" device="${device}" creationDate="${stampBerlin(end)}" startDate="${stampBerlin(start)}" endDate="${stampBerlin(end)}" value="HKCategoryValueSleepAnalysis${value}"` +
+    (zone ? `>\n  <MetadataEntry key="HKTimeZone" value="Europe/Berlin"/>\n </Record>\n` : '/>\n');
+  expected.nights = [];
+  expected.noNight = [];
+  expected.naps = [];
+  const sleepFrom = utcDay(now - 27 * 86_400_000);
+  for (let k = 41; k >= 0; k--) {
+    const wakeDay = berlinDay(now - k * 86_400_000);
+    const bed = berlinMidnight(wakeDay) - (95 - Math.floor(rand() * 80)) * minute;
+    const charging = k % 9 === 4;
+    let t = bed + (8 + Math.floor(rand() * 15)) * minute;
+    const wake = t + (380 + Math.floor(rand() * 100)) * minute;
+    // A night still going on now is written later, as the watch does.
+    if (wake > now) continue;
+    let asleep = 0;
+    if (!charging) {
+      const cycle = ['AsleepCore', 'AsleepDeep', 'AsleepCore', 'AsleepREM'];
+      let i = 0;
+      while (t < wake) {
+        const stage = cycle[i % cycle.length];
+        const len = (stage === 'AsleepDeep' ? 10 + rand() * 30 : stage === 'AsleepREM' ? 10 + rand() * 25 : 15 + rand() * 35) * minute;
+        const end = Math.min(wake, t + Math.round(len / minute) * minute);
+        sleepLines.push(sleepRec('Jo’s Apple Watch', WATCH, t, end, stage, true));
+        asleep += end - t;
+        t = end;
+        i++;
+        if (i % 4 === 0 && t < wake - 20 * minute && rand() < 0.5) {
+          const awake = (3 + Math.floor(rand() * 9)) * minute;
+          sleepLines.push(sleepRec('Jo’s Apple Watch', WATCH, t, t + awake, 'Awake', true));
+          t += awake;
+        }
+      }
+    }
+    // The iPhone's sleep schedule: time in bed around the night, never sleep.
+    sleepLines.push(sleepRec('Jo’s iPhone', PHONE, bed - 10 * minute, wake + 8 * minute, 'InBed', false));
+    const inWindow = wakeDay >= sleepFrom && wakeDay <= utcDay(now);
+    if (charging) {
+      if (inWindow) expected.noNight.push(wakeDay);
+    } else if (inWindow && wake <= now - 15 * minute) expected.nights.push({ date: wakeDay, hours: Math.round((asleep / 3_600_000) * 100) / 100, origin: 'com.apple.health.watch' });
+    // A nap in the afternoon of every sixth day: not a night.
+    const napAt = berlinMidnight(wakeDay) + 14 * 60 * minute;
+    if (k % 6 === 2 && napAt + 30 * minute <= now) {
+      sleepLines.push(sleepRec('Jo’s Apple Watch', WATCH, napAt, napAt + 30 * minute, 'AsleepCore', true));
+      expected.naps.push(wakeDay);
+    }
+  }
+
   // Workouts: spread over the last two years, the newest few in the last week.
   const TYPES = [
     ['HKWorkoutActivityTypeRunning', 'running', 'HKQuantityTypeIdentifierDistanceWalkingRunning'],
@@ -177,7 +254,7 @@ function* xmlPieces(expected) {
   }
 
   // Heart rate fills the file to its size, with the steps and workouts spread through it.
-  const others = [...stepLines, ...workoutLines];
+  const others = [...stepLines, ...sleepLines, ...workoutLines];
   const hrStart = now - 3 * 365 * 86_400_000;
   let n = 0;
   let next = 0;
@@ -273,4 +350,4 @@ if (isXml) {
 fs.closeSync(fd);
 expected.exportDate = iso(now);
 fs.writeFileSync(`${out}.expected.json`, JSON.stringify(expected, null, 1));
-console.log(`wrote ${out}: ${(offset / 1048576).toFixed(1)} MB${isXml ? '' : ` (export.xml ${(central.find((c) => c.nameBuf.toString().endsWith('/export.xml')).size / 1048576).toFixed(1)} MB uncompressed)`}, ${expected.saved.length} workouts to save, ${expected.ask} to ask about, ${Object.keys(expected.stepDays).length} days of steps`);
+console.log(`wrote ${out}: ${(offset / 1048576).toFixed(1)} MB${isXml ? '' : ` (export.xml ${(central.find((c) => c.nameBuf.toString().endsWith('/export.xml')).size / 1048576).toFixed(1)} MB uncompressed)`}, ${expected.saved.length} workouts to save, ${expected.ask} to ask about, ${Object.keys(expected.stepDays).length} days of steps, ${expected.nights.length} nights`);

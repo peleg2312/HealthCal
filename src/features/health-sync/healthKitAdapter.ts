@@ -8,14 +8,29 @@
  * in-memory stand-in (healthKitAdapter.test.ts) and only adapter.ios.ts ever
  * loads the native module.
  *
- * Read only: five types (workouts, active energy, walking and running distance,
- * cycling distance, steps), no writing, no background delivery, no clinical
- * records. HealthKit gives everything the person allowed, at any age; the sync
- * still only looks at the last 30 days of workouts and 35 days of steps.
+ * Read only: six types (workouts, active energy, walking and running distance,
+ * cycling distance, steps, and sleep analysis, asked for on its own:
+ * SLEEP_READ_TYPES), no writing, no background delivery, no clinical records.
+ * HealthKit gives everything the person allowed, at any age; the sync still
+ * only looks at the last 30 days of workouts and 35 days of steps and sleep.
  */
-import { accessFromRequestStatus, distanceTypeFor, HK, READ_TYPES, stepDaysFromStatistics, toHealthKitError, workoutFromHealthKit, workoutRef, type HealthKitApi, type HKWorkoutProxy, type WorkoutStats } from './healthKit';
+import {
+  accessFromRequestStatus,
+  distanceTypeFor,
+  HK,
+  READ_TYPES,
+  SLEEP_READ_TYPES,
+  sleepFromHealthKit,
+  stepDaysFromStatistics,
+  toHealthKitError,
+  workoutFromHealthKit,
+  workoutRef,
+  type HealthKitApi,
+  type HKWorkoutProxy,
+  type WorkoutStats,
+} from './healthKit';
 import { localClock, type StepClock } from './steps';
-import type { HealthAccess, HealthAdapter, HealthAvailability, HealthWorkout, ReadOptions, StepDayTotal, StepsRange } from './types';
+import type { AccessRequest, HealthAccess, HealthAdapter, HealthAvailability, HealthWorkout, ReadOptions, SleepSample, StepDayTotal, StepsRange } from './types';
 
 export interface HealthKitLinks {
   /** Open the Health app (where Sharing > Apps > HealthCal lists what may be read). */
@@ -25,6 +40,7 @@ export interface HealthKitLinks {
 /** `clock` decides which day a statistics interval is (default: the phone's own, as `today()`). */
 export function createHealthKitAdapter(api: HealthKitApi, links: HealthKitLinks, clock: StepClock = localClock): HealthAdapter {
   const toRead = { toRead: READ_TYPES };
+  const sleepToRead = { toRead: SLEEP_READ_TYPES };
 
   async function availability(): Promise<HealthAvailability> {
     try {
@@ -39,18 +55,26 @@ export function createHealthKitAdapter(api: HealthKitApi, links: HealthKitLinks,
     }
   }
 
+  /** The five, then sleep on its own: a phone that allowed the five before sleep was read has not been asked about sleep. */
+  async function current(): Promise<HealthAccess> {
+    const main = await api.getRequestStatusForAuthorization(toRead);
+    const sleep = await api.getRequestStatusForAuthorization(sleepToRead);
+    return accessFromRequestStatus(main, sleep);
+  }
+
   async function access(): Promise<HealthAccess> {
     try {
-      return accessFromRequestStatus(await api.getRequestStatusForAuthorization(toRead));
+      return await current();
     } catch (e) {
       throw toHealthKitError(e);
     }
   }
 
-  async function requestAccess(): Promise<HealthAccess> {
+  /** 'all': the five and sleep in one sheet (turning sync on). 'sleep': sleep alone (the Sleep row's "Allow"). */
+  async function requestAccess(what: AccessRequest = 'all'): Promise<HealthAccess> {
     try {
-      await api.requestAuthorization(toRead);
-      return accessFromRequestStatus(await api.getRequestStatusForAuthorization(toRead));
+      await api.requestAuthorization(what === 'sleep' ? sleepToRead : { toRead: [...READ_TYPES, ...SLEEP_READ_TYPES] });
+      return await current();
     } catch (e) {
       throw toHealthKitError(e);
     }
@@ -114,6 +138,30 @@ export function createHealthKitAdapter(api: HealthKitApi, links: HealthKitLinks,
     }
   }
 
+  /**
+   * Every sleep-analysis sample overlapping the range, from every source, as
+   * raw stages (healthKit.ts, sleepFromHealthKit). The date filter's strict
+   * flags are left unset, so a night that began before `from` is included.
+   */
+  async function readSleep(range: { from: string; to: string }, allowed: HealthAccess): Promise<SleepSample[]> {
+    if (!allowed.sleep) return [];
+    try {
+      const list = await api.queryCategorySamples(HK.sleep, {
+        limit: 0,
+        ascending: true,
+        filter: { date: { startDate: new Date(range.from), endDate: new Date(range.to) } },
+      });
+      const out: SleepSample[] = [];
+      for (const x of list) {
+        const sample = sleepFromHealthKit(x);
+        if (sample) out.push(sample);
+      }
+      return out;
+    } catch (e) {
+      throw toHealthKitError(e);
+    }
+  }
+
   return {
     store: 'apple-health',
     availability,
@@ -121,6 +169,7 @@ export function createHealthKitAdapter(api: HealthKitApi, links: HealthKitLinks,
     requestAccess,
     readWorkouts,
     readStepDays,
+    readSleep,
     openSettings: () => links.openHealth(),
     // Apple Health is part of iOS: there is nothing to install or update.
     openInstall: () => {},

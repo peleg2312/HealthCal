@@ -1,8 +1,9 @@
 /**
  * A small Health app export, written the way the Health app writes one, for
  * the tests (test-only: nothing in the app imports it). Both generations of
- * <Workout> appear, with heart rate, sleep and the <Me> element as the noise
- * that must be skipped, and the person's own device names in sourceName.
+ * <Workout> appear, with heart rate and the <Me> element as the noise that
+ * must be skipped, a sleep record of the night before the export, and the
+ * person's own device names in sourceName.
  */
 
 export interface FixtureStep {
@@ -29,6 +30,26 @@ const DTD = `<!DOCTYPE HealthData [
 
 export function stepRecord(s: FixtureStep): string {
   return ` <Record type="HKQuantityTypeIdentifierStepCount" sourceName="${s.source}" sourceVersion="17.1" device="${s.device ?? PHONE_DEVICE}" unit="count" creationDate="${s.end}" startDate="${s.start}" endDate="${s.end}" value="${s.value}"/>\n`;
+}
+
+export interface FixtureSleep {
+  source: string;
+  /** A device string; '' for none (an app's record). Default: the Apple Watch. */
+  device?: string;
+  start: string;
+  end: string;
+  /** The value's last word: 'InBed', 'AsleepCore', 'AsleepDeep', 'AsleepREM', 'Awake', 'AsleepUnspecified', 'Asleep'. */
+  value: string;
+  /** HKTimeZone, written as a <MetadataEntry> child the way the Apple Watch writes it. */
+  timeZone?: string;
+}
+
+/** One sleep-analysis sample; with a time zone it has children and a closing </Record>. */
+export function sleepRecord(s: FixtureSleep): string {
+  const device = s.device === '' ? '' : ` device="${s.device ?? WATCH_DEVICE}"`;
+  const open = ` <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="${s.source}" sourceVersion="10.1"${device} creationDate="${s.end}" startDate="${s.start}" endDate="${s.end}" value="HKCategoryValueSleepAnalysis${s.value}"`;
+  if (!s.timeZone) return `${open}/>\n`;
+  return `${open}>\n  <MetadataEntry key="HKTimeZone" value="${s.timeZone}"/>\n  <MetadataEntry key="HKMetadataKeySyncVersion" value="1"/>\n </Record>\n`;
 }
 
 export function heartRecord(at: string): string {

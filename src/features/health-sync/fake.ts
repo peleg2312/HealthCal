@@ -4,9 +4,9 @@
  * rules and the sync are tested against it, and the browser build can show the
  * sync screen's states in development (sync.ts, `__healthcalHealthSync`).
  */
-import { HealthError, NO_ACCESS, type HealthAccess, type HealthAdapter, type HealthAvailability, type HealthStore, type HealthWorkout, type StepDayTotal } from './types';
+import { HealthError, NO_ACCESS, type HealthAccess, type HealthAdapter, type HealthAvailability, type HealthStore, type HealthWorkout, type SleepSample, type StepDayTotal } from './types';
 
-export const FULL_ACCESS: HealthAccess = { workouts: true, activeEnergy: true, totalEnergy: true, distance: true, steps: true };
+export const FULL_ACCESS: HealthAccess = { workouts: true, activeEnergy: true, totalEnergy: true, distance: true, steps: true, sleep: true };
 
 export interface FakeHealth {
   store: HealthStore;
@@ -19,12 +19,16 @@ export interface FakeHealth {
   steps: StepDayTotal[];
   /** Make step reads fail (workouts are still read). */
   stepsFail: HealthError | null;
+  /** The store's raw sleep samples, from every app, as the adapters list them (sleep.ts makes the nights). */
+  sleep: SleepSample[];
+  /** Make sleep reads fail (workouts and steps are still read). */
+  sleepFail: HealthError | null;
   /** Make reads fail: at once, or after this many workouts' details were read (access taken away mid-sync). */
   fail: { error: HealthError; afterDetails?: number } | null;
   /** Milliseconds each read takes. */
   delayMs: number;
   /** How often each question was asked. */
-  calls: { availability: number; access: number; request: number; reads: number; details: number; steps: number; settings: number; install: number };
+  calls: { availability: number; access: number; request: number; reads: number; details: number; steps: number; sleep: number; settings: number; install: number };
 }
 
 export function createFakeAdapter(init: Partial<Omit<FakeHealth, 'calls'>> = {}): { adapter: HealthAdapter; health: FakeHealth } {
@@ -36,10 +40,12 @@ export function createFakeAdapter(init: Partial<Omit<FakeHealth, 'calls'>> = {})
     workouts: [],
     steps: [],
     stepsFail: null,
+    sleep: [],
+    sleepFail: null,
     fail: null,
     delayMs: 0,
     ...init,
-    calls: { availability: 0, access: 0, request: 0, reads: 0, details: 0, steps: 0, settings: 0, install: 0 },
+    calls: { availability: 0, access: 0, request: 0, reads: 0, details: 0, steps: 0, sleep: 0, settings: 0, install: 0 },
   };
   const adapter: HealthAdapter = {
     get store() {
@@ -53,9 +59,10 @@ export function createFakeAdapter(init: Partial<Omit<FakeHealth, 'calls'>> = {})
       health.calls.access += 1;
       return health.access;
     },
-    requestAccess: async () => {
+    requestAccess: async (what = 'all') => {
       health.calls.request += 1;
-      if (health.grant) health.access = health.grant;
+      // Asked for sleep alone (an iPhone's Sleep row): only sleep can change.
+      if (health.grant) health.access = what === 'sleep' ? { ...health.access, sleep: health.grant.sleep } : health.grant;
       return health.access;
     },
     readWorkouts: async (range, access, options) => {
@@ -92,6 +99,16 @@ export function createFakeAdapter(init: Partial<Omit<FakeHealth, 'calls'>> = {})
       if (health.stepsFail) throw health.stepsFail;
       // Like both stores: the days of the range that have steps.
       return health.steps.filter((d) => d.day >= range.fromDay && d.day <= range.toDay);
+    },
+    readSleep: async (range, access) => {
+      health.calls.sleep += 1;
+      if (health.delayMs) await new Promise((resolve) => setTimeout(resolve, health.delayMs));
+      if (!access.sleep || !health.access.sleep) return [];
+      if (health.sleepFail) throw health.sleepFail;
+      // Like both stores: every sample that overlaps the range, the ones across its edges included.
+      const from = Date.parse(range.from);
+      const to = Date.parse(range.to);
+      return health.sleep.filter((s) => Date.parse(s.end) > from && Date.parse(s.start) < to).map((s) => ({ ...s }));
     },
     openSettings: () => {
       health.calls.settings += 1;

@@ -188,6 +188,12 @@ const sleep = [
   { id: 'sleep-sheet-row', route: '/sleep', taps: ['sleep-row-3'], sheet: true, note: 'an earlier night opened' },
   { id: 'sleep-help-open', route: '/sleep', taps: ['sleep-help'], waitFor: 'sleep-help-body', note: 'why 7 to 9 hours, open' },
   { id: 'sleep-past-day', route: '/sleep?date={day}', day: -4, note: 'four nights ago' },
+  // A night without a rating (what a synced night is until the person rates it). The demo's ratings are 2 to 5,
+  // so tapping "Poor" twice selects it and clears it again whatever last night had; saving leaves it unrated.
+  { id: 'sleep-unrated', route: '/sleep', taps: ['sleep-log', 'sleep-quality-1', 'sleep-quality-1', 'sleep-save', { wait: 4500 }], waitFor: 'sleep-last-night', note: 'last night saved without a rating' },
+  { id: 'sleep-unrated-sheet', route: '/sleep', taps: ['sleep-log', 'sleep-quality-1', 'sleep-quality-1'], sheet: true, note: 'the sheet with no rating chosen' },
+  // Synced nights (source 'health', from Garmin Connect, Apple Watch or the Health export) cannot be seeded by a
+  // state yet: the format carries no records and the health demo has no sleep until the sleep sync lands.
 ];
 
 // ------------------------------------------------------------------ fasting

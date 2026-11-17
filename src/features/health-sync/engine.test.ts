@@ -53,7 +53,7 @@ describe('health sync', () => {
     it('adds new workouts by themselves with one message, and Undo removes exactly those', async () => {
       const mine = handLogged('yoga', 30, '2026-11-12', '2026-11-12T20:00:00');
       const r = rig({ workouts: [morningRun(), eveningRide()], existing: [mine] });
-      expect(await r.sync.sync('auto')).toEqual({ status: 'done', added: 2, updated: 0, review: 0 });
+      expect(await r.sync.sync('auto')).toEqual({ status: 'done', added: 2, updated: 0, review: 0, nights: 0 });
       expect(r.diary.live()).toHaveLength(3);
       expect(r.toasts.map((t) => t.message)).toEqual(['2 workouts added from Garmin Connect']);
       expect(r.state.get()).toMatchObject({ lastSyncedAt: new Date(NOON).toISOString(), lastError: null, lastResult: { added: 2, updated: 0 } });
@@ -82,7 +82,7 @@ describe('health sync', () => {
       const r = rig({ workouts: [morningRun()] });
       await r.sync.sync('auto');
       r.clock.now += 16 * MIN;
-      expect(await r.sync.sync('auto')).toEqual({ status: 'done', added: 0, updated: 0, review: 0 });
+      expect(await r.sync.sync('auto')).toEqual({ status: 'done', added: 0, updated: 0, review: 0, nights: 0 });
       expect(r.toasts).toHaveLength(1);
       expect(r.diary.live()).toHaveLength(1);
     });
@@ -206,7 +206,7 @@ describe('health sync', () => {
     it('asks for permission, then syncs straight away', async () => {
       const r = rig({ workouts: [morningRun()], enabled: false, health: { access: NO_ACCESS } });
       const out = await r.sync.enable();
-      expect(out).toEqual({ ok: true, sync: { status: 'done', added: 1, updated: 0, review: 0 } });
+      expect(out).toEqual({ ok: true, sync: { status: 'done', added: 1, updated: 0, review: 0, nights: 0 } });
       expect(r.health.calls.request).toBe(1);
       expect(r.state.get().enabled).toBe(true);
     });
@@ -276,7 +276,7 @@ describe('health sync', () => {
 
       r.health.workouts = [{ ...bare, activeKcal: 480, totalKcal: 552, distanceM: 8200 }];
       r.clock.now += 16 * MIN;
-      expect(await r.sync.sync('auto')).toEqual({ status: 'done', added: 0, updated: 1, review: 0 });
+      expect(await r.sync.sync('auto')).toEqual({ status: 'done', added: 0, updated: 1, review: 0, nights: 0 });
       expect(r.diary.live()).toHaveLength(1);
       expect(r.diary.live()[0]).toMatchObject({ id: estimate.id, kcalNet: RUN_NET, kcalGross: 552, measured: true, distanceKm: 8.2 });
       expect(r.toasts[1].message).toBe('1 workout updated from Garmin Connect');
@@ -295,7 +295,7 @@ describe('health sync', () => {
 
     it('keeps a possible duplicate of a hand-logged session out of the diary and in the list', async () => {
       const r = rig({ workouts: [morningRun(), eveningRide()], existing: [hand()] });
-      expect(await r.sync.sync('auto')).toEqual({ status: 'done', added: 1, updated: 0, review: 1 });
+      expect(await r.sync.sync('auto')).toEqual({ status: 'done', added: 1, updated: 0, review: 1, nights: 0 });
       expect(r.toasts[0].message).toBe('1 workout added from Garmin Connect');
       expect(r.state.get().review).toMatchObject([{ kind: 'duplicate', matchByHand: true, from: 'Garmin Connect' }]);
       expect(r.diary.live().map((e) => e.activityId).sort()).toEqual(['cycling', 'running']);
@@ -366,7 +366,7 @@ describe('health sync', () => {
     it('a workout whose type is unknown waits until the person says what it was; the answer is remembered', async () => {
       const first = workout({ start: '2026-11-12T16:00:00Z', minutes: 90, exerciseType: TYPE.other, title: 'Climbing gym', activeKcal: 500 });
       const r = rig({ workouts: [first] });
-      expect(await r.sync.sync('auto')).toEqual({ status: 'done', added: 0, updated: 0, review: 1 });
+      expect(await r.sync.sync('auto')).toEqual({ status: 'done', added: 0, updated: 0, review: 1, nights: 0 });
       expect(r.toasts).toEqual([]);
       const item = r.state.get().review[0];
       expect(item).toMatchObject({ kind: 'activity', entry: null });
@@ -415,7 +415,7 @@ describe('health sync', () => {
 
       r.health.workouts.push(morningRun());
       r.clock.now += 16 * MIN;
-      expect(await r.sync.sync('auto')).toEqual({ status: 'done', added: 0, updated: 1, review: 0 });
+      expect(await r.sync.sync('auto')).toEqual({ status: 'done', added: 0, updated: 1, review: 0, nights: 0 });
       expect(r.diary.live()).toMatchObject([{ kcalNet: RUN_NET, measured: true }]);
       expect(r.diary.live()[0].id).not.toBe(phoneId);
       expect(r.toasts[1].message).toBe('1 workout updated from Garmin Connect');
@@ -431,7 +431,7 @@ describe('health sync', () => {
   it('500 workouts on the first sync: every one saved once', async () => {
     const many = Array.from({ length: 500 }, (_, i) => workout({ start: new Date(NOON - 29 * 86_400_000 + i * 80 * MIN).toISOString(), minutes: 30 + (i % 30), activeKcal: 200 + i, origin: i % 5 === 0 ? SAMSUNG : GARMIN }));
     const r = rig({ workouts: many });
-    expect(await r.sync.sync('manual')).toEqual({ status: 'done', added: 500, updated: 0, review: 0 });
+    expect(await r.sync.sync('manual')).toEqual({ status: 'done', added: 500, updated: 0, review: 0, nights: 0 });
     expect(r.diary.live()).toHaveLength(500);
     expect(r.toasts[0].message).toBe('500 workouts added from Health Connect');
     r.toasts[0].undo();
@@ -670,7 +670,7 @@ describe('the diary and the sync memory reach the device apart', () => {
     it('is not remembered; the person sees the same; the next sync with a working save remembers it', async () => {
       const p = phone({ workouts: [morningRun()] });
       p.diary.flushMode = 'fail';
-      expect(await p.sync.sync('auto')).toEqual({ status: 'done', added: 1, updated: 0, review: 0 });
+      expect(await p.sync.sync('auto')).toEqual({ status: 'done', added: 1, updated: 0, review: 0, nights: 0 });
       expect(p.toasts).toHaveLength(1);
       expect(p.diary.live()).toHaveLength(1);
       expect(p.state.get().handled).toEqual({});

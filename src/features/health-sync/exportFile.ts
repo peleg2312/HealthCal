@@ -43,13 +43,25 @@
  * has a few steps and another has many takes the few (as the Health app does).
  * It is an approximation of what the Health app shows (which orders sources by
  * the person's choice, minute by minute), not the Health app's figure.
+ *
+ * Sleep. Each <Record type="HKCategoryTypeIdentifierSleepAnalysis"> is one
+ * stretch of one stage from one source (in bed, asleep, awake, core, deep,
+ * REM). `createSleepTally` keeps the stretches of the window per source and
+ * turns them into nights by the sync's own rules (sleep.ts `nightsFrom`): per
+ * source the union of its stretches, a source's main period per wake day, then
+ * one source per night (stages over none, a watch over a phone, more sleep),
+ * never a sum. Time awake and in bed are never sleep, so the iPhone's "in bed"
+ * block beside a watch's night adds nothing. The source's name is a grouping
+ * key in memory only; a night keeps the kind of device ('com.apple.health.watch',
+ * 'com.apple.health.iphone'), a known app's id (Garmin Connect), or 'file:other',
+ * and store 'file'.
  */
 import { normalizeText } from '@/features/import/text';
 import type { ImportedWorkout } from '@/features/import/types';
 import { addDays } from '@/lib/dates';
-import type { ISODate } from '@/types';
+import type { ISODate, SleepEntry } from '@/types';
 
-import type { RawStat, RawWorkout, StepRecord } from '@/features/import/appleExport';
+import type { RawStat, RawWorkout, SleepRecord, StepRecord } from '@/features/import/appleExport';
 
 import { appleExerciseType, appleTypeFromName } from './appleHealthTypes';
 import { sportOf, workoutSpan } from './convert';
@@ -57,8 +69,10 @@ import { workoutEnergy, type EnergyContext } from './energy';
 import { zoneOffsetSecAt } from './healthKit';
 import { mergeOrigins } from './merge';
 import { healthExternalId, originName } from './origins';
+import type { Handled } from './plan';
+import { nightsFrom, planSleep, sleepHandledKey, sleepKindOf, type SleepNight, type SleepPlan } from './sleep';
 import type { StepClock, StepDays } from './steps';
-import type { HealthWorkout } from './types';
+import type { HealthWorkout, SleepSample, SleepStage } from './types';
 
 // ---------------------------------------------------------------- dates and units
 
@@ -392,3 +406,129 @@ export function createStepTally(clock: StepClock, fromDay: ISODate, toDay: ISODa
 
 /** The instant of an export date, for the tally. */
 export const exportInstant = (s: string): number | null => parseExportDate(s)?.ms ?? null;
+
+// ---------------------------------------------------------------- sleep
+
+/** HKCategoryValueSleepAnalysis as the export writes it ('Asleep' is the older exports' name for unspecified). */
+const SLEEP_VALUES: Record<string, SleepStage> = {
+  HKCategoryValueSleepAnalysisInBed: 'inBed',
+  HKCategoryValueSleepAnalysisAsleepUnspecified: 'asleep',
+  HKCategoryValueSleepAnalysisAsleep: 'asleep',
+  HKCategoryValueSleepAnalysisAwake: 'awake',
+  HKCategoryValueSleepAnalysisAsleepCore: 'light',
+  HKCategoryValueSleepAnalysisAsleepDeep: 'deep',
+  HKCategoryValueSleepAnalysisAsleepREM: 'rem',
+};
+
+/** The stage a sleep record's value stands for; anything else is 'unknown' (never counted). */
+export function exportSleepStage(value: string): SleepStage {
+  return SLEEP_VALUES[value.trim()] ?? 'unknown';
+}
+
+/** The origin a night from the file is kept under: the kind of Apple device, a known app's id, or 'file:other'. Never a name. */
+export function exportSleepOrigin(sourceName: string | null | undefined, device: string | null | undefined): string {
+  const origin = exportOrigin(sourceName, device);
+  return origin === 'com.apple.health.device' ? 'file:other' : origin;
+}
+
+/** A stretch longer than this is not one stage of one night. */
+const MAX_SLEEP_SAMPLE_MS = 24 * HOUR;
+
+/**
+ * Sleep records of the window, per source, turned into nights (see the file
+ * comment). Keeps the stretches (a few thousand for SLEEP_DAYS nights), never the records.
+ */
+export function createSleepTally(clock: StepClock) {
+  const samples: SleepSample[] = [];
+  /** Grouping key (kept origin and source name, in memory only) to the origin a night keeps. */
+  const origins = new Map<string, string>();
+  /** Offsets by zone and hour: a zone's offset is looked up once an hour, not once a stretch. */
+  const zones = new Map<string, number | null>();
+  const zoneAt = (tz: string, ms: number) => {
+    const key = `${tz}|${Math.floor(ms / HOUR)}`;
+    let v = zones.get(key);
+    if (v === undefined) {
+      v = zoneOffsetSecAt(tz, ms);
+      zones.set(key, v);
+    }
+    return v;
+  };
+
+  function addRecord(r: SleepRecord) {
+    const start = parseExportDate(r.startDate);
+    const end = parseExportDate(r.endDate);
+    if (!start || !end || end.ms <= start.ms || end.ms - start.ms > MAX_SLEEP_SAMPLE_MS) return;
+    const stage = exportSleepStage(r.value);
+    // In bed and unknown stretches never count: not kept.
+    if (stage === 'inBed' || stage === 'unknown') return;
+    const origin = exportSleepOrigin(r.sourceName, r.device);
+    // Two sources of the same kind (two apps on the phone) stay apart: one night is never made of two.
+    const key = `${origin}#${normalizeText(r.sourceName ?? '', 'NFC')}`;
+    origins.set(key, origin);
+    // The zone the night was slept in: HKTimeZone when the app wrote it, else the offset the date was written in
+    // (which may be the exporting phone's zone, not the sleeper's: docs/health-sync.md "Not proven").
+    const zone = r.timeZone ? zoneAt(r.timeZone, end.ms) : null;
+    samples.push({
+      store: 'file',
+      origin: key,
+      kind: sleepKindOf(origin),
+      start: new Date(start.ms).toISOString(),
+      end: new Date(end.ms).toISOString(),
+      zoneOffsetSec: zone ?? end.offsetMin * 60,
+      stage,
+    });
+  }
+
+  /** At most one night per wake day from `firstDay`, oldest first. `now`: when the export was made (a night still going on then is left out). */
+  function nights(now: number, firstDay: ISODate): SleepNight[] {
+    return nightsFrom(samples, { now, clock, firstDay }).map((n) => ({ ...n, origin: origins.get(n.origin) ?? 'file:other' }));
+  }
+
+  return {
+    addRecord,
+    nights,
+    get samples() {
+      return samples.length;
+    },
+  };
+}
+
+/**
+ * The nights of every export read in one visit, one per wake day: where two
+ * files cover the same day, the newer file's (it was made later, so its night
+ * is the finished one). Oldest day first.
+ */
+export function fileNights(reads: readonly { asOf: string; nights: readonly SleepNight[] }[]): SleepNight[] {
+  const byDay = new Map<ISODate, SleepNight>();
+  const order = [...reads].sort((a, b) => (a.asOf < b.asOf ? -1 : a.asOf > b.asOf ? 1 : 0));
+  for (const r of order) for (const n of r.nights) byDay.set(n.date, n);
+  return [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** What saving a file's nights would do: the sync's own plan (sleep.ts planSleep), and why the others are left as they are. */
+export interface FileSleepPlan extends SleepPlan {
+  /** Nights the file holds in the window. */
+  found: number;
+  /** Nights for days the person deleted (or whose sync they undid): never written again. */
+  deleted: number;
+  /** Nights for days whose night is already in the sleep log and stays (by hand, the same, or a better reading). */
+  kept: number;
+}
+
+/**
+ * The plan for a file's nights against the sleep log (every record, deleted
+ * ones included) and this phone's sync memory. A night entered by hand, a
+ * deleted one and a synced one from a health store are never replaced by the
+ * file (rule h).
+ */
+export function planFileSleep(nights: readonly SleepNight[], existing: readonly SleepEntry[], handled: Readonly<Record<string, Handled>>): FileSleepPlan {
+  const plan = planSleep({ nights, existing, handled });
+  const live = new Set(existing.filter((r) => r && !r.deleted).map((r) => r.date));
+  let deleted = 0;
+  for (const n of nights) {
+    const skipped = handled[sleepHandledKey(n.date)]?.how === 'skipped';
+    if (skipped || (!live.has(n.date) && existing.some((r) => r && r.date === n.date))) deleted += 1;
+  }
+  const written = plan.add.length + plan.update.length;
+  return { ...plan, found: nights.length, deleted, kept: Math.max(0, nights.length - written - deleted) };
+}

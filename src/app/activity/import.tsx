@@ -7,6 +7,7 @@ import { entriesToSave, netChange } from '@/features/import';
 import { ActivitySheet } from '@/features/import/ui/ActivitySheet';
 import { DoneView, doneTitle } from '@/features/import/ui/DoneView';
 import { countRows, fileNotes, filterRows, paceSetsEffort, workouts, type RowFilter } from '@/features/import/ui/format';
+import { useHealthSync } from '@/features/health-sync/store';
 import { pickGarminFiles } from '@/features/import/ui/pickFiles';
 import { QuestionsView, questionsTitle } from '@/features/import/ui/QuestionsView';
 import { ReadingView } from '@/features/import/ui/ReadingView';
@@ -15,6 +16,7 @@ import {
   cancelImport,
   commitImport,
   confirmAnswers,
+  extrasPart,
   leaveImport,
   pickActivity,
   replaceHandLogged,
@@ -23,6 +25,8 @@ import {
   selectAll,
   setAnswers,
   setEstimateIntensity,
+  sleepNightCount,
+  sleepPlanOf,
   startWithFiles,
   stepDayCount,
   toggleRow,
@@ -36,12 +40,13 @@ import { prefers12h } from '@/features/settings/components';
 import { startOfWeek } from '@/lib/dates';
 import { ViewerBlockedError } from '@/services/viewer';
 import { formatNumber } from '@/lib/units';
+import { useStore } from '@/store';
 import { useToday } from '@/store/clock';
 import { useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import { Button, Card, Divider, EmptyState, Header, Screen, Text, toast } from '@/ui';
 
-/** /activity/import: bring in workouts from files: Garmin Connect's exports, or the Health app's export (workouts and steps). */
+/** /activity/import: bring in workouts from files: Garmin Connect's exports, or the Health app's export (workouts, steps and sleep). */
 export default function ImportScreen() {
   const { spacing } = useTheme();
   const insets = useSafeAreaInsets();
@@ -59,6 +64,8 @@ export default function ImportScreen() {
   const answers = useImportSession((s) => s.answers);
   const result = useImportSession((s) => s.result);
   const exports = useImportSession((s) => s.exports);
+  const sleepRecords = useStore((s) => s.sleep);
+  const handled = useHealthSync((s) => s.handled);
 
   const [picking, setPicking] = useState(false);
   const [filter, setFilter] = useState<RowFilter>('all');
@@ -102,7 +109,10 @@ export default function ImportScreen() {
   const bottomNotes = notes.filter(infoOnly);
   // Days of steps a Health export read here would save with the import (0: none).
   const stepDays = stepDayCount(exports);
-  const stepsPart = stepDays ? `steps for ${stepDays === 1 ? '1 day' : `${stepDays} days`}` : '';
+  // Nights a Health export read here would write to the sleep log with the import (0: none; a hand-entered or better night stays).
+  const nights = sleepNightCount(sleepPlanOf(exports, Object.values(sleepRecords), handled));
+  const stepsPart = extrasPart(stepDays, nights);
+  const extras = stepDays > 0 || nights > 0;
   const estimateRows = rows.filter((r) => r.entry && !r.entry.measured && r.status !== 'already-imported' && r.status !== 'duplicate-in-file');
   const estimates = estimateRows.length;
   const paced = estimateRows.filter((r) => paceSetsEffort(r)).length;
@@ -123,7 +133,7 @@ export default function ImportScreen() {
       : phase === 'questions'
         ? questionsTitle(csvFiles.length, systemTimeFiles.length)
         : phase === 'done' && result
-          ? doneTitle(result.entries, result.previous, result.undone, result.steps?.days ?? 0)
+          ? doneTitle(result.entries, result.previous, result.undone, result.steps?.days ?? 0, result.sleep?.nights ?? 0)
           : phase === 'reading'
             ? readingLine
             : 'Garmin files or Health export';
@@ -145,9 +155,9 @@ export default function ImportScreen() {
     const nothing = rows.length === 0;
     const allLocked = !nothing && counts.locked === counts.total;
     const dayCount = new Set(toSave.map((e) => e.date)).size;
-    // Nothing to import (no workouts, or every one already in HealthCal) and no steps: the one useful action is other files.
+    // Nothing to import (no workouts, or every one already in HealthCal) and no steps or nights: the one useful action is other files.
     const footer =
-      (nothing || allLocked) && !stepDays ? (
+      (nothing || allLocked) && !extras ? (
         <Button testID="import-choose-again" title="Choose other files" onPress={() => void choose()} loading={picking} />
       ) : (
         <View style={{ gap: spacing.sm }}>
@@ -155,10 +165,12 @@ export default function ImportScreen() {
             {/* The kcal is the summary's large number; the footer says only where it goes (and an update's change, which the summary does not show), and the steps that go in with it. */}
             {toSave.length
               ? `${updating && addedKcal <= 0 ? `Changes the budget by ${addedKcal < 0 ? '−' : '+'}${formatNumber(Math.abs(addedKcal))} kcal, across ` : 'Goes to '}${dayCount === 1 ? 'one day' : `${dayCount} days`}${stepsPart ? `, with ${stepsPart}` : ''}`
-              : stepDays
+              : extras
                 ? nothing || allLocked
-                  ? 'Steps show on Train and are never added to your calories.'
-                  : 'No workouts ticked: only the steps are saved.'
+                  ? nights && !stepDays
+                    ? 'Nights go to your sleep log.'
+                    : `Steps show on Train and are never added to your calories.${nights ? ' Nights go to your sleep log.' : ''}`
+                  : `No workouts ticked: only the ${stepDays && nights ? 'steps and sleep are' : nights ? 'sleep is' : 'steps are'} saved.`
                 : 'Tick the workouts to import.'}
           </Text>
           <Button
@@ -168,11 +180,13 @@ export default function ImportScreen() {
                 ? updating === toSave.length
                   ? `Update ${workouts(updating)}`
                   : `Import ${workouts(toSave.length)}`
-                : stepDays
-                  ? `Save ${stepsPart}`
-                  : 'Nothing to import'
+                : stepDays && nights
+                  ? 'Save steps and sleep'
+                  : extras
+                    ? `Save ${stepsPart}`
+                    : 'Nothing to import'
             }
-            disabled={!toSave.length && !stepDays}
+            disabled={!toSave.length && !extras}
             onPress={commitImport}
           />
         </View>
@@ -184,11 +198,15 @@ export default function ImportScreen() {
             <Card testID="import-nothing">
               <EmptyState
                 title="No workouts in these files"
-                message={stepDays ? 'The steps in them can still be saved; they show on Train. The notes below say more for each file.' : 'The notes below say why for each file.'}
+                message={
+                  extras
+                    ? `The ${stepDays && nights ? 'steps and sleep' : nights ? 'sleep' : 'steps'} in them can still be saved. The notes below say more for each file.`
+                    : 'The notes below say why for each file.'
+                }
               />
             </Card>
             <FileNotes notes={notes} />
-            {stepDays ? (
+            {extras ? (
               <View style={{ alignItems: 'flex-start' }}>
                 <TextLink testID="import-other-files" label="Choose other files" onPress={() => void choose()} />
               </View>
@@ -235,10 +253,10 @@ export default function ImportScreen() {
               </Text>
             }
             ListFooterComponent={
-              allLocked && !bottomNotes.length && !stepDays ? undefined : (
+              allLocked && !bottomNotes.length && !extras ? undefined : (
                 <View style={{ paddingTop: spacing.lg, gap: spacing.lg }}>
                   <FileNotes notes={bottomNotes} />
-                  {allLocked && !stepDays ? null : (
+                  {allLocked && !extras ? null : (
                     <View style={{ alignItems: 'flex-start' }}>
                       <TextLink testID="import-other-files" label="Choose other files" onPress={() => void choose()} />
                     </View>
@@ -267,10 +285,10 @@ export default function ImportScreen() {
       result.undone ? undefined : (
         <Button
           testID="import-see-train"
-          title="See them in Train"
+          title={!result.entries.length && result.sleep && !result.steps ? 'See your sleep log' : 'See them in Train'}
           onPress={() => {
-            // Steps only: this week's card, where today's steps show.
-            if (!result.entries.length) return router.replace('/train' as never);
+            // Steps only: this week's card, where today's steps show. Sleep only: the sleep log.
+            if (!result.entries.length) return router.replace((result.sleep && !result.steps ? '/sleep' : '/train') as never);
             const newest = result.entries.reduce((m, e) => (e.date > m ? e.date : m), result.entries[0].date);
             router.replace(`/train?week=${startOfWeek(newest)}` as never);
           }}
@@ -283,7 +301,7 @@ export default function ImportScreen() {
       {phase === 'start' ? <StartView failed={failed} /> : null}
       {phase === 'reading' ? <ReadingView progress={progress} /> : null}
       {phase === 'questions' ? <QuestionsView todayDate={todayDate} hour12={hour12} onChangeZone={setZoneFor} /> : null}
-      {phase === 'done' && result ? <DoneView entries={result.entries} previous={result.previous} undone={result.undone} stepsDays={result.steps?.days ?? 0} todayDate={todayDate} onStartOver={resetImport} /> : null}
+      {phase === 'done' && result ? <DoneView entries={result.entries} previous={result.previous} undone={result.undone} stepsDays={result.steps?.days ?? 0} nights={result.sleep?.nights ?? 0} todayDate={todayDate} onStartOver={resetImport} /> : null}
       {sheets}
     </Screen>
   );

@@ -7,8 +7,10 @@ import { clockTime, dayLabel, distanceLabel, durationLabel, localDay } from '@/f
 import { plausibleOffsetMin } from '@/features/import/time';
 import { formatShortDate, toISODate } from '@/lib/dates';
 import { kcalRange } from '@/lib/exercise';
+import { sleepFrom } from '@/features/trackers/sleepSource';
+import { formatHours } from '@/features/trackers/helpers';
 import { formatNumber } from '@/lib/units';
-import type { ISODate, UnitSystem } from '@/types';
+import type { ISODate, SleepEntry, UnitSystem } from '@/types';
 
 import { workoutSpan } from '../convert';
 import type { OriginSeen, ReviewItem } from '../plan';
@@ -145,6 +147,29 @@ export function stepsRowText(access: HealthAccess | null, steps: { days: Record<
   if (n > 0) return `${formatNumber(n)} today, shown on Train`;
   if (!steps.readAt) return 'Shown on Train once they are read';
   return Object.keys(steps.days).length ? 'None yet today. Shown on Train' : `None in ${store} in the last 35 days`;
+}
+
+/**
+ * The sleep row on the sync screen: last night (the sleep record dated today,
+ * the wake day) and where it came from, or why there is none.
+ * "Last night 7 h 12 min, from Garmin Connect". `gone`: last night was deleted
+ * or its sync undone, which no later sync brings back, so the row never says it may still come.
+ */
+export function sleepRowText(
+  access: HealthAccess | null,
+  lastNight: Pick<SleepEntry, 'hours' | 'source' | 'store' | 'origin'> | null | undefined,
+  sleepReadAt: string | null,
+  store: string,
+  gone = false,
+): string {
+  if (access && !access.sleep) return 'Not shared yet. Allow sleep to fill your sleep log';
+  if (lastNight) {
+    const from = sleepFrom(lastNight);
+    return `Last night ${formatHours(lastNight.hours)}, ${from ? `from ${from}` : 'entered by you'}`;
+  }
+  if (gone) return 'Last night was deleted. A sync does not add it again';
+  if (!sleepReadAt) return 'Nights go to your sleep log once they are read';
+  return `No night from ${store} for last night yet`;
 }
 
 /** What is missing when calories or distance may not be read; null when everything may. */

@@ -6,14 +6,20 @@ import { Button, CupKey, Sheet, Text } from '@/ui';
 
 import { storeName, type HealthStore } from '../types';
 
-type Read = { title: string; why: string };
+type Read = { title: string; why: string; sleep?: boolean };
 
 const STEPS: Read = {
   title: 'Steps',
-  why: 'Your daily steps, shown on Train. Never added to your calories: your activity level already counts everyday walking.',
+  why: 'Your daily steps, shown on Train. Never added to your calories.',
 };
 
-/** What each store is asked for: READ_PERMISSIONS (healthConnect.ts) and READ_TYPES (healthKit.ts), in plain words. */
+const SLEEP: Read = {
+  title: 'Sleep',
+  why: 'How long you slept each night. Time awake or in bed is not counted, and sleep is never added to your calories.',
+  sleep: true,
+};
+
+/** What each store is asked for: READ_PERMISSIONS (healthConnect.ts), READ_TYPES and SLEEP_READ_TYPES (healthKit.ts), in plain words. */
 const READS: Record<HealthStore, Read[]> = {
   'health-connect': [
     { title: 'Exercise', why: 'Your workouts: what kind, when they started and ended, and their name.' },
@@ -21,12 +27,14 @@ const READS: Record<HealthStore, Read[]> = {
     { title: 'Active calories burned', why: 'What a workout burned above resting, used when an app records no total.' },
     { title: 'Distance', why: 'How far a run, ride or swim was.' },
     STEPS,
+    SLEEP,
   ],
   'apple-health': [
     { title: 'Workouts', why: 'Your workouts: what kind, when they started and ended, and the app that recorded them.' },
-    { title: 'Active energy', why: 'What a workout burned above resting. Your day already counts your resting calories, so only the rest is added, as for a session you log yourself.' },
+    { title: 'Active energy', why: 'What a workout burned above resting: what is added to your day, as for a session you log yourself.' },
     { title: 'Walking + running distance and cycling distance', why: 'How far a walk, run or ride was.' },
     STEPS,
+    SLEEP,
   ],
 };
 
@@ -56,7 +64,7 @@ export function ExplainSheet({ store, visible, busy, onClose, onContinue }: { st
         <View style={{ gap: spacing.md }}>
           {reads.map((r) => (
             <View key={r.title} style={{ flexDirection: 'row', gap: spacing.md }}>
-              <CupKey color={colors.exercise} size={9} style={{ marginTop: 6 }} />
+              <CupKey color={r.sleep ? colors.sleep : colors.exercise} size={9} style={{ marginTop: 6 }} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text variant="bodyStrong">{r.title}</Text>
                 <Text variant="caption" color="textSecondary">
@@ -68,8 +76,8 @@ export function ExplainSheet({ store, visible, busy, onClose, onContinue }: { st
         </View>
         <Text variant="body" color="textSecondary">
           {apple
-            ? `It does not ask for heart rate, sleep, weight, location, clinical records or anything else, and it cannot write to ${name}. You can turn any of them off. A workout can carry its own calorie total, which may still come with it when active energy is off; turn off workouts to keep them out.`
-            : `It does not ask for heart rate, sleep, weight, location or anything else, and it cannot write to ${name}. You can allow only some of them: without the calories, workouts are still added, with the app's own estimate.`}
+            ? `It does not ask for heart rate, weight, location, clinical records or anything else, and cannot write to ${name}. You can turn any of them off; a workout may still bring its own calorie total with active energy off.`
+            : `It does not ask for heart rate, weight, location or anything else, and it cannot write to ${name}. You can allow only some of them: without the calories, workouts are still added, with the app's own estimate.`}
         </Text>
       </View>
     </Sheet>

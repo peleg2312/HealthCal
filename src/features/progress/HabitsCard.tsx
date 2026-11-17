@@ -9,6 +9,7 @@ import type { UnitSystem } from '@/types';
 import { Card, CupKey, Divider, PressableScale, ProgressBar, Text } from '@/ui';
 
 import { go, TrendLegend, TrendMark } from './parts';
+import { sleepDetail } from './sleepDetail';
 
 function HabitRow({
   testID,
@@ -117,7 +118,7 @@ export function HabitsCard({ summary, previous, units }: { summary: PeriodSummar
         title="Sleep"
         value={s ? hoursText(s.avgHours).replace(' h', '') : null}
         unit="h / night"
-        detail={s ? keep(`${plural(s.nights, 'night')} logged · quality ${s.avgQuality.toFixed(1)} of 5 · aim for ${SLEEP_TARGET_HOURS} to ${SLEEP_MAX_HOURS} h`) : 'No sleep logged in this range yet'}
+        detail={s ? keep(sleepDetail(s)) : 'No sleep logged in this range yet'}
         progress={s ? Math.min(s.avgHours, SLEEP_MAX_HOURS) / SLEEP_TARGET_HOURS : 0}
         trend={direction(s?.avgHours, p?.sleep?.avgHours, 0.1)}
         period={period}

@@ -9,8 +9,8 @@
  * electrocardiograms/*.csv are never candidates, so they are never read or inflated.
  *
  * `readHealthExport` then streams exactly that entry's bytes through the
- * scanner (src/features/import/zip.ts, appleExport.ts) and the step tally
- * (exportFile.ts), so neither the archive nor the XML is ever held in memory;
+ * scanner (src/features/import/zip.ts, appleExport.ts), the step tally and the
+ * sleep tally (exportFile.ts), so neither the archive nor the XML is ever held in memory;
  * it reports the share read, can be cancelled between chunks, and waits
  * between chunks so the screen keeps drawing.
  */
@@ -19,7 +19,8 @@ import { listZip, looksLikeZip, streamEntry, streamRange, ZipCutShort, type Byte
 import { addDays } from '@/lib/dates';
 import type { ISODate } from '@/types';
 
-import { createStepTally, exportInstant, parseExportDate } from './exportFile';
+import { createSleepTally, createStepTally, exportInstant, parseExportDate } from './exportFile';
+import { SLEEP_DAYS, SLEEP_LEAD_DAYS, type SleepNight } from './sleep';
 import { localClock, oldestStepDay, type FileSteps, type StepClock } from './steps';
 
 /** The file is a Health export but ends before its closing </HealthData>: it is refused as damaged or incomplete. */
@@ -112,9 +113,14 @@ export interface ExportRead {
   workouts: RawWorkout[];
   /** Steps for the days the file covers inside the 35-day window; null when it has none there. */
   steps: (FileSteps & { fromDay: ISODate }) | null;
+  /**
+   * Nights for the wake days the file covers inside the sync's sleep window (SLEEP_DAYS, sleep.ts
+   * rules; store 'file'), oldest first: not saved yet (the review's Import does that).
+   */
+  nights: SleepNight[];
   /** When the export was made (its ExportDate), else when it was read. */
   asOf: string;
-  counts: { records: number; stepRecords: number; stepSamplesUsed: number };
+  counts: { records: number; stepRecords: number; stepSamplesUsed: number; sleepRecords: number; sleepSamplesUsed: number };
 }
 
 export interface ReadExportOptions extends Pick<StreamOptions, 'onProgress' | 'cancelled' | 'yieldEvery' | 'chunkSize'> {
@@ -133,10 +139,15 @@ export async function readHealthExport(src: ByteSource, found: ExportFound, opti
   const today = clock.dayOf(options.now);
   const fromDay = oldestStepDay(today);
   const tally = createStepTally(clock, fromDay, today);
+  // Sleep: the same wake days as a sync's first read (SLEEP_DAYS), from noon two days before the first (a night that starts in the evening is whole).
+  const sleepFirstDay = addDays(today, -(SLEEP_DAYS - 1));
+  const sleep = createSleepTally(clock);
   const scanner = createHealthScanner({
     // Dates are written in an offset that can be a day off the phone's calendar: one day more is looked at, and the tally keeps only the window.
     stepsFromDay: addDays(fromDay, -1),
     onStep: (r) => tally.addRecord(r, exportInstant),
+    sleepFromDay: addDays(sleepFirstDay, -(SLEEP_LEAD_DAYS + 1)),
+    onSleep: sleep.addRecord,
   });
   const stream: StreamOptions = { onProgress: options.onProgress, cancelled: options.cancelled, yieldEvery: options.yieldEvery, chunkSize: options.chunkSize };
   if (found.kind === 'zip') await streamEntry(src, found.entry, scanner.push, stream);
@@ -154,5 +165,7 @@ export async function readHealthExport(src: ByteSource, found: ExportFound, opti
   // Nothing after the export was made can be in it; the tally's window ends today.
   for (const day of Object.keys(days)) if (day > asOfDay) delete days[day];
   const steps = Object.keys(days).length && asOfDay >= fromDay ? { days, asOf, asOfDay, fromDay } : null;
-  return { workouts: result.workouts, steps, asOf, counts: { ...result.counts, stepSamplesUsed: tally.samples } };
+  // A night still going on when the export was made is left out (sleep.ts rule f), as is anything after it.
+  const nights = sleep.nights(asOfMs, sleepFirstDay).filter((n) => n.date <= asOfDay);
+  return { workouts: result.workouts, steps, nights, asOf, counts: { ...result.counts, stepSamplesUsed: tally.samples, sleepSamplesUsed: sleep.samples } };
 }

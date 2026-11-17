@@ -4,7 +4,7 @@
  */
 import { addDays, diffDays, formatShortDate, lastNDates } from '@/lib/dates';
 import type { TrendPoint } from '@/lib/trend';
-import type { ISODate, SleepEntry } from '@/types';
+import type { ISODate, SleepEntry, SleepQuality } from '@/types';
 
 // ------------------------------------------------------------------ common
 
@@ -122,7 +122,7 @@ export function hasMeasurements(e: { waistCm?: number; hipCm?: number; neckCm?: 
 /** Adult reference range (AASM / Sleep Research Society 2015). */
 export const SLEEP_RANGE: [number, number] = [7, 9];
 
-export const QUALITY_LABELS: Record<SleepEntry['quality'], string> = {
+export const QUALITY_LABELS: Record<SleepQuality, string> = {
   1: 'Poor',
   2: 'Fair',
   3: 'Okay',
@@ -130,9 +130,37 @@ export const QUALITY_LABELS: Record<SleepEntry['quality'], string> = {
   5: 'Great',
 };
 
+/**
+ * The record a sleep edit writes. Changing the time asleep of a night read from
+ * a health store makes it the person's own: where it came from, its times and its
+ * stages no longer describe it, so they go (and the sync then leaves it alone).
+ * A change of quality alone keeps them. `quality` null leaves the night unrated.
+ */
+export function nightAfterEdit(
+  existing: SleepEntry | undefined,
+  date: ISODate,
+  hours: number,
+  quality: SleepQuality | null,
+): Omit<SleepEntry, 'id' | 'updatedAt'> & { id?: string } {
+  const base: Partial<SleepEntry> = { ...(existing ?? {}) };
+  delete base.deleted;
+  delete base.updatedAt;
+  if (existing?.source === 'health' && Math.abs(existing.hours - hours) > 1e-9) {
+    delete base.source;
+    delete base.store;
+    delete base.origin;
+    delete base.startedAt;
+    delete base.endedAt;
+    delete base.stages;
+  }
+  delete base.quality;
+  return { ...base, id: existing?.id, date, hours, ...(quality !== null ? { quality } : {}) };
+}
+
 export interface SleepSummary {
   nights: number;
   avgHours: number | null;
+  /** Average over the nights that have a quality (a synced night may have none), null when none do. */
   avgQuality: number | null;
   inRange: number;
   /** Standard deviation of nightly duration, hours. */
@@ -147,11 +175,12 @@ export function sleepSummary(entries: SleepEntry[], days: number, end: ISODate):
   const logged = dates.map((d) => byDate.get(d)).filter((e): e is SleepEntry => !!e);
   const n = logged.length;
   const avg = n ? logged.reduce((s, e) => s + e.hours, 0) / n : null;
+  const rated = logged.filter((e): e is SleepEntry & { quality: SleepQuality } => typeof e.quality === 'number');
   const spread = n >= 2 && avg !== null ? Math.sqrt(logged.reduce((s, e) => s + (e.hours - avg) ** 2, 0) / n) : null;
   return {
     nights: n,
     avgHours: avg,
-    avgQuality: n ? logged.reduce((s, e) => s + e.quality, 0) / n : null,
+    avgQuality: rated.length ? rated.reduce((s, e) => s + e.quality, 0) / rated.length : null,
     inRange: logged.filter((e) => e.hours >= SLEEP_RANGE[0] && e.hours <= SLEEP_RANGE[1]).length,
     spreadHours: spread,
     series: dates.map((d) => ({ date: d, hours: byDate.get(d)?.hours ?? 0 })),

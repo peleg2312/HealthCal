@@ -6,6 +6,7 @@ import { Platform, View } from 'react-native';
 import { Group } from '@/features/settings/components';
 import { timeAgo } from '@/features/settings/format';
 import type { EnableOutcome } from '@/features/health-sync/engine';
+import { sleepHandledKey } from '@/features/health-sync/sleep';
 import { errorText, type SyncError } from '@/features/health-sync/state';
 import { syncReach } from '@/features/health-sync/reach';
 import { useHealthSync } from '@/features/health-sync/store';
@@ -13,10 +14,12 @@ import { healthAdapter, healthSync, useHealthStatus } from '@/features/health-sy
 import { storeName } from '@/features/health-sync/types';
 import { ActivityPickSheet } from '@/features/health-sync/ui/ActivityPickSheet';
 import { ExplainSheet } from '@/features/health-sync/ui/ExplainSheet';
-import { accessNote, originLine, stepsRowText, switchSubtitle } from '@/features/health-sync/ui/format';
+import { accessNote, originLine, sleepRowText, stepsRowText, switchSubtitle } from '@/features/health-sync/ui/format';
 import { ReviewCard } from '@/features/health-sync/ui/ReviewCard';
+import { findByDate } from '@/features/trackers/helpers';
 import { useNow, useToday } from '@/store/clock';
-import { useProfile } from '@/store/selectors';
+import { useStore } from '@/store';
+import { useLive, useProfile } from '@/store/selectors';
 import { fonts, useTheme } from '@/theme';
 import { Button, Card, Header, ListRow, PressableScale, Screen, SectionTitle, Text, Toggle, haptic, toast } from '@/ui';
 
@@ -34,6 +37,12 @@ export default function HealthSyncScreen() {
   /** Why turning it on did not work, until the next try. */
   const [problem, setProblem] = useState<Problem | null>(null);
   const [pickFor, setPickFor] = useState<string | null>(null);
+  /** Last night: the sleep record dated today (the day the person woke up). */
+  const lastNight = findByDate(useLive('sleep'), todayDate);
+  /** Last night was deleted (or its sync undone): a sync never adds it again, so the row must not say it may come. */
+  const sleepRecords = useStore((s) => s.sleep);
+  const lastNightGone =
+    !lastNight && (Object.values(sleepRecords).some((r) => r.date === todayDate && r.deleted) || state.handled[sleepHandledKey(todayDate)]?.how === 'skipped');
 
   const store = storeName(healthAdapter.store);
   const apple = healthAdapter.store === 'apple-health';
@@ -51,7 +60,7 @@ export default function HealthSyncScreen() {
     if (out.ok) {
       setProblem(null);
       haptic.success();
-      if (out.sync.status === 'done' && out.sync.added + out.sync.updated === 0) toast(out.sync.review ? 'Sync is on. Some workouts need a look' : 'Sync is on. New workouts will appear by themselves');
+      if (out.sync.status === 'done' && out.sync.added + out.sync.updated + out.sync.nights === 0) toast(out.sync.review ? 'Sync is on. Some workouts need a look' : 'Sync is on. New workouts will appear by themselves');
     } else setProblem(out.why);
   };
 
@@ -94,10 +103,40 @@ export default function HealthSyncScreen() {
     }
   };
 
+  /**
+   * Sleep was added after some people allowed the first five types: ask for it
+   * (an iPhone asks for sleep alone; Android shows what is not allowed yet), and say how it went.
+   */
+  const allowSleep = async () => {
+    setAsking(true);
+    let allowed: boolean | null = null;
+    try {
+      allowed = (await healthAdapter.requestAccess('sleep')).sleep;
+    } catch {
+      allowed = null;
+    }
+    setAsking(false);
+    status.refresh();
+    if (allowed && apple) {
+      // Apple Health says only that it asked, never what the person chose (it keeps that private): words true either way.
+      haptic.success();
+      toast(`Your sleep log fills from ${store} after this sync, if you allowed sleep`, { tint: 'sleep' });
+      void healthSync.sync('manual');
+    } else if (allowed) {
+      haptic.success();
+      toast('Sleep is shared. Your nights go to the sleep log after this sync', { tint: 'sleep' });
+      void healthSync.sync('manual');
+    } else if (allowed === false) {
+      toast(`Sleep is still not shared. Allow it in ${store}`, { label: `Open`, onPress: () => healthAdapter.openSettings() });
+    } else {
+      toast(`${store} did not answer. Try again in a moment`);
+    }
+  };
+
   const syncNow = async () => {
     const out = await healthSync.sync('manual');
     status.refresh();
-    if (out.status === 'done' && out.added + out.updated === 0) toast(out.review ? 'Nothing new to add. Some workouts need a look' : `Up to date. Nothing new in ${store}`);
+    if (out.status === 'done' && out.added + out.updated + out.nights === 0) toast(out.review ? 'Nothing new to add. Some workouts need a look' : `Up to date. Nothing new in ${store}`);
   };
 
   if (!supported) {
@@ -146,7 +185,7 @@ export default function HealthSyncScreen() {
           Your daily steps show on Train. They are never added to your calories: your activity level already counts everyday walking.
         </Text>
         <Text variant="body" color="textSecondary">
-          HealthCal only reads workouts, their calories and distance, and steps. It writes nothing back.
+          HealthCal only reads workouts, their calories and distance, steps, and how long you slept. It writes nothing back.
         </Text>
       </Card>
 
@@ -259,7 +298,7 @@ export default function HealthSyncScreen() {
               />
             </View>
             <Text variant="caption" color="textSecondary">
-              Runs by itself when you open HealthCal or the Train tab, at most every 15 minutes, and looks at the last 30 days.
+              Runs by itself when you open HealthCal or the Train tab, at most every 15 minutes, and looks at the last 30 days of workouts.
               {state.lastResult ? ` Last change ${timeAgo(state.lastResult.at, now) ?? 'just now'}: ${changeText(state.lastResult)}.` : ''}
             </Text>
           </Card>
@@ -273,6 +312,23 @@ export default function HealthSyncScreen() {
               onPress={(status.access ?? state.access)?.steps === false ? () => void allowSteps() : undefined}
               right={
                 (status.access ?? state.access)?.steps === false ? (
+                  <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
+                    Allow
+                  </Text>
+                ) : undefined
+              }
+            />
+          </Group>
+
+          <Group title="Sleep" footer="Time awake and time in bed are not counted as sleep.">
+            <ListRow
+              testID="health-sync-sleep"
+              title="Nights"
+              subtitle={sleepRowText(status.access ?? state.access, lastNight, state.sleepReadAt, store, lastNightGone)}
+              chevron={false}
+              onPress={(status.access ?? state.access)?.sleep === false ? () => void allowSleep() : undefined}
+              right={
+                (status.access ?? state.access)?.sleep === false ? (
                   <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
                     Allow
                   </Text>
@@ -302,8 +358,8 @@ export default function HealthSyncScreen() {
         <View style={{ paddingVertical: spacing.md, gap: 4 }}>
           <Text variant="bodyStrong">Stop at any time with the switch</Text>
           <Text variant="caption" color="textSecondary">
-            Once it is off, nothing more is read and the steps kept on this phone are cleared. Workouts already added stay in Train, where you can delete any of them; a workout you
-            delete is not brought back by a later sync. To take the permission away as well,{' '}
+            Once it is off, nothing more is read and the steps kept on this phone are cleared. Workouts and nights already added stay, in Train and the sleep log, where you can
+            delete any of them; one you delete is not brought back by a later sync. To take the permission away as well,{' '}
             {apple ? 'open the Health app and turn HealthCal off under Sharing, Apps.' : `open ${store} and remove HealthCal under app permissions.`}
           </Text>
         </View>
@@ -313,7 +369,8 @@ export default function HealthSyncScreen() {
       <Group title="What happens to this data">
         <View style={{ paddingVertical: spacing.md, gap: spacing.sm }} testID="health-sync-privacy">
           <Text variant="caption" color="textSecondary">
-            HealthCal reads workouts and, for each, its {apple ? 'active calories' : 'active and total calories'} and distance, and your daily steps. Nothing is written back to {store}.
+            HealthCal reads workouts and, for each, its {apple ? 'active calories' : 'active and total calories'} and distance, your daily steps, and how long you slept each
+            night. Nothing is written back to {store}.
           </Text>
           <Text variant="caption" color="textSecondary">
             A synced workout is kept like a session you log yourself: on this phone, and in your account if you have one, so your other devices show it. It is never sent to the
@@ -322,6 +379,10 @@ export default function HealthSyncScreen() {
           </Text>
           <Text variant="caption" color="textSecondary">
             Steps stay on this phone only, for the last 35 days: they are not added to your account, never sent to the AI food analysis and never shown to friends.
+          </Text>
+          <Text variant="caption" color="textSecondary">
+            A night of sleep is kept in your sleep log like one you enter yourself, with the app it came from and its stages: on this phone, and in your account if you have
+            one. It is never added to your calories, never sent to the AI food analysis and never shown to friends.
           </Text>
         </View>
       </Group>
@@ -350,7 +411,8 @@ export default function HealthSyncScreen() {
   );
 }
 
-const changeText = (r: { added: number; updated: number }) => [r.added ? `${r.added} added` : '', r.updated ? `${r.updated} updated` : ''].filter(Boolean).join(', ');
+const changeText = (r: { added: number; updated: number; nights?: number }) =>
+  [r.added ? `${r.added} added` : '', r.updated ? `${r.updated} updated` : '', r.nights ? `${r.nights} ${r.nights === 1 ? 'night' : 'nights'} of sleep` : ''].filter(Boolean).join(', ');
 
 /** Why sync could not be turned on, in two lines (what happened, what to do), with the one thing that fixes it. */
 function ProblemCard({

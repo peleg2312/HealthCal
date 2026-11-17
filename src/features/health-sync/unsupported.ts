@@ -18,6 +18,9 @@ export const unsupportedAdapter: HealthAdapter = {
   readStepDays: async () => {
     throw unavailable();
   },
+  readSleep: async () => {
+    throw unavailable();
+  },
   openSettings: () => {},
   openInstall: () => {},
 };

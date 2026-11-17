@@ -283,7 +283,8 @@ export default function AboutScreen() {
         <P>
           With Workout sync switched on, HealthCal reads your workouts from {stores.from}: each session with its calories and its distance. They
           are stored like sessions you log by hand. It also reads your daily steps, which stay on this phone only, for 35 days, and are never
-          added to your calories. Nothing is written back to {stores.notBack}, and this data is never sent for AI analysis, used for ads or shared
+          added to your calories. And it reads how long you slept each night, kept in your sleep log like a night you enter yourself (in your
+          account if you have one) and never added to your calories. Nothing is written back to {stores.notBack}, and this data is never sent for AI analysis, used for ads or shared
           with anyone else; friends see only what the Friends screen says they see.
         </P>
         <AiConsentAbout />

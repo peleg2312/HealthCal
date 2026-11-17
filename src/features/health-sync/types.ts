@@ -2,14 +2,15 @@
  * Automatic workout sync: shapes shared by the adapters (one per platform) and
  * the rules (pure, the same on every platform).
  *
- * An adapter only answers five questions about the phone's health store: is it
+ * An adapter only answers six questions about the phone's health store: is it
  * there, what may this app read, please ask, "which workouts are in this time
- * range" and "how many steps on each day of it". Everything else (calories,
- * duplicates, which app activity it is, what is saved, which days of steps are kept) is decided
+ * range", "how many steps on each day of it" and "which sleep samples are in it".
+ * Everything else (calories, duplicates, which app activity it is, what is saved,
+ * which days of steps are kept, which night a day had) is decided
  * in the rules, so Health Connect and Apple Health share every rule.
  */
 
-import type { ISODate } from '@/types';
+import type { ISODate, SleepStore } from '@/types';
 
 /** The phone's health store a workout was read from. */
 export type HealthStore = 'health-connect' | 'apple-health';
@@ -66,9 +67,54 @@ export interface HealthAccess {
   distance: boolean;
   /** Daily steps: shown on Train, never added to the calorie budget (steps.ts). */
   steps: boolean;
+  /**
+   * Sleep: nights for the sleep log (sleep.ts). Asked for on its own on an iPhone
+   * (HealthKit's sleep type is not in READ_TYPES), so a phone that allowed the
+   * five above before sleep existed reads false here until the person allows it.
+   */
+  sleep: boolean;
 }
 
-export const NO_ACCESS: HealthAccess = { workouts: false, activeEnergy: false, totalEnergy: false, distance: false, steps: false };
+export const NO_ACCESS: HealthAccess = { workouts: false, activeEnergy: false, totalEnergy: false, distance: false, steps: false, sleep: false };
+
+/**
+ * What one stretch of a sleep sample was, as the store recorded it.
+ * 'asleep': asleep with no stage given (Health Connect's STAGE_TYPE_SLEEPING, a
+ * session without stages; HealthKit's asleepUnspecified). 'light' is HealthKit's
+ * "core". 'awake' includes Health Connect's out-of-bed and awake-in-bed stages.
+ * Only asleep, light, deep and rem count as sleep (sleep.ts).
+ */
+export type SleepStage = 'asleep' | 'light' | 'deep' | 'rem' | 'awake' | 'inBed' | 'unknown';
+
+/** What kind of device wrote a sample: a watch's nights rank above a phone's or an app's (sleep.ts). */
+export type SleepSourceKind = 'watch' | 'phone' | 'other';
+
+/**
+ * One stretch of one sleep stage, as a health store or the Health export holds
+ * it, before any rule is applied. A Health Connect session is listed as one
+ * sample per stage (or one 'asleep' sample for a session without stages); a
+ * HealthKit sleep-analysis sample is one sample.
+ */
+export interface SleepSample {
+  /** Where it was read: Health Connect, Apple Health, or the Health app's export file. */
+  store: SleepStore;
+  /**
+   * The app that wrote it: a package name, a bundle id, or appleOrigin()'s
+   * 'com.apple.health.watch' / 'com.apple.health.iphone'; from the export file
+   * one of those two or 'file:other'. Never a device's or a person's name.
+   */
+  origin: string;
+  /** From the origin (sleep.ts, sleepKindOf), or Health Connect's device type when the record states one. */
+  kind: SleepSourceKind;
+  /** ISO 8601 instants. */
+  start: string;
+  end: string;
+  /** Seconds east of UTC at the end of the sample, when the record states it; null: the phone's own zone is used. */
+  zoneOffsetSec: number | null;
+  stage: SleepStage;
+  /** The store's id of the session the sample belongs to (Health Connect's metadata.id), when there is one. */
+  sessionId?: string;
+}
 
 /**
  * The steps of one local calendar day, as the health store itself totals them:
@@ -115,14 +161,23 @@ export interface ReadOptions {
   needsDetail?: (workout: Pick<HealthWorkout, 'id' | 'origin' | 'startTime' | 'endTime'>) => boolean;
 }
 
+/** What a permission request asks for (HealthAdapter.requestAccess). */
+export type AccessRequest = 'all' | 'sleep';
+
 export interface HealthAdapter {
   /** The health store this build reads; null where there is none (web). */
   readonly store: HealthStore | null;
   availability(): Promise<HealthAvailability>;
   /** What may be read right now. Never shows anything to the person. */
   access(): Promise<HealthAccess>;
-  /** Show the system's permission sheet and report what was allowed. */
-  requestAccess(): Promise<HealthAccess>;
+  /**
+   * Show the system's permission sheet and report what was allowed. 'all' (the
+   * default, turning sync on) asks for everything that is read; 'sleep' (the
+   * sync screen's "Allow" on the Sleep row) asks for sleep alone where the
+   * store can ask for one type (Apple Health); Health Connect asks its whole
+   * list again, as for steps, and shows only what is not allowed yet.
+   */
+  requestAccess(what?: AccessRequest): Promise<HealthAccess>;
   /**
    * Every workout in the range, from every app, each with the energy and
    * distance its own app wrote inside its interval. `access` is what may be
@@ -138,6 +193,12 @@ export interface HealthAdapter {
    * without steps may be left out. Empty when steps may not be read. Throws HealthError.
    */
   readStepDays(range: StepsRange, access: HealthAccess): Promise<StepDayTotal[]>;
+  /**
+   * Every sleep sample overlapping the range (ISO instants), from every app,
+   * as raw stages: the nights are made from them by the rules in sleep.ts.
+   * Empty when sleep may not be read (`access.sleep` false). Throws HealthError.
+   */
+  readSleep(range: { from: string; to: string }, access: HealthAccess): Promise<SleepSample[]>;
   /** Open the health store's own settings, where access is given and taken away. */
   openSettings(): void;
   /** Open the store page that installs or updates the health store. */

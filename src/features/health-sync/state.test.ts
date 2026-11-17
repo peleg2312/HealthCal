@@ -32,6 +32,15 @@ describe('sync state', () => {
   it('words the confirmation', () => {
     expect(syncMessage(2, 0, ['Garmin Connect', 'Garmin Connect'], 'Health Connect')).toBe('2 workouts added from Garmin Connect');
     expect(syncMessage(1, 0, ['Strava'], 'Health Connect')).toBe('1 workout added from Strava');
+    // Nights of sleep in the same message.
+    const g = 'Garmin Connect';
+    expect(syncMessage(0, 0, [], 'Health Connect', { added: 1, updated: 0, apps: [g] })).toBe('1 night of sleep added from Garmin Connect');
+    expect(syncMessage(0, 0, [], 'Health Connect', { added: 2, updated: 1, apps: [g, g, g] })).toBe('2 nights of sleep added, 1 updated from Garmin Connect');
+    expect(syncMessage(0, 0, [], 'Health Connect', { added: 0, updated: 2, apps: [g] })).toBe('2 nights of sleep updated from Garmin Connect');
+    expect(syncMessage(1, 0, [g], 'Health Connect', { added: 3, updated: 0, apps: [g] })).toBe('1 workout and 3 nights of sleep added from Garmin Connect');
+    expect(syncMessage(0, 1, ['Strava'], 'Health Connect', { added: 0, updated: 1, apps: [g] })).toBe('1 workout and 1 night of sleep updated from Health Connect');
+    expect(syncMessage(1, 0, [g], 'Health Connect', { added: 0, updated: 2, apps: [g] })).toBe('1 workout and 2 nights of sleep synced from Garmin Connect');
+    expect(syncMessage(1, 0, [g], 'Health Connect', { added: 0, updated: 0, apps: ['Oura'] })).toBe('1 workout added from Garmin Connect');
     expect(syncMessage(0, 1, ['Garmin Connect'], 'Health Connect')).toBe('1 workout updated from Garmin Connect');
     expect(syncMessage(2, 1, ['Garmin Connect', 'Strava', 'Strava'], 'Health Connect')).toBe('2 workouts added, 1 updated from Health Connect');
   });

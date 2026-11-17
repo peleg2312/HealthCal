@@ -6,10 +6,10 @@
 import { formatDuration } from '@/lib/dates';
 import { live } from '@/store/selectors';
 import { useStore } from '@/store';
-import type { FastingSession, ISODate, Profile, SleepEntry, WeightEntry } from '@/types';
+import type { FastingSession, ISODate, Profile, SleepEntry, SleepQuality, WeightEntry } from '@/types';
 import { haptic, toast } from '@/ui';
 
-import { fastProgress, findByDate, isMostRecentDate, latestBodyFat } from './helpers';
+import { fastProgress, findByDate, isMostRecentDate, latestBodyFat, nightAfterEdit } from './helpers';
 
 type WeightPatch = Partial<Omit<WeightEntry, 'id' | 'updatedAt' | 'deleted' | 'date'>>;
 
@@ -85,13 +85,20 @@ export function deleteWeightRecord(entry: WeightEntry) {
   });
 }
 
-export function saveSleep(date: ISODate, hours: number, quality: SleepEntry['quality']) {
+/**
+ * Save the night for `date`. `quality` null leaves the night without one (a synced
+ * night the person has not rated). A night read from a health store stays one
+ * while only its quality changes; a new time asleep makes it the person's own
+ * (`nightAfterEdit`). Undo puts the whole previous record back.
+ */
+export function saveSleep(date: ISODate, hours: number, quality: SleepQuality | null) {
   const s = useStore.getState();
   const existing = findByDate(live(s.sleep), date);
-  const saved = s.upsert('sleep', { ...(existing ?? {}), date, hours, quality, id: existing?.id });
+  const saved = s.upsert('sleep', nightAfterEdit(existing, date, hours, quality));
   haptic.success();
   toast(existing ? 'Sleep updated' : 'Sleep saved', {
     label: 'Undo',
+    tint: 'sleep',
     onPress: () => {
       const st = useStore.getState();
       if (existing) st.upsert('sleep', existing);
@@ -103,7 +110,7 @@ export function saveSleep(date: ISODate, hours: number, quality: SleepEntry['qua
 export function deleteSleep(entry: SleepEntry) {
   useStore.getState().remove('sleep', entry.id);
   haptic.tap();
-  toast('Night deleted', { label: 'Undo', onPress: () => useStore.getState().restore('sleep', entry.id) });
+  toast('Night deleted', { label: 'Undo', tint: 'sleep', onPress: () => useStore.getState().restore('sleep', entry.id) });
 }
 
 export function startFast(targetHours: number, startISO: string = new Date().toISOString()): FastingSession {

@@ -39,8 +39,8 @@ export interface HealthSyncState {
   handled: Record<string, Handled>;
   /** Activities the person chose for a kind of workout (plan.ts, `choiceKey`). */
   choices: Record<string, string>;
-  /** What the last successful sync changed. */
-  lastResult: { at: string; added: number; updated: number } | null;
+  /** What the last successful sync changed (`nights`: nights of sleep added or updated; absent before sleep was read). */
+  lastResult: { at: string; added: number; updated: number; nights?: number } | null;
   /** Steps per day for the last 35 days (steps.ts): shown on Train, never counted as calories. */
   steps: StepsMemory;
   /**
@@ -49,6 +49,14 @@ export interface HealthSyncState {
    * wins over a file's, and because switching sync off clears only what sync read.
    */
   fileSteps: FileSteps | null;
+  /**
+   * When sleep was last read successfully (sleep.ts, sleepReadRange): the next
+   * read starts the day before, so a phone that was away for a week reads that
+   * week. Null: never, so the first read covers 35 days. The nights themselves
+   * are diary records ('sleep'); what this phone did with a day is in `handled`
+   * under 'sleep:<date>'.
+   */
+  sleepReadAt: string | null;
 }
 
 export const INITIAL_STATE: HealthSyncState = {
@@ -64,6 +72,7 @@ export const INITIAL_STATE: HealthSyncState = {
   lastResult: null,
   steps: NO_STEPS,
   fileSteps: null,
+  sleepReadAt: null,
 };
 
 const isRecord = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
@@ -78,7 +87,7 @@ export function restoreState(saved: unknown): HealthSyncState {
   if (!isRecord(saved)) return INITIAL_STATE;
   const error = isRecord(saved.lastError) && typeof saved.lastError.code === 'string' && typeof saved.lastError.at === 'string' ? (saved.lastError as unknown as SyncError) : null;
   // A build before steps saved no `steps` flag: steps were not asked for then.
-  const access = isRecord(saved.access) && typeof saved.access.workouts === 'boolean' ? ({ ...(saved.access as unknown as HealthAccess), steps: saved.access.steps === true } as HealthAccess) : null;
+  const access = isRecord(saved.access) && typeof saved.access.workouts === 'boolean' ? ({ ...(saved.access as unknown as HealthAccess), steps: saved.access.steps === true, sleep: saved.access.sleep === true } as HealthAccess) : null;
   const result = isRecord(saved.lastResult) && typeof saved.lastResult.at === 'string' ? (saved.lastResult as HealthSyncState['lastResult']) : null;
   const review = Array.isArray(saved.review)
     ? (saved.review.filter((r) => isRecord(r) && typeof r.id === 'string' && isRecord(r.workout) && typeof r.workout.startTime === 'string' && typeof r.reason === 'string') as ReviewItem[])
@@ -116,6 +125,7 @@ export function restoreState(saved: unknown): HealthSyncState {
     lastResult: result,
     steps: { days, readAt: savedSteps ? text(savedSteps.readAt) : null },
     fileSteps,
+    sleepReadAt: text(saved.sleepReadAt),
   };
 }
 
@@ -189,14 +199,37 @@ export function rememberMarks(handled: Record<string, Handled>, marks: Record<st
 }
 
 const workouts = (n: number) => `${n} ${n === 1 ? 'workout' : 'workouts'}`;
+const nightsOf = (n: number) => `${n} ${n === 1 ? 'night' : 'nights'} of sleep`;
 
-/** "2 workouts added from Garmin Connect", "1 workout updated from Garmin Connect", "2 workouts added, 1 updated from Health Connect". */
-export function syncMessage(added: number, updated: number, apps: string[], store: string): string {
-  const names = [...new Set(apps)];
+/** Nights of sleep a sync wrote, and the apps they came from. */
+export interface NightsChange {
+  added: number;
+  updated: number;
+  apps: string[];
+}
+
+/**
+ * "2 workouts added from Garmin Connect", "1 workout updated from Garmin Connect", "2 workouts added, 1 updated from Health Connect";
+ * with nights: "1 night of sleep added from Garmin Connect", "1 workout and 3 nights of sleep added from Garmin Connect",
+ * "1 workout and 2 nights of sleep synced from Health Connect" (some added, some updated). One app named, else the store.
+ */
+export function syncMessage(added: number, updated: number, apps: string[], store: string, nights?: NightsChange): string {
+  const na = nights?.added ?? 0;
+  const nu = nights?.updated ?? 0;
+  const names = [...new Set([...apps, ...(na + nu ? (nights?.apps ?? []) : [])])];
   const from = names.length === 1 ? names[0] : store;
-  if (added && updated) return `${workouts(added)} added, ${updated} updated from ${from}`;
-  if (added) return `${workouts(added)} added from ${from}`;
-  return `${workouts(updated)} updated from ${from}`;
+  if (na + nu === 0) {
+    if (added && updated) return `${workouts(added)} added, ${updated} updated from ${from}`;
+    if (added) return `${workouts(added)} added from ${from}`;
+    return `${workouts(updated)} updated from ${from}`;
+  }
+  if (added + updated === 0) {
+    if (na && nu) return `${nightsOf(na)} added, ${nu} updated from ${from}`;
+    return `${nightsOf(na + nu)} ${na ? 'added' : 'updated'} from ${from}`;
+  }
+  if (!updated && !nu) return `${workouts(added)} and ${nightsOf(na)} added from ${from}`;
+  if (!added && !na) return `${workouts(updated)} and ${nightsOf(nu)} updated from ${from}`;
+  return `${workouts(added + updated)} and ${nightsOf(na + nu)} synced from ${from}`;
 }
 
 /** What to tell the person about a failed sync, and what they can do. */

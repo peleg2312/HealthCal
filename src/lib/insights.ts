@@ -42,7 +42,8 @@ export interface InsightDay {
 export interface SleepLike {
   date: ISODate;
   hours: number;
-  quality: number;
+  /** 1 to 5 when the person rated the night; a night read from a health store may have none. */
+  quality?: number;
 }
 
 // ------------------------------------------------------------- thresholds
@@ -122,7 +123,8 @@ export interface PeriodSummary {
     /** Guideline minutes per week. */
     weeklyMinutes: number;
   };
-  sleep: { avgHours: number; nights: number; avgQuality: number } | null;
+  /** avgQuality averages only the `rated` nights (those that have a quality); null when none do. */
+  sleep: { avgHours: number; nights: number; avgQuality: number | null; rated: number } | null;
   weight: {
     startTrend: number;
     endTrend: number;
@@ -229,8 +231,9 @@ export function summarizePeriod(input: {
     weeklyMinutes: (guideline * 7) / Math.max(7, effectiveDays),
   };
 
+  const rated = sleepIn.flatMap((s) => (typeof s.quality === 'number' ? [s.quality] : []));
   const sleepSummary = sleepIn.length
-    ? { avgHours: avg(sleepIn.map((s) => s.hours)), nights: sleepIn.length, avgQuality: avg(sleepIn.map((s) => s.quality)) }
+    ? { avgHours: avg(sleepIn.map((s) => s.hours)), nights: sleepIn.length, avgQuality: rated.length ? avg(rated) : null, rated: rated.length }
     : null;
 
   let weight: PeriodSummary['weight'] = null;

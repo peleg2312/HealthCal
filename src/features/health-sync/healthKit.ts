@@ -24,7 +24,8 @@
  */
 import { appleExerciseType, HK_TYPE } from './appleHealthTypes';
 import { appleOrigin, isAppleOrigin, isKnownOrigin } from './origins';
-import { HealthError, NO_ACCESS, type HealthAccess, type HealthWorkout, type StepDayTotal } from './types';
+import { sleepKindOf } from './sleep';
+import { HealthError, NO_ACCESS, type HealthAccess, type HealthWorkout, type SleepSample, type SleepStage, type StepDayTotal } from './types';
 
 /** HealthKit's identifiers for what is read. Nothing else is ever asked for, and nothing is written. */
 export const HK = {
@@ -33,10 +34,23 @@ export const HK = {
   walkingRunningDistance: 'HKQuantityTypeIdentifierDistanceWalkingRunning',
   cyclingDistance: 'HKQuantityTypeIdentifierDistanceCycling',
   steps: 'HKQuantityTypeIdentifierStepCount',
+  sleep: 'HKCategoryTypeIdentifierSleepAnalysis',
 } as const;
 
 /** The five read permissions, in the order the system sheet lists them. */
 export const READ_TYPES = [HK.workout, HK.activeEnergy, HK.walkingRunningDistance, HK.cyclingDistance, HK.steps] as const;
+
+/**
+ * Sleep is asked for apart from READ_TYPES, never added to it: HealthKit
+ * answers "already asked" for a list only when every type in it was asked, so
+ * a phone that allowed the five above before sleep was read would otherwise
+ * look as if it had never been asked at all. The first switch-on asks both
+ * lists at once; the sync screen's "Allow" asks this one alone.
+ */
+export const SLEEP_READ_TYPES = [HK.sleep] as const;
+
+/** Every type the app may ask to read. */
+export type HealthKitReadType = (typeof READ_TYPES)[number] | (typeof SLEEP_READ_TYPES)[number];
 
 /** HKAuthorizationRequestStatus (the library's AuthorizationRequestStatus enum). */
 export const REQUEST_STATUS = { unknown: 0, shouldRequest: 1, unnecessary: 2 } as const;
@@ -100,6 +114,24 @@ export interface HKWorkoutProxy extends HKWorkoutSample {
   dispose(): void;
 }
 
+/**
+ * `CategorySample` (src/types/CategoryType.ts, BaseSample in core
+ * src/types/Shared.ts), the part read here. For sleep analysis `value` is
+ * CategoryValueSleepAnalysis (src/generated/healthkit.generated.ts): 0 inBed,
+ * 1 asleepUnspecified (also the old `asleep`), 2 awake, 3 asleepCore, 4
+ * asleepDeep, 5 asleepREM.
+ */
+export interface HKCategorySample {
+  readonly uuid: string;
+  readonly startDate: Date;
+  readonly endDate: Date;
+  readonly value: number;
+  readonly sourceRevision: HKSourceRevision;
+  readonly device?: HKDevice;
+  /** HKTimeZone when the writing app gave one. */
+  readonly metadata: Readonly<Record<string, unknown>>;
+}
+
 /** `DateFilter` inside `FilterForSamples` (src/types/QueryOptions.ts). */
 export interface HKDateFilter {
   readonly filter?: { readonly date?: { readonly startDate?: Date; readonly endDate?: Date } };
@@ -115,8 +147,14 @@ export interface HKDateFilter {
  */
 export interface HealthKitApi {
   isHealthDataAvailable(): boolean;
-  getRequestStatusForAuthorization(toCheck: { toRead: typeof READ_TYPES }): Promise<number>;
-  requestAuthorization(toRequest: { toRead: typeof READ_TYPES }): Promise<boolean>;
+  getRequestStatusForAuthorization(toCheck: { toRead: readonly HealthKitReadType[] }): Promise<number>;
+  requestAuthorization(toRequest: { toRead: readonly HealthKitReadType[] }): Promise<boolean>;
+  /**
+   * Sleep-analysis samples (CategoryTypeModule.queryCategorySamples). With the
+   * date filter's strict flags left unset, samples that cross the range's
+   * edges are included. There is no statistics query for this type.
+   */
+  queryCategorySamples(identifier: typeof HK.sleep, options: HKDateFilter & { limit: number; ascending?: boolean }): Promise<readonly HKCategorySample[]>;
   queryWorkoutSamples(options: HKDateFilter & { limit: number; ascending?: boolean }): Promise<readonly HKWorkoutProxy[]>;
   queryStatisticsCollectionForQuantity(
     identifier: typeof HK.steps,
@@ -136,9 +174,11 @@ export interface HealthKitApi {
  * readable; a type the person refused comes back empty and the screen says
  * where to allow it.
  */
-export function accessFromRequestStatus(status: number): HealthAccess {
-  if (status !== REQUEST_STATUS.unnecessary) return NO_ACCESS;
-  return { workouts: true, activeEnergy: true, totalEnergy: false, distance: true, steps: true };
+export function accessFromRequestStatus(status: number, sleepStatus: number = REQUEST_STATUS.unknown): HealthAccess {
+  // Sleep has its own question (SLEEP_READ_TYPES), so READ_TYPES' status says nothing about it.
+  const sleep = sleepStatus === REQUEST_STATUS.unnecessary;
+  if (status !== REQUEST_STATUS.unnecessary) return { ...NO_ACCESS, sleep };
+  return { workouts: true, activeEnergy: true, totalEnergy: false, distance: true, steps: true, sleep };
 }
 
 /** The distance statistic a workout's type is measured in, when the workout has no total distance. */
@@ -265,6 +305,49 @@ export function stepDaysFromStatistics(stats: readonly HKStatistics[], dayOf: (m
     out.push({ day: dayOf(middle), count: Math.round(q.quantity) });
   }
   return out;
+}
+
+/** CategoryValueSleepAnalysis as this feature's stages ('light' is Apple's "core"). */
+export function sleepStageFromValue(value: unknown): SleepStage {
+  switch (value) {
+    case 0:
+      return 'inBed';
+    case 1:
+      return 'asleep';
+    case 2:
+      return 'awake';
+    case 3:
+      return 'light';
+    case 4:
+      return 'deep';
+    case 5:
+      return 'rem';
+    default:
+      return 'unknown';
+  }
+}
+
+/**
+ * One sleep-analysis sample as a raw sleep sample (sleep.ts makes the night).
+ * The app is appleOrigin's: an Apple Watch and the iPhone by their kind, never
+ * their UUID or name. The zone is the sample's HKTimeZone at its end, when the
+ * writing app gave one. Null when it has no source or no length.
+ */
+export function sleepFromHealthKit(x: HKCategorySample): SleepSample | null {
+  const start = x?.startDate instanceof Date ? x.startDate.getTime() : Number.NaN;
+  const end = x?.endDate instanceof Date ? x.endDate.getTime() : Number.NaN;
+  const bundle = x?.sourceRevision?.source?.bundleIdentifier;
+  if (!bundle || !Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
+  const origin = appleOrigin(bundle, x.sourceRevision?.productType);
+  return {
+    store: 'healthKit',
+    origin,
+    kind: sleepKindOf(origin),
+    start: new Date(start).toISOString(),
+    end: new Date(end).toISOString(),
+    zoneOffsetSec: zoneOffsetSecAt(x.metadata?.HKTimeZone, end),
+    stage: sleepStageFromValue(x.value),
+  };
 }
 
 /**

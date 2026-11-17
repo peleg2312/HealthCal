@@ -4,7 +4,7 @@ import { planSync } from '../plan';
 import { CTX, handLogged, TYPE, workout } from '../testing';
 import { NO_ACCESS } from '../types';
 
-import { accessNote, stepsRowText, originLine, profileSubtitle, reviewLabels, reviewView, switchSubtitle } from './format';
+import { accessNote, sleepRowText, stepsRowText, originLine, profileSubtitle, reviewLabels, reviewView, switchSubtitle } from './format';
 
 const plain = (s: string) => s.replace(/ /g, ' ');
 
@@ -98,10 +98,10 @@ describe('sync screen wording', () => {
 
   it('says what is not shared', () => {
     expect(accessNote(null)).toBeNull();
-    expect(accessNote({ workouts: true, activeEnergy: true, totalEnergy: false, distance: true, steps: true })).toBeNull();
+    expect(accessNote({ workouts: true, activeEnergy: true, totalEnergy: false, distance: true, steps: true, sleep: true })).toBeNull();
     expect(accessNote({ ...NO_ACCESS, workouts: true })).toMatch(/^Calories and distance are not shared/);
     expect(accessNote({ ...NO_ACCESS, workouts: true, distance: true })).toMatch(/^Calories are not shared/);
-    expect(accessNote({ workouts: true, activeEnergy: true, totalEnergy: true, distance: false, steps: true })).toMatch(/^Distance is not shared/);
+    expect(accessNote({ workouts: true, activeEnergy: true, totalEnergy: true, distance: false, steps: true, sleep: true })).toMatch(/^Distance is not shared/);
   });
 
   it('says what happens to steps', () => {
@@ -112,5 +112,22 @@ describe('sync screen wording', () => {
     expect(stepsRowText({ ...NO_ACCESS, workouts: true, steps: true }, read, '2026-11-15', 'Apple Health')).toBe('None yet today. Shown on Train');
     expect(stepsRowText({ ...NO_ACCESS, workouts: true, steps: true }, none, '2026-11-14', 'Apple Health')).toBe('Shown on Train once they are read');
     expect(stepsRowText({ ...NO_ACCESS, workouts: true, steps: true }, { days: {}, readAt: 'x' }, '2026-11-14', 'Apple Health')).toBe('None in Apple Health in the last 35 days');
+  });
+});
+
+describe('the Sleep row', () => {
+  const all = { workouts: true, activeEnergy: true, totalEnergy: true, distance: true, steps: true, sleep: true };
+  it('offers to allow sleep when it is not shared, and says last night and where it came from', () => {
+    expect(sleepRowText({ ...all, sleep: false }, null, null, 'Health Connect')).toBe('Not shared yet. Allow sleep to fill your sleep log');
+    expect(sleepRowText(all, { hours: 7.2, source: 'health', store: 'healthConnect', origin: 'com.garmin.android.apps.connectmobile' }, '2026-11-14T08:00:00Z', 'Health Connect')).toBe(
+      'Last night 7 h 12 min, from Garmin Connect',
+    );
+    expect(sleepRowText(all, { hours: 7.5, source: 'health', store: 'healthKit', origin: 'com.apple.health.watch' }, null, 'Apple Health')).toBe('Last night 7 h 30 min, from Apple Watch');
+    expect(sleepRowText(all, { hours: 6 }, null, 'Apple Health')).toBe('Last night 6 h, entered by you');
+    expect(sleepRowText(all, undefined, null, 'Apple Health')).toBe('Nights go to your sleep log once they are read');
+    expect(sleepRowText(all, undefined, '2026-11-14T08:00:00Z', 'Apple Health')).toBe('No night from Apple Health for last night yet');
+    // Deleted, or its sync undone: no later sync adds it, so the row does not say it may still come.
+    expect(sleepRowText(all, undefined, '2026-11-14T08:00:00Z', 'Apple Health', true)).toBe('Last night was deleted. A sync does not add it again');
+    expect(sleepRowText({ ...all, sleep: false }, undefined, null, 'Health Connect', true)).toBe('Not shared yet. Allow sleep to fill your sleep log');
   });
 });

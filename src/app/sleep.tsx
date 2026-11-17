@@ -8,14 +8,15 @@ import { deleteSleep, saveSleep } from '@/features/trackers/actions';
 import { dayTitle, resolveDateParam } from '@/features/trackers/dateParam';
 import { DayStepper, Explain, ExplainText, Figure, RequireProfile } from '@/features/trackers/components';
 import { findByDate, formatHours, QUALITY_LABELS, SLEEP_RANGE, sleepSummary } from '@/features/trackers/helpers';
+import { sleepFromLine, stagesLine } from '@/features/trackers/sleepSource';
 import { useToday } from '@/store/clock';
 import { useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
-import type { ISODate, SleepEntry } from '@/types';
+import type { ISODate, SleepEntry, SleepQuality } from '@/types';
 import { BarChart, Button, Card, Chip, CupKey, Divider, EmptyState, Header, ListRow, Screen, SectionTitle, Segmented, Sheet, Stepper, Text } from '@/ui';
 
 type Window = '7' | '30';
-const QUALITIES: SleepEntry['quality'][] = [1, 2, 3, 4, 5];
+const QUALITIES: SleepQuality[] = [1, 2, 3, 4, 5];
 
 /** 7.25 -> '7 h 15' + 'min', 7 -> '7' + 'h': a duration as a figure and its unit, read the way every other duration in the app is. */
 function hm(hours: number): { value: string; unit: string } {
@@ -30,6 +31,34 @@ function QualityDots({ quality, size = 10 }: { quality: number; size?: number })
       {QUALITIES.map((q) => (
         <CupKey key={q} size={size} color={q <= quality ? colors.sleep : colors.borderStrong} variant={q <= quality ? 'filled' : 'outline'} />
       ))}
+    </View>
+  );
+}
+
+/** History row: its rating and where it came from, "Good sleep · From Garmin Connect". */
+function historySubtitle(e: SleepEntry): string | undefined {
+  const parts = [e.quality ? `${QUALITY_LABELS[e.quality]} sleep` : null, sleepFromLine(e)].filter(Boolean);
+  return parts.length ? parts.join(' · ') : undefined;
+}
+
+/** Where a synced night came from and its stages; nothing for a night entered by hand. */
+function SyncedNight({ night }: { night: SleepEntry }) {
+  const from = sleepFromLine(night);
+  if (!from) return null;
+  const stages = stagesLine(night.stages);
+  return (
+    <View style={{ gap: 4 }}>
+      <Text variant="label" color="textSecondary" testID="sleep-last-night-from">
+        {from}
+      </Text>
+      {stages ? (
+        <Text variant="caption" color="textSecondary" testID="sleep-last-night-stages">
+          {stages}
+        </Text>
+      ) : null}
+      <Text variant="caption" color="textSecondary">
+        Time awake and time in bed are not counted as sleep.
+      </Text>
     </View>
   );
 }
@@ -112,12 +141,15 @@ function SleepScreen() {
             {lastNight ? (
               <>
                 <HoursBig hours={lastNight.hours} testID="sleep-last-night" />
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <QualityDots quality={lastNight.quality} />
-                  <Text variant="label" color="textSecondary">
-                    {QUALITY_LABELS[lastNight.quality]} sleep
-                  </Text>
-                </View>
+                {lastNight.quality ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <QualityDots quality={lastNight.quality} />
+                    <Text variant="label" color="textSecondary">
+                      {QUALITY_LABELS[lastNight.quality]} sleep
+                    </Text>
+                  </View>
+                ) : null}
+                <SyncedNight night={lastNight} />
               </>
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -155,7 +187,7 @@ function SleepScreen() {
               {[
                 'Shaded: 7 to 9 h.',
                 summary.nights < days ? `${days - summary.nights} of ${days} nights not logged.` : null,
-                summary.avgQuality !== null ? `Average quality ${QUALITY_LABELS[Math.round(summary.avgQuality) as SleepEntry['quality']].toLowerCase()}.` : null,
+                summary.avgQuality !== null ? `Average quality ${QUALITY_LABELS[Math.round(summary.avgQuality) as SleepQuality].toLowerCase()}.` : null,
               ]
                 .filter(Boolean)
                 .join(' ')}
@@ -181,7 +213,7 @@ function SleepScreen() {
                 <ListRow
                   testID={`sleep-row-${i}`}
                   title={formatDayLabel(e.date)}
-                  subtitle={`${QUALITY_LABELS[e.quality]} sleep`}
+                  subtitle={historySubtitle(e)}
                   value={formatHours(e.hours)}
                   onPress={() => setSheetDate(e.date)}
                 />
@@ -199,14 +231,16 @@ function SleepScreen() {
 function SleepSheet({ date, onDate, onClose, entries }: { date: ISODate | null; onDate: (d: ISODate) => void; onClose: () => void; entries: SleepEntry[] }) {
   const { spacing } = useTheme();
   const existing = date ? findByDate(entries, date) : undefined;
+  const from = existing ? sleepFromLine(existing) : null;
   const [hours, setHours] = useState(7.5);
-  const [quality, setQuality] = useState<SleepEntry['quality']>(3);
+  // A new night starts at "Okay"; a synced night the person has not rated starts with none.
+  const [quality, setQuality] = useState<SleepQuality | null>(3);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const key = date ? `${date}:${existing?.id ?? 'new'}` : null;
   if (key !== loadedFor) {
     setLoadedFor(key);
     setHours(existing?.hours ?? 7.5);
-    setQuality(existing?.quality ?? 3);
+    setQuality(existing ? (existing.quality ?? null) : 3);
   }
   return (
     <Sheet
@@ -237,6 +271,11 @@ function SleepSheet({ date, onDate, onClose, entries }: { date: ISODate | null; 
           ) : null}
         </View>
       }>
+      {existing && from ? (
+        <Text variant="caption" color="textSecondary" testID="sleep-sheet-from">
+          {`${from}. A rating keeps it synced; a new time makes it yours.`}
+        </Text>
+      ) : null}
       <Text variant="label" color="textSecondary">
         Woke up on
       </Text>
@@ -258,7 +297,8 @@ function SleepSheet({ date, onDate, onClose, entries }: { date: ISODate | null; 
       </Text>
       <View style={{ flexDirection: 'row', gap: 6 }}>
         {QUALITIES.map((q) => (
-          <Chip key={q} testID={`sleep-quality-${q}`} label={QUALITY_LABELS[q]} selected={quality === q} onPress={() => setQuality(q)} style={{ flex: 1, paddingHorizontal: 4, justifyContent: 'center' }} />
+          // Tapping the chosen one again clears it: a night does not need a rating.
+          <Chip key={q} testID={`sleep-quality-${q}`} label={QUALITY_LABELS[q]} selected={quality === q} onPress={() => setQuality(quality === q ? null : q)} style={{ flex: 1, paddingHorizontal: 4, justifyContent: 'center' }} />
         ))}
       </View>
     </Sheet>

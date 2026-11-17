@@ -13,11 +13,17 @@
  *   - <Record type="HKQuantityTypeIdentifierStepCount"> whose start date is on
  *     or after `stepsFromDay`, handed to `onStep` one at a time (the caller
  *     adds them up and keeps no sample);
+ *   - <Record type="HKCategoryTypeIdentifierSleepAnalysis"> whose start date is
+ *     on or after `sleepFromDay`, handed to `onSleep` one at a time with only
+ *     its source, device, dates, value and the HKTimeZone of its direct
+ *     <MetadataEntry> children (the caller turns them into nights, sleep.ts);
  *   - the <ExportDate> value.
  *
- * Everything else (heart rate, sleep, body measurements, the <Me> element with
- * the date of birth, workout events and routes, anything clinical) is passed
- * over by its first bytes: it is never decoded into a string, kept or logged.
+ * Everything else (heart rate, older sleep, body measurements, the <Me> element
+ * with the date of birth, workout events and routes, anything clinical) is
+ * passed over by its first bytes: it is never decoded into a string, kept or
+ * logged. A record's type and start date are compared as bytes, so a record
+ * that is not kept is never decoded either.
  *
  * A tag, an attribute or a multi-byte character can be split across two
  * chunks: the unfinished tag's bytes are carried over to the next chunk, and
@@ -54,10 +60,26 @@ export interface StepRecord {
   value: string;
 }
 
+/** One sleep-analysis sample, as written. Its source name is for grouping in memory only, never kept. */
+export interface SleepRecord {
+  sourceName: string;
+  /** The device string ('<<HKDevice: …>, name:…, model:Watch, …>'): only its kind is ever used. */
+  device: string;
+  startDate: string;
+  endDate: string;
+  /** 'HKCategoryValueSleepAnalysisAsleepCore', ... */
+  value: string;
+  /** The HKTimeZone metadata of the sample ('Europe/Berlin'), when the app wrote one. */
+  timeZone: string | null;
+}
+
 export interface ScanOptions {
   /** 'YYYY-MM-DD': step records whose start date (as written, in its own offset) is before this are skipped unread. */
   stepsFromDay?: string;
   onStep?(record: StepRecord): void;
+  /** 'YYYY-MM-DD': sleep records whose start date (as written) is before this are skipped unread. */
+  sleepFromDay?: string;
+  onSleep?(record: SleepRecord): void;
 }
 
 export interface ScanResult {
@@ -71,7 +93,7 @@ export interface ScanResult {
   complete: boolean;
   exportDate: string | null;
   workouts: RawWorkout[];
-  counts: { records: number; stepRecords: number };
+  counts: { records: number; stepRecords: number; sleepRecords: number };
 }
 
 export class HealthExportError extends Error {}
@@ -87,6 +109,7 @@ const MAX_TAG = 4 * 1024 * 1024;
 
 const ascii = (s: string) => Uint8Array.from(s, (c) => c.charCodeAt(0));
 const STEP_TYPE = ascii('HKQuantityTypeIdentifierStepCount"');
+const SLEEP_TYPE = ascii('HKCategoryTypeIdentifierSleepAnalysis"');
 const TYPE_ATTR = ascii('type="');
 const START_ATTR = ascii('startDate="');
 
@@ -135,8 +158,19 @@ const decodeAttrs = (buf: Uint8Array, lt: number, gt: number) => attrsOf(strFrom
 /** A name that starts with one of these may matter; anything else is skipped by its first letters. */
 const firstLetterMatters = new Set([0x57 /* W */, 0x52 /* R */, 0x45 /* E */, 0x48 /* H */, 0x4d /* M */]);
 
+/** Does the start date at `s` (as written, 'YYYY-MM-DD …') fall on or after `day`? Compared as bytes: nothing is decoded. */
+function onOrAfter(buf: Uint8Array, s: number, day: Uint8Array): boolean {
+  for (let i = 0; i < day.length; i++) {
+    const c = buf[s + i];
+    if (c < day[i]) return false;
+    if (c > day[i]) return true;
+  }
+  return true;
+}
+
 export function createHealthScanner(options: ScanOptions = {}) {
   const fromDay = options.stepsFromDay ? ascii(options.stepsFromDay) : null;
+  const sleepFromDay = options.sleepFromDay ? ascii(options.sleepFromDay) : null;
   let carry: Uint8Array | null = null;
   let isHealthExport = false;
   let complete = false;
@@ -144,6 +178,9 @@ export function createHealthScanner(options: ScanOptions = {}) {
   const workouts: RawWorkout[] = [];
   let records = 0;
   let stepRecords = 0;
+  let sleepRecords = 0;
+  /** A kept sleep record whose children (its metadata) are still being read: handed on at its </Record>. */
+  let sleep: SleepRecord | null = null;
   /** The workout being read, and the names of the open elements inside it. */
   let current: RawWorkout | null = null;
   const inside: string[] = [];
@@ -164,21 +201,31 @@ export function createHealthScanner(options: ScanOptions = {}) {
   function onRecord(buf: Uint8Array, lt: number, gt: number) {
     records++;
     const t = after(buf, lt + 7, gt, TYPE_ATTR);
-    if (t < 0 || !bytesAt(buf, t, STEP_TYPE)) return;
-    stepRecords++;
-    if (!options.onStep) return;
-    if (fromDay) {
-      // 'YYYY-MM-DD' compares as text: an old sample is dropped before anything is decoded.
-      const s = after(buf, lt + 7, gt, START_ATTR);
-      if (s < 0) return;
-      for (let i = 0; i < fromDay.length; i++) {
-        const c = buf[s + i];
-        if (c < fromDay[i]) return;
-        if (c > fromDay[i]) break;
+    if (t < 0) return;
+    if (bytesAt(buf, t, STEP_TYPE)) {
+      stepRecords++;
+      if (!options.onStep) return;
+      if (fromDay) {
+        // 'YYYY-MM-DD' compares as text: an old sample is dropped before anything is decoded.
+        const s = after(buf, lt + 7, gt, START_ATTR);
+        if (s < 0 || !onOrAfter(buf, s, fromDay)) return;
       }
+      const a = decodeAttrs(buf, lt, gt);
+      options.onStep({ sourceName: a.sourceName ?? '', startDate: a.startDate ?? '', endDate: a.endDate ?? a.startDate ?? '', value: a.value ?? '' });
+      return;
+    }
+    if (!bytesAt(buf, t, SLEEP_TYPE)) return;
+    sleepRecords++;
+    if (!options.onSleep) return;
+    if (sleepFromDay) {
+      const s = after(buf, lt + 7, gt, START_ATTR);
+      if (s < 0 || !onOrAfter(buf, s, sleepFromDay)) return;
     }
     const a = decodeAttrs(buf, lt, gt);
-    options.onStep({ sourceName: a.sourceName ?? '', startDate: a.startDate ?? '', endDate: a.endDate ?? a.startDate ?? '', value: a.value ?? '' });
+    const record: SleepRecord = { sourceName: a.sourceName ?? '', device: a.device ?? '', startDate: a.startDate ?? '', endDate: a.endDate ?? a.startDate ?? '', value: a.value ?? '', timeZone: null };
+    // A record with children carries its metadata inside: it is handed on at its </Record>.
+    if (buf[gt - 1] === SLASH) options.onSleep(record);
+    else sleep = record;
   }
 
   /** One whole tag, buf[lt..gt]. */
@@ -186,6 +233,14 @@ export function createHealthScanner(options: ScanOptions = {}) {
     const c1 = buf[lt + 1];
     const selfClosing = buf[gt - 1] === SLASH;
     if (c1 === SLASH) {
+      if (sleep) {
+        // Only a kept sleep record's own children come before its </Record> (Apple writes no deeper elements in a record).
+        if (nameAt(buf, lt + 2, Math.min(gt, lt + 16)) === 'Record') {
+          options.onSleep?.(sleep);
+          sleep = null;
+        }
+        return;
+      }
       if (!current) {
         if (nameAt(buf, lt + 2, Math.min(gt, lt + 16)) === 'HealthData') complete = true;
         return;
@@ -209,6 +264,14 @@ export function createHealthScanner(options: ScanOptions = {}) {
         if (a.type) current.stats.push({ type: a.type, sum: Number.isFinite(sum) ? sum : null, unit: a.unit ?? '', nested: depth > 1 });
       }
       if (!selfClosing) inside.push(name);
+      return;
+    }
+    if (sleep) {
+      // A kept sleep record's metadata: only its time zone is read.
+      if (c1 === 0x4d && nameAt(buf, lt + 1, Math.min(gt, lt + 20)) === 'MetadataEntry') {
+        const a = decodeAttrs(buf, lt, gt);
+        if (a.key === 'HKTimeZone' && a.value) sleep.timeZone = a.value;
+      }
       return;
     }
     if (!firstLetterMatters.has(c1)) return;
@@ -294,10 +357,12 @@ export function createHealthScanner(options: ScanOptions = {}) {
 
   function finish(): ScanResult {
     // A workout still open is half read (its statistics may come after the cut): it is never handed on as finished.
+    // A sleep record still open is the same: a file cut there is refused as incomplete anyway.
     current = null;
+    sleep = null;
     inside.length = 0;
     carry = null;
-    return { isHealthExport, complete, exportDate, workouts, counts: { records, stepRecords } };
+    return { isHealthExport, complete, exportDate, workouts, counts: { records, stepRecords, sleepRecords } };
   }
 
   return { push, finish };

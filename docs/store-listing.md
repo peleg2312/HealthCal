@@ -172,13 +172,13 @@ HealthCal gives estimates for everyday tracking. It is not a medical device and 
 Play only: add this paragraph at the end of WORKOUTS.
 
 ```
-- On Android, sync workouts automatically from Health Connect: exercise sessions with their calories and distance from Garmin Connect, Samsung Health, Fitbit and other apps. Your daily steps show on your training week; they are never added to your calories.
+- On Android, sync workouts automatically from Health Connect: exercise sessions with their calories and distance from Garmin Connect, Samsung Health, Fitbit and other apps. Your daily steps show on your training week, and each night's sleep fills your sleep log; neither is ever added to your calories.
 ```
 
 App Store only, once an iPhone build with Apple Health (the library is bound since November 2026: docs/health-sync.md, "How the iPhone side is bound") has been checked on a phone and is the one submitted: add this paragraph at the end of WORKOUTS. Apple's review asks that an app using HealthKit says so in its description and in the app (the sync screen is named "Workout sync" and says "From Apple Health"; the Profile row opens it).
 
 ```
-- Works with Apple Health: workouts from your Apple Watch, Garmin Connect and other apps arrive by themselves, with their calories and distance. Your daily steps show on your training week; they are never added to your calories. HealthCal only reads from Apple Health and never writes to it.
+- Works with Apple Health: workouts from your Apple Watch, Garmin Connect and other apps arrive by themselves, with their calories and distance. Your daily steps show on your training week, and each night's sleep fills your sleep log; neither is ever added to your calories. HealthCal only reads from Apple Health and never writes to it.
 ```
 
 ## Specifications read
@@ -218,7 +218,7 @@ The stores will ask for these, and only you can provide them:
    - the app works on the device without an account;
    - with an account, data syncs to your Supabase project;
    - a meal photo or description is sent to the analyse-food function and on to the AI model provider to make an estimate;
-   - with Workout sync on, workouts, their active and total calories and distance, and daily steps are read from Health Connect on Android or Apple Health on iPhone (the iPhone side reads steps on an iPhone simulator and has not yet run on a real phone; docs/health-sync.md, "State of the iPhone side"); workouts are kept like hand-logged sessions, steps only on the phone; none of it goes to the AI provider, advertisers or anyone else, and nothing is written back;
+   - with Workout sync on, workouts, their active and total calories and distance, daily steps and how long the person slept each night (sleep sessions and their stages; time awake and in bed are not counted) are read from Health Connect on Android or Apple Health on iPhone (the iPhone side reads steps on an iPhone simulator and has not yet run on a real phone; docs/health-sync.md, "State of the iPhone side"); workouts are kept like hand-logged sessions and nights like nights entered by hand in the sleep log, steps only on the phone; none of it goes to the AI provider, advertisers or anyone else, and nothing is written back;
    - friends see only minutes, sessions, streak and recent workouts;
    - how export and deletion work.
 2. **Apple: App Privacy answers** (the "nutrition label"). Data linked to the user when an account exists:
@@ -229,16 +229,16 @@ The stores will ask for these, and only you can provide them:
 
    No tracking and no ads. Declare Photos (or Other User Content) as shared with a third-party AI provider, Anthropic, for app functionality only and not used for tracking. Apple's guideline 5.1.2 also asks that people are told, and agree, before personal data goes to a third-party AI service: the app asks once per device before the first estimate (`src/features/ai/AiConsentSheet.tsx`), says on the estimate screen where the photo or description goes, and lets people withdraw in About HealthCal, under Privacy.
    **Apple Health (HealthKit), for the review, once the Apple Health build is the one submitted** (the library is installed and bound, but no signed iPhone build has read Apple Health on a phone yet: docs/health-sync.md, "State of the iPhone side"). These lines are what App Review checks for an app that reads HealthKit (App Store Review Guidelines 2.5.1 and 5.1.3, read 16 November 2026):
-   - *Usage text* (`NSHealthShareUsageDescription`, which the library's config plugin sets from app.json; docs/health-sync.md): "HealthCal reads the workouts and steps you choose from Apple Health to fill your training week. It never writes to Apple Health and never sends this data to the AI functions." There is no `NSHealthUpdateUsageDescription`: nothing is written.
-   - *What is read* (5.1.3(i): "You must disclose the specific health data that you are collecting from the device"): workouts, active energy, walking and running distance, cycling distance and step count. Put this list in the privacy policy and in the App Review notes.
-   - *Not used for ads or data mining, not shared* (5.1.3(i)): workouts become ordinary sessions in the person's own diary (and their account if they have one); steps stay on the phone. Nothing goes to the AI provider, to analytics or to advertisers. Friends see only the friends summary (minutes, sessions, streak, recent workouts' names, lengths, distances and dates), which is the same for a workout logged by hand.
+   - *Usage text* (`NSHealthShareUsageDescription`, which the library's config plugin sets from app.json; docs/health-sync.md): "HealthCal reads the workouts, steps and sleep you choose from Apple Health to fill your training week and sleep log. It never writes to Apple Health and never sends this data to the AI functions." (The lead sets this text in app.json with the sleep change; until then app.json still has the earlier text without sleep.) There is no `NSHealthUpdateUsageDescription`: nothing is written.
+   - *What is read* (5.1.3(i): "You must disclose the specific health data that you are collecting from the device"): workouts, active energy, walking and running distance, cycling distance, step count and sleep analysis (how long the person slept each night and its stages; time awake and in bed are not counted). Put this list in the privacy policy and in the App Review notes.
+   - *Not used for ads or data mining, not shared* (5.1.3(i)): workouts become ordinary sessions in the person's own diary and nights ordinary entries in their sleep log (and their account if they have one); steps stay on the phone. Nothing goes to the AI provider, to analytics or to advertisers. Friends see only the friends summary (minutes, sessions, streak, recent workouts' names, lengths, distances and dates), which is the same for a workout logged by hand.
    - *No iCloud* (5.1.3(ii)): HealthCal stores nothing in iCloud; the account backend is Supabase.
    - *Nothing written* (5.1.3(ii)): HealthCal never writes to HealthKit.
    - *In the app* (2.5.1, HealthKit used for fitness and integrated with the Health app): the sync screen names Apple Health, explains each type before iOS asks, and links to the Health app.
-   - *App Privacy answers*: add "Fitness" (workouts, steps) under Health and Fitness, linked to the user only for workouts when an account exists; steps are not collected off the device.
-   - *Review notes*: say that sync is off until switched on in Profile > Workout sync, and that a reviewer can turn it on with a test iPhone that has a workout in the Health app.
+   - *App Privacy answers*: add "Fitness" (workouts, steps) and "Health" (sleep) under Health and Fitness, linked to the user only for workouts and sleep when an account exists; steps are not collected off the device.
+   - *Review notes*: list what is read (the six types above, sleep analysis included), say that sync is off until switched on in Profile > Workout sync, and that a reviewer can turn it on with a test iPhone that has a workout (and, to see sleep, a night of sleep) in the Health app.
 3. **Google Play: Health Connect declaration and Data safety form.**
-   - In App content, the Health Connect permissions declaration: read access to exercise, active calories, total calories, distance and steps only, as `READ_PERMISSIONS` and docs/health-sync.md list them, with the reason for each and a link to the privacy policy. Steps were added after the first four: if the declaration was already filed, file the change (steps: "shown as a daily count on the training week; never added to calories, never shared").
+   - In App content, the Health Connect permissions declaration: read access to exercise, active calories, total calories, distance, steps and sleep only, as `READ_PERMISSIONS` and docs/health-sync.md list them, with the reason for each and a link to the privacy policy. Steps were added after the first four: if the declaration was already filed, file the change (steps: "shown as a daily count on the training week; never added to calories, never shared"; sleep: "how long the person slept each night, kept in their sleep log; never added to calories, never sent to AI, never shared").
    - The Health apps declaration.
    - The Data safety form, with the same facts as Apple's answers.
 4. **Account deletion web link (Play).** Play asks for a web page where someone can request deletion without the app. The in-app "Delete account" is not enough on its own there.

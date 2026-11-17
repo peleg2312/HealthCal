@@ -5,20 +5,22 @@
  * it without prop drilling.
  *
  * Nothing is saved until the person taps Import (or Save steps): a Health
- * export's steps wait with its workouts, go in with them, and Undo takes both
- * out. Leaving the screen while a file is read stops the read (`leaveImport`):
+ * export's steps and nights wait with its workouts, go in with them, and Undo
+ * takes them all out. Leaving the screen while a file is read stops the read (`leaveImport`):
  * a read that was left or started over never writes into the session again.
  */
 import { create } from 'zustand';
 
-import { exportWorkouts } from '@/features/health-sync/exportFile';
+import { exportWorkouts, fileNights, planFileSleep, type FileSleepPlan } from '@/features/health-sync/exportFile';
 import { findHealthExport, readHealthExport, type ExportRead } from '@/features/health-sync/exportRead';
+import type { Handled } from '@/features/health-sync/plan';
+import { sleepChanges, undoSleep, type SleepPlan } from '@/features/health-sync/sleep';
 import { mergeFileSteps, type FileSteps } from '@/features/health-sync/steps';
 import { useHealthSync, whenLoaded } from '@/features/health-sync/store';
 import { today } from '@/lib/dates';
 import { bmr, formulaTdee } from '@/lib/energy';
 import { useStore } from '@/store';
-import type { ActivityEntry, Intensity } from '@/types';
+import type { ActivityEntry, Intensity, SleepEntry } from '@/types';
 import { haptic, toast } from '@/ui';
 
 import type { ConvertContext, ImportedEntry } from '../convert';
@@ -50,6 +52,8 @@ export interface ImportResult {
   previous: ActivityEntry[];
   /** Steps from a Health export saved with this import: how many days, and what the phone kept before (Undo puts it back). */
   steps: { days: number; before: FileSteps | null } | null;
+  /** Nights from a Health export written to the sleep log with this import (Undo takes them out, or puts the earlier ones back). */
+  sleep: { nights: number; plan: Pick<SleepPlan, 'add' | 'update'> } | null;
   undone: boolean;
 }
 
@@ -296,8 +300,8 @@ async function readExport(file: PickedFile, index: number, total: number, mine: 
       return { workouts: [], warnings: [], errors: [{ file: name, code: 'apple-damaged', message }], files: [{ file: name, format: 'apple' }] };
     }
     stillCurrent(mine);
-    // The phone's step memory is loaded now, so saving with the import (a tap later) is immediate.
-    if (read.steps) await whenLoaded();
+    // The phone's step and sync memory is loaded now, so saving with the import (a tap later) is immediate.
+    if (read.steps || read.nights.length) await whenLoaded();
     stillCurrent(mine);
     set({ exports: { ...get().exports, [name]: read } });
   }
@@ -307,6 +311,8 @@ async function readExport(file: PickedFile, index: number, total: number, mine: 
     const n = Object.keys(read.steps.days).length;
     warnings.push(warn('apple-steps', `Steps for ${plural(n, 'day', 'days')} are saved on this phone with the import. They show on Train and are never added to your calories.`, name));
   }
+  const sleepNote = sleepNoteOf(sleepPlanOf({ [name]: read }, Object.values(useStore.getState().sleep), useHealthSync.getState().handled));
+  if (sleepNote) warnings.push(warn('apple-sleep', sleepNote, name));
   if (leftOut.otherSource) warnings.push(warn('apple-merged', `${plural(leftOut.otherSource, 'workout was', 'workouts were')} recorded by two sources and ${leftOut.otherSource === 1 ? 'is' : 'are'} listed once.`, name));
   if (leftOut.notExercise) warnings.push(warn('apple-not-exercise', `${plural(leftOut.notExercise, 'rest or transition was', 'rests or transitions were')} left out.`, name));
   return { workouts, warnings, errors: [], files: [{ file: name, format: 'apple' }] };
@@ -440,7 +446,43 @@ export function stepDayCount(exports: Record<string, ExportRead>): number {
 }
 
 /**
- * Save the ticked workouts, and the steps of any Health export read. Undo
+ * What saving the nights of the Health exports read in this visit would do to
+ * the sleep log (`records`: every sleep record, deleted ones included;
+ * `handled`: the phone's sync memory). Null when no export holds a night. Pure.
+ */
+export function sleepPlanOf(exports: Record<string, ExportRead>, records: readonly SleepEntry[], handled: Readonly<Record<string, Handled>>): FileSleepPlan | null {
+  const reads = Object.values(exports).filter((r) => r.nights.length);
+  if (!reads.length) return null;
+  return planFileSleep(fileNights(reads), records, handled);
+}
+
+/** How many nights the import would write to the sleep log (0: none). Pure. */
+export const sleepNightCount = (plan: FileSleepPlan | null): number => (plan ? sleepChanges(plan) : 0);
+
+/** The file note about sleep: how many nights go to the sleep log, what stays, and that only sleep counts. Null when the file has none. Pure. */
+export function sleepNoteOf(plan: FileSleepPlan | null): string | null {
+  if (!plan || !plan.found) return null;
+  const n = sleepChanges(plan);
+  const parts: string[] = [];
+  if (n) {
+    parts.push(`Sleep for ${plural(n, 'night', 'nights')} goes to your sleep log with the import.`);
+    if (plan.kept) parts.push(`${plural(plan.kept, 'night', 'nights')} already there ${plan.kept === 1 ? 'stays' : 'stay'} as ${plan.kept === 1 ? 'it is' : 'they are'}.`);
+  } else if (plan.kept) {
+    const all = plan.kept === plan.found;
+    parts.push(`${all ? 'The ' : ''}${plural(plan.kept, 'night', 'nights')} in this file ${plan.kept === 1 ? 'is' : 'are'} already in your sleep log.`);
+  }
+  if (plan.deleted) parts.push(`${plural(plan.deleted, 'night', 'nights')} you deleted ${plan.deleted === 1 ? 'is' : 'are'} left out.`);
+  if (n) parts.push('Time awake and time in bed are not counted as sleep.');
+  return parts.join(' ');
+}
+
+/** "steps for 30 days", "sleep for 28 nights", or both joined by "and"; '' when neither. */
+export function extrasPart(stepDays: number, nights: number): string {
+  return [stepDays ? `steps for ${plural(stepDays, 'day', 'days')}` : '', nights ? `sleep for ${plural(nights, 'night', 'nights')}` : ''].filter(Boolean).join(' and ');
+}
+
+/**
+ * Save the ticked workouts, and the steps and nights of any Health export read. Undo
  * removes exactly what was added, puts updated workouts back as they were and
  * puts the phone's steps back as they were before.
  */
@@ -448,7 +490,9 @@ export function commitImport() {
   const rows = get().rows;
   const entries = entriesToSave(rows);
   const files = stepsToSave(get().exports);
-  if (!entries.length && !files.length) return;
+  const sleepPlan = sleepPlanOf(get().exports, Object.values(useStore.getState().sleep), useHealthSync.getState().handled);
+  const nights = sleepNightCount(sleepPlan);
+  if (!entries.length && !files.length && !nights) return;
   const stored = useStore.getState().activities;
   const previous = entries.map((e) => stored[e.id]).filter((e): e is ActivityEntry => !!e && !e.deleted);
   if (entries.length) useStore.getState().upsertMany('activities', entries);
@@ -461,12 +505,21 @@ export function commitImport() {
     useHealthSync.setState({ fileSteps: kept });
     steps = { days: stepDayCount(get().exports), before };
   }
+  let sleep: ImportResult['sleep'] = null;
+  if (sleepPlan && nights) {
+    // planSleep keeps each updated night's id and quality; a new night's id comes from its date.
+    const written = [...sleepPlan.add, ...sleepPlan.update.map((u) => u.after)];
+    useStore.getState().upsertMany('sleep', written);
+    sleep = { nights, plan: { add: sleepPlan.add, update: sleepPlan.update } };
+  }
   haptic.success();
-  const result: ImportResult = { entries, previous, steps, undone: false };
+  const result: ImportResult = { entries, previous, steps, sleep, undone: false };
   set({ phase: 'done', result });
   const updated = previous.length;
   const added = entries.length - updated;
-  const message = [added ? `${workoutsLabel(added)} imported` : '', updated ? `${workoutsLabel(updated)} updated` : '', !entries.length && steps ? 'Steps saved' : ''].filter(Boolean).join(', ');
+  const message = entries.length
+    ? [added ? `${workoutsLabel(added)} imported` : '', updated ? `${workoutsLabel(updated)} updated` : ''].filter(Boolean).join(', ')
+    : savedOnly(!!steps, !!sleep);
   toast(message, { label: 'Undo', onPress: () => undoImport(result) });
 }
 
@@ -476,7 +529,18 @@ export function undoImport(result: ImportResult) {
   if (result.previous.length) store.upsertMany('activities', result.previous);
   for (const e of result.entries) if (!back.has(e.id)) store.remove('activities', e.id);
   if (result.steps) useHealthSync.setState({ fileSteps: result.steps.before });
+  if (result.sleep) {
+    // Only nights still as the import wrote them: one the person changed since is theirs (undoSleep).
+    const back = undoSleep(result.sleep.plan, Object.values(useStore.getState().sleep));
+    for (const r of back.remove) store.remove('sleep', r.id);
+    if (back.restore.length) store.upsertMany('sleep', back.restore);
+  }
   const r = get().result;
   // Only mark this session's result when it is the import being undone.
   if (r && r.entries === result.entries) set({ result: { ...r, undone: true } });
+}
+
+/** The toast and header line when only steps or nights were saved: "Steps saved", "Sleep saved", "Steps and sleep saved". */
+export function savedOnly(steps: boolean, sleep: boolean): string {
+  return steps && sleep ? 'Steps and sleep saved' : sleep ? 'Sleep saved' : steps ? 'Steps saved' : '';
 }

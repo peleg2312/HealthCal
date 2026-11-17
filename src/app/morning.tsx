@@ -58,7 +58,8 @@ export default function MorningScreen() {
 
   const footer = (
     <View style={{ flexDirection: 'row', gap: spacing.md }}>
-      <Button testID="morning-today" title="Today" accessibilityLabel="Go to Today" variant="secondary" full={false} onPress={close} style={{ flex: 1, paddingHorizontal: spacing.md }} />
+      {/* "Today" always lands on Today, also when the page was opened from Profile; the X goes back to where it was opened. */}
+      <Button testID="morning-today" title="Today" accessibilityLabel="Go to Today" variant="secondary" full={false} onPress={() => router.dismissTo('/' as never)} style={{ flex: 1, paddingHorizontal: spacing.md }} />
       <Button
         testID="morning-log"
         title={logMealTitle(meal)}

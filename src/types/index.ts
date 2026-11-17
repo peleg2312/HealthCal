@@ -248,11 +248,42 @@ export interface WeightEntry extends SyncedRecord {
   note?: string;
 }
 
+/** How a night felt, 1 (poor) to 5 (great). Only ever given by the person. */
+export type SleepQuality = 1 | 2 | 3 | 4 | 5;
+
+/** Which health store a synced night was read from ('file' is the Health app's export). */
+export type SleepStore = 'healthConnect' | 'healthKit' | 'file';
+
+/** Minutes of each sleep stage in a synced night. Awake time is never counted as sleep. */
+export interface SleepStages {
+  light: number;
+  deep: number;
+  rem: number;
+  awake: number;
+}
+
+/**
+ * One night, one record per wake day (the id is derived from `date`).
+ * Entered by hand: `date`, `hours`, `quality`. Read from a health store
+ * (src/features/health-sync): `source: 'health'` with `store`, `origin`,
+ * `startedAt`, `endedAt` and `stages`, and no quality until the person gives one.
+ */
 export interface SleepEntry extends SyncedRecord {
   /** The date the user woke up. */
   date: ISODate;
+  /** Hours asleep (time awake and in bed not counted), rounded to 2 decimals when synced. */
   hours: number;
-  quality: 1 | 2 | 3 | 4 | 5;
+  quality?: SleepQuality;
+  /** Set only on a night read from a health store. Cleared when the person changes its hours. */
+  source?: 'health';
+  store?: SleepStore;
+  /** The app that wrote it (a package, bundle id or `com.apple.health.watch`), never a device's name. */
+  origin?: string;
+  /** First fall asleep and last wake, ISO instants. */
+  startedAt?: ISODateTime;
+  endedAt?: ISODateTime;
+  /** Minutes per stage, or null when the source recorded no stages. */
+  stages?: SleepStages | null;
 }
 
 /** A saved strength routine: a named list of exercises with a set count each, started in one tap. */

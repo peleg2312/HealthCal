@@ -144,6 +144,18 @@ describe('summarizePeriod', () => {
     expect(summarizePeriod({ days, trend: [], sleep: [], today: TODAY }).macros!.fiber).toBeNull();
   });
 
+  it('averages sleep quality only over rated nights, and gives none when no night is rated', () => {
+    const days = run(6, (d) => day(d, {}));
+    const rated: SleepLike[] = days.map((d, i) => ({ date: d.date, hours: 7, ...(i < 2 ? { quality: i + 3 } : {}) }));
+    const s = summarizePeriod({ days, trend: [], sleep: rated, today: TODAY });
+    expect(s.sleep!.nights).toBe(6);
+    expect(s.sleep!.avgQuality).toBe(3.5);
+    expect(s.sleep!.rated).toBe(2);
+    const unrated = summarizePeriod({ days, trend: [], sleep: days.map((d) => ({ date: d.date, hours: 7 })), today: TODAY });
+    expect(unrated.sleep!.avgQuality).toBeNull();
+    expect(unrated.sleep!.rated).toBe(0);
+  });
+
   it('summarises water, activity, sleep and weight', () => {
     const days = run(14, (d, i) => day(d, { water: [{ ml: i % 2 ? 2600 : 1500, hour: 9 }], minutes: i % 3 === 0 ? 30 : 0 }));
     const sleep: SleepLike[] = days.map((d, i) => ({ date: d.date, hours: i % 2 ? 6 : 8, quality: 3 }));

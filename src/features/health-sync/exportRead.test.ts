@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { memorySource, StreamCancelled, type ByteSource } from '@/features/import/zip';
 import { buildZip, utf8 } from '@/features/import/zipBuilder';
 
-import { exportXml, newWorkout, oldWorkout, stepRecord } from './exportFixture';
+import { DEVICES, exportXml, newWorkout, oldWorkout, sleepRecord, stepRecord } from './exportFixture';
 import { findHealthExport, neverRead, readHealthExport } from './exportRead';
 import { fileStepsNote, mergeFileSteps, shownSteps, zoneClock, type FileSteps } from './steps';
 
@@ -68,6 +68,8 @@ describe('reading a Health export from a picked file', () => {
       // The phone has more steps in the window (3,900 to the watch's 3,200), so it leads: 15 Nov is its 3,000, the watch's walk is not added.
       expect(read.steps).toEqual({ days: { '2026-11-15': 3000, '2026-11-16': 900 }, asOf: '2026-11-16T07:30:00.000Z', asOfDay: '2026-11-16', fromDay: '2026-10-13' });
       expect(shares[shares.length - 1]).toBe(1);
+      // The fixture's one night (core sleep from 23:00 to 06:30, from the watch by its name's kind).
+      expect(read.nights).toEqual([expect.objectContaining({ date: '2026-11-15', hours: 7.5, store: 'file', origin: 'com.apple.health.watch' })]);
       // No route became a workout, nothing clinical was looked at.
       expect(JSON.stringify(read)).not.toMatch(/Route|Clinical|1990/);
     });
@@ -98,6 +100,24 @@ describe('reading a Health export from a picked file', () => {
     expect(neverRead('apple_health_export/workout-routes/x.xml')).toBe(true);
     expect(neverRead('apple_health_export/electrocardiograms/ecg.csv')).toBe(true);
     expect(neverRead('apple_health_export/export.xml')).toBe(false);
+  });
+
+  it('reads the nights of the window only, with no name kept', async () => {
+    const night = (prev: string, day: string) =>
+      sleepRecord({ source: 'Dana’s Apple Watch', start: `${prev} 23:30:00 +0100`, end: `${day} 03:00:00 +0100`, value: 'AsleepDeep', timeZone: 'Europe/Amsterdam' }) +
+      sleepRecord({ source: 'Dana’s Apple Watch', start: `${day} 03:00:00 +0100`, end: `${day} 06:30:00 +0100`, value: 'AsleepREM', timeZone: 'Europe/Amsterdam' }) +
+      sleepRecord({ source: 'Dana’s iPhone', device: DEVICES.phone, start: `${prev} 23:00:00 +0100`, end: `${day} 07:00:00 +0100`, value: 'InBed' });
+    // 20 Oct is the window's first wake day (28 days to 16 Nov); 16 Oct is before it, 16 Nov is still going on when the export is made (08:30 +0100).
+    const body = night('2026-10-15', '2026-10-16') + night('2026-10-19', '2026-10-20') + night('2026-11-11', '2026-11-12') + sleepRecord({ source: 'Dana’s Apple Watch', start: '2026-11-16 01:00:00 +0100', end: '2026-11-16 08:25:00 +0100', value: 'AsleepCore' });
+    const src = memorySource(utf8(exportXml(body)));
+    const read = await readHealthExport(src, (await findHealthExport(src))!, { now, clock, xmlChunkSize: 333 });
+    expect(read.nights.map((n) => [n.date, n.hours, n.origin])).toEqual([
+      ['2026-10-20', 7, 'com.apple.health.watch'],
+      ['2026-11-12', 7, 'com.apple.health.watch'],
+      ['2026-11-15', 7.5, 'com.apple.health.watch'],
+    ]);
+    expect(read.counts).toMatchObject({ sleepRecords: 11 });
+    expect(JSON.stringify(read.nights)).not.toMatch(/Dana|HKDevice/);
   });
 
   it('can be cancelled between chunks', async () => {

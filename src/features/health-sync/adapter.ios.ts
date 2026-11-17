@@ -1,5 +1,5 @@
 /**
- * iPhone: workouts and steps from Apple Health, through @kingstinct/react-native-healthkit.
+ * iPhone: workouts, steps and sleep from Apple Health, through @kingstinct/react-native-healthkit.
  * Only this file loads the native module (Metro picks it by its .ios extension; Android and
  * the browser get the files beside it). Everything it does is in healthKitAdapter.ts.
  *
@@ -10,6 +10,7 @@
 import {
   getRequestStatusForAuthorization,
   isHealthDataAvailable,
+  queryCategorySamples,
   queryStatisticsCollectionForQuantity,
   queryWorkoutSamples,
   requestAuthorization,
@@ -24,6 +25,6 @@ function openHealth(): void {
 }
 
 export const adapter = createHealthKitAdapter(
-  { isHealthDataAvailable, getRequestStatusForAuthorization, requestAuthorization, queryWorkoutSamples, queryStatisticsCollectionForQuantity },
+  { isHealthDataAvailable, getRequestStatusForAuthorization, requestAuthorization, queryWorkoutSamples, queryStatisticsCollectionForQuantity, queryCategorySamples },
   { openHealth },
 );

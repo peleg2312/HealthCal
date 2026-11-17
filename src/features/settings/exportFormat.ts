@@ -220,6 +220,24 @@ function isLoggedItem(x: unknown): boolean {
   return isObj(x) && isStr(x.name) && isNutrients(x.nutrients) && optNum(x.quantity) && optNum(x.grams) && (x.food === undefined || x.food === null || isFood(x.food));
 }
 
+const SLEEP_STORES = ['healthConnect', 'healthKit', 'file'];
+const SLEEP_STAGES = ['light', 'deep', 'rem', 'awake'] as const;
+
+/** A night's optional fields: its rating, and where a synced night came from (SleepEntry in src/types). */
+function isSleepExtras(r: Obj): boolean {
+  const q = r.quality;
+  const s = r.stages;
+  return (
+    (q === undefined || (Number.isInteger(q) && (q as number) >= 1 && (q as number) <= 5)) &&
+    (r.source === undefined || r.source === 'health') &&
+    (r.store === undefined || SLEEP_STORES.includes(r.store as string)) &&
+    (r.origin === undefined || isStr(r.origin)) &&
+    (r.startedAt === undefined || isTime(r.startedAt)) &&
+    (r.endedAt === undefined || isTime(r.endedAt)) &&
+    (s === undefined || s === null || (isObj(s) && SLEEP_STAGES.every((k) => isNonNeg(s[k]))))
+  );
+}
+
 /** Shape checks per collection, on top of the common id and timestamp. */
 const VALIDATORS: Record<Collection, (r: Obj) => boolean> = {
   foodEntries: (r) => isDayKey(r.date) && MEALS.includes(r.meal as string) && isLoggedItem(r),
@@ -228,7 +246,7 @@ const VALIDATORS: Record<Collection, (r: Obj) => boolean> = {
   activities: (r) => isDayKey(r.date) && isStr(r.name) && isNonNeg(r.durationMin) && isNonNeg(r.kcalNet) && isNonNeg(r.kcalGross) && optNum(r.met) && optNum(r.distanceKm),
   water: (r) => isDayKey(r.date) && isNum(r.ml) && r.ml > 0 && r.ml <= 10000,
   weights: (r) => isDayKey(r.date) && isNum(r.kg) && r.kg > 0 && r.kg < 700 && optNum(r.bodyFatPct),
-  sleep: (r) => isDayKey(r.date) && isNum(r.hours) && r.hours >= 0 && r.hours <= 24,
+  sleep: (r) => isDayKey(r.date) && isNum(r.hours) && r.hours >= 0 && r.hours <= 24 && isSleepExtras(r),
   fasting: (r) => isTime(r.start) && (r.end === undefined || r.end === null || isTime(r.end)) && isNum(r.targetHours),
   favorites: (r) => isFood(r.food),
   days: (r) => isDayKey(r.date) && isNonNeg(r.target) && isNonNeg(r.tdee) && isNum(r.weightKg),

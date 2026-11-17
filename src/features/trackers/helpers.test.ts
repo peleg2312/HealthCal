@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { navyBodyFatPct } from '@/lib/body';
 import { weightTrend } from '@/lib/trend';
-import type { SleepEntry } from '@/types';
+import type { SleepEntry, SleepQuality } from '@/types';
 
 import {
   clampFastStart,
@@ -104,7 +104,7 @@ describe('body', () => {
 });
 
 describe('sleep', () => {
-  const e = (date: string, hours: number, quality: SleepEntry['quality']): SleepEntry => ({ id: date, updatedAt: '', date, hours, quality });
+  const e = (date: string, hours: number, quality?: SleepQuality): SleepEntry => ({ id: date, updatedAt: '', date, hours, ...(quality ? { quality } : {}) });
 
   it('summarises a window', () => {
     const s = sleepSummary([e('2026-11-13', 8, 4), e('2026-11-12', 6, 2), e('2026-11-01', 7, 3)], 7, '2026-11-13');
@@ -116,6 +116,14 @@ describe('sleep', () => {
     expect(s.series).toHaveLength(7);
     expect(s.series[6]).toEqual({ date: '2026-11-13', hours: 8 });
     expect(s.series[0].hours).toBe(0);
+  });
+
+  it('averages quality over the rated nights only', () => {
+    const s = sleepSummary([e('2026-11-13', 8, 4), e('2026-11-12', 6), e('2026-11-11', 7, 2)], 7, '2026-11-13');
+    expect(s.nights).toBe(3);
+    expect(s.avgHours).toBe(7);
+    expect(s.avgQuality).toBe(3);
+    expect(sleepSummary([e('2026-11-13', 8), e('2026-11-12', 6)], 7, '2026-11-13').avgQuality).toBeNull();
   });
 
   it('handles no data', () => {

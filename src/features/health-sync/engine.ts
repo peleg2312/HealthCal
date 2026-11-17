@@ -5,7 +5,10 @@
  *
  * One run: check the health store is there and may be read, list the last 30
  * days of workouts, plan (plan.ts), save what is new, keep what needs a look,
- * and say what was added in one message with an Undo. A run that fails changes
+ * read the steps and the nights of sleep (sleep.ts) in the same run, and say
+ * what was added, workouts and nights together, in one message with an Undo.
+ * Steps and sleep are extra: a failed or refused read of either never fails
+ * the run. A run that fails changes
  * nothing in the diary and leaves a note for the sync screen; it never shows
  * anything by itself.
  *
@@ -19,10 +22,12 @@ import { ACTIVITY_BY_ID } from '@/data/activities';
 import type { ImportedEntry } from '@/features/import/convert';
 import { replaceHandLoggedPlan } from '@/features/import/plan';
 import { isoSeconds } from '@/features/import/time';
-import type { ActivityEntry } from '@/types';
+import type { ActivityEntry, SleepEntry } from '@/types';
 
 import { recordIdFor, workoutSpan, type HealthContext, type HealthEntry } from './convert';
+import { originName } from './origins';
 import { choiceKey, planSync, workoutKey, type Handled, type ReviewItem, type SyncPlan } from './plan';
+import { nightsFrom, planSleep, readSleepSafely, sleepReadRange, undoSleep, type SleepPlan, type SleepSave } from './sleep';
 import { pruneHandled, readRange, RECHECK_DAYS, rememberMarks, shouldAutoSync, syncMessage, unremembered, type HealthSyncState, type SyncError, type SyncErrorCode } from './state';
 import { localClock, mergeStepDays, NO_STEPS, pruneStepDays, stepDaysFromTotals, stepsReadRange, type StepClock, type StepsMemory } from './steps';
 import { HealthError, storeName, type HealthAccess, type HealthAdapter, type HealthWorkout, type StepDayTotal } from './types';
@@ -32,7 +37,8 @@ export type SyncTrigger = 'auto' | 'manual';
 export type SyncOutcome =
   | { status: 'skipped'; why: 'off' | 'too-soon' | 'no-profile' | 'busy' }
   | { status: 'failed'; error: SyncError }
-  | { status: 'done'; added: number; updated: number; review: number };
+  /** `nights`: nights of sleep added or updated. */
+  | { status: 'done'; added: number; updated: number; review: number; nights: number };
 
 export type EnableOutcome =
   | { ok: true; sync: SyncOutcome }
@@ -56,13 +62,31 @@ export interface Diary {
   flush(): Promise<boolean>;
 }
 
+/**
+ * The sleep log ('sleep' records): read and written in the same store as the
+ * diary, so `Diary.flush` confirms both.
+ */
+export interface SleepLog {
+  /** Every sleep record, soft-deleted ones included. */
+  all(): SleepEntry[];
+  /** Insert or replace by date (upsert derives the id from it); a deleted record saved again is live again. */
+  save(nights: (SleepSave | SleepEntry)[]): void;
+  /** Soft delete. */
+  remove(id: string): void;
+}
+
 export interface SyncDeps {
   adapter: HealthAdapter;
   now(): number;
   state: { get(): HealthSyncState; set(patch: Partial<HealthSyncState>): void };
   diary: Diary;
-  /** One confirmation with an Undo. */
-  announce(message: string, undo: () => void): void;
+  /** Nights of sleep. Without it no sleep is read. */
+  sleep?: SleepLog;
+  /**
+   * One confirmation with an Undo. `tint`: what the change was, for the toast's
+   * level line ('exercise' when it holds a workout, 'sleep' for nights only).
+   */
+  announce(message: string, undo: () => void, tint?: 'exercise' | 'sleep'): void;
   /**
    * Called when a run starts and when it is done, for the screen's "Syncing"
    * and for the updater, which restarts only at rest.
@@ -108,6 +132,15 @@ function asSyncError(e: unknown, now: number): SyncError {
 
 export function createHealthSync(deps: SyncDeps) {
   const { adapter, diary, state } = deps;
+  const sleepLog = deps.sleep ?? null;
+  /** Days of sleep the person deleted, to remember once the diary is confirmed on the device (planSleep's `remember`). */
+  let sleepMarks: Record<string, Handled> = {};
+  /**
+   * When the last sleep read was, kept only once the nights it wrote are confirmed on the device: the next read
+   * starts from it (sleepReadRange), so a `sleepReadAt` saved ahead of the nights would leave the older ones of a
+   * read lost to a closed app never read again. Until then the next sync reads from the earlier value.
+   */
+  let sleepReadPending: string | null = null;
   const timeout = deps.timeoutMs ?? 45_000;
   const clock = deps.stepClock ?? localClock;
   // Asked each time: a development build can swap the adapter after this is made.
@@ -158,7 +191,9 @@ export function createHealthSync(deps: SyncDeps) {
   async function rememberSaved(): Promise<boolean> {
     const s = state.get();
     const marks = unremembered(s.handled, diary.all(), deps.now(), new Set(s.review.map((r) => r.id)));
-    if (!Object.keys(marks).length) return true;
+    const nights = sleepMarks;
+    const readAt = sleepReadPending;
+    if (!Object.keys(marks).length && !Object.keys(nights).length && !readAt) return true;
     confirming += 1;
     showBusy();
     try {
@@ -176,8 +211,13 @@ export function createHealthSync(deps: SyncDeps) {
       const present = new Set(diary.all().map((e) => e.id));
       const waiting = new Set(latest.review.map((r) => r.id));
       const keep = Object.fromEntries(Object.entries(marks).filter(([id]) => present.has(id) && !waiting.has(id)));
-      const handled = rememberMarks(latest.handled, keep);
+      const handled = rememberMarks(latest.handled, { ...keep, ...nights });
       if (handled !== latest.handled) state.set({ handled });
+      // Never back to an earlier read (two waits can end in either order).
+      if (readAt && (!latest.sleepReadAt || readAt > latest.sleepReadAt)) state.set({ sleepReadAt: readAt });
+      if (sleepReadPending === readAt) sleepReadPending = null;
+      // Only the marks that were remembered now; a later plan may have added more meanwhile.
+      sleepMarks = Object.fromEntries(Object.entries(sleepMarks).filter(([k]) => !(k in nights)));
       return true;
     } finally {
       confirming -= 1;
@@ -185,16 +225,28 @@ export function createHealthSync(deps: SyncDeps) {
     }
   }
 
-  /** Save what the plan adds by itself and say so once (rememberSaved remembers it once it is on the device). Returns how many were added and updated. */
-  function apply(plan: SyncPlan, more: Partial<HealthSyncState> = {}): { added: number; updated: number } {
+  /**
+   * Save what the plan adds by itself, and the nights of sleep, and say so once
+   * (rememberSaved remembers it once it is on the device). Returns how many
+   * workouts were added and updated, and how many nights were written.
+   */
+  function apply(plan: SyncPlan, more: Partial<HealthSyncState> = {}, sleepPlan: SleepPlan | null = null): { added: number; updated: number; nights: number } {
     const saves = [...plan.add, ...plan.update, ...plan.replace];
     if (saves.length) diary.save(saves.map((p) => p.entry));
     for (const r of plan.replace) diary.remove(r.remove.id);
     const added = plan.add.length;
     const updated = plan.update.length + plan.replace.length;
+    const nightSaves = sleepPlan && sleepLog ? [...sleepPlan.add, ...sleepPlan.update.map((u) => u.after)] : [];
+    if (nightSaves.length && sleepLog) sleepLog.save(nightSaves);
+    if (sleepPlan) sleepMarks = { ...sleepMarks, ...sleepPlan.remember };
+    const nightsAdded = sleepPlan && sleepLog ? sleepPlan.add.length : 0;
+    const nightsUpdated = sleepPlan && sleepLog ? sleepPlan.update.length : 0;
     state.set(more);
-    if (added + updated > 0) {
-      deps.announce(syncMessage(added, updated, saves.map((p) => p.from), storeLabel()), () => {
+    if (added + updated + nightsAdded + nightsUpdated > 0) {
+      const nights = { added: nightsAdded, updated: nightsUpdated, apps: nightSaves.map((n) => originName(n.origin ?? '')) };
+      const message = syncMessage(added, updated, saves.map((p) => p.from), storeLabel(), nights);
+      deps.announce(message, () => {
+        if (sleepPlan && sleepLog && nightSaves.length) undoNights(sleepPlan, sleepLog);
         // Take out exactly what was added, and put changed workouts back as they were.
         for (const p of [...plan.add, ...plan.replace]) diary.remove(p.entry.id);
         const back = [...plan.update.map((u) => u.before), ...plan.replace.map((r) => r.remove)];
@@ -207,9 +259,22 @@ export function createHealthSync(deps: SyncDeps) {
         // before the diary is saved (the person asked for it out, so this can never hide one they want).
         h = rememberMarks(h, Object.fromEntries(plan.add.map((p) => [p.entry.id, { how: 'saved' as const, at: p.entry.startedAt }])));
         state.set({ handled: h });
-      });
+      }, added + updated > 0 ? 'exercise' : 'sleep');
     }
-    return { added, updated };
+    return { added, updated, nights: nightsAdded + nightsUpdated };
+  }
+
+  /**
+   * The nights' part of the one Undo (sleep.ts, undoSleep): the added nights
+   * go, updated ones get their earlier version back, and every day it touched
+   * is remembered at once, as the workouts' Undo does (the person asked for
+   * them out, so the mark can never hide a night they want).
+   */
+  function undoNights(plan: SleepPlan, log: SleepLog): void {
+    const undo = undoSleep(plan, log.all());
+    for (const r of undo.remove) log.remove(r.id);
+    if (undo.restore.length) log.save(undo.restore);
+    state.set({ handled: { ...state.get().handled, ...undo.marks } });
   }
 
   /** Review items carry the activity the person picked for them from one plan to the next. */
@@ -245,6 +310,7 @@ export function createHealthSync(deps: SyncDeps) {
     let access: HealthAccess;
     let read: HealthWorkout[];
     let steps: StepsMemory | null = null;
+    let sleep: { samples: Parameters<typeof nightsFrom>[0]; firstDay: string; readAt: string } | null = null;
     try {
       const availability = await withTimeout(adapter.availability(), timeout);
       if (availability !== 'available') return fail(availability);
@@ -269,6 +335,7 @@ export function createHealthSync(deps: SyncDeps) {
       };
       read = await withTimeout(adapter.readWorkouts(readRange(now), access, { needsDetail }), timeout);
       steps = await readSteps(access, s.steps, now);
+      sleep = await readNights(access, s.sleepReadAt, now);
     } catch (e) {
       const error = asSyncError(e, deps.now());
       state.set({ lastError: error });
@@ -290,21 +357,48 @@ export function createHealthSync(deps: SyncDeps) {
       choices: current.choices,
       picks: picksOf(current.review),
     });
+    // Rule h (sleep.ts): against the sleep log as it is now and what this phone already did with each day.
+    const sleepPlan =
+      sleep && sleepLog
+        ? planSleep({ nights: nightsFrom(sleep.samples, { now: deps.now(), clock, firstDay: sleep.firstDay }), existing: sleepLog.all(), handled: current.handled })
+        : null;
+    // Kept as read only once what it wrote is on the device (rememberSaved, right after this run).
+    if (sleep) sleepReadPending = sleep.readAt;
     const at = new Date(deps.now()).toISOString();
-    const { added, updated } = apply(plan, {
-      lastSyncedAt: at,
-      lastError: null,
-      access,
-      origins: plan.origins,
-      review: carryPicks(plan.review, current.review),
-    });
+    const { added, updated, nights } = apply(
+      plan,
+      {
+        lastSyncedAt: at,
+        lastError: null,
+        access,
+        origins: plan.origins,
+        review: carryPicks(plan.review, current.review),
+      },
+      sleepPlan,
+    );
     state.set({
       handled: pruneHandled(state.get().handled, deps.now()),
-      lastResult: added + updated > 0 ? { at, added, updated } : state.get().lastResult,
+      lastResult: added + updated + nights > 0 ? { at, added, updated, ...(nights ? { nights } : null) } : state.get().lastResult,
       // Steps the store would not give (not allowed, or the read failed) leave what was kept; old days drop out.
       steps: steps ?? { ...current.steps, days: pruneStepDays(current.steps.days, clock.dayOf(deps.now())) },
     });
-    return { status: 'done', added, updated, review: plan.review.length };
+    return { status: 'done', added, updated, review: plan.review.length, nights };
+  }
+
+  /**
+   * The sleep samples since the last read (sleep.ts, rule g), or null when
+   * sleep may not be read, the read failed or there is no sleep log: sleep is
+   * extra, so a failure here never fails the sync (rule j), and the next sync
+   * reads the same days again because `sleepReadAt` is left as it was. A read
+   * that worked moves `sleepReadAt` only once its nights are confirmed on the
+   * device (`rememberSaved`).
+   */
+  async function readNights(access: HealthAccess, readAt: string | null, now: number) {
+    if (!sleepLog || !access.sleep) return null;
+    const range = sleepReadRange(readAt, now, clock);
+    const read = await withTimeout(readSleepSafely(adapter, { from: range.from, to: range.to }, access), timeout).catch(() => null);
+    if (!read || !read.ok) return null;
+    return { samples: read.samples, firstDay: range.firstDay, readAt: new Date(now).toISOString() };
   }
 
   /**

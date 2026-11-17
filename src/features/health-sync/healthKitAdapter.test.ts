@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import type { HealthKitApi, HKStatistics, HKWorkoutProxy } from './healthKit';
+import type { HealthKitApi, HKCategorySample, HKStatistics, HKWorkoutProxy } from './healthKit';
 import { createHealthKitAdapter } from './healthKitAdapter';
 import { zoneClock } from './steps';
 import { NO_ACCESS } from './types';
@@ -24,26 +24,37 @@ interface Stand {
   workouts: HKWorkoutProxy[];
   /** The statistics collection HealthKit answers a steps question with (one entry per day with data). */
   steps: HKStatistics[];
+  /** Sleep-analysis samples, and the request status of the sleep type on its own (1: not asked yet). */
+  sleep: HKCategorySample[];
+  sleepStatus: number;
   opened: number;
 }
 
-function stand(init: Partial<Pick<Stand, 'status' | 'available' | 'refuse'>> = {}): Stand {
-  const s = { calls: [], disposed: [], status: 1, available: true, refuse: null, workouts: [], steps: [], opened: 0, ...init } as Omit<Stand, 'api'> & { api?: HealthKitApi };
+function stand(init: Partial<Pick<Stand, 'status' | 'available' | 'refuse' | 'sleepStatus'>> = {}): Stand {
+  const s = { calls: [], disposed: [], status: 1, available: true, refuse: null, workouts: [], steps: [], sleep: [], sleepStatus: 1, opened: 0, ...init } as Omit<Stand, 'api'> & { api?: HealthKitApi };
+  const isSleep = (types: readonly string[]) => types.length === 1 && types[0] === 'HKCategoryTypeIdentifierSleepAnalysis';
   const guard = () => {
     if (s.refuse) throw new Error(s.refuse);
   };
   s.api = {
     isHealthDataAvailable: () => s.available,
     getRequestStatusForAuthorization: async (toCheck) => {
-      s.calls.push(`status:${toCheck.toRead.length}`);
+      s.calls.push(isSleep(toCheck.toRead) ? 'status:sleep' : `status:${toCheck.toRead.length}`);
       guard();
-      return s.status;
+      return isSleep(toCheck.toRead) ? s.sleepStatus : s.status;
     },
     requestAuthorization: async (toRequest) => {
       s.calls.push(`request:${toRequest.toRead.join(',')}`);
       guard();
-      s.status = 2;
+      // Asked types are answered (whatever the person chose: HealthKit never says which reads were allowed).
+      if (toRequest.toRead.includes('HKCategoryTypeIdentifierSleepAnalysis')) s.sleepStatus = 2;
+      if (!isSleep(toRequest.toRead)) s.status = 2;
       return true;
+    },
+    queryCategorySamples: async (identifier, options) => {
+      s.calls.push(`category:${identifier}:${options.limit}:${options.ascending}:${options.filter?.date?.startDate?.toISOString()}:${options.filter?.date?.endDate?.toISOString()}`);
+      guard();
+      return s.sleep;
     },
     queryWorkoutSamples: async (options) => {
       s.calls.push(`workouts:${options.limit}:${options.filter?.date?.startDate?.toISOString()}:${options.filter?.date?.endDate?.toISOString()}`);
@@ -80,15 +91,17 @@ const proxy = (id: string, start: string, minutes: number, stats: Record<string,
 const RANGE = { from: '2026-10-15T12:00:00.000Z', to: '2026-11-14T12:00:00.000Z' };
 
 describe('the iPhone adapter', () => {
-  it('is Apple Health, available, and asks once for the five read types', async () => {
+  it('is Apple Health, available, and asks once for the five read types and sleep', async () => {
     const s = stand();
     const a = createHealthKitAdapter(s.api, { openHealth: () => void (s.opened += 1) });
     expect(a.store).toBe('apple-health');
     expect(await a.availability()).toBe('available');
     expect(await a.access()).toEqual(NO_ACCESS);
     const access = await a.requestAccess();
-    expect(access).toMatchObject({ workouts: true, activeEnergy: true, distance: true, steps: true });
-    expect(s.calls).toContain('request:HKWorkoutTypeIdentifier,HKQuantityTypeIdentifierActiveEnergyBurned,HKQuantityTypeIdentifierDistanceWalkingRunning,HKQuantityTypeIdentifierDistanceCycling,HKQuantityTypeIdentifierStepCount');
+    expect(access).toMatchObject({ workouts: true, activeEnergy: true, distance: true, steps: true, sleep: true });
+    expect(s.calls).toContain(
+      'request:HKWorkoutTypeIdentifier,HKQuantityTypeIdentifierActiveEnergyBurned,HKQuantityTypeIdentifierDistanceWalkingRunning,HKQuantityTypeIdentifierDistanceCycling,HKQuantityTypeIdentifierStepCount,HKCategoryTypeIdentifierSleepAnalysis',
+    );
     a.openSettings();
     expect(s.opened).toBe(1);
   });
@@ -147,5 +160,64 @@ describe('the iPhone adapter', () => {
     const access = await a.access();
     s.refuse = ENTITLEMENT;
     await expect(a.readStepDays({ from: '2026-11-12T23:00:00.000Z', to: '2026-11-14T12:00:00.000Z', fromDay: '2026-11-13', toDay: '2026-11-14' }, access)).rejects.toMatchObject({ code: 'not-entitled' });
+  });
+});
+
+const night = (value: number, start: string, end: string, over: Partial<HKCategorySample> = {}): HKCategorySample => ({
+  uuid: `${value}-${start}`,
+  startDate: new Date(start),
+  endDate: new Date(end),
+  value,
+  sourceRevision: { source: { name: 'Apple Watch', bundleIdentifier: 'com.apple.health.81B2C3D4-0000-4000-8000-000000000001' }, productType: 'Watch7,1' },
+  metadata: { HKTimeZone: 'Europe/Amsterdam' },
+  ...over,
+});
+
+describe('Apple Health sleep', () => {
+  it('reads the five as allowed and sleep as not asked on a phone that allowed sync before sleep was read', async () => {
+    const s = stand({ status: 2, sleepStatus: 1 });
+    const a = createHealthKitAdapter(s.api, { openHealth: () => {} });
+    expect(await a.access()).toEqual({ workouts: true, activeEnergy: true, totalEnergy: false, distance: true, steps: true, sleep: false });
+    expect(s.calls).toEqual(['status:5', 'status:sleep']);
+  });
+
+  it('asks for sleep alone from the Sleep row, and then reads it as allowed', async () => {
+    const s = stand({ status: 2, sleepStatus: 1 });
+    const a = createHealthKitAdapter(s.api, { openHealth: () => {} });
+    const access = await a.requestAccess('sleep');
+    expect(s.calls).toContain('request:HKCategoryTypeIdentifierSleepAnalysis');
+    expect(access).toMatchObject({ workouts: true, sleep: true });
+  });
+
+  it('lists every sleep sample in the range as raw stages, with no strict edges, and nothing without access', async () => {
+    const s = stand({ status: 2, sleepStatus: 2 });
+    s.sleep = [
+      night(0, '2026-11-13T21:30:00Z', '2026-11-14T05:40:00Z', { sourceRevision: { source: { name: 'iPhone', bundleIdentifier: 'com.apple.health.81B2C3D4-0000-4000-8000-000000000002' }, productType: 'iPhone15,2' } }),
+      night(3, '2026-11-13T22:00:00Z', '2026-11-14T01:00:00Z'),
+      night(4, '2026-11-14T01:00:00Z', '2026-11-14T02:00:00Z'),
+      night(2, '2026-11-14T02:00:00Z', '2026-11-14T02:10:00Z'),
+      night(5, '2026-11-14T02:10:00Z', '2026-11-14T05:30:00Z'),
+      night(1, '2026-11-14T05:30:00Z', '2026-11-14T05:30:00Z'),
+    ];
+    const a = createHealthKitAdapter(s.api, { openHealth: () => {} });
+    expect(await a.readSleep(RANGE, { ...NO_ACCESS, workouts: true })).toEqual([]);
+    expect(s.calls.some((c) => c.startsWith('category:'))).toBe(false);
+    const samples = await a.readSleep(RANGE, { ...NO_ACCESS, workouts: true, sleep: true });
+    expect(s.calls).toContain(`category:HKCategoryTypeIdentifierSleepAnalysis:0:true:${RANGE.from}:${RANGE.to}`);
+    // The sample with no length is left out; the device UUIDs never appear.
+    expect(samples.map((x) => [x.origin, x.kind, x.stage])).toEqual([
+      ['com.apple.health.iphone', 'phone', 'inBed'],
+      ['com.apple.health.watch', 'watch', 'light'],
+      ['com.apple.health.watch', 'watch', 'deep'],
+      ['com.apple.health.watch', 'watch', 'awake'],
+      ['com.apple.health.watch', 'watch', 'rem'],
+    ]);
+    expect(samples[1]).toEqual({ store: 'healthKit', origin: 'com.apple.health.watch', kind: 'watch', start: '2026-11-13T22:00:00.000Z', end: '2026-11-14T01:00:00.000Z', zoneOffsetSec: 3600, stage: 'light' });
+  });
+
+  it('turns a refused or failed read into the feature\'s error', async () => {
+    const s = stand({ status: 2, sleepStatus: 2, refuse: 'Authorization not determined' });
+    const a = createHealthKitAdapter(s.api, { openHealth: () => {} });
+    await expect(a.readSleep(RANGE, { ...NO_ACCESS, sleep: true })).rejects.toMatchObject({ code: 'permission' });
   });
 });
