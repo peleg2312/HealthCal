@@ -71,9 +71,19 @@ tags:
     text: '8432'
     optional: true
 - takeScreenshot: 46-health-steps-typed
+# iOS 26's form is confirmed with a tick at its top right, which has no "Add" text (seen in the
+# first runs: the form stayed open with 8432 typed). The tick sits at about 90% across, 11% down.
 - tapOn:
-    text: '(?i)add'
+    text: '(?i)^add$'
     optional: true
+# Only while the form is still open (the typed number is on screen as typed, without a comma).
+- runFlow:
+    when:
+      visible: '8432'
+    commands:
+      - tapOn:
+          point: '90%,11%'
+          optional: true
 - waitForAnimationToEnd:
     timeout: 3000
 - takeScreenshot: 47-health-steps-added
@@ -107,7 +117,10 @@ tags:
     timeout: 3000
 - takeScreenshot: 49-health-add-workout-form
 - tapOn:
-    text: '(?i)add'
+    text: '(?i)^add$'
+    optional: true
+- tapOn:
+    point: '90%,11%'
     optional: true
 - waitForAnimationToEnd:
     timeout: 3000
