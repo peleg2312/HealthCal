@@ -155,7 +155,7 @@ The repository is linked to an Expo project (`app.json`: `owner`, `extra.eas.pro
 | Android | An APK installed by hand | `bash scripts/ops/build-android-apk.sh` (builds on this machine, about 40 minutes the first time, 15 after) or the `preview` profile above | Signed with the template's debug key; a Play Store release needs its own key |
 | iPhone, free, no computer | The web app added to the Home Screen from Safari | `node scripts/ops/deploy-web.mjs` publishes it to https://healthcal.expo.app | No reminders and no Health sync; the camera goes through Safari. Workouts and steps come in from the Health app's own export (Health app, your picture, Export All Health Data; then Train > Import, docs/health-sync.md) |
 | iPhone, free, with a computer | An `.ipa` with no Apple signing, signed with the person's own Apple ID by a sideloading tool | `npx eas-cli@latest build -p ios --profile ios-unsigned` (`.eas/build/ios-unsigned.yml`) | Must be signed again every 7 days; three such apps per Apple ID; no Apple Health sync with Sideloadly or AltStore (they sign without the HealthKit entitlement, and the sync screen says so and offers the Health export import instead); Impactor or xtool may keep it, not yet tried (docs/health-sync.md) |
-| iPhone, TestFlight or the App Store | A signed build | `npx eas-cli@latest build -p ios --profile production` | Needs an Apple Developer account; signed with the HealthKit entitlement, so this is the route for Apple Health sync (the library is installed and bound; not yet run on a phone; Xcode on a Mac with a free Apple ID can also sign a copy with it; docs/health-sync.md) |
+| iPhone, TestFlight or the App Store | A signed build | `npx eas-cli@latest build -p ios --profile production` | Needs an Apple Developer account; signed with the HealthKit entitlement, so this is the route for Apple Health sync (the library is installed and bound, and reads steps on an iPhone simulator; not yet run on a real phone; Xcode on a Mac with a free Apple ID can also sign a copy with it; docs/health-sync.md) |
 
 `public/` holds what makes the web app installable (the manifest, the icons, the full-screen tags in `index.html`). The backend must allow the published address as a return address for sign-up and reset emails (Supabase: Authentication, URL configuration).
 
@@ -181,11 +181,18 @@ The scripts under `scripts/dev` test the web build in a browser. The flows in `.
 
 - `first-day.yml`: setup with the keyboard on every field, food added to lunch and opened again, the four tabs and the sync screen.
 - `health-and-about.yml` (after first-day): Workout sync turned on, the app's explanation, the system's permission screen (Apple Health or Health Connect), the sync screen and Train's steps line, then About and its version block with "Check for updates".
-- `health-data-ios.yml` (iPhone only, best effort, not yet seen to pass): tries to type steps into the simulator's Health app, sync, and show them on Train.
+- `health-data-ios.yml` (iPhone only, best effort): types steps into the simulator's Health app, syncs, and looks for them on Train.
 
 **On GitHub's machines, free.** The repository is public, so GitHub Actions' standard runners, macOS included, cost nothing. `.github/workflows/phone-test.yml` builds the app in Release (the JavaScript inside, no Metro; the Supabase settings from `eas.json`'s `build.production.env`) and runs the flows on an iPhone simulator (macOS 26, Xcode 26.4 or later) and an Android emulator (Android 15, x86_64; Health Connect is expected on this image, and the job log lists the health packages it found). It starts only by hand.
 
-It has not run on GitHub yet: the first run will show what still needs fixing. health-and-about's taps on the system permission screens and all of health-data-ios are written from guessed labels and are optional, and health-data-ios never fails the job.
+What the first runs showed (16 and 17 November 2026):
+
+- Android 15 emulator: `first-day` and `health-and-about` pass in about two minutes each. Health Connect's own permission screen is answered ("Allow all", "Allow") and the sync screen then reads "On, last synced just now".
+- iPhone 17 simulator, iOS 26.5: `first-day` and `health-and-about` pass: setup with the keyboard on every field, the diary, the tabs, Apple's Health access sheet ("Turn On All", "Allow") and a sync from an empty Apple Health. It is the first time the iPhone app ran anywhere.
+- An update published to a test channel arrived on both: About reads "Updated Nov 16" and "Up to date" after the second start.
+- `health-data-ios` showed the whole path once: 8,432 steps typed into the simulator's Health app were read through HealthKit and shown on the sync screen ("8,432 today, shown on Train") and on Train. Adding a workout by hand in the Health app did not go through, so reading a workout from Apple Health is still unproven.
+
+Two things that cost a run each: GitHub's `macos-26` machines are not always free (the job waits 15 minutes and is cancelled without starting: start it again; `macos-15` cannot build this app, because its newest Xcode is 26.3 and expo-modules-jsi does not compile before 26.4), and on a cold simulator the first flow can lose Maestro's driver ("Device became unreachable"): start the run again with `app_run_id` and it passes. The system screens' labels in the flows are the ones these runs showed; they are still tapped as optional, and health-data-ios never fails the job.
 
 ```bash
 # Actions tab > Phone test > Run workflow (choose the branch, platform, flows), or:

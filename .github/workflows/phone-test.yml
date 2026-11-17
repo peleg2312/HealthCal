@@ -15,8 +15,9 @@
 #
 # Starting a run cancels a run of the same branch and platform that is still going.
 #
-# Not yet run on GitHub when this was written: the labels of the system permission screens and of the
-# Health app are guesses, tapped as optional, and health-data-ios never fails the job.
+# First runs, 16 and 17 November 2026: first-day and health-and-about pass on both phones (README,
+# "Testing on a phone"). The system screens are still tapped as optional, and health-data-ios never
+# fails the job. A macos-26 job that gets no machine is cancelled after 15 minutes: start it again.
 #
 # On an Expo SDK, React Native or runner-image upgrade, change: the Xcode list and minimum in both
 # "Select Xcode" steps (Expo's version table, docs.expo.dev/versions/v<major>.0.0/); the sdkmanager

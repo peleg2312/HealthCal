@@ -218,7 +218,7 @@ The stores will ask for these, and only you can provide them:
    - the app works on the device without an account;
    - with an account, data syncs to your Supabase project;
    - a meal photo or description is sent to the analyse-food function and on to the AI model provider to make an estimate;
-   - with Workout sync on, workouts, their active and total calories and distance, and daily steps are read from Health Connect on Android or Apple Health on iPhone (the iPhone side is built but has not yet run on a phone; docs/health-sync.md, "State of the iPhone side"); workouts are kept like hand-logged sessions, steps only on the phone; none of it goes to the AI provider, advertisers or anyone else, and nothing is written back;
+   - with Workout sync on, workouts, their active and total calories and distance, and daily steps are read from Health Connect on Android or Apple Health on iPhone (the iPhone side reads steps on an iPhone simulator and has not yet run on a real phone; docs/health-sync.md, "State of the iPhone side"); workouts are kept like hand-logged sessions, steps only on the phone; none of it goes to the AI provider, advertisers or anyone else, and nothing is written back;
    - friends see only minutes, sessions, streak and recent workouts;
    - how export and deletion work.
 2. **Apple: App Privacy answers** (the "nutrition label"). Data linked to the user when an account exists:
