@@ -202,3 +202,32 @@ name: Workout sync and About on a phone
     id: train-steps
     optional: true
 
+
+# The morning page, opened on purpose (Profile > See yesterday): on a new person's first day it shows
+# the empty state, with its header and its two footer buttons, and "Today" closes it onto Today.
+- tapOn:
+    id: tab-index
+- extendedWaitUntil:
+    visible:
+      id: today-energy
+    timeout: 20000
+- tapOn:
+    id: today-profile
+- scrollUntilVisible:
+    element:
+      id: profile-morning-open
+    direction: DOWN
+    timeout: 20000
+- takeScreenshot: 32-profile-morning-rows
+- tapOn:
+    id: profile-morning-open
+- extendedWaitUntil:
+    visible:
+      id: morning-screen
+    timeout: 20000
+- takeScreenshot: 33-morning-page
+- tapOn:
+    id: morning-today
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 34-after-morning-today
