@@ -78,6 +78,7 @@ Measured on 16 November 2026 with `scripts/ops/eval-food-ai.mjs` (the function's
 | --- | --- | --- | --- | --- |
 | Typed meal | `claude-haiku-5-5`, effort low | about 500 / 270 | $0.00018 | $0.18 |
 | Photo, 768 px | the same | about 1,480 / 240 | $0.00027 | $0.27 |
+| Photo, 768 px, since 18 November (stepwise guide, below) | the same | about 1,600 / 390 | $0.00035 to $0.00037 | $0.36 |
 | Careful pass, typed | `claude-sonnet-5-5`, effort medium | about 540 / 130 | $0.002 | $2.39 |
 | Careful pass, photo at 1024 px | the same | about 1,730 / 280 | $0.006 | $6.28 |
 
@@ -88,12 +89,41 @@ Two answer forms are in use, each where it measured better:
 
 On that small set the default put 60 of 60 typed rounds and 30 of 30 photo rounds inside the calorie range a careful person would accept (typically within 3% of its middle for typed meals and 6% for photos). What it gets wrong is what a photo cannot show: the size of a whole dish with nothing beside it for scale, and look-alikes (lentils read as minced meat). The careful pass is better at look-alikes, for ten to twenty times the price, which is why it is a button and not the default.
 
+#### How close it gets: measured against weighed dishes (18 November 2026)
+
+The figures above judged answers against a range a careful person would accept. In November 2026 the estimate was measured against weighed truth instead, through a temporary test route on the project's own backend (`scripts/ops/food-ai-lab/README.md`), with every request priced from its own usage into a money ledger (the whole round, planning runs included, cost $2.47):
+
+- 60 photos of cafeteria plates from Nutrition5k (Google's dataset of weighed dishes with lab-checked calories), each looked at by eye against its ingredient list; 9 whose photo contradicts the list (food hidden under other food, food missing from the list, an undressed salad) were replaced. 51 of the 60 are 150 kcal or more, and the headline figures are on those, because a 30 kcal miss on a 50 kcal side is not what a person feels.
+- 52 typed meals whose truth is computed from `src/data/foods.ts`, and 16 packaged products whose truth is the maker's label (Open Food Facts), so one typed set does not depend on the app's own table. The label set and the two drinks are now in `scripts/ops/food-ai-cases.json`.
+
+What it showed and what changed:
+
+| Quick pass (`claude-haiku-5-5`, effort low) | before | after | change, paired by dish (95% interval) |
+| --- | --- | --- | --- |
+| Photo: mean error on meals of 150 kcal or more | 40% | 31% | -9 points [-13, -5] |
+| Photo: median error / median signed error | 30 to 34% / +24% | 23 to 26% / +7 to +9% | |
+| Photo: mean miss in kcal, every dish | 139 to 144 kcal | 109 to 112 kcal | -30 to -36 kcal |
+| Photo: within 20% of the truth | 32 to 38% | 40 to 48% | |
+| Photo: cost / median time / slowest tenth | $0.00029 / 2.5 s / 3.2 s | $0.00035 to $0.00037 / 2.6 to 2.9 s / 3.6 to 5 s | |
+| Typed (foods.ts truth / label truth): median error | 8% / 5% | 7% / 4% (unchanged code; the second run is the noise) | |
+
+- **Typed meals were already close** (median error 5 to 8%) and stay as they were: the same plain-lines answer and the same guide.
+- **Photos carry nearly all the error, and read high**: before, a quick photo answer was off by a median of about 30%, over-estimating by a median of 24%, mostly portions about 1.25 times too large and cooking fat counted twice (once in the food, once as "oil"). The quick pass now reads a photo with the same rules worked through as five steps (items, portion from what is visible and not a typical serving, energy per 100 g, fat counted once, the arithmetic checked): `GUIDE_PHOTO` in `supabase/functions/analyze-food/analyze.ts`. The same model, effort and answer form; about 270 more input tokens and 70 to 110 more output tokens a photo (a longer guide and a longer answer: 1,657 in and 377 out against 1,384 and 306 before), about $0.00035 a photo against $0.00029.
+- **How sure that is.** The gain was found in two runs and confirmed in a third that ran both prompts side by side in the same hour (two trials each); the code as built was then run once more and landed on the same figures. Trial-to-trial spread of one setup was about 1 to 4 points, so a difference under 3 to 4 points on this set is noise. The gain shows on dishes with and without recorded oil, under and over 300 g. Nutrition5k's truth leaves out cooking fat it did not weigh: if that fat adds 10% the gain is about -8 points, if 20% about -5, if 30% it is inside the noise. Honestly put: about 5 to 10 points less error on these dishes.
+- **The careful pass keeps the plain guide.** With the stepwise guide it was no more accurate (-2 points, inside the noise) and turned large meals into under-counts (median -29% over 500 g), the harmful direction for a calorie diary.
+- **Drinks keep their alcohol.** The server's check that calories agree with the macros cut half a litre of beer from 215 to 78 kcal and a glass of wine from 128 to 16, because alcohol's 7 kcal a gram is in no macro. A drink-like item (named as a drink, almost no protein or fat) now keeps the calories its alcohol can explain; kale, virgin olive oil, margarita pizza, whisked eggs, cider vinegar and wine sauce are still checked (`alcoholRoom`, tested both ways).
+- **The range shown is wider for photos.** "likely X to Y" held the true calories in only 44 to 52% of quick photo answers. A photo answer's band is now one and a half times as wide (`PHOTO_SPREAD` in `src/features/ai/estimate.ts`), which holds them in about two thirds (67% on the final run, about +-38%), and a quick photo answer says "rough X to Y" rather than "likely". The careful pass on a photo holds about four in five at that width and keeps "likely"; typed meals keep their band and their word. Holding four in five on the quick pass would need +-50%. Once logged, the diary shows any estimate's band as "Estimate, between X and Y kcal", without "likely" or the model's confidence figure (which is not the chance the band holds the truth), and a food logged again from Recent keeps the width of its last band (`bandSpread` in `src/features/food/build.ts`), so a photo estimate stays as wide as when it was first logged.
+
+Tried and not adopted (each measured on the same dishes): effort medium on the quick pass (-3 points, inside the noise, slowest tenth 5.7 s); the app's food table in the prompt, as energy per 100 g or to compute the nutrients (no gain, two answers cut off, 40% more cost); the model's own low and high weight (no better than the confidence band at the same width); `claude-sonnet-5-5` as the quick pass (-8 points, at about 18 times the cost and 3.8 s); `claude-opus-5-5` for either pass (no better than Sonnet, twice its cost, 4.7 s).
+
+What these numbers do not show: anything about your own meals. The test photos are small plates shot from straight above at 640 x 480. Telling the model the true total weight was worth about -10 points and a true size word (small, medium, large) about -7, as an upper bound; a size question for the person was neither built nor measured, and would take the place of the added-fat question, which already appears on three answers in four. The real check is 10 to 20 of your own meals, weighed and photographed in the app.
+
 Two switches, as function secrets, change the trade without a deploy:
 
 - `FOOD_THINKING=off` is the cheapest setting for typed meals: $0.11 per 1,000. It is also measurably less accurate (54 of 60 typed rounds in range: eggs counted twice, a cooked weight priced as dry), so it is not the default.
 - `FOOD_FORMAT=json` or `FOOD_FORMAT=lines` forces one answer form for everything.
 
-Tried and not adopted, because they cost more or saved nothing a person would notice: effort medium on the small model (35 to 70% more per analysis, no measurable gain), prompt caching (the fixed part of the request is small and requests are minutes or hours apart, so it would mostly pay for cache writes) and smaller photos (three cents per 1,000 analyses, at a risk to portion judgement). Run the script again after changing the prompt, the model or the photo size: `ANTHROPIC_API_KEY=... node --experimental-transform-types scripts/ops/eval-food-ai.mjs` (40 requests, about one cent; `--show-misfits` prints any answer that did not keep the plain-lines form).
+Tried and not adopted, because they cost more or saved nothing a person would notice: effort medium on the small model (35 to 70% more per analysis, no measurable gain), prompt caching (the fixed part of the request is small and requests are minutes or hours apart, so it would mostly pay for cache writes) and smaller photos (three cents per 1,000 analyses, at a risk to portion judgement). Run the script again after changing the prompt, the model or the photo size: `ANTHROPIC_API_KEY=... node --experimental-transform-types scripts/ops/eval-food-ai.mjs` (the 38 typed meals twice, about 1.5 cents; `--photos=<dir>` adds photos with weighed truth, `--compare=A,B` pairs two configurations by case with a bootstrap interval, and `--show-misfits` prints any answer that did not keep the plain-lines form). Every request is priced into a ledger before the next one is sent (`--ledger`, `--expect`).
 
 The function enforces a daily limit per person (kept against a hash of the email, so deleting and recreating an account does not reset it) and a ceiling across all users, records usage in `ai_usage`, and gives the allowance back when a request fails without being billed.
 

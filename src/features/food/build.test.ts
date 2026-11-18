@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { aiFoodDefinition, itemRange } from '@/features/ai/estimate';
+import { PHOTO_SPREAD, aiFoodDefinition, itemRange, itemSpread } from '@/features/ai/estimate';
 import type { Food, SavedMeal, SavedMealItem } from '@/types';
 
-import { UNKNOWN_AI_CONFIDENCE, buildEntry, estimateRange, formatPortion, planSavedMeal, savedItemFromFood, scaleRange, servingsPhrase, setItemAmount } from './build';
+import { UNKNOWN_AI_CONFIDENCE, bandSpread, buildEntry, estimateRange, formatPortion, planSavedMeal, savedItemFromFood, scaleRange, servingsPhrase, setItemAmount, spreadRange } from './build';
 
 const rice: Food = {
   id: 'rice',
@@ -29,6 +29,23 @@ describe('buildEntry', () => {
     expect(e.kcalRange).toEqual(estimateRange(e.nutrients.kcal, UNKNOWN_AI_CONFIDENCE));
     expect(e.kcalRange![0]).toBeLessThan(e.nutrients.kcal);
     expect(e.kcalRange![1]).toBeGreaterThan(e.nutrients.kcal);
+  });
+  it('keeps a photo estimate\'s wider band when it is logged again (from Recent)', () => {
+    // First logged from a quick photo: the band is PHOTO_SPREAD (1.5) times the plain one.
+    const photoBand = itemRange(aiItem, PHOTO_SPREAD);
+    const spread = bandSpread(photoBand, aiItem.kcal)!;
+    expect(spread).toBeCloseTo(itemSpread(0.7, PHOTO_SPREAD), 2);
+    const e = buildEntry({ food: aiFood, serving: aiFood.servings[0], quantity: 2, meal: 'dinner', date: '2026-11-13', confidence: 0.7, spread });
+    const plain = estimateRange(e.nutrients.kcal, 0.7);
+    expect(e.kcalRange![1] - e.kcalRange![0]).toBeGreaterThan(plain[1] - plain[0]);
+    expect(e.kcalRange).toEqual(spreadRange(e.nutrients.kcal, spread));
+    // A typed estimate keeps its plain band the same way.
+    expect(bandSpread(itemRange(aiItem), aiItem.kcal)).toBeCloseTo(itemSpread(0.7), 2);
+  });
+  it('reads no width from a missing band or a zero value', () => {
+    expect(bandSpread(undefined, 400)).toBeUndefined();
+    expect(bandSpread([0, 0], 0)).toBeUndefined();
+    expect(bandSpread([100, 900], 200)).toBe(0.9);
   });
   it('gives reference foods no range', () => {
     const e = buildEntry({ food: rice, serving: rice.servings[0], quantity: 1, meal: 'lunch', date: '2026-11-13' });

@@ -24,6 +24,22 @@ export function estimateRange(kcal: number, confidence: number): [number, number
   return [Math.round(kcal * (1 - s)), Math.round(kcal * (1 + s))];
 }
 
+/**
+ * How wide a logged band is around its value, as a share of it (the larger side, at most 0.9). A re-logged
+ * estimate takes the width of its last band, so a food first read from a photo keeps its wider photo band
+ * (PHOTO_SPREAD) when it comes back from Recent, instead of the narrower typed one.
+ */
+export function bandSpread(range: [number, number] | undefined, kcal: number): number | undefined {
+  if (!range || !(kcal > 0)) return undefined;
+  const s = Math.max(kcal - range[0], range[1] - kcal) / kcal;
+  return Number.isFinite(s) && s > 0 ? Math.min(0.9, s) : undefined;
+}
+
+/** A band of a given width around a value (bandSpread's inverse). */
+export function spreadRange(kcal: number, spread: number): [number, number] {
+  return [Math.round(kcal * (1 - spread)), Math.round(kcal * (1 + spread))];
+}
+
 /** Scale a range by a factor (a new amount over the old one). */
 export function scaleRange(range: [number, number], factor: number): [number, number] {
   const f = Number.isFinite(factor) && factor > 0 ? factor : 0;
@@ -38,10 +54,12 @@ export interface BuildEntryInput {
   date: ISODate;
   /** For an AI food: how sure the estimate was (0..1). Defaults to UNKNOWN_AI_CONFIDENCE. */
   confidence?: number;
+  /** For an AI food: the width of its last logged band (bandSpread); when given, the new band keeps it. */
+  spread?: number;
 }
 
 /** Build the diary line for a food definition and an amount. */
-export function buildEntry({ food, serving, quantity, meal, date, confidence }: BuildEntryInput): Omit<FoodEntry, 'id' | 'updatedAt'> {
+export function buildEntry({ food, serving, quantity, meal, date, confidence, spread }: BuildEntryInput): Omit<FoodEntry, 'id' | 'updatedAt'> {
   const grams = serving.grams * quantity;
   const nutrients = scaleNutrients(food.per100g, grams);
   const c = confidence ?? UNKNOWN_AI_CONFIDENCE;
@@ -59,7 +77,7 @@ export function buildEntry({ food, serving, quantity, meal, date, confidence }: 
     grams,
     nutrients,
     // A re-logged estimate is still an estimate.
-    ...(food.source === 'ai' ? { kcalRange: estimateRange(nutrients.kcal, c), confidence: c } : null),
+    ...(food.source === 'ai' ? { kcalRange: spread !== undefined ? spreadRange(nutrients.kcal, spread) : estimateRange(nutrients.kcal, c), confidence: c } : null),
     food,
     loggedAt: nowISO(),
   };

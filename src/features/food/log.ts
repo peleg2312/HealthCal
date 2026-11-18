@@ -11,7 +11,7 @@ import type { Food, FoodEntry, ISODate, MealType, Nutrients, SavedMeal, SavedMea
 import { haptic, toast } from '@/ui';
 
 import { mealOnDay } from './addedTo';
-import { buildEntry, planSavedMeal } from './build';
+import { bandSpread, buildEntry, planSavedMeal } from './build';
 
 export { buildEntry } from './build';
 
@@ -26,14 +26,15 @@ export interface LogFoodInput {
 }
 
 /** How sure the latest estimate of this AI food was, so a re-log keeps the same band. */
-function lastConfidence(food: Food): number | undefined {
-  if (food.source !== 'ai') return undefined;
+/** How sure the last log of an AI food was, and how wide its band was (so a photo estimate keeps its wider band). */
+function lastEstimate(food: Food): { confidence?: number; spread?: number } {
+  if (food.source !== 'ai') return {};
   let best: FoodEntry | undefined;
   for (const e of live(useStore.getState().foodEntries)) {
     if (e.foodId !== food.id || e.confidence === undefined) continue;
     if (!best || e.loggedAt > best.loggedAt) best = e;
   }
-  return best?.confidence;
+  return best ? { confidence: best.confidence, spread: bandSpread(best.kcalRange, best.nutrients.kcal) } : {};
 }
 
 /** The meal and, when it is not today, the day: read at the moment of the log (an event handler), never while rendering. */
@@ -63,7 +64,7 @@ export function recentsAfterUndo<T extends { id: string }>(now: readonly T[], be
 /** Rewrite an existing entry with a new food, serving or amount. Keeps when it was logged and scales an estimate's range. */
 function rewriteEntry(input: LogFoodInput & { entryId: string }): FoodEntry {
   const store = useStore.getState();
-  const built = buildEntry({ ...input, confidence: lastConfidence(input.food) });
+  const built = buildEntry({ ...input, ...lastEstimate(input.food) });
   const existing = store.foodEntries[input.entryId];
   // An edited estimate is still an estimate: keep its range, scaled to the new amount.
   const scale = existing?.kcalRange && existing.nutrients.kcal > 0 ? built.nutrients.kcal / existing.nutrients.kcal : null;
@@ -87,7 +88,7 @@ export function logFood(input: LogFoodInput): FoodEntry {
     toast('Entry updated', before ? { label: 'Undo', onPress: () => useStore.getState().upsert('foodEntries', before) } : undefined);
     return entry;
   }
-  const entry = store.upsert('foodEntries', buildEntry({ ...input, confidence: lastConfidence(input.food) }));
+  const entry = store.upsert('foodEntries', buildEntry({ ...input, ...lastEstimate(input.food) }));
   const recentsBefore = store.recentFoods;
   store.rememberFood(input.food);
   announce(`Added to ${where(input.meal, input.date)}`, [entry.id], () => {

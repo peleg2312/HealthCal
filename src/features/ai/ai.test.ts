@@ -11,14 +11,20 @@ import {
   applyAddedFat,
   calorieRange,
   confidenceLevel,
+  formatKcalRange,
   gramStep,
+  itemRange,
+  itemSpread,
   makeRow,
   overallConfidence,
+  PHOTO_SPREAD,
+  rangeWord,
   rescaleItem,
   aiFoodDefinition,
   renameRow,
   rowsFromResult,
   rowsToLogItems,
+  rowWiden,
   setRowGrams,
   swapRow,
   totals,
@@ -66,6 +72,21 @@ describe('totals and range', () => {
     const [lo2, hi2] = calorieRange([{ ...rice, confidence: 0 }]);
     expect(lo2).toBe(140); // 260 * 0.55 = 143
     expect(hi2).toBe(380); // 260 * 1.45 = 377
+  });
+  it('a photo answer gets a band one and a half times as wide, only on what the model read', () => {
+    // chicken spread 0.15 x 1.5 = 0.225: 192.2 .. 303.8
+    expect(calorieRange([chicken], [PHOTO_SPREAD])).toEqual([190, 310]);
+    // never past 90 %: rice at confidence 0 would be 0.45 x 1.5 = 0.675, still inside
+    expect(itemSpread(0, 3)).toBe(0.9);
+    expect(rowWiden(makeRow(rice, 'detected'), true)).toBe(PHOTO_SPREAD);
+    expect(rowWiden(makeRow(rice, 'added'), true)).toBe(1);
+    expect(rowWiden(makeRow(rice, 'fat'), true)).toBe(1);
+    expect(rowWiden(makeRow(rice, 'detected'), false)).toBe(1);
+    // The words: a quick photo answer is rough; a typed one and the careful pass stay likely.
+    expect(formatKcalRange([190, 310], rangeWord(true, false))).toBe('rough 190 to 310');
+    expect(formatKcalRange([190, 310], rangeWord(true, true))).toBe('likely 190 to 310');
+    expect(formatKcalRange([190, 310], rangeWord(false, false))).toBe('likely 190 to 310');
+    expect(formatKcalRange([190, 310])).toBe('likely 190 to 310');
   });
   it('words for confidence', () => {
     expect(confidenceLevel(0.9)).toBe('high');
@@ -422,6 +443,14 @@ describe('logging reviewed rows', () => {
     expect(items[0].kcalRange![1]).toBeGreaterThan(260);
     expect(items[1]).toMatchObject({ name: cauli.name, source: cauli.source, servingLabel: '1 g', quantity: 150, grams: 150, confidence: 1 });
     expect(items[1].food?.id).toBe(cauli.id);
+  });
+  it('logs a photo answer with the wider band on what the model read, the plain one on what the person added', () => {
+    const rows = [makeRow(chicken, 'detected'), makeRow(chicken, 'added')];
+    const items = rowsToLogItems(rows, id, true);
+    expect(items[0].kcalRange).toEqual(itemRange(chicken, PHOTO_SPREAD));
+    expect(items[0].kcalRange).toEqual([192, 304]);
+    expect(items[1].kcalRange).toEqual(itemRange(chicken));
+    expect(rowsToLogItems(rows, id)[0].kcalRange).toEqual([211, 285]);
   });
 });
 

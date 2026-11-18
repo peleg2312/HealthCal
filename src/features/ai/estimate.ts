@@ -47,26 +47,41 @@ const clamp01 = (n: number) => Math.min(1, Math.max(0, Number.isFinite(n) ? n : 
 /**
  * Relative uncertainty of one item. `buildEntry` (src/features/food/build.ts) uses it too, so the range shown
  * here is the same one the diary shows after logging: 15 % for a confident
- * item, widening to 45 % for a guess.
+ * item, widening to 45 % for a guess. `widen` scales it (PHOTO_SPREAD for an
+ * item read from a photo), never past 90 %.
  */
-export function itemSpread(confidence: number): number {
-  return 0.15 + (1 - clamp01(confidence)) * 0.3;
+export function itemSpread(confidence: number, widen = 1): number {
+  return Math.min(0.9, (0.15 + (1 - clamp01(confidence)) * 0.3) * widen);
 }
 
 /**
- * Likely calorie range for the whole meal. Item ranges are added, not combined
- * as independent errors: photo estimates tend to miss in the same direction
- * (portions and hidden fat both run low), so a narrower band would overstate
- * certainty. Rounded outward to 10 kcal.
+ * How much wider the band is for an item the model read from a photo. Measured
+ * against weighed dishes (README, "AI food estimate"): the plain band held the
+ * true calories in only 44% of quick photo answers (58% careful); one and a half
+ * times as wide holds them in about two thirds (quick, about +-40%) and about
+ * four in five (careful). Typed meals keep the plain band.
  */
-export function calorieRange(items: AiFoodItem[]): [number, number] {
+export const PHOTO_SPREAD = 1.5;
+
+/** The spread factor for a review row: wider for what the model read from a photo, plain for what the person added or chose. */
+export function rowWiden(row: Pick<ReviewRow, 'kind'>, fromPhoto: boolean): number {
+  return fromPhoto && row.kind === 'detected' ? PHOTO_SPREAD : 1;
+}
+
+/**
+ * Calorie range for the whole meal. Item ranges are added, not combined
+ * as independent errors: photo estimates tend to miss in the same direction
+ * (portions and hidden fat both run the same way), so a narrower band would overstate
+ * certainty. Rounded outward to 10 kcal. `widen` is per item, in the items' order (1 when left out).
+ */
+export function calorieRange(items: AiFoodItem[], widen: number[] = []): [number, number] {
   let low = 0;
   let high = 0;
-  for (const it of items) {
-    const s = itemSpread(it.confidence);
+  items.forEach((it, i) => {
+    const s = itemSpread(it.confidence, widen[i] ?? 1);
     low += it.kcal * (1 - s);
     high += it.kcal * (1 + s);
-  }
+  });
   return [Math.max(0, Math.floor(low / 10) * 10), Math.ceil(high / 10) * 10];
 }
 
@@ -203,8 +218,18 @@ export function gramStep(grams: number): number {
   return 50;
 }
 
-export function formatKcalRange([low, high]: [number, number]): string {
-  return `likely ${low} to ${high}`;
+/**
+ * The words before the range. "likely" where the band holds the truth most of the time (typed meals, the
+ * careful pass on a photo); "rough" for a quick photo answer, whose band holds it about two times in three.
+ */
+export type RangeWord = 'likely' | 'rough';
+
+export function rangeWord(fromPhoto: boolean, carefulPass: boolean): RangeWord {
+  return fromPhoto && !carefulPass ? 'rough' : 'likely';
+}
+
+export function formatKcalRange([low, high]: [number, number], word: RangeWord = 'likely'): string {
+  return `${word} ${low} to ${high}`;
 }
 
 // ------------------------------------------------------------ correction
@@ -248,25 +273,25 @@ export function aiFoodDefinition(item: AiFoodItem, id: string): Food {
   };
 }
 
-/** Likely calorie range for one logged item, the same band the review shows. */
-export function itemRange(item: AiFoodItem): [number, number] {
-  const s = itemSpread(item.confidence);
+/** Calorie range for one logged item, the same band the review shows. */
+export function itemRange(item: AiFoodItem, widen = 1): [number, number] {
+  const s = itemSpread(item.confidence, widen);
   return [Math.round(item.kcal * (1 - s)), Math.round(item.kcal * (1 + s))];
 }
 
 /**
  * The diary lines for the reviewed rows. Estimated rows carry a derived
- * definition and their range; rows matched to a database food are logged
+ * definition and their range (wider for rows read from a photo, `fromPhoto`); rows matched to a database food are logged
  * with that food per gram, keeping the range because the portion is still a
  * guess. Rows without a name or weight are left out.
  */
-export function rowsToLogItems(rows: ReviewRow[], makeId: () => string): SavedMealItem[] {
+export function rowsToLogItems(rows: ReviewRow[], makeId: () => string, fromPhoto = false): SavedMealItem[] {
   const out: SavedMealItem[] = [];
   for (const r of rows) {
     const it = { ...r.item, name: r.item.name.trim() };
     if (!(it.grams > 0) || !it.name) continue;
     const nutrients = { kcal: it.kcal, protein: it.protein, carbs: it.carbs, fat: it.fat, fiber: it.fiber };
-    const range = { kcalRange: itemRange(it), confidence: it.confidence };
+    const range = { kcalRange: itemRange(it, rowWiden(r, fromPhoto)), confidence: it.confidence };
     if (r.food) {
       out.push({
         name: r.food.name,

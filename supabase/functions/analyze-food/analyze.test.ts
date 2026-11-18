@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it, vi } from 'vitest';
 
-import { AnalyzeError, analyzeFood, costOf, FAST_MODEL, mailboxOf, parseAnswer, parseLines, PRECISE_MODEL, RETRY_MAX_TOKENS, sanitizeItems, TIME_BUDGET_MS, validateInput } from './analyze';
+import { alcoholRoom, AnalyzeError, analyzeFood, costOf, FAST_MODEL, mailboxOf, parseAnswer, parseLines, PRECISE_MODEL, RETRY_MAX_TOKENS, sanitizeItems, systemFor, TIME_BUDGET_MS, validateInput } from './analyze';
 
 const err = (fn: () => unknown): AnalyzeError => {
   try {
@@ -152,6 +152,66 @@ describe('sanitizeItems', () => {
   it('calories are capped at 9 kcal per gram when macros are missing', () => {
     expect(sanitizeItems([item({ grams: 100, kcal: 5000, protein: 0, carbs: 0, fat: 0 })])[0].kcal).toBe(900);
   });
+  it('a drink keeps the calories its alcohol explains (measured: beer was cut from 215 to 78, wine from 128 to 16)', () => {
+    // 500 g beer: macros 2.5 g protein + 18 g carbs = 82 kcal; alcohol brings it to about 215.
+    expect(sanitizeItems([item({ name: 'Beer', grams: 500, kcal: 215, protein: 2.5, carbs: 18, fat: 0, fiber: 0 })])[0].kcal).toBe(215);
+    expect(sanitizeItems([item({ name: 'Red wine', grams: 150, kcal: 128, protein: 0.1, carbs: 4, fat: 0, fiber: 0 })])[0].kcal).toBe(128);
+    expect(sanitizeItems([item({ name: 'Gin and tonic', grams: 250, kcal: 170, protein: 0, carbs: 20, fat: 0, fiber: 0 })])[0].kcal).toBe(170);
+    expect(sanitizeItems([item({ name: 'כוס יין', grams: 150, kcal: 125, protein: 0.1, carbs: 4, fat: 0, fiber: 0 })])[0].kcal).toBe(125);
+    expect(sanitizeItems([item({ name: 'Glass of rosé', grams: 150, kcal: 125, protein: 0.1, carbs: 4, fat: 0, fiber: 0 })])[0].kcal).toBe(125);
+  });
+  it('the alcohol allowance has a ceiling: more than 0.4 g of alcohol a gram is still corrected', () => {
+    // 100 g "vodka" with no macros: atwater 0 keeps the stated kcal; with 1 g carbs the ceiling is 4 + 280 + 25.
+    expect(sanitizeItems([item({ name: 'Vodka', grams: 100, kcal: 300, protein: 0, carbs: 1, fat: 0, fiber: 0 })])[0].kcal).toBe(300);
+    expect(sanitizeItems([item({ name: 'Vodka', grams: 100, kcal: 320, protein: 0, carbs: 1, fat: 0, fiber: 0 })])[0].kcal).toBe(4);
+    // Alcohol only adds: a drink whose kcal is far below its macros is corrected as before.
+    expect(sanitizeItems([item({ name: 'Beer', grams: 500, kcal: 10, protein: 2.5, carbs: 18, fat: 0, fiber: 0 })])[0].kcal).toBe(82);
+  });
+  it.each([
+    'Kale salad',
+    'Extra virgin olive oil',
+    'Pizza margarita',
+    'Margarita pizza',
+    'Whisked eggs',
+    'Apple cider vinegar',
+    'Red wine sauce',
+    'Wine-braised beef',
+    'Beer-battered fish',
+    'Pale bread',
+    'Stale bagel',
+    'Spectrum',
+    'Ginger tea',
+    'Alcohol-free beer',
+    'חומץ יין',
+  ])('a food that only sounds like a drink is still held to its macros: %s', (name) => {
+    expect(alcoholRoom(name, 300, 1, 0)).toBe(0);
+    // 300 g with macros worth 1,200 kcal claimed as 2,000: corrected, whatever the name.
+    expect(sanitizeItems([item({ name, grams: 300, kcal: 2000, protein: 0, carbs: 300, fat: 0, fiber: 0 })])[0].kcal).toBe(1200);
+  });
+  it.each(['Ginger ale', 'Root beer', 'Fruit cocktail', 'Cocktail tomatoes', 'Hot apple cider', 'Sparkling apple cider', 'Ginger beer', 'Birch beer', 'Shrimp cocktail'])(
+    'a soft drink or food with a drink word in its name holds no alcohol: %s',
+    (name) => {
+      expect(alcoholRoom(name, 330, 0.5, 0.2)).toBe(0);
+      // 330 g with 30 g of carbs (120 kcal) claimed as 600 kcal: cut to the macros (review finding, round 5).
+      expect(sanitizeItems([item({ name, grams: 330, kcal: 600, protein: 0, carbs: 30, fat: 0, fiber: 0 })])[0].kcal).toBe(120);
+    },
+  );
+  it.each(['Hard cider', 'Hard apple cider', 'Alcoholic ginger beer', 'Apple cider 4.5% ABV', 'Cider', 'Beer', 'Pale ale', 'Mojito', 'Cocktail'])(
+    'the same words still count as a drink when the name says alcohol: %s',
+    (name) => {
+      expect(alcoholRoom(name, 330, 0.5, 0.2)).toBeGreaterThan(0);
+    },
+  );
+  it('a non-alcoholic ginger beer stays held to its macros', () => {
+    expect(alcoholRoom('Non-alcoholic ginger beer', 330, 0, 0)).toBe(0);
+  });
+  it('a dish named after a drink but with real protein or fat is not a drink (salmon sake, a wine stew)', () => {
+    expect(alcoholRoom('Salmon (sake)', 100, 20, 10)).toBe(0);
+    expect(alcoholRoom('Sake', 100, 20, 10)).toBe(0);
+    expect(alcoholRoom('Sake', 100, 0.5, 0)).toBe(280);
+    const o = sanitizeItems([item({ name: 'Beef in red wine', grams: 300, kcal: 900, protein: 60, carbs: 10, fat: 20, fiber: 0 })])[0];
+    expect(o.kcal).toBe(460);
+  });
 });
 
 // ---------------------------------------------------------------- analyzeFood
@@ -238,6 +298,32 @@ describe('analyzeFood request construction', () => {
     await analyzeFood(photo.client, { image: 'QUJD' }, { format: 'lines' });
     // Forced by the option it can be; by default it is not (the first test of this block).
     expect((photo.make.mock.calls[0] as unknown as [Record<string, any>])[0].output_config).toEqual({ effort: 'low' });
+  });
+  it('a photo on the quick pass is read with the stepwise guide; the careful pass, typed meals and the second try keep the plain guide', async () => {
+    const quick = fakeClient(msg());
+    await analyzeFood(quick.client, { image: 'QUJD', text: 'large plate' });
+    const qs = (quick.make.mock.calls[0] as unknown as [Record<string, any>])[0].system as string;
+    expect(qs).toBe(systemFor({ image: 'QUJD' }, 'json'));
+    expect(qs).toContain('Work through these steps before you answer');
+    expect(qs).toContain('a small scoop is a small scoop');
+    // The same form and schema as before: only the guide changed.
+    expect(qs).toContain('Each item: n its name, g grams, k kcal');
+    expect((quick.make.mock.calls[0] as unknown as [Record<string, any>])[0].output_config.format.schema.properties.items.items.required).toEqual(['n', 'g', 'k', 'p', 'c', 'f', 'b', 'q']);
+
+    const careful = fakeClient(msg({ model: PRECISE_MODEL }));
+    await analyzeFood(careful.client, { image: 'QUJD', precise: true });
+    const cs = (careful.beta.mock.calls[0] as unknown as [Record<string, any>])[0].system as string;
+    expect(cs).not.toContain('Work through these steps');
+    expect(cs).toContain('Photos hide fat');
+    expect(cs).toContain('Each item: n its name, g grams, k kcal');
+    expect(cs).toBe(systemFor({ image: 'QUJD', precise: true }, 'json'));
+
+    const typed = fakeClient(msg());
+    await analyzeFood(typed.client, { text: 'two eggs' }, { format: 'json' });
+    expect((typed.make.mock.calls[0] as unknown as [Record<string, any>])[0].system).toBe(cs);
+    expect(systemFor({ text: 'x' } as never, 'lines')).not.toContain('Work through these steps');
+    // A forced lines answer for a photo that did not parse is asked again with the plain guide (never measured with the steps).
+    expect(systemFor({ image: 'QUJD' }, 'json', true)).toBe(cs);
   });
   it('model overrides from options are honoured', async () => {
     const f = fakeClient(msg());

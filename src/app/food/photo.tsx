@@ -21,9 +21,11 @@ import {
   formatKcalRange,
   makeRow,
   overallConfidence,
+  rangeWord,
   renameRow,
   rowsFromResult,
   rowsToLogItems,
+  rowWiden,
   setRowGrams,
   swapRow,
   totals,
@@ -264,7 +266,7 @@ export default function PhotoScreen() {
   }
 
   function add() {
-    const items = rowsToLogItems(rows, newId);
+    const items = rowsToLogItems(rows, newId, mode === 'photo');
     if (items.length === 0) return;
     logItems(items, meal, date);
     // Estimates and matched foods show up in Recent, ready to log again.
@@ -314,7 +316,12 @@ export default function PhotoScreen() {
   const title = step === 'review' || (result && (step === 'analysing' || error?.precise)) ? 'Review estimate' : mode === 'photo' ? 'Snap a meal' : 'Describe a meal';
   const items = rows.map((r) => r.item);
   const sum = totals(items);
-  const range = calorieRange(items);
+  // A photo answer's band is wider, and a quick one is called rough (src/features/ai/estimate.ts, PHOTO_SPREAD).
+  const range = calorieRange(
+    items,
+    rows.map((r) => rowWiden(r, mode === 'photo')),
+  );
+  const word = rangeWord(mode === 'photo', precisePass);
   const conf = confidenceLevel(overallConfidence(rows.filter((r) => r.kind === 'detected').map((r) => r.item)));
   const isDemo = !!result?.demo;
   // The sample result is not about the photo, so it does not wear it.
@@ -462,7 +469,7 @@ export default function PhotoScreen() {
                 uri={heroPhoto}
                 dish={result.dish}
                 kcal={sum.kcal}
-                range={`${formatKcalRange(range)} kcal`}
+                range={`${formatKcalRange(range, word)} kcal`}
                 items={rows.filter((r) => r.kind !== 'fat').map((r) => ({ key: r.key, item: r.item }))}
                 onItemPress={showRow}
               />
@@ -502,7 +509,7 @@ export default function PhotoScreen() {
                   </Text>
                 </View>
                 <Text variant="label" color="textSecondary" testID="ai-total-range">
-                  {formatKcalRange(range)} kcal
+                  {formatKcalRange(range, word)} kcal
                 </Text>
               </View>
               <MacroBar protein={sum.protein} carbs={sum.carbs} fat={sum.fat} />

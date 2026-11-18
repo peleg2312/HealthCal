@@ -5,7 +5,7 @@ import { View } from 'react-native';
 
 import { updateEntryDirect } from '@/features/food/actions';
 import { AmountEditor } from '@/features/food/AmountEditor';
-import { UNKNOWN_AI_CONFIDENCE, estimateRange, scaleRange } from '@/features/food/build';
+import { UNKNOWN_AI_CONFIDENCE, bandSpread, estimateRange, scaleRange, spreadRange } from '@/features/food/build';
 import { DayStepper, KcalValue, MacroStat, MealPicker, SourceBadge } from '@/features/food/components';
 import { useFoodDraft } from '@/features/food/draft';
 import { dayPhrase, href, portionLabel, kcal, lastPortions, matchServing, param, parseDate, parseMeal, portionFor, sourceInfo } from '@/features/food/helpers';
@@ -46,10 +46,21 @@ function FoodDetail() {
   return <FoodEditor key={`${food.id}-${liveCustom?.updatedAt ?? ''}`} food={food} initialMeal={parseMeal(params.meal)} initialDate={parseDate(params.date)} />;
 }
 
-function latestConfidence(entries: FoodEntry[], foodId: string): number | undefined {
+/** The band a new log of an AI food will get: its last band's width (bandSpread), else from its confidence (log.ts, lastEstimate). */
+function nextBand(entries: FoodEntry[], foodId: string, kcalNow: number): [number, number] {
   let best: FoodEntry | undefined;
   for (const e of entries) if (e.foodId === foodId && e.confidence !== undefined && (!best || e.loggedAt > best.loggedAt)) best = e;
-  return best?.confidence;
+  const spread = best ? bandSpread(best.kcalRange, best.nutrients.kcal) : undefined;
+  return spread !== undefined ? spreadRange(kcalNow, spread) : estimateRange(kcalNow, best?.confidence ?? UNKNOWN_AI_CONFIDENCE);
+}
+
+/**
+ * The words for a logged estimate's band. Not "likely" and no confidence figure: a quick photo band holds the
+ * true calories only about two times in three (the review calls it "rough"), and a model's own confidence is
+ * not the chance the band holds the truth. One wording for every estimate, before or after logging.
+ */
+function estimateBandText([low, high]: [number, number]): string {
+  return `Estimate, between ${kcal(low)} and ${kcal(high)} kcal`;
 }
 
 function Missing({ message }: { message: string }) {
@@ -210,7 +221,7 @@ function MacroSummary({ n, kcalNote, range }: { n: Nutrients; kcalNote: string; 
       </View>
       {range ? (
         <Text variant="caption" color="textSecondary" tabular testID="detail-kcal-range">
-          Likely between {kcal(range[0])} and {kcal(range[1])} kcal
+          {estimateBandText(range)}
         </Text>
       ) : null}
       <View style={{ marginTop: spacing.md }}>
@@ -247,7 +258,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
       ? scaleRange(entry.kcalRange, n.kcal / entry.nutrients.kcal)
       : null
     : food.source === 'ai'
-      ? estimateRange(n.kcal, latestConfidence(entries, food.id) ?? UNKNOWN_AI_CONFIDENCE)
+      ? nextBand(entries, food.id, n.kcal)
       : null;
 
   const save = () => {
@@ -376,7 +387,7 @@ function ManualEditor({ entry }: { entry: FoodEntry }) {
         explain={info.explain}
         note={
           rangeKept && entry.kcalRange
-            ? `Likely between ${kcal(entry.kcalRange[0])} and ${kcal(entry.kcalRange[1])} kcal${entry.confidence !== undefined ? ` (${Math.round(entry.confidence * 100)}% confidence)` : ''}`
+            ? estimateBandText(entry.kcalRange)
             : undefined
         }
       />

@@ -88,6 +88,23 @@ Judge portions from plate, cutlery, hands and packaging for scale. Use the user'
 Photos hide fat: give each fried, sautéed, dressed or sauced item the calories it has as normally cooked or served, fat included. Fold that fat into the item's own numbers; list oil, butter or dressing as its own item only when you can see it or the user names it.
 Names are short and generic, in the user's language.`;
 
+/**
+ * How the quick pass reads a photo: the same rules worked through as steps. Measured on 60
+ * Nutrition5k dishes (paired, two runs plus an interleaved confirming run of two trials each,
+ * README "AI food estimate"): mean absolute error on meals of 150 kcal or more fell by about 9
+ * points [-13, -5], mostly from smaller portions and from fat no longer counted twice. Used only
+ * for a photo on the quick pass: on the careful pass it gained nothing and turned large meals into
+ * under-counts, and typed meals keep GUIDE (already 5 to 8% median error).
+ */
+const GUIDE_PHOTO = `You estimate nutrition for a food diary from a photo and/or a short description.
+Work through these steps before you answer:
+1. Items. Name each distinct food or drink you can see or that the user names. A mixed dish you cannot take apart (a stew, a sandwich, a slice of pizza) is one item; a plate of separate foods is one item per food. Look closely before naming; when a food could be one of several things, choose the most likely and lower its confidence.
+2. Portion. Estimate each item's edible weight in grams as served from what is visible: how much of the plate or bowl it covers and how thick or deep it is, against the plate, bowl, cutlery, hands or packaging. Do not default to a typical serving size: a small scoop is a small scoop. Use the user's amounts whenever they give them.
+3. Energy density. Take each item's energy and macros per 100 g as cooked or served from standard reference values.
+4. Fat. A fried, sautéed, dressed or sauced item carries the fat it normally has when cooked that way, inside its own numbers. List oil, butter, dressing or sauce as its own item only when you can see it apart from the food or the user names it, and then do not count it again inside the food.
+5. Arithmetic. kcal = grams x energy per 100 g / 100. Protein x 4 + carbs x 4 + fat x 9 (+ alcohol x 7) comes within about a tenth of kcal; fix whichever number is wrong.
+Names are short and generic, in the user's language.`;
+
 /** The usual answer: plain lines, parsed by `parseLines`. */
 const SYSTEM_LINES = `${GUIDE}
 Reply with these lines and nothing else:
@@ -100,12 +117,22 @@ Q is one short question about added fat or sauce the photo cannot show, only whe
 N is at most one short sentence about what limits accuracy (for example no scale reference); leave the line out when nothing does.
 If there is no food or drink, write no I line and say so in N.`;
 
-/** The second try, when the lines did not parse: the same guidance, answered as schema-checked JSON. */
-const SYSTEM_JSON = `${GUIDE}
-Each item: n its name, g grams, k kcal, p protein g, c carbs g, f fat g, b fiber g, q confidence, 0 to 1 for how sure you are of that item's identity and portion together.
+/** The schema-checked form's own words, after the guide. */
+const JSON_FORM = `Each item: n its name, g grams, k kcal, p protein g, c carbs g, f fat g, b fiber g, q confidence, 0 to 1 for how sure you are of that item's identity and portion together.
 hidden_fat_question: one short question about added fat or sauce the photo cannot show, when the answer would change the estimate by more than about 50 kcal; otherwise null.
 note: at most one short sentence about what limits accuracy (for example no scale reference), or null.
 If there is no food or drink, return an empty items array and say so in note.`;
+
+/** A photo on the careful pass, and the second try when typed lines did not parse: the guidance answered as schema-checked JSON. */
+const SYSTEM_JSON = `${GUIDE}\n${JSON_FORM}`;
+/** A photo on the quick pass (see GUIDE_PHOTO). */
+const SYSTEM_JSON_PHOTO = `${GUIDE_PHOTO}\n${JSON_FORM}`;
+
+/** Which system text a request carries. Exported for the tests and the measuring script. */
+export function systemFor(input: Pick<AnalyzeInput, 'image' | 'precise'>, format: 'lines' | 'json', again = false): string {
+  if (format === 'lines') return SYSTEM_LINES;
+  return input.image && !input.precise && !again ? SYSTEM_JSON_PHOTO : SYSTEM_JSON;
+}
 
 /** Compact on purpose: every property name is output tokens on every item. */
 const SCHEMA = {
@@ -162,6 +189,37 @@ export function validateInput(body: unknown): AnalyzeInput {
   return { image, mediaType, text: text || undefined, precise: b.precise === true };
 }
 
+/**
+ * A drink whose name says it holds alcohol. Whole words only (a leading boundary too, so kale,
+ * pale bread, virgin olive oil and whisked eggs are not ale, gin or whisky), and never a food
+ * cooked with a drink (wine sauce, cider vinegar, beer-battered fish, margarita pizza). The bounds are
+ * any letter or digit in any script, because JavaScript's \b sees neither Hebrew letters nor "é".
+ */
+const ALCOHOL_WORDS =
+  /(?<![\p{L}\p{N}])(beers?|lagers?|ales?|ipa|stouts?|porters?|pilsners?|wines?|ros[eé]|champagne|prosecco|cava|vodka|whisk(?:e)?y|bourbon|scotch|gin|rum|tequila|mezcal|brandy|cognac|liqueurs?|cocktails?|ciders?|sake|soju|ouzo|arak|raki|sangria|mojito|margarita|martini|negroni|spritz|mead|בירה|יין|וודקה|ערק|ויסקי|קוקטייל)(?![\p{L}\p{N}])/iu;
+const NOT_A_DRINK = /vinegar|sauce|gravy|braised|batter|glaze|marinade|reduction|poached|pizza|cake|bread|risotto|stew|sashimi|sushi|jus\b|alcohol[- ]free|non[- ]?alcoholic|\b0[.,]0\b|חומץ|רוטב/i;
+/**
+ * Soft drinks and foods named with a drink word that hold no alcohol: ginger ale, root beer, fruit
+ * cocktail, cocktail tomatoes, shrimp cocktail, (hot, sparkling) apple cider. They count as a drink
+ * only when the name says alcohol (hard cider, alcoholic ginger beer, 4.5% ABV).
+ */
+const SOFT_LOOKALIKE =
+  /ginger[- ]?(?:ale|beer)s?|(?:root|birch|butter)[- ]?beers?|fruit[- ]cocktails?|cocktail[- ](?:tomato(?:es)?|sausages?|onions?|cherr(?:y|ies)|franks?|weenies?)|(?:shrimp|prawn|seafood|crab)[- ]cocktails?|(?:apple|hot|sweet|sparkling)[- ]ciders?/i;
+const SAYS_ALCOHOL = /\bhard\b|(?<!non[- ]?)alcoholic|\d+(?:[.,]\d+)?\s*%\s*(?:abv|alc|vol)/i;
+
+/**
+ * Alcohol carries 7 kcal a gram that no macro holds, so for a drink the kcal above the macros is
+ * kept up to what alcohol could explain: at most 0.4 g of alcohol a gram (spirits are about 0.32).
+ * Only for a drink-like item: named as a drink and almost no protein or fat (under 2% of its
+ * weight), so a dish with wine in its name is still checked against its macros.
+ */
+export function alcoholRoom(name: string, grams: number, protein: number, fat: number): number {
+  if (!ALCOHOL_WORDS.test(name) || NOT_A_DRINK.test(name)) return 0;
+  if (SOFT_LOOKALIKE.test(name) && !SAYS_ALCOHOL.test(name)) return 0;
+  if (protein + fat >= grams * 0.02) return 0;
+  return grams * 0.4 * 7;
+}
+
 const num = (v: unknown, max: number): number => {
   const n = typeof v === 'number' && Number.isFinite(v) ? v : 0;
   return Math.min(max, Math.max(0, n));
@@ -194,8 +252,10 @@ export function sanitizeItems(raw: unknown): AnalyzedItem[] {
     const fiber = Math.min(num(o.fiber, grams), carbs);
     const atwater = protein * 4 + carbs * 4 + fat * 9;
     let kcal = num(o.kcal, grams * 9);
-    // Alcohol and fibre explain small gaps; a large gap is an error, so fall back to the macros.
-    if (atwater > 0 && Math.abs(kcal - atwater) > Math.max(25, atwater * 0.25)) kcal = atwater;
+    // Fibre explains small gaps and alcohol larger ones in a drink; any other large gap is an error, so fall back to the macros.
+    const tolerance = Math.max(25, atwater * 0.25);
+    const alcohol = kcal > atwater && kcal - atwater <= alcoholRoom(name, grams, protein, fat) + tolerance;
+    if (atwater > 0 && Math.abs(kcal - atwater) > tolerance && !alcohol) kcal = atwater;
     if (kcal === 0 && atwater > 0) kcal = atwater;
     const round1 = (n: number) => Math.round(n * 10) / 10;
     out.push({
@@ -354,7 +414,7 @@ export async function analyzeFood(client: Anthropic, input: AnalyzeInput, option
       // Reasoning counts toward this cap, so it leaves room for both; a typical answer uses 60 to 400 tokens.
       max_tokens: again ? RETRY_MAX_TOKENS : 2000,
       ...(!input.precise && (again || options.thinking === 'off') ? { thinking: { type: 'disabled' as const } } : null),
-      system: format === 'lines' ? SYSTEM_LINES : SYSTEM_JSON,
+      system: systemFor(input, format, again),
       messages: [{ role: 'user' as const, content }],
       output_config:
         format === 'lines'
