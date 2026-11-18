@@ -20,9 +20,8 @@
  *
  * Speed: the app runs this on every keystroke on Hermes (no JIT). Each food's names are indexed once
  * per food object (stems and skeletons included); the corpus's sorted gate tokens and per-script typo
- * vocabularies are built once per corpus (cached on the base array and the custom and recent food
- * objects); typo candidates are computed once per search over the distinct tokens of the word's own
- * script, not per food. `scripts/dev/search-timing.mjs` measures it with and without the interpreter
+ * vocabularies are built once per set of food objects; typo candidates are computed once per search
+ * over the distinct tokens of the word's own script, not per food. `scripts/dev/search-timing.mjs` measures it with and without the interpreter
  * flags.
  */
 import { BUILTIN_FOODS } from '@/data/foods';
@@ -129,6 +128,31 @@ export function editDistance(a: string, b: string, max = 2): number {
     prev = cur;
   }
   return prev[b.length];
+}
+
+/**
+ * `editDistance(a, b, 1) <= 1` without allocating: equal, one substitution, one letter more or less, or
+ * two neighbours swapped. The typo sets call it for hundreds of tokens per keystroke, and on Hermes the
+ * arrays of the general version cost more than the comparison.
+ */
+export function withinOneEdit(a: string, b: string): boolean {
+  const la = a.length;
+  const lb = b.length;
+  if (la === lb) {
+    let i = 0;
+    while (i < la && a[i] === b[i]) i++;
+    if (i >= la - 1) return true;
+    // One substitution at i, or a swap of i and i + 1.
+    if (a.slice(i + 1) === b.slice(i + 1)) return true;
+    return a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2);
+  }
+  if (la - lb === 1 || lb - la === 1) {
+    const [l, s] = la > lb ? [a, b] : [b, a];
+    let i = 0;
+    while (i < s.length && l[i] === s[i]) i++;
+    return l.slice(i + 1) === s.slice(i);
+  }
+  return false;
 }
 
 const HAS_LATIN = /[a-z]/;
@@ -251,17 +275,17 @@ function anyStartsWith(sorted: readonly string[], q: string): boolean {
   return lo < sorted.length && sorted[lo].startsWith(q);
 }
 
-// One slot: the search screen asks with the same corpus on every keystroke. The key is the base array
-// and the custom and recent food objects (an edited own food is a new object, so its new name counts).
-let corpusBase: readonly Food[] | null = null;
-let corpusExtra: readonly Food[] = [];
+// One slot: the search screen asks with the same foods on every keystroke. The key is the list of food
+// objects itself, compared one by one (a few hundred identity checks): a caller that builds a new array
+// of the same foods on every render (the photo review's pool) keeps the cache, and an edited own food,
+// which is a new object, rebuilds it.
+let corpusFoods: readonly Food[] = [];
 let corpusVal: Corpus | null = null;
 
-function corpusFor(base: readonly Food[], extra: readonly Food[], foods: readonly Food[]): Corpus {
-  if (corpusVal && corpusBase === base && corpusExtra.length === extra.length && corpusExtra.every((f, i) => f === extra[i])) return corpusVal;
+function corpusFor(foods: readonly Food[]): Corpus {
+  if (corpusVal && corpusFoods.length === foods.length && corpusFoods.every((f, i) => f === foods[i])) return corpusVal;
   corpusVal = buildCorpus(foods);
-  corpusBase = base;
-  corpusExtra = extra.slice();
+  corpusFoods = foods;
   return corpusVal;
 }
 
@@ -306,9 +330,10 @@ function typoSet(q: string, he: boolean, c: Corpus): Map<string, number> {
     let s = 0;
     if (he && t.length >= 4 && c.typoHeSkel[i] === qSkel) s = SKEL;
     else if (editOk) {
-      if (Math.abs(t.length - q.length) <= max && editDistance(q, t, max) <= max) s = FUZZY;
+      const d = t.length - q.length;
+      if (d <= max && d >= -max && (max === 1 ? withinOneEdit(q, t) : editDistance(q, t, max) <= max)) s = FUZZY;
       // A typo while still typing a longer word: "chik" -> "chicken".
-      else if (t.length > q.length && t[0] === q0 && editDistance(q, t.slice(0, q.length), 1) <= 1) s = FUZZY - 3;
+      else if (d > 0 && t[0] === q0 && withinOneEdit(q, t.slice(0, q.length))) s = FUZZY - 3;
     }
     if (s) out.set(t, s);
   }
@@ -519,7 +544,7 @@ export function searchLocal(query: string, ctx: SearchContext = {}, limit = 40):
   const customIds = new Set(custom.map((f) => f.id));
 
   const foods = [...byId.values()];
-  const corpus = corpusFor(base, custom.length || recents.length ? [...custom, ...recents] : [], foods);
+  const corpus = corpusFor(foods);
   let p = makePlan(query, corpus);
   if (!p) return [];
   let found = match(foods, p);

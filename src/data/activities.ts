@@ -11,6 +11,12 @@
  */
 import type { ActivityCategory, ActivityDef } from '@/types';
 
+// Relative paths with the extension, so `node --experimental-strip-types scripts/check-activities.mjs`
+// can load this file without a resolver (Metro and TypeScript accept them too).
+import { collapseDoubles, fold, isHebrew } from '../lib/hebrew.ts';
+
+import { ACTIVITY_NAMES_HE } from './activityNamesHe.ts';
+
 type Triple<T> = [T, T, T];
 
 interface Row {
@@ -823,14 +829,53 @@ export const MET_SOURCES: Record<string, string> = Object.fromEntries(
 
 const byName = (a: ActivityDef, b: ActivityDef) => a.name.localeCompare(b.name);
 
+/** Folded Hebrew names per activity (from `ACTIVITY_NAMES_HE`), built on the first Hebrew query. */
+let hebrewNames: Map<string, string[]> | null = null;
+
+function foldedHebrewNames(): Map<string, string[]> {
+  if (!hebrewNames) {
+    hebrewNames = new Map();
+    for (const [id, names] of Object.entries(ACTIVITY_NAMES_HE)) hebrewNames.set(id, names.map(foldHebrewName));
+  }
+  return hebrewNames;
+}
+
+/** Folded, with doubled vav and yod collapsed, so שחיה finds שחייה. */
+function foldHebrewName(s: string): string {
+  return collapseDoubles(fold(s));
+}
+
+/**
+ * Hebrew rank of an activity for a folded query: its name is the query (3), starts with it (3.2), has
+ * a word that starts with it (3.4), or holds it (4); a shorter name ranks a little higher within each
+ * (ריצ: ריצה before ריצת שטח); -1 when none of its Hebrew names match.
+ */
+function hebrewRank(id: string, q: string): number {
+  let best = -1;
+  for (const n of foldedHebrewNames().get(id) ?? []) {
+    let r = -1;
+    if (n === q) r = 3;
+    else if (n.startsWith(q)) r = 3.2;
+    else if (n.split(' ').some((w) => w.startsWith(q))) r = 3.4;
+    else if (n.includes(q)) r = 4;
+    if (r >= 0) r += Math.min(n.length, 99) / 1000;
+    if (r >= 0 && (best < 0 || r < best)) best = r;
+  }
+  return best;
+}
+
 /**
  * Case-insensitive match on name and keywords. Results whose name starts with
  * the query come first, then name word-prefix matches, then other matches;
  * ties are sorted by name. An empty query returns everything sorted by name.
+ * A query with a Hebrew letter is matched, folded (`@/lib/hebrew`), against the
+ * Hebrew names of `ACTIVITY_NAMES_HE` as extra keywords (rank 3, the exact name
+ * first); English queries are matched exactly as before.
  */
 export function searchActivities(query: string): ActivityDef[] {
   const q = query.trim().toLowerCase();
   if (!q) return [...ACTIVITIES].sort(byName);
+  const he = isHebrew(q) ? foldHebrewName(q) : '';
 
   const ranked: { a: ActivityDef; rank: number }[] = [];
   for (const a of ACTIVITIES) {
@@ -841,6 +886,7 @@ export function searchActivities(query: string): ActivityDef[] {
     else if (name.includes(q)) rank = 2;
     else if (a.keywords?.some((k) => k.toLowerCase().startsWith(q))) rank = 3;
     else if (a.keywords?.some((k) => k.toLowerCase().includes(q))) rank = 4;
+    else if (he) rank = hebrewRank(a.id, he);
     if (rank >= 0) ranked.push({ a, rank });
   }
   ranked.sort((x, y) => x.rank - y.rank || byName(x.a, y.a));

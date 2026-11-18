@@ -13,10 +13,11 @@
  * before the tap ("Add 140 kcal to lunch"); the sheet never opens on a disabled button.
  */
 import { ChevronDown, ChevronUp, Search, X } from 'lucide-react-native';
-import React, { useMemo, useState } from 'react';
+import React, { useDeferredValue, useMemo, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { resolveFood } from '@/features/food/usuals';
+import { isolateRtl } from '@/lib/bidi';
 import { searchLocal } from '@/services/foodSearch';
 import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
@@ -73,10 +74,15 @@ export function DrinkPickSheet({
   const customById = useMemo(() => new Map(customFoods.map((f) => [f.id, f as Food])), [customFoods]);
   const recents = useMemo(() => recentFoods.map((f) => resolveFood(f, customById)).filter((f): f is Food => !!f).slice(0, 30), [recentFoods, customById]);
   const q = query.trim();
-  const foods = useMemo(
-    () => (q ? withoutAlcohol(searchLocal(q, { customFoods, recentFoods: recents, favoriteIds }, 30).map((h) => h.food)) : sheetDrinks()),
-    [q, customFoods, recents, favoriteIds],
-  );
+  // A slow search never holds up typing: the list follows a beat behind.
+  const localQ = useDeferredValue(q);
+  // Each drink with the search name the query found, when that was not its stored name (a Hebrew name).
+  const rows: { food: Food; matched?: string }[] = useMemo(() => {
+    if (!localQ) return sheetDrinks().map((food) => ({ food }));
+    const hits = searchLocal(localQ, { customFoods, recentFoods: recents, favoriteIds }, 30);
+    const kept = new Set(withoutAlcohol(hits.map((h) => h.food)).map((f) => f.id));
+    return hits.filter((h) => kept.has(h.food.id)).map((h) => ({ food: h.food, matched: h.matched }));
+  }, [localQ, customFoods, recents, favoriteIds]);
   const kcalError = enteredKcalError(kcalTyped);
   const canAdd = !!(amount && amount > 0 && kcalTyped && kcalTyped > 0 && !kcalError);
 
@@ -160,27 +166,33 @@ export function DrinkPickSheet({
           Tap a drink to choose it, then tap a glass to add it.
         </Text>
         <View>
-          {foods.length === 0 ? (
+          {rows.length === 0 ? (
             <Text testID="water-pick-none" variant="body" color="textSecondary" style={{ paddingVertical: spacing.md }}>
-              No drink matches “{q}”. Try another word, or enter the calories above.
+              No drink matches “{isolateRtl(q)}”. Try another word, or enter the calories above.
             </Text>
           ) : (
-            foods.map((food, i) => (
+            rows.map(({ food, matched }, i) => (
               <View key={food.id}>
                 {i > 0 ? <Divider inset={36} /> : null}
                 <PressableScale
                   testID={`water-pick-${food.id}`}
                   onPress={() => onPick(food)}
                   scaleTo={0.985}
-                  accessibilityLabel={`${food.name}, ${pickCaption(food, glassMl, units)}`}
+                  accessibilityLabel={`${food.name}${matched ? `, ${matched}` : ''}, ${pickCaption(food, glassMl, units)}`}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 8 }}>
                   <View style={{ width: 24, alignItems: 'center' }}>
                     <Text style={{ fontSize: 17, lineHeight: 24 }}>{food.emoji ?? '🥤'}</Text>
                   </View>
                   <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                     <Text variant="bodyStrong" numberOfLines={2}>
-                      {food.name}
+                      {isolateRtl(food.name)}
                     </Text>
+                    {/* The name the query found, as on food search (FoodRow): one line under the name. */}
+                    {matched ? (
+                      <Text variant="caption" color="textSecondary" numberOfLines={1} testID={`water-pick-${food.id}-matched`}>
+                        {isolateRtl(matched)}
+                      </Text>
+                    ) : null}
                     <Text variant="caption" color="textSecondary">
                       {pickCaption(food, glassMl, units)}
                     </Text>

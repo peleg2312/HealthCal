@@ -6,6 +6,7 @@
 import { followEntry, pairEditBlocked, undoEdit } from '@/features/drinks/pair';
 import { DRINKS_NOT_COPIED, DRINKS_NOT_SAVED } from '@/features/drinks/rules';
 import { isWaterDrinkEntry } from '@/features/drinks/via';
+import { isolateRtl } from '@/lib/bidi';
 import { addDays } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
 import { MEAL_LABEL } from '@/lib/nutrition';
@@ -127,7 +128,7 @@ export function saveMeal(name: string, entries: FoodEntry[]): SavedMeal | null {
   }
   const meal = useStore.getState().upsert('savedMeals', { name: name.trim() || 'Saved meal', items: food.map(toSavedMealItem) });
   haptic.success();
-  toast(`Saved "${meal.name}"`, { label: 'Undo', onPress: () => useStore.getState().remove('savedMeals', meal.id) });
+  toast(`Saved "${isolateRtl(meal.name)}"`, { label: 'Undo', onPress: () => useStore.getState().remove('savedMeals', meal.id) });
   return meal;
 }
 
@@ -148,7 +149,7 @@ export function storeSavedMeal(input: { id: string | null; name: string; serving
     servings,
   });
   haptic.success();
-  toast(before ? `Saved changes to "${meal.name}"` : `Saved "${meal.name}"`, {
+  toast(before ? `Saved changes to "${isolateRtl(meal.name)}"` : `Saved "${isolateRtl(meal.name)}"`, {
     label: 'Undo',
     onPress: () => (before ? useStore.getState().upsert('savedMeals', before) : useStore.getState().remove('savedMeals', meal.id)),
   });
@@ -165,13 +166,13 @@ export function renameSavedMeal(meal: SavedMeal, name: string): void {
 export function deleteSavedMeal(meal: SavedMeal): void {
   useStore.getState().remove('savedMeals', meal.id);
   haptic.tap();
-  toast(`Deleted "${meal.name}"`, { label: 'Undo', onPress: () => useStore.getState().restore('savedMeals', meal.id) });
+  toast(`Deleted "${isolateRtl(meal.name)}"`, { label: 'Undo', onPress: () => useStore.getState().restore('savedMeals', meal.id) });
 }
 
 export function deleteCustomFood(food: CustomFood): void {
   useStore.getState().remove('customFoods', food.id);
   haptic.tap();
-  toast(`Deleted ${food.name}`, { label: 'Undo', onPress: () => useStore.getState().restore('customFoods', food.id) });
+  toast(`Deleted ${isolateRtl(food.name)}`, { label: 'Undo', onPress: () => useStore.getState().restore('customFoods', food.id) });
 }
 
 /**

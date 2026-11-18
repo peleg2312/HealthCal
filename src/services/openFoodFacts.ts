@@ -8,17 +8,32 @@ import { Platform } from 'react-native';
 import { atwaterKcal } from '@/lib/nutrition';
 import type { Food, Nutrients, Serving } from '@/types';
 
+import { offSearchQuery } from './offQuery';
 import { FUNCTIONS_URL, SUPABASE_ANON_KEY } from './supabase';
 
 const BASE = 'https://world.openfoodfacts.org';
 /** Full-text search service (the search endpoints on the main site answer 503 since full-text search moved here). */
 const SEARCH = 'https://search.openfoodfacts.org/search';
-const FIELDS = 'code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity';
+/**
+ * The fields asked for. `product_name_he` and `generic_name` are name fallbacks
+ * (an Israeli product often has only its Hebrew name, entered as
+ * `product_name_he`); the search index holds neither of them, so they matter
+ * mostly to the barcode lookup.
+ */
+const FIELDS = 'code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity,product_name_he,generic_name';
+/**
+ * The fields of a free-text search: exactly the list sent before the name
+ * fallbacks, so that request (and what it finds) stays byte for byte what it
+ * was for every query without a Hebrew letter.
+ */
+const TEXT_FIELDS = 'code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity';
 
 interface OffProduct {
   code?: string;
   product_name?: string;
   product_name_en?: string;
+  product_name_he?: string;
+  generic_name?: string;
   /** A comma-separated string from the product API, a list from the search service. */
   brands?: string | string[];
   nutriments?: Record<string, number | string | undefined>;
@@ -31,9 +46,19 @@ function n(v: number | string | undefined): number | undefined {
   return typeof x === 'number' && Number.isFinite(x) && x >= 0 ? x : undefined;
 }
 
+/**
+ * The product's name: its name in its main language, then its Hebrew name (an
+ * Israeli product's English field often holds a shorter Hebrew text), then the
+ * English one, then the generic description. Products without a Hebrew name
+ * keep the order they had.
+ */
+function productName(p: OffProduct): string {
+  return (p.product_name || p.product_name_he || p.product_name_en || p.generic_name || '').trim();
+}
+
 /** Map a product to our Food shape, or null when it lacks usable nutrition data. */
 export function offToFood(p: OffProduct): Food | null {
-  const name = (p.product_name || p.product_name_en || '').trim();
+  const name = productName(p);
   const nu = p.nutriments ?? {};
   let kcal = n(nu['energy-kcal_100g']);
   const kj = n(nu['energy_100g']);
@@ -76,12 +101,15 @@ export function offToFood(p: OffProduct): Food | null {
   };
 }
 
+/** The service answered with an HTTP error, as opposed to not answering at all. */
+class HttpError extends Error {}
+
 async function getJson(url: string, timeoutMs: number, headers: Record<string, string> = {}): Promise<unknown> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, { signal: controller.signal, headers: { Accept: 'application/json', ...headers } });
-    if (!res.ok) throw new Error(`Open Food Facts responded ${res.status}`);
+    if (!res.ok) throw new HttpError(`Open Food Facts responded ${res.status}`);
     return await res.json();
   } finally {
     clearTimeout(timer);
@@ -97,7 +125,7 @@ export async function lookupBarcode(code: string): Promise<BarcodeResult> {
   const data = (await getJson(`${BASE}/api/v2/product/${clean}.json?fields=${FIELDS}`, 12_000)) as { status?: number; product?: OffProduct };
   if (data.status !== 1 || !data.product) return { status: 'not_found' };
   const food = offToFood({ ...data.product, code: clean });
-  if (!food) return { status: 'incomplete', name: data.product.product_name ?? 'This product' };
+  if (!food) return { status: 'incomplete', name: productName(data.product) || 'This product' };
   return { status: 'found', food };
 }
 
@@ -130,21 +158,64 @@ export interface ProductSearchResult {
  */
 export const onlineSearchAvailable = Platform.OS !== 'web' || FUNCTIONS_URL !== '';
 
+const hitsOf = (data: unknown): OffProduct[] => (data as { hits?: OffProduct[] } | null)?.hits ?? [];
+
 /**
- * Full-text product search. Never throws: `failed` tells "offline" apart from
- * "no matches", and `unavailable` covers the browser-without-backend case.
+ * The search service's request for a query, as a phone sends it. A query
+ * without a Hebrew letter is today's free-text request, unchanged; one with a
+ * Hebrew letter is a field query (`offSearchQuery`) sorted by popularity.
+ * `text` asks for the free-text form whatever the query holds (the one
+ * fallback of a field query that found nothing usable).
+ */
+export function searchRequestUrl(q: string, limit: number, text = false): string {
+  const built = text ? { q } : offSearchQuery(q);
+  if (built.sortBy) {
+    return `${SEARCH}?q=${encodeURIComponent(built.q)}&page_size=${limit}&fields=${FIELDS}&sort_by=${built.sortBy}`;
+  }
+  return `${SEARCH}?q=${encodeURIComponent(built.q)}&page_size=${limit}&fields=${TEXT_FIELDS}`;
+}
+
+/** Time a phone waits for the service, for the first request and its one fallback together. */
+const SEARCH_TIMEOUT_MS = 10_000;
+
+/**
+ * Product search. Never throws: `failed` tells "offline" apart from "no
+ * matches", and `unavailable` covers the browser-without-backend case.
+ *
+ * The browser sends the plain query to the `food-search` edge function, which
+ * builds the same request itself. A phone sends one request; only when a
+ * Hebrew field query found no product the app can show (or the service
+ * refused it) does it send the free-text request once more, within the same
+ * time limit. The caller's debounce keeps the rate within what the service
+ * asks for.
  */
 export async function searchProductsWithStatus(query: string, limit = 20): Promise<ProductSearchResult> {
   const q = query.trim();
   if (q.length < 2) return { foods: [], failed: false, unavailable: false };
   if (!onlineSearchAvailable) return { foods: [], failed: false, unavailable: true };
-  const term = encodeURIComponent(q);
   try {
-    const data =
-      Platform.OS === 'web'
-        ? await getJson(`${FUNCTIONS_URL}/food-search?q=${term}&limit=${limit}`, 12_000, { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` })
-        : await getJson(`${SEARCH}?q=${term}&page_size=${limit}&fields=${FIELDS}`, 10_000);
-    return { foods: toFoods((data as { hits?: OffProduct[] }).hits ?? []), failed: false, unavailable: false };
+    if (Platform.OS === 'web') {
+      const term = encodeURIComponent(q);
+      const data = await getJson(`${FUNCTIONS_URL}/food-search?q=${term}&limit=${limit}`, 12_000, { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` });
+      return { foods: toFoods(hitsOf(data)), failed: false, unavailable: false };
+    }
+    if (!offSearchQuery(q).sortBy) {
+      const data = await getJson(searchRequestUrl(q, limit), SEARCH_TIMEOUT_MS);
+      return { foods: toFoods(hitsOf(data)), failed: false, unavailable: false };
+    }
+    const deadline = Date.now() + SEARCH_TIMEOUT_MS;
+    try {
+      const foods = toFoods(hitsOf(await getJson(searchRequestUrl(q, limit), SEARCH_TIMEOUT_MS)));
+      if (foods.length > 0) return { foods, failed: false, unavailable: false };
+    } catch (e) {
+      // Not answering at all: a second request would not answer either.
+      if (!(e instanceof HttpError)) throw e;
+      console.warn('Open Food Facts refused a field query; using the free-text search', e);
+    }
+    const left = deadline - Date.now();
+    if (left < 1000) return { foods: [], failed: false, unavailable: false };
+    const data = await getJson(searchRequestUrl(q, limit, true), left);
+    return { foods: toFoods(hitsOf(data)), failed: false, unavailable: false };
   } catch {
     return { foods: [], failed: true, unavailable: false };
   }

@@ -8,7 +8,7 @@ import type { Food, Serving } from '@/types';
 import { Chip, NumberField, Stepper } from '@/ui';
 
 import { balancedLines, chipWidth } from './chipLines';
-import { formatQty } from './helpers';
+import { formatQty, servingText } from './helpers';
 
 export interface AmountValue {
   serving: Serving;
@@ -82,7 +82,7 @@ export function AmountEditor({
                 <Chip
                   key={`${s.label}-${i}`}
                   testID={`${testIDPrefix}-serving-${i}`}
-                  label={s.label === '1 g' ? 'grams' : s.label}
+                  label={s.label === '1 g' ? 'grams' : servingText(s.label)}
                   selected={s.label === serving.label}
                   onPress={() => chooseServing(s)}
                 />

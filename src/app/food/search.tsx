@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Camera, PenLine, ScanBarcode, Search, Star, Utensils, X, Zap } from 'lucide-react-native';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 
 import { AmountEditor } from '@/features/food/AmountEditor';
@@ -11,6 +11,7 @@ import { formatPortion, itemsRange, mealServings } from '@/features/food/build';
 import { deleteEntry, logFood, setEntryAmount } from '@/features/food/log';
 import { LogSavedMealSheet } from '@/features/food/SavedMealParts';
 import { resolveFood, usualFoods } from '@/features/food/usuals';
+import { isolateRtl } from '@/lib/bidi';
 import { formatDayLabel } from '@/lib/dates';
 import { MEAL_LABEL, entriesTotal, sumNutrients } from '@/lib/nutrition';
 import { searchLocal, searchOnlineWithStatus } from '@/services/foodSearch';
@@ -74,9 +75,12 @@ export default function FoodSearchScreen() {
   const mine = useMemo(() => [...customFoods].sort((a, b) => a.name.localeCompare(b.name)), [customFoods]);
 
   const q = query.trim();
+  // The local list follows the typing a beat behind when a search is slow (an older phone), so a
+  // keystroke never waits for it; the online search below still uses the query as typed.
+  const localQ = useDeferredValue(q);
   const local = useMemo(
-    () => (q ? searchLocal(q, { customFoods, recentFoods: recents, favoriteIds }, 30) : []),
-    [q, customFoods, recents, favoriteIds],
+    () => (localQ ? searchLocal(localQ, { customFoods, recentFoods: recents, favoriteIds }, 30) : []),
+    [localQ, customFoods, recents, favoriteIds],
   );
 
   // Online products arrive after a pause in typing; stale answers are dropped.
@@ -121,7 +125,7 @@ export default function FoodSearchScreen() {
   };
   const go = (path: string, extra: Record<string, string> = {}) => router.push(href(path, { meal, date, ...extra }) as never);
 
-  const row = (food: Food, testID: string, trailing?: React.ReactNode) => {
+  const row = (food: Food, testID: string, trailing?: React.ReactNode, matched?: string) => {
     const p = portionFor(food, lastMap);
     const e = addedByFood.get(food.id);
     return (
@@ -134,6 +138,7 @@ export default function FoodSearchScreen() {
         onPress={() => open(food)}
         onQuickAdd={() => quickAdd(food)}
         trailing={trailing}
+        matched={matched}
         amount={
           e
             ? {
@@ -285,7 +290,7 @@ export default function FoodSearchScreen() {
                         </View>
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
-                            {m.name}
+                            {isolateRtl(m.name)}
                           </Text>
                           <Text variant="caption" color="textSecondary" numberOfLines={1}>
                             {count > 1
@@ -324,7 +329,7 @@ export default function FoodSearchScreen() {
       ) : (
         <>
           {local.length > 0 ? (
-            <List testID="search-local-results">{local.map((h, i) => row(h.food, `result-${i}`))}</List>
+            <List testID="search-local-results">{local.map((h, i) => row(h.food, `result-${i}`, undefined, h.matched))}</List>
           ) : (
             <View testID="search-no-local" style={{ gap: 4, paddingVertical: spacing.sm }}>
               <Text variant="h3">No matches in your foods or the reference list</Text>
@@ -375,7 +380,7 @@ export default function FoodSearchScreen() {
       <Sheet
         visible={!!amountEntry}
         onClose={() => setAmountEntryId(null)}
-        title={amountEntry ? amountEntry.name : undefined}
+        title={amountEntry ? isolateRtl(amountEntry.name) : undefined}
         footer={
           amountEntry ? (
             <View style={{ flexDirection: 'row', gap: spacing.md }}>

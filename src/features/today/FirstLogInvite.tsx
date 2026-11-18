@@ -6,6 +6,7 @@ import { View } from 'react-native';
 import { BUILTIN_FOODS } from '@/data/foods';
 import { logFood } from '@/features/food/log';
 import { usualFoods } from '@/features/food/usuals';
+import { isolateRtl } from '@/lib/bidi';
 import { MEAL_LABEL, MEAL_SHARE, scaleNutrients } from '@/lib/nutrition';
 import { formatNumber } from '@/lib/units';
 import { useLive } from '@/store/selectors';
@@ -97,7 +98,7 @@ export function FirstLogInvite({ meal, date, budget }: { meal: MealType; date: I
               <Chip
                 key={p.key}
                 testID={`today-first-${p.key}`}
-                label={`${p.label} · ${formatNumber(Math.round(p.kcal))} kcal`}
+                label={`${isolateRtl(p.label)} · ${formatNumber(Math.round(p.kcal))} kcal`}
                 icon={<Plus size={14} color={colors.text} strokeWidth={2.2} />}
                 onPress={() => logFood({ food: p.food, serving: p.serving, quantity: p.quantity, meal, date })}
               />

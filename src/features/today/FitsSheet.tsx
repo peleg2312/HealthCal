@@ -3,9 +3,10 @@ import { Check, Plus, Search } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { lastPortions, matchServing } from '@/features/food/helpers';
+import { lastPortions, matchServing, servingText } from '@/features/food/helpers';
 import { logFood } from '@/features/food/log';
 import { customFoodIndex, resolveFood, resolveUsuals, usualFoods } from '@/features/food/usuals';
+import { isolateRtl } from '@/lib/bidi';
 import { MEAL_LABEL } from '@/lib/nutrition';
 import { formatNumber } from '@/lib/units';
 import { useStore } from '@/store';
@@ -17,9 +18,11 @@ import { Button, CupKey, Divider, EmptyState, IconButton, Sheet, Text } from '@/
 
 import { fitCandidates, rankFits, type Fit } from './fits';
 
-function portionLabel(f: Fit): string {
+/** "1 cup" or "1.5 × 1 cup"; `shown` draws a serving label written in Hebrew isolated (display only, never for a screen reader). */
+function portionLabel(f: Fit, shown = false): string {
   const q = f.quantity;
-  return q === 1 ? f.serving.label : `${Number.isInteger(q) ? q : q.toFixed(1)} × ${f.serving.label}`;
+  const label = shown ? servingText(f.serving.label) : f.serving.label;
+  return q === 1 ? label : `${Number.isInteger(q) ? q : q.toFixed(1)} × ${label}`;
 }
 
 const SOURCE_LABEL: Record<Fit['from'], string> = { usual: 'Usual', favourite: 'Favourite', recent: 'Recent' };
@@ -129,7 +132,7 @@ export function FitsSheet({
                   <Text style={{ fontSize: 17, lineHeight: 22, width: 22, textAlign: 'center' }}>{f.food.emoji || '🍽️'}</Text>
                   <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                     <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
-                      {f.food.name}
+                      {isolateRtl(f.food.name)}
                     </Text>
                     {/* A narrow phone has no room for a numbers column: they lead the line under the name. */}
                     {narrow ? (
@@ -147,7 +150,7 @@ export function FitsSheet({
                       </View>
                     ) : null}
                     <Text variant="caption" color="textSecondary" numberOfLines={2}>
-                      {`${portionLabel(f)} · ${SOURCE_LABEL[f.from]}`}
+                      {`${portionLabel(f, true)} · ${SOURCE_LABEL[f.from]}`}
                     </Text>
                   </View>
                   {narrow ? null : (

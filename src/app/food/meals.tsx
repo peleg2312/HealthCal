@@ -8,6 +8,7 @@ import { formatPortion, itemsRange, mealServings } from '@/features/food/build';
 import { DayStepper, MealPicker, RowEmoji } from '@/features/food/components';
 import { href, kcal, parseDate, parseMeal } from '@/features/food/helpers';
 import { LogSavedMealSheet, itemLine } from '@/features/food/SavedMealParts';
+import { isolateRtl } from '@/lib/bidi';
 import { MEAL_LABEL, sumNutrients } from '@/lib/nutrition';
 import { useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
@@ -55,7 +56,7 @@ export default function SavedMealsScreen() {
             <Card key={m.id} testID={`saved-meal-card-${i}`} style={{ gap: spacing.md }}>
               <View>
                 <Text variant="h3" numberOfLines={2}>
-                  {m.name}
+                  {isolateRtl(m.name)}
                 </Text>
                 <Text variant="caption" color="textSecondary" tabular numberOfLines={2}>
                   {count > 1
@@ -71,7 +72,7 @@ export default function SavedMealsScreen() {
                     <RowEmoji emoji={it.emoji} />
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text variant="body" numberOfLines={2}>
-                        {it.name}
+                        {isolateRtl(it.name)}
                       </Text>
                       <Text variant="caption" color="textSecondary" numberOfLines={2} tabular>
                         {itemLine(it)}

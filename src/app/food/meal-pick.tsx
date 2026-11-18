@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { Search, X } from 'lucide-react-native';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 
 import { BUILTIN_FOODS } from '@/data/foods';
@@ -10,6 +10,7 @@ import { amountLabel, kcal, lastPortions, portionFor, portionKcal, portionLabel,
 import { addDraftItem, removeDraftItem, updateDraftItem, useMealDraft, type DraftRow } from '@/features/food/mealDraft';
 import { RequireProfile } from '@/features/food/RequireProfile';
 import { ItemAmountSheet } from '@/features/food/SavedMealParts';
+import { isolateRtl } from '@/lib/bidi';
 import { searchLocal, searchOnlineWithStatus } from '@/services/foodSearch';
 import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
@@ -58,7 +59,12 @@ function MealPick() {
     [recentFoods, customById],
   );
   const q = query.trim();
-  const local = useMemo(() => (q ? searchLocal(q, { customFoods, recentFoods: recents, favoriteIds }, 30) : []), [q, customFoods, recents, favoriteIds]);
+  // A slow search never holds up typing: the local list follows a beat behind (the online search uses `q`).
+  const localQ = useDeferredValue(q);
+  const local = useMemo(
+    () => (localQ ? searchLocal(localQ, { customFoods, recentFoods: recents, favoriteIds }, 30) : []),
+    [localQ, customFoods, recents, favoriteIds],
+  );
 
   const latest = useRef('');
   useEffect(() => {
@@ -89,10 +95,10 @@ function MealPick() {
   const removeRow = (r: DraftRow) => {
     const undo = removeDraftItem(r.key);
     haptic.tap();
-    toast(`Removed ${r.item.name}`, { label: 'Undo', onPress: undo });
+    toast(`Removed ${isolateRtl(r.item.name)}`, { label: 'Undo', onPress: undo });
   };
 
-  const row = (food: Food, testID: string) => {
+  const row = (food: Food, testID: string, matched?: string) => {
     const r = rowByFood.get(food.id);
     const p = portionFor(food, lastMap);
     return (
@@ -104,6 +110,7 @@ function MealPick() {
         kcalValue={r ? r.item.nutrients.kcal : portionKcal(food, p)}
         onPress={() => (r ? setEditing(r.key) : add(food))}
         onQuickAdd={() => add(food)}
+        matched={matched}
         amount={
           r
             ? {
@@ -132,7 +139,7 @@ function MealPick() {
 
   const header = (
     <View style={{ gap: spacing.sm, paddingBottom: spacing.sm }}>
-      <Header title={`Add to ${name.trim() || 'new meal'}`} subtitle="Foods go into the meal, not the diary" />
+      <Header title={`Add to ${isolateRtl(name.trim()) || 'new meal'}`} subtitle="Foods go into the meal, not the diary" />
       <TextField
         testID="meal-pick-input"
         placeholder={narrow ? 'Search foods and brands' : 'Search foods, brands, your foods'}
@@ -187,7 +194,7 @@ function MealPick() {
       ) : (
         <>
           {local.length ? (
-            <List>{local.map((h, i) => row(h.food, `pick-result-${i}`))}</List>
+            <List>{local.map((h, i) => row(h.food, `pick-result-${i}`, h.matched))}</List>
           ) : (
             <Text variant="body" color="textSecondary" testID="meal-pick-none">
               No matches in your foods or the reference list.

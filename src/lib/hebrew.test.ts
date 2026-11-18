@@ -25,7 +25,7 @@ function legacyNormalize(s: string): string {
   return s
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 }
@@ -56,16 +56,16 @@ describe('fold on Latin text', () => {
 
 describe('fold on Hebrew text (4.1)', () => {
   it('removes vowel points, cantillation and the shin and sin dots', () => {
-    expect(fold('חוּמוּס')).toBe('חומוס');
-    expect(fold('שְׁנִיצֶל')).toBe('שניצל');
-    expect(fold('שׂניצל')).toBe('שניצל');
-    expect(fold('ב֑ר֯א')).toBe('ברא');
-    expect(fold('בֿרׇׅׄא')).toBe('ברא');
+    expect(fold('חו\u05bcמו\u05bcס')).toBe('חומוס');
+    expect(fold('ש\u05b0\u05c1נ\u05b4יצ\u05b6ל')).toBe('שניצל');
+    expect(fold('ש\u05c2ניצל')).toBe('שניצל');
+    expect(fold('ב\u0591ר\u05afא')).toBe('ברא');
+    expect(fold('ב\u05bfר\u05c4\u05c5\u05c7א')).toBe('ברא');
   });
 
   it('decomposes presentation forms (U+FB2A shin with shin dot) and the alef-lamed ligature', () => {
-    expect(fold('שׁניצל')).toBe('שניצל');
-    expect(fold('ﭏכוהול')).toBe('אלכוהול');
+    expect(fold('\ufb2aניצל')).toBe('שניצל');
+    expect(fold('\ufb4fכוהול')).toBe('אלכוהול');
   });
 
   it('makes final letters normal', () => {
@@ -74,13 +74,13 @@ describe('fold on Hebrew text (4.1)', () => {
   });
 
   it('deletes every geresh form after a Hebrew letter', () => {
-    for (const g of ["'", '׳', '’', '‘', '`', '´']) expect(fold(`קוטג${g}`)).toBe('קוטג');
+    for (const g of ["'", '\u05f3', '’', '‘', '`', '´']) expect(fold(`קוטג${g}`)).toBe('קוטג');
     expect(fold("צ'יפס")).toBe('ציפס');
-    expect(fold('ג׳חנון')).toBe('גחנונ');
+    expect(fold('ג\u05f3חנון')).toBe('גחנונ');
   });
 
   it('deletes gershayim between two Hebrew letters, every form', () => {
-    for (const g of ['"', '״', '“', '”']) expect(fold(`תפו${g}א`)).toBe('תפוא');
+    for (const g of ['"', '\u05f4', '“', '”']) expect(fold(`תפו${g}א`)).toBe('תפוא');
     expect(fold('צה"ל"ים')).toBe('צהלימ');
   });
 
@@ -89,13 +89,13 @@ describe('fold on Hebrew text (4.1)', () => {
   });
 
   it('expands the Yiddish digraphs', () => {
-    expect(fold('װױײ')).toBe('וווייי');
+    expect(fold('\u05f0\u05f1\u05f2')).toBe('וווייי');
   });
 
   it('breaks words at maqaf, hyphen, sof pasuq and other punctuation', () => {
-    expect(fold('פיתה־טחינה')).toBe('פיתה טחינה');
+    expect(fold('פיתה\u05beטחינה')).toBe('פיתה טחינה');
     expect(fold('פיתה-טחינה')).toBe('פיתה טחינה');
-    expect(fold('פיתה׃טחינה׀חומוס׆')).toBe('פיתה טחינה חומוס');
+    expect(fold('פיתה\u05c3טחינה\u05c0חומוס\u05c6')).toBe('פיתה טחינה חומוס');
   });
 
   it('puts a space between Hebrew and a Latin letter or digit, either way', () => {

@@ -7,6 +7,7 @@
 import { router } from 'expo-router';
 
 import { ACTIVITY_BY_ID } from '@/data/activities';
+import { isolateRtl } from '@/lib/bidi';
 import { formulaTdee } from '@/lib/energy';
 import { nowISO } from '@/lib/id';
 import { useStore } from '@/store';
@@ -45,7 +46,7 @@ export function saveActivity(input: SaveActivityInput): ActivityEntry | null {
     const previous = existing;
     const entry = store.upsert('activities', { ...built, id: existing.id });
     haptic.success();
-    toast(`${entry.name} updated`, {
+    toast(`${isolateRtl(entry.name)} updated`, {
       label: 'Undo',
       onPress: () => useStore.getState().upsert('activities', previous),
     });
@@ -55,7 +56,7 @@ export function saveActivity(input: SaveActivityInput): ActivityEntry | null {
   const entry = store.upsert('activities', built);
   store.rememberActivity(activity.id);
   haptic.success();
-  toast(`${entry.name} logged, about ${Math.round(entry.kcalNet)} kcal above resting`, {
+  toast(`${isolateRtl(entry.name)} logged, about ${Math.round(entry.kcalNet)} kcal above resting`, {
     label: 'Undo',
     onPress: () => useStore.getState().remove('activities', entry.id),
   });
@@ -67,7 +68,7 @@ export function deleteActivity(entry: ActivityEntry): void {
   // An unsaved edit of this workout would otherwise outlive it.
   useStrengthDrafts.getState().discard(entry.id);
   haptic.tap();
-  toast(`Removed ${entry.name.toLowerCase()}`, {
+  toast(`Removed ${isolateRtl(entry.name.toLowerCase())}`, {
     label: 'Undo',
     onPress: () => useStore.getState().restore('activities', entry.id),
   });

@@ -5,6 +5,7 @@
  */
 import { followEntry, pairEditBlocked, undoEdit } from '@/features/drinks/pair';
 import { livePartner, removedEntryToast, removedWaterToast, waterPointingAt, type DrinkPlan } from '@/features/drinks/rules';
+import { isolateRtl } from '@/lib/bidi';
 import { today } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
 import { useStore } from '@/store';
@@ -195,7 +196,7 @@ export function logSavedMeal(
   opts: { portion?: number; include?: boolean[] } = {},
 ): FoodEntry[] {
   const plan = planSavedMeal(meal, opts);
-  return logItems(plan.items, mealType, date, `${meal.name} added to ${where(mealType, date)}`);
+  return logItems(plan.items, mealType, date, `${isolateRtl(meal.name)} added to ${where(mealType, date)}`);
 }
 
 const unitsNow = (): UnitSystem => useStore.getState().profile?.units ?? 'metric';
@@ -208,7 +209,7 @@ export function deleteEntry(entry: FoodEntry): void {
   const water = waterPointingAt(useStore.getState().water, entry.id);
   useStore.getState().remove('foodEntries', entry.id);
   haptic.tap();
-  const message = water ? removedEntryToast(entry.name, water, unitsNow()) : `Removed ${entry.name}`;
+  const message = water ? removedEntryToast(isolateRtl(entry.name), water, unitsNow()) : `Removed ${isolateRtl(entry.name)}`;
   toast(message, { label: 'Undo', onPress: () => useStore.getState().restore('foodEntries', entry.id) });
 }
 

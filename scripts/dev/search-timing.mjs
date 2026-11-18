@@ -31,7 +31,7 @@ const QUERIES = [
   'chicken breast', 'chiken', 'brocolli', 'עגבניות', 'ב', 'tahina', 'chicken', '2 ביצים', 'טוסט גבינה צהובה', 'חומוס בטחינה',
   'apple', 'rice', 'greek yogurt', 'chi', 'salad', 'pepsi', 'a',
 ];
-const HE = /[א-ת]/;
+const HE = /[\u05d0-\u05ea]/;
 const BUDGET = { interpLatin: 6, interpAny: 10, interpFirst: 30, jitAny: 3 };
 
 const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1];

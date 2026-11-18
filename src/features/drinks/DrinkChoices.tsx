@@ -12,6 +12,7 @@
 import React from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import { isolateRtl } from '@/lib/bidi';
 import { useTheme } from '@/theme';
 import type { Beverage, Food, UnitSystem } from '@/types';
 import { PressableScale, Text } from '@/ui';
@@ -129,7 +130,7 @@ export function DrinkChoices({
             node: (
               <DrinkChip
                 testID="water-choice-food"
-                label={picked.name}
+                label={isolateRtl(picked.name)}
                 a11y={choiceA11y(picked.name, picked, glassMl, units)}
                 selected={selected?.id === 'food'}
                 maxWidth={PICKED_MAX_W}

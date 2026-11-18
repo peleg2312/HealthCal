@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { TextInput, View } from 'react-native';
 
 import { SourceTag } from '@/features/food/components';
+import { isolateRtl } from '@/lib/bidi';
 import { formatMacro } from '@/lib/nutrition';
 import { cup, fonts, useTheme } from '@/theme';
 import type { Food } from '@/types';
@@ -177,7 +178,7 @@ function SwapChip({ name, kcal, selected, onPress, testID }: { name: string; kca
         borderColor: selected ? colors.text : colors.borderStrong,
       }}>
       <Text variant="label" color={fg} numberOfLines={2} style={{ fontSize: 13.5, lineHeight: 18 }}>
-        {name}
+        {isolateRtl(name)}
         <Text variant="label" color={selected ? 'bg' : 'textSecondary'} style={{ fontSize: 13.5 }}>{` · ${kcal}\u00A0kcal`}</Text>
       </Text>
     </PressableScale>

@@ -121,6 +121,17 @@ const longFood = ([name, emoji, kcal, protein, carbs, fat, fiber, label, grams, 
   id: brand ? `stress_custom_${i}` : `b_stress_${i}`, name, emoji, ...(brand ? { brand } : null), source: brand ? 'custom' : 'builtin', verified: !brand, category: 'seed',
   per100g: { kcal, protein, carbs, fat, fiber }, servings: [{ label, grams }],
 });
+// Own foods named in Hebrew, as a person in Israel writes them: one all Hebrew with a Hebrew serving
+// label (and numbers inside the name), one that starts in Latin letters. Their names and labels must
+// start at the left of every line they are drawn in, and keep the numbers beside them in order.
+const HEBREW = [
+  ["קוטג' 5% עם זיתים ושמן זית", '🧀', 112, 9.6, 2.4, 7.2, 0.6, '1 גביע', 250],
+  ['Pita פיתה מקמח מלא', '🫓', 262, 9.8, 52, 2.1, 6.8, '1 pita', 100],
+];
+const hebrewFood = ([name, emoji, kcal, protein, carbs, fat, fiber, label, grams], i) => ({
+  id: `stress_custom_he_${i}`, name, emoji, source: 'custom', verified: false, category: 'seed',
+  per100g: { kcal, protein, carbs, fat, fiber }, servings: [{ label, grams }],
+});
 const itemOf = (food, qty = 1) => {
   const grams = food.servings[0].grams * qty;
   const f = grams / 100;
@@ -133,7 +144,7 @@ const itemOf = (food, qty = 1) => {
 /**
  * Turns the five demo weeks into the long end of real use: a 22-character first name, food and
  * saved-meal names of 50 to 60 characters (a long-named food is usual at every meal), a long brand, a two-sentence activity note, a meal of
- * 12 items, a day at 11,480 kcal and one at 0, 1,240 active minutes in the last seven days,
+ * 12 items (13 with the Hebrew-named own food), two own foods and a saved meal named in Hebrew, a day at 11,480 kcal and one at 0, 1,240 active minutes in the last seven days,
  * 12.5 L of water today, 142.6 kg body weight and a 412-day logging streak.
  */
 function stressUp(state, { put, baselineTdee }) {
@@ -207,6 +218,16 @@ function stressUp(state, { put, baselineTdee }) {
 
   // A saved meal with a long name and the twelve items.
   put('savedMeals', { name: "Sunday brunch with the whole family at grandma's house", items: foods.map((f) => itemOf(f)) });
+
+  // Two own foods named in Hebrew. The first is in today's lunch (its thirteenth item) and in lunch
+  // on ten earlier days, so it is the second usual lunch food (the + sheet and "What fits" at lunch
+  // time show it); with the bundled Israeli salad it makes a saved meal named in Hebrew (the third
+  // saved meal, index 2).
+  const hebrew = HEBREW.map(hebrewFood);
+  for (const f of hebrew) state.customFoods[f.id] = { ...f, updatedAt: new Date().toISOString(), deleted: false };
+  for (const n of [0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12]) logItem(n, 'lunch', itemOf(hebrew[0]), 13, n === 0 ? 40 : 45);
+  put('savedMeals', { name: 'ארוחת בוקר ישראלית', items: [itemOf(hebrew[0]), itemOf(FOODS.salad)] });
+
   state.recentFoods = [...foods.slice(0, 8), ...state.recentFoods].slice(0, 12);
   state.favoriteFoodIds = [foods[0].id, custom[0].id, ...state.favoriteFoodIds];
 }

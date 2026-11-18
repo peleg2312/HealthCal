@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { ALSO_IN_WATER, waterPointingAt } from '@/features/drinks/rules';
+import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { addDays, formatDayLabel } from '@/lib/dates';
 import { MEAL_LABEL, entriesTotal } from '@/lib/nutrition';
 import { useToday } from '@/store/clock';
@@ -147,12 +148,12 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
         <RowEmoji emoji={entry.emoji} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text variant="bodyStrong" numberOfLines={3} style={{ fontFamily: fonts.semibold }}>
-            {entry.name}
+            {isolateRtl(entry.name)}
           </Text>
           {/* On a narrow phone the calories move to the end of the portion line, so the name has the row's width. */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
             {/* The source's mark leads the line and its word ends it, so a portion that wraps never leaves the mark floating. */}
-            <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: 6 }} accessible accessibilityLabel={`${portion}${inWater ? `, ${ALSO_IN_WATER}` : ''}, ${source.label}`}>
+            <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: 6 }} accessible accessibilityLabel={`${withoutMarks(portion)}${inWater ? `, ${ALSO_IN_WATER}` : ''}, ${source.label}`}>
               <CupKey color={colors.textSecondary} variant={sourceKeyVariant(ai ? 'ai' : entry.source)} size={8} style={{ marginTop: 5 }} />
               <Text testID={inWater ? `entry-in-water-${entry.id}` : undefined} variant="caption" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1 }}>
                 {`${portion}${inWater ? ` · ${ALSO_IN_WATER}` : ''} · ${source.short}`}
@@ -270,7 +271,7 @@ export function MealCard({
                 <Repeat2 size={16} color={colors.text} strokeWidth={2.2} />
               </View>
               <Text variant="label" color="text" style={{ flexShrink: 1, textDecorationLine: 'underline' }} numberOfLines={3}>
-                Repeat {dayPhrase(previous.date)}: {previous.entries.map((e) => e.name.split(',')[0]).join(', ')}
+                Repeat {dayPhrase(previous.date)}: {previous.entries.map((e) => isolateRtl(e.name.split(',')[0])).join(', ')}
               </Text>
               <Text variant="caption" color="textSecondary" tabular numberOfLines={1} style={{ marginLeft: 'auto', flexShrink: 0 }}>
                 {kcal(entriesTotal(previous.entries).kcal)} kcal

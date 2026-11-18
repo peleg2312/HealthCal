@@ -13,7 +13,10 @@
  */
 
 /** A Hebrew letter (folded text has only the 22 base letters plus the five finals before step 4). */
-const HE_LETTER = /[א-ת]/;
+const HE_LETTER = /[\u05d0-\u05ea]/;
+
+/** Anything from the Hebrew block or the Hebrew presentation forms (which decompose into it). */
+const HE_ANY = /[\u0590-\u05ff\ufb1d-\ufb4f]/;
 
 const FINALS: Readonly<Record<string, string>> = {
   'ך': 'כ', // ך -> כ
@@ -27,8 +30,8 @@ const FINALS: Readonly<Record<string, string>> = {
  * Search normalisation, in the order of the specification (4.1):
  * NFD; cantillation and vowel points removed (maqaf, paseq, sof pasuq and nun hafukha kept, they are
  * punctuation and break words below); the alef-lamed ligature; final letters; a geresh after a Hebrew
- * letter deleted (', ׳, ’, ‘, `, ´); gershayim between two Hebrew letters deleted (", ״, “, ”); the
- * Yiddish digraphs; lower case and Latin accents removed; anything not a-z, 0-9 or א-ת a space; a
+ * letter deleted (', U+05F3, U+2019, U+2018, `, U+00B4); gershayim between two Hebrew letters
+ * deleted (", U+05F4, U+201C, U+201D); the Yiddish digraphs; lower case and Latin accents removed; anything not a-z, 0-9 or א-ת a space; a
  * space between Hebrew and a Latin letter or digit; trimmed single spaces.
  */
 export function fold(s: string): string {

@@ -2,17 +2,21 @@
  * Free, offline suggestions for an item the analysis missed: match the typed
  * words against the bundled reference foods and turn the best hits into
  * review items at their default serving. No analysis is spent on these.
+ *
+ * English words are scored here (state words such as "grilled" or "raw" steer
+ * the choice); the food search (`searchLocal`) fills the slots left, so a
+ * Hebrew word, a Latin spelling such as "tehina" or a typo still finds a food.
  */
+import { fold, isHebrew } from '@/lib/hebrew';
 import { scaleNutrients } from '@/lib/nutrition';
+import { searchLocal } from '@/services/foodSearch';
 import type { AiFoodItem, Food } from '@/types';
 
-const words = (s: string) =>
-  s
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .split(/[^a-z0-9]+/)
-    .filter((w) => w.length > 1);
+/**
+ * Folded words of two letters or more. For Latin text exactly the words this scorer always used, so
+ * English suggestions are unchanged; Hebrew words are kept (an own food may be named in Hebrew).
+ */
+const words = (s: string) => fold(s).split(' ').filter((w) => w.length > 1);
 
 const UNICODE_FRACTIONS: Record<string, number> = { '½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 1 / 3, '⅔': 2 / 3, '⅛': 0.125 };
 
@@ -69,7 +73,8 @@ function stateFit(queryWords: string[], nameWords: string[]): number {
 }
 
 export function matchFoods(query: string, foods: Food[], limit = 3): Food[] {
-  const all = words(parseAmount(query).rest);
+  const rest = parseAmount(query).rest;
+  const all = words(rest);
   const q = all.filter((w) => !GENERIC.has(w));
   if (q.length === 0) return [];
   const scored: { food: Food; score: number }[] = [];
@@ -93,10 +98,20 @@ export function matchFoods(query: string, foods: Food[], limit = 3): Food[] {
     score += fit;
     scored.push({ food, score });
   }
-  return scored
+  const out = scored
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map((s) => s.food);
+  if (out.length >= limit && !isHebrew(rest)) return out;
+  // The food search fills the rest: Hebrew names, Latin spellings, typos, Hebrew amounts and prefixes.
+  const seen = new Set(out.map((f) => f.id));
+  for (const hit of searchLocal(rest, { foods }, limit + out.length)) {
+    if (out.length >= limit) break;
+    if (seen.has(hit.food.id) || stateFit(all, words(hit.food.name)) < 0) continue;
+    seen.add(hit.food.id);
+    out.push(hit.food);
+  }
+  return out;
 }
 
 /** Convert a matched food to a review item, honouring a typed amount. */

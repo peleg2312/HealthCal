@@ -67,7 +67,7 @@ const check = (ok, what) => {
   if (!ok) failures.push(what);
 };
 /** Text as a person reads it: the app keeps numbers with their units using no-break spaces and word joiners. */
-const plain = (s) => s.replace(/\u00A0/g, ' ').replace(/\u2060/g, '').replace(/\s+/g, ' ').trim();
+const plain = (s) => s.replace(/\u00A0/g, ' ').replace(/[\u2060\u200E\u2068\u2069]/g, '').replace(/\s+/g, ' ').trim();
 const state = (page) => page.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())));
 const tap = async (page, id) => {
   const el = page.getByTestId(id).first();

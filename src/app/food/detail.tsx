@@ -12,6 +12,7 @@ import { useFoodDraft } from '@/features/food/draft';
 import { dayPhrase, href, portionLabel, kcal, lastPortions, matchServing, param, parseDate, parseMeal, portionFor, sourceInfo } from '@/features/food/helpers';
 import { deleteEntry, logFood } from '@/features/food/log';
 import { RequireProfile } from '@/features/food/RequireProfile';
+import { isolateRtl } from '@/lib/bidi';
 import { MEAL_LABEL, atwaterKcal, formatMacro, scaleNutrients } from '@/lib/nutrition';
 import { useStore } from '@/store';
 import { useToday } from '@/store/clock';
@@ -204,11 +205,11 @@ function Hero({ name, brand, source, explain, note, onEdit }: { name: string; br
     <View style={{ gap: 6 }}>
       {/* The food's name at a section title's size: the header above holds the screen's title. */}
       <Text variant="h3" numberOfLines={3} testID="detail-name">
-        {name}
+        {isolateRtl(name)}
       </Text>
       {brand ? (
         <Text variant="label" color="textSecondary" numberOfLines={2}>
-          {brand}
+          {isolateRtl(brand)}
         </Text>
       ) : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: 2 }}>
@@ -292,7 +293,8 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
   const totalGrams = serving.grams * quantity;
   const paired = usePairedDrink(entry, { grams: totalGrams, date });
   const n = scaleNutrients(food.per100g, totalGrams);
-  const info = sourceInfo(food.source);
+  // The sentence behind the badge names this food's own record (USDA, the national database, or none).
+  const info = sourceInfo(food.source, food);
   const perGram = serving.label === '1 g';
   // An estimate keeps showing as one: the entry's own range scaled to the amount, or the band a new log will get.
   const range = entry?.kcalRange
@@ -391,7 +393,7 @@ function ManualEditor({ entry }: { entry: FoodEntry }) {
   const [meal, setMeal] = useState(entry.meal);
   const [date, setDate] = useState(entry.date);
   const paired = usePairedDrink(entry, { grams: entry.grams, date });
-  const info = sourceInfo(entry.source);
+  const info = sourceInfo(entry.source, entry.food);
   const n: Nutrients = { kcal: kcalV ?? 0, protein: protein ?? 0, carbs: carbs ?? 0, fat: fat ?? 0 };
   const implied = atwaterKcal(n);
   const rangeKept = entry.kcalRange && Math.round(n.kcal) === Math.round(entry.nutrients.kcal);

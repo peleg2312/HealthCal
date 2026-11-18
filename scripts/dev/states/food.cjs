@@ -16,6 +16,12 @@ function isoDay(n) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 const LONG_QUERY = 'greek yogurt with honey granola and fresh blueberries large';
+/** Today at this local clock time, for a state that needs the meal of the hour (the stress seed's Hebrew-named usual food is a lunch). */
+function todayAt(h, m = 0) {
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return d.getTime();
+}
 
 module.exports = [
   // ---------------------------------------------------------------- Today
@@ -130,4 +136,22 @@ module.exports = [
   { id: 'meal-pick', route: '/food/meal-edit', data: 'stress', taps: ['meal-edit-add', 'pick-recent-0-add', { wait: 600 }], waitFor: 'pick-recent-0-stepper', note: 'adding long-named foods to the builder: the stepper and the count' },
   { id: 'meal-pick-search', route: '/food/meal-edit', taps: ['meal-edit-add', { type: 'meal-pick-input', text: 'chicken' }, { wait: 800 }], waitFor: 'meal-pick-screen', note: 'meal builder search results' },
   { id: 'meal-pick-none', route: '/food/meal-edit', taps: ['meal-edit-add', { type: 'meal-pick-input', text: 'zzqxv' }, { wait: 800 }], waitFor: 'meal-pick-none', note: 'meal builder, nothing found' },
+
+  // ---------------------------------------------------------------- Hebrew names and search
+  // A person in Israel types the food's Hebrew name, or the Latin spelling Israelis use. Every Hebrew
+  // name starts at the row's left edge, numbers stay with their units, the matched line is one line.
+  // The stress seed holds two own foods named in Hebrew ("קוטג' 5% עם זיתים ושמן זית", serving "1 גביע";
+  // "Pita פיתה מקמח מלא"), the first in today's lunch and usual at lunch, and a saved meal named in Hebrew.
+  { id: 'search-hebrew', route: '/food/search', type: { 'food-search-input': 'קוטג' }, taps: [{ wait: 1200 }], note: 'a Hebrew word: the matched Hebrew name under each row' },
+  { id: 'search-hebrew-prefix', route: '/food/search', type: { 'food-search-input': 'והחומוס' }, taps: [{ wait: 1200 }], note: 'a prefixed Hebrew word' },
+  { id: 'search-hebrew-relaxed', route: '/food/search', type: { 'food-search-input': '2 ביצים' }, taps: [{ wait: 1200 }], note: 'an amount in the query' },
+  { id: 'search-hebrew-none', route: '/food/search', type: { 'food-search-input': 'סביח' }, taps: [{ wait: 1500 }], waitFor: 'search-no-local', note: 'a Hebrew word with no match' },
+  { id: 'search-latin-israeli', route: '/food/search', type: { 'food-search-input': 'tehina' }, taps: [{ wait: 1200 }], note: 'a Latin spelling' },
+  { id: 'search-own-hebrew', route: '/food/search', data: 'stress', type: { 'food-search-input': 'קוטג 5' }, taps: [{ wait: 1200 }], note: 'an own food named in Hebrew with a Hebrew serving label' },
+  { id: 'diary-hebrew-stress', route: '/diary', data: 'stress', note: 'a Hebrew-named entry with a Hebrew serving label in lunch' },
+  { id: 'detail-hebrew', route: '/food/search', data: 'stress', type: { 'food-search-input': 'קוטג 5' }, taps: [{ wait: 1200 }, 'result-0'], waitFor: 'food-detail-screen', note: 'food detail of the Hebrew own food' },
+  { id: 'meals-hebrew', route: '/food/meals', data: 'stress', note: 'a saved meal named in Hebrew with a Hebrew item' },
+  { id: 'today-hebrew-usual', route: '/', data: 'stress', now: todayAt(12, 30), taps: ['today-remaining-open'], sheet: true, note: 'What fits at lunch time: the usual food named in Hebrew' },
+  { id: 'quick-sheet-hebrew', route: '/', data: 'stress', now: todayAt(12, 30), taps: ['tab-add'], sheet: true, note: 'the + sheet at lunch time: the usual food and the saved meal named in Hebrew' },
+  { id: 'meal-pick-hebrew', route: '/food/meal-edit', taps: ['meal-edit-add', { type: 'meal-pick-input', text: 'חומוס' }, { wait: 800 }], waitFor: 'meal-pick-screen', note: 'the meal builder searched in Hebrew: the matched line' },
 ];

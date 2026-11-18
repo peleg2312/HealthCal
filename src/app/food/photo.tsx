@@ -42,6 +42,7 @@ import { photoText, readWeight } from '@/features/ai/weight';
 import { MealPicker } from '@/features/food/components';
 import { logItems } from '@/features/food/log';
 import { BUILTIN_FOODS } from '@/data/foods';
+import { isolateRtl } from '@/lib/bidi';
 import { today } from '@/lib/dates';
 import { newId } from '@/lib/id';
 import { formatMacro, mealForTime, MEALS } from '@/lib/nutrition';
@@ -302,7 +303,7 @@ export default function PhotoScreen() {
     const fatBefore = fat;
     if (r.kind === 'fat') setFat('none');
     setRows((rs) => rs.filter((x) => x.key !== r.key));
-    toast(`Removed ${r.item.name.trim() || 'item'}`, {
+    toast(`Removed ${isolateRtl(r.item.name.trim()) || 'item'}`, {
       label: 'Undo',
       onPress: () => {
         if (r.kind === 'fat') {

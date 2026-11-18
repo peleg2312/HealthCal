@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text as RNText, type TextProps as RNTextProps } from 'react-native';
 
+import { leftToRightStart } from '@/lib/bidi';
 import { keepTogether, keepUnitWithNumber } from '@/lib/text';
 import { useTheme, type TextVariant, type ThemeColors } from '@/theme';
 
@@ -71,6 +72,7 @@ export function Text({ variant = 'body', color, align, tabular, style, children,
       ...rest,
       style: [typography[variant], { color: resolved }, align && { textAlign: align }, tabular && { fontVariant: ['tabular-nums'] }, style],
     },
-    ...keepNumbers(children, variant === 'unit'),
+    // A whole name that starts with a Hebrew or Arabic letter stays at the left edge (@/lib/bidi).
+    ...keepNumbers(typeof children === 'string' ? leftToRightStart(children) : children, variant === 'unit'),
   );
 }

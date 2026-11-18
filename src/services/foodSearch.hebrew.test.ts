@@ -17,7 +17,9 @@ import { SEARCH_NAMES } from '@/data/searchNames';
 import { fold, hebrewStem, isHebrew } from '@/lib/hebrew';
 import type { Food } from '@/types';
 
-import { searchLocal, tokenize } from './foodSearch';
+import { foodToItem, matchFoods, parseAmount } from '@/features/ai/localMatch';
+
+import { type SearchContext, searchLocal, tokenize } from './foodSearch';
 
 const FIXTURES = path.join(__dirname, '__fixtures__');
 
@@ -53,10 +55,10 @@ const food = (id: string, name: string, extra: Partial<Food> = {}): Food => ({
 
 /** The four own foods of the "own" context (4.8). */
 const OWN: Food[] = [
-  food('c_cottage', "קוטג' 5%", { per100g: { kcal: 95 } }),
-  food('c_hummus_he', 'חומוס עם טחינה', { per100g: { kcal: 230 } }),
-  food('c_mixed', 'Pita פיתה מקמח מלא', { per100g: { kcal: 250 } }),
-  food('c_salad_mom', 'סלט של אמא', { per100g: { kcal: 90 } }),
+  food('c_cottage', "קוטג' 5%", { per100g: { kcal: 95, protein: 11, carbs: 3, fat: 5 } }),
+  food('c_hummus_he', 'חומוס עם טחינה', { per100g: { kcal: 230, protein: 8, carbs: 14, fat: 16 } }),
+  food('c_mixed', 'Pita פיתה מקמח מלא', { per100g: { kcal: 250, protein: 9, carbs: 50, fat: 2 } }),
+  food('c_salad_mom', 'סלט של אמא', { per100g: { kcal: 90, protein: 2, carbs: 8, fat: 5 } }),
 ];
 const HALVA = BUILTIN_FOODS.find((f) => f.id === 'b_halva');
 
@@ -211,10 +213,11 @@ describe('rules the lists cannot show', () => {
 
 describe('an own food named in Hebrew', () => {
   const pie = food('c_pie', 'פשטידת ברוקולי של סבתא');
-  for (const [label, ctx] of [
+  const contexts: [string, SearchContext][] = [
     ['alone', { foods: [], customFoods: [pie] }],
     ['among the bundled foods', { customFoods: [pie] }],
-  ] as const) {
+  ];
+  for (const [label, ctx] of contexts) {
     it(`is found ${label} by a Hebrew word, a prefixed word, a typo and a defective spelling`, () => {
       for (const q of ['פשטידת', 'פשטידת ברוקולי', 'ברוקולי סבתא', 'והפשטידת', 'פשתידת', 'פשטדת', 'פשטיד']) {
         expect(searchLocal(q, ctx)[0]?.food.id, q).toBe('c_pie');
@@ -227,7 +230,7 @@ describe('inputs nobody planned for', () => {
   const ctx = { customFoods: OWN };
 
   it('empty, blank and punctuation-only queries return nothing', () => {
-    for (const q of ['', '   ', '!!!', '...', '״', "'", '—', '־', '‎⁨⁩']) expect(searchLocal(q, ctx)).toEqual([]);
+    for (const q of ['', '   ', '!!!', '...', '\u05f4', "'", '—', '\u05be', '\u200e\u2068\u2069']) expect(searchLocal(q, ctx)).toEqual([]);
   });
 
   it('a query of only stop words still searches for them', () => {
@@ -269,8 +272,8 @@ describe('inputs nobody planned for', () => {
       ...'אבגדהוזחטיכלמנסעפצקרשתךםןףץ',
       ...'abcdefghijklmnopqrstuvwxyz',
       ...'0123456789',
-      ' ', ' ', ' ', "'", '"', '%', '-', '(', ')', ',', '.', '׳', '״', '־', 'ִ', 'ּ', 'ׁ',
-      '‎', '⁨', '🍕', 'ح', 'م', 'é', 'שׁ', 'ﭏ',
+      ' ', ' ', ' ', "'", '"', '%', '-', '(', ')', ',', '.', '\u05f3', '\u05f4', '\u05be', '\u05b4', '\u05bc', '\u05c1',
+      '\u200e', '\u2068', '🍕', 'ح', 'م', 'é', '\ufb2a', '\ufb4f',
     ];
     let seed = 12345;
     const rand = () => {
@@ -296,3 +299,33 @@ describe('inputs nobody planned for', () => {
     expect(worst, worstQ).toBeLessThan(50);
   });
 });
+
+describe('the photo review\'s "add what the analysis missed" (localMatch)', () => {
+  it('finds a food typed in Hebrew, with a prefix, an amount or a Latin spelling', () => {
+    expect(matchFoods('חומוס', BUILTIN_FOODS)[0]?.id).toBe('b_hummus');
+    expect(matchFoods('שניצל עוף', BUILTIN_FOODS)[0]?.id).toBe('b_schnitzel_chicken');
+    expect(matchFoods('והחומוס', BUILTIN_FOODS)[0]?.id).toBe('b_hummus');
+    expect(matchFoods('shnitzel', BUILTIN_FOODS)[0]?.id).toBe('b_schnitzel_chicken');
+    expect(matchFoods('חומוס', BUILTIN_FOODS).length).toBeLessThanOrEqual(3);
+  });
+
+  it('reads a leading amount before a Hebrew word and scales the item', () => {
+    expect(parseAmount('2 ביצים')).toEqual({ count: 2, grams: null, rest: 'ביצים' });
+    expect(parseAmount('150 g חומוס')).toEqual({ count: null, grams: 150, rest: 'חומוס' });
+    const hummus = matchFoods('150 g חומוס', BUILTIN_FOODS)[0];
+    expect(hummus.id).toBe('b_hummus');
+    expect(foodToItem(hummus, '150 g חומוס').grams).toBe(150);
+    expect(matchFoods('2 ביצים', BUILTIN_FOODS)[0]?.id).toBe('b_egg_boiled');
+  });
+
+  it('finds an own food named in Hebrew in the pool', () => {
+    const pool = [...OWN, ...BUILTIN_FOODS];
+    expect(matchFoods('סלט של אמא', pool)[0]?.id).toBe('c_salad_mom');
+  });
+
+  it('nothing for words that match nothing', () => {
+    expect(matchFoods('קקקקקק', BUILTIN_FOODS)).toEqual([]);
+    expect(matchFoods('  ', BUILTIN_FOODS)).toEqual([]);
+  });
+});
+

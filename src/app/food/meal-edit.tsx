@@ -10,6 +10,7 @@ import { RowEmoji } from '@/features/food/components';
 import { closeMealDraft, openMealDraft, removeDraftItem, setDraftName, setDraftServings, updateDraftItem, useMealDraft } from '@/features/food/mealDraft';
 import { RequireProfile } from '@/features/food/RequireProfile';
 import { ItemAmountSheet, itemLine } from '@/features/food/SavedMealParts';
+import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { sumNutrients } from '@/lib/nutrition';
 import { useStore } from '@/store';
 import { fonts, useTheme } from '@/theme';
@@ -63,7 +64,7 @@ function MealEdit() {
     const row = rows.find((r) => r.key === key);
     const undo = removeDraftItem(key);
     haptic.tap();
-    if (row) toast(`Removed ${row.item.name}`, { label: 'Undo', onPress: undo });
+    if (row) toast(`Removed ${isolateRtl(row.item.name)}`, { label: 'Undo', onPress: undo });
   };
 
   return (
@@ -166,12 +167,12 @@ function MealEdit() {
                   testID={`meal-edit-item-${i}`}
                   scaleTo={0.985}
                   onPress={() => setEditing(r.key)}
-                  accessibilityLabel={`${r.item.name}, ${itemLine(r.item)}. Change amount`}
+                  accessibilityLabel={`${r.item.name}, ${withoutMarks(itemLine(r.item))}. Change amount`}
                   style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>
                   <RowEmoji emoji={r.item.emoji} />
                   <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                     <Text variant="bodyStrong" numberOfLines={3} style={{ fontFamily: fonts.semibold }}>
-                      {r.item.name}
+                      {isolateRtl(r.item.name)}
                     </Text>
                     <Text variant="caption" color="textSecondary" numberOfLines={2} tabular>
                       {itemLine(r.item)}

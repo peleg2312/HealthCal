@@ -262,7 +262,7 @@ export default function AboutScreen() {
       <Section icon={(c) => <BookOpen size={20} color={c} />} color={colors.carbs} title="Where food data comes from">
         <P>
           Three sources, ranked by how much to trust them, and each food shows which one it came from. First, a bundled reference list of common
-          foods, available offline, each with the values of a national food composition record: USDA FoodData Central, or Israel&apos;s national
+          foods, available offline, most with the values of a national food composition record: USDA FoodData Central, or Israel&apos;s national
           nutrition database (Tzameret) from the Ministry of Health, published on data.gov.il, foods updated October 2022. Second, Open Food Facts, a free community database of packaged products
           used for barcode scans; entries are checked for plausible values but are crowd-sourced, so they rank below reference data. Third, foods
           and meals you create yourself.

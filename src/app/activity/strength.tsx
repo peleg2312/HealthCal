@@ -26,6 +26,7 @@ import {
   type DraftExercise,
   type StrengthDraft,
 } from '@/features/activity/strengthDraft';
+import { isolateRtl } from '@/lib/bidi';
 import { formatDayLabel, formatDuration, formatShortDate, today } from '@/lib/dates';
 import { formulaTdee } from '@/lib/energy';
 import { INTENSITY_LABELS, estimateOneRepMax, findStrengthRecords, kcalRange, strengthVolumeKg, type StrengthRecord } from '@/lib/exercise';
@@ -815,7 +816,7 @@ function SaveRoutineSheet({ visible, onClose, exercises }: { visible: boolean; o
     if (!list.length || !value.trim()) return;
     const r = addRoutine(value, list);
     haptic.success();
-    toast(`Saved ${r.name} as a routine`);
+    toast(`Saved ${isolateRtl(r.name)} as a routine`);
     close();
   };
   return (
@@ -826,7 +827,7 @@ function SaveRoutineSheet({ visible, onClose, exercises }: { visible: boolean; o
       footer={<Button testID="routine-save" title="Save routine" onPress={save} disabled={!list.length || !value.trim()} />}>
       <TextField testID="routine-name" label="Name" value={value} onChangeText={setName} maxLength={40} returnKeyType="done" onSubmitEditing={save} />
       <Text variant="caption" color="textSecondary">
-        {list.map((e) => `${e.name} × ${e.sets}`).join(', ')}. Starting it later adds these exercises with empty sets; your last numbers show as a guide.
+        {list.map((e) => `${isolateRtl(e.name)} × ${e.sets}`).join(', ')}. Starting it later adds these exercises with empty sets; your last numbers show as a guide.
       </Text>
     </Sheet>
   );

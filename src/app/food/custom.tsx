@@ -7,6 +7,7 @@ import { deleteCustomFood } from '@/features/food/actions';
 import { setFoodDraft, useFoodDraft } from '@/features/food/draft';
 import { href, kcal, param, parseMeal, toPer100 } from '@/features/food/helpers';
 import { logFood } from '@/features/food/log';
+import { isolateRtl } from '@/lib/bidi';
 import { today } from '@/lib/dates';
 import { atwaterKcal, GRAM_SERVING } from '@/lib/nutrition';
 import { useStore } from '@/store';
@@ -129,7 +130,7 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
       goBack(href('/food/search', { meal, date }));
       return;
     }
-    toast(`Saved ${food.name} to my foods`, { label: 'Undo', onPress: () => useStore.getState().remove('customFoods', food.id) });
+    toast(`Saved ${isolateRtl(food.name)} to my foods`, { label: 'Undo', onPress: () => useStore.getState().remove('customFoods', food.id) });
     goBack('/food/search');
   };
 

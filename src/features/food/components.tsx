@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useToday } from '@/store/clock';
+import { isolateRtl } from '@/lib/bidi';
 import { addDays, formatDayLabel, formatLongDate, today } from '@/lib/dates';
 import { MEALS } from '@/lib/nutrition';
 import { cup, fonts, useTheme } from '@/theme';
@@ -174,8 +175,10 @@ export function FoodRow({
   trailing,
   testID,
   amount,
+  matched,
 }: {
   food: Food;
+  /** The portion, already for display (`portionLabel`). */
   subtitle: string;
   kcalValue: number;
   onPress: () => void;
@@ -183,6 +186,11 @@ export function FoodRow({
   trailing?: React.ReactNode;
   testID?: string;
   amount?: RowAmount;
+  /**
+   * The search name the query matched when it was not the stored name (a Hebrew name, `SearchHit.matched`):
+   * one quiet line under the name, so a person sees why the row is there. Search results only.
+   */
+  matched?: string;
 }) {
   const { colors, spacing } = useTheme();
   const { width } = useWindowDimensions();
@@ -210,21 +218,27 @@ export function FoodRow({
         testID={testID}
         onPress={onPress}
         scaleTo={0.985}
-        accessibilityLabel={`${food.name}, ${Math.round(kcalValue)} kilocalories. Open details`}
+        accessibilityLabel={`${food.name}${matched ? `, ${matched}` : ''}, ${Math.round(kcalValue)} kilocalories. Open details`}
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>
         <RowEmoji emoji={food.emoji} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           {/* Up to three lines, as in the diary: a long name ("Israeli salad (tomato, cucumber, onion, ...)") is read, not cut. */}
           <Text variant="bodyStrong" numberOfLines={3} style={{ fontFamily: fonts.semibold }}>
-            {food.name}
+            {isolateRtl(food.name)}
           </Text>
+          {/* The name the query found, on one line in the name's column (a title and its one line under it). */}
+          {matched ? (
+            <Text variant="caption" color="textSecondary" numberOfLines={1} testID={testID ? `${testID}-matched` : undefined}>
+              {isolateRtl(matched)}
+            </Text>
+          ) : null}
           {/* The source's mark leads the line and its word ends it, so a long portion or brand wraps
               to a second line instead of cutting the calories, and the mark never floats. */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
             <CupKey color={colors.textSecondary} variant={sourceKeyVariant(food.source)} size={8} style={{ marginTop: 5 }} />
             <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1 }}>
               {/* Once added, the live kcal leads. */}
-              {amount ? `${kcal(kcalValue)} kcal · ` : food.brand ? `${food.brand} · ` : ''}
+              {amount ? `${kcal(kcalValue)} kcal · ` : food.brand ? `${isolateRtl(food.brand)} · ` : ''}
               {subtitle}
               {amount ? '' : ` · ${kcal(kcalValue)} kcal`}
               {` · ${sourceInfo(food.source).short}`}

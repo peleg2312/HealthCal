@@ -3,7 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { Animated, Platform, useWindowDimensions, View } from 'react-native';
 
 import { SourceTag } from '@/features/food/components';
-import { dayPhrase, formatQty, kcal, lastPortions, portionFor } from '@/features/food/helpers';
+import { dayPhrase, formatQty, kcal, lastPortions, portionFor, servingText } from '@/features/food/helpers';
+import { isolateRtl } from '@/lib/bidi';
 import { MEAL_LABEL, scaleNutrients, servingsFor } from '@/lib/nutrition';
 import { useDay, useLive } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
@@ -73,11 +74,11 @@ export function ScanResultCard({
       <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text variant="title" numberOfLines={2} testID="scan-result-name">
-            {food.name}
+            {isolateRtl(food.name)}
           </Text>
           {food.brand ? (
             <Text variant="caption" color="textSecondary" numberOfLines={1}>
-              {food.brand}
+              {isolateRtl(food.brand)}
             </Text>
           ) : null}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 2 }}>
@@ -118,7 +119,7 @@ export function ScanResultCard({
           <Chip
             key={`${s.label}-${i}`}
             testID={`scan-serving-${i}`}
-            label={s.label}
+            label={servingText(s.label)}
             selected={s.label === portion.serving.label}
             onPress={() => setPortion({ serving: s, quantity: 1 })}
           />

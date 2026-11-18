@@ -7,6 +7,7 @@ import { Check } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
+import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { MEAL_LABEL } from '@/lib/nutrition';
 import { cup, useTheme } from '@/theme';
 import type { ISODate, MealType, SavedMeal, SavedMealItem } from '@/types';
@@ -15,7 +16,7 @@ import { Button, Chip, ChipWrap, NumberField, PressableScale, Sheet, Stepper, Te
 import { AmountEditor } from './AmountEditor';
 import { RowEmoji } from './components';
 import { formatPortion, mealServings, planSavedMeal, setItemAmount } from './build';
-import { dayPhrase, formatQty, kcal, matchServing, portionLabel } from './helpers';
+import { dayPhrase, formatQty, kcal, matchServing, portionLabel, servingText } from './helpers';
 import { logSavedMeal } from './log';
 
 const PORTIONS = [0.5, 1, 2];
@@ -25,7 +26,7 @@ export function itemLine(it: SavedMealItem): string {
   const portion = portionLabel(it.servingLabel, it.quantity);
   const g = Math.round(it.grams);
   // Show the weight too when the portion is a household measure ("1.5 × 1 cup · 240 g").
-  const weight = g > 0 && !/\bg$/.test(portion) && it.servingLabel !== '1 g' ? ` · ${g} g` : '';
+  const weight = g > 0 && !/\bg$/.test(withoutMarks(portion)) && it.servingLabel !== '1 g' ? ` · ${g} g` : '';
   return `${portion}${weight} · ${it.kcalRange ? '~' : ''}${kcal(it.nutrients.kcal)} kcal`;
 }
 
@@ -52,7 +53,7 @@ export function LogSavedMealSheet({ meal, mealType, date, onClose }: { meal: Sav
     <Sheet
       visible
       onClose={onClose}
-      title={meal.name}
+      title={isolateRtl(meal.name)}
       footer={
         <Button
           testID="log-meal-confirm"
@@ -117,7 +118,7 @@ export function LogSavedMealSheet({ meal, mealType, date, onClose }: { meal: Sav
               feedback="select"
               accessibilityRole="checkbox"
               accessibilityState={{ checked: on }}
-              accessibilityLabel={`${it.name}, ${itemLine(it)}`}
+              accessibilityLabel={`${it.name}, ${withoutMarks(itemLine(it))}`}
               onPress={() => setInclude((cur) => meal.items.map((_, j) => (j === i ? !(cur[j] ?? true) : (cur[j] ?? true))))}
               style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 48, paddingVertical: 4 }}>
               <View
@@ -136,7 +137,7 @@ export function LogSavedMealSheet({ meal, mealType, date, onClose }: { meal: Sav
               <RowEmoji emoji={it.emoji} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text variant="body" numberOfLines={2} color={on ? 'text' : 'textTertiary'}>
-                  {it.name}
+                  {isolateRtl(it.name)}
                 </Text>
                 <Text variant="caption" color="textSecondary" numberOfLines={2} tabular>
                   {itemLine(it)}
@@ -175,7 +176,7 @@ export function ItemAmountSheet({
     <Sheet
       visible
       onClose={onClose}
-      title={item.name}
+      title={isolateRtl(item.name)}
       footer={
         <View style={{ flexDirection: 'row', gap: spacing.md }}>
           <Button testID="meal-item-remove" variant="secondary" full={false} title="Remove" onPress={onRemove} />
@@ -204,7 +205,7 @@ export function ItemAmountSheet({
             step={0.5}
             min={0.25}
             max={50}
-            format={(v) => `${formatQty(v)} × ${item.servingLabel}`}
+            format={(v) => `${formatQty(v)} × ${servingText(item.servingLabel)}`}
             onChange={(q) => onChange(setItemAmount(item, { label: item.servingLabel, grams: 0 }, q))}
           />
         </View>

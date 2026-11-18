@@ -74,7 +74,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     await page.getByTestId(id).first().fill(String(value), { timeout: 15000 });
     await page.waitForTimeout(150);
   };
-  const text = async (id) => (await page.getByTestId(id).first().innerText({ timeout: 15000 })).replace(/\u00A0/g, ' ').replace(/\u2060/g, '').trim();
+  const text = async (id) => (await page.getByTestId(id).first().innerText({ timeout: 15000 })).replace(/\u00A0/g, ' ').replace(/[\u2060\u200E\u2068\u2069]/g, '').trim();
   const shot = async (name) => SHOTS && page.screenshot({ path: `${SHOTS}/${name}.png` });
   const focusedId = () => page.evaluate(() => document.activeElement?.getAttribute('data-testid') || document.activeElement?.tagName || 'nothing');
   const blur = () => page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
@@ -230,6 +230,32 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   // Banana, raw: 89 kcal per 100 g (USDA); the entry must equal grams x per-100 g.
   const expectedBanana = (banana.grams * banana.food.per100g.kcal) / 100;
   check('entry calories equal grams x per-100 g value', near(banana.nutrients.kcal, expectedBanana, 0.01) && banana.food.per100g.kcal === 89 && banana.grams > 0, `${banana.grams} g -> ${banana.nutrients.kcal.toFixed(1)} kcal`);
+
+  // ------------------------------------------- a food searched by its Hebrew name
+  // A person types the Hebrew word: the row shows the stored English name with the Hebrew name it
+  // matched under it (the name that matched best: "קוטג'" for this query, "קוטג' 5%" for "קוטג 5"),
+  // and what is stored is the English food (search names are never stored).
+  const HEBREW_LETTER = /[\u0590-\u05FF]/;
+  await fill('food-search-input', '');
+  await fill('food-search-input', 'קוטג');
+  await page.waitForTimeout(700);
+  await shot('e2e-search-hebrew');
+  const heName = await text('result-0').catch(() => '');
+  const heMatched = await text('result-0-matched').catch(() => '');
+  check('a Hebrew word finds the food: its English name, the Hebrew name under it', heName.includes('Cottage cheese, 5% fat') && heMatched.startsWith("קוטג'"), `row "${heName.replace(/\n/g, ' | ').slice(0, 120)}", matched "${heMatched}"`);
+  await tap('result-0-add');
+  await page.waitForTimeout(500);
+  s = await stored();
+  const newest = live(s.foodEntries).sort((a, b) => b.loggedAt.localeCompare(a.loggedAt))[0];
+  check('the entry is stored under the English name', !!newest && newest.name === 'Cottage cheese, 5% fat' && newest.foodId === 'b_cottage_cheese_5pct', newest ? `${newest.name} (${newest.foodId})` : 'no entry');
+  check('no Hebrew letter is stored anywhere', !HEBREW_LETTER.test(JSON.stringify(s)), (JSON.stringify(s).match(/.{0,40}[\u0590-\u05FF].{0,40}/) || [''])[0]);
+  // Take it out again (soft delete, as Undo does), so the day's numbers below stay the banana's.
+  if (newest && newest.foodId === 'b_cottage_cheese_5pct') await page.evaluate((id) => window.__healthcal.getState().remove('foodEntries', id), newest.id);
+  await fill('food-search-input', '');
+  await fill('food-search-input', 'tehina');
+  await page.waitForTimeout(700);
+  const latin = await text('result-0').catch(() => '');
+  check('a Latin spelling Israelis type finds the food', latin.includes('Tahini sauce (prepared, diluted)'), latin.replace(/\n/g, ' | ').slice(0, 120));
 
   // ------------------------------------- the photo screen's weighed total (optional field)
   // A photo chosen, then the weight field: a tap anywhere in it focuses it, the faked keyboard keeps
@@ -399,10 +425,10 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   check('morning: without an account the synced settings are not written', (await mstored()).settings.morningSeenDay === undefined, String((await mstored()).settings.morningSeenDay));
   let firstQuote = '';
   if (opened) {
-    const line = (await morning.getByTestId('morning-line').first().innerText().catch(() => '')).replace(/\u00A0/g, ' ').replace(/\u2060/g, '').trim();
+    const line = (await morning.getByTestId('morning-line').first().innerText().catch(() => '')).replace(/\u00A0/g, ' ').replace(/[\u2060\u200E\u2068\u2069]/g, '').trim();
     check('morning: yesterday is described in one neutral sentence', line.length > 0 && !/!|fail|cheat|great|over budget/i.test(line), line);
     // The second edition: a greeting by the time of day, a quote of the day, and words that never scold.
-    const norm = (t) => t.replace(/\u00A0/g, ' ').replace(/\u2060/g, '').trim();
+    const norm = (t) => t.replace(/\u00A0/g, ' ').replace(/[\u2060\u200E\u2068\u2069]/g, '').trim();
     const headerTitle = norm(await morning.getByTestId('screen-header').first().innerText().catch(() => ''));
     check('morning: the header greets by the time of day', headerTitle.startsWith('Good morning'), headerTitle.split('\n')[0]);
     firstQuote = norm(await morning.getByTestId('morning-quote-text').first().innerText().catch(() => ''));
@@ -442,7 +468,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   await morning.evaluate(() => localStorage.removeItem('healthcal-morning/seen'));
   await morning.goto(BASE + '/', { waitUntil: 'networkidle' });
   const again = await morning.getByTestId('morning-quote-text').first().waitFor({ state: 'visible', timeout: 15000 }).then(() => true, () => false);
-  const againQuote = again ? (await morning.getByTestId('morning-quote-text').first().innerText()).replace(/\u00A0/g, ' ').replace(/\u2060/g, '').trim() : '';
+  const againQuote = again ? (await morning.getByTestId('morning-quote-text').first().innerText()).replace(/\u00A0/g, ' ').replace(/[\u2060\u200E\u2068\u2069]/g, '').trim() : '';
   check('morning: the same quote all day on this device', again && againQuote === firstQuote, `${againQuote} vs ${firstQuote}`);
   // The row the coach's step for today names is left out of For today (it is said once): any row left opens its place.
   const planRow = morning.locator('[data-testid^="morning-plan-"]:not([data-testid="morning-plan"])').first();

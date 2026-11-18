@@ -5,12 +5,13 @@ import { ScrollView, useWindowDimensions, View } from 'react-native';
 
 import { hasFoodLogged } from '@/features/drinks/via';
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
-import { matchServing } from '@/features/food/helpers';
+import { matchServing, servingText } from '@/features/food/helpers';
 import { formatPortion, mealServings, planSavedMeal } from '@/features/food/build';
 import { logFood, logItems, logSavedMeal } from '@/features/food/log';
 import { addWater } from '@/features/today/StatusRail';
 import { quickLogDate, quickLogPastDate, useViewedDay } from '@/features/today/viewedDay';
 import { customFoodIndex, resolveUsuals, usualFoods, usualLabel, type UsualFood } from '@/features/food/usuals';
+import { isolateRtl } from '@/lib/bidi';
 import { addDays, formatDayLabel, formatShortDate } from '@/lib/dates';
 import { MEAL_LABEL, mealForTime } from '@/lib/nutrition';
 import { formatNumber, formatVolume } from '@/lib/units';
@@ -134,10 +135,11 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                   {/* Two lines, so a name like "Greek yogurt, plain, 2%" reads whole. The name never grows with the row
                       (a taller neighbour would show the line after its ellipsis); the caption sits at the foot instead. */}
                   <Text variant="label" numberOfLines={2}>
-                    {u.last.name}
+                    {isolateRtl(u.last.name)}
                   </Text>
                   <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ marginTop: 'auto' }}>
-                    {usualLabel(u)}
+                    {/* The serving label drawn isolated when it is written in Hebrew (display only). */}
+                    {usualLabel({ ...u, last: { ...u.last, servingLabel: servingText(u.last.servingLabel) } })}
                   </Text>
                 </PressableScale>
               );
@@ -160,7 +162,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                   <AddMark done={done.includes('saved')} />
                 </View>
                 <Text variant="label" numberOfLines={2}>
-                  {savedMeal.name}
+                  {isolateRtl(savedMeal.name)}
                 </Text>
                 <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ marginTop: 'auto' }}>
                   {savedServings > 1
@@ -278,7 +280,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
 function RepeatRow({ label, entries, done, onPress }: { label: string; entries: FoodEntry[]; done: boolean; onPress: () => void }) {
   const { colors, radius, spacing } = useTheme();
   const kcal = entries.reduce((s, e) => s + e.nutrients.kcal, 0);
-  const names = entries.map((e) => e.name).join(', ');
+  const names = entries.map((e) => isolateRtl(e.name)).join(', ');
   return (
     <PressableScale
       testID="quick-repeat"

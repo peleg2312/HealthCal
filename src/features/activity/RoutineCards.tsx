@@ -2,6 +2,7 @@ import { Play, Repeat, X } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
+import { isolateRtl } from '@/lib/bidi';
 import { formatShortDate } from '@/lib/dates';
 import { useLive } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
@@ -43,7 +44,7 @@ function RoutineCard({ template, id, onStart, testID }: { template: RoutineTempl
     if (!id) return;
     const removed = removeRoutine(id);
     if (!removed) return;
-    toast(`Removed ${removed.name}`, { label: 'Undo', onPress: () => restoreRoutine(removed.id) });
+    toast(`Removed ${isolateRtl(removed.name)}`, { label: 'Undo', onPress: () => restoreRoutine(removed.id) });
   };
   return (
     <View
@@ -54,7 +55,8 @@ function RoutineCard({ template, id, onStart, testID }: { template: RoutineTempl
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
             {id ? null : <Repeat size={16} color={colors.exercise} />}
             <Text variant="bodyStrong" numberOfLines={1} style={{ flexShrink: 1 }}>
-              {title}
+              {/* A routine named in Hebrew stays at the left and keeps its date after it (display only). */}
+              {id ? isolateRtl(template.name) : `${isolateRtl(template.name)}${template.date ? `, ${formatShortDate(template.date)}` : ''}`}
             </Text>
           </View>
           <Text variant="caption" color="textSecondary" numberOfLines={2} testID={`${testID}-exercises`}>

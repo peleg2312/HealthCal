@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { BUILTIN_FOODS } from '@/data/foods';
 import type { Food } from '@/types';
 
-import { editDistance, rankOnline, searchLocal, stem } from './foodSearch';
+import { editDistance, rankOnline, searchLocal, stem, withinOneEdit } from './foodSearch';
 
 const food = (id: string, name: string, extra: Partial<Food> = {}): Food => ({
   id,
@@ -33,6 +33,28 @@ describe('text helpers', () => {
     expect(editDistance('brest', 'breast')).toBe(1);
     expect(editDistance('cihcken', 'chicken')).toBe(1);
     expect(editDistance('banana', 'chicken', 2)).toBeGreaterThan(2);
+  });
+
+  it('withinOneEdit agrees with editDistance(a, b, 1) <= 1', () => {
+    const letters = ['a', 'b', 'c', 'ח', 'ו'];
+    let seed = 7;
+    const rand = (n: number) => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed % n;
+    };
+    const word = () => Array.from({ length: rand(6) }, () => letters[rand(letters.length)]).join('');
+    for (let n = 0; n < 20000; n++) {
+      const a = word();
+      // Half the time b is a with one random edit, so the near cases are well covered.
+      let b = word();
+      if (n % 2) {
+        const i = rand(a.length + 1);
+        const op = rand(4);
+        const ch = letters[rand(letters.length)];
+        b = op === 0 ? a.slice(0, i) + ch + a.slice(i) : op === 1 ? a.slice(0, i) + a.slice(i + 1) : op === 2 ? a.slice(0, i) + ch + a.slice(i + 1) : a.slice(0, i) + a.slice(i + 1, i + 2) + a.slice(i, i + 1) + a.slice(i + 2);
+      }
+      expect(withinOneEdit(a, b), `${a} ${b}`).toBe(editDistance(a, b, 1) <= 1);
+    }
   });
 });
 
@@ -163,14 +185,14 @@ describe('rankOnline', () => {
     const off = (id: string, name: string, brand?: string) => food(id, name, { source: 'openfoodfacts', brand });
     const products = [
       off('off_1', 'Chocolate milk', 'תנובה'),
-      off('off_2', 'קוטג׳ 3% שומן', 'טרה'),
+      off('off_2', 'קוטג\u05f3 3% שומן', 'טרה'),
       off('off_3', "קוטג' 5% שומן", 'תנובה'),
       off('off_4', 'גבינה לבנה 5%', 'תנובה'),
       off('off_5', 'חומוס אחלה עם טחינה', 'אחלה'),
     ];
     // Geresh in any form, the number and the brand word.
     expect(rankOnline('קוטג 5', products).map((f) => f.id).slice(0, 1)).toEqual(['off_3']);
-    expect(rankOnline('קוטג׳', products).map((f) => f.id).slice(0, 2).sort()).toEqual(['off_2', 'off_3']);
+    expect(rankOnline('קוטג\u05f3', products).map((f) => f.id).slice(0, 2).sort()).toEqual(['off_2', 'off_3']);
     expect(rankOnline('תנובה קוטג', products)[0].id).toBe('off_3');
     // A word with a prefix finds the product as typed; nothing is dropped.
     expect(rankOnline('חומוס בטחינה', products)).toHaveLength(5);

@@ -9,6 +9,7 @@ import { ScanResultCard, type ScanFoundFrom } from '@/features/ai/ScanResultCard
 import { setFoodDraft } from '@/features/food/draft';
 import { href, kcal } from '@/features/food/helpers';
 import { logFood } from '@/features/food/log';
+import { isolateRtl } from '@/lib/bidi';
 import { today } from '@/lib/dates';
 import { entriesTotal, mealForTime, MEALS } from '@/lib/nutrition';
 import { lookupBarcode } from '@/services/openFoodFacts';
@@ -268,7 +269,7 @@ export default function ScanScreen() {
           <Text variant="body" color="textSecondary">
             {phase.kind === 'not_found'
               ? `Barcode ${phase.code} is not in Open Food Facts yet. Add it once from the label and it will be in your foods next time.`
-              : `${phase.name} is in Open Food Facts, but its nutrition values are missing or do not add up, so it cannot be logged as it is. Add it from the label instead.`}
+              : `${isolateRtl(phase.name)} is in Open Food Facts, but its nutrition values are missing or do not add up, so it cannot be logged as it is. Add it from the label instead.`}
           </Text>
           <View style={{ gap: spacing.sm, marginTop: spacing.xs }}>
             <Button

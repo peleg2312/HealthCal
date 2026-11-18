@@ -2,6 +2,8 @@
  * Pure helpers shared by the food screens: route params, number formatting,
  * data-source labels and the "last portion" used for one-tap re-logging.
  */
+import { NATIONAL_LABELS, NATIONAL_RECIPES } from '@/data/foods';
+import { hasRtl, isolateRtl } from '@/lib/bidi';
 import { formatDayLabel, today } from '@/lib/dates';
 import { defaultServing, formatMacro, mealForTime, servingsFor } from '@/lib/nutrition';
 import { formatNumber } from '@/lib/units';
@@ -50,15 +52,39 @@ export function formatQty(q: number): string {
   return String(Math.round(q * 100) / 100);
 }
 
-/** "1 large" or "2 × 1 large" or "150 g". */
+/**
+ * The words of a serving label as drawn inside an app line (display only, never stored): a label
+ * written in Hebrew or Arabic is isolated (`isolateRtl`), and a trailing amount in brackets stays
+ * outside the isolate, so "גביע (250 g)" keeps "(250 g)" in the line's left-to-right order.
+ */
+function servingWords(words: string): string {
+  if (!hasRtl(words)) return words;
+  const tail = words.match(/^(.*?\S)(\s*\([^()]*\))$/);
+  return tail && !hasRtl(tail[2]) ? `${isolateRtl(tail[1])}${tail[2]}` : isolateRtl(words);
+}
+
+/**
+ * A serving label as drawn in an app line ("1 גביע" reads 1, then the word, like "1 cup"). English
+ * labels come back unchanged. Display only: never store or compare the result.
+ */
+export function servingText(label: string): string {
+  if (!hasRtl(label)) return label;
+  const counted = label.match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
+  return counted ? `${counted[1]} ${servingWords(counted[2])}` : servingWords(label);
+}
+
+/**
+ * "1 large" or "2 × 1 large" or "150 g", for display. A serving label written in Hebrew or Arabic
+ * is isolated (`servingText`); the number and the grams never are. Never store the result.
+ */
 export function portionLabel(servingLabel: string, quantity: number): string {
   if (servingLabel === '1 g') return `${formatQty(quantity)} g`;
   if (servingLabel === '100 g' && quantity !== 1) return `${formatQty(quantity * 100)} g`;
-  if (quantity === 1) return servingLabel;
+  if (quantity === 1) return servingText(servingLabel);
   // "1 pita" taken 1.5 times is "1.5 pita"; "2 tbsp" taken 3 times is "6 tbsp". Anything else keeps the multiplier.
   const counted = servingLabel.match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
-  if (counted) return `${formatQty(Number(counted[1]) * quantity)} ${counted[2]}`;
-  return `${formatQty(quantity)} × ${servingLabel}`;
+  if (counted) return `${formatQty(Number(counted[1]) * quantity)} ${servingWords(counted[2])}`;
+  return `${formatQty(quantity)} × ${servingWords(servingLabel)}`;
 }
 
 /** Step size for an amount: 10 g in gram mode, 0.5 servings otherwise. */
@@ -99,11 +125,34 @@ export interface SourceInfo {
   explain: string;
 }
 
-export function sourceInfo(source: FoodSource): SourceInfo {
+/**
+ * Where a bundled food's numbers come from, in one sentence (the detail page, behind the badge): the
+ * record it names (`fdcId` for USDA, `ilCode` for Israel's national nutrition database, which marks
+ * its recipe records in NATIONAL_RECIPES and its packaged products in NATIONAL_LABELS), or none.
+ */
+export function referenceExplain(food: Pick<Food, 'fdcId' | 'ilCode'>): string {
+  const lead = 'From the bundled reference list.';
+  if (food.fdcId !== undefined) return `${lead} Values from USDA FoodData Central.`;
+  if (food.ilCode !== undefined) {
+    if (NATIONAL_RECIPES.has(food.ilCode)) return `${lead} Values for a typical home recipe, computed by Israel's Ministry of Health (national nutrition database).`;
+    if (NATIONAL_LABELS.has(food.ilCode))
+      return `${lead} Values from the Israeli Ministry of Health's national nutrition database, from the product's label as recorded there (database updated October 2022).`;
+    return `${lead} Values from the Israeli Ministry of Health's national nutrition database (database updated October 2022).`;
+  }
+  return `${lead} An estimate from a typical recipe, not a measured record.`;
+}
+
+/** A data source's names and colour; with the food, a bundled food's `explain` names its own record (`referenceExplain`). */
+export function sourceInfo(source: FoodSource, food?: Pick<Food, 'fdcId' | 'ilCode'>): SourceInfo {
   switch (source) {
     case 'builtin':
     case 'usda':
-      return { label: 'Reference data', short: 'Reference', color: 'success', explain: 'From the bundled reference database (USDA-based values).' };
+      return {
+        label: 'Reference data',
+        short: 'Reference',
+        color: 'success',
+        explain: source === 'builtin' && food ? referenceExplain(food) : 'From the bundled reference database (USDA-based values).',
+      };
     case 'openfoodfacts':
       return {
         label: 'Community data',
