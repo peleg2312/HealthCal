@@ -28,7 +28,7 @@ name: Workout sync and About on a phone
     visible:
       id: today-energy
     timeout: 120000
-# A run that crosses midnight (first-day set up yesterday) opens the morning page ("Yesterday") over
+# A run that crosses midnight (first-day set up yesterday) opens the morning page ("Good morning") over
 # Today about a second after the start, between 04:00 and 12:00: close it with its "Today" button
 # (morning-today, which closes exactly as the X does; the kit's X is header-close, not a morning testID).
 # On the setup day it never opens, so this tap finds nothing and goes on.
@@ -203,8 +203,8 @@ name: Workout sync and About on a phone
     optional: true
 
 
-# The morning page, opened on purpose (Profile > See yesterday): on a new person's first day it shows
-# the empty state, with its header and its two footer buttons, and "Today" closes it onto Today.
+# The morning page, opened on purpose (Profile > See yesterday): on a new person's first day its card
+# reads "Nothing logged yesterday.", under its greeting header and over its two footer buttons, and "Today" closes it onto Today.
 - tapOn:
     id: tab-index
 - extendedWaitUntil:

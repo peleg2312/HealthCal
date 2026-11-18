@@ -232,6 +232,14 @@ function stressUp(state, { put, baselineTdee }) {
 //                1.3 = past the target); 0 means no fast running.
 //   eatBack      1 adds exercise to the budget (the demo's setting), 0 leaves it out (Goals, "Add
 //                exercise to my budget" off): Today then says what was burned and not added.
+// For the morning page's states (scripts/dev/states/morning.cjs, which view the seed's today from
+// tomorrow morning, so "tomorrow" below is the page's today):
+//   lastNight    hours of sleep in a record dated tomorrow (the page's last night); the seed itself
+//                never writes tomorrow.
+//   weighInGap   days: removes every weigh-in after (tomorrow - weighInGap) and puts one on that day,
+//                so the newest weigh-in is exactly that many days before the page's today.
+//   onboardedToday  true sets profile.onboardedAt to the seed's today at 09:00 (the page's day 2).
+//   name         sets profile.name ('' for none).
 // Only what is named changes; everything else stays the demo's. Applied in that order: eatBack, exercise and
 // the week first (they move the budget and the water goal), then food, water and the fast.
 
@@ -270,13 +278,19 @@ function appMaths() {
   return appCache;
 }
 
-const VALUE_KEYS = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack'];
+const VALUE_KEYS = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack', 'lastNight', 'weighInGap', 'onboardedToday', 'name'];
+/** Knobs that are not numbers: their type is checked on its own. */
+const VALUE_TYPES = { onboardedToday: 'boolean', name: 'string' };
 
 /** Sets the day's amounts (see above). `put` writes a record the way buildSeed does. */
 function applyValues(state, values, { put, weightKg, baselineTdee }) {
   const unknown = Object.keys(values).filter((k) => !VALUE_KEYS.includes(k));
   if (unknown.length) throw new Error(`seed values: unknown ${unknown.join(', ')} (known: ${VALUE_KEYS.join(', ')})`);
-  for (const [k, v] of Object.entries(values)) if (typeof v !== 'number' || !(v >= 0)) throw new Error(`seed values: ${k} must be a number of 0 or more`);
+  for (const [k, v] of Object.entries(values)) {
+    if (VALUE_TYPES[k]) {
+      if (typeof v !== VALUE_TYPES[k]) throw new Error(`seed values: ${k} must be a ${VALUE_TYPES[k]}`);
+    } else if (typeof v !== 'number' || !(v >= 0)) throw new Error(`seed values: ${k} must be a number of 0 or more`);
+  }
   const m = appMaths();
   const day = iso(daysAgo(0));
   const live = (c) => Object.values(state[c] || {}).filter((r) => !r.deleted);
@@ -363,6 +377,21 @@ function applyValues(state, values, { put, weightKg, baselineTdee }) {
       left -= ml;
     }
   }
+  if (values.lastNight !== undefined) {
+    const night = iso(daysAgo(-1));
+    drop('sleep', (r) => r.date !== night);
+    if (values.lastNight > 0) put('sleep', { date: night, hours: Math.round(values.lastNight * 100) / 100 });
+  }
+  if (values.weighInGap !== undefined) {
+    const last = iso(daysAgo(Math.round(values.weighInGap) - 1));
+    const kept = live('weights').filter((w) => w.date <= last).sort((a, b) => b.date.localeCompare(a.date));
+    const kgThen = kept[0]?.kg ?? state.profile.weightKg;
+    drop('weights', (w) => w.date < last);
+    put('weights', { date: last, kg: kgThen });
+    state.profile.weightKg = kgThen;
+  }
+  if (values.onboardedToday) state.profile.onboardedAt = at(0, 9);
+  if (values.name !== undefined) state.profile.name = values.name;
   if (values.fasting !== undefined) {
     drop('fasting', () => false);
     if (values.fasting > 0) {
@@ -374,7 +403,7 @@ function applyValues(state, values, { put, weightKg, baselineTdee }) {
 
 /**
  * @param {{ days?: number, empty?: boolean, theme?: 'system'|'light'|'dark'|'blossom', onboarded?: boolean, units?: 'metric'|'imperial', store?: boolean, stress?: boolean,
- *   values?: { eaten?: number, protein?: number, exercise?: number, water?: number, weekMinutes?: number, fasting?: number } }} opts
+ *   values?: { eaten?: number, protein?: number, exercise?: number, water?: number, weekMinutes?: number, fasting?: number, eatBack?: number, lastNight?: number, weighInGap?: number, onboardedToday?: boolean, name?: string } }} opts
  */
 export function buildSeed(opts = {}) {
   const { days = 35, empty = false, theme = 'dark', onboarded = true, units = 'metric', store = false, stress = false, values = null } = opts;

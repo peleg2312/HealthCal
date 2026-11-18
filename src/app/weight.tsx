@@ -1,6 +1,6 @@
 import { Plus } from 'lucide-react-native';
 import { useLocalSearchParams } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { resolveDateParam } from '@/features/trackers/dateParam';
@@ -58,11 +58,18 @@ function WeightScreen() {
   const [range, setRange] = useState<WeightRange>('3m');
   const end = useToday();
   // Opened for a past day (?date=): the weigh-in sheet starts on that day.
-  const params = useLocalSearchParams<{ date?: string }>();
+  const params = useLocalSearchParams<{ date?: string; log?: string }>();
   const [sheetDate, setSheetDate] = useState<ISODate | null>(() => {
     const asked = resolveDateParam(params.date, end);
     return params.date && asked !== end ? asked : null;
   });
+  // ?log=1 (the morning page's "Weigh in"): open the weigh-in sheet for today once, so one tap logs it.
+  const logOpened = useRef(false);
+  useEffect(() => {
+    if (params.log !== '1' || logOpened.current) return;
+    logOpened.current = true;
+    setSheetDate(end);
+  }, [params.log, end]);
   const [showAll, setShowAll] = useState(false);
   const unit = weightUnit(units);
 

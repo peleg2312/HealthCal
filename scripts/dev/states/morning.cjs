@@ -1,4 +1,5 @@
-// The morning page ("Yesterday", /morning): yesterday at a glance, opened by itself on the first visit
+// The morning page (/morning): a greeting, a quote, yesterday at a glance, what went well, what to improve and
+// a plan for today, opened by itself on the first visit
 // of a morning (src/features/morning/rule.ts) or from Profile > See yesterday. The format is in the
 // header of scripts/dev/evidence.cjs.
 //
@@ -11,6 +12,12 @@
 // yesterday, carrying the values; last night's sleep is then dated tomorrow, which the seed never writes,
 // so those states show the sleep cup's "Add". The states without `now` show the demo's real yesterday,
 // with its sleep.
+//
+// Do not let a run cross local midnight. The clocks below (`now`, `evening`, `morningOf`) are worked out
+// once, when this list is loaded, but the seed is built from the real today at each capture: after
+// midnight the page's yesterday is no longer the seed's today and the case states fail (seen once at 390 px:
+// morning-a-strong NOT CAPTURED, morning-c-half and morning-d-water timed out). evidence.cjs takes `now` as
+// a number, so a run started late in the evening is split, or started again after midnight.
 //
 // The automatic opening: an automated browser never sees the page unless the window carries
 // __healthcalMorning before the app starts (src/features/morning/allowed.ts), so morning-auto sets that
@@ -34,6 +41,15 @@ function morningOf(daysAgo) {
   return d.getTime();
 }
 
+/** Tomorrow at 19:30 local: the page opened in the evening from Profile ("Good evening", "Log dinner"). */
+function tomorrowEvening() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(19, 30, 0, 0);
+  return d.getTime();
+}
+const evening = tomorrowEvening();
+
 /** 'YYYY-MM-DD' of the local day `daysAgo` before today. */
 function localDay(daysAgo) {
   const d = new Date();
@@ -44,7 +60,7 @@ function localDay(daysAgo) {
 module.exports = [
   // Yesterday as the demo has it, last night's sleep present.
   { id: 'morning', route: '/morning', waitFor: 'morning-card', note: "yesterday from the demo data, with last night's sleep" },
-  { id: 'morning-first', route: '/morning?first=1', waitFor: 'morning-first', note: 'the first automatic showing: the line under the card about turning it off in Profile' },
+  { id: 'morning-first', route: '/morning?first=1', waitFor: 'morning-first', note: 'the first automatic showing: the line about turning it off in Profile, in the pinned footer over the two buttons' },
 
   // Yesterday at chosen values (the seed's today, seen from tomorrow 08:10): no sleep for last night.
   { id: 'morning-within', route: '/morning', now, values: { eaten: 0.95, protein: 1.05, water: 1.1 }, waitFor: 'morning-card', note: "within the budget, protein and water reached (brim lines), last night's sleep missing: Add" },
@@ -69,7 +85,94 @@ module.exports = [
     note: 'yesterday with 28,940 steps from the health store, beside the longest movement line',
   },
   { id: 'morning-imperial', route: '/morning', imperial: true, waitFor: 'morning-card', note: 'water in fl oz' },
-  { id: 'morning-empty', route: '/morning', data: 'empty', waitFor: 'morning-screen', absent: ['morning-cups'], note: 'nothing logged yesterday: the empty state in place of the shelf' },
+  { id: 'morning-empty', route: '/morning', data: 'empty', waitFor: 'morning-screen', absent: ['morning-cups'], note: 'nothing logged yesterday: the plain card in place of the shelf' },
+
+  // The second edition's cases (the specification's A to G): a greeting, a personal line, the quote, yesterday's
+  // card, "What went well", "What to improve" and "For today". The values knobs lastNight, weighInGap,
+  // onboardedToday and name are described in scripts/dev/seed.mjs.
+  {
+    id: 'morning-a-strong',
+    route: '/morning',
+    now,
+    values: { eaten: 0.95, protein: 1.05, water: 1.03, exercise: 290, weekMinutes: 105, lastNight: 7.5 },
+    waitFor: 'morning-well',
+    absent: ['morning-adjust', 'morning-note'],
+    note: 'a strong day: a personal line, three things that went well, nothing to improve, a plan',
+  },
+  {
+    id: 'morning-b-heavy',
+    route: '/morning',
+    now,
+    values: { eaten: 1.3, protein: 0.74, water: 0.6, exercise: 0, lastNight: 5.67, weighInGap: 9 },
+    waitFor: 'morning-plan-weigh',
+    absent: ['morning-note'],
+    note: 'more than 10% above the budget, a short night (a rest quote on the 10 days of 31 that have one, else the day\'s again quote), a weigh-in 9 days old: the calorie item first in What to improve, the whole day logged in What went well',
+  },
+  {
+    id: 'morning-c-half',
+    route: '/morning',
+    now,
+    values: { eaten: 0.19, protein: 0.12, water: 0, exercise: 0 },
+    waitFor: 'morning-plan-sleep',
+    absent: ['morning-well', 'morning-adjust'],
+    note: 'breakfast only: the note under the card, no lists, the plan with last night\'s sleep',
+  },
+  {
+    id: 'morning-d-water',
+    route: '/morning',
+    now,
+    values: { eaten: 0, water: 0.36, exercise: 0 },
+    waitFor: 'morning-note',
+    absent: ['morning-well', 'morning-adjust'],
+    note: 'only water yesterday: "No food logged.", the note, no lists',
+  },
+  {
+    id: 'morning-e-empty',
+    route: '/morning',
+    data: 'empty',
+    waitFor: 'morning-screen',
+    absent: ['morning-cups', 'morning-well', 'morning-adjust'],
+    note: 'nothing logged yesterday: the plain card, a quote and a plan for today',
+  },
+  {
+    id: 'morning-f-day2',
+    route: '/morning',
+    now: evening,
+    values: { eaten: 0.68, protein: 0.58, water: 0.58, onboardedToday: true, name: '' },
+    waitFor: 'morning-personal',
+    note: 'day 2, no name, opened in the evening: "Good evening", "Day 2 of your first week.", one item to improve, "Log dinner"',
+  },
+  {
+    id: 'morning-g-stress',
+    route: '/morning',
+    data: 'stress',
+    imperial: true,
+    now: morningOf(1),
+    waitFor: 'morning-personal',
+    note: 'long content, imperial: the 22-character name left out of the title and shown in the personal line, the 11,480 kcal feast',
+  },
+  {
+    id: 'morning-quote-longest',
+    route: '/morning?quote=stevenson-quiet-minds',
+    data: 'stress',
+    now: morningOf(1),
+    waitFor: 'morning-quote-text',
+    note: 'the longest quote (143 characters) with the long name; run it at 320',
+  },
+  {
+    id: 'morning-quote-verse',
+    route: '/morning?quote=longfellow-up-and-doing',
+    waitFor: 'morning-quote-text',
+    note: 'a four-line verse quote: its line breaks kept',
+  },
+  {
+    id: 'morning-evening',
+    route: '/morning',
+    now: evening,
+    values: { eaten: 0.95, protein: 1.05, water: 1.03, exercise: 290, weekMinutes: 105, lastNight: 7.5 },
+    waitFor: 'morning-well',
+    note: 'case A opened in the evening from Profile: "Good evening, ..." and "Log dinner"',
+  },
 
   // The automatic opening (the hook in src/app/(tabs)/index.tsx): with the flag it rises over Today ...
   { id: 'morning-auto', route: '/', now, flags: { __healthcalMorning: true }, waitFor: 'morning-card', note: 'opened by itself on the first visit of the morning (the test flag set)' },

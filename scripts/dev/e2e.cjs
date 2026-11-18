@@ -4,7 +4,7 @@
  * the running web app (default http://localhost:8081):
  *
  *   welcome -> onboarding -> plan -> Today -> log food -> log a run -> add water -> reload
- *   -> the next morning: the morning page opens by itself once, closes onto Today, not again
+ *   -> the next morning: the morning page opens by itself once (greeting, quote, plan), closes onto Today, not again
  *
  * The expected numbers are recomputed here from the published formulas, not
  * read back from the app's own calculation code, so a mistake in the engine
@@ -341,14 +341,30 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   const at = new URL(morning.url());
   check('morning: the page opens by itself on the first visit of the morning', opened && at.pathname === '/morning', morning.url());
   check('morning: the first showing says how to turn it off', at.searchParams.get('first') === '1' && (await morning.getByTestId('morning-first').count()) > 0, morning.url());
+  // In the pinned footer, so it is in view however long the page is.
+  const firstBox = await morning.getByTestId('screen-footer').getByTestId('morning-first').first().boundingBox().catch(() => null);
+  const view = morning.viewportSize();
+  check('morning: the line about turning it off is in view, in the footer', !!firstBox && !!view && firstBox.y >= 0 && firstBox.y + firstBox.height <= view.height, JSON.stringify(firstBox));
   // Marked on this device under its own key (src/features/morning/seen.ts), not in the synced settings: without
   // an account there is no pull to wait for, and a settings write would only be a write the updater sees.
   const seenHere = await morning.evaluate(() => localStorage.getItem('healthcal-morning/seen'));
   check('morning: it is marked as seen today on this device, before anything else', seenHere === tomorrowDay, `${seenHere} vs ${tomorrowDay}`);
   check('morning: without an account the synced settings are not written', (await mstored()).settings.morningSeenDay === undefined, String((await mstored()).settings.morningSeenDay));
+  let firstQuote = '';
   if (opened) {
     const line = (await morning.getByTestId('morning-line').first().innerText().catch(() => '')).replace(/\u00A0/g, ' ').replace(/\u2060/g, '').trim();
     check('morning: yesterday is described in one neutral sentence', line.length > 0 && !/!|fail|cheat|great|over budget/i.test(line), line);
+    // The second edition: a greeting by the time of day, a quote of the day, and words that never scold.
+    const norm = (t) => t.replace(/\u00A0/g, ' ').replace(/\u2060/g, '').trim();
+    const headerTitle = norm(await morning.getByTestId('screen-header').first().innerText().catch(() => ''));
+    check('morning: the header greets by the time of day', headerTitle.startsWith('Good morning'), headerTitle.split('\n')[0]);
+    firstQuote = norm(await morning.getByTestId('morning-quote-text').first().innerText().catch(() => ''));
+    const author = norm(await morning.getByTestId('morning-quote-author').first().innerText().catch(() => ''));
+    check('morning: a quote of the day with its author', firstQuote.length > 0 && author.length > 0, `${firstQuote} / ${author}`);
+    const quoteBlock = norm(await morning.getByTestId('morning-quote').first().innerText().catch(() => ''));
+    const pageText = norm(await morning.getByTestId('morning-screen').first().innerText().catch(() => '')).replace(quoteBlock, '');
+    const harsh = /\b(fail|failed|cheat|great job|should|bad|missed your|over budget)\b/i.exec(pageText);
+    check('morning: its own words have no exclamation mark and no blame', !pageText.includes('!') && !harsh, harsh ? harsh[0] : pageText.includes('!') ? 'an exclamation mark' : '');
     // The X at the top left: morning-close if the screen names it, else the kit Header's own X (header-close).
     await morning.locator('[data-testid="morning-close"], [data-testid="header-close"]').first().click({ timeout: 15000 });
     await morning.waitForURL((u) => new URL(u).pathname === '/', { timeout: 8000 }).catch(() => {});
@@ -360,6 +376,25 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   // The page decides 900 ms after the app settles: wait well past that.
   await morning.waitForTimeout(2500);
   check('morning: it does not open again the same morning after a reload', new URL(morning.url()).pathname === '/' && (await morning.getByTestId('morning-card').count()) === 0, morning.url());
+  // Shown again the same morning (the seen day cleared, so it rises over Today once more): the quote is the one
+  // kept on this device for the day (quotePin.ts), and a row of "For today" opens its place, with the browser's
+  // back landing on Today.
+  await morning.evaluate(() => localStorage.removeItem('healthcal-morning/seen'));
+  await morning.goto(BASE + '/', { waitUntil: 'networkidle' });
+  const again = await morning.getByTestId('morning-quote-text').first().waitFor({ state: 'visible', timeout: 15000 }).then(() => true, () => false);
+  const againQuote = again ? (await morning.getByTestId('morning-quote-text').first().innerText()).replace(/\u00A0/g, ' ').replace(/\u2060/g, '').trim() : '';
+  check('morning: the same quote all day on this device', again && againQuote === firstQuote, `${againQuote} vs ${firstQuote}`);
+  const waterRow = morning.getByTestId('morning-plan-water').first();
+  if (again && (await waterRow.count()) > 0) {
+    await waterRow.click();
+    await morning.waitForURL((u) => new URL(u).pathname === '/water', { timeout: 8000 }).catch(() => {});
+    const onWater = new URL(morning.url()).pathname === '/water';
+    await morning.goBack().catch(() => {});
+    await morning.waitForURL((u) => new URL(u).pathname === '/', { timeout: 8000 }).catch(() => {});
+    check("morning: a row of For today opens its place, and back lands on Today", onWater && new URL(morning.url()).pathname === '/', morning.url());
+  } else {
+    check("morning: For today offers today's water", false, again ? 'no morning-plan-water' : 'the page did not open again');
+  }
   await morningContext.close();
 
   const real = errors.filter((e) => !/favicon|DevTools|useNativeDriver|pointerEvents is deprecated|shadow\*/i.test(e));

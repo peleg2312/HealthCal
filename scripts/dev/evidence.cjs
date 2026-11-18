@@ -100,7 +100,8 @@
  *                                  budget and protein target, exercise in net kcal, water as a share of
  *                                  today's goal, weekMinutes toward the weekly guideline, fasting as a
  *                                  share of the fasting target, eatBack 0 to leave exercise out of the
- *                                  budget. scripts/dev/states/sweep.cjs uses it to
+ *                                  budget; for the morning page lastNight, weighInGap, onboardedToday and
+ *                                  name (seed.mjs says what each does). scripts/dev/states/sweep.cjs uses it to
  *                                  take every labelled cup and bar at the values that stress it.
  *     now: Date.parse('2026-11-19T18:00:00'),   the page's clock (Playwright's clock.setFixedTime: Date.now
  *                                  and new Date() return it, timers still run), for a screen whose words depend on
@@ -1030,7 +1031,9 @@ function runChecks() {
 // ------------------------------------------------------------------ states
 
 const STATE_FIELDS = ['id', 'route', 'data', 'imperial', 'day', 'values', 'health', 'type', 'taps', 'waitFor', 'sheet', 'note', 'now', 'flags', 'absent'];
-const VALUES = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack'];
+const VALUES = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack', 'lastNight', 'weighInGap', 'onboardedToday', 'name'];
+/** The morning page's knobs that are not numbers (seed.mjs checks them again). */
+const VALUE_TYPES = { onboardedToday: 'boolean', name: 'string' };
 const DATA = ['demo', 'empty', 'fresh', 'stress'];
 
 /** What is wrong with one state's form (empty when nothing), `where` naming it in each message. */
@@ -1050,7 +1053,7 @@ function stateProblems(s, where) {
   if (s.values !== undefined) {
     if (!s.values || typeof s.values !== 'object' || Array.isArray(s.values)) problems.push(`${where}: values is { ${VALUES.join(', ')} }`);
     else {
-      for (const [k, v] of Object.entries(s.values)) if (!VALUES.includes(k) || typeof v !== 'number' || !(v >= 0)) problems.push(`${where}: values.${k} must be one of ${VALUES.join(', ')}, a number of 0 or more`);
+      for (const [k, v] of Object.entries(s.values)) if (!VALUES.includes(k) || (VALUE_TYPES[k] ? typeof v !== VALUE_TYPES[k] : typeof v !== 'number' || !(v >= 0))) problems.push(`${where}: values.${k} must be one of ${VALUES.join(', ')}, a number of 0 or more (onboardedToday a boolean, name a string)`);
       if (!['demo', 'stress', undefined].includes(s.data)) problems.push(`${where}: values go on the demo or stress data`);
     }
   }

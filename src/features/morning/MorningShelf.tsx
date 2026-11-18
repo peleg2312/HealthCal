@@ -19,6 +19,9 @@ const CUP_W_NARROW = 44;
 const CUP_H = 152;
 /** Under 360 px the card is shorter, so a phone of 320 x 568 still shows the whole page with the footer. */
 const CUP_H_NARROW = 128;
+/** The compact shelf (the morning page's yesterday card under the quote): shorter cups, the same widths. */
+const CUP_H_COMPACT = 96;
+const CUP_H_COMPACT_NARROW = 80;
 /** The shelf reaches 4 px into the card's side padding on each side, so the captions have a little more room. */
 const SHELF_BLEED = 4;
 
@@ -58,11 +61,11 @@ function calorieLabel(d: ShelfDay): string {
  * column is the same: cup, label, the number alone, then "of <goal> <unit>", so the cups and
  * the numbers line up across the shelf. The cups pour left to right once per day per session.
  */
-export function MorningShelf({ day, sleepHours, units }: { day: ShelfDay; sleepHours: number | null; units: UnitSystem }) {
+export function MorningShelf({ day, sleepHours, units, compact = false }: { day: ShelfDay; sleepHours: number | null; units: UnitSystem; compact?: boolean }) {
   const { colors, spacing, chartFill } = useTheme();
   const narrow = useWindowDimensions().width < 360;
   const cupW = narrow ? CUP_W_NARROW : CUP_W;
-  const cupH = narrow ? CUP_H_NARROW : CUP_H;
+  const cupH = compact ? (narrow ? CUP_H_COMPACT_NARROW : CUP_H_COMPACT) : narrow ? CUP_H_NARROW : CUP_H;
   const numStyle = narrow ? { fontSize: 17, lineHeight: 22 } : undefined;
   const numH = narrow ? 22 : 24;
   const key = (id: string) => `morning-${day.date}-${id}`;
