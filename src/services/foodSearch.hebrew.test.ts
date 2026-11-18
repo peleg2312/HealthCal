@@ -98,7 +98,7 @@ function runList(name: string) {
 describe.skipIf(!TABLE_COMPLETE)('Hebrew query lists (needs the full name table in src/data/searchNames.ts)', () => {
   it('the worked examples (4.8) and the fix round\'s rules', () => {
     const { lines, failures } = runList('hebrew-examples.tsv');
-    expect(lines.length).toBe(229);
+    expect(lines.length).toBe(241);
     expect(failures).toEqual([]);
   });
 
@@ -149,7 +149,8 @@ describe.skipIf(!TABLE_COMPLETE)('Hebrew query lists (needs the full name table 
       if (!pass) wrong.push(`${r.q} (${r.level} ${r.expected}): ${ids.slice(0, 4).join(' ') || 'nothing'}`);
     }
     expect(wrong).toEqual([]);
-    // Measured on 2026-11-18 after the second fix round: 381 first, 8 in the first three, 34 nothing or parts only, 11 known misses.
+    // Measured on 2026-11-18 after the second fix round, the lead's G1b (old rows keep their English names)
+    // and G1c ("3 אחוז" reads as "3%"): 381 first, 8 in the first three, 34 nothing or parts only, 11 known misses.
     expect(count.first).toBeGreaterThanOrEqual(381);
   });
 

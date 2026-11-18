@@ -93,6 +93,34 @@ export function fold(s: string): string {
     .trim();
 }
 
+/** The words for "percent" after a number, folded. */
+const PERCENT_WORDS: ReadonlySet<string> = new Set(['אחוז', 'אחוזים'].map(fold));
+
+/**
+ * A number, then optional spaces or a dash, then a run of Hebrew letters and points (the word after it).
+ * The run stops at the first character that is not a Hebrew letter or point, so it is a whole word.
+ */
+const NUMBER_THEN_WORD =
+  /(\d+(?:[.,]\d+)?)[\s\-\u05be\u2010-\u2015]*([\u0591-\u05bd\u05bf\u05c1\u05c2\u05c4\u05c5\u05c7א-ת\u05f0-\u05f2\ufb1d-\ufb4f]+)/g;
+
+/** A Latin letter or a digit: a number glued after one ("x3") is not a number word of its own. */
+const LATIN_OR_DIGIT = /[a-z0-9À-ɏ]/i;
+
+/**
+ * Typed text with a number followed by the word אחוז or אחוזים written as that number with a percent
+ * sign ("חלב 3 אחוז" -> "חלב 3%", "1.5 אחוזים" -> "1.5%"), so the search reads both the same way in every
+ * pass. Only the query is read this way, never a name. A lone אחוז with no number before it stays a word,
+ * and text without a Hebrew letter is returned as it is (English does not change).
+ */
+export function percentSigns(s: string): string {
+  // Most queries hold no אח (with or without points) and no presentation form: skip the replacement, which
+  // folds every word after a number (on Hermes each call costs).
+  if (!/\d/.test(s) || !(/א[\u0591-\u05c7]*ח/.test(s) || /[\ufb1d-\ufb4f]/.test(s))) return s;
+  return s.replace(NUMBER_THEN_WORD, (m: string, num: string, word: string, at: number) =>
+    !LATIN_OR_DIGIT.test(s[at - 1] ?? '') && PERCENT_WORDS.has(fold(word)) ? `${num}%` : m,
+  );
+}
+
 /** Whether the folded word is Arabic or Cyrillic (an own food's name): matched whole or by its beginning only. */
 export function isOtherScript(w: string): boolean {
   return OTHER_LETTER.test(w);

@@ -1,8 +1,10 @@
 # The photo review's swap suggestions (matchFoods, top 3) for the English review's 50 typical item names.
 # Columns: item, before (the code and the 348 foods of git 3fa7914), now (today's code and foods).
 # Text without a Hebrew letter is scored exactly as before (localMatch.test.ts proves it against a copy of the
-# old scorer); a "now" that differs from "before" comes from the foods added in this job, or from the English
-# names that now state their fat percentage (lead's ruling G1: more words in a name score a little lower).
+# old scorer); a "now" that differs from "before" comes only from the foods added in this job and the new rows'
+# names. Every food of git 3fa7914 keeps its English name of that time (lead's ruling G1b, which withdrew the
+# fat-percentage renames of the second fix round), so "Cheddar cheese", "Feta cheese" and "Granola with yogurt"
+# offer what they offered before that round.
 # Ruling G9 (second fix round): "Fruit salad" no longer offers the fruit yogurt first (renamed "Yogurt with
 # fruit, 3% fat"), and the last line, "Cheese omelette", no longer the baked cheesecake (renamed "Cheesecake,
 # baked, made with 5% quark"). Rewrite "now" with
@@ -20,7 +22,7 @@ Mixed vegetables	b_vegetable_oil	b_chicken_soup,b_vegetable_soup,b_vegetable_oil
 Garlic bread	b_garlic,b_bread_rye,b_bread_sourdough	b_garlic,b_bread_rye,b_bread_sourdough
 Pepperoni pizza slice	b_pizza_pepperoni,b_pizza_cheese,b_bread_white	b_pizza_pepperoni,b_pizza_cheese,b_eggplant_fried
 Tomato soup	b_tomato_paste,b_tomato_juice,b_tomato	b_tomato_paste,b_tomato_juice,b_tomato
-Cheddar cheese	b_cheddar,b_cream_cheese,b_feta	b_cheddar,b_quesadilla_cheese,b_sambusak
+Cheddar cheese	b_cheddar,b_cream_cheese,b_feta	b_cheddar,b_cream_cheese,b_feta
 Bacon strips	b_bacon_cooked	b_bacon_cooked
 Hash browns	b_hash_browns,b_rice_brown_cooked,b_rice_brown_dry	b_hash_browns,b_rice_brown_cooked,b_rice_brown_dry
 Orange juice	b_orange_juice,b_orange,b_apple_juice	b_orange_juice,b_orange,b_apple_juice
@@ -44,9 +46,9 @@ Falafel balls	b_falafel	b_falafel
 Tahini sauce	b_tahini,b_soy_sauce,b_bbq_sauce	b_tahini_sauce,b_tahini,b_soy_sauce
 Israeli salad	b_israeli_salad,b_caesar_salad,b_caesar_salad_chicken	b_israeli_salad,b_caesar_salad,b_caesar_salad_chicken
 Shakshuka	b_shakshuka	b_shakshuka
-Feta cheese	b_feta,b_cream_cheese,b_cheddar	b_feta,b_quesadilla_cheese,b_sambusak
+Feta cheese	b_feta,b_cream_cheese,b_cheddar	b_feta,b_cream_cheese,b_cheddar
 Olive oil dressing	b_olive_oil,b_greek_salad,b_canola_oil	b_olive_oil,b_greek_salad,b_canola_oil
-Granola with yogurt	b_granola_bar,b_yogurt_plain_whole,b_yogurt_plain_lowfat	b_granola_bar,b_yogurt_plain_lowfat,b_yogurt_high_protein
+Granola with yogurt	b_granola_bar,b_yogurt_plain_whole,b_yogurt_plain_lowfat	b_granola_bar,b_yogurt_plain_whole,b_yogurt_plain_lowfat
 Pancakes with syrup	b_pancakes,b_maple_syrup	b_pancakes,b_maple_syrup,b_silan
 Whipped cream	b_cream_cheese,b_sour_cream,b_cream_heavy	b_cream_cheese,b_cream_cheese_5pct,b_cooking_cream
 Chopped salad	b_caesar_salad,b_caesar_salad_chicken,b_greek_salad	b_caesar_salad,b_chopped_liver,b_caesar_salad_chicken
@@ -57,4 +59,4 @@ Baked beans	b_butternut_squash,b_potato_baked,b_green_beans	b_butternut_squash,b
 Roasted vegetables	b_lamb_leg_cooked,b_pork_tenderloin_cooked,b_chicken_breast_cooked	b_lamb_leg_cooked,b_pork_tenderloin_cooked,b_chicken_breast_cooked
 Fruit salad	b_smoothie_fruit,b_jam,b_caesar_salad	b_smoothie_fruit,b_jam,b_yogurt_fruit
 Ice cream	b_ice_cream_vanilla,b_cream_cheese,b_sour_cream	b_ice_cream_vanilla,b_ice_cream_bar,b_cream_cheese
-Cheese omelette	b_cream_cheese,b_cheddar,b_feta	b_quesadilla_cheese,b_sambusak,b_cottage_cheese_2pct
+Cheese omelette	b_cream_cheese,b_cheddar,b_feta	b_cream_cheese,b_cheddar,b_feta

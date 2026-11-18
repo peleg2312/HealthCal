@@ -379,6 +379,15 @@ async function load(ctx, target, seeds) {
       await page.waitForTimeout(300);
     } else if (t.wait) {
       await page.waitForTimeout(t.wait);
+    } else if (t.reload) {
+      // As in evidence.cjs: save what the app holds and load the page again, as after a restart.
+      problem = await step('reload', async () => {
+        await frame.evaluate(() => window.__healthcal.flush());
+        await page.reload({ waitUntil: hosted ? 'load' : 'networkidle', timeout: 120000 });
+        frame = await appFrame(page);
+        await frame.waitForSelector('[data-testid]', { timeout: 30000 });
+        await page.waitForTimeout(700);
+      });
     } else if (t.choose) {
       problem = await step(`choose files with ${t.choose}`, async () => {
         const chooser = page.waitForEvent('filechooser', { timeout: 8000 });

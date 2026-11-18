@@ -26,7 +26,7 @@ shakshuka	b_shakshuka	first
 קוטג 5%	b_cottage_cheese_5pct	first
 כוס חלב	b_milk_whole	first
 חלב 1%	b_milk_1pct	first
-חלב 3 אחוז	b_milk_whole	first
+חלב 3 אחוז	b_milk_whole	first	G1c: a number followed by אחוז reads as the number with %, so this is "חלב 3%", found first by whole milk's own name
 חלב דל שומן	ANY:b_milk_1pct|b_milk_skim|b_milk_2pct	first
 חלב שיבולת	b_oat_milk	first
 200 מ"ל חלב	b_milk_whole	first

@@ -15,6 +15,7 @@ import {
   isOtherScript,
   LONE_PREFIXES,
   MODIFIERS,
+  percentSigns,
   prefixReadings,
   QUANTITY,
   shortPluralBase,
@@ -230,5 +231,31 @@ describe('Hebrew helpers (4.2)', () => {
     expect(prefixReadings('לחמ')).toEqual([]);
     expect(prefixReadings('בננה')).toEqual(['ננה']);
     expect(prefixReadings('חומוס')).toEqual([]);
+  });
+
+  it('percentSigns: a number followed by אחוז or אחוזים is the number with %, nothing else changes', () => {
+    expect(percentSigns('חלב 3 אחוז')).toBe('חלב 3%');
+    expect(percentSigns('קוטג 5 אחוזים')).toBe('קוטג 5%');
+    expect(percentSigns('יוגורט 1.5 אחוז')).toBe('יוגורט 1.5%');
+    expect(percentSigns('חלב 1,5 אחוז')).toBe('חלב 1,5%');
+    // Glued to the number, with a dash or a maqaf, final letters, vowel points.
+    expect(percentSigns('חלב 3אחוז')).toBe('חלב 3%');
+    expect(percentSigns('חלב 3-אחוזים')).toBe('חלב 3%');
+    expect(percentSigns('חלב 3\u05beאחוז')).toBe('חלב 3%');
+    expect(percentSigns('חלב 3 אחוזימ')).toBe('חלב 3%');
+    expect(percentSigns('חלב 3 א\u05b8חו\u05bcז')).toBe('חלב 3%');
+    // The prefixes the query already handles stay where they are.
+    expect(percentSigns('חלב ב-3 אחוז')).toBe('חלב ב-3%');
+    expect(percentSigns('חלב של 3 אחוז שומן')).toBe('חלב של 3% שומן');
+    // A lone אחוז, a longer word, a number before another word, and a digit inside a Latin word stay.
+    expect(percentSigns('אחוז')).toBe('אחוז');
+    expect(percentSigns('חלב אחוז')).toBe('חלב אחוז');
+    expect(percentSigns('3 אחוזית')).toBe('3 אחוזית');
+    expect(percentSigns('3 באחוז')).toBe('3 באחוז');
+    expect(percentSigns('2 ביצים 5 אחוז')).toBe('2 ביצים 5%');
+    expect(percentSigns('x3 אחוז')).toBe('x3 אחוז');
+    // Latin text is untouched.
+    expect(percentSigns('milk 3 percent')).toBe('milk 3 percent');
+    expect(percentSigns('milk 3%')).toBe('milk 3%');
   });
 });

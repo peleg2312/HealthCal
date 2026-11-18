@@ -39,6 +39,8 @@ const QUERIES = [
   // The second fix round: a percentage the strict pass finds, one the relaxed pass leaves unmatched (only foods
   // whose name states a percentage), one that empties the relaxed pass, and one the parts pass never searches alone.
   'גבינה בולגרית 5%', "קוטג' 7%", 'פיתה 5%', 'פיתה חומוס 5%',
+  // A number followed by אחוז or אחוזים, read as the number with % (the lead's G1c).
+  'חלב 3 אחוז', 'יוגורט יווני 0 אחוזים',
 ];
 const HE = /[\u05d0-\u05ea]/;
 const BUDGET = { interpLatin: 6, interpAny: 10, interpFirst: 30, jitAny: 3 };

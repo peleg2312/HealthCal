@@ -19,8 +19,9 @@
  * queries and the first result of 230 more in `english-more.tsv`). When a query with a Hebrew letter finds nothing, a relaxed
  * pass lets amounts, numbers, preparation words and words found nowhere (a brand) after the first
  * content word go unmatched, and then the parts pass shows each word's own foods (see `searchLocal`). A typed
- * percentage ("5%", "9 אחוז") changes the calories: the relaxed pass shows only foods whose name states a
- * percentage, and the parts pass never searches one alone.
+ * percentage ("5%"; a number followed by אחוז or אחוזים is read as the number with %, in every pass, by
+ * `percentSigns`) changes the calories: the relaxed pass shows only foods whose name states a percentage,
+ * and the parts pass never searches one alone.
  * A name token after לא ("אורז לא מבושל") matches only a query that says לא too.
  *
  * Speed: the app runs this on every keystroke on Hermes (no JIT). Each food's names are indexed once
@@ -42,6 +43,7 @@ import {
   isOtherScript,
   LONE_PREFIXES,
   MODIFIERS,
+  percentSigns,
   PREFIX_SET,
   prefixReadings,
   QUANTITY,
@@ -361,7 +363,7 @@ interface Plan {
   /** Words that may go unmatched (relaxed pass only). */
   optional: boolean[];
   /**
-   * A fat percentage or any other percentage ("5%", "1.5%", "9 אחוז"): a number that changes the calories.
+   * A fat percentage or any other percentage ("5%", "1.5%", "9 אחוז" read as "9%"): a number that changes the calories.
    * The relaxed pass may leave it unmatched only for a food whose name states a percentage (`PCT_NAME`).
    */
   pct: boolean[];
@@ -476,7 +478,10 @@ const MAX_WORDS = 10;
 const MAX_RELAXED_WORDS = 6;
 
 function makePlan(query: string, c: Corpus): Plan | null {
-  const clipped = query.length > MAX_CHARS ? query.slice(0, MAX_CHARS) : query;
+  // A number followed by אחוז or אחוזים is that number with a percent sign ("חלב 3 אחוז" is "חלב 3%"), in
+  // every pass. Rewritten before the cut (it only shortens the text, so a cut long text keeps its start).
+  const pctRead = percentSigns(query.length > 2 * MAX_CHARS ? query.slice(0, 2 * MAX_CHARS) : query);
+  const clipped = pctRead.length > MAX_CHARS ? pctRead.slice(0, MAX_CHARS) : pctRead;
   const qNorm = fold(clipped);
   if (!qNorm) return null;
   let qTokens = tokenizeFolded(qNorm);
@@ -513,15 +518,15 @@ const PCT_NAME = /\d\s*%/;
 const PCT_TYPED = /\d+(?:[.,]\d+)?\s*%/g;
 /** A Latin letter next to a digit: fold keeps the two in one word ("x2"), so that digit run is no word of its own. */
 const LATIN_NEXT = /[a-z\u00c0-\u024f]/i;
-const PERCENT_WORDS: ReadonlySet<string> = new Set(['אחוז', 'אחוזים'].map((w) => tokenize(w)[0]));
 
 /**
  * Which query words are a percentage: a number typed with % (each digit run of it, so "1.5%" marks 1 and
- * 5), or a number before אחוז or אחוזים. The digit runs of the raw text are the number words of the
- * tokens, in order; when the two counts differ (a digit inside a Latin word) none is marked.
+ * 5; a number before אחוז or אחוזים already reads as one, `percentSigns`). The digit runs of the raw text
+ * are the number words of the tokens, in order; when the two counts differ (a digit inside a Latin word)
+ * none is marked.
  */
 function percentages(raw: string, qTokens: string[]): boolean[] {
-  const out = qTokens.map((q, i) => DIGITS.test(q) && i + 1 < qTokens.length && PERCENT_WORDS.has(qTokens[i + 1]));
+  const out = qTokens.map(() => false);
   if (raw.indexOf('%') < 0) return out;
   const inPct: boolean[] = [];
   const spans: [number, number][] = [];
@@ -850,7 +855,7 @@ const WITHOUT: ReadonlySet<string> = new Set(['ללא', 'בלי']);
 
 /**
  * The parts pass: two or more Hebrew content words (two letters or more, not numbers, amounts,
- * preparation words or stop words; never a word after ללא or בלי, never the אחוז of a percentage) that no
+ * preparation words or stop words; never a word after ללא or בלי) that no
  * food holds together. Each word is searched by itself
  * (strictly, prefix readings on) and the foods are shown in the order the words were typed: the best
  * three of each word, then the rest; a food found by more of the words comes first. So "שניצל בפיתה"
@@ -861,10 +866,9 @@ function partsPass(p: Plan, foods: readonly Food[], c: Corpus, who: Who): Ranked
   if (!p.allHe) return [];
   const words: string[] = [];
   p.qTokens.forEach((q, i) => {
-    // One letter is a word still being typed, never a part of its own.
-    // A percentage (its number, and אחוז after it) is never a part of its own.
+    // One letter is a word still being typed, never a part of its own. A percentage is a number, never
+    // a part (and "3 אחוז" reads as "3%", so its אחוז is no word here).
     if (!p.he[i] || q.length < 2 || setWord(q) || WITHOUT.has(q) || (i > 0 && WITHOUT.has(p.qTokens[i - 1]))) return;
-    if (i > 0 && p.pct[i - 1] && PERCENT_WORDS.has(q)) return;
     if (!words.includes(q)) words.push(q);
   });
   if (words.length < 2) return [];

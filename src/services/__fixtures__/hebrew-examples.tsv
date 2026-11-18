@@ -247,6 +247,21 @@ tahina	b_tahini,b_tahini_sauce
 טחינה 30%	-
 פיתה 1.5%	-
 פיתה 5 אחוז	-
+# G1b: the foods from before this job keep their English names (no percentage in them); each is still found
+# first by its own search name with its percentage
+חלב 3%	b_milk_whole
+יוגורט 3%	b_yogurt_plain_whole
+שמנת חמוצה 20%	b_sour_cream
+גבינת שמנת 30%	b_cream_cheese
+# G1c: a number followed by אחוז or אחוזים is that number with %, in every pass; each line gives what its "N%" form gives
+חלב 3 אחוז	b_milk_whole
+יוגורט 3 אחוז	b_yogurt_plain_whole
+יוגורט 1.5 אחוז	b_yogurt_plain_lowfat
+שמנת חמוצה 20 אחוז	b_sour_cream
+גבינת שמנת 30 אחוז	b_cream_cheese
+חלב 0 אחוז	b_milk_skim
+יוגורט יווני 0 אחוז	b_greek_yogurt_nonfat
+קוטג 5 אחוזים	b_cottage_cheese_5pct
 # G1: the parts pass never searches a percentage alone (no food found only by its 5)
 פיתה חומוס 5%	b_pita_bakery	b_white_cheese_5pct,b_cottage_cheese_5pct,b_bulgarian_cheese_5pct
 # G2: fish as people type them; plain דג is tilapia, and pickled herring is never first
