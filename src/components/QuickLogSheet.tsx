@@ -3,6 +3,7 @@ import { Activity, Camera, Check, Droplets, PenLine, Plus, Repeat2, Scale, ScanB
 import React, { useState } from 'react';
 import { ScrollView, useWindowDimensions, View } from 'react-native';
 
+import { hasFoodLogged } from '@/features/drinks/via';
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
 import { matchServing } from '@/features/food/helpers';
 import { formatPortion, mealServings, planSavedMeal } from '@/features/food/build';
@@ -60,7 +61,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   const viewed = useViewedDay((s) => s.date);
   const logDate = viewed ?? todayDate;
   const prev = findPreviousMeal(entries, logDate, meal, 7);
-  const alreadyLogged = entries.some((e) => e.date === logDate && e.meal === meal);
+  const alreadyLogged = hasFoodLogged(entries.filter((e) => e.date === logDate && e.meal === meal));
   const savedMeal = [...saved].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] as SavedMeal | undefined;
   const savedServings = savedMeal ? mealServings(savedMeal) : 1;
   // Under 360 px a half tile has no room for the icon beside its name ("Snap a" / "meal"): the icon goes above it.

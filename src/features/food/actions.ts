@@ -3,7 +3,7 @@
  * days, clearing a meal, saving a meal, and managing custom foods. Every one
  * of them can be undone from the toast.
  */
-import { followEntry, undoEdit } from '@/features/drinks/pair';
+import { followEntry, pairEditBlocked, undoEdit } from '@/features/drinks/pair';
 import { DRINKS_NOT_COPIED, DRINKS_NOT_SAVED } from '@/features/drinks/rules';
 import { isWaterDrinkEntry } from '@/features/drinks/via';
 import { addDays } from '@/lib/dates';
@@ -183,6 +183,13 @@ export function updateEntryDirect(
   entry: FoodEntry,
   patch: { name: string; nutrients: Nutrients; meal: MealType; date: ISODate },
 ): FoodEntry {
+  // A drink also counted in Water stays on today or earlier (the water screen cannot show a future day).
+  const refused = pairEditBlocked(entry, { grams: entry.grams, date: patch.date });
+  if (refused) {
+    haptic.warn();
+    toast(refused);
+    return entry;
+  }
   const kcalChanged = Math.round(patch.nutrients.kcal) !== Math.round(entry.nutrients.kcal);
   const next = useStore.getState().upsert('foodEntries', {
     ...entry,

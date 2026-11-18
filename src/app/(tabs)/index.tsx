@@ -3,6 +3,7 @@ import { Plus, Repeat2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import { hasFoodLogged } from '@/features/drinks/via';
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
 import { useRecapReady } from '@/features/progress/recapReady';
 import { coachTip, rhythmFromReminders, type ClosedDay } from '@/features/today/coach';
@@ -49,7 +50,7 @@ export default function TodayScreen() {
   const streak = useStreakMoment(consistency, todayDate);
   const start = startDate(profile.onboardedAt);
   // Day one (or a profile with nothing logged yet): one obvious first action.
-  const firstDay = isToday && day.entries.length === 0 && consistency.totalDaysLogged === 0;
+  const firstDay = isToday && !hasFoodLogged(day.entries) && consistency.totalDaysLogged === 0;
   const yesterday = useDay(addDays(todayDate, -1));
   const now = useNow();
   const recap = useRecapReady();
@@ -155,7 +156,9 @@ function EnergyCard({
   const eaten = day.eaten.kcal;
   const budget = Math.max(0, day.budget);
   // A past day with no food is not an intake deficit of the whole budget: it was not logged.
-  const notLogged = !isToday && day.entries.length === 0;
+  const notLogged = !isToday && !hasFoodLogged(day.entries);
+  // Only drinks from Water that day: their calories are in the cup, so "Nothing logged" would not be true.
+  const drinksOnly = notLogged && day.entries.length > 0;
   // Calories workouts add to this day (its own and shares carried from the six days before), drawn as
   // hatched headroom at the top of the vessel. Read from the day's rule, never from budget minus target.
   const headroom = Math.max(0, day.exerciseAdded);
@@ -209,10 +212,10 @@ function EnergyCard({
           testID="today-not-logged"
           scaleTo={0.97}
           onPress={() => router.push(`/diary?date=${day.date}` as never)}
-          accessibilityLabel="Nothing logged for this day. Open the diary to add it"
+          accessibilityLabel={drinksOnly ? 'Only drinks logged for this day. Open the diary to add what you ate' : 'Nothing logged for this day. Open the diary to add it'}
           style={{ alignSelf: 'flex-start', gap: 2 }}>
           <Text variant="h2" testID="today-remaining">
-            Nothing logged
+            {drinksOnly ? 'Drinks only' : 'Nothing logged'}
           </Text>
           <Text variant="label" color="primaryInk">
             Add what you ate

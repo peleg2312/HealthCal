@@ -13,6 +13,7 @@ import { Note, RequireProfile, splitUnit, Tile } from '@/features/trackers/compo
 import { dayTitle, resolveDateParam } from '@/features/trackers/dateParam';
 import { keepOrConvert, MAX_PRESET_ML, MIN_PRESET_ML, normalizePresets } from '@/features/trackers/helpers';
 import { FadeRow, useLeavingRows } from '@/features/food/rowMotion';
+import { mealOnDay } from '@/features/food/addedTo';
 import { href } from '@/features/food/helpers';
 import { logDrink, removeDrink } from '@/features/food/log';
 import { customFoodIndex, resolveFood } from '@/features/food/usuals';
@@ -20,7 +21,7 @@ import { ENTERED, type DrinkChoice } from '@/features/drinks/choices';
 import { DrinkChoices } from '@/features/drinks/DrinkChoices';
 import { DrinkPickSheet } from '@/features/drinks/DrinkPickSheet';
 import { loadDrinkMemory, rememberDrinkChoice, useDrinkMemory } from '@/features/drinks/memory';
-import { livePartner, noticeLine, pickedFood, planDrink, rememberedChoice, sameDrinkInDiary, selectChoice, selectFood, waterRowCaption } from '@/features/drinks/rules';
+import { drinkMeal, livePartner, noticeLine, pickedFood, pickedToast, planDrink, rememberedChoice, sameDrinkFoodIds, sameDrinkInDiary, selectChoice, selectFood, waterRowCaption, waterRowTitle } from '@/features/drinks/rules';
 import { leftLitreDecimals, shownMl, volumeNumber, volumeUnitFor, waterLeftMl } from '@/features/today/volume';
 import { useTheme } from '@/theme';
 import type { Beverage, Food, WaterEntry } from '@/types';
@@ -140,7 +141,8 @@ function WaterScreen() {
   const selected = rememberedChoice(memory, beverage, resolve);
   const picked = pickedFood(selected, memory, beverage, resolve);
   // The same food already in the diary within 3 hours: said before the tap, with "Water only".
-  const sameEntry = selected?.food ? sameDrinkInDiary(foodEntries, waterRecords, selected.food.id, date, now.toISOString()) : null;
+  // `now` ticks once a minute, so an entry logged since its last tick is still "before now" with a minute's grace.
+  const sameEntry = selected?.food ? sameDrinkInDiary(foodEntries, waterRecords, sameDrinkFoodIds(beverage, selected), date, new Date(now.getTime() + 60_000).toISOString()) : null;
   const waterOnlyOn = waterOnly && !!sameEntry;
   const customMl = custom && custom > 0 ? volumeToMl(custom, units) : 0;
   // The words before the tap, from the same plan the tap writes (clock from useNow, never read while rendering).
@@ -323,7 +325,7 @@ function WaterScreen() {
           glassMl={glassMl}
           units={units}
           line={line}
-          notice={sameEntry && selected?.food ? noticeLine(sameEntry) : null}
+          notice={sameEntry && selected?.food ? noticeLine(sameEntry, selected, beverage) : null}
           waterOnly={waterOnlyOn}
           onChoose={choose}
           onPicked={choosePicked}
@@ -405,7 +407,7 @@ function WaterScreen() {
             const counts = Math.round(effectiveMl(e.ml, e.beverage));
             // A drink whose calories are in the diary: the row opens that entry (the one place to change its amount).
             const partner = livePartner(e, foodEntries);
-            const title = `${formatVolume(e.ml, units)} ${BEVERAGE_LABELS[e.beverage].label.toLowerCase()}`;
+            const title = waterRowTitle(e, units);
             const text = (
               <>
                 <View style={{ width: 24, alignItems: 'center' }}>
@@ -421,7 +423,8 @@ function WaterScreen() {
                   </Text>
                   {partner ? (
                     <Text testID={`water-entry-kcal-${i}`} variant="caption" color="textSecondary" numberOfLines={2}>
-                      {waterRowCaption(partner, e.date)}
+                      {/* "129 kcal in breakfast" stays whole, so a wrap falls after the name and never leaves the meal alone on the last line. */}
+                      {waterRowCaption(partner, e.date).replace(/kcal in (\S+)/, 'kcal\u00A0in\u00A0$1')}
                     </Text>
                   ) : null}
                 </View>
@@ -517,8 +520,11 @@ function WaterScreen() {
         onPick={(food) => {
           choosePicked(food);
           setPickQuery(null);
+          // Choosing logs nothing: the line above the glasses now names it, and a glass adds it.
+          toast(pickedToast(food), { tint: 'water' });
         }}
         onEntered={enterCalories}
+        where={mealOnDay(drinkMeal(now), date, todayDate)}
         onClose={() => setPickQuery(null)}
       />
       <PresetSheet visible={editing} onClose={() => setEditing(false)} presets={settings.waterPresets} units={units} />

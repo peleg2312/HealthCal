@@ -4,7 +4,7 @@ import { diffDays } from '@/lib/dates';
 import { isCompleteDay } from '@/lib/insights';
 import { useStore } from '@/store';
 import { useToday } from '@/store/clock';
-import { isWaterDrinkEntry } from '@/features/drinks/via';
+import { hasFoodLogged } from '@/features/drinks/via';
 import { foodLoggedDates, useConsistency, useDays, useLive } from '@/store/selectors';
 import type { ISODate } from '@/types';
 
@@ -55,7 +55,7 @@ export function useConsistencyData() {
     for (const d of days) {
       byDate.set(d.date, {
         date: d.date,
-        logged: d.entries.some((e) => !isWaterDrinkEntry(e)),
+        logged: hasFoodLogged(d.entries),
         complete: isCompleteDay(d, t),
         kcal: d.eaten.kcal,
         budget: d.budget,

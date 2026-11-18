@@ -6,6 +6,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { usualFoods } from '@/features/food/usuals';
+import { recapDayCups } from '@/features/progress/recapDays';
+import { recapLine } from '@/features/today/recapLine';
 import { dayFacts } from '@/features/morning/facts';
 import { isValidRecord } from '@/features/settings/exportFormat';
 import { addDays } from '@/lib/dates';
@@ -13,6 +15,7 @@ import { computeConsistency, foodLoggedDates } from '@/store/selectors';
 import type { FoodEntry } from '@/types';
 
 import { DRINK_CHOICES, PICK_CHIP } from './choices';
+import { hasFoodLogged } from './via';
 import { DRINK_CHOICE_KEY, loadDrinkMemory, parseDrinkMemory, rememberDrinkChoice, resetDrinkMemoryForTests, useDrinkMemory } from './memory';
 import {
   ALSO_IN_WATER,
@@ -20,7 +23,10 @@ import {
   DRINKS_NOT_SAVED,
   builtinFood,
   detailDrinkNote,
+  enteredKcalError,
   noticeLine,
+  pairEditProblem,
+  pickedToast,
   planDrink,
   removedEntryToast,
   removedWaterToast,
@@ -64,6 +70,24 @@ describe('the streak and the logging calendar', () => {
     // As for a water-only person before drinks had calories: two days without food end the run.
     expect(computeConsistency(foodLoggedDates(list), TODAY).streak).toBe(0);
     expect(computeConsistency(foodLoggedDates([...list, entry(addDays(TODAY, -1))]), TODAY).streak).toBe(2);
+  });
+});
+
+describe('one meaning of "logged"', () => {
+  const summary = (date: string, entries: FoodEntry[]) =>
+    ({ date, entries, eaten: { kcal: entries.reduce((n, e) => n + e.nutrients.kcal, 0), protein: 0, carbs: 0, fat: 0 }, budget: 2000, activities: [], waterEntries: [] }) as never;
+  it('hasFoodLogged: a drink from Water never makes a day or a meal logged', () => {
+    expect(hasFoodLogged([])).toBe(false);
+    expect(hasFoodLogged([drink(TODAY)])).toBe(false);
+    expect(hasFoodLogged([drink(TODAY), entry(TODAY)])).toBe(true);
+  });
+  it("the recap's cups and line: a day of drinks only reads as not logged", () => {
+    const monday = '2026-11-16';
+    const cups = recapDayCups(monday, [summary(monday, [drink(monday)]), summary('2026-11-17', [entry('2026-11-17')])], TODAY);
+    expect(cups[0]).toMatchObject({ logged: false, ratio: 0 });
+    expect(cups[0].detail).toMatch(/not logged$/);
+    expect(cups[1].logged).toBe(true);
+    expect(recapLine([summary(monday, [drink(monday)]), summary('2026-11-17', [entry('2026-11-17')])] as never)).toBe('Logged 1 of 2 days');
   });
 });
 
@@ -153,6 +177,12 @@ describe('words', () => {
       removedWaterToast({ ml: 250, beverage: 'milk' }, e, 'metric'),
       removedEntryToast(e.name, { ml: 250 }, 'metric'),
       detailDrinkNote({ ml: 250 }, 'metric'),
+      detailDrinkNote({ ml: 250 }, 'metric', false),
+      enteredKcalError(15000),
+      enteredKcalError(0),
+      pickedToast(e),
+      pairEditProblem({ ml: 250 }, { grams: 258, date: TODAY }, { grams: 258, date: addDays(TODAY, 1) }, TODAY, 'metric')?.text,
+      pairEditProblem({ ml: 250 }, { grams: 258, date: TODAY }, { grams: 258 * 50, date: TODAY }, TODAY, 'metric')?.text,
       DRINKS_NOT_SAVED,
       DRINKS_NOT_COPIED,
     ].filter((w): w is string => !!w);

@@ -358,6 +358,7 @@ export function computeConsistency(dates: Set<ISODate>, end: ISODate = today()):
  * from the water screen (water-only days stay what they were before drinks had calories).
  */
 export function foodLoggedDates(entries: readonly FoodEntry[]): Set<ISODate> {
+  // The date-set form of hasFoodLogged (@/features/drinks/via): one meaning of "logged".
   return new Set(entries.filter((e) => !e.deleted && !isWaterDrinkEntry(e)).map((e) => e.date));
 }
 

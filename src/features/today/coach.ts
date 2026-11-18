@@ -5,6 +5,7 @@
  * about 76 characters) and never repeat a number the screen already shows
  * (kcal left, the budget, the macro amounts): the line sits under the calorie card.
  */
+import { hasFoodLogged } from '@/features/drinks/via';
 import { isCompleteDay } from '@/lib/trend';
 import { formatNumber, formatVolume } from '@/lib/units';
 import type { DaySummary } from '@/store/selectors';
@@ -133,7 +134,7 @@ export function coachTip(
   }));
   const search = (meal: MealType) => `/food/search?meal=${meal}&date=${day.date}`;
 
-  if (day.entries.length === 0) {
+  if (!hasFoodLogged(day.entries)) {
     // The meal coming up or just past: from 90 minutes before its time, a snack once dinner is 90 minutes gone.
     const current = [...meals].reverse().find((m) => awake >= m.at - 1.5);
     const dinnerAt = meals[2].at;
@@ -157,7 +158,7 @@ export function coachTip(
   const due = meals.find((m, i) => {
     const next = meals[i + 1]?.at;
     const until = Math.min(m.at + 4, next !== undefined && next > m.at ? next : Infinity);
-    return awake >= m.at + 1 && awake <= until && day.byMeal[m.meal].length === 0;
+    return awake >= m.at + 1 && awake <= until && !hasFoodLogged(day.byMeal[m.meal]);
   });
   if (due) {
     return {

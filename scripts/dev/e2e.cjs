@@ -460,6 +460,140 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   }
   await morningContext.close();
 
+  // ------------------------------------------- drinks with calories (src/features/drinks)
+  // On the water screen a kind's choice with a food writes the water record and a diary entry together
+  // (logDrink); Undo and a delete on Water take both, a delete in the diary only the calories.
+  await page.goto(BASE + '/water', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  s = await stored();
+  const gi = Math.max(0, s.settings.waterPresets.indexOf(250));
+  const pressed = async (id) => (await page.getByTestId(id).count()) > 0 && (await page.getByTestId(id).first().getAttribute('aria-pressed', { timeout: 5000 })) === 'true';
+  // mealForTime (src/lib/nutrition.ts) on the page's own clock.
+  const pageMeal = await page.evaluate(() => {
+    const d = new Date();
+    const h = d.getHours() + d.getMinutes() / 60;
+    return h >= 4.5 && h < 10.5 ? 'breakfast' : h >= 11.5 && h < 15 ? 'lunch' : h >= 17.5 && h < 21.5 ? 'dinner' : 'snack';
+  });
+  const mealWord = pageMeal === 'snack' ? 'snacks' : pageMeal;
+  await tap('water-beverage-milk');
+  check('drinks: Milk opens its choices with semi-skimmed selected', await pressed('water-choice-milk_semi'));
+  const drinkLine = await text('water-drink-line');
+  check('drinks: the line names the drink and its calories before the tap', /Semi-skimmed milk: 129 kcal per 250 ml/.test(drinkLine), drinkLine);
+  check('drinks: the 250 ml glass shows 129 kcal', (await text(`water-add-${gi}`)).includes('129 kcal'), await text(`water-add-${gi}`));
+  const newIn = (after, before, c) => live(after[c]).filter((r) => !before[c][r.id]);
+  let before = await stored();
+  await tap(`water-add-${gi}`);
+  s = await stored();
+  const [w1] = newIn(s, before, 'water');
+  const [e1] = newIn(s, before, 'foodEntries');
+  check(
+    'drinks: one tap writes one water record and one diary entry that belong together',
+    newIn(s, before, 'water').length === 1 && newIn(s, before, 'foodEntries').length === 1 && w1.drink === 'milk_semi' && w1.foodEntryId === e1.id && e1.via === 'water' && Math.round(e1.nutrients.kcal) === 129 && e1.meal === pageMeal,
+    JSON.stringify({ w1, e1: e1 && { meal: e1.meal, via: e1.via, kcal: e1.nutrients.kcal } }).slice(0, 240),
+  );
+  const addedToast = await text('toast');
+  check('drinks: the toast says what was added and where', addedToast.includes(`Added 250 ml of milk, 129 kcal to ${mealWord}`), addedToast);
+  await tap('toast-action');
+  s = await stored();
+  check('drinks: Undo removes both', !!s.water[w1.id]?.deleted && !!s.foodEntries[e1.id]?.deleted);
+  before = await stored();
+  await tap(`water-add-${gi}`);
+  s = await stored();
+  const [w2] = newIn(s, before, 'water');
+  const [e2] = newIn(s, before, 'foodEntries');
+  check('drinks: logged again', !!w2 && !!e2 && w2.foodEntryId === e2.id);
+  await page.waitForTimeout(5000);
+  // The same milk logged in the diary itself (as the food search would): the water screen says so before the tap.
+  await page.evaluate((e) => {
+    const { id: _id, updatedAt: _u, via: _v, ...rest } = e;
+    window.__healthcal.getState().upsert('foodEntries', { ...rest, loggedAt: new Date().toISOString() });
+  }, e2);
+  await page.waitForTimeout(600);
+  const notice = (await page.getByTestId('water-drink-notice').count()) ? await text('water-drink-notice') : '';
+  check('drinks: the same milk already in the diary is said before the tap, with Water only', notice.startsWith('Semi-skimmed milk is already in') && (await page.getByTestId('water-water-only').count()) > 0, notice);
+  check('drinks: Water only is off by default', !(await pressed('water-water-only')));
+  await tap('water-water-only');
+  check('drinks: with Water only on, the glasses read No calories', (await text(`water-add-${gi}`)).includes('No calories'), await text(`water-add-${gi}`));
+  before = await stored();
+  await tap(`water-add-${gi}`);
+  s = await stored();
+  const [w3] = newIn(s, before, 'water');
+  check('drinks: Water only writes the water record alone', !!w3 && !w3.foodEntryId && newIn(s, before, 'foodEntries').length === 0, JSON.stringify(w3));
+  check('drinks: the Water only toast', (await text('toast')).includes('for water only'), await text('toast'));
+  check('drinks: Water only turns off after the log', !(await pressed('water-water-only')));
+  await page.waitForTimeout(5000);
+  // The diary marks the paired entry; a delete there removes the calories and keeps the water.
+  await page.goto(`${BASE}/diary`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  const mark = (await page.getByTestId(`entry-in-water-${e2.id}`).count()) ? await text(`entry-in-water-${e2.id}`) : '';
+  check('drinks: the diary row says "also in Water"', mark.includes('also in Water'), mark);
+  await tap(`entry-delete-${e2.id}`);
+  s = await stored();
+  check('drinks: deleting in the diary keeps the water', !!s.foodEntries[e2.id]?.deleted && !s.water[w2.id]?.deleted);
+  check('drinks: and the toast says so', (await text('toast')).includes('The 250 ml stays in Water.'), await text('toast'));
+  await tap('toast-action');
+  s = await stored();
+  check('drinks: Undo in the diary brings the entry back', !s.foodEntries[e2.id]?.deleted);
+  await page.waitForTimeout(5000);
+  // Deleting on Water takes both.
+  await page.goto(`${BASE}/water`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  const pairedRow = await page.evaluate(() => {
+    const el = document.querySelector('[data-testid^="water-entry-kcal-"]');
+    return el ? el.getAttribute('data-testid').replace('water-entry-kcal-', '') : null;
+  });
+  if (pairedRow !== null) await tap(`water-delete-${pairedRow}`);
+  s = await stored();
+  check('drinks: deleting on Water removes the water and its calories', pairedRow !== null && !!s.water[w2.id]?.deleted && !!s.foodEntries[e2.id]?.deleted, `row ${pairedRow}`);
+  check('drinks: the delete toast names the calories', (await text('toast')).includes('Removed 250 ml of milk and its 129 kcal'), await text('toast'));
+  await page.waitForTimeout(5000);
+  // Coffee starts on Black: no calories, no diary entry.
+  await tap('water-beverage-coffee');
+  check('drinks: Coffee starts on Black', await pressed('water-choice-coffee_black'));
+  check('drinks: a black coffee glass shows no calories', !(await text(`water-add-${gi}`)).includes('kcal'), await text(`water-add-${gi}`));
+  before = await stored();
+  await tap(`water-add-${gi}`);
+  s = await stored();
+  const [wc] = newIn(s, before, 'water');
+  check('drinks: a black coffee writes no diary entry', !!wc && wc.drink === 'coffee_black' && !wc.foodEntryId && newIn(s, before, 'foodEntries').length === 0, JSON.stringify(wc));
+  // Other's "Choose a drink": no disabled button on opening; "Or enter calories" is in the first view and
+  // its button says what it adds; tapping a drink only chooses it, and says so.
+  await page.waitForTimeout(5000);
+  await tap('water-beverage-other');
+  await tap('water-choice-pick');
+  check('drinks: the pick sheet opens with no button at its foot', (await page.getByTestId('water-pick-kcal-add').count()) === 0 && (await page.getByTestId('water-pick-kcal-open').count()) > 0);
+  await tap('water-pick-kcal-open');
+  await fill('water-pick-kcal', 140);
+  const kcalButton = await text('water-pick-kcal-add');
+  check('drinks: entered calories say where they go before the tap', kcalButton.startsWith('Add 140 kcal to '), kcalButton);
+  before = await stored();
+  await tap('water-pick-kcal-add');
+  s = await stored();
+  const [ek] = newIn(s, before, 'foodEntries');
+  check('drinks: entered calories write the pair', !!ek && ek.via === 'water' && Math.round(ek.nutrients.kcal) === 140 && newIn(s, before, 'water').length === 1, JSON.stringify(ek && { kcal: ek.nutrients.kcal, via: ek.via }));
+  await page.waitForTimeout(5000);
+  await tap('water-choice-pick');
+  before = await stored();
+  await tap('water-pick-b_apple_juice');
+  s = await stored();
+  const chosenToast = await text('toast');
+  check('drinks: a drink tapped in the sheet is chosen, not logged, and the toast says so', chosenToast.endsWith('chosen. Tap a glass to add it.') && newIn(s, before, 'water').length === 0 && newIn(s, before, 'foodEntries').length === 0, chosenToast);
+  // The choice is remembered on this device.
+  await tap('water-beverage-milk');
+  await tap('water-choice-milk_whole');
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(1500);
+  await tap('water-beverage-milk');
+  check('drinks: the last milk chosen is selected after a reload', await pressed('water-choice-milk_whole'));
+  // Today's water button stays plain water.
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  before = await stored();
+  await tap('today-water-250');
+  s = await stored();
+  const [wt] = newIn(s, before, 'water');
+  check("drinks: Today's +250 ml stays plain water", !!wt && wt.beverage === 'water' && !wt.drink && newIn(s, before, 'foodEntries').length === 0, JSON.stringify(wt));
+
   const real = errors.filter((e) => !/favicon|DevTools|useNativeDriver|pointerEvents is deprecated|shadow\*/i.test(e));
   check('no runtime or console errors during the whole run', real.length === 0, real.slice(0, 3).join(' || '));
 

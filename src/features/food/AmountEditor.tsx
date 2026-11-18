@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import { labelMl } from '@/features/drinks/rules';
 import { servingsFor } from '@/lib/nutrition';
 import { useTheme } from '@/theme';
 import type { Food, Serving } from '@/types';
@@ -48,6 +49,9 @@ export function AmountEditor({
   const servingList = options.some((s) => s.label === serving.label) ? options : [serving, ...options];
   const totalGrams = serving.grams * quantity;
   const perGram = serving.label === '1 g';
+  // A volume portion ("250 ml", "8 fl oz") shows whole grams, as the line above it does ("258 g");
+  // display only: the stored grams and the calories keep their tenth.
+  const shownGrams = labelMl(serving.label) !== null ? Math.round(totalGrams) : Math.round(totalGrams * 10) / 10;
 
   const setTypedState = (g: number | null | undefined) => {
     setTyped(g);
@@ -104,7 +108,7 @@ export function AmountEditor({
         />
         <NumberField
           testID={`${testIDPrefix}-grams`}
-          value={typed !== undefined ? typed : Math.round(totalGrams * 10) / 10}
+          value={typed !== undefined ? typed : shownGrams}
           onChange={(g) => {
             setTypedState(g);
             if (g !== null && g > 0 && g <= MAX_GRAMS) onChange({ serving, quantity: g / serving.grams });

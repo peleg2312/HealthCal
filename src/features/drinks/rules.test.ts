@@ -9,21 +9,26 @@ import {
   builtinFood,
   choiceA11y,
   detailDrinkNote,
+  drinkGrams,
   drinkKcal,
   drinkMeal,
+  enteredKcalError,
   gramsPerMl,
   isAlcohol,
   isWaterDrinkEntry,
   labelMl,
   livePartner,
   noticeLine,
+  pairEditProblem,
   pickCaption,
   pickedFood,
+  pickedToast,
   planDrink,
   remember,
   rememberedChoice,
   removedEntryToast,
   removedWaterToast,
+  sameDrinkFoodIds,
   sameDrinkInDiary,
   selectChoice,
   selectFood,
@@ -31,6 +36,7 @@ import {
   waterForEntryEdit,
   waterPointingAt,
   waterRowCaption,
+  waterRowTitle,
   withoutAlcohol,
   type PlanDrinkInput,
 } from './rules';
@@ -145,7 +151,7 @@ describe('planDrink', () => {
     expect(p.entry!.grams).toBeCloseTo(257.8, 1);
     expect(Math.round(p.entry!.nutrients.kcal)).toBe(129);
     expect(p.kcal).toBe(129);
-    expect(p.toast).toBe('Added 250 ml milk, 129 kcal to lunch');
+    expect(p.toast).toBe('Added 250 ml of milk, 129 kcal to lunch');
     expect(p.line).toBe('Semi-skimmed milk: 129 kcal per 250 ml, to lunch');
     expect(p.tile).toBe('129 kcal');
     expect(p.label).toBe('Add 250 ml of semi-skimmed milk, 129 kcal to lunch');
@@ -153,11 +159,11 @@ describe('planDrink', () => {
 
   it('names the day when it is not today', () => {
     const y = planDrink(base({ date: addDays(TODAY, -1) }));
-    expect(y.toast).toBe("Added 250 ml milk, 129 kcal to yesterday's lunch");
+    expect(y.toast).toBe("Added 250 ml of milk, 129 kcal to yesterday's lunch");
     expect(y.line).toBe("Semi-skimmed milk: 129 kcal per 250 ml, to yesterday's lunch");
     expect(y.entry!.date).toBe('2026-11-17');
     const week = planDrink(base({ date: '2026-11-11', now: at(8, 5) }));
-    expect(week.toast).toBe('Added 250 ml milk, 129 kcal to breakfast, Wed Nov 11');
+    expect(week.toast).toBe('Added 250 ml of milk, 129 kcal to breakfast, Wed Nov 11');
     expect(week.water.date).toBe('2026-11-11');
   });
 
@@ -193,7 +199,7 @@ describe('planDrink', () => {
     const p = planDrink(base({ kind: 'other', drink: { id: 'kcal', food: null }, ml: 330, kcal: 140 }));
     expect(p.water).toMatchObject({ beverage: 'other', drink: 'kcal', ml: 330 });
     expect(p.entry).toMatchObject({ name: 'Other drink', emoji: '🫗', source: 'quick', servingLabel: '330 ml', quantity: 1, grams: 0, nutrients: { kcal: 140, protein: 0, carbs: 0, fat: 0 }, via: 'water', meal: 'lunch' });
-    expect(p.toast).toBe('Added 330 ml other drink, 140 kcal to lunch');
+    expect(p.toast).toBe('Added 330 ml of other drink, 140 kcal to lunch');
     expect(planDrink(base({ kind: 'other', drink: { id: 'kcal', food: null }, kcal: 0 })).entry).toBeNull();
   });
 
@@ -201,14 +207,14 @@ describe('planDrink', () => {
     const p = planDrink(base({ kind: 'juice', drink: sel('juice_orange'), waterOnly: true }));
     expect(p.entry).toBeNull();
     expect(p.water.drink).toBe('juice_orange');
-    expect(p.toast).toBe('Added 250 ml juice, for water only');
+    expect(p.toast).toBe('Added 250 ml of juice, for water only');
     expect(p.tile).toBe('No calories');
     // On a no-calorie choice the chip changes nothing.
     expect(planDrink(base({ kind: 'tea', drink: sel('tea_plain'), waterOnly: true })).toast).toBe('Added 250 ml of tea');
   });
 
   it('a soft drink under Other and a picked food', () => {
-    expect(planDrink(base({ kind: 'other', drink: sel('soft_regular'), ml: 330 })).toast).toBe('Added 330 ml soft drink, 145 kcal to lunch');
+    expect(planDrink(base({ kind: 'other', drink: sel('soft_regular'), ml: 330 })).toast).toBe('Added 330 ml of soft drink, 145 kcal to lunch');
     const p = planDrink(base({ kind: 'juice', drink: selectFood(B('b_grape_juice')) }));
     expect(p.water.drink).toBe('food');
     expect(p.entry!.foodId).toBe('b_grape_juice');
@@ -217,7 +223,7 @@ describe('planDrink', () => {
 
   it('imperial glasses', () => {
     const p = planDrink(base({ ml: 237, units: 'imperial' }));
-    expect(p.toast).toBe('Added 8 fl oz milk, 122 kcal to lunch');
+    expect(p.toast).toBe('Added 8 fl oz of milk, 122 kcal to lunch');
     expect(p.entry!.servingLabel).toBe('8 fl oz');
   });
 });
@@ -270,7 +276,71 @@ describe('sameDrinkInDiary', () => {
     const found = sameDrinkInDiary([cereal], [], 'b_milk_2pct', TODAY, at(8).toISOString());
     expect(found?.id).toBe('cereal');
     expect(noticeLine(found!)).toBe('Milk, reduced fat (2%) is already in breakfast (07:30).');
+    // Named as the drink line above names it when it is the selected choice's own food.
+    expect(noticeLine(found!, sel('milk_semi'), 'milk')).toBe('Semi-skimmed milk is already in breakfast (07:30).');
     expect(planDrink(base({ now: at(8) })).kcal).toBe(129);
+  });
+  it("another variant of the same kind counts too (any of the kind's choice foods), named by its own name", () => {
+    const whole = entry({ id: 'whole', name: 'Milk, whole', foodId: 'b_milk_whole', grams: 244, loggedAt: at(7, 30).toISOString() });
+    const ids = sameDrinkFoodIds('milk', sel('milk_semi'));
+    expect(ids).toEqual(expect.arrayContaining(['b_milk_2pct', 'b_milk_whole', 'b_milk_skim']));
+    const found = sameDrinkInDiary([whole], [], ids, TODAY, at(8).toISOString());
+    expect(found?.id).toBe('whole');
+    expect(noticeLine(found!, sel('milk_semi'), 'milk')).toBe('Milk, whole is already in breakfast (07:30).');
+    // Never one already linked to a water record, never another kind's food, nothing for a no-calorie choice.
+    expect(sameDrinkInDiary([whole], [water({ foodEntryId: 'whole' })], ids, TODAY, at(8).toISOString())).toBeNull();
+    expect(sameDrinkInDiary([entry({ loggedAt: at(7, 30).toISOString() })], [], ids, TODAY, at(8).toISOString())).toBeNull();
+    expect(sameDrinkFoodIds('coffee', sel('coffee_black'))).toEqual([]);
+    // A picked food: itself and the kind's choice foods.
+    expect(sameDrinkFoodIds('juice', selectFood(B('b_grape_juice')))).toEqual(expect.arrayContaining(['b_grape_juice', 'b_orange_juice', 'b_apple_juice']));
+    expect(noticeLine(entry({ loggedAt: at(7, 30).toISOString() }), selectFood(B('b_grape_juice')), 'juice')).toBe('Orange juice is already in breakfast (07:30).');
+  });
+});
+
+describe('a paired entry stays true to its water', () => {
+  const w = { ml: 250 };
+  it('never moved to a future day; an entry already there can still be edited', () => {
+    expect(pairEditProblem(w, { grams: 258, date: TODAY }, { grams: 258, date: '2026-11-19' }, TODAY, 'metric')).toEqual({
+      field: 'day',
+      text: 'A drink also counted in Water stays on today or an earlier day.',
+    });
+    expect(pairEditProblem(w, { grams: 258, date: TODAY }, { grams: 258, date: '2026-11-17' }, TODAY, 'metric')).toBeNull();
+    expect(pairEditProblem(w, { grams: 258, date: '2026-11-19' }, { grams: 300, date: '2026-11-19' }, TODAY, 'metric')).toBeNull();
+  });
+  it('never larger than 10,000 ml of the drink', () => {
+    expect(pairEditProblem(w, { grams: 258, date: TODAY }, { grams: 258 * 40, date: TODAY }, TODAY, 'metric')).toBeNull();
+    expect(pairEditProblem(w, { grams: 258, date: TODAY }, { grams: 258 * 41, date: TODAY }, TODAY, 'metric')).toEqual({
+      field: 'amount',
+      text: 'A drink also counted in Water is at most 10 L.',
+    });
+    expect(pairEditProblem(w, { grams: 258, date: TODAY }, { grams: 258 * 41, date: TODAY }, TODAY, 'imperial')?.text).toMatch(/^A drink also counted in Water is at most \d[\d,]* fl oz\.$/);
+    // An entered drink (grams 0) has no amount the water follows.
+    expect(pairEditProblem(w, { grams: 0, date: TODAY }, { grams: 0, date: TODAY }, TODAY, 'metric')).toBeNull();
+  });
+});
+
+describe('calories typed in, a pick, a row title', () => {
+  it("the quick-add screen's limit, in neutral words", () => {
+    expect(enteredKcalError(null)).toBeNull();
+    expect(enteredKcalError(140)).toBeNull();
+    expect(enteredKcalError(9999)).toBeNull();
+    expect(enteredKcalError(10000)).toBe('Up to 9,999 kcal');
+    expect(enteredKcalError(15000)).toBe('Up to 9,999 kcal');
+    expect(enteredKcalError(0)).toBe('Enter the calories');
+  });
+  it('a pick logs nothing and says so', () => {
+    expect(pickedToast(B('b_apple_juice'))).toBe(`${B('b_apple_juice').name} chosen. Tap a glass to add it.`);
+  });
+  it("a row under Other with a known choice reads with the drink's own noun; the rest as before", () => {
+    expect(waterRowTitle({ ml: 330, beverage: 'other', drink: 'soft_regular' }, 'metric')).toBe('330 ml soft drink');
+    expect(waterRowTitle({ ml: 330, beverage: 'other', drink: 'kcal' }, 'metric')).toBe('330 ml other');
+    expect(waterRowTitle({ ml: 330, beverage: 'other', drink: 'food' }, 'metric')).toBe('330 ml other');
+    expect(waterRowTitle({ ml: 330, beverage: 'other' }, 'metric')).toBe('330 ml other');
+    expect(waterRowTitle({ ml: 250, beverage: 'milk', drink: 'milk_semi' }, 'metric')).toBe('250 ml milk');
+    expect(waterRowTitle({ ml: 250, beverage: 'coffee', drink: 'latte' }, 'metric')).toBe('250 ml coffee');
+  });
+  it('grams keep their tenth (display rounds them in food detail)', () => {
+    expect(drinkGrams(B('b_milk_2pct'), 250)).toBeCloseTo(257.8, 1);
   });
 });
 
@@ -301,10 +371,13 @@ describe('the pair', () => {
     const milk = entry({ name: 'Milk, reduced fat (2%)', nutrients: { kcal: 128.9, protein: 8.5, carbs: 12.4, fat: 5.1 } });
     expect(waterRowCaption(milk, TODAY)).toBe('Milk, reduced fat (2%) · 129 kcal in breakfast');
     expect(waterRowCaption({ ...milk, date: '2026-11-20' }, TODAY)).toBe('Milk, reduced fat (2%) · 129 kcal in breakfast, Fri Nov 20');
-    expect(removedWaterToast(water({ beverage: 'milk', drink: 'milk_semi' }), milk, 'metric')).toBe('Removed 250 ml milk and its 129 kcal');
+    expect(removedWaterToast(water({ beverage: 'milk', drink: 'milk_semi' }), milk, 'metric')).toBe('Removed 250 ml of milk and its 129 kcal');
     expect(removedWaterToast(water({ beverage: 'milk' }), null, 'metric')).toBe('Removed 250 ml');
     expect(removedEntryToast('Milk, reduced fat (2%)', { ml: 250 }, 'metric')).toBe('Removed Milk, reduced fat (2%). The 250 ml stays in Water.');
     expect(detailDrinkNote({ ml: 250 }, 'metric')).toBe('Also counted in Water as 250 ml. Changing the amount here changes it there; deleting here keeps the water.');
+    expect(detailDrinkNote({ ml: 330 }, 'metric', false)).toBe(
+      'Also counted in Water as 330 ml. The calories here do not change it; changing the day moves it there, and deleting here keeps the water.',
+    );
     expect(choiceA11y('Whole', B('b_milk_whole'), 250, 'metric')).toBe('Whole, 157 kcal per 250 ml');
     expect(choiceA11y('Black', null, 250, 'metric')).toBe('Black, no calories');
   });

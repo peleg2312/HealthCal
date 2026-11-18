@@ -3,7 +3,7 @@ import { Info, Star, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
-import { detailDrinkNote, waterPointingAt } from '@/features/drinks/rules';
+import { detailDrinkNote, pairEditProblem, waterPointingAt, type PairEditProblem } from '@/features/drinks/rules';
 import { updateEntryDirect } from '@/features/food/actions';
 import { AmountEditor } from '@/features/food/AmountEditor';
 import { UNKNOWN_AI_CONFIDENCE, bandSpread, estimateRange, scaleRange, spreadRange } from '@/features/food/build';
@@ -14,9 +14,10 @@ import { deleteEntry, logFood } from '@/features/food/log';
 import { RequireProfile } from '@/features/food/RequireProfile';
 import { MEAL_LABEL, atwaterKcal, formatMacro, scaleNutrients } from '@/lib/nutrition';
 import { useStore } from '@/store';
+import { useToday } from '@/store/clock';
 import { useDay, useLive } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
-import type { Food, FoodEntry, ISODate, MealType, Nutrients, Serving } from '@/types';
+import type { Food, FoodEntry, ISODate, MealType, Nutrients, Serving, WaterEntry } from '@/types';
 import { Button, Card, CupKey, Divider, EmptyState, Header, IconButton, MacroBar, NumberField, PressableScale, Screen, Text, TextField, goBack } from '@/ui';
 
 export default function FoodDetailRoute() {
@@ -65,16 +66,40 @@ function estimateBandText([low, high]: [number, number]): string {
 }
 
 /**
- * Under the amount of a drink logged on the water screen: it is also counted in Water, an amount or
- * day saved here moves the water record with it, and a delete here keeps the water.
+ * A drink logged on the water screen: its live water record, and why the edit on screen cannot be
+ * saved (a future day, more than one water record holds), or null. Save is off while there is one.
  */
-function DrinkNote({ entryId }: { entryId?: string }) {
-  const water = useStore((s) => (entryId ? waterPointingAt(s.water, entryId) : null));
+function usePairedDrink(entry: FoodEntry | undefined, after: { grams: number; date: ISODate }): { water: WaterEntry | null; problem: PairEditProblem | null } {
+  const water = useStore((s) => (entry ? waterPointingAt(s.water, entry.id) : null));
+  const units = useStore((s) => s.profile?.units ?? 'metric');
+  const todayDate = useToday();
+  const problem = water && entry ? pairEditProblem(water, entry, after, todayDate, units) : null;
+  return { water, problem };
+}
+
+/**
+ * Under the amount of a drink logged on the water screen: it is also counted in Water, an amount or
+ * day saved here moves the water record with it, and a delete here keeps the water. An amount the
+ * pair cannot follow says why here, under the amount it is about (Save waits).
+ */
+function DrinkNote({ water, problem, hasAmount }: { water: WaterEntry | null; problem: PairEditProblem | null; hasAmount: boolean }) {
   const units = useStore((s) => s.profile?.units ?? 'metric');
   if (!water) return null;
   return (
-    <Text testID="detail-drink-note" variant="caption" color="textSecondary">
-      {detailDrinkNote(water, units)}
+    <View style={{ gap: 4 }}>
+      <Text testID="detail-drink-note" variant="caption" color="textSecondary">
+        {detailDrinkNote(water, units, hasAmount)}
+      </Text>
+      {problem?.field === 'amount' ? <PairProblem text={problem.text} /> : null}
+    </View>
+  );
+}
+
+/** One neutral line beside the control an edit of a paired drink cannot use (a future day, more than 10,000 ml). */
+function PairProblem({ text }: { text: string }) {
+  return (
+    <Text testID="detail-drink-problem" variant="caption" color="warningInk">
+      {text}
     </Text>
   );
 }
@@ -265,6 +290,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
   const [gramsInvalid, setGramsInvalid] = useState(false);
   const { serving, quantity } = portion;
   const totalGrams = serving.grams * quantity;
+  const paired = usePairedDrink(entry, { grams: totalGrams, date });
   const n = scaleNutrients(food.per100g, totalGrams);
   const info = sourceInfo(food.source);
   const perGram = serving.label === '1 g';
@@ -319,7 +345,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
             testID="detail-save"
             style={{ flex: 1 }}
             title={entry ? 'Save changes' : `Add to ${MEAL_LABEL[meal].toLowerCase()}`}
-            disabled={!(totalGrams > 0) || gramsInvalid}
+            disabled={!(totalGrams > 0) || gramsInvalid || !!paired.problem}
             onPress={save}
           />
         </View>
@@ -338,7 +364,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
         <Divider />
         <AmountEditor food={food} value={portion} onChange={setPortion} onPendingChange={setGramsInvalid} testIDPrefix="detail" />
       </Card>
-      <DrinkNote entryId={entry?.id} />
+      <DrinkNote water={paired.water} problem={paired.problem} hasAmount />
 
       <ImpactLine date={date} kcalValue={n.kcal} replacing={entry} />
 
@@ -346,6 +372,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
         <Text variant="h3">Meal and day</Text>
         <MealPicker value={meal} onChange={setMeal} testIDPrefix="detail-meal" />
         <DayStepper value={date} onChange={setDate} testIDPrefix="detail-day" />
+        {paired.problem?.field === 'day' ? <PairProblem text={paired.problem.text} /> : null}
       </Card>
 
       <NutritionFacts portion={n} per100g={food.per100g} showPer100 />
@@ -363,6 +390,7 @@ function ManualEditor({ entry }: { entry: FoodEntry }) {
   const [fat, setFat] = useState<number | null>(entry.nutrients.fat || null);
   const [meal, setMeal] = useState(entry.meal);
   const [date, setDate] = useState(entry.date);
+  const paired = usePairedDrink(entry, { grams: entry.grams, date });
   const info = sourceInfo(entry.source);
   const n: Nutrients = { kcal: kcalV ?? 0, protein: protein ?? 0, carbs: carbs ?? 0, fat: fat ?? 0 };
   const implied = atwaterKcal(n);
@@ -390,7 +418,7 @@ function ManualEditor({ entry }: { entry: FoodEntry }) {
             testID="detail-save"
             style={{ flex: 1 }}
             title="Save changes"
-            disabled={kcalV === null || kcalV < 0}
+            disabled={kcalV === null || kcalV < 0 || !!paired.problem}
             onPress={() => {
               updateEntryDirect(entry, { name, nutrients: n, meal, date });
               goBack(href('/diary', { date }));
@@ -424,12 +452,13 @@ function ManualEditor({ entry }: { entry: FoodEntry }) {
           </Text>
         ) : null}
       </Card>
-      <DrinkNote entryId={entry.id} />
+      <DrinkNote water={paired.water} problem={paired.problem} hasAmount={entry.grams > 0} />
       <ImpactLine date={date} kcalValue={n.kcal} replacing={entry} />
       <Card style={{ gap: spacing.md }}>
         <Text variant="h3">Meal and day</Text>
         <MealPicker value={meal} onChange={setMeal} testIDPrefix="detail-meal" />
         <DayStepper value={date} onChange={setDate} testIDPrefix="detail-day" />
+        {paired.problem?.field === 'day' ? <PairProblem text={paired.problem.text} /> : null}
       </Card>
       {entry.nutrients.fiber !== undefined || entry.nutrients.sodium !== undefined ? (
         <NutritionFacts portion={{ ...entry.nutrients, ...n }} showPer100={false} />

@@ -3,6 +3,7 @@
  * the verdict: every day is measured against its own budget (never the week's
  * average), and a check is a fully logged day within 10% of it.
  */
+import { hasFoodLogged } from '@/features/drinks/via';
 import { addDays, formatShortDate } from '@/lib/dates';
 import { inBudgetBand, isCompleteDay, type InsightDay } from '@/lib/insights';
 import { formatNumber } from '@/lib/units';
@@ -28,7 +29,7 @@ export function recapDayCups(weekStart: ISODate, days: InsightDay[], today: ISOD
   return Array.from({ length: 7 }, (_, i) => {
     const date = addDays(weekStart, i);
     const d = byDate.get(date);
-    const logged = !!d && d.entries.length > 0;
+    const logged = !!d && hasFoodLogged(d.entries);
     const kcal = logged ? d.eaten.kcal : 0;
     const budget = d?.budget ?? 0;
     const ratio = logged && budget > 0 ? kcal / budget : 0;

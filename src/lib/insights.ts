@@ -27,7 +27,8 @@ import { formatNumber, formatVolume, formatWeight } from './units';
  */
 export interface InsightDay {
   date: ISODate;
-  entries: readonly { nutrients: Pick<Nutrients, 'fiber'> }[];
+  /** `via` marks a drink from Water (not "food logged": `hasFoodLogged`, @/features/drinks/via). */
+  entries: readonly { nutrients: Pick<Nutrients, 'fiber'>; via?: 'water' }[];
   eaten: Nutrients;
   budget: number;
   macros: { proteinG: number; carbsG: number; fatG: number; fiberG: number };

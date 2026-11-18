@@ -6,10 +6,13 @@
  * (`pickCaption`). A tap closes the sheet and makes that drink the kind's selected choice (the
  * screen remembers it); the person then taps a glass, so the calories are seen before they are added.
  *
- * Under the list, "Or enter calories": an amount and the calories, logged at once as a quick entry
- * "Other drink" (via the screen's `onEntered`, which goes through planDrink and logDrink).
+ * Directly under the search field, "Or enter calories" (`water-pick-kcal-open`, in the sheet's first
+ * view) opens an amount and a calories field (under the quick-add screen's limit), logged at once as
+ * a quick entry "Other drink" (via the screen's `onEntered`, which goes through planDrink and
+ * logDrink). The pinned button is there only while those fields are open, and says what it will do
+ * before the tap ("Add 140 kcal to lunch"); the sheet never opens on a disabled button.
  */
-import { Search, X } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Search, X } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
@@ -17,12 +20,12 @@ import { resolveFood } from '@/features/food/usuals';
 import { searchLocal } from '@/services/foodSearch';
 import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
-import { volumeUnit, volumeValue } from '@/lib/units';
+import { formatNumber, volumeUnit, volumeValue } from '@/lib/units';
 import { useTheme } from '@/theme';
 import type { Food, UnitSystem } from '@/types';
 import { Button, Divider, IconButton, NumberField, PressableScale, Sheet, Text, TextField } from '@/ui';
 
-import { pickCaption, sheetDrinks, withoutAlcohol } from './rules';
+import { enteredKcalError, pickCaption, sheetDrinks, withoutAlcohol } from './rules';
 
 export function DrinkPickSheet({
   visible,
@@ -31,6 +34,7 @@ export function DrinkPickSheet({
   units,
   onPick,
   onEntered,
+  where,
   onClose,
 }: {
   visible: boolean;
@@ -41,6 +45,8 @@ export function DrinkPickSheet({
   onPick: (food: Food) => void;
   /** Amount in the person's units and calories typed in; the screen logs them. */
   onEntered: (amountShown: number, kcal: number) => void;
+  /** Where entered calories go: "lunch", "yesterday's lunch" (mealOnDay). */
+  where: string;
   onClose: () => void;
 }) {
   const { colors, spacing } = useTheme();
@@ -49,6 +55,7 @@ export function DrinkPickSheet({
   const [query, setQuery] = useState(initialQuery);
   const [amount, setAmount] = useState<number | null>(glassShown);
   const [kcalTyped, setKcalTyped] = useState<number | null>(null);
+  const [entering, setEntering] = useState(false);
   const [wasVisible, setWasVisible] = useState(visible);
   if (visible !== wasVisible) {
     setWasVisible(visible);
@@ -56,6 +63,7 @@ export function DrinkPickSheet({
       setQuery(initialQuery);
       setAmount(glassShown);
       setKcalTyped(null);
+      setEntering(false);
     }
   }
 
@@ -69,7 +77,8 @@ export function DrinkPickSheet({
     () => (q ? withoutAlcohol(searchLocal(q, { customFoods, recentFoods: recents, favoriteIds }, 30).map((h) => h.food)) : sheetDrinks()),
     [q, customFoods, recents, favoriteIds],
   );
-  const canAdd = !!(amount && amount > 0 && kcalTyped && kcalTyped > 0);
+  const kcalError = enteredKcalError(kcalTyped);
+  const canAdd = !!(amount && amount > 0 && kcalTyped && kcalTyped > 0 && !kcalError);
 
   return (
     <Sheet
@@ -77,14 +86,16 @@ export function DrinkPickSheet({
       onClose={onClose}
       title="Choose a drink"
       footer={
-        <Button
-          testID="water-pick-kcal-add"
-          title="Add drink"
-          disabled={!canAdd}
-          onPress={() => {
-            if (amount && kcalTyped) onEntered(amount, kcalTyped);
-          }}
-        />
+        entering ? (
+          <Button
+            testID="water-pick-kcal-add"
+            title={canAdd && kcalTyped ? `Add ${formatNumber(Math.round(kcalTyped))} kcal to ${where}` : `Add to ${where}`}
+            disabled={!canAdd}
+            onPress={() => {
+              if (canAdd && amount && kcalTyped) onEntered(amount, kcalTyped);
+            }}
+          />
+        ) : undefined
       }>
       <View testID="water-pick-sheet" style={{ gap: spacing.md }}>
         <TextField
@@ -105,10 +116,53 @@ export function DrinkPickSheet({
             ) : null
           }
         />
+        <PressableScale
+          testID="water-pick-kcal-open"
+          onPress={() => setEntering((v) => !v)}
+          scaleTo={0.985}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: entering }}
+          accessibilityLabel="Or enter calories"
+          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 44 }}>
+          <Text variant="bodyStrong" color="primaryInk" style={{ flex: 1 }}>
+            Or enter calories
+          </Text>
+          {entering ? <ChevronUp size={20} color={colors.textSecondary} strokeWidth={1.9} /> : <ChevronDown size={20} color={colors.textSecondary} strokeWidth={1.9} />}
+        </PressableScale>
+        {entering ? (
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            <NumberField
+              testID="water-pick-ml"
+              label="Amount"
+              suffix={volumeUnit(units)}
+              decimals={0}
+              value={amount}
+              onChange={setAmount}
+              style={{ flex: 1 }}
+              accessibilityLabel={`Amount in ${volumeUnit(units)}`}
+            />
+            <NumberField
+              testID="water-pick-kcal"
+              label="Calories"
+              suffix="kcal"
+              placeholder="e.g. 120"
+              decimals={0}
+              value={kcalTyped}
+              onChange={setKcalTyped}
+              error={kcalError}
+              style={{ flex: 1 }}
+              accessibilityLabel="Calories in kcal"
+            />
+          </View>
+        ) : null}
+        <Divider />
+        <Text testID="water-pick-hint" variant="caption" color="textSecondary">
+          Tap a drink to choose it, then tap a glass to add it.
+        </Text>
         <View>
           {foods.length === 0 ? (
             <Text testID="water-pick-none" variant="body" color="textSecondary" style={{ paddingVertical: spacing.md }}>
-              No drink matches “{q}”. Try another word, or enter the calories below.
+              No drink matches “{q}”. Try another word, or enter the calories above.
             </Text>
           ) : (
             foods.map((food, i) => (
@@ -135,31 +189,6 @@ export function DrinkPickSheet({
               </View>
             ))
           )}
-        </View>
-        <Divider />
-        <Text variant="h3">Or enter calories</Text>
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <NumberField
-            testID="water-pick-ml"
-            label="Amount"
-            suffix={volumeUnit(units)}
-            decimals={0}
-            value={amount}
-            onChange={setAmount}
-            style={{ flex: 1 }}
-            accessibilityLabel={`Amount in ${volumeUnit(units)}`}
-          />
-          <NumberField
-            testID="water-pick-kcal"
-            label="Calories"
-            suffix="kcal"
-            placeholder="e.g. 120"
-            decimals={0}
-            value={kcalTyped}
-            onChange={setKcalTyped}
-            style={{ flex: 1 }}
-            accessibilityLabel="Calories in kcal"
-          />
         </View>
       </View>
     </Sheet>

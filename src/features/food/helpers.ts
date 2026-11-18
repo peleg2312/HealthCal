@@ -41,6 +41,8 @@ export function href(path: string, params: Record<string, string | number | unde
 }
 
 export const kcal = (n: number) => formatNumber(Math.round(n));
+/** Calories typed in for one entry stay under this (quick add, a drink's "Or enter calories"). */
+export const QUICK_KCAL_LIMIT = 10000;
 export const grams = (n: number) => `${formatMacro(n)} g`;
 
 /** "1.5" not "1.50", "0.25" kept. */

@@ -7,12 +7,13 @@
  * skip what is already done, respect quiet hours, space them out, cap the day.
  */
 import { ACTIVITY_BY_ID } from '@/data/activities';
+import { hasFoodLogged, isWaterDrinkEntry } from '@/features/drinks/via';
 import { addDays, formatClock, fromISODate, parseHHmm, toISODate } from '@/lib/dates';
 import { netKcal } from '@/lib/exercise';
 import { glassesLeft } from '@/lib/hydration';
 import { formatNumber, formatVolume, mlToFlOz } from '@/lib/units';
 import type { DaySummary } from '@/store/selectors';
-import type { ISODate, MealType, ReminderSettings, UnitSystem } from '@/types';
+import type { FoodEntry, ISODate, MealType, ReminderSettings, UnitSystem } from '@/types';
 
 export type ReminderKind = 'water' | 'meal' | 'checkin' | 'weighin' | 'movement';
 
@@ -153,7 +154,7 @@ export function mealBody(day: DaySummary, mealLabel: string): string {
 
 /** Everything that counts as "on track" for the evening check-in. */
 export function dayOnTrack(day: DaySummary): boolean {
-  const mealsLogged = MEALS.every((m) => day.byMeal[m.key].length > 0);
+  const mealsLogged = MEALS.every((m) => hasFoodLogged(day.byMeal[m.key]));
   return (
     mealsLogged &&
     day.remaining >= 0 &&
@@ -168,7 +169,7 @@ export function checkInBody(day: DaySummary, units: UnitSystem): string {
   const proteinLeft = Math.round(day.macros.proteinG - day.eaten.protein);
   parts.push(proteinLeft > 0 ? `${proteinLeft} g protein to go` : 'protein goal met');
   parts.push(day.waterRemainingMl > 0 ? `${volumeText(day.waterRemainingMl, units)} water to go` : 'water goal met');
-  const unlogged = MEALS.filter((m) => day.byMeal[m.key].length === 0).map((m) => m.label.toLowerCase());
+  const unlogged = MEALS.filter((m) => !hasFoodLogged(day.byMeal[m.key])).map((m) => m.label.toLowerCase());
   const tail = unlogged.length ? ` Not logged yet: ${unlogged.join(', ')}.` : '';
   const sentence = parts.join(', ');
   return `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}.${tail}`;
@@ -213,6 +214,25 @@ export function waterCategory(presets: number[] | undefined, units: UnitSystem):
     identifier: `healthcal-water-${amounts.join('-')}-${units}`,
     actions: amounts.map((ml) => ({ identifier: `water-add-${ml}`, buttonTitle: waterButtonTitle(ml, units) })),
   };
+}
+
+/**
+ * "Repeat yesterday's <meal>": what it copies and whether it may. Only food logged in the diary
+ * itself: a drink from Water is never copied (its water would not come with it), a meal that held
+ * only such drinks is not offered (`repeatableMeals`), and a drink alone in today's meal does not
+ * make it "already logged". `entries` are the live entries.
+ */
+export function mealRepeat(entries: readonly FoodEntry[], date: ISODate, meal: MealType): { items: FoodEntry[]; already: boolean } {
+  const from = addDays(date, -1);
+  const items = entries.filter((e) => e.date === from && e.meal === meal && !isWaterDrinkEntry(e));
+  const already = hasFoodLogged(entries.filter((e) => e.date === date && e.meal === meal));
+  return { items, already };
+}
+
+/** The main meals of the day before `date` that "Repeat yesterday's" can offer (`PlannerDay.previousDayMeals`). */
+export function repeatableMeals(entries: readonly FoodEntry[], date: ISODate): MealType[] {
+  const before = addDays(date, -1);
+  return [...new Set(entries.filter((e) => e.date === before && e.meal !== 'snack' && !isWaterDrinkEntry(e)).map((e) => e.meal))];
 }
 
 export function mealRepeatCategory(meal: Exclude<MealType, 'snack'>): ReminderCategory {
@@ -306,7 +326,8 @@ function candidatesForDay(input: PlannerInput, day: PlannerDay, untilMinutes: nu
 
   if (r.meals.enabled) {
     for (const m of MEALS) {
-      if (s.byMeal[m.key].length > 0) continue;
+      // Skipped once food is logged for the meal; a coffee or juice from Water alone does not count.
+      if (hasFoodLogged(s.byMeal[m.key])) continue;
       const repeatable = day.previousDayMeals?.includes(m.key) ?? false;
       add('meal', parseHHmm(r.meals[m.key]), m.key, m.label, mealBody(s, m.label), {
         url: `/food/search?meal=${m.key}&date=${s.date}`,

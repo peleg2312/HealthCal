@@ -10,7 +10,7 @@
 import { guidelineMinutes } from '@/lib/exercise';
 import { BUDGET_BAND } from '@/lib/insights';
 import { isCompleteDay } from '@/lib/trend';
-import { isWaterDrinkEntry } from '@/features/drinks/via';
+import { hasFoodLogged } from '@/features/drinks/via';
 import { isEstimate } from '@/features/today/meals';
 import type { ActivityEntry, FoodEntry, ISODate } from '@/types';
 
@@ -60,7 +60,7 @@ export function isOverBand(complete: boolean, kcal: number, budget: number): boo
 export function dayFacts(d: DayFactsSource, approx: boolean = d.entries.some(isEstimate)): DayFacts {
   const kcal = d.eaten.kcal;
   const budget = d.budget;
-  const foodLogged = d.entries.some((e) => !isWaterDrinkEntry(e));
+  const foodLogged = hasFoodLogged(d.entries);
   const complete = isCompleteDay(kcal, budget);
   return {
     date: d.date,

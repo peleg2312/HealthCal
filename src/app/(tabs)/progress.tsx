@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 
 import { TabHeader } from '@/components/TabHeader';
+import { hasFoodLogged } from '@/features/drinks/via';
 import { startOfWeek } from '@/lib/dates';
 import { rangeRule } from '@/lib/exerciseBudget';
 import { MIN_INSIGHT_DAYS, weekRangeLabel } from '@/lib/insights';
@@ -38,7 +39,7 @@ export default function ProgressScreen() {
 
   if (early) {
     const weekStart = startOfWeek(d.today);
-    const loggedThisWeek = d.weekDays.filter((x) => x.date >= weekStart && x.entries.length > 0).length;
+    const loggedThisWeek = d.weekDays.filter((x) => x.date >= weekStart && hasFoodLogged(x.entries)).length;
     return (
       <Screen tabs testID="progress-screen" header={<TabHeader tab="progress" overline="Trends and insights" title="Progress" />}>
         <EarlyState

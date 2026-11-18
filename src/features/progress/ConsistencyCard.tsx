@@ -1,6 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 
+import { hasFoodLogged } from '@/features/drinks/via';
 import { addDays, startOfWeek, weekdayShort } from '@/lib/dates';
 import type { InsightDay } from '@/lib/insights';
 import type { Consistency } from '@/store/selectors';
@@ -12,7 +13,8 @@ import { BigStat, Note, SectionCard } from './parts';
 export function ConsistencyCard({ consistency, weekDays, today }: { consistency: Consistency; weekDays: InsightDay[]; today: string }) {
   const { colors, spacing } = useTheme();
   const start = startOfWeek(today);
-  const logged = new Set(weekDays.filter((d) => d.entries.length > 0).map((d) => d.date));
+  // Food logged, as the streak and the total beside it count (drinks from Water alone are not a logged day).
+  const logged = new Set(weekDays.filter((d) => hasFoodLogged(d.entries)).map((d) => d.date));
   const week = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   const elapsed = week.filter((d) => d <= today).length;
   const thisWeek = week.filter((d) => logged.has(d)).length;

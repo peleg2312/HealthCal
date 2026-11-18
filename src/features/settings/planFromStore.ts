@@ -6,16 +6,16 @@ import { addDays, toISODate } from '@/lib/dates';
 import { formulaTdee } from '@/lib/energy';
 import type { Store } from '@/store';
 import { computeDayFromStore, live } from '@/store/selectors';
-import type { ISODate, MealType, ReminderSettings } from '@/types';
+import type { ISODate, ReminderSettings } from '@/types';
 
-import { planReminders, type PlannedReminder, type PlannerDay } from './reminderPlanner';
+import { planReminders, repeatableMeals, type PlannedReminder, type PlannerDay } from './reminderPlanner';
 
 function plannerDay(s: Store, date: ISODate): PlannerDay | null {
   const summary = computeDayFromStore(s, date);
   if (!summary) return null;
   const weighed = live(s.weights).some((w) => w.date === date);
-  const before = addDays(date, -1);
-  const previousDayMeals = [...new Set(live(s.foodEntries).filter((e) => e.date === before && e.meal !== 'snack').map((e) => e.meal))] as MealType[];
+  // A meal that held only drinks from Water is not offered for "Repeat yesterday's" (they are never copied).
+  const previousDayMeals = repeatableMeals(live(s.foodEntries), date);
   return { summary, weighed, previousDayMeals };
 }
 

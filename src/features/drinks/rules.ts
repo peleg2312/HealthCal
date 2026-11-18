@@ -17,11 +17,20 @@
  * - Nothing is linked silently: a same food already in the diary within 3 h (`sameDrinkInDiary`) is
  *   shown before the tap (`noticeLine`) with a "Water only" chip, off by default.
  * - Alcohol stays out of the water screen (`isAlcohol`, by id and by name).
+ * - A paired entry stays true to its water: no edit moves it to a future day or past 10,000 ml of
+ *   the drink (`pairEditProblem`, said beside the control in food detail, refused with the reason
+ *   by every write path).
+ * - Calories left without their drink are accepted when they cannot be prevented, and stay visible
+ *   (an ordinary diary row, without "also in Water"), counted and deletable; `via` stays 'water', so
+ *   they are still not "food logged". Two ways in: an app from before this change deletes the water
+ *   record only; and two phones race, one deleting on Water while the other deletes the entry in
+ *   the diary and taps Undo (restore('foodEntries') never touches water, so the entry's newer stamp
+ *   wins). Tested in pair.test.ts, "two phones".
  */
 import { BUILTIN_FOODS } from '@/data/foods';
 import { mealOnDay } from '@/features/food/addedTo';
 import { buildEntry } from '@/features/food/build';
-import { sourceInfo } from '@/features/food/helpers';
+import { QUICK_KCAL_LIMIT, sourceInfo } from '@/features/food/helpers';
 import { formatShortDate, weekdayShort } from '@/lib/dates';
 import { BEVERAGE_LABELS } from '@/lib/hydration';
 import { MEAL_LABEL, mealForTime } from '@/lib/nutrition';
@@ -85,7 +94,10 @@ export function gramsPerMl(food: Pick<Food, 'servings'>): { gPerMl: number; assu
   return { gPerMl: 1, assumed: true };
 }
 
-/** The grams logged for `ml` of a food (to 0.1 g, so the diary's calories equal the tile's). */
+/**
+ * The grams logged for `ml` of a food (to 0.1 g, so the diary's calories equal the tile's). Food
+ * detail shows a volume portion's grams as whole grams ("258 g"); that is display only.
+ */
 export function drinkGrams(food: Pick<Food, 'servings'>, ml: number): number {
   return Math.round(ml * gramsPerMl(food).gPerMl * 10) / 10;
 }
@@ -186,11 +198,26 @@ export function remember(memory: DrinkMemory, kind: Beverage, selected: Selected
 
 const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
-/** "milk", "sports drink", "soft drink": the drink in the toast (the kind, or a fixed Other choice's name). */
+/**
+ * "milk", "sports drink", "soft drink", "other drink": the drink in a toast. The kind, except a fixed
+ * Other choice (its own name) and calories typed in ("other drink", as the diary names that entry).
+ */
 function noun(kind: Beverage, drinkId: string | null | undefined): string {
+  if (drinkId === ENTERED) return 'other drink';
   if (kind !== 'other') return BEVERAGE_LABELS[kind].label.toLowerCase();
   const choice = choiceById(drinkId);
   return choice?.foodId ? choice.name : 'other drink';
+}
+
+/**
+ * A water row's title: the kind as always ("250 ml milk", "250 ml coffee"), except a drink under
+ * Other with a known food choice, which reads with the drink's own noun as its toast does ("330 ml
+ * soft drink"). A drink picked in the sheet, entered or unknown under Other keeps "other".
+ */
+export function waterRowTitle(water: Pick<WaterEntry, 'ml' | 'beverage' | 'drink'>, units: UnitSystem): string {
+  const choice = water.beverage === 'other' ? choiceById(water.drink) : undefined;
+  const name = choice?.foodId && choice.kind === 'other' ? choice.name : BEVERAGE_LABELS[water.beverage].label.toLowerCase();
+  return `${formatVolume(water.ml, units)} ${name}`;
 }
 
 /** How the drink is named in the drink line: the choice's name or the picked food's own. */
@@ -213,6 +240,24 @@ export function pickCaption(food: Food, glassMl: number, units: UnitSystem): str
   const per = `${formatNumber(drinkKcal(food, glassMl))} kcal per ${formatVolume(glassMl, units)}`;
   const taken = assumed ? `, taken as ${formatNumber(drinkGrams(food, glassMl))} g` : '';
   return `${per}${taken} · ${sourceInfo(food.source).short}`;
+}
+
+// ---------------------------------------------------------------- calories typed in
+
+/**
+ * The calories field's error, or null when the number can be added. The same limit as the quick-add
+ * screen (`QUICK_KCAL_LIMIT`: under 10,000 kcal), said in neutral words.
+ */
+export function enteredKcalError(kcal: number | null): string | null {
+  if (kcal === null) return null;
+  if (!(kcal > 0)) return 'Enter the calories';
+  if (kcal >= QUICK_KCAL_LIMIT) return `Up to ${formatNumber(QUICK_KCAL_LIMIT - 1)} kcal`;
+  return null;
+}
+
+/** The toast after a drink is picked in the sheet: nothing is logged until a glass is tapped. */
+export function pickedToast(food: Pick<Food, 'name'>): string {
+  return `${food.name} chosen. Tap a glass to add it.`;
 }
 
 // ---------------------------------------------------------------- the meal
@@ -327,7 +372,7 @@ export function planDrink(input: PlanDrinkInput): DrinkPlan {
       entry: null,
       kcal: 0,
       meal,
-      toast: `Added ${vol} ${noun(kind, choices.id)}, for water only`,
+      toast: `Added ${vol} of ${noun(kind, choices.id)}, for water only`,
       line: `${cap(name)}: for water only, no calories added`,
       tile: 'No calories',
       label: `Add ${vol} of ${name}, for water only`,
@@ -341,7 +386,7 @@ export function planDrink(input: PlanDrinkInput): DrinkPlan {
     entry,
     kcal,
     meal,
-    toast: `Added ${vol} ${noun(kind, choices.id)}, ${k} to ${where}`,
+    toast: `Added ${vol} of ${noun(kind, choices.id)}, ${k} to ${where}`,
     line: custom ? `${vol} ${name}: ${k}, to ${where}` : `${cap(name)}: ${k} per ${vol}, to ${where}`,
     tile: k,
     label: `Add ${vol} of ${name}, ${k} to ${where}`,
@@ -356,23 +401,37 @@ function liveRecords<T extends { deleted?: boolean }>(records: Iterable<T> | Rec
 }
 
 /**
- * The same food already in the diary: the latest live entry of `foodId` on `date`, logged within
- * the 3 hours before `nowIso`, that no live water record points at. The water screen then says so
- * before the tap (`noticeLine`) and offers "Water only"; nothing is linked or dropped by itself.
+ * The foods that count as "the same drink" for the notice: the selected food and every food behind
+ * the kind's own choices (any milk for Milk, any juice choice for Juice, any coffee with calories for
+ * Coffee), so whole milk from the diary's search is named before semi-skimmed is added on Water.
+ */
+export function sameDrinkFoodIds(kind: Beverage, selected: SelectedDrink | null): string[] {
+  if (!selected?.food) return [];
+  const ids = new Set<string>([selected.food.id]);
+  for (const c of choicesFor(kind)) if (c.foodId) ids.add(c.foodId);
+  return [...ids];
+}
+
+/**
+ * The same drink already in the diary: the latest live entry of one of `foodIds` (one id, or the
+ * kind's set from `sameDrinkFoodIds`) on `date`, logged within the 3 hours before `nowIso`, that no
+ * live water record points at. The water screen then says so before the tap (`noticeLine`) and
+ * offers "Water only"; nothing is linked or dropped by itself.
  */
 export function sameDrinkInDiary(
   entries: Iterable<FoodEntry> | Record<string, FoodEntry>,
   water: Iterable<WaterEntry> | Record<string, WaterEntry>,
-  foodId: string | null | undefined,
+  foodIds: string | readonly string[] | null | undefined,
   date: ISODate,
   nowIso: string,
 ): FoodEntry | null {
-  if (!foodId) return null;
+  const ids = new Set(typeof foodIds === 'string' ? [foodIds] : (foodIds ?? []));
+  if (ids.size === 0) return null;
   const now = Date.parse(nowIso);
   const linked = new Set(liveRecords(water).map((w) => w.foodEntryId).filter(Boolean));
   let best: FoodEntry | null = null;
   for (const e of liveRecords(entries)) {
-    if (e.foodId !== foodId || e.date !== date || linked.has(e.id)) continue;
+    if (!e.foodId || !ids.has(e.foodId) || e.date !== date || linked.has(e.id)) continue;
     const at = Date.parse(e.loggedAt);
     if (!(at <= now && now - at <= SAME_DRINK_WINDOW_MS)) continue;
     if (!best || e.loggedAt > best.loggedAt) best = e;
@@ -385,9 +444,15 @@ function clock(iso: string): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-/** "Orange juice is already in breakfast (08:10)." */
-export function noticeLine(entry: Pick<FoodEntry, 'name' | 'meal' | 'loggedAt'>): string {
-  return `${entry.name} is already in ${MEAL_LABEL[entry.meal].toLowerCase()} (${clock(entry.loggedAt)}).`;
+/**
+ * "Orange juice is already in breakfast (08:10)." When the entry is the selected choice's own food,
+ * it is named as the drink line above names it ("Semi-skimmed milk is already in ..."); any other
+ * food (whole milk from the search, a picked drink) by the entry's own name.
+ */
+export function noticeLine(entry: Pick<FoodEntry, 'name' | 'meal' | 'loggedAt' | 'foodId'>, selected?: SelectedDrink | null, kind?: Beverage): string {
+  const choice = choiceById(selected?.id);
+  const name = choice && kind && choice.foodId && choice.foodId === entry.foodId ? cap(choice.name) : entry.name;
+  return `${name} is already in ${MEAL_LABEL[entry.meal].toLowerCase()} (${clock(entry.loggedAt)}).`;
 }
 
 // ---------------------------------------------------------------- the pair
@@ -431,6 +496,34 @@ export function waterForEntryEdit(
   return out.ml !== undefined || out.date !== undefined ? out : null;
 }
 
+/** Why an edit of a paired entry cannot be saved, and which control it is about. */
+export interface PairEditProblem {
+  /** 'day': the day control; 'amount': the amount. The screen shows `text` beside that control. */
+  field: 'day' | 'amount';
+  text: string;
+}
+
+/**
+ * Why an edit of a paired entry cannot be saved, or null. The pair stays true (both records with
+ * matching numbers): the water screen cannot show a future day, and one water record holds at most
+ * 10,000 ml, so a paired drink is not moved past today nor made larger than that. Every write path
+ * asks this (followEntry's callers through pairEditBlocked) and food detail shows it before Save.
+ */
+export function pairEditProblem(
+  water: Pick<WaterEntry, 'ml'>,
+  before: Pick<FoodEntry, 'grams' | 'date'>,
+  after: Pick<FoodEntry, 'grams' | 'date'>,
+  today: ISODate,
+  units: UnitSystem,
+): PairEditProblem | null {
+  // Only a move to a future day: an entry left where it is (even one an older app moved ahead) can still be edited.
+  if (after.date > today && after.date !== before.date) return { field: 'day', text: 'A drink also counted in Water stays on today or an earlier day.' };
+  if (before.grams > 0 && after.grams > 0 && (water.ml * after.grams) / before.grams > MAX_ML + 0.5) {
+    return { field: 'amount', text: `A drink also counted in Water is at most ${formatVolume(MAX_ML, units)}.` };
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------- words for the pair
 
 /** The diary row's mark for an entry a live water record points at: "250 ml · also in Water · Reference". */
@@ -442,11 +535,11 @@ export function waterRowCaption(entry: Pick<FoodEntry, 'name' | 'meal' | 'date' 
   return `${entry.name} · ${formatNumber(Math.round(entry.nutrients.kcal))} kcal in ${MEAL_LABEL[entry.meal].toLowerCase()}${day}`;
 }
 
-/** The toast after deleting a water record: "Removed 250 ml milk and its 129 kcal", or "Removed 250 ml" without calories. */
+/** The toast after deleting a water record: "Removed 250 ml of milk and its 129 kcal", or "Removed 250 ml" without calories. */
 export function removedWaterToast(water: Pick<WaterEntry, 'ml' | 'beverage' | 'drink'>, partner: Pick<FoodEntry, 'nutrients'> | null, units: UnitSystem): string {
   const vol = formatVolume(water.ml, units);
   if (!partner) return `Removed ${vol}`;
-  return `Removed ${vol} ${noun(water.beverage, water.drink)} and its ${formatNumber(Math.round(partner.nutrients.kcal))} kcal`;
+  return `Removed ${vol} of ${noun(water.beverage, water.drink)} and its ${formatNumber(Math.round(partner.nutrients.kcal))} kcal`;
 }
 
 /** The toast after deleting, in the diary, an entry a water record points at. */
@@ -454,9 +547,16 @@ export function removedEntryToast(name: string, water: Pick<WaterEntry, 'ml'>, u
   return `Removed ${name}. The ${formatVolume(water.ml, units)} stays in Water.`;
 }
 
-/** `detail-drink-note` on a paired entry's detail. */
-export function detailDrinkNote(water: Pick<WaterEntry, 'ml'>, units: UnitSystem): string {
-  return `Also counted in Water as ${formatVolume(water.ml, units)}. Changing the amount here changes it there; deleting here keeps the water.`;
+/**
+ * `detail-drink-note` on a paired entry's detail. An entry with an amount (a reference food) moves
+ * its water with the amount and the day. One whose calories were typed in (grams 0) has no amount
+ * the water could follow: its calories never change the water, only its day moves it.
+ */
+export function detailDrinkNote(water: Pick<WaterEntry, 'ml'>, units: UnitSystem, hasAmount = true): string {
+  const vol = formatVolume(water.ml, units);
+  return hasAmount
+    ? `Also counted in Water as ${vol}. Changing the amount here changes it there; deleting here keeps the water.`
+    : `Also counted in Water as ${vol}. The calories here do not change it; changing the day moves it there, and deleting here keeps the water.`;
 }
 
 /** saveMeal's toast when every entry was a drink from Water. */

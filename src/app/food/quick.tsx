@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { DayStepper, MealPicker } from '@/features/food/components';
-import { href, kcal, parseDate, parseMeal } from '@/features/food/helpers';
+import { QUICK_KCAL_LIMIT, href, kcal, parseDate, parseMeal } from '@/features/food/helpers';
 import { logQuickAdd } from '@/features/food/log';
 import { atwaterKcal, MEAL_LABEL } from '@/lib/nutrition';
 import { useTheme } from '@/theme';
@@ -24,7 +24,7 @@ export default function QuickAddScreen() {
   const implied = Math.round(atwaterKcal({ protein: protein ?? 0, carbs: carbs ?? 0, fat: fat ?? 0 }));
   const calories = kcalV ?? (hasMacros ? implied : null);
   const mismatch = kcalV !== null && hasMacros && implied > 40 && Math.abs(implied - kcalV) > Math.max(50, kcalV * 0.2);
-  const valid = calories !== null && calories > 0 && calories < 10000;
+  const valid = calories !== null && calories > 0 && calories < QUICK_KCAL_LIMIT;
 
   const save = () => {
     if (!valid) return;

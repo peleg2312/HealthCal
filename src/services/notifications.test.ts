@@ -5,12 +5,15 @@ import { addDays, toISODate } from '@/lib/dates';
 import { netKcal } from '@/lib/exercise';
 import {
   checkInBody,
+  dayOnTrack,
   inQuietHours,
   MAX_PER_DAY,
   MIN_GAP_MINUTES,
   planReminders,
+  mealRepeat,
   mealRepeatCategory,
   parseReminderAction,
+  repeatableMeals,
   reminderTimeLabel,
   snoozeTime,
   walkNetKcal,
@@ -331,6 +334,33 @@ describe('reminder links and actions', () => {
     expect(waterCategory([250, 500], 'metric').identifier).not.toBe(waterCategory([250, 500], 'imperial').identifier);
     expect(waterActionAmounts(undefined)).toEqual([250, 500]);
     expect(waterActionAmounts([250, 250, 5])).toEqual([250]);
+  });
+
+  it('a drink from Water never cancels a meal reminder nor counts as a logged meal in the check-in', () => {
+    const now = at(6);
+    const latte = { ...entry('breakfast', 139, 7), id: 'latte', via: 'water' as const };
+    const s = day('2026-11-11', { meals: ['lunch', 'dinner'], eaten: 1900, protein: 150, waterMl: 2500 });
+    s.byMeal.breakfast.push(latte);
+    s.entries.push(latte);
+    const plan = planReminders(input(now, {}, s), now);
+    expect(plan.find((r) => r.id === 'meal-breakfast-2026-11-11')).toBeDefined();
+    expect(dayOnTrack(s)).toBe(false);
+    expect(checkInBody(s, 'metric')).toMatch(/Not logged yet: breakfast\.$/);
+  });
+
+  it('"Repeat yesterday\'s" never copies a drink from Water, is not offered for drinks alone, and is not refused by one', () => {
+    const at2 = (date: string, meal: MealType, id: string, via?: 'water') => ({ ...entry(meal), id, date, ...(via ? { via } : null) });
+    const y = '2026-11-10';
+    const t = '2026-11-11';
+    const onlyDrink = [at2(y, 'breakfast', 'y-latte', 'water')];
+    expect(repeatableMeals(onlyDrink, t)).toEqual([]);
+    expect(mealRepeat(onlyDrink, t, 'breakfast').items).toEqual([]);
+    const both = [...onlyDrink, at2(y, 'breakfast', 'y-oats'), at2(t, 'breakfast', 't-latte', 'water')];
+    expect(repeatableMeals(both, t)).toEqual(['breakfast']);
+    const r = mealRepeat(both, t, 'breakfast');
+    expect(r.items.map((e) => e.id)).toEqual(['y-oats']);
+    expect(r.already).toBe(false);
+    expect(mealRepeat([...both, at2(t, 'breakfast', 't-oats')], t, 'breakfast').already).toBe(true);
   });
 
   it('offers to repeat a meal only when the day before had it', () => {

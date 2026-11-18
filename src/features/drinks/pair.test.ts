@@ -52,7 +52,7 @@ describe('logging a drink', () => {
     expect(liveWater()).toHaveLength(1);
     expect(liveEntries()).toHaveLength(1);
     expect(kcalOn(TODAY)).toBe(129);
-    expect(last().message).toMatch(/^Added 250 ml milk, 129 kcal to (breakfast|lunch|dinner|snacks)$/);
+    expect(last().message).toMatch(/^Added 250 ml of milk, 129 kcal to (breakfast|lunch|dinner|snacks)$/);
     expect(last().opts?.tint).toBe('water');
   });
 
@@ -115,7 +115,7 @@ describe('deleting from either side', () => {
   it('on Water: both go in one act, the toast names the calories, Undo brings both back', () => {
     const { water, entry } = logDrink(plan());
     removeDrink(S().water[water.id]);
-    expect(last().message).toBe('Removed 250 ml milk and its 129 kcal');
+    expect(last().message).toBe('Removed 250 ml of milk and its 129 kcal');
     expect(S().water[water.id].deleted).toBe(true);
     expect(S().foodEntries[entry!.id].deleted).toBe(true);
     expect(S().water[water.id].updatedAt).toBe(S().foodEntries[entry!.id].updatedAt);
@@ -210,12 +210,34 @@ describe('changing the amount or day in the diary', () => {
     const yesterday = addDays(TODAY, -1);
     logFood({ food, serving: { label: e().servingLabel, grams: e().grams }, quantity: 1, meal: e().meal, date: yesterday, entryId: entry!.id });
     expect(S().water[water.id].date).toBe(yesterday);
+    // A future day is refused, with the reason, and neither record moves.
     logFood({ food, serving: { label: e().servingLabel, grams: e().grams }, quantity: 1, meal: e().meal, date: addDays(TODAY, 1), entryId: entry!.id });
+    expect(last().message).toBe('A drink also counted in Water stays on today or an earlier day.');
+    expect(e().date).toBe(yesterday);
     expect(S().water[water.id].date).toBe(yesterday);
     const stamp = S().water[water.id].updatedAt;
     logFood({ food, serving: { label: e().servingLabel, grams: e().grams }, quantity: 1, meal: 'snack', date: e().date, entryId: entry!.id });
     expect(S().water[water.id].ml).toBe(250);
     expect(S().water[water.id].updatedAt >= stamp).toBe(true);
+  });
+
+  it('a paired entry never goes to a future day nor past 10,000 ml of the drink, from any edit; the reason is said', () => {
+    const { water, entry } = logDrink(plan());
+    const e = () => S().foodEntries[entry!.id];
+    const before = e();
+    // The stepper and the detail's amount: 40 glasses (10,000 ml) is the most, 41 is refused.
+    setEntryAmount(e(), 40);
+    expect(S().water[water.id].ml).toBe(10000);
+    setEntryAmount(e(), 41);
+    expect(last().message).toBe('A drink also counted in Water is at most 10 L.');
+    expect(e().quantity).toBe(40);
+    expect(S().water[water.id].ml).toBe(10000);
+    // The manual editor's day.
+    updateEntryDirect(e(), { name: e().name, nutrients: e().nutrients, meal: e().meal, date: addDays(TODAY, 1) });
+    expect(last().message).toBe('A drink also counted in Water stays on today or an earlier day.');
+    expect(e().date).toBe(TODAY);
+    expect(S().water[water.id].date).toBe(TODAY);
+    expect(before.via).toBe('water');
   });
 
   it('an entered drink (no grams) follows its new day; Undo restores both', () => {
@@ -402,6 +424,32 @@ describe('two phones', () => {
       expect(p.store.getState().water[two.waterId].deleted).toBe(false);
       expect(p.store.getState().foodEntries[two.entryId].deleted).toBe(true);
       consistent(p);
+    }
+  });
+
+  it('A deletes on Water while B deletes in the diary and taps Undo: the entry is left without its water, visible, counted and deletable', async () => {
+    // Accepted (rules.ts header): restore('foodEntries') never touches water, so B's Undo stamps the
+    // entry after A's delete. After sync the entry is live with via 'water' and no live water.
+    const { a, b, waterId, entryId } = await pairOnBoth();
+    a.log.removeDrink(a.store.getState().water[waterId]);
+    await sleep();
+    b.log.deleteEntry(b.store.getState().foodEntries[entryId]);
+    toasts[toasts.length - 1].opts!.onPress!();
+    sync(a, b);
+    for (const p of [a, b]) {
+      const s = p.store.getState();
+      expect(s.water[waterId].deleted).toBe(true);
+      const e = s.foodEntries[entryId];
+      expect(e.deleted).toBe(false);
+      expect(e.via).toBe('water');
+      // Visible in the diary and counted: an ordinary live entry for that day.
+      expect(Object.values(s.foodEntries).filter((x) => !x.deleted && x.date === TODAY).map((x) => x.id)).toEqual([entryId]);
+      expect(Math.round(e.nutrients.kcal)).toBe(129);
+      // Deletable, with the plain toast (no water says it stays).
+      toasts.length = 0;
+      p.log.deleteEntry(e);
+      expect(p.store.getState().foodEntries[entryId].deleted).toBe(true);
+      expect(toasts[0].message).toBe(`Removed ${e.name}`);
     }
   });
 

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 
+import { hasFoodLogged } from '@/features/drinks/via';
 import { addDays, startOfWeek } from '@/lib/dates';
 import { isCompleteDay, type WeeklyRecap } from '@/lib/insights';
 import { useToday } from '@/store/clock';
@@ -9,7 +10,7 @@ import type { ISODate, MealType } from '@/types';
 import { MEAL_ORDER, type ShareDay, type ShareDayInput, type ShareWeekInput } from './content';
 
 function shareDay(d: DaySummary | WeeklyRecap['days'][number], today: ISODate): ShareDay {
-  return { date: d.date, logged: d.entries.length > 0, kcal: d.eaten.kcal, budget: d.budget, complete: isCompleteDay(d, today) };
+  return { date: d.date, logged: hasFoodLogged(d.entries), kcal: d.eaten.kcal, budget: d.budget, complete: isCompleteDay(d, today) };
 }
 
 /** Everything a day card may show, read from the store. Weight is not read at all. */

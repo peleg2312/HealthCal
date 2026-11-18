@@ -21,8 +21,8 @@ import { Platform } from 'react-native';
 
 import { logItems } from '@/features/food/log';
 import { planFromStore } from '@/features/settings/planFromStore';
-import { parseReminderAction, snoozeTime, type PlannedReminder, type ReminderCategory } from '@/features/settings/reminderPlanner';
-import { addDays, today } from '@/lib/dates';
+import { mealRepeat, parseReminderAction, snoozeTime, type PlannedReminder, type ReminderCategory } from '@/features/settings/reminderPlanner';
+import { today } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
 import { formatVolume } from '@/lib/units';
 import { useStore } from '@/store';
@@ -73,14 +73,12 @@ function addWaterFromReminder(ml: number) {
 }
 
 function repeatMealFromReminder(meal: 'breakfast' | 'lunch' | 'dinner', date: string) {
-  const s = useStore.getState();
-  const from = addDays(date, -1);
-  const items = live(s.foodEntries).filter((e) => e.date === from && e.meal === meal);
+  // Drinks from Water are never copied, and a drink alone does not make the meal "already logged" (mealRepeat).
+  const { items, already } = mealRepeat(live(useStore.getState().foodEntries), date, meal);
   if (items.length === 0) {
     toast(`Nothing was logged for ${meal} yesterday`);
     return;
   }
-  const already = live(s.foodEntries).some((e) => e.date === date && e.meal === meal);
   if (already) {
     toast(`${meal.charAt(0).toUpperCase()}${meal.slice(1)} is already logged today`);
     return;

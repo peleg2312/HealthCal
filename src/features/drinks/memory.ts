@@ -8,6 +8,11 @@
  * never for "Water only". Read once into a small store (`useDrinkMemory`); until it is read the
  * defaults show. Every read and write is in try/catch: unreadable storage means "defaults".
  * The rule for what is selected on arrival is the pure `rememberedChoice` (./rules.ts).
+ *
+ * Per device, like the quote pin and the spread hint: the key is outside the store's `healthcal/`
+ * prefix, so neither sign-out nor the recovery screen's wipe clears it, and the next account on the
+ * same phone starts on the last choice made there. Accepted: it holds a choice (and for a picked
+ * drink, that food), nothing synced, and an own food that is no longer there falls back to the default.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';

@@ -1,5 +1,6 @@
 /**
- * Bundled offline food database. Nutrients are per 100 g (100 ml for liquids).
+ * Bundled offline food database. Nutrients are per 100 g; liquids too (drinks are converted from ml
+ * with their serving's density, src/features/drinks/rules.ts gramsPerMl).
  *
  * Checked in November 2026 against the downloaded USDA FoodData Central CSV/JSON
  * releases: SR Legacy (sr_legacy_food_csv_2018-04), FNDDS survey foods
