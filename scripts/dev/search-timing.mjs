@@ -36,8 +36,8 @@ const QUERIES = [
   // The parts pass (strict and relaxed find nothing; each word searched by itself), the relaxed pass with an
   // amount, a glued prefix inside a name, and a long Hebrew query (six words, the most the parts pass reads).
   'שניצל בפיתה', 'סביח בפיתה', 'קפה עם חלב סויה', '150 גר עוף', 'חציל טחינה', 'פלאפל חומוס טחינה סלט חריף מלפפון',
-  // The second fix round: a percentage the strict pass finds, one the relaxed pass leaves unmatched (only foods
-  // whose name states a percentage), one that empties the relaxed pass, and one the parts pass never searches alone.
+  // The second fix round: a percentage the strict pass finds, two the relaxed pass leaves unmatched (any food, the
+  // third round's K1), and one the parts pass never searches alone.
   'גבינה בולגרית 5%', "קוטג' 7%", 'פיתה 5%', 'פיתה חומוס 5%',
   // A number followed by אחוז or אחוזים, read as the number with % (the lead's G1c).
   'חלב 3 אחוז', 'יוגורט יווני 0 אחוזים',

@@ -5,7 +5,8 @@
  *
  *   welcome -> onboarding -> plan -> Today -> log food -> log a run -> add water -> reload
  *   -> the next morning: the morning page opens by itself once (greeting, quote, plan), closes onto Today, not again
- *   -> ... -> drinks -> an old portion after a reload: the + sheet's tile shows what its tap stores
+ *   -> ... -> drinks -> an old portion after a reload: the + sheet's tile shows what its tap stores, and so does
+ *      "Repeat yesterday's <meal>" (bundled foods at today's values, an own food and an online product as stored)
  *
  * The expected numbers are recomputed here from the published formulas, not
  * read back from the app's own calculation code, so a mistake in the engine
@@ -675,6 +676,26 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
         });
       }
     }
+    // For "Repeat yesterday's <meal>" (lead's decision L1): yesterday, in every meal, an own food logged at 450 kcal per
+    // 100 g and since edited to 500, and an online product; today's meals emptied so the repeat is offered at any hour.
+    const s = window.__healthcal.getState();
+    const own = { id: 'e2e_own_granola', name: 'My granola', emoji: '\u{1F963}', source: 'custom', verified: false, per100g: { kcal: 450, protein: 10, carbs: 60, fat: 18 }, servings: [{ label: '1 bowl', grams: 60 }] };
+    s.upsert('customFoods', { ...own, per100g: { ...own.per100g, kcal: 500 } });
+    const online = { id: 'off_7290000000001', name: 'Hummus spread', brand: 'Store brand', source: 'openfoodfacts', verified: false, per100g: { kcal: 250, protein: 7, carbs: 12, fat: 19 }, servings: [{ label: '1 tbsp', grams: 15 }] };
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const y = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const now = new Date();
+    const t = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    for (const meal of ['breakfast', 'lunch', 'dinner', 'snack']) {
+      for (const [food, label, grams, quantity] of [[own, '1 bowl', 60, 1], [online, '1 tbsp', 30, 2]]) {
+        s.upsert('foodEntries', {
+          date: y, meal, name: food.name, brand: food.brand, emoji: food.emoji, foodId: food.id, source: food.source, verified: false, servingLabel: label, quantity, grams,
+          nutrients: Object.fromEntries(Object.entries(food.per100g).map(([k, v]) => [k, (v * grams) / 100])), food, loggedAt: `${y}T11:00:00.000Z`,
+        });
+      }
+    }
+    for (const e of Object.values(s.foodEntries)) if (!e.deleted && e.date === t) s.remove('foodEntries', e.id);
   });
   await page.evaluate(() => window.__healthcal.flush());
   await page.waitForTimeout(500);
@@ -682,6 +703,22 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   await page.waitForTimeout(1500);
   await tap('tab-add');
   const tile = (await text('quick-usual-b_bourekas_cheese')).replace(/\s*\n\s*/g, ' / ');
+  const repeatRow = (await text('quick-repeat')).replace(/\s*\n\s*/g, ' / ');
+  before = await stored();
+  await tap('quick-repeat');
+  s = await stored();
+  const copied = newIn(s, before, 'foodEntries');
+  const rowKcal = Number((repeatRow.match(/([\d,]+) kcal/) || [])[1]?.replace(/,/g, ''));
+  const copiedKcal = copied.reduce((n, e) => n + e.nutrients.kcal, 0);
+  const cb = copied.find((e) => e.foodId === 'b_bourekas_cheese');
+  const co = copied.find((e) => e.foodId === 'e2e_own_granola');
+  const cn = copied.find((e) => e.foodId === 'off_7290000000001');
+  check(
+    "repeat: after a reload \"Repeat yesterday's\" shows what its tap stores (bundled at today's values, own food and online product as logged)",
+    copied.length === 3 && rowKcal === Math.round(copiedKcal) && !!cb && cb.servingLabel === '80 g' && Math.abs(cb.nutrients.kcal - (cb.food.per100g.kcal * 80) / 100) < 0.01 &&
+      !!co && Math.abs(co.nutrients.kcal - 270) < 0.01 && co.servingLabel === '1 bowl' && !!cn && Math.abs(cn.nutrients.kcal - 75) < 0.01,
+    `row "${repeatRow}", stored ${copied.map((e) => `${e.name} ${e.servingLabel} x${e.quantity} ${e.nutrients.kcal.toFixed(1)}`).join('; ')}`,
+  );
   before = await stored();
   await tap('quick-usual-b_bourekas_cheese');
   s = await stored();

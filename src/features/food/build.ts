@@ -11,6 +11,8 @@ import { nowISO } from '@/lib/id';
 import { scaleNutrients, sumNutrients } from '@/lib/nutrition';
 import type { Food, FoodEntry, ISODate, MealType, Nutrients, SavedMeal, SavedMealItem, Serving } from '@/types';
 
+import { currentValues } from './usuals';
+
 /**
  * Confidence assumed for an AI food re-logged when no earlier entry says how
  * sure the estimate was. Deliberately on the unsure side, so the range is
@@ -186,10 +188,12 @@ export interface SavedMealPlan {
  * What logging a saved meal adds. A plain meal logs its ticked items as they
  * are. A recipe (servings > 1) logs one line, the ticked items summed and
  * scaled to the portion, with a food definition so it can be re-portioned
- * later. `include` defaults to every item; `portion` to one serving.
+ * later. `include` defaults to every item; `portion` to one serving. A line of
+ * a bundled food counts at today's values for its grams (`currentValues`); the
+ * saved meal itself is not changed.
  */
 export function planSavedMeal(meal: Pick<SavedMeal, 'id' | 'name' | 'items' | 'servings'>, opts: { portion?: number; include?: boolean[] } = {}): SavedMealPlan {
-  const ticked = meal.items.filter((_, i) => opts.include?.[i] ?? true);
+  const ticked = meal.items.filter((_, i) => opts.include?.[i] ?? true).map(currentValues);
   const servings = mealServings(meal);
   if (servings <= 1) {
     const n = sumNutrients(ticked.map((it) => it.nutrients));

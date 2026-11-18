@@ -18,6 +18,7 @@ import { RowEmoji } from './components';
 import { formatPortion, mealServings, planSavedMeal, setItemAmount } from './build';
 import { dayPhrase, formatQty, kcal, labelGrams, matchServing, portionLabel, servingText } from './helpers';
 import { logSavedMeal } from './log';
+import { currentValues } from './usuals';
 
 const PORTIONS = [0.5, 1, 2];
 
@@ -108,8 +109,10 @@ export function LogSavedMealSheet({ meal, mealType, date, onClose }: { meal: Sav
         <Text variant="label" style={{ marginBottom: spacing.xs }}>
           {recipe ? 'In this recipe' : 'Items'}
         </Text>
-        {meal.items.map((it, i) => {
+        {meal.items.map((saved, i) => {
           const on = include[i] ?? true;
+          // The line as logging it adds it (currentValues), the same as the total on the button.
+          const it = currentValues(saved);
           return (
             <PressableScale
               key={i}

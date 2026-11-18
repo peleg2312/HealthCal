@@ -239,3 +239,6 @@ skhug	-	b_schug	new: a Latin search name of a new food
 zatar	-	b_zaatar	new: a Latin search name of a new food
 zhoug	-	b_schug	new: a Latin search name of a new food
 zhug	-	b_schug	new: a Latin search name of a new food
+sunflower seeds	b_sunflower_seeds	b_sunflower_seeds
+pumpkin seeds	b_pumpkin_seeds	b_pumpkin_seeds
+quark	-	b_white_cheese_5pct	latin: 'quark' is a Latin search name of white cheese (K3); the cheesecake made with it comes second

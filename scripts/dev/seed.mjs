@@ -276,6 +276,16 @@ function stressUp(state, { put, baselineTdee }) {
 //                src/store/persistence.ts). Today's bundled food names "1 piece" at another weight, so the + sheet,
 //                food search and What fits must show and log 80 g at today's values (entries ...b001 to ...b005;
 //                the usual snack, since the demo's snacks vary: look at it with the clock at 16:30).
+// For copies at today's values (lead's decision L1 of the Israeli foods review):
+//   oldBourekas  2: the above, and yesterday's lunch is five foods logged at 12:40, three of them bundled foods logged before the
+//                Israeli foods were added (commit 3fa7914), in the shape a restart gives them (today's bundled food
+//                attached, the old label, grams and nutrients): cheese bourekas "1 piece" 80 g (268 kcal), halloumi
+//                2 x "1 slice" 30 g (192.6 kcal), chicken schnitzel "1 piece" 130 g (331.5 kcal); then an own food
+//                (My granola, 1 bowl 60 g, 270 kcal, the live own food since edited to 500 kcal per 100 g) and an
+//                online product (Hummus spread, 2 tbsp 30 g, 75 kcal). Today's lunch is left empty, so "Repeat
+//                yesterday's lunch" is offered at lunch time (entries ...c001 to ...c005; look with the clock at 12:30).
+//                Also the newest saved meal, "Lunch plate" (...c101), saved then: the old bourekas and halloumi lines
+//                with their old food copies and the own food (lead's decision L2).
 // Only what is named changes; everything else stays the demo's. Applied in that order: eatBack, spread, exercise and
 // the week first (they move the budget and the water goal), then food, water, drinks and the fast.
 
@@ -470,6 +480,43 @@ function applyValues(state, values, { put, weightKg, baselineTdee }) {
         source: 'builtin', verified: false, servingLabel: '1 piece', quantity: 1, grams: 80, nutrients, food, loggedAt: at(n, 16, 30),
       });
     }
+  }
+  if (values.oldBourekas >= 2) {
+    const yesterday = iso(daysAgo(1));
+    drop('foodEntries', (e) => !((e.date === yesterday || e.date === day) && e.meal === 'lunch'));
+    // The rows of src/data/foods.ts at 3fa7914: kcal, protein, carbs, fat, fiber, sugar, satFat, sodium per 100 g.
+    const OLD_ROWS = {
+      b_bourekas_cheese: { per: [335, 9.0, 28.0, 21.0, 1.0, 1.5, 9.0, 600], label: '1 piece', grams: 80, quantity: 1 },
+      b_halloumi: { per: [321, 21.0, 2.2, 25.0, 0, 1.5, 16.0, 1200], label: '1 slice', grams: 30, quantity: 2 },
+      b_schnitzel_chicken: { per: [255, 20.0, 12.0, 14.0, 0.8, 0.8, 2.5, 450], label: '1 piece', grams: 130, quantity: 1 },
+    };
+    const KEYS = ['kcal', 'protein', 'carbs', 'fat', 'fiber', 'sugar', 'satFat', 'sodium'];
+    const scaled = (per100g, grams) => Object.fromEntries(Object.entries(per100g).map(([k, v]) => [k, (v * grams) / 100]));
+    let n = 0;
+    const entry = (food, label, grams, quantity, nutrients, extra = {}) => {
+      n++;
+      put('foodEntries', {
+        id: `00000000-0000-4000-8000-00000000c00${n}`, date: yesterday, meal: 'lunch', name: food.name, emoji: food.emoji, foodId: food.id,
+        source: food.source, verified: !!food.verified, servingLabel: label, quantity, grams: grams * quantity, nutrients, food, loggedAt: at(1, 12, 40 + n), ...extra,
+      });
+    };
+    for (const [id, o] of Object.entries(OLD_ROWS)) {
+      const per100g = Object.fromEntries(KEYS.map((k, i) => [k, o.per[i]]));
+      entry(bundledFood(id), o.label, o.grams, o.quantity, scaled(per100g, o.grams * o.quantity));
+    }
+    const ownThen = { id: 'seed_own_granola', name: 'My granola', emoji: '🥣', source: 'custom', verified: false, per100g: { kcal: 450, protein: 10, carbs: 60, fat: 18, fiber: 7 }, servings: [{ label: '1 bowl', grams: 60 }] };
+    state.customFoods[ownThen.id] = { ...ownThen, per100g: { ...ownThen.per100g, kcal: 500 }, updatedAt: at(1, 20), deleted: false };
+    entry(ownThen, '1 bowl', 60, 1, scaled(ownThen.per100g, 60));
+    const online = { id: 'off_7290000000001', name: 'Hummus spread', brand: 'Store brand', emoji: '🥫', source: 'openfoodfacts', verified: false, per100g: { kcal: 250, protein: 7, carbs: 12, fat: 19, fiber: 5 }, servings: [{ label: '1 tbsp', grams: 15 }] };
+    entry(online, '1 tbsp', 15, 2, scaled(online.per100g, 30), { brand: online.brand });
+    // A saved meal from then (a synced record keeps each line's food copy as it was): the old bourekas and halloumi
+    // lines and the own food; the newest saved meal, so it is the + sheet's tile and the first card on Saved meals.
+    const line = (food, label, grams, quantity, per100g) => ({ name: food.name, emoji: food.emoji, servingLabel: label, quantity, grams: grams * quantity, nutrients: scaled(per100g, grams * quantity), food: { ...food, per100g }, source: food.source, verified: !!food.verified });
+    const oldPer = (id) => Object.fromEntries(KEYS.map((k, i) => [k, OLD_ROWS[id].per[i]]));
+    put('savedMeals', {
+      id: '00000000-0000-4000-8000-00000000c101', name: 'Lunch plate', updatedAt: new Date().toISOString(), servings: 1,
+      items: [line(bundledFood('b_bourekas_cheese'), '1 piece', 80, 1, oldPer('b_bourekas_cheese')), line(bundledFood('b_halloumi'), '1 slice', 30, 2, oldPer('b_halloumi')), line(ownThen, '1 bowl', 60, 1, ownThen.per100g)],
+    });
   }
   if (values.lastNight !== undefined) {
     const night = iso(daysAgo(-1));

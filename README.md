@@ -235,6 +235,7 @@ The scripts under `scripts/dev` test the web build in a browser. The flows in `.
 - `health-and-about.yml` (after first-day): Workout sync turned on, the app's explanation, the system's permission screen (Apple Health or Health Connect), the sync screen and Train's steps line, then About and its version block with "Check for updates".
 - `health-data-ios.yml` (iPhone only, best effort): types steps into the simulator's Health app, syncs, and looks for them on Train.
 - `drinks.yml` (after first-day, run with `flows=first-day,drinks`): a milk logged on the water screen with its choices and the calorie line, its row in Today's log and the diary, then the drink sheet with calories typed while the keyboard is up. Passed on the Android 15 emulator on 18 November 2026 (run 44319058732).
+- `hebrew.yml` (after first-day, run with `flows=first-day,hebrew`; best effort, its screenshots are the evidence): the app's second start, then the food search with a Hebrew word typed on the phone's keyboard ("קוטג"), the result added to dinner, a Latin spelling ("tehina") and the diary.
 
 **On GitHub's machines, free.** The repository is public, so GitHub Actions' standard runners, macOS included, cost nothing. `.github/workflows/phone-test.yml` builds the app in Release (the JavaScript inside, no Metro; the Supabase settings from `eas.json`'s `build.production.env`) and runs the flows on an iPhone simulator (macOS 26, Xcode 26.4 or later) and an Android emulator (Android 15, x86_64; Health Connect is expected on this image, and the job log lists the health packages it found). It starts only by hand.
 
@@ -245,6 +246,12 @@ What the first runs showed (16 and 17 November 2026):
 - An update published to a test channel arrived on both: About reads "Updated Nov 16" and "Up to date" after the second start.
 - `health-data-ios` showed the whole path once: 8,432 steps typed into the simulator's Health app were read through HealthKit and shown on the sync screen ("8,432 today, shown on Train") and on Train. Adding a workout by hand in the Health app did not go through, so reading a workout from Apple Health is still unproven.
 
+Hebrew, on the Android 15 emulator (18 November 2026):
+
+- The phone in English (run 44349310828): Maestro typed "קוטג" and the search showed "Cottage cheese, 5% fat" first with the name it matched under it, a tap added 238 kcal to dinner, and "tehina" found the tahini sauce first with an online product under "Online products".
+- The phone set to Hebrew (`-f android_locale=system:he-IL`): a build from before `src/features/layout/leftToRight.ts` came up mirrored on every screen, the tabs in reverse order and English text against the right edge (run 44337190400). A build with that file was left to right from its first start, with only the phone's own status bar mirrored, and both flows passed (run 44354679253).
+- `android_locale` takes a language tag for the app alone (`he-IL`, through Android's per-app language, which did not mirror the app and on one run met the emulator's "Pixel Launcher isn't responding" dialog) or `system:<tag>` for the whole emulator, which is what a phone set to Hebrew is. Leave it empty for a phone in English. Not tried: a real phone, and an iPhone set to Hebrew (iOS does not mirror an app that ships no right-to-left language).
+
 Two things that cost a run each: GitHub's `macos-26` machines are not always free (the job waits 15 minutes and is cancelled without starting: start it again; `macos-15` cannot build this app, because its newest Xcode is 26.3 and expo-modules-jsi does not compile before 26.4), and on a cold simulator the first flow can lose Maestro's driver ("Device became unreachable"): start the run again with `app_run_id` and it passes. The system screens' labels in the flows are the ones these runs showed; they are still tapped as optional, and health-data-ios never fails the job.
 
 ```bash
@@ -254,6 +261,9 @@ gh workflow run phone-test.yml --ref claude/health-fitness-app-17mku3 -f platfor
 gh api -X POST repos/peleg2312/HealthCal/actions/workflows/phone-test.yml/dispatches \
   -f ref=claude/health-fitness-app-17mku3 -f 'inputs[platform]=ios' -f 'inputs[flows]=first-day,health-and-about'
 # (with curl: -H 'Authorization: Bearer <token>' -H 'Accept: application/vnd.github+json' and the same JSON body)
+
+# Hebrew typed into the food search, on an emulator whose own language is Hebrew:
+gh workflow run phone-test.yml --ref claude/health-fitness-app-17mku3 -f platform=android -f flows=first-day,hebrew -f android_locale=system:he-IL
 
 # Changed only a flow? Reuse the app an earlier run built (the number in its URL) and skip the 20 to 30 minute build.
 # That run must have built the platform asked for (platform=both, or the same platform):

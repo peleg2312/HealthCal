@@ -8,6 +8,7 @@ import { formatPortion, itemsRange, mealServings } from '@/features/food/build';
 import { DayStepper, MealPicker, RowEmoji } from '@/features/food/components';
 import { href, kcal, parseDate, parseMeal } from '@/features/food/helpers';
 import { LogSavedMealSheet, itemLine } from '@/features/food/SavedMealParts';
+import { currentValues } from '@/features/food/usuals';
 import { isolateRtl } from '@/lib/bidi';
 import { MEAL_LABEL, sumNutrients } from '@/lib/nutrition';
 import { useLive } from '@/store/selectors';
@@ -49,7 +50,9 @@ export default function SavedMealsScreen() {
         />
       ) : (
         meals.map((m, i) => {
-          const n = sumNutrients(m.items.map((it) => it.nutrients));
+          // Each line as logging it adds it: a bundled food at today's values (currentValues); the saved meal is not changed.
+          const items = m.items.map(currentValues);
+          const n = sumNutrients(items.map((it) => it.nutrients));
           const count = mealServings(m);
           const approx = itemsRange(m.items) ? '~' : '';
           return (
@@ -67,7 +70,7 @@ export default function SavedMealsScreen() {
               <MacroBar protein={n.protein * 4} carbs={n.carbs * 4} fat={n.fat * 9} height={6} />
               {/* Each item's amount goes under its name, as in the diary, so neither squeezes the other into a few letters. */}
               <View style={{ gap: spacing.sm }}>
-                {m.items.map((it, j) => (
+                {items.map((it, j) => (
                   <View key={j} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                     <RowEmoji emoji={it.emoji} />
                     <View style={{ flex: 1, minWidth: 0 }}>

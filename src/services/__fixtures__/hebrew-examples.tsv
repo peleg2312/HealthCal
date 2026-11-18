@@ -240,13 +240,21 @@ tahina	b_tahini,b_tahini_sauce
 קוטג' 9%	b_cottage_cheese_9pct	b_cottage_cheese_5pct
 קוטג 9%	b_cottage_cheese_9pct
 קוטג 9 אחוז	b_cottage_cheese_9pct
-# G1: the relaxed pass leaves a percentage unmatched only for a food whose English name states one (7% is no row)
+# K1: the relaxed pass may leave a typed percentage unmatched for any food, as before round two (the round-two
+# filter that kept only foods whose name states a percentage is withdrawn: it hid the right food for one word
+# with a percentage). "פיתה 5%" and the like therefore show the pitas again, as the relaxed pass gives.
 קוטג' 7%	b_cottage_cheese_5pct
 גבינה לבנה 7 אחוז	b_white_cheese_5pct
-פיתה 5%	-
-טחינה 30%	-
-פיתה 1.5%	-
-פיתה 5 אחוז	-
+פיתה 5%	b_pita_bakery
+טחינה 30%	b_tahini_sauce
+פיתה 1.5%	b_pita_bakery
+פיתה 5 אחוז	b_pita_bakery
+קפיר 1.5%	b_kefir
+פטה 16%	b_feta
+מוצרלה 20%	b_mozzarella
+ריקוטה 5%	b_ricotta
+חלב 3.5%	b_milk_whole
+טחינה 100%	b_tahini
 # G1b: the foods from before this job keep their English names (no percentage in them); each is still found
 # first by its own search name with its percentage
 חלב 3%	b_milk_whole
@@ -273,6 +281,12 @@ tahina	b_tahini,b_tahini_sauce
 דג בקלה	b_cod_cooked	b_herring_pickled
 דג פורל	b_trout_cooked	b_herring_pickled
 דג מלוח	b_herring_pickled
+# K2: a fish typed as 'דג X' finds that fish first (not tilapia); plain דג stays on tilapia
+דג מקרל	b_mackerel_cooked	b_tilapia_cooked
+דג הליבוט	b_halibut_cooked	b_tilapia_cooked
+דג טונה	b_tuna_canned_water	b_tilapia_cooked
+דג סרדין	b_sardines_canned	b_tilapia_cooked
+דג הרינג	b_herring_pickled	b_tilapia_cooked
 # G3: white seeds are pumpkin seeds in the shell
 גרעינים לבנים	b_pumpkin_seeds_shell	b_sunflower_seeds_shell
 גרעיני דלעת	b_pumpkin_seeds_shell

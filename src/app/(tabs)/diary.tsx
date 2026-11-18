@@ -6,6 +6,7 @@ import { type ScrollView, type ScrollViewProps, View } from 'react-native';
 import { copyPreviousDay, copyPreviousMeal, findPreviousDay, findPreviousMeal } from '@/features/food/actions';
 import { DaySummaryCard, MealCard, MealMenuSheet } from '@/features/food/DiaryParts';
 import { dayPhrase, href, kcal, param, parseDate } from '@/features/food/helpers';
+import { currentKcal } from '@/features/food/usuals';
 import { TabHeader, tabDay } from '@/components/TabHeader';
 import { ShareDayButton } from '@/features/share';
 import { DayRingStrip } from '@/features/today/DayRingStrip';
@@ -13,7 +14,7 @@ import { useBackToToday } from '@/features/today/useBackToToday';
 import { useDaySwipe } from '@/features/today/useDaySwipe';
 import { useReportViewedDay } from '@/features/today/viewedDay';
 import { addDays, today } from '@/lib/dates';
-import { MEALS, entriesTotal, mealForTime } from '@/lib/nutrition';
+import { MEALS, mealForTime } from '@/lib/nutrition';
 import { useToday } from '@/store/clock';
 import { useDay, useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
@@ -105,7 +106,7 @@ export default function DiaryScreen() {
                 testID="diary-copy-yesterday"
                 size="md"
                 icon={<Copy size={18} color={colors.onPrimary} />}
-                title={`Copy ${dayPhrase(previousDay.date)} · ${kcal(entriesTotal(previousDay.entries).kcal)} kcal`}
+                title={`Copy ${dayPhrase(previousDay.date)} · ${kcal(currentKcal(previousDay.entries))} kcal`}
                 onPress={() => copyPreviousDay(date)}
               />
             ) : null}

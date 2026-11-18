@@ -43,8 +43,7 @@
  * English search shows for an everyday food was renamed (one exception from the first review round: labneh,
  * "full fat" before, is "9% fat", its national record's level). A row added with the Israeli foods
  * whose product comes in several fat percentages states its own in its English name ("Bulgarian cheese,
- * 5% fat", "Milk, 1% fat"); the food search leaves a typed percentage unmatched only for a food whose
- * name states one (src/services/foodSearch.ts), so the difference is on the screen.
+ * 5% fat", "Milk, 1% fat"), so the difference is on the screen.
  *
  * The national database (`ilCode`, il() below): Tzameret, Israel's Ministry of
  * Health, published on data.gov.il; foods updated October 2022. Only records with
@@ -473,7 +472,7 @@ export const BUILTIN_FOODS: Food[] = [
   f('chia_seeds', 'Chia seeds', '🌱', 'nuts_seeds', [486, 16.54, 42.12, 30.74, 34.4, undefined, 3.33, 16], [['1 tbsp', 12], ['1 oz', 28]], 170554),
   f('flaxseed', 'Flaxseed', '🌱', 'nuts_seeds', [534, 18.29, 28.88, 42.16, 27.3, 1.55, 3.67, 30], [['1 tbsp whole', 10], ['1 tbsp ground', 7]], 169414),
   f('sunflower_seeds', 'Sunflower seed kernels', '🌻', 'nuts_seeds', [584, 20.78, 20, 51.46, 8.6, 2.62, 4.46, 9], [['1 oz', 28], ['1/4 cup', 35]], 170562),
-  il('sunflower_seeds_shell', 'Sunflower seeds, roasted, in shell (weighed with shells)', '🌻', 'nuts_seeds', [292, 12, 13.1, 24, 6.1, 2.9, 7, 2000], [['50 g', 50], ['100 g', 100]], 1877),
+  il('sunflower_seeds_shell', 'In-shell sunflower seeds, roasted (weighed with shells)', '🌻', 'nuts_seeds', [292, 12, 13.1, 24, 6.1, 2.9, 7, 2000], [['50 g', 50], ['100 g', 100]], 1877),
   f('pumpkin_seeds', 'Pumpkin seeds (pepitas), hulled', '🎃', 'nuts_seeds', [559, 30.23, 10.71, 49.05, 6, 1.4, 8.66, 7], [['1 oz', 28], ['1/4 cup', 32]], 170556),
   f('pumpkin_seeds_shell', 'Pumpkin seeds, roasted, salted, in shell (weighed with shells)', '🎃', 'nuts_seeds', [446, 18.55, 53.75, 19.4, 18.4, undefined, 3.67, 2541], [['1 oz (85 seeds)', 28.35], ['1 cup', 64]], 168601),
   f('sesame_seeds', 'Sesame seeds', '🌱', 'nuts_seeds', [573, 17.73, 23.45, 49.67, 11.8, 0.3, 6.96, 11], [['1 tbsp', 9], ['1 tsp', 3]], 170150),

@@ -7,6 +7,8 @@ import { create } from 'zustand';
 
 import type { SavedMeal, SavedMealItem } from '@/types';
 
+import { currentValues } from './usuals';
+
 export interface DraftRow {
   key: string;
   item: SavedMealItem;
@@ -47,7 +49,9 @@ function resetDraft(meal?: SavedMeal): void {
     id: meal?.id ?? null,
     name: meal?.name ?? '',
     servings: meal?.servings && meal.servings > 1 ? meal.servings : 1,
-    rows: (meal?.items ?? []).map((item) => ({ key: nextKey(), item })),
+    // Each line as logging the meal adds it: a bundled food at today's values for its grams (currentValues), so the
+    // builder's totals and amount editor agree with the + sheet and Saved meals. Stored only if the person saves.
+    rows: (meal?.items ?? []).map((item) => ({ key: nextKey(), item: currentValues(item) })),
     dirty: false,
   });
 }

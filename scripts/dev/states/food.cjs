@@ -169,6 +169,20 @@ module.exports = [
   // Food detail of such an entry, opened from the diary: the row says 268 kcal, the detail 298 kcal at the same 80 g,
   // so one neutral line under the calories says why (lead's decision H2). Not for a new food or an entry that agrees.
   { id: 'detail-old-portion', route: '/diary?date={day}', day: -1, values: { oldBourekas: 1 }, taps: [{ reload: true }, 'entry-00000000-0000-4000-8000-00000000b001'], waitFor: 'detail-values-updated', note: 'an old bourekas entry opened: 298 kcal and the line "This food\'s values were updated since you logged it."' },
+  // ---------------------------------------------------------------- copies at today's values (lead's decisions L1, L2)
+  // Yesterday's lunch (seed knob oldBourekas: 2): cheese bourekas, halloumi and chicken schnitzel logged before the Israeli
+  // foods, in the shape a restart gives them, then an own food and an online product; today's lunch empty; the newest
+  // saved meal "Lunch plate" holds the old bourekas and halloumi lines. Every row that offers a copy shows what a tap
+  // stores: the bundled foods at today's values for their grams ("Repeat yesterday's lunch, 1,170 kcal", not 1,137),
+  // the own food and the online product as logged. The clock is at lunch; each state reloads first.
+  { id: 'quick-sheet-repeat-old', route: '/', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }, 'tab-add'], sheet: true, waitFor: 'quick-repeat', note: 'the + sheet: "Repeat yesterday\'s lunch, 1,170 kcal" and the saved meal tile at today\'s values' },
+  { id: 'quick-sheet-repeat-old-done', route: '/', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }, 'tab-add', 'quick-repeat', { wait: 300 }], sheet: true, note: 'Repeat tapped: its tick and the toast' },
+  { id: 'diary-repeat-old', route: '/diary', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }], waitFor: 'meal-repeat-lunch', note: 'the diary\'s lunch card: "Repeat yesterday: ... 1,170 kcal"' },
+  { id: 'diary-menu-old', route: '/diary', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }, 'meal-menu-lunch'], sheet: true, waitFor: 'meal-menu-copy-previous', note: 'the lunch menu: "Copy from yesterday, 5 items, 1,170 kcal"' },
+  { id: 'diary-copy-to-old', route: '/diary?date={day}', day: -1, values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }, 'meal-menu-lunch'], sheet: true, waitFor: 'meal-menu-copy-to', note: 'yesterday\'s lunch menu: "Copy to another day, 5 items, 1,170 kcal" while the card says 1,137' },
+  { id: 'meals-old', route: '/food/meals', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }], waitFor: 'saved-meal-card-0', note: 'Saved meals: "Lunch plate" at today\'s values (744 kcal), its lines "80 g" and "2 x 30 g"' },
+  { id: 'meals-log-sheet-old', route: '/food/meals', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }, 'saved-meal-log-0'], sheet: true, note: 'logging "Lunch plate": each line and the button at today\'s values' },
+  { id: 'meal-edit-old', route: '/food/meals', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }, 'saved-meal-edit-0'], waitFor: 'meal-edit-screen', note: 'the builder of "Lunch plate": its total at today\'s values' },
   { id: 'detail-entry-agrees', route: '/diary?date={day}', day: -1, values: { oldBourekas: 1 }, taps: ['^entry-'], waitFor: 'food-detail-screen', absent: ['detail-values-updated'], note: 'an entry whose numbers agree: no line' },
   { id: 'detail-new-food-no-line', route: '/food/search?meal=snack', values: { oldBourekas: 1 }, type: { 'food-search-input': 'bourekas cheese' }, taps: [{ wait: 1200 }, 'result-0'], waitFor: 'food-detail-screen', absent: ['detail-values-updated'], note: 'the same food being added new: no line' },
 ];

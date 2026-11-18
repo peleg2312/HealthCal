@@ -10,7 +10,7 @@ import { amountLabel, href, kcal, lastPortions, matchServing, parseDate, parseMe
 import { formatPortion, itemsRange, mealServings } from '@/features/food/build';
 import { deleteEntry, logFood, setEntryAmount } from '@/features/food/log';
 import { LogSavedMealSheet } from '@/features/food/SavedMealParts';
-import { resolveFood, usualFoods } from '@/features/food/usuals';
+import { currentValues, resolveFood, usualFoods } from '@/features/food/usuals';
 import { isolateRtl } from '@/lib/bidi';
 import { formatDayLabel } from '@/lib/dates';
 import { MEAL_LABEL, entriesTotal, sumNutrients } from '@/lib/nutrition';
@@ -278,7 +278,8 @@ export default function FoodSearchScreen() {
               <List>
                 {savedMeals.map((m, i) => {
                   const count = mealServings(m);
-                  const total = sumNutrients(m.items.map((it) => it.nutrients)).kcal / count;
+                  // Each line as logging the meal adds it: a bundled food at today's values (currentValues).
+                  const total = sumNutrients(m.items.map(currentValues).map((it) => it.nutrients)).kcal / count;
                   const approx = itemsRange(m.items) ? '~' : '';
                   return (
                     <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>

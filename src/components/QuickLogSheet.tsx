@@ -10,7 +10,7 @@ import { formatPortion, mealServings, planSavedMeal } from '@/features/food/buil
 import { logFood, logItems, logSavedMeal } from '@/features/food/log';
 import { addWater } from '@/features/today/StatusRail';
 import { quickLogDate, quickLogPastDate, useViewedDay } from '@/features/today/viewedDay';
-import { customFoodIndex, resolveUsuals, usualFoods, usualLabel, type UsualFood } from '@/features/food/usuals';
+import { currentKcal, customFoodIndex, resolveUsuals, usualFoods, usualLabel, type UsualFood } from '@/features/food/usuals';
 import { isolateRtl } from '@/lib/bidi';
 import { addDays, formatDayLabel, formatShortDate } from '@/lib/dates';
 import { MEAL_LABEL, mealForTime } from '@/lib/nutrition';
@@ -279,7 +279,8 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
 
 function RepeatRow({ label, entries, done, onPress }: { label: string; entries: FoodEntry[]; done: boolean; onPress: () => void }) {
   const { colors, radius, spacing } = useTheme();
-  const kcal = entries.reduce((s, e) => s + e.nutrients.kcal, 0);
+  // What the tap stores: a bundled food at today's values for its grams (currentKcal, the rule copyEntries logs by).
+  const kcal = currentKcal(entries);
   const names = entries.map((e) => isolateRtl(e.name)).join(', ');
   return (
     <PressableScale

@@ -98,7 +98,7 @@ function runList(name: string) {
 describe.skipIf(!TABLE_COMPLETE)('Hebrew query lists (needs the full name table in src/data/searchNames.ts)', () => {
   it('the worked examples (4.8) and the fix round\'s rules', () => {
     const { lines, failures } = runList('hebrew-examples.tsv');
-    expect(lines.length).toBe(241);
+    expect(lines.length).toBe(252);
     expect(failures).toEqual([]);
   });
 

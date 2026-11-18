@@ -10,7 +10,7 @@ import { formatQty, matchServing } from '@/features/food/helpers';
 import { diffDays } from '@/lib/dates';
 import { scaleNutrients } from '@/lib/nutrition';
 import { formatNumber } from '@/lib/units';
-import type { Food, FoodEntry, ISODate, MealType } from '@/types';
+import type { Food, FoodEntry, ISODate, MealType, SavedMealItem } from '@/types';
 
 export interface UsualFood {
   /** The food's id, or its name and brand for entries logged without a food (quick add, estimates). */
@@ -78,12 +78,41 @@ export function resolveUsuals(usuals: UsualFood[], customById: ReadonlyMap<strin
       out.push(u);
       continue;
     }
-    const q = u.last.quantity;
-    const servingLabel = q > 0 ? matchServing(food, u.last.servingLabel, u.last.grams / q).label : u.last.servingLabel;
-    const last = { ...u.last, food, name: food.name, brand: food.brand, emoji: food.emoji ?? u.last.emoji, servingLabel, nutrients: scaleNutrients(food.per100g, u.last.grams) };
+    const last = atFoodValues(u.last, food);
     out.push({ ...u, food, last });
   }
   return out;
+}
+
+/**
+ * A remembered amount of `food` at the food's values now: the grams always stay, the label goes through
+ * `matchServing` (a label the food now names at another weight becomes the amount in grams) and the nutrients
+ * are the food's for those grams. The one rule behind the usual tiles (`resolveUsuals`) and every copy
+ * (`currentValues`).
+ */
+export function atFoodValues<T extends SavedMealItem>(it: T, food: Food): T {
+  const q = it.quantity;
+  const servingLabel = q > 0 ? matchServing(food, it.servingLabel, it.grams / q).label : it.servingLabel;
+  return { ...it, food, name: food.name, brand: food.brand, emoji: food.emoji ?? it.emoji, servingLabel, nutrients: scaleNutrients(food.per100g, it.grams) };
+}
+
+/**
+ * A diary entry or saved-meal line as it is logged again (Repeat, copying a meal or a day, a reminder's
+ * "Repeat yesterday's", a saved meal): a bundled food at today's values for its own grams (`atFoodValues`), so a
+ * corrected value never lives on through copies. A person's own food, an online product, a quick add, an
+ * estimate (it carries a range: the numbers are the person's reviewed ones) and a drink from Water come back as
+ * they are. Never writes anything: the stored entry or saved meal stays as it was.
+ */
+export function currentValues<T extends SavedMealItem | FoodEntry>(it: T): T {
+  const stored = it.food;
+  if (!stored || stored.source !== 'builtin' || it.kcalRange || isWaterDrinkEntry(it as Pick<FoodEntry, 'via'>) || !(it.grams > 0)) return it;
+  const food = BUILTIN_BY_ID.get(stored.id);
+  return food ? atFoodValues(it, food) : it;
+}
+
+/** The calories a copy of these entries or lines stores (`currentValues`): what a row that offers the copy shows. */
+export function currentKcal(items: readonly (SavedMealItem | FoodEntry)[]): number {
+  return items.reduce((s, it) => s + currentValues(it).nutrients.kcal, 0);
 }
 
 export function foodKey(e: Pick<FoodEntry, 'foodId' | 'name' | 'brand'>): string {

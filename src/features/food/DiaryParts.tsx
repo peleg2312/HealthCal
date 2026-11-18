@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { ALSO_IN_WATER, waterPointingAt } from '@/features/drinks/rules';
+import { isWaterDrinkEntry } from '@/features/drinks/via';
 import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { addDays, formatDayLabel } from '@/lib/dates';
 import { MEAL_LABEL, entriesTotal } from '@/lib/nutrition';
@@ -17,6 +18,7 @@ import { clearEntries, copyEntries, saveMeal } from './actions';
 import { DayStepper, KcalTrail, MealPicker, RowEmoji, sourceKeyVariant } from './components';
 import { dayPhrase, href, kcal, portionLabel, sourceInfo } from './helpers';
 import { deleteEntry } from './log';
+import { currentKcal } from './usuals';
 import { FadeRow, useLeavingRows } from './rowMotion';
 
 /**
@@ -274,7 +276,7 @@ export function MealCard({
                 Repeat {dayPhrase(previous.date)}: {previous.entries.map((e) => isolateRtl(e.name.split(',')[0])).join(', ')}
               </Text>
               <Text variant="caption" color="textSecondary" tabular numberOfLines={1} style={{ marginLeft: 'auto', flexShrink: 0 }}>
-                {kcal(entriesTotal(previous.entries).kcal)} kcal
+                {kcal(currentKcal(previous.entries))} kcal
               </Text>
             </PressableScale>
           ) : null}
@@ -324,8 +326,11 @@ export function MealMenuSheet({
 
   if (!meal) return <Sheet visible={false} onClose={onClose}>{null}</Sheet>;
   const label = MEAL_LABEL[meal];
-  const total = entriesTotal(entries).kcal;
-  const count = `${entries.length} ${entries.length === 1 ? 'item' : 'items'}`;
+  // What a copy or a saved meal of these logs: a bundled food at today's values (currentKcal), and never a
+  // drink paired with Water (copyEntries and saveMeal leave it out), so the lines name what the tap stores.
+  const copyable = entries.filter((e) => !isWaterDrinkEntry(e));
+  const total = currentKcal(copyable);
+  const count = `${copyable.length} ${copyable.length === 1 ? 'item' : 'items'}`;
 
   if (step === 'copyTo') {
     return (
@@ -383,7 +388,7 @@ export function MealMenuSheet({
           title={previous ? `Copy from ${dayPhrase(previous.date)}` : `Copy from an earlier day`}
           subtitle={
             previous
-              ? `${previous.entries.length} ${previous.entries.length === 1 ? 'item' : 'items'} · ${kcal(entriesTotal(previous.entries).kcal)} kcal`
+              ? `${previous.entries.length} ${previous.entries.length === 1 ? 'item' : 'items'} · ${kcal(currentKcal(previous.entries))} kcal`
               : `No ${label.toLowerCase()} logged in the last 60 days`
           }
           left={<Copy size={20} color={previous ? colors.text : colors.textTertiary} />}

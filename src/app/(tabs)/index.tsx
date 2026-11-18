@@ -5,6 +5,7 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { hasFoodLogged } from '@/features/drinks/via';
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
+import { currentKcal } from '@/features/food/usuals';
 import { useRecapReady } from '@/features/progress/recapReady';
 import { coachTip, rhythmFromReminders, type ClosedDay } from '@/features/today/coach';
 import { DayRingStrip } from '@/features/today/DayRingStrip';
@@ -399,7 +400,8 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
       />
     );
   } else if (quick?.kind === 'repeat' && prev) {
-    const kcal = prev.entries.reduce((sum, e) => sum + e.nutrients.kcal, 0);
+    // What the tap stores: a bundled food at today's values (currentKcal, the rule copyEntries logs by).
+    const kcal = currentKcal(prev.entries);
     const meal = MEAL_LABEL[quick.meal].toLowerCase();
     const when = relativeTo(prev.date, day.date);
     button = (
@@ -485,7 +487,7 @@ function MealsSection({ day }: { day: DaySummary }) {
                     {entries.length
                       ? line.detail
                       : prev
-                        ? `${sentence(relativeTo(prev.date, day.date))}: ${formatNumber(prev.entries.reduce((s, e) => s + e.nutrients.kcal, 0))} kcal`
+                        ? `${sentence(relativeTo(prev.date, day.date))}: ${formatNumber(currentKcal(prev.entries))} kcal`
                         : `Around ${formatNumber(Math.round((day.budget * MEAL_SHARE[m.id]) / 10) * 10)} kcal suggested`}
                   </Text>
                 </PressableScale>
@@ -504,7 +506,7 @@ function MealsSection({ day }: { day: DaySummary }) {
 
 function RepeatButton({ meal, date, prev }: { meal: MealType; date: ISODate; prev: { date: ISODate; entries: FoodEntry[] } }) {
   const { colors } = useTheme();
-  const kcal = prev.entries.reduce((s, e) => s + e.nutrients.kcal, 0);
+  const kcal = currentKcal(prev.entries);
   const label = MEAL_LABEL[meal].toLowerCase();
   const when = relativeTo(prev.date, date);
   return (

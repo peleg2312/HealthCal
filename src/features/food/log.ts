@@ -15,6 +15,7 @@ import { haptic, toast } from '@/ui';
 
 import { mealOnDay } from './addedTo';
 import { bandSpread, buildEntry, planSavedMeal } from './build';
+import { currentValues } from './usuals';
 
 export { buildEntry } from './build';
 
@@ -156,12 +157,15 @@ export function logQuickAdd(input: { name: string; nutrients: Nutrients; meal: M
   return entry;
 }
 
-/** Re-log a set of existing entries or saved-meal items onto a day and meal. */
+/**
+ * Re-log a set of existing entries or saved-meal items onto a day and meal. A bundled food goes in at today's
+ * values for its own grams (`currentValues`); everything else as it was stored.
+ */
 export function logItems(items: (SavedMealItem | FoodEntry)[], meal: MealType, date: ISODate, label?: string): FoodEntry[] {
   if (items.length === 0) return [];
   const entries = useStore.getState().upsertMany(
     'foodEntries',
-    items.map((it) => ({
+    items.map(currentValues).map((it) => ({
       date,
       meal,
       name: it.name,
