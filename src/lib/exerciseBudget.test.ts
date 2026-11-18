@@ -363,7 +363,9 @@ function givenByEachWorkout(w: World): Map<ISODate, { net: number; given: number
   return out;
 }
 
-describe('properties over random workout and rule histories', () => {
+// 60 random 160-day lives per property: a few seconds each, more on a busy machine, so the limit is 30 s
+// (at the default 5 s these timed out now and then in a full run).
+describe('properties over random workout and rule histories', { timeout: 30_000 }, () => {
   const START = '2026-03-02';
   const DAYS = 160;
   const SEEDS = Array.from({ length: 60 }, (_, i) => 1000 + i);
