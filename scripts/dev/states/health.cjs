@@ -115,6 +115,16 @@ const tomorrowMorning = (() => {
   d.setHours(8, 10, 0, 0);
   return d.getTime();
 })();
+/**
+ * Today at 09:30 local, for the states that show last night: the demo night ends at 06:35 and a night
+ * that ended under 15 minutes ago is left for a later sync (sleep.ts, rule f), so a capture made before
+ * about 06:50 would show "Not logged yet" (seen on 18 November 2026).
+ */
+const todayMidMorning = (() => {
+  const d = new Date(now);
+  d.setHours(9, 30, 0, 0);
+  return d.getTime();
+})();
 /** Synced Garmin nights for the last week, the one three days ago unstaged. */
 const garminWeek = [0, 1, 2, 3, 4, 5, 6].flatMap((d) => sleepNight('healthConnect', GARMIN_ANDROID, 'watch', d, { staged: d !== 3 }));
 
@@ -336,6 +346,7 @@ module.exports = [
     route: '/sleep',
     // A profile and no diary: the demo data has its own nights entered by hand, which a sync never replaces.
     data: 'empty',
+    now: todayMidMorning,
     health: syncedSleep(garminWeek),
     waitFor: 'sleep-last-night-from',
     note: 'the sleep log with a week of Garmin nights from Health Connect, one without stages, none rated: "From Garmin Connect" and the stages line',
@@ -344,6 +355,7 @@ module.exports = [
     id: 'sleep-synced-sheet',
     route: '/sleep',
     data: 'empty',
+    now: todayMidMorning,
     health: syncedSleep(garminWeek),
     waitFor: 'sleep-last-night-from',
     taps: ['sleep-log'],
