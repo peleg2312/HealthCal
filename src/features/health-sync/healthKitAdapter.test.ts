@@ -309,6 +309,16 @@ describe('Apple Health weigh-ins, the day\'s calories and workout heart rate', (
     ]);
   });
 
+  it('asks the Steps row for the first list alone, never the newer rows', async () => {
+    const s = stand({ status: 2, sleepStatus: 2 });
+    const a = createHealthKitAdapter(s.api, { openHealth: () => {} });
+    await a.requestAccess('steps');
+    const asked = s.calls.filter((c) => c.startsWith('request:'));
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).toContain('HKQuantityTypeIdentifierStepCount');
+    for (const t of ['SleepAnalysis', 'BodyMass', 'BasalEnergyBurned', 'HeartRate']) expect(asked[0]).not.toContain(t);
+  });
+
   it('counts the day\'s calories as allowed only when active energy (the five) was asked too', async () => {
     const s = stand({ status: 1, energyStatus: 2 });
     expect(await createHealthKitAdapter(s.api, { openHealth: () => {} }).access()).toMatchObject({ dayEnergy: false });
@@ -334,6 +344,23 @@ describe('Apple Health weigh-ins, the day\'s calories and workout heart rate', (
     expect(await a.readWeighIns(RANGE, { ...access, weight: false })).toEqual([]);
   });
 
+  it('keeps the weights when the body-fat read fails, and fails only when the weights do', async () => {
+    const s = stand({ status: 2, weightStatus: 2 });
+    s.bodyMass = [quantity(82.4, '2026-11-14T06:12:00Z')];
+    const read = s.api.queryQuantitySamples;
+    s.api.queryQuantitySamples = async (identifier, options) => {
+      if (identifier === 'HKQuantityTypeIdentifierBodyFatPercentage') throw new Error('boom');
+      return read(identifier, options);
+    };
+    const a = createHealthKitAdapter(s.api, { openHealth: () => {} });
+    const access = await a.access();
+    expect((await a.readWeighIns(RANGE, access)).map((x) => [x.kind, x.value])).toEqual([['weight', 82.4]]);
+    s.api.queryQuantitySamples = async () => {
+      throw new Error('boom');
+    };
+    await expect(a.readWeighIns(RANGE, access)).rejects.toBeTruthy();
+  });
+
   it('adds the active and basal statistics collections per day, from the first day\'s midnight', async () => {
     const s = stand({ status: 2, energyStatus: 2 });
     const day = (start: string, end: string, kcal: number, bundle = GARMIN_IOS): HKStatistics => ({ sumQuantity: { unit: 'kcal', quantity: kcal }, startDate: new Date(start), endDate: new Date(end), sources: [{ name: 'Connect', bundleIdentifier: bundle }] });
@@ -356,7 +383,7 @@ describe('Apple Health weigh-ins, the day\'s calories and workout heart rate', (
     const s = stand({ status: 2, heartStatus: 2 });
     const own: HKStatistics = { averageQuantity: { unit: 'count/min', quantity: 142.4 }, maximumQuantity: { unit: 'count/min', quantity: 171.2 } };
     s.workouts = [proxy('w1', '2026-11-12T06:00:00Z', 45, { HKQuantityTypeIdentifierHeartRate: own }, s), proxy('w2', '2026-11-13T06:00:00Z', 30, {}, s)];
-    s.heartWindow = { averageQuantity: { unit: 'count/min', quantity: 128 }, maximumQuantity: { unit: 'count/min', quantity: 160 }, sources: [] };
+    s.heartWindow = { averageQuantity: { unit: 'count/min', quantity: 128 }, maximumQuantity: { unit: 'count/min', quantity: 160 }, sources: [{ name: 'Connect', bundleIdentifier: 'com.garmin.connect.mobile' }] };
     const a = createHealthKitAdapter(s.api, { openHealth: () => {} });
     const access = await a.access();
     const out = await a.readWorkouts(RANGE, access);
@@ -375,6 +402,25 @@ describe('Apple Health weigh-ins, the day\'s calories and workout heart rate', (
     const [w3] = await b.readWorkouts(RANGE, await b.access());
     expect(w3.avgHeartRate).toBeUndefined();
     expect(s2.calls.some((c) => c.includes('HeartRate'))).toBe(false);
+  });
+
+  it('leaves a workout without heart rate when the samples in its time came from another source too, or name none', async () => {
+    const window = (sources: HKStatistics['sources']): HKStatistics => ({ averageQuantity: { unit: 'count/min', quantity: 128 }, maximumQuantity: { unit: 'count/min', quantity: 160 }, sources });
+    for (const [sources, expected] of [
+      [[{ name: 'Connect', bundleIdentifier: 'com.garmin.connect.mobile' }, { name: 'Dana\'s Apple Watch', bundleIdentifier: 'com.apple.health.ABCDEF12-3456-7890' }], undefined],
+      [[{ name: 'Powerbeats', bundleIdentifier: 'com.apple.health.11111111-2222' }], undefined],
+      [[], undefined],
+      [undefined, undefined],
+      [[{ name: 'Connect', bundleIdentifier: 'com.garmin.connect.mobile' }], 128],
+    ] as const) {
+      const s = stand({ status: 2, heartStatus: 2 });
+      s.workouts = [proxy('w1', '2026-11-12T06:00:00Z', 45, {}, s)];
+      s.heartWindow = window(sources as HKStatistics['sources']);
+      const a = createHealthKitAdapter(s.api, { openHealth: () => {} });
+      const [w] = await a.readWorkouts(RANGE, await a.access());
+      expect(w.id).toBe('w1');
+      expect(w.avgHeartRate).toBe(expected);
+    }
   });
 
   it('keeps the workout when its heart-rate question fails', async () => {

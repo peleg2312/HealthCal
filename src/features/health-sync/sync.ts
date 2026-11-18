@@ -114,7 +114,6 @@ export const healthSync = createHealthSync({
     remove: (id) => useStore.getState().remove('weights', id),
   },
   afterPull,
-  targetsLearn: () => useStore.getState().profile?.useAdaptiveTdee === true,
   // The level line of the toast takes the exercise colour for workouts, the sleep colour for nights, the weight colour for weigh-ins alone.
   announce: (message, undo, tint = 'exercise') => toast(message, { label: 'Undo', onPress: undo, tint }),
   onBusy: (busy) => useHealthSync.setState({ busy }),

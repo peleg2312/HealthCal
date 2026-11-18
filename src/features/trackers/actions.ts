@@ -1,8 +1,12 @@
 /**
  * Writes for the tracker screens. Each save or delete can be undone from the
- * toast, and weigh-ins keep `profile.weightKg` (and body fat) in step with the
- * newest record so calorie and water targets follow.
+ * toast. Saving the newest weigh-in points `profile.weightKg` (and body fat) at
+ * it, so calorie and water targets follow; deleting one moves the profile only
+ * when its figures came from that weigh-in (`profileAfterDelete`). A weigh-in a
+ * health store wrote reaches the profile only by the person's own save of it or
+ * "Use it for targets", never by deleting another one.
  */
+import { rememberDeletedNight, rememberDeletedWeighIn } from '@/features/health-sync/deletions';
 import { formatDuration } from '@/lib/dates';
 import { formatWeight } from '@/lib/units';
 import { live } from '@/store/selectors';
@@ -10,33 +14,14 @@ import { useStore } from '@/store';
 import type { FastingSession, ISODate, Profile, SleepEntry, SleepQuality, WeightEntry } from '@/types';
 import { haptic, toast } from '@/ui';
 
-import { bodyFatFollowsDelete, fastProgress, findByDate, isMostRecentDate, latestBodyFat, nightAfterEdit, weighInAfterEdit } from './helpers';
-import { isSyncedWeighIn } from './weighInSource';
+import { fastProgress, findByDate, isMostRecentDate, nightAfterEdit, ownLatestBodyFat, profileAfterDelete, weighInAfterEdit } from './helpers';
+import { isSyncedWeighIn, sameFat } from './weighInSource';
 
 type WeightPatch = Partial<Omit<WeightEntry, 'id' | 'updatedAt' | 'deleted' | 'date'>>;
 
 function profileSnapshot(): Pick<Profile, 'weightKg' | 'bodyFatPct'> | null {
   const p = useStore.getState().profile;
   return p ? { weightKg: p.weightKg, bodyFatPct: p.bodyFatPct } : null;
-}
-
-/**
- * Point the profile at the newest live weigh-in. When `bodyFatChanged`, body fat
- * also follows the newest weigh-in that has a reading, or is cleared, so BMR does
- * not keep using a value the user removed.
- */
-function syncProfileToLatest(bodyFatChanged: boolean) {
-  const s = useStore.getState();
-  if (!s.profile) return;
-  const entries = live(s.weights).sort((a, b) => a.date.localeCompare(b.date));
-  const latest = entries[entries.length - 1];
-  const patch: Partial<Profile> = {};
-  if (latest && latest.kg !== s.profile.weightKg) patch.weightKg = latest.kg;
-  if (bodyFatChanged) {
-    const bf = latestBodyFat(entries);
-    if (bf !== s.profile.bodyFatPct) patch.bodyFatPct = bf;
-  }
-  if (Object.keys(patch).length) s.setProfile(patch);
 }
 
 /**
@@ -54,8 +39,12 @@ export function saveWeightRecord(date: ISODate, patch: WeightPatch & { kg: numbe
   const updatesProfile = isMostRecentDate(entries, date);
   if (updatesProfile) {
     s.setProfile({ weightKg: patch.kg, ...(patch.bodyFatPct !== undefined ? { bodyFatPct: patch.bodyFatPct } : {}) });
-    // Body fat cleared on the newest weigh-in: fall back to the newest other reading, or none.
-    if ('bodyFatPct' in patch && patch.bodyFatPct === undefined) syncProfileToLatest(true);
+    // Body fat cleared on the newest weigh-in: fall back to the newest other reading of the person's own, or none.
+    if ('bodyFatPct' in patch && patch.bodyFatPct === undefined) {
+      const st = useStore.getState();
+      const bf = ownLatestBodyFat(live(st.weights));
+      if (st.profile && bf !== st.profile.bodyFatPct) st.setProfile({ bodyFatPct: bf });
+    }
   }
   haptic.success();
   toast(opts.message ?? (existing ? 'Weigh-in updated' : 'Weigh-in saved'), {
@@ -73,11 +62,12 @@ export function saveWeightRecord(date: ISODate, patch: WeightPatch & { kg: numbe
 export function deleteWeightRecord(entry: WeightEntry) {
   const s = useStore.getState();
   const before = profileSnapshot();
-  // Only the newest body fat reading feeds the profile, and only when the profile's value came from it:
-  // deleting an older one, or one whose body fat the person typed over in Goals or on /body, leaves it alone.
-  const feedsBodyFat = bodyFatFollowsDelete(s.profile, entry, live(s.weights));
+  // The profile moves only when its figures came from this weigh-in, and never onto a synced one by itself.
+  const patch = profileAfterDelete(s.profile, entry, live(s.weights));
   s.remove('weights', entry.id);
-  syncProfileToLatest(feedsBodyFat);
+  if (Object.keys(patch).length) s.setProfile(patch);
+  // Remembered now, not at the next sync: without an account the deletion marker is gone a day later.
+  const forget = rememberDeletedWeighIn(entry);
   haptic.tap();
   // A synced one is not added again: its deletion marker (and the sync's memory) keep it out.
   toast(isSyncedWeighIn(entry) ? 'Weigh-in deleted. Sync will not add it again' : 'Weigh-in deleted', {
@@ -85,7 +75,8 @@ export function deleteWeightRecord(entry: WeightEntry) {
     onPress: () => {
       const st = useStore.getState();
       st.restore('weights', entry.id);
-      if (before) st.setProfile(before);
+      forget();
+      if (before && Object.keys(patch).length) st.setProfile(before);
     },
   });
 }
@@ -102,7 +93,9 @@ export function applyWeighInToTargets(entry: Pick<WeightEntry, 'kg' | 'bodyFatPc
   const before = profileSnapshot();
   s.setProfile({ weightKg: entry.kg, ...(typeof entry.bodyFatPct === 'number' ? { bodyFatPct: entry.bodyFatPct } : {}) });
   haptic.success();
-  toast(`Targets now use ${formatWeight(entry.kg, s.profile.units)}`, {
+  // Name the body fat too when the tap changed it, so the toast says everything the tap set.
+  const fat = typeof entry.bodyFatPct === 'number' && !sameFat(entry.bodyFatPct, s.profile.bodyFatPct) ? ` and ${entry.bodyFatPct.toFixed(1)}% body fat` : '';
+  toast(`Targets now use ${formatWeight(entry.kg, s.profile.units)}${fat}`, {
     label: 'Undo',
     tint: 'weight',
     onPress: () => {
@@ -135,8 +128,17 @@ export function saveSleep(date: ISODate, hours: number, quality: SleepQuality | 
 
 export function deleteSleep(entry: SleepEntry) {
   useStore.getState().remove('sleep', entry.id);
+  // Remembered now, not at the next sync: without an account the deletion marker is gone a day later.
+  const forget = rememberDeletedNight(entry);
   haptic.tap();
-  toast('Night deleted', { label: 'Undo', tint: 'sleep', onPress: () => useStore.getState().restore('sleep', entry.id) });
+  toast('Night deleted', {
+    label: 'Undo',
+    tint: 'sleep',
+    onPress: () => {
+      useStore.getState().restore('sleep', entry.id);
+      forget();
+    },
+  });
 }
 
 export function startFast(targetHours: number, startISO: string = new Date().toISOString()): FastingSession {

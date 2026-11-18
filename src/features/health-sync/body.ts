@@ -29,20 +29,24 @@
  *  c) One weigh-in a day (`weighInsFrom`): the earliest weight reading of the
  *     local day across all apps (the app asks for a morning weigh-in before
  *     breakfast); a tie at the same instant goes to the origin id that sorts
- *     first. A later reading never moves it, so syncs do not churn and two
- *     phones converge. Days before the read's first day are dropped.
+ *     first. Readings up to 10 minutes after that earliest one are the same
+ *     weigh-in (two apps forwarding one scale's reading): of those, the earliest
+ *     whose own app also has a body fat for it is taken, so a copy without body
+ *     fat a second earlier does not lose it. A later weigh-in never moves the
+ *     choice, so syncs do not churn and two phones converge. Days before the
+ *     read's first day are dropped.
  *  d) Body fat: the reading from the same app within 10 minutes of the chosen
- *     weight (the nearest; a tie goes to the earlier), else none. A body-fat
- *     reading alone makes no record.
- *  e) Between two apps on one day, (c)'s earliest wins: a weigh-in is one
- *     measurement, not an estimate, so no app outranks another.
+ *     weight (the nearest; a tie goes to the earlier), else none. Another app's
+ *     body fat is never paired. A body-fat reading alone makes no record.
+ *  e) Between two apps on one day, (c)'s choice wins (`preferReading`): a
+ *     weigh-in is one measurement, not an estimate, so no app outranks another.
  *  f) `planWeights`, per day: a day remembered as skipped ('weight:<date>') is
  *     never written (checked first: saving a record undeletes it); a day whose
  *     record is deleted is remembered and skipped; a day with nothing gets the
  *     reading; a record that is not a synced one is the person's and is never
- *     touched; a synced one is updated only by an earlier reading that arrived
- *     late (or one at the same instant from an origin that sorts first), or by
- *     the same reading corrected (its kg, or body fat that arrived later or was
+ *     touched; a synced one is updated only by a reading (c) prefers that arrived
+ *     late (`preferReading`: an earlier weigh-in, or within the same weigh-in the
+ *     copy that has body fat), or by the same reading corrected (its kg, or body fat that arrived later or was
  *     corrected). The person's waist, hip, neck and note are kept. Equal figures
  *     write nothing. A later reading never replaces an earlier one, so two
  *     phones that each saw different readings converge on the earliest.
@@ -61,9 +65,11 @@
  *     date touched is remembered as skipped at once.
  *  i) `readWeighInsSafely`: a failed or refused read never fails the sync; the
  *     engine then keeps `weightReadAt`, so the next sync reads the same days.
- *  j) Deletion memory: a day the person deleted is remembered under
- *     'weight:<date>' only once the save is confirmed on the device (the engine's
- *     `rememberSaved`, as for sleep). Across phones the synced soft-deleted record
+ *  j) Deletion memory: a day the person deletes is remembered under
+ *     'weight:<date>' at the delete itself (deletions.ts, from the tracker's
+ *     delete), since without an account the deletion marker is gone 24 hours
+ *     later; a deleted record a plan finds is remembered too, once the save is
+ *     confirmed on the device (the engine's `rememberSaved`, as for sleep). Across phones the synced soft-deleted record
  *     is the memory; the engine plans weigh-ins only after a data-sync round that
  *     pulled after the run began, so it is on the device before planning.
  */
@@ -172,28 +178,61 @@ function firstReading(a: { ms: number; origin: string }, b: { ms: number; origin
   return a.origin < b.origin ? -1 : a.origin > b.origin ? 1 : 0;
 }
 
+type Timed = BodySample & { ms: number };
+
+/** The body fat paired with weight reading `w` (rule d): same app, within 10 minutes, the nearest (a tie goes to the earlier). */
+function pairedFat(w: Timed, fats: readonly Timed[]): Timed | null {
+  let fat: Timed | null = null;
+  for (const f of fats) {
+    if (f.origin !== w.origin) continue;
+    const gap = Math.abs(f.ms - w.ms);
+    if (gap > BODY_FAT_PAIR_MS) continue;
+    if (!fat || gap < Math.abs(fat.ms - w.ms) || (gap === Math.abs(fat.ms - w.ms) && f.ms < fat.ms)) fat = f;
+  }
+  return fat;
+}
+
+/**
+ * Rule c's order between two readings of one day, as the plan compares a new
+ * reading with the saved one: negative when `a` is the better. Within 10 minutes
+ * of each other they are one weigh-in and the one with body fat is the better;
+ * otherwise, and between two with or two without, the earlier (then the origin).
+ */
+export function preferReading(a: { ms: number; origin: string; hasFat: boolean }, b: { ms: number; origin: string; hasFat: boolean }): number {
+  if (Math.abs(a.ms - b.ms) <= BODY_FAT_PAIR_MS && a.hasFat !== b.hasFat) return a.hasFat ? -1 : 1;
+  return firstReading(a, b);
+}
+
 /** Rules a to e: one weigh-in per local day from `firstDay` on, oldest day first. */
 export function weighInsFrom(samples: readonly BodySample[], clock: StepClock, firstDay: ISODate): WeighIn[] {
   const clean = samples.map(plausibleSample).filter((s): s is BodySample => s !== null);
-  const chosen = new Map<ISODate, BodySample & { ms: number }>();
+  const byDay = new Map<ISODate, Timed[]>();
   for (const s of clean) {
     if (s.kind !== 'weight') continue;
     const day = readingDay(s, clock);
     if (day < firstDay) continue;
-    const r = { ...s, ms: Date.parse(s.time) };
-    const held = chosen.get(day);
-    if (!held || firstReading(r, held) < 0) chosen.set(day, r);
+    const list = byDay.get(day) ?? [];
+    list.push({ ...s, ms: Date.parse(s.time) });
+    byDay.set(day, list);
   }
   const fats = clean.filter((s) => s.kind === 'bodyFat').map((s) => ({ ...s, ms: Date.parse(s.time) }));
   const out: WeighIn[] = [];
-  for (const day of [...chosen.keys()].sort()) {
-    const w = chosen.get(day)!;
-    let fat: { value: number; ms: number } | null = null;
-    for (const f of fats) {
-      if (f.origin !== w.origin) continue;
-      const gap = Math.abs(f.ms - w.ms);
-      if (gap > BODY_FAT_PAIR_MS) continue;
-      if (!fat || gap < Math.abs(fat.ms - w.ms) || (gap === Math.abs(fat.ms - w.ms) && f.ms < fat.ms)) fat = f;
+  for (const day of [...byDay.keys()].sort()) {
+    const readings = byDay.get(day)!.sort(firstReading);
+    const earliest = readings[0];
+    // The same weigh-in forwarded by several apps: the earliest copy that has its own body fat, else the earliest.
+    let w = earliest;
+    let fat = pairedFat(earliest, fats);
+    if (!fat) {
+      for (const r of readings) {
+        if (r.ms - earliest.ms > BODY_FAT_PAIR_MS) break;
+        const f = pairedFat(r, fats);
+        if (f) {
+          w = r;
+          fat = f;
+          break;
+        }
+      }
     }
     out.push({ date: day, store: w.store, origin: w.origin, measuredAt: w.time, kg: w.value, bodyFatPct: fat ? fat.value : null });
   }
@@ -280,16 +319,16 @@ export function planWeights({ weighIns, existing, handled }: WeightPlanInput): W
     // 4. Entered or changed by the person: theirs.
     if (!isSyncedWeighIn(live)) continue;
     // 5. A synced weigh-in.
-    const next = { ms: Date.parse(w.measuredAt), origin: w.origin };
-    const held = { ms: parse(live.measuredAt), origin: live.origin ?? '' };
-    const earlier = Number.isFinite(held.ms) && firstReading(next, held) < 0;
+    const next = { ms: Date.parse(w.measuredAt), origin: w.origin, hasFat: w.bodyFatPct !== null };
+    const held = { ms: parse(live.measuredAt), origin: live.origin ?? '', hasFat: typeof live.bodyFatPct === 'number' };
     const sameReading = Number.isFinite(held.ms) && next.ms === held.ms && next.origin === held.origin;
-    if (!earlier && !sameReading) continue;
+    const better = !sameReading && Number.isFinite(held.ms) && preferReading(next, held) < 0;
+    if (!better && !sameReading) continue;
     const after: WeightEntry = { ...live, kg: w.kg, store: w.store, origin: w.origin, measuredAt: w.measuredAt, syncedKg: w.kg };
     if (w.bodyFatPct !== null) {
       after.bodyFatPct = w.bodyFatPct;
       after.syncedBodyFatPct = w.bodyFatPct;
-    } else if (earlier) {
+    } else if (better) {
       // Another reading now: the earlier one's body fat does not describe it.
       delete after.bodyFatPct;
       delete after.syncedBodyFatPct;

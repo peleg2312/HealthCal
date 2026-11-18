@@ -158,6 +158,10 @@ describe('the Weight, Calories burned and Heart rate rows', () => {
     expect(weightRowText(FULL_ACCESS, { ...latest, synced: false }, '2026-11-18T08:00:00Z', 'Health Connect', 'metric')).toBe('Latest 82.4 kg on Nov 18, entered by you');
     expect(weightRowText(FULL_ACCESS, latest, '2026-11-18T08:00:00Z', 'Health Connect', 'imperial')).toBe('Latest 181.7 lb on Nov 18, from Garmin Connect');
     expect(weightRowText(FULL_ACCESS, null, '2026-11-18T08:00:00Z', 'Apple Health', 'metric')).toBe('None in Apple Health in the last 4 weeks');
+    // Held for the account's data sync: said, whether or not weigh-ins were read before.
+    expect(weightRowText(FULL_ACCESS, null, null, 'Health Connect', 'metric', true)).toBe('Waiting for your account to sync before adding weigh-ins');
+    expect(weightRowText(FULL_ACCESS, latest, '2026-11-18T08:00:00Z', 'Health Connect', 'metric', true)).toBe('Waiting for your account to sync before adding weigh-ins');
+    expect(weightRowText({ ...FULL_ACCESS, weight: false }, latest, null, 'Health Connect', 'metric', true)).toBe('Not shared yet. Allow it to fill in your weigh-ins');
   });
   it('the day calories: Allow, the estimate, or when it will show', () => {
     expect(energyRowText({ ...FULL_ACCESS, dayEnergy: false }, null)).toBe("Not shared yet. Allow it to compare with HealthCal's estimate");

@@ -361,3 +361,43 @@ export function bodyFatFollowsDelete(
   const newest = live.every((e) => e.id === entry.id || typeof e.bodyFatPct !== 'number' || e.date < entry.date);
   return newest && sameFat(profile.bodyFatPct, entry.bodyFatPct);
 }
+
+/**
+ * Body fat the profile may fall back to: the newest of the person's own weigh-ins
+ * that has one. A synced weigh-in (`isSyncedWeighIn`) does not count: it reaches
+ * the profile only by the person's own save of it or "Use it for targets".
+ */
+export function ownLatestBodyFat(entries: readonly WeightEntry[]): number | undefined {
+  return latestBodyFat(entries.filter((e) => !e.deleted && !isSyncedWeighIn(e)));
+}
+
+/**
+ * What deleting `entry` changes in the profile (`live`: the live weigh-ins before
+ * the delete). The weight moves only when the entry was the newest-dated weigh-in
+ * and the profile's weight came from it; it then goes to the newest remaining
+ * weigh-in of the person's own (a synced one waits for "Use it for targets"), or
+ * stays when there is none. Body fat follows `bodyFatFollowsDelete`, falling back
+ * to `ownLatestBodyFat` or none. Deleting an older weigh-in, or one whose figures
+ * the person has typed over in Goals or on /body, changes nothing. A key present
+ * with `undefined` clears that figure.
+ */
+export function profileAfterDelete(
+  profile: Pick<Profile, 'weightKg' | 'bodyFatPct'> | null | undefined,
+  entry: WeightEntry,
+  live: readonly WeightEntry[],
+): Partial<Pick<Profile, 'weightKg' | 'bodyFatPct'>> {
+  if (!profile) return {};
+  const rest = live.filter((e) => e.id !== entry.id && !e.deleted);
+  const patch: Partial<Pick<Profile, 'weightKg' | 'bodyFatPct'>> = {};
+  const newest = rest.every((e) => e.date < entry.date);
+  if (newest && sameKg(profile.weightKg, entry.kg)) {
+    let target: WeightEntry | undefined;
+    for (const e of rest) if (!isSyncedWeighIn(e) && (!target || e.date > target.date)) target = e;
+    if (target && !sameKg(target.kg, profile.weightKg)) patch.weightKg = target.kg;
+  }
+  if (bodyFatFollowsDelete(profile, entry, live)) {
+    const bf = ownLatestBodyFat(rest);
+    if (bf !== profile.bodyFatPct) patch.bodyFatPct = bf;
+  }
+  return patch;
+}

@@ -11,6 +11,7 @@ import { sleepKindOf } from './sleep';
 import {
   HealthError,
   NO_ACCESS,
+  type AccessRequest,
   type BodySample,
   type DayEnergyDay,
   type HealthAccess,
@@ -42,9 +43,9 @@ export type ActiveEnergyDayGroup = AggregationGroupResult<'ActiveCaloriesBurned'
 /**
  * The nine things the app reads. Nothing else is ever requested. Adding one
  * means app.json (android.permissions), this list, the explanation sheet,
- * docs/health-sync.md and the Play Console declaration together. Weight, body
- * fat and heart rate came after sleep: a phone that allowed the six before is
- * asked for them only from their own row (WEIGHT_PERMISSIONS, HEART_PERMISSIONS).
+ * docs/health-sync.md and the Play Console declaration together. Steps, sleep,
+ * weight, body fat and heart rate came later: a phone that allowed sync before
+ * is asked for each only from its own row (`permissionsFor`).
  */
 export const READ_PERMISSIONS: Permission[] = [
   { accessType: 'read', recordType: 'ExerciseSession' },
@@ -75,6 +76,24 @@ export const DAY_ENERGY_PERMISSIONS: Permission[] = [
   { accessType: 'read', recordType: 'TotalCaloriesBurned' },
   { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
 ];
+
+/** The Steps row (added after the first four types) and the Sleep row (after the first five): each its own type alone. */
+export const STEPS_PERMISSIONS: Permission[] = [{ accessType: 'read', recordType: 'Steps' }];
+export const SLEEP_PERMISSIONS: Permission[] = [{ accessType: 'read', recordType: 'SleepSession' }];
+
+/**
+ * What each request asks Health Connect for. Turning sync on asks the whole
+ * list; every row's own Allow asks only that row's types, so a phone that
+ * allowed sync before is never shown types another row is about.
+ */
+export function permissionsFor(what: AccessRequest): Permission[] {
+  if (what === 'steps') return STEPS_PERMISSIONS;
+  if (what === 'sleep') return SLEEP_PERMISSIONS;
+  if (what === 'weight') return WEIGHT_PERMISSIONS;
+  if (what === 'heartRate') return HEART_PERMISSIONS;
+  if (what === 'dayEnergy') return DAY_ENERGY_PERMISSIONS;
+  return READ_PERMISSIONS;
+}
 
 /** What a list of granted permissions lets the app read. */
 export function accessFrom(granted: readonly { accessType: string; recordType: string }[]): HealthAccess {

@@ -63,6 +63,13 @@ describe('the watch estimate', () => {
     expect(watchEstimate(week([2600, 2600, 2600, 2600, 2600], []), TODAY, none, 2400, BMR, 'apple-health')?.label).toBe('Apple Health');
   });
 
+  it('on an iPhone, leaves Apple\'s own devices out of the name when a watch app recorded too', () => {
+    const IPHONE = 'com.apple.health.device';
+    expect(watchEstimate(week([2600, 2600, 2600, 2600, 2600], [GARMIN, IPHONE]), TODAY, none, 2400, BMR, 'apple-health')?.label).toBe('Garmin Connect');
+    // Apple's devices alone: the device kind is not known here, so the store's name.
+    expect(watchEstimate(week([2600, 2600, 2600, 2600, 2600], [IPHONE]), TODAY, none, 2400, BMR, 'apple-health')?.label).toBe('Apple Health');
+  });
+
   it('HealthCal\'s side is the maintenance the targets use plus the same days\' workouts', () => {
     const days = week([2600, 2600, 2600, 2600, 2600, null, null]);
     // Workouts on two of the valid days and on one day that is not counted (the 17th has no watch figure).

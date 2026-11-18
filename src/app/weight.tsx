@@ -217,10 +217,16 @@ function WeightScreen() {
                   <ListRow
                     testID={`weight-row-${i}`}
                     title={formatDayLabel(e.date)}
-                    subtitle={[weighInFromLine(e), isPlausibleBodyFat(e.bodyFatPct) ? `${e.bodyFatPct}% body fat` : null, delta !== null ? `${Math.abs(delta) < 0.05 ? '0' : `${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(1)}`} ${unit} vs previous` : null].filter(Boolean)
-                        // Each part stays whole ("20.8% body fat"), so a long line breaks only between them.
-                        .map((part) => (part as string).replace(/ /g, '\u00A0'))
-                        .join(' · ') || undefined}
+                    subtitle={[
+                      delta !== null ? `${Math.abs(delta) < 0.05 ? '0' : `${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(1)}`} ${unit} vs previous` : null,
+                      isPlausibleBodyFat(e.bodyFatPct) ? `${e.bodyFatPct}% body fat` : null,
+                      weighInFromLine(e)?.replace(/^From /, 'from ') ?? null,
+                    ]
+                      .filter(Boolean)
+                      // The change first and where it came from last: at 320 px a long line is shortened at the source, never the change.
+                      // Each part stays whole ("20.8% body fat"), so a long line breaks only between them.
+                      .map((part) => (part as string).replace(/ /g, '\u00A0'))
+                      .join(' · ') || undefined}
                     value={fixedWeight(e.kg, units)}
                     onPress={() => setSheetDate(e.date)}
                   />
@@ -246,8 +252,9 @@ function targetsBehindText(
   units: UnitSystem,
 ): string {
   const from = weighInFromLine(behind.latest)?.replace(/^From /, 'from ') ?? 'from your health app';
-  const fat = behind.bodyFatPct !== undefined ? ` with ${behind.bodyFatPct}% body fat` : '';
-  const ownFat = behind.bodyFatPct !== undefined ? (typeof profile.bodyFatPct === 'number' ? ` and ${profile.bodyFatPct}% body fat` : ' and no body fat') : '';
+  // One decimal on both sides; a profile without body fat leaves the clause out.
+  const fat = behind.bodyFatPct !== undefined ? ` with ${behind.bodyFatPct.toFixed(1)}% body fat` : '';
+  const ownFat = behind.bodyFatPct !== undefined && typeof profile.bodyFatPct === 'number' ? ` and ${profile.bodyFatPct.toFixed(1)}% body fat` : '';
   return `Your targets use ${fixedWeight(profile.weightKg, units)}${ownFat}. Your latest weigh-in, ${from} on ${formatShortDate(behind.latest.date)}, is ${fixedWeight(behind.kg, units)}${fat}.`;
 }
 

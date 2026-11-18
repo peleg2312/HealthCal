@@ -75,7 +75,8 @@ export interface FakeHealth {
 }
 
 /** What each row's own "Allow" asks for (the rows added after sleep): only these flags can change. */
-const ROW_FLAGS: Record<'sleep' | 'weight' | 'dayEnergy' | 'heartRate', (keyof HealthAccess)[]> = {
+const ROW_FLAGS: Record<'steps' | 'sleep' | 'weight' | 'dayEnergy' | 'heartRate', (keyof HealthAccess)[]> = {
+  steps: ['steps'],
   sleep: ['sleep'],
   weight: ['weight', 'bodyFat'],
   dayEnergy: ['dayEnergy'],
@@ -86,8 +87,6 @@ export function createFakeAdapter(init: Partial<Omit<FakeHealth, 'calls'>> = {})
   const health: FakeHealth = {
     store: 'health-connect',
     availability: 'available',
-    access: NO_ACCESS,
-    grant: FULL_ACCESS,
     workouts: [],
     steps: [],
     stepsFail: null,
@@ -100,6 +99,10 @@ export function createFakeAdapter(init: Partial<Omit<FakeHealth, 'calls'>> = {})
     fail: null,
     delayMs: 0,
     ...init,
+    // A flag left out is not allowed (false), never undefined: a browser demo written before a flag existed
+    // (window.__healthcalHealthDemo) then answers a row's Allow as refused, as a phone would, not as "no answer".
+    access: { ...NO_ACCESS, ...init.access },
+    grant: init.grant === undefined ? FULL_ACCESS : init.grant && { ...NO_ACCESS, ...init.grant },
     calls: { availability: 0, access: 0, request: 0, reads: 0, details: 0, steps: 0, sleep: 0, weighIns: 0, dayEnergy: 0, settings: 0, install: 0 },
   };
   const adapter: HealthAdapter = {
@@ -116,7 +119,7 @@ export function createFakeAdapter(init: Partial<Omit<FakeHealth, 'calls'>> = {})
     },
     requestAccess: async (what = 'all') => {
       health.calls.request += 1;
-      // Asked from one row (Sleep, Weight, Calories burned, Heart rate): only that row's flags can change.
+      // Asked from one row (Steps, Sleep, Weight, Calories burned, Heart rate): only that row's flags can change.
       if (health.grant) {
         if (what === 'all') health.access = health.grant;
         else {

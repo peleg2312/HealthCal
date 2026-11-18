@@ -17,7 +17,7 @@ import { healthAdapter } from '../sync';
  * shows it: null until sync is on and 5 of the last 7 full days are valid.
  * Kept on this phone only; it is added to no budget and informs no estimate.
  */
-export function useWatchEstimate(model: EnergyModel): (Estimate & { learned: boolean }) | null {
+export function useWatchEstimate(model: EnergyModel): (Estimate & { learned: boolean; maintenance: number }) | null {
   const enabled = useHealthSync((s) => s.enabled);
   const days = useHealthSync((s) => s.dayEnergy.days);
   const profile = useProfile();
@@ -25,8 +25,9 @@ export function useWatchEstimate(model: EnergyModel): (Estimate & { learned: boo
   const todayDate = useToday();
   return useMemo(() => {
     if (!enabled) return null;
-    const est = watchEstimate(days, todayDate, exerciseNetByDate(activities), maintenanceKcal(model), bmr(profile).kcal, healthAdapter.store);
-    return est ? { ...est, learned: model.usingAdaptive } : null;
+    const maintenance = maintenanceKcal(model);
+    const est = watchEstimate(days, todayDate, exerciseNetByDate(activities), maintenance, bmr(profile).kcal, healthAdapter.store);
+    return est ? { ...est, learned: model.usingAdaptive, maintenance: Math.round(maintenance) } : null;
   }, [enabled, days, todayDate, activities, model, profile]);
 }
 
@@ -51,9 +52,11 @@ export function WatchEstimate({ model }: { model: EnergyModel }) {
         {formatNumber(est.avg)}
         <Text variant="unit"> kcal a day</Text>
       </Text>
+      {/* Names the figure it is built on, in the card's own words (the blend, or the formula), so the reader can find it on the card. */}
       <Text variant="caption" color="textSecondary">
-        Average of {est.n} full days, workouts included. HealthCal&apos;s figure for the same days is {formatNumber(est.app)} kcal: your{' '}
-        {est.learned ? 'learned' : 'formula'} estimate, which sets your targets, plus your workouts. Shown to compare; it does not change your budget.
+        Average of {est.n} full days, workouts included. HealthCal&apos;s figure for the same days is {formatNumber(est.app)} kcal:{' '}
+        {est.learned ? 'your blended estimate' : 'the formula estimate'} of {formatNumber(est.maintenance)} kcal before workouts, plus the workouts you logged. Shown to
+        compare; it does not change your budget.
       </Text>
     </View>
   );

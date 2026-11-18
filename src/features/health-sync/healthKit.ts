@@ -343,6 +343,21 @@ export function bpmOf(q: HKQuantity | undefined | null): number | null {
   return null;
 }
 
+/**
+ * Heart rate asked over a workout's time from every source (the query cannot
+ * filter by source without native objects) is the workout's own only when the
+ * answer's sources (the library always asks `separateBySource`) are all the
+ * app that recorded the workout, by its raw bundle id. Another source's beats
+ * (an Apple Watch, earbuds, a strap app) or no sources at all: null, so the
+ * workout carries no heart rate rather than a blend.
+ */
+export function ownHeartWindow(st: HKStatistics | null | undefined, workoutBundle: string | null | undefined): HKStatistics | null {
+  if (!st || !workoutBundle) return null;
+  const sources = st.sources ?? [];
+  if (sources.length === 0) return null;
+  return sources.every((src) => src?.bundleIdentifier === workoutBundle) ? st : null;
+}
+
 /** A heart-rate statistic as a workout's two figures (heart.ts), or nothing. */
 export function heartFromStatistics(st: HKStatistics | null | undefined): Pick<HealthWorkout, 'avgHeartRate' | 'maxHeartRate'> {
   const hr = heartFigures(bpmOf(st?.averageQuantity), bpmOf(st?.maximumQuantity));

@@ -100,7 +100,12 @@ function sleepNight(store, origin, kind, daysAgo, { from = now, staged = true } 
 const GARMIN_ANDROID = 'com.garmin.android.apps.connectmobile';
 const garminNights = [...sleepNight('healthConnect', GARMIN_ANDROID, 'watch', 0), ...sleepNight('healthConnect', GARMIN_ANDROID, 'watch', 1)];
 const watchNights = [...sleepNight('healthKit', 'com.apple.health.watch', 'watch', 0), ...sleepNight('healthKit', 'com.apple.health.watch', 'watch', 1)];
-const ALL_ANDROID = { workouts: true, activeEnergy: true, totalEnergy: true, distance: true, steps: true, sleep: true };
+/**
+ * A phone that allowed the six types read before weight and heart rate, as Health Connect answers it
+ * (healthConnect.ts accessFrom): the day's calories need only the two calorie types, so they count as
+ * allowed already; weight, body fat and heart rate are not.
+ */
+const ALL_ANDROID = { workouts: true, activeEnergy: true, totalEnergy: true, distance: true, steps: true, sleep: true, dayEnergy: true, weight: false, bodyFat: false, heartRate: false };
 /** Health Connect with sleep allowed and these samples, sync on (and this phone's memory on top). */
 const syncedSleep = (sleep, state = {}) => ({ demo: { store: 'health-connect', availability: 'available', access: ALL_ANDROID, grant: ALL_ANDROID, workouts: [], steps: [], sleep }, state: { enabled: true, ...state } });
 /** Tomorrow at 08:10 local: the morning page's yesterday is the seed's today (morning.cjs). */
@@ -461,11 +466,20 @@ module.exports = [
     note: 'Android: weight allowed and read, no weigh-in in Health Connect: "None in Health Connect in the last 4 weeks"; calories burned allowed with no days yet',
   },
   {
+    id: 'health-sync-android-weight-waiting',
+    route: '/settings/health-sync',
+    data: 'empty',
+    // The read fails here so the browser's own sync (no account: never held) leaves the held state as it was.
+    health: { ...androidAll({}, { weightWaitingSince: iso(now - HOUR) }), demo: { ...androidAll().demo, weighInsFail: { code: 'unknown', message: 'held' } } },
+    waitFor: 'health-sync-weight',
+    note: 'Android, signed in: weigh-ins read but held because the account sync has not finished a round: the Weight row says it waits for the account',
+  },
+  {
     id: 'health-sync-android-weight-not-allowed',
     route: '/settings/health-sync',
     health: androidAll({ weighIns: garminWeighIns(14), access: ALL_ANDROID, grant: ALL_ANDROID }),
     waitFor: 'health-sync-weight',
-    note: 'Android: sync on from before weight, calories burned and heart rate were read (the six allowed): three rows offer Allow',
+    note: 'Android: sync on from before weight and heart rate were read (the six allowed): Weight and Heart rate offer Allow; Calories burned is already allowed by the two calorie types',
   },
   {
     id: 'health-sync-android-weight-allow',
@@ -480,9 +494,10 @@ module.exports = [
     id: 'health-sync-android-weight-refused',
     route: '/settings/health-sync',
     health: androidAll({ weighIns: garminWeighIns(14), access: ALL_ANDROID, grant: ALL_ANDROID }),
-    waitFor: 'health-sync-weight-allow',
-    taps: ['health-sync-weight-allow'],
-    note: 'Android: Allow tapped on the Weight row and refused again: a toast says so and opens Health Connect',
+    // Checked after the tap: only the refusal's toast has an action ("Open"); "did not answer" has none.
+    waitFor: 'toast-action',
+    taps: [{ wait: 1500 }, 'health-sync-weight-allow'],
+    note: 'Android: Allow tapped on the Weight row and refused again: "Weight is still not shared. Allow it in Health Connect" with Open',
   },
   {
     id: 'health-sync-iphone-new-not-asked',

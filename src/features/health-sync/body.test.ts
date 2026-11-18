@@ -120,6 +120,23 @@ describe('one weigh-in a day (rules c, d, e)', () => {
     expect(weighInsFrom([base, fat('2026-11-14T06:12:00Z', 18.2, { origin: WITHINGS })], ams, '2026-11-01')[0].bodyFatPct).toBeNull();
   });
 
+  it('one weigh-in forwarded by two apps keeps the body fat of the copy that has one, even a second later', () => {
+    const samples = [
+      w('2026-11-17T06:00:01Z', 80, { origin: 'b.scale' }),
+      w('2026-11-17T06:00:00Z', 81, { origin: 'a.garmin' }),
+      fat('2026-11-17T06:00:02Z', 20, { origin: 'b.scale' }),
+    ];
+    for (const order of [samples, [...samples].reverse()]) {
+      expect(weighInsFrom(order, ams, '2026-11-01')[0]).toMatchObject({ origin: 'b.scale', kg: 80, bodyFatPct: 20, measuredAt: '2026-11-17T06:00:01.000Z' });
+    }
+    // More than 10 minutes after the earliest: another weigh-in, so the earliest stays, without body fat.
+    const later = [w('2026-11-17T06:00:00Z', 81, { origin: 'a.garmin' }), w('2026-11-17T06:10:01Z', 80, { origin: 'b.scale' }), fat('2026-11-17T06:10:01Z', 20, { origin: 'b.scale' })];
+    expect(weighInsFrom(later, ams, '2026-11-01')[0]).toMatchObject({ origin: 'a.garmin', kg: 81, bodyFatPct: null });
+    // Both copies with body fat: the earliest, as before.
+    const both = [...samples, fat('2026-11-17T06:00:00Z', 21, { origin: 'a.garmin' })];
+    expect(weighInsFrom(both, ams, '2026-11-01')[0]).toMatchObject({ origin: 'a.garmin', bodyFatPct: 21 });
+  });
+
   it('makes nothing from a body-fat reading alone', () => {
     expect(weighInsFrom([fat('2026-11-14T06:12:00Z', 18.2)], ams, '2026-11-01')).toEqual([]);
   });
@@ -213,6 +230,19 @@ describe('planWeights (rule f)', () => {
     const onB = plan([early], [record({ ...a, id: 'w' })]);
     expect(onB.update[0].after).toMatchObject({ kg: 82.0, measuredAt: '2026-11-14T05:40:00.000Z' });
     expect(plan([early], [onB.update[0].after]).update).toEqual([]);
+  });
+
+  it('within one weigh-in, the copy with body fat replaces the one without, never the other way round', () => {
+    const plain = synced({ origin: 'a.garmin', measuredAt: '2026-11-14T06:00:00.000Z', kg: 81 });
+    const withFat = reading({ origin: 'b.scale', measuredAt: '2026-11-14T06:00:01.000Z', kg: 80, bodyFatPct: 20 });
+    const up = plan([withFat], [plain]);
+    expect(up.update[0].after).toMatchObject({ origin: 'b.scale', kg: 80, bodyFatPct: 20, syncedBodyFatPct: 20, measuredAt: '2026-11-14T06:00:01.000Z' });
+    // A phone that has not seen the scale's body fat yet does not take it back to the copy without.
+    expect(plan([reading({ origin: 'a.garmin', measuredAt: '2026-11-14T06:00:00.000Z', kg: 81 })], [up.update[0].after]).update).toEqual([]);
+    // An earlier weigh-in more than 10 minutes before still wins, and its missing body fat goes.
+    const earlier = plan([reading({ origin: 'a.garmin', measuredAt: '2026-11-14T05:40:00.000Z', kg: 81 })], [up.update[0].after]);
+    expect(earlier.update[0].after).toMatchObject({ origin: 'a.garmin', kg: 81 });
+    expect(earlier.update[0].after).not.toHaveProperty('bodyFatPct');
   });
 
   it('one weigh-in a day even if a day is listed twice', () => {

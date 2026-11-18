@@ -10,12 +10,13 @@ import { describe, expect, it } from 'vitest';
 import type { SleepEntry, WeightEntry } from '@/types';
 
 import { weightHandledKey } from './body';
+import { withDeletedDay } from './deletions';
 import { MIN_ENERGY_DAYS, watchEstimate } from './dayEnergy';
 import { createHealthSync, roundEndedSince, type SleepLog, type SyncDeps, type WeightLog } from './engine';
 import { createFakeAdapter, FULL_ACCESS, type FakeHealth } from './fake';
 import { zoneClock } from './steps';
 import { GARMIN, memoryDiary, memoryState, workout } from './testing';
-import { HealthError, type BodySample, type DayEnergyDay, type SleepSample } from './types';
+import { HealthError, type BodySample, type DayEnergyDay, type HealthAccess, type SleepSample } from './types';
 
 const clock = zoneClock('Europe/Amsterdam');
 /** Saturday 14 November 2026, 12:00 in Amsterdam. */
@@ -75,10 +76,9 @@ interface RigOptions {
   weights?: ReturnType<typeof memoryWeights>;
   /** What the data sync's pull answers; `bring` runs first, as records another phone wrote arriving. */
   pull?: { ok: boolean; bring?: () => void };
-  learns?: boolean;
 }
 
-function rig({ health = {}, state: initial = {}, weights = memoryWeights(), pull = { ok: true }, learns = false }: RigOptions = {}) {
+function rig({ health = {}, state: initial = {}, weights = memoryWeights(), pull = { ok: true } }: RigOptions = {}) {
   const fake = createFakeAdapter({ access: FULL_ACCESS, ...health });
   const ranges: { from: string; to: string }[] = [];
   const adapter = { ...fake.adapter, store: fake.adapter.store, readWeighIns: (range: { from: string; to: string }, access: typeof FULL_ACCESS) => (ranges.push(range), fake.adapter.readWeighIns(range, access)) };
@@ -100,7 +100,6 @@ function rig({ health = {}, state: initial = {}, weights = memoryWeights(), pull
       pull.bring?.();
       return pull.ok;
     },
-    targetsLearn: () => learns,
     announce: (message, undo, tint) => void toasts.push({ message, undo, tint }),
     stepClock: clock,
   };
@@ -151,14 +150,18 @@ describe('weigh-ins in a sync', () => {
     expect(r.weights.live()).toEqual([]);
   });
 
-  it('says on the first read that many weigh-ins now feed the trend, and the targets when the learned estimate is on', async () => {
+  it('says on the first read of many weigh-ins how far back they go', async () => {
     const many = daysUpTo14(26).map((d, i) => weight(d, 84 - i * 0.1));
     const plain = rig({ health: { weighIns: many } });
     await plain.sync.sync('auto');
-    expect(plain.toasts[0].message).toBe('26 weigh-ins added from Garmin Connect. They cover the last 4 weeks.');
-    const learns = rig({ health: { workouts: [workout({ start: '2026-11-13T17:00:00+01:00', minutes: 45 })], weighIns: many }, learns: true });
-    await learns.sync.sync('auto');
-    expect(learns.toasts[0].message).toBe('1 workout and 26 weigh-ins added from Garmin Connect. They cover the last 4 weeks.');
+    expect(plain.toasts[0].message).toBe('26 weigh-ins added from Garmin Connect. They go back to Oct 20.');
+    const both = rig({ health: { workouts: [workout({ start: '2026-11-13T17:00:00+01:00', minutes: 45 })], weighIns: many } });
+    await both.sync.sync('auto');
+    expect(both.toasts[0].message).toBe('1 workout and 26 weigh-ins added from Garmin Connect. They go back to Oct 20.');
+    // A fortnight says a fortnight: the date is the earliest one added, never a fixed span.
+    const fortnight = rig({ health: { weighIns: daysUpTo14(13).map((d) => weight(d, 82)) } });
+    await fortnight.sync.sync('auto');
+    expect(fortnight.toasts[0].message).toBe('13 weigh-ins added from Garmin Connect. They go back to Nov 2.');
     // A later read with as many says only what it added.
     const again = rig({ health: { weighIns: many }, state: { weightReadAt: '2026-10-01T08:00:00.000Z' } });
     await again.sync.sync('auto');
@@ -217,6 +220,23 @@ describe('weigh-ins in a sync', () => {
     expect(r.weights.live()).toEqual([]);
   });
 
+  it('a weigh-in deleted right after a sync stays deleted when the marker is purged before the next run (no account)', async () => {
+    const r = rig({ health: { weighIns: [weight('2026-11-14', 82.1)] } });
+    expect(await r.sync.sync('auto')).toMatchObject({ weighIns: 1 });
+    // The person deletes it at once: the tracker's delete remembers the day (deletions.ts) as it removes the record.
+    const deleted = r.weights.live()[0];
+    r.weights.remove(deleted.id);
+    r.state.set({ handled: withDeletedDay(r.state.get().handled, weightHandledKey(deleted.date), deleted.measuredAt!, r.now.ms) });
+    r.now.ms += 5 * 60_000;
+    expect(await r.sync.sync('auto')).toMatchObject({ status: 'skipped', why: 'too-soon' });
+    // A day later, without an account, the store's start purges the deletion marker before any run.
+    r.now.ms += 25 * 3_600_000;
+    r.weights.records.delete('2026-11-14');
+    expect(await r.sync.sync('auto')).toMatchObject({ status: 'done', weighIns: 0 });
+    expect(r.weights.live()).toEqual([]);
+    expect(r.state.get().handled[weightHandledKey('2026-11-14')]).toMatchObject({ how: 'skipped' });
+  });
+
   it('moves weightReadAt only once what the read wrote is confirmed on the device', async () => {
     const r = rig({ health: { weighIns: [weight('2026-11-12', 82.6), weight('2026-11-13', 82.4)] } });
     r.diary.flushMode = 'fail';
@@ -237,10 +257,16 @@ describe('weigh-ins in a sync', () => {
     expect(r.weights.all()).toEqual([]);
     expect(r.state.get().weightReadAt).toBeNull();
     expect(r.toasts.map((t) => t.message)).toEqual(['1 workout added from Garmin Connect']);
+    // The Weight row is told why (weightRowText): held since the first run that held them.
+    expect(r.state.get().weightWaitingSince).toBe(new Date(NOON).toISOString());
+    later(r);
+    await r.sync.sync('auto');
+    expect(r.state.get().weightWaitingSince).toBe(new Date(NOON).toISOString());
     r.pull.ok = true;
     later(r);
     expect(await r.sync.sync('auto')).toMatchObject({ weighIns: 1 });
-    expect(r.ranges[1].from).toBe(r.ranges[0].from);
+    expect(r.ranges[2].from).toBe(r.ranges[0].from);
+    expect(r.state.get().weightWaitingSince).toBeNull();
   });
 
   it('does not wait for the pull when there is nothing to plan', async () => {
@@ -249,6 +275,7 @@ describe('weigh-ins in a sync', () => {
     expect(r.pulls).toEqual([]);
     // Nothing was in the store: the read still counts as done.
     expect(r.state.get().weightReadAt).toBe(new Date(NOON).toISOString());
+    expect(r.state.get().weightWaitingSince).toBeNull();
   });
 
   it('a deletion made on another phone that the pull brings stops the add', async () => {
@@ -308,6 +335,9 @@ describe('weigh-ins in a sync', () => {
     expect(await createFakeAdapter({ access: before, grant: null }).adapter.requestAccess('weight')).toEqual(before);
     // Allowed from the row: only that row's flags change.
     expect(await createFakeAdapter({ access: before }).adapter.requestAccess('weight')).toEqual({ ...before, weight: true, bodyFat: true });
+    // A browser demo written before a flag existed leaves it out: it reads as not allowed (false), so a row's Allow is answered as refused, as on a phone.
+    const old = { workouts: true, activeEnergy: true, totalEnergy: true, distance: true, steps: true, sleep: true } as unknown as HealthAccess;
+    expect(await createFakeAdapter({ access: old, grant: old }).adapter.requestAccess('weight')).toMatchObject({ weight: false, bodyFat: false });
   });
 
   it('reads no body fat that may not be read', async () => {

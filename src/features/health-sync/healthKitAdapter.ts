@@ -24,6 +24,7 @@ import {
   ENERGY_READ_TYPES,
   HEART_READ_TYPES,
   HK,
+  ownHeartWindow,
   READ_TYPES,
   SLEEP_READ_TYPES,
   WEIGHT_READ_TYPES,
@@ -55,6 +56,8 @@ export function createHealthKitAdapter(api: HealthKitApi, links: HealthKitLinks,
   const heartToRead = { toRead: HEART_READ_TYPES };
   /** What each "Allow" asks: a row's own list alone, or every list in one sheet when sync is turned on. */
   const requestFor = (what: AccessRequest): { toRead: readonly HealthKitReadType[] } => {
+    // Steps are in the first list (READ_TYPES): a phone missing them is asked that list again, never the newer rows.
+    if (what === 'steps') return { toRead: READ_TYPES };
     if (what === 'sleep') return sleepToRead;
     if (what === 'weight') return weightToRead;
     if (what === 'dayEnergy') return energyToRead;
@@ -122,17 +125,19 @@ export function createHealthKitAdapter(api: HealthKitApi, links: HealthKitLinks,
 
   /**
    * A workout's heart rate in count/min: its own statistic (HKWorkout.statistics(for:)), else the
-   * samples inside its time from every source (a source filter needs native objects). Heart rate is
+   * samples inside its time, asked from every source (a source filter needs native objects) and kept
+   * only when every source in the answer is the workout's own app (ownHeartWindow). Heart rate is
    * extra: a failed question leaves the workout without it, never without the workout.
    */
   async function heartOf(w: HKWorkoutProxy): Promise<HKStatistics | null> {
     try {
       const own = await w.getStatistic(HK.heartRate, 'count/min');
       if (own?.averageQuantity) return own;
-      return await api.queryStatisticsForQuantity(HK.heartRate, ['discreteAverage', 'discreteMax'], {
+      const window = await api.queryStatisticsForQuantity(HK.heartRate, ['discreteAverage', 'discreteMax'], {
         unit: 'count/min',
         filter: { date: { startDate: w.startDate, endDate: w.endDate, strictStartDate: true, strictEndDate: true } },
       });
+      return ownHeartWindow(window, w.sourceRevision?.source?.bundleIdentifier);
     } catch {
       return null;
     }
@@ -214,7 +219,8 @@ export function createHealthKitAdapter(api: HealthKitApi, links: HealthKitLinks,
   /**
    * Every body-mass sample in the range (kg) and, when body fat may be read,
    * every body-fat sample ('%', a fraction), from every source, as raw samples
-   * (body.ts chooses one weigh-in a day).
+   * (body.ts chooses one weigh-in a day). A failed body-fat read leaves the
+   * weights without it.
    */
   async function readWeighIns(range: { from: string; to: string }, allowed: HealthAccess): Promise<BodySample[]> {
     if (!allowed.weight) return [];
@@ -226,9 +232,17 @@ export function createHealthKitAdapter(api: HealthKitApi, links: HealthKitLinks,
         if (sample) out.push(sample);
       }
       if (allowed.bodyFat) {
-        for (const x of await api.queryQuantitySamples(HK.bodyFat, { limit: 0, ascending: true, unit: '%', filter })) {
-          const sample = bodyFromHealthKit(x, 'bodyFat');
-          if (sample) out.push(sample);
+        // Body fat is the optional part: a failed read keeps the weights, and a
+        // late body fat is filled in on a later run (body.ts, rule f(ii)).
+        try {
+          const fat: BodySample[] = [];
+          for (const x of await api.queryQuantitySamples(HK.bodyFat, { limit: 0, ascending: true, unit: '%', filter })) {
+            const sample = bodyFromHealthKit(x, 'bodyFat');
+            if (sample) fat.push(sample);
+          }
+          out.push(...fat);
+        } catch {
+          // Weights alone.
         }
       }
       return out;

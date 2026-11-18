@@ -128,8 +128,6 @@ export interface SyncDeps {
    * Absent: true (tests, a build without accounts).
    */
   afterPull?(since: number): Promise<boolean>;
-  /** Whether the targets use the learned burn estimate (only the toast's words depend on it). */
-  targetsLearn?(): boolean;
   /**
    * One confirmation with an Undo. `tint`: what the change was, for the toast's
    * level line ('exercise' when it holds a workout, 'sleep' for nights without
@@ -333,7 +331,7 @@ export function createHealthSync(deps: SyncDeps) {
       const weighIns = { added: weighInsAdded, updated: weighInsUpdated, apps: weightSaves.map((w) => originName(w.origin ?? '')) };
       const message =
         syncMessage(added, updated, saves.map((p) => p.from), storeLabel(), nights, weighIns) +
-        weighInNote(weighInsAdded, weighInWords.firstRead, deps.targetsLearn?.() === true);
+        weighInNote(weighInsAdded, weighInWords.firstRead, weightLog && weightPlan?.add.length ? weightPlan.add.reduce((a, w) => (w.date < a ? w.date : a), weightPlan.add[0].date) : null);
       const tint: SyncTint = added + updated > 0 ? 'exercise' : nightsAdded + nightsUpdated > 0 ? 'sleep' : 'weight';
       deps.announce(message, () => {
         if (sleepPlan && sleepLog && nightSaves.length) undoNights(sleepPlan, sleepLog);
@@ -451,7 +449,12 @@ export function createHealthSync(deps: SyncDeps) {
 
     // Weigh-ins are synced records another phone may have deleted: plan them only once a pull that ended after this
     // run began has brought those deletions here. Without it they wait, and `weightReadAt` stays, for the next run.
-    if (weighIns && weighIns.samples.length > 0 && !(await pulledSince(now))) weighIns = null;
+    // Held: the Weight row says it waits for the account (`weightWaitingSince`); read and planned, or nothing to add: it no longer waits.
+    let weightWaiting: 'held' | 'clear' | 'keep' = weighIns ? 'clear' : 'keep';
+    if (weighIns && weighIns.samples.length > 0 && !(await pulledSince(now))) {
+      weighIns = null;
+      weightWaiting = 'held';
+    }
 
     // From here on nothing waits: the plan is made from the diary as it is now and saved at once.
     const ctx = diary.context();
@@ -506,6 +509,7 @@ export function createHealthSync(deps: SyncDeps) {
       steps: steps ?? { ...current.steps, days: pruneStepDays(current.steps.days, today) },
       // The same for the day's calories burned.
       dayEnergy: dayEnergy ?? { ...current.dayEnergy, days: pruneDayEnergy(current.dayEnergy.days, today) },
+      weightWaitingSince: weightWaiting === 'held' ? (current.weightWaitingSince ?? at) : weightWaiting === 'clear' ? null : current.weightWaitingSince,
     });
     return { status: 'done', added, updated, review: plan.review.length, nights, weighIns: weighInCount };
   }

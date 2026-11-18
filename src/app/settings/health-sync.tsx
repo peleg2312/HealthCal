@@ -95,7 +95,7 @@ export default function HealthSyncScreen() {
     setAsking(true);
     let allowed: boolean | null = null;
     try {
-      allowed = (await healthAdapter.requestAccess()).steps;
+      allowed = (await healthAdapter.requestAccess('steps')).steps;
     } catch {
       allowed = null;
     }
@@ -115,7 +115,7 @@ export default function HealthSyncScreen() {
 
   /**
    * Sleep was added after some people allowed the first five types: ask for it
-   * (an iPhone asks for sleep alone; Android shows what is not allowed yet), and say how it went.
+   * alone (SLEEP_PERMISSIONS, SLEEP_READ_TYPES), and say how it went.
    */
   const allowSleep = async () => {
     setAsking(true);
@@ -395,6 +395,7 @@ export default function HealthSyncScreen() {
                 state.weightReadAt,
                 store,
                 profile.units,
+                state.weightWaitingSince !== null,
               )}
               chevron={access?.weight === true}
               onPress={access?.weight === true ? () => router.push('/weight') : () => void allowRow('weight')}
@@ -502,10 +503,11 @@ export default function HealthSyncScreen() {
   );
 }
 
+/** "1 workout added, 13 weigh-ins": workouts are named, so a count beside nights or weigh-ins is never read as theirs. */
 const changeText = (r: { added: number; updated: number; nights?: number; weighIns?: number }) =>
   [
-    r.added ? `${r.added} added` : '',
-    r.updated ? `${r.updated} updated` : '',
+    r.added ? `${r.added} ${r.added === 1 ? 'workout' : 'workouts'} added` : '',
+    r.updated ? (r.added ? `${r.updated} updated` : `${r.updated} ${r.updated === 1 ? 'workout' : 'workouts'} updated`) : '',
     r.nights ? `${r.nights} ${r.nights === 1 ? 'night' : 'nights'} of sleep` : '',
     r.weighIns ? `${r.weighIns} ${r.weighIns === 1 ? 'weigh-in' : 'weigh-ins'}` : '',
   ]

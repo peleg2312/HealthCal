@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { WeightEntry } from '@/types';
 
-import { bodyFatFollowsDelete, targetsBehind, weighInAfterEdit } from './helpers';
+import { bodyFatFollowsDelete, ownLatestBodyFat, profileAfterDelete, targetsBehind, weighInAfterEdit } from './helpers';
 import { isSyncedWeighIn, weighInFromLine } from './weighInSource';
 
 const GARMIN = 'com.garmin.android.apps.connectmobile';
@@ -88,5 +88,43 @@ describe('deleting a weigh-in with body fat', () => {
     expect(bodyFatFollowsDelete({ bodyFatPct: 21 }, a, [a, b])).toBe(false);
     // No body fat on the deleted one.
     expect(bodyFatFollowsDelete({ bodyFatPct: 18.2 }, { id: 'c', date: '2026-11-15' }, [a, b])).toBe(false);
+  });
+});
+
+describe('what deleting a weigh-in changes in the profile', () => {
+  const oct = hand({ id: 'oct', date: '2026-10-03', kg: 90 });
+  const nov10 = hand({ id: 'n10', date: '2026-11-10', kg: 84, bodyFatPct: 21 });
+  const nov17 = synced({ id: 'n17', date: '2026-11-17', kg: 82.4, syncedKg: 82.4, bodyFatPct: 18.2, syncedBodyFatPct: 18.2 });
+  const nov18 = synced({ id: 'n18', date: '2026-11-18', kg: 82.0, syncedKg: 82.0, bodyFatPct: undefined, syncedBodyFatPct: undefined });
+  const all = [oct, nov10, nov17, nov18];
+
+  it('deleting an older weigh-in never points the targets at a newer synced one', () => {
+    expect(profileAfterDelete({ weightKg: 84, bodyFatPct: 21 }, oct, all)).toEqual({});
+    expect(profileAfterDelete({ weightKg: 84, bodyFatPct: 21 }, nov10, all)).toEqual({});
+  });
+
+  it('deleting the newest moves the weight only when it came from it, and then to the person\'s own newest', () => {
+    const mine = hand({ id: 'n19', date: '2026-11-19', kg: 81 });
+    expect(profileAfterDelete({ weightKg: 81 }, mine, [...all, mine])).toEqual({ weightKg: 84 });
+    // Typed over in Goals since: left alone.
+    expect(profileAfterDelete({ weightKg: 79 }, mine, [...all, mine])).toEqual({});
+    // A synced newest the person used for targets: back to their own newest, not to the other synced one.
+    expect(profileAfterDelete({ weightKg: 82.0 }, nov18, all)).toEqual({ weightKg: 84 });
+    // Nothing of their own left: the profile stays, and "Use it for targets" offers the synced one.
+    expect(profileAfterDelete({ weightKg: 82.0 }, nov18, [nov17, nov18])).toEqual({});
+    // Before this round's records: hand weigh-ins only, as it always was.
+    expect(profileAfterDelete({ weightKg: 81 }, mine, [oct, nov10, mine])).toEqual({ weightKg: 84 });
+  });
+
+  it('body fat falls back to the person\'s own newest reading, never to a synced one, or is cleared', () => {
+    const mine = hand({ id: 'n19', date: '2026-11-19', kg: 81, bodyFatPct: 19.5 });
+    expect(profileAfterDelete({ weightKg: 81, bodyFatPct: 19.5 }, mine, [...all, mine])).toEqual({ weightKg: 84, bodyFatPct: 21 });
+    expect(profileAfterDelete({ weightKg: 81, bodyFatPct: 19.5 }, mine, [nov17, mine])).toEqual({ bodyFatPct: undefined });
+    expect(ownLatestBodyFat(all)).toBe(21);
+    expect(ownLatestBodyFat([nov17])).toBeUndefined();
+  });
+
+  it('no profile, no change', () => {
+    expect(profileAfterDelete(null, oct, all)).toEqual({});
   });
 });

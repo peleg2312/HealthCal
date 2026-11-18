@@ -19,16 +19,13 @@ import {
   accessFrom,
   availabilityFrom,
   bodyFatFromRecord,
-  DAY_ENERGY_PERMISSIONS,
   dayEnergyFromPeriods,
-  HEART_PERMISSIONS,
-  READ_PERMISSIONS,
+  permissionsFor,
   sessionRef,
   sessionToWorkout,
   sleepFromSession,
   stepDaysFromPeriods,
   toHealthError,
-  WEIGHT_PERMISSIONS,
   weighInFromRecord,
   type SessionDetails,
   type SessionRecord,
@@ -85,18 +82,6 @@ async function access(): Promise<HealthAccess> {
   } catch (e) {
     throw toHealthError(e);
   }
-}
-
-/**
- * The rows added after sleep ask for their own types alone, so a phone that
- * allowed the six before sees only what that row reads; turning sync on and the
- * Sleep row ask the whole list (Health Connect shows only what is not allowed yet).
- */
-function permissionsFor(what: AccessRequest) {
-  if (what === 'weight') return WEIGHT_PERMISSIONS;
-  if (what === 'heartRate') return HEART_PERMISSIONS;
-  if (what === 'dayEnergy') return DAY_ENERGY_PERMISSIONS;
-  return READ_PERMISSIONS;
 }
 
 async function requestAccess(what: AccessRequest = 'all'): Promise<HealthAccess> {
@@ -244,7 +229,8 @@ async function readAll<T extends 'Weight' | 'BodyFat'>(recordType: T, range: { f
 /**
  * Every weight reading in the range, from every app, and the body-fat readings
  * beside them when body fat may be read, as raw samples (body.ts chooses the
- * one weigh-in a day). Empty when weight may not be read.
+ * one weigh-in a day). Empty when weight may not be read; a failed body-fat
+ * read leaves the weights without it.
  */
 async function readWeighIns(range: { from: string; to: string }, allowed: HealthAccess): Promise<BodySample[]> {
   if (!allowed.weight) return [];
@@ -256,9 +242,17 @@ async function readWeighIns(range: { from: string; to: string }, allowed: Health
       if (s) out.push(s);
     }
     if (allowed.bodyFat) {
-      for (const r of await readAll('BodyFat', range)) {
-        const s = bodyFatFromRecord(r);
-        if (s) out.push(s);
+      // Body fat is the optional part: a failed read keeps the weights, and a
+      // late body fat is filled in on a later run (body.ts, rule f(ii)).
+      try {
+        const fat: BodySample[] = [];
+        for (const r of await readAll('BodyFat', range)) {
+          const s = bodyFatFromRecord(r);
+          if (s) fat.push(s);
+        }
+        out.push(...fat);
+      } catch {
+        // Weights alone.
       }
     }
     return out;

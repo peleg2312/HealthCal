@@ -5,7 +5,8 @@
  * so the switch does too. It is kept in on-device storage under its own key
  * (store.ts) and never leaves the device.
  */
-import type { ActivityEntry } from '@/types';
+import { formatShortDate } from '@/lib/dates';
+import type { ActivityEntry, ISODate } from '@/types';
 
 import { NO_DAY_ENERGY, type DayEnergyMemory, type EnergyDays } from './dayEnergy';
 import type { Handled, OriginSeen, ReviewItem } from './plan';
@@ -72,6 +73,14 @@ export interface HealthSyncState {
    */
   weightReadAt: string | null;
   /**
+   * When a run first held back the weigh-ins it read because the account's
+   * data sync had not finished a round since the run began (the engine's pull
+   * gate, body.ts rule j); null when nothing waits. The Weight row says so
+   * (`weightRowText`) instead of "after the next sync". Cleared by the first
+   * run that plans weigh-ins or finds none to add.
+   */
+  weightWaitingSince: string | null;
+  /**
    * The day's calories burned as the watch counts them, the last 14 days
    * (dayEnergy.ts): shown on Progress beside HealthCal's estimate, never added
    * to anything, never synced, exported, sent to AI or to friends. Cleared when
@@ -95,6 +104,7 @@ export const INITIAL_STATE: HealthSyncState = {
   fileSteps: null,
   sleepReadAt: null,
   weightReadAt: null,
+  weightWaitingSince: null,
   dayEnergy: NO_DAY_ENERGY,
 };
 
@@ -174,6 +184,7 @@ export function restoreState(saved: unknown): HealthSyncState {
     fileSteps,
     sleepReadAt: text(saved.sleepReadAt),
     weightReadAt: text(saved.weightReadAt),
+    weightWaitingSince: text(saved.weightWaitingSince),
     dayEnergy: { days: energyDays, readAt: savedEnergy ? text(savedEnergy.readAt) : null },
   };
 }
@@ -305,16 +316,16 @@ export const MANY_WEIGH_INS = 5;
 /**
  * The second sentence of the sync's toast when the first weigh-in read brings
  * many at once, appended to `syncMessage`'s line, the full stop included:
- * ". They cover the last 4 weeks." `firstRead`: weightReadAt was null before
- * this read. '' otherwise. What they now feed (the weight trend, and the burn
- * estimate the targets use when the learned estimate is on, `learns`) is said
- * under the sync screen's Weight row instead: the longer sentence took four
- * lines of the toast at 360 px (the specification's fallback, section 6.4).
+ * ". They go back to Oct 20." with the earliest date added, so it says what
+ * arrived rather than claiming a span. `firstRead`: weightReadAt was null
+ * before this read. '' otherwise. What they now feed (the weight trend, and the
+ * burn estimate the targets use when the learned estimate is on) is said under
+ * the sync screen's Weight row instead: the longer sentence took four lines of
+ * the toast at 360 px (the specification's fallback, section 6.4).
  */
-export function weighInNote(added: number, firstRead: boolean, learns: boolean): string {
-  if (!firstRead || added < MANY_WEIGH_INS) return '';
-  void learns;
-  return '. They cover the last 4 weeks.';
+export function weighInNote(added: number, firstRead: boolean, earliest: ISODate | null): string {
+  if (!firstRead || added < MANY_WEIGH_INS || !earliest) return '';
+  return `. They go back to ${formatShortDate(earliest)}.`;
 }
 
 /** What to tell the person about a failed sync, and what they can do. */

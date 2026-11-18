@@ -15,6 +15,7 @@ import {
   HEART_PERMISSIONS,
   heartFromAggregate,
   ownFigure,
+  permissionsFor,
   READ_PERMISSIONS,
   sessionRef,
   sessionToWorkout,
@@ -75,6 +76,17 @@ describe('Health Connect mapping', () => {
     // Every row's list is part of the whole, and nothing is ever written.
     for (const p of [...WEIGHT_PERMISSIONS, ...HEART_PERMISSIONS, ...DAY_ENERGY_PERMISSIONS]) expect(READ_PERMISSIONS).toContainEqual(p);
     expect(READ_PERMISSIONS.every((p) => p.accessType === 'read')).toBe(true);
+  });
+
+  it('asks each row for its own types alone, and the whole list only when sync is turned on', () => {
+    expect(permissionsFor('all')).toBe(READ_PERMISSIONS);
+    // A phone that allowed sync before sleep, or before steps, is shown only that row's type on its Allow.
+    expect(permissionsFor('steps')).toEqual([{ accessType: 'read', recordType: 'Steps' }]);
+    expect(permissionsFor('sleep')).toEqual([{ accessType: 'read', recordType: 'SleepSession' }]);
+    expect(permissionsFor('weight')).toBe(WEIGHT_PERMISSIONS);
+    expect(permissionsFor('heartRate')).toBe(HEART_PERMISSIONS);
+    expect(permissionsFor('dayEnergy')).toBe(DAY_ENERGY_PERMISSIONS);
+    for (const what of ['steps', 'sleep', 'weight', 'heartRate', 'dayEnergy'] as const) for (const p of permissionsFor(what)) expect(READ_PERMISSIONS).toContainEqual(p);
   });
 
   it('reads what is granted from the permission list', () => {

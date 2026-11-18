@@ -223,7 +223,7 @@ export interface ReadOptions {
 }
 
 /** What a permission request asks for (HealthAdapter.requestAccess). */
-export type AccessRequest = 'all' | 'sleep' | 'weight' | 'dayEnergy' | 'heartRate';
+export type AccessRequest = 'all' | 'steps' | 'sleep' | 'weight' | 'dayEnergy' | 'heartRate';
 
 export interface HealthAdapter {
   /** The health store this build reads; null where there is none (web). */

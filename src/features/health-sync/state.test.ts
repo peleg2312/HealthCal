@@ -61,25 +61,28 @@ describe('sync state', () => {
     expect(syncMessage(1, 0, [g], hc, { added: 3, updated: 0, apps: [g] }, { added: 0, updated: 0, apps: ['Withings'] })).toBe('1 workout and 3 nights of sleep added from Garmin Connect');
   });
 
-  it('says what many weigh-ins from the first read now feed', () => {
+  it('says how far back many weigh-ins from the first read go', () => {
     // Short, so the toast stays readable at 320 px; what they feed is said under the sync screen's Weight row.
-    expect(weighInNote(26, true, false)).toBe('. They cover the last 4 weeks.');
-    expect(weighInNote(26, true, true)).toBe('. They cover the last 4 weeks.');
-    expect(weighInNote(4, true, true)).toBe('');
-    expect(weighInNote(26, false, true)).toBe('');
-    const full = syncMessage(1, 0, ['Garmin Connect'], 'Health Connect', undefined, { added: 26, updated: 0, apps: ['Garmin Connect'] }) + weighInNote(26, true, true);
-    expect(full).toBe('1 workout and 26 weigh-ins added from Garmin Connect. They cover the last 4 weeks.');
+    expect(weighInNote(26, true, '2026-10-20')).toBe('. They go back to Oct 20.');
+    expect(weighInNote(13, true, '2026-11-02')).toBe('. They go back to Nov 2.');
+    expect(weighInNote(4, true, '2026-11-02')).toBe('');
+    expect(weighInNote(26, false, '2026-10-20')).toBe('');
+    expect(weighInNote(26, true, null)).toBe('');
+    const full = syncMessage(1, 0, ['Garmin Connect'], 'Health Connect', undefined, { added: 26, updated: 0, apps: ['Garmin Connect'] }) + weighInNote(26, true, '2026-10-20');
+    expect(full).toBe('1 workout and 26 weigh-ins added from Garmin Connect. They go back to Oct 20.');
   });
 
   it('restores weigh-ins\' read time, the day\'s calories and the new access flags; older saves read them as not asked', () => {
     const old = restoreState({ enabled: true, access: { workouts: true, activeEnergy: true, totalEnergy: true, distance: true, steps: true, sleep: true } });
     expect(old.access).toEqual({ workouts: true, activeEnergy: true, totalEnergy: true, distance: true, steps: true, sleep: true, weight: false, bodyFat: false, dayEnergy: false, heartRate: false });
     expect(old.weightReadAt).toBeNull();
+    expect(old.weightWaitingSince).toBeNull();
     expect(old.dayEnergy).toEqual({ days: {}, readAt: null });
     const now = restoreState({
       enabled: true,
       access: { workouts: true, activeEnergy: true, totalEnergy: true, distance: true, steps: true, sleep: true, weight: true, bodyFat: 'yes', dayEnergy: true, heartRate: true },
       weightReadAt: '2026-11-14T08:00:00.000Z',
+      weightWaitingSince: '2026-11-14T09:00:00.000Z',
       dayEnergy: {
         readAt: '2026-11-14T08:00:00.000Z',
         days: {
@@ -93,6 +96,7 @@ describe('sync state', () => {
     });
     expect(now.access).toMatchObject({ weight: true, bodyFat: false, dayEnergy: true, heartRate: true });
     expect(now.weightReadAt).toBe('2026-11-14T08:00:00.000Z');
+    expect(now.weightWaitingSince).toBe('2026-11-14T09:00:00.000Z');
     expect(now.dayEnergy).toEqual({ readAt: '2026-11-14T08:00:00.000Z', days: { '2026-11-13': { kcal: 2640, activeKcal: 710, origins: ['com.garmin.android.apps.connectmobile'] } } });
     expect(now.lastResult?.weighIns).toBe(26);
     expect(restoreState({ dayEnergy: 'lots', weightReadAt: 5 })).toMatchObject({ dayEnergy: { days: {}, readAt: null }, weightReadAt: null });

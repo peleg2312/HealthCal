@@ -24,7 +24,7 @@
 import { addDays } from '@/lib/dates';
 import type { ActivityEntry, ISODate } from '@/types';
 
-import { originName } from './origins';
+import { isAppleOrigin, originName } from './origins';
 import type { StepClock } from './steps';
 import { HealthError, storeName, type DayEnergyDay, type HealthAccess, type HealthErrorCode, type HealthStore, type StepsRange } from './types';
 
@@ -136,7 +136,7 @@ export interface WatchEstimate {
   avg: number;
   /** How many days it is over. */
   n: number;
-  /** "Garmin Connect" when one app recorded every valid day, else the store's name. */
+  /** "Garmin Connect" when one app recorded every valid day (Apple's own devices aside when another app did), else the store's name. */
   label: string;
   /** HealthCal's figure for the same days: maintenance plus the mean workout net calories, rounded to 10. */
   app: number;
@@ -171,7 +171,11 @@ export function watchEstimate(
   const exercise = mean(valid.map((d) => (Number.isFinite(exerciseNetByDate[d]) ? exerciseNetByDate[d] : 0)));
   const origins = new Set<string>();
   for (const d of valid) for (const o of days[d].origins) if (o !== HEALTH_CONNECT_ORIGIN) origins.add(o);
-  const names = new Set([...origins].map((o) => originName(o)));
+  // An iPhone writes its own active energy beside a watch app's (and its sources
+  // carry no device kind, so every Apple device reads 'Apple Health'): when
+  // another app recorded too, Apple's own devices are left out of the name.
+  const apps = [...origins].filter((o) => !isAppleOrigin(o));
+  const names = new Set((apps.length > 0 ? apps : [...origins]).map((o) => originName(o)));
   const label = names.size === 1 ? [...names][0] : storeName(store);
   return { avg, n: valid.length, label, app: to10(maintenanceKcal + exercise) };
 }

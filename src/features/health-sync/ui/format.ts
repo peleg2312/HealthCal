@@ -177,6 +177,8 @@ export function sleepRowText(
  * from, or why there is none. `latest` is the newest-dated live weigh-in;
  * `synced` says whether it is still the sync's (`isSyncedWeighIn`), `from` its
  * app's name ("Garmin Connect"). "Latest 82.4 kg on Nov 18, from Garmin Connect".
+ * `waiting`: the last run held its weigh-ins for the account's data sync
+ * (`weightWaitingSince`), which has not finished a round since.
  */
 export function weightRowText(
   access: HealthAccess | null,
@@ -184,8 +186,10 @@ export function weightRowText(
   weightReadAt: string | null,
   store: string,
   units: UnitSystem,
+  waiting = false,
 ): string {
   if (!access || access.weight !== true) return 'Not shared yet. Allow it to fill in your weigh-ins';
+  if (waiting) return 'Waiting for your account to sync before adding weigh-ins';
   if (!weightReadAt) return 'Weigh-ins go to Weight after the next sync';
   if (latest) {
     const head = `Latest ${formatWeight(latest.kg, units)} on ${formatShortDate(latest.date)}`;
