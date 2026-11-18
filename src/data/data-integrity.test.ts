@@ -8,7 +8,21 @@ import {
   POPULAR_ACTIVITY_IDS,
   searchActivities,
 } from './activities';
-import { BUILTIN_FOODS } from './foods';
+import { BUILTIN_FOODS, NATIONAL_LABELS, NATIONAL_RECIPES } from './foods';
+
+// The water screen's reading of a serving label (src/features/drinks/rules.ts labelMl), copied so this file
+// stays free of app imports.
+function labelMl(label: string): number | null {
+  const ml = label.match(/(\d+(?:\.\d+)?)\s*ml\b/i);
+  if (ml) return Number(ml[1]);
+  const l = label.match(/(\d+(?:\.\d+)?)\s*(?:l|litres?|liters?)\b/i);
+  if (l) return Number(l[1]) * 1000;
+  const oz = label.match(/(\d+(?:\.\d+)?)\s*fl\.?\s*oz\b/i);
+  if (oz) return Number(oz[1]) * 29.5735;
+  const cup = label.match(/(?:(\d+(?:\.\d+)?)(?:\/(\d+))?\s+)?cups?\b/i);
+  if (cup) return (cup[1] ? Number(cup[1]) / (cup[2] ? Number(cup[2]) : 1) : 1) * 236.588;
+  return null;
+}
 
 // Mirrors scripts/check-foods.mjs and scripts/check-activities.mjs so the checks run with the suite.
 
@@ -32,11 +46,50 @@ describe('BUILTIN_FOODS', () => {
   it('every food is builtin-sourced with a boolean verified flag', () => {
     expect(BUILTIN_FOODS.filter((f) => f.source !== 'builtin' || typeof f.verified !== 'boolean').map((f) => f.id)).toEqual([]);
   });
-  it('a food is verified exactly when it names the USDA record it was checked against', () => {
-    const hasFdc = (f: (typeof BUILTIN_FOODS)[number]) => Number.isInteger(f.fdcId) && (f.fdcId ?? 0) > 0;
-    expect(BUILTIN_FOODS.filter((f) => f.verified !== hasFdc(f) || (!f.verified && f.fdcId !== undefined)).map((f) => f.id)).toEqual([]);
-    const fdc = BUILTIN_FOODS.filter(hasFdc).map((f) => f.fdcId);
+  it('a food is verified exactly when it names one record: a USDA fdcId or a national ilCode, never both', () => {
+    const isId = (v: number | undefined) => Number.isInteger(v) && (v ?? 0) > 0;
+    const bad = BUILTIN_FOODS.filter((f) => {
+      const fdc = isId(f.fdcId), il = isId(f.ilCode);
+      return (f.fdcId !== undefined && !fdc) || (f.ilCode !== undefined && !il) || (fdc && il) || f.verified !== (fdc || il);
+    });
+    expect(bad.map((f) => f.id)).toEqual([]);
+    const fdc = BUILTIN_FOODS.filter((f) => f.fdcId !== undefined).map((f) => f.fdcId);
     expect(fdc.filter((id, i) => fdc.indexOf(id) !== i)).toEqual([]);
+    const il = BUILTIN_FOODS.filter((f) => f.ilCode !== undefined).map((f) => f.ilCode);
+    expect(il.filter((id, i) => il.indexOf(id) !== i)).toEqual([]);
+  });
+  it('NATIONAL_RECIPES and NATIONAL_LABELS name bundled national records, and never the same one', () => {
+    const codes = new Set(BUILTIN_FOODS.map((f) => f.ilCode).filter((c) => c !== undefined));
+    expect([...NATIONAL_RECIPES].filter((c) => !codes.has(c))).toEqual([]);
+    expect([...NATIONAL_LABELS].filter((c) => !codes.has(c))).toEqual([]);
+    expect([...NATIONAL_LABELS].filter((c) => NATIONAL_RECIPES.has(c))).toEqual([]);
+    expect(NATIONAL_RECIPES.size).toBe(48);
+    expect(NATIONAL_LABELS.size).toBe(10);
+  });
+  it('a national food\'s spoons are measuring spoons: "tbsp" 4 to 25 g, "tsp" 1 to 10 g', () => {
+    const bad: string[] = [];
+    for (const f of BUILTIN_FOODS) {
+      if (f.ilCode === undefined) continue;
+      for (const s of f.servings) {
+        if (/\btbsp\b/.test(s.label) && (s.grams < 4 || s.grams > 25)) bad.push(`${f.id} "${s.label}" ${s.grams} g`);
+        if (/\btsp\b/.test(s.label) && (s.grams < 1 || s.grams > 10)) bad.push(`${f.id} "${s.label}" ${s.grams} g`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+  it('every drink\'s first volume serving weighs 0.90 to 1.15 g per ml, and every national drink names its volume', () => {
+    const bad: string[] = [];
+    for (const f of BUILTIN_FOODS) {
+      if (f.category !== 'drinks') continue;
+      const s = f.servings.find((x) => labelMl(x.label));
+      if (!s) {
+        if (f.ilCode !== undefined) bad.push(`${f.id} names no volume`);
+        continue;
+      }
+      const d = s.grams / labelMl(s.label)!;
+      if (d < 0.9 || d > 1.15) bad.push(`${f.id} "${s.label}" ${d.toFixed(2)} g/ml`);
+    }
+    expect(bad).toEqual([]);
   });
   it('every food has at least one serving, all with positive finite grams', () => {
     const bad = BUILTIN_FOODS.filter((f) => f.servings.length < 1 || f.servings.some((s) => !(s.grams > 0) || !Number.isFinite(s.grams) || !s.label));
@@ -69,12 +122,14 @@ describe('BUILTIN_FOODS', () => {
   it('sodium is in milligrams: no food above 40,000 mg per 100 g (pure salt is 39,300)', () => {
     expect(BUILTIN_FOODS.filter((f) => (f.per100g.sodium ?? 0) > 40_000).map((f) => f.id)).toEqual([]);
   });
-  it('kcal agrees with Atwater 4/4/9 (+7 kcal/g alcohol) within max(15 kcal, 12%) apart from listed exceptions', () => {
+  it('kcal agrees with Atwater 4/4/9 (+7 kcal/g alcohol) within max(15 kcal, 12%) apart from listed exceptions; national foods count fibre at 2 kcal/g', () => {
     const bad: string[] = [];
     for (const f of BUILTIN_FOODS) {
       if (ATWATER_EXCEPTIONS.has(f.id)) continue;
       const n = f.per100g;
-      const calc = 4 * n.protein + 4 * n.carbs + 9 * n.fat + 7 * (ALCOHOL_G_PER_100[f.id] ?? 0);
+      // A national record's energy was computed from available carbohydrate (4 kcal/g) and fibre (2 kcal/g).
+      const fibre = f.ilCode !== undefined ? (n.fiber ?? 0) : 0;
+      const calc = 4 * n.protein + 4 * (n.carbs - fibre) + 2 * fibre + 9 * n.fat + 7 * (ALCOHOL_G_PER_100[f.id] ?? 0);
       const diff = Math.abs(n.kcal - calc);
       if (diff > 15 && diff > 0.12 * Math.max(n.kcal, calc)) bad.push(`${f.id}: kcal ${n.kcal} vs ${calc.toFixed(0)}`);
     }
@@ -111,9 +166,11 @@ describe('computed tea and coffee drinks', () => {
     expect(by.get('b_sports_drink_low')?.fdcId).toBe(2710774);
     expect(BUILTIN_FOODS.filter((f) => f.fdcId === 2710774)).toHaveLength(1);
   });
-  it('counts: 348 foods, 322 checked against a USDA record', () => {
-    expect(BUILTIN_FOODS.length).toBe(348);
-    expect(BUILTIN_FOODS.filter((f) => f.fdcId !== undefined)).toHaveLength(322);
+  it('counts: 448 foods, 329 with a USDA record, 99 with a national record, 20 estimates', () => {
+    expect(BUILTIN_FOODS.length).toBe(448);
+    expect(BUILTIN_FOODS.filter((f) => f.fdcId !== undefined)).toHaveLength(329);
+    expect(BUILTIN_FOODS.filter((f) => f.ilCode !== undefined)).toHaveLength(99);
+    expect(BUILTIN_FOODS.filter((f) => !f.verified)).toHaveLength(20);
   });
 });
 

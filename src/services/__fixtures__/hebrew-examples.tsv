@@ -1,0 +1,176 @@
+# query	must be first (comma: first, second, ...; '-' = no result)	must not appear in the 40 results	context (own = four own foods, favHalva = halva is a favourite and recent)
+# -- plain words and the default reading
+חומוס	b_hummus	b_pita_white
+פיתה	b_pita_bakery	
+טחינה	b_tahini_sauce
+טחינה גולמית	b_tahini	b_tahini_sauce
+קוטג'	b_cottage_cheese_5pct
+קוטג	b_cottage_cheese_5pct
+קוטג׳	b_cottage_cheese_5pct
+קוטג’	b_cottage_cheese_5pct
+קוטג 3	b_cottage_cheese_3pct	b_cottage_cheese_5pct
+קוטג' 3%	b_cottage_cheese_3pct	b_cottage_cheese_5pct
+3% קוטג	b_cottage_cheese_3pct
+גבינה לבנה	b_white_cheese_5pct
+גבינה צהובה	b_yellow_cheese_28pct
+גבינה צהובה לייט	b_yellow_cheese_9pct
+חלב	b_milk_whole
+חלב 1%	b_milk_1pct
+לבן	b_leben
+לבנה	b_labneh
+שוקו	b_shoko
+שניצל	b_schnitzel_chicken
+שניצל תירס	b_corn_schnitzel	b_schnitzel_chicken
+בורקס	b_bourekas_cheese
+בורקס תפוחי אדמה	b_bourekas_potato
+בורקס תפו"א	b_bourekas_potato
+פלאפל	b_falafel
+שקשוקה	b_shakshuka
+סלט ירקות	b_israeli_salad
+לחם	b_bread_achid
+במבה	b_bamba	b_baba_ganoush
+ביסלי	b_bissli
+קרמבו	b_krembo
+מלבי	b_malabi
+מצה	b_matza
+חלה	b_challah
+# -- vowel points, final letters, typing in progress
+חוּמוּס	b_hummus
+שְׁנִיצֶל	b_schnitzel_chicken
+חומו	b_hummus
+שמ	b_vegetable_oil
+פית	b_pita_bakery
+שניצ	b_schnitzel_chicken
+עגבנ	b_tomato
+במב	b_bamba
+# -- geresh spellings
+צ'יפס	b_french_fries
+ציפס	b_french_fries
+ג'חנון	b_jachnun
+גחנון	b_jachnun
+ג׳חנון	b_jachnun
+מג'דרה	b_mejadra
+# -- one-letter prefixes, and words that only look prefixed
+והחומוס	b_hummus
+בטחינה	b_baba_ganoush	
+והטחינה	b_tahini_sauce	
+שהקוטג	b_cottage_cheese_5pct
+בננה	b_banana
+מלון	b_cantaloupe
+שמן	b_vegetable_oil
+לחם	b_bread_achid
+מלפפון	b_cucumber
+# -- full and defective spelling, doubled yod
+חמוס	b_hummus
+עגבנייה	b_tomato
+עגבניה	b_tomato
+שוורמה	b_chicken_shawarma
+לביבה	b_latkes
+# -- plural and construct endings with the guard
+עגבניות	b_tomato
+ביצים	b_egg_boiled
+תותים	b_strawberries
+מלפפונים	b_cucumber
+חלב	b_milk_whole
+חלבה	b_halva	b_milk_whole
+# -- a whole word beats a prefix even with history
+חלב	b_milk_whole		favHalva
+# -- typos by length
+פלאפאל	b_falafel
+שקשוקע	b_shakshuka
+תה	b_tea_brewed	b_strawberries
+קפה	b_coffee_black
+# -- words in any order, stop words, numbers
+עוף שניצל	b_schnitzel_chicken
+סלט של אמא	c_salad_mom		own
+חומוס עם טחינה	c_hummus_he		own
+קולה ללא סוכר	b_cola_diet
+קולה זירו	b_cola_diet
+קולה	b_cola
+# -- mixed scripts
+חומוס pita	-
+פיתה pocket	-	
+# -- own foods named in Hebrew, and a mixed own name
+קוטג 5	c_cottage		own
+פיתה מקמח מלא	b_pita_wholewheat,c_mixed		own
+# -- Latin spellings Israelis type
+humus	b_hummus
+hummus	b_hummus
+tehina	b_tahini_sauce
+tahina	b_tahini,b_tahini_sauce
+labane	b_labneh
+labaneh	b_labneh
+shnitzel	b_schnitzel_chicken
+burekas	b_bourekas_cheese
+bamba	b_bamba	b_baba_ganoush
+ptitim	b_ptitim_cooked
+jachnun	b_jachnun
+malawach	b_malawach
+shakshouka	b_shakshuka
+schug	b_schug
+zhug	b_schug
+majadra	b_mejadra
+sufganiya	b_sufganiya
+kubbeh	b_kubbeh_fried
+cholent	b_hamin
+# -- English must not move
+chicken breast	b_chicken_breast_raw,b_chicken_breast_cooked	
+cottage cheese	b_cottage_cheese_2pct
+pita	b_pita_white
+ham	b_ham_deli
+egg	b_egg_fried	
+milk	b_milk_whole
+tea	b_tea_brewed
+brocolli	b_broccoli_raw
+# -- added for the final spec (skeptic round): plurals not written in the table
+גזרים	b_carrot_raw
+לימונים	b_lemon
+אבטיחים	b_watermelon
+בצלים	b_onion
+פלפלים	b_bell_pepper_red
+שניצלים	b_schnitzel_chicken
+שוקי עוף	b_chicken_drumstick
+# -- words spread over a food's Hebrew names, qualifier words, amounts (relaxed pass)
+אורז לבן מבושל	b_rice_white_cooked
+טוסט גבינה צהובה	b_grilled_cheese
+חלה מתוקה	b_challah
+מנה פלאפל	b_falafel
+ביסלי גריל	b_bissli
+פרגיות על האש	b_chicken_thigh_cooked
+חציל קלוי	b_eggplant_cooked
+חומוס עם טחינה	b_hummus_homemade
+חומוס בטחינה	b_hummus_homemade
+2 ביצים	b_egg_boiled
+כוס חלב	b_milk_whole
+חצי פיתה	b_pita_bakery
+כף סוכר	b_sugar_white
+קוטג 5% תנובה	b_cottage_cheese_5pct
+# -- a word still being typed that is also a whole word: whole word first, the longer words follow
+שוק	b_lamb_leg_cooked,b_chicken_drumstick,b_shoko
+שמנ	b_vegetable_oil
+שמנת	b_sour_cream_15pct
+שום	b_garlic
+# -- names that sent a person to the wrong food (fixed in the table)
+ארטיק	b_ice_cream_vanilla,b_ice_pop
+קרטיב	b_ice_pop
+בורגר	b_hamburger
+נפוליאון	-
+לאפה	-
+laban	b_leben
+# -- stem collisions and broad words
+פירות	b_smoothie_fruit	b_mashed_potato
+פירה	b_mashed_potato
+טורטית	b_tortit	b_tortilla_flour
+טורטיה	b_tortilla_flour	b_tortit
+סלט	b_israeli_salad
+בשר	b_beef_ground_80_raw
+קפה שחור	b_coffee_black	b_espresso
+קפה טורקי	b_coffee_black
+# -- a one-letter prefix written with a hyphen
+ה-חומוס	b_hummus
+ב-פיתה	b_pita_bakery
+# -- brand words people type for a generic food
+פפסי	b_cola
+pepsi	b_cola
+coke	b_cola
+tahina	b_tahini,b_tahini_sauce

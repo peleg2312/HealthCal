@@ -1,0 +1,65 @@
+# Food search with Hebrew typed on a phone, after first-day.yml has set the app up (no clearState: it
+# needs the profile first-day made, and it is the app's second start, which is when the left-to-right
+# layout holds on a phone set to Hebrew: src/features/layout/leftToRight.ts).
+#
+# Best effort: whether Maestro can type Hebrew differs by phone, so every step after the first screenshot
+# is optional and the pictures are the evidence: 60 shows which side the layout starts from, 61 the
+# results for a Hebrew word with the matched name under each food, 62 a Latin spelling, 63 the diary.
+#
+#   GitHub (free):  Actions > Phone test > Run workflow, flows = first-day,hebrew
+#                   (android_locale = system:he-IL for a phone set to Hebrew)
+#   A phone or emulator on your desk:  maestro test .maestro/first-day.yml .maestro/hebrew.yml
+appId: app.healthcal.mobile
+name: Hebrew in the food search
+---
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: today-energy
+    timeout: 120000
+# After midnight the morning page may open over Today (see health-and-about.yml).
+- tapOn:
+    id: morning-today
+    optional: true
+- takeScreenshot: 60-today-second-start
+
+- tapOn:
+    id: tab-diary
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: meal-add-dinner
+    direction: DOWN
+    timeout: 20000
+    optional: true
+- tapOn:
+    id: meal-add-dinner
+    optional: true
+- tapOn:
+    id: food-search-input
+    optional: true
+- inputText: קוטג
+- extendedWaitUntil:
+    visible:
+      id: result-0-add
+    timeout: 15000
+    optional: true
+- takeScreenshot: 61-search-hebrew
+- tapOn:
+    id: result-0-add
+    optional: true
+- eraseText: 10
+- inputText: tehina
+- extendedWaitUntil:
+    visible:
+      id: result-0-add
+    timeout: 15000
+    optional: true
+- takeScreenshot: 62-search-latin-spelling
+- tapOn:
+    id: search-done
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 63-diary-after-hebrew-search

@@ -33,6 +33,7 @@ import { ThemeProvider, useReducedMotion, useTheme } from '@/theme';
 import { ToastHost } from '@/ui';
 // Read once at the start, before the router draws a screen or changes the address (the morning page's start facts).
 import '@/features/morning/launch';
+import '@/features/layout/leftToRight';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 

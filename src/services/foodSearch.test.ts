@@ -158,4 +158,26 @@ describe('rankOnline', () => {
     const out = rankOnline('greek yogurt', products, ['off_b']);
     expect(out.map((f) => f.id)).toEqual(['off_c', 'off_a']);
   });
+
+  it('ranks Hebrew product names by the same rules: every word first, then the service order', () => {
+    const off = (id: string, name: string, brand?: string) => food(id, name, { source: 'openfoodfacts', brand });
+    const products = [
+      off('off_1', 'Chocolate milk', 'תנובה'),
+      off('off_2', 'קוטג׳ 3% שומן', 'טרה'),
+      off('off_3', "קוטג' 5% שומן", 'תנובה'),
+      off('off_4', 'גבינה לבנה 5%', 'תנובה'),
+      off('off_5', 'חומוס אחלה עם טחינה', 'אחלה'),
+    ];
+    // Geresh in any form, the number and the brand word.
+    expect(rankOnline('קוטג 5', products).map((f) => f.id).slice(0, 1)).toEqual(['off_3']);
+    expect(rankOnline('קוטג׳', products).map((f) => f.id).slice(0, 2).sort()).toEqual(['off_2', 'off_3']);
+    expect(rankOnline('תנובה קוטג', products)[0].id).toBe('off_3');
+    // A word with a prefix finds the product as typed; nothing is dropped.
+    expect(rankOnline('חומוס בטחינה', products)).toHaveLength(5);
+    expect(rankOnline('חומוס', products)[0].id).toBe('off_5');
+    // No product matches: the service's order stays.
+    expect(rankOnline('שוקולד', products).map((f) => f.id)).toEqual(['off_1', 'off_2', 'off_3', 'off_4', 'off_5']);
+    // A Latin query keeps today's order rules over Hebrew names.
+    expect(rankOnline('chocolate', products)[0].id).toBe('off_1');
+  });
 });

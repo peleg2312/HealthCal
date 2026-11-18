@@ -1,0 +1,307 @@
+# English ranking: query, top 5 before Hebrew search (2026-11-18, 348 foods), top 5 now, top 3 of rankOnline (| ids).
+# Over the bundled foods plus 12 branded own foods (foodSearch.english.test.ts). Rewrite the "now" column with
+# HEALTHCAL_RECORD_ENGLISH=1 npx vitest run src/services/foodSearch.english.test.ts after reading every changed line.
+apple	b_apple,b_apple_pie,b_apple_juice,b_pineapple	b_apple,b_apple_pie,b_apple_juice,b_pineapple	| off_1,off_2,off_3
+banana	b_banana	b_banana	| off_1,off_2,off_3
+orange	b_orange,b_orange_juice	b_orange,b_orange_juice	| off_1,off_2,off_3
+grapes	b_grapes,b_grape_juice,b_dolma,b_grapefruit	b_grapes,b_grape_juice,b_dolma,b_grapefruit	| off_1,off_2,off_3
+strawberry	my_yogurt,b_strawberries	my_yogurt,b_strawberries	| off_1,off_2,off_3
+strawberries	b_strawberries,my_yogurt	b_strawberries,my_yogurt	| off_1,off_2,off_3
+blueberries	b_blueberries	b_blueberries	| off_1,off_2,off_3
+watermelon	b_watermelon	b_watermelon	| off_1,off_2,off_3
+melon	b_honeydew,b_cantaloupe,b_watermelon	b_honeydew,b_cantaloupe,b_watermelon	| off_1,off_2,off_3
+mango	b_mango	b_mango,b_amba	| off_1,off_2,off_3
+kiwi	b_kiwi	b_kiwi	| off_1,off_2,off_3
+peach	b_peach	b_peach	| off_1,off_2,off_3
+pear	b_pear	b_pear,b_ptitim_cooked	| off_2,off_1,off_3
+avocado	b_avocado,b_avocado_oil,b_sushi_california	b_avocado,b_avocado_oil,b_sushi_california	| off_1,off_2,off_3
+lemon	b_lemon,b_lemon_lime_soda,b_lemonade,b_tabbouleh,b_israeli_salad	b_lemon,b_lemon_lime_soda,b_limonana,b_lemonade,b_cabbage_salad	| off_1,off_2,off_3
+dates	b_dates_medjool	b_dates_medjool,b_silan	| off_1,off_2,off_3
+raisins	b_raisins	b_raisins	| off_1,off_2,off_3
+broccoli	b_broccoli_raw,b_broccoli_cooked	b_broccoli_raw,b_broccoli_cooked	| off_1,off_2,off_3
+carrot	b_carrot_raw,b_carrot_cooked	b_carrot_raw,b_carrot_cooked,b_carrot_salad	| off_1,off_2,off_3
+carrots	b_carrot_cooked,b_carrot_raw	b_carrot_cooked,b_carrot_raw,b_carrot_salad	| off_1,off_2,off_3
+tomato	my_ketchup,b_tomato,b_tomato_juice,b_tomato_paste,b_tomato_sauce	my_ketchup,b_tomato,b_tomato_juice,b_tomato_paste,b_tomato_sauce	| off_1,off_2,off_3
+tomatoes	my_ketchup,b_tomato,b_tomato_juice,b_tomato_paste,b_tomato_sauce	my_ketchup,b_tomato,b_tomato_juice,b_tomato_paste,b_tomato_sauce	| off_1,off_2,off_3
+cucumber	b_cucumber,b_pickles_dill,b_tzatziki,b_sushi_california,b_greek_salad	b_cucumber,b_pickles_dill,b_tzatziki,b_sushi_california,b_israeli_salad	| off_1,off_2,off_3
+lettuce	b_lettuce_iceberg,b_lettuce_romaine	b_lettuce_iceberg,b_lettuce_romaine	| off_1,off_2,off_3
+spinach	b_spinach_raw,b_spinach_cooked	b_spinach_raw,b_spinach_cooked,b_bourekas_spinach	| off_1,off_2,off_3
+kale	b_kale	b_kale	| off_1,off_2,off_3
+cabbage	b_cabbage	b_cabbage,b_cabbage_salad	| off_1,off_2,off_3
+cauliflower	b_cauliflower	b_cauliflower	| off_1,off_2,off_3
+pepper	b_bell_pepper_red,b_bell_pepper_green,b_shakshuka,b_pizza_pepperoni	b_bell_pepper_red,b_bell_pepper_green,b_stuffed_peppers,b_schug,b_matbucha	| off_1,off_2,off_3
+onion	b_onion,b_israeli_salad	b_onion,b_mejadra,b_israeli_salad	| off_1,off_2,off_3
+garlic	b_garlic	b_garlic	| off_1,off_2,off_3
+mushrooms	b_mushrooms	b_mushrooms	| off_1,off_2,off_3
+zucchini	b_zucchini	b_zucchini	| off_1,off_2,off_3
+eggplant	b_eggplant_raw,b_eggplant_cooked,b_baba_ganoush	b_eggplant_raw,b_eggplant_cooked,b_eggplant_fried,b_eggplant_mayo,b_baba_ganoush	| off_1,off_2,off_3
+celery	b_celery	b_celery	| off_1,off_2,off_3
+potato	b_potato_raw,b_potato_baked,b_potato_boiled,b_potato_chips,b_mashed_potato	b_potato_raw,b_potato_baked,b_potato_boiled,b_potato_chips,b_latkes	| off_9,off_1,off_2
+potatoes	b_potato_raw,b_potato_baked,b_potato_boiled,b_potato_chips,b_mashed_potato	b_potato_raw,b_potato_baked,b_potato_boiled,b_potato_chips,b_latkes	| off_9,off_1,off_2
+corn	b_cornflakes,b_corn_cooked,b_tortilla_corn,b_popcorn_air	b_cornflakes,b_corn_cooked,b_corn_schnitzel,b_tortilla_corn,b_apropo	| off_7,off_1,off_2
+peas	b_pear,b_peas_cooked,b_split_peas,b_peach,b_peanuts	b_pear,b_peas_cooked,b_split_peas,b_peach,b_peanuts	| off_2,off_1,off_3
+beans	b_fava_beans,b_black_beans,b_green_beans,b_pinto_beans,b_kidney_beans	b_fava_beans,b_black_beans,b_green_beans,b_pinto_beans,b_kidney_beans	| off_1,off_2,off_3
+asparagus	b_asparagus	b_asparagus	| off_1,off_2,off_3
+beets	b_beets_cooked	b_beets_cooked	| off_1,off_2,off_3
+pumpkin	b_pumpkin_cooked,b_pumpkin_seeds	b_pumpkin_cooked,b_pumpkin_soup,b_pumpkin_seeds	| off_1,off_2,off_3
+olives	b_olives_green,b_olives_black,b_olive_oil,b_greek_salad	b_olives_green,b_olives_black,b_olive_oil,b_greek_salad	| off_1,off_2,off_3
+pickles	b_pickles_dill,b_olives_green	b_pickles_dill,b_herring_pickled,b_olives_green,b_amba	| off_1,off_2,off_3
+rice	b_rice_cakes,b_rice_noodles_cooked,b_fried_rice,b_rice_brown_cooked,b_rice_white_cooked	b_rice_cakes,b_rice_noodles_cooked,b_fried_rice,b_rice_brown_cooked,b_rice_white_cooked	| off_1,off_2,off_3
+pasta	b_pasta_cooked,b_pasta_dry,b_marinara,b_pasta_wholewheat_cooked	b_pasta_cooked,b_pasta_dry,b_marinara,b_pasta_wholewheat_cooked	| off_1,off_2,off_3
+noodles	b_rice_noodles_cooked,b_egg_noodles_cooked	b_rice_noodles_cooked,b_egg_noodles_cooked,b_kugel,b_rice_vermicelli	| off_1,off_2,off_3
+couscous	b_couscous_cooked,b_couscous_dry	b_couscous_cooked,b_couscous_dry,b_ptitim_cooked	| off_1,off_2,off_3
+quinoa	b_quinoa_cooked,b_quinoa_dry	b_quinoa_cooked,b_quinoa_dry	| off_1,off_2,off_3
+bulgur	b_bulgur_cooked,b_bulgur_dry,b_tabbouleh	b_bulgur_cooked,b_bulgur_dry,b_kubbeh_fried,b_tabbouleh	| off_1,off_2,off_3
+oats	b_oats_dry,b_oat_milk,b_oatmeal_cooked,b_granola,b_goat_cheese	b_oats_dry,b_oat_milk,b_oatmeal_cooked,b_granola,b_goat_cheese	| off_1,off_2,off_3
+oatmeal	b_oatmeal_cooked	b_oatmeal_cooked	| off_1,off_2,off_3
+bread	b_bread_rye,b_bread_sourdough,b_bread_white,b_bread_wholewheat,b_naan	b_bread_rye,b_bread_sourdough,b_bread_white,b_bread_wholewheat,b_bread_achid	| off_1,off_2,off_3
+bagel	b_bagel	b_bagel	| off_1,off_2,off_3
+pita	b_pita_white,b_pita_wholewheat,b_shawarma_pita,b_pumpkin_seeds	b_pita_white,b_pita_wholewheat,b_pita_bakery,b_druze_pita,b_shawarma_pita	| off_5,off_1,off_2
+tortilla	b_tortilla_corn,b_tortilla_flour,b_tortilla_chips	b_tortilla_corn,b_tortilla_flour,b_tortilla_chips	| off_10,off_1,off_2
+naan	b_naan	b_naan	| off_1,off_2,off_3
+croissant	b_croissant	b_croissant	| off_1,off_2,off_3
+crackers	b_crackers_saltine	b_crackers_saltine,b_crackers_wholewheat	| off_1,off_2,off_3
+flour	b_flour_white,b_tortilla_flour	b_flour_white,b_tortilla_flour	| off_1,off_2,off_3
+sugar	b_sugar_brown,b_sugar_white,b_tea_sugar,b_coffee_sugar,b_tea_milk_sugar	b_sugar_brown,b_sugar_white,b_tea_sugar,b_coffee_sugar,b_tea_milk_sugar	| off_1,off_2,off_3
+honey	my_cereal,b_honey,b_honeydew,b_granola	my_cereal,b_honey,b_honeydew,b_granola	| off_1,off_2,off_3
+jam	b_jam	b_jam,b_sufganiya	| off_1,off_2,off_3
+lentils	b_lentils_dry,b_lentils_cooked	b_lentils_dry,b_lentils_cooked,b_lentil_soup,b_mejadra	| off_1,off_2,off_3
+chickpeas	b_chickpeas_dry,b_chickpeas_cooked	b_chickpeas_dry,b_chickpeas_cooked,b_hummus_homemade	| off_1,off_2,off_3
+tofu	b_tofu_firm	b_tofu_firm	| off_1,off_2,off_3
+tempeh	b_tempeh	b_tempeh	| off_1,off_2,off_3
+beef	b_beef_jerky,b_beef_ribeye_cooked,b_beef_sirloin_cooked,b_beef_ground_80_raw,b_beef_ground_85_cooked	b_beef_jerky,b_beef_ribeye_cooked,b_beef_sirloin_cooked,b_beef_ground_80_raw,b_beef_ground_85_cooked	| off_1,off_2,off_3
+steak	b_tuna_steak_cooked,b_beef_ribeye_cooked,b_beef_sirloin_cooked	b_tuna_steak_cooked,b_beef_ribeye_cooked,b_beef_sirloin_cooked	| off_1,off_2,off_3
+lamb	b_lamb_leg_cooked,b_lamb_ground_cooked	b_lamb_leg_cooked,b_lamb_ground_cooked	| off_1,off_2,off_3
+pork	b_sausage_pork,b_pork_chop_cooked,b_pork_tenderloin_cooked,b_salami	b_sausage_pork,b_pork_chop_cooked,b_pork_tenderloin_cooked,b_salami	| off_1,off_2,off_3
+bacon	b_bacon_cooked	b_bacon_cooked	| off_1,off_2,off_3
+ham	b_ham_deli,b_hamburger	b_ham_deli,b_hamin,b_hamburger,b_hamantaschen	| off_1,off_2,off_3
+turkey	b_turkey_deli,b_turkey_breast_cooked,b_turkey_ground_cooked	b_turkey_deli,b_turkey_breast_cooked,b_turkey_ground_cooked	| off_1,off_2,off_3
+sausage	b_sausage_pork	b_sausage_pork,b_merguez	| off_1,off_2,off_3
+salami	b_salami	b_salami	| off_1,off_2,off_3
+jerky	b_beef_jerky	b_beef_jerky	| off_1,off_2,off_3
+chicken	b_chicken_nuggets,b_chicken_breast_raw,b_chicken_curry,b_chicken_thigh_cooked,b_chicken_breast_cooked	b_chicken_nuggets,b_chicken_breast_raw,b_chicken_curry,b_schnitzel_chicken,b_chicken_thigh_cooked	| off_1,off_2,off_3
+salmon	b_smoked_salmon,b_salmon_raw,b_salmon_wild_cooked,b_salmon_cooked,b_sushi_salmon_nigiri	b_smoked_salmon,b_salmon_raw,b_salmon_wild_cooked,b_salmon_cooked,b_sushi_salmon_nigiri	| off_1,off_2,off_3
+tuna	b_tuna_canned_oil,b_tuna_canned_water,b_tuna_steak_cooked	b_tuna_canned_oil,b_tuna_canned_water,b_tuna_steak_cooked,b_tuna_salad	| off_1,off_2,off_3
+cod	b_cod_cooked	b_cod_cooked	| off_1,off_2,off_3
+tilapia	b_tilapia_cooked	b_tilapia_cooked	| off_1,off_2,off_3
+shrimp	b_shrimp_cooked,b_pad_thai	b_shrimp_cooked,b_pad_thai	| off_1,off_2,off_3
+sardines	b_sardines_canned	b_sardines_canned	| off_1,off_2,off_3
+trout	b_trout_cooked	b_trout_cooked	| off_1,off_2,off_3
+crab	b_crab_cooked,b_sushi_california	b_crab_cooked,b_sushi_california	| off_1,off_2,off_3
+egg	b_egg_fried,b_egg_raw,b_egg_boiled,b_egg_scrambled,b_egg_yolk	b_egg_fried,b_egg_raw,b_egg_boiled,b_egg_scrambled,b_egg_yolk	| off_1,off_2,off_3
+eggs	b_egg_fried,b_egg_raw,b_egg_boiled,b_egg_scrambled,b_egg_yolk	b_egg_fried,b_egg_raw,b_egg_boiled,b_egg_scrambled,b_egg_yolk	| off_1,off_2,off_3
+milk	b_milk_whole,b_milk_skim,b_milk_2pct,b_milk_chocolate,b_milkshake_vanilla	b_milk_whole,b_milk_1pct,b_milk_skim,b_milk_2pct,b_milk_chocolate	| off_3,off_1,off_2
+yogurt	b_yogurt_plain_lowfat,b_yogurt_plain_whole,my_yogurt,b_greek_yogurt_nonfat,b_greek_yogurt_whole	b_yogurt_plain_lowfat,b_yogurt_plain_whole,b_yogurt_high_protein,my_yogurt,b_greek_yogurt_nonfat	| off_6,off_1,off_2
+yoghurt	b_yogurt_plain_lowfat,b_yogurt_plain_whole,my_yogurt,b_greek_yogurt_nonfat,b_greek_yogurt_whole	b_yogurt_plain_lowfat,b_yogurt_plain_whole,b_yogurt_high_protein,my_yogurt,b_greek_yogurt_nonfat	| off_6,off_1,off_2
+labneh	b_labneh	b_labneh	| off_1,off_2,off_3
+kefir	b_kefir	b_kefir	| off_1,off_2,off_3
+cottage	my_cottage,b_cottage_cheese_2pct,b_cottage_cheese_4pct	my_cottage,b_cottage_cheese_2pct,b_cottage_cheese_3pct,b_cottage_cheese_4pct,b_cottage_cheese_5pct	| off_4,off_1,off_2
+butter	b_butter,b_buttermilk,b_butternut_squash,b_almond_butter,b_peanut_butter	b_butter,b_buttermilk,b_butternut_squash,b_almond_butter,b_peanut_butter	| off_1,off_2,off_3
+ghee	b_ghee	b_ghee	| off_6,off_1,off_2
+cheese	b_cheesecake,b_cheeseburger,my_cottage,my_cheese,b_brie	b_cheesecake,b_cheeseburger,my_cottage,my_cheese,b_brie	| off_4,off_10,off_1
+cheddar	b_cheddar	b_cheddar	| off_1,off_2,off_3
+mozzarella	b_mozzarella_part_skim,b_mozzarella	b_mozzarella_part_skim,b_mozzarella	| off_1,off_2,off_3
+parmesan	b_parmesan	b_parmesan	| off_1,off_2,off_3
+feta	b_feta,b_greek_salad	b_feta,b_greek_salad	| off_1,off_2,off_3
+halloumi	b_halloumi	b_halloumi	| off_1,off_2,off_3
+ricotta	b_ricotta	b_ricotta	| off_1,off_2,off_3
+almonds	b_almonds,b_almond_butter,b_almond_milk	b_almonds,b_almond_butter,b_almond_milk,b_tortit	| off_1,off_2,off_3
+walnuts	b_walnuts	b_walnuts	| off_1,off_2,off_3
+cashews	b_cashews	b_cashews	| off_1,off_2,off_3
+pistachios	b_pistachios	b_pistachios	| off_1,off_2,off_3
+peanuts	b_peanuts,b_peanut_butter,my_bars	b_peanuts,b_peanut_butter,b_bamba,my_bars	| off_2,off_1,off_3
+seeds	b_chia_seeds,b_sesame_seeds,b_hemp_seeds,b_pomegranate,b_pumpkin_seeds	b_chia_seeds,b_sesame_seeds,b_hemp_seeds,b_pomegranate,b_pumpkin_seeds	| off_1,off_2,off_3
+tahini	b_tahini,b_halva	b_tahini,b_tahini_sauce,b_halva,b_hummus_homemade	| off_1,off_2,off_3
+oil	b_olive_oil,b_canola_oil,b_sesame_oil,b_avocado_oil,b_coconut_oil	b_olive_oil,b_canola_oil,b_sesame_oil,b_avocado_oil,b_coconut_oil	| off_1,off_2,off_3
+mayonnaise	b_mayonnaise	b_mayonnaise,b_tuna_salad,b_eggplant_mayo,b_egg_salad	| off_1,off_2,off_3
+ketchup	b_ketchup,my_ketchup	b_ketchup,my_ketchup	| off_1,off_2,off_3
+mustard	b_mustard	b_mustard	| off_1,off_2,off_3
+salsa	b_salsa	b_salsa	| off_1,off_2,off_3
+pesto	b_pesto	b_pesto	| off_1,off_2,off_3
+guacamole	b_guacamole	b_guacamole	| off_1,off_2,off_3
+hummus	b_hummus	b_hummus,b_hummus_homemade	| off_1,off_2,off_3
+falafel	b_falafel	b_falafel	| off_1,off_2,off_3
+shakshuka	b_shakshuka	b_shakshuka	| off_1,off_2,off_3
+shawarma	b_chicken_shawarma,b_shawarma_pita	b_chicken_shawarma,b_shawarma_pita	| off_1,off_2,off_3
+schnitzel	b_schnitzel_chicken	b_schnitzel_chicken,b_corn_schnitzel,b_soy_schnitzel	| off_1,off_2,off_3
+bourekas	b_bourekas_cheese	b_bourekas_cheese,b_bourekas_potato,b_bourekas_spinach	| off_1,off_2,off_3
+halva	b_halva	b_halva	| off_1,off_2,off_3
+tabbouleh	b_tabbouleh	b_tabbouleh	| off_1,off_2,off_3
+chips	b_potato_chips,b_tortilla_chips,b_cookie_choc_chip,b_trail_mix	b_potato_chips,b_tortilla_chips,b_cookie_choc_chip,b_trail_mix	| off_9,off_10,off_1
+popcorn	b_popcorn_air	b_popcorn_air	| off_1,off_2,off_3
+chocolate	b_chocolate_hazelnut_spread,b_chocolate_cake,b_milk_chocolate,b_dark_chocolate,b_hot_chocolate	b_chocolate_hazelnut_spread,b_chocolate_cake,b_mekupelet,b_milk_chocolate,b_dark_chocolate	| off_3,off_1,off_2
+cookie	b_cookie_choc_chip	b_cookie_choc_chip	| off_1,off_2,off_3
+brownie	b_brownie	b_brownie	| off_1,off_2,off_3
+donut	-	-	| off_1,off_2,off_3
+cake	b_rice_cakes,b_chocolate_cake,b_cheesecake,b_pancakes	b_rice_cakes,b_babka,b_chocolate_cake,b_cheesecake,b_pancakes	| off_1,off_2,off_3
+pizza	b_pizza_cheese,b_pizza_pepperoni	b_pizza_cheese,b_pizza_pepperoni	| off_1,off_2,off_3
+hamburger	b_hamburger	b_hamburger	| off_1,off_2,off_3
+burger	b_hamburger,b_cheeseburger	b_hamburger,b_cheeseburger	| off_1,off_2,off_3
+fries	b_french_fries	b_french_fries	| off_1,off_2,off_3
+burrito	b_burrito_beef_bean	b_burrito_beef_bean	| off_1,off_2,off_3
+taco	b_taco_beef	b_taco_beef	| off_1,off_2,off_3
+salad	b_caesar_salad,b_caesar_salad_chicken,b_greek_salad,b_israeli_salad,b_shawarma_pita	b_caesar_salad,b_caesar_salad_chicken,b_israeli_salad,b_greek_salad,b_tuna_salad	| off_1,off_2,off_3
+spaghetti	my_pasta,b_spaghetti_meat_sauce	my_pasta,b_spaghetti_meat_sauce	| off_1,off_2,off_3
+lasagna	b_lasagna	b_lasagna	| off_1,off_2,off_3
+sushi	b_sushi_salmon_nigiri,b_sushi_california	b_sushi_salmon_nigiri,b_sushi_california	| off_1,off_2,off_3
+curry	b_chicken_curry	b_chicken_curry	| off_1,off_2,off_3
+coffee	b_coffee_black,b_coffee_milk,b_coffee_sugar,b_coffee_milk_sugar	b_coffee_black,b_coffee_milk,b_coffee_sugar,b_coffee_milk_sugar,b_turkish_coffee_sweet	| off_1,off_2,off_3
+espresso	b_espresso	b_espresso	| off_1,off_2,off_3
+latte	b_latte	b_latte	| off_1,off_2,off_3
+cappuccino	b_cappuccino	b_cappuccino	| off_1,off_2,off_3
+tea	b_tea_brewed,b_tea_milk,b_tea_sugar,b_tea_milk_sugar,b_iced_tea_sweet	b_tea_brewed,b_tea_milk,b_tea_sugar,b_tea_milk_sugar,b_iced_tea_sweet	| off_1,off_2,off_3
+juice	b_apple_juice,b_grape_juice,b_orange_juice,b_tomato_juice,b_cranberry_juice	b_apple_juice,b_grape_juice,b_orange_juice,b_tomato_juice,b_cranberry_juice	| off_1,off_2,off_3
+lemonade	b_lemonade	b_lemonade	| off_1,off_2,off_3
+cola	b_cola_diet,b_cola,my_cola,b_chocolate_hazelnut_spread,b_chocolate_cake	b_cola_diet,b_cola,my_cola,b_chocolate_hazelnut_spread,b_chocolate_cake	| off_8,off_3,off_1
+soda	b_lemon_lime_soda	b_lemon_lime_soda	| off_1,off_2,off_3
+beer	b_beer_light,b_beer	b_beer_light,b_beer	| off_1,off_2,off_3
+wine	b_wine_red,b_wine_white	b_wine_red,b_wine_white	| off_1,off_2,off_3
+vodka	b_spirits	b_spirits	| off_1,off_2,off_3
+smoothie	b_smoothie_fruit	b_smoothie_fruit	| off_1,off_2,off_3
+protein	my_bars,b_protein_shake_rtd,b_protein_bar,b_pea_protein,b_whey_protein	my_bars,b_protein_shake_rtd,b_protein_bar,b_pea_protein,b_whey_protein	| off_1,off_2,off_3
+whey	b_whey_protein,b_whey_isolate	b_whey_protein,b_whey_isolate	| off_1,off_2,off_3
+app	b_apple,b_apple_pie,b_apple_juice,b_pineapple,b_cappuccino	b_apple,b_apple_pie,b_apple_juice,b_pineapple,b_cappuccino	| off_1,off_2,off_3
+ban	b_banana	b_banana,b_kubaneh	| off_1,off_2,off_3
+str	my_yogurt,b_strawberries,b_labneh,b_bourekas_cheese	my_yogurt,b_strawberries,b_labneh,b_knafeh,b_bourekas_cheese	| off_1,off_2,off_3
+blu	b_blueberries,b_crab_cooked,b_tuna_steak_cooked	b_blueberries,b_crab_cooked,b_tuna_steak_cooked	| off_1,off_2,off_3
+wat	b_watermelon,b_coconut_water,b_oatmeal_cooked,b_tuna_canned_water	b_watermelon,b_coconut_water,b_oatmeal_cooked,b_tuna_canned_water,b_ice_pop	| off_1,off_2,off_3
+avo	b_avocado,b_avocado_oil,b_sushi_california	b_avocado,b_avocado_oil,b_sushi_california	| off_1,off_2,off_3
+bro	b_brownie,b_broccoli_raw,b_broccoli_cooked,b_rice_brown_cooked,b_rice_brown_dry	b_brownie,b_broccoli_raw,b_broccoli_cooked,b_rice_brown_cooked,b_rice_brown_dry	| off_1,off_2,off_3
+car	b_carrot_raw,b_carrot_cooked,b_chili_beans,b_mac_and_cheese	b_carrot_raw,b_carrot_cooked,b_carrot_salad,b_chili_beans,b_mac_and_cheese	| off_1,off_2,off_3
+tom	my_ketchup,b_tomato,b_tomato_juice,b_tomato_paste,b_tomato_sauce	my_ketchup,b_tomato,b_tomato_juice,b_tomato_paste,b_tomato_sauce	| off_1,off_2,off_3
+cuc	b_cucumber,b_pickles_dill,b_tzatziki,b_sushi_california,b_greek_salad	b_cucumber,b_pickles_dill,b_tzatziki,b_sushi_california,b_israeli_salad	| off_1,off_2,off_3
+spi	b_spinach_raw,b_spinach_cooked,b_spirits	b_spinach_raw,b_spinach_cooked,b_spirits,b_turkish_salad,b_merguez	| off_1,off_2,off_3
+pot	b_potato_raw,b_potato_baked,b_potato_boiled,b_potato_chips,b_mashed_potato	b_potato_raw,b_potato_baked,b_potato_boiled,b_potato_chips,b_latkes	| off_9,off_1,off_2
+swe	b_corn_cooked,b_sweet_potato,b_cherries,b_iced_tea_sweet,b_condensed_milk	b_corn_cooked,b_sweet_potato,b_kugel,b_cherries,b_iced_tea_sweet	| off_1,off_2,off_3
+ric	b_rice_cakes,b_rice_noodles_cooked,b_ricotta,b_fried_rice,b_rice_brown_cooked	b_rice_cakes,b_rice_noodles_cooked,b_ricotta,b_fried_rice,b_rice_brown_cooked	| off_1,off_2,off_3
+pas	b_pasta_cooked,b_pasta_dry,b_marinara,b_tomato_paste,b_pasta_wholewheat_cooked	b_pasta_cooked,b_pasta_dry,b_marinara,b_tomato_paste,b_pasta_wholewheat_cooked	| off_1,off_2,off_3
+bre	b_bread_rye,b_bread_sourdough,b_bread_white,b_bread_wholewheat,b_naan	b_bread_rye,b_bread_sourdough,b_bread_white,b_bread_wholewheat,b_bread_achid	| off_1,off_2,off_3
+chi	b_chickpeas_dry,b_chickpeas_cooked,b_chia_seeds,b_chicken_nuggets,b_chicken_breast_raw	b_chickpeas_dry,b_chickpeas_cooked,b_chia_seeds,b_chicken_nuggets,b_chicken_breast_raw	| off_9,off_10,off_1
+chick	b_chickpeas_dry,b_chickpeas_cooked,b_chicken_nuggets,b_chicken_breast_raw,b_chicken_curry	b_chickpeas_dry,b_chickpeas_cooked,b_chicken_nuggets,b_chicken_breast_raw,b_chicken_curry	| off_1,off_2,off_3
+sal	b_smoked_salmon,b_salsa,b_salami,b_salmon_raw,b_salmon_wild_cooked	b_smoked_salmon,b_salsa,b_salami,b_salmon_raw,b_salmon_wild_cooked	| off_1,off_2,off_3
+egg	b_egg_fried,b_egg_raw,b_egg_boiled,b_egg_scrambled,b_egg_yolk	b_egg_fried,b_egg_raw,b_egg_boiled,b_egg_scrambled,b_egg_yolk	| off_1,off_2,off_3
+yog	b_yogurt_plain_lowfat,b_yogurt_plain_whole,my_yogurt,b_greek_yogurt_nonfat,b_greek_yogurt_whole	b_yogurt_plain_lowfat,b_yogurt_plain_whole,b_yogurt_high_protein,my_yogurt,b_greek_yogurt_nonfat	| off_6,off_1,off_2
+che	b_cherries,b_cheesecake,b_cheeseburger,b_cheddar,my_cottage	b_cherries,b_cheesecake,b_cheeseburger,b_cheddar,my_cottage	| off_4,off_10,off_1
+chee	b_cheesecake,b_cheeseburger,my_cottage,my_cheese,b_brie	b_cheesecake,b_cheeseburger,my_cottage,my_cheese,b_brie	| off_4,off_10,off_1
+alm	b_almonds,b_almond_butter,b_almond_milk,b_smoked_salmon,b_salmon_raw	b_almonds,b_almond_butter,b_almond_milk,b_tortit,b_smoked_salmon	| off_1,off_2,off_3
+pea	b_pear,b_peach,b_peanuts,b_peanut_butter,b_peas_cooked	b_pear,b_peach,b_peanuts,b_peanut_butter,b_bamba	| off_2,off_1,off_3
+oli	b_olives_green,b_olives_black,b_olive_oil,b_broccoli_raw,b_broccoli_cooked	b_olives_green,b_olives_black,b_olive_oil,b_broccoli_raw,b_broccoli_cooked	| off_1,off_2,off_3
+hum	b_hummus	b_hummus,b_hummus_homemade	| off_1,off_2,off_3
+fal	b_falafel	b_falafel	| off_1,off_2,off_3
+sha	b_shakshuka,b_protein_shake_rtd,b_chicken_shawarma,b_shawarma_pita,b_milkshake_vanilla	b_shakshuka,b_protein_shake_rtd,b_chicken_shawarma,b_shawarma_pita,b_milkshake_vanilla	| off_1,off_2,off_3
+sch	b_schnitzel_chicken	b_schnitzel_chicken,b_schug,b_hamantaschen,b_corn_schnitzel,b_soy_schnitzel	| off_1,off_2,off_3
+cof	b_coffee_black,b_coffee_milk,b_coffee_sugar,b_coffee_milk_sugar	b_coffee_black,b_coffee_milk,b_coffee_sugar,b_coffee_milk_sugar,b_turkish_coffee_sweet	| off_1,off_2,off_3
+lat	b_latte,b_chocolate_hazelnut_spread,b_chocolate_cake,b_milk_chocolate,b_dark_chocolate	b_latte,b_latkes,b_chocolate_hazelnut_spread,b_chocolate_cake,b_mekupelet	| off_3,off_1,off_2
+bee	b_beets_cooked,b_beer_light,b_beer,b_beef_jerky,b_beef_ribeye_cooked	b_beets_cooked,b_beer_light,b_beer,b_beef_jerky,b_beef_ribeye_cooked	| off_1,off_2,off_3
+win	b_wine_red,b_wine_white,b_chicken_wing_cooked	b_wine_red,b_wine_white,b_chicken_wing_cooked	| off_1,off_2,off_3
+pro	my_bars,b_provolone,b_protein_shake_rtd,b_protein_bar,b_pea_protein	my_bars,b_provolone,b_protein_shake_rtd,b_protein_bar,b_pea_protein	| off_1,off_2,off_3
+gre	b_greek_yogurt_nonfat,b_peas_cooked,b_green_beans,b_greek_yogurt_whole,b_greek_salad	b_greek_yogurt_nonfat,b_peas_cooked,b_green_beans,b_greek_yogurt_whole,b_greek_salad	| off_6,off_1,off_2
+aple	b_maple_syrup	b_maple_syrup	| off_1,off_2,off_3
+banan	b_banana	b_banana	| off_1,off_2,off_3
+bananna	b_banana	b_banana	| off_1,off_2,off_3
+strawbery	my_yogurt,b_strawberries	my_yogurt,b_strawberries	| off_1,off_2,off_3
+bluberries	b_blueberries	b_blueberries	| off_1,off_2,off_3
+avacado	b_avocado,b_avocado_oil,b_sushi_california	b_avocado,b_avocado_oil,b_sushi_california	| off_1,off_2,off_3
+brocoli	b_broccoli_raw,b_broccoli_cooked	b_broccoli_raw,b_broccoli_cooked	| off_1,off_2,off_3
+brocolli	b_broccoli_raw,b_broccoli_cooked	b_broccoli_raw,b_broccoli_cooked	| off_1,off_2,off_3
+tomatoe	my_ketchup,b_tomato,b_tomato_juice,b_tomato_paste,b_tomato_sauce	my_ketchup,b_tomato,b_tomato_juice,b_tomato_paste,b_tomato_sauce	| off_1,off_2,off_3
+cucmber	b_cucumber,b_pickles_dill,b_tzatziki,b_sushi_california,b_greek_salad	b_cucumber,b_pickles_dill,b_tzatziki,b_sushi_california,b_israeli_salad	| off_1,off_2,off_3
+spinch	b_spinach_raw,b_spinach_cooked	b_spinach_raw,b_spinach_cooked,b_bourekas_spinach	| off_1,off_2,off_3
+potatoe	b_potato_raw,b_potato_baked,b_potato_boiled,b_potato_chips,b_mashed_potato	b_potato_raw,b_potato_baked,b_potato_boiled,b_potato_chips,b_latkes	| off_9,off_1,off_2
+chiken	my_shake,b_chicken_nuggets,b_chicken_breast_raw,b_chicken_curry,b_chicken_thigh_cooked	my_shake,b_chicken_nuggets,b_chicken_breast_raw,b_chicken_curry,b_schnitzel_chicken	| off_1,off_2,off_3
+chikcen	my_shake,b_chicken_nuggets,b_chicken_breast_raw,b_chicken_curry,b_chicken_thigh_cooked	my_shake,b_chicken_nuggets,b_chicken_breast_raw,b_chicken_curry,b_schnitzel_chicken	| off_1,off_2,off_3
+chiecken	my_shake,b_chicken_nuggets,b_chicken_breast_raw,b_chicken_curry,b_chicken_thigh_cooked	my_shake,b_chicken_nuggets,b_chicken_breast_raw,b_chicken_curry,b_schnitzel_chicken	| off_1,off_2,off_3
+salmom	b_smoked_salmon,b_salmon_raw,b_salmon_wild_cooked,b_salmon_cooked,b_sushi_salmon_nigiri	b_smoked_salmon,b_salmon_raw,b_salmon_wild_cooked,b_salmon_cooked,b_sushi_salmon_nigiri	| off_1,off_2,off_3
+tuan	b_tuna_canned_oil,b_tuna_canned_water,b_tuna_steak_cooked	b_tuna_canned_oil,b_tuna_canned_water,b_tuna_steak_cooked,b_tuna_salad	| off_1,off_2,off_3
+yougurt	b_yogurt_plain_lowfat,b_yogurt_plain_whole,my_yogurt,b_greek_yogurt_nonfat,b_greek_yogurt_whole	b_yogurt_plain_lowfat,b_yogurt_plain_whole,b_yogurt_high_protein,my_yogurt,b_greek_yogurt_nonfat	| off_6,off_1,off_2
+yogurtt	b_yogurt_plain_lowfat,b_yogurt_plain_whole,my_yogurt,b_greek_yogurt_nonfat,b_greek_yogurt_whole	b_yogurt_plain_lowfat,b_yogurt_plain_whole,b_yogurt_high_protein,my_yogurt,b_greek_yogurt_nonfat	| off_6,off_1,off_2
+chese	b_cheesecake,my_cottage,my_cheese,b_cheeseburger,b_brie	b_cheesecake,my_cottage,my_cheese,b_cheeseburger,b_brie	| off_4,off_10,off_1
+mozarella	b_mozzarella_part_skim,b_mozzarella	b_mozzarella_part_skim,b_mozzarella	| off_1,off_2,off_3
+parmesean	b_parmesan	b_parmesan	| off_1,off_2,off_3
+almons	b_almonds,b_almond_butter,b_almond_milk,b_smoked_salmon,b_salmon_raw	b_almonds,b_almond_butter,b_almond_milk,b_tortit,b_smoked_salmon	| off_1,off_2,off_3
+pistachoi	b_pistachios	b_pistachios	| off_1,off_2,off_3
+humus	b_hummus	b_hummus,b_hummus_homemade	| off_1,off_2,off_3
+hummous	b_hummus	b_hummus,b_hummus_homemade	| off_1,off_2,off_3
+falafal	b_falafel	b_falafel	| off_1,off_2,off_3
+shakshouka	b_shakshuka	b_shakshuka	| off_1,off_2,off_3
+shwarma	b_chicken_shawarma,b_shawarma_pita	b_chicken_shawarma,b_shawarma_pita	| off_1,off_2,off_3
+shnitzel	b_schnitzel_chicken	b_schnitzel_chicken,b_corn_schnitzel,b_soy_schnitzel	| off_1,off_2,off_3
+burekas	b_bourekas_cheese	b_bourekas_cheese,b_bourekas_potato,b_bourekas_spinach	| off_1,off_2,off_3
+tahina	b_tahini,b_halva	b_tahini,b_tahini_sauce,b_halva,b_hummus_homemade	| off_1,off_2,off_3
+lasagne	b_lasagna	b_lasagna	| off_1,off_2,off_3
+spagetti	my_pasta,b_spaghetti_meat_sauce	my_pasta,b_spaghetti_meat_sauce	| off_1,off_2,off_3
+expresso	b_espresso	b_espresso	| off_1,off_2,off_3
+capuccino	b_cappuccino	b_cappuccino	| off_1,off_2,off_3
+lemonaid	b_lemonade	b_lemonade	| off_1,off_2,off_3
+protien	my_bars,b_protein_shake_rtd,b_protein_bar,b_pea_protein,b_whey_protein	my_bars,b_protein_shake_rtd,b_protein_bar,b_pea_protein,b_whey_protein	| off_1,off_2,off_3
+chicken breast	b_chicken_breast_raw,b_chicken_breast_cooked	b_chicken_breast_raw,b_chicken_breast_cooked	| off_1,off_2,off_3
+chicken thigh	b_chicken_thigh_cooked,b_chicken_thigh_skin_cooked	b_chicken_thigh_cooked,b_chicken_thigh_skin_cooked	| off_1,off_2,off_3
+chicken wings	b_chicken_wing_cooked	b_chicken_wing_cooked	| off_1,off_2,off_3
+ground beef	b_beef_ground_80_raw,b_beef_ground_85_cooked,b_beef_ground_90_cooked	b_beef_ground_80_raw,b_beef_ground_85_cooked,b_beef_ground_90_cooked	| off_1,off_2,off_3
+brown rice	b_rice_brown_cooked,b_rice_brown_dry	b_rice_brown_cooked,b_rice_brown_dry	| off_1,off_2,off_3
+white rice	b_rice_white_cooked,b_rice_white_dry	b_rice_white_cooked,b_rice_white_dry	| off_1,off_2,off_3
+rice cooked	b_rice_noodles_cooked,b_rice_brown_cooked,b_rice_white_cooked,b_rice_brown_dry,b_rice_white_dry	b_rice_noodles_cooked,b_rice_brown_cooked,b_rice_white_cooked,b_rice_brown_dry,b_rice_white_dry	| off_1,off_2,off_3
+pasta dry	b_pasta_dry	b_pasta_dry	| off_1,off_2,off_3
+whole wheat bread	b_bread_wholewheat,b_pita_wholewheat	b_bread_wholewheat,b_bread_achid,b_pita_wholewheat	| off_1,off_2,off_3
+greek yogurt	b_greek_yogurt_nonfat,b_greek_yogurt_whole	b_greek_yogurt_nonfat,b_greek_yogurt_whole	| off_6,off_1,off_2
+cottage cheese	my_cottage,b_cottage_cheese_2pct,b_cottage_cheese_4pct	my_cottage,b_cottage_cheese_2pct,b_cottage_cheese_3pct,b_cottage_cheese_4pct,b_cottage_cheese_5pct	| off_4,off_1,off_2
+cream cheese	my_cheese,b_cream_cheese	my_cheese,b_cream_cheese,b_cream_cheese_5pct	| off_1,off_2,off_3
+peanut butter	b_peanut_butter	b_peanut_butter	| off_1,off_2,off_3
+almond milk	b_almond_milk	b_almond_milk	| off_1,off_2,off_3
+olive oil	b_olive_oil,b_greek_salad	b_olive_oil,b_greek_salad	| off_1,off_2,off_3
+sweet potato	b_sweet_potato	b_sweet_potato	| off_1,off_2,off_3
+green beans	b_green_beans	b_green_beans	| off_1,off_2,off_3
+hard boiled egg	b_egg_boiled	b_egg_boiled	| off_1,off_2,off_3
+boiled egg	b_egg_boiled,b_eggplant_cooked	b_egg_boiled,b_eggplant_cooked	| off_1,off_2,off_3
+fried egg	b_egg_fried	b_egg_fried,b_eggplant_fried	| off_1,off_2,off_3
+scrambled eggs	b_egg_scrambled	b_egg_scrambled	| off_1,off_2,off_3
+orange juice	b_orange_juice	b_orange_juice	| off_1,off_2,off_3
+apple juice	b_apple_juice	b_apple_juice	| off_1,off_2,off_3
+dark chocolate	b_dark_chocolate	b_dark_chocolate	| off_1,off_2,off_3
+ice cream	b_ice_cream_vanilla	b_ice_cream_vanilla	| off_1,off_2,off_3
+french fries	b_french_fries	b_french_fries	| off_1,off_2,off_3
+pizza pepperoni	b_pizza_pepperoni	b_pizza_pepperoni	| off_1,off_2,off_3
+caesar salad	b_caesar_salad,b_caesar_salad_chicken	b_caesar_salad,b_caesar_salad_chicken	| off_1,off_2,off_3
+greek salad	b_greek_salad	b_greek_salad	| off_1,off_2,off_3
+israeli salad	b_israeli_salad	b_israeli_salad	| off_1,off_2,off_3
+chicken shawarma	b_chicken_shawarma,b_shawarma_pita	b_chicken_shawarma,b_shawarma_pita	| off_1,off_2,off_3
+chicken schnitzel	b_schnitzel_chicken	b_schnitzel_chicken	| off_1,off_2,off_3
+cheese bourekas	b_bourekas_cheese	b_bourekas_cheese	| off_1,off_2,off_3
+coffee milk	b_coffee_milk,b_coffee_milk_sugar	b_coffee_milk,b_coffee_milk_sugar	| off_1,off_2,off_3
+tea sugar	b_tea_sugar,b_tea_milk_sugar	b_tea_sugar,b_tea_milk_sugar	| off_1,off_2,off_3
+protein bar	my_bars,b_protein_bar	my_bars,b_protein_bar	| off_1,off_2,off_3
+protein shake	b_protein_shake_rtd	b_protein_shake_rtd	| off_1,off_2,off_3
+smoked salmon	b_smoked_salmon	b_smoked_salmon	| off_1,off_2,off_3
+canned tuna	b_tuna_canned_oil,b_tuna_canned_water	b_tuna_canned_oil,b_tuna_canned_water	| off_1,off_2,off_3
+tuna in water	b_tuna_canned_water	b_tuna_canned_water	| off_1,off_2,off_3
+red wine	b_wine_red	b_wine_red	| off_1,off_2,off_3
+light beer	b_beer_light	b_beer_light	| off_1,off_2,off_3
+diet cola	b_cola_diet	b_cola_diet	| off_1,off_2,off_3
+chocolate chip cookie	b_cookie_choc_chip	b_cookie_choc_chip	| off_1,off_2,off_3
+mac and cheese	b_mac_and_cheese	b_mac_and_cheese	| off_1,off_2,off_3
+fried rice	b_fried_rice	b_fried_rice,b_mejadra	| off_1,off_2,off_3
+pad thai	b_pad_thai	b_pad_thai	| off_1,off_2,off_3
+chicken curry	b_chicken_curry	b_chicken_curry	| off_1,off_2,off_3
+egg white	b_egg_white	b_egg_white	| off_1,off_2,off_3
+oat milk	b_oat_milk	b_oat_milk	| off_1,off_2,off_3
+soy sauce	b_soy_sauce	b_soy_sauce	| off_1,off_2,off_3
+nutella	my_spread	my_spread	| off_1,off_2,off_3
+oreo	my_cookie	my_cookie	| off_1,off_2,off_3
+heinz	my_ketchup	my_ketchup	| off_1,off_2,off_3
+coca cola	my_cola	my_cola	| off_8,off_1,off_2
+coke	b_rice_cakes,b_chocolate_cake	b_cola,b_cola_diet,b_rice_cakes,b_babka,b_chocolate_cake	| off_1,off_2,off_3
+pepsi	-	b_cola,b_cola_diet,b_persimmon	| off_1,off_2,off_3
+quaker	my_granola	my_granola	| off_1,off_2,off_3
+cheerios	my_cereal	my_cereal	| off_1,off_2,off_3
+kelloggs	-	-	| off_7,off_1,off_2
+tnuva	my_cottage	my_cottage	| off_3,off_4,off_1
+osem	-	-	| off_2,off_1,off_3
+elite	-	-	| off_1,off_2,off_3
+strauss	-	-	| off_1,off_2,off_3
+danone	my_yogurt	my_yogurt	| off_6,off_1,off_2
+activia	-	-	| off_1,off_2,off_3
+yoplait	-	-	| off_1,off_2,off_3
+philadelphia	my_cheese	my_cheese	| off_1,off_2,off_3
+barilla	my_pasta	my_pasta	| off_1,off_2,off_3
+lays	-	-	| off_9,off_1,off_2
+doritos	-	-	| off_10,off_1,off_2

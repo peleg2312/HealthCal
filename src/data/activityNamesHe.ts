@@ -30,7 +30,7 @@ export const ACTIVITY_NAMES_HE: Readonly<Record<string, readonly string[]>> = {
   stretching: ['מתיחות'],
   yoga: ['יוגה'],
   volleyball: ['כדורעף'],
-  beach_volleyball: ['כדורעף חופים', 'מטקות'],
+  beach_volleyball: ['כדורעף חופים'],
   basketball: ['כדורסל'],
   soccer: ['כדורגל'],
   football: ['פוטבול'],

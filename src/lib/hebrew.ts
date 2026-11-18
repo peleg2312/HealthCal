@@ -32,20 +32,30 @@ const FINALS: Readonly<Record<string, string>> = {
  * space between Hebrew and a Latin letter or digit; trimmed single spaces.
  */
 export function fold(s: string): string {
+  // Text with nothing from the Hebrew block or the Hebrew presentation forms takes the short road (the
+  // Hebrew steps would change nothing); on Hermes this halves the time to index the bundled names.
+  if (!HE_ANY.test(s)) {
+    return s
+      .normalize('NFD')
+      .toLowerCase()
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
   return s
     .normalize('NFD')
-    .replace(/[֑-ְ֯-ׇֽֿׁׂׅׄ]/g, '')
-    .replace(/ﭏ/g, 'אל')
-    .replace(/[ךםןףץ]/g, (c) => FINALS[c] ?? c)
-    .replace(/([א-ת])['׳’‘`´]/g, '$1')
-    .replace(/([א-ת])["״“”](?=[א-ת])/g, '$1')
-    .replace(/װ/g, 'וו')
-    .replace(/ױ/g, 'וי')
-    .replace(/ײ/g, 'יי')
+    .replace(/[\u0591-\u05af\u05b0-\u05bd\u05bf\u05c1\u05c2\u05c4\u05c5\u05c7]/g, '')
+    .replace(/\ufb4f/g, '\u05d0\u05dc')
+    .replace(/[\u05da\u05dd\u05df\u05e3\u05e5]/g, (c) => FINALS[c] ?? c)
+    .replace(/([\u05d0-\u05ea])['\u05f3\u2019\u2018`\u00b4]/g, '$1')
+    .replace(/([\u05d0-\u05ea])["\u05f4\u201c\u201d](?=[\u05d0-\u05ea])/g, '$1')
+    .replace(/\u05f0/g, '\u05d5\u05d5')
+    .replace(/\u05f1/g, '\u05d5\u05d9')
+    .replace(/\u05f2/g, '\u05d9\u05d9')
     .toLowerCase()
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9א-ת]+/g, ' ')
-    .replace(/([א-ת])(?=[a-z0-9])|([a-z0-9])(?=[א-ת])/g, '$1$2 ')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\u05d0-\u05ea]+/g, ' ')
+    .replace(/([\u05d0-\u05ea])(?=[a-z0-9])|([a-z0-9])(?=[\u05d0-\u05ea])/g, '$1$2 ')
     .replace(/ +/g, ' ')
     .trim();
 }
