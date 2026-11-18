@@ -63,6 +63,11 @@ on:
         type: choice
         options: [macos-26, macos-15]
         default: macos-26
+      android_locale:
+        description: "Optional, Android only: a language for the app, as on a phone set to it (for example he-IL). The system's own screens stay in English, so the flows still find them"
+        type: string
+        default: ''
+        required: false
 
 permissions:
   contents: read
@@ -730,11 +735,19 @@ jobs:
 
       - name: Install the app and start its log
         timeout-minutes: 5
+        env:
+          ANDROID_LOCALE: ${{ inputs.android_locale }}
         run: |
           set -euo pipefail
           APK=$(ls "$RUNNER_TEMP"/app/*.apk | head -1)
           adb -s "$DEVICE" install -r "$APK"
           mkdir -p "$RESULTS"
+          # A phone set to another language, for this app only (Android 13+): what the app reads as the
+          # phone's language (Locale.getDefault) changes, the system's screens do not.
+          if [ -n "$ANDROID_LOCALE" ]; then
+            adb -s "$DEVICE" shell cmd locale set-app-locales "$APP_ID" --user 0 --locales "$ANDROID_LOCALE"
+            echo "App language: $(adb -s "$DEVICE" shell cmd locale get-app-locales "$APP_ID" --user 0 | tr -d '\r')"
+          fi
           adb -s "$DEVICE" logcat -c || true
           nohup adb -s "$DEVICE" logcat -v threadtime -b main,system,crash > "$RUNNER_TEMP/logcat-full.txt" 2>&1 &
           echo $! > "$RUNNER_TEMP/logcat.pid"
