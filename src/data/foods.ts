@@ -73,6 +73,11 @@ const f = (id: string, name: string, emoji: string, category: string, n: N, serv
   servings: servings.map(([label, grams]) => ({ label, grams })),
 });
 
+/** National records (`ilCode`) that the Ministry computed from a typical home recipe. Drives the source line behind a food's badge. */
+export const NATIONAL_RECIPES: ReadonlySet<number> = new Set<number>([]);
+/** National records (`ilCode`) whose values are a packaged product's label as recorded in the national database. */
+export const NATIONAL_LABELS: ReadonlySet<number> = new Set<number>([]);
+
 export const BUILTIN_FOODS: Food[] = [
   // ------------------------------------------------------------------ fruit
   f('apple', 'Apple, raw', '🍎', 'fruit', [52, 0.26, 13.8, 0.17, 2.4, 10.4, 0.03, 1], [['1 medium', 182], ['1 small', 149], ['1 large', 223]], 171688),

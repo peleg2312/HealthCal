@@ -1,0 +1,309 @@
+# whole words
+apple
+banana
+orange
+grapes
+strawberry
+strawberries
+blueberries
+watermelon
+melon
+mango
+kiwi
+peach
+pear
+avocado
+lemon
+dates
+raisins
+broccoli
+carrot
+carrots
+tomato
+tomatoes
+cucumber
+lettuce
+spinach
+kale
+cabbage
+cauliflower
+pepper
+onion
+garlic
+mushrooms
+zucchini
+eggplant
+celery
+potato
+potatoes
+corn
+peas
+beans
+asparagus
+beets
+pumpkin
+olives
+pickles
+rice
+pasta
+noodles
+couscous
+quinoa
+bulgur
+oats
+oatmeal
+bread
+bagel
+pita
+tortilla
+naan
+croissant
+crackers
+flour
+sugar
+honey
+jam
+lentils
+chickpeas
+tofu
+tempeh
+beef
+steak
+lamb
+pork
+bacon
+ham
+turkey
+sausage
+salami
+jerky
+chicken
+salmon
+tuna
+cod
+tilapia
+shrimp
+sardines
+trout
+crab
+egg
+eggs
+milk
+yogurt
+yoghurt
+labneh
+kefir
+cottage
+butter
+ghee
+cheese
+cheddar
+mozzarella
+parmesan
+feta
+halloumi
+ricotta
+almonds
+walnuts
+cashews
+pistachios
+peanuts
+seeds
+tahini
+oil
+mayonnaise
+ketchup
+mustard
+salsa
+pesto
+guacamole
+hummus
+falafel
+shakshuka
+shawarma
+schnitzel
+bourekas
+halva
+tabbouleh
+chips
+popcorn
+chocolate
+cookie
+brownie
+donut
+cake
+pizza
+hamburger
+burger
+fries
+burrito
+taco
+salad
+spaghetti
+lasagna
+sushi
+curry
+coffee
+espresso
+latte
+cappuccino
+tea
+juice
+lemonade
+cola
+soda
+beer
+wine
+vodka
+smoothie
+protein
+whey
+# prefixes
+app
+ban
+str
+blu
+wat
+avo
+bro
+car
+tom
+cuc
+spi
+pot
+swe
+ric
+pas
+bre
+chi
+chick
+sal
+egg
+yog
+che
+chee
+alm
+pea
+oli
+hum
+fal
+sha
+sch
+cof
+lat
+bee
+win
+pro
+gre
+# typos
+aple
+banan
+bananna
+strawbery
+bluberries
+avacado
+brocoli
+brocolli
+tomatoe
+cucmber
+spinch
+potatoe
+chiken
+chikcen
+chiecken
+salmom
+tuan
+yougurt
+yogurtt
+chese
+mozarella
+parmesean
+almons
+pistachoi
+humus
+hummous
+falafal
+shakshouka
+shwarma
+shnitzel
+burekas
+tahina
+lasagne
+spagetti
+expresso
+capuccino
+lemonaid
+protien
+# two words
+chicken breast
+chicken thigh
+chicken wings
+ground beef
+brown rice
+white rice
+rice cooked
+pasta dry
+whole wheat bread
+greek yogurt
+cottage cheese
+cream cheese
+peanut butter
+almond milk
+olive oil
+sweet potato
+green beans
+hard boiled egg
+boiled egg
+fried egg
+scrambled eggs
+orange juice
+apple juice
+dark chocolate
+ice cream
+french fries
+pizza pepperoni
+caesar salad
+greek salad
+israeli salad
+chicken shawarma
+chicken schnitzel
+cheese bourekas
+coffee milk
+tea sugar
+protein bar
+protein shake
+smoked salmon
+canned tuna
+tuna in water
+red wine
+light beer
+diet cola
+chocolate chip cookie
+mac and cheese
+fried rice
+pad thai
+chicken curry
+egg white
+oat milk
+soy sauce
+# brands and packaged words
+nutella
+oreo
+heinz
+coca cola
+coke
+pepsi
+quaker
+cheerios
+kelloggs
+tnuva
+osem
+elite
+strauss
+danone
+activia
+yoplait
+philadelphia
+barilla
+lays
+doritos

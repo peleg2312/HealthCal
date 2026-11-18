@@ -22,6 +22,12 @@ export interface SearchHit {
   score: number;
   /** Strongest reason this food is in the user's world (for labels and tests). */
   origin: SearchOrigin;
+  /**
+   * The search name the query matched, when that was one of the food's Hebrew search names
+   * (`@/data/searchNames`) and not its stored name. Shown under the name in a result row. Display
+   * only: never stored.
+   */
+  matched?: string;
 }
 
 export interface SearchContext {

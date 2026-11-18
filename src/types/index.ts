@@ -100,6 +100,12 @@ export interface Food {
   verified: boolean;
   /** The USDA FoodData Central record a bundled food's values were checked against. */
   fdcId?: number;
+  /**
+   * The Israeli national nutrition database (Tzameret, Ministry of Health) record a bundled food's
+   * values come from: its `Code` column. Carbohydrate is stored as the record's available
+   * carbohydrate plus its fibre, so it is total carbohydrate like every other food.
+   */
+  ilCode?: number;
   category?: string;
   /** Emoji shown in lists. */
   emoji?: string;
