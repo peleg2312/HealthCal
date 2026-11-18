@@ -9,6 +9,19 @@ name: First day on a phone
 ---
 - launchApp:
     clearState: true
+# A cold emulator sometimes puts "Pixel Launcher isn't responding" over the app (seen 18 November
+# 2026, run 44254258039): "Wait" dismisses it. Not there on an iPhone or a warm emulator.
+- runFlow:
+    when:
+      platform: Android
+      visible:
+        text: "(?i).*isn't responding.*"
+    commands:
+      - tapOn:
+          text: '(?i)wait'
+          optional: true
+      - waitForAnimationToEnd:
+          timeout: 3000
 - extendedWaitUntil:
     visible:
       id: welcome-get-started
