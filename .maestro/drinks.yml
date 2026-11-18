@@ -1,0 +1,137 @@
+# Drinks with calories on a phone, after first-day.yml has set the app up (no clearState: it needs
+# the profile first-day made).
+#
+# Milk from the water screen: its choices, the line that says the calories before the tap, one glass,
+# its row in "Today's log", and the diary with the same drink. Then, best effort (every step optional,
+# the pictures are the evidence): the drink sheet under Other, with calories typed while the keyboard
+# is up, which only a phone shows.
+#
+#   GitHub (free):  Actions > Phone test > Run workflow, flows = first-day,drinks
+#   A phone or emulator on your desk:  maestro test .maestro/first-day.yml .maestro/drinks.yml
+appId: app.healthcal.mobile
+name: Drinks with calories on a phone
+---
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: today-energy
+    timeout: 120000
+# After midnight the morning page may open over Today (see health-and-about.yml).
+- tapOn:
+    id: morning-today
+    optional: true
+
+# Today > Water.
+- scrollUntilVisible:
+    element:
+      id: today-water
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: today-water
+- extendedWaitUntil:
+    visible:
+      id: water-beverage-milk
+    timeout: 20000
+- takeScreenshot: 40-water
+
+# Milk: the choices appear, the line under them names the calories and the meal before any tap.
+- tapOn:
+    id: water-beverage-milk
+- extendedWaitUntil:
+    visible:
+      id: water-drink-line
+    timeout: 10000
+- takeScreenshot: 41-water-milk-choices
+- tapOn:
+    id: water-choice-milk_whole
+- takeScreenshot: 42-water-milk-whole
+
+# One glass: the water record and the diary entry are written together; the toast says both.
+- scrollUntilVisible:
+    element:
+      id: water-add-1
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: water-add-1
+- takeScreenshot: 43-water-milk-added
+- scrollUntilVisible:
+    element:
+      id: water-entry-0
+    direction: DOWN
+    timeout: 20000
+- takeScreenshot: 44-water-log-with-calories
+# The row's second line ("Milk, whole · 157 kcal in lunch") sits inside the row's button: looked for, not required.
+- assertVisible:
+    id: water-entry-kcal-0
+    optional: true
+
+# The diary holds the same drink, marked "also in Water".
+- tapOn:
+    id: header-back
+- extendedWaitUntil:
+    visible:
+      id: today-energy
+    timeout: 20000
+- tapOn:
+    id: tab-diary
+- scrollUntilVisible:
+    element:
+      text: '(?i).*also (counted )?in water.*'
+    direction: DOWN
+    timeout: 30000
+    optional: true
+- takeScreenshot: 45-diary-also-in-water
+
+# Best effort from here: Other > Choose a drink > Or enter calories, with the keyboard up.
+- tapOn:
+    id: tab-index
+- scrollUntilVisible:
+    element:
+      id: today-water
+    direction: DOWN
+    timeout: 20000
+    optional: true
+- tapOn:
+    id: today-water
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: water-beverage-milk
+    timeout: 20000
+    optional: true
+# The kinds are a sideways row; Other is at its end.
+- swipe:
+    from:
+      id: water-beverage-milk
+    direction: LEFT
+    optional: true
+- tapOn:
+    id: water-beverage-other
+    optional: true
+- takeScreenshot: 46-water-other-choices
+- tapOn:
+    id: water-choice-pick
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: water-pick-kcal-open
+    timeout: 10000
+    optional: true
+- takeScreenshot: 47-drink-sheet
+- tapOn:
+    id: water-pick-kcal-open
+    optional: true
+- tapOn:
+    id: water-pick-kcal
+    optional: true
+- inputText: '140'
+- takeScreenshot: 48-drink-sheet-calories-keyboard
+- tapOn:
+    id: water-pick-kcal-add
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 49-after-entered-calories
