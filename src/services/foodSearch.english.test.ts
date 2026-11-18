@@ -5,10 +5,14 @@
  * - the first result is the one from before, except "coke" and "pepsi" (now regular cola, through its
  *   brand words);
  * - no food that was in a top 5 drops out of the query's 40 results;
+ * - every food that moved into a top 5 is new in this job or one of the six corrected rows (a verified
+ *   record now), apart from the colas for coke and pepsi (`__fixtures__/foods-before.txt` lists the
+ *   foods from before);
  * - "salad" keeps Caesar salad first and Greek salad in its top 5;
  * - the top 5 now is the recorded one (a changed line is read and recorded on purpose).
- * Every changed line is one of: a new food enters; one of the six corrected rows moves up because it is
- * now a verified record; the two brand words above.
+ * `__fixtures__/english-more.tsv` adds the English reviewer's 213 queries and every Latin search name of
+ * five letters or fewer: the first result as recorded, and wherever it differs from before this job, a
+ * reason that the test checks (a new food, a Latin search name of the food, or a corrected row).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -61,6 +65,18 @@ const ONLINE: Food[] = [
   food('off_10', 'Nacho cheese tortilla chips', 'Doritos', 'openfoodfacts'),
 ];
 
+/** The six existing rows whose values were corrected from a verified record (they may move up). */
+const CORRECTED = new Set(['b_labneh', 'b_halloumi', 'b_shakshuka', 'b_israeli_salad', 'b_schnitzel_chicken', 'b_bourekas_cheese']);
+const BEFORE_IDS = new Set(
+  readFileSync(path.join(__dirname, '__fixtures__', 'foods-before.txt'), 'utf8')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('#')),
+);
+/** Regular and diet cola, which coke and pepsi now find through their brand words. */
+const COLAS = new Set(['b_cola', 'b_cola_diet']);
+const isNew = (id: string) => !BEFORE_IDS.has(id) && !id.startsWith('my_');
+
 const raw = readFileSync(FILE, 'utf8').split('\n');
 const header = raw.filter((l) => l.startsWith('#'));
 const rows = raw
@@ -95,6 +111,18 @@ describe('English search keeps its ranking', () => {
     expect(lost).toEqual([]);
   });
 
+  it('lets only new foods and the corrected rows move into a top 5 (the colas for coke and pepsi)', () => {
+    const wrong: string[] = [];
+    for (const r of rows) {
+      const before = new Set(ids(r.before));
+      for (const id of top(r.q, 5)) {
+        if (before.has(id) || isNew(id) || CORRECTED.has(id) || (FIRST_MAY_CHANGE.has(r.q) && COLAS.has(id))) continue;
+        wrong.push(`${r.q}: ${id}`);
+      }
+    }
+    expect(wrong).toEqual([]);
+  });
+
   it('keeps the online order', () => {
     const changed = rows.filter((r) => `| ${rankOnline(r.q, ONLINE).slice(0, 3).map((f) => f.id).join(',')}` !== r.online);
     expect(changed.map((r) => r.q)).toEqual([]);
@@ -118,5 +146,60 @@ describe('English search keeps its ranking', () => {
   it.skipIf(!TABLE_COMPLETE)('coke and pepsi find regular cola first', () => {
     expect(top('coke', 1)[0]).toBe('b_cola');
     expect(top('pepsi', 1)[0]).toBe('b_cola');
+  });
+});
+
+const MORE_FILE = path.join(__dirname, '__fixtures__', 'english-more.tsv');
+const moreRaw = readFileSync(MORE_FILE, 'utf8').split('\n');
+const more = moreRaw
+  .filter((l) => l.trim() && !l.startsWith('#'))
+  .map((l) => {
+    const [q, before, now, reason = ''] = l.split('\t');
+    return { q, before, now, reason };
+  });
+
+describe('English search beyond the 304 queries (english-more.tsv)', () => {
+  it('reads the 213 queries of the English review and the short Latin search names', () => {
+    expect(more.length).toBeGreaterThanOrEqual(213);
+    expect(new Set(more.map((r) => r.q)).size).toBe(more.length);
+  });
+
+  it('every Latin search name of five letters or fewer is a query line here or in english-ranking.txt', () => {
+    const asked = new Set([...more.map((r) => r.q), ...rows.map((r) => r.q)]);
+    const short = Object.values(SEARCH_NAMES).flatMap((n) => n.latin ?? []).filter((l) => l.length <= 5);
+    expect(short.filter((l) => !asked.has(l))).toEqual([]);
+  });
+
+  it.skipIf(!TABLE_COMPLETE)('gives the recorded first result for every query', () => {
+    const now = more.map((r) => ({ ...r, got: top(r.q, 1)[0] ?? '-' }));
+    if (RECORD) {
+      const byQ = new Map(now.map((r) => [r.q, r]));
+      const out = moreRaw.map((l) => {
+        if (!l.trim() || l.startsWith('#')) return l;
+        const r = byQ.get(l.split('\t')[0])!;
+        return [r.q, r.before, r.got, r.reason].join('\t').replace(/\t+$/, '');
+      });
+      writeFileSync(MORE_FILE, out.join('\n'));
+      return;
+    }
+    expect(now.filter((r) => r.got !== r.now).map((r) => `${r.q}: recorded ${r.now}, now ${r.got}`)).toEqual([]);
+  });
+
+  it('gives a checked reason wherever the first result differs from before this job, and none elsewhere', () => {
+    const wrong: string[] = [];
+    for (const r of more) {
+      if (r.before === r.now) {
+        if (r.reason) wrong.push(`${r.q}: a reason on an unchanged line`);
+        continue;
+      }
+      const latin = SEARCH_NAMES[r.now]?.latin ?? [];
+      const ok = r.reason.startsWith('new:')
+        ? isNew(r.now)
+        : r.reason.startsWith('latin:')
+          ? latin.some((n) => n === r.q || n.startsWith(r.q))
+          : r.reason.startsWith('corrected:') && CORRECTED.has(r.now);
+      if (!ok) wrong.push(`${r.q}: ${r.before} -> ${r.now} (${r.reason || 'no reason'})`);
+    }
+    expect(wrong).toEqual([]);
   });
 });

@@ -1,0 +1,241 @@
+# English queries beyond the 304 of english-ranking.txt (C16): the English reviewer's 213 queries, the two
+# misspellings a new food's token cut off from their food (bulgar, limon: in the 213), and every Latin
+# search name of five letters or fewer (src/data/searchNames.ts), so the four-letter rule for Latin names is
+# checked on exactly these words. Queries already in english-ranking.txt are left out.
+# Columns: query, first result before this job (the code and the 348 foods of git 3fa7914, with the 12 own
+# foods of foodSearch.english.test.ts), first result now, and the reason wherever the two differ:
+#   new: <why>        the first result now is a food new in this job (checked against foods-before.txt)
+#   latin: <why>      the query is a Latin search name of the first result (checked against the table)
+#   corrected: <why>  one of the six corrected rows (listed in foodSearch.english.test.ts)
+# Rewrite the "now" column with HEALTHCAL_RECORD_ENGLISH=1 npx vitest run src/services/foodSearch.english.test.ts
+# after reading every changed line; a changed first result needs its reason.
+hala	b_halva	b_challah	new: 'hala' is a Latin search name of challah (a new food)
+emek	-	b_yellow_cheese_28pct	new: a Latin search name of a new food
+artik	b_artichoke	b_artichoke
+ful	b_coconut_milk_canned	b_fava_beans	latin: 'ful' is a Latin search name of fava beans (kept by the decisions; artik and halla were removed)
+foul	-	b_fava_beans	latin: 'foul' is a Latin search name of fava beans
+laban	-	b_leben	new: a Latin search name of a new food
+pitta	b_pistachios	b_pita_bakery	new: a Latin search name of a new food
+matzo	-	b_matza	new: a Latin search name of a new food
+kuskus	-	b_couscous_cooked	latin: a Latin search name of this food (nothing was found before)
+burgul	-	b_bulgur_cooked	latin: a Latin search name of this food (nothing was found before)
+sabra	-	-
+tehina	-	b_tahini_sauce	new: a Latin search name of a new food
+halla	b_halva	b_challah	new: a new food enters
+challa	-	b_challah	new: a new food enters
+matza	-	b_matza	new: a Latin search name of a new food
+matzah	-	b_matza	new: a Latin search name of a new food
+bulgar	b_bulgur_cooked	b_bulgur_cooked
+halvah	b_halva	b_halva
+kebab	-	b_kebab	new: a new food enters
+kabob	-	-
+felafel	b_falafel	b_falafel
+schwarma	b_chicken_shawarma	b_chicken_shawarma
+latke	b_latte	b_latkes	new: a new food enters
+latkes	b_latte	b_latkes	new: a new food enters
+kugel	-	b_kugel	new: a new food enters
+blintz	-	-
+lox	b_smoked_salmon	b_smoked_salmon
+herring	-	b_herring_pickled	new: a new food enters
+gefilte	-	b_gefilte_fish	new: a new food enters
+borscht	-	-
+pickle	b_pickles_dill	b_pickles_dill
+olive	b_olives_green	b_olives_green
+yogourt	b_yogurt_plain_lowfat	b_yogurt_plain_lowfat
+granola	b_granola	b_granola
+muesli	-	-
+porridge	-	b_semolina_porridge	new: a new food enters
+toast	b_french_toast	b_french_toast
+french toast	b_french_toast	b_french_toast
+jelly	-	-
+maple syrup	b_maple_syrup	b_maple_syrup
+pancake	b_pancakes	b_pancakes
+waffle	b_waffle	b_waffle
+muffin	b_english_muffin	b_english_muffin
+doughnut	b_donut_glazed	b_donut_glazed
+cupcake	-	-
+cheesecake	b_cheesecake	b_cheesecake
+popsicle	-	-
+sorbet	-	-
+gelato	-	-
+pudding	-	b_danny_pudding	new: a new food enters
+custard	b_mustard	b_mustard
+milk chocolate	b_milk_chocolate	b_milk_chocolate
+candy	b_gummy_candy	b_gummy_candy
+gummy	b_gummy_candy	b_gummy_candy
+pretzel	b_pretzels	b_pretzels
+tortilla chips	b_tortilla_chips	b_tortilla_chips
+nachos	-	-
+quesadilla	b_quesadilla_cheese	b_quesadilla_cheese
+enchilada	-	-
+pepperoni	b_pizza_pepperoni	b_pizza_pepperoni
+macaroni	b_mac_and_cheese	b_mac_and_cheese
+ravioli	-	-
+ramen	-	-
+miso soup	-	-
+edamame	b_edamame	b_edamame
+lentil soup	-	b_lentil_soup	new: a new food enters
+black beans	b_black_beans	b_black_beans
+kidney beans	b_kidney_beans	b_kidney_beans
+baked beans	-	-
+potato salad	-	-
+coleslaw	-	-
+egg salad	-	b_egg_salad	new: a new food enters
+tuna salad	-	b_tuna_salad	new: a new food enters
+carrot salad	-	b_carrot_salad	new: a new food enters
+chicken salad	b_shawarma_pita	b_shawarma_pita
+garden salad	-	-
+aubergine	-	-
+courgette	-	-
+squash	b_butternut_squash	b_butternut_squash
+arugula	-	-
+mushroom	b_mushrooms	b_mushrooms
+beet	b_beets_cooked	b_beets_cooked
+radish	b_radish	b_radish
+onion rings	-	-
+garlic bread	-	-
+pork chop	b_pork_chop_cooked	b_pork_chop_cooked
+hot dog	b_hot_dog_bun	b_hot_dogs_chicken	new: the new chicken hot dog row
+meatballs	-	b_meatballs_tomato	new: a new food enters
+meatloaf	-	-
+roast beef	-	-
+lamb chop	-	-
+liver	-	b_chopped_liver	new: a new food enters
+duck	-	-
+prawns	-	-
+lobster	-	-
+anchovy	-	-
+grape juice	b_grape_juice	b_grape_juice
+iced tea	b_iced_tea_sweet	b_iced_tea_sweet
+hot chocolate	b_hot_chocolate	b_hot_chocolate
+sprite	-	-
+fanta	-	-
+red bull	b_bell_pepper_red	b_bell_pepper_red
+gatorade	-	-
+coconut water	b_coconut_water	b_coconut_water
+soy milk	b_soy_milk	b_soy_milk
+whole milk	b_milk_whole	b_milk_whole
+skim milk	b_milk_skim	b_milk_skim
+margarine	b_margarine	b_margarine
+mayo	b_mayonnaise	b_mayonnaise
+ranch	b_ranch_dressing	b_ranch_dressing
+vinaigrette	-	-
+canola oil	b_canola_oil	b_canola_oil
+brown sugar	b_sugar_brown	b_sugar_brown
+rice cake	b_rice_cakes	b_rice_cakes
+rice cakes	b_rice_cakes	b_rice_cakes
+cereal	my_cereal	my_cereal
+cornflakes	-	-
+snickers	-	-
+kitkat	-	-
+mars	b_marshmallows	b_marshmallows
+twix	-	-
+kellogg	-	-
+chobani	-	-
+pringles	b_hamburger	b_hamburger
+cheetos	-	-
+tostitos	-	b_tortit	new: reached by the unchanged English typo route (tostitos, tortit); nothing before
+mcdonalds	-	-
+big mac	-	-
+whopper	-	b_chopped_liver	new: reached by the unchanged English typo route (whopper, chopped: two edits); nothing before
+nuggets	b_chicken_nuggets	b_chicken_nuggets
+chicken nuggets	b_chicken_nuggets	b_chicken_nuggets
+chicken soup	my_shake	b_chicken_soup	new: the bundled chicken soup row is new (the own food Mum's chicken soup was first)
+butter chicken	-	-
+tikka masala	-	-
+stir fry	-	-
+dumplings	-	-
+spring roll	-	-
+egg roll	-	-
+omelet	-	-
+omelette	-	-
+poached egg	b_shakshuka	b_shakshuka
+deviled eggs	-	-
+benedict	-	-
+hash browns	b_hash_browns	b_hash_browns
+grits	b_grilled_cheese	b_grilled_cheese
+biscuit	-	b_petit_beurre	new: a new food enters
+gravy	-	-
+cornbread	-	-
+sourdough	b_bread_sourdough	b_bread_sourdough
+rye	b_bread_rye	b_bread_rye
+pumpernickel	-	-
+baguette	-	-
+roti	-	-
+chapati	-	-
+pita bread	b_pita_white	b_pita_white
+wrap	-	-
+bun	b_hot_dog_bun	b_hot_dog_bun
+roll	b_sushi_california	b_bread_roll	new: a new food enters
+sandwich	my_cookie	my_cookie
+blt	-	-
+club sandwich	-	-
+grilled cheese	b_grilled_cheese	b_grilled_cheese
+panini	-	-
+sub	-	-
+cheeseburger	b_cheeseburger	b_cheeseburger
+veggie burger	-	-
+ap	b_apple	b_apple
+ba	b_bagel	b_bagel
+br	b_bread_rye	b_bread_rye
+ch	b_cheesecake	b_challah	new: a two-letter prefix may show a new food first while typing (decision E)
+co	my_cola	my_cola
+eg	b_egg_fried	b_egg_fried
+fr	b_fried_rice	b_fried_rice
+gr	b_grapes	b_grapes
+ha	my_spread	my_spread
+la	b_latte	b_lachuch	new: a two-letter prefix may show a new food first while typing (decision E)
+mi	b_milk_whole	b_milk_whole
+pa	b_papaya	b_papaya
+po	b_potato_raw	b_potato_raw
+sa	my_cookie	my_cookie
+st	my_yogurt	my_yogurt
+to	my_ketchup	my_ketchup
+yo	b_yogurt_plain_lowfat	b_yogurt_plain_lowfat
+cre	my_cheese	my_cheese
+gra	b_grapes	b_grapes
+lem	b_lemonade	b_lemonade
+mac	b_mackerel_cooked	b_mackerel_cooked
+mil	b_milk_whole	b_milk_whole
+oat	b_oats_dry	b_oats_dry
+appl	b_apple	b_apple
+bana	b_banana	b_banana
+brea	b_bread_rye	b_bread_rye
+chic	b_chickpeas_dry	b_chickpeas_dry
+choc	b_chocolate_hazelnut_spread	b_chocolate_hazelnut_spread
+coff	b_coffee_black	b_coffee_black
+crea	my_cheese	my_cheese
+gree	b_greek_yogurt_nonfat	b_greek_yogurt_nonfat
+lemo	b_lemon	b_lemon
+oran	b_orange	b_orange
+past	b_pasta_cooked	b_pasta_cooked
+pota	b_potato_raw	b_potato_raw
+sala	b_salami	b_salami
+toma	my_ketchup	my_ketchup
+yogu	b_yogurt_plain_lowfat	b_yogurt_plain_lowfat
+appel	b_apple	b_apple
+choclate	b_chocolate_hazelnut_spread	b_chocolate_hazelnut_spread
+cofee	b_coffee_black	b_coffee_black
+cucumbr	b_cucumber	b_cucumber
+lettuse	b_lettuce_iceberg	b_lettuce_iceberg
+oatmel	b_oatmeal_cooked	b_oatmeal_cooked
+sandwhich	my_cookie	my_cookie
+spinnach	b_spinach_raw	b_spinach_raw
+stawberry	my_yogurt	my_yogurt
+limon	b_lemonade	b_lemon	latin: C16 put 'limon' on lemon (the new token limonana had cut the typo route); lemonade was first before
+afuch	-	b_latte	latin: a Latin search name of this food (nothing was found before)
+arak	-	b_spirits	latin: a Latin search name of this food (nothing was found before)
+bisli	-	b_bissli	new: a Latin search name of a new food
+chala	-	b_challah	new: a Latin search name of a new food
+kinoa	-	b_quinoa_cooked	latin: a Latin search name of this food (nothing was found before)
+kotej	-	b_cottage_cheese_5pct	new: a Latin search name of a new food
+kubba	-	b_kubbeh_fried	new: a Latin search name of a new food
+kube	-	b_kubbeh_fried	new: a Latin search name of a new food
+labne	b_labneh	b_labneh
+lahoh	-	b_lachuch	new: a Latin search name of a new food
+lben	-	b_leben	new: a Latin search name of a new food
+samna	-	b_ghee	latin: a Latin search name of this food (nothing was found before)
+skhug	-	b_schug	new: a Latin search name of a new food
+zatar	-	b_zaatar	new: a Latin search name of a new food
+zhoug	-	b_schug	new: a Latin search name of a new food
+zhug	-	b_schug	new: a Latin search name of a new food

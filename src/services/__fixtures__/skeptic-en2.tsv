@@ -1,56 +1,58 @@
-salad	?
-chocolate milk	?
-pudding	?
-cheese	?
-white cheese	?
-bread roll	?
-crackers	?
-cookies	?
-chocolate bar	?
-wafer	?
-hot dog	?
-chicken	?
-roast chicken	?
-chicken soup	?
-soup	?
-pita bread	?
-hummus	?
-tahini	?
-eggplant	?
-fried eggplant	?
-coffee turkish	?
-turkish coffee	?
-lemonade	?
-ice pop	?
-popsicle	?
-donut	?
-doughnut	?
-pancakes	?
-cake	?
-meatballs	?
-kebab	?
-liver	?
-fish	?
-sour cream	?
-cream	?
-milk 1	?
-1% milk	?
-matzo	?
-matzah	?
-matza ball	?
-babka	?
-yeast cake	?
-latke	?
-schug	?
-cholent	?
-sabich	?
-laffa	?
-lafa	?
-shawarma	?
-falafel pita	?
-corn schnitzel	?
-soy	?
-persimmon	?
-pepsi	?
-pers	?
-cola	?
+# English queries a skeptical reader typed (2026-11-18). Each line: the first result (or - for none), which is
+# the first result before this job unless that food is new (the English check proper is english-ranking.txt).
+salad	b_caesar_salad
+chocolate milk	b_milk_chocolate
+pudding	b_danny_pudding
+cheese	b_cheesecake
+white cheese	b_white_cheese_5pct
+bread roll	b_bread_roll
+crackers	b_crackers_saltine
+cookies	b_cookie_choc_chip
+chocolate bar	b_mekupelet
+wafer	b_wafers_chocolate
+hot dog	b_hot_dogs_chicken
+chicken	b_chicken_nuggets
+roast chicken	b_chicken_roasted
+chicken soup	b_chicken_soup
+soup	b_soup_croutons
+pita bread	b_pita_white
+hummus	b_hummus
+tahini	b_tahini
+eggplant	b_eggplant_raw
+fried eggplant	b_eggplant_fried
+coffee turkish	b_turkish_coffee_sweet
+turkish coffee	b_turkish_coffee_sweet
+lemonade	b_lemonade
+ice pop	b_ice_pop
+popsicle	-
+donut	-
+doughnut	b_donut_glazed
+pancakes	b_pancakes
+cake	b_rice_cakes
+meatballs	b_meatballs_tomato
+kebab	b_kebab
+liver	b_chopped_liver
+fish	b_fish_patties
+sour cream	b_sour_cream
+cream	b_cream_cheese
+milk 1	b_milk_1pct
+1% milk	b_milk_1pct
+matzo	b_matza
+matzah	b_matza
+matza ball	-
+babka	b_babka
+yeast cake	b_babka
+latke	b_latkes
+schug	b_schug
+cholent	b_hamin
+sabich	-
+laffa	-
+lafa	b_lasagna
+shawarma	b_chicken_shawarma
+falafel pita	-
+corn schnitzel	b_corn_schnitzel
+soy	b_soy_sauce
+persimmon	b_persimmon
+pepsi	b_cola
+pers	b_persimmon
+cola	b_cola_diet

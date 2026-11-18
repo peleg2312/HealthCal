@@ -19,7 +19,7 @@ import type { Food } from '@/types';
 
 import { foodToItem, matchFoods, parseAmount } from '@/features/ai/localMatch';
 
-import { type SearchContext, searchLocal, tokenize } from './foodSearch';
+import { localPass, rankOnline, type SearchContext, searchLocal, tokenize } from './foodSearch';
 
 const FIXTURES = path.join(__dirname, '__fixtures__');
 
@@ -96,13 +96,13 @@ function runList(name: string) {
 }
 
 describe.skipIf(!TABLE_COMPLETE)('Hebrew query lists (needs the full name table in src/data/searchNames.ts)', () => {
-  it('the 155 worked examples (4.8)', () => {
+  it('the worked examples (4.8) and the fix round\'s rules', () => {
     const { lines, failures } = runList('hebrew-examples.tsv');
-    expect(lines.length).toBe(155);
+    expect(lines.length).toBe(203);
     expect(failures).toEqual([]);
   });
 
-  it("the automatic list: each food's first Hebrew name finds it first", () => {
+  it("each food's first Hebrew name finds it first (proves only that the first names are distinct, not that they mean the food)", () => {
     const failures: string[] = [];
     let n = 0;
     for (const id of BUNDLED_IDS) {
@@ -116,7 +116,41 @@ describe.skipIf(!TABLE_COMPLETE)('Hebrew query lists (needs the full name table 
   });
 
   it.each(['skeptic-q80.tsv', 'skeptic-q2.tsv', 'skeptic-en2.tsv', 'q-fixes.tsv', 'q-dem.tsv'])('%s', (name) => {
-    expect(runList(name).failures).toEqual([]);
+    const { lines, failures } = runList(name);
+    // Every line asserts something: a first id, '-' (nothing), or a must-not id.
+    expect(lines.filter((l) => l.want === '?' && !l.notIn.length).map((l) => l.q)).toEqual([]);
+    expect(failures).toEqual([]);
+  });
+
+  it("the traps reader's queries keep their level (traps.tsv)", () => {
+    const rows = readFileSync(path.join(FIXTURES, 'traps.tsv'), 'utf8')
+      .split('\n')
+      .filter((l) => l.trim() && !l.startsWith('#'))
+      .map((l) => {
+        const [q, expected, level, note = ''] = l.split('\t');
+        return { q, expected, level, note };
+      });
+    expect(rows.length).toBe(434);
+    const wrong: string[] = [];
+    const count: Record<string, number> = {};
+    for (const r of rows) {
+      count[r.level] = (count[r.level] ?? 0) + 1;
+      const ids = searchLocal(r.q).map((h) => h.food.id);
+      const ok = r.expected.startsWith('ANY:') ? r.expected.slice(4).split('|') : [r.expected];
+      for (const id of ok) if (id !== 'NONE' && !KNOWN_IDS.has(id)) wrong.push(`${r.q}: unknown id ${id}`);
+      const pass =
+        r.level === 'first'
+          ? ok.includes(ids[0])
+          : r.level === 'top3'
+            ? ids.slice(0, 3).some((x) => ok.includes(x))
+            : r.level === 'none'
+              ? r.expected === 'NONE' && (ids.length === 0 || localPass(r.q) === 'parts')
+              : r.level === 'miss' && r.note.length > 0;
+      if (!pass) wrong.push(`${r.q} (${r.level} ${r.expected}): ${ids.slice(0, 4).join(' ') || 'nothing'}`);
+    }
+    expect(wrong).toEqual([]);
+    // Measured on 2026-11-18 after the fix round: 377 first, 8 in the first three, 34 nothing or parts only, 15 known misses.
+    expect(count.first).toBeGreaterThanOrEqual(377);
   });
 
   it('every stem shared by different Hebrew name words is wanted (STEM_STOP holds the rest)', () => {
@@ -146,7 +180,7 @@ describe.skipIf(!TABLE_COMPLETE)('Hebrew query lists (needs the full name table 
     // Each of these joins two forms of one word (singular, plural, construct, feminine), read against
     // the table on 2026-11-18. A new collision fails here: read it, and either add it below or put
     // its stem in STEM_STOP (`@/lib/hebrew`) when the two words mean different things.
-    const WANTED = new Set(['תאנ', 'מיובש', 'עגבני', 'מבושל', 'ירוק', 'שחור', 'חמוצ', 'מטוגנ', 'יבש', 'ביצ', 'פית', 'לבנ', 'חמא', 'נקניקי', 'גבינ', 'סופגני']);
+    const WANTED = new Set(['תאנ', 'מיובש', 'עגבני', 'מבושל', 'ירוק', 'שחור', 'חמוצ', 'מטוגנ', 'יבש', 'ביצ', 'פית', 'לבנ', 'חמא', 'נקניקי', 'גבינ', 'סופגני', 'קציצ', 'מלוח']);
     expect(collisions.filter((c) => !WANTED.has(c.split(':')[0]))).toEqual([]);
     expect(collisions.some((c) => c.startsWith('פיר:') || c.startsWith('טורטי:'))).toBe(false);
   });
@@ -211,6 +245,69 @@ describe('rules the lists cannot show', () => {
   });
 });
 
+describe('the fix round\'s rules a list cannot show', () => {
+  it('the parts pass runs only when the strict and relaxed passes found nothing, and only for Hebrew', () => {
+    expect(localPass('שניצל בפיתה')).toBe('parts');
+    expect(localPass('שניצל עוף')).toBe('strict');
+    expect(localPass('קוטג 5% תנובה')).toBe('relaxed');
+    expect(localPass('schnitzel pita')).toBe('none');
+    // A word after ללא or בלי is never searched by itself.
+    expect(searchLocal('ריבה ללא סוכר')).toEqual([]);
+    // Each hit names the Hebrew name its own word found.
+    const hits = searchLocal('שניצל בפיתה');
+    expect(hits.find((h) => h.food.id === 'b_pita_bakery')?.matched).toBe('פיתה');
+    expect(hits.find((h) => h.food.id === 'b_schnitzel_chicken')?.matched).toBe('שניצל');
+  });
+
+  it('a food found by more of the words comes before one found by fewer (parts pass)', () => {
+    const both = food('c_both', 'פיתה עם שניצל');
+    const own = food('c_one', 'שניצל של אמא');
+    // Neither holds בפיתה whole; the own food with both words ranks first.
+    const ids = searchLocal('שניצל בפיתה', { customFoods: [own, both] }).map((h) => h.food.id);
+    expect(ids[0]).toBe('c_both');
+  });
+
+  it('only the first 10 words and 80 characters are searched; the relaxed and parts passes stop above 6 words', () => {
+    expect(searchLocal('חומוס ' + 'קקקקק '.repeat(12))[0]).toBeUndefined();
+    expect(searchLocal('חומוס חומוס חומוס חומוס חומוס חומוס חומוס חומוס חומוס חומוס קקקקקק')[0]?.food.id).toBe('b_hummus');
+    // Characters after the 80th are not read: the word that would empty the list is never seen.
+    expect(searchLocal(`חומוס${' '.repeat(80)}קקקקקק`)[0]?.food.id).toBe('b_hummus');
+    expect(localPass('חומוס פיתה טחינה סלט שניצל צ\'יפס קקקקקק')).toBe('none');
+  });
+
+  it('a favourite or own food that matched in part comes right after the best whole match', () => {
+    const shake = food('c_shake', 'חלבון וניל');
+    const ids = searchLocal('חלב', { customFoods: [shake], favoriteIds: ['c_shake'], recentFoods: [shake] }).map((h) => h.food.id);
+    expect(ids.slice(0, 2)).toEqual(['b_milk_whole', 'c_shake']);
+    expect(ids[2]).toMatch(/^b_milk_/);
+  });
+
+  it('an own food named in Arabic or Russian is found by its word or the beginning of it, never by a typo', () => {
+    const ar = food('c_ar', 'حمص بالطحينة');
+    const ru = food('c_ru', 'Хумус домашний');
+    const ctx = { customFoods: [ar, ru] };
+    expect(searchLocal('حمص', ctx)[0]?.food.id).toBe('c_ar');
+    expect(searchLocal('حم', ctx)[0]?.food.id).toBe('c_ar');
+    expect(searchLocal('хумус', ctx)[0]?.food.id).toBe('c_ru');
+    expect(searchLocal('Хум', ctx)[0]?.food.id).toBe('c_ru');
+    expect(searchLocal('домашн', ctx)[0]?.food.id).toBe('c_ru');
+    expect(searchLocal('хумуз', ctx)).toEqual([]);
+    expect(searchLocal('мус', ctx)).toEqual([]);
+  });
+
+  it('online: a product holding every Hebrew word whole comes before one holding a word only as a prefix', () => {
+    const halva = food('o_halva', 'חלבה אחווה', { source: 'openfoodfacts' });
+    const milk = food('o_milk', 'תנובה חלב 3%', { source: 'openfoodfacts' });
+    expect(rankOnline('חלב 3%', [halva, milk]).map((f) => f.id)).toEqual(['o_milk', 'o_halva']);
+    expect(rankOnline('חלב', [halva, milk]).map((f) => f.id)).toEqual(['o_milk', 'o_halva']);
+  });
+
+  it('a name word after לא matches only a query that says לא', () => {
+    expect(searchLocal('אורז לא מבושל')[0]?.food.id).toBe('b_rice_white_dry');
+    expect(searchLocal('קינואה מבושלת').map((h) => h.food.id)).not.toContain('b_quinoa_dry');
+  });
+});
+
 describe('an own food named in Hebrew', () => {
   const pie = food('c_pie', 'פשטידת ברוקולי של סבתא');
   const contexts: [string, SearchContext][] = [
@@ -241,7 +338,7 @@ describe('inputs nobody planned for', () => {
     expect(searchLocal('and', ctx).length).toBeGreaterThan(0);
   });
 
-  it('emoji and Arabic letters are ignored like punctuation', () => {
+  it('emoji are ignored like punctuation, and an Arabic word finds no bundled food', () => {
     expect(searchLocal('🍌')).toEqual([]);
     expect(searchLocal('حمص')).toEqual([]);
     expect(searchLocal('🍌 בננה')[0].food.id).toBe('b_banana');
@@ -301,12 +398,18 @@ describe('inputs nobody planned for', () => {
 });
 
 describe('the photo review\'s "add what the analysis missed" (localMatch)', () => {
-  it('finds a food typed in Hebrew, with a prefix, an amount or a Latin spelling', () => {
+  it('finds a food typed in Hebrew, with a prefix or an amount, through the food search', () => {
     expect(matchFoods('חומוס', BUILTIN_FOODS)[0]?.id).toBe('b_hummus');
     expect(matchFoods('שניצל עוף', BUILTIN_FOODS)[0]?.id).toBe('b_schnitzel_chicken');
     expect(matchFoods('והחומוס', BUILTIN_FOODS)[0]?.id).toBe('b_hummus');
-    expect(matchFoods('shnitzel', BUILTIN_FOODS)[0]?.id).toBe('b_schnitzel_chicken');
     expect(matchFoods('חומוס', BUILTIN_FOODS).length).toBeLessThanOrEqual(3);
+    // A Hebrew cooked word never offers the dry food (C9).
+    expect(matchFoods('אורז מבושל', BUILTIN_FOODS).map((f) => f.id)).not.toContain('b_rice_white_dry');
+  });
+
+  it('leaves text without a Hebrew letter to the English scorer, as before (no Latin spellings, no typos)', () => {
+    expect(matchFoods('shnitzel', BUILTIN_FOODS)).toEqual([]);
+    expect(matchFoods('banana', BUILTIN_FOODS)[0]?.id).toBe('b_banana');
   });
 
   it('reads a leading amount before a Hebrew word and scales the item', () => {
@@ -328,4 +431,3 @@ describe('the photo review\'s "add what the analysis missed" (localMatch)', () =
     expect(matchFoods('  ', BUILTIN_FOODS)).toEqual([]);
   });
 });
-

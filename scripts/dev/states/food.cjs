@@ -154,4 +154,13 @@ module.exports = [
   { id: 'today-hebrew-usual', route: '/', data: 'stress', now: todayAt(12, 30), taps: ['today-remaining-open'], sheet: true, note: 'What fits at lunch time: the usual food named in Hebrew' },
   { id: 'quick-sheet-hebrew', route: '/', data: 'stress', now: todayAt(12, 30), taps: ['tab-add'], sheet: true, note: 'the + sheet at lunch time: the usual food and the saved meal named in Hebrew' },
   { id: 'meal-pick-hebrew', route: '/food/meal-edit', taps: ['meal-edit-add', { type: 'meal-pick-input', text: 'חומוס' }, { wait: 800 }], waitFor: 'meal-pick-screen', note: 'the meal builder searched in Hebrew: the matched line' },
+
+  // ---------------------------------------------------------------- a remembered portion whose food changed
+  // Five earlier snacks hold the copy of cheese bourekas from before the Israeli foods ("1 piece" 80 g; seed
+  // knob oldBourekas). Today's food names "1 piece" at another weight, so every place shows and logs "80 g"
+  // at today's values, never the stale label (lead's decision D1). The clock is at snack time.
+  { id: 'quick-sheet-old-portion', route: '/', values: { oldBourekas: 1 }, now: todayAt(16, 30), taps: ['tab-add'], sheet: true, waitFor: 'quick-usual-b_bourekas_cheese', note: 'the + sheet: the usual bourekas as "80 g, 298 kcal"' },
+  { id: 'quick-sheet-old-portion-logged', route: '/', values: { oldBourekas: 1 }, now: todayAt(16, 30), taps: ['tab-add', 'quick-usual-b_bourekas_cheese', { wait: 300 }], sheet: true, note: 'the usual bourekas added from the + sheet: its tick and the toast' },
+  { id: 'search-old-portion', route: '/food/search?meal=snack', values: { oldBourekas: 1 }, now: todayAt(16, 30), taps: ['search-tab-usual'], note: 'food search, Usual: the bourekas row at 80 g' },
+  { id: 'today-fits-old-portion', route: '/', values: { oldBourekas: 1 }, now: todayAt(16, 30), taps: ['today-remaining-open'], sheet: true, note: 'What fits: the usual bourekas at 80 g' },
 ];

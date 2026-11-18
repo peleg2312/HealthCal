@@ -1,5 +1,16 @@
-// Sanity checks for src/data/foods.ts. Run: node --experimental-strip-types scripts/check-foods.mjs
-import { BUILTIN_FOODS } from '../src/data/foods.ts';
+// Consistency checks for src/data/foods.ts. Run: node --experimental-strip-types scripts/check-foods.mjs [--foods-ts=<path>]
+//
+// Consistency only: ids and records are unique, values are plausible and agree with each other (energy against
+// the macros, sugar and fibre within carbohydrate, spoons and drinks), and the counts match the header. It does
+// not compare a value with its source record: scripts/ops/check-national-foods.mjs does that for the national
+// foods and the FNDDS additions (docs/food-data.md). --foods-ts runs it against a copy of foods.ts.
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const arg = process.argv.slice(2).find((a) => a.startsWith('--foods-ts='));
+const { BUILTIN_FOODS } = await import(
+  arg ? pathToFileURL(resolve(arg.slice('--foods-ts='.length))).href : new URL('../src/data/foods.ts', import.meta.url).href
+);
 
 // Grams of ethanol per 100 g, for alcoholic drinks (7 kcal/g).
 const ALCOHOL = { b_beer: 3.9, b_beer_light: 3.2, b_wine_red: 10.6, b_wine_white: 10.3, b_spirits: 33.0 };
@@ -89,7 +100,7 @@ for (const food of BUILTIN_FOODS) {
   if (diff > 15 && diff > 0.12 * Math.max(n.kcal, calc)) fail(id, `kcal ${n.kcal} vs ${hasIl ? 'national' : 'Atwater'} ${calc.toFixed(0)} (${((diff / n.kcal) * 100).toFixed(0)}%)`);
 }
 // The counts in the header of src/data/foods.ts.
-const COUNTS = { total: 448, fdc: 329, il: 99, neither: 20 };
+const COUNTS = { total: 464, fdc: 328, il: 116, neither: 20 };
 const got = { total: BUILTIN_FOODS.length, fdc: fdcIds.size, il: ilCodes.size, neither: BUILTIN_FOODS.length - fdcIds.size - ilCodes.size };
 for (const k of Object.keys(COUNTS)) if (got[k] !== COUNTS[k]) fail('counts', `${k}: ${got[k]}, the header says ${COUNTS[k]}`);
 console.log(`${BUILTIN_FOODS.length} foods (${fdcIds.size} USDA, ${ilCodes.size} national, ${got.neither} estimates), ${bad} failures`);

@@ -5,6 +5,7 @@
  */
 import { useMemo } from 'react';
 
+import { isolateRtl } from '@/lib/bidi';
 import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
 import type { ActivityEntry, Routine, StrengthExercise } from '@/types';
@@ -74,9 +75,13 @@ export function startRoutineDraft(t: Pick<RoutineTemplate, 'exercises'>, date: s
   return draftFromRoutine(t, newDraft(date), now);
 }
 
-/** "Bench press, Barbell row, Overhead press" with set counts kept out for a short line. */
+/**
+ * "Bench press, Barbell row, Overhead press" with set counts kept out for a short line. Drawn text
+ * only: an exercise named in Hebrew or Arabic is isolated (`isolateRtl`), so the line starts at the
+ * left and the commas stay between the names.
+ */
 export function routineSummary(t: Pick<RoutineTemplate, 'exercises'>): string {
-  return t.exercises.map((e) => e.name).join(', ');
+  return t.exercises.map((e) => isolateRtl(e.name)).join(', ');
 }
 
 export function routineSetCount(t: Pick<RoutineTemplate, 'exercises'>): number {

@@ -13,7 +13,7 @@ import type { ActivityCategory, ActivityDef } from '@/types';
 
 // Relative paths with the extension, so `node --experimental-strip-types scripts/check-activities.mjs`
 // can load this file without a resolver (Metro and TypeScript accept them too).
-import { collapseDoubles, fold, isHebrew } from '../lib/hebrew.ts';
+import { collapseDoubles, fold, hebrewStem, isHebrew, prefixReadings, shortPluralBase } from '../lib/hebrew.ts';
 
 import { ACTIVITY_NAMES_HE } from './activityNamesHe.ts';
 
@@ -848,9 +848,11 @@ function foldHebrewName(s: string): string {
 /**
  * Hebrew rank of an activity for a folded query: its name is the query (3), starts with it (3.2), has
  * a word that starts with it (3.4), or holds it (4); a shorter name ranks a little higher within each
- * (ריצ: ריצה before ריצת שטח); -1 when none of its Hebrew names match.
+ * (ריצ: ריצה before ריצת שטח); -1 when none of its Hebrew names match. Read through a prefix or as a
+ * plural (ההליכה, הליכות, ריצות: a name word is the reading, or has the same stem) it ranks 3.6, or
+ * 3.8 when a name word only starts with the reading.
  */
-function hebrewRank(id: string, q: string): number {
+function hebrewRank(id: string, q: string, forms: HebrewForms): number {
   let best = -1;
   for (const n of foldedHebrewNames().get(id) ?? []) {
     let r = -1;
@@ -858,10 +860,39 @@ function hebrewRank(id: string, q: string): number {
     else if (n.startsWith(q)) r = 3.2;
     else if (n.split(' ').some((w) => w.startsWith(q))) r = 3.4;
     else if (n.includes(q)) r = 4;
+    else {
+      const ws = n.split(' ');
+      if (ws.some((w) => forms.whole.includes(w) || (forms.stems.length > 0 && forms.stems.includes(hebrewStem(w) ?? '')))) r = 3.6;
+      else if (ws.some((w) => forms.readings.some((x) => w.startsWith(x)))) r = 3.8;
+    }
     if (r >= 0) r += Math.min(n.length, 99) / 1000;
     if (r >= 0 && (best < 0 || r < best)) best = r;
   }
   return best;
+}
+
+/** The other ways a folded Hebrew query word may be read: without a prefix, and by its stem. */
+interface HebrewForms {
+  /** Words a name word may equal: the prefix readings, and a four-letter plural's singular (two letters). */
+  whole: string[];
+  /** Stems a name word's stem may equal (of the query and of each reading). */
+  stems: string[];
+  /** The prefix readings, which a name word may start with. */
+  readings: string[];
+}
+
+function hebrewForms(q: string): HebrewForms {
+  if (q.includes(' ')) return { whole: [], stems: [], readings: [] };
+  const readings = prefixReadings(q);
+  const whole = [...readings];
+  const stems: string[] = [];
+  for (const w of [q, ...readings]) {
+    const st = hebrewStem(w);
+    if (st) stems.push(st);
+    const b = shortPluralBase(w);
+    if (b) whole.push(b);
+  }
+  return { whole, stems, readings };
 }
 
 /**
@@ -876,6 +907,7 @@ export function searchActivities(query: string): ActivityDef[] {
   const q = query.trim().toLowerCase();
   if (!q) return [...ACTIVITIES].sort(byName);
   const he = isHebrew(q) ? foldHebrewName(q) : '';
+  const forms = he ? hebrewForms(he) : null;
 
   const ranked: { a: ActivityDef; rank: number }[] = [];
   for (const a of ACTIVITIES) {
@@ -886,7 +918,7 @@ export function searchActivities(query: string): ActivityDef[] {
     else if (name.includes(q)) rank = 2;
     else if (a.keywords?.some((k) => k.toLowerCase().startsWith(q))) rank = 3;
     else if (a.keywords?.some((k) => k.toLowerCase().includes(q))) rank = 4;
-    else if (he) rank = hebrewRank(a.id, he);
+    else if (forms) rank = hebrewRank(a.id, he, forms);
     if (rank >= 0) ranked.push({ a, rank });
   }
   ranked.sort((x, y) => x.rank - y.rank || byName(x.a, y.a));

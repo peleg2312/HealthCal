@@ -10,7 +10,7 @@
 יוגורט פרו	b_yogurt_high_protein
 מעדן	b_danny_pudding
 שוקו	b_shoko
-שוק	?
+שוק	b_chicken_drumstick
 שוקולד	b_milk_chocolate
 שוקולד מריר	b_dark_chocolate
 חטיף חלבון	b_protein_bar
@@ -27,37 +27,37 @@
 אורז	b_rice_white_cooked
 אורז לבן מבושל	b_rice_white_cooked
 פסטה	b_pasta_cooked
-פסטה ברוטב עגבניות	?
+פסטה ברוטב עגבניות	b_marinara
 פתיתים	b_ptitim_cooked
 לחם מלא	b_bread_wholewheat
 פרוסת לחם	b_bread_achid
-פיתה מלאה	b_pita_wholewheat
+פיתה מלאה	b_pita_wholewheat_bakery,b_pita_wholewheat
 טוסט	b_grilled_cheese
 טוסט גבינה צהובה	b_grilled_cheese
-פלאפל בפיתה	?
+פלאפל בפיתה	b_falafel,b_pita_bakery
 מנה פלאפל	b_falafel
-חומוס פול	?
-חומוס עם פול	?
-סלט חצילים	?
+חומוס פול	b_hummus
+חומוס עם פול	b_hummus
+סלט חצילים	b_baba_ganoush
 חציל קלוי	b_eggplant_cooked
 חצילים על האש	b_eggplant_cooked
 מלפפון חמוץ	b_pickles_dill
 תפוחים	b_apple
 תמרים	b_dates_medjool
 ביסלי גריל	b_bissli
-עוגה	?
+עוגה	b_babka
 עוגיות	b_cookie_choc_chip
-קפה הפוך	b_cappuccino
-נס קפה	?
-קפה שחור	?
+קפה הפוך	b_latte	b_cappuccino
+נס קפה	b_coffee_black,b_coffee_milk
+קפה שחור	b_coffee_black
 תה	b_tea_brewed
 לימונענע	b_limonana
-דג	?
-דניס	?
-בולגרית 5%	?
+דג	b_herring_pickled
+דניס	b_sea_bream_grilled
+בולגרית 5%	b_bulgarian_cheese
 קוואקר	b_oats_dry
 נוטלה	b_chocolate_hazelnut_spread
-חומוס אחלה	?
+חומוס אחלה	b_hummus
 סלט טחינה	b_tahini_sauce
 שניצאל	b_schnitzel_chicken
 חומס	b_hummus
@@ -68,22 +68,22 @@
 עגבנייות	b_tomato
 פיתות	b_pita_bakery
 ממרח שוקולד	b_chocolate_hazelnut_spread
-מים	?
-סודה	?
-שמנת	?
-שמנ	?
+מים	-
+סודה	-
+שמנת	b_sour_cream_15pct
+שמנ	b_vegetable_oil
 עוף	b_chicken_roasted
 פלפל	b_bell_pepper_red
 פלפלים	b_bell_pepper_red
 גבינת שמנת	b_cream_cheese_5pct
-נפוליאון	?
-בשר	?
+נפוליאון	-
+בשר	b_beef_ground_85_cooked
 סטייק	b_beef_sirloin_cooked
 אנטרקוט	b_beef_ribeye_cooked
-ירקות	?
-פירות	?
-מרק	?
-סלט	?
+ירקות	b_vegetable_soup
+פירות	b_smoothie_fruit	b_mashed_potato
+מרק	b_chicken_soup
+סלט	b_israeli_salad
 ממולאים	b_stuffed_peppers
 יין	b_wine_red
 ערק	b_spirits
@@ -94,18 +94,18 @@
 ביצה 2	b_egg_boiled
 קוטג 5% תנובה	b_cottage_cheese_5pct
 בננות	b_banana
-ננה	?
-נענע	?
-לון	?
+ננה	-
+נענע	b_tea_brewed
+לון	-
 בצל	b_onion
 בצלים	b_onion
 שום	b_garlic
-שמש	?
-מלח	?
+שמש	-
+מלח	-
 סוכר	b_sugar_white
 כף סוכר	b_sugar_white
 פופקורן	b_popcorn_air
 תפוצ׳יפס	b_potato_chips
 ציפס	b_french_fries
-בגט	?
+בגט	-
 חלה מתוקה	b_challah

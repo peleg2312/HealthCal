@@ -269,6 +269,12 @@ function stressUp(state, { put, baselineTdee }) {
 //                2: also 13:10, 330 ml soft drink to lunch (...d002 / ...d102). Applied after water.
 //   diaryDrink   1: today 08:05, 250 ml semi-skimmed milk logged in the diary only (breakfast, entry ...d003,
 //                no water record, no `via`): the water screen's "already in breakfast" notice and "Water only".
+// For a remembered portion whose food has changed since (lead's decision D1 of the Israeli foods review):
+//   oldBourekas  1: on each of the five days before today, at 16:30, one snack entry of cheese bourekas that
+//                holds the copy of the food from before the Israeli foods were added (commit 3fa7914: "1 piece"
+//                80 g, 335 kcal per 100 g). Today's bundled food names "1 piece" at another weight, so the + sheet,
+//                food search and What fits must show and log 80 g at today's values (entries ...b001 to ...b005;
+//                the usual snack, since the demo's snacks vary: look at it with the clock at 16:30).
 // Only what is named changes; everything else stays the demo's. Applied in that order: eatBack, spread, exercise and
 // the week first (they move the budget and the water goal), then food, water, drinks and the fast.
 
@@ -285,7 +291,9 @@ function appMaths() {
   const require = createRequire(import.meta.url);
   const ts = require('typescript');
   // expo-crypto is native: the drink rules reach it through @/lib/id (buildEntry's nowISO); Node has randomUUID.
-  const stubs = { react: {}, './clock': {}, './index': {}, 'expo-crypto': { randomUUID } };
+  // Food search is never called here, but buildEntry reaches it (ai/estimate -> ai/localMatch) and it loads
+  // the online product search, which needs React Native: an empty stand-in keeps the chain pure.
+  const stubs = { react: {}, './clock': {}, './index': {}, 'expo-crypto': { randomUUID }, '@/services/foodSearch': {} };
   const cache = new Map();
   const load = (file) => {
     if (cache.has(file)) return cache.get(file).exports;
@@ -308,7 +316,7 @@ function appMaths() {
   return appCache;
 }
 
-const VALUE_KEYS = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack', 'spread', 'lastNight', 'weighInGap', 'onboardedToday', 'name', 'drinks', 'diaryDrink'];
+const VALUE_KEYS = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack', 'spread', 'lastNight', 'weighInGap', 'onboardedToday', 'name', 'drinks', 'diaryDrink', 'oldBourekas'];
 /** Knobs that are not numbers: their type is checked on its own. */
 const VALUE_TYPES = { onboardedToday: 'boolean', name: 'string' };
 
@@ -434,6 +442,21 @@ function applyValues(state, values, { put, weightKg, baselineTdee }) {
     const { via: _via, ...entry } = plan.entry;
     put('foodEntries', { ...entry, id: '00000000-0000-4000-8000-00000000d003' });
   }
+  if (values.oldBourekas > 0) {
+    // The row of src/data/foods.ts at 3fa7914, as a diary entry kept it.
+    const per100g = { kcal: 335, protein: 9, carbs: 28, fat: 21, fiber: 1, sugar: 1.5, satFat: 9, sodium: 600 };
+    const food = {
+      id: 'b_bourekas_cheese', name: 'Bourekas, cheese (puff pastry)', emoji: '🥐', category: 'middle_eastern', source: 'builtin', verified: false,
+      per100g, servings: [{ label: '1 piece', grams: 80 }, { label: '1 large', grams: 110 }, { label: '1 small', grams: 55 }],
+    };
+    const nutrients = Object.fromEntries(Object.entries(per100g).map(([k, v]) => [k, (v * 80) / 100]));
+    for (let n = 1; n <= 5; n++) {
+      put('foodEntries', {
+        id: `00000000-0000-4000-8000-00000000b00${n}`, date: iso(daysAgo(n)), meal: 'snack', name: food.name, emoji: food.emoji, foodId: food.id,
+        source: 'builtin', verified: false, servingLabel: '1 piece', quantity: 1, grams: 80, nutrients, food, loggedAt: at(n, 16, 30),
+      });
+    }
+  }
   if (values.lastNight !== undefined) {
     const night = iso(daysAgo(-1));
     drop('sleep', (r) => r.date !== night);
@@ -460,7 +483,7 @@ function applyValues(state, values, { put, weightKg, baselineTdee }) {
 
 /**
  * @param {{ days?: number, empty?: boolean, theme?: 'system'|'light'|'dark'|'blossom', onboarded?: boolean, units?: 'metric'|'imperial', store?: boolean, stress?: boolean,
- *   values?: { eaten?: number, protein?: number, exercise?: number, water?: number, weekMinutes?: number, fasting?: number, eatBack?: number, spread?: number, lastNight?: number, weighInGap?: number, onboardedToday?: boolean, name?: string, drinks?: number, diaryDrink?: number } }} opts
+ *   values?: { eaten?: number, protein?: number, exercise?: number, water?: number, weekMinutes?: number, fasting?: number, eatBack?: number, spread?: number, lastNight?: number, weighInGap?: number, onboardedToday?: boolean, name?: string, drinks?: number, diaryDrink?: number, oldBourekas?: number } }} opts
  */
 export function buildSeed(opts = {}) {
   const { days = 35, empty = false, theme = 'dark', onboarded = true, units = 'metric', store = false, stress = false, values = null } = opts;

@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import { BUILTIN_FOODS, NATIONAL_LABELS, NATIONAL_RECIPES } from '@/data/foods';
 
-import { amountLabel, portionLabel, servingText, sourceInfo, stepAmount, toPer100 } from './helpers';
+import { fitCandidates } from '@/features/today/fits';
+import { scaleNutrients } from '@/lib/nutrition';
+import { formatNumber } from '@/lib/units';
+import type { Food, FoodEntry } from '@/types';
+
+import { buildEntry } from './build';
+import { amountLabel, lastPortions, matchServing, portionFor, portionLabel, servingText, sourceInfo, stepAmount, toPer100 } from './helpers';
+import { resolveUsuals, usualFoods, usualLabel } from './usuals';
 
 describe('stepAmount', () => {
   it('steps servings by a half', () => {
@@ -91,9 +98,9 @@ describe('sourceInfo for a bundled food', () => {
       "From the bundled reference list. Values from the Israeli Ministry of Health's national nutrition database, from the product's label as recorded there (database updated October 2022).",
     );
     expect(sourceInfo('builtin', { ilCode: recipe }).explain).toBe(
-      "From the bundled reference list. Values for a typical home recipe, computed by Israel's Ministry of Health (national nutrition database).",
+      "From the bundled reference list. Values for a typical home recipe, computed by the Israeli Ministry of Health (national nutrition database).",
     );
-    expect(sourceInfo('builtin', {}).explain).toBe('From the bundled reference list. An estimate from a typical recipe, not a measured record.');
+    expect(sourceInfo('builtin', {}).explain).toBe('From the bundled reference list. An estimate from a typical label or recipe, not a measured record.');
   });
   it('keeps today\'s sentence without a food, and the badge words', () => {
     expect(sourceInfo('builtin').explain).toBe('From the bundled reference database (USDA-based values).');
@@ -102,5 +109,108 @@ describe('sourceInfo for a bundled food', () => {
   });
   it('agrees with the bundled list: every food names at most one record', () => {
     for (const f of BUILTIN_FOODS) expect(f.fdcId !== undefined && f.ilCode !== undefined).toBe(false);
+  });
+});
+
+// ------------------------------------------- a remembered portion (lead's decision D1)
+
+describe('a remembered portion is logged as it is shown', () => {
+  // A diary entry keeps a copy of the food as it was. Cheese bourekas before this job (3fa7914) was
+  // "1 piece" 80 g at 335 kcal per 100 g; the bundled food may since name "1 piece" at another weight.
+  // Built from the live food's own first serving, so the case holds whatever the list says today.
+  const OLD_PER100: Record<string, Food['per100g']> = {
+    b_bourekas_cheese: { kcal: 335, protein: 9, carbs: 28, fat: 21, fiber: 1, sugar: 1.5, satFat: 9, sodium: 600 },
+    b_halloumi: { kcal: 321, protein: 21, carbs: 2.2, fat: 25, fiber: 0, sugar: 1.5, satFat: 16, sodium: 1200 },
+    b_schnitzel_chicken: { kcal: 255, protein: 20, carbs: 12, fat: 14, fiber: 0.8, sugar: 0.8, satFat: 2.5, sodium: 450 },
+  };
+  const live = (id: string): Food => {
+    const f = BUILTIN_FOODS.find((x) => x.id === id);
+    if (!f) throw new Error(`missing ${id}`);
+    return f;
+  };
+  /** The live food's first label at a weight 30 g away from today's (80 g for bourekas when today's is 50 g). */
+  const staleCopy = (id: string) => {
+    const now = live(id);
+    const label = now.servings[0].label;
+    const oldGrams = id === 'b_bourekas_cheese' && now.servings[0].grams !== 80 ? 80 : now.servings[0].grams + 30;
+    const copy: Food = { ...now, verified: false, per100g: OLD_PER100[id], servings: [{ label, grams: oldGrams }] };
+    return { copy, label, oldGrams, now };
+  };
+  let n = 0;
+  const stored = (copy: Food, label: string, gramsPerUnit: number, date: string, quantity = 1): FoodEntry => ({
+    id: `old-${n++}`,
+    updatedAt: `${date}T12:00:00.000Z`,
+    date,
+    meal: 'lunch',
+    name: copy.name,
+    foodId: copy.id,
+    food: copy,
+    source: 'builtin',
+    verified: false,
+    servingLabel: label,
+    quantity,
+    grams: gramsPerUnit * quantity,
+    nutrients: scaleNutrients(copy.per100g, gramsPerUnit * quantity),
+    loggedAt: `${date}T12:00:00.000Z`,
+  });
+  const TODAY = '2026-11-18';
+  const DAYS = ['2026-11-15', '2026-11-16', '2026-11-17'];
+
+  for (const id of Object.keys(OLD_PER100)) {
+    it(`${id}: a label that now names another weight is matched by grams, shown and stored in grams`, () => {
+      const { copy, label, oldGrams, now } = staleCopy(id);
+      expect(now.servings.find((s) => s.label === label)?.grams).not.toBe(oldGrams);
+      const s = matchServing(now, label, oldGrams);
+      expect(s.grams).toBe(oldGrams);
+      expect(s.label).toBe(`${oldGrams} g`);
+      // The same label at the same weight is still that label.
+      expect(matchServing(now, label, now.servings[0].grams)).toEqual(now.servings[0]);
+      // Search, the meal picker and food detail open on the remembered amount.
+      const p = portionFor(now, lastPortions([stored(copy, label, oldGrams, DAYS[2])]));
+      expect(p.serving.grams * p.quantity).toBe(oldGrams);
+      expect(portionLabel(p.serving.label, p.quantity)).toBe(`${oldGrams} g`);
+    });
+
+    it(`${id}: the + sheet's chip logs the calories it shows`, () => {
+      const { copy, label, oldGrams } = staleCopy(id);
+      const entries = DAYS.map((d) => stored(copy, label, oldGrams, d));
+      const [u] = resolveUsuals(usualFoods(entries, 'lunch', TODAY), new Map());
+      const shownKcal = Math.round(u.last.nutrients.kcal);
+      expect(usualLabel(u)).toBe(`${oldGrams} g, ${formatNumber(shownKcal)} kcal`);
+      // QuickLogSheet.logUsual
+      const e = u.last;
+      const logged = buildEntry({ food: e.food!, serving: matchServing(e.food!, e.servingLabel, e.grams / e.quantity), quantity: e.quantity, meal: 'lunch', date: TODAY });
+      expect(logged.grams).toBe(oldGrams);
+      expect(Math.round(logged.nutrients.kcal)).toBe(shownKcal);
+      expect(logged.servingLabel).toBe(`${oldGrams} g`);
+    });
+
+    it(`${id}: a "What fits" row logs the calories it shows, from a usual, a favourite or a recent`, () => {
+      const { copy, label, oldGrams, now } = staleCopy(id);
+      const entries = DAYS.map((d) => stored(copy, label, oldGrams, d));
+      const usual = resolveUsuals(usualFoods(entries, 'lunch', TODAY, { withFood: true }), new Map()).map((u) => u.last);
+      for (const src of [
+        { usual, favourites: [], recents: [] },
+        { usual: [], favourites: [now], recents: [] },
+        { usual: [], favourites: [], recents: [now] },
+      ]) {
+        const [fit] = fitCandidates({ ...src, lastByFood: lastPortions(entries) });
+        // FitsSheet.add
+        const logged = buildEntry({ food: fit.food, serving: fit.serving, quantity: fit.quantity, meal: 'lunch', date: TODAY });
+        expect(fit.serving.label).toBe(`${oldGrams} g`);
+        expect(logged.grams).toBe(oldGrams);
+        expect(Math.round(logged.nutrients.kcal)).toBe(Math.round(fit.kcal));
+        expect(logged.nutrients.protein).toBeCloseTo(fit.protein, 6);
+        expect(Math.round(fit.kcal)).toBe(Math.round((now.per100g.kcal * oldGrams) / 100));
+      }
+    });
+  }
+
+  it('two pieces at the old weight are 160 g, and a label the food no longer has keeps its words', () => {
+    const { copy, label, oldGrams, now } = staleCopy('b_bourekas_cheese');
+    const [u] = resolveUsuals(usualFoods(DAYS.map((d) => stored(copy, label, oldGrams, d, 2)), 'lunch', TODAY), new Map());
+    expect(usualLabel(u)).toBe(`${oldGrams * 2} g, ${formatNumber(Math.round((now.per100g.kcal * oldGrams * 2) / 100))} kcal`);
+    const gone = matchServing(now, '1 enormous', 110);
+    expect(gone).toEqual({ label: '1 enormous', grams: 110 });
   });
 });

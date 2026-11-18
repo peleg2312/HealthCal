@@ -25,11 +25,14 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const SRC = path.join(ROOT, 'src');
 const INTERP = ['--no-opt', '--no-sparkplug', '--no-maglev'];
 
-/** The queries: the specification's 20 timing queries (4.9) plus a few everyday English ones. */
+/** The queries: the specification's 20 timing queries (4.9), a few everyday English ones and the fix round's passes. */
 const QUERIES = [
   'חומוס', 'קוטג 5', 'שניצל', 'והחומוס', 'פלאפאל', 'שקשוקע', 'חמוס', 'xyzzy', 'קקקקקק', 'avacado',
   'chicken breast', 'chiken', 'brocolli', 'עגבניות', 'ב', 'tahina', 'chicken', '2 ביצים', 'טוסט גבינה צהובה', 'חומוס בטחינה',
   'apple', 'rice', 'greek yogurt', 'chi', 'salad', 'pepsi', 'a',
+  // The parts pass (strict and relaxed find nothing; each word searched by itself), the relaxed pass with an
+  // amount, a glued prefix inside a name, and a long Hebrew query (six words, the most the parts pass reads).
+  'שניצל בפיתה', 'סביח בפיתה', 'קפה עם חלב סויה', '150 גר עוף', 'חציל טחינה', 'פלאפל חומוס טחינה סלט חריף מלפפון',
 ];
 const HE = /[\u05d0-\u05ea]/;
 const BUDGET = { interpLatin: 6, interpAny: 10, interpFirst: 30, jitAny: 3 };

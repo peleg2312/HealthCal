@@ -134,12 +134,12 @@ export function referenceExplain(food: Pick<Food, 'fdcId' | 'ilCode'>): string {
   const lead = 'From the bundled reference list.';
   if (food.fdcId !== undefined) return `${lead} Values from USDA FoodData Central.`;
   if (food.ilCode !== undefined) {
-    if (NATIONAL_RECIPES.has(food.ilCode)) return `${lead} Values for a typical home recipe, computed by Israel's Ministry of Health (national nutrition database).`;
+    if (NATIONAL_RECIPES.has(food.ilCode)) return `${lead} Values for a typical home recipe, computed by the Israeli Ministry of Health (national nutrition database).`;
     if (NATIONAL_LABELS.has(food.ilCode))
       return `${lead} Values from the Israeli Ministry of Health's national nutrition database, from the product's label as recorded there (database updated October 2022).`;
     return `${lead} Values from the Israeli Ministry of Health's national nutrition database (database updated October 2022).`;
   }
-  return `${lead} An estimate from a typical recipe, not a measured record.`;
+  return `${lead} An estimate from a typical label or recipe, not a measured record.`;
 }
 
 /** A data source's names and colour; with the food, a bundled food's `explain` names its own record (`referenceExplain`). */
@@ -177,13 +177,28 @@ export interface Portion {
   quantity: number;
 }
 
-/** Find a serving of `food` that matches a logged label or gram amount. */
+/** "80 g" for a remembered amount whose label now names another weight (`matchServing`). */
+export function gramsServing(gramsPerUnit: number): Serving {
+  return { label: `${formatQty(Math.round(gramsPerUnit * 10) / 10)} g`, grams: gramsPerUnit };
+}
+
+/**
+ * The serving of `food` for a logged label and gram amount, so a remembered portion is logged as it
+ * was eaten and priced: the grams always win. The label is kept when the food still names it at that
+ * weight; else a serving of the same weight; else, when the food now names that label at another
+ * weight (a corrected bundled food: "1 piece" was 80 g, is 50 g now), the amount in grams ("80 g"),
+ * never the stale label; else the remembered label as it was. A label alone (no usable grams) still
+ * finds its serving.
+ */
 export function matchServing(food: Food, label: string, gramsPerUnit: number): Serving {
   const options = servingsFor(food);
-  return (
-    options.find((s) => s.label === label) ??
-    options.find((s) => Math.abs(s.grams - gramsPerUnit) < 0.5) ?? { label, grams: gramsPerUnit }
-  );
+  const byLabel = options.find((s) => s.label === label);
+  if (!(gramsPerUnit > 0) || !Number.isFinite(gramsPerUnit)) return byLabel ?? { label, grams: gramsPerUnit };
+  const sameWeight = (s: Serving) => Math.abs(s.grams - gramsPerUnit) < 0.5;
+  if (byLabel && sameWeight(byLabel)) return byLabel;
+  const byGrams = options.find(sameWeight);
+  if (byGrams) return byGrams;
+  return byLabel ? gramsServing(gramsPerUnit) : { label, grams: gramsPerUnit };
 }
 
 /** Map foodId -> most recent entry of it, so re-logging repeats the amount last eaten. A glass from the water screen (an ml amount) is left out. */

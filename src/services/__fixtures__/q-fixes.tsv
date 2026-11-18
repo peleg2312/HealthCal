@@ -4,8 +4,8 @@
 בצלים	b_onion
 פלפלים	b_bell_pepper_red
 שניצלים	b_schnitzel_chicken
-שניצלונים	?
-מרקים	?
+שניצלונים	b_schnitzel_chicken
+מרקים	b_chicken_soup
 שוקי עוף	b_chicken_drumstick
 ביצים	b_egg_boiled
 תותים	b_strawberries
@@ -13,29 +13,29 @@
 טוסט גבינה צהובה	b_grilled_cheese
 חלה מתוקה	b_challah
 מנה פלאפל	b_falafel
-חומוס בטחינה	?
-חומוס עם טחינה	?
+חומוס בטחינה	b_hummus_homemade
+חומוס עם טחינה	b_hummus_homemade
 ביסלי גריל	b_bissli
 פרגיות על האש	b_chicken_thigh_cooked
 חציל קלוי	b_eggplant_cooked
-שוק	?
+שוק	b_chicken_drumstick
 שמנ	b_vegetable_oil
-שמנת	?
+שמנת	b_sour_cream_15pct
 שום	b_garlic
 פירות	b_smoothie_fruit
 פירה	b_mashed_potato
 טורטית	b_tortit
 טורטיה	b_tortilla_flour
 סלט	b_israeli_salad
-בשר	b_beef_ground_80_raw
+בשר	b_beef_ground_85_cooked
 קפה שחור	b_coffee_black
 קפה טורקי	b_coffee_black
 ה-חומוס	b_hummus
 ב-פיתה	b_pita_bakery
-נפוליאון	?
-לאפה	?
+נפוליאון	-
+לאפה	-
 בורגר	b_hamburger
-ארטיק	b_ice_cream_vanilla
+ארטיק	b_ice_cream_bar	b_ice_cream_vanilla
 קרטיב	b_ice_pop
 laban	b_leben
 רוגלך	b_rugelach

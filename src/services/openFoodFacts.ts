@@ -8,7 +8,7 @@ import { Platform } from 'react-native';
 import { atwaterKcal } from '@/lib/nutrition';
 import type { Food, Nutrients, Serving } from '@/types';
 
-import { offSearchQuery } from './offQuery';
+import { offQueryText, offSearchQuery } from './offQuery';
 import { FUNCTIONS_URL, SUPABASE_ANON_KEY } from './supabase';
 
 const BASE = 'https://world.openfoodfacts.org';
@@ -53,7 +53,8 @@ function n(v: number | string | undefined): number | undefined {
  * keep the order they had.
  */
 function productName(p: OffProduct): string {
-  return (p.product_name || p.product_name_he || p.product_name_en || p.generic_name || '').trim();
+  // Each candidate is trimmed before choosing: a name of spaces must not hide the Hebrew name behind it.
+  return [p.product_name, p.product_name_he, p.product_name_en, p.generic_name].map((x) => (typeof x === 'string' ? x.trim() : '')).find(Boolean) ?? '';
 }
 
 /** Map a product to our Food shape, or null when it lacks usable nutrition data. */
@@ -103,6 +104,8 @@ export function offToFood(p: OffProduct): Food | null {
 
 /** The service answered with an HTTP error, as opposed to not answering at all. */
 class HttpError extends Error {}
+/** The service answered with a body that is not a search answer (not JSON, null, no list of hits). */
+class MalformedError extends Error {}
 
 async function getJson(url: string, timeoutMs: number, headers: Record<string, string> = {}): Promise<unknown> {
   const controller = new AbortController();
@@ -110,7 +113,13 @@ async function getJson(url: string, timeoutMs: number, headers: Record<string, s
   try {
     const res = await fetch(url, { signal: controller.signal, headers: { Accept: 'application/json', ...headers } });
     if (!res.ok) throw new HttpError(`Open Food Facts responded ${res.status}`);
-    return await res.json();
+    try {
+      return await res.json();
+    } catch (e) {
+      // An abort while the body arrives is a timeout, not a malformed answer.
+      if (controller.signal.aborted) throw e;
+      throw new MalformedError('Open Food Facts sent a body that is not JSON');
+    }
   } finally {
     clearTimeout(timer);
   }
@@ -158,7 +167,12 @@ export interface ProductSearchResult {
  */
 export const onlineSearchAvailable = Platform.OS !== 'web' || FUNCTIONS_URL !== '';
 
-const hitsOf = (data: unknown): OffProduct[] => (data as { hits?: OffProduct[] } | null)?.hits ?? [];
+/** The hits of a search answer; a body without a list of hits is a failure, never "no matches". */
+const hitsOf = (data: unknown): OffProduct[] => {
+  const hits = data && typeof data === 'object' ? (data as { hits?: unknown }).hits : undefined;
+  if (!Array.isArray(hits)) throw new MalformedError('Open Food Facts sent no list of hits');
+  return hits as OffProduct[];
+};
 
 /**
  * The search service's request for a query, as a phone sends it. A query
@@ -168,7 +182,7 @@ const hitsOf = (data: unknown): OffProduct[] => (data as { hits?: OffProduct[] }
  * fallback of a field query that found nothing usable).
  */
 export function searchRequestUrl(q: string, limit: number, text = false): string {
-  const built = text ? { q } : offSearchQuery(q);
+  const built = text ? { q: offQueryText(q) } : offSearchQuery(q);
   if (built.sortBy) {
     return `${SEARCH}?q=${encodeURIComponent(built.q)}&page_size=${limit}&fields=${FIELDS}&sort_by=${built.sortBy}`;
   }
@@ -195,7 +209,7 @@ export async function searchProductsWithStatus(query: string, limit = 20): Promi
   if (!onlineSearchAvailable) return { foods: [], failed: false, unavailable: true };
   try {
     if (Platform.OS === 'web') {
-      const term = encodeURIComponent(q);
+      const term = encodeURIComponent(offQueryText(q));
       const data = await getJson(`${FUNCTIONS_URL}/food-search?q=${term}&limit=${limit}`, 12_000, { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` });
       return { foods: toFoods(hitsOf(data)), failed: false, unavailable: false };
     }
@@ -212,8 +226,9 @@ export async function searchProductsWithStatus(query: string, limit = 20): Promi
       if (!(e instanceof HttpError)) throw e;
       console.warn('Open Food Facts refused a field query; using the free-text search', e);
     }
+    // No time left for the fallback: the search did not finish, which is a failure, not "no matches".
     const left = deadline - Date.now();
-    if (left < 1000) return { foods: [], failed: false, unavailable: false };
+    if (left < 1000) return { foods: [], failed: true, unavailable: false };
     const data = await getJson(searchRequestUrl(q, limit, true), left);
     return { foods: toFoods(hitsOf(data)), failed: false, unavailable: false };
   } catch {

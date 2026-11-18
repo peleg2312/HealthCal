@@ -1,11 +1,19 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
-import { offSearchQuery as fnQuery, usableHit } from '../../supabase/functions/food-search/query';
-import { offSearchQuery } from './offQuery';
+import { offQueryText as fnText, offSearchQuery as fnQuery, usableHit } from '../../supabase/functions/food-search/query';
+import { MAX_QUERY_CHARS, offQueryText, offSearchQuery } from './offQuery';
 import { offToFood } from './openFoodFacts';
 
 const clause = (w: string) => `(product_name.main:${w}* OR product_name.en:${w}* OR brands:${w}*)`;
 const field = (...words: string[]) => ({ q: words.map(clause).join(' AND '), sortBy: '-popularity_key' });
+/** The clause of a word with an inner geresh: the geresh form and the joined form, the two the service finds. */
+const quoted = (g: string, j: string) =>
+  `(product_name.main:${g}* OR product_name.main:${j}* OR product_name.en:${g}* OR product_name.en:${j}* OR brands:${g}* OR brands:${j}*)`;
+/** An apostrophe, a geresh or a right single quote: between two Hebrew letters they are part of the word. */
+const INNER = ["'", '\u05F3', '\u2019'];
 
 /** Every character the specification names as reserved (6.1.5), and the geresh forms. */
 const RESERVED = ['+', '-', '&', '|', '!', '(', ')', '{', '}', '[', ']', '^', '"', '~', '*', '?', ':', '\\', '/', '=', '<', '>', '%', "'", '׳', '״', '’', '`'];
@@ -19,6 +27,15 @@ const QUERIES = [
   'ב',
   "קוטג'",
   'קוטג׳ 5%',
+  "ג'חנון",
+  'צ\u05F3יפס',
+  'שוקולד צ\u2019יפס',
+  "ג''חנון",
+  "'גחנון'",
+  'ג\uE000חנון',
+  'א'.repeat(200),
+  `חלב ${'א'.repeat(5000)}`,
+  `${'x'.repeat(100)} חלב`,
   'תפו"א',
   'שוקולד פרה',
   'קפה עלית',
@@ -101,8 +118,29 @@ describe('offSearchQuery: a Hebrew letter makes a field query from whitelisted w
     expect(offSearchQuery('Cottage קוטג')).toEqual(field('cottage', 'קוטג'));
     expect(offSearchQuery('חטיף 50 גרם')).toEqual(field('חטיף', '50', 'גרם'));
   });
-  it.each(RESERVED)('the reserved character %j only separates words', (c) => {
+  it.each(RESERVED.filter((c) => !INNER.includes(c)))('the reserved character %j only separates words', (c) => {
     expect(offSearchQuery(`שוקו${c}לד`)).toEqual(field('שוקו', 'לד'));
+  });
+  it.each(INNER)('%j between two Hebrew letters keeps the word whole, in the geresh and the joined form', (c) => {
+    expect(offSearchQuery(`שוקו${c}לד`)).toEqual({ q: quoted('שוקו\u05F3לד', 'שוקולד'), sortBy: '-popularity_key' });
+  });
+  it("ג'חנון and צ'יפס are sent whole, never as חנון or יפס", () => {
+    expect(offSearchQuery("ג'חנון")).toEqual({ q: quoted('ג\u05F3חנון', 'גחנון'), sortBy: '-popularity_key' });
+    expect(offSearchQuery('צ\u05F3יפס')).toEqual({ q: quoted('צ\u05F3יפס', 'ציפס'), sortBy: '-popularity_key' });
+    expect(offSearchQuery('שוקולד צ\u2019יפס')).toEqual({ q: `${clause('שוקולד')} AND ${quoted('צ\u05F3יפס', 'ציפס')}`, sortBy: '-popularity_key' });
+  });
+  it('a quote at the edge of a word, two quotes, or the private mark typed by itself still separate', () => {
+    expect(offSearchQuery("ג''חנון")).toEqual(field('חנון'));
+    expect(offSearchQuery("'גחנון'")).toEqual(field('גחנון'));
+    expect(offSearchQuery('ג\uE000חנון')).toEqual(field('חנון'));
+  });
+  it('only the first 80 characters are read, in the field query and in the free text', () => {
+    expect(MAX_QUERY_CHARS).toBe(80);
+    expect(offSearchQuery('א'.repeat(200))).toEqual(field('א'.repeat(80)));
+    expect(offSearchQuery('x'.repeat(100))).toEqual({ q: 'x'.repeat(80) });
+    expect(offSearchQuery(`${'x'.repeat(100)} חלב`)).toEqual({ q: 'x'.repeat(80) });
+    expect(offQueryText('y'.repeat(81))).toBe('y'.repeat(80));
+    expect(offSearchQuery(`חלב ${'א'.repeat(5000)}`).q.length).toBeLessThan(600);
   });
   it('no built query holds anything but the clause syntax and whitelisted words', () => {
     for (const q of QUERIES) {
@@ -110,7 +148,14 @@ describe('offSearchQuery: a Hebrew letter makes a field query from whitelisted w
       if (!built.sortBy) continue;
       const rest = built.q
         .split(' AND ')
-        .map((c) => c.replace(/^\(product_name\.main:([א-תa-z0-9]+)\* OR product_name\.en:\1\* OR brands:\1\*\)$/, ''));
+        .map((c) =>
+          c
+            .replace(/^\(product_name\.main:([א-תa-z0-9]+)\* OR product_name\.en:\1\* OR brands:\1\*\)$/, '')
+            .replace(
+              /^\(product_name\.main:([א-תa-z0-9\u05F3]+)\* OR product_name\.main:([א-תa-z0-9]+)\* OR product_name\.en:\1\* OR product_name\.en:\2\* OR brands:\1\* OR brands:\2\*\)$/,
+              '',
+            ),
+        );
       expect(rest.every((r) => r === ''), q).toBe(true);
       expect(built.q.includes(':*'), q).toBe(false);
     }
@@ -120,7 +165,21 @@ describe('offSearchQuery: a Hebrew letter makes a field query from whitelisted w
 describe('the edge function builds the same query (supabase/functions/food-search/query.ts)', () => {
   it(`agrees on all ${QUERIES.length} queries`, () => {
     expect(QUERIES.length).toBeGreaterThanOrEqual(40);
-    for (const q of QUERIES) expect(fnQuery(q), q).toEqual(offSearchQuery(q));
+    for (const q of QUERIES) {
+      expect(fnQuery(q), q).toEqual(offSearchQuery(q));
+      expect(fnText(q), q).toBe(offQueryText(q));
+    }
+  });
+  it('the two copies of the builder are the same text', () => {
+    const block = (path: string) => {
+      const s = readFileSync(resolve(__dirname, path), 'utf8');
+      const from = s.indexOf('/** A Hebrew letter');
+      const to = s.indexOf('/** A search hit');
+      return from >= 0 ? s.slice(from, to > from ? to : s.length).trimEnd() : '';
+    };
+    const app = block('offQuery.ts');
+    expect(app.length).toBeGreaterThan(1000);
+    expect(block('../../supabase/functions/food-search/query.ts')).toBe(app);
   });
 });
 
@@ -161,6 +220,12 @@ describe("usableHit (the function's fallback test) agrees with offToFood", () =>
         expect(usableHit(p), JSON.stringify(p)).toBe(offToFood(p) !== null);
       }
     }
+  });
+  it('a name of spaces does not hide the Hebrew name behind it', () => {
+    expect(usableHit({ ...base, product_name: '   ', product_name_he: 'במבה' })).toBe(true);
+    expect(offToFood({ ...base, product_name: '   ', product_name_he: 'במבה' })?.name).toBe('במבה');
+    expect(usableHit({ ...base, product_name: ' ', product_name_he: ' ', product_name_en: 'Bamba' })).toBe(true);
+    expect(usableHit({ ...base, product_name: ' ', product_name_he: ' ', product_name_en: ' ', generic_name: ' ' })).toBe(false);
   });
   it('anything that is not an object is not usable', () => {
     expect(usableHit(null)).toBe(false);

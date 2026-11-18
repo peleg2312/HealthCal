@@ -1,0 +1,55 @@
+# The photo review's swap suggestions (matchFoods, top 3) for the English review's 50 typical item names.
+# Columns: item, before (the code and the 348 foods of git 3fa7914), now (today's code and foods).
+# Text without a Hebrew letter is scored exactly as before (localMatch.test.ts proves it against a copy of the
+# old scorer); a "now" that differs from "before" comes from the foods added in this job. Rewrite "now" with
+# HEALTHCAL_RECORD_AI=1 npx vitest run src/features/ai/localMatch.test.ts after reading every changed line.
+Vanilla custard	b_milkshake_vanilla,b_ice_cream_vanilla	b_milkshake_vanilla,b_ice_cream_vanilla
+Grilled chicken breast	b_chicken_breast_cooked,b_caesar_salad_chicken,b_chicken_nuggets	b_chicken_breast_cooked,b_caesar_salad_chicken,b_chicken_nuggets
+Caesar salad	b_caesar_salad,b_caesar_salad_chicken,b_greek_salad	b_caesar_salad,b_caesar_salad_chicken,b_tuna_salad
+Pad thai	b_pad_thai	b_pad_thai
+Beef burrito	b_burrito_beef_bean,b_beef_jerky,b_beef_ribeye_cooked	b_burrito_beef_bean,b_beef_jerky,b_beef_ribeye_cooked
+Chocolate chip cookie	b_cookie_choc_chip,b_trail_mix,b_chocolate_hazelnut_spread	b_cookie_choc_chip,b_trail_mix,b_chocolate_hazelnut_spread
+Fried egg	b_egg_fried,b_fried_rice,b_egg_boiled	b_egg_fried,b_eggplant_fried,b_fried_rice
+Steamed white rice	b_rice_white_cooked,b_rice_noodles_cooked,b_white_beans	b_rice_white_cooked,b_rice_noodles_cooked,b_white_beans
+Mixed green salad	b_peas_cooked,b_green_beans,b_kiwi	b_peas_cooked,b_green_beans,b_kiwi
+Mixed vegetables	b_vegetable_oil	b_chicken_soup,b_vegetable_soup,b_vegetable_oil
+Garlic bread	b_garlic,b_bread_rye,b_bread_sourdough	b_garlic,b_bread_rye,b_bread_sourdough
+Pepperoni pizza slice	b_pizza_pepperoni,b_pizza_cheese,b_bread_white	b_pizza_pepperoni,b_pizza_cheese,b_eggplant_fried
+Tomato soup	b_tomato_paste,b_tomato_juice,b_tomato	b_tomato_paste,b_tomato_juice,b_tomato
+Cheddar cheese	b_cheddar,b_cream_cheese,b_feta	b_cheddar,b_cheesecake_baked,b_cream_cheese
+Bacon strips	b_bacon_cooked	b_bacon_cooked
+Hash browns	b_hash_browns,b_rice_brown_cooked,b_rice_brown_dry	b_hash_browns,b_rice_brown_cooked,b_rice_brown_dry
+Orange juice	b_orange_juice,b_orange,b_apple_juice	b_orange_juice,b_orange,b_apple_juice
+Spaghetti bolognese	b_spaghetti_meat_sauce	b_spaghetti_meat_sauce
+Chicken tikka masala	b_chicken_nuggets,b_chicken_breast_raw,b_chicken_shawarma	b_chicken_nuggets,b_chicken_breast_raw,b_chicken_soup
+Roast potatoes	b_potato_chips,b_potato_baked,b_potato_boiled	b_potato_chips,b_latkes,b_potato_baked
+Sauteed spinach	b_spinach_cooked	b_spinach_cooked,b_bourekas_spinach
+Blueberry muffin	b_english_muffin	b_english_muffin
+Scrambled eggs	b_egg_scrambled,b_egg_fried,b_egg_boiled	b_egg_scrambled,b_egg_fried,b_egg_boiled
+Avocado toast	b_avocado,b_avocado_oil,b_french_toast	b_avocado,b_avocado_oil,b_french_toast
+Smoked salmon	b_smoked_salmon,b_salmon_cooked,b_salmon_raw	b_smoked_salmon,b_salmon_cooked,b_salmon_raw
+Cream sauce	b_cream_cheese,b_sour_cream,b_soy_sauce	b_cream_cheese,b_cream_cheese_5pct,b_cooking_cream
+Tortilla chips	b_tortilla_chips,b_tortilla_flour,b_tortilla_corn	b_tortilla_chips,b_tortilla_flour,b_tortilla_corn
+Guacamole	b_guacamole	b_guacamole
+Coleslaw	-	-
+Potato salad	b_potato_chips,b_potato_baked,b_potato_boiled	b_potato_chips,b_latkes,b_potato_baked
+Pickled cucumber	b_cucumber,b_olives_green,b_pickles_dill	b_cucumber,b_herring_pickled,b_olives_green
+Hummus	b_hummus	b_hummus,b_hummus_homemade
+Pita bread	b_pita_white,b_pita_wholewheat,b_bread_rye	b_pita_white,b_pita_wholewheat,b_pita_bakery
+Falafel balls	b_falafel	b_falafel
+Tahini sauce	b_tahini,b_soy_sauce,b_bbq_sauce	b_tahini_sauce,b_tahini,b_soy_sauce
+Israeli salad	b_israeli_salad,b_caesar_salad,b_caesar_salad_chicken	b_israeli_salad,b_caesar_salad,b_caesar_salad_chicken
+Shakshuka	b_shakshuka	b_shakshuka
+Feta cheese	b_feta,b_cream_cheese,b_cheddar	b_feta,b_cheesecake_baked,b_cream_cheese
+Olive oil dressing	b_olive_oil,b_greek_salad,b_canola_oil	b_olive_oil,b_greek_salad,b_canola_oil
+Granola with yogurt	b_granola_bar,b_yogurt_plain_whole,b_yogurt_plain_lowfat	b_granola_bar,b_yogurt_plain_whole,b_yogurt_plain_lowfat
+Pancakes with syrup	b_pancakes,b_maple_syrup	b_pancakes,b_maple_syrup,b_silan
+Whipped cream	b_cream_cheese,b_sour_cream,b_cream_heavy	b_cream_cheese,b_cream_cheese_5pct,b_cooking_cream
+Chopped salad	b_caesar_salad,b_caesar_salad_chicken,b_greek_salad	b_caesar_salad,b_chopped_liver,b_caesar_salad_chicken
+Mashed potatoes	b_mashed_potato,b_potato_chips,b_potato_baked	b_mashed_potato,b_potato_chips,b_latkes
+Gravy	-	-
+Corn on the cob	b_cornflakes,b_tortilla_corn,b_corn_cooked	b_cornflakes,b_tortilla_corn,b_apropo
+Baked beans	b_butternut_squash,b_potato_baked,b_green_beans	b_butternut_squash,b_potato_baked,b_green_beans
+Roasted vegetables	b_lamb_leg_cooked,b_pork_tenderloin_cooked,b_chicken_breast_cooked	b_lamb_leg_cooked,b_pork_tenderloin_cooked,b_chicken_breast_cooked
+Fruit salad	b_smoothie_fruit,b_jam,b_caesar_salad	b_yogurt_fruit,b_smoothie_fruit,b_jam
+Ice cream	b_ice_cream_vanilla,b_cream_cheese,b_sour_cream	b_ice_cream_vanilla,b_ice_cream_bar,b_cream_cheese

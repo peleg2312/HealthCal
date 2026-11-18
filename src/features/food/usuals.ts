@@ -6,6 +6,7 @@
  */
 import { BUILTIN_FOODS } from '@/data/foods';
 import { isWaterDrinkEntry } from '@/features/drinks/via';
+import { formatQty, matchServing } from '@/features/food/helpers';
 import { diffDays } from '@/lib/dates';
 import { scaleNutrients } from '@/lib/nutrition';
 import { formatNumber } from '@/lib/units';
@@ -55,7 +56,9 @@ export function customFoodIndex(customFoods: readonly Food[]): Map<string, Food>
 
 /**
  * Usual foods as they are now: a deleted own food is dropped, and an edited
- * one shows and logs today's values at the remembered amount.
+ * one shows and logs today's values at the remembered amount. The remembered
+ * grams always stay; a label that the food now names at another weight becomes
+ * the amount in grams (`matchServing`), so the chip shows what a tap logs.
  */
 export function resolveUsuals(usuals: UsualFood[], customById: ReadonlyMap<string, Food>): UsualFood[] {
   const out: UsualFood[] = [];
@@ -71,7 +74,9 @@ export function resolveUsuals(usuals: UsualFood[], customById: ReadonlyMap<strin
       out.push(u);
       continue;
     }
-    const last = { ...u.last, food, name: food.name, brand: food.brand, emoji: food.emoji ?? u.last.emoji, nutrients: scaleNutrients(food.per100g, u.last.grams) };
+    const q = u.last.quantity;
+    const servingLabel = q > 0 ? matchServing(food, u.last.servingLabel, u.last.grams / q).label : u.last.servingLabel;
+    const last = { ...u.last, food, name: food.name, brand: food.brand, emoji: food.emoji ?? u.last.emoji, servingLabel, nutrients: scaleNutrients(food.per100g, u.last.grams) };
     out.push({ ...u, food, last });
   }
   return out;
@@ -115,9 +120,11 @@ export function usualFoods(entries: FoodEntry[], meal: MealType, today: ISODate,
     .slice(0, limit);
 }
 
-/** "1 cup, 205 kcal" for a tile. */
+/** "1 cup, 205 kcal" for a tile; an amount in grams is said as its total ("160 g, 597 kcal", not "2 × 80 g"). */
 export function usualLabel(u: UsualFood): string {
   const q = u.last.quantity;
-  const portion = q === 1 ? u.last.servingLabel : `${Number.isInteger(q) ? q : q.toFixed(1)} × ${u.last.servingLabel}`;
+  const label = u.last.servingLabel;
+  const inGrams = /^\d+(?:\.\d+)? g$/.test(label);
+  const portion = q === 1 ? label : inGrams ? `${formatQty(Math.round(u.last.grams * 10) / 10)} g` : `${Number.isInteger(q) ? q : q.toFixed(1)} × ${label}`;
   return `${portion}, ${formatNumber(u.last.nutrients.kcal)} kcal`;
 }

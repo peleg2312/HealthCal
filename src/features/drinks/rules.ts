@@ -31,6 +31,7 @@ import { BUILTIN_FOODS } from '@/data/foods';
 import { mealOnDay } from '@/features/food/addedTo';
 import { buildEntry } from '@/features/food/build';
 import { QUICK_KCAL_LIMIT, sourceInfo } from '@/features/food/helpers';
+import { isolateRtl } from '@/lib/bidi';
 import { formatShortDate, weekdayShort } from '@/lib/dates';
 import { BEVERAGE_LABELS } from '@/lib/hydration';
 import { MEAL_LABEL, mealForTime } from '@/lib/nutrition';
@@ -255,9 +256,9 @@ export function enteredKcalError(kcal: number | null): string | null {
   return null;
 }
 
-/** The toast after a drink is picked in the sheet: nothing is logged until a glass is tapped. */
+/** The toast after a drink is picked in the sheet: nothing is logged until a glass is tapped. A Hebrew or Arabic name is isolated (drawn text; the toast announces it without the marks). */
 export function pickedToast(food: Pick<Food, 'name'>): string {
-  return `${food.name} chosen. Tap a glass to add it.`;
+  return `${isolateRtl(food.name)} chosen. Tap a glass to add it.`;
 }
 
 // ---------------------------------------------------------------- the meal
@@ -364,7 +365,9 @@ export function planDrink(input: PlanDrinkInput): DrinkPlan {
     entry = { ...buildEntry({ food: choices.food, serving: { label: vol, grams }, quantity: 1, meal, date }), loggedAt, via: 'water' };
   }
 
-  if (!entry) return plain(`${cap(name)}: no calories added`);
+  // `line` is drawn (a Hebrew or Arabic name isolated, `isolateRtl`); `label` is for screen readers and keeps the raw name.
+  const shown = isolateRtl(cap(name));
+  if (!entry) return plain(`${shown}: no calories added`);
 
   if (input.waterOnly) {
     return {
@@ -373,7 +376,7 @@ export function planDrink(input: PlanDrinkInput): DrinkPlan {
       kcal: 0,
       meal,
       toast: `Added ${vol} of ${noun(kind, choices.id)}, for water only`,
-      line: `${cap(name)}: for water only, no calories added`,
+      line: `${shown}: for water only, no calories added`,
       tile: 'No calories',
       label: `Add ${vol} of ${name}, for water only`,
     };
@@ -387,7 +390,7 @@ export function planDrink(input: PlanDrinkInput): DrinkPlan {
     kcal,
     meal,
     toast: `Added ${vol} of ${noun(kind, choices.id)}, ${k} to ${where}`,
-    line: custom ? `${vol} ${name}: ${k}, to ${where}` : `${cap(name)}: ${k} per ${vol}, to ${where}`,
+    line: custom ? `${vol} ${isolateRtl(name)}: ${k}, to ${where}` : `${shown}: ${k} per ${vol}, to ${where}`,
     tile: k,
     label: `Add ${vol} of ${name}, ${k} to ${where}`,
   };
@@ -452,7 +455,8 @@ function clock(iso: string): string {
 export function noticeLine(entry: Pick<FoodEntry, 'name' | 'meal' | 'loggedAt' | 'foodId'>, selected?: SelectedDrink | null, kind?: Beverage): string {
   const choice = choiceById(selected?.id);
   const name = choice && kind && choice.foodId && choice.foodId === entry.foodId ? cap(choice.name) : entry.name;
-  return `${name} is already in ${MEAL_LABEL[entry.meal].toLowerCase()} (${clock(entry.loggedAt)}).`;
+  // Drawn text: a Hebrew or Arabic name is isolated, so the sentence still starts at the left.
+  return `${isolateRtl(name)} is already in ${MEAL_LABEL[entry.meal].toLowerCase()} (${clock(entry.loggedAt)}).`;
 }
 
 // ---------------------------------------------------------------- the pair

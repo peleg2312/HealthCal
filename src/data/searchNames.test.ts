@@ -12,11 +12,11 @@ import type { Collection, SyncedRecord } from '@/types';
 import { BUILTIN_FOODS } from './foods';
 import { SEARCH_NAMES } from './searchNames';
 
-const HEBREW_LETTER = /[א-ת]/;
+const HEBREW_LETTER = /[\u05d0-\u05ea]/;
 // Cantillation and vowel points (and the other combining marks of the Hebrew block), and the invisible
 // direction and joining characters: none belongs in a stored search name.
-const POINTS = /[֑-ׇֽֿׁׂׅׄ]/;
-const INVISIBLE = /[ ​-‏‪-‮⁠-⁩﻿]/;
+const POINTS = /[\u0591-\u05bd\u05bf\u05c1\u05c2\u05c4\u05c5\u05c7]/;
+const INVISIBLE = /[\u00a0\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/;
 
 const entries = Object.entries(SEARCH_NAMES);
 const BY_ID = new Map(BUILTIN_FOODS.map((f) => [f.id, f]));
@@ -39,6 +39,34 @@ const NOT_NAMES: { name: string; on?: string; why: string }[] = [
   { name: 'שוק עוף עם עור', on: 'b_chicken_thigh_skin_cooked', why: 'שוק is the drumstick' },
   { name: 'קפה שחור', on: 'b_espresso', why: 'brewed black coffee' },
   { name: 'קפה טורקי', on: 'b_espresso', why: 'brewed black coffee' },
+  // Taken out after the readers' review (lead's decisions B2): an ordinary word, a category, or a name that
+  // sent people to a different food.
+  { name: 'חלבון', why: 'the ordinary word for protein: on no food (חלבון ביצה and אבקת חלבון say which)' },
+  { name: 'וואי', why: 'the interjection "wow"' },
+  { name: 'דייסה', why: 'oat or semolina porridge, with water or milk: on no food' },
+  { name: 'מעדן חלב', why: 'every dairy pudding' },
+  { name: 'משקה מוגז', why: 'any fizzy drink, diet ones included' },
+  { name: "צ'ילי", why: 'the hot pepper or sweet chili sauce, not chili con carne' },
+  { name: 'חלב ושמנת', why: 'no product or phrase people use' },
+  { name: 'נקניק', why: 'every cold cut: each sibling carries its qualifier' },
+  { name: 'גבינת שמנת', why: 'cream cheese of every fat level: each carries its percent' },
+  { name: 'גרעינים לבנים', why: 'pumpkin seeds in the shell, which the list does not hold' },
+  { name: 'בשר טחון 15%', why: 'the raw pack\'s label: the cooked row says מבושל' },
+  { name: 'בשר טחון 10%', why: 'the raw pack\'s label: the cooked row says מבושל' },
+  { name: 'אפונה יבשה', on: 'b_split_peas', why: 'dry, on a cooked row' },
+  { name: 'ביצה טרייה', why: 'a fresh egg, not a raw one' },
+  { name: 'תפוח אדמה טרי', why: 'fresh, not raw' },
+  { name: 'חזה עוף טרי', why: 'fresh (not frozen), not raw' },
+  { name: 'סלמון טרי', why: 'fresh, not raw' },
+  { name: 'ארטיק', on: 'b_ice_cream_vanilla', why: 'an ice cream bar on a stick: b_ice_cream_bar' },
+  { name: 'גרעינים', on: 'b_sunflower_seeds', why: 'the snack in the shell: b_sunflower_seeds_shell' },
+  { name: 'גרעינים שחורים', on: 'b_sunflower_seeds', why: 'the snack in the shell: b_sunflower_seeds_shell' },
+  { name: 'שמנת לבישול', on: 'b_half_and_half', why: 'cooking cream: b_cooking_cream' },
+  { name: 'פיתה לבנה', on: 'b_pita_white', why: 'the ordinary 100 g pita: b_pita_bakery' },
+  { name: 'הפוך', on: 'b_cappuccino', why: 'a latte-style drink: b_latte' },
+  { name: 'נס קפה', on: 'b_coffee_milk', why: 'black instant coffee: b_coffee_black (with milk is נס קפה עם חלב)' },
+  { name: 'artik', why: 'moved English results (arti showed ice cream above artichoke)' },
+  { name: 'halla', why: 'moved English results (hall showed challah above halloumi)' },
 ];
 
 /** The plain everyday word and the one food a person means by it with nothing else typed (spec 3.1 rule 2). */
@@ -53,8 +81,27 @@ const PLAIN: Record<string, string> = {
   ביצה: 'b_egg_boiled',
   קפה: 'b_coffee_black',
   סלט: 'b_israeli_salad',
-  בשר: 'b_beef_ground_80_raw',
-  ארטיק: 'b_ice_cream_vanilla',
+  בשר: 'b_beef_ground_85_cooked',
+  ארטיק: 'b_ice_cream_bar',
+  שלגון: 'b_ice_cream_bar',
+  גבינה: 'b_white_cheese_5pct',
+  מרק: 'b_chicken_soup',
+  הודו: 'b_turkey_breast_cooked',
+  חריף: 'b_schug',
+  שוק: 'b_chicken_drumstick',
+  סטייק: 'b_beef_sirloin_cooked',
+  הפוך: 'b_latte',
+  'נס קפה': 'b_coffee_black',
+  גרעינים: 'b_sunflower_seeds_shell',
+  'עוגת גבינה': 'b_cheesecake_baked',
+  'פיתה מלאה': 'b_pita_wholewheat_bakery',
+  'פיתה לבנה': 'b_pita_bakery',
+  'שמנת לבישול': 'b_cooking_cream',
+  פשטידה: 'b_pashtida',
+  'כבד עוף': 'b_chicken_liver_fried',
+  'קציצות דגים': 'b_fish_patties',
+  'קציצות עוף': 'b_chicken_patties',
+  'לחם קל': 'b_bread_light',
 };
 
 describe('SEARCH_NAMES', () => {

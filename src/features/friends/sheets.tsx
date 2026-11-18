@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
+import { isolateRtl } from '@/lib/bidi';
 import { formatShortDate, toISODate } from '@/lib/dates';
 import { setupSocial, type Friend, type SocialMe, type SocialSharing } from '@/services/friends';
 import { useTheme } from '@/theme';
@@ -74,12 +75,13 @@ export function FriendSheet({
           ) : null}
           {!sharesAnything(s) ? (
             <Text variant="body" color="textSecondary">
-              {f.displayName} is not sharing their week right now. You can still cheer their day.
+              {/* One string, the name isolated: a friend named in Hebrew must not turn the sentence right to left. */}
+              {`${isolateRtl(f.displayName)} is not sharing their week right now. You can still cheer their day.`}
             </Text>
           ) : null}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
             <Text variant="body" style={{ flex: 1 }}>
-              Cheer {f.displayName}&apos;s day
+              {`Cheer ${isolateRtl(f.displayName)}'s day`}
             </Text>
             <CheerButton testID="friends-cheer-day" cheered={f.cheered.includes(dayCheer)} label={`${f.displayName}'s day`} onPress={() => onCheer(f, dayCheer)} />
           </View>

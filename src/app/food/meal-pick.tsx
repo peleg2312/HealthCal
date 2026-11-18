@@ -195,11 +195,12 @@ function MealPick() {
         <>
           {local.length ? (
             <List>{local.map((h, i) => row(h.food, `pick-result-${i}`, h.matched))}</List>
-          ) : (
+          ) : localQ === q ? (
+            // Judged only once the list has caught up with the typing: while it lags, nothing, never a false "No matches".
             <Text variant="body" color="textSecondary" testID="meal-pick-none">
               No matches in your foods or the reference list.
             </Text>
-          )}
+          ) : null}
           {q.length >= 2 ? (
             <View style={{ gap: spacing.xs }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>

@@ -261,3 +261,55 @@ describe('searchProductsWithStatus: one request, and one fallback only when a fi
     expect(urls).toHaveLength(0);
   });
 });
+
+describe("the second review's cases (lead's decision D5)", () => {
+  const usable = { ...good, product_name: 'במבה' };
+  it('a product named only with spaces keeps its Hebrew name, in search and at the scanner', async () => {
+    expect(offToFood({ ...good, product_name: '   ', product_name_he: 'במבה' })!.name).toBe('במבה');
+    expect(offToFood({ ...good, product_name: '   ', product_name_en: 'Bamba' })!.name).toBe('Bamba');
+    fakeFetch([{ status: 1, product: { product_name: '  ', product_name_he: 'במבה', nutriments: {} } }]);
+    expect(await lookupBarcode('7290000066318')).toEqual({ status: 'incomplete', name: 'במבה' });
+  });
+  it('a word with a geresh is sent whole: ג\'חנון never as חנון', () => {
+    const url = decodeURIComponent(searchRequestUrl("ג'חנון", 24));
+    expect(url).toContain('product_name.main:ג׳חנון*');
+    expect(url).toContain('product_name.main:גחנון*');
+    expect(url).not.toMatch(/:חנון\*/);
+  });
+  it('a long query is cut to 80 characters on the phone, as the function cuts it', () => {
+    const long = 'x'.repeat(200);
+    expect(searchRequestUrl(long, 24)).toBe(`https://search.openfoodfacts.org/search?q=${'x'.repeat(80)}&page_size=24&fields=${TODAY_FIELDS}`);
+    expect(searchRequestUrl(`חלב ${'א'.repeat(5000)}`, 24, true).length).toBeLessThan(700);
+    expect(decodeURIComponent(searchRequestUrl(`חלב ${'א'.repeat(5000)}`, 24)).length).toBeLessThan(900);
+  });
+  it('a first answer that leaves no time for the fallback is a failure, not "no matches"', async () => {
+    let now = 1_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const urls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        urls.push(url);
+        now += 9_500;
+        return { ok: true, status: 200, json: async () => ({ hits: [] }) };
+      }),
+    );
+    expect(await searchProductsWithStatus('קרמבו', 24)).toEqual({ foods: [], failed: true, unavailable: false });
+    expect(urls).toHaveLength(1);
+    vi.restoreAllMocks();
+  });
+  it('a body that is not JSON, null, or without a list of hits is a failure', async () => {
+    for (const q of ['במבה', 'bamba']) {
+      vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => JSON.parse('<html>') })));
+      expect(await searchProductsWithStatus(q, 24), q).toEqual({ foods: [], failed: true, unavailable: false });
+      vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => null })));
+      expect(await searchProductsWithStatus(q, 24), q).toEqual({ foods: [], failed: true, unavailable: false });
+      fakeFetch([{ products: [usable] }]);
+      expect(await searchProductsWithStatus(q, 24), q).toEqual({ foods: [], failed: true, unavailable: false });
+    }
+  });
+  it('an empty list of hits is still "no matches"', async () => {
+    fakeFetch([{ hits: [] }]);
+    expect(await searchProductsWithStatus('bamba', 24)).toEqual({ foods: [], failed: false, unavailable: false });
+  });
+});

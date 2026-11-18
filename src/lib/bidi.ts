@@ -12,13 +12,13 @@
  * they return their input, so English lines are unchanged.
  */
 
-/** Hebrew, Arabic and their presentation forms. */
-const RTL = /[֐-׿؀-ۿ܀-ࣿיִ-﷿ﹰ-﻿]/;
+/** Hebrew, Arabic and their presentation forms, up to U+FEFC (U+FEFF, the byte-order mark, is not a letter). */
+const RTL = /[\u0590-\u05FF\u0600-\u06FF\u0700-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFC]/;
 /** Left-to-right mark: a strong left-to-right character that draws nothing. */
-export const LRM = '‎';
+export const LRM = '\u200E';
 /** First strong isolate and pop directional isolate: the text between them is one unit for the bidi rules. */
-export const FSI = '⁨';
-export const PDI = '⁩';
+export const FSI = '\u2068';
+export const PDI = '\u2069';
 
 /** Does the text hold a Hebrew or Arabic letter? */
 export function hasRtl(text: string): boolean {
@@ -40,7 +40,7 @@ export function isolateRtl(text: string): string {
 function isStrongLtr(ch: string): boolean {
   if (ch === LRM) return true;
   if (ch.toLowerCase() !== ch.toUpperCase()) return true;
-  return /[぀-鿿가-힯豈-﫿]/.test(ch);
+  return /[\u3040-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]/.test(ch);
 }
 
 /**
@@ -68,5 +68,5 @@ export function leftToRightStart(text: string): string {
 
 /** The text without the marks these functions add (for a comparison or a test that reads drawn text). */
 export function withoutMarks(text: string): string {
-  return text.replace(/[‎⁨⁩]/g, '');
+  return text.replace(/[\u200E\u2068\u2069]/g, '');
 }

@@ -10,6 +10,8 @@ import { searchLocal } from './foodSearch';
 const QUERIES = [
   'חומוס', 'קוטג 5', 'שניצל', 'והחומוס', 'פלאפאל', 'שקשוקע', 'חמוס', 'xyzzy', 'קקקקקק', 'avacado',
   'chicken breast', 'chiken', 'brocolli', 'עגבניות', 'ב', 'tahina', 'chicken', '2 ביצים', 'טוסט גבינה צהובה', 'חומוס בטחינה',
+  // The parts pass and a six-word Hebrew query.
+  'שניצל בפיתה', 'סביח בפיתה', 'פלאפל חומוס טחינה סלט חריף מלפפון',
 ];
 
 const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];

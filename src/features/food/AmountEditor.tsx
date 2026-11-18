@@ -83,6 +83,7 @@ export function AmountEditor({
                   key={`${s.label}-${i}`}
                   testID={`${testIDPrefix}-serving-${i}`}
                   label={s.label === '1 g' ? 'grams' : servingText(s.label)}
+                  accessibilityLabel={s.label === '1 g' ? 'grams' : s.label}
                   selected={s.label === serving.label}
                   onPress={() => chooseServing(s)}
                 />

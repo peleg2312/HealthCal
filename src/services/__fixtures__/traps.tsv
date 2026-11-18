@@ -1,0 +1,446 @@
+# The traps reader's Hebrew queries (review of 2026-11-18, traps/queries.tsv, extra.tsv, extra2.tsv), written
+# before the reader ran anything, with the food the reader expected first. Columns: query, expected, level, note.
+#   expected  a food id, ANY:<id>|<id> (any of them), or NONE (the app has no such food)
+#   level     first: the expected food is first; top3: it is in the first three;
+#             none: the query finds nothing, or only the parts pass's honest parts (each word's own foods);
+#             miss: a known miss, with its reason in the note
+# Where the lead's decisions changed the answer (a new row, a name that moved), the expected id follows the
+# decision and the note says which. foodSearch.hebrew.test.ts holds every line to its level; raise a level when
+# a line gets better, and never lower one without a note.
+# -- the 337 queries written before any run (traps/queries.tsv)
+חביתה	b_egg_fried	first
+חביתה מ2 ביצים	b_egg_fried	first
+2 ביצים	b_egg_boiled	first
+ביצה עין	b_egg_fried	first
+ביצה קשה	b_egg_boiled	first
+ביצים קשות	b_egg_boiled	first
+ביצים מקושקשות	b_egg_scrambled	first
+מקושקשת	b_egg_scrambled	first
+שקשוקה	b_shakshuka	first
+שקשוקה עם פטה	b_shakshuka	first
+shakshuka	b_shakshuka	first
+שקשוקא	b_shakshuka	first
+קוטג	b_cottage_cheese_5pct	first
+קוטג' תנובה	b_cottage_cheese_5pct	first
+קוטג 3 אחוז	b_cottage_cheese_3pct	first
+קוטג 5%	b_cottage_cheese_5pct	first
+כוס חלב	b_milk_whole	first
+חלב 1%	b_milk_1pct	first
+חלב 3 אחוז	b_milk_whole	first
+חלב דל שומן	ANY:b_milk_1pct|b_milk_skim|b_milk_2pct	first
+חלב שיבולת	b_oat_milk	first
+200 מ"ל חלב	b_milk_whole	first
+2 פרוסות לחם	b_bread_achid	first
+פרוסת לחם מלא	b_bread_wholewheat	first
+לחם קל	b_bread_light	first	A11 new row
+לחם כוסמין	ANY:b_bread_achid|b_bread_wholewheat	first	the reader: bread is a fair stand-in for spelt bread
+לחם שיפון	b_bread_rye	first
+טוסט	b_grilled_cheese	first
+פרוסת חלה	b_challah	first
+חלות	b_challah	first
+לחמנייה	b_bread_roll	first
+לחמניות	b_bread_roll	first
+בייגל	b_bagel	first
+קרואסון שוקולד	b_croissant_chocolate	first	A11 new row
+גבינה לבנה 9	b_white_cheese_9pct	first
+2 פרוסות גבינה צהובה	b_yellow_cheese_28pct	first
+צהובה	b_yellow_cheese_28pct	first
+בולגרית 5	b_bulgarian_cheese	first
+גבינה מלוחה	ANY:b_bulgarian_cheese|b_feta	first
+לאבנה	b_labneh	first
+labane	b_labneh	first
+לבנה עם זעתר	b_labneh	first
+זיתים קלמטה	ANY:b_olives_black|b_olives_green	first
+סלט קצוץ	b_israeli_salad	first
+סלט עגבניות מלפפונים	b_israeli_salad	first
+עגבניות שרי	b_tomato	first
+פלפל צהוב	b_bell_pepper_red	first
+פלפל חריף	NONE	none
+גמבה	b_bell_pepper_red	first
+גמבות	b_bell_pepper_red	first
+חצי אבוקדו	b_avocado	first
+קופסת טונה	b_tuna_canned_water	first
+טונה בשמן	b_tuna_canned_oil	first
+דייסת קוואקר	b_oatmeal_cooked	first
+קוואקר	b_oats_dry	first
+גרנולה עם יוגורט	ANY:b_granola|b_yogurt_plain_whole	first
+קורנפלקס עם חלב	ANY:b_cornflakes|b_milk_whole	first
+יוגורט יווני	b_greek_yogurt_whole	first
+פרו	b_yogurt_high_protein	first
+דנונה פרו	b_yogurt_high_protein	first
+יופלה	NONE	none
+מעדן	ANY:b_milky_pudding|b_danny_pudding	first
+שוקו בשקית	b_shoko	first
+הפוך גדול	b_latte	first	B2: הפוך is the latte
+הפוך סויה	b_latte	first	B2: הפוך is the latte
+נס קפה	ANY:b_coffee_black|b_coffee_milk	first
+נס	ANY:b_coffee_black|b_coffee_milk	first
+אספרסו כפול	b_espresso	first
+קפה שחור עם סוכר	b_turkish_coffee_sweet	first
+תה עם סוכר	b_tea_sugar	first
+תה ירוק	b_tea_brewed	first
+אייס קפה	NONE	none
+ברד	NONE	none
+שניצלים	b_schnitzel_chicken	first
+שניצל בפיתה	ANY:b_schnitzel_chicken|b_pita_bakery	first
+schnitzel	b_schnitzel_chicken	first
+שניצל טבעול	b_soy_schnitzel	first
+100 גרם אורז	b_rice_white_cooked	first
+אורז פרסי	ANY:b_rice_white_cooked|b_rice_vermicelli	first
+אורז בסמטי	b_rice_white_cooked	first
+פתיתים אוסם	b_ptitim_cooked	first
+פסטה ברוטב עגבניות	ANY:b_pasta_cooked|b_marinara	first
+פסטה רוזה	ANY:b_pasta_cooked	first
+ספגטי בולונז	b_spaghetti_meat_sauce	first
+מקרוני וגבינה	b_mac_and_cheese	first
+מרק	ANY:b_chicken_soup|b_vegetable_soup	first
+מרק כתום	b_pumpkin_soup	first
+מרק אפונה	b_split_pea_soup	first	A11 new row
+מרק קובה	b_kubbeh_soup	first
+קובה סלק	b_kubbeh_soup	top3
+עוף בתנור	b_chicken_roasted	first
+150 גרם חזה עוף	b_chicken_breast_cooked	first
+פרגיות	b_chicken_thigh_cooked	first
+סטייק פרגית	b_chicken_thigh_cooked	first
+כרעיים	ANY:b_chicken_drumstick|b_chicken_thigh_skin_cooked	first
+שוקיים	b_chicken_drumstick	first
+קציצות עוף	b_chicken_patties	first	A11 new row
+קציצות דגים	b_fish_patties	first	A11 new row
+אנטרקוט	b_beef_ribeye_cooked	first
+קבבים	b_kebab	first
+כבד עוף	b_chicken_liver_fried	first	A11 new row
+כבד	ANY:b_chopped_liver|b_chicken_liver_fried	first	A11 new row
+שוארמה	b_chicken_shawarma	first
+שווארמה בלאפה	ANY:b_shawarma_pita|b_chicken_shawarma	first
+לאפה	NONE	none
+פלאפל בפיתה	ANY:b_falafel|b_pita_bakery	first
+חצי מנה פלאפל	b_falafel	first
+5 כדורי פלאפל	b_falafel	first
+felafel	b_falafel	first
+צלחת חומוס	b_hummus	first
+והחומוס	b_hummus	first
+חומוס צבר	b_hummus	first
+חומוס אחלה	b_hummus	first
+חומוס פול	ANY:b_hummus|b_fava_beans	first
+מסבחה	ANY:b_hummus_homemade|b_hummus	first
+hummus	b_hummus	first
+humus	b_hummus	first
+עם טחינה	b_tahini_sauce	first
+tehina	b_tahini_sauce	first
+סביח	NONE	none
+sabich	NONE	none
+סביח בפיתה	NONE	none
+חציל קלוי	b_eggplant_cooked	first
+חצילים בטחינה	b_baba_ganoush	first
+סלט חצילים	ANY:b_baba_ganoush|b_eggplant_mayo	first
+סלט מטבוחה	b_matbucha	first
+כרוב סגול	b_cabbage	first
+חריף	ANY:b_schug	first
+ציפס	b_french_fries	first
+צ׳יפס	b_french_fries	first
+תפוא	b_potato_boiled	first
+תפוח אדמה בתנור	b_potato_baked	top3
+תפוחי אדמה מטוגנים	b_french_fries	first
+בטטה בתנור	b_sweet_potato	first
+בורקס פטריות	ANY:b_bourekas_cheese|b_bourekas_potato|b_bourekas_spinach	first
+בורקס במילוי גבינה	b_bourekas_cheese	first
+בורקסים	b_bourekas_cheese	first
+burekas	b_bourekas_cheese	first
+bourekas	b_bourekas_cheese	first
+גחנון	b_jachnun	first
+jachnun	b_jachnun	first
+מלאוואח	b_malawach	first
+malawach	b_malawach	first
+2 משולשים פיצה	b_pizza_cheese	first
+פיצה מרגריטה	b_pizza_cheese	first
+המבורגר בלחמניה	b_hamburger	first
+נקניקיה בלחמניה	b_hot_dog_bun	first
+נקניק	ANY:b_salami|b_turkey_deli|b_ham_deli	first	B2: no food owns plain נקניק
+מעורב	b_mixed_grill	first
+סושי סלמון	b_sushi_salmon_nigiri	first
+נודלס	ANY:b_egg_noodles_cooked|b_rice_noodles_cooked	first
+מוקפץ	ANY:b_fried_rice|b_egg_noodles_cooked	first
+נודלס מוקפצים	ANY:b_egg_noodles_cooked|b_fried_rice	first
+מג׳דרה	b_mejadra	first
+מג'אדרה	b_mejadra	first
+צולנט	b_hamin	first
+דפינה	b_hamin	first
+קוגל ירושלמי	b_kugel	first
+גפילטה	b_gefilte_fish	first
+דג	ANY:b_tilapia_cooked|b_salmon_cooked|b_cod_cooked	miss	plain דג has no owner (a tie of three fish names; asked the data fixer)
+פילה סלמון	b_salmon_cooked	first
+דניס	b_sea_bream_grilled	first	A11 new row
+לברק	NONE	none
+חראיימה	b_chraime	first
+סופגניות	b_sufganiya	first
+לביבה	b_latkes	first
+לביבות גבינה	NONE	none
+אוזן המן	b_hamantaschen	first
+מצות	b_matza	first
+מצה בריי	ANY:b_matza	first
+חרוסת	NONE	none
+תפוח בדבש	ANY:b_apple|b_honey	first
+עוגה	ANY:b_chocolate_cake|b_cheesecake|b_babka	first
+עוגיות	ANY:b_cookie_choc_chip|b_petit_beurre	first
+רוגעלך	b_rugelach	first
+קנאפה	b_knafeh	first
+במבה נוגט	b_bamba	first
+bamba	b_bamba	first
+ביסלי גריל	b_bissli	first
+ביסלי בצל	b_bissli	first
+תפוציפס	b_potato_chips	first
+פריכית אורז	b_rice_cakes	first
+פריכיות תירס	b_rice_cakes	first
+קרקרים	b_crackers_saltine	first
+פתיבר	b_petit_beurre	first
+ביסקויטים	b_petit_beurre	first
+וופלים	b_wafers_chocolate	first
+שוקולד פרה	b_milk_chocolate	first
+קוביית שוקולד	b_milk_chocolate	first
+ארטיק	b_ice_cream_bar	first	B2: ארטיק on the ice cream bar
+שלגון	b_ice_cream_bar	first	B2: שלגון on the ice cream bar
+סוכריות	ANY:b_gummy_candy	first
+חטיף	ANY:b_granola_bar|b_protein_bar	first
+פיצוחים	ANY:b_trail_mix|b_sunflower_seeds	first
+גרעיני אבטיח	NONE	none
+10 שקדים	b_almonds	first
+אגוזים	ANY:b_walnuts|b_trail_mix	first
+תמר מגהול	b_dates_medjool	first
+פירות יבשים	ANY:b_dried_apricots|b_raisins|b_prunes|b_dried_figs	miss	no food is named פירות יבשים; the parts pass shows fruit drinks and dry foods
+תפוח ירוק	b_apple	first
+2 בננות	b_banana	first
+קלמנטינות	b_mandarin	first
+אשכול ענבים	b_grapes	first
+קיוי	b_kiwi	first
+פומלה	NONE	none
+שרי	b_tomato	first
+גזר גמדי	b_carrot_raw	first
+ברוקולי מאודה	b_broccoli_cooked	first
+כרובית מטוגנת	b_cauliflower	first
+קישוא ממולא	ANY:b_zucchini|b_stuffed_peppers	first
+עדשים כתומות	b_lentils_cooked	first
+שעועית לבנה ברוטב	b_white_beans	first
+ful	b_fava_beans	first
+מים	NONE	none
+סודה	NONE	none
+פחית קולה	b_cola	first
+זירו	b_cola_diet	first
+דיאט	b_cola_diet	first
+פאנטה	NONE	none
+מיץ תפוזים סחוט	b_orange_juice	first
+מיץ	ANY:b_orange_juice|b_apple_juice|b_grape_juice	first
+פיוזטי	b_iced_tea_sweet	first
+גולדסטר	b_beer	first
+בקבוק בירה	b_beer	first
+כוס יין	b_wine_red	first
+ודקה	b_spirits	first
+ויסקי	b_spirits	first
+סקופ חלבון	b_whey_protein	first
+שייק	ANY:b_smoothie_fruit|b_milkshake_vanilla|b_protein_shake_rtd	first
+קקאו	b_hot_chocolate	first
+גבינה	ANY:b_white_cheese_5pct|b_yellow_cheese_28pct|b_cottage_cheese_5pct	first
+בשר	b_beef_ground_85_cooked	first	B2: בשר on cooked minced beef
+כפית סוכר	b_sugar_white	first
+כף שמן זית	b_olive_oil	first
+כף מיונז	b_mayonnaise	first
+מלח	NONE	none
+חמוס	b_hummus	first
+בפיתה	b_pita_bakery	miss	בפיתה is a whole word of שווארמה בפיתה, so the strict pass finds that first
+חצי פיתה	b_pita_bakery	first
+פיטה	b_pita_bakery	first
+פתה	b_pita_bakery	miss	left to nothing: פתה is פיתה written short or פטה with ת (C5 narrowed: three letters only by a final א/ה)
+טורטיות	b_tortilla_flour	first
+עוף ואורז	ANY:b_chicken_roasted|b_rice_white_cooked	first
+אורז ועוף	ANY:b_chicken_roasted|b_rice_white_cooked	first
+ומלפפון	b_cucumber	first
+לחביתה	b_egg_fried	first
+הביצה	b_egg_boiled	first
+הודו	ANY:b_turkey_breast_cooked|b_turkey_deli	first
+שקש	b_shakshuka	first
+שניצ	b_schnitzel_chicken	first
+חומ	b_hummus	first
+פלא	b_falafel	first
+קוט	b_cottage_cheese_5pct	first
+במב	b_bamba	first
+בורק	b_bourekas_cheese	first
+שוו	b_chicken_shawarma	first
+פית	b_pita_bakery	first
+חבי	b_egg_fried	first
+סופג	b_sufganiya	first
+טחי	b_tahini_sauce	first
+עגב	b_tomato	first
+מלפ	b_cucumber	first
+ביצ	b_egg_boiled	first
+ptitim	b_ptitim_cooked	first
+petitim	b_ptitim_cooked	first
+krembo	b_krembo	first
+bisli	b_bissli	first
+sufganiyot	b_sufganiya	first
+cholent	b_hamin	first
+kanafe	b_knafeh	first
+kotej	b_cottage_cheese_5pct	first
+tzfatit	b_tzfatit	first
+shoko	b_shoko	first
+leben	b_leben	first
+sachlav	b_sachlab	first
+tchina	b_tahini_sauce	first
+jachnoon	b_jachnun	first
+shwarma	b_chicken_shawarma	first
+majadra	b_mejadra	first
+kube	b_kubbeh_fried	first
+tahina	b_tahini_sauce	top3
+labneh	b_labneh	first
+sabih	NONE	none
+יוגורט 0%	ANY:b_greek_yogurt_nonfat|b_yogurt_plain_lowfat	first
+1/2 אבוקדו	b_avocado	first
+30 גרם שקדים	b_almonds	first
+2 כפות טחינה	b_tahini_sauce	first
+כף טחינה גולמית	b_tahini	first
+0.5 פיתה	b_pita_bakery	first
+150 גר עוף	b_chicken_roasted	first
+100 ג' אורז	b_rice_white_cooked	first
+קופסה טונה	b_tuna_canned_water	first
+חצי כוס אורז	b_rice_white_cooked	first
+ספל קפה	b_coffee_black	first
+מנה שניצל	b_schnitzel_chicken	first
+מגש פיצה	b_pizza_cheese	first
+קערת סלט	b_israeli_salad	first
+אדמה תפוח	b_potato_boiled	first
+עוף חזה	b_chicken_breast_cooked	first
+לבנה גבינה	b_white_cheese_5pct	first
+שוק	b_chicken_drumstick	first
+סרטן	b_crab_cooked	first
+שמנת	ANY:b_sour_cream_15pct|b_cream_heavy	first
+שמנת לבישול	b_cooking_cream	first	A11 new row
+עמק	b_yellow_cheese_28pct	first
+גרעיני חמנייה	ANY:b_sunflower_seeds_shell|b_sunflower_seeds	first	A5: in-shell row
+חלבון	ANY:b_egg_white|b_whey_protein	first
+חלבונים	b_egg_white	first
+פיתה עם חומוס	ANY:b_hummus|b_pita_bakery	first
+כריך	ANY:b_grilled_cheese	first
+סנדוויץ	NONE	none
+בגט	NONE	none
+ג'בטה	NONE	none
+פשטידה	b_pashtida	first	A11 new row
+קיש	NONE	miss	quiche is unknown; קיש is the beginning of קישוא while typing
+שישליק	NONE	none
+כנפיים ברביקיו	b_chicken_wing_cooked	first
+טוסט גבינה צהובה	b_grilled_cheese	first
+יוגורט עם גרנולה	ANY:b_yogurt_plain_whole|b_granola	first
+חטיף אנרגיה	ANY:b_granola_bar|b_protein_bar|b_energy_drink	first
+אבטיח ובולגרית	ANY:b_watermelon|b_bulgarian_cheese	first
+סלט פירות	NONE	none
+דג סלמון	b_salmon_cooked	miss	no name holds דג with salmon (asked the data fixer)
+פירה ביתי	b_mashed_potato	first
+קפה עם חלב סויה	ANY:b_coffee_milk	first
+קפה עם חלב שקדים	ANY:b_coffee_milk	first
+תה עם לימון	b_tea_brewed	first
+לימון	b_lemon	first
+אורז ושעועית	ANY:b_rice_white_cooked|b_white_beans	first
+שעועית ואורז	ANY:b_rice_white_cooked|b_white_beans	first
+חלב עמיד	b_milk_whole	first
+גבינת קוטג	b_cottage_cheese_5pct	first
+קוטג' 9%	NONE	miss	no 9% cottage; the relaxed pass may leave a number unmatched (rule 4.6, unchanged)
+מוצרלה טרייה	b_mozzarella	first
+חומוס עם ביצה	ANY:b_hummus|b_egg_boiled	first
+פול מדמס	b_fava_beans	first
+אורז מלא בישול	b_rice_brown_cooked	first
+# -- trap queries written after the first run (traps/extra.tsv)
+מלוח	NONE	miss	מלווח stays a name of malawach (B2) and folds to מלוח
+מלווח	b_malawach	first
+בוטנים מלוחים	b_peanuts	first
+גבינה מלוחה	ANY:b_bulgarian_cheese|b_feta	first
+שוקולד לבן	NONE	none
+טונה לבנה	b_tuna_canned_water	first
+לבן גד	b_leben	first
+מקלות סרטן	NONE	none
+סרטנים	b_crab_cooked	first
+ירקות מעורבים	NONE	miss	vegetable dishes hold ירקות; no mixed-vegetables row
+פיצוחים מעורבים	b_trail_mix	first
+מעורבים	b_mixed_grill	first	the plural of מעורב, the mixed grill
+לחם טוסט	b_bread_white	first
+פרוסת טוסט	b_bread_white	top3
+סוויט צ'ילי	NONE	none
+רוטב צ'ילי	NONE	none
+צ'ילי	b_chili_beans	first
+תה מתוק	b_tea_sugar	first
+קפה מתוק	b_coffee_sugar	first
+קפה קר	NONE	none
+שוקו קר	b_shoko	first	the name שוקו קר is on the shoko row (the chocolate croissant also holds both words as beginnings)
+שתי ביצים	b_egg_boiled	first
+שלוש כפות טחינה	b_tahini_sauce	first
+קצת אורז	b_rice_white_cooked	first
+חבילת במבה	b_bamba	first
+שקית במבה	b_bamba	first
+שורה שוקולד	b_milk_chocolate	first
+כ100 גרם אורז	b_rice_white_cooked	first
+כ-200 גרם עוף	b_chicken_roasted	first
+1 ק"ג עגבניות	b_tomato	first
+ליטר חלב	b_milk_whole	first
+סויה	ANY:b_soy_sauce	first
+קובה	b_kubbeh_fried	first
+תפוחי	ANY:b_potato_boiled|b_apple	first
+פירות	NONE	miss	no plain fruit row; fruit drinks hold the word
+שומ	b_sesame_seeds	top3
+שמנ	ANY:b_sour_cream_15pct|b_vegetable_oil	first
+חל	ANY:b_milk_whole|b_challah	first
+חלב	b_milk_whole	first
+גבינת שמנת	b_cream_cheese	top3
+דייסה	ANY:b_oatmeal_cooked|b_semolina_porridge	first	B2: דייסה alone off oatmeal
+דייסת סולת	b_semolina_porridge	first	A11 new row
+קוד	b_cod_cooked	first
+חמוצים	b_pickles_dill	first
+לבנים	b_pumpkin_seeds	miss	stem joins לבנים with leben and labneh (the traps reader: leave it)
+ופל	b_wafers_chocolate	first
+וופל	ANY:b_wafers_chocolate|b_waffle	first
+פרנץ טוסט	b_french_toast	first
+אורז אטריות	b_rice_vermicelli	top3
+אטריות אורז	b_rice_noodles_cooked	first
+מכבי	b_beer	first
+גומי	b_gummy_candy	first
+מסטיק	NONE	none
+ביצה טרייה	ANY:b_egg_raw|b_egg_boiled	first
+חזה עוף טרי	b_chicken_breast_raw	top3
+טחינה גולמית	b_tahini	first
+טחינה מוכנה	b_tahini_sauce	first
+חומוס עם פול	ANY:b_hummus|b_fava_beans	first
+כבש	b_lamb_leg_cooked	first
+כבוש	b_sauerkraut	first
+הפוכה	NONE	miss	stem joins הפוכה with הפוך, the latte
+חלבה	b_halva	first
+חלבון ביצה	b_egg_white	first
+אבקת חלבון	b_whey_protein	first
+משקה מוגז	NONE	miss	the name is gone (B2); מוגז is found nowhere and may go unmatched after the first word, so drinks named משקה show
+קולה ללא סוכר	b_cola_diet	first
+בירה ללא אלכוהול	NONE	none
+יין ללא אלכוהול	NONE	none
+מיץ ללא סוכר	NONE	none
+ריבה ללא סוכר	NONE	none
+שוקולד ללא סוכר	NONE	none
+# -- typo queries (traps/extra2.tsv)
+טורטיות	b_tortilla_flour	first
+כוטג	b_cottage_cheese_5pct	first
+כרמבו	b_krembo	first
+טחינע	b_tahini_sauce	first
+במבע	b_bamba	first
+קטצופ	b_ketchup	first
+פסתה	b_pasta_cooked	first
+עורז	b_rice_white_cooked	first
+אורס	b_rice_white_cooked	miss	four letters: no edit-distance typo, and ס is not ז in the sound-alike skeleton
+שניסל	b_schnitzel_chicken	first
+סלאט	b_israeli_salad	miss	four letters: no edit-distance typo
+יוגורת	b_yogurt_plain_whole	first
+גבינא	ANY:b_white_cheese_5pct	first
+מלאפפון	b_cucumber	first
+בננא	b_banana	first
+אבטיך	b_watermelon	first
+חזה אוף	b_chicken_breast_cooked	first
+קפא	b_coffee_black	first
+תפוז ים	b_orange	first
+שוקולאד	b_milk_chocolate	first
+פיצא	b_pizza_cheese	first
+המבורגער	b_hamburger	first
+שווארמא	b_chicken_shawarma	first
+ג'חנון	b_jachnun	first
+ג׳חנון	b_jachnun	first
+גחנון	b_jachnun	first

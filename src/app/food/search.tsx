@@ -82,6 +82,9 @@ export default function FoodSearchScreen() {
     () => (localQ ? searchLocal(localQ, { customFoods, recentFoods: recents, favoriteIds }, 30) : []),
     [localQ, customFoods, recents, favoriteIds],
   );
+  // "No matches" is judged only once the local list has caught up with the typing; while it lags,
+  // the previous list stays (or nothing shows), never the empty state for a query that has matches.
+  const noLocal = localQ === q && local.length === 0;
 
   // Online products arrive after a pause in typing; stale answers are dropped.
   const latest = useRef('');
@@ -330,14 +333,14 @@ export default function FoodSearchScreen() {
         <>
           {local.length > 0 ? (
             <List testID="search-local-results">{local.map((h, i) => row(h.food, `result-${i}`, undefined, h.matched))}</List>
-          ) : (
+          ) : noLocal ? (
             <View testID="search-no-local" style={{ gap: 4, paddingVertical: spacing.sm }}>
               <Text variant="h3">No matches in your foods or the reference list</Text>
               <Text variant="body" color="textSecondary">
                 Try fewer words, check the online products below, or add it another way.
               </Text>
             </View>
-          )}
+          ) : null}
 
           {q.length >= 2 ? (
             <View style={{ gap: spacing.xs }} testID="search-online">
@@ -370,7 +373,7 @@ export default function FoodSearchScreen() {
 
           <View style={{ gap: spacing.sm }}>
             <Text variant="label" color="textSecondary">
-              {local.length === 0 && online.status === 'done' && onlineItems.length === 0 ? 'Add it another way' : "Can't find it?"}
+              {noLocal && online.status === 'done' && onlineItems.length === 0 ? 'Add it another way' : "Can't find it?"}
             </Text>
             {escapes}
           </View>

@@ -3,6 +3,7 @@ import { AccessibilityInfo, Animated, Easing, Platform, View } from 'react-nativ
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { create } from 'zustand';
 
+import { withoutMarks } from '@/lib/bidi';
 import { cup, isReducedMotion, MAX_CONTENT_WIDTH, motion, useTheme, type ThemeColors } from '@/theme';
 
 import { PressableScale } from './Pressable';
@@ -118,8 +119,10 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
     if (!message || !active) return;
     if (announcedId !== id) {
       announcedId = id;
-      // Live regions are Android-only; announcing explicitly covers iOS as well.
-      AccessibilityInfo.announceForAccessibility(actionLabel ? `${message}. ${actionLabel} available.` : message);
+      // Live regions are Android-only; announcing explicitly covers iOS as well. A name isolated for
+      // drawing (`isolateRtl`) is announced raw: screen readers get no direction marks.
+      const spoken = withoutMarks(message);
+      AccessibilityInfo.announceForAccessibility(actionLabel ? `${spoken}. ${actionLabel} available.` : spoken);
     }
     // Rises 16 px and fades in, ease-out, no bounce; instant under reduced motion.
     if (isReducedMotion()) anim.setValue(1);
@@ -172,7 +175,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
           pointerEvents="none"
           style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 3, borderTopLeftRadius: radius.shoulder, borderTopRightRadius: radius.shoulder, backgroundColor: tint ? ((colors as unknown as Record<string, string>)[tint] ?? tint) : colors.primary }}
         />
-        <Text variant="label" color={colors.bg} style={{ flexShrink: 1 }}>
+        <Text variant="label" color={colors.bg} style={{ flexShrink: 1 }} accessibilityLabel={withoutMarks(message)}>
           {message}
         </Text>
         {actionLabel ? (

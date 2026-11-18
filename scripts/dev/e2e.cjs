@@ -257,6 +257,39 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   const latin = await text('result-0').catch(() => '');
   check('a Latin spelling Israelis type finds the food', latin.includes('Tahini sauce (prepared, diluted)'), latin.replace(/\n/g, ' | ').slice(0, 120));
 
+  // ------------------------------- no false "No matches" while the list catches up with the typing
+  // The local list follows the typing a beat behind on a slow phone (useDeferredValue). With the CPU
+  // slowed four times and one key every 60 ms, the no-match text must never be drawn for a query that
+  // has matches, and must still be drawn for one that has none (sampled every 16 ms).
+  const typeAndWatch = async (word) => {
+    await fill('food-search-input', '');
+    await page.getByTestId('food-search-input').first().focus();
+    await page.evaluate(() => {
+      window.__noMatch = [];
+      window.__noMatchTimer = setInterval(() => {
+        const shown = [...document.querySelectorAll('[data-testid="search-no-local"]')].some((e) => e.getBoundingClientRect().height > 0);
+        const field = [...document.querySelectorAll('[data-testid="food-search-input"]')].find((e) => e.getBoundingClientRect().height > 0);
+        if (shown) window.__noMatch.push(field ? field.value : '?');
+      }, 16);
+    });
+    await page.keyboard.type(word, { delay: 60 });
+    await page.waitForTimeout(1500);
+    return page.evaluate(() => {
+      clearInterval(window.__noMatchTimer);
+      return [...new Set(window.__noMatch)];
+    });
+  };
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+  for (const word of ['chicken', 'חומוס']) {
+    const seen = await typeAndWatch(word);
+    check(`typing "${word}" on a slow phone never shows "No matches"`, seen.length === 0, seen.length ? `shown for ${JSON.stringify(seen)}` : 'never shown');
+  }
+  const none = await typeAndWatch('zzzzqq');
+  check('a query with no match still says so', none.includes('zzzzqq') && (await page.getByTestId('search-no-local').first().isVisible()), `shown for ${JSON.stringify(none)}`);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  await cdp.detach();
+
   // ------------------------------------- the photo screen's weighed total (optional field)
   // A photo chosen, then the weight field: a tap anywhere in it focuses it, the faked keyboard keeps
   // it above the pinned "Estimate nutrition", and a problem shows only once the field is left.

@@ -166,7 +166,8 @@ export function DrinkPickSheet({
           Tap a drink to choose it, then tap a glass to add it.
         </Text>
         <View>
-          {rows.length === 0 ? (
+          {rows.length === 0 && localQ !== q ? null : rows.length === 0 ? (
+            // Judged only once the list has caught up with the typing: while it lags, nothing, never a false "No drink matches".
             <Text testID="water-pick-none" variant="body" color="textSecondary" style={{ paddingVertical: spacing.md }}>
               No drink matches “{isolateRtl(q)}”. Try another word, or enter the calories above.
             </Text>

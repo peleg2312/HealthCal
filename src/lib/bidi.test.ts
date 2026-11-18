@@ -30,6 +30,14 @@ describe('isolateRtl', () => {
     expect(isolateRtl('ﻻ')).toBe(`${LRM}${FSI}ﻻ${PDI}`);
   });
 
+  it('ends the right-to-left range at U+FEFC: a byte-order mark is not a letter', () => {
+    expect(hasRtl('\uFEFC')).toBe(true);
+    expect(hasRtl('\uFEFF')).toBe(false);
+    expect(hasRtl('\uFEFDMilk')).toBe(false);
+    expect(isolateRtl('\uFEFFMilk, whole')).toBe('\uFEFFMilk, whole');
+    expect(startsRtl('\uFEFF\uFEFFMilk')).toBe(false);
+  });
+
   it('wraps a string with only vowel points', () => {
     expect(hasRtl('ָ')).toBe(true);
   });

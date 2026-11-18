@@ -20,8 +20,11 @@ export function Chip({
   dropdown,
   style,
   testID,
+  accessibilityLabel,
 }: {
   label: string;
+  /** What a screen reader says; the label by default. Pass the raw text when `label` carries direction marks (`isolateRtl`). */
+  accessibilityLabel?: string;
   selected?: boolean;
   onPress?: () => void;
   icon?: React.ReactNode;
@@ -43,7 +46,7 @@ export function Chip({
       accessibilityState={{ selected: !!selected }}
       // react-native-web drops accessibilityState, so the browser is told directly.
       aria-pressed={!!selected}
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
       style={[
         {
           flexDirection: 'row',

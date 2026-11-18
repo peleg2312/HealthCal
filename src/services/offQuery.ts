@@ -34,13 +34,40 @@ export interface OffSearchQuery {
 const HEBREW_LETTER = /[א-תװ-ײיִ-ﭏ]/;
 /** Cantillation marks and vowel points (the same set as `fold`, src/lib/hebrew.ts) and Latin accents. */
 const MARKS = /[֑-ְ֯-ׇֽֿׁׂׅׄ̀-ͯ]/g;
-/** Anything that is not a Hebrew letter, a-z or 0-9 separates words. */
-const SEPARATOR = /[^א-תa-z0-9]+/;
+/**
+ * A geresh, an apostrophe or a right single quote between two Hebrew letters is part of the word
+ * (ג'חנון, צ'יפס): it is kept as a private mark while the words are split, and one typed by itself
+ * is removed first. Anywhere else (קוטג', a quote) it separates like every other character.
+ */
+const INNER_QUOTE = /([א-ת])['’׳](?=[א-ת])/g;
+const JOIN = '';
+/** Anything that is not a Hebrew letter, a-z, 0-9 or the mark of an inner geresh separates words. */
+const SEPARATOR = /[^א-תa-z0-9]+/;
 /** Words that carry no product meaning, and the Lucene operators spelled as words. */
 const STOP = new Set(['עם', 'של', 'את', 'and', 'or', 'not']);
 const MAX_WORDS = 6;
+/** Only the first 80 characters of what was typed are sent, by the phones and by the function alike. */
+export const MAX_QUERY_CHARS = 80;
+/** The fields of a field query, in the order of its clauses. */
+const NAME_FIELDS = ['product_name.main', 'product_name.en', 'brands'];
 
-export function offSearchQuery(q: string): OffSearchQuery {
+/** The text of the free-text search (and of the field query's fallback): what was typed, cut to 80 characters. */
+export function offQueryText(q: string): string {
+  return q.slice(0, MAX_QUERY_CHARS);
+}
+
+/**
+ * One word's clause. A word with an inner geresh is asked in the two forms the service finds (checked
+ * against search.openfoodfacts.org on 2026-11-18): with the geresh (U+05F3, "צ׳יפס" found 9 products)
+ * and joined ("ציפס" found 2); the ASCII apostrophe form and the part after the geresh found none.
+ */
+function clause(w: string): string {
+  const forms = w.includes(JOIN) ? [w.split(JOIN).join('׳'), w.split(JOIN).join('')] : [w];
+  return `(${NAME_FIELDS.flatMap((f) => forms.map((x) => `${f}:${x}*`)).join(' OR ')})`;
+}
+
+export function offSearchQuery(typed: string): OffSearchQuery {
+  const q = offQueryText(typed);
   if (!HEBREW_LETTER.test(q)) return { q };
   const words: string[] = [];
   const clean = q
@@ -50,7 +77,9 @@ export function offSearchQuery(q: string): OffSearchQuery {
     .replace(/ױ/g, 'וי')
     .replace(/ײ/g, 'יי')
     .replace(MARKS, '')
-    .toLowerCase();
+    .toLowerCase()
+    .replace(//g, ' ')
+    .replace(INNER_QUOTE, `$1${JOIN}`);
   for (const w of clean.split(SEPARATOR)) {
     if (w.length < 2 || STOP.has(w) || words.includes(w)) continue;
     words.push(w);
@@ -58,7 +87,7 @@ export function offSearchQuery(q: string): OffSearchQuery {
   }
   if (words.length === 0) return { q };
   return {
-    q: words.map((w) => `(product_name.main:${w}* OR product_name.en:${w}* OR brands:${w}*)`).join(' AND '),
+    q: words.map(clause).join(' AND '),
     sortBy: '-popularity_key',
   };
 }

@@ -3,7 +3,8 @@
  * recents) that fit in the calories left, ranked by protein per kcal when
  * protein is the gap. Pure, so the ranking is unit-tested.
  */
-import { defaultServing } from '@/lib/nutrition';
+import { matchServing } from '@/features/food/helpers';
+import { defaultServing, scaleNutrients } from '@/lib/nutrition';
 import type { Food, FoodEntry, Serving } from '@/types';
 
 export type FitSource = 'usual' | 'favourite' | 'recent';
@@ -28,22 +29,29 @@ export interface FitSources {
   lastByFood: Map<string, FoodEntry>;
 }
 
-function fromEntry(e: FoodEntry, from: FitSource): Fit | null {
-  if (!e.food || !(e.quantity > 0)) return null;
+/**
+ * A remembered portion of `food` (the food as it is now; the entry may hold an older copy): the
+ * remembered grams, priced with today's values, under the serving `matchServing` gives, which is the
+ * one the row logs ("80 g" when the food now names the remembered label at another weight).
+ */
+function fromEntry(e: FoodEntry, from: FitSource, food: Food | undefined = e.food): Fit | null {
+  if (!food || !(e.quantity > 0)) return null;
+  const gramsPerUnit = e.grams / e.quantity;
+  const n = scaleNutrients(food.per100g, e.grams);
   return {
-    key: e.food.id,
-    food: e.food,
-    serving: { label: e.servingLabel, grams: e.grams / e.quantity },
+    key: food.id,
+    food,
+    serving: matchServing(food, e.servingLabel, gramsPerUnit),
     quantity: e.quantity,
-    kcal: e.nutrients.kcal,
-    protein: e.nutrients.protein,
+    kcal: n.kcal,
+    protein: n.protein,
     from,
   };
 }
 
 function fromFood(food: Food, from: FitSource, last?: FoodEntry): Fit {
-  const fromLast = last ? fromEntry(last, from) : null;
-  if (fromLast) return { ...fromLast, food };
+  const fromLast = last ? fromEntry(last, from, food) : null;
+  if (fromLast) return fromLast;
   const serving = defaultServing(food);
   const f = serving.grams / 100;
   return { key: food.id, food, serving, quantity: 1, kcal: food.per100g.kcal * f, protein: food.per100g.protein * f, from };

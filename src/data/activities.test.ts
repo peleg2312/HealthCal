@@ -27,6 +27,19 @@ describe('searchActivities in Hebrew', () => {
     expect(searchActivities('ריצ').map((a) => a.id)).toContain('trail_running');
   });
 
+  it('reads a Hebrew word through a prefix and as a plural', () => {
+    expect(first('ההליכה')).toBe('walking');
+    expect(first('והריצה')).toBe('running');
+    expect(first('באופניים')).toBe('cycling');
+    expect(first('היוגה')).toBe('yoga');
+    // Plurals: the same stem as the name's word.
+    expect(first('ריצות')).toBe('running');
+    expect(first('הליכות')).toBe('walking');
+    expect(first('השחיות')).toBe('swimming');
+    // A reading never beats a name the query matches as typed.
+    expect(searchActivities('הליכה').map((a) => a.id)[0]).toBe('walking');
+  });
+
   it('finds nothing for a Hebrew word no activity has, and never throws', () => {
     expect(searchActivities('קקקקק')).toEqual([]);
     for (const q of ['ה', '\u05f3', '🏃', 'حمص', 'ריצה run', '\u200e']) expect(() => searchActivities(q)).not.toThrow();

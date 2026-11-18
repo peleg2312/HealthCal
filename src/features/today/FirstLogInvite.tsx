@@ -5,7 +5,8 @@ import { View } from 'react-native';
 
 import { BUILTIN_FOODS } from '@/data/foods';
 import { logFood } from '@/features/food/log';
-import { usualFoods } from '@/features/food/usuals';
+import { matchServing } from '@/features/food/helpers';
+import { customFoodIndex, resolveUsuals, usualFoods } from '@/features/food/usuals';
 import { isolateRtl } from '@/lib/bidi';
 import { MEAL_LABEL, MEAL_SHARE, scaleNutrients } from '@/lib/nutrition';
 import { formatNumber } from '@/lib/units';
@@ -49,13 +50,19 @@ interface Pick {
 
 const BY_ID = new Map(BUILTIN_FOODS.map((f) => [f.id, f]));
 
-/** Three one-tap foods for the meal: the person's usual ones when there are any, else bundled staples. */
-function picks(entries: Parameters<typeof usualFoods>[0], meal: MealType, today: ISODate): Pick[] {
-  const usual: Pick[] = usualFoods(entries, meal, today, { withFood: true, limit: 3 }).flatMap((u) =>
-    u.food
-      ? [{ key: u.key, label: u.food.name.split(',')[0], food: u.food, serving: { label: u.last.servingLabel, grams: u.last.grams / (u.last.quantity || 1) }, quantity: u.last.quantity || 1, kcal: u.last.nutrients.kcal }]
-      : [],
-  );
+/**
+ * Three one-tap foods for the meal: the person's usual ones when there are any, else bundled staples.
+ * A usual food is the food as it is now at the remembered grams (`resolveUsuals`), so the chip's
+ * calories are what a tap logs.
+ */
+function picks(entries: Parameters<typeof usualFoods>[0], meal: MealType, today: ISODate, customFoods: readonly Food[]): Pick[] {
+  const usual: Pick[] = resolveUsuals(usualFoods(entries, meal, today, { withFood: true, limit: 3 }), customFoodIndex(customFoods)).flatMap((u) => {
+    const food = u.last.food ?? u.food;
+    if (!food) return [];
+    const quantity = u.last.quantity || 1;
+    const serving = matchServing(food, u.last.servingLabel, u.last.grams / quantity);
+    return [{ key: u.key, label: food.name.split(',')[0], food, serving, quantity, kcal: scaleNutrients(food.per100g, serving.grams * quantity).kcal }];
+  });
   if (usual.length >= 3) return usual;
   const staples = STAPLES[meal].flatMap((s) => {
     const food = BY_ID.get(s.id);
@@ -75,9 +82,10 @@ function picks(entries: Parameters<typeof usualFoods>[0], meal: MealType, today:
 export function FirstLogInvite({ meal, date, budget }: { meal: MealType; date: ISODate; budget: number }) {
   const { colors, spacing } = useTheme();
   const entries = useLive('foodEntries');
+  const customFoods = useLive('customFoods');
   const label = MEAL_LABEL[meal];
   const share = Math.round((budget * MEAL_SHARE[meal]) / 10) * 10;
-  const options = picks(entries, meal, date);
+  const options = picks(entries, meal, date, customFoods);
   return (
     <View testID="today-first-invite" style={{ gap: spacing.md }}>
       <Text variant="overline">{`${label} · around ${formatNumber(share)} kcal`}</Text>
@@ -99,6 +107,7 @@ export function FirstLogInvite({ meal, date, budget }: { meal: MealType; date: I
                 key={p.key}
                 testID={`today-first-${p.key}`}
                 label={`${isolateRtl(p.label)} · ${formatNumber(Math.round(p.kcal))} kcal`}
+                accessibilityLabel={`${p.label} · ${formatNumber(Math.round(p.kcal))} kcal`}
                 icon={<Plus size={14} color={colors.text} strokeWidth={2.2} />}
                 onPress={() => logFood({ food: p.food, serving: p.serving, quantity: p.quantity, meal, date })}
               />

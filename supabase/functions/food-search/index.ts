@@ -13,7 +13,7 @@
  * that finds no product the app can show is the free-text search asked once
  * more, so the browser makes one call.
  */
-import { offSearchQuery, usableHit } from './query.ts';
+import { offQueryText, offSearchQuery, usableHit } from './query.ts';
 
 const SEARCH = 'https://search.openfoodfacts.org/search';
 /** A field query also asks for the name fallbacks of `offToFood`. */
@@ -36,7 +36,8 @@ Deno.serve(async (req) => {
   if (req.method !== 'GET') return json(405, { error: 'method_not_allowed' });
 
   const url = new URL(req.url);
-  const q = (url.searchParams.get('q') ?? '').trim().slice(0, 80);
+  // Cut to 80 characters inside the shared builder (`offQueryText`), as the phones cut it.
+  const q = offQueryText((url.searchParams.get('q') ?? '').trim());
   const limit = Math.min(30, Math.max(1, Number(url.searchParams.get('limit')) || 24));
   if (q.length < 2) return json(400, { error: 'bad_request', message: 'Search for at least two characters.' });
 
@@ -45,23 +46,30 @@ Deno.serve(async (req) => {
   const timer = setTimeout(() => controller.abort(), 9000);
   const ask = (url: string) => fetch(url, { signal: controller.signal, headers: { Accept: 'application/json' } });
   const textUrl = `${SEARCH}?q=${encodeURIComponent(q)}&page_size=${limit}&fields=${TEXT_FIELDS}`;
+  // Product data changes slowly; let the browser and CDN reuse answers for an hour. A fallback that
+  // follows a refused field query is kept 60 s only, so one refusal does not stand for an hour.
+  let cache = 'public, max-age=3600';
   try {
     const built = offSearchQuery(q);
     if (built.sortBy) {
       const field = await ask(`${SEARCH}?q=${encodeURIComponent(built.q)}&page_size=${limit}&fields=${FIELDS}&sort_by=${built.sortBy}`);
       if (field.ok) {
-        const data = (await field.json()) as { hits?: unknown[] };
-        const hits = Array.isArray(data.hits) ? data.hits : [];
-        if (hits.some(usableHit)) return json(200, { hits }, { 'Cache-Control': 'public, max-age=3600' });
+        const data = (await field.json()) as { hits?: unknown } | null;
+        const list = data?.hits;
+        const hits = Array.isArray(list) ? list : [];
+        if (hits.some(usableHit)) return json(200, { hits }, { 'Cache-Control': cache });
       } else {
         console.warn(`food-search: the field query was refused (${field.status}); using the free-text search`);
+        cache = 'public, max-age=60';
       }
     }
     const upstream = await ask(textUrl);
     if (!upstream.ok) return json(502, { error: 'upstream', message: 'The product database is not answering right now.' });
-    const data = (await upstream.json()) as { hits?: unknown[] };
-    // Product data changes slowly; let the browser and CDN reuse answers for an hour.
-    return json(200, { hits: Array.isArray(data.hits) ? data.hits : [] }, { 'Cache-Control': 'public, max-age=3600' });
+    const data = (await upstream.json()) as { hits?: unknown } | null;
+    // A body without a list of hits is a failure, never "no matches".
+    const hits = data?.hits;
+    if (!Array.isArray(hits)) return json(502, { error: 'upstream', message: 'The product database is not answering right now.' });
+    return json(200, { hits }, { 'Cache-Control': cache });
   } catch {
     return json(502, { error: 'upstream', message: 'The product database is not answering right now.' });
   } finally {

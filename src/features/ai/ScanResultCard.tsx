@@ -120,6 +120,7 @@ export function ScanResultCard({
             key={`${s.label}-${i}`}
             testID={`scan-serving-${i}`}
             label={servingText(s.label)}
+            accessibilityLabel={s.label}
             selected={s.label === portion.serving.label}
             onPress={() => setPortion({ serving: s, quantity: 1 })}
           />

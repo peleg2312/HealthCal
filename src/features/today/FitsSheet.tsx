@@ -3,7 +3,7 @@ import { Check, Plus, Search } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { lastPortions, matchServing, servingText } from '@/features/food/helpers';
+import { lastPortions, servingText } from '@/features/food/helpers';
 import { logFood } from '@/features/food/log';
 import { customFoodIndex, resolveFood, resolveUsuals, usualFoods } from '@/features/food/usuals';
 import { isolateRtl } from '@/lib/bidi';
@@ -84,7 +84,8 @@ export function FitsSheet({
   };
 
   const add = (f: Fit) => {
-    logFood({ food: f.food, serving: matchServing(f.food, f.serving.label, f.serving.grams), quantity: f.quantity, meal, date });
+    // The serving the row priced (`fitCandidates` resolves the remembered portion), so what is added is what was shown.
+    logFood({ food: f.food, serving: f.serving, quantity: f.quantity, meal, date });
     setAdded((a) => [...a, { key: f.key, kcal: f.kcal }]);
   };
 

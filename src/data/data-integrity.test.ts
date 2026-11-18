@@ -8,6 +8,7 @@ import {
   POPULAR_ACTIVITY_IDS,
   searchActivities,
 } from './activities';
+import { ACTIVITY_NAMES_HE } from './activityNamesHe';
 import { BUILTIN_FOODS, NATIONAL_LABELS, NATIONAL_RECIPES } from './foods';
 
 // The water screen's reading of a serving label (src/features/drinks/rules.ts labelMl), copied so this file
@@ -63,8 +64,8 @@ describe('BUILTIN_FOODS', () => {
     expect([...NATIONAL_RECIPES].filter((c) => !codes.has(c))).toEqual([]);
     expect([...NATIONAL_LABELS].filter((c) => !codes.has(c))).toEqual([]);
     expect([...NATIONAL_LABELS].filter((c) => NATIONAL_RECIPES.has(c))).toEqual([]);
-    expect(NATIONAL_RECIPES.size).toBe(48);
-    expect(NATIONAL_LABELS.size).toBe(10);
+    expect(NATIONAL_RECIPES.size).toBe(55);
+    expect(NATIONAL_LABELS.size).toBe(61);
   });
   it('a national food\'s spoons are measuring spoons: "tbsp" 4 to 25 g, "tsp" 1 to 10 g', () => {
     const bad: string[] = [];
@@ -166,16 +167,20 @@ describe('computed tea and coffee drinks', () => {
     expect(by.get('b_sports_drink_low')?.fdcId).toBe(2710774);
     expect(BUILTIN_FOODS.filter((f) => f.fdcId === 2710774)).toHaveLength(1);
   });
-  it('counts: 448 foods, 329 with a USDA record, 99 with a national record, 20 estimates', () => {
-    expect(BUILTIN_FOODS.length).toBe(448);
-    expect(BUILTIN_FOODS.filter((f) => f.fdcId !== undefined)).toHaveLength(329);
-    expect(BUILTIN_FOODS.filter((f) => f.ilCode !== undefined)).toHaveLength(99);
+  it('counts: 464 foods, 328 with a USDA record, 116 with a national record, 20 estimates', () => {
+    expect(BUILTIN_FOODS.length).toBe(464);
+    expect(BUILTIN_FOODS.filter((f) => f.fdcId !== undefined)).toHaveLength(328);
+    expect(BUILTIN_FOODS.filter((f) => f.ilCode !== undefined)).toHaveLength(116);
     expect(BUILTIN_FOODS.filter((f) => !f.verified)).toHaveLength(20);
   });
 });
 
 describe('ACTIVITIES', () => {
   const INTENSITIES = ['light', 'moderate', 'vigorous'] as const;
+  it('every activity has at least one Hebrew name, and every Hebrew name belongs to an activity', () => {
+    expect(ACTIVITIES.filter((a) => !(ACTIVITY_NAMES_HE[a.id]?.length > 0)).map((a) => a.id)).toEqual([]);
+    expect(Object.keys(ACTIVITY_NAMES_HE).filter((id) => !ACTIVITY_BY_ID[id])).toEqual([]);
+  });
   it('ids are unique and the lookup map is complete', () => {
     const ids = ACTIVITIES.map((a) => a.id);
     expect(new Set(ids).size).toBe(ids.length);

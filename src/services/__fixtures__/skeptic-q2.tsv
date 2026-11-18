@@ -1,44 +1,44 @@
-חומוס בטחינה	?
-חומוס עם טחינה	?
+חומוס בטחינה	b_hummus_homemade
+חומוס עם טחינה	b_hummus_homemade
 שניצלונים	b_schnitzel_chicken
 בורגר	b_hamburger
 קציצה	b_meatballs_tomato
 ה-חומוס	b_hummus
-מרקים	?
+מרקים	b_chicken_soup
 גזרים	b_carrot_raw
 לימונים	b_lemon
-נקניקיה	?
+נקניקיה	b_hot_dogs_chicken
 שוקי עוף	b_chicken_drumstick
-כרעיים	?
-כרעי עוף	?
+כרעיים	b_chicken_thigh_skin_cooked
+כרעי עוף	b_chicken_thigh_skin_cooked
 טורטיה	b_tortilla_flour
 טורטית	b_tortit
 ספרייט	b_lemon_lime_soda
 מילקי	b_milky_pudding
 דני	b_danny_pudding
-לאפה	?
-סביח	?
+לאפה	-
+סביח	-
 פיצה	b_pizza_cheese
 אבטיח	b_watermelon
 אבטיחים	b_watermelon
 חסה	b_lettuce_romaine
-חסות	?
-קוטג׳ עם זיתים	?
+חסות	-
+קוטג׳ עם זיתים	b_cottage_cheese_5pct
 cottage 5	b_cottage_cheese_5pct
 kotej	b_cottage_cheese_5pct
 milky	b_milky_pudding
 krembo	b_krembo
 bamba	b_bamba
 tehina	b_tahini_sauce
-hummus tahini	?
-hafuch	b_cappuccino
+hummus tahini	b_hummus_homemade
+hafuch	b_latte	b_cappuccino
 shoko	b_shoko
 eshel	b_eshel
 leben	b_leben
-laban	?
+laban	b_leben
 labneh	b_labneh
 pargit	b_chicken_thigh_cooked
-sabich	?
+sabich	-
 jachnun	b_jachnun
 kubbe	b_kubbeh_fried
 ptitim	b_ptitim_cooked

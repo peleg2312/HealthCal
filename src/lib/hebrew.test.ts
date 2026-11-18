@@ -12,11 +12,14 @@ import {
   HEBREW_STOPWORDS,
   hebrewStem,
   isHebrew,
+  isOtherScript,
   LONE_PREFIXES,
   MODIFIERS,
   prefixReadings,
   QUANTITY,
+  shortPluralBase,
   skeleton,
+  soundSkeleton,
   STEM_STOP,
 } from './hebrew';
 
@@ -106,10 +109,25 @@ describe('fold on Hebrew text (4.1)', () => {
     expect(fold('Pita פיתה מקמח מלא')).toBe('pita פיתה מקמח מלא');
   });
 
-  it('drops emoji, Arabic letters and other scripts like any other symbol', () => {
+  it('drops emoji and other symbols', () => {
     expect(fold('🍕 חומוס')).toBe('חומוס');
-    expect(fold('حمص')).toBe('');
-    expect(fold('хумус hummus')).toBe('hummus');
+    expect(fold('🍕')).toBe('');
+    expect(fold('Ωmega 3')).toBe('mega 3');
+  });
+
+  it('keeps Arabic and Cyrillic letters as words of their own script', () => {
+    expect(fold('حمص بالطحينة')).toBe('حمص بالطحينة');
+    // Arabic vowel marks and hamza marks go, so a word is found with or without them.
+    expect(fold('حُمُّص')).toBe('حمص');
+    expect(fold('أرز')).toBe(fold('ارز'));
+    expect(fold('Хумус домашний')).toBe('хумус домашнии');
+    expect(fold('хумус hummus')).toBe('хумус hummus');
+    // Each script is a word of its own, also next to digits and Hebrew.
+    expect(fold('хлеб5%חלב')).toBe('хлеб 5 חלב');
+    expect(fold('حمص2')).toBe('حمص 2');
+    expect(isOtherScript(fold('Хлеб'))).toBe(true);
+    expect(isOtherScript('hummus')).toBe(false);
+    expect(isOtherScript('חומוס')).toBe(false);
   });
 });
 
@@ -132,8 +150,13 @@ describe('Hebrew helpers (4.2)', () => {
     expect([...LONE_PREFIXES].sort()).toEqual(['ב', 'ה', 'כ', 'ל', 'מ', 'ש'].sort());
     expect(QUANTITY.has('גרמ')).toBe(true);
     expect(QUANTITY.has('כוס')).toBe(true);
+    // ג' and ק"ג fold to ג and קג.
+    for (const w of ['גר', "ג'", 'ק"ג', 'קילו', 'ליטר', 'קצת', 'מעט', 'אשכול', 'סקופ', 'חבילה', 'חבילת', 'ספל', 'מגש', 'צנצנת']) expect(QUANTITY.has(fold(w)), w).toBe(true);
     expect(MODIFIERS.has('קטנ')).toBe(true);
     expect(MODIFIERS.has('חמ')).toBe(true);
+    for (const w of ['בתנור', 'אפוי', 'אפויה', 'בינוני', 'בינונית', 'כפול', 'כפולה']) expect(MODIFIERS.has(fold(w)), w).toBe(true);
+    // Sweet, iced, fried and in sauce change the calories: never skippable.
+    for (const w of ['מתוק', 'מתוקה', 'קר', 'קרה', 'מטוגן', 'ברוטב']) expect(MODIFIERS.has(fold(w)) || QUANTITY.has(fold(w)), w).toBe(false);
     for (const w of [...QUANTITY, ...MODIFIERS]) expect(fold(w)).toBe(w);
   });
 
@@ -175,10 +198,33 @@ describe('Hebrew helpers (4.2)', () => {
     expect(skeleton('')).toBe('');
   });
 
+  it('soundSkeleton: ט as ת, כ as ק, ע as א, a final ה as א, after the skeleton', () => {
+    expect(soundSkeleton('פיטה')).toBe(soundSkeleton('פיתה'));
+    expect(soundSkeleton('בננא')).toBe(soundSkeleton('בננה'));
+    expect(soundSkeleton('פסתה')).toBe(soundSkeleton('פסטה'));
+    expect(soundSkeleton('עורז')).toBe(soundSkeleton('אורז'));
+    expect(soundSkeleton('כוטג')).toBe(soundSkeleton('קוטג'));
+    expect(soundSkeleton('אורס')).not.toBe(soundSkeleton('אורז'));
+    expect(soundSkeleton('')).toBe('');
+  });
+
+  it('shortPluralBase: a four-letter plural\'s two-letter singular, never a word-set word', () => {
+    expect(shortPluralBase('דגימ')).toBe('דג');
+    expect(shortPluralBase('חסות')).toBe('חס');
+    // על is in the word sets: עלים is not read as על.
+    expect(shortPluralBase('עלימ')).toBeNull();
+    expect(shortPluralBase('ביצימ')).toBeNull();
+    expect(shortPluralBase('דגנ')).toBeNull();
+  });
+
   it('prefixReadings: every prefix in order, 3+ letters left, no duplicates', () => {
     expect(prefixReadings('והחומוס')).toEqual(['חומוס', 'החומוס']);
     expect(prefixReadings('בטחינה')).toEqual(['טחינה']);
-    expect(prefixReadings('שהקוטג')).toEqual(['קוטג', 'הקוטג']);
+    expect(prefixReadings('שהקוטג')).toEqual(['קוטג']);
+    // מ and ש alone are not prefixes: מסטיק is chewing gum, not "from steak"; in a chain they stay.
+    expect(prefixReadings('מסטיק')).toEqual([]);
+    expect(prefixReadings('שניצל')).toEqual([]);
+    expect(prefixReadings('מהחומוס')).toEqual(['חומוס']);
     // Fewer than three letters left: no reading.
     expect(prefixReadings('בתה')).toEqual([]);
     expect(prefixReadings('לחמ')).toEqual([]);

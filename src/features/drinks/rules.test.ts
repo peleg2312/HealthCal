@@ -448,3 +448,23 @@ describe('rememberedChoice', () => {
     expect(pickedFood(sel('soft_regular'), m, 'milk')).toBeNull();
   });
 });
+
+describe('a drink named in Hebrew in the drawn lines (lead\'s decision D3)', () => {
+  const he = own({ name: 'לימונדה ביתית' });
+  const iso = `‎⁨${he.name}⁩`;
+  it('isolates the name in the "chosen" toast, the drink line and the notice', () => {
+    expect(pickedToast(he)).toBe(`${iso} chosen. Tap a glass to add it.`);
+    const p = planDrink(base({ kind: 'other', drink: selectFood(he) }));
+    expect(p.line.startsWith(iso)).toBe(true);
+    const custom = planDrink(base({ kind: 'other', drink: selectFood(he), ml: 330, amount: 'custom' }));
+    expect(custom.line).toContain(`330 ml ${iso}:`);
+    expect(noticeLine(entry({ name: he.name, foodId: he.id, loggedAt: at(7, 30).toISOString() }), selectFood(he), 'other')).toBe(`${iso} is already in breakfast (07:30).`);
+  });
+  it('keeps the raw name for screen readers and changes no English line', () => {
+    const p = planDrink(base({ kind: 'other', drink: selectFood(he) }));
+    expect(p.label).toContain(he.name);
+    expect(p.label).not.toMatch(/[‎⁨⁩]/);
+    expect(pickedToast(own())).toBe('Homemade lemonade chosen. Tap a glass to add it.');
+    expect(planDrink(base()).line).not.toMatch(/[‎⁨⁩]/);
+  });
+});
