@@ -6,10 +6,13 @@
  * first call (index build) and the budgets of the specification (4.9):
  *   interpreter only: median <= 6 ms for every Latin query, <= 10 ms for any query, first call <= 30 ms
  *   JIT:              median <= 3 ms for any query
+ * The interpreter's first call is one measurement per process and noisy, so it is measured in five fresh
+ * processes (`--mode=first`), all five are printed, and their median is held to the budget.
  * Exits 1 when a budget is missed.
  *
  *   node scripts/dev/search-timing.mjs            both modes, side by side
  *   node scripts/dev/search-timing.mjs --mode=jit (or --mode=interp) one mode, as JSON
+ *   node scripts/dev/search-timing.mjs --mode=first  the first call only, as JSON (run with the interpreter flags)
  *
  * The app's TypeScript is loaded with Node's type stripping and a small loader that resolves the `@/`
  * alias and extensionless imports, stands in for react-native, and replaces the online part
@@ -33,9 +36,14 @@ const QUERIES = [
   // The parts pass (strict and relaxed find nothing; each word searched by itself), the relaxed pass with an
   // amount, a glued prefix inside a name, and a long Hebrew query (six words, the most the parts pass reads).
   'שניצל בפיתה', 'סביח בפיתה', 'קפה עם חלב סויה', '150 גר עוף', 'חציל טחינה', 'פלאפל חומוס טחינה סלט חריף מלפפון',
+  // The second fix round: a percentage the strict pass finds, one the relaxed pass leaves unmatched (only foods
+  // whose name states a percentage), one that empties the relaxed pass, and one the parts pass never searches alone.
+  'גבינה בולגרית 5%', "קוטג' 7%", 'פיתה 5%', 'פיתה חומוס 5%',
 ];
 const HE = /[\u05d0-\u05ea]/;
 const BUDGET = { interpLatin: 6, interpAny: 10, interpFirst: 30, jitAny: 3 };
+/** Fresh interpreter processes that measure the first call. */
+const FIRST_RUNS = 5;
 
 const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1];
 
@@ -76,6 +84,10 @@ async function child(mode) {
   const t0 = performance.now();
   searchLocal(QUERIES[0]);
   const first = performance.now() - t0;
+  if (mode === 'first') {
+    process.stdout.write(JSON.stringify({ mode, foods: BUILTIN_FOODS.length, first }));
+    return;
+  }
   const rows = [];
   for (const q of QUERIES) {
     const ts = [];
@@ -90,7 +102,7 @@ async function child(mode) {
 }
 
 function run(mode) {
-  const flags = ['--experimental-strip-types', '--no-warnings', ...(mode === 'interp' ? INTERP : [])];
+  const flags = ['--experimental-strip-types', '--no-warnings', ...(mode === 'jit' ? [] : INTERP)];
   const r = spawnSync(process.execPath, [...flags, fileURLToPath(import.meta.url), `--mode=${mode}`], { encoding: 'utf8', cwd: ROOT });
   if (r.status !== 0) {
     process.stderr.write(r.stderr);
@@ -105,6 +117,8 @@ async function main() {
   if (!existsSync(path.join(SRC, 'services/foodSearch.ts'))) throw new Error('run from the repository');
   const jit = run('jit');
   const interp = run('interp');
+  const firsts = Array.from({ length: FIRST_RUNS }, () => run('first').first);
+  const firstMedian = median(firsts);
   const misses = [];
   const pad = (s, n) => String(s).padEnd(n);
   console.log(`Local food search, ${jit.foods} bundled foods, median of 25 runs after 5 warm-ups (ms)`);
@@ -116,14 +130,15 @@ async function main() {
     if (j.ms > BUDGET.jitAny) misses.push(`JIT ${r.q} ${j.ms.toFixed(2)} ms`);
     console.log(`${pad(r.q, 22)}${pad(r.ms.toFixed(2), 13)}${j.ms.toFixed(2)}`);
   });
-  console.log(`${pad('first call', 22)}${pad(interp.first.toFixed(1), 13)}${jit.first.toFixed(1)}`);
-  if (interp.first > BUDGET.interpFirst) misses.push(`interpreter first call ${interp.first.toFixed(1)} ms`);
+  console.log(`${pad('first call', 22)}${pad(firstMedian.toFixed(1), 13)}${jit.first.toFixed(1)}`);
+  console.log(`  interpreter first call in ${FIRST_RUNS} fresh processes: ${firsts.map((x) => x.toFixed(1)).join(', ')} ms (median ${firstMedian.toFixed(1)})`);
+  if (firstMedian > BUDGET.interpFirst) misses.push(`interpreter first call, median of ${FIRST_RUNS} processes, ${firstMedian.toFixed(1)} ms`);
   const slowest = (rows, f) => rows.filter(f).reduce((a, b) => (b.ms > a.ms ? b : a), { ms: 0, q: '-' });
   const sl = slowest(interp.rows, (r) => !HE.test(r.q));
   const sa = slowest(interp.rows, () => true);
   const sj = slowest(jit.rows, () => true);
   console.log(
-    `Budgets: interpreter Latin <= ${BUDGET.interpLatin} (slowest ${sl.ms.toFixed(2)}, ${sl.q}), any <= ${BUDGET.interpAny} (slowest ${sa.ms.toFixed(2)}, ${sa.q}), first call <= ${BUDGET.interpFirst}; JIT any <= ${BUDGET.jitAny} (slowest ${sj.ms.toFixed(2)}, ${sj.q})`,
+    `Budgets: interpreter Latin <= ${BUDGET.interpLatin} (slowest ${sl.ms.toFixed(2)}, ${sl.q}), any <= ${BUDGET.interpAny} (slowest ${sa.ms.toFixed(2)}, ${sa.q}), first call (median of ${FIRST_RUNS} processes) <= ${BUDGET.interpFirst}; JIT any <= ${BUDGET.jitAny} (slowest ${sj.ms.toFixed(2)}, ${sj.q})`,
   );
   if (misses.length) {
     console.log(`MISSED: ${misses.join('; ')}`);

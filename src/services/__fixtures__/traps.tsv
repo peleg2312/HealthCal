@@ -45,7 +45,7 @@ shakshuka	b_shakshuka	first
 גבינה לבנה 9	b_white_cheese_9pct	first
 2 פרוסות גבינה צהובה	b_yellow_cheese_28pct	first
 צהובה	b_yellow_cheese_28pct	first
-בולגרית 5	b_bulgarian_cheese	first
+בולגרית 5	b_bulgarian_cheese_5pct	first	G1: the 5% Bulgarian cheese row was added
 גבינה מלוחה	ANY:b_bulgarian_cheese|b_feta	first
 לאבנה	b_labneh	first
 labane	b_labneh	first
@@ -155,7 +155,7 @@ malawach	b_malawach	first
 פיצה מרגריטה	b_pizza_cheese	first
 המבורגר בלחמניה	b_hamburger	first
 נקניקיה בלחמניה	b_hot_dog_bun	first
-נקניק	ANY:b_salami|b_turkey_deli|b_ham_deli	first	B2: no food owns plain נקניק
+נקניק	b_turkey_deli	first	B2: no food owns plain נקניק; G6: the tie puts turkey deli first, never pork
 מעורב	b_mixed_grill	first
 סושי סלמון	b_sushi_salmon_nigiri	first
 נודלס	ANY:b_egg_noodles_cooked|b_rice_noodles_cooked	first
@@ -167,7 +167,7 @@ malawach	b_malawach	first
 דפינה	b_hamin	first
 קוגל ירושלמי	b_kugel	first
 גפילטה	b_gefilte_fish	first
-דג	ANY:b_tilapia_cooked|b_salmon_cooked|b_cod_cooked	miss	plain דג has no owner (a tie of three fish names; asked the data fixer)
+דג	b_tilapia_cooked	first	G2: plain דג is tilapia
 פילה סלמון	b_salmon_cooked	first
 דניס	b_sea_bream_grilled	first	A11 new row
 לברק	NONE	none
@@ -330,7 +330,7 @@ sabih	NONE	none
 חטיף אנרגיה	ANY:b_granola_bar|b_protein_bar|b_energy_drink	first
 אבטיח ובולגרית	ANY:b_watermelon|b_bulgarian_cheese	first
 סלט פירות	NONE	none
-דג סלמון	b_salmon_cooked	miss	no name holds דג with salmon (asked the data fixer)
+דג סלמון	b_salmon_cooked	first	G2: the name דג סלמון
 פירה ביתי	b_mashed_potato	first
 קפה עם חלב סויה	ANY:b_coffee_milk	first
 קפה עם חלב שקדים	ANY:b_coffee_milk	first
@@ -340,7 +340,7 @@ sabih	NONE	none
 שעועית ואורז	ANY:b_rice_white_cooked|b_white_beans	first
 חלב עמיד	b_milk_whole	first
 גבינת קוטג	b_cottage_cheese_5pct	first
-קוטג' 9%	NONE	miss	no 9% cottage; the relaxed pass may leave a number unmatched (rule 4.6, unchanged)
+קוטג' 9%	b_cottage_cheese_9pct	first	G1: the 9% cottage cheese row was added
 מוצרלה טרייה	b_mozzarella	first
 חומוס עם ביצה	ANY:b_hummus|b_egg_boiled	first
 פול מדמס	b_fava_beans	first
@@ -410,7 +410,7 @@ sabih	NONE	none
 חלבה	b_halva	first
 חלבון ביצה	b_egg_white	first
 אבקת חלבון	b_whey_protein	first
-משקה מוגז	NONE	miss	the name is gone (B2); מוגז is found nowhere and may go unmatched after the first word, so drinks named משקה show
+משקה מוגז	b_cola	first	G5: the name is back on regular cola
 קולה ללא סוכר	b_cola_diet	first
 בירה ללא אלכוהול	NONE	none
 יין ללא אלכוהול	NONE	none

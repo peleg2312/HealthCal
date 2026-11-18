@@ -270,9 +270,10 @@ function stressUp(state, { put, baselineTdee }) {
 //   diaryDrink   1: today 08:05, 250 ml semi-skimmed milk logged in the diary only (breakfast, entry ...d003,
 //                no water record, no `via`): the water screen's "already in breakfast" notice and "Water only".
 // For a remembered portion whose food has changed since (lead's decision D1 of the Israeli foods review):
-//   oldBourekas  1: on each of the five days before today, at 16:30, one snack entry of cheese bourekas that
-//                holds the copy of the food from before the Israeli foods were added (commit 3fa7914: "1 piece"
-//                80 g, 335 kcal per 100 g). Today's bundled food names "1 piece" at another weight, so the + sheet,
+//   oldBourekas  1: on each of the five days before today, at 16:30, one snack entry of cheese bourekas logged
+//                before the Israeli foods were added (commit 3fa7914: "1 piece" 80 g, 335 kcal per 100 g), in the
+//                shape a restart gives it (today's bundled food attached, the old label, grams and nutrients;
+//                src/store/persistence.ts). Today's bundled food names "1 piece" at another weight, so the + sheet,
 //                food search and What fits must show and log 80 g at today's values (entries ...b001 to ...b005;
 //                the usual snack, since the demo's snacks vary: look at it with the clock at 16:30).
 // Only what is named changes; everything else stays the demo's. Applied in that order: eatBack, spread, exercise and
@@ -314,6 +315,19 @@ function appMaths() {
   const lib = (f) => load(fileURLToPath(new URL(f, APP)));
   appCache = { ...lib('lib/dates.ts'), ...lib('lib/exercise.ts'), ...lib('store/selectors.ts'), drinks: lib('features/drinks/rules.ts'), choices: lib('features/drinks/choices.ts') };
   return appCache;
+}
+
+/** Today's bundled food with this id, from src/data/foods.ts (the object the app attaches to an entry on load). */
+function bundledFood(id) {
+  const require = createRequire(import.meta.url);
+  const ts = require('typescript');
+  const file = fileURLToPath(new URL('data/foods.ts', APP));
+  const module = { exports: {} };
+  const code = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
+  new Function('require', 'module', 'exports', code)(() => ({}), module, module.exports);
+  const food = module.exports.BUILTIN_FOODS.find((f) => f.id === id);
+  if (!food) throw new Error(`seed values: no bundled food ${id}`);
+  return JSON.parse(JSON.stringify(food));
 }
 
 const VALUE_KEYS = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack', 'spread', 'lastNight', 'weighInGap', 'onboardedToday', 'name', 'drinks', 'diaryDrink', 'oldBourekas'];
@@ -443,12 +457,12 @@ function applyValues(state, values, { put, weightKg, baselineTdee }) {
     put('foodEntries', { ...entry, id: '00000000-0000-4000-8000-00000000d003' });
   }
   if (values.oldBourekas > 0) {
-    // The row of src/data/foods.ts at 3fa7914, as a diary entry kept it.
+    // Logged from the row of src/data/foods.ts at 3fa7914 ("1 piece" 80 g, 335 kcal per 100 g), in the shape the
+    // device holds after a restart: src/store/persistence.ts saves a bundled food's entry without its copy of the
+    // food and attaches today's bundled food on load, so the entry's label, grams and nutrients are the old ones
+    // while its `food` is today's. (Writing the old copy here would hide what a person sees after a restart.)
     const per100g = { kcal: 335, protein: 9, carbs: 28, fat: 21, fiber: 1, sugar: 1.5, satFat: 9, sodium: 600 };
-    const food = {
-      id: 'b_bourekas_cheese', name: 'Bourekas, cheese (puff pastry)', emoji: '🥐', category: 'middle_eastern', source: 'builtin', verified: false,
-      per100g, servings: [{ label: '1 piece', grams: 80 }, { label: '1 large', grams: 110 }, { label: '1 small', grams: 55 }],
-    };
+    const food = bundledFood('b_bourekas_cheese');
     const nutrients = Object.fromEntries(Object.entries(per100g).map(([k, v]) => [k, (v * 80) / 100]));
     for (let n = 1; n <= 5; n++) {
       put('foodEntries', {

@@ -5,6 +5,7 @@
  *
  *   welcome -> onboarding -> plan -> Today -> log food -> log a run -> add water -> reload
  *   -> the next morning: the morning page opens by itself once (greeting, quote, plan), closes onto Today, not again
+ *   -> ... -> drinks -> an old portion after a reload: the + sheet's tile shows what its tap stores
  *
  * The expected numbers are recomputed here from the published formulas, not
  * read back from the app's own calculation code, so a mistake in the engine
@@ -652,6 +653,47 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   s = await stored();
   const [wt] = newIn(s, before, 'water');
   check("drinks: Today's +250 ml stays plain water", !!wt && wt.beverage === 'water' && !wt.drink && newIn(s, before, 'foodEntries').length === 0, JSON.stringify(wt));
+
+  // A remembered portion after a restart (lead's decision H1). Cheese bourekas logged before the Israeli foods
+  // ("1 piece" 80 g at 335 kcal per 100 g, commit 3fa7914) on the three days before today, in every meal, so it is
+  // the usual food whatever the time. After a reload the device holds today's bundled food on those entries
+  // (src/store/persistence.ts): the + sheet's tile must show what its tap stores.
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  await page.evaluate(() => {
+    const pad = (n) => String(n).padStart(2, '0');
+    const per100 = { kcal: 335, protein: 9, carbs: 28, fat: 21, fiber: 1, sugar: 1.5, satFat: 9, sodium: 600 };
+    const food = { id: 'b_bourekas_cheese', name: 'Bourekas, cheese (puff pastry)', emoji: '\u{1F950}', category: 'middle_eastern', source: 'builtin', verified: false, per100g: per100, servings: [{ label: '1 piece', grams: 80 }, { label: '1 large', grams: 110 }, { label: '1 small', grams: 55 }] };
+    for (const n of [1, 2, 3]) {
+      const d = new Date();
+      d.setDate(d.getDate() - n);
+      const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      for (const meal of ['breakfast', 'lunch', 'dinner', 'snack']) {
+        window.__healthcal.getState().upsert('foodEntries', {
+          date, meal, name: food.name, emoji: food.emoji, foodId: food.id, source: 'builtin', verified: false, servingLabel: '1 piece', quantity: 1, grams: 80,
+          nutrients: Object.fromEntries(Object.entries(per100).map(([k, v]) => [k, (v * 80) / 100])), food, loggedAt: `${date}T10:00:00.000Z`,
+        });
+      }
+    }
+  });
+  await page.evaluate(() => window.__healthcal.flush());
+  await page.waitForTimeout(500);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(1500);
+  await tap('tab-add');
+  const tile = (await text('quick-usual-b_bourekas_cheese')).replace(/\s*\n\s*/g, ' / ');
+  before = await stored();
+  await tap('quick-usual-b_bourekas_cheese');
+  s = await stored();
+  const [old] = newIn(s, before, 'foodEntries');
+  const shownKcal = Number((tile.match(/([\d,]+) kcal/) || [])[1]?.replace(/,/g, ''));
+  check(
+    'old portion: after a reload the + sheet tile shows what its tap stores',
+    !!old && shownKcal === Math.round(old.nutrients.kcal) && tile.includes(`${old.grams} g,`) && old.servingLabel === '80 g',
+    `tile "${tile}", stored ${old ? `${old.servingLabel} x${old.quantity} ${old.grams} g ${old.nutrients.kcal.toFixed(1)} kcal` : 'nothing'}`,
+  );
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(500);
 
   const real = errors.filter((e) => !/favicon|DevTools|useNativeDriver|pointerEvents is deprecated|shadow\*/i.test(e));
   check('no runtime or console errors during the whole run', real.length === 0, real.slice(0, 3).join(' || '));

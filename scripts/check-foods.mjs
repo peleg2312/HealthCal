@@ -35,6 +35,9 @@ function labelMl(label) {
   return null;
 }
 
+/** A serving label that is a weight: "50 g". */
+const WEIGHT_LABEL = /^(\d+(?:\.\d+)?) g$/;
+
 let bad = 0;
 const fail = (id, msg) => { bad++; console.log(`FAIL ${id}: ${msg}`); };
 const ids = new Set();
@@ -64,9 +67,14 @@ for (const food of BUILTIN_FOODS) {
     ilCodes.set(food.ilCode, id);
   }
   if (!food.servings.length || food.servings.length > 4) fail(id, `servings count ${food.servings.length}`);
+  // A label that is a weight ("50 g") weighs exactly that. The implicit 100 g serving is not repeated, apart from
+  // a row whose servings are all weights (the national check's WEIGHT_ONLY rows, each with its reason there).
+  const weightOnly = food.servings.every((s) => WEIGHT_LABEL.test(s.label));
   for (const s of food.servings) {
     if (!(s.grams > 0)) fail(id, `serving ${s.label} grams`);
-    if (/^100 ?g$/i.test(s.label)) fail(id, '100 g serving must not be included');
+    const w = s.label.match(WEIGHT_LABEL);
+    if (w && Math.abs(Number(w[1]) - s.grams) > 1e-9) fail(id, `"${s.label}" is ${s.grams} g; a weight label weighs what it says`);
+    if (/^100 ?g$/i.test(s.label) && !weightOnly) fail(id, '100 g serving must not be included');
   }
   // A national food's spoons are measuring spoons: "tbsp" 4 to 25 g, "tsp" 1 to 10 g (heavier ones are "serving spoons").
   if (hasIl) {
@@ -100,7 +108,7 @@ for (const food of BUILTIN_FOODS) {
   if (diff > 15 && diff > 0.12 * Math.max(n.kcal, calc)) fail(id, `kcal ${n.kcal} vs ${hasIl ? 'national' : 'Atwater'} ${calc.toFixed(0)} (${((diff / n.kcal) * 100).toFixed(0)}%)`);
 }
 // The counts in the header of src/data/foods.ts.
-const COUNTS = { total: 464, fdc: 328, il: 116, neither: 20 };
+const COUNTS = { total: 467, fdc: 329, il: 118, neither: 20 };
 const got = { total: BUILTIN_FOODS.length, fdc: fdcIds.size, il: ilCodes.size, neither: BUILTIN_FOODS.length - fdcIds.size - ilCodes.size };
 for (const k of Object.keys(COUNTS)) if (got[k] !== COUNTS[k]) fail('counts', `${k}: ${got[k]}, the header says ${COUNTS[k]}`);
 console.log(`${BUILTIN_FOODS.length} foods (${fdcIds.size} USDA, ${ilCodes.size} national, ${got.neither} estimates), ${bad} failures`);

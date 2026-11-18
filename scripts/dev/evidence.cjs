@@ -127,6 +127,8 @@
  *                                    tap a control that opens the file picker and pick these files
  *                                    (paths from the repository root)
  *       { wait: 800 },               wait this many milliseconds
+ *       { reload: true },            save what the app holds and load the page again, as after a restart
+ *                                    (saved entries of bundled foods come back with today's food attached)
  *     ],
  *     waitFor: 'import-list',      a testID that must be visible before the capture
  *     sheet: true,                 a sheet is open at the end (and must be: a capture with a
@@ -1060,8 +1062,8 @@ function stateProblems(s, where) {
     }
   }
   for (const t of s.taps || []) {
-    const ok = typeof t === 'string' || (t && typeof t === 'object' && ((typeof t.type === 'string' && typeof t.text === 'string') || typeof t.wait === 'number' || (typeof t.choose === 'string' && Array.isArray(t.files))));
-    if (!ok) problems.push(`${where}: a step is a testID, { type, text }, { wait } or { choose, files }; got ${JSON.stringify(t)}`);
+    const ok = typeof t === 'string' || (t && typeof t === 'object' && ((typeof t.type === 'string' && typeof t.text === 'string') || typeof t.wait === 'number' || t.reload === true || (typeof t.choose === 'string' && Array.isArray(t.files))));
+    if (!ok) problems.push(`${where}: a step is a testID, { type, text }, { wait }, { reload: true } or { choose, files }; got ${JSON.stringify(t)}`);
     if (t && t.files) for (const f of t.files) if (!fs.existsSync(path.resolve(ROOT, f))) problems.push(`${where}: no file ${f}`);
   }
   return problems;
@@ -1168,6 +1170,14 @@ async function open(context, job, seed) {
       await page.waitForTimeout(300);
     } else if (t.wait) {
       await page.waitForTimeout(t.wait);
+    } else if (t.reload) {
+      // The seed is written only on the first load of this tab, so what the app saved is what comes back.
+      problem = await step('reload', async () => {
+        await page.evaluate(() => window.__healthcal.flush());
+        await page.reload({ waitUntil: 'networkidle', timeout: 120000 });
+        await page.waitForSelector('[data-testid]', { timeout: 15000 });
+        await page.waitForTimeout(700);
+      });
     } else if (t.choose) {
       problem = await step(`choose files with ${t.choose}`, async () => {
         const chooser = page.waitForEvent('filechooser', { timeout: 15000 });

@@ -45,6 +45,13 @@ describe('searchActivities in Hebrew', () => {
     for (const q of ['ה', '\u05f3', '🏃', 'حمص', 'ריצה run', '\u200e']) expect(() => searchActivities(q)).not.toThrow();
   });
 
+  it('finds table tennis by the joined spelling, and gives no activity the generic word for training (ruling G7)', () => {
+    expect(first('פינגפונג')).toBe('table_tennis');
+    expect(first('פינג פונג')).toBe('table_tennis');
+    const generic = Object.entries(ACTIVITY_NAMES_HE).filter(([, names]) => names.some((n) => n === 'אימון' || n === 'אימונים'));
+    expect(generic).toEqual([]);
+  });
+
   it('leaves English as it was', () => {
     expect(first('run')).toBe('running');
     expect(searchActivities('SWIM')[0].name.toLowerCase().startsWith('swim')).toBe(true);

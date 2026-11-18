@@ -156,11 +156,18 @@ module.exports = [
   { id: 'meal-pick-hebrew', route: '/food/meal-edit', taps: ['meal-edit-add', { type: 'meal-pick-input', text: 'חומוס' }, { wait: 800 }], waitFor: 'meal-pick-screen', note: 'the meal builder searched in Hebrew: the matched line' },
 
   // ---------------------------------------------------------------- a remembered portion whose food changed
-  // Five earlier snacks hold the copy of cheese bourekas from before the Israeli foods ("1 piece" 80 g; seed
-  // knob oldBourekas). Today's food names "1 piece" at another weight, so every place shows and logs "80 g"
-  // at today's values, never the stale label (lead's decision D1). The clock is at snack time.
+  // Five earlier snacks of cheese bourekas logged before the Israeli foods ("1 piece" 80 g at 335 kcal per 100 g;
+  // seed knob oldBourekas), in the shape the device holds after a restart: today's bundled food attached, the old
+  // label, grams and calories kept (src/store/persistence.ts). Today's food names "1 piece" at another weight, so
+  // every place shows and logs "80 g" at today's values, never the stale label (lead's decisions D1 and H1). Before
+  // H1 the + sheet showed "1 piece, 268 kcal" here and a tap stored 298 kcal. The clock is at snack time.
   { id: 'quick-sheet-old-portion', route: '/', values: { oldBourekas: 1 }, now: todayAt(16, 30), taps: ['tab-add'], sheet: true, waitFor: 'quick-usual-b_bourekas_cheese', note: 'the + sheet: the usual bourekas as "80 g, 298 kcal"' },
   { id: 'quick-sheet-old-portion-logged', route: '/', values: { oldBourekas: 1 }, now: todayAt(16, 30), taps: ['tab-add', 'quick-usual-b_bourekas_cheese', { wait: 300 }], sheet: true, note: 'the usual bourekas added from the + sheet: its tick and the toast' },
   { id: 'search-old-portion', route: '/food/search?meal=snack', values: { oldBourekas: 1 }, now: todayAt(16, 30), taps: ['search-tab-usual'], note: 'food search, Usual: the bourekas row at 80 g' },
   { id: 'today-fits-old-portion', route: '/', values: { oldBourekas: 1 }, now: todayAt(16, 30), taps: ['today-remaining-open'], sheet: true, note: 'What fits: the usual bourekas at 80 g' },
+  // Food detail of such an entry, opened from the diary: the row says 268 kcal, the detail 298 kcal at the same 80 g,
+  // so one neutral line under the calories says why (lead's decision H2). Not for a new food or an entry that agrees.
+  { id: 'detail-old-portion', route: '/diary?date={day}', day: -1, values: { oldBourekas: 1 }, taps: ['entry-00000000-0000-4000-8000-00000000b001'], waitFor: 'detail-values-updated', note: 'an old bourekas entry opened: 298 kcal and the line "This food\'s values were updated since you logged it."' },
+  { id: 'detail-entry-agrees', route: '/diary?date={day}', day: -1, values: { oldBourekas: 1 }, taps: ['^entry-'], waitFor: 'food-detail-screen', absent: ['detail-values-updated'], note: 'an entry whose numbers agree: no line' },
+  { id: 'detail-new-food-no-line', route: '/food/search?meal=snack', values: { oldBourekas: 1 }, type: { 'food-search-input': 'bourekas cheese' }, taps: [{ wait: 1200 }, 'result-0'], waitFor: 'food-detail-screen', absent: ['detail-values-updated'], note: 'the same food being added new: no line' },
 ];

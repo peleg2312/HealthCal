@@ -100,7 +100,7 @@ meatballs	-	b_meatballs_tomato	new: a new food enters
 meatloaf	-	-
 roast beef	-	-
 lamb chop	-	-
-liver	-	b_chopped_liver	new: a new food enters
+liver	-	b_chicken_liver_fried	new: a new food enters (G8 renamed the chicken livers row 'Liver, chicken, fried with onion', so fried chicken finds the schnitzel again; liver now finds the liver itself before the spread)
 duck	-	-
 prawns	-	-
 lobster	-	-
@@ -134,10 +134,10 @@ kellogg	-	-
 chobani	-	-
 pringles	b_hamburger	b_hamburger
 cheetos	-	-
-tostitos	-	b_tortit	new: reached by the unchanged English typo route (tostitos, tortit); nothing before
+tostitos	-	b_tortit	new: a known typo hit (tostitos, tortit) through the unchanged English typo route; nothing before; left as it is by the lead's rulings C8 and G8
 mcdonalds	-	-
 big mac	-	-
-whopper	-	b_chopped_liver	new: reached by the unchanged English typo route (whopper, chopped: two edits); nothing before
+whopper	-	b_chopped_liver	new: a known typo hit (whopper, chopped: two edits) through the unchanged English typo route; nothing before; left as it is by the lead's rulings C8 and G8
 nuggets	b_chicken_nuggets	b_chicken_nuggets
 chicken nuggets	b_chicken_nuggets	b_chicken_nuggets
 chicken soup	my_shake	b_chicken_soup	new: the bundled chicken soup row is new (the own food Mum's chicken soup was first)

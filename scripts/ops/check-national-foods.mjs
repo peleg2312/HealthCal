@@ -1,10 +1,12 @@
 // Checks every bundled food that names an Israeli national nutrition database record (`ilCode`) against
-// the downloaded national tables, and with --fndds the foods added from USDA FNDDS against that release.
+// the downloaded national tables, with --fndds the foods added from USDA FNDDS against that release, and with --sr
+// the foods added from USDA SR Legacy in the second fix round against the SR Legacy release.
 // Run by hand (the source files are not in the repository; docs/food-data.md says how to get them):
 //
 //   node --experimental-strip-types scripts/ops/check-national-foods.mjs \
 //     --foods=<mitzrachim.csv or .json> --units=<yehidot_mida_lemitzrachim.csv or .json> \
-//     [--fndds=<survey_food_csv folder>] [--foods-ts=<a copy of src/data/foods.ts>] [--names-ts=<a copy of searchNames.ts>]
+//     [--fndds=<survey_food_csv folder>] [--sr=<sr_legacy_food_csv folder>] [--foods-ts=<a copy of src/data/foods.ts>]
+//     [--names-ts=<a copy of searchNames.ts>]
 //
 // --foods-ts and --names-ts run the check against a copy (to prove a planted fault is caught); by default the
 // repository's own files are read. One line per failure, then the name pairs and the counts; exit 1 on any
@@ -18,7 +20,7 @@ import { HEBREW_STOPWORDS, collapseDoubles, fold } from '../../src/lib/hebrew.ts
 const args = Object.fromEntries(process.argv.slice(2).map((a) => a.replace(/^--/, '').split(/=(.*)/s).slice(0, 2)));
 if (!args.foods || !args.units) {
   console.error(
-    'usage: --foods=<mitzrachim.csv|json> --units=<yehidot_mida_lemitzrachim.csv|json> [--fndds=<folder>] [--foods-ts=<path>] [--names-ts=<path>]',
+    'usage: --foods=<mitzrachim.csv|json> --units=<yehidot_mida_lemitzrachim.csv|json> [--fndds=<folder>] [--sr=<folder>] [--foods-ts=<path>] [--names-ts=<path>]',
   );
   process.exit(2);
 }
@@ -99,7 +101,9 @@ function labelFits(unit, grams, label, ctx) {
   if (g && g[3] === 'g' && Math.abs(Number(g[2]) - grams) <= 0.5 && unit >= 100 && unit <= 105) return /^1 [a-z][a-z ]*$/.test(g[1]);
   const noun = /^1 (?!small |large |mini |thin |thick |level |heaped )[a-z][a-z ]*$/;
   switch (unit) {
-    case 100: case 103: return noun.test(label);
+    // A plain unit (יחידה) above 120 g states its grams ("1 serving (133 g)", merguez), through the branch above.
+    case 100: return grams <= 120 && noun.test(label);
+    case 103: return noun.test(label);
     case 101: return /^1 mini [a-z ]+$/.test(label);
     case 102: return /^1 small [a-z ]+$/.test(label);
     case 104: return /^1 large [a-z ]+$/.test(label);
@@ -163,6 +167,16 @@ function spoonAndDrink(food) {
     }
   }
 }
+
+/**
+ * Rows whose servings may be stated as weights ("50 g" at exactly 50 g), each with its reason: the record has a
+ * gram unit (700) and no household unit a person would mean. Any other row with a weight label fails.
+ */
+const WEIGHT_ONLY = {
+  b_sunflower_seeds_shell:
+    'record 1877 has only a 2.7 g tbsp, a 1 g tsp, the gram and a kilogram; people eat the snack by the bag or the handful, tens of grams',
+};
+const WEIGHT_LABEL = /^(\d+(?:\.\d+)?) g$/;
 
 // ------------------------------------------------------------------ the food's names against its record
 /**
@@ -243,6 +257,14 @@ for (const food of national) {
   const ctx = { units, drink: food.category === 'drinks', soup: /\bsoup\b/i.test(food.name) };
   if (!food.servings.length || food.servings.length > 4) fail(id, `${food.servings.length} servings; 1 to 4 expected`);
   for (const s of food.servings) {
+    const w = s.label.match(WEIGHT_LABEL);
+    if (w) {
+      // A weight: exactly its grams, on a WEIGHT_ONLY row whose record has the gram unit (700).
+      if (Math.abs(Number(w[1]) - s.grams) > 1e-9) fail(id, `"${s.label}" is ${s.grams} g; a weight label weighs what it says`);
+      else if (!(id in WEIGHT_ONLY)) fail(id, `"${s.label}" is a weight label on a row that is not in WEIGHT_ONLY`);
+      else if (!units.some((u) => u.unit === 700 && u.grams === 1)) fail(id, `"${s.label}": record ${code} has no gram unit`);
+      continue;
+    }
     const same = units.filter((u) => u.grams !== undefined && Math.abs(u.grams - s.grams) <= 0.1 + 1e-9);
     if (!same.length) { fail(id, `"${s.label}" ${s.grams} g is no unit of record ${code}`); continue; }
     if (!same.some((u) => labelFits(u.unit, u.grams, s.label, ctx))) {
@@ -265,6 +287,11 @@ if (sorted(NATIONAL_LABELS) !== sorted(labelCodes)) fail('NATIONAL_LABELS', `hol
 for (const code of NATIONAL_LABELS) if (!national.some((f) => f.ilCode === code)) fail('NATIONAL_LABELS', `${code} is no bundled food's record`);
 for (const code of NATIONAL_RECIPES) if (!national.some((f) => f.ilCode === code)) fail('NATIONAL_RECIPES', `${code} is no bundled food's record`);
 for (const id of Object.keys(NAME_EXCEPTIONS)) if (!national.some((f) => f.id === id)) fail('NAME_EXCEPTIONS', `${id} is no national food`);
+for (const id of Object.keys(WEIGHT_ONLY)) {
+  const food = national.find((f) => f.id === id);
+  if (!food) fail('WEIGHT_ONLY', `${id} is no national food`);
+  else if (!food.servings.some((s) => WEIGHT_LABEL.test(s.label))) fail('WEIGHT_ONLY', `${id} has no weight label: take it out`);
+}
 
 // ------------------------------------------------------------------ USDA FNDDS additions (optional)
 /**
@@ -327,11 +354,72 @@ if (args.fndds) {
   }
 }
 
+// ------------------------------------------------------------------ USDA SR Legacy additions (optional)
+/**
+ * The foods added from SR Legacy 2018-04 in the second fix round (the older SR rows were checked when they were
+ * added; header of foods.ts). Every value the record reports is compared, a value it does not report must be
+ * left out, and every serving must be one of the record's own portions (food_portion.csv) at its grams.
+ */
+const SR_ADDED = ['b_pumpkin_seeds_shell'];
+let srChecked = 0;
+if (args.sr) {
+  const dir = args.sr;
+  const need = ['food.csv', 'food_nutrient.csv', 'food_portion.csv', 'nutrient.csv'].map((f) => join(dir, f));
+  if (!need.every(existsSync)) {
+    fail('sr', `${dir} lacks food.csv, food_nutrient.csv, food_portion.csv and nutrient.csv`);
+  } else {
+    // SR Legacy's food_nutrient.csv names a nutrient by its id; nutrient.csv gives each id its number (208 energy ...).
+    const NUTR = { 208: 'kcal', 203: 'protein', 205: 'carbs', 204: 'fat', 291: 'fiber', 269: 'sugar', 606: 'satFat', 307: 'sodium' };
+    const byId = new Map(parseCsv(readFileSync(need[3], 'utf8')).map((r) => [num(r.id), NUTR[num(r.nutrient_nbr)]]));
+    const want = new Map(SR_ADDED.map((id) => [BUILTIN_FOODS.find((f) => f.id === id)?.fdcId, id]));
+    const desc = new Map();
+    for (const row of parseCsv(readFileSync(need[0], 'utf8'))) if (want.has(num(row.fdc_id))) desc.set(num(row.fdc_id), `${row.data_type}: ${row.description}`);
+    const got = new Map();
+    for (const row of parseCsv(readFileSync(need[1], 'utf8'))) {
+      const fdc = num(row.fdc_id);
+      const key = byId.get(num(row.nutrient_id));
+      if (!want.has(fdc) || !key) continue;
+      if (!got.has(fdc)) got.set(fdc, {});
+      got.get(fdc)[key] = num(row.amount);
+    }
+    const portions = new Map();
+    for (const row of parseCsv(readFileSync(need[2], 'utf8'))) {
+      const fdc = num(row.fdc_id);
+      if (!want.has(fdc)) continue;
+      if (!portions.has(fdc)) portions.set(fdc, []);
+      portions.get(fdc).push({ what: `${row.amount} ${row.modifier}`.trim(), grams: num(row.gram_weight) });
+    }
+    for (const [fdc, id] of want) {
+      const food = BUILTIN_FOODS.find((f) => f.id === id);
+      const v = got.get(fdc);
+      if (!food || !v || !String(desc.get(fdc) ?? '').startsWith('sr_legacy_food')) { fail(id, `no SR Legacy record ${fdc}`); continue; }
+      srChecked++;
+      for (const k of Object.values(NUTR)) {
+        const raw = v[k];
+        const stored = food.per100g[k];
+        if (raw === undefined) {
+          if (stored !== undefined) fail(id, `${k}: stored ${stored}, but SR Legacy ${fdc} does not report it (leave it out)`);
+          continue;
+        }
+        const expect = k === 'sugar' ? Math.min(raw, v.carbs ?? raw) : raw;
+        if (stored === undefined || Math.abs(stored - expect) > (k === 'kcal' || k === 'sodium' ? 0.5 : 0.05) + 1e-9) fail(id, `${k}: stored ${stored}, SR Legacy ${raw}`);
+      }
+      for (const s of food.servings) {
+        if (!(portions.get(fdc) ?? []).some((p) => p.grams !== undefined && Math.abs(p.grams - s.grams) <= 0.1 + 1e-9)) {
+          fail(id, `"${s.label}" ${s.grams} g is no SR Legacy portion of ${fdc}`);
+        }
+      }
+      console.log(`SR Legacy ${fdc} (${desc.get(fdc)}) for ${id}: portions ${(portions.get(fdc) ?? []).map((p) => `${p.what} = ${p.grams} g`).join('; ')}`);
+    }
+  }
+}
+
 console.log('\nHebrew search names against the record (ok: a name shares a word with the record\'s Hebrew name):');
 for (const line of namePairs) console.log(`  ${line}`);
 console.log(
   `${national.length} national foods checked (${recipeCodes.size} Ministry recipes, ${labelCodes.size} product labels)` +
     (args.fndds ? `, ${fnddsChecked} of ${Object.keys(FNDDS_ADDED).length} FNDDS additions checked with their servings` : ', FNDDS additions not checked (no --fndds)') +
+    (args.sr ? `, ${srChecked} of ${SR_ADDED.length} SR Legacy additions checked with their servings` : ', SR Legacy additions not checked (no --sr)') +
     `; ${failures} failures`,
 );
 process.exit(failures ? 1 : 0);

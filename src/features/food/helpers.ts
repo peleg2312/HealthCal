@@ -5,7 +5,7 @@
 import { NATIONAL_LABELS, NATIONAL_RECIPES } from '@/data/foods';
 import { hasRtl, isolateRtl } from '@/lib/bidi';
 import { formatDayLabel, today } from '@/lib/dates';
-import { defaultServing, formatMacro, mealForTime, servingsFor } from '@/lib/nutrition';
+import { defaultServing, formatMacro, mealForTime, scaleNutrients, servingsFor } from '@/lib/nutrition';
 import { formatNumber } from '@/lib/units';
 import { isWaterDrinkEntry } from '@/features/drinks/via';
 import type { ThemeColors } from '@/theme';
@@ -106,10 +106,16 @@ export function stepAmount(quantity: number, servingLabel: string, dir: 1 | -1):
   return Math.max(0, Math.round(snapped * step * 1000) / 1000);
 }
 
-/** Short amount for a compact stepper: "1.5 ×" or "150 g". */
+/** The grams a serving label names when the label is itself a weight ("50 g" gives 50), else null. */
+export function labelGrams(servingLabel: string): number | null {
+  const m = servingLabel.match(/^(\d+(?:\.\d+)?) g$/);
+  return m ? Number(m[1]) : null;
+}
+
+/** Short amount for a compact stepper: "1.5 ×", or "150 g" for a serving that is a weight ("100 g", "50 g"). */
 export function amountLabel(servingLabel: string, quantity: number): string {
-  if (servingLabel === '1 g') return `${formatQty(quantity)} g`;
-  if (servingLabel === '100 g') return `${formatQty(quantity * 100)} g`;
+  const g = labelGrams(servingLabel);
+  if (g !== null) return `${formatQty(g * quantity)} g`;
   return `${formatQty(quantity)} ×`;
 }
 
@@ -220,6 +226,17 @@ export function portionFor(food: Food, last: Map<string, FoodEntry>): Portion {
 
 export function portionKcal(food: Food, p: Portion): number {
   return (food.per100g.kcal * p.serving.grams * p.quantity) / 100;
+}
+
+/**
+ * Whether an entry opened for editing shows other calories than its diary row: `food` (the one the editor prices
+ * and saves with; for a bundled food, today's, which a restart attaches to the entry in src/store/persistence.ts)
+ * gives another rounded number for the entry's own grams than the entry stores. Never for a new food (no entry)
+ * or a person's own food.
+ */
+export function valuesUpdated(food: Food, entry: Pick<FoodEntry, 'grams' | 'nutrients'> | undefined): boolean {
+  if (!entry || food.source === 'custom' || !(entry.grams > 0)) return false;
+  return Math.round(scaleNutrients(food.per100g, entry.grams).kcal) !== Math.round(entry.nutrients.kcal);
 }
 
 /** Convert label values to per-100 g. */

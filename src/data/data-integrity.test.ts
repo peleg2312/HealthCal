@@ -27,6 +27,9 @@ function labelMl(label: string): number | null {
 
 // Mirrors scripts/check-foods.mjs and scripts/check-activities.mjs so the checks run with the suite.
 
+/** A serving label that is a weight: "50 g" (scripts/check-foods.mjs WEIGHT_LABEL). */
+const WEIGHT_LABEL = /^(\d+(?:\.\d+)?) g$/;
+
 const ALCOHOL_G_PER_100: Record<string, number> = { b_beer: 3.9, b_beer_light: 3.2, b_wine_red: 10.6, b_wine_white: 10.3, b_spirits: 33.0 };
 // Reasoned exceptions to the Atwater check (USDA food-specific energy factors); same list as the script.
 const ATWATER_EXCEPTIONS = new Set(['b_lemon', 'b_corn_cooked', 'b_tomato_paste', 'b_balsamic_vinegar']);
@@ -65,7 +68,7 @@ describe('BUILTIN_FOODS', () => {
     expect([...NATIONAL_LABELS].filter((c) => !codes.has(c))).toEqual([]);
     expect([...NATIONAL_LABELS].filter((c) => NATIONAL_RECIPES.has(c))).toEqual([]);
     expect(NATIONAL_RECIPES.size).toBe(55);
-    expect(NATIONAL_LABELS.size).toBe(61);
+    expect(NATIONAL_LABELS.size).toBe(63);
   });
   it('a national food\'s spoons are measuring spoons: "tbsp" 4 to 25 g, "tsp" 1 to 10 g', () => {
     const bad: string[] = [];
@@ -96,8 +99,24 @@ describe('BUILTIN_FOODS', () => {
     const bad = BUILTIN_FOODS.filter((f) => f.servings.length < 1 || f.servings.some((s) => !(s.grams > 0) || !Number.isFinite(s.grams) || !s.label));
     expect(bad.map((f) => f.id)).toEqual([]);
   });
-  it('servings do not repeat the implicit 100 g one', () => {
-    expect(BUILTIN_FOODS.filter((f) => f.servings.some((s) => /^100 ?g$/i.test(s.label))).map((f) => f.id)).toEqual([]);
+  it('servings do not repeat the implicit 100 g one, apart from a row whose servings are all weights', () => {
+    const weightOnly = (f: (typeof BUILTIN_FOODS)[number]) => f.servings.every((s) => WEIGHT_LABEL.test(s.label));
+    expect(BUILTIN_FOODS.filter((f) => !weightOnly(f) && f.servings.some((s) => /^100 ?g$/i.test(s.label))).map((f) => f.id)).toEqual([]);
+  });
+  it('a serving labelled as a weight ("50 g") weighs exactly that, and only the in-shell sunflower seeds have such servings', () => {
+    const bad: string[] = [];
+    const rows = new Set<string>();
+    for (const f of BUILTIN_FOODS) {
+      for (const s of f.servings) {
+        const m = s.label.match(WEIGHT_LABEL);
+        if (!m) continue;
+        rows.add(f.id);
+        if (Math.abs(Number(m[1]) - s.grams) > 1e-9) bad.push(`${f.id} "${s.label}" ${s.grams} g`);
+      }
+    }
+    expect(bad).toEqual([]);
+    // The national check's WEIGHT_ONLY set (scripts/ops/check-national-foods.mjs), with its reason there.
+    expect([...rows]).toEqual(['b_sunflower_seeds_shell']);
   });
   it('per-100 g values are finite and non-negative; kcal is plausible (0..905)', () => {
     const bad: string[] = [];
@@ -167,10 +186,10 @@ describe('computed tea and coffee drinks', () => {
     expect(by.get('b_sports_drink_low')?.fdcId).toBe(2710774);
     expect(BUILTIN_FOODS.filter((f) => f.fdcId === 2710774)).toHaveLength(1);
   });
-  it('counts: 464 foods, 328 with a USDA record, 116 with a national record, 20 estimates', () => {
-    expect(BUILTIN_FOODS.length).toBe(464);
-    expect(BUILTIN_FOODS.filter((f) => f.fdcId !== undefined)).toHaveLength(328);
-    expect(BUILTIN_FOODS.filter((f) => f.ilCode !== undefined)).toHaveLength(116);
+  it('counts: 467 foods, 329 with a USDA record, 118 with a national record, 20 estimates', () => {
+    expect(BUILTIN_FOODS.length).toBe(467);
+    expect(BUILTIN_FOODS.filter((f) => f.fdcId !== undefined)).toHaveLength(329);
+    expect(BUILTIN_FOODS.filter((f) => f.ilCode !== undefined)).toHaveLength(118);
     expect(BUILTIN_FOODS.filter((f) => !f.verified)).toHaveLength(20);
   });
 });

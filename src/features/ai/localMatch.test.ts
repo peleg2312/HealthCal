@@ -2,7 +2,7 @@
  * The photo review's suggestions (`matchFoods`) after Hebrew search (decision C17): text without a Hebrew
  * letter is scored exactly as before (proved against a copy of the scorer from git 3fa7914 on today's foods),
  * text with a Hebrew letter goes to the food search. `__fixtures__/ai-items.tsv` records the English review's
- * 50 item names before this job and now.
+ * 50 item names and Cheese omelette (ruling G9) before this job and now.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -82,8 +82,8 @@ const ids = (fs: Food[]) => fs.map((f) => f.id).join(',') || '-';
 const own = (id: string, name: string): Food => ({ id, name, per100g: { kcal: 100, protein: 5, carbs: 10, fat: 3 }, servings: [], source: 'custom', verified: false });
 
 describe('matchFoods after Hebrew search', () => {
-  it('reads the 50 item names', () => {
-    expect(items.length).toBe(50);
+  it('reads the 50 item names and the line of ruling G9', () => {
+    expect(items.length).toBe(51);
   });
 
   it('scores text without a Hebrew letter exactly as the code before this job did, on the same foods', () => {
@@ -104,7 +104,10 @@ describe('matchFoods after Hebrew search', () => {
     }
   });
 
-  it('gives the recorded suggestions for the 50 item names', () => {
+  it('gives the recorded suggestions for the 51 item names', () => {
+    // Ruling G9: neither new row is the first suggestion for these two.
+    expect(matchFoods('Fruit salad', BUILTIN_FOODS)[0]?.id).not.toBe('b_yogurt_fruit');
+    expect(matchFoods('Cheese omelette', BUILTIN_FOODS)[0]?.id).not.toBe('b_cheesecake_baked');
     const now = items.map((i) => ({ ...i, got: ids(matchFoods(i.q, BUILTIN_FOODS)) }));
     if (RECORD) {
       const byQ = new Map(now.map((r) => [r.q, r]));

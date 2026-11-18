@@ -3,7 +3,7 @@ import { Check, Plus, Search } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { lastPortions, servingText } from '@/features/food/helpers';
+import { formatQty, labelGrams, lastPortions, servingText } from '@/features/food/helpers';
 import { logFood } from '@/features/food/log';
 import { customFoodIndex, resolveFood, resolveUsuals, usualFoods } from '@/features/food/usuals';
 import { isolateRtl } from '@/lib/bidi';
@@ -21,6 +21,9 @@ import { fitCandidates, rankFits, type Fit } from './fits';
 /** "1 cup" or "1.5 × 1 cup"; `shown` draws a serving label written in Hebrew isolated (display only, never for a screen reader). */
 function portionLabel(f: Fit, shown = false): string {
   const q = f.quantity;
+  // A serving that is a weight is said as the total ("100 g", never "2 × 50 g").
+  const g = labelGrams(f.serving.label);
+  if (g !== null) return `${formatQty(g * q)} g`;
   const label = shown ? servingText(f.serving.label) : f.serving.label;
   return q === 1 ? label : `${Number.isInteger(q) ? q : q.toFixed(1)} × ${label}`;
 }

@@ -8,7 +8,7 @@
  * (foundation_food_json_2026-10-29, consulted but no record was chosen from it,
  * because the matching SR Legacy record carries the full nutrient set).
  *
- * 464 foods. 328 name the USDA record they were checked against (`fdcId`), 116 name a record of
+ * 467 foods. 329 name the USDA record they were checked against (`fdcId`), 118 name a record of
  * Israel's national nutrition database (`ilCode`), and 20 name neither. A food is `verified: true`
  * exactly when it names one record, `fdcId` or `ilCode`, never both.
  *
@@ -35,6 +35,13 @@
  * kohlrabi 3801) or FNDDS portions (the chicken rows, rusks). Pickled herring was
  * added the same way at first, but Israeli label records exist, so it now names
  * one (1227, Miki; the USDA record was 262 kcal, the Israeli products 186 to 209).
+ * Pumpkin seeds in the shell (SR Legacy 168601, "whole, roasted, with salt added") were added from SR Legacy
+ * in the second fix round, because the national record of the same food (8250) is a copy of it; its
+ * servings are the record's own portions, it reports no sugar (left out), and the national check proves it
+ * against sr_legacy_food_csv_2018-04 (--sr).
+ * English names state the fat percentage of every row whose product comes in several (milk, yogurts,
+ * creams, cheeses, minced meat): the record's own fat per 100 g, rounded, so a search for one percentage
+ * shows the difference on the screen.
  *
  * The national database (`ilCode`, il() below): Tzameret, Israel's Ministry of
  * Health, published on data.gov.il; foods updated October 2022. Only records with
@@ -62,8 +69,12 @@
  * or with the grams in brackets ("1 piece (76 g)", "1 serving (133 g)"); a national
  * spoon heavier than 25 g is a "serving spoon", never a "tbsp"; a drink names its
  * volume ("1 cup (240 ml)"); soups are served in a "bowl" and a "small bowl" on
- * purpose (the units are portions). The first serving is the one a person most
- * often means. Bamba's 25 g bag is "1 small bag" beside its 80 g "1 large bag": the
+ * purpose (the units are portions); a plain unit (100) above 120 g states its grams
+ * ("1 piece (175 g)"). A row whose record has no household unit a person would mean
+ * may state its servings as weights, "50 g" at exactly 50 g, when the record has the
+ * gram unit (700): only the rows in the national check's WEIGHT_ONLY set (in-shell
+ * sunflower seeds, whose units are a 2.7 g tbsp and a 1 g tsp; servings "50 g" and
+ * "100 g"). The first serving is the one a person most often means. Bamba's 25 g bag is "1 small bag" beside its 80 g "1 large bag": the
  * record's units are a bag (25 g) and a large package (80 g). Rugelach (2445) is
  * stored with no flavour, because the record's Hebrew name says cinnamon and its
  * English name chocolate. Each national record was compared with the other records
@@ -71,7 +82,7 @@
  * was replaced by a mainstream sibling (hamin, the ice pop, vegetable soup) or kept
  * for a stated reason (a different fat level or product).
  * NATIONAL_RECIPES lists the 55 Ministry recipe records (their source line says
- * "a typical home recipe") and NATIONAL_LABELS all 61 product records (`makor` 3),
+ * "a typical home recipe") and NATIONAL_LABELS all 63 product records (`makor` 3),
  * whose source line says "from the product's label as recorded there". Ten of the
  * products are stored under a generic English name with the product's name in
  * brackets ("Peanut puffs, corn-based (Bamba)").
@@ -79,7 +90,8 @@
  * from the downloaded tables and checks that each food's Hebrew search names share
  * a word with its record's Hebrew name (docs/food-data.md); last passed 2026-11-18,
  * together with the six FNDDS additions and their servings against
- * survey_food_csv_2024-10-31.
+ * survey_food_csv_2024-10-31 and the SR Legacy addition against
+ * sr_legacy_food_csv_2018-04.
  *
  * The other 20 foods have no honest record and stay `verified: false`
  * with typical-label or recipe-based estimates: gummy candy, Caesar salads and
@@ -151,9 +163,10 @@ export const NATIONAL_RECIPES: ReadonlySet<number> = new Set<number>([
  * there" for each. scripts/ops/check-national-foods.mjs requires this set to equal the makor 3 codes.
  */
 export const NATIONAL_LABELS: ReadonlySet<number> = new Set<number>([
-  25, 84, 91, 94, 127, 149, 268, 285, 319, 367, 381, 385, 437, 450, 470, 472, 489, 494, 500, 532, 542, 910, 1093, 1099,
-  1227, 1800, 1877, 1940, 1946, 1970, 1978, 1988, 2062, 2243, 2261, 2265, 2381, 2445, 2451, 2496, 2534, 2580, 2581,
-  2585, 3030, 3687, 3978, 4170, 4213, 4547, 4584, 4653, 4675, 4697, 8588, 8605, 8606, 8631, 8641, 8835, 9707,
+  25, 84, 91, 94, 127, 149, 268, 285, 319, 367, 381, 385, 437, 446, 450, 470, 472, 489, 494, 496, 500, 532, 542, 910,
+  1093, 1099, 1227, 1800, 1877, 1940, 1946, 1970, 1978, 1988, 2062, 2243, 2261, 2265, 2381, 2445, 2451, 2496, 2534,
+  2580, 2581, 2585, 3030, 3687, 3978, 4170, 4213, 4547, 4584, 4653, 4675, 4697, 8588, 8605, 8606, 8631, 8641, 8835,
+  9707,
 ]);
 
 export const BUILTIN_FOODS: Food[] = [
@@ -288,7 +301,7 @@ export const BUILTIN_FOODS: Food[] = [
   il('ptitim_cooked', 'Ptitim (pearl couscous), COOKED', '🍚', 'grains', [155, 4.9, 33, 0.6, 1.4, 0.2, 0.1, 231], [['1 cup', 194], ['1 tbsp', 21]], 2625),
   il('rice_vermicelli', 'Vermicelli rice (rice with toasted noodles)', '🍚', 'grains', [191, 3.4, 30.9, 5.7, 0.7, 0.7, 0.5, 71], [['1 cup', 158], ['1 small serving', 85], ['1 serving', 177]], 9228),
   il('rice_white_oil', 'Home-style rice, made with oil', '🍚', 'grains', [196, 3, 33.7, 5, 0.5, 0, 0.4, 138], [['1 cup', 158], ['1 serving', 177], ['1 small serving', 85], ['1 tbsp', 12]], 9669),
-  il('semolina_porridge', 'Semolina porridge, made with milk', '🥣', 'grains', [95, 4.4, 12.7, 2.9, 0.4, 4.2, 1.7, 46], [['1 cup', 230], ['1 serving', 200], ['1 large serving', 300]], 9690),
+  il('semolina_porridge', 'Semolina porridge, made with milk, no added sugar', '🥣', 'grains', [95, 4.4, 12.7, 2.9, 0.4, 4.2, 1.7, 46], [['1 cup', 230], ['1 serving', 200], ['1 large serving', 300]], 9690),
   il('croissant_chocolate', 'Croissant, chocolate', '🥐', 'grains', [417, 9.7, 53.9, 19.8, 3.9, 20, 5.3, 702], [['1 large croissant', 122], ['1 small croissant', 50]], 1978),
 
   // ----------------------------------------------------- sugars & sweeteners
@@ -321,7 +334,7 @@ export const BUILTIN_FOODS: Food[] = [
   f('beef_sirloin_cooked', 'Beef sirloin steak, lean, COOKED (grilled)', '🥩', 'meat', [183, 30.6, 0, 5.8, 0, 0, 2.2, 64], [['3 oz cooked', 85], ['1 steak (6 oz)', 170]], 168634),
   f('beef_ribeye_cooked', 'Beef ribeye steak, COOKED (grilled)', '🥩', 'meat', [291, 23.7, 0, 21.8, 0, 0, 9.7, 54], [['3 oz cooked', 85], ['1 steak (8 oz raw)', 170]], 173392),
   f('lamb_leg_cooked', 'Lamb leg, COOKED (roasted)', '🍖', 'meat', [258, 25.6, 0, 16.5, 0, 0, 6.9, 66], [['3 oz cooked', 85], ['1 serving', 120]], 174312),
-  f('lamb_ground_cooked', 'Ground lamb, COOKED', '🍖', 'meat', [283, 24.8, 0, 19.6, 0, 0, 8.1, 81], [['3 oz cooked', 85], ['1 patty', 85]], 172544),
+  f('lamb_ground_cooked', 'Ground lamb, COOKED, 20% fat', '🍖', 'meat', [283, 24.8, 0, 19.6, 0, 0, 8.1, 81], [['3 oz cooked', 85], ['1 patty', 85]], 172544),
   f('pork_chop_cooked', 'Pork chop, COOKED (broiled)', '🥩', 'meat', [209, 25.6, 0, 11.1, 0, 0, 3.5, 55], [['1 chop', 157], ['3 oz cooked', 85]], 167827),
   f('pork_tenderloin_cooked', 'Pork tenderloin, COOKED (roasted)', '🥩', 'meat', [143, 26.2, 0, 3.5, 0, 0, 1.2, 57], [['3 oz cooked', 85], ['1/2 tenderloin', 160]], 168250),
   f('bacon_cooked', 'Bacon, COOKED (pan-fried)', '🥓', 'meat', [468, 33.9, 1.7, 35.1, 0, 0, 12, 1684], [['1 slice', 11.5], ['3 slices', 34.5]], 168322),
@@ -342,12 +355,12 @@ export const BUILTIN_FOODS: Food[] = [
   f('chicken_wing_cooked', 'Chicken wings, with skin, COOKED (roasted)', '🍗', 'poultry', [254, 23.8, 0, 16.9, 0, 0, 5, 98], [['1 wing (meat+skin)', 34], ['6 wings', 204]], 173630),
   f('chicken_nuggets', 'Chicken nuggets, cooked', '🍗', 'poultry', [307, 15.9, 14.9, 20.4, 0.9, 0.1, 3.6, 594], [['1 nugget', 17], ['6 nuggets', 100]], 2706092),
   f('turkey_breast_cooked', 'Turkey breast, roasted, no skin', '🦃', 'poultry', [136, 29.5, 0, 2, 0, 0, 0.7, 114], [['3 oz cooked', 85], ['1 slice thick', 40]], 174516),
-  f('turkey_ground_cooked', 'Ground turkey, COOKED', '🦃', 'poultry', [203, 27.4, 0, 10.4, 0, 0, 2.7, 78], [['3 oz cooked', 85], ['1 patty', 85]], 171506),
+  f('turkey_ground_cooked', 'Ground turkey, COOKED, 10% fat', '🦃', 'poultry', [203, 27.4, 0, 10.4, 0, 0, 2.7, 78], [['3 oz cooked', 85], ['1 patty', 85]], 171506),
   f('chicken_roasted', 'Whole roast chicken, with skin', '🍗', 'poultry', [203, 24.7, 0, 10.8, 0, 0, 2.9, 338], [['1 piece', 60], ['1/2 chicken', 300], ['1 cup diced', 135]], 2705933),
   f('chicken_drumstick', 'Chicken drumstick, with skin, COOKED (roasted)', '🍗', 'poultry', [190, 23.2, 0, 10.1, 0, 0, 2.7, 353], [['1 medium drumstick', 60], ['1 small drumstick', 45], ['1 large drumstick', 80]], 2706002),
   il('mixed_grill', 'Jerusalem grill (meorav)', '🍢', 'poultry', [196, 32.1, 3.9, 5.1, 0.7, 1.7, 1, 732], [['1 serving', 200], ['1 small serving', 150]], 1004),
   il('chopped_liver', 'Liver spread, chopped (chopped liver)', '🍗', 'poultry', [231, 17.3, 3.2, 16.2, 0.5, 1.7, 3, 606], [['1 tbsp', 20]], 9110),
-  il('chicken_liver_fried', 'Chicken livers, fried with onion', '🍗', 'poultry', [195, 17.4, 3.4, 12.1, 0.6, 1.6, 2.2, 549], [['1 serving', 200], ['1 piece', 24]], 1056),
+  il('chicken_liver_fried', 'Liver, chicken, fried with onion', '🍗', 'poultry', [195, 17.4, 3.4, 12.1, 0.6, 1.6, 2.2, 549], [['1 serving', 200], ['1 piece', 24]], 1056),
   il('hot_dogs_chicken', 'Hot dogs (frankfurters), chicken', '🌭', 'poultry', [220, 14, 5.1, 16, 0.1, 0.5, 5, 700], [['1 hot dog', 34], ['1 mini hot dog', 15], ['1 large hot dog', 81]], 1099),
   il('chicken_patties', 'Chicken patties, ready to heat', '🍗', 'poultry', [186, 15, 12, 10, 6, 0.8, 3, 410], [['1 patty', 40]], 910),
 
@@ -383,61 +396,63 @@ export const BUILTIN_FOODS: Food[] = [
   f('egg_yolk', 'Egg yolk, raw', '🥚', 'eggs', [322, 15.86, 3.59, 26.54, 0, 0.56, 9.55, 48], [['1 large yolk', 17]], 172184),
 
   // ------------------------------------------------------------------- dairy
-  f('milk_whole', 'Milk, whole', '🥛', 'dairy', [61, 3.15, 4.8, 3.25, 0, 4.8, 1.86, 43], [['1 cup', 244], ['1 glass (200 ml)', 206]], 171265),
+  f('milk_whole', 'Milk, whole (3.25%)', '🥛', 'dairy', [61, 3.15, 4.8, 3.25, 0, 4.8, 1.86, 43], [['1 cup', 244], ['1 glass (200 ml)', 206]], 171265),
   f('milk_2pct', 'Milk, reduced fat (2%)', '🥛', 'dairy', [50, 3.3, 4.8, 1.98, 0, 4.8, 1.3, 47], [['1 cup', 244], ['1 glass (200 ml)', 206]], 171267),
-  f('milk_skim', 'Milk, skim (nonfat)', '🥛', 'dairy', [34, 3.37, 4.96, 0.08, 0, 4.96, 0.05, 42], [['1 cup', 245], ['1 glass (200 ml)', 206]], 171269),
-  f('buttermilk', 'Buttermilk, low-fat', '🥛', 'dairy', [40, 3.31, 4.79, 1.1, 0, 4.79, 0.7, 148], [['1 cup', 245]], 170874),
-  f('yogurt_plain_whole', 'Yogurt, plain, whole milk', '🥣', 'dairy', [61, 3.47, 4.66, 3.25, 0, 4.66, 2.1, 46], [['1 cup', 245], ['1 container (6 oz)', 170]], 171284),
-  f('yogurt_plain_lowfat', 'Yogurt, plain, low-fat', '🥣', 'dairy', [63, 5.25, 7.04, 1.55, 0, 7.04, 1, 70], [['1 cup', 245], ['1 container (6 oz)', 170]], 170886),
-  f('greek_yogurt_nonfat', 'Greek yogurt, plain, nonfat', '🥣', 'dairy', [59, 10.19, 3.6, 0.39, 0, 3.2, 0.1, 36], [['1 container (170 g)', 170], ['1 cup', 245], ['1 tbsp', 15]], 170894),
-  f('greek_yogurt_whole', 'Greek yogurt, plain, whole milk', '🥣', 'dairy', [97, 9, 3.98, 5, 0, 3.98, 2.4, 35], [['1 container (170 g)', 170], ['1 cup', 245], ['1 tbsp', 15]], 171304),
+  f('milk_skim', 'Milk, skim (nonfat, 0.1% fat)', '🥛', 'dairy', [34, 3.37, 4.96, 0.08, 0, 4.96, 0.05, 42], [['1 cup', 245], ['1 glass (200 ml)', 206]], 171269),
+  f('buttermilk', 'Buttermilk, low-fat (1.1% fat)', '🥛', 'dairy', [40, 3.31, 4.79, 1.1, 0, 4.79, 0.7, 148], [['1 cup', 245]], 170874),
+  f('yogurt_plain_whole', 'Yogurt, plain, whole milk, 3.25% fat', '🥣', 'dairy', [61, 3.47, 4.66, 3.25, 0, 4.66, 2.1, 46], [['1 cup', 245], ['1 container (6 oz)', 170]], 171284),
+  f('yogurt_plain_lowfat', 'Yogurt, plain, low-fat (1.6%)', '🥣', 'dairy', [63, 5.25, 7.04, 1.55, 0, 7.04, 1, 70], [['1 cup', 245], ['1 container (6 oz)', 170]], 170886),
+  f('greek_yogurt_nonfat', 'Greek yogurt, nonfat (0%)', '🥣', 'dairy', [59, 10.19, 3.6, 0.39, 0, 3.2, 0.1, 36], [['1 container (170 g)', 170], ['1 cup', 245], ['1 tbsp', 15]], 170894),
+  f('greek_yogurt_whole', 'Greek yogurt, plain, whole milk, 5% fat', '🥣', 'dairy', [97, 9, 3.98, 5, 0, 3.98, 2.4, 35], [['1 container (170 g)', 170], ['1 cup', 245], ['1 tbsp', 15]], 171304),
   il('labneh', 'Labneh (strained yogurt cheese), 9% fat', '🥣', 'dairy', [127, 8, 3.5, 9, 0, 3.5, 5.4, 500], [['1 level tbsp', 12], ['1 heaped serving spoon', 44], ['1 tub', 250]], 127),
-  f('kefir', 'Kefir, plain, low-fat', '🥛', 'dairy', [43, 3.8, 4.8, 1, 0, 4.6, 0.7, 40], [['1 cup', 243]], 170904),
+  f('kefir', 'Kefir, plain, low-fat (1% fat)', '🥛', 'dairy', [43, 3.8, 4.8, 1, 0, 4.6, 0.7, 40], [['1 cup', 243]], 170904),
   f('cottage_cheese_2pct', 'Cottage cheese, 2% fat', '🥣', 'dairy', [81, 10.45, 4.76, 2.27, 0, 4, 1.2, 308], [['1/2 cup', 113], ['1 cup', 226]], 172182),
   f('cottage_cheese_4pct', 'Cottage cheese, 4% fat', '🥣', 'dairy', [98, 11.12, 3.38, 4.3, 0, 2.67, 1.7, 315], [['1/2 cup', 113], ['1 cup', 226]], 172179),
-  f('sour_cream', 'Sour cream', '🥣', 'dairy', [198, 2.44, 4.63, 19.35, 0, 3.4, 10.1, 31], [['1 tbsp', 12], ['2 tbsp', 24], ['1/4 cup', 58]], 171257),
-  f('cream_cheese', 'Cream cheese', '🧈', 'dairy', [350, 6.2, 5.5, 34.44, 0, 3.8, 20.2, 314], [['1 tbsp', 14.5], ['1 oz', 28], ['2 tbsp', 29]], 173418),
-  f('cream_heavy', 'Heavy whipping cream', '🥛', 'dairy', [340, 2.84, 2.8, 36.08, 0, 2.8, 23, 27], [['1 tbsp', 15], ['1 cup', 238]], 170859),
-  f('half_and_half', 'Half-and-half cream', '🥛', 'dairy', [131, 3.13, 4.3, 11.5, 0, 4.1, 7, 61], [['1 tbsp', 15], ['1 cup', 242]], 171255),
+  f('sour_cream', 'Sour cream, 19%', '🥣', 'dairy', [198, 2.44, 4.63, 19.35, 0, 3.4, 10.1, 31], [['1 tbsp', 12], ['2 tbsp', 24], ['1/4 cup', 58]], 171257),
+  f('cream_cheese', 'Cream cheese, 34% fat', '🧈', 'dairy', [350, 6.2, 5.5, 34.44, 0, 3.8, 20.2, 314], [['1 tbsp', 14.5], ['1 oz', 28], ['2 tbsp', 29]], 173418),
+  f('cream_heavy', 'Heavy whipping cream, 36% fat', '🥛', 'dairy', [340, 2.84, 2.8, 36.08, 0, 2.8, 23, 27], [['1 tbsp', 15], ['1 cup', 238]], 170859),
+  f('half_and_half', 'Half-and-half cream, 11.5% fat', '🥛', 'dairy', [131, 3.13, 4.3, 11.5, 0, 4.1, 7, 61], [['1 tbsp', 15], ['1 cup', 242]], 171255),
   f('butter', 'Butter, salted', '🧈', 'dairy', [717, 0.85, 0.06, 81.11, 0, 0.06, 51.4, 643], [['1 tbsp', 14.2], ['1 tsp', 4.7], ['1 pat', 5]], 173410),
   f('ghee', 'Ghee (clarified butter)', '🧈', 'dairy', [876, 0.28, 0, 99.48, 0, 0, 61.9, 2], [['1 tbsp', 13], ['1 tsp', 4.3]], 173412),
   f('ice_cream_vanilla', 'Ice cream, vanilla', '🍨', 'dairy', [207, 3.5, 23.6, 11, 0.7, 21.2, 6.8, 80], [['1/2 cup', 66], ['1 scoop', 72], ['1 cup', 132]], 167575),
-  f('condensed_milk', 'Condensed milk, sweetened', '🥛', 'dairy', [321, 7.91, 54.4, 8.7, 0, 54.4, 5.5, 127], [['1 tbsp', 19], ['2 tbsp', 38]], 171275),
+  f('condensed_milk', 'Condensed milk, sweetened, 8.7% fat', '🥛', 'dairy', [321, 7.91, 54.4, 8.7, 0, 54.4, 5.5, 127], [['1 tbsp', 19], ['2 tbsp', 38]], 171275),
   f('almond_milk', 'Almond milk, unsweetened', '🥛', 'dairy', [15, 0.4, 1.3, 1, 0.2, 0.8, 0.1, 72], [['1 cup', 240], ['1 glass (200 ml)', 200]], 174832),
   f('soy_milk', 'Soy milk, unsweetened', '🥛', 'dairy', [33, 2.86, 1.74, 1.61, 0.5, 0.4, 0.2, 37], [['1 cup', 243], ['1 glass (200 ml)', 200]], 175215),
   f('oat_milk', 'Oat milk', '🥛', 'dairy', [45, 0.7, 5.4, 2.3, 0.5, 2, 0.2, 43], [['1 cup', 240], ['1 glass (200 ml)', 200]], 2705412),
   f('coconut_milk_canned', 'Coconut milk, canned (full fat)', '🥥', 'dairy', [197, 2.02, 2.81, 21.33, undefined, undefined, 18.9, 13], [['1/4 cup', 57], ['1 cup', 226], ['1 tbsp', 15]], 170173),
   il('leben', 'Leben, 3% fat', '🥛', 'dairy', [56, 3, 3.8, 3, 0, 3.8, 1.9, 45], [['1 tub', 200], ['1 tbsp', 20]], 94),
   il('eshel', 'Eshel (cultured milk), 4.5% fat', '🥛', 'dairy', [71, 3.3, 4.2, 4.5, 0, undefined, 2.9, 41], [['1 tub', 200]], 84),
-  il('milk_1pct', 'Milk, 1% fat', '🥛', 'dairy', [43, 3.3, 5.1, 1, 0, 5.1, 0.6, 50], [['1 cup', 240], ['1 tbsp', 10]], 25),
+  il('milk_1pct', 'Milk, low-fat (1% fat)', '🥛', 'dairy', [43, 3.3, 5.1, 1, 0, 5.1, 0.6, 50], [['1 cup', 240], ['1 tbsp', 10]], 25),
   il('shoko', 'Shoko (chocolate milk), 1.5% fat', '🥛', 'dairy', [53, 3.1, 8.2, 1.5, 1, 6, 1.2, 45], [['1 bag', 225], ['1 cup', 240], ['1 carton', 500]], 149),
   il('yogurt_high_protein', 'Yogurt, high-protein, 2.9% fat', '🥣', 'dairy', [74, 8, 5, 2.9, 1, 2.1, 1.9, 40], [['1 tub', 150]], 9707),
-  il('yogurt_fruit', 'Fruit yogurt, 3% fat', '🥣', 'dairy', [109, 3.6, 16.9, 3, 0, 16.9, 1.9, 62], [['1 tub', 150], ['1 tbsp', 20]], 91),
+  il('yogurt_fruit', 'Yogurt with fruit, 3% fat', '🥣', 'dairy', [109, 3.6, 16.9, 3, 0, 16.9, 1.9, 62], [['1 tub', 150], ['1 tbsp', 20]], 91),
   il('sour_cream_15pct', 'Sour cream, 15% fat', '🥣', 'dairy', [159, 2.7, 3.3, 15, 0, undefined, 9, 45], [['1 tbsp', 18], ['1 tub', 200]], 285),
   il('cooking_cream', 'Cream for cooking, 15% fat', '🥛', 'dairy', [161, 2.3, 4.2, 15, 0, 4.2, 9, 41], [['1 tbsp', 14], ['1 carton', 250]], 268),
 
   // ------------------------------------------------------------------ cheese
-  f('cheddar', 'Cheddar cheese', '🧀', 'cheese', [403, 22.87, 3.4, 33.31, 0, 0.48, 18.9, 653], [['1 slice', 21], ['1 oz', 28], ['1 cup shredded', 113]], 173414),
-  f('mozzarella', 'Mozzarella, whole milk', '🧀', 'cheese', [299, 22.17, 2.4, 22.1, 0, 0, 13.9, 486], [['1 oz', 28], ['1/4 cup shredded', 28]], 170845),
-  f('mozzarella_part_skim', 'Mozzarella, part-skim', '🧀', 'cheese', [254, 24.26, 2.77, 15.92, 0, 1.13, 10.1, 619], [['1 oz', 28], ['1/4 cup shredded', 28]], 170847),
-  f('parmesan', 'Parmesan cheese, hard', '🧀', 'cheese', [392, 35.75, 3.22, 25, 0, 0.1, 14.8, 1175], [['1 tbsp grated', 5], ['1 oz', 28]], 170848),
-  f('feta', 'Feta cheese', '🧀', 'cheese', [265, 14.21, 3.9, 21.5, 0, 0, 13.3, 1139], [['1 oz', 28], ['1/4 cup crumbled', 38]], 173420),
-  f('swiss', 'Swiss cheese', '🧀', 'cheese', [393, 26.96, 1.4, 31, 0, 0, 18.2, 187], [['1 slice', 22], ['1 oz', 28]], 171251),
-  f('gouda', 'Gouda cheese', '🧀', 'cheese', [356, 24.94, 2.22, 27.44, 0, 2.22, 17.6, 819], [['1 slice', 28], ['1 oz', 28]], 171241),
-  f('brie', 'Brie cheese', '🧀', 'cheese', [334, 20.75, 0.45, 27.68, 0, 0.45, 17.4, 629], [['1 oz', 28], ['1 wedge', 40]], 172177),
-  f('goat_cheese', 'Goat cheese, soft', '🧀', 'cheese', [264, 18.5, 0, 21.1, 0, 0, 14.6, 459], [['1 oz', 28], ['2 tbsp crumbled', 20]], 173435),
-  il('halloumi', 'Halloumi cheese', '🧀', 'cheese', [292, 18, 1, 24, 0, 0.4, 16, 1000], [['1 slice', 20]], 489),
-  f('ricotta', 'Ricotta cheese, whole milk', '🧀', 'cheese', [150, 7.5, 7.3, 10.2, 0, 0.27, 6.4, 110], [['1/2 cup', 124], ['1/4 cup', 62]], 170851),
-  f('provolone', 'Provolone cheese', '🧀', 'cheese', [351, 25.58, 2.14, 26.62, 0, 0.55, 17.1, 727], [['1 slice', 28], ['1 oz', 28]], 170850),
-  f('american_cheese', 'American cheese, processed', '🧀', 'cheese', [366, 18.1, 4.8, 30.7, 0, 2.3, 18.1, 1671], [['1 slice', 21], ['2 slices', 42]], 170853),
+  f('cheddar', 'Cheddar cheese, 33% fat', '🧀', 'cheese', [403, 22.87, 3.4, 33.31, 0, 0.48, 18.9, 653], [['1 slice', 21], ['1 oz', 28], ['1 cup shredded', 113]], 173414),
+  f('mozzarella', 'Mozzarella, whole milk, 22% fat', '🧀', 'cheese', [299, 22.17, 2.4, 22.1, 0, 0, 13.9, 486], [['1 oz', 28], ['1/4 cup shredded', 28]], 170845),
+  f('mozzarella_part_skim', 'Mozzarella, part-skim, 16% fat', '🧀', 'cheese', [254, 24.26, 2.77, 15.92, 0, 1.13, 10.1, 619], [['1 oz', 28], ['1/4 cup shredded', 28]], 170847),
+  f('parmesan', 'Parmesan cheese, hard, 25% fat', '🧀', 'cheese', [392, 35.75, 3.22, 25, 0, 0.1, 14.8, 1175], [['1 tbsp grated', 5], ['1 oz', 28]], 170848),
+  f('feta', 'Feta cheese, 21.5% fat', '🧀', 'cheese', [265, 14.21, 3.9, 21.5, 0, 0, 13.3, 1139], [['1 oz', 28], ['1/4 cup crumbled', 38]], 173420),
+  f('swiss', 'Swiss cheese, 31% fat', '🧀', 'cheese', [393, 26.96, 1.4, 31, 0, 0, 18.2, 187], [['1 slice', 22], ['1 oz', 28]], 171251),
+  f('gouda', 'Gouda cheese, 27% fat', '🧀', 'cheese', [356, 24.94, 2.22, 27.44, 0, 2.22, 17.6, 819], [['1 slice', 28], ['1 oz', 28]], 171241),
+  f('brie', 'Brie cheese, 28% fat', '🧀', 'cheese', [334, 20.75, 0.45, 27.68, 0, 0.45, 17.4, 629], [['1 oz', 28], ['1 wedge', 40]], 172177),
+  f('goat_cheese', 'Goat cheese, soft, 21% fat', '🧀', 'cheese', [264, 18.5, 0, 21.1, 0, 0, 14.6, 459], [['1 oz', 28], ['2 tbsp crumbled', 20]], 173435),
+  il('halloumi', 'Halloumi cheese, 24% fat', '🧀', 'cheese', [292, 18, 1, 24, 0, 0.4, 16, 1000], [['1 slice', 20]], 489),
+  f('ricotta', 'Ricotta cheese, whole milk, 10% fat', '🧀', 'cheese', [150, 7.5, 7.3, 10.2, 0, 0.27, 6.4, 110], [['1/2 cup', 124], ['1/4 cup', 62]], 170851),
+  f('provolone', 'Provolone cheese, 27% fat', '🧀', 'cheese', [351, 25.58, 2.14, 26.62, 0, 0.55, 17.1, 727], [['1 slice', 28], ['1 oz', 28]], 170850),
+  f('american_cheese', 'American cheese, processed, 31% fat', '🧀', 'cheese', [366, 18.1, 4.8, 30.7, 0, 2.3, 18.1, 1671], [['1 slice', 21], ['2 slices', 42]], 170853),
   il('cottage_cheese_5pct', 'Cottage cheese, 5% fat', '🥣', 'cheese', [95, 11, 1.5, 5, 0, 1.2, 3, 350], [['1 tub', 250], ['1 serving spoon', 40]], 494),
   il('cottage_cheese_3pct', 'Cottage cheese, 3% fat', '🥣', 'cheese', [77, 11, 1.5, 3, 0, 1.5, 1.8, 350], [['1 tub', 250], ['1 serving spoon', 40]], 500),
+  il('cottage_cheese_9pct', 'Cottage cheese, 9% fat', '🥣', 'cheese', [126, 10.5, 1.2, 9, 0, 1.2, 5.4, 350], [['1 tub', 250], ['1 serving spoon', 40]], 496),
   il('white_cheese_5pct', 'White cheese, soft, 5% fat', '🥣', 'cheese', [98, 9, 4.3, 5, 0, 3.9, 3, 210], [['1 tub', 250], ['1 mini tub', 50], ['1 serving spoon', 40]], 532),
   il('white_cheese_9pct', 'White cheese, soft, 9% fat', '🥣', 'cheese', [127, 8.5, 3, 9, 0, 3, 5.4, 210], [['1 tub', 250], ['1 serving spoon', 40]], 542),
   il('cream_cheese_5pct', 'Cream cheese spread, 5% fat', '🧀', 'cheese', [110, 10, 8, 5, 3.5, 3.2, 3, 300], [['1 serving spoon', 40], ['1 box', 200]], 8605),
   il('yellow_cheese_28pct', 'Yellow cheese, sliced, 28% fat', '🧀', 'cheese', [345, 23, 0.2, 28, 0, 0.2, 17, 670], [['1 slice', 25]], 8606),
   il('yellow_cheese_9pct', 'Yellow cheese, light, 9% fat', '🧀', 'cheese', [202, 30, 0.2, 9, 0, 0.1, 5.4, 530], [['1 slice', 20], ['1 tbsp grated', 8]], 472),
   il('bulgarian_cheese', 'Bulgarian cheese, 24% fat', '🧀', 'cheese', [275, 11, 3.7, 24, 0, 2.9, 16, 1155], [['1 tbsp crumbled', 16]], 437),
+  il('bulgarian_cheese_5pct', 'Bulgarian cheese, 5% fat', '🧀', 'cheese', [131, 20.4, 1, 5, 0, 0.1, 3, 1860], [['1 tbsp crumbled', 16]], 446),
   il('tzfatit', 'Tzfatit cheese (Safed), 5% fat', '🧀', 'cheese', [130, 17.2, 4.1, 5, 0, 4, 3, 810], [['1 slice', 45], ['1 small serving', 25]], 450),
   il('kashkaval', 'Kashkaval cheese, 22% fat', '🧀', 'cheese', [303, 25, 1.2, 22, 0, 1.2, 14.7, 500], [['1 tbsp grated', 9], ['1 cup grated', 110]], 470),
 
@@ -455,8 +470,9 @@ export const BUILTIN_FOODS: Food[] = [
   f('chia_seeds', 'Chia seeds', '🌱', 'nuts_seeds', [486, 16.54, 42.12, 30.74, 34.4, undefined, 3.33, 16], [['1 tbsp', 12], ['1 oz', 28]], 170554),
   f('flaxseed', 'Flaxseed', '🌱', 'nuts_seeds', [534, 18.29, 28.88, 42.16, 27.3, 1.55, 3.67, 30], [['1 tbsp whole', 10], ['1 tbsp ground', 7]], 169414),
   f('sunflower_seeds', 'Sunflower seed kernels', '🌻', 'nuts_seeds', [584, 20.78, 20, 51.46, 8.6, 2.62, 4.46, 9], [['1 oz', 28], ['1/4 cup', 35]], 170562),
-  il('sunflower_seeds_shell', 'Sunflower seeds, roasted, in shell (weighed with shells)', '🌻', 'nuts_seeds', [292, 12, 13.1, 24, 6.1, 2.9, 7, 2000], [['1 tsp', 1]], 1877),
+  il('sunflower_seeds_shell', 'Sunflower seeds, roasted, in shell (weighed with shells)', '🌻', 'nuts_seeds', [292, 12, 13.1, 24, 6.1, 2.9, 7, 2000], [['50 g', 50], ['100 g', 100]], 1877),
   f('pumpkin_seeds', 'Pumpkin seeds (pepitas), hulled', '🎃', 'nuts_seeds', [559, 30.23, 10.71, 49.05, 6, 1.4, 8.66, 7], [['1 oz', 28], ['1/4 cup', 32]], 170556),
+  f('pumpkin_seeds_shell', 'Pumpkin seeds, roasted, salted, in shell (weighed with shells)', '🎃', 'nuts_seeds', [446, 18.55, 53.75, 19.4, 18.4, undefined, 3.67, 2541], [['1 oz (85 seeds)', 28.35], ['1 cup', 64]], 168601),
   f('sesame_seeds', 'Sesame seeds', '🌱', 'nuts_seeds', [573, 17.73, 23.45, 49.67, 11.8, 0.3, 6.96, 11], [['1 tbsp', 9], ['1 tsp', 3]], 170150),
   f('hemp_seeds', 'Hemp seeds, hulled', '🌱', 'nuts_seeds', [553, 31.56, 8.67, 48.75, 4, 1.5, 4.6, 5], [['1 tbsp', 10], ['3 tbsp', 30]], 170148),
   f('peanut_butter', 'Peanut butter, smooth', '🥜', 'nuts_seeds', [598, 22.2, 22.3, 51.4, 5, 10.5, 10.3, 426], [['1 tbsp', 16], ['2 tbsp', 32], ['1 tsp', 5]], 174266),
@@ -517,9 +533,9 @@ export const BUILTIN_FOODS: Food[] = [
   il('rugelach', 'Rugelach', '🥐', 'snacks_sweets', [435, 6, 58, 23, 7, 15.5, 4, 166], [['1 piece', 45]], 2445),
   il('sufganiya', 'Sufganiya (jam doughnut)', '🍩', 'snacks_sweets', [376, 8.1, 49.2, 16.3, 1.2, 24, 2.5, 372], [['1 doughnut', 85], ['1 small doughnut', 50]], 2451),
   il('babka', 'Yeast cake (babka), chocolate', '🍰', 'snacks_sweets', [394, 9.3, 68.4, 13.4, 7.7, 32.7, 7.5, 72], [['1 slice', 34], ['1 thin slice', 25], ['1 thick slice', 45]], 9792),
-  il('cheesecake_baked', 'Cheesecake, baked, white cheese 5%', '🍰', 'snacks_sweets', [259, 7.7, 34.3, 10.2, 0.4, 20.8, 4.4, 149], [['1 slice', 77.5]], 2116),
+  il('cheesecake_baked', 'Cheesecake, baked, made with 5% quark', '🍰', 'snacks_sweets', [259, 7.7, 34.3, 10.2, 0.4, 20.8, 4.4, 149], [['1 slice', 77.5]], 2116),
   il('hamantaschen', 'Hamantaschen, poppy seed', '🍪', 'snacks_sweets', [402, 6.1, 51.5, 18.9, 1.8, 23, 5.3, 195], [['1 piece', 40], ['1 small piece', 30], ['1 large piece', 64]], 2237),
-  il('soup_croutons', 'Soup croutons (shkedei marak)', '🥣', 'snacks_sweets', [524, 9.2, 65.2, 25.2, undefined, 0.8, 8.3, 630], [['1 tbsp', 9]], 1988),
+  il('soup_croutons', 'Croutons for soup (shkedei marak)', '🥣', 'snacks_sweets', [524, 9.2, 65.2, 25.2, undefined, 0.8, 8.3, 630], [['1 tbsp', 9]], 1988),
   il('bamba', 'Peanut puffs, corn-based (Bamba)', '🥜', 'snacks_sweets', [534, 17.5, 45, 34, 5.5, 3.2, 5.6, 390], [['1 small bag', 25], ['1 large bag', 80], ['1 tbsp', 4]], 2581),
   il('bissli', 'Snack, wheat-based, salty (Bissli)', '🥨', 'snacks_sweets', [480, 10, 67.8, 20, 2.8, 3.5, 8, 700], [['1 small bag', 40], ['1 bag', 70]], 2585),
   il('apropo', 'Snack, corn-based (Apropo)', '🌽', 'snacks_sweets', [538, 4.5, 62.5, 30, undefined, 3.5, 3.5, 390], [['1 bag', 40]], 2580),
@@ -599,7 +615,7 @@ export const BUILTIN_FOODS: Food[] = [
   il('malawach', 'Malawach, fried', '🫓', 'middle_eastern', [395, 5.8, 47.2, 21.2, 1.5, 6.8, 10.9, 597], [['1 piece', 138], ['1 small piece', 96]], 3024),
   il('jachnun', 'Jachnun (rolled dough, slow-cooked)', '🫓', 'middle_eastern', [388, 5, 42.4, 22, undefined, 0, 12.1, 465], [['1 roll', 116.5]], 3030),
   il('kubaneh', 'Kubaneh (Yemenite bread)', '🍞', 'middle_eastern', [342, 8.2, 55.5, 9.3, 2.6, 2.3, 5.2, 112], [['1 serving', 161], ['1 large serving', 200]], 2075),
-  il('lachuch', 'Lachuch (Yemenite flatbread)', '🫓', 'middle_eastern', [190, 5.7, 35.5, 2.7, 2, 1.6, 0.2, 205], [['1 piece', 175]], 2070),
+  il('lachuch', 'Lachuch (Yemenite flatbread)', '🫓', 'middle_eastern', [190, 5.7, 35.5, 2.7, 2, 1.6, 0.2, 205], [['1 piece (175 g)', 175]], 2070),
   il('bourekas_potato', 'Bourekas, potato filling (frozen)', '🥐', 'middle_eastern', [288, 4.1, 34.2, 15.7, 1.5, 4.6, 7.3, 315], [['1 piece', 33.3], ['1 small piece', 22.2]], 8631),
   il('bourekas_spinach', 'Bourekas, spinach filling (phyllo, frozen)', '🥐', 'middle_eastern', [299, 4.8, 32.6, 17.7, 2.6, 4, 1.6, 571], [['1 piece', 41]], 8641),
   il('sambusak', 'Sambusak, cheese', '🥟', 'middle_eastern', [304, 10.7, 37.7, 12, 1.6, 1.8, 4.4, 619], [['1 piece', 80]], 3061),

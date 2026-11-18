@@ -181,7 +181,7 @@ tahina	b_tahini,b_tahini_sauce
 פסטה מבושלת	b_pasta_cooked	b_pasta_dry
 קינואה מבושלת	b_quinoa_cooked	b_quinoa_dry
 # C10: four-letter plurals, a prefix reading read by its stem, a prefix glued onto a word of a name
-דגים	b_herring_pickled	b_cornflakes
+דגים	b_tilapia_cooked	b_cornflakes
 הגבינות	b_white_cheese_5pct
 והעוגה	b_babka
 והשניצלים	b_schnitzel_chicken
@@ -233,3 +233,37 @@ tahina	b_tahini,b_tahini_sauce
 פלאפל פיתה	b_falafel,b_pita_bakery
 שקשוקה עם פטה	b_shakshuka,b_feta
 ריבה ללא סוכר	-
+# -- the second fix round (lead's decisions G1 to G7); each line names its ruling
+# G1: a fat percentage changes the calories. The 5% Bulgarian and 9% cottage rows are found by the strict pass
+גבינה בולגרית 5%	b_bulgarian_cheese_5pct
+בולגרית 5%	b_bulgarian_cheese_5pct
+קוטג' 9%	b_cottage_cheese_9pct	b_cottage_cheese_5pct
+קוטג 9%	b_cottage_cheese_9pct
+קוטג 9 אחוז	b_cottage_cheese_9pct
+# G1: the relaxed pass leaves a percentage unmatched only for a food whose English name states one (7% is no row)
+קוטג' 7%	b_cottage_cheese_5pct
+גבינה לבנה 7 אחוז	b_white_cheese_5pct
+פיתה 5%	-
+טחינה 30%	-
+פיתה 1.5%	-
+פיתה 5 אחוז	-
+# G1: the parts pass never searches a percentage alone (no food found only by its 5)
+פיתה חומוס 5%	b_pita_bakery	b_white_cheese_5pct,b_cottage_cheese_5pct,b_bulgarian_cheese_5pct
+# G2: fish as people type them; plain דג is tilapia, and pickled herring is never first
+דג	b_tilapia_cooked
+דגים	b_tilapia_cooked
+דג סלמון	b_salmon_cooked	b_herring_pickled
+דג אמנון	b_tilapia_cooked	b_herring_pickled
+דג מושט	b_tilapia_cooked	b_herring_pickled
+דג בקלה	b_cod_cooked	b_herring_pickled
+דג פורל	b_trout_cooked	b_herring_pickled
+דג מלוח	b_herring_pickled
+# G3: white seeds are pumpkin seeds in the shell
+גרעינים לבנים	b_pumpkin_seeds_shell	b_sunflower_seeds_shell
+גרעיני דלעת	b_pumpkin_seeds_shell
+גרעינים	b_sunflower_seeds_shell
+# G5: a soft drink is the regular cola, never soy milk
+משקה מוגז	b_cola,b_cola_diet	b_soy_milk
+משקה מוגז דיאט	b_cola_diet
+# G6: plain נקניק has no owner, and the tie does not put pork first
+נקניק	b_turkey_deli

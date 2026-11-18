@@ -3,6 +3,7 @@ import { Check, GlassWater, Info, Trash2 } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import { isolateRtl } from '@/lib/bidi';
 import { today, toISODate, weekdayShort } from '@/lib/dates';
 import { BEVERAGE_LABELS, baseWaterGoalMl, effectiveMl, exerciseWaterMl, glassesLeft, HYDRATION_FACTOR } from '@/lib/hydration';
 import { formatVolume, formatWeight, volumeToMl, volumeUnit, volumeValue } from '@/lib/units';
@@ -423,8 +424,9 @@ function WaterScreen() {
                   </Text>
                   {partner ? (
                     <Text testID={`water-entry-kcal-${i}`} variant="caption" color="textSecondary" numberOfLines={2}>
-                      {/* "129 kcal in breakfast" stays whole, so a wrap falls after the name and never leaves the meal alone on the last line. */}
-                      {waterRowCaption(partner, e.date).replace(/kcal in (\S+)/, 'kcal\u00A0in\u00A0$1')}
+                      {/* "129 kcal in breakfast" stays whole, so a wrap falls after the name and never leaves the meal alone on the last line.
+                          The drink's name is drawn isolated (a name in Hebrew keeps the line's order); the label below keeps it raw. */}
+                      {waterRowCaption({ ...partner, name: isolateRtl(partner.name) }, e.date).replace(/kcal in (\S+)/, 'kcal\u00A0in\u00A0$1')}
                     </Text>
                   ) : null}
                 </View>

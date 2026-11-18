@@ -56,7 +56,7 @@ export function customFoodIndex(customFoods: readonly Food[]): Map<string, Food>
 
 /**
  * Usual foods as they are now: a deleted own food is dropped, and an edited
- * one shows and logs today's values at the remembered amount. The remembered
+ * own food or a bundled food shows and logs today's values at the remembered amount. The remembered
  * grams always stay; a label that the food now names at another weight becomes
  * the amount in grams (`matchServing`), so the chip shows what a tap logs.
  */
@@ -70,7 +70,11 @@ export function resolveUsuals(usuals: UsualFood[], customById: ReadonlyMap<strin
     }
     const food = resolveFood(stored, customById);
     if (!food) continue;
-    if (food === stored) {
+    // A bundled food is always priced at today's values: after a restart the entry holds today's bundled food
+    // (src/store/persistence.ts attaches it on load) while its label, grams and calories are those it was logged
+    // with, so `food === stored` says nothing about whether the numbers changed. An online product's stored copy
+    // and an own food that is still the same record are the truth and stay as they are.
+    if (food === stored && BUILTIN_BY_ID.get(food.id) !== food) {
       out.push(u);
       continue;
     }

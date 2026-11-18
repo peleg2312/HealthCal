@@ -55,7 +55,7 @@ export const ACTIVITY_NAMES_HE: Readonly<Record<string, readonly string[]>> = {
   tennis: ['טניס'],
   padel: ['פאדל'],
   pickleball: ['פיקלבול'],
-  table_tennis: ['טניס שולחן', 'פינג פונג'],
+  table_tennis: ['טניס שולחן', 'פינג פונג', 'פינגפונג'],
   badminton: ['בדמינטון'],
   squash: ['סקווש'],
   racquetball: ['רקטבול'],

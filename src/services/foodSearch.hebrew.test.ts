@@ -98,7 +98,7 @@ function runList(name: string) {
 describe.skipIf(!TABLE_COMPLETE)('Hebrew query lists (needs the full name table in src/data/searchNames.ts)', () => {
   it('the worked examples (4.8) and the fix round\'s rules', () => {
     const { lines, failures } = runList('hebrew-examples.tsv');
-    expect(lines.length).toBe(203);
+    expect(lines.length).toBe(229);
     expect(failures).toEqual([]);
   });
 
@@ -149,8 +149,8 @@ describe.skipIf(!TABLE_COMPLETE)('Hebrew query lists (needs the full name table 
       if (!pass) wrong.push(`${r.q} (${r.level} ${r.expected}): ${ids.slice(0, 4).join(' ') || 'nothing'}`);
     }
     expect(wrong).toEqual([]);
-    // Measured on 2026-11-18 after the fix round: 377 first, 8 in the first three, 34 nothing or parts only, 15 known misses.
-    expect(count.first).toBeGreaterThanOrEqual(377);
+    // Measured on 2026-11-18 after the second fix round: 381 first, 8 in the first three, 34 nothing or parts only, 11 known misses.
+    expect(count.first).toBeGreaterThanOrEqual(381);
   });
 
   it('every stem shared by different Hebrew name words is wanted (STEM_STOP holds the rest)', () => {

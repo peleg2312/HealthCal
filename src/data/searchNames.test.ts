@@ -45,12 +45,13 @@ const NOT_NAMES: { name: string; on?: string; why: string }[] = [
   { name: 'וואי', why: 'the interjection "wow"' },
   { name: 'דייסה', why: 'oat or semolina porridge, with water or milk: on no food' },
   { name: 'מעדן חלב', why: 'every dairy pudding' },
-  { name: 'משקה מוגז', why: 'any fizzy drink, diet ones included' },
   { name: "צ'ילי", why: 'the hot pepper or sweet chili sauce, not chili con carne' },
   { name: 'חלב ושמנת', why: 'no product or phrase people use' },
   { name: 'נקניק', why: 'every cold cut: each sibling carries its qualifier' },
   { name: 'גבינת שמנת', why: 'cream cheese of every fat level: each carries its percent' },
-  { name: 'גרעינים לבנים', why: 'pumpkin seeds in the shell, which the list does not hold' },
+  { name: 'גרעינים לבנים', on: 'b_sunflower_seeds_shell', why: 'white seeds are pumpkin seeds in the shell: b_pumpkin_seeds_shell' },
+  { name: 'משקה מוגז', on: 'b_cola_diet', why: 'a soft drink with nothing else typed is the regular one: b_cola (the diet one is משקה מוגז דיאט)' },
+  { name: 'נקניק חזיר', on: 'b_ham_deli', why: 'tied with נקניק הודו for plain נקניק and put pork first; the ham row says נקניק חזיר פרוס' },
   { name: 'בשר טחון 15%', why: 'the raw pack\'s label: the cooked row says מבושל' },
   { name: 'בשר טחון 10%', why: 'the raw pack\'s label: the cooked row says מבושל' },
   { name: 'אפונה יבשה', on: 'b_split_peas', why: 'dry, on a cooked row' },
@@ -102,6 +103,11 @@ const PLAIN: Record<string, string> = {
   'קציצות דגים': 'b_fish_patties',
   'קציצות עוף': 'b_chicken_patties',
   'לחם קל': 'b_bread_light',
+  דג: 'b_tilapia_cooked',
+  'דג מלוח': 'b_herring_pickled',
+  'משקה מוגז': 'b_cola',
+  'גרעינים לבנים': 'b_pumpkin_seeds_shell',
+  'גרעיני דלעת': 'b_pumpkin_seeds_shell',
 };
 
 describe('SEARCH_NAMES', () => {

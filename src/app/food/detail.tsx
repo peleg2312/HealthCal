@@ -9,7 +9,7 @@ import { AmountEditor } from '@/features/food/AmountEditor';
 import { UNKNOWN_AI_CONFIDENCE, bandSpread, estimateRange, scaleRange, spreadRange } from '@/features/food/build';
 import { DayStepper, KcalValue, MacroStat, MealPicker, SourceBadge } from '@/features/food/components';
 import { useFoodDraft } from '@/features/food/draft';
-import { dayPhrase, href, portionLabel, kcal, lastPortions, matchServing, param, parseDate, parseMeal, portionFor, sourceInfo } from '@/features/food/helpers';
+import { dayPhrase, href, portionLabel, kcal, labelGrams, lastPortions, matchServing, param, parseDate, parseMeal, portionFor, sourceInfo, valuesUpdated } from '@/features/food/helpers';
 import { deleteEntry, logFood } from '@/features/food/log';
 import { RequireProfile } from '@/features/food/RequireProfile';
 import { isolateRtl } from '@/lib/bidi';
@@ -248,8 +248,11 @@ function Hero({ name, brand, source, explain, note, onEdit }: { name: string; br
   );
 }
 
+/** Said under the calories when an entry opens at other calories than it stores (`valuesUpdated`). */
+const VALUES_UPDATED = "This food's values were updated since you logged it. Saving uses the new ones.";
+
 /** Calories (large) with the portion beside them, the macro bar and the three macros: the top of the portion card. */
-function MacroSummary({ n, kcalNote, range }: { n: Nutrients; kcalNote: string; range?: [number, number] | null }) {
+function MacroSummary({ n, kcalNote, range, updated }: { n: Nutrients; kcalNote: string; range?: [number, number] | null; updated?: boolean }) {
   const { colors, spacing } = useTheme();
   return (
     <View>
@@ -264,6 +267,11 @@ function MacroSummary({ n, kcalNote, range }: { n: Nutrients; kcalNote: string; 
       {range ? (
         <Text variant="caption" color="textSecondary" tabular testID="detail-kcal-range">
           {estimateBandText(range)}
+        </Text>
+      ) : null}
+      {updated ? (
+        <Text variant="caption" color="textSecondary" testID="detail-values-updated">
+          {VALUES_UPDATED}
         </Text>
       ) : null}
       <View style={{ marginTop: spacing.md }}>
@@ -304,6 +312,9 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
     : food.source === 'ai'
       ? nextBand(entries, food.id, n.kcal)
       : null;
+
+  // A property of the stored entry, not of the amount being chosen: it stays while the amount changes.
+  const updated = valuesUpdated(food, entry);
 
   const save = () => {
     logFood({ food, serving, quantity, meal, date, entryId: entry?.id });
@@ -362,7 +373,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
 
       {/* One card for the portion: what it holds, then how much. The amount stays in the first view at 360 x 740. */}
       <Card style={{ gap: spacing.lg }} testID="detail-portion">
-        <MacroSummary range={range} n={n} kcalNote={`${portionLabel(serving.label, quantity)}${perGram || serving.label === '100 g' || (quantity === 1 && /\d\s?g\)*$/.test(serving.label)) ? '' : ` · ${Math.round(totalGrams)} g`}`} />
+        <MacroSummary range={range} n={n} updated={updated} kcalNote={`${portionLabel(serving.label, quantity)}${perGram || labelGrams(serving.label) !== null || (quantity === 1 && /\d\s?g\)*$/.test(serving.label)) ? '' : ` · ${Math.round(totalGrams)} g`}`} />
         <Divider />
         <AmountEditor food={food} value={portion} onChange={setPortion} onPendingChange={setGramsInvalid} testIDPrefix="detail" />
       </Card>

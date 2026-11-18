@@ -8,7 +8,7 @@ import { formatNumber } from '@/lib/units';
 import type { Food, FoodEntry } from '@/types';
 
 import { buildEntry } from './build';
-import { amountLabel, lastPortions, matchServing, portionFor, portionLabel, servingText, sourceInfo, stepAmount, toPer100 } from './helpers';
+import { amountLabel, formatQty, lastPortions, matchServing, portionFor, portionKcal, portionLabel, servingText, sourceInfo, stepAmount, toPer100, valuesUpdated, labelGrams } from './helpers';
 import { resolveUsuals, usualFoods, usualLabel } from './usuals';
 
 describe('stepAmount', () => {
@@ -42,6 +42,20 @@ describe('amountLabel', () => {
     expect(amountLabel('1 g', 150)).toBe('150 g');
     expect(amountLabel('100 g', 1.5)).toBe('150 g');
     expect(amountLabel('1 cup', 1.5)).toBe('1.5 ×');
+  });
+});
+
+describe('a serving that is a weight ("50 g", ruling G4)', () => {
+  it('reads as the total weight at every amount, never "1 × 50 g" or "50 g · 50 g"', () => {
+    expect(portionLabel('50 g', 1)).toBe('50 g');
+    expect(portionLabel('50 g', 1.5)).toBe('75 g');
+    expect(portionLabel('50 g', 2)).toBe('100 g');
+    expect(amountLabel('50 g', 1)).toBe('50 g');
+    expect(amountLabel('50 g', 1.5)).toBe('75 g');
+    expect(amountLabel('50 g', 2)).toBe('100 g');
+    expect(amountLabel('1 piece', 2)).toBe('2 ×');
+    expect(labelGrams('50 g')).toBe(50);
+    expect(labelGrams('1 piece (50 g)')).toBeNull();
   });
 });
 
@@ -212,5 +226,123 @@ describe('a remembered portion is logged as it is shown', () => {
     expect(usualLabel(u)).toBe(`${oldGrams * 2} g, ${formatNumber(Math.round((now.per100g.kcal * oldGrams * 2) / 100))} kcal`);
     const gone = matchServing(now, '1 enormous', 110);
     expect(gone).toEqual({ label: '1 enormous', grams: 110 });
+  });
+});
+
+// ------------------------------------------- after a reload (lead's decision H1)
+
+describe('a remembered portion after a reload: the stored shape', () => {
+  // On the device a bundled food's entry is saved without its food copy and today's bundled food is attached
+  // again on load (src/store/persistence.ts), so an entry logged before the food's values changed holds today's
+  // food while its label, grams and nutrients are the old ones. The rows of 3fa7914, as they were logged:
+  const OLD: Record<string, { per100: Food['per100g']; label: string; gramsPerUnit: number; quantity: number }> = {
+    b_bourekas_cheese: { per100: { kcal: 335, protein: 9, carbs: 28, fat: 21 }, label: '1 piece', gramsPerUnit: 80, quantity: 1 },
+    b_halloumi: { per100: { kcal: 321, protein: 21, carbs: 2.2, fat: 25 }, label: '1 slice', gramsPerUnit: 30, quantity: 2 },
+    b_schnitzel_chicken: { per100: { kcal: 255, protein: 20, carbs: 12, fat: 14 }, label: '1 piece', gramsPerUnit: 130, quantity: 1 },
+  };
+  const live = (id: string): Food => BUILTIN_FOODS.find((x) => x.id === id)!;
+  let k = 0;
+  /** What persistence.ts gives back for an entry of `id` logged at 3fa7914: JSON without the food, today's food attached. */
+  const reloaded = (id: string, date: string): FoodEntry => {
+    const o = OLD[id];
+    const grams = o.gramsPerUnit * o.quantity;
+    const saved = JSON.parse(
+      JSON.stringify({
+        id: `r-${k++}`, updatedAt: `${date}T12:00:00.000Z`, date, meal: 'lunch', name: live(id).name, foodId: id, source: 'builtin', verified: false,
+        servingLabel: o.label, quantity: o.quantity, grams, nutrients: scaleNutrients(o.per100, grams), loggedAt: `${date}T12:00:00.000Z`,
+      }),
+    ) as FoodEntry;
+    return { ...saved, food: live(id) };
+  };
+  const TODAY = '2026-11-18';
+  const DAYS = ['2026-11-15', '2026-11-16', '2026-11-17'];
+  const EXPECT: Record<string, string> = {
+    b_bourekas_cheese: '80 g, 298 kcal',
+    b_halloumi: '60 g, 175 kcal',
+    b_schnitzel_chicken: '130 g, 351 kcal',
+  };
+
+  for (const id of Object.keys(OLD)) {
+    const entries = () => DAYS.map((d) => reloaded(id, d));
+
+    it(`${id}: the + sheet's tile shows what a tap stores`, () => {
+      const [u] = resolveUsuals(usualFoods(entries(), 'lunch', TODAY), new Map());
+      expect(usualLabel(u)).toBe(EXPECT[id]);
+      // QuickLogSheet.logUsual
+      const e = u.last;
+      const logged = buildEntry({ food: e.food!, serving: matchServing(e.food!, e.servingLabel, e.grams / e.quantity), quantity: e.quantity, meal: 'lunch', date: TODAY });
+      expect(`${formatQty(logged.grams)} g, ${formatNumber(Math.round(logged.nutrients.kcal))} kcal`).toBe(EXPECT[id]);
+    });
+
+    it(`${id}: What fits, food search (Usual, recents, favourites) and the first-day chips show what a tap stores`, () => {
+      const es = entries();
+      const now = live(id);
+      const usual = resolveUsuals(usualFoods(es, 'lunch', TODAY, { withFood: true }), new Map()).map((u) => u.last);
+      for (const src of [
+        { usual, favourites: [], recents: [] },
+        { usual: [], favourites: [now], recents: [] },
+        { usual: [], favourites: [], recents: [now] },
+      ]) {
+        const [fit] = fitCandidates({ ...src, lastByFood: lastPortions(es) });
+        const logged = buildEntry({ food: fit.food, serving: fit.serving, quantity: fit.quantity, meal: 'lunch', date: TODAY });
+        expect(`${formatQty(logged.grams)} g, ${formatNumber(Math.round(fit.kcal))} kcal`).toBe(EXPECT[id]);
+        expect(Math.round(logged.nutrients.kcal)).toBe(Math.round(fit.kcal));
+      }
+      // food search and the meal picker: portionFor + portionKcal for the row, logFood with the same portion
+      const p = portionFor(now, lastPortions(es));
+      const logged = buildEntry({ food: now, serving: p.serving, quantity: p.quantity, meal: 'lunch', date: TODAY });
+      expect(Math.round(logged.nutrients.kcal)).toBe(Math.round(portionKcal(now, p)));
+      expect(`${formatQty(logged.grams)} g, ${formatNumber(Math.round(portionKcal(now, p)))} kcal`).toBe(EXPECT[id]);
+    });
+  }
+
+  it('food detail says the values were updated only for an entry whose calories now differ', () => {
+    for (const id of Object.keys(OLD)) {
+      const old = reloaded(id, DAYS[0]);
+      expect(valuesUpdated(old.food!, old)).toBe(true);
+      // The same food logged today agrees with its entry.
+      const now = live(id);
+      const fresh = buildEntry({ food: now, serving: now.servings[0], quantity: 1, meal: 'lunch', date: TODAY });
+      expect(valuesUpdated(now, fresh)).toBe(false);
+      // A new food being added (no entry).
+      expect(valuesUpdated(now, undefined)).toBe(false);
+    }
+    // Rounding: 268.4 stored, 268.0 now is the same number on the screen.
+    const f: Food = { id: 'b_x', name: 'x', per100g: { kcal: 335, protein: 0, carbs: 0, fat: 0 }, servings: [], source: 'builtin', verified: true };
+    expect(valuesUpdated(f, { grams: 80, nutrients: { kcal: 268.4, protein: 0, carbs: 0, fat: 0 } })).toBe(false);
+    // A person's own food: never, even when the numbers differ.
+    expect(valuesUpdated({ ...f, source: 'custom' }, { grams: 80, nutrients: { kcal: 300, protein: 0, carbs: 0, fat: 0 } })).toBe(false);
+  });
+
+  it('an online product and a bundled food whose values did not change keep the stored portion as it is', () => {
+    const off: Food = { id: 'off_123', name: 'Snack bar', per100g: { kcal: 400, protein: 5, carbs: 60, fat: 15 }, servings: [{ label: '1 bar', grams: 40 }], source: 'openfoodfacts', verified: false };
+    const offEntries = DAYS.map((d, i): FoodEntry => ({
+      id: `off-${i}`, updatedAt: '', date: d, meal: 'snack', name: off.name, foodId: off.id, food: off, source: 'openfoodfacts', verified: false,
+      servingLabel: '1 bar', quantity: 1, grams: 40, nutrients: { kcal: 150, protein: 2, carbs: 22, fat: 6 }, loggedAt: `${d}T15:00:00.000Z`,
+    }));
+    const [u] = resolveUsuals(usualFoods(offEntries, 'snack', TODAY), new Map());
+    expect(usualLabel(u)).toBe('1 bar, 150 kcal');
+    expect(u.last).toBe(offEntries[2]);
+
+    const rice = BUILTIN_FOODS[0];
+    const s = rice.servings[0] ?? { label: '100 g', grams: 100 };
+    const riceEntries = DAYS.map((d, i): FoodEntry => ({
+      id: `rice-${i}`, updatedAt: '', date: d, meal: 'dinner', name: rice.name, foodId: rice.id, food: rice, source: 'builtin', verified: true,
+      servingLabel: s.label, quantity: 1, grams: s.grams, nutrients: scaleNutrients(rice.per100g, s.grams), loggedAt: `${d}T19:00:00.000Z`,
+    }));
+    const [r] = resolveUsuals(usualFoods(riceEntries, 'dinner', TODAY), new Map());
+    expect(r.last.servingLabel).toBe(s.label);
+    expect(Math.round(r.last.nutrients.kcal)).toBe(Math.round(riceEntries[2].nutrients.kcal));
+  });
+
+  it('a person\'s own food shows and logs its live values', () => {
+    const mine: Food = { id: 'c_1', name: 'My granola', per100g: { kcal: 450, protein: 10, carbs: 60, fat: 18 }, servings: [{ label: '1 bowl', grams: 60 }], source: 'custom', verified: false };
+    const edited: Food = { ...mine, per100g: { ...mine.per100g, kcal: 500 } };
+    const es = DAYS.map((d, i): FoodEntry => ({
+      id: `c-${i}`, updatedAt: '', date: d, meal: 'breakfast', name: mine.name, foodId: mine.id, food: mine, source: 'custom', verified: false,
+      servingLabel: '1 bowl', quantity: 1, grams: 60, nutrients: scaleNutrients(mine.per100g, 60), loggedAt: `${d}T08:00:00.000Z`,
+    }));
+    expect(usualLabel(resolveUsuals(usualFoods(es, 'breakfast', TODAY), new Map([[mine.id, mine]]))[0])).toBe('1 bowl, 270 kcal');
+    expect(usualLabel(resolveUsuals(usualFoods(es, 'breakfast', TODAY), new Map([[mine.id, edited]]))[0])).toBe('1 bowl, 300 kcal');
   });
 });

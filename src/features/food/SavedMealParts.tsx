@@ -16,7 +16,7 @@ import { Button, Chip, ChipWrap, NumberField, PressableScale, Sheet, Stepper, Te
 import { AmountEditor } from './AmountEditor';
 import { RowEmoji } from './components';
 import { formatPortion, mealServings, planSavedMeal, setItemAmount } from './build';
-import { dayPhrase, formatQty, kcal, matchServing, portionLabel, servingText } from './helpers';
+import { dayPhrase, formatQty, kcal, labelGrams, matchServing, portionLabel, servingText } from './helpers';
 import { logSavedMeal } from './log';
 
 const PORTIONS = [0.5, 1, 2];
@@ -205,7 +205,7 @@ export function ItemAmountSheet({
             step={0.5}
             min={0.25}
             max={50}
-            format={(v) => `${formatQty(v)} × ${servingText(item.servingLabel)}`}
+            format={(v) => (labelGrams(item.servingLabel) !== null ? `${formatQty(labelGrams(item.servingLabel)! * v)} g` : `${formatQty(v)} × ${servingText(item.servingLabel)}`)}
             onChange={(q) => onChange(setItemAmount(item, { label: item.servingLabel, grams: 0 }, q))}
           />
         </View>
