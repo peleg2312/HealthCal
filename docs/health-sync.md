@@ -277,6 +277,7 @@ On GitHub's iPhone 17 simulator (iOS 26.5; `.github/workflows/phone-test.yml`, r
 - Turning Workout sync on shows the app's explanation and then Apple's Health access sheet, which lists only what is read (Active Energy, Cycling Distance, Steps, Walking + Running Distance, Workouts). After "Turn On All" and "Allow" the screen reads "On, last synced just now", with "None in Apple Health" for an empty store.
 - 8,432 steps typed into the simulator's Health app are read through the statistics collection and shown on the sync screen ("8,432 today, shown on Train") and on Train ("8,432 steps today").
 - With sleep added (run 44181867538, 17 November 2026, runtime version 2): Apple's Health access sheet lists Sleep among the types to read; after "Turn On All" and "Allow" the sync screen reads "On, last synced just now" and its Sleep section says "No night from Apple Health for last night yet". The simulator's Health app held no sleep, so `queryCategorySamples` has returned only an empty list on a phone.
+- With weigh-ins, the day's calories and workout heart rate added (run 44250443905, 18 November 2026, runtime version 3): the three flows pass, and the sync screen shows the Weight, Calories burned and Heart rate rows with the same words as on Android. The simulator's Health app held none of that data.
 
 ## Not yet proven on iPhone (needs a build signed with the HealthKit entitlement and a phone)
 
@@ -294,6 +295,8 @@ On GitHub's iPhone 17 simulator (iOS 26.5; `.github/workflows/phone-test.yml`, r
 On GitHub's Android 15 emulator (runs 43966387322 and 43983509309): turning Workout sync on shows the app's explanation, Health Connect's first-use screen and its permission screen with the five read permissions; after "Allow all" and "Allow" the sync screen reads "On, last synced just now", with "None in Health Connect" for an empty store. No workout or step data was in that store, so nothing was read from one.
 
 With sleep added (run 44181867538, 17 November 2026, runtime version 2): Health Connect's permission screen lists Sleep beside the other read permissions; after "Allow all" and "Allow" the sync screen reads "On, last synced just now" and its Sleep section says "No night from Health Connect for last night yet". The store held no sleep session, so no night was read from one.
+
+With weigh-ins, the day's calories and workout heart rate added (runs 44250443905 and 44256357997, 18 November 2026, runtime version 3): Health Connect's permission screen lists Body fat, Heart rate and Weight beside the earlier six; after "Allow all" and "Allow" the sync screen shows its Weight row ("Latest 82 kg on Nov 18, entered by you": the setup weight, nothing from the store), Calories burned ("Shown on Progress after 5 full days recorded") and Heart rate. The store held no weight, energy or heart rate data, so none was read from one.
 
 ## Not yet proven on Android (needs an Android build and a phone)
 
