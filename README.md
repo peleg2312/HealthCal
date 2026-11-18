@@ -234,6 +234,7 @@ The scripts under `scripts/dev` test the web build in a browser. The flows in `.
 - `first-day.yml`: setup with the keyboard on every field, food added to lunch and opened again, the four tabs and the sync screen.
 - `health-and-about.yml` (after first-day): Workout sync turned on, the app's explanation, the system's permission screen (Apple Health or Health Connect), the sync screen and Train's steps line, then About and its version block with "Check for updates".
 - `health-data-ios.yml` (iPhone only, best effort): types steps into the simulator's Health app, syncs, and looks for them on Train.
+- `drinks.yml` (after first-day, run with `flows=first-day,drinks`): a milk logged on the water screen with its choices and the calorie line, its row in Today's log and the diary, then the drink sheet with calories typed while the keyboard is up. Passed on the Android 15 emulator on 18 November 2026 (run 44319058732).
 
 **On GitHub's machines, free.** The repository is public, so GitHub Actions' standard runners, macOS included, cost nothing. `.github/workflows/phone-test.yml` builds the app in Release (the JavaScript inside, no Metro; the Supabase settings from `eas.json`'s `build.production.env`) and runs the flows on an iPhone simulator (macOS 26, Xcode 26.4 or later) and an Android emulator (Android 15, x86_64; Health Connect is expected on this image, and the job log lists the health packages it found). It starts only by hand.
 
