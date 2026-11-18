@@ -213,12 +213,14 @@ name: Workout sync and About on a phone
 - takeScreenshot: 28b-sync-weight-energy-heart-rows
 
 # Train: the week card, where the steps line shows when there are steps (none on a new emulator).
-# If a Health Connect screen is still on top (a label guessed wrong), Back leaves it first.
+# If a Health Connect screen is still on top (a label guessed wrong), Back leaves it first. The test
+# is the pinned header's back cup, which shows wherever the sync screen is scrolled (the switch does
+# not: the rows above scrolled it away, and Back then left the sync screen itself).
 - runFlow:
     when:
       platform: Android
       notVisible:
-        id: health-sync-switch
+        id: header-back
     commands:
       - pressKey: back
       - waitForAnimationToEnd:
