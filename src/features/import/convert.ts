@@ -136,6 +136,7 @@ export function toActivityEntry(w: ImportedWorkout, activity: ActivityDef, ctx: 
   };
   if (measured) entry.measured = true;
   if (w.avgHeartRate !== null && w.avgHeartRate > 0) entry.avgHeartRate = Math.round(w.avgHeartRate);
+  if (w.avgHeartRate !== null && w.avgHeartRate > 0 && w.maxHeartRate !== null && w.maxHeartRate >= w.avgHeartRate) entry.maxHeartRate = Math.round(w.maxHeartRate);
   if (activity.tracksDistance && w.distanceM !== null && w.distanceM > 0) entry.distanceKm = Math.round(w.distanceM) / 1000;
   const title = w.title?.trim();
   if (title && !sameWords(title, activity.name) && !sameWords(title, w.sport)) entry.notes = title;

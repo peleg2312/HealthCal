@@ -71,7 +71,7 @@ function rig(health: Partial<FakeHealth> = {}, initial: Parameters<typeof memory
 describe('sleep in a sync', () => {
   it('reads 28 days the first time from noon two days before, saves one night per wake day and says so with the sleep colour', async () => {
     const r = rig({ sleep: [...night('2026-11-13', '2026-11-12'), ...night('2026-11-14', '2026-11-13')] });
-    expect(await r.sync.sync('auto')).toEqual({ status: 'done', added: 0, updated: 0, review: 0, nights: 2 });
+    expect(await r.sync.sync('auto')).toEqual({ status: 'done', added: 0, updated: 0, review: 0, nights: 2, weighIns: 0 });
     expect(r.ranges).toEqual([{ from: '2026-10-16T10:00:00.000Z' /* noon, summer time */, to: new Date(NOON).toISOString() }]);
     expect(r.sleep.live().map((n) => [n.date, n.hours, n.source, n.store, n.origin])).toEqual([
       ['2026-11-13', 7.5, 'health', 'healthConnect', GARMIN],

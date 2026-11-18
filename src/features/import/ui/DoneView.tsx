@@ -1,8 +1,11 @@
 import React from 'react';
 import { View } from 'react-native';
 
+import { SpreadHint } from '@/features/activity/SpreadHint';
 import { formatDuration } from '@/lib/dates';
+import { ruleOfDates } from '@/lib/exerciseBudget';
 import { formatNumber } from '@/lib/units';
+import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ActivityEntry, ISODate } from '@/types';
 import { Card, CupKey, Divider, EmptyState, MiniCup, Text } from '@/ui';
@@ -48,6 +51,10 @@ export function DoneView({
   onStartOver: () => void;
 }) {
   const { colors, spacing } = useTheme();
+  const profile = useProfile();
+  const snapshots = useLive('days');
+  // Each workout is placed by the rule its own date had (an older workout may fall before a change of rule).
+  const rule = ruleOfDates(profile, new Map(snapshots.map((d) => [d.date, d])), entries.map((e) => e.date));
   const sum = summarise(entries, previous);
   const n = entries.length;
   const stepsLine = stepsDays ? `Steps for ${stepsDays} ${stepsDays === 1 ? 'day' : 'days'} saved on this phone. They show on Train and are never added to your calories.` : null;
@@ -95,9 +102,14 @@ export function DoneView({
       {/* What was done ("1 workout added") is the header's short line: doneTitle. */}
       <Text variant="body" color="textSecondary">
         {sum.sessions
-          ? 'Each day’s budget now includes the calories above resting.'
+          ? rule === 'week'
+            ? 'Each workout’s calories above resting now raise its day and the six after it.'
+            : rule === 'mixed'
+              ? 'Each workout’s calories above resting now count by the rule its day had: on that day, or shared over it and the six after.'
+              : 'Each day’s budget now includes the calories above resting.'
           : `The workouts now carry the numbers from the file. Each day’s budget follows them.`}
       </Text>
+      <SpreadHint testID="import-spread-hint" style={{ marginVertical: -spacing.sm }} />
       {stepsLine ? (
         <Text variant="body" color="textSecondary" testID="import-done-steps">
           {stepsLine}

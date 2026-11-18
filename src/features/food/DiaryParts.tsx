@@ -32,9 +32,17 @@ export function DaySummaryCard({ day, share }: { day: DaySummary; share?: React.
   const stacked = screenW < 480;
   const over = day.remaining < 0;
   const budget = Math.max(0, day.budget);
-  // Calories added by exercise, drawn as hatched headroom at the right end.
-  const headroom = Math.max(0, day.budget - day.target);
-  const notAdded = headroom === 0 && day.exerciseNet > 0;
+  // Calories workouts add to this day (its own and shares carried from the six days before), drawn as
+  // hatched headroom at the right end. Read from the day's rule, never from budget minus target.
+  const headroom = Math.max(0, day.exerciseAdded);
+  const notAdded = day.exerciseRule === 'off' && day.exerciseNet > 0;
+  // The old words only when all of it is this day's own burn added on the day.
+  const addedLine =
+    day.exerciseRule === 'day' && day.exerciseCarry === 0
+      ? `+${kcal(headroom)} from exercise`
+      : day.exerciseRule === 'week'
+        ? `+${kcal(headroom)} from workouts, over 7 days`
+        : `+${kcal(headroom)} from workouts`;
   return (
     <Card testID="diary-summary" padding={18}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
@@ -63,8 +71,9 @@ export function DaySummaryCard({ day, share }: { day: DaySummary; share?: React.
         {share}
       </View>
       <Trough value={day.eaten.kcal} max={budget} headroom={headroom} color={colors.calories} memoryKey={`diary-${day.date}`} style={{ marginTop: spacing.md }} />
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: 10 }}>
-        <Text variant="caption" color="textSecondary" tabular>
+      {/* On a narrow phone a long exercise line moves under the target, whole, rather than squeezing both. */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: spacing.md, rowGap: 4, marginTop: 10 }}>
+        <Text variant="caption" color="textSecondary" tabular numberOfLines={1}>
           {`Target ${kcal(day.target)}`}
         </Text>
         {headroom > 0 || notAdded ? (
@@ -74,8 +83,8 @@ export function DaySummaryCard({ day, share }: { day: DaySummary; share?: React.
                 <Hatch width={11} height={11} color={colors.headroom} step={4} opacity={1} />
               </View>
             ) : null}
-            <Text variant="caption" color="textSecondary" tabular numberOfLines={1} style={{ flexShrink: 1 }}>
-              {headroom > 0 ? `+${kcal(headroom)} from exercise` : `${kcal(day.exerciseNet)} kcal burned, not added`}
+            <Text variant="caption" color="textSecondary" tabular numberOfLines={2} style={{ flexShrink: 1 }} testID="diary-exercise">
+              {headroom > 0 ? addedLine : `${kcal(day.exerciseNet)} kcal burned, not added`}
             </Text>
           </View>
         ) : null}

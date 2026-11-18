@@ -61,9 +61,9 @@ export interface ShareDayInput {
   today: ISODate;
   units: UnitSystem;
   kcal: number;
-  /** The day's own budget (exercise included when it is eaten back). */
+  /** The day's own budget (exercise included as the day's rule adds it). */
   budget: number;
-  /** Net exercise calories inside the budget (drawn as hatched headroom); 0 when not eaten back. */
+  /** Workout calories inside the budget (`DaySummary.exerciseAdded`, drawn as hatched headroom); 0 when none are added. */
   exerciseInBudget: number;
   /** kcal per meal, for the cup's bands. */
   mealKcal: Record<MealType, number>;

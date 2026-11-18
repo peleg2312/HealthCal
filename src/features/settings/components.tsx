@@ -260,9 +260,9 @@ export function InitialsAvatar({ name, size = 64 }: { name: string; size?: numbe
 }
 
 /** Small explanatory paragraph used under form controls. */
-export function Hint({ children }: { children: React.ReactNode }) {
+export function Hint({ children, testID }: { children: React.ReactNode; testID?: string }) {
   return (
-    <Text variant="caption" color="textSecondary">
+    <Text variant="caption" color="textSecondary" testID={testID}>
       {children}
     </Text>
   );

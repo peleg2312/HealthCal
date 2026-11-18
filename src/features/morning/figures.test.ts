@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { logMealTitle, spokenHours, waterFigures } from './figures';
+import { budgetShare, hoursAndMinutes, logMealTitle, spokenHours, waterFigures } from './figures';
 
 describe('waterFigures', () => {
   it('puts the amount in the goal unit, litres for a goal of a litre or more', () => {
@@ -39,5 +39,20 @@ describe('logMealTitle', () => {
     expect(logMealTitle('lunch')).toBe('Log lunch');
     expect(logMealTitle('dinner')).toBe('Log dinner');
     expect(logMealTitle('snack')).toBe('Log a snack');
+  });
+});
+
+describe('budgetShare and hoursAndMinutes', () => {
+  it('the share of the day\'s own budget, whole percent', () => {
+    expect(budgetShare(2062, 2170)).toBe(95);
+    expect(budgetShare(2850, 2190)).toBe(130);
+    expect(budgetShare(0, 2190)).toBe(0);
+    expect(budgetShare(2000, 0)).toBeNull();
+  });
+  it('sleep in hours and minutes, as the lists say it', () => {
+    expect(hoursAndMinutes(7.5)).toEqual({ h: 7, m: 30 });
+    expect(hoursAndMinutes(5.67)).toEqual({ h: 5, m: 40 });
+    expect(hoursAndMinutes(8)).toEqual({ h: 8, m: 0 });
+    expect(hoursAndMinutes(0.75)).toEqual({ h: 0, m: 45 });
   });
 });

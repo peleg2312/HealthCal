@@ -54,6 +54,8 @@ const KNOWN: Record<string, string> = {
   'com.apple.health.iphone': 'iPhone',
   'com.apple.health.watch': 'Apple Watch',
   'com.apple.health.device': 'Apple Health',
+  // A reading typed into the Health app itself (its own bundle id, not a device's).
+  'com.apple.Health': 'Apple Health',
   'com.strava.stravaride': 'Strava',
   'com.nike.nikeplus-gps': 'Nike Run Club',
 };

@@ -87,7 +87,7 @@ function HeroCup({ height, narrow, small }: { height: number; narrow: boolean; s
                   <Text variant="numM" style={{ fontSize: 17 }}>
                     +290
                   </Text>
-                  {' burned, added'}
+                  {' from workouts'}
                 </Text>
               </FadeUp>
             ),

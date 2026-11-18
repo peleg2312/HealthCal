@@ -5,6 +5,7 @@
 import { useMemo } from 'react';
 
 import { addDays, diffDays, lastNDates, startOfWeek, today } from '@/lib/dates';
+import { dayRuleFor, exercisePlaced, type ExerciseRule } from '@/lib/exerciseBudget';
 import { bmr, calorieTarget, formulaTdee, macroTargets, type BmrMethod, type CalorieTarget, type MacroTargets } from '@/lib/energy';
 import { baseWaterGoalMl, effectiveMl, exerciseWaterMl } from '@/lib/hydration';
 import { entriesTotal } from '@/lib/nutrition';
@@ -117,8 +118,14 @@ export interface DaySummary {
   activeMinutes: number;
   /** Base target, before exercise. */
   target: number;
-  /** Target plus exercise when the user eats exercise calories back. */
+  /** Target plus what workouts add to this day (`exerciseAdded`). */
   budget: number;
+  /** How this day takes workout calories (`@/lib/exerciseBudget`): 'off' adds nothing. */
+  exerciseRule: ExerciseRule;
+  /** budget - target: workout calories in this day's budget, its own and carried. */
+  exerciseAdded: number;
+  /** The part of `exerciseAdded` from workouts on the six days before ('week' shares), rounded. */
+  exerciseCarry: number;
   /** budget - eaten; negative when over. */
   remaining: number;
   macros: MacroTargets;
@@ -129,11 +136,26 @@ export interface DaySummary {
   waterRemainingMl: number;
 }
 
+/** Net workout calories by date and snapshots by date, built once by a caller that computes many days. */
+export interface DayLookups {
+  netByDate: Record<ISODate, number>;
+  snapshotByDate: Map<ISODate, DaySnapshot>;
+}
+
+export function dayLookups(activities: ActivityEntry[], snapshots: DaySnapshot[]): DayLookups {
+  return { netByDate: exerciseByDate(activities), snapshotByDate: new Map(snapshots.map((d) => [d.date, d])) };
+}
+
 /**
  * `snapshots` are the targets recorded on each day as it happened. A past day
  * is judged against the target it had at the time, so changing a goal (or the
  * expenditure estimate moving) does not rewrite history. Days without one
  * (before the feature, or never opened) fall back to the current model.
+ *
+ * Workout calories are placed by `exercisePlaced` (`@/lib/exerciseBudget`):
+ * the day's budget can hold shares of workouts from the six days before, so
+ * `activities` must be every live activity, not only this day's. `lookups` are
+ * built from `activities` and `snapshots` when absent.
  */
 export function computeDay(
   date: ISODate,
@@ -143,6 +165,7 @@ export function computeDay(
   activities: ActivityEntry[],
   water: WaterEntry[],
   snapshots: DaySnapshot[] = [],
+  lookups: DayLookups = dayLookups(activities, snapshots),
 ): DaySummary {
   const entries = foodEntries.filter((e) => e.date === date).sort((a, b) => a.loggedAt.localeCompare(b.loggedAt));
   const byMeal: Record<MealType, FoodEntry[]> = { breakfast: [], lunch: [], dinner: [], snack: [] };
@@ -154,10 +177,10 @@ export function computeDay(
   const exerciseGross = dayActivities.reduce((s, a) => s + a.kcalGross, 0);
   const activeMinutes = dayActivities.reduce((s, a) => s + a.durationMin, 0);
 
-  const snapshot = snapshots.find((d) => d.date === date);
+  const snapshot = lookups.snapshotByDate.get(date);
   const target = snapshot ? snapshot.target : model.target.target;
-  const eatBack = snapshot ? snapshot.eatBackExercise : profile.eatBackExercise;
-  const budget = Math.round(target + (eatBack ? exerciseNet : 0));
+  const placed = exercisePlaced(date, lookups.netByDate, dayRuleFor(profile, lookups.snapshotByDate));
+  const budget = Math.round(target + placed.added);
 
   const waterEntries = water.filter((w) => w.date === date).sort((a, b) => a.loggedAt.localeCompare(b.loggedAt));
   const waterMl = Math.round(waterEntries.reduce((s, w) => s + effectiveMl(w.ml, w.beverage), 0));
@@ -177,6 +200,9 @@ export function computeDay(
     activeMinutes,
     target,
     budget,
+    exerciseRule: placed.rule,
+    exerciseAdded: budget - target,
+    exerciseCarry: Math.round(placed.carry),
     remaining: Math.round(budget - eaten.kcal),
     macros: macroTargets(profile, budget),
     waterEntries,
@@ -240,17 +266,29 @@ export function useDays(count: number, end: ISODate): DaySummary[] {
   const activities = useLive('activities');
   const water = useLive('water');
   const days = useLive('days');
-  return useMemo(() => {
-    // Each day gets the model as of that day, exactly as useDay(date) does, so a past day
-    // shows the same budget on every screen. Days with a recorded snapshot use that instead.
-    const inputs = modelInputs(food, weights, activities);
-    const recorded = new Set(days.map((d) => d.date));
-    const current = computeEnergyModel(profile, food, weights, end, activities, inputs);
-    return lastNDates(count, end).map((d) => {
-      const model = d === end || recorded.has(d) ? current : computeEnergyModel(profile, food, weights, d, activities, inputs);
-      return computeDay(d, profile, model, food, activities, water, days);
-    });
-  }, [count, end, profile, food, weights, activities, water, days]);
+  return useMemo(() => computeDays(count, end, profile, food, weights, activities, water, days), [count, end, profile, food, weights, activities, water, days]);
+}
+
+/** What useDays returns, for plain state (all live records). */
+export function computeDays(
+  count: number,
+  end: ISODate,
+  profile: Profile,
+  food: FoodEntry[],
+  weights: WeightEntry[],
+  activities: ActivityEntry[],
+  water: WaterEntry[],
+  days: DaySnapshot[],
+): DaySummary[] {
+  // Each day gets the model as of that day, exactly as useDay(date) does, so a past day
+  // shows the same budget on every screen. Days with a recorded snapshot use that instead.
+  const inputs = modelInputs(food, weights, activities);
+  const lookups = dayLookups(activities, days);
+  const current = computeEnergyModel(profile, food, weights, end, activities, inputs);
+  return lastNDates(count, end).map((d) => {
+    const model = d === end || lookups.snapshotByDate.has(d) ? current : computeEnergyModel(profile, food, weights, d, activities, inputs);
+    return computeDay(d, profile, model, food, activities, water, days, lookups);
+  });
 }
 
 export interface WeightSeries {

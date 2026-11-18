@@ -1031,7 +1031,7 @@ function runChecks() {
 // ------------------------------------------------------------------ states
 
 const STATE_FIELDS = ['id', 'route', 'data', 'imperial', 'day', 'values', 'health', 'type', 'taps', 'waitFor', 'sheet', 'note', 'now', 'flags', 'absent'];
-const VALUES = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack', 'lastNight', 'weighInGap', 'onboardedToday', 'name'];
+const VALUES = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack', 'spread', 'lastNight', 'weighInGap', 'onboardedToday', 'name'];
 /** The morning page's knobs that are not numbers (seed.mjs checks them again). */
 const VALUE_TYPES = { onboardedToday: 'boolean', name: 'string' };
 const DATA = ['demo', 'empty', 'fresh', 'stress'];

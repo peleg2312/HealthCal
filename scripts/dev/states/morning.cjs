@@ -1,5 +1,6 @@
-// The morning page (/morning): a greeting, a quote, yesterday at a glance, what went well, what to improve and
-// a plan for today, opened by itself on the first visit
+// The morning page (/morning): a greeting, the week in cups with the coach (what went well, the next step, the
+// first step for today), the quote of the day, yesterday at a glance, what went well, what to improve and a plan
+// for today (each without what the coach and the card already say), opened by itself on the first visit
 // of a morning (src/features/morning/rule.ts) or from Profile > See yesterday. The format is in the
 // header of scripts/dev/evidence.cjs.
 //
@@ -67,8 +68,9 @@ module.exports = [
   { id: 'morning-band', route: '/morning', now, values: { eaten: 1.06 }, waitFor: 'morning-card', note: '6% above the budget: "Within 10% of the budget"' },
   { id: 'morning-over', route: '/morning', now, values: { eaten: 1.3, exercise: 400 }, waitFor: 'morning-card', note: '30% above the budget with 400 kcal of exercise: the amber lip and the hatched headroom' },
   { id: 'morning-noeatback', route: '/morning', now, values: { eaten: 0.9, exercise: 300, eatBack: 0 }, waitFor: 'morning-card', note: 'exercise not added to the budget: no hatched headroom' },
+  { id: 'morning-week', route: '/morning', now, values: { eaten: 0.9, exercise: 400, spread: 1 }, waitFor: 'morning-card', note: 'workout calories over 7 days: the headroom of yesterday is its first share and the carried ones' },
   { id: 'morning-partial', route: '/morning', now, values: { eaten: 0.3 }, waitFor: 'morning-card', note: 'a day logged in part: the pale calorie cup, "partly logged"' },
-  { id: 'morning-no-food', route: '/morning', now, values: { eaten: 0, water: 0.5 }, waitFor: 'morning-card', note: 'no food, half the water: dashed calorie and protein cups, "No food logged."' },
+  { id: 'morning-no-food', route: '/morning', now, values: { eaten: 0, water: 0.5 }, waitFor: 'morning-card', note: 'no food yesterday after a week with food, half the water: the large cup empty under "Not logged", dashed calorie and protein keys, "No food logged."' },
 
   // Long content, imperial units and nothing at all.
   { id: 'morning-stress', route: '/morning', data: 'stress', waitFor: 'morning-card', note: 'long names and big numbers' },
@@ -85,7 +87,7 @@ module.exports = [
     note: 'yesterday with 28,940 steps from the health store, beside the longest movement line',
   },
   { id: 'morning-imperial', route: '/morning', imperial: true, waitFor: 'morning-card', note: 'water in fl oz' },
-  { id: 'morning-empty', route: '/morning', data: 'empty', waitFor: 'morning-screen', absent: ['morning-cups'], note: 'nothing logged yesterday: the plain card in place of the shelf' },
+  { id: 'morning-empty', route: '/morning', data: 'empty', waitFor: 'morning-screen', absent: ['morning-cups', 'morning-week-yesterday'], note: 'nothing logged yesterday: no week picture, the plain card in place of the figures' },
 
   // The second edition's cases (the specification's A to G): a greeting, a personal line, the quote, yesterday's
   // card, "What went well", "What to improve" and "For today". The values knobs lastNight, weighInGap,
@@ -95,9 +97,9 @@ module.exports = [
     route: '/morning',
     now,
     values: { eaten: 0.95, protein: 1.05, water: 1.03, exercise: 290, weekMinutes: 105, lastNight: 7.5 },
-    waitFor: 'morning-well',
-    absent: ['morning-adjust', 'morning-note'],
-    note: 'a strong day: a personal line, three things that went well, nothing to improve, a plan',
+    waitFor: 'morning-week',
+    absent: ['morning-adjust', 'morning-note', 'morning-coach-improve', 'morning-plan-water'],
+    note: 'a strong day: the week in cups with a workout, the coach naming two good things and the step for today (no improve line), the whole coach and the first line of the quote above the footer at 360 x 740; no "What went well" left to say (the coach names the workout and the night, the card the budget, protein and water), nothing to improve, the plan without the water row the coach names',
   },
   {
     id: 'morning-b-heavy',
@@ -106,7 +108,7 @@ module.exports = [
     values: { eaten: 1.3, protein: 0.74, water: 0.6, exercise: 0, lastNight: 5.67, weighInGap: 9 },
     waitFor: 'morning-plan-weigh',
     absent: ['morning-note'],
-    note: 'more than 10% above the budget, a short night (a rest quote on the 10 days of 31 that have one, else the day\'s again quote), a weigh-in 9 days old: the calorie item first in What to improve, the whole day logged in What went well',
+    note: 'more than 10% above the budget, a short night (a rest quote on the 10 days of 31 that have one, else the day\'s again quote), a weigh-in 9 days old: the coach names the logging habit and protein (74%, cut from the three-item list) as the next step, with today\'s share per meal; What to improve keeps the night and water (the card states the calories); the Eaten cell shows its share of the budget',
   },
   {
     id: 'morning-c-half',
@@ -115,7 +117,7 @@ module.exports = [
     values: { eaten: 0.19, protein: 0.12, water: 0, exercise: 0 },
     waitFor: 'morning-plan-sleep',
     absent: ['morning-well', 'morning-adjust'],
-    note: 'breakfast only: the note under the card, no lists, the plan with last night\'s sleep',
+    note: 'breakfast only: the coach opens neutrally with "log the rest" as the next step, the note under the card, no lists, the plan with last night\'s sleep',
   },
   {
     id: 'morning-d-water',
@@ -130,17 +132,21 @@ module.exports = [
     id: 'morning-e-empty',
     route: '/morning',
     data: 'empty',
-    waitFor: 'morning-screen',
-    absent: ['morning-cups', 'morning-well', 'morning-adjust'],
-    note: 'nothing logged yesterday: the plain card, a quote and a plan for today',
+    now,
+    waitFor: 'morning-coach',
+    absent: ['morning-cups', 'morning-well', 'morning-adjust', 'morning-week-yesterday'],
+    note: 'nothing logged yesterday, in the morning ("Good morning", "Log breakfast"): no week picture, only the coach in the block, the plain card, a plan and the quote',
   },
   {
     id: 'morning-f-day2',
     route: '/morning',
     now: evening,
     values: { eaten: 0.68, protein: 0.58, water: 0.58, onboardedToday: true, name: '' },
-    waitFor: 'morning-personal',
-    note: 'day 2, no name, opened in the evening: "Good evening", "Day 2 of your first week.", one item to improve, "Log dinner"',
+    waitFor: 'morning-week-yesterday',
+    // The seed's today is the setup day and the page's yesterday; the day before it must not be drawn.
+    // No streak tag in the first week: the seed's five weeks before setup would make it "33-day streak" beside "Day 2".
+    absent: [`morning-week-day-${localDay(1)}`, 'morning-streak'],
+    note: 'day 2, no name, opened in the evening: "Good evening", "Day 2 of your first week.", only two cups (Yesterday and Today, nothing before setup), no streak tag, "Log dinner"; the week\'s minutes count from the setup day, so nothing from the seed\'s history before setup is praised',
   },
   {
     id: 'morning-g-stress',
@@ -148,8 +154,8 @@ module.exports = [
     data: 'stress',
     imperial: true,
     now: morningOf(1),
-    waitFor: 'morning-personal',
-    note: 'long content, imperial: the 22-character name left out of the title and shown in the personal line, the 11,480 kcal feast',
+    waitFor: 'morning-week',
+    note: 'long content, imperial: the 22-character name left out of the title and shown in the personal line, the 11,480 kcal feast over the large cup a size down',
   },
   {
     id: 'morning-quote-longest',
@@ -170,7 +176,7 @@ module.exports = [
     route: '/morning',
     now: evening,
     values: { eaten: 0.95, protein: 1.05, water: 1.03, exercise: 290, weekMinutes: 105, lastNight: 7.5 },
-    waitFor: 'morning-well',
+    waitFor: 'morning-coach',
     note: 'case A opened in the evening from Profile: "Good evening, ..." and "Log dinner"',
   },
 

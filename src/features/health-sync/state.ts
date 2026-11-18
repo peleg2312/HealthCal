@@ -7,6 +7,7 @@
  */
 import type { ActivityEntry } from '@/types';
 
+import { NO_DAY_ENERGY, type DayEnergyMemory, type EnergyDays } from './dayEnergy';
 import type { Handled, OriginSeen, ReviewItem } from './plan';
 import { NO_STEPS, type FileSteps, type StepDays, type StepsMemory } from './steps';
 import type { HealthAccess, HealthAvailability, HealthErrorCode } from './types';
@@ -39,8 +40,12 @@ export interface HealthSyncState {
   handled: Record<string, Handled>;
   /** Activities the person chose for a kind of workout (plan.ts, `choiceKey`). */
   choices: Record<string, string>;
-  /** What the last successful sync changed (`nights`: nights of sleep added or updated; absent before sleep was read). */
-  lastResult: { at: string; added: number; updated: number; nights?: number } | null;
+  /**
+   * What the last successful sync changed (`nights`: nights of sleep added or
+   * updated, absent before sleep was read; `weighIns`: weigh-ins added or updated,
+   * absent before weigh-ins were read).
+   */
+  lastResult: { at: string; added: number; updated: number; nights?: number; weighIns?: number } | null;
   /** Steps per day for the last 35 days (steps.ts): shown on Train, never counted as calories. */
   steps: StepsMemory;
   /**
@@ -57,6 +62,22 @@ export interface HealthSyncState {
    * under 'sleep:<date>'.
    */
   sleepReadAt: string | null;
+  /**
+   * When weigh-ins were last read and what that read wrote was confirmed on the
+   * device (body.ts, weightReadRange; set in the engine's `rememberSaved`, as
+   * `sleepReadAt`). Null: never, so the first read covers 28 days and its toast
+   * may say what many weigh-ins now feed (`weighInNote`). The weigh-ins are
+   * synced 'weights' records; what this phone did with a day is in `handled`
+   * under 'weight:<date>'. Kept when sync is turned off, as `sleepReadAt` is.
+   */
+  weightReadAt: string | null;
+  /**
+   * The day's calories burned as the watch counts them, the last 14 days
+   * (dayEnergy.ts): shown on Progress beside HealthCal's estimate, never added
+   * to anything, never synced, exported, sent to AI or to friends. Cleared when
+   * sync is turned off, as steps are.
+   */
+  dayEnergy: DayEnergyMemory;
 }
 
 export const INITIAL_STATE: HealthSyncState = {
@@ -73,10 +94,13 @@ export const INITIAL_STATE: HealthSyncState = {
   steps: NO_STEPS,
   fileSteps: null,
   sleepReadAt: null,
+  weightReadAt: null,
+  dayEnergy: NO_DAY_ENERGY,
 };
 
 const isRecord = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 const text = (x: unknown): string | null => (typeof x === 'string' ? x : null);
+const nonNeg = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x) && x >= 0;
 
 /**
  * What was read back from the device, made safe: anything missing or of the
@@ -86,8 +110,22 @@ const text = (x: unknown): string | null => (typeof x === 'string' ? x : null);
 export function restoreState(saved: unknown): HealthSyncState {
   if (!isRecord(saved)) return INITIAL_STATE;
   const error = isRecord(saved.lastError) && typeof saved.lastError.code === 'string' && typeof saved.lastError.at === 'string' ? (saved.lastError as unknown as SyncError) : null;
-  // A build before steps saved no `steps` flag: steps were not asked for then.
-  const access = isRecord(saved.access) && typeof saved.access.workouts === 'boolean' ? ({ ...(saved.access as unknown as HealthAccess), steps: saved.access.steps === true, sleep: saved.access.sleep === true } as HealthAccess) : null;
+  // A build before steps, sleep, weight, day energy or heart rate saved no flag for it: it was not asked for then.
+  const a = isRecord(saved.access) && typeof saved.access.workouts === 'boolean' ? saved.access : null;
+  const access: HealthAccess | null = a
+    ? {
+        workouts: a.workouts === true,
+        activeEnergy: a.activeEnergy === true,
+        totalEnergy: a.totalEnergy === true,
+        distance: a.distance === true,
+        steps: a.steps === true,
+        sleep: a.sleep === true,
+        weight: a.weight === true,
+        bodyFat: a.bodyFat === true,
+        dayEnergy: a.dayEnergy === true,
+        heartRate: a.heartRate === true,
+      }
+    : null;
   const result = isRecord(saved.lastResult) && typeof saved.lastResult.at === 'string' ? (saved.lastResult as HealthSyncState['lastResult']) : null;
   const review = Array.isArray(saved.review)
     ? (saved.review.filter((r) => isRecord(r) && typeof r.id === 'string' && isRecord(r.workout) && typeof r.workout.startTime === 'string' && typeof r.reason === 'string') as ReviewItem[])
@@ -112,6 +150,15 @@ export function restoreState(saved: unknown): HealthSyncState {
     for (const [day, n] of Object.entries(saved.fileSteps.days)) if (/^\d{4}-\d{2}-\d{2}$/.test(day) && typeof n === 'number' && Number.isFinite(n) && n > 0) fd[day] = Math.round(n);
     fileSteps = { days: fd, asOf: saved.fileSteps.asOf, asOfDay: saved.fileSteps.asOfDay };
   }
+  const energyDays: EnergyDays = {};
+  const savedEnergy = isRecord(saved.dayEnergy) ? saved.dayEnergy : null;
+  if (savedEnergy && isRecord(savedEnergy.days)) {
+    for (const [day, v] of Object.entries(savedEnergy.days)) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !isRecord(v) || !nonNeg(v.kcal) || !nonNeg(v.activeKcal)) continue;
+      const origins = Array.isArray(v.origins) ? v.origins.filter((o): o is string => typeof o === 'string') : [];
+      energyDays[day] = { kcal: v.kcal, activeKcal: v.activeKcal, origins };
+    }
+  }
   return {
     enabled: saved.enabled === true,
     lastAttemptAt: text(saved.lastAttemptAt),
@@ -126,6 +173,8 @@ export function restoreState(saved: unknown): HealthSyncState {
     steps: { days, readAt: savedSteps ? text(savedSteps.readAt) : null },
     fileSteps,
     sleepReadAt: text(saved.sleepReadAt),
+    weightReadAt: text(saved.weightReadAt),
+    dayEnergy: { days: energyDays, readAt: savedEnergy ? text(savedEnergy.readAt) : null },
   };
 }
 
@@ -200,36 +249,72 @@ export function rememberMarks(handled: Record<string, Handled>, marks: Record<st
 
 const workouts = (n: number) => `${n} ${n === 1 ? 'workout' : 'workouts'}`;
 const nightsOf = (n: number) => `${n} ${n === 1 ? 'night' : 'nights'} of sleep`;
+const weighInsOf = (n: number) => `${n} ${n === 1 ? 'weigh-in' : 'weigh-ins'}`;
 
-/** Nights of sleep a sync wrote, and the apps they came from. */
-export interface NightsChange {
+/** Records of one kind a sync wrote, and the apps they came from. */
+export interface KindChange {
   added: number;
   updated: number;
   apps: string[];
 }
 
+/** Nights of sleep a sync wrote, and the apps they came from. */
+export type NightsChange = KindChange;
+/** Weigh-ins a sync wrote, and the apps they came from. */
+export type WeighInsChange = KindChange;
+
+/** "A", "A and B", "A, B and C". */
+function joinKinds(parts: string[]): string {
+  if (parts.length <= 1) return parts.join('');
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
+
 /**
- * "2 workouts added from Garmin Connect", "1 workout updated from Garmin Connect", "2 workouts added, 1 updated from Health Connect";
- * with nights: "1 night of sleep added from Garmin Connect", "1 workout and 3 nights of sleep added from Garmin Connect",
- * "1 workout and 2 nights of sleep synced from Health Connect" (some added, some updated). One app named, else the store.
+ * The sync's one toast. Each kind with its own counted noun; one app named when
+ * every change came from it, else the store.
+ *  - one kind: "2 workouts added from Garmin Connect", "1 workout updated from Garmin Connect",
+ *    "2 workouts added, 1 updated from Health Connect", "3 weigh-ins added, 1 updated from Garmin Connect";
+ *  - several: "1 workout and 3 nights of sleep added from Garmin Connect" (only additions),
+ *    "… updated from …" (only updates), else "1 workout, 2 nights of sleep and 3 weigh-ins synced from Health Connect"
+ *    (each kind's added plus updated).
  */
-export function syncMessage(added: number, updated: number, apps: string[], store: string, nights?: NightsChange): string {
-  const na = nights?.added ?? 0;
-  const nu = nights?.updated ?? 0;
-  const names = [...new Set([...apps, ...(na + nu ? (nights?.apps ?? []) : [])])];
+export function syncMessage(added: number, updated: number, apps: string[], store: string, nights?: NightsChange, weighIns?: WeighInsChange): string {
+  const kinds = [
+    { noun: workouts, added, updated, apps },
+    { noun: nightsOf, added: nights?.added ?? 0, updated: nights?.updated ?? 0, apps: nights?.apps ?? [] },
+    { noun: weighInsOf, added: weighIns?.added ?? 0, updated: weighIns?.updated ?? 0, apps: weighIns?.apps ?? [] },
+  ];
+  const changed = kinds.filter((k) => k.added + k.updated > 0);
+  // Workouts' apps always count (as before nights were read); another kind's only when it changed something.
+  const names = [...new Set([...apps, ...changed.filter((k) => k.noun !== workouts).flatMap((k) => k.apps)])];
   const from = names.length === 1 ? names[0] : store;
-  if (na + nu === 0) {
-    if (added && updated) return `${workouts(added)} added, ${updated} updated from ${from}`;
-    if (added) return `${workouts(added)} added from ${from}`;
-    return `${workouts(updated)} updated from ${from}`;
+  const shown = changed.length ? changed : [kinds[0]];
+  if (shown.length === 1) {
+    const k = shown[0];
+    if (k.added && k.updated) return `${k.noun(k.added)} added, ${k.updated} updated from ${from}`;
+    return `${k.noun(k.added + k.updated)} ${k.added ? 'added' : 'updated'} from ${from}`;
   }
-  if (added + updated === 0) {
-    if (na && nu) return `${nightsOf(na)} added, ${nu} updated from ${from}`;
-    return `${nightsOf(na + nu)} ${na ? 'added' : 'updated'} from ${from}`;
-  }
-  if (!updated && !nu) return `${workouts(added)} and ${nightsOf(na)} added from ${from}`;
-  if (!added && !na) return `${workouts(updated)} and ${nightsOf(nu)} updated from ${from}`;
-  return `${workouts(added + updated)} and ${nightsOf(na + nu)} synced from ${from}`;
+  if (shown.every((k) => !k.updated)) return `${joinKinds(shown.map((k) => k.noun(k.added)))} added from ${from}`;
+  if (shown.every((k) => !k.added)) return `${joinKinds(shown.map((k) => k.noun(k.updated)))} updated from ${from}`;
+  return `${joinKinds(shown.map((k) => k.noun(k.added + k.updated)))} synced from ${from}`;
+}
+
+/** A first read that adds at least this many weigh-ins says what they now feed (`weighInNote`). */
+export const MANY_WEIGH_INS = 5;
+
+/**
+ * The second sentence of the sync's toast when the first weigh-in read brings
+ * many at once, appended to `syncMessage`'s line, the full stop included:
+ * ". They cover the last 4 weeks." `firstRead`: weightReadAt was null before
+ * this read. '' otherwise. What they now feed (the weight trend, and the burn
+ * estimate the targets use when the learned estimate is on, `learns`) is said
+ * under the sync screen's Weight row instead: the longer sentence took four
+ * lines of the toast at 360 px (the specification's fallback, section 6.4).
+ */
+export function weighInNote(added: number, firstRead: boolean, learns: boolean): string {
+  if (!firstRead || added < MANY_WEIGH_INS) return '';
+  void learns;
+  return '. They cover the last 4 weeks.';
 }
 
 /** What to tell the person about a failed sync, and what they can do. */

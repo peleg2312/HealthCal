@@ -126,6 +126,48 @@ tags:
     timeout: 3000
 - takeScreenshot: 50-health-workout-added
 
+# A weigh-in: Browse > Body Measurements > Weight > Add Data, 82.4 (kg on a simulator set to metric;
+# the region decides). HealthCal should show it on Weight as "From Apple Health".
+- tapOn:
+    text: '(?i)browse'
+    optional: true
+- tapOn:
+    text: '(?i)browse'
+    optional: true
+- tapOn:
+    text: '(?i)body measurements'
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn:
+    text: '(?i)^weight$'
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 50a-health-weight
+- tapOn:
+    text: '(?i)add data'
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- inputText:
+    text: '82.4'
+    optional: true
+- takeScreenshot: 50b-health-weight-typed
+- tapOn:
+    text: '(?i)^add$'
+    optional: true
+- runFlow:
+    when:
+      visible: '82.4'
+    commands:
+      - tapOn:
+          point: '90%,11%'
+          optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 50c-health-weight-added
+
 # Back to HealthCal: Profile > Workout sync > Sync now, then Train.
 - launchApp:
     appId: app.healthcal.mobile
@@ -208,3 +250,58 @@ tags:
     id: train-steps
     optional: true
 - takeScreenshot: 54-train-steps
+
+# Weight: the weigh-in typed above, if the sheet allowed weight (the Weight row's own Allow asks
+# WEIGHT_READ_TYPES alone on a phone that allowed the first lists before). Best effort.
+- tapOn:
+    id: tab-index
+    optional: true
+- tapOn:
+    id: today-profile
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: profile-health-sync
+    direction: DOWN
+    timeout: 20000
+    optional: true
+- tapOn:
+    id: profile-health-sync
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: health-sync-weight-allow
+    direction: DOWN
+    timeout: 10000
+    optional: true
+- tapOn:
+    id: health-sync-weight-allow
+    optional: true
+- tapOn:
+    text: '(?i)turn on all.*'
+    optional: true
+- tapOn:
+    text: '(?i)allow'
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: health-sync-weight
+    direction: DOWN
+    timeout: 10000
+    optional: true
+- takeScreenshot: 55-sync-weight-row
+- tapOn:
+    id: health-sync-weight
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: weight-row-0
+    timeout: 15000
+    optional: true
+- assertVisible:
+    id: weight-row-0
+    text: '(?i).*from apple health.*'
+    optional: true
+- takeScreenshot: 56-weight-from-apple-health

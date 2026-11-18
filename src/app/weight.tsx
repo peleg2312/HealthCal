@@ -3,13 +3,15 @@ import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
+import { clockTime } from '@/features/import/ui/format';
 import { resolveDateParam } from '@/features/trackers/dateParam';
 import { diffDays, formatDayLabel, formatShortDate } from '@/lib/dates';
 import { isPlausibleBodyFat, projectedGoalDate } from '@/lib/energy';
 import { formatWeight, weightToKg, weightUnit, weightValue } from '@/lib/units';
-import { deleteWeightRecord, saveWeightRecord } from '@/features/trackers/actions';
+import { applyWeighInToTargets, deleteWeightRecord, saveWeightRecord } from '@/features/trackers/actions';
 import { DayStepper, Explain, ExplainText, Figure, RequireProfile } from '@/features/trackers/components';
-import { findByDate, keepOrConvert, weightChartData, weightStats, type WeightRange } from '@/features/trackers/helpers';
+import { findByDate, keepOrConvert, targetsBehind, weightChartData, weightStats, type WeightRange } from '@/features/trackers/helpers';
+import { isSyncedWeighIn, weighInFromLine } from '@/features/trackers/weighInSource';
 import { useToday } from '@/store/clock';
 import { useProfile, useWeightSeries } from '@/store/selectors';
 import { useTheme } from '@/theme';
@@ -79,6 +81,9 @@ function WeightScreen() {
   const target = profile.targetWeightKg;
   const projected = stats && target && stats.weeklyKg !== null ? projectedGoalDate(stats.trendKg, target, stats.weeklyKg) : null;
   const latest = series.latest;
+
+  // The newest weigh-in came from a health store and the targets do not use it yet: one tap applies it (a sync never does).
+  const behind = targetsBehind(profile, series.entries);
 
   const history = [...series.entries].reverse();
   const shown = showAll ? history : history.slice(0, 14);
@@ -150,6 +155,23 @@ function WeightScreen() {
             </Explain>
           </Card>
 
+          {behind ? (
+            <Card testID="weight-targets-behind" style={{ gap: spacing.md }}>
+              <Text variant="body" color="textSecondary" testID="weight-targets-behind-text">
+                {targetsBehindText(behind, profile, units)}
+              </Text>
+              <Button
+                testID="weight-use-latest"
+                title="Use it for targets"
+                variant="secondary"
+                size="sm"
+                full={false}
+                style={{ alignSelf: 'flex-start' }}
+                onPress={() => applyWeighInToTargets(behind.latest)}
+              />
+            </Card>
+          ) : null}
+
           <Card style={{ gap: spacing.lg }}>
             <View style={{ flexDirection: 'row', gap: spacing.md }}>
               <Figure
@@ -195,7 +217,10 @@ function WeightScreen() {
                   <ListRow
                     testID={`weight-row-${i}`}
                     title={formatDayLabel(e.date)}
-                    subtitle={[isPlausibleBodyFat(e.bodyFatPct) ? `${e.bodyFatPct}% body fat` : null, delta !== null ? `${Math.abs(delta) < 0.05 ? '0' : `${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(1)}`} ${unit} vs previous` : null].filter(Boolean).join(' · ') || undefined}
+                    subtitle={[weighInFromLine(e), isPlausibleBodyFat(e.bodyFatPct) ? `${e.bodyFatPct}% body fat` : null, delta !== null ? `${Math.abs(delta) < 0.05 ? '0' : `${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(1)}`} ${unit} vs previous` : null].filter(Boolean)
+                        // Each part stays whole ("20.8% body fat"), so a long line breaks only between them.
+                        .map((part) => (part as string).replace(/ /g, '\u00A0'))
+                        .join(' · ') || undefined}
                     value={fixedWeight(e.kg, units)}
                     onPress={() => setSheetDate(e.date)}
                   />
@@ -209,6 +234,21 @@ function WeightScreen() {
       <WeighInSheet date={sheetDate} onDate={setSheetDate} onClose={() => setSheetDate(null)} entries={series.entries} units={units} fallbackKg={latest?.kg ?? profile.weightKg} />
     </Screen>
   );
+}
+
+/**
+ * "Your targets use 84.0 kg. Your latest weigh-in, from Garmin Connect on Nov 18, is 82.4 kg."
+ * With body fat: "… is 82.4 kg with 18.2% body fat."
+ */
+function targetsBehindText(
+  behind: NonNullable<ReturnType<typeof targetsBehind>>,
+  profile: { weightKg: number; bodyFatPct?: number | null },
+  units: UnitSystem,
+): string {
+  const from = weighInFromLine(behind.latest)?.replace(/^From /, 'from ') ?? 'from your health app';
+  const fat = behind.bodyFatPct !== undefined ? ` with ${behind.bodyFatPct}% body fat` : '';
+  const ownFat = behind.bodyFatPct !== undefined ? (typeof profile.bodyFatPct === 'number' ? ` and ${profile.bodyFatPct}% body fat` : ' and no body fat') : '';
+  return `Your targets use ${fixedWeight(profile.weightKg, units)}${ownFat}. Your latest weigh-in, ${from} on ${formatShortDate(behind.latest.date)}, is ${fixedWeight(behind.kg, units)}${fat}.`;
 }
 
 function Legend({ swatch, label }: { swatch: React.ReactNode; label: string }) {
@@ -287,6 +327,13 @@ function WeighInSheet({
         </View>
       }>
       {date ? <DayStepper date={date} onChange={onDate} testID="weight-date" /> : null}
+      {existing && isSyncedWeighIn(existing) ? (
+        <Text variant="caption" color="textSecondary" testID="weight-synced-note">
+          {weighInFromLine(existing)}
+          {existing.measuredAt && Number.isFinite(Date.parse(existing.measuredAt)) ? ` at ${clockTime({ startUtc: existing.measuredAt }, units === 'imperial')}` : ''}. Changing the weight or
+          body fat makes it yours, and sync leaves it alone after that.
+        </Text>
+      ) : null}
       <NumberField
         testID="weight-input"
         label="Weight"

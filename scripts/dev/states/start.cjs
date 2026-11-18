@@ -76,6 +76,7 @@ const settings = [
   { id: 'goals-imperial', route: '/settings/goals', imperial: true, note: 'goals in lb and ft in' },
   { id: 'goals-stress', route: '/settings/goals', data: 'stress', note: 'goals at 142.6 kg' },
   { id: 'goals-macro-custom', route: '/settings/goals', taps: ['goals-macro-custom'], waitFor: 'goals-pct-total', note: 'custom macro split fields' },
+  { id: 'goals-exercise-week', route: '/settings/goals', taps: ['goals-exercise-spread-week'], waitFor: 'goals-exercise-note', note: 'workout calories switched from "Same day" to "Over 7 days": the note says when it starts' },
   { id: 'goals-maintain', route: '/settings/goals', taps: ['goals-goal-maintain'], note: 'goal: keep weight (no target or pace fields)' },
   { id: 'goals-gain-imperial', route: '/settings/goals', imperial: true, taps: ['goals-goal-gain'], note: 'goal: gain, in lb (the target is now below the current weight)' },
   { id: 'goals-sex-female', route: '/settings/goals', taps: ['goals-sex-female'], note: 'body details with female chosen' },

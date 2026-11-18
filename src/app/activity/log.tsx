@@ -6,15 +6,18 @@ import { useWindowDimensions, View } from 'react-native';
 import { ACTIVITY_BY_ID, MET_SOURCES } from '@/data/activities';
 import { basisFromEntry, formatPace, localiseSpeedText, paceModeFor, sessionPreview, sessionWaterMl } from '@/features/activity/build';
 import { DateStepper } from '@/features/activity/components';
+import { SpreadHint } from '@/features/activity/SpreadHint';
 import { syncedFrom } from '@/features/health-sync/origins';
+import { HeartRateLine } from '@/features/health-sync/ui/HeartRateLine';
 import { deleteActivity, leaveFlow, saveActivity } from '@/features/activity/session';
 import { formatDayLabel, today } from '@/lib/dates';
 import { formulaTdee } from '@/lib/energy';
+import { dailyShare } from '@/lib/exerciseBudget';
 import { exerciseWaterMl } from '@/lib/hydration';
 import { INTENSITY_LABELS } from '@/lib/exercise';
 import { distanceToKm, distanceUnit, distanceValue, formatNumber, formatVolume, formatWeight, round } from '@/lib/units';
 import { useStore } from '@/store';
-import { useLive, useProfile } from '@/store/selectors';
+import { useDay, useLive, useProfile } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
 import type { Intensity } from '@/types';
 import { Button, Card, Chip, CupKey, EmptyState, Header, IconButton, NumberField, PressableScale, Screen, Text, TextField } from '@/ui';
@@ -86,6 +89,8 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
   const dayLabel = formatDayLabel(date);
   const dayWord = date === today() ? "today's" : `${/,/.test(dayLabel) ? dayLabel : dayLabel.toLowerCase()}'s`;
   const restingShare = Math.round((tdee / 1440) * minutes);
+  // A workout on this date is placed by this date's rule: on the day, over 7 days, or not added.
+  const rule = useDay(date).exerciseRule;
 
   // Effort tiles sit three in a row while every word of their hints fits a tile; a word like
   // "strokes/min" or "Recreational" would break mid-word there, so the three become rows, the hint
@@ -124,9 +129,12 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
   };
 
   const lead = isMeasured ? `${Device} measured ${formatNumber(preview.gross)} kcal in total` : `About ${formatNumber(preview.gross)} kcal`;
-  const sentence = profile.eatBackExercise
-    ? `${lead}, of which ${formatNumber(preview.net)} is above what your day already includes; ${formatNumber(preview.net)} is added to ${dayWord} budget.`
-    : `${lead}, of which ${formatNumber(preview.net)} is above what your day already includes. Your budget stays the same, because adding exercise calories back is turned off in your goals.`;
+  const sentence =
+    rule === 'week'
+      ? `${lead}, of which ${formatNumber(preview.net)} is above what your day already includes; about ${formatNumber(dailyShare(preview.net))} a day is added to ${dayWord} budget and each of the next six days.`
+      : rule === 'day'
+        ? `${lead}, of which ${formatNumber(preview.net)} is above what your day already includes; ${formatNumber(preview.net)} is added to ${dayWord} budget.`
+        : `${lead}, of which ${formatNumber(preview.net)} is above what your day already includes. Your budget stays the same, because adding exercise calories back is turned off in your goals.`;
   // Said before saving: the edit replaces the device's figure with an estimate.
   const replaceNote =
     preview.kind === 'estimate' && preview.replacesMeasured && entry
@@ -180,11 +188,11 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
           </View>
           <View style={{ alignItems: 'flex-end', ...cup(radius.tile, 5), backgroundColor: colors.surfaceAlt, paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
             <Text variant="numM" tabular testID="log-activity-net">
-              {profile.eatBackExercise ? '+' : ''}
+              {rule !== 'off' ? '+' : ''}
               {formatNumber(preview.net)}
             </Text>
-            <Text variant="caption" color="textSecondary">
-              {profile.eatBackExercise ? 'to budget' : 'above resting'}
+            <Text variant="caption" color="textSecondary" testID="log-activity-net-caption">
+              {rule === 'week' ? 'over 7 days' : rule === 'day' ? 'to budget' : 'above resting'}
             </Text>
           </View>
         </View>
@@ -197,6 +205,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
             </Text>
           </View>
         ) : null}
+        {entry ? <HeartRateLine entry={entry} /> : null}
         {replaceNote ? (
           <Text variant="label" color="text" testID="log-activity-replaces-measured">
             {replaceNote}
@@ -214,6 +223,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
                 : 'Too short to change the water goal'}
           </Text>
         </View>
+        <SpreadHint testID="log-activity-spread-hint" />
         <PressableScale
           testID="log-activity-source"
           accessibilityLabel="Where this number comes from"

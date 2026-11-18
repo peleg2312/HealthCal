@@ -19,9 +19,11 @@
 //   the fasting cup          not running, 5%, 37%, 85%, at target, 30% past
 //   the share card           nothing eaten, 60%, 30% over, with the calories shown
 //   the plan reveal          a gain, a small loss and a big loss (start.cjs has the usual loss and keeping weight)
-//   the morning shelf        yesterday within the budget with protein and water reached, 30% over with
-//                            400 kcal of exercise, logged in part, the strong day (case A) and long content,
-//                            imperial (case G) (morning.cjs: the clock at tomorrow 08:10)
+//   the morning page         the week in cups (yesterday's large cup with its number) and yesterday's figures:
+//                            within the budget with protein and water reached, 30% over with 400 kcal of
+//                            exercise, logged in part, no food yesterday after a week with food, the strong
+//                            day (case A) and long content, imperial (case G) (morning.cjs: the clock at
+//                            tomorrow 08:10)
 const start = require('./start.cjs');
 const morning = require('./morning.cjs');
 
@@ -41,6 +43,10 @@ const today = [
   { id: 'sweep-today-protein-low', route: '/', values: { eaten: 0.6, exercise: 290, protein: 0.05 }, note: 'Today, 60% eaten with almost no protein' },
   { id: 'sweep-today-protein-over', route: '/', values: { eaten: 0.6, exercise: 290, protein: 1.3 }, note: 'Today, 60% eaten, protein 30% past its target' },
   ...WATER.map(([water, pct]) => ({ id: `sweep-today-water-${pct}`, route: '/', values: { eaten: 0.6, exercise: 290, water }, note: `Today with ${pct}% of the water goal` })),
+  // Workout calories over 7 days (values.spread): the cup's label reads "from workouts".
+  { id: 'sweep-today-week-ex-0', route: '/', values: { spread: 1, exercise: 0, eaten: 0.6 }, note: 'Over 7 days, no workout today: the headroom is all shares carried from the last six days' },
+  { id: 'sweep-today-week-ex-290', route: '/', values: { spread: 1, exercise: 290, eaten: 0.6 }, note: 'Over 7 days, a 290 kcal workout today: its first share plus the carried ones' },
+  { id: 'sweep-today-week-ex-900-over', route: '/', values: { spread: 1, exercise: 900, eaten: 1.3 }, note: 'Over 7 days, 900 kcal today and 30% over the budget' },
 ];
 
 // ------------------------------------------------------------------ the diary
@@ -50,6 +56,7 @@ const diary = [
     id: `sweep-diary-eaten-${pct}-ex-${exercise}`, route: '/diary', values: { eaten, exercise },
     note: `the diary's summary at ${pct}% eaten, ${exercise} kcal of exercise`,
   }))),
+  { id: 'sweep-diary-week', route: '/diary', values: { spread: 1, exercise: 290, eaten: 0.6 }, note: 'the diary\'s summary over 7 days: "+N from workouts, over 7 days"' },
 ];
 
 // ------------------------------------------------------------------ trackers
@@ -75,9 +82,9 @@ const plan = [
   { id: 'sweep-plan-big-loss', route: '/onboarding', data: 'fresh', taps: withPlan('lose', '52'), waitFor: 'plan-reveal', note: 'the plan reveal for losing 16 kg' },
 ];
 
-// ------------------------------------------------------------------ the morning shelf
-// The four cups of /morning at yesterday's values (the states of morning.cjs, under their own ids).
-const shelf = ['morning-within', 'morning-over', 'morning-partial', 'morning-a-strong', 'morning-g-stress'].map((id) => {
+// ------------------------------------------------------------------ the morning page
+// The week's cups and yesterday's figures on /morning at yesterday's values (the states of morning.cjs, under their own ids).
+const shelf = ['morning-within', 'morning-over', 'morning-partial', 'morning-no-food', 'morning-a-strong', 'morning-g-stress'].map((id) => {
   const s = morning.find((m) => m.id === id);
   if (!s) throw new Error(`sweep: no state ${id} in morning.cjs`);
   return { ...s, id: `sweep-${id}` };

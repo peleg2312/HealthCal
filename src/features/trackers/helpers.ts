@@ -4,7 +4,9 @@
  */
 import { addDays, diffDays, formatShortDate, lastNDates } from '@/lib/dates';
 import type { TrendPoint } from '@/lib/trend';
-import type { ISODate, SleepEntry, SleepQuality } from '@/types';
+import type { ISODate, Profile, SleepEntry, SleepQuality, WeightEntry } from '@/types';
+
+import { isSyncedWeighIn, sameFat, sameKg, withoutSyncFields } from './weighInSource';
 
 // ------------------------------------------------------------------ common
 
@@ -285,4 +287,77 @@ export function latestBodyFat(entries: { date: ISODate; bodyFatPct?: number }[])
     if (!best || e.date > best.date) best = e;
   }
   return best?.bodyFatPct;
+}
+
+// ------------------------------------------------------- synced weigh-ins
+
+/** The figures a weigh-in edit may change (the sheet's patch). */
+export type WeighInPatch = Partial<Omit<WeightEntry, 'id' | 'updatedAt' | 'deleted' | 'date'>>;
+
+/**
+ * The record a weigh-in save writes. Changing the weight or the body fat of a
+ * weigh-in a health store wrote (`isSyncedWeighIn`) makes it the person's own:
+ * where it came from no longer describes it, so those fields go, and the sync
+ * leaves it alone after that. Changing only waist, hip, neck or the note keeps it
+ * synced. Fields not in the patch are kept; a patch key set to undefined clears it.
+ */
+export function weighInAfterEdit(
+  existing: WeightEntry | undefined,
+  date: ISODate,
+  patch: WeighInPatch & { kg: number },
+): Omit<WeightEntry, 'id' | 'updatedAt'> & { id?: string } {
+  const merged: Partial<WeightEntry> = { ...(existing ?? {}), ...patch };
+  delete merged.deleted;
+  delete merged.updatedAt;
+  for (const k of Object.keys(merged) as (keyof WeightEntry)[]) if (merged[k] === undefined) delete merged[k];
+  const changesReading =
+    !!existing &&
+    isSyncedWeighIn(existing) &&
+    (!sameKg(patch.kg, existing.kg) || ('bodyFatPct' in patch && !sameFat(patch.bodyFatPct, existing.bodyFatPct)));
+  const out = changesReading ? withoutSyncFields(merged) : merged;
+  return { ...out, id: existing?.id, date, kg: patch.kg };
+}
+
+/** What a synced weigh-in would set the targets to, when they do not use it yet (`targetsBehind`). */
+export interface TargetsBehind {
+  latest: WeightEntry;
+  kg: number;
+  /** Set only when the weigh-in has body fat that differs from the profile's. */
+  bodyFatPct?: number;
+}
+
+/**
+ * The newest-dated live weigh-in, when it is a synced one whose weight differs
+ * from the profile's by 0.05 kg or more, or whose body fat differs from the
+ * profile's by 0.1 or more: what "Use it for targets" on /weight would apply.
+ * Null otherwise (no profile, no weigh-ins, the newest is the person's own, or
+ * the targets already use it). A sync never writes the profile itself.
+ */
+export function targetsBehind(profile: Pick<Profile, 'weightKg' | 'bodyFatPct'> | null | undefined, liveWeights: readonly WeightEntry[]): TargetsBehind | null {
+  if (!profile) return null;
+  let latest: WeightEntry | undefined;
+  for (const w of liveWeights) if (!w.deleted && (!latest || w.date > latest.date)) latest = w;
+  if (!latest || !isSyncedWeighIn(latest)) return null;
+  const kgDiffers = Math.abs(latest.kg - profile.weightKg) >= 0.05;
+  const fat = latest.bodyFatPct;
+  const fatDiffers = typeof fat === 'number' && (typeof profile.bodyFatPct !== 'number' || Math.abs(fat - profile.bodyFatPct) >= 0.1);
+  if (!kgDiffers && !fatDiffers) return null;
+  return { latest, kg: latest.kg, ...(fatDiffers ? { bodyFatPct: fat } : {}) };
+}
+
+/**
+ * Whether deleting `entry` should move the profile's body fat to the newest
+ * other reading (or clear it): only when the entry held the newest body-fat
+ * reading among the live weigh-ins and the profile's value is that reading's,
+ * i.e. it came from this weigh-in. A body fat typed in Goals or on /body that
+ * differs is never cleared by deleting a weigh-in.
+ */
+export function bodyFatFollowsDelete(
+  profile: Pick<Profile, 'bodyFatPct'> | null | undefined,
+  entry: Pick<WeightEntry, 'id' | 'date' | 'bodyFatPct'>,
+  live: readonly Pick<WeightEntry, 'id' | 'date' | 'bodyFatPct'>[],
+): boolean {
+  if (typeof entry.bodyFatPct !== 'number' || !profile || typeof profile.bodyFatPct !== 'number') return false;
+  const newest = live.every((e) => e.id === entry.id || typeof e.bodyFatPct !== 'number' || e.date < entry.date);
+  return newest && sameFat(profile.bodyFatPct, entry.bodyFatPct);
 }

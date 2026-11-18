@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import { addDays, diffDays, startOfWeek } from '@/lib/dates';
+import { exerciseRuleOf, rangeRule } from '@/lib/exerciseBudget';
 import { lastClosedWeek, planChangeText, recapTiles, recapWeeks, weeklyRecap } from '@/lib/insights';
 import { useToday } from '@/store/clock';
 import { useDays, useEnergyModel, useLive, useProfile, useWeightSeries } from '@/store/selectors';
@@ -39,6 +40,8 @@ export function useRecap(weekParam?: string) {
         { target: after.target.target, tdee: after.tdee, usingAdaptive: after.usingAdaptive },
       ),
     };
+    // A week not yet begun has no days: it is described by the current rule.
+    const weekDays = days.filter((x) => x.date >= week && x.date < addDays(week, 7));
     const earlier = recapWeeks(days, today, MAX_WEEKS_BACK).filter((w) => w !== week);
     const lastClosed = lastClosedWeek(today);
     return {
@@ -48,7 +51,8 @@ export function useRecap(weekParam?: string) {
       tiles: recap ? recapTiles(recap) : [],
       plan,
       earlier: week !== lastClosed ? [lastClosed, ...earlier.filter((w) => w !== lastClosed)] : earlier,
-      eatBack: profile.eatBackExercise,
+      // The rules the recapped week's days had (it may lie before a change of rule), not today's.
+      exerciseRule: weekDays.length ? rangeRule(weekDays.map((x) => x.exerciseRule)) : exerciseRuleOf(profile),
     };
   }, [days, series.trend, sleep, today, profile, week, future, before, after, nextStart]);
 }

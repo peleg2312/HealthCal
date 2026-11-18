@@ -4,14 +4,20 @@ import { describe, expect, it, vi } from 'vitest';
 // Only the pure compute* functions are under test, so the store module is stubbed out.
 vi.mock('./index', () => ({ useStore: vi.fn() }));
 
-import { addDays } from '@/lib/dates';
-import type { ActivityEntry, FoodEntry, Profile, WaterEntry, WeightEntry } from '@/types';
+import path from 'node:path';
+
+import { addDays, diffDays, startOfWeek } from '@/lib/dates';
+import { formulaTdee } from '@/lib/energy';
+import { withRuleChange } from '@/lib/exerciseBudget';
+import type { ActivityEntry, DaySnapshot, FoodEntry, Profile, WaterEntry, WeightEntry } from '@/types';
 
 import {
   computeConsistency,
   computeDay,
   computeDayFromStore,
+  computeDays,
   computeEnergyModel,
+  exerciseByDate,
   intakeByDate,
   live,
   modelInputs,
@@ -394,5 +400,201 @@ describe('a past day has one budget, whichever way it is asked for', () => {
     }
     // And the model really does differ between dates here, so the check above is not vacuous.
     expect(computeEnergyModel(p, foods, weights, END).tdee).not.toBe(computeEnergyModel(p, foods, weights, addDays(END, -33)).tdee);
+  });
+});
+
+describe('workout calories over 7 days', () => {
+  const T = '2026-11-18';
+  const week: Profile = { ...profile, eatBackExercise: true, exerciseSpread: 'week' };
+  const model = computeEnergyModel(week, [], [], T);
+  const target = model.target.target;
+  const snap = (date: string, eatBackExercise: boolean): DaySnapshot => ({ id: `d${date}`, updatedAt: '', date, target, tdee: 2500, eatBackExercise, weightKg: 80 });
+  // 400 net on Sunday Nov 15, 290 net today.
+  const acts = [act('2026-11-15', 400, 520), act(T, 290, 380)];
+
+  it('reports the rule, what is added and the part carried from earlier days', () => {
+    const d = computeDay(T, week, model, [], acts, []);
+    expect(d.exerciseRule).toBe('week');
+    expect(d.exerciseCarry).toBe(57);
+    expect(d.exerciseAdded).toBe(57 + 41);
+    expect(d.budget).toBe(target + 98);
+    expect(d.exerciseAdded).toBe(d.budget - d.target);
+    expect(d.exerciseNet).toBe(290); // the day's own burn is still reported whole
+    expect(d.remaining).toBe(target + 98);
+  });
+  it('same day reports no carry and adds the day in full; off adds nothing', () => {
+    const day = computeDay(T, profile, model, [], acts, []);
+    expect([day.exerciseRule, day.exerciseAdded, day.exerciseCarry]).toEqual(['day', 290, 0]);
+    const off = computeDay(T, { ...week, eatBackExercise: false }, model, [], acts, []);
+    expect([off.exerciseRule, off.exerciseAdded, off.exerciseCarry]).toEqual(['off', 0, 0]);
+  });
+  it('macro targets follow the spread budget', () => {
+    const d = computeDay(T, week, model, [], acts, []);
+    const fat = Math.round(((target + 98) * 0.28) / 9);
+    expect(Math.abs(d.macros.fatG - fat)).toBeLessThanOrEqual(1);
+  });
+  it('water stays on the workout day only', () => {
+    const d = computeDay(T, week, model, [], [act('2026-11-15', 400, 520, { durationMin: 60 })], []);
+    expect(d.waterGoalMl).toBe(computeDay(T, week, model, [], [], []).waterGoalMl);
+  });
+  it('the spread follows the profile history, not the snapshot', () => {
+    const p = { ...week, ...withRuleChange({ eatBackExercise: true }, 'week', T) };
+    expect(p.exerciseRuleHistory).toEqual([{ until: T, rule: 'day' }]);
+    // Sunday is a snapshotted 'day' day: its 400 stays on Sunday, nothing carries into today.
+    const snaps = [snap('2026-11-15', true), snap('2026-11-16', true)];
+    const sunday = computeDay('2026-11-15', p, model, [], acts, [], snaps);
+    expect([sunday.exerciseRule, sunday.exerciseAdded]).toEqual(['day', 400]);
+    const today = computeDay(T, p, model, [], acts, [], snaps);
+    expect([today.exerciseRule, today.exerciseAdded, today.exerciseCarry]).toEqual(['week', 41, 0]);
+  });
+  it('a snapshot with eatBackExercise false is off whatever the history says', () => {
+    const d = computeDay('2026-11-15', week, model, [], acts, [], [snap('2026-11-15', false)]);
+    expect([d.exerciseRule, d.exerciseAdded, d.budget]).toEqual(['off', 0, target]);
+    // and an off day gives nothing to the days after it
+    expect(computeDay(T, week, model, [], acts, [], [snap('2026-11-15', false)]).exerciseCarry).toBe(0);
+  });
+  it('a run of days (useDays) and one day (useDay) agree under week', () => {
+    const many: ActivityEntry[] = [];
+    for (let i = 0; i < 40; i++) if (i % 3 === 0) many.push(act(addDays(T, -i), 150 + i * 13, 300));
+    const foods = Array.from({ length: 40 }, (_, i) => food(addDays(T, -i), 2000 + i));
+    const weights = Array.from({ length: 40 }, (_, i) => weight(addDays(T, -i), 80 - i * 0.02));
+    const snaps = [snap(addDays(T, -3), true), snap(addDays(T, -4), false)];
+    const run = computeDays(30, T, week, foods, weights, many, [], snaps);
+    for (const d of run) {
+      const m = computeEnergyModel(week, foods, weights, d.date, many);
+      const one = computeDay(d.date, week, m, foods, many, [], snaps);
+      expect({ date: d.date, budget: d.budget, added: d.exerciseAdded, carry: d.exerciseCarry, rule: d.exerciseRule }).toEqual({
+        date: d.date,
+        budget: one.budget,
+        added: one.exerciseAdded,
+        carry: one.exerciseCarry,
+        rule: one.exerciseRule,
+      });
+    }
+    expect(run.some((d) => d.exerciseCarry > 0)).toBe(true);
+    const fromStore = computeDayFromStore(
+      {
+        profile: week,
+        foodEntries: Object.fromEntries(foods.map((f) => [f.id, f])),
+        weights: Object.fromEntries(weights.map((w) => [w.id, w])),
+        activities: Object.fromEntries(many.map((a) => [a.id, a])),
+        water: {},
+        days: Object.fromEntries(snaps.map((x) => [x.id, x])),
+      } as never,
+      T,
+    )!;
+    expect(fromStore.budget).toBe(run[run.length - 1].budget);
+  });
+});
+
+describe('Same day with no history gives the numbers the old code gave, on the demo data', () => {
+  it('every day of the seed, by the old formula', async () => {
+    const seedPath = path.resolve(__dirname, '../../scripts/dev/seed.mjs');
+    const { buildSeed } = await import(/* @vite-ignore */ seedPath);
+    const { state } = buildSeed();
+    const liveOf = <T extends { deleted?: boolean }>(m: Record<string, T> | undefined): T[] => Object.values(m ?? {}).filter((r) => !r.deleted);
+    const p: Profile = state.profile;
+    expect(p.exerciseSpread).toBeUndefined();
+    const foods = liveOf<FoodEntry>(state.foodEntries);
+    const weights = liveOf<WeightEntry>(state.weights);
+    const acts = liveOf<ActivityEntry>(state.activities);
+    const snaps = liveOf<DaySnapshot>(state.days);
+    const dates = [...new Set([...foods.map((f) => f.date), ...acts.map((a) => a.date)])].sort();
+    const end = dates[dates.length - 1];
+    const run = computeDays(dates.length + 3, end, p, foods, weights, acts, [], snaps);
+    let withWorkout = 0;
+    for (const d of run) {
+      const m = computeEnergyModel(p, foods, weights, d.date, acts);
+      const snapshot = snaps.find((x) => x.date === d.date);
+      const target = snapshot ? snapshot.target : m.target.target;
+      const eatBack = snapshot ? snapshot.eatBackExercise : p.eatBackExercise;
+      const exerciseNet = acts.filter((a) => a.date === d.date).reduce((s, a) => s + a.kcalNet, 0);
+      expect({ date: d.date, budget: d.budget }).toEqual({ date: d.date, budget: Math.round(target + (eatBack ? exerciseNet : 0)) });
+      expect(d.exerciseCarry).toBe(0);
+      if (exerciseNet > 0) withWorkout++;
+    }
+    expect(withWorkout).toBeGreaterThan(5);
+    // The same for the demo with adding turned off.
+    const off = { ...p, eatBackExercise: false };
+    for (const d of computeDays(dates.length, end, off, foods, weights, acts, [], [])) expect(d.budget).toBe(d.target);
+  });
+});
+
+describe('learned expenditure with workouts over 7 days (section 4.2 of the specification)', () => {
+  // Male, 180 cm, 85 kg, light activity, losing 0.5 kg a week, learned expenditure on. His true
+  // non-exercise expenditure is 6% above the formula. He eats exactly each day's budget, and his
+  // weight follows energy balance. Workouts: 400 net on Tuesdays and Thursdays.
+  const sim: Profile = {
+    ...profile,
+    name: 'Sim',
+    sex: 'male',
+    birthDate: '1990-06-01',
+    heightCm: 180,
+    weightKg: 85,
+    activityLevel: 'light',
+    goal: 'lose',
+    weeklyRateKg: 0.5,
+    useAdaptiveTdee: true,
+    eatBackExercise: true,
+  };
+  const START = '2026-08-03';
+  const trueE = Math.round(formulaTdee(sim) * 1.06);
+
+  function run(p: Profile, days: number, workoutsFrom: number) {
+    const acts: ActivityEntry[] = [];
+    for (let i = workoutsFrom; i < days; i++) {
+      const d = addDays(START, i);
+      const w = diffDays(startOfWeek(d), d);
+      if (w === 1 || w === 3) acts.push(act(d, 400, 520));
+    }
+    const exercise = exerciseByDate(acts);
+    const inputs = { weights: [] as { date: string; kg: number }[], intake: {} as Record<string, number>, exercise };
+    let kg = 85;
+    const budgets: number[] = [];
+    const targets: number[] = [];
+    for (let i = 0; i < days; i++) {
+      const d = addDays(START, i);
+      inputs.weights.push({ date: d, kg: Math.round(kg * 100) / 100 });
+      const m = computeEnergyModel(p, [], [], d, acts, inputs);
+      const b = computeDay(d, p, m, [], acts, []).budget;
+      inputs.intake[d] = b;
+      budgets.push(b);
+      targets.push(m.target.target);
+      kg += (b - trueE - (exercise[d] ?? 0)) / 7700;
+    }
+    return { budgets, targets, kg };
+  }
+  const weekP: Profile = { ...sim, exerciseSpread: 'week' };
+  const sumOf = (xs: number[]) => xs.reduce((s, v) => s + v, 0);
+  // The documented bound on the learned target's lag under 'week': 6/7 of the change in weekly net
+  // burn (800), over 28 days, times the confidence (at most 0.85), plus the target's 10 kcal rounding.
+  const BOUND = Math.ceil(((6 / 7) * 800 * 0.85) / 28) + 10;
+
+  it('steady state, 2 x 400 a week for 112 days: the same budget and weight as Same day', () => {
+    const day = run(sim, 112, 0);
+    const wk = run(weekP, 112, 0);
+    const last28 = (xs: number[]) => sumOf(xs.slice(-28));
+    expect(Math.abs(last28(wk.budgets) - last28(day.budgets)) / last28(day.budgets)).toBeLessThan(0.005);
+    expect(Math.abs(wk.kg - day.kg)).toBeLessThan(0.1);
+    // The specification's figures (60,600 and 60,640 kcal; 76.45 and 76.42 kg), within 0.5%.
+    expect(Math.abs(last28(day.budgets) - 60600) / 60600).toBeLessThan(0.005);
+    expect(Math.abs(last28(wk.budgets) - 60640) / 60640).toBeLessThan(0.005);
+    expect(Math.abs(day.kg - 76.45) / 76.45).toBeLessThan(0.005);
+    expect(Math.abs(wk.kg - 76.42) / 76.42).toBeLessThan(0.005);
+  });
+
+  it('ramp: 56 days without workouts, then 2 x 400 a week for 84 days; the target stays inside the documented bound', () => {
+    const day = run(sim, 140, 56);
+    const wk = run(weekP, 140, 56);
+    const after = (xs: number[]) => sumOf(xs.slice(56));
+    expect(Math.abs(after(wk.budgets) - after(day.budgets)) / after(day.budgets)).toBeLessThan(0.005);
+    expect(Math.abs(after(day.budgets) - 181800) / 181800).toBeLessThan(0.005);
+    expect(Math.abs(after(wk.budgets) - 181750) / 181750).toBeLessThan(0.005);
+    expect(Math.abs(wk.kg - day.kg)).toBeLessThan(0.1);
+    expect(Math.abs(day.kg - 74.32) / 74.32).toBeLessThan(0.005);
+    const diff = wk.targets.map((t, i) => t - day.targets[i]);
+    expect(Math.max(...diff.map(Math.abs))).toBeLessThanOrEqual(BOUND);
+    // Measured: -10 to +20 kcal; 181,800 and 181,750 kcal after the ramp; 74.32 kg both.
+    expect(Math.min(...diff)).toBeGreaterThanOrEqual(-BOUND);
   });
 });

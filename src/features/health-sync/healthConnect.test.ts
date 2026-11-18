@@ -6,10 +6,29 @@ import { describe, expect, it } from 'vitest';
 
 import { addDays } from '@/lib/dates';
 
-import { accessFrom, availabilityFrom, ownFigure, READ_PERMISSIONS, sessionRef, sessionToWorkout, sleepFromSession, sleepStageOf, stepDaysFromPeriods, toHealthError, type SleepSessionRaw } from './healthConnect';
+import {
+  accessFrom,
+  availabilityFrom,
+  bodyFatFromRecord,
+  DAY_ENERGY_PERMISSIONS,
+  dayEnergyFromPeriods,
+  HEART_PERMISSIONS,
+  heartFromAggregate,
+  ownFigure,
+  READ_PERMISSIONS,
+  sessionRef,
+  sessionToWorkout,
+  sleepFromSession,
+  sleepStageOf,
+  stepDaysFromPeriods,
+  toHealthError,
+  WEIGHT_PERMISSIONS,
+  weighInFromRecord,
+  type SleepSessionRaw,
+} from './healthConnect';
 import { nightsFrom } from './sleep';
 import { zoneClock } from './steps';
-import { HealthError } from './types';
+import { HealthError, NO_ACCESS } from './types';
 
 const GARMIN = 'com.garmin.android.apps.connectmobile';
 
@@ -32,7 +51,7 @@ const distance = (m: number, dataOrigins = [GARMIN]): AggregateResult<'Distance'
 });
 
 describe('Health Connect mapping', () => {
-  it('asks for six read permissions and nothing else', () => {
+  it('asks for nine read permissions and nothing else, and each later row for its own alone', () => {
     expect(READ_PERMISSIONS).toEqual([
       { accessType: 'read', recordType: 'ExerciseSession' },
       { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
@@ -40,12 +59,28 @@ describe('Health Connect mapping', () => {
       { accessType: 'read', recordType: 'Distance' },
       { accessType: 'read', recordType: 'Steps' },
       { accessType: 'read', recordType: 'SleepSession' },
+      { accessType: 'read', recordType: 'Weight' },
+      { accessType: 'read', recordType: 'BodyFat' },
+      { accessType: 'read', recordType: 'HeartRate' },
     ]);
+    expect(WEIGHT_PERMISSIONS).toEqual([
+      { accessType: 'read', recordType: 'Weight' },
+      { accessType: 'read', recordType: 'BodyFat' },
+    ]);
+    expect(HEART_PERMISSIONS).toEqual([{ accessType: 'read', recordType: 'HeartRate' }]);
+    expect(DAY_ENERGY_PERMISSIONS).toEqual([
+      { accessType: 'read', recordType: 'TotalCaloriesBurned' },
+      { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
+    ]);
+    // Every row's list is part of the whole, and nothing is ever written.
+    for (const p of [...WEIGHT_PERMISSIONS, ...HEART_PERMISSIONS, ...DAY_ENERGY_PERMISSIONS]) expect(READ_PERMISSIONS).toContainEqual(p);
+    expect(READ_PERMISSIONS.every((p) => p.accessType === 'read')).toBe(true);
   });
 
   it('reads what is granted from the permission list', () => {
-    expect(accessFrom([])).toEqual({ workouts: false, activeEnergy: false, totalEnergy: false, distance: false, steps: false, sleep: false });
+    expect(accessFrom([])).toEqual(NO_ACCESS);
     expect(accessFrom([{ accessType: 'read', recordType: 'ExerciseSession' }, { accessType: 'read', recordType: 'Distance' }, { accessType: 'write', recordType: 'ActiveCaloriesBurned' }])).toEqual({
+      ...NO_ACCESS,
       workouts: true,
       activeEnergy: false,
       totalEnergy: false,
@@ -53,9 +88,25 @@ describe('Health Connect mapping', () => {
       steps: false,
       sleep: false,
     });
-    expect(accessFrom(READ_PERMISSIONS)).toEqual({ workouts: true, activeEnergy: true, totalEnergy: true, distance: true, steps: true, sleep: true });
+    expect(accessFrom(READ_PERMISSIONS)).toEqual({
+      workouts: true,
+      activeEnergy: true,
+      totalEnergy: true,
+      distance: true,
+      steps: true,
+      sleep: true,
+      weight: true,
+      bodyFat: true,
+      dayEnergy: true,
+      heartRate: true,
+    });
     // A phone that allowed the first five before sleep was read: sleep is not shared until asked.
     expect(accessFrom(READ_PERMISSIONS.slice(0, 5)).sleep).toBe(false);
+    // A phone that allowed the six before this round: the day's calories (the same two types) already are; weight and heart rate are not.
+    expect(accessFrom(READ_PERMISSIONS.slice(0, 6))).toMatchObject({ dayEnergy: true, weight: false, bodyFat: false, heartRate: false });
+    // Weight without body fat, and a day total with only one of its two types.
+    expect(accessFrom([{ accessType: 'read', recordType: 'Weight' }])).toMatchObject({ weight: true, bodyFat: false });
+    expect(accessFrom([{ accessType: 'read', recordType: 'TotalCaloriesBurned' }]).dayEnergy).toBe(false);
   });
 
   it('takes the steps per day from Health Connect\'s own day totals', () => {
@@ -225,5 +276,58 @@ describe('Health Connect sleep', () => {
     expect(sleepFromSession(sleepSession({ endTime: '2026-11-11T22:40:00Z' }))).toEqual([]);
     const samples = sleepFromSession(sleepSession({ stages: [{ startTime: '2026-11-12T01:00:00Z', endTime: '2026-11-12T01:00:00Z', stage: 4 }, { startTime: 'x', endTime: 'y', stage: 4 }] }));
     expect(samples).toEqual([expect.objectContaining({ stage: 'asleep' })]);
+  });
+});
+
+describe('Health Connect weigh-ins, day totals and heart rate', () => {
+  const G = 'com.garmin.android.apps.connectmobile';
+
+  it('maps Weight and BodyFat records in the library\'s own shapes', () => {
+    const weight: RecordResult<'Weight'> = {
+      time: '2026-11-14T05:12:00Z',
+      zoneOffset: { id: '+01:00', totalSeconds: 3600 },
+      weight: { inGrams: 82400, inKilograms: 82.4, inMilligrams: 0, inMicrograms: 0, inOunces: 0, inPounds: 181.66 },
+      metadata: { id: 'w1', dataOrigin: G, lastModifiedTime: '', clientRecordId: null, clientRecordVersion: 0, device: null, recordingMethod: 3 } as never,
+    } as RecordResult<'Weight'>;
+    expect(weighInFromRecord(weight)).toEqual({ store: 'healthConnect', origin: G, time: '2026-11-14T05:12:00.000Z', zoneOffsetSec: 3600, kind: 'weight', value: 82.4 });
+    const fat = { time: '2026-11-14T05:12:30Z', zoneOffset: undefined, percentage: 18.2, metadata: { dataOrigin: G } } as unknown as RecordResult<'BodyFat'>;
+    expect(bodyFatFromRecord(fat)).toEqual({ store: 'healthConnect', origin: G, time: '2026-11-14T05:12:30.000Z', zoneOffsetSec: null, kind: 'bodyFat', value: 18.2 });
+    // No origin, no readable time, no value: not a reading.
+    expect(weighInFromRecord({ ...weight, metadata: undefined })).toBeNull();
+    expect(weighInFromRecord({ ...weight, time: 'later' })).toBeNull();
+    expect(bodyFatFromRecord({ ...fat, percentage: Number.NaN })).toBeNull();
+  });
+
+  it('turns the two day-sliced aggregates into one day each, origins joined', () => {
+    const total = (startTime: string, kcal: number, origins: string[]): AggregationGroupResult<'TotalCaloriesBurned'> => ({
+      result: { ENERGY_TOTAL: { inKilocalories: kcal, inCalories: kcal * 1000, inJoules: 0, inKilojoules: 0 }, dataOrigins: origins },
+      startTime,
+      endTime: '',
+    });
+    const active = (startTime: string, kcal: number, origins: string[]): AggregationGroupResult<'ActiveCaloriesBurned'> => ({
+      result: { ACTIVE_CALORIES_TOTAL: { inKilocalories: kcal, inCalories: kcal * 1000, inJoules: 0, inKilojoules: 0 }, dataOrigins: origins },
+      startTime,
+      endTime: '',
+    });
+    expect(
+      dayEnergyFromPeriods(
+        [total('2026-11-12T00:00', 2640.4, [G, 'com.google.android.apps.healthdata']), total('2026-11-13T00:00', 1700, ['com.google.android.apps.healthdata']), total('2026-11-14T00:00', 0, [])],
+        [active('2026-11-12T00:00', 812.6, [G]), active('2026-11-13T00:00', 0, [])],
+      ),
+    ).toEqual([
+      { day: '2026-11-12', kcal: 2640, activeKcal: 813, origins: [G, 'com.google.android.apps.healthdata'] },
+      { day: '2026-11-13', kcal: 1700, activeKcal: 0, origins: ['com.google.android.apps.healthdata'] },
+    ]);
+  });
+
+  it('keeps a session\'s heart rate only when beats were measured, and only from its own app', () => {
+    const hr = (avg: number, max: number, count: number, origins: string[]): AggregateResult<'HeartRate'> => ({ BPM_AVG: avg, BPM_MAX: max, BPM_MIN: 60, MEASUREMENTS_COUNT: count, dataOrigins: origins });
+    expect(heartFromAggregate(hr(142.4, 171.6, 2700, [G]), G)).toEqual({ avg: 142, max: 172 });
+    expect(heartFromAggregate(hr(0, 0, 0, []), G)).toBeNull();
+    expect(heartFromAggregate(hr(140, 170, 900, ['com.polar.beat']), G)).toBeNull();
+    expect(heartFromAggregate(null, G)).toBeNull();
+    const session = { startTime: '2026-11-14T07:00:00Z', endTime: '2026-11-14T07:45:00Z', exerciseType: 56, metadata: { id: 's1', dataOrigin: G } } as unknown as RecordResult<'ExerciseSession'>;
+    expect(sessionToWorkout(session, { heart: hr(142, 171, 2700, [G]) })).toMatchObject({ avgHeartRate: 142, maxHeartRate: 171 });
+    expect(sessionToWorkout(session, {})).not.toHaveProperty('avgHeartRate');
   });
 });

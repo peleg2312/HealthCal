@@ -138,6 +138,43 @@ function exportFile(name, mb, workouts = 24) {
   return file;
 }
 
+// ---------------------------------------------------------------- weight, the day's calories, workout heart rate
+/** Every type allowed, the four added after sleep included (weight, body fat, the day's calories, heart rate). */
+const ALL_NEW = { ...ALL_ANDROID, weight: true, bodyFat: true, dayEnergy: true, heartRate: true };
+/**
+ * Garmin weigh-ins as Health Connect lists them (BodySample in types.ts): one each morning at 06:12 local
+ * for the `days` days up to today, drifting down from `startKg`, with body fat two minutes later when `fat`.
+ */
+function garminWeighIns(days, { startKg = 83.6, fat = true, from = now, store = 'healthConnect', origin = GARMIN_ANDROID } = {}) {
+  const out = [];
+  for (let d = days - 1; d >= 0; d--) {
+    const t = atLocal(d, 6, 12, from);
+    const kg = Math.round((startKg - ((days - 1 - d) * 1.2) / Math.max(1, days - 1) + (d % 3 === 0 ? 0.3 : -0.1)) * 10) / 10;
+    out.push({ store, origin, time: iso(t), zoneOffsetSec: null, kind: 'weight', value: kg });
+    if (fat) out.push({ store, origin, time: iso(t + 120_000), zoneOffsetSec: null, kind: 'bodyFat', value: Math.round((21.4 - (days - 1 - d) * 0.05) * 10) / 10 });
+  }
+  return out;
+}
+/**
+ * The store's calories burned per day (DayEnergyDay in types.ts) for the `days` days before today, from Garmin;
+ * the days listed in `gaps` have no active calories (the watch was off), so they do not count.
+ */
+function garminEnergy(days, { gaps = [], from = now } = {}) {
+  const out = [];
+  for (let d = 1; d <= days; d++) {
+    const active = gaps.includes(d) ? 0 : 520 + ((d * 137) % 380);
+    out.push({ day: localDay(d, from), kcal: 2240 + active, activeKcal: active, origins: [GARMIN_ANDROID, 'com.google.android.apps.healthdata'] });
+  }
+  return out;
+}
+/** Health Connect with every type, sync on, and these weigh-ins, day calories and workouts. */
+const androidAll = ({ weighIns = [], dayEnergy = [], workouts = [], access = ALL_NEW, grant = ALL_NEW } = {}, state = {}) => ({
+  demo: { store: 'health-connect', availability: 'available', access, grant, workouts, steps, sleep: [], weighIns, dayEnergy },
+  state: { enabled: true, ...state },
+});
+/** A Garmin run yesterday morning with its heart rate. */
+const heartRun = workout('health-connect', 'hc-heart-run', GARMIN_ANDROID, 56, atLocal(1, 7), 45, { activeKcal: 480, totalKcal: 552, distanceM: 8200, avgHeartRate: 142, maxHeartRate: 171 });
+
 module.exports = [
   {
     id: 'train-steps',
@@ -403,4 +440,146 @@ module.exports = [
     note: 'the same with long content and five-figure counts',
   },
   { id: 'train-steps-empty-web', route: '/train', waitFor: 'train-steps-import', note: 'Train on the web with no steps: one quiet line that leads to the import' },
+
+  // ---------------------------------------------------------------- weight, the day's calories and heart rate (rows, Weight, Progress, a workout)
+  {
+    id: 'health-sync-android-weight',
+    route: '/settings/health-sync',
+    // A profile and no diary: the demo data has its own weigh-ins entered by hand, which a sync never replaces.
+    data: 'empty',
+    health: androidAll({ weighIns: garminWeighIns(14), workouts: [heartRun] }),
+    waitFor: 'health-sync-weight',
+    taps: [{ wait: 3000 }],
+    note: 'Android: weight allowed, a fortnight of Garmin weigh-ins with body fat: the Weight row says the latest and "from Garmin Connect"; heart rate allowed',
+  },
+  {
+    id: 'health-sync-android-weight-none',
+    route: '/settings/health-sync',
+    data: 'empty',
+    health: androidAll({}, { weightReadAt: iso(now - HOUR) }),
+    waitFor: 'health-sync-weight',
+    note: 'Android: weight allowed and read, no weigh-in in Health Connect: "None in Health Connect in the last 4 weeks"; calories burned allowed with no days yet',
+  },
+  {
+    id: 'health-sync-android-weight-not-allowed',
+    route: '/settings/health-sync',
+    health: androidAll({ weighIns: garminWeighIns(14), access: ALL_ANDROID, grant: ALL_ANDROID }),
+    waitFor: 'health-sync-weight',
+    note: 'Android: sync on from before weight, calories burned and heart rate were read (the six allowed): three rows offer Allow',
+  },
+  {
+    id: 'health-sync-android-weight-allow',
+    route: '/settings/health-sync',
+    data: 'empty',
+    health: androidAll({ weighIns: garminWeighIns(14), access: ALL_ANDROID, grant: ALL_NEW }),
+    waitFor: 'health-sync-weight',
+    taps: ['health-sync-weight-allow', { wait: 1500 }],
+    note: 'Android: Allow tapped on the Weight row and allowed: a toast says so and the sync brings in the weigh-ins',
+  },
+  {
+    id: 'health-sync-android-weight-refused',
+    route: '/settings/health-sync',
+    health: androidAll({ weighIns: garminWeighIns(14), access: ALL_ANDROID, grant: ALL_ANDROID }),
+    waitFor: 'health-sync-weight-allow',
+    taps: ['health-sync-weight-allow'],
+    note: 'Android: Allow tapped on the Weight row and refused again: a toast says so and opens Health Connect',
+  },
+  {
+    id: 'health-sync-iphone-new-not-asked',
+    route: '/settings/health-sync',
+    health: { demo: iphone({ access: { ...FULL, sleep: true }, grant: { ...FULL, sleep: true } }), state: { enabled: true } },
+    waitFor: 'health-sync-weight',
+    note: 'iPhone: the five and sleep allowed before this round: Weight, Calories burned and Heart rate offer Allow',
+  },
+  {
+    id: 'health-sync-android-energy',
+    route: '/settings/health-sync',
+    health: androidAll({ dayEnergy: garminEnergy(7, { gaps: [3] }) }),
+    waitFor: 'health-sync-energy',
+    taps: [{ wait: 2500 }],
+    note: 'Android: 7 days of Garmin calories, one without active calories: "About … kcal a day over 6 full days, from Garmin Connect"',
+  },
+  {
+    id: 'health-sync-android-energy-few',
+    route: '/settings/health-sync',
+    health: androidAll({ dayEnergy: garminEnergy(3) }),
+    waitFor: 'health-sync-energy',
+    taps: [{ wait: 2500 }],
+    note: 'Android: only 3 days recorded: "Shown on Progress after 5 full days recorded"',
+  },
+  {
+    id: 'weight-synced',
+    route: '/weight',
+    data: 'empty',
+    health: androidAll({ weighIns: garminWeighIns(14) }),
+    waitFor: 'weight-targets-behind',
+    // The sync's toast ("13 weigh-ins added …", 12 s with its Undo) has gone by the time the screen is captured.
+    taps: [{ wait: 13000 }],
+    note: 'Weight with a fortnight of Garmin weigh-ins: "From Garmin Connect" on each row and the targets card, the targets still on 78.4 kg',
+  },
+  {
+    id: 'weight-synced-imperial',
+    route: '/weight',
+    data: 'empty',
+    imperial: true,
+    health: androidAll({ weighIns: garminWeighIns(14) }),
+    waitFor: 'weight-targets-behind',
+    taps: [{ wait: 13000 }],
+    note: 'the same in pounds',
+  },
+  {
+    id: 'weight-synced-sheet',
+    route: '/weight',
+    data: 'empty',
+    health: androidAll({ weighIns: garminWeighIns(14) }),
+    waitFor: 'weight-row-0',
+    taps: [{ wait: 13000 }, 'weight-row-0'],
+    sheet: true,
+    note: 'a synced weigh-in opened to edit: where and when it came from, and that changing it makes it yours',
+  },
+  {
+    id: 'weight-synced-use',
+    route: '/weight',
+    data: 'empty',
+    health: androidAll({ weighIns: garminWeighIns(14) }),
+    // waitFor is checked after the taps: the card is gone by then, and the toast is there.
+    waitFor: 'toast-action',
+    absent: ['weight-targets-behind'],
+    taps: [{ wait: 13000 }, 'weight-use-latest'],
+    note: '"Use it for targets" tapped: the toast "Targets now use … kg" with Undo, and the card gone',
+  },
+  {
+    id: 'weight-first-read-toast',
+    route: '/weight',
+    data: 'empty',
+    health: androidAll({ weighIns: garminWeighIns(26, { startKg: 85.2 }), workouts: [heartRun] }),
+    waitFor: 'toast-action',
+    note: 'the first read brings 26 weigh-ins and a workout: one toast with the second sentence, and Undo',
+  },
+  {
+    id: 'progress-watch',
+    route: '/progress',
+    health: androidAll({ dayEnergy: garminEnergy(7, { gaps: [3] }) }),
+    waitFor: 'progress-energy-watch',
+    taps: [{ wait: 2500 }, 'progress-segment-body'],
+    note: "Progress with 6 valid days of Garmin calories: the watch's estimate beside HealthCal's figure for the same days",
+  },
+  {
+    id: 'progress-watch-none',
+    route: '/progress',
+    health: androidAll({ dayEnergy: garminEnergy(3) }),
+    waitFor: 'progress-energy',
+    taps: [{ wait: 2500 }, 'progress-segment-body'],
+    absent: ['progress-energy-watch'],
+    note: 'Progress with only 3 days recorded: no watch block',
+  },
+  {
+    id: 'activity-heart-rate',
+    route: '/train',
+    data: 'empty',
+    health: androidAll({ workouts: [heartRun] }),
+    waitFor: 'log-activity-heart-rate',
+    taps: [{ wait: 2500 }, 'session-running'],
+    note: 'a synced Garmin run opened: "Heart rate: average 142 bpm, highest 171 bpm" under where it came from',
+  },
 ];

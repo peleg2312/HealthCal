@@ -9,7 +9,7 @@ import { formatShortDate, toISODate } from '@/lib/dates';
 import { kcalRange } from '@/lib/exercise';
 import { sleepFrom } from '@/features/trackers/sleepSource';
 import { formatHours } from '@/features/trackers/helpers';
-import { formatNumber } from '@/lib/units';
+import { formatNumber, formatWeight } from '@/lib/units';
 import type { ISODate, SleepEntry, UnitSystem } from '@/types';
 
 import { workoutSpan } from '../convert';
@@ -25,7 +25,7 @@ export interface ReviewView {
   meta: string;
   /** "From Garmin Connect". */
   source: string;
-  /** What would be added to the day ("+480", "~412"); null until the activity is known. */
+  /** The workout's calories above resting, as shown ("+480", "~412"); null until the activity is known. */
   added: string | null;
   /** True when that figure is the app's estimate. */
   estimate: boolean;
@@ -170,6 +170,52 @@ export function sleepRowText(
   if (gone) return 'Last night was deleted. A sync does not add it again';
   if (!sleepReadAt) return 'Nights go to your sleep log once they are read';
   return `No night from ${store} for last night yet`;
+}
+
+/**
+ * The Weight row on the sync screen: the newest live weigh-in and where it came
+ * from, or why there is none. `latest` is the newest-dated live weigh-in;
+ * `synced` says whether it is still the sync's (`isSyncedWeighIn`), `from` its
+ * app's name ("Garmin Connect"). "Latest 82.4 kg on Nov 18, from Garmin Connect".
+ */
+export function weightRowText(
+  access: HealthAccess | null,
+  latest: { kg: number; date: ISODate; synced: boolean; from: string | null } | null,
+  weightReadAt: string | null,
+  store: string,
+  units: UnitSystem,
+): string {
+  if (!access || access.weight !== true) return 'Not shared yet. Allow it to fill in your weigh-ins';
+  if (!weightReadAt) return 'Weigh-ins go to Weight after the next sync';
+  if (latest) {
+    const head = `Latest ${formatWeight(latest.kg, units)} on ${formatShortDate(latest.date)}`;
+    return latest.synced ? `${head}, from ${latest.from ?? store}` : `${head}, entered by you`;
+  }
+  return `None in ${store} in the last 4 weeks`;
+}
+
+/**
+ * The "Calories burned in a day" row: the watch's estimate when there is one
+ * (dayEnergy.ts `watchEstimate`), else when it will show.
+ */
+export function energyRowText(access: HealthAccess | null, estimate: { avg: number; n: number; label: string } | null): string {
+  if (!access || access.dayEnergy !== true) return "Not shared yet. Allow it to compare with HealthCal's estimate";
+  if (estimate) return `About ${formatNumber(estimate.avg)} kcal a day over ${estimate.n} full days, from ${estimate.label}. Shown on Progress`;
+  return 'Shown on Progress after 5 full days recorded';
+}
+
+/** The "Heart rate in workouts" row. */
+export function heartRowText(access: HealthAccess | null): string {
+  if (!access || access.heartRate !== true) return "Not shared yet. Allow it to see each workout's heart rate";
+  return 'Average and highest, shown on each synced workout';
+}
+
+/** "Heart rate: average 142 bpm, highest 171 bpm", or the average alone; null without one. */
+export function heartRateText(avg: number | null | undefined, max: number | null | undefined): string | null {
+  if (typeof avg !== 'number' || !Number.isFinite(avg) || avg <= 0) return null;
+  const a = Math.round(avg);
+  if (typeof max === 'number' && Number.isFinite(max) && max >= a) return `Heart rate: average ${a} bpm, highest ${Math.round(max)} bpm`;
+  return `Average heart rate ${a} bpm`;
 }
 
 /** What is missing when calories or distance may not be read; null when everything may. */

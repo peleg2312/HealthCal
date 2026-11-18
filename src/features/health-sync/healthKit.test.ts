@@ -12,7 +12,31 @@ import { prepareImport } from '@/features/import/plan';
 import { readImportFile } from '@/features/import/read';
 
 import { sessionToWorkout } from './healthConnect';
-import { accessFromRequestStatus, distanceTypeFor, HK, kcalOf, metresOf, READ_TYPES, SLEEP_READ_TYPES, sleepFromHealthKit, sleepStageFromValue, stepDaysFromStatistics, toHealthKitError, workoutFromHealthKit, zoneOffsetSecAt, type HKStatistics, type HKWorkoutSample } from './healthKit';
+import {
+  accessFromRequestStatus,
+  bodyFromHealthKit,
+  bpmOf,
+  dayEnergyFromStatistics,
+  distanceTypeFor,
+  ENERGY_READ_TYPES,
+  HEART_READ_TYPES,
+  heartFromStatistics,
+  HK,
+  kcalOf,
+  metresOf,
+  READ_TYPES,
+  SLEEP_READ_TYPES,
+  sleepFromHealthKit,
+  sleepStageFromValue,
+  stepDaysFromStatistics,
+  toHealthKitError,
+  WEIGHT_READ_TYPES,
+  workoutFromHealthKit,
+  zoneOffsetSecAt,
+  type HKQuantitySample,
+  type HKStatistics,
+  type HKWorkoutSample,
+} from './healthKit';
 import { originName, syncedFrom } from './origins';
 import { planSync } from './plan';
 import { zoneClock } from './steps';
@@ -248,13 +272,28 @@ describe('Apple Health permission and errors', () => {
   });
 
   it('counts everything as readable once asked, since HealthKit never says what was refused', () => {
-    expect(accessFromRequestStatus(2)).toEqual({ workouts: true, activeEnergy: true, totalEnergy: false, distance: true, steps: true, sleep: false });
+    expect(accessFromRequestStatus(2)).toEqual({ ...NO_ACCESS, workouts: true, activeEnergy: true, totalEnergy: false, distance: true, steps: true, sleep: false });
     expect(accessFromRequestStatus(1)).toEqual(NO_ACCESS);
     expect(accessFromRequestStatus(0)).toEqual(NO_ACCESS);
     // Sleep is its own question: allowed only when that one was asked.
     expect(accessFromRequestStatus(2, 2).sleep).toBe(true);
-    expect(accessFromRequestStatus(2, 1)).toEqual({ workouts: true, activeEnergy: true, totalEnergy: false, distance: true, steps: true, sleep: false });
+    expect(accessFromRequestStatus(2, 1)).toEqual({ ...NO_ACCESS, workouts: true, activeEnergy: true, totalEnergy: false, distance: true, steps: true, sleep: false });
     expect(accessFromRequestStatus(1, 2)).toEqual({ ...NO_ACCESS, sleep: true });
+  });
+
+  it('keeps weight, resting energy and heart rate in lists of their own, and reads each as allowed only once asked', () => {
+    expect(WEIGHT_READ_TYPES).toEqual(['HKQuantityTypeIdentifierBodyMass', 'HKQuantityTypeIdentifierBodyFatPercentage']);
+    expect(ENERGY_READ_TYPES).toEqual(['HKQuantityTypeIdentifierBasalEnergyBurned']);
+    expect(HEART_READ_TYPES).toEqual(['HKQuantityTypeIdentifierHeartRate']);
+    const lists: readonly (readonly string[])[] = [READ_TYPES, SLEEP_READ_TYPES, WEIGHT_READ_TYPES, ENERGY_READ_TYPES, HEART_READ_TYPES];
+    const all = lists.flat();
+    expect(new Set(all).size).toBe(all.length);
+    // A phone that allowed the five and sleep: the three later rows read false.
+    expect(accessFromRequestStatus(2, 2)).toMatchObject({ weight: false, bodyFat: false, dayEnergy: false, heartRate: false });
+    expect(accessFromRequestStatus(2, 2, 2, 2, 2)).toMatchObject({ weight: true, bodyFat: true, dayEnergy: true, heartRate: true });
+    // The day's total needs active energy (the five) as well as resting energy.
+    expect(accessFromRequestStatus(1, 1, 1, 2, 1).dayEnergy).toBe(false);
+    expect(accessFromRequestStatus(1, 1, 2, 1, 2)).toEqual({ ...NO_ACCESS, weight: true, bodyFat: true, heartRate: true });
   });
 
   it('knows a copy without the HealthKit entitlement from any other refusal', () => {
@@ -292,5 +331,52 @@ describe('Apple Health sleep values', () => {
     expect(sleepFromHealthKit({ ...base, metadata: {} })?.zoneOffsetSec).toBeNull();
     expect(sleepFromHealthKit({ ...base, endDate: base.startDate })).toBeNull();
     expect(sleepFromHealthKit({ ...base, sourceRevision: { source: { name: 'x', bundleIdentifier: '' } } })).toBeNull();
+  });
+});
+
+describe('Apple Health weigh-ins, day totals and heart rate values', () => {
+  const sample = (bundle: string, productType?: string, metadata: Record<string, unknown> = {}): HKQuantitySample => ({
+    quantity: 82.4,
+    startDate: new Date('2026-11-14T05:12:00Z'),
+    sourceRevision: { source: { name: 'x', bundleIdentifier: bundle }, ...(productType ? { productType } : null) },
+    metadata,
+  });
+
+  it('names the app of a weigh-in: Garmin by its bundle, an Apple device by its kind, the Health app itself', () => {
+    expect(bodyFromHealthKit(sample('com.garmin.connect.mobile', undefined, { HKTimeZone: 'Europe/Amsterdam' }), 'weight')).toEqual({
+      store: 'healthKit',
+      origin: 'com.garmin.connect.mobile',
+      time: '2026-11-14T05:12:00.000Z',
+      zoneOffsetSec: 3600,
+      kind: 'weight',
+      value: 82.4,
+    });
+    expect(bodyFromHealthKit(sample('com.apple.health.81B2C3D4-0000-4000-8000-000000000002', 'iPhone15,2'), 'weight')?.origin).toBe('com.apple.health.iphone');
+    expect(bodyFromHealthKit(sample('com.apple.Health'), 'weight')?.origin).toBe('com.apple.Health');
+    expect(originName('com.apple.Health')).toBe('Apple Health');
+    expect(bodyFromHealthKit({ ...sample(''), quantity: 80 }, 'weight')).toBeNull();
+  });
+
+  it('sums active and basal energy per day, by the middle of each interval', () => {
+    const ams = zoneClock('Europe/Amsterdam');
+    const st = (start: string, end: string, kcal: number, bundle: string): HKStatistics => ({ sumQuantity: { unit: 'kcal', quantity: kcal }, startDate: new Date(start), endDate: new Date(end), sources: [{ bundleIdentifier: bundle }] });
+    expect(
+      dayEnergyFromStatistics(
+        [st('2026-11-12T23:00:00Z', '2026-11-13T23:00:00Z', 600, 'com.garmin.connect.mobile')],
+        [st('2026-11-12T23:00:00Z', '2026-11-13T23:00:00Z', 1700, 'com.garmin.connect.mobile'), st('2026-11-13T23:00:00Z', '2026-11-14T23:00:00Z', 800, 'com.apple.health.81B2C3D4-0000-4000-8000-000000000002')],
+        ams.dayOf,
+      ),
+    ).toEqual([
+      { day: '2026-11-13', kcal: 2300, activeKcal: 600, origins: ['com.garmin.connect.mobile'] },
+      { day: '2026-11-14', kcal: 800, activeKcal: 0, origins: ['com.apple.health.device'] },
+    ]);
+  });
+
+  it('reads heart rate in beats per minute, from count/min or count/s', () => {
+    expect(bpmOf({ unit: 'count/min', quantity: 142 })).toBe(142);
+    expect(bpmOf({ unit: 'count/s', quantity: 2.5 })).toBe(150);
+    expect(bpmOf({ unit: 'kcal', quantity: 2 })).toBeNull();
+    expect(heartFromStatistics({ averageQuantity: { unit: 'count/min', quantity: 142.4 }, maximumQuantity: { unit: 'count/min', quantity: 120 } })).toEqual({ avgHeartRate: 142, maxHeartRate: null });
+    expect(heartFromStatistics({})).toEqual({});
   });
 });

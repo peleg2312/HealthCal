@@ -156,8 +156,11 @@ function EnergyCard({
   const budget = Math.max(0, day.budget);
   // A past day with no food is not an intake deficit of the whole budget: it was not logged.
   const notLogged = !isToday && day.entries.length === 0;
-  // Calories added by exercise, drawn as hatched headroom at the top of the vessel.
-  const headroom = Math.max(0, day.budget - day.target);
+  // Calories workouts add to this day (its own and shares carried from the six days before), drawn as
+  // hatched headroom at the top of the vessel. Read from the day's rule, never from budget minus target.
+  const headroom = Math.max(0, day.exerciseAdded);
+  // Today's old case: all of it is this day's own burn. Otherwise it holds carried shares, so it is "from workouts".
+  const pure = day.exerciseRule === 'day' && day.exerciseCarry === 0;
   const left = formatNumber(Math.abs(day.remaining));
   // The big number sits in the empty space between the level and the base budget (or the brim).
   const inBand = eaten > budget - headroom;
@@ -167,11 +170,15 @@ function EnergyCard({
   const height = firstDay ? VESSEL_H_FIRST : VESSEL_H;
   const vesselW = narrow ? 66 : 84;
   // Burned in activity but left out of the budget (exercise is not added in Goals).
-  const notAdded = headroom > 0 ? 0 : Math.max(0, day.exerciseNet);
+  const notAdded = day.exerciseRule === 'off' ? Math.max(0, day.exerciseNet) : 0;
   const budgetLabel =
-    headroom > 0
-      ? `Budget ${formatNumber(day.budget)} kilocalories: ${formatNumber(day.target)} target plus ${formatNumber(headroom)} from exercise`
-      : `Daily budget ${formatNumber(day.budget)} kilocalories`;
+    headroom <= 0
+      ? `Daily budget ${formatNumber(day.budget)} kilocalories`
+      : pure
+        ? `Budget ${formatNumber(day.budget)} kilocalories: ${formatNumber(day.target)} target plus ${formatNumber(headroom)} from exercise`
+        : day.exerciseRule === 'week'
+          ? `Budget ${formatNumber(day.budget)} kilocalories: ${formatNumber(day.target)} target plus ${formatNumber(headroom)}, a seventh of each workout in the last 7 days`
+          : `Budget ${formatNumber(day.budget)} kilocalories: ${formatNumber(day.target)} target plus ${formatNumber(headroom)} from workouts`;
 
   const labels: VesselLabel[] = [];
   if (headroom > 0) {
@@ -186,7 +193,7 @@ function EnergyCard({
         <Text variant="numM" numberOfLines={1} style={{ fontSize: 17, lineHeight: 22 }}>
           {`+${formatNumber(headroom)}`}
           <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
-            {'  burned, added'}
+            {pure ? '  burned, added' : '  from workouts'}
           </Text>
         </Text>
       ),

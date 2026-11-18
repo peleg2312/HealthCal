@@ -47,6 +47,8 @@ const pick = [
 // ------------------------------------------------------------------ log a session
 const log = [
   { id: 'log-new-running', route: '/activity/log?activityId=running', waitFor: 'log-activity-result', note: 'a new run, starting from the last one' },
+  { id: 'log-week', route: '/activity/log?activityId=running', values: { spread: 1 }, waitFor: 'log-activity-result', note: 'over 7 days: "+N over 7 days" beside the burn' },
+  { id: 'log-day-hint', route: '/activity/log?activityId=running', waitFor: 'log-activity-spread-hint', note: 'same day: the hint that workouts can be shared over 7 days, which opens Goals' },
   { id: 'log-light', route: '/activity/log?activityId=volleyball', taps: ['intensity-light'], note: 'light effort selected' },
   { id: 'log-vigorous', route: '/activity/log?activityId=paddleboarding', taps: ['intensity-vigorous'], note: 'vigorous, the longest activity name' },
   { id: 'log-competitive', route: '/activity/log?activityId=volleyball', note: 'effort hints with long words ("Recreational", "Competitive"): rows, never a split word' },
@@ -153,6 +155,9 @@ const water = [
 
 // ------------------------------------------------------------------ weight
 const weight = [
+  // Weigh-ins synced from Garmin Connect through the in-memory health store, with the "Use it for targets" card
+  // (defined once in health.cjs, so the crawl taps the same screen the evidence states show).
+  require('./health.cjs').find((s) => s.id === 'weight-synced'),
   { id: 'weight-1m', route: '/weight', taps: ['weight-range-1m'], note: 'one month' },
   { id: 'weight-all', route: '/weight', taps: ['weight-range-all'], note: 'all of it' },
   { id: 'weight-stress', route: '/weight', data: 'stress', note: '142.6 kg, target 118 kg' },

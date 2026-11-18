@@ -1,7 +1,8 @@
 /**
  * Automatic workout sync, wired to the real app: the platform's adapter, the
  * store, the toast and the phone's own memory. The rules are in plan.ts, the
- * run itself in engine.ts (with the nights of sleep, sleep.ts); this file only connects them and decides when a
+ * run itself in engine.ts (with the nights of sleep, sleep.ts, the weigh-ins,
+ * body.ts, and the day's calories, dayEnergy.ts); this file only connects them and decides when a
  * sync starts: when the app comes to the foreground and when Train opens
  * (engine.ts keeps that to once every 15 minutes), and on "Sync now".
  */
@@ -10,12 +11,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { bmr, formulaTdee } from '@/lib/energy';
+import { syncNow, useSyncState } from '@/services/sync';
 import { useStore } from '@/store';
 import { flushPersistence, useHydration } from '@/store/persistence';
 import { toast } from '@/ui';
 
 import { adapter as platformAdapter } from './adapter';
-import { createHealthSync, type SyncOutcome } from './engine';
+import { createHealthSync, PULL_WAIT_MS, roundEndedSince, type SyncOutcome } from './engine';
 import { createFakeAdapter, type FakeHealth } from './fake';
 import { remembered, resetHealthSync, useHealthSync, whenLoaded } from './store';
 import { HealthError, type HealthAccess, type HealthAdapter, type HealthAvailability } from './types';
@@ -33,11 +35,39 @@ const liveAdapter: HealthAdapter = {
   readWorkouts: (range, access, options) => active.readWorkouts(range, access, options),
   readStepDays: (range, access) => active.readStepDays(range, access),
   readSleep: (range, access) => active.readSleep(range, access),
+  readWeighIns: (range, access) => active.readWeighIns(range, access),
+  readDayEnergy: (range, access) => active.readDayEnergy(range, access),
   openSettings: () => active.openSettings(),
   openInstall: () => active.openInstall(),
 };
 
 export const healthAdapter = liveAdapter;
+
+/**
+ * Before weigh-ins are planned: nothing to wait for without an account; with one, run a data-sync round and
+ * wait for it (at most PULL_WAIT_MS), so a weigh-in deleted on another phone is here before it is planned.
+ */
+async function afterPull(since: number): Promise<boolean> {
+  if (useStore.getState().ownerId === null) return true;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    const finished = await Promise.race([
+      syncNow().then(
+        () => true,
+        () => false,
+      ),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), PULL_WAIT_MS);
+      }),
+    ]);
+    const st = useSyncState.getState();
+    return finished && roundEndedSince(st.status, st.lastRunAt, since);
+  } catch {
+    return false;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 export const healthSync = createHealthSync({
   adapter: liveAdapter,
@@ -74,7 +104,18 @@ export const healthSync = createHealthSync({
     },
     remove: (id) => useStore.getState().remove('sleep', id),
   },
-  // The level line of the toast takes the exercise colour for workouts, the sleep colour for nights alone.
+  // Weigh-ins (body.ts): ordinary synced 'weights' records, one per date. Only the records: never the profile,
+  // so a synced weigh-in reaches the targets only by the person's own tap on /weight.
+  weights: {
+    all: () => Object.values(useStore.getState().weights),
+    save: (records) => {
+      useStore.getState().upsertMany('weights', records);
+    },
+    remove: (id) => useStore.getState().remove('weights', id),
+  },
+  afterPull,
+  targetsLearn: () => useStore.getState().profile?.useAdaptiveTdee === true,
+  // The level line of the toast takes the exercise colour for workouts, the sleep colour for nights, the weight colour for weigh-ins alone.
   announce: (message, undo, tint = 'exercise') => toast(message, { label: 'Undo', onPress: undo, tint }),
   onBusy: (busy) => useHealthSync.setState({ busy }),
   // Waiting for what a sync saved to be confirmed on the device: the updater waits for it as for a run (updates.ts).

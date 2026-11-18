@@ -35,6 +35,9 @@ function day(patch: Partial<DaySummary> = {}): DaySummary {
     activeMinutes: 0,
     target: 2000,
     budget: 2000,
+    exerciseRule: 'day',
+    exerciseAdded: 0,
+    exerciseCarry: 0,
     remaining: 2000 - kcal,
     macros: {
       proteinG: 150,

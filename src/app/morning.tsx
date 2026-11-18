@@ -5,27 +5,30 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { fileStepsNote, shownSteps } from '@/features/health-sync/steps';
 import { useHealthSync } from '@/features/health-sync/store';
+import { coachMessage } from '@/features/morning/coach';
 import { dayFacts, isNothing } from '@/features/morning/facts';
 import { logMealTitle } from '@/features/morning/figures';
 import { morningTitle } from '@/features/morning/greeting';
 import { goalMet, morningLine } from '@/features/morning/line';
-import { MorningShelf } from '@/features/morning/MorningShelf';
 import { MoveRow } from '@/features/morning/MoveRow';
 import { personalLine } from '@/features/morning/personal';
 import { targetsLine, todayPlan, weekBeforeYesterday, weekSoFar } from '@/features/morning/plan';
 import { PlanCard } from '@/features/morning/PlanCard';
 import { QuoteBlock } from '@/features/morning/QuoteBlock';
 import { quoteTheme } from '@/features/morning/quotes';
-import { NOTHING_CAPTION, NOTHING_LINE, reviewNote, toAdjust, wentWell } from '@/features/morning/review';
+import { NOTHING_CAPTION, NOTHING_LINE, reviewNote, toAdjust, wentWell, type ReviewKind } from '@/features/morning/review';
 import { ReviewList } from '@/features/morning/ReviewList';
 import { useDayQuote } from '@/features/morning/useDayQuote';
+import { WeekBlock } from '@/features/morning/WeekBlock';
+import { weekCells, type WeekDayIn } from '@/features/morning/weekCells';
+import { YesterdayFigures } from '@/features/morning/YesterdayFigures';
 import { ShareDayButton } from '@/features/share';
 import { findByDate } from '@/features/trackers/helpers';
 import { addDays, diffDays, formatShortDate, greeting, toISODate, weekdayShort } from '@/lib/dates';
 import { guidelineMinutes } from '@/lib/exercise';
 import { mealForTime } from '@/lib/nutrition';
 import { useNow, useToday } from '@/store/clock';
-import { useConsistency, useDay, useDays, useLive, useProfile, useWeightSeries } from '@/store/selectors';
+import { useConsistency, useDay, useDays, useLive, useProfile, useWeightSeries, type DaySummary } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ActivityEntry, ISODate } from '@/types';
 import { Button, Card, Divider, FadeUp, Header, Screen, Text, goBack } from '@/ui';
@@ -36,22 +39,33 @@ function minutesIn(activities: ActivityEntry[], range: { from: ISODate; to: ISOD
   return guidelineMinutes(activities.filter((a) => a.date >= range.from && a.date <= range.to));
 }
 
+/** What yesterday's card sentence (morningLine) already states whenever the item is listed: within the budget, protein and water reached ... */
+const WELL_SAID_BY_CARD: readonly ReviewKind[] = ['budget', 'protein', 'water'];
+/** ... and the calories above the day's budget. */
+const ADJUST_SAID_BY_CARD: readonly ReviewKind[] = ['cal'];
+
+/** What the week picture needs of one day. */
+function weekDay(d: DaySummary): WeekDayIn {
+  const f = dayFacts(d);
+  return { date: d.date, kcal: d.eaten.kcal, budget: d.budget, target: d.target, foodLogged: f.foodLogged, complete: f.complete, approx: f.approx, workout: d.activities.length > 0 };
+}
+
 /**
  * The morning page: a personal start to the day, laid over Today as a task screen. It opens by
  * itself on the first visit of a morning (useMorningPage, rule.ts), or on purpose from Profile at
  * any hour. Opened either way it only reads: it never consults the rule or marks the day (the
  * quote it shows is kept on this device for the day, quotePin.ts, which is not a store write).
  *
- * Top to bottom: the greeting by name in the header over today's date; one true personal line
- * (personal.ts); the quote of the day (quotes.ts); yesterday's card (the sentence, four cups for
- * eaten, protein and water yesterday and sleep last night, the movement line); "What went well"
- * and "What to improve" (review.ts); "For today" (plan.ts); and the footer with "Today" and
- * "Log <meal>". Every word comes from the pure, tested functions; this file gathers the values
- * and places the blocks.
- *
- * The blocks are one Screen gap (16) apart, with no extra margins, so that at 360 x 740 a quote of
- * up to three lines still leaves the title of the next section above the footer: the first view
- * shows that there is more below.
+ * Top to bottom: the greeting by name in the header over today's date; the week block (WeekBlock:
+ * "Your week", the personal line, the week in cups with yesterday large, and the coach in three
+ * voices: what went well, the next step, the first step for today); the quote of the day
+ * (quotes.ts); yesterday's card (the sentence, four figures for eaten, protein and water yesterday
+ * and sleep last night, the movement line); "What went well" and "What to improve" (review.ts) and
+ * "For today" (plan.ts), each holding only what the coach and the card do not already say; and the
+ * pinned footer with "Today" and "Log <meal>". Every word comes from the pure, tested functions
+ * (coach.ts, personal.ts, line.ts, review.ts, plan.ts, quotes.ts, weekLabel.ts); this file gathers
+ * the values and places the blocks.
+ * At 360 x 740 the whole coach is in the first view, above the footer.
  */
 export default function MorningScreen() {
   const { colors, spacing } = useTheme();
@@ -89,14 +103,15 @@ export default function MorningScreen() {
   const title = morningTitle(greeting(now), profile.name, width);
   const sleepHours: Record<ISODate, number> = {};
   for (const s of sleepAll) sleepHours[s.date] = s.hours;
-  const personal = personalLine(
-    { today, onboardedDay, streak, days: recent.map((d) => dayFacts(d)), sleepHours },
-    title.nameShown ? null : (profile.name ?? null),
-  );
+  const personal = personalLine({ today, onboardedDay, streak, days: recent.map((d) => dayFacts(d)), sleepHours }, title.nameShown ? null : (profile.name ?? null));
 
   const { quote, ready: quoteReady } = useDayQuote(today, quoteTheme(y, lastNight ? lastNight.hours : null), params.quote);
 
-  const review = { y, weekBefore: minutesIn(activities, weekBeforeYesterday(today)), lastNight, units: profile.units, firstWeek };
+  // In the first week the week's minutes count from the setup day, as the week picture and the
+  // streak tag do: history from before setup would read "150 active minutes reached" beside "Day 2".
+  const fromSetup = (range: { from: ISODate; to: ISODate } | null) =>
+    range && firstWeek && onboardedDay && range.from < onboardedDay ? (onboardedDay > range.to ? null : { from: onboardedDay, to: range.to }) : range;
+  const review = { y, weekBefore: minutesIn(activities, fromSetup(weekBeforeYesterday(today))), lastNight, units: profile.units, firstWeek };
   const well = wentWell(review);
   const adjust = toAdjust(review);
   const note = reviewNote(y);
@@ -104,13 +119,25 @@ export default function MorningScreen() {
     today,
     waterMl: todayDay.waterMl,
     waterGoalMl: todayDay.waterGoalMl,
-    weekMinutes: minutesIn(activities, weekSoFar(today)),
+    weekMinutes: minutesIn(activities, fromSetup(weekSoFar(today))),
     lastWeighIn: weights.latest?.date ?? null,
     lastNightLogged: !!sleep,
     firstAdjust: adjust[0]?.kind ?? null,
     units: profile.units,
   });
-  const targets = targetsLine({ budget: todayDay.budget, proteinG: todayDay.macros.proteinG });
+  const todayTargets = { budget: todayDay.budget, proteinG: todayDay.macros.proteinG };
+  const targets = targetsLine(todayTargets);
+  const coach = coachMessage({ today, y, well, adjust, plan, targets: todayTargets, firstWeekDay: firstWeek ? dayN : 0 });
+
+  // Each fact is said once: the lists and the plan leave out what the coach already names, and what
+  // yesterday's card already says in its sentence (the budget, protein and water reached, calories
+  // above the band). The coach's step for today replaces its plan row.
+  const wellShown = well.filter((w) => !coach.goodKinds.includes(w.kind) && !WELL_SAID_BY_CARD.includes(w.kind));
+  const adjustShown = adjust.filter((a) => a.kind !== coach.improveKind && !ADJUST_SAID_BY_CARD.includes(a.kind));
+  const planShown = plan.filter((p) => p.kind !== coach.todayFrom);
+
+  const week = weekCells({ days: recent.slice(-7).map(weekDay), todayDay: weekDay(todayDay), setupDay: onboardedDay, yesterday, today });
+  const kcalShown = week.show && !!week.yesterday?.foodLogged;
 
   const meal = mealForTime(now);
   const close = () => goBack('/');
@@ -140,7 +167,7 @@ export default function MorningScreen() {
   );
 
   const dayLabel = (
-    <Text variant="label" color="textSecondary" numberOfLines={1} testID="morning-day">
+    <Text variant="overline" color="textSecondary" numberOfLines={1} testID="morning-day">
       {`Yesterday · ${weekdayShort(yesterday)}, ${formatShortDate(yesterday)}`}
     </Text>
   );
@@ -150,93 +177,90 @@ export default function MorningScreen() {
       testID="morning-screen"
       header={<Header title={title.title} subtitle={`${weekdayShort(today)}, ${formatShortDate(today)}`} close onBack={close} right={<ShareDayButton date={yesterday} testID="morning-share" />} />}
       footer={footer}>
-      {personal ? (
-        <FadeUp index={0}>
-          <Text variant="body" color="text" testID="morning-personal">
-            {personal}
-          </Text>
-        </FadeUp>
-      ) : null}
-
-      <FadeUp index={1}>
-        <QuoteBlock quote={quote} ready={quoteReady} />
+      <FadeUp index={0}>
+        <WeekBlock cells={week} streak={streak} personal={personal} coach={coach} firstWeek={firstWeek} />
       </FadeUp>
 
+      {/* The quote of the day, second: its first line is in the first view on a strong day at 360 x 740. */}
       <FadeUp index={2}>
-        {nothing ? (
-          <Card testID="morning-card" padding={16}>
-            {dayLabel}
-            <Text variant="title" testID="morning-line" style={{ marginTop: spacing.xs }}>
-              {NOTHING_LINE}
-            </Text>
+        <Card padding={18}>
+          <QuoteBlock quote={quote} ready={quoteReady} />
+        </Card>
+      </FadeUp>
+
+      <FadeUp index={3}>
+        <Card testID="morning-card" padding={18}>
+          {dayLabel}
+          <Text variant="title" testID="morning-line" style={{ marginTop: spacing.sm }}>
+            {nothing
+              ? NOTHING_LINE
+              : morningLine({
+                  kcal: day.eaten.kcal,
+                  budget: day.budget,
+                  complete: y.complete,
+                  foodLogged: y.foodLogged,
+                  proteinMet: goalMet(day.eaten.protein, day.macros.proteinG),
+                  waterMet: goalMet(day.waterMl, day.waterGoalMl),
+                })}
+          </Text>
+          {nothing ? (
             <Text variant="caption" color="textSecondary" style={{ marginTop: spacing.xs }}>
               {NOTHING_CAPTION}
             </Text>
-          </Card>
-        ) : (
-          <Card testID="morning-card" padding={16}>
-            {dayLabel}
-            <Text variant="title" testID="morning-line" style={{ marginTop: spacing.xs }}>
-              {morningLine({
-                kcal: day.eaten.kcal,
-                budget: day.budget,
-                complete: y.complete,
-                foodLogged: y.foodLogged,
-                proteinMet: goalMet(day.eaten.protein, day.macros.proteinG),
-                waterMet: goalMet(day.waterMl, day.waterGoalMl),
-              })}
-            </Text>
-            <View style={{ marginTop: spacing.md }}>
-              <MorningShelf
-                compact
-                units={profile.units}
-                sleepHours={sleep ? sleep.hours : null}
-                day={{
-                  date: yesterday,
-                  kcal: day.eaten.kcal,
-                  budget: day.budget,
-                  headroom: day.budget - day.target,
-                  protein: day.eaten.protein,
-                  proteinG: day.macros.proteinG,
-                  waterMl: day.waterMl,
-                  waterGoalMl: day.waterGoalMl,
-                  foodLogged: y.foodLogged,
-                  complete: y.complete,
-                  approx: y.approx,
-                }}
-              />
-            </View>
-            <View style={{ marginVertical: spacing.md }}>
-              <Divider />
-            </View>
-            <MoveRow activities={day.activities} exerciseNet={day.exerciseNet} steps={steps} stepsNote={stepsNote} />
-          </Card>
-        )}
+          ) : (
+            <>
+              <View style={{ marginTop: spacing.lg }}>
+                <YesterdayFigures
+                  kcalShown={kcalShown}
+                  units={profile.units}
+                  sleepHours={sleep ? sleep.hours : null}
+                  day={{
+                    date: yesterday,
+                    kcal: day.eaten.kcal,
+                    budget: day.budget,
+                    headroom: Math.max(0, day.budget - day.target),
+                    protein: day.eaten.protein,
+                    proteinG: day.macros.proteinG,
+                    waterMl: day.waterMl,
+                    waterGoalMl: day.waterGoalMl,
+                    foodLogged: y.foodLogged,
+                    complete: y.complete,
+                    approx: y.approx,
+                  }}
+                />
+              </View>
+              <View style={{ marginVertical: spacing.md }}>
+                <Divider />
+              </View>
+              <MoveRow activities={day.activities} exerciseNet={day.exerciseNet} steps={steps} stepsNote={stepsNote} />
+            </>
+          )}
+        </Card>
       </FadeUp>
 
       {note ? (
-        <FadeUp index={3} style={{ marginTop: -spacing.xs }}>
+        <FadeUp index={4} style={{ marginTop: -spacing.xs }}>
           <Text variant="caption" color="textSecondary" testID="morning-note">
             {note}
           </Text>
         </FadeUp>
       ) : null}
 
-      {well.length > 0 ? (
-        <FadeUp index={3}>
-          <ReviewList variant="well" items={well} />
-        </FadeUp>
-      ) : null}
-
-      {adjust.length > 0 ? (
+      {wellShown.length > 0 ? (
         <FadeUp index={4}>
-          <ReviewList variant="adjust" items={adjust} />
+          <ReviewList variant="well" items={wellShown} />
         </FadeUp>
       ) : null}
 
-      {targets || plan.length > 0 ? (
+      {adjustShown.length > 0 ? (
         <FadeUp index={5}>
-          <PlanCard today={today} targets={targets} items={plan} />
+          <ReviewList variant="adjust" items={adjustShown} />
+        </FadeUp>
+      ) : null}
+
+      {targets || planShown.length > 0 ? (
+        <FadeUp index={6}>
+          <PlanCard today={today} targets={targets} items={planShown} />
         </FadeUp>
       ) : null}
     </Screen>

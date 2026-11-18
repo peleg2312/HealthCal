@@ -1,6 +1,9 @@
 /**
  * Defects an independent tester found, each kept as a test so it stays fixed.
  */
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ACTIVITY_BY_ID } from '@/data/activities';
@@ -181,5 +184,26 @@ describe('regressions', () => {
     expect(p.leftOut.unusable).toBe(1);
     // A minute is a workout.
     expect(planSync({ workouts: [workout({ start: '2026-11-10T07:00:00Z', minutes: 1, activeKcal: 8, totalKcal: 10 })], existing: [], ctx: CTX }).add).toHaveLength(1);
+  });
+});
+
+describe('a sync never writes the profile', () => {
+  // A profile write from inside a sync, before this visit's pull, would put this phone's whole profile over a
+  // goal changed on another device (settings and the profile sync as one object). profile.weightKg follows a
+  // synced weigh-in only by the person's own save or "Use it for targets" on /weight (trackers/actions.ts).
+  it('no file under src/features/health-sync calls setProfile, syncProfileToLatest, saveWeightRecord or deleteWeightRecord', () => {
+    const root = join(__dirname);
+    const files: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const p = join(dir, name);
+        if (statSync(p).isDirectory()) walk(p);
+        else if (/\.(ts|tsx)$/.test(name) && !/\.test\.ts$/.test(name)) files.push(p);
+      }
+    };
+    walk(root);
+    expect(files.length).toBeGreaterThan(20);
+    const offenders = files.filter((f) => /\b(setProfile|syncProfileToLatest|saveWeightRecord|deleteWeightRecord)\b/.test(readFileSync(f, 'utf8')));
+    expect(offenders).toEqual([]);
   });
 });

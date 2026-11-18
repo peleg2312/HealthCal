@@ -753,7 +753,7 @@ async function gestureChecks(browser, seeds) {
     ['header-close', 'the X', ['/'], false],
     ['morning-today', '"Today"', ['/'], false],
     ['morning-log', '"Log <meal>"', ['/food/search'], true],
-    ['morning-cal', 'the calorie cup', ['/diary'], true],
+    ['morning-cal', "yesterday's Eaten figure", ['/diary'], true],
     ['morning-move', 'the movement row', ['/train'], true],
   ]) {
     await guard(`morning: ${label}`, async () => {

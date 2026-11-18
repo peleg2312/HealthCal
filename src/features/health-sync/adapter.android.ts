@@ -5,9 +5,10 @@
  * extension; iOS and web get the files beside it). It makes the calls and
  * nothing else: every rule about what the answers mean is in the pure modules.
  *
- * Read only, six record types (exercise, active and total calories, distance,
- * steps, sleep), no background reads and no history beyond Health Connect's
- * default 30 days before the first permission (app.json lists the same six).
+ * Read only, nine record types (exercise, active and total calories, distance,
+ * steps, sleep, weight, body fat, heart rate), no background reads and no
+ * history beyond Health Connect's default 30 days before the first permission
+ * (app.json must list the same nine).
  * None of this can run outside an Android build; see docs/health-sync.md for
  * what still has to be checked on a phone.
  */
@@ -17,17 +18,36 @@ import { aggregateGroupByPeriod, aggregateRecord, getGrantedPermissions, getSdkS
 import {
   accessFrom,
   availabilityFrom,
+  bodyFatFromRecord,
+  DAY_ENERGY_PERMISSIONS,
+  dayEnergyFromPeriods,
+  HEART_PERMISSIONS,
   READ_PERMISSIONS,
   sessionRef,
   sessionToWorkout,
   sleepFromSession,
   stepDaysFromPeriods,
   toHealthError,
+  WEIGHT_PERMISSIONS,
+  weighInFromRecord,
   type SessionDetails,
   type SessionRecord,
   type SleepSessionRaw,
 } from './healthConnect';
-import { HealthError, type HealthAccess, type HealthAdapter, type HealthAvailability, type HealthWorkout, type ReadOptions, type SleepSample, type StepDayTotal, type StepsRange } from './types';
+import {
+  HealthError,
+  type AccessRequest,
+  type BodySample,
+  type DayEnergyDay,
+  type HealthAccess,
+  type HealthAdapter,
+  type HealthAvailability,
+  type HealthWorkout,
+  type ReadOptions,
+  type SleepSample,
+  type StepDayTotal,
+  type StepsRange,
+} from './types';
 
 const PROVIDER = 'com.google.android.apps.healthdata';
 /** Sessions per page, and a ceiling on pages so a misbehaving token cannot loop for ever. */
@@ -67,10 +87,22 @@ async function access(): Promise<HealthAccess> {
   }
 }
 
-async function requestAccess(): Promise<HealthAccess> {
+/**
+ * The rows added after sleep ask for their own types alone, so a phone that
+ * allowed the six before sees only what that row reads; turning sync on and the
+ * Sleep row ask the whole list (Health Connect shows only what is not allowed yet).
+ */
+function permissionsFor(what: AccessRequest) {
+  if (what === 'weight') return WEIGHT_PERMISSIONS;
+  if (what === 'heartRate') return HEART_PERMISSIONS;
+  if (what === 'dayEnergy') return DAY_ENERGY_PERMISSIONS;
+  return READ_PERMISSIONS;
+}
+
+async function requestAccess(what: AccessRequest = 'all'): Promise<HealthAccess> {
   try {
     await ready();
-    await requestPermission(READ_PERMISSIONS);
+    await requestPermission(permissionsFor(what));
     // Ask again what is granted: the sheet's own answer only lists what was requested this time.
     return accessFrom(await getGrantedPermissions());
   } catch (e) {
@@ -84,12 +116,14 @@ async function details(ref: Pick<HealthWorkout, 'origin' | 'startTime' | 'endTim
     timeRangeFilter: { operator: 'between' as const, startTime: ref.startTime, endTime: ref.endTime },
     dataOriginFilter: [ref.origin],
   };
-  const [active, total, distance] = await Promise.all([
+  const [active, total, distance, heart] = await Promise.all([
     allowed.activeEnergy ? aggregateRecord({ recordType: 'ActiveCaloriesBurned', ...scope }) : null,
     allowed.totalEnergy ? aggregateRecord({ recordType: 'TotalCaloriesBurned', ...scope }) : null,
     allowed.distance ? aggregateRecord({ recordType: 'Distance', ...scope }) : null,
+    // Heart rate is extra: a refused or failed question leaves the workout without it, never without the workout.
+    allowed.heartRate ? aggregateRecord({ recordType: 'HeartRate', ...scope }).catch(() => null) : null,
   ]);
-  return { active, total, distance };
+  return { active, total, distance, heart };
 }
 
 async function readWorkouts(range: { from: string; to: string }, allowed: HealthAccess, options?: ReadOptions): Promise<HealthWorkout[]> {
@@ -189,4 +223,81 @@ async function readSleep(range: { from: string; to: string }, allowed: HealthAcc
   }
 }
 
-export const adapter: HealthAdapter = { store: 'health-connect', availability, access, requestAccess, readWorkouts, readStepDays, readSleep, openSettings, openInstall };
+/** Every record of one instantaneous type in the range, paged like the sessions. */
+async function readAll<T extends 'Weight' | 'BodyFat'>(recordType: T, range: { from: string; to: string }) {
+  const out = [];
+  let pageToken: string | undefined;
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const result = await readRecords(recordType, {
+      timeRangeFilter: { operator: 'between', startTime: range.from, endTime: range.to },
+      ascendingOrder: true,
+      pageSize: PAGE_SIZE,
+      ...(pageToken ? { pageToken } : null),
+    });
+    out.push(...result.records);
+    if (!result.pageToken || result.records.length === 0) break;
+    pageToken = result.pageToken;
+  }
+  return out;
+}
+
+/**
+ * Every weight reading in the range, from every app, and the body-fat readings
+ * beside them when body fat may be read, as raw samples (body.ts chooses the
+ * one weigh-in a day). Empty when weight may not be read.
+ */
+async function readWeighIns(range: { from: string; to: string }, allowed: HealthAccess): Promise<BodySample[]> {
+  if (!allowed.weight) return [];
+  try {
+    await ready();
+    const out: BodySample[] = [];
+    for (const r of await readAll('Weight', range)) {
+      const s = weighInFromRecord(r);
+      if (s) out.push(s);
+    }
+    if (allowed.bodyFat) {
+      for (const r of await readAll('BodyFat', range)) {
+        const s = bodyFatFromRecord(r);
+        if (s) out.push(s);
+      }
+    }
+    return out;
+  } catch (e) {
+    throw toHealthError(e);
+  }
+}
+
+/**
+ * The calories burned on each local day, as Health Connect totals them (one
+ * count where apps overlap): total and active energy, sliced by calendar day in
+ * the phone's zone like the steps. Shown on Progress only (dayEnergy.ts).
+ */
+async function readDayEnergy(range: StepsRange, allowed: HealthAccess): Promise<DayEnergyDay[]> {
+  if (!allowed.dayEnergy) return [];
+  try {
+    await ready();
+    const scope = {
+      timeRangeFilter: { operator: 'between' as const, startTime: range.from, endTime: range.to },
+      timeRangeSlicer: { period: 'DAYS' as const, length: 1 },
+    };
+    const total = await aggregateGroupByPeriod({ recordType: 'TotalCaloriesBurned', ...scope });
+    const active = await aggregateGroupByPeriod({ recordType: 'ActiveCaloriesBurned', ...scope });
+    return dayEnergyFromPeriods(total, active);
+  } catch (e) {
+    throw toHealthError(e);
+  }
+}
+
+export const adapter: HealthAdapter = {
+  store: 'health-connect',
+  availability,
+  access,
+  requestAccess,
+  readWorkouts,
+  readStepDays,
+  readSleep,
+  readWeighIns,
+  readDayEnergy,
+  openSettings,
+  openInstall,
+};

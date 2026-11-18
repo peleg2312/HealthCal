@@ -238,7 +238,7 @@ export default function AboutScreen() {
         <P>
           With &quot;Learn from my data&quot; on, HealthCal fits a straight line through your weigh-ins of the last 28 days and compares its slope
           with what you ate: expenditure = average intake − rate of change (kg a day) × 7,700. Logged workouts are then taken out, because each one is
-          already added to its own day, so eating back exercise calories is never counted twice. It needs at least 10 fully logged days (800 kcal or more), 5 weigh-ins and two weeks between the first
+          already added to the budget, on its own day or shared over seven days, so eating back exercise calories is never counted twice. It needs at least 10 fully logged days (800 kcal or more), 5 weigh-ins and two weeks between the first
           and last. The result is blended with the equation, trusting your data more as it grows (up to 85%), and kept within 65% to 145% of the
           equation so a few missed logs cannot produce an extreme target.
         </P>
@@ -284,7 +284,8 @@ export default function AboutScreen() {
           With Workout sync switched on, HealthCal reads your workouts from {stores.from}: each session with its calories and its distance. They
           are stored like sessions you log by hand. It also reads your daily steps, which stay on this phone only, for 35 days, and are never
           added to your calories. And it reads how long you slept each night, kept in your sleep log like a night you enter yourself (in your
-          account if you have one) and never added to your calories. Nothing is written back to {stores.notBack}, and this data is never sent for AI analysis, used for ads or shared
+          account if you have one) and never added to your calories. With your permission it also reads your weigh-ins with body fat (kept like ones you enter), the
+          calories you burn in a day (on this phone only, shown beside HealthCal&apos;s estimate and never added) and each workout&apos;s heart rate. Nothing is written back to {stores.notBack}, and this data is never sent for AI analysis, used for ads or shared
           with anyone else; friends see only what the Friends screen says they see.
         </P>
         <AiConsentAbout />

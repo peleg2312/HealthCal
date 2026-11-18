@@ -33,7 +33,7 @@ export function useShareDayInput(date: ISODate): ShareDayInput {
       units: profile.units,
       kcal: day.eaten.kcal,
       budget: day.budget,
-      exerciseInBudget: Math.max(0, day.budget - day.target),
+      exerciseInBudget: Math.max(0, day.exerciseAdded),
       mealKcal,
       mealFoods,
       waterMl: day.waterMl,

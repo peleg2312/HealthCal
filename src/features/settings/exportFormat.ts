@@ -238,14 +238,26 @@ function isSleepExtras(r: Obj): boolean {
   );
 }
 
+/** A weigh-in's optional fields saying where a synced one came from (WeightEntry in src/types; health-sync/body.ts). */
+function isWeighInExtras(r: Obj): boolean {
+  return (
+    (r.source === undefined || r.source === 'health') &&
+    (r.store === undefined || SLEEP_STORES.includes(r.store as string)) &&
+    (r.origin === undefined || isStr(r.origin)) &&
+    (r.measuredAt === undefined || isTime(r.measuredAt)) &&
+    optNum(r.syncedKg) &&
+    optNum(r.syncedBodyFatPct)
+  );
+}
+
 /** Shape checks per collection, on top of the common id and timestamp. */
 const VALIDATORS: Record<Collection, (r: Obj) => boolean> = {
   foodEntries: (r) => isDayKey(r.date) && MEALS.includes(r.meal as string) && isLoggedItem(r),
   customFoods: (r) => isFood(r),
   savedMeals: (r) => isStr(r.name) && Array.isArray(r.items) && r.items.every(isLoggedItem) && optNum(r.servings),
-  activities: (r) => isDayKey(r.date) && isStr(r.name) && isNonNeg(r.durationMin) && isNonNeg(r.kcalNet) && isNonNeg(r.kcalGross) && optNum(r.met) && optNum(r.distanceKm),
+  activities: (r) => isDayKey(r.date) && isStr(r.name) && isNonNeg(r.durationMin) && isNonNeg(r.kcalNet) && isNonNeg(r.kcalGross) && optNum(r.met) && optNum(r.distanceKm) && optNum(r.avgHeartRate) && optNum(r.maxHeartRate),
   water: (r) => isDayKey(r.date) && isNum(r.ml) && r.ml > 0 && r.ml <= 10000,
-  weights: (r) => isDayKey(r.date) && isNum(r.kg) && r.kg > 0 && r.kg < 700 && optNum(r.bodyFatPct),
+  weights: (r) => isDayKey(r.date) && isNum(r.kg) && r.kg > 0 && r.kg < 700 && optNum(r.bodyFatPct) && isWeighInExtras(r),
   sleep: (r) => isDayKey(r.date) && isNum(r.hours) && r.hours >= 0 && r.hours <= 24 && isSleepExtras(r),
   fasting: (r) => isTime(r.start) && (r.end === undefined || r.end === null || isTime(r.end)) && isNum(r.targetHours),
   favorites: (r) => isFood(r.food),
@@ -285,7 +297,11 @@ export function isValidProfile(x: unknown): x is Profile {
     optNum(x.bodyFatPct) &&
     (x.macroSplitOverride === undefined ||
       x.macroSplitOverride === null ||
-      (isObj(x.macroSplitOverride) && isNonNeg(x.macroSplitOverride.protein) && isNonNeg(x.macroSplitOverride.carbs) && isNonNeg(x.macroSplitOverride.fat)))
+      (isObj(x.macroSplitOverride) && isNonNeg(x.macroSplitOverride.protein) && isNonNeg(x.macroSplitOverride.carbs) && isNonNeg(x.macroSplitOverride.fat))) &&
+    (x.exerciseSpread === undefined || x.exerciseSpread === 'day' || x.exerciseSpread === 'week') &&
+    (x.exerciseRuleHistory === undefined ||
+      (Array.isArray(x.exerciseRuleHistory) &&
+        x.exerciseRuleHistory.every((e) => isObj(e) && isDayKey(e.until) && (e.rule === 'day' || e.rule === 'week' || e.rule === 'off'))))
   );
 }
 

@@ -2,9 +2,11 @@
  * Automatic workout sync: shapes shared by the adapters (one per platform) and
  * the rules (pure, the same on every platform).
  *
- * An adapter only answers six questions about the phone's health store: is it
+ * An adapter only answers a few plain questions about the phone's health store: is it
  * there, what may this app read, please ask, "which workouts are in this time
- * range", "how many steps on each day of it" and "which sleep samples are in it".
+ * range" (with each one's heart rate), "how many steps on each day of it",
+ * "which sleep samples are in it", "which weight and body-fat readings" and
+ * "how many calories were burned on each day of it".
  * Everything else (calories, duplicates, which app activity it is, what is saved,
  * which days of steps are kept, which night a day had) is decided
  * in the rules, so Health Connect and Apple Health share every rule.
@@ -47,6 +49,9 @@ export interface HealthWorkout {
   distanceM: number | null;
   /** 'Garmin Forerunner 265' when the record names the device. Shown on the sync screen, never saved. */
   device?: string | null;
+  /** Beats per minute inside this workout's own time, through heartFigures (heart.ts); absent or null when not read. */
+  avgHeartRate?: number | null;
+  maxHeartRate?: number | null;
 }
 
 /**
@@ -73,9 +78,36 @@ export interface HealthAccess {
    * five above before sleep existed reads false here until the person allows it.
    */
   sleep: boolean;
+  /**
+   * Weigh-ins (Health Connect Weight; HealthKit BodyMass) and body fat with
+   * them (BodyFat; BodyFatPercentage), for the synced weights collection
+   * (body.ts). Asked apart from the types above, so a phone that allowed sync
+   * before reads false here until the person allows them on the Weight row.
+   */
+  weight: boolean;
+  bodyFat: boolean;
+  /**
+   * The day's calories burned, kept on this phone and shown on Progress as the
+   * watch's estimate (dayEnergy.ts). Health Connect: total and active calories
+   * (already asked for workouts); HealthKit: active plus basal energy.
+   */
+  dayEnergy: boolean;
+  /** A synced workout's average and highest heart rate (heart.ts), shown on the workout only. */
+  heartRate: boolean;
 }
 
-export const NO_ACCESS: HealthAccess = { workouts: false, activeEnergy: false, totalEnergy: false, distance: false, steps: false, sleep: false };
+export const NO_ACCESS: HealthAccess = {
+  workouts: false,
+  activeEnergy: false,
+  totalEnergy: false,
+  distance: false,
+  steps: false,
+  sleep: false,
+  weight: false,
+  bodyFat: false,
+  dayEnergy: false,
+  heartRate: false,
+};
 
 /**
  * What one stretch of a sleep sample was, as the store recorded it.
@@ -114,6 +146,35 @@ export interface SleepSample {
   stage: SleepStage;
   /** The store's id of the session the sample belongs to (Health Connect's metadata.id), when there is one. */
   sessionId?: string;
+}
+
+/**
+ * One weight or body-fat reading as a health store holds it, before any rule
+ * (body.ts) is applied. Weight in kilograms; body fat in percent, or as a
+ * fraction (HealthKit's percent unit: 0.25 is 25 %), which body.ts turns into percent.
+ */
+export interface BodySample {
+  store: SleepStore;
+  /** The app that wrote it: a package name, a bundle id, or appleOrigin()'s com.apple.health.watch/iphone/device. */
+  origin: string;
+  /** The reading's instant, ISO 8601. */
+  time: string;
+  /** Seconds east of UTC where it was measured, when the record states it; null: the phone's calendar decides the day. */
+  zoneOffsetSec: number | null;
+  kind: 'weight' | 'bodyFat';
+  value: number;
+}
+
+/**
+ * One local calendar day's calories burned as the store totals it (dayEnergy.ts):
+ * `kcal` all energy, resting included; `activeKcal` the part above resting;
+ * `origins` the apps whose records went into either figure.
+ */
+export interface DayEnergyDay {
+  day: ISODate;
+  kcal: number;
+  activeKcal: number;
+  origins: string[];
 }
 
 /**
@@ -162,7 +223,7 @@ export interface ReadOptions {
 }
 
 /** What a permission request asks for (HealthAdapter.requestAccess). */
-export type AccessRequest = 'all' | 'sleep';
+export type AccessRequest = 'all' | 'sleep' | 'weight' | 'dayEnergy' | 'heartRate';
 
 export interface HealthAdapter {
   /** The health store this build reads; null where there is none (web). */
@@ -176,6 +237,9 @@ export interface HealthAdapter {
    * sync screen's "Allow" on the Sleep row) asks for sleep alone where the
    * store can ask for one type (Apple Health); Health Connect asks its whole
    * list again, as for steps, and shows only what is not allowed yet.
+   * 'weight', 'dayEnergy' and 'heartRate' (the rows added after sleep) ask for
+   * that row's types alone on both stores, so a phone that allowed sync before
+   * is shown only what the row reads.
    */
   requestAccess(what?: AccessRequest): Promise<HealthAccess>;
   /**
@@ -199,6 +263,20 @@ export interface HealthAdapter {
    * Empty when sleep may not be read (`access.sleep` false). Throws HealthError.
    */
   readSleep(range: { from: string; to: string }, access: HealthAccess): Promise<SleepSample[]>;
+  /**
+   * Every weight reading in the range (ISO instants), from every app, and the
+   * body-fat readings beside them when `access.bodyFat`, as raw samples: the
+   * one weigh-in a day is chosen by the rules in body.ts. Empty when weight
+   * may not be read (`access.weight` false). Throws HealthError.
+   */
+  readWeighIns(range: { from: string; to: string }, access: HealthAccess): Promise<BodySample[]>;
+  /**
+   * The calories burned on each local calendar day of the range, as the store
+   * totals them (all energy and the part above resting, with the apps behind
+   * them): the watch's own estimate, kept on the phone and shown on Progress
+   * only (dayEnergy.ts). Empty when `access.dayEnergy` is false. Throws HealthError.
+   */
+  readDayEnergy(range: StepsRange, access: HealthAccess): Promise<DayEnergyDay[]>;
   /** Open the health store's own settings, where access is given and taken away. */
   openSettings(): void;
   /** Open the store page that installs or updates the health store. */

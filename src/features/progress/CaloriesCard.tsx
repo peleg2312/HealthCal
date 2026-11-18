@@ -2,6 +2,7 @@ import { Info } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
+import type { ExerciseRule } from '@/lib/exerciseBudget';
 import { direction, type InsightDay, type PeriodSummary, type UsualRange } from '@/lib/insights';
 import { formatNumber } from '@/lib/units';
 import { useTheme, withOpacity } from '@/theme';
@@ -16,7 +17,7 @@ export function CaloriesCard({
   previous,
   usual,
   today,
-  eatBack,
+  rule,
 }: {
   days: InsightDay[];
   summary: PeriodSummary;
@@ -25,7 +26,8 @@ export function CaloriesCard({
   /** The user's usual intake range; shaded behind the bars when known. */
   usual?: UsualRange | null;
   today: string;
-  eatBack: boolean;
+  /** The workout rule of the days shown (`rangeRule` over their `exerciseRule`; 'mixed' across a change), for the sentence about what budgets include. */
+  rule: ExerciseRule | 'mixed';
 }) {
   const { colors, spacing } = useTheme();
   const [help, setHelp] = useState(false);
@@ -105,7 +107,7 @@ export function CaloriesCard({
               {usual ? <Text variant="body">The grey band is your usual intake: the middle half of your fully logged days in the last 4 weeks.</Text> : null}
               <Text variant="body" color="textSecondary">
                 Averages use {summary.completeDays} fully logged {summary.completeDays === 1 ? 'day' : 'days'}. Today
-                {summary.partialDays ? ` and ${summary.partialDays} partly logged ${summary.partialDays === 1 ? 'day' : 'days'} (under 800 kcal or half the budget)` : ''} {summary.partialDays ? 'are' : 'is'} left out.{eatBack ? ' Budgets include the exercise calories you eat back.' : ''} Press and drag on the chart to read each {weekly ? 'week' : 'day'}.
+                {summary.partialDays ? ` and ${summary.partialDays} partly logged ${summary.partialDays === 1 ? 'day' : 'days'} (under 800 kcal or half the budget)` : ''} {summary.partialDays ? 'are' : 'is'} left out.{rule === 'week' ? ' Budgets include workout calories, each shared over 7 days.' : rule === 'mixed' ? ' Budgets include workout calories, on their own day or shared over 7 days, by the rule each day had.' : rule === 'day' ? ' Budgets include the exercise calories you eat back.' : ''} Press and drag on the chart to read each {weekly ? 'week' : 'day'}.
               </Text>
             </View>
           </Sheet>

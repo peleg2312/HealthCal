@@ -125,6 +125,14 @@ name: Workout sync and About on a phone
     when:
       platform: iOS
     commands:
+      # Since 18 November 2026 the sheet also lists Weight, Body Fat Percentage, Heart Rate and
+      # Resting Energy (WEIGHT_READ_TYPES, HEART_READ_TYPES, ENERGY_READ_TYPES). Looked for, never required.
+      - assertVisible:
+          text: '(?i).*body fat percentage.*'
+          optional: true
+      - assertVisible:
+          text: '(?i).*resting energy.*'
+          optional: true
       - tapOn:
           text: '(?i)turn on all.*'
           optional: true
@@ -146,6 +154,14 @@ name: Workout sync and About on a phone
           text: '(?i)get started'
           optional: true
       - takeScreenshot: 24-android-permissions
+      # Since 18 November 2026 the screen also lists Weight, Body fat and Heart rate (only once
+      # app.json declares them). Looked for, never required.
+      - assertVisible:
+          text: '(?i).*body fat.*'
+          optional: true
+      - assertVisible:
+          text: '(?i).*heart rate.*'
+          optional: true
       - tapOn:
           text: '(?i)allow all'
           optional: true
@@ -171,6 +187,30 @@ name: Workout sync and About on a phone
     timeout: 15000
     optional: true
 - takeScreenshot: 28-sync-steps-row
+# The rows added on 18 November 2026: Weight, Calories burned in a day, Heart rate in workouts. With no
+# watch in CI they say "None in …" or "Shown on Progress after 5 full days recorded"; all optional.
+- scrollUntilVisible:
+    element:
+      id: health-sync-weight
+    direction: DOWN
+    timeout: 15000
+    optional: true
+- assertVisible:
+    id: health-sync-weight
+    optional: true
+- scrollUntilVisible:
+    element:
+      id: health-sync-heart
+    direction: DOWN
+    timeout: 15000
+    optional: true
+- assertVisible:
+    id: health-sync-energy
+    optional: true
+- assertVisible:
+    id: health-sync-heart
+    optional: true
+- takeScreenshot: 28b-sync-weight-energy-heart-rows
 
 # Train: the week card, where the steps line shows when there are steps (none on a new emulator).
 # If a Health Connect screen is still on top (a label guessed wrong), Back leaves it first.

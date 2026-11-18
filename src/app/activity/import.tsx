@@ -38,11 +38,12 @@ import { deviceTimeZone, zoneLabel } from '@/features/import/ui/timeZones';
 import { WorkoutRow } from '@/features/import/ui/WorkoutRow';
 import { prefers12h } from '@/features/settings/components';
 import { startOfWeek } from '@/lib/dates';
+import { ruleOfDates } from '@/lib/exerciseBudget';
 import { ViewerBlockedError } from '@/services/viewer';
 import { formatNumber } from '@/lib/units';
 import { useStore } from '@/store';
 import { useToday } from '@/store/clock';
-import { useProfile } from '@/store/selectors';
+import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import { Button, Card, Divider, EmptyState, Header, Screen, Text, toast } from '@/ui';
 
@@ -65,6 +66,7 @@ export default function ImportScreen() {
   const result = useImportSession((s) => s.result);
   const exports = useImportSession((s) => s.exports);
   const sleepRecords = useStore((s) => s.sleep);
+  const snapshots = useLive('days');
   const handled = useHealthSync((s) => s.handled);
 
   const [picking, setPicking] = useState(false);
@@ -98,6 +100,8 @@ export default function ImportScreen() {
 
   const counts = countRows(rows);
   const toSave = entriesToSave(rows);
+  // Each workout is placed by the rule its own date had, so the words follow the dates being saved, not today's choice.
+  const saveRule = ruleOfDates(profile, new Map(snapshots.map((d) => [d.date, d])), toSave.map((e) => e.date));
   // An update changes a day by the difference from what is stored, not by its full figure.
   const addedKcal = Math.round(rows.filter((r) => r.selected).reduce((s, r) => s + netChange(r).kcalNet, 0));
   const updating = rows.filter((r) => r.selected && r.status === 'update').length;
@@ -155,6 +159,13 @@ export default function ImportScreen() {
     const nothing = rows.length === 0;
     const allLocked = !nothing && counts.locked === counts.total;
     const dayCount = new Set(toSave.map((e) => e.date)).size;
+    // Over 7 days, each workout's calories go to its day and the six after it, not to its day alone; dates on both
+    // sides of a change of rule are said neutrally.
+    const spreadWords =
+      saveRule === 'week' ? { where: 'shared over 7 days from each workout’s day', line: 'Shared over 7 days from each workout’s day' }
+      : saveRule === 'mixed' ? { where: 'each workout by the rule its day had', line: 'Each workout counts by the rule its day had' }
+      : null;
+    const where = spreadWords ? spreadWords.where : dayCount === 1 ? 'one day' : `${dayCount} days`;
     // Nothing to import (no workouts, or every one already in HealthCal) and no steps or nights: the one useful action is other files.
     const footer =
       (nothing || allLocked) && !extras ? (
@@ -164,7 +175,9 @@ export default function ImportScreen() {
           <Text variant="caption" color="textSecondary" align="center" testID="import-footer-line">
             {/* The kcal is the summary's large number; the footer says only where it goes (and an update's change, which the summary does not show), and the steps that go in with it. */}
             {toSave.length
-              ? `${updating && addedKcal <= 0 ? `Changes the budget by ${addedKcal < 0 ? '−' : '+'}${formatNumber(Math.abs(addedKcal))} kcal, across ` : 'Goes to '}${dayCount === 1 ? 'one day' : `${dayCount} days`}${stepsPart ? `, with ${stepsPart}` : ''}`
+              ? spreadWords
+                ? `${updating && addedKcal <= 0 ? `Changes the budget by ${addedKcal < 0 ? '−' : '+'}${formatNumber(Math.abs(addedKcal))} kcal, ${where}` : spreadWords.line}${stepsPart ? `, with ${stepsPart}` : ''}`
+                : `${updating && addedKcal <= 0 ? `Changes the budget by ${addedKcal < 0 ? '−' : '+'}${formatNumber(Math.abs(addedKcal))} kcal, across ` : 'Goes to '}${where}${stepsPart ? `, with ${stepsPart}` : ''}`
               : extras
                 ? nothing || allLocked
                   ? nights && !stepDays

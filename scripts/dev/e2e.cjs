@@ -254,12 +254,15 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   await tap('today-water-250');
   await page.waitForTimeout(500);
   await shot('e2e-today');
-  const expectedBudget = Math.round(expectedTarget + expectedNet);
+  // A new person gets 'Over 7 days': today's budget holds the first of seven whole shares of the run's net calories.
+  const expectedAdded = Math.floor(Math.round(run ? run.kcalNet : expectedNet) / 7);
+  const expectedBudget = Math.round(expectedTarget + expectedAdded);
   const expectedLeft = Math.round(expectedBudget - expectedBanana);
   const left = num(await text('today-remaining'));
-  check('Today: calories left = target + net exercise - eaten', near(left, expectedLeft, 1), `shown ${left}, expected ${expectedLeft} (budget ${expectedBudget})`);
+  check('Today: calories left = target + first share of net exercise - eaten', near(left, expectedLeft, 1), `shown ${left}, expected ${expectedLeft} (budget ${expectedBudget})`);
   const energy = await text('today-energy');
-  check('Today shows the budget breakdown with the exercise share', energy.replace(/,/g, '').includes(`${expectedBudget}`) && energy.replace(/,/g, '').includes(`${Math.round(expectedNet)}`), energy.replace(/\n/g, ' | ').slice(0, 160));
+  check('Today shows the budget breakdown with the exercise share', energy.replace(/,/g, '').includes(`${expectedBudget}`) && energy.replace(/,/g, '').includes(`${expectedAdded}`), energy.replace(/\n/g, ' | ').slice(0, 160));
+  check('Today: the shared workout calories read "from workouts"', energy.includes('from workouts'), energy.replace(/\n/g, ' | ').slice(0, 160));
   // Water goal: 33 ml/kg within 1.6-3.0 L for women, plus 550 ml per hour of moderate exercise, both rounded to 50 ml.
   const base = Math.round(Math.min(3000, Math.max(1600, 68 * 33)) / 50) * 50;
   const extra = Math.round(Math.min(0.5 * 550, 2000) / 50) * 50;
@@ -318,6 +321,25 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   check('motion: numbers settle on the right value', near(mLeft, expectedLeft, 1), `${mLeft} vs ${expectedLeft}`);
   await mpage.close();
 
+  // ------------------------------------------- workout calories: Over 7 days -> Same day
+  const localKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  // A new person starts on "Over 7 days". Choosing "Same day" with a workout dated today starts tomorrow
+  // (effectiveFrom), so saving leaves today's budget exactly as it was and writes one closed period.
+  await page.goto(`${BASE}/settings/goals`, { waitUntil: 'networkidle' });
+  await page.getByTestId('goals-exercise-spread-week').first().waitFor({ timeout: 15000 });
+  check('Goals: a new person is on "Over 7 days"', (await page.getByTestId('goals-exercise-spread-week').first().getAttribute('aria-selected')) === 'true');
+  await tap('goals-exercise-spread-day');
+  const spreadNote = await text('goals-exercise-note');
+  check('Goals: the note says the change waits for tomorrow when a workout is dated today', /starts with tomorrow.s workouts/i.test(spreadNote), spreadNote);
+  await tap('goals-save');
+  await page.waitForTimeout(600);
+  s = await stored();
+  const hist = s.profile.exerciseRuleHistory ?? [];
+  check('Goals: "Same day" is saved with "Over 7 days" kept up to today', s.profile.exerciseSpread === 'day' && hist.length === 1 && hist[0].rule === 'week' && hist[0].until > localKey(new Date()), JSON.stringify({ spread: s.profile.exerciseSpread, hist }));
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' });
+  await page.waitForTimeout(800);
+  check("Goals: saving the change leaves today's budget as it was", near(num(await text('today-remaining')), expectedLeft, 1), await text('today-remaining'));
+
   // ------------------------------------------------------- the next morning
   // The same saved data, seen at 08:10 tomorrow: today's food, run and water are then yesterday, and the
   // morning page (/morning, src/features/morning) opens by itself on the first visit, once. An automated
@@ -365,6 +387,19 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     const pageText = norm(await morning.getByTestId('morning-screen').first().innerText().catch(() => '')).replace(quoteBlock, '');
     const harsh = /\b(fail|failed|cheat|great job|should|bad|missed your|over budget)\b/i.exec(pageText);
     check('morning: its own words have no exclamation mark and no blame', !pageText.includes('!') && !harsh, harsh ? harsh[0] : pageText.includes('!') ? 'an exclamation mark' : '');
+    // The coach in the week block (coach.ts): a lead, then the next step and the first step for today, one
+    // accessible element; plain words that speak to the person, never a verdict or a call to eat less.
+    const coach = norm(await morning.getByTestId('morning-coach').first().innerText().catch(() => ''));
+    const lead = norm(await morning.getByTestId('morning-coach-lead').first().innerText().catch(() => ''));
+    const coachHarsh = /\b(bad|fail|failed|cheat|should have|lazy|guilty|eat less|make up for|great job)\b/i.exec(coach);
+    check('morning: the coach speaks, with a lead sentence', coach.length > 0 && lead.length > 0 && coach.startsWith(lead), `${lead} / ${coach}`);
+    check('morning: the coach has no exclamation mark and no blame word', !coach.includes('!') && !coachHarsh, coachHarsh ? coachHarsh[0] : coach);
+    const coachLabel = await morning.getByTestId('morning-coach').first().getAttribute('aria-label').catch(() => null);
+    check('morning: the coach is read once, as its own label', !!coachLabel && coachLabel.length > 0, String(coachLabel));
+    check('morning: the week block shows the week in cups', (await morning.getByTestId('morning-week').count()) > 0 && (await morning.getByTestId('morning-week-yesterday').count()) > 0, '');
+    // The quote is second, under the week block and above yesterday's card.
+    const [weekBox, quoteBox, cardBox] = await Promise.all(['morning-week', 'morning-quote', 'morning-card'].map((id) => morning.getByTestId(id).first().boundingBox().catch(() => null)));
+    check('morning: the quote sits under the week block and above yesterday\'s card', !!weekBox && !!quoteBox && !!cardBox && weekBox.y < quoteBox.y && quoteBox.y < cardBox.y, JSON.stringify([weekBox?.y, quoteBox?.y, cardBox?.y]));
     // The X at the top left: morning-close if the screen names it, else the kit Header's own X (header-close).
     await morning.locator('[data-testid="morning-close"], [data-testid="header-close"]').first().click({ timeout: 15000 });
     await morning.waitForURL((u) => new URL(u).pathname === '/', { timeout: 8000 }).catch(() => {});
@@ -384,16 +419,19 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   const again = await morning.getByTestId('morning-quote-text').first().waitFor({ state: 'visible', timeout: 15000 }).then(() => true, () => false);
   const againQuote = again ? (await morning.getByTestId('morning-quote-text').first().innerText()).replace(/\u00A0/g, ' ').replace(/\u2060/g, '').trim() : '';
   check('morning: the same quote all day on this device', again && againQuote === firstQuote, `${againQuote} vs ${firstQuote}`);
-  const waterRow = morning.getByTestId('morning-plan-water').first();
-  if (again && (await waterRow.count()) > 0) {
-    await waterRow.click();
-    await morning.waitForURL((u) => new URL(u).pathname === '/water', { timeout: 8000 }).catch(() => {});
-    const onWater = new URL(morning.url()).pathname === '/water';
+  // The row the coach's step for today names is left out of For today (it is said once): any row left opens its place.
+  const planRow = morning.locator('[data-testid^="morning-plan-"]:not([data-testid="morning-plan"])').first();
+  if (again && (await planRow.count()) > 0) {
+    const rowId = (await planRow.getAttribute('data-testid')) || '';
+    const place = { 'morning-plan-water': '/water', 'morning-plan-move': '/activity/pick', 'morning-plan-weigh': '/weight', 'morning-plan-sleep': '/sleep' }[rowId];
+    await planRow.click();
+    await morning.waitForURL((u) => new URL(u).pathname === place, { timeout: 8000 }).catch(() => {});
+    const onPlace = !!place && new URL(morning.url()).pathname === place;
     await morning.goBack().catch(() => {});
     await morning.waitForURL((u) => new URL(u).pathname === '/', { timeout: 8000 }).catch(() => {});
-    check("morning: a row of For today opens its place, and back lands on Today", onWater && new URL(morning.url()).pathname === '/', morning.url());
+    check('morning: a row of For today opens its place, and back lands on Today', onPlace && new URL(morning.url()).pathname === '/', `${rowId} ${morning.url()}`);
   } else {
-    check("morning: For today offers today's water", false, again ? 'no morning-plan-water' : 'the page did not open again');
+    check('morning: For today offers a row', false, again ? 'no morning-plan row' : 'the page did not open again');
   }
   await morningContext.close();
 

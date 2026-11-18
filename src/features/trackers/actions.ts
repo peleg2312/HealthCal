@@ -4,12 +4,14 @@
  * newest record so calorie and water targets follow.
  */
 import { formatDuration } from '@/lib/dates';
+import { formatWeight } from '@/lib/units';
 import { live } from '@/store/selectors';
 import { useStore } from '@/store';
 import type { FastingSession, ISODate, Profile, SleepEntry, SleepQuality, WeightEntry } from '@/types';
 import { haptic, toast } from '@/ui';
 
-import { fastProgress, findByDate, isMostRecentDate, latestBodyFat, nightAfterEdit } from './helpers';
+import { bodyFatFollowsDelete, fastProgress, findByDate, isMostRecentDate, latestBodyFat, nightAfterEdit, weighInAfterEdit } from './helpers';
+import { isSyncedWeighIn } from './weighInSource';
 
 type WeightPatch = Partial<Omit<WeightEntry, 'id' | 'updatedAt' | 'deleted' | 'date'>>;
 
@@ -39,14 +41,16 @@ function syncProfileToLatest(bodyFatChanged: boolean) {
 
 /**
  * Save or update the record for `date` (one per date). Fields not in the patch
- * are kept, so saving a weight does not wipe measurements and vice versa.
+ * are kept, so saving a weight does not wipe measurements and vice versa. A
+ * weigh-in from a health store whose weight or body fat is changed here becomes
+ * the person's own (`weighInAfterEdit`), and the sync leaves it alone after that.
  */
 export function saveWeightRecord(date: ISODate, patch: WeightPatch & { kg: number }, opts: { message?: string } = {}): WeightEntry {
   const s = useStore.getState();
   const entries = live(s.weights);
   const existing = findByDate(entries, date);
   const before = profileSnapshot();
-  const saved = s.upsert('weights', { ...(existing ?? {}), ...patch, date, id: existing?.id });
+  const saved = s.upsert('weights', weighInAfterEdit(existing, date, patch));
   const updatesProfile = isMostRecentDate(entries, date);
   if (updatesProfile) {
     s.setProfile({ weightKg: patch.kg, ...(patch.bodyFatPct !== undefined ? { bodyFatPct: patch.bodyFatPct } : {}) });
@@ -69,18 +73,40 @@ export function saveWeightRecord(date: ISODate, patch: WeightPatch & { kg: numbe
 export function deleteWeightRecord(entry: WeightEntry) {
   const s = useStore.getState();
   const before = profileSnapshot();
-  // Only the newest body fat reading feeds the profile; deleting an older one leaves it alone.
-  const feedsBodyFat =
-    entry.bodyFatPct !== undefined && live(s.weights).every((e) => e.id === entry.id || e.bodyFatPct === undefined || e.date < entry.date);
+  // Only the newest body fat reading feeds the profile, and only when the profile's value came from it:
+  // deleting an older one, or one whose body fat the person typed over in Goals or on /body, leaves it alone.
+  const feedsBodyFat = bodyFatFollowsDelete(s.profile, entry, live(s.weights));
   s.remove('weights', entry.id);
   syncProfileToLatest(feedsBodyFat);
   haptic.tap();
-  toast('Weigh-in deleted', {
+  // A synced one is not added again: its deletion marker (and the sync's memory) keep it out.
+  toast(isSyncedWeighIn(entry) ? 'Weigh-in deleted. Sync will not add it again' : 'Weigh-in deleted', {
     label: 'Undo',
     onPress: () => {
       const st = useStore.getState();
       st.restore('weights', entry.id);
       if (before) st.setProfile(before);
+    },
+  });
+}
+
+/**
+ * "Use it for targets" on /weight: point the profile at a synced weigh-in, by
+ * the person's own tap (a sync never writes the profile). Sets the weight, and
+ * the body fat when the weigh-in has one; Undo puts the earlier figures back.
+ * (Not named use…: it is called from a press handler, not a hook.)
+ */
+export function applyWeighInToTargets(entry: Pick<WeightEntry, 'kg' | 'bodyFatPct'>) {
+  const s = useStore.getState();
+  if (!s.profile) return;
+  const before = profileSnapshot();
+  s.setProfile({ weightKg: entry.kg, ...(typeof entry.bodyFatPct === 'number' ? { bodyFatPct: entry.bodyFatPct } : {}) });
+  haptic.success();
+  toast(`Targets now use ${formatWeight(entry.kg, s.profile.units)}`, {
+    label: 'Undo',
+    tint: 'weight',
+    onPress: () => {
+      if (before) useStore.getState().setProfile(before);
     },
   });
 }

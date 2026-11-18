@@ -5,10 +5,15 @@
  *
  * One run: check the health store is there and may be read, list the last 30
  * days of workouts, plan (plan.ts), save what is new, keep what needs a look,
- * read the steps and the nights of sleep (sleep.ts) in the same run, and say
- * what was added, workouts and nights together, in one message with an Undo.
- * Steps and sleep are extra: a failed or refused read of either never fails
- * the run. A run that fails changes
+ * read the steps, the nights of sleep (sleep.ts), the weigh-ins (body.ts) and
+ * the day's calories burned (dayEnergy.ts) in the same run, and say what was
+ * added, workouts, nights and weigh-ins together, in one message with one Undo.
+ * Steps, sleep, weigh-ins and day energy are extra: a failed or refused read of
+ * any of them never fails the run. Weigh-ins are synced records that another
+ * phone may have deleted, so for someone signed in they are planned only after
+ * a data-sync round that ended after this run began (`afterPull`); otherwise
+ * they wait for the next run. The run never writes the synced profile: a synced
+ * weigh-in reaches the targets only by the person's own tap on /weight. A run that fails changes
  * nothing in the diary and leaves a note for the sync screen; it never shows
  * anything by itself.
  *
@@ -22,23 +27,37 @@ import { ACTIVITY_BY_ID } from '@/data/activities';
 import type { ImportedEntry } from '@/features/import/convert';
 import { replaceHandLoggedPlan } from '@/features/import/plan';
 import { isoSeconds } from '@/features/import/time';
-import type { ActivityEntry, SleepEntry } from '@/types';
+import type { ActivityEntry, SleepEntry, WeightEntry } from '@/types';
 
+import { planWeights, readWeighInsSafely, undoWeighIns, weighInsFrom, weightReadRange, type WeightPlan, type WeightSave } from './body';
 import { recordIdFor, workoutSpan, type HealthContext, type HealthEntry } from './convert';
+import { dayEnergyReadRange, mergeDayEnergy, NO_DAY_ENERGY, pruneDayEnergy, readDayEnergySafely, type DayEnergyMemory } from './dayEnergy';
 import { originName } from './origins';
 import { choiceKey, planSync, workoutKey, type Handled, type ReviewItem, type SyncPlan } from './plan';
 import { nightsFrom, planSleep, readSleepSafely, sleepReadRange, undoSleep, type SleepPlan, type SleepSave } from './sleep';
-import { pruneHandled, readRange, RECHECK_DAYS, rememberMarks, shouldAutoSync, syncMessage, unremembered, type HealthSyncState, type SyncError, type SyncErrorCode } from './state';
+import {
+  pruneHandled,
+  readRange,
+  RECHECK_DAYS,
+  rememberMarks,
+  shouldAutoSync,
+  syncMessage,
+  unremembered,
+  weighInNote,
+  type HealthSyncState,
+  type SyncError,
+  type SyncErrorCode,
+} from './state';
 import { localClock, mergeStepDays, NO_STEPS, pruneStepDays, stepDaysFromTotals, stepsReadRange, type StepClock, type StepsMemory } from './steps';
-import { HealthError, storeName, type HealthAccess, type HealthAdapter, type HealthWorkout, type StepDayTotal } from './types';
+import { HealthError, storeName, type BodySample, type HealthAccess, type HealthAdapter, type HealthWorkout, type StepDayTotal } from './types';
 
 export type SyncTrigger = 'auto' | 'manual';
 
 export type SyncOutcome =
   | { status: 'skipped'; why: 'off' | 'too-soon' | 'no-profile' | 'busy' }
   | { status: 'failed'; error: SyncError }
-  /** `nights`: nights of sleep added or updated. */
-  | { status: 'done'; added: number; updated: number; review: number; nights: number };
+  /** `nights`: nights of sleep added or updated; `weighIns`: weigh-ins added or updated. */
+  | { status: 'done'; added: number; updated: number; review: number; nights: number; weighIns: number };
 
 export type EnableOutcome =
   | { ok: true; sync: SyncOutcome }
@@ -75,6 +94,23 @@ export interface SleepLog {
   remove(id: string): void;
 }
 
+/**
+ * The weigh-in log (synced 'weights' records): read and written in the same
+ * store as the diary, so `Diary.flush` confirms it too. It holds no profile:
+ * nothing a sync writes moves the targets.
+ */
+export interface WeightLog {
+  /** Every weights record, soft-deleted ones included. */
+  all(): WeightEntry[];
+  /** Insert or replace by date (upsert derives the id from it); a deleted record saved again is live again. */
+  save(records: (WeightSave | WeightEntry)[]): void;
+  /** Soft delete. */
+  remove(id: string): void;
+}
+
+/** What the toast's level line shows: a workout, else a night, else a weigh-in. */
+export type SyncTint = 'exercise' | 'sleep' | 'weight';
+
 export interface SyncDeps {
   adapter: HealthAdapter;
   now(): number;
@@ -82,11 +118,24 @@ export interface SyncDeps {
   diary: Diary;
   /** Nights of sleep. Without it no sleep is read. */
   sleep?: SleepLog;
+  /** Weigh-ins. Without it no weight is read. */
+  weights?: WeightLog;
+  /**
+   * Resolves true once the data the account holds has been pulled in a round
+   * that ended at or after `since` (ms), or when there is no account; false when
+   * that could not be had in time. Weigh-ins are planned only after true, so a
+   * weigh-in deleted on another phone is on this one before it is planned.
+   * Absent: true (tests, a build without accounts).
+   */
+  afterPull?(since: number): Promise<boolean>;
+  /** Whether the targets use the learned burn estimate (only the toast's words depend on it). */
+  targetsLearn?(): boolean;
   /**
    * One confirmation with an Undo. `tint`: what the change was, for the toast's
-   * level line ('exercise' when it holds a workout, 'sleep' for nights only).
+   * level line ('exercise' when it holds a workout, 'sleep' for nights without
+   * one, 'weight' for weigh-ins alone).
    */
-  announce(message: string, undo: () => void, tint?: 'exercise' | 'sleep'): void;
+  announce(message: string, undo: () => void, tint?: SyncTint): void;
   /**
    * Called when a run starts and when it is done, for the screen's "Syncing"
    * and for the updater, which restarts only at rest.
@@ -105,6 +154,19 @@ export interface SyncDeps {
 }
 
 const DAY_MS = 86_400_000;
+/** How long weigh-ins wait for the data sync's pull before they are left to the next run (the morning page's wait). */
+export const PULL_WAIT_MS = 8000;
+
+/**
+ * The data sync ran a whole round (push and pull) that ended at or after `since` (ms) and left nothing in
+ * error: what `afterPull` waits for (sync.ts). The same test the morning page makes before it writes synced
+ * settings, kept here so this feature does not depend on that one.
+ */
+export function roundEndedSince(status: string, lastRunAt: string | null, since: number): boolean {
+  if (status !== 'idle' || !lastRunAt) return false;
+  const at = Date.parse(lastRunAt);
+  return Number.isFinite(at) && at >= since;
+}
 /** How long the diary's save may take to be confirmed (less than the health store's limit: nothing waits on it but the memory). */
 const FLUSH_LIMIT_MS = 10_000;
 
@@ -141,6 +203,11 @@ export function createHealthSync(deps: SyncDeps) {
    * read lost to a closed app never read again. Until then the next sync reads from the earlier value.
    */
   let sleepReadPending: string | null = null;
+  const weightLog = deps.weights ?? null;
+  /** Days of weigh-ins the person deleted, remembered once the save is confirmed (planWeights' `remember`), as `sleepMarks`. */
+  let weightMarks: Record<string, Handled> = {};
+  /** When weigh-ins were last read, kept only once what that read wrote is confirmed on the device, as `sleepReadPending`. */
+  let weightReadPending: string | null = null;
   const timeout = deps.timeoutMs ?? 45_000;
   const clock = deps.stepClock ?? localClock;
   // Asked each time: a development build can swap the adapter after this is made.
@@ -193,7 +260,9 @@ export function createHealthSync(deps: SyncDeps) {
     const marks = unremembered(s.handled, diary.all(), deps.now(), new Set(s.review.map((r) => r.id)));
     const nights = sleepMarks;
     const readAt = sleepReadPending;
-    if (!Object.keys(marks).length && !Object.keys(nights).length && !readAt) return true;
+    const weighIns = weightMarks;
+    const weightAt = weightReadPending;
+    if (!Object.keys(marks).length && !Object.keys(nights).length && !readAt && !Object.keys(weighIns).length && !weightAt) return true;
     confirming += 1;
     showBusy();
     try {
@@ -211,13 +280,17 @@ export function createHealthSync(deps: SyncDeps) {
       const present = new Set(diary.all().map((e) => e.id));
       const waiting = new Set(latest.review.map((r) => r.id));
       const keep = Object.fromEntries(Object.entries(marks).filter(([id]) => present.has(id) && !waiting.has(id)));
-      const handled = rememberMarks(latest.handled, { ...keep, ...nights });
+      const handled = rememberMarks(latest.handled, { ...keep, ...nights, ...weighIns });
       if (handled !== latest.handled) state.set({ handled });
       // Never back to an earlier read (two waits can end in either order).
       if (readAt && (!latest.sleepReadAt || readAt > latest.sleepReadAt)) state.set({ sleepReadAt: readAt });
       if (sleepReadPending === readAt) sleepReadPending = null;
+      const weightLatest = state.get().weightReadAt;
+      if (weightAt && (!weightLatest || weightAt > weightLatest)) state.set({ weightReadAt: weightAt });
+      if (weightReadPending === weightAt) weightReadPending = null;
       // Only the marks that were remembered now; a later plan may have added more meanwhile.
       sleepMarks = Object.fromEntries(Object.entries(sleepMarks).filter(([k]) => !(k in nights)));
+      weightMarks = Object.fromEntries(Object.entries(weightMarks).filter(([k]) => !(k in weighIns)));
       return true;
     } finally {
       confirming -= 1;
@@ -226,11 +299,19 @@ export function createHealthSync(deps: SyncDeps) {
   }
 
   /**
-   * Save what the plan adds by itself, and the nights of sleep, and say so once
-   * (rememberSaved remembers it once it is on the device). Returns how many
-   * workouts were added and updated, and how many nights were written.
+   * Save what the plan adds by itself, the nights of sleep and the weigh-ins,
+   * and say so once (rememberSaved remembers it once it is on the device).
+   * Returns how many workouts were added and updated, and how many nights and
+   * weigh-ins were written. `weighInWords`: whether this was the first weigh-in
+   * read (its toast may say what many weigh-ins now feed).
    */
-  function apply(plan: SyncPlan, more: Partial<HealthSyncState> = {}, sleepPlan: SleepPlan | null = null): { added: number; updated: number; nights: number } {
+  function apply(
+    plan: SyncPlan,
+    more: Partial<HealthSyncState> = {},
+    sleepPlan: SleepPlan | null = null,
+    weightPlan: WeightPlan | null = null,
+    weighInWords: { firstRead: boolean } = { firstRead: false },
+  ): { added: number; updated: number; nights: number; weighIns: number } {
     const saves = [...plan.add, ...plan.update, ...plan.replace];
     if (saves.length) diary.save(saves.map((p) => p.entry));
     for (const r of plan.replace) diary.remove(r.remove.id);
@@ -241,12 +322,22 @@ export function createHealthSync(deps: SyncDeps) {
     if (sleepPlan) sleepMarks = { ...sleepMarks, ...sleepPlan.remember };
     const nightsAdded = sleepPlan && sleepLog ? sleepPlan.add.length : 0;
     const nightsUpdated = sleepPlan && sleepLog ? sleepPlan.update.length : 0;
+    const weightSaves: (WeightSave | WeightEntry)[] = weightPlan && weightLog ? [...weightPlan.add, ...weightPlan.update.map((u) => u.after)] : [];
+    if (weightSaves.length && weightLog) weightLog.save(weightSaves);
+    if (weightPlan && weightLog) weightMarks = { ...weightMarks, ...weightPlan.remember };
+    const weighInsAdded = weightPlan && weightLog ? weightPlan.add.length : 0;
+    const weighInsUpdated = weightPlan && weightLog ? weightPlan.update.length : 0;
     state.set(more);
-    if (added + updated + nightsAdded + nightsUpdated > 0) {
+    if (added + updated + nightsAdded + nightsUpdated + weighInsAdded + weighInsUpdated > 0) {
       const nights = { added: nightsAdded, updated: nightsUpdated, apps: nightSaves.map((n) => originName(n.origin ?? '')) };
-      const message = syncMessage(added, updated, saves.map((p) => p.from), storeLabel(), nights);
+      const weighIns = { added: weighInsAdded, updated: weighInsUpdated, apps: weightSaves.map((w) => originName(w.origin ?? '')) };
+      const message =
+        syncMessage(added, updated, saves.map((p) => p.from), storeLabel(), nights, weighIns) +
+        weighInNote(weighInsAdded, weighInWords.firstRead, deps.targetsLearn?.() === true);
+      const tint: SyncTint = added + updated > 0 ? 'exercise' : nightsAdded + nightsUpdated > 0 ? 'sleep' : 'weight';
       deps.announce(message, () => {
         if (sleepPlan && sleepLog && nightSaves.length) undoNights(sleepPlan, sleepLog);
+        if (weightPlan && weightLog && weightSaves.length) undoWeights(weightPlan, weightLog);
         // Take out exactly what was added, and put changed workouts back as they were.
         for (const p of [...plan.add, ...plan.replace]) diary.remove(p.entry.id);
         const back = [...plan.update.map((u) => u.before), ...plan.replace.map((r) => r.remove)];
@@ -259,9 +350,9 @@ export function createHealthSync(deps: SyncDeps) {
         // before the diary is saved (the person asked for it out, so this can never hide one they want).
         h = rememberMarks(h, Object.fromEntries(plan.add.map((p) => [p.entry.id, { how: 'saved' as const, at: p.entry.startedAt }])));
         state.set({ handled: h });
-      }, added + updated > 0 ? 'exercise' : 'sleep');
+      }, tint);
     }
-    return { added, updated, nights: nightsAdded + nightsUpdated };
+    return { added, updated, nights: nightsAdded + nightsUpdated, weighIns: weighInsAdded + weighInsUpdated };
   }
 
   /**
@@ -272,6 +363,18 @@ export function createHealthSync(deps: SyncDeps) {
    */
   function undoNights(plan: SleepPlan, log: SleepLog): void {
     const undo = undoSleep(plan, log.all());
+    for (const r of undo.remove) log.remove(r.id);
+    if (undo.restore.length) log.save(undo.restore);
+    state.set({ handled: { ...state.get().handled, ...undo.marks } });
+  }
+
+  /**
+   * The weigh-ins' part of the one Undo (body.ts, undoWeighIns): the added ones go (soft delete, so their
+   * markers keep every phone from adding them again), updated ones get their earlier figures back as the
+   * person's own, and every day it touched is remembered at once. The profile is never touched.
+   */
+  function undoWeights(plan: WeightPlan, log: WeightLog): void {
+    const undo = undoWeighIns(plan, log.all());
     for (const r of undo.remove) log.remove(r.id);
     if (undo.restore.length) log.save(undo.restore);
     state.set({ handled: { ...state.get().handled, ...undo.marks } });
@@ -311,6 +414,8 @@ export function createHealthSync(deps: SyncDeps) {
     let read: HealthWorkout[];
     let steps: StepsMemory | null = null;
     let sleep: { samples: Parameters<typeof nightsFrom>[0]; firstDay: string; readAt: string } | null = null;
+    let weighIns: { samples: BodySample[]; firstDay: string; readAt: string } | null = null;
+    let dayEnergy: DayEnergyMemory | null = null;
     try {
       const availability = await withTimeout(adapter.availability(), timeout);
       if (availability !== 'available') return fail(availability);
@@ -336,11 +441,17 @@ export function createHealthSync(deps: SyncDeps) {
       read = await withTimeout(adapter.readWorkouts(readRange(now), access, { needsDetail }), timeout);
       steps = await readSteps(access, s.steps, now);
       sleep = await readNights(access, s.sleepReadAt, now);
+      weighIns = await readWeights(access, s.weightReadAt, now);
+      dayEnergy = await readEnergy(access, s.dayEnergy, now);
     } catch (e) {
       const error = asSyncError(e, deps.now());
       state.set({ lastError: error });
       return { status: 'failed', error };
     }
+
+    // Weigh-ins are synced records another phone may have deleted: plan them only once a pull that ended after this
+    // run began has brought those deletions here. Without it they wait, and `weightReadAt` stays, for the next run.
+    if (weighIns && weighIns.samples.length > 0 && !(await pulledSince(now))) weighIns = null;
 
     // From here on nothing waits: the plan is made from the diary as it is now and saved at once.
     const ctx = diary.context();
@@ -362,10 +473,16 @@ export function createHealthSync(deps: SyncDeps) {
       sleep && sleepLog
         ? planSleep({ nights: nightsFrom(sleep.samples, { now: deps.now(), clock, firstDay: sleep.firstDay }), existing: sleepLog.all(), handled: current.handled })
         : null;
+    // Rule f (body.ts): against the weigh-ins as they are now (after the pull) and what this phone did with each day.
+    const weightPlan =
+      weighIns && weightLog
+        ? planWeights({ weighIns: weighInsFrom(weighIns.samples, clock, weighIns.firstDay), existing: weightLog.all(), handled: current.handled })
+        : null;
     // Kept as read only once what it wrote is on the device (rememberSaved, right after this run).
     if (sleep) sleepReadPending = sleep.readAt;
+    if (weighIns) weightReadPending = weighIns.readAt;
     const at = new Date(deps.now()).toISOString();
-    const { added, updated, nights } = apply(
+    const { added, updated, nights, weighIns: weighInCount } = apply(
       plan,
       {
         lastSyncedAt: at,
@@ -375,14 +492,61 @@ export function createHealthSync(deps: SyncDeps) {
         review: carryPicks(plan.review, current.review),
       },
       sleepPlan,
+      weightPlan,
+      { firstRead: current.weightReadAt === null },
     );
+    const today = clock.dayOf(deps.now());
     state.set({
       handled: pruneHandled(state.get().handled, deps.now()),
-      lastResult: added + updated + nights > 0 ? { at, added, updated, ...(nights ? { nights } : null) } : state.get().lastResult,
+      lastResult:
+        added + updated + nights + weighInCount > 0
+          ? { at, added, updated, ...(nights ? { nights } : null), ...(weighInCount ? { weighIns: weighInCount } : null) }
+          : state.get().lastResult,
       // Steps the store would not give (not allowed, or the read failed) leave what was kept; old days drop out.
-      steps: steps ?? { ...current.steps, days: pruneStepDays(current.steps.days, clock.dayOf(deps.now())) },
+      steps: steps ?? { ...current.steps, days: pruneStepDays(current.steps.days, today) },
+      // The same for the day's calories burned.
+      dayEnergy: dayEnergy ?? { ...current.dayEnergy, days: pruneDayEnergy(current.dayEnergy.days, today) },
     });
-    return { status: 'done', added, updated, review: plan.review.length, nights };
+    return { status: 'done', added, updated, review: plan.review.length, nights, weighIns: weighInCount };
+  }
+
+  /** `afterPull`, never longer than the health store's own limit, and false on any failure. */
+  async function pulledSince(since: number): Promise<boolean> {
+    if (!deps.afterPull) return true;
+    try {
+      return (await withTimeout(Promise.resolve(deps.afterPull(since)), timeout)) === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * The weight and body-fat readings since the last read (body.ts, rule g), or
+   * null when weight may not be read, there is no weigh-in log or the read
+   * failed: weigh-ins are extra, so a failure here never fails the sync (rule
+   * i), and the next sync reads the same days because `weightReadAt` is left as
+   * it was. A read that worked moves `weightReadAt` only once what it wrote is
+   * confirmed on the device (`rememberSaved`).
+   */
+  async function readWeights(access: HealthAccess, readAt: string | null, now: number) {
+    if (!weightLog || !access.weight) return null;
+    const range = weightReadRange(readAt, now, clock);
+    const read = await withTimeout(readWeighInsSafely(adapter, { from: range.from, to: range.to }, access), timeout).catch(() => null);
+    if (!read || !read.ok) return null;
+    return { samples: read.samples, firstDay: range.firstDay, readAt: new Date(now).toISOString() };
+  }
+
+  /**
+   * The day's calories burned since the last read (dayEnergy.ts), or null when
+   * they may not be read or the read failed: shown on Progress only, so a
+   * failure here never fails the sync.
+   */
+  async function readEnergy(access: HealthAccess, before: DayEnergyMemory, now: number): Promise<DayEnergyMemory | null> {
+    if (!access.dayEnergy) return null;
+    const range = dayEnergyReadRange(before.readAt, now, clock);
+    const read = await withTimeout(readDayEnergySafely(adapter, range, access), timeout).catch(() => null);
+    if (!read || !read.ok) return null;
+    return { days: mergeDayEnergy(before.days, read.days, range.fromDay, range.toDay), readAt: new Date(now).toISOString() };
   }
 
   /**
@@ -465,10 +629,11 @@ export function createHealthSync(deps: SyncDeps) {
 
   /**
    * Switch off: nothing more is read. What was added stays; so does the memory of what was deleted or skipped.
-   * The steps go: they are only a copy of the health store's, shown while sync is on.
+   * The steps and the day's calories burned go: they are only a copy of the health store's, shown while sync is on.
+   * Weigh-ins stay, as workouts and nights do.
    */
   function disable(): void {
-    state.set({ enabled: false, review: [], lastError: null, steps: NO_STEPS });
+    state.set({ enabled: false, review: [], lastError: null, steps: NO_STEPS, dayEnergy: NO_DAY_ENERGY });
   }
 
   const itemOf = (id: string) => state.get().review.find((r) => r.id === id);

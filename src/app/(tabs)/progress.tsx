@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 
 import { TabHeader } from '@/components/TabHeader';
 import { startOfWeek } from '@/lib/dates';
+import { rangeRule } from '@/lib/exerciseBudget';
 import { MIN_INSIGHT_DAYS, weekRangeLabel } from '@/lib/insights';
 import { CaloriesADay } from '@/features/progress/CaloriesADay';
 import { CaloriesCard } from '@/features/progress/CaloriesCard';
@@ -82,7 +83,7 @@ export default function ProgressScreen() {
       ) : null}
       {segment === 'nutrition' ? (
         <>
-          <CaloriesCard days={d.days} summary={d.summary} previous={d.previous} usual={d.usualKcal} today={d.today} eatBack={d.profile.eatBackExercise} />
+          <CaloriesCard days={d.days} summary={d.summary} previous={d.previous} usual={d.usualKcal} today={d.today} rule={rangeRule(d.days.map((x) => x.exerciseRule))} />
           <MacrosCard summary={d.summary} days={d.days} today={d.today} />
         </>
       ) : null}

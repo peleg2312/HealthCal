@@ -65,7 +65,7 @@ export function metaLine(w: ImportedWorkout, todayDate: ISODate, units: UnitSyst
 }
 
 export interface CalorieView {
-  /** What goes into the day's budget, as shown ("+561", "~488"); null until there is an activity. */
+  /** The workout's calories above resting, as shown ("+561", "~488"); null until there is an activity. */
   added: string | null;
   /** True when the added figure is an estimate (the file had no calories). */
   estimate: boolean;

@@ -33,6 +33,9 @@ export interface MacroSplit {
   fat: number;
 }
 
+/** Where a workout's added calories go: its own day, or shared over that day and the six after it (`@/lib/exerciseBudget`). */
+export type ExerciseSpread = 'day' | 'week';
+
 export interface Profile {
   name: string;
   sex: Sex;
@@ -54,6 +57,10 @@ export interface Profile {
   waterGoalMlOverride?: number;
   /** Whether logged exercise adds calories back to the daily budget. */
   eatBackExercise: boolean;
+  /** How added workout calories are placed; absent = 'day'. Only read when eatBackExercise is true. */
+  exerciseSpread?: ExerciseSpread;
+  /** Closed periods with the rule each had; written only by a Goals save (withRuleChange). */
+  exerciseRuleHistory?: { until: ISODate; rule: 'day' | 'week' | 'off' }[];
   /** Use the adaptive (data-driven) expenditure estimate once it is reliable. */
   useAdaptiveTdee: boolean;
   onboardedAt?: ISODateTime;
@@ -221,6 +228,8 @@ export interface ActivityEntry extends SyncedRecord {
   /** True when the calories were measured by a device (heart rate, power) instead of estimated from a MET table. */
   measured?: boolean;
   avgHeartRate?: number;
+  /** Highest heart rate in the session, beats per minute (a device file or the health store); shown on the workout only. */
+  maxHeartRate?: number;
   distanceKm?: number;
   notes?: string;
   exercises?: StrengthExercise[];
@@ -246,6 +255,20 @@ export interface WeightEntry extends SyncedRecord {
   hipCm?: number;
   neckCm?: number;
   note?: string;
+  /** Set only on a weigh-in read from a health store (src/features/health-sync/body.ts). Absent: entered by hand. */
+  source?: 'health';
+  /** The store it was read from ('file' is not written yet). */
+  store?: SleepStore;
+  /** The app that wrote it: a package, a bundle id, or appleOrigin()'s com.apple.health.watch/iphone/device. Never a device's or person's name. */
+  origin?: string;
+  /** The reading's instant, `new Date(ms).toISOString()`; compare with Date.parse. */
+  measuredAt?: ISODateTime;
+  /**
+   * What the sync wrote. The record stays a synced one only while `kg` and
+   * `bodyFatPct` still equal these (`isSyncedWeighIn`, src/features/trackers/weighInSource.ts).
+   */
+  syncedKg?: number;
+  syncedBodyFatPct?: number;
 }
 
 /** How a night felt, 1 (poor) to 5 (great). Only ever given by the person. */

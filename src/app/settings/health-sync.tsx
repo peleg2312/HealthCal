@@ -3,6 +3,7 @@ import { RefreshCw } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Platform, View } from 'react-native';
 
+import { SpreadHint } from '@/features/activity/SpreadHint';
 import { Group } from '@/features/settings/components';
 import { timeAgo } from '@/features/settings/format';
 import type { EnableOutcome } from '@/features/health-sync/engine';
@@ -14,12 +15,15 @@ import { healthAdapter, healthSync, useHealthStatus } from '@/features/health-sy
 import { storeName } from '@/features/health-sync/types';
 import { ActivityPickSheet } from '@/features/health-sync/ui/ActivityPickSheet';
 import { ExplainSheet } from '@/features/health-sync/ui/ExplainSheet';
-import { accessNote, originLine, sleepRowText, stepsRowText, switchSubtitle } from '@/features/health-sync/ui/format';
+import { accessNote, energyRowText, heartRowText, originLine, sleepRowText, stepsRowText, switchSubtitle, weightRowText } from '@/features/health-sync/ui/format';
 import { ReviewCard } from '@/features/health-sync/ui/ReviewCard';
+import { useWatchEstimate } from '@/features/health-sync/ui/WatchEstimate';
+import type { AccessRequest } from '@/features/health-sync/types';
 import { findByDate } from '@/features/trackers/helpers';
+import { isSyncedWeighIn, weighInFromLine } from '@/features/trackers/weighInSource';
 import { useNow, useToday } from '@/store/clock';
 import { useStore } from '@/store';
-import { useLive, useProfile } from '@/store/selectors';
+import { useEnergyModel, useLive, useProfile } from '@/store/selectors';
 import { fonts, useTheme } from '@/theme';
 import { Button, Card, Header, ListRow, PressableScale, Screen, SectionTitle, Text, Toggle, haptic, toast } from '@/ui';
 
@@ -44,6 +48,12 @@ export default function HealthSyncScreen() {
   const lastNightGone =
     !lastNight && (Object.values(sleepRecords).some((r) => r.date === todayDate && r.deleted) || state.handled[sleepHandledKey(todayDate)]?.how === 'skipped');
 
+  /** The newest live weigh-in, for the Weight row. */
+  const weighIns = useLive('weights');
+  const newestWeighIn = weighIns.reduce<(typeof weighIns)[number] | null>((a, w) => (!a || w.date > a.date ? w : a), null);
+  /** The watch's day calories, as Progress shows them (null until 5 full days). */
+  const watch = useWatchEstimate(useEnergyModel(todayDate));
+
   const store = storeName(healthAdapter.store);
   const apple = healthAdapter.store === 'apple-health';
   // Known at once where there is no health store at all (the browser); an iPad without Apple Health says so once asked.
@@ -60,7 +70,7 @@ export default function HealthSyncScreen() {
     if (out.ok) {
       setProblem(null);
       haptic.success();
-      if (out.sync.status === 'done' && out.sync.added + out.sync.updated + out.sync.nights === 0) toast(out.sync.review ? 'Sync is on. Some workouts need a look' : 'Sync is on. New workouts will appear by themselves');
+      if (out.sync.status === 'done' && out.sync.added + out.sync.updated + out.sync.nights + out.sync.weighIns === 0) toast(out.sync.review ? 'Sync is on. Some workouts need a look' : 'Sync is on. New workouts will appear by themselves');
     } else setProblem(out.why);
   };
 
@@ -133,10 +143,41 @@ export default function HealthSyncScreen() {
     }
   };
 
+  /**
+   * Weight, the day's calories and heart rate were added after people allowed the first types: each row asks
+   * for its own types alone (healthConnect.ts, healthKit.ts), says how it went, and then syncs.
+   */
+  const allowRow = async (what: Extract<AccessRequest, 'weight' | 'dayEnergy' | 'heartRate'>) => {
+    const words = ROW_WORDS[what];
+    setAsking(true);
+    let allowed: boolean | null = null;
+    try {
+      allowed = (await healthAdapter.requestAccess(what))[what];
+    } catch {
+      allowed = null;
+    }
+    setAsking(false);
+    status.refresh();
+    if (allowed && apple) {
+      // Apple Health says only that it asked, never what the person chose: words true either way.
+      haptic.success();
+      toast(words.apple(store), { tint: words.tint });
+      void healthSync.sync('manual');
+    } else if (allowed) {
+      haptic.success();
+      toast(words.shared, { tint: words.tint });
+      void healthSync.sync('manual');
+    } else if (allowed === false) {
+      toast(`${words.still} ${store}`, { label: 'Open', onPress: () => healthAdapter.openSettings() });
+    } else {
+      toast(`${store} did not answer. Try again in a moment`);
+    }
+  };
+
   const syncNow = async () => {
     const out = await healthSync.sync('manual');
     status.refresh();
-    if (out.status === 'done' && out.added + out.updated + out.nights === 0) toast(out.review ? 'Nothing new to add. Some workouts need a look' : `Up to date. Nothing new in ${store}`);
+    if (out.status === 'done' && out.added + out.updated + out.nights + out.weighIns === 0) toast(out.review ? 'Nothing new to add. Some workouts need a look' : `Up to date. Nothing new in ${store}`);
   };
 
   if (!supported) {
@@ -168,7 +209,8 @@ export default function HealthSyncScreen() {
   }
 
   const unavailable = status.availability === 'not-installed' || status.availability === 'update-required' || status.availability === 'not-entitled' ? status.availability : null;
-  const note = state.enabled ? accessNote(status.access ?? state.access) : null;
+  const access = status.access ?? state.access;
+  const note = state.enabled ? accessNote(access) : null;
   const pickItem = state.review.find((r) => r.id === pickFor) ?? null;
   // One thing at a time: what stops it from being turned on, else what stopped the last sync.
   const shown: Problem | null = problem ?? (state.enabled ? null : unavailable);
@@ -185,9 +227,11 @@ export default function HealthSyncScreen() {
           Your daily steps show on Train. They are never added to your calories: your activity level already counts everyday walking.
         </Text>
         <Text variant="body" color="textSecondary">
-          HealthCal only reads workouts, their calories and distance, steps, and how long you slept. It writes nothing back.
+          HealthCal only reads workouts with their calories, distance and heart rate, steps, how long you slept, your weigh-ins and the calories you burn in a day. It
+          writes nothing back.
         </Text>
       </Card>
+      <SpreadHint testID="health-sync-spread-hint" style={{ marginVertical: -spacing.sm, paddingHorizontal: spacing.xs }} />
 
       <Card padding={0} style={{ paddingHorizontal: spacing.lg }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 64, paddingVertical: spacing.md }}>
@@ -337,6 +381,49 @@ export default function HealthSyncScreen() {
             />
           </Group>
 
+          <Group
+            title="Weight"
+            footer={`One a day: the first weigh-in of the day, with body fat when the same app measured it. ${
+              profile?.useAdaptiveTdee === true ? 'They feed your weight trend and the burn estimate your targets use.' : 'They feed your weight trend.'
+            } One you enter or change yourself is never replaced, and one you delete is not added again.`}>
+            <ListRow
+              testID="health-sync-weight"
+              title="Weigh-ins"
+              subtitle={weightRowText(
+                access,
+                newestWeighIn ? { kg: newestWeighIn.kg, date: newestWeighIn.date, synced: isSyncedWeighIn(newestWeighIn), from: weighInFromLine(newestWeighIn)?.replace(/^From /, '') ?? null } : null,
+                state.weightReadAt,
+                store,
+                profile.units,
+              )}
+              chevron={access?.weight === true}
+              onPress={access?.weight === true ? () => router.push('/weight') : () => void allowRow('weight')}
+              right={access?.weight === true ? undefined : <AllowLabel testID="health-sync-weight-allow" />}
+            />
+          </Group>
+
+          <Group title="Calories burned in a day" footer="Your watch's own estimate, shown on Progress beside HealthCal's. It is never added to your budget.">
+            <ListRow
+              testID="health-sync-energy"
+              title="Calories burned"
+              subtitle={energyRowText(access, watch)}
+              chevron={false}
+              onPress={access?.dayEnergy === true ? undefined : () => void allowRow('dayEnergy')}
+              right={access?.dayEnergy === true ? undefined : <AllowLabel testID="health-sync-energy-allow" />}
+            />
+          </Group>
+
+          <Group title="Heart rate in workouts">
+            <ListRow
+              testID="health-sync-heart"
+              title="Heart rate"
+              subtitle={heartRowText(access)}
+              chevron={false}
+              onPress={access?.heartRate === true ? undefined : () => void allowRow('heartRate')}
+              right={access?.heartRate === true ? undefined : <AllowLabel testID="health-sync-heart-allow" />}
+            />
+          </Group>
+
           <Group title={`Found in ${store}`} footer={note ?? undefined}>
             {state.origins.length ? (
               state.origins.map((o) => <ListRow key={o.origin} testID={`health-sync-origin-${o.origin}`} title={o.name} subtitle={originLine(o)} chevron={false} />)
@@ -358,8 +445,8 @@ export default function HealthSyncScreen() {
         <View style={{ paddingVertical: spacing.md, gap: 4 }}>
           <Text variant="bodyStrong">Stop at any time with the switch</Text>
           <Text variant="caption" color="textSecondary">
-            Once it is off, nothing more is read and the steps kept on this phone are cleared. Workouts and nights already added stay, in Train and the sleep log, where you can
-            delete any of them; one you delete is not brought back by a later sync. To take the permission away as well,{' '}
+            Once it is off, nothing more is read and the steps and daily calories kept on this phone are cleared. Workouts, nights and weigh-ins already added stay, in Train, the
+            sleep log and Weight, where you can delete any of them; one you delete is not brought back by a later sync. To take the permission away as well,{' '}
             {apple ? 'open the Health app and turn HealthCal off under Sharing, Apps.' : `open ${store} and remove HealthCal under app permissions.`}
           </Text>
         </View>
@@ -369,8 +456,8 @@ export default function HealthSyncScreen() {
       <Group title="What happens to this data">
         <View style={{ paddingVertical: spacing.md, gap: spacing.sm }} testID="health-sync-privacy">
           <Text variant="caption" color="textSecondary">
-            HealthCal reads workouts and, for each, its {apple ? 'active calories' : 'active and total calories'} and distance, your daily steps, and how long you slept each
-            night. Nothing is written back to {store}.
+            HealthCal reads workouts and, for each, its {apple ? 'active calories' : 'active and total calories'}, distance and heart rate, your daily steps, how long you slept
+            each night, your weigh-ins with body fat, and the calories you burn in a day. Nothing is written back to {store}.
           </Text>
           <Text variant="caption" color="textSecondary">
             A synced workout is kept like a session you log yourself: on this phone, and in your account if you have one, so your other devices show it. It is never sent to the
@@ -383,6 +470,10 @@ export default function HealthSyncScreen() {
           <Text variant="caption" color="textSecondary">
             A night of sleep is kept in your sleep log like one you enter yourself, with the app it came from and its stages: on this phone, and in your account if you have
             one. It is never added to your calories, never sent to the AI food analysis and never shown to friends.
+          </Text>
+          <Text variant="caption" color="textSecondary" testID="health-sync-privacy-more">
+            Weigh-ins are kept like weigh-ins you enter, in your account when you have one. Calories burned in a day stay on this phone. Heart rate is kept on the workout.
+            None of it goes to the AI functions or to friends.
           </Text>
         </View>
       </Group>
@@ -411,8 +502,46 @@ export default function HealthSyncScreen() {
   );
 }
 
-const changeText = (r: { added: number; updated: number; nights?: number }) =>
-  [r.added ? `${r.added} added` : '', r.updated ? `${r.updated} updated` : '', r.nights ? `${r.nights} ${r.nights === 1 ? 'night' : 'nights'} of sleep` : ''].filter(Boolean).join(', ');
+const changeText = (r: { added: number; updated: number; nights?: number; weighIns?: number }) =>
+  [
+    r.added ? `${r.added} added` : '',
+    r.updated ? `${r.updated} updated` : '',
+    r.nights ? `${r.nights} ${r.nights === 1 ? 'night' : 'nights'} of sleep` : '',
+    r.weighIns ? `${r.weighIns} ${r.weighIns === 1 ? 'weigh-in' : 'weigh-ins'}` : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
+
+/** What each row's own Allow says once asked (`allowRow`). */
+const ROW_WORDS: Record<'weight' | 'dayEnergy' | 'heartRate', { tint: 'weight' | 'calories' | 'exercise'; shared: string; apple: (store: string) => string; still: string }> = {
+  weight: {
+    tint: 'weight',
+    shared: 'Weight is shared. Your weigh-ins go to Weight after this sync',
+    apple: (store) => `Your weigh-ins go to Weight from ${store} after this sync, if you allowed weight`,
+    still: 'Weight is still not shared. Allow it in',
+  },
+  dayEnergy: {
+    tint: 'calories',
+    shared: 'Calories burned are shared. They show on Progress after 5 full days',
+    apple: () => 'Calories burned show on Progress after 5 full days, if you allowed resting energy',
+    still: 'Calories burned are still not shared. Allow them in',
+  },
+  heartRate: {
+    tint: 'exercise',
+    shared: 'Heart rate is shared. Workouts show it after this sync',
+    apple: () => 'Workouts show their heart rate after this sync, if you allowed it',
+    still: 'Heart rate is still not shared. Allow it in',
+  },
+};
+
+/** The Allow on a row whose types are not shared yet: the row itself is the button. */
+function AllowLabel({ testID }: { testID: string }) {
+  return (
+    <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }} testID={testID}>
+      Allow
+    </Text>
+  );
+}
 
 /** Why sync could not be turned on, in two lines (what happened, what to do), with the one thing that fixes it. */
 function ProblemCard({

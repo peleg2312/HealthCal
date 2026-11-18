@@ -48,3 +48,18 @@ export function spokenHours(hours: number): string {
 export function logMealTitle(meal: MealType): string {
   return meal === 'snack' ? 'Log a snack' : `Log ${meal}`;
 }
+
+/**
+ * Yesterday's eaten share of its own budget, in whole percent ("95", "130"), for the Eaten figure
+ * when the week picture already shows the calories; null without a budget.
+ */
+export function budgetShare(kcal: number, budget: number): number | null {
+  if (!(budget > 0)) return null;
+  return Math.round((Math.max(0, kcal) / budget) * 100);
+}
+
+/** Hours of sleep as whole hours and minutes, the form used everywhere on the page ("7 h 30 min"). */
+export function hoursAndMinutes(hours: number): { h: number; m: number } {
+  const mins = Math.round(Math.max(0, hours) * 60);
+  return { h: Math.floor(mins / 60), m: mins % 60 };
+}

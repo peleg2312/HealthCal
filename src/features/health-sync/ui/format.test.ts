@@ -4,7 +4,22 @@ import { planSync } from '../plan';
 import { CTX, handLogged, TYPE, workout } from '../testing';
 import { NO_ACCESS } from '../types';
 
-import { accessNote, sleepRowText, stepsRowText, originLine, profileSubtitle, reviewLabels, reviewView, switchSubtitle } from './format';
+import { FULL_ACCESS } from '../fake';
+
+import {
+  accessNote,
+  energyRowText,
+  heartRateText,
+  heartRowText,
+  originLine,
+  profileSubtitle,
+  reviewLabels,
+  reviewView,
+  sleepRowText,
+  stepsRowText,
+  switchSubtitle,
+  weightRowText,
+} from './format';
 
 const plain = (s: string) => s.replace(/ /g, ' ');
 
@@ -98,10 +113,10 @@ describe('sync screen wording', () => {
 
   it('says what is not shared', () => {
     expect(accessNote(null)).toBeNull();
-    expect(accessNote({ workouts: true, activeEnergy: true, totalEnergy: false, distance: true, steps: true, sleep: true })).toBeNull();
+    expect(accessNote({ ...NO_ACCESS, workouts: true, activeEnergy: true, totalEnergy: false, distance: true, steps: true, sleep: true })).toBeNull();
     expect(accessNote({ ...NO_ACCESS, workouts: true })).toMatch(/^Calories and distance are not shared/);
     expect(accessNote({ ...NO_ACCESS, workouts: true, distance: true })).toMatch(/^Calories are not shared/);
-    expect(accessNote({ workouts: true, activeEnergy: true, totalEnergy: true, distance: false, steps: true, sleep: true })).toMatch(/^Distance is not shared/);
+    expect(accessNote({ ...NO_ACCESS, workouts: true, activeEnergy: true, totalEnergy: true, distance: false, steps: true, sleep: true })).toMatch(/^Distance is not shared/);
   });
 
   it('says what happens to steps', () => {
@@ -116,7 +131,7 @@ describe('sync screen wording', () => {
 });
 
 describe('the Sleep row', () => {
-  const all = { workouts: true, activeEnergy: true, totalEnergy: true, distance: true, steps: true, sleep: true };
+  const all = { ...NO_ACCESS, workouts: true, activeEnergy: true, totalEnergy: true, distance: true, steps: true, sleep: true };
   it('offers to allow sleep when it is not shared, and says last night and where it came from', () => {
     expect(sleepRowText({ ...all, sleep: false }, null, null, 'Health Connect')).toBe('Not shared yet. Allow sleep to fill your sleep log');
     expect(sleepRowText(all, { hours: 7.2, source: 'health', store: 'healthConnect', origin: 'com.garmin.android.apps.connectmobile' }, '2026-11-14T08:00:00Z', 'Health Connect')).toBe(
@@ -129,5 +144,33 @@ describe('the Sleep row', () => {
     // Deleted, or its sync undone: no later sync adds it, so the row does not say it may still come.
     expect(sleepRowText(all, undefined, '2026-11-14T08:00:00Z', 'Apple Health', true)).toBe('Last night was deleted. A sync does not add it again');
     expect(sleepRowText({ ...all, sleep: false }, undefined, null, 'Health Connect', true)).toBe('Not shared yet. Allow sleep to fill your sleep log');
+  });
+});
+
+describe('the Weight, Calories burned and Heart rate rows', () => {
+  const latest = { kg: 82.4, date: '2026-11-18', synced: true, from: 'Garmin Connect' };
+  it('offers Allow until weight is shared, then says the latest and where it came from', () => {
+    expect(weightRowText({ ...FULL_ACCESS, weight: false }, latest, null, 'Health Connect', 'metric')).toBe('Not shared yet. Allow it to fill in your weigh-ins');
+    // A save from before the weight types existed has no flag at all.
+    expect(weightRowText({ workouts: true } as never, latest, null, 'Health Connect', 'metric')).toBe('Not shared yet. Allow it to fill in your weigh-ins');
+    expect(weightRowText(FULL_ACCESS, latest, null, 'Health Connect', 'metric')).toBe('Weigh-ins go to Weight after the next sync');
+    expect(weightRowText(FULL_ACCESS, latest, '2026-11-18T08:00:00Z', 'Health Connect', 'metric')).toBe('Latest 82.4 kg on Nov 18, from Garmin Connect');
+    expect(weightRowText(FULL_ACCESS, { ...latest, synced: false }, '2026-11-18T08:00:00Z', 'Health Connect', 'metric')).toBe('Latest 82.4 kg on Nov 18, entered by you');
+    expect(weightRowText(FULL_ACCESS, latest, '2026-11-18T08:00:00Z', 'Health Connect', 'imperial')).toBe('Latest 181.7 lb on Nov 18, from Garmin Connect');
+    expect(weightRowText(FULL_ACCESS, null, '2026-11-18T08:00:00Z', 'Apple Health', 'metric')).toBe('None in Apple Health in the last 4 weeks');
+  });
+  it('the day calories: Allow, the estimate, or when it will show', () => {
+    expect(energyRowText({ ...FULL_ACCESS, dayEnergy: false }, null)).toBe("Not shared yet. Allow it to compare with HealthCal's estimate");
+    expect(energyRowText(FULL_ACCESS, { avg: 2640, n: 6, label: 'Garmin Connect' })).toBe('About 2,640 kcal a day over 6 full days, from Garmin Connect. Shown on Progress');
+    expect(energyRowText(FULL_ACCESS, null)).toBe('Shown on Progress after 5 full days recorded');
+  });
+  it('heart rate', () => {
+    expect(heartRowText({ ...FULL_ACCESS, heartRate: false })).toBe("Not shared yet. Allow it to see each workout's heart rate");
+    expect(heartRowText(FULL_ACCESS)).toBe('Average and highest, shown on each synced workout');
+    expect(heartRateText(142, 171)).toBe('Heart rate: average 142 bpm, highest 171 bpm');
+    expect(heartRateText(142, null)).toBe('Average heart rate 142 bpm');
+    expect(heartRateText(142, 120)).toBe('Average heart rate 142 bpm');
+    expect(heartRateText(undefined, 171)).toBeNull();
+    expect(heartRateText(0, 0)).toBeNull();
   });
 });

@@ -1,11 +1,14 @@
-import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useRef, useState } from 'react';
+import { View, type ScrollView, type ScrollViewProps } from 'react-native';
 
 import { Group, Hint, OptionRow } from '@/features/settings/components';
 import { formatMonthDayYear } from '@/features/settings/format';
+import { spreadChangeNote, spreadRuleNote } from '@/features/settings/spreadWords';
 import { birthDateError, customSplitError, heightError, rateForGoal, targetWeightError } from '@/features/settings/goalsValidation';
-import { ageFromBirthDate } from '@/lib/dates';
+import { markSpreadHintDone } from '@/features/activity/spreadHint';
+import { ageFromBirthDate, today } from '@/lib/dates';
+import { effectiveFrom, exerciseRuleOf, ruleFieldsOnSave } from '@/lib/exerciseBudget';
 import { ACTIVITY_LABELS, macroTargets, maxWeeklyRateKg, projectedGoalDate } from '@/lib/energy';
 import { baseWaterGoalMl } from '@/lib/hydration';
 import {
@@ -25,7 +28,7 @@ import { useStore } from '@/store';
 import { useToday } from '@/store/clock';
 import { computeEnergyModel, useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
-import type { ActivityLevel, GoalType, MacroSplit, Profile, Sex } from '@/types';
+import type { ActivityLevel, ExerciseSpread, GoalType, MacroSplit, Profile, Sex } from '@/types';
 import { Button, Card, Chip, ChipWrap, CupKey, goBack, Header, MacroBar, NumberField, Screen, Segmented, Stepper, Text, TextField, ToggleRow, toast } from '@/ui';
 
 type MacroMode = 'auto' | 'balanced' | 'protein' | 'lowcarb' | 'custom';
@@ -61,6 +64,11 @@ function modeOf(split: MacroSplit | undefined): MacroMode {
 
 const pct = (x: number) => Math.round(x * 100);
 
+const SPREAD_OPTIONS: { value: ExerciseSpread; label: string }[] = [
+  { value: 'week', label: 'Over 7 days' },
+  { value: 'day', label: 'Same day' },
+];
+
 const GOALS: { value: GoalType; label: string }[] = [
   { value: 'lose', label: 'Lose' },
   { value: 'maintain', label: 'Maintain' },
@@ -89,6 +97,10 @@ function GoalsForm() {
   const activities = useLive('activities');
   const todayDate = useToday();
   const u = saved.units;
+  // `?section=exercise` (the "over 7 days" hint) opens the page at "How the budget works", the last block.
+  const { section } = useLocalSearchParams<{ section?: string }>();
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const scrolledToSection = useRef(false);
 
   // A plan saved as lose or gain with no pace (an older maintain plan switched over) gets the default pace, so Save fixes it.
   const [draft, setDraft] = useState<Profile>(() =>
@@ -124,6 +136,10 @@ function GoalsForm() {
   // The profile the preview and Save use.
   const effective: Profile = {
     ...draft,
+    // Closed periods are only ever the saved profile's: a draft opened before a pull may hold an older list.
+    exerciseRuleHistory: saved.exerciseRuleHistory,
+    // With adding off the spread control is hidden, so a choice made there before turning it off is not kept.
+    exerciseSpread: draft.eatBackExercise ? draft.exerciseSpread : saved.exerciseSpread,
     birthDate: birthValid ? birthText : saved.birthDate,
     calorieTargetOverride: manualCalories ? draft.calorieTargetOverride : undefined,
     waterGoalMlOverride: manualWater ? draft.waterGoalMlOverride : undefined,
@@ -149,14 +165,28 @@ function GoalsForm() {
   const valid = birthValid && macroValid && heightValid && bodyFatValid && caloriesValid && waterValid && targetValid;
   const dirty = JSON.stringify(effective) !== JSON.stringify(saved);
 
+  // How workout calories reach the budget: the saved rule and the one on screen.
+  const savedRule = exerciseRuleOf(saved);
+  const draftRule = exerciseRuleOf(effective);
+  const workoutToday = activities.some((a) => a.date === todayDate);
+  // A change between "Over 7 days" and "Same day" starts today, or tomorrow when a workout is dated today; turning adding off or on applies at once and needs no words.
+  const spreadNote = spreadChangeNote(savedRule, draftRule, effectiveFrom(savedRule, draftRule, todayDate, workoutToday) !== todayDate);
+
   const save = () => {
     if (!valid) return;
     const { updatedAt: _ignored, ...rest } = effective;
     void _ignored;
-    setProfile({
+    let next: Partial<Profile> = {
       ...rest,
       weeklyRateKg: Math.min(rest.weeklyRateKg, maxRate || rest.weeklyRateKg),
-    });
+    };
+    // An event handler, so the clock is read here. The rule fields come from the saved profile, never the
+    // draft (ruleFieldsOnSave): an unchanged rule keeps the saved history as it is now.
+    const day = today();
+    next = { ...next, ...ruleFieldsOnSave(saved, exerciseRuleOf(effective), day, activities.some((a) => a.date === day)) };
+    setProfile(next);
+    // The choice was on screen, so the hint that points here has done its job on this device.
+    if (effective.eatBackExercise) markSpreadHintDone();
     toast('Plan saved');
     goBack('/profile');
   };
@@ -166,6 +196,7 @@ function GoalsForm() {
 
   return (
     <Screen
+      scrollProps={{ ref: scrollRef } as ScrollViewProps}
       header={<Header title="Goals and targets" subtitle="Budget, macros and water" />}
       footer={<Button testID="goals-save" title={dirty ? 'Save plan' : 'No changes'} disabled={!valid || !dirty} onPress={save} />}>
       {/* Live preview */}
@@ -209,7 +240,11 @@ function GoalsForm() {
             <PreviewStat label="Water" value={formatVolume(water, u)} color={colors.water} />
           </View>
           <Text variant="caption" color="textSecondary" testID="goals-preview-note">
-            {effective.eatBackExercise ? 'On a day without workouts. A logged workout raises that day.' : 'On a day without workouts. A workout raises that day’s water.'}
+            {draftRule === 'week'
+              ? 'On a day without recent workouts. Each workout raises its own day and the next six by a seventh of its calories.'
+              : effective.eatBackExercise
+                ? 'On a day without workouts. A logged workout raises that day.'
+                : 'On a day without workouts. A workout raises that day’s water.'}
           </Text>
         </View>
         {draft.goal !== 'maintain' ? (
@@ -505,32 +540,59 @@ function GoalsForm() {
         </View>
       </Group>
 
-      <Group
-        title="How the budget works"
-        footer={
-          model.adaptive.observed === null
-            ? `Learning starts after ${model.adaptive.needs ?? 'a little more data'}.`
-            : undefined
-        }>
-        <ToggleRow
-          testID="goals-eat-back"
-          title="Add exercise to my budget"
-          subtitle="Workouts add only the calories burned above resting."
-          value={draft.eatBackExercise}
-          onChange={(eatBackExercise) => patch({ eatBackExercise })}
-        />
-        <ToggleRow
-          testID="goals-adaptive"
-          title="Learn from my data"
-          subtitle={
-            model.adaptive.observed !== null
-              ? `Your logs and weigh-ins suggest you use ${formatNumber(model.adaptive.observed)} kcal a day.`
-              : 'Compares what you log with your weight trend.'
-          }
-          value={draft.useAdaptiveTdee}
-          onChange={(useAdaptiveTdee) => patch({ useAdaptiveTdee })}
-        />
-      </Group>
+      <View
+        testID="goals-budget-section"
+        onLayout={(e) => {
+          // Once, on the first layout: later layouts (the block growing as the choice opens) never move the page.
+          if (section !== 'exercise' || scrolledToSection.current) return;
+          scrolledToSection.current = true;
+          const y = e.nativeEvent.layout.y;
+          scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing.sm), animated: false });
+        }}>
+        <Group
+          title="How the budget works"
+          footer={
+            model.adaptive.observed === null
+              ? `Learning starts after ${model.adaptive.needs ?? 'a little more data'}.`
+              : undefined
+          }>
+          <ToggleRow
+            testID="goals-eat-back"
+            title="Add exercise to my budget"
+            subtitle="Workouts add only the calories burned above resting."
+            value={draft.eatBackExercise}
+            onChange={(eatBackExercise) => patch({ eatBackExercise })}
+          />
+          {draft.eatBackExercise ? (
+            <View style={{ paddingVertical: spacing.md, gap: spacing.md }} testID="goals-exercise-block">
+              <Text variant="label" color="textSecondary">
+                Workout calories
+              </Text>
+              <Segmented<ExerciseSpread>
+                testID="goals-exercise-spread"
+                value={draft.exerciseSpread ?? 'day'}
+                // Choosing what is saved puts back exactly what is saved (an older profile has no value: "Same day").
+                onChange={(v) => patch({ exerciseSpread: v === (saved.exerciseSpread ?? 'day') ? saved.exerciseSpread : v })}
+                options={SPREAD_OPTIONS}
+              />
+              <Hint testID="goals-exercise-note">
+                {spreadNote ? `${spreadRuleNote(draftRule)} ${spreadNote}` : spreadRuleNote(draftRule)}
+              </Hint>
+            </View>
+          ) : null}
+          <ToggleRow
+            testID="goals-adaptive"
+            title="Learn from my data"
+            subtitle={
+              model.adaptive.observed !== null
+                ? `Your logs and weigh-ins suggest you use ${formatNumber(model.adaptive.observed)} kcal a day.`
+                : 'Compares what you log with your weight trend.'
+            }
+            value={draft.useAdaptiveTdee}
+            onChange={(useAdaptiveTdee) => patch({ useAdaptiveTdee })}
+          />
+        </Group>
+      </View>
     </Screen>
   );
 }

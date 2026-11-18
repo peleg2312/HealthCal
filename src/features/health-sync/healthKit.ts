@@ -16,16 +16,27 @@
  * Calories: HKWorkout.totalEnergyBurned is "the total active energy burned
  * during the workout" (Apple's documentation; deprecated in iOS 18 for the
  * workout's ActiveEnergyBurned statistic), so it is the *active* figure here.
- * HealthKit holds no workout total with resting included unless the app reads
- * basal energy, which HealthCal does not ask for: an Apple Health workout is
+ * Basal energy is read only as a day's total for Progress (ENERGY_READ_TYPES,
+ * dayEnergy.ts), never for a workout: an Apple Health workout is
  * priced by the "only active" row of energy.ts (gross = active + the resting
  * rate for those minutes, net = gross minus the resting share), the same rule
  * Health Connect uses when an app writes only active energy.
  */
 import { appleExerciseType, HK_TYPE } from './appleHealthTypes';
 import { appleOrigin, isAppleOrigin, isKnownOrigin } from './origins';
+import { heartFigures } from './heart';
 import { sleepKindOf } from './sleep';
-import { HealthError, NO_ACCESS, type HealthAccess, type HealthWorkout, type SleepSample, type SleepStage, type StepDayTotal } from './types';
+import {
+  HealthError,
+  NO_ACCESS,
+  type BodySample,
+  type DayEnergyDay,
+  type HealthAccess,
+  type HealthWorkout,
+  type SleepSample,
+  type SleepStage,
+  type StepDayTotal,
+} from './types';
 
 /** HealthKit's identifiers for what is read. Nothing else is ever asked for, and nothing is written. */
 export const HK = {
@@ -35,6 +46,10 @@ export const HK = {
   cyclingDistance: 'HKQuantityTypeIdentifierDistanceCycling',
   steps: 'HKQuantityTypeIdentifierStepCount',
   sleep: 'HKCategoryTypeIdentifierSleepAnalysis',
+  bodyMass: 'HKQuantityTypeIdentifierBodyMass',
+  bodyFat: 'HKQuantityTypeIdentifierBodyFatPercentage',
+  basalEnergy: 'HKQuantityTypeIdentifierBasalEnergyBurned',
+  heartRate: 'HKQuantityTypeIdentifierHeartRate',
 } as const;
 
 /** The five read permissions, in the order the system sheet lists them. */
@@ -49,8 +64,25 @@ export const READ_TYPES = [HK.workout, HK.activeEnergy, HK.walkingRunningDistanc
  */
 export const SLEEP_READ_TYPES = [HK.sleep] as const;
 
+/**
+ * The rows added after sleep, each its own list for the same reason, never
+ * merged into READ_TYPES or into each other: weigh-ins with body fat (body.ts),
+ * resting energy for the day's total burn on Progress (dayEnergy.ts; active
+ * energy is already in READ_TYPES), and heart rate inside a workout (heart.ts).
+ * Turning sync on asks all five lists in one sheet; each row's "Allow" asks its
+ * own list alone.
+ */
+export const WEIGHT_READ_TYPES = [HK.bodyMass, HK.bodyFat] as const;
+export const ENERGY_READ_TYPES = [HK.basalEnergy] as const;
+export const HEART_READ_TYPES = [HK.heartRate] as const;
+
 /** Every type the app may ask to read. */
-export type HealthKitReadType = (typeof READ_TYPES)[number] | (typeof SLEEP_READ_TYPES)[number];
+export type HealthKitReadType =
+  | (typeof READ_TYPES)[number]
+  | (typeof SLEEP_READ_TYPES)[number]
+  | (typeof WEIGHT_READ_TYPES)[number]
+  | (typeof ENERGY_READ_TYPES)[number]
+  | (typeof HEART_READ_TYPES)[number];
 
 /** HKAuthorizationRequestStatus (the library's AuthorizationRequestStatus enum). */
 export const REQUEST_STATUS = { unknown: 0, shouldRequest: 1, unnecessary: 2 } as const;
@@ -103,8 +135,22 @@ export interface HKWorkoutSample {
  */
 export interface HKStatistics {
   readonly sumQuantity?: HKQuantity;
+  /** `discreteAverage`, `discreteMax` (heart rate). */
+  readonly averageQuantity?: HKQuantity;
+  readonly maximumQuantity?: HKQuantity;
   readonly startDate?: Date;
   readonly endDate?: Date;
+  /** The apps whose samples went into the figure. */
+  readonly sources?: readonly { readonly name?: string; readonly bundleIdentifier: string }[];
+}
+
+/** `QuantitySample` (src/types/QuantitySample.ts, BaseSample in core src/types/Shared.ts), the part read here. */
+export interface HKQuantitySample {
+  readonly quantity: number;
+  readonly startDate: Date;
+  readonly sourceRevision: HKSourceRevision;
+  /** HKTimeZone when the writing app gave one. */
+  readonly metadata: Readonly<Record<string, unknown>>;
 }
 
 /** `WorkoutProxy` (src/specs/WorkoutProxy.nitro.ts): the sample plus calls on it. */
@@ -132,10 +178,15 @@ export interface HKCategorySample {
   readonly metadata: Readonly<Record<string, unknown>>;
 }
 
-/** `DateFilter` inside `FilterForSamples` (src/types/QueryOptions.ts). */
+/** `DateFilter` inside `FilterForSamples` (src/types/QueryOptions.ts; core src/types/QueryOptions.ts). */
 export interface HKDateFilter {
-  readonly filter?: { readonly date?: { readonly startDate?: Date; readonly endDate?: Date } };
+  readonly filter?: { readonly date?: { readonly startDate?: Date; readonly endDate?: Date; readonly strictStartDate?: boolean; readonly strictEndDate?: boolean } };
 }
+
+/** The quantity types read as raw samples (weigh-ins). */
+export type HKSampleType = typeof HK.bodyMass | typeof HK.bodyFat;
+/** The quantity types read as statistics. */
+export type HKStatisticsType = typeof HK.steps | typeof HK.activeEnergy | typeof HK.basalEnergy | typeof HK.heartRate;
 
 /**
  * The calls the iPhone adapter makes, with the library's own names and
@@ -157,12 +208,16 @@ export interface HealthKitApi {
   queryCategorySamples(identifier: typeof HK.sleep, options: HKDateFilter & { limit: number; ascending?: boolean }): Promise<readonly HKCategorySample[]>;
   queryWorkoutSamples(options: HKDateFilter & { limit: number; ascending?: boolean }): Promise<readonly HKWorkoutProxy[]>;
   queryStatisticsCollectionForQuantity(
-    identifier: typeof HK.steps,
+    identifier: HKStatisticsType,
     statistics: readonly 'cumulativeSum'[],
     anchorDate: Date,
     intervalComponents: { readonly day?: number },
     options?: HKDateFilter & { unit?: string },
   ): Promise<readonly HKStatistics[]>;
+  /** Weight and body-fat samples (QuantityTypeModule.queryQuantitySamples); `limit` 0 is all. */
+  queryQuantitySamples(identifier: HKSampleType, options: HKDateFilter & { limit: number; ascending?: boolean; unit?: string }): Promise<readonly HKQuantitySample[]>;
+  /** One statistic over a time range (QuantityTypeModule.queryStatisticsForQuantity): a workout's heart rate when it carries none. */
+  queryStatisticsForQuantity(identifier: HKStatisticsType, statistics: readonly ('discreteAverage' | 'discreteMax')[], options?: HKDateFilter & { unit?: string }): Promise<HKStatistics>;
 }
 
 // ---------------------------------------------------------------- rules
@@ -174,11 +229,26 @@ export interface HealthKitApi {
  * readable; a type the person refused comes back empty and the screen says
  * where to allow it.
  */
-export function accessFromRequestStatus(status: number, sleepStatus: number = REQUEST_STATUS.unknown): HealthAccess {
-  // Sleep has its own question (SLEEP_READ_TYPES), so READ_TYPES' status says nothing about it.
-  const sleep = sleepStatus === REQUEST_STATUS.unnecessary;
-  if (status !== REQUEST_STATUS.unnecessary) return { ...NO_ACCESS, sleep };
-  return { workouts: true, activeEnergy: true, totalEnergy: false, distance: true, steps: true, sleep };
+export function accessFromRequestStatus(
+  status: number,
+  sleepStatus: number = REQUEST_STATUS.unknown,
+  weightStatus: number = REQUEST_STATUS.unknown,
+  energyStatus: number = REQUEST_STATUS.unknown,
+  heartStatus: number = REQUEST_STATUS.unknown,
+): HealthAccess {
+  // Each later list has its own question, so READ_TYPES' status says nothing about them.
+  const asked = (x: number) => x === REQUEST_STATUS.unnecessary;
+  const main = asked(status);
+  const rows = {
+    sleep: asked(sleepStatus),
+    weight: asked(weightStatus),
+    bodyFat: asked(weightStatus),
+    heartRate: asked(heartStatus),
+    // The day's total is active (READ_TYPES) plus resting (ENERGY_READ_TYPES): both lists.
+    dayEnergy: asked(energyStatus) && main,
+  };
+  if (!main) return { ...NO_ACCESS, ...rows };
+  return { ...NO_ACCESS, workouts: true, activeEnergy: true, totalEnergy: false, distance: true, steps: true, ...rows };
 }
 
 /** The distance statistic a workout's type is measured in, when the workout has no total distance. */
@@ -260,6 +330,23 @@ export function workoutRef(w: HKWorkoutSample): Pick<HealthWorkout, 'id' | 'orig
 export interface WorkoutStats {
   activeEnergy?: HKStatistics | null;
   distance?: HKStatistics | null;
+  /** Heart rate in count/min: the workout's own statistic, else the samples inside its time (averageQuantity, maximumQuantity). */
+  heartRate?: HKStatistics | null;
+}
+
+/** Beats per minute from a heart-rate quantity asked in 'count/min' (or 'count/s', which the library uses by default). */
+export function bpmOf(q: HKQuantity | undefined | null): number | null {
+  if (!q || typeof q.quantity !== 'number' || !Number.isFinite(q.quantity) || q.quantity <= 0) return null;
+  const unit = q.unit.toLowerCase();
+  if (unit === 'count/min') return q.quantity;
+  if (unit === 'count/s') return q.quantity * 60;
+  return null;
+}
+
+/** A heart-rate statistic as a workout's two figures (heart.ts), or nothing. */
+export function heartFromStatistics(st: HKStatistics | null | undefined): Pick<HealthWorkout, 'avgHeartRate' | 'maxHeartRate'> {
+  const hr = heartFigures(bpmOf(st?.averageQuantity), bpmOf(st?.maximumQuantity));
+  return hr ? { avgHeartRate: hr.avg, maxHeartRate: hr.max } : {};
 }
 
 /**
@@ -284,6 +371,7 @@ export function workoutFromHealthKit(w: HKWorkoutSample, stats: WorkoutStats | n
     totalKcal: null,
     distanceM: stats ? (metresOf(w.totalDistance) ?? metresOf(stats.distance?.sumQuantity)) : null,
     device: deviceName(w.device),
+    ...(stats ? heartFromStatistics(stats.heartRate) : {}),
   };
 }
 
@@ -305,6 +393,56 @@ export function stepDaysFromStatistics(stats: readonly HKStatistics[], dayOf: (m
     out.push({ day: dayOf(middle), count: Math.round(q.quantity) });
   }
   return out;
+}
+
+/**
+ * One weight (kg) or body-fat sample (the library's '%' is HKUnit.percent(),
+ * a fraction: 0.25 is 25 %, which body.ts turns into percent) as a raw body
+ * sample. The app is appleOrigin's; the zone is the sample's HKTimeZone when
+ * the writing app gave one. Null when it has no source or no time.
+ */
+export function bodyFromHealthKit(x: HKQuantitySample, kind: BodySample['kind']): BodySample | null {
+  const ms = x?.startDate instanceof Date ? x.startDate.getTime() : Number.NaN;
+  const bundle = x?.sourceRevision?.source?.bundleIdentifier;
+  if (!bundle || !Number.isFinite(ms) || typeof x.quantity !== 'number' || !Number.isFinite(x.quantity)) return null;
+  return {
+    store: 'healthKit',
+    origin: appleOrigin(bundle, x.sourceRevision?.productType),
+    time: new Date(ms).toISOString(),
+    zoneOffsetSec: zoneOffsetSecAt(x.metadata?.HKTimeZone, ms),
+    kind,
+    value: x.quantity,
+  };
+}
+
+/**
+ * The day's calories burned from two statistics collections (active and basal
+ * energy, one interval a day, `cumulativeSum` in kcal), named as the steps are
+ * (the day the middle of the interval falls on). `kcal` is active plus basal;
+ * the apps are each interval's sources, by appleOrigin. A day with neither is left out.
+ */
+export function dayEnergyFromStatistics(active: readonly HKStatistics[], basal: readonly HKStatistics[], dayOf: (ms: number) => string): DayEnergyDay[] {
+  const days = new Map<string, { kcal: number; activeKcal: number; origins: Set<string> }>();
+  const add = (stats: readonly HKStatistics[], isActive: boolean) => {
+    for (const st of stats) {
+      const start = st?.startDate instanceof Date ? st.startDate.getTime() : Number.NaN;
+      if (!Number.isFinite(start)) continue;
+      const end = st.endDate instanceof Date ? st.endDate.getTime() : Number.NaN;
+      const kcal = kcalOf(st.sumQuantity);
+      if (kcal === null) continue;
+      const day = dayOf(Number.isFinite(end) && end > start ? (start + end) / 2 : start + 12 * 3_600_000);
+      const d = days.get(day) ?? { kcal: 0, activeKcal: 0, origins: new Set<string>() };
+      d.kcal += kcal;
+      if (isActive) d.activeKcal += kcal;
+      for (const src of st.sources ?? []) if (src?.bundleIdentifier) d.origins.add(appleOrigin(src.bundleIdentifier));
+      days.set(day, d);
+    }
+  };
+  add(active, true);
+  add(basal, false);
+  return [...days.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, d]) => ({ day, kcal: Math.round(d.kcal), activeKcal: Math.round(d.activeKcal), origins: [...d.origins].sort() }));
 }
 
 /** CategoryValueSleepAnalysis as this feature's stages ('light' is Apple's "core"). */

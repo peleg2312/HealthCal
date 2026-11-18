@@ -6,6 +6,7 @@ import {
   BACKUP_COLLECTIONS,
   csvCell,
   foodCsv,
+  isValidProfile,
   isValidRecord,
   mergeCollections,
   parseBackup,
@@ -216,6 +217,42 @@ describe('backup validation', () => {
     expect(ok({ stages: [230, 75, 110, 16] })).toBe(false);
   });
 
+  it('round-trips a synced weigh-in and checks its fields; old weigh-ins stay valid', () => {
+    const weigh = (extra: Record<string, unknown> = {}) => ({ id: U1, updatedAt: '2026-11-10T10:00:00Z', date: '2026-11-10', kg: 82.4, ...extra });
+    const synced = {
+      bodyFatPct: 18.2,
+      source: 'health',
+      store: 'healthConnect',
+      origin: 'com.garmin.android.apps.connectmobile',
+      measuredAt: '2026-11-10T05:12:00.000Z',
+      syncedKg: 82.4,
+      syncedBodyFatPct: 18.2,
+      waistCm: 88,
+    };
+    const ok = (extra: Record<string, unknown>) => isValidRecord('weights', weigh(extra));
+    expect(ok({})).toBe(true); // a weigh-in entered by hand, as every backup before this held
+    expect(ok({ bodyFatPct: 20, note: 'after run' })).toBe(true);
+    expect(ok(synced)).toBe(true);
+    expect(ok({ ...synced, store: 'healthKit', origin: 'com.apple.Health', measuredAt: '2026-11-10T05:12:00Z' })).toBe(true);
+    expect(ok({ source: 'garmin' })).toBe(false);
+    expect(ok({ ...synced, store: 'fitbit' })).toBe(false);
+    expect(ok({ ...synced, origin: 7 })).toBe(false);
+    expect(ok({ ...synced, measuredAt: 'this morning' })).toBe(false);
+    expect(ok({ ...synced, syncedKg: '82.4' })).toBe(false);
+    expect(ok({ ...synced, syncedBodyFatPct: 'x' })).toBe(false);
+    const parsed = parseBackup(wrap({ weights: [weigh(synced)] }));
+    expect(parsed.ok && parsed.backup.collections.weights).toEqual([weigh(synced)]);
+  });
+
+  it('round-trips a workout\'s heart rate', () => {
+    const act = { id: U2, updatedAt: '2026-11-10T10:00:00Z', date: '2026-11-10', name: 'Running', durationMin: 45, kcalNet: 420, kcalGross: 510, avgHeartRate: 142, maxHeartRate: 171 };
+    expect(isValidRecord('activities', act)).toBe(true);
+    expect(isValidRecord('activities', { ...act, maxHeartRate: 'high' })).toBe(false);
+    expect(isValidRecord('activities', { ...act, avgHeartRate: '142' })).toBe(false);
+    const parsed = parseBackup(wrap({ activities: [act] }));
+    expect(parsed.ok && parsed.backup.collections.activities).toEqual([act]);
+  });
+
   it('keeps a valid profile', () => {
     const profile = {
       name: 'A', sex: 'female', birthDate: '1990-04-21', heightCm: 170, weightKg: 70, activityLevel: 'light', goal: 'lose', weeklyRateKg: 0.5,
@@ -223,5 +260,28 @@ describe('backup validation', () => {
     };
     const parsed = parseBackup(wrap({}, { profile }));
     expect(parsed.ok && parsed.backup.profile).toEqual(profile);
+  });
+
+  it('accepts how workout calories are placed, and refuses what it cannot read', () => {
+    const base = {
+      name: 'A', sex: 'female', birthDate: '1990-04-21', heightCm: 170, weightKg: 70, activityLevel: 'light', goal: 'lose', weeklyRateKg: 0.5,
+      units: 'metric', eatBackExercise: true, useAdaptiveTdee: true, updatedAt: '2026-11-10T10:00:00Z',
+    };
+    const history = [{ until: '2026-11-01', rule: 'off' }, { until: '2026-11-16', rule: 'day' }];
+    for (const extra of [{ exerciseSpread: 'day' }, { exerciseSpread: 'week' }, {}, { exerciseSpread: 'week', exerciseRuleHistory: history }, { exerciseRuleHistory: [] }]) {
+      expect(isValidProfile({ ...base, ...extra })).toBe(true);
+    }
+    const parsed = parseBackup(wrap({}, { profile: { ...base, exerciseSpread: 'week', exerciseRuleHistory: history } }));
+    expect(parsed.ok && parsed.backup.profile).toEqual({ ...base, exerciseSpread: 'week', exerciseRuleHistory: history });
+    for (const extra of [
+      { exerciseSpread: 'month' },
+      { exerciseRuleHistory: [{ rule: 'day' }] },
+      { exerciseRuleHistory: [{ until: '16/11/2026', rule: 'day' }] },
+      { exerciseRuleHistory: [{ until: '2026-11-16', rule: 'month' }] },
+      { exerciseRuleHistory: [null] },
+      { exerciseRuleHistory: { until: '2026-11-16', rule: 'day' } },
+    ]) {
+      expect(isValidProfile({ ...base, ...extra })).toBe(false);
+    }
   });
 });

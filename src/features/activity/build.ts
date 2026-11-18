@@ -112,6 +112,7 @@ export function rebuildActivityEntry(existing: ActivityEntry, input: Omit<BuildA
   if (existing.externalId) built.externalId = existing.externalId;
   if (existing.startedAt) built.startedAt = existing.startedAt;
   if (existing.avgHeartRate) built.avgHeartRate = existing.avgHeartRate;
+  if (existing.maxHeartRate) built.maxHeartRate = existing.maxHeartRate;
   if (existing.activityId === built.activityId && existing.intensity === built.intensity && existing.durationMin === built.durationMin) {
     built.met = existing.met;
     built.kcalGross = existing.kcalGross;

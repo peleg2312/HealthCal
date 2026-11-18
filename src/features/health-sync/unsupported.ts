@@ -21,6 +21,9 @@ export const unsupportedAdapter: HealthAdapter = {
   readSleep: async () => {
     throw unavailable();
   },
+  // Extra reads: there is nothing to read here, and an empty answer never fails a run.
+  readWeighIns: async () => [],
+  readDayEnergy: async () => [],
   openSettings: () => {},
   openInstall: () => {},
 };

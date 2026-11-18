@@ -86,8 +86,9 @@ export function toImportedWorkout(w: HealthWorkout, index: number, ctx: EnergyCo
     distanceM: typeof w.distanceM === 'number' && w.distanceM > 0 ? w.distanceM : null,
     // The pipeline's calories are a total, resting included.
     kcal: workoutEnergy(w, span.durationSec, ctx).kcalGross,
-    avgHeartRate: null,
-    maxHeartRate: null,
+    // Read only where details were read and heart rate may be read (heart.ts); the pipeline keeps them on the entry.
+    avgHeartRate: typeof w.avgHeartRate === 'number' && w.avgHeartRate > 0 ? w.avgHeartRate : null,
+    maxHeartRate: typeof w.maxHeartRate === 'number' && w.maxHeartRate > 0 ? w.maxHeartRate : null,
     sport: sportOf(w).name,
     subSport: null,
     title: w.title?.trim() || null,

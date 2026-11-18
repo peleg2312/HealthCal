@@ -400,6 +400,7 @@ export function buildPlan(d: Draft, now: Date = new Date()): Plan | null {
     weeklyRateKg: round(rateKgOf(d, weightKg), 3),
     units: d.units,
     eatBackExercise: true,
+    exerciseSpread: 'week',
     useAdaptiveTdee: true,
   };
   const full = { ...profile, updatedAt: now.toISOString() } as Profile;

@@ -68,8 +68,8 @@ export function SummaryCard({ counts, addedKcal, csvLine, onChangeCsv }: { count
           variant="caption"
           color="textSecondary"
           testID="import-net-note"
-          accessibilityLabel="Garmin’s calories include what your body burns at rest anyway. Only the part above resting is added to each day’s budget, so nothing is counted twice.">
-          Only the part above resting is added, so nothing counts twice.
+          accessibilityLabel="Garmin’s calories include what your body burns at rest anyway. Only the part above resting counts, so nothing is counted twice.">
+          Only the part above resting counts, so nothing counts twice.
         </Text>
       )}
       {csvLine ? (

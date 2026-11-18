@@ -99,7 +99,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
           <Text variant="overline" color="textSecondary">
             Your daily budget
           </Text>
-          <BudgetVessel target={t.target} tdee={plan.tdee} goal={p.goal} note={`${budgetNote}Workouts you log add their calories on top, as hatched headroom.`} />
+          <BudgetVessel target={t.target} tdee={plan.tdee} goal={p.goal} note={`${budgetNote}Each workout you log adds its calories on top, shared over 7 days, as hatched headroom.`} />
         </Card>
       </FadeUp>
 

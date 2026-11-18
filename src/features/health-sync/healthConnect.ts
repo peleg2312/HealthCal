@@ -6,8 +6,20 @@
  */
 import type { AggregateResult, AggregationGroupResult, Permission, RecordResult } from 'react-native-health-connect';
 
+import { heartFigures } from './heart';
 import { sleepKindOf } from './sleep';
-import { HealthError, NO_ACCESS, type HealthAccess, type HealthWorkout, type SleepSample, type SleepSourceKind, type SleepStage, type StepDayTotal } from './types';
+import {
+  HealthError,
+  NO_ACCESS,
+  type BodySample,
+  type DayEnergyDay,
+  type HealthAccess,
+  type HealthWorkout,
+  type SleepSample,
+  type SleepSourceKind,
+  type SleepStage,
+  type StepDayTotal,
+} from './types';
 
 export type SessionRecord = RecordResult<'ExerciseSession'>;
 /** One day's steps from `aggregateGroupByPeriod({ recordType: 'Steps', timeRangeSlicer: { period: 'DAYS', length: 1 } })`. */
@@ -23,10 +35,16 @@ export type SleepSessionRaw = RecordResult<'SleepSession'> & {
   endZoneOffset?: { id: string; totalSeconds: number } | null;
 };
 
+/** A day's calories burned, one group of `aggregateGroupByPeriod({ recordType: 'TotalCaloriesBurned' | 'ActiveCaloriesBurned', timeRangeSlicer: DAYS })`. */
+export type TotalEnergyDayGroup = AggregationGroupResult<'TotalCaloriesBurned'>;
+export type ActiveEnergyDayGroup = AggregationGroupResult<'ActiveCaloriesBurned'>;
+
 /**
- * The six things the app reads. Nothing else is ever requested. Adding one
+ * The nine things the app reads. Nothing else is ever requested. Adding one
  * means app.json (android.permissions), this list, the explanation sheet,
- * docs/health-sync.md and the Play Console declaration together.
+ * docs/health-sync.md and the Play Console declaration together. Weight, body
+ * fat and heart rate came after sleep: a phone that allowed the six before is
+ * asked for them only from their own row (WEIGHT_PERMISSIONS, HEART_PERMISSIONS).
  */
 export const READ_PERMISSIONS: Permission[] = [
   { accessType: 'read', recordType: 'ExerciseSession' },
@@ -35,6 +53,27 @@ export const READ_PERMISSIONS: Permission[] = [
   { accessType: 'read', recordType: 'Distance' },
   { accessType: 'read', recordType: 'Steps' },
   { accessType: 'read', recordType: 'SleepSession' },
+  { accessType: 'read', recordType: 'Weight' },
+  { accessType: 'read', recordType: 'BodyFat' },
+  { accessType: 'read', recordType: 'HeartRate' },
+];
+
+/** The sync screen's Weight row: weigh-ins and the body fat measured with them (body.ts). */
+export const WEIGHT_PERMISSIONS: Permission[] = [
+  { accessType: 'read', recordType: 'Weight' },
+  { accessType: 'read', recordType: 'BodyFat' },
+];
+
+/** The "Heart rate in workouts" row (heart.ts). */
+export const HEART_PERMISSIONS: Permission[] = [{ accessType: 'read', recordType: 'HeartRate' }];
+
+/**
+ * The "Calories burned in a day" row (dayEnergy.ts): the same two types a
+ * workout's calories are read with, so most phones already allowed them.
+ */
+export const DAY_ENERGY_PERMISSIONS: Permission[] = [
+  { accessType: 'read', recordType: 'TotalCaloriesBurned' },
+  { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
 ];
 
 /** What a list of granted permissions lets the app read. */
@@ -48,6 +87,11 @@ export function accessFrom(granted: readonly { accessType: string; recordType: s
     distance: can('Distance'),
     steps: can('Steps'),
     sleep: can('SleepSession'),
+    weight: can('Weight'),
+    bodyFat: can('BodyFat'),
+    // Both: a day counts only when the total holds a recorded active part (dayEnergy.ts, validEnergyDay).
+    dayEnergy: can('TotalCaloriesBurned') && can('ActiveCaloriesBurned'),
+    heartRate: can('HeartRate'),
   };
 }
 
@@ -90,6 +134,24 @@ export interface SessionDetails {
   active?: AggregateResult<'ActiveCaloriesBurned'> | null;
   total?: AggregateResult<'TotalCaloriesBurned'> | null;
   distance?: AggregateResult<'Distance'> | null;
+  /** The HeartRate aggregate over the session, from its own app; only read when heart rate may be read. */
+  heart?: AggregateResult<'HeartRate'> | null;
+}
+
+/**
+ * A session's average and highest heart rate from the HeartRate aggregate
+ * (BPM_AVG, BPM_MAX, MEASUREMENTS_COUNT; the library answers 0.0 for each when
+ * nothing was measured). Null when nothing was measured, or when the beats
+ * came only from other apps (as `ownFigure`): a chest strap's app recording
+ * beside the watch is not this workout's own reading.
+ */
+export function heartFromAggregate(result: AggregateResult<'HeartRate'> | null | undefined, origin: string): { avg: number; max: number | null } | null {
+  if (!result) return null;
+  const count = result.MEASUREMENTS_COUNT;
+  if (typeof count !== 'number' || !Number.isFinite(count) || count <= 0) return null;
+  const origins = result.dataOrigins;
+  if (Array.isArray(origins) && origins.length > 0 && !origins.includes(origin)) return null;
+  return heartFigures(result.BPM_AVG, result.BPM_MAX, count);
 }
 
 /** 'Garmin Forerunner 265' from the record's device, when it names one. */
@@ -123,7 +185,82 @@ export function sessionToWorkout(s: SessionRecord, details: SessionDetails | nul
     totalKcal: ownFigure(details?.total?.ENERGY_TOTAL?.inKilocalories, details?.total?.dataOrigins, ref.origin),
     distanceM: ownFigure(details?.distance?.DISTANCE?.inMeters, details?.distance?.dataOrigins, ref.origin),
     device: deviceName(s.metadata?.device),
+    ...heartFields(details?.heart, ref.origin),
   };
+}
+
+/** Heart rate on a workout only where it was read and measured; nothing at all otherwise. */
+function heartFields(result: AggregateResult<'HeartRate'> | null | undefined, origin: string): Pick<HealthWorkout, 'avgHeartRate' | 'maxHeartRate'> {
+  const hr = heartFromAggregate(result, origin);
+  return hr ? { avgHeartRate: hr.avg, maxHeartRate: hr.max } : {};
+}
+
+/** A Weight or BodyFat record as the library hands it back (`time` an Instant's text, `zoneOffset` { id, totalSeconds } or null). */
+interface InstantRecordRaw {
+  time?: string;
+  zoneOffset?: { totalSeconds?: unknown } | null;
+  metadata?: { dataOrigin?: string } | null;
+}
+
+function bodySample(r: InstantRecordRaw | null | undefined, kind: BodySample['kind'], value: unknown): BodySample | null {
+  const origin = r?.metadata?.dataOrigin;
+  const ms = Date.parse(r?.time ?? '');
+  if (!origin || !Number.isFinite(ms) || typeof value !== 'number' || !Number.isFinite(value)) return null;
+  return { store: 'healthConnect', origin, time: new Date(ms).toISOString(), zoneOffsetSec: offsetOf(r?.zoneOffset), kind, value };
+}
+
+/** One WeightRecord (ReactWeightRecord.kt: `weight` as a MassResult) as a raw weight sample in kilograms. Null when it cannot be used. */
+export function weighInFromRecord(r: InstantRecordRaw & { weight?: { inKilograms?: unknown } | null }): BodySample | null {
+  return bodySample(r, 'weight', r?.weight?.inKilograms);
+}
+
+/** One BodyFatRecord (ReactBodyFatRecord.kt: `percentage` 0 to 100) as a raw body-fat sample. Null when it cannot be used. */
+export function bodyFatFromRecord(r: InstantRecordRaw & { percentage?: unknown }): BodySample | null {
+  return bodySample(r, 'bodyFat', r?.percentage);
+}
+
+const dayOfGroup = (g: { startTime?: unknown } | null | undefined): string | undefined =>
+  typeof g?.startTime === 'string' ? /^(\d{4}-\d{2}-\d{2})/.exec(g.startTime)?.[1] : undefined;
+
+const kcalIn = (x: { inKilocalories?: unknown } | null | undefined): number =>
+  typeof x?.inKilocalories === 'number' && Number.isFinite(x.inKilocalories) && x.inKilocalories > 0 ? x.inKilocalories : 0;
+
+/**
+ * Health Connect's calories burned per day, from the two day-sliced aggregates
+ * (total and active), as stepDaysFromPeriods names days: `startTime` is a local
+ * date-time, its date is the day. The apps are both groups' `dataOrigins`
+ * together. A day with neither figure is left out.
+ */
+export function dayEnergyFromPeriods(total: readonly TotalEnergyDayGroup[], active: readonly ActiveEnergyDayGroup[]): DayEnergyDay[] {
+  const days = new Map<string, DayEnergyDay>();
+  const at = (day: string) => {
+    let d = days.get(day);
+    if (!d) {
+      d = { day, kcal: 0, activeKcal: 0, origins: [] };
+      days.set(day, d);
+    }
+    return d;
+  };
+  const originsOf = (x: unknown): string[] => (Array.isArray(x) ? x.filter((o): o is string => typeof o === 'string' && o.length > 0) : []);
+  for (const g of total) {
+    const day = dayOfGroup(g);
+    const kcal = kcalIn(g?.result?.ENERGY_TOTAL);
+    if (!day || kcal <= 0) continue;
+    const d = at(day);
+    d.kcal += kcal;
+    d.origins.push(...originsOf(g.result?.dataOrigins));
+  }
+  for (const g of active) {
+    const day = dayOfGroup(g);
+    const kcal = kcalIn(g?.result?.ACTIVE_CALORIES_TOTAL);
+    if (!day || kcal <= 0) continue;
+    const d = at(day);
+    d.activeKcal += kcal;
+    d.origins.push(...originsOf(g.result?.dataOrigins));
+  }
+  return [...days.values()]
+    .sort((a, b) => a.day.localeCompare(b.day))
+    .map((d) => ({ ...d, kcal: Math.round(d.kcal), activeKcal: Math.round(d.activeKcal), origins: [...new Set(d.origins)].sort() }));
 }
 
 /**

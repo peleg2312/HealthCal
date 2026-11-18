@@ -80,6 +80,7 @@ describe('workout references friends see', () => {
     externalId: 'garmin:2026-11-14T07:05:00Z',
     startedAt: '2026-11-14T07:05:00Z',
     avgHeartRate: 151,
+    maxHeartRate: 178,
     measured: true,
     loggedAt: '2026-11-14T07:53:00.000Z',
   });
@@ -95,7 +96,7 @@ describe('workout references friends see', () => {
     const text = JSON.stringify(s);
     expect(s.workouts![0].id).toBe(shareRef(KEY, imported.id));
     expect(text).not.toContain(imported.id);
-    expect(text).not.toMatch(/07:05|07:53|T\d\d:|garmin|151|heart|startedAt|loggedAt|externalId/i);
+    expect(text).not.toMatch(/07:05|07:53|T\d\d:|garmin|151|178|heart|startedAt|loggedAt|externalId/i);
     expect(Object.keys(s.workouts![0]).sort()).toEqual(['date', 'emoji', 'id', 'minutes', 'name']);
   });
 
