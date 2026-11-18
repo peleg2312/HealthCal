@@ -50,3 +50,6 @@ crawl-out/
 
 # Python bytecode from the CI helper scripts
 __pycache__/
+
+# Throwaway tests that reviewers and engineers write to try the app's code; deleted after use, never committed.
+src/__scratch__/
