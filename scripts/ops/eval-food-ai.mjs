@@ -34,8 +34,12 @@
  *   medium       the small model at effort medium
  *   no-thinking  the small model, effort low, thinking switched off
  *   precise      the "check again more carefully" pass: the bigger model (and the 1024 px photo)
+ *   weight       a photo with its weighed total, as the app sends it from "Weighed it? Total grams": the quick pass with
+ *                photoText(note, grams) (src/features/ai/weight.ts) as the photo's text, grams from the case's truth.grams;
+ *                off=<percent> sends it that much off (weight/off=15, weight/off=-15: a person's own scale, or the bowl in it)
  *   Changes after a slash: model=<id>, effort=<level>, thinking=off|omit (omit drops the field, for models that refuse
- *   disabled thinking), max=<max_tokens>, v=<features> (passed to the analyze code as options.variant; for --analyze copies).
+ *   disabled thinking), max=<max_tokens>, v=<features> (passed to the analyze code as options.variant; for --analyze copies),
+ *   off=<percent> (weight only).
  *
  * Scoring. A case with `truth` ({ kcal, protein?, carbs?, fat?, grams? }) is scored against it; a case with only min/max
  * passes when the total falls inside. Headline figures are on meals of 150 kcal or more (a 30 kcal miss on a 50 kcal side
@@ -56,6 +60,8 @@ const { AnalyzeError, analyzeFood, parseAnswer } = await import(
 );
 
 import { ceilingOf, costOf, mayReserve, maybeBilled } from './eval-food-ai-money.mjs';
+// The app's own words for a weighed total, so the 'weight' config sends exactly what the app sends.
+const { photoText } = await import('../../src/features/ai/weight.ts');
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(here, '..', '..');
@@ -94,8 +100,9 @@ const photoCases = photoCasesFile && kind !== 'text' ? JSON.parse(fs.readFileSyn
 function parseConfig(label) {
   const [base, ...rest] = label.split('/');
   const changes = Object.fromEntries(rest.map((kv) => kv.split('=')));
-  if (!['current', 'json', 'medium', 'no-thinking', 'precise'].includes(base)) throw new Error(`Unknown config ${base}`);
-  for (const k of Object.keys(changes)) if (!['model', 'effort', 'thinking', 'max', 'v'].includes(k)) throw new Error(`Unknown change ${k} in ${label}`);
+  if (!['current', 'json', 'medium', 'no-thinking', 'precise', 'weight'].includes(base)) throw new Error(`Unknown config ${base}`);
+  for (const k of Object.keys(changes)) if (!['model', 'effort', 'thinking', 'max', 'v', 'off'].includes(k)) throw new Error(`Unknown change ${k} in ${label}`);
+  if (changes.off !== undefined && (base !== 'weight' || !Number.isFinite(Number(changes.off)))) throw new Error(`off=<percent> goes with weight only, in ${label}`);
   return { label, base, changes };
 }
 
@@ -292,6 +299,11 @@ async function runOne(config, c, trial) {
   if (c.file) {
     input.image = fs.readFileSync(path.join(photosDir, precise && c.filePrecise ? c.filePrecise : c.file)).toString('base64');
     input.mediaType = 'image/jpeg';
+    if (config.base === 'weight') {
+      const grams = c.truth?.grams ? c.truth.grams * (1 + Number(config.changes.off ?? 0) / 100) : null;
+      // A case's own text is the note beside the weight; a case without a weighed total sends the note alone.
+      input.text = photoText(c.text ?? '', grams === null ? null : Math.round(grams));
+    }
   }
   const sink = { id: c.id, requests: [], usd: 0, upstreamMs: 0 };
   const started = Date.now();

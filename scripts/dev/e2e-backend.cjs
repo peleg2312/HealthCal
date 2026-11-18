@@ -188,12 +188,17 @@ async function device(browser, seedJson) {
   const fc = await chooser;
   if (fc) await fc.setFiles(big);
   await A.page.waitForTimeout(1500);
+  // A weighed total ("Weighed it? Total grams") goes as the photo's text in the measured words, rounded to 10 g.
+  if (await A.has('ai-photo-weight')) await A.fill('ai-photo-weight', '418');
   if (await A.has('ai-analyse')) await A.tap('ai-analyse');
   await A.page.waitForSelector('[data-testid="ai-add-to-diary"]', { timeout: 20000 }).catch(() => {});
   srv = await server();
   const photoReq = srv.aiRequests[srv.aiRequests.length - 1];
   // 2400x1800 downscaled to 768 px on the long edge as JPEG should be far below 300 KB of base64.
   check('a photo is downscaled before upload', !!fc && photoReq?.hasImage === true && photoReq.imageChars > 2000 && photoReq.imageChars < 400000, photoReq ? `${Math.round(photoReq.imageChars / 1024)} KB of base64, ${photoReq.mediaType}` : 'no request');
+  check('a weighed total travels as the measured sentence and nothing else', photoReq?.text === 'About 420 g of food in total.' && photoReq?.precise === false, photoReq ? JSON.stringify(photoReq.text) : 'no request');
+  await A.shot('backend-ai-photo-weight');
+  check('the review says the weighed total was used', (await A.has('ai-weight-used')) && (await A.page.getByText('Made with your weighed total, 418 g').count()) > 0);
 
   // ------------------------------------------------------------ sign out
   await B.go('/settings/account');

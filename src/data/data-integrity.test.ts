@@ -82,6 +82,41 @@ describe('BUILTIN_FOODS', () => {
   });
 });
 
+// The six tea and coffee drinks of the water screen are computed from reference rows (header of foods.ts):
+// a 250 ml cup is 220 g brew + 30 ml 2% milk (30.9 g) [+ 4.2 g sugar]; sugar only is 250 g brew + 4.2 g sugar.
+describe('computed tea and coffee drinks', () => {
+  const by = new Map(BUILTIN_FOODS.map((f) => [f.id, f]));
+  const KEYS = ['kcal', 'protein', 'carbs', 'fat', 'sugar', 'satFat', 'sodium'] as const;
+  const recipes: Record<string, [string, number][]> = {
+    b_coffee_milk: [['b_coffee_black', 220], ['b_milk_2pct', 30.9]],
+    b_coffee_milk_sugar: [['b_coffee_black', 220], ['b_milk_2pct', 30.9], ['b_sugar_white', 4.2]],
+    b_coffee_sugar: [['b_coffee_black', 250], ['b_sugar_white', 4.2]],
+    b_tea_milk: [['b_tea_brewed', 220], ['b_milk_2pct', 30.9]],
+    b_tea_milk_sugar: [['b_tea_brewed', 220], ['b_milk_2pct', 30.9], ['b_sugar_white', 4.2]],
+    b_tea_sugar: [['b_tea_brewed', 250], ['b_sugar_white', 4.2]],
+  };
+  it.each(Object.entries(recipes))('%s recomputes from its rows (0.1 kcal, 0.05 g, sodium to the mg) and its cup weighs the recipe', (id, parts) => {
+    const food = by.get(id)!;
+    expect(food.verified).toBe(false);
+    const grams = parts.reduce((s, [, g]) => s + g, 0);
+    for (const k of KEYS) {
+      const total = parts.reduce((s, [pid, g]) => s + ((by.get(pid)!.per100g[k] ?? 0) * g) / 100, 0);
+      const per100 = (total * 100) / grams;
+      const tol = k === 'kcal' ? 0.1 : k === 'sodium' ? 0.5 : 0.05;
+      expect(Math.abs((food.per100g[k] ?? 0) - per100), `${id} ${k}: ${food.per100g[k]} vs ${per100.toFixed(3)}`).toBeLessThanOrEqual(tol);
+    }
+    expect(food.servings[0]).toEqual({ label: '1 cup (250 ml)', grams: Math.round(grams) });
+  });
+  it('the low-calorie sports drink names its FNDDS record once', () => {
+    expect(by.get('b_sports_drink_low')?.fdcId).toBe(2710774);
+    expect(BUILTIN_FOODS.filter((f) => f.fdcId === 2710774)).toHaveLength(1);
+  });
+  it('counts: 348 foods, 322 checked against a USDA record', () => {
+    expect(BUILTIN_FOODS.length).toBe(348);
+    expect(BUILTIN_FOODS.filter((f) => f.fdcId !== undefined)).toHaveLength(322);
+  });
+});
+
 describe('ACTIVITIES', () => {
   const INTENSITIES = ['light', 'moderate', 'vigorous'] as const;
   it('ids are unique and the lookup map is complete', () => {

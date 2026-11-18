@@ -10,12 +10,13 @@
 import { guidelineMinutes } from '@/lib/exercise';
 import { BUDGET_BAND } from '@/lib/insights';
 import { isCompleteDay } from '@/lib/trend';
+import { isWaterDrinkEntry } from '@/features/drinks/via';
 import { isEstimate } from '@/features/today/meals';
 import type { ActivityEntry, FoodEntry, ISODate } from '@/types';
 
 export interface DayFacts {
   date: ISODate;
-  /** Any food entry on the day. */
+  /** Any food entry on the day other than a drink from the water screen (those count as water, as before they had calories). */
   foodLogged: boolean;
   /** isCompleteDay(kcal, budget): a fully logged day. */
   complete: boolean;
@@ -40,7 +41,7 @@ export interface DayFacts {
 /** The parts of a DaySummary that dayFacts reads. */
 export interface DayFactsSource {
   date: ISODate;
-  entries: readonly Pick<FoodEntry, 'source' | 'kcalRange'>[];
+  entries: readonly Pick<FoodEntry, 'source' | 'kcalRange' | 'via'>[];
   eaten: { kcal: number; protein: number };
   budget: number;
   macros: { proteinG: number };
@@ -59,7 +60,7 @@ export function isOverBand(complete: boolean, kcal: number, budget: number): boo
 export function dayFacts(d: DayFactsSource, approx: boolean = d.entries.some(isEstimate)): DayFacts {
   const kcal = d.eaten.kcal;
   const budget = d.budget;
-  const foodLogged = d.entries.length > 0;
+  const foodLogged = d.entries.some((e) => !isWaterDrinkEntry(e));
   const complete = isCompleteDay(kcal, budget);
   return {
     date: d.date,

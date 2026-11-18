@@ -1,22 +1,29 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Check, GlassWater, Info, Trash2 } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { toISODate, weekdayShort } from '@/lib/dates';
-import { nowISO } from '@/lib/id';
+import { today, toISODate, weekdayShort } from '@/lib/dates';
 import { BEVERAGE_LABELS, baseWaterGoalMl, effectiveMl, exerciseWaterMl, glassesLeft, HYDRATION_FACTOR } from '@/lib/hydration';
 import { formatVolume, formatWeight, volumeToMl, volumeUnit, volumeValue } from '@/lib/units';
-import { useToday } from '@/store/clock';
+import { useNow, useToday } from '@/store/clock';
 import { DEFAULT_SETTINGS, useStore } from '@/store';
-import { useDay, useDays, useProfile } from '@/store/selectors';
+import { useDay, useDays, useLive, useProfile } from '@/store/selectors';
 import { Note, RequireProfile, splitUnit, Tile } from '@/features/trackers/components';
 import { dayTitle, resolveDateParam } from '@/features/trackers/dateParam';
 import { keepOrConvert, MAX_PRESET_ML, MIN_PRESET_ML, normalizePresets } from '@/features/trackers/helpers';
 import { FadeRow, useLeavingRows } from '@/features/food/rowMotion';
+import { href } from '@/features/food/helpers';
+import { logDrink, removeDrink } from '@/features/food/log';
+import { customFoodIndex, resolveFood } from '@/features/food/usuals';
+import { ENTERED, type DrinkChoice } from '@/features/drinks/choices';
+import { DrinkChoices } from '@/features/drinks/DrinkChoices';
+import { DrinkPickSheet } from '@/features/drinks/DrinkPickSheet';
+import { loadDrinkMemory, rememberDrinkChoice, useDrinkMemory } from '@/features/drinks/memory';
+import { livePartner, noticeLine, pickedFood, planDrink, rememberedChoice, sameDrinkInDiary, selectChoice, selectFood, waterRowCaption } from '@/features/drinks/rules';
 import { leftLitreDecimals, shownMl, volumeNumber, volumeUnitFor, waterLeftMl } from '@/features/today/volume';
 import { useTheme } from '@/theme';
-import type { Beverage, WaterEntry } from '@/types';
+import type { Beverage, Food, WaterEntry } from '@/types';
 import {
   AnimatedList,
   AnimatedNumber,
@@ -34,6 +41,7 @@ import {
   IconButton,
   MiniCup,
   NumberField,
+  PressableScale,
   Screen,
   SectionTitle,
   Sheet,
@@ -105,6 +113,18 @@ function WaterScreen() {
   const [editing, setEditing] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
   const [showAllLog, setShowAllLog] = useState(false);
+  // "Water only" (the same drink already in the diary): off by default, off again after each log and on any change.
+  const [waterOnly, setWaterOnly] = useState(false);
+  // The drink sheet, open with its first search ("juice" for Other juice).
+  const [pickQuery, setPickQuery] = useState<string | null>(null);
+  const now = useNow();
+  const memory = useDrinkMemory((s) => s.memory);
+  const foodEntries = useStore((s) => s.foodEntries);
+  const waterRecords = useStore((s) => s.water);
+  const customFoods = useLive('customFoods');
+  useEffect(() => {
+    void loadDrinkMemory();
+  }, []);
 
   const consumed = day.waterMl;
   const goal = day.waterGoalMl;
@@ -114,24 +134,47 @@ function WaterScreen() {
   const progress = goal > 0 ? consumed / goal : 0;
   const glassMl = settings.waterPresets.includes(250) ? 250 : (settings.waterPresets[1] ?? settings.waterPresets[0] ?? 250);
 
-  const add = (ml: number) => {
+  // What the next tap logs for the kind: the choice remembered on this device, else the kind's default (Water: none).
+  const customById = customFoodIndex(customFoods);
+  const resolve = (f: Food) => resolveFood(f, customById);
+  const selected = rememberedChoice(memory, beverage, resolve);
+  const picked = pickedFood(selected, memory, beverage, resolve);
+  // The same food already in the diary within 3 hours: said before the tap, with "Water only".
+  const sameEntry = selected?.food ? sameDrinkInDiary(foodEntries, waterRecords, selected.food.id, date, now.toISOString()) : null;
+  const waterOnlyOn = waterOnly && !!sameEntry;
+  const customMl = custom && custom > 0 ? volumeToMl(custom, units) : 0;
+  // The words before the tap, from the same plan the tap writes (clock from useNow, never read while rendering).
+  const shownPlan = (ml: number, amount: 'glass' | 'custom') => planDrink({ kind: beverage, drink: selected, ml, date, now, today: todayDate, units, waterOnly: waterOnlyOn, amount });
+  const line = beverage === 'water' ? '' : customMl > 0 && customMl <= 5000 ? shownPlan(customMl, 'custom').line : shownPlan(glassMl, 'glass').line;
+
+  const add = (ml: number, amount: 'glass' | 'custom' = 'glass') => {
     if (!(ml > 0)) return;
-    const store = useStore.getState();
-    const entry = store.upsert('water', { date, ml: Math.round(ml), beverage, loggedAt: nowISO() });
     // Crossing the goal is marked by the vessel itself (its onReached adds the success haptic).
-    haptic.tap();
-    const label = beverage === 'water' ? '' : ` of ${BEVERAGE_LABELS[beverage].label.toLowerCase()}`;
-    toast(`Added ${formatVolume(ml, units)}${label}`, {
-      label: 'Undo',
-      tint: 'water',
-      onPress: () => useStore.getState().remove('water', entry.id),
-    });
+    logDrink(planDrink({ kind: beverage, drink: selected, ml, date, now: new Date(), today: today(), units, waterOnly: waterOnlyOn, amount }));
+    setWaterOnly(false);
   };
 
-  const removeEntry = (e: WaterEntry) => {
-    useStore.getState().remove('water', e.id);
-    haptic.tap();
-    toast(`Removed ${formatVolume(e.ml, units)}`, { label: 'Undo', tint: 'water', onPress: () => useStore.getState().restore('water', e.id) });
+  const chooseKind = (b: Beverage) => {
+    setBeverage(b);
+    setWaterOnly(false);
+  };
+  const choose = (c: DrinkChoice) => {
+    rememberDrinkChoice(beverage, selectChoice(c));
+    setWaterOnly(false);
+  };
+  const choosePicked = (food: Food) => {
+    rememberDrinkChoice(beverage, selectFood(food));
+    setWaterOnly(false);
+  };
+  const enterCalories = (amountShown: number, kcal: number) => {
+    const ml = volumeToMl(amountShown, units);
+    if (ml > 5000) {
+      toast(`Add up to ${formatVolume(5000, units)} at a time`);
+      return;
+    }
+    setPickQuery(null);
+    logDrink(planDrink({ kind: beverage, drink: { id: ENTERED, food: null }, ml, kcal, date, now: new Date(), today: today(), units, amount: 'custom' }));
+    setWaterOnly(false);
   };
 
   // The level crossed the goal while the screen is open: the vessel settles and flashes its brim,
@@ -268,23 +311,40 @@ function WaterScreen() {
             testID={`water-beverage-${b}`}
             label={BEVERAGE_LABELS[b].label}
             selected={beverage === b}
-            onPress={() => setBeverage(b)}
+            onPress={() => chooseKind(b)}
           />
         ))}
       </ChipRow>
+      {beverage === 'water' ? null : (
+        <DrinkChoices
+          kind={beverage}
+          selected={selected}
+          picked={picked}
+          glassMl={glassMl}
+          units={units}
+          line={line}
+          notice={sameEntry && selected?.food ? noticeLine(sameEntry) : null}
+          waterOnly={waterOnlyOn}
+          onChoose={choose}
+          onPicked={choosePicked}
+          onOpenPick={(q) => setPickQuery(q)}
+          onWaterOnly={setWaterOnly}
+        />
+      )}
       <View style={{ gap: spacing.sm }}>
         {tileRows(settings.waterPresets.length, screenW).map((row, r) => (
           <View key={r} style={{ flexDirection: 'row', gap: spacing.sm }}>
             {row.map((i) => {
               if (i < 0) return <View key={`pad-${r}-${i}`} style={{ flex: 1 }} />;
               const ml = settings.waterPresets[i];
+              const tilePlan = shownPlan(ml, 'glass');
               return (
                 <Tile
                   key={`${ml}-${i}`}
                   testID={`water-add-${i}`}
-                  accessibilityLabel={`Add ${formatVolume(ml, units)} of ${BEVERAGE_LABELS[beverage].label.toLowerCase()}`}
+                  accessibilityLabel={tilePlan.label}
                   title={formatVolume(ml, units)}
-                  subtitle={i === 0 ? 'Small' : undefined}
+                  subtitle={tilePlan.tile ?? (i === 0 ? 'Small' : undefined)}
                   icon={<GlassWater size={Math.min(26, 16 + i * 3)} color={colors.water} strokeWidth={1.9} />}
                   onPress={() => add(ml)}
                 />
@@ -320,7 +380,7 @@ function WaterScreen() {
               toast(`Add up to ${formatVolume(5000, units)} at a time`);
               return;
             }
-            add(ml);
+            add(ml, 'custom');
             setCustom(null);
           }}
         />
@@ -343,28 +403,53 @@ function WaterScreen() {
           <AnimatedList key={date}>
           {rows.map(({ item: e, leaving }, i) => {
             const counts = Math.round(effectiveMl(e.ml, e.beverage));
+            // A drink whose calories are in the diary: the row opens that entry (the one place to change its amount).
+            const partner = livePartner(e, foodEntries);
+            const title = `${formatVolume(e.ml, units)} ${BEVERAGE_LABELS[e.beverage].label.toLowerCase()}`;
+            const text = (
+              <>
+                <View style={{ width: 24, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 17, lineHeight: 24 }}>{BEVERAGE_LABELS[e.beverage].emoji}</Text>
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text variant="bodyStrong" tabular>
+                    {title}
+                  </Text>
+                  <Text variant="caption" color="textSecondary">
+                    {loggedLabel(e)}
+                    {counts !== e.ml ? ` · counts as ${formatVolume(counts, units)}` : ''}
+                  </Text>
+                  {partner ? (
+                    <Text testID={`water-entry-kcal-${i}`} variant="caption" color="textSecondary" numberOfLines={2}>
+                      {waterRowCaption(partner, e.date)}
+                    </Text>
+                  ) : null}
+                </View>
+              </>
+            );
+            const rowStyle = { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 6 } as const;
             return (
               <FadeRow key={e.id} leaving={leaving}>
                 {i > 0 ? <Divider inset={36} /> : null}
-                <View testID={`water-entry-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 6 }}>
-                  <View style={{ width: 24, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 17, lineHeight: 24 }}>{BEVERAGE_LABELS[e.beverage].emoji}</Text>
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text variant="bodyStrong" tabular>
-                      {formatVolume(e.ml, units)} {BEVERAGE_LABELS[e.beverage].label.toLowerCase()}
-                    </Text>
-                    <Text variant="caption" color="textSecondary">
-                      {loggedLabel(e)}
-                      {counts !== e.ml ? ` · counts as ${formatVolume(counts, units)}` : ''}
-                    </Text>
-                  </View>
+                <View testID={`water-entry-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                  {partner ? (
+                    <PressableScale
+                      testID={`water-entry-open-${i}`}
+                      scaleTo={0.985}
+                      accessibilityLabel={`${title}, ${waterRowCaption(partner, e.date).replace(' · ', ', ')}. Edit in diary`}
+                      onPress={() => router.push(href('/food/detail', { entryId: partner.id, meal: partner.meal, date: partner.date }) as never)}
+                      style={{ ...rowStyle, flex: 1, minWidth: 0 }}>
+                      {text}
+                    </PressableScale>
+                  ) : (
+                    <View style={{ ...rowStyle, flex: 1, minWidth: 0 }}>{text}</View>
+                  )}
                   <IconButton
                     testID={`water-delete-${i}`}
                     accessibilityLabel={`Delete ${formatVolume(e.ml, units)}, ${loggedLabel(e)}`}
                     tone="clear"
                     size={44}
-                    onPress={() => removeEntry(e)}>
+                    onPress={() => removeDrink(e)}>
                     <Trash2 size={18} color={colors.textSecondary} strokeWidth={1.9} />
                   </IconButton>
                 </View>
@@ -424,6 +509,18 @@ function WaterScreen() {
         <Button testID="water-change-goal" title="Change goal" variant="secondary" size="md" onPress={() => router.push('/settings/goals' as never)} />
       </Card>
 
+      <DrinkPickSheet
+        visible={pickQuery !== null}
+        initialQuery={pickQuery ?? ''}
+        glassMl={glassMl}
+        units={units}
+        onPick={(food) => {
+          choosePicked(food);
+          setPickQuery(null);
+        }}
+        onEntered={enterCalories}
+        onClose={() => setPickQuery(null)}
+      />
       <PresetSheet visible={editing} onClose={() => setEditing(false)} presets={settings.waterPresets} units={units} />
     </Screen>
   );

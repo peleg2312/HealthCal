@@ -3,11 +3,13 @@
  * instead of touching the store directly so every entry is built the same way,
  * recents stay up to date, and every add or delete can be undone.
  */
+import { followEntry, undoEdit } from '@/features/drinks/pair';
+import { livePartner, removedEntryToast, removedWaterToast, waterPointingAt, type DrinkPlan } from '@/features/drinks/rules';
 import { today } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
 import { useStore } from '@/store';
 import { live } from '@/store/selectors';
-import type { Food, FoodEntry, ISODate, MealType, Nutrients, SavedMeal, SavedMealItem, Serving } from '@/types';
+import type { Food, FoodEntry, ISODate, MealType, Nutrients, SavedMeal, SavedMealItem, Serving, UnitSystem, WaterEntry } from '@/types';
 import { haptic, toast } from '@/ui';
 
 import { mealOnDay } from './addedTo';
@@ -61,31 +63,38 @@ export function recentsAfterUndo<T extends { id: string }>(now: readonly T[], be
   return now[0]?.id === foodId ? before : now;
 }
 
-/** Rewrite an existing entry with a new food, serving or amount. Keeps when it was logged and scales an estimate's range. */
-function rewriteEntry(input: LogFoodInput & { entryId: string }): FoodEntry {
+/**
+ * Rewrite an existing entry with a new food, serving or amount. Keeps when it was logged, scales an
+ * estimate's range, keeps a drink's `via`, and moves the drink's water record with it (followEntry);
+ * `waterBefore` is that record as it was, for Undo.
+ */
+function rewriteEntry(input: LogFoodInput & { entryId: string }): { entry: FoodEntry; waterBefore: WaterEntry | null } {
   const store = useStore.getState();
   const built = buildEntry({ ...input, ...lastEstimate(input.food) });
   const existing = store.foodEntries[input.entryId];
   // An edited estimate is still an estimate: keep its range, scaled to the new amount.
   const scale = existing?.kcalRange && existing.nutrients.kcal > 0 ? built.nutrients.kcal / existing.nutrients.kcal : null;
-  return store.upsert('foodEntries', {
+  const entry = store.upsert('foodEntries', {
     ...built,
     id: input.entryId,
     loggedAt: existing?.loggedAt ?? built.loggedAt,
+    ...(existing?.via ? { via: existing.via } : null),
     ...(scale !== null && existing?.kcalRange
       ? { kcalRange: [Math.round(existing.kcalRange[0] * scale), Math.round(existing.kcalRange[1] * scale)] as [number, number], confidence: existing.confidence }
       : null),
   });
+  const waterBefore = existing && !existing.deleted ? followEntry(existing, entry) : null;
+  return { entry, waterBefore };
 }
 
 export function logFood(input: LogFoodInput): FoodEntry {
   const store = useStore.getState();
   if (input.entryId) {
     const before = store.foodEntries[input.entryId];
-    const entry = rewriteEntry({ ...input, entryId: input.entryId });
+    const { entry, waterBefore } = rewriteEntry({ ...input, entryId: input.entryId });
     haptic.success();
-    // Undo puts the entry back exactly as it was (amount, meal and day).
-    toast('Entry updated', before ? { label: 'Undo', onPress: () => useStore.getState().upsert('foodEntries', before) } : undefined);
+    // Undo puts the entry back exactly as it was (amount, meal and day), and a drink's water record with it.
+    toast('Entry updated', before ? { label: 'Undo', onPress: () => undoEdit(before, waterBefore) } : undefined);
     return entry;
   }
   const entry = store.upsert('foodEntries', buildEntry({ ...input, ...lastEstimate(input.food) }));
@@ -110,7 +119,7 @@ export function setEntryAmount(entry: FoodEntry, quantity: number, serving?: Ser
   if (!entry.food) return entry;
   const s = serving ?? { label: entry.servingLabel, grams: entry.quantity > 0 ? entry.grams / entry.quantity : entry.grams };
   haptic.select();
-  return rewriteEntry({ food: entry.food, serving: s, quantity, meal: entry.meal, date: entry.date, entryId: entry.id });
+  return rewriteEntry({ food: entry.food, serving: s, quantity, meal: entry.meal, date: entry.date, entryId: entry.id }).entry;
 }
 
 /** Calories-only (optionally macros) entry for when the user just knows the number. */
@@ -175,10 +184,46 @@ export function logSavedMeal(
   return logItems(plan.items, mealType, date, `${meal.name} added to ${where(mealType, date)}`);
 }
 
+const unitsNow = (): UnitSystem => useStore.getState().profile?.units ?? 'metric';
+
+/**
+ * Delete a diary entry (soft, with Undo). An entry a drink's water record points at goes alone: the
+ * calories are removed and the water stays counted, and the toast says so.
+ */
 export function deleteEntry(entry: FoodEntry): void {
+  const water = waterPointingAt(useStore.getState().water, entry.id);
   useStore.getState().remove('foodEntries', entry.id);
   haptic.tap();
-  toast(`Removed ${entry.name}`, { label: 'Undo', onPress: () => useStore.getState().restore('foodEntries', entry.id) });
+  const message = water ? removedEntryToast(entry.name, water, unitsNow()) : `Removed ${entry.name}`;
+  toast(message, { label: 'Undo', onPress: () => useStore.getState().restore('foodEntries', entry.id) });
+}
+
+/**
+ * Log a drink from the water screen as planned by `planDrink` (@/features/drinks/rules): the diary
+ * entry first (when the drink has calories), then the water record pointing at it. No recents (a
+ * drink from Water never enters them), haptic.tap, one toast tinted 'water' whose Undo removes both
+ * (the store's cascade). Plain water writes exactly the record and toast the water screen always did.
+ */
+export function logDrink(plan: DrinkPlan): { water: WaterEntry; entry: FoodEntry | null } {
+  const store = useStore.getState();
+  const entry = plan.entry ? store.upsert('foodEntries', plan.entry) : null;
+  const water = store.upsert('water', entry ? { ...plan.water, foodEntryId: entry.id } : plan.water);
+  // Crossing the goal is marked by the vessel itself (its onReached adds the success haptic).
+  haptic.tap();
+  toast(plan.toast, { label: 'Undo', tint: 'water', onPress: () => useStore.getState().remove('water', water.id) });
+  return { water, entry };
+}
+
+/**
+ * Delete a drink on the water screen (soft, with Undo). A drink with live calories in the diary takes
+ * them with it, in one store act ("Removed 250 ml milk and its 129 kcal"); Undo brings both back.
+ */
+export function removeDrink(water: WaterEntry): void {
+  const s = useStore.getState();
+  const partner = livePartner(water, s.foodEntries);
+  s.remove('water', water.id);
+  haptic.tap();
+  toast(removedWaterToast(water, partner, unitsNow()), { label: 'Undo', tint: 'water', onPress: () => useStore.getState().restore('water', water.id) });
 }
 
 export function toSavedMealItem(e: FoodEntry): SavedMealItem {

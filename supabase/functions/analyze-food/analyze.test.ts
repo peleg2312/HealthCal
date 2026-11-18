@@ -548,6 +548,14 @@ describe('the plain-lines answer', () => {
     await analyzeFood(p.client, { text: 'rice', precise: true }, { thinking: 'off' });
     expect('thinking' in call(p.beta, 0)[0]).toBe(false);
   });
+  it('never sends disabled thinking to a fast model that refuses it (FOOD_MODEL set to a Sonnet or Opus)', async () => {
+    for (const fastModel of ['claude-sonnet-5-5', 'claude-opus-5-5']) {
+      const f = fakeClient(text(lines));
+      await analyzeFood(f.client, { text: 'rice' }, { thinking: 'off', fastModel });
+      expect(call(f.make, 0)[0].model).toBe(fastModel);
+      expect('thinking' in call(f.make, 0)[0]).toBe(false);
+    }
+  });
 });
 
 describe('analyzeFood response handling', () => {

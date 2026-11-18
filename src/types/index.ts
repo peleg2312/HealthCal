@@ -128,6 +128,8 @@ export interface FoodEntry extends SyncedRecord {
   /** The definition this entry was logged from, kept so it can be re-scaled or re-logged offline. */
   food?: Food;
   loggedAt: ISODateTime;
+  /** 'water': written with a water record by the water screen (src/features/drinks). Keeps it out of recents, usual foods, last portions, copies, saved meals and the logging streak. */
+  via?: 'water';
 }
 
 export interface SavedMealItem {
@@ -245,6 +247,10 @@ export interface WaterEntry extends SyncedRecord {
   ml: number;
   beverage: Beverage;
   loggedAt: ISODateTime;
+  /** What the drink was: a DRINK_CHOICES id, 'food' (picked) or 'kcal' (calories entered). Absent: logged before drinks had choices, or plain water. */
+  drink?: string;
+  /** The diary entry holding this drink's calories (src/features/drinks). Absent: it added no calories. */
+  foodEntryId?: string;
 }
 
 export interface WeightEntry extends SyncedRecord {

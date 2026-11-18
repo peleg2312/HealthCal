@@ -4,6 +4,7 @@
  */
 import { useMemo } from 'react';
 
+import { isWaterDrinkEntry } from '@/features/drinks/via';
 import { addDays, diffDays, lastNDates, startOfWeek, today } from '@/lib/dates';
 import { dayRuleFor, exercisePlaced, type ExerciseRule } from '@/lib/exerciseBudget';
 import { bmr, calorieTarget, formulaTdee, macroTargets, type BmrMethod, type CalorieTarget, type MacroTargets } from '@/lib/energy';
@@ -352,7 +353,15 @@ export function computeConsistency(dates: Set<ISODate>, end: ISODate = today()):
   return { streak, daysThisWeek: week, loggedToday: dates.has(end), totalDaysLogged: dates.size };
 }
 
+/**
+ * The days with food logged, for the streak and the logging calendar: any live entry except a drink
+ * from the water screen (water-only days stay what they were before drinks had calories).
+ */
+export function foodLoggedDates(entries: readonly FoodEntry[]): Set<ISODate> {
+  return new Set(entries.filter((e) => !e.deleted && !isWaterDrinkEntry(e)).map((e) => e.date));
+}
+
 export function useConsistency(end: ISODate): Consistency {
   const food = useLive('foodEntries');
-  return useMemo(() => computeConsistency(new Set(food.map((e) => e.date)), end), [food, end]);
+  return useMemo(() => computeConsistency(foodLoggedDates(food), end), [food, end]);
 }

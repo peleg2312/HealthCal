@@ -100,7 +100,8 @@
  *                                  budget and protein target, exercise in net kcal, water as a share of
  *                                  today's goal, weekMinutes toward the weekly guideline, fasting as a
  *                                  share of the fasting target, eatBack 0 to leave exercise out of the
- *                                  budget; for the morning page lastNight, weighInGap, onboardedToday and
+ *                                  budget; drinks and diaryDrink for drinks with calories (seed.mjs);
+ *                                  for the morning page lastNight, weighInGap, onboardedToday and
  *                                  name (seed.mjs says what each does). scripts/dev/states/sweep.cjs uses it to
  *                                  take every labelled cup and bar at the values that stress it.
  *     now: Date.parse('2026-11-19T18:00:00'),   the page's clock (Playwright's clock.setFixedTime: Date.now
@@ -1031,7 +1032,7 @@ function runChecks() {
 // ------------------------------------------------------------------ states
 
 const STATE_FIELDS = ['id', 'route', 'data', 'imperial', 'day', 'values', 'health', 'type', 'taps', 'waitFor', 'sheet', 'note', 'now', 'flags', 'absent'];
-const VALUES = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack', 'spread', 'lastNight', 'weighInGap', 'onboardedToday', 'name'];
+const VALUES = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack', 'spread', 'lastNight', 'weighInGap', 'onboardedToday', 'name', 'drinks', 'diaryDrink'];
 /** The morning page's knobs that are not numbers (seed.mjs checks them again). */
 const VALUE_TYPES = { onboardedToday: 'boolean', name: 'string' };
 const DATA = ['demo', 'empty', 'fresh', 'stress'];

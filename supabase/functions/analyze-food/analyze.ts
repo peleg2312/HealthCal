@@ -25,6 +25,12 @@ import Anthropic from '@anthropic-ai/sdk';
 
 export const FAST_MODEL = 'claude-haiku-5-5';
 export const PRECISE_MODEL = 'claude-sonnet-5-5';
+/**
+ * The models that accept `thinking: {type: 'disabled'}` at the efforts used here. Claude Sonnet 5.5
+ * and Claude Opus 5.5 refuse it with a 400 at every effort, so if FOOD_MODEL ever names one of them,
+ * the second try and FOOD_THINKING=off leave the field out instead of failing every request.
+ */
+const TAKES_DISABLED_THINKING = new Set(['claude-haiku-5-5']);
 
 export interface AnalyzeInput {
   /** Base64 image data without a data: prefix. */
@@ -413,7 +419,7 @@ export async function analyzeFood(client: Anthropic, input: AnalyzeInput, option
       model,
       // Reasoning counts toward this cap, so it leaves room for both; a typical answer uses 60 to 400 tokens.
       max_tokens: again ? RETRY_MAX_TOKENS : 2000,
-      ...(!input.precise && (again || options.thinking === 'off') ? { thinking: { type: 'disabled' as const } } : null),
+      ...(!input.precise && TAKES_DISABLED_THINKING.has(model) && (again || options.thinking === 'off') ? { thinking: { type: 'disabled' as const } } : null),
       system: systemFor(input, format, again),
       messages: [{ role: 'user' as const, content }],
       output_config:

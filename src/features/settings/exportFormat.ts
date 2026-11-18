@@ -90,8 +90,9 @@ export function waterCsv(entries: WaterEntry[]): string {
   const rows = entries
     .filter((e) => !e.deleted)
     .sort(byDateThen((x) => x.loggedAt))
-    .map((e) => [e.date, e.beverage, e.ml, Math.round(effectiveMl(e.ml, e.beverage)), e.loggedAt]);
-  return toCsv(['date', 'drink', 'ml', 'hydration_ml', 'logged_at'], rows);
+    .map((e) => [e.date, e.beverage, e.ml, Math.round(effectiveMl(e.ml, e.beverage)), e.loggedAt, e.drink ?? '']);
+  // `choice` is what the drink was (src/features/drinks/choices), last so older readers of the file keep their columns.
+  return toCsv(['date', 'drink', 'ml', 'hydration_ml', 'logged_at', 'choice'], rows);
 }
 
 // --------------------------------------------------------------- backup
@@ -252,11 +253,18 @@ function isWeighInExtras(r: Obj): boolean {
 
 /** Shape checks per collection, on top of the common id and timestamp. */
 const VALIDATORS: Record<Collection, (r: Obj) => boolean> = {
-  foodEntries: (r) => isDayKey(r.date) && MEALS.includes(r.meal as string) && isLoggedItem(r),
+  foodEntries: (r) => isDayKey(r.date) && MEALS.includes(r.meal as string) && isLoggedItem(r) && (r.via === undefined || r.via === 'water'),
   customFoods: (r) => isFood(r),
   savedMeals: (r) => isStr(r.name) && Array.isArray(r.items) && r.items.every(isLoggedItem) && optNum(r.servings),
   activities: (r) => isDayKey(r.date) && isStr(r.name) && isNonNeg(r.durationMin) && isNonNeg(r.kcalNet) && isNonNeg(r.kcalGross) && optNum(r.met) && optNum(r.distanceKm) && optNum(r.avgHeartRate) && optNum(r.maxHeartRate),
-  water: (r) => isDayKey(r.date) && isNum(r.ml) && r.ml > 0 && r.ml <= 10000,
+  // A drink with calories (src/features/drinks): what it was, and the diary entry holding its calories.
+  water: (r) =>
+    isDayKey(r.date) &&
+    isNum(r.ml) &&
+    r.ml > 0 &&
+    r.ml <= 10000 &&
+    (r.drink === undefined || (isStr(r.drink) && r.drink.length <= 64)) &&
+    (r.foodEntryId === undefined || (isStr(r.foodEntryId) && UUID.test(r.foodEntryId))),
   weights: (r) => isDayKey(r.date) && isNum(r.kg) && r.kg > 0 && r.kg < 700 && optNum(r.bodyFatPct) && isWeighInExtras(r),
   sleep: (r) => isDayKey(r.date) && isNum(r.hours) && r.hours >= 0 && r.hours <= 24 && isSleepExtras(r),
   fasting: (r) => isTime(r.start) && (r.end === undefined || r.end === null || isTime(r.end)) && isNum(r.targetHours),

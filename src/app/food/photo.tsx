@@ -38,6 +38,7 @@ import { ItemRow } from '@/features/ai/ItemRow';
 import { matchFoods } from '@/features/ai/localMatch';
 import { PhotoHero } from '@/features/ai/PhotoHero';
 import { SampleNotice } from '@/features/ai/SampleNotice';
+import { photoText, readWeight } from '@/features/ai/weight';
 import { MealPicker } from '@/features/food/components';
 import { logItems } from '@/features/food/log';
 import { BUILTIN_FOODS } from '@/data/foods';
@@ -83,6 +84,14 @@ export default function PhotoScreen() {
   const [preview, setPreview] = useState<PreparedImage | null>(null);
   const [preparing, setPreparing] = useState(false);
   const [note, setNote] = useState('');
+  // The meal's weighed total as typed, optional (@/features/ai/weight: grams, or ounces for imperial),
+  // whether its problem is on show (after the field is left or Estimate is tapped, not while typing),
+  // and the total the shown estimate was made with, as the person typed it.
+  const [weightText, setWeightText] = useState('');
+  const [weightChecked, setWeightChecked] = useState(false);
+  const [usedWeight, setUsedWeight] = useState<string | null>(null);
+  const units = useStore((s) => s.profile?.units) ?? 'metric';
+  const weight = readWeight(weightText, units);
   const [description, setDescription] = useState('');
   const [result, setResult] = useState<AiFoodResult | null>(null);
   const [rows, setRows] = useState<ReviewRow[]>([]);
@@ -148,7 +157,18 @@ export default function PhotoScreen() {
   }, [highlight]);
 
   const searchHref = `/food/search?meal=${meal}&date=${date}`;
+  const weightError = mode === 'photo' && weightChecked ? weight.problem : null;
+  // A total that cannot be used does not disable the button: tapping it says why (a disabled button would not).
   const ready = mode === 'photo' ? !!preview : description.trim().length >= 3;
+
+  function estimate() {
+    if (mode === 'photo' && weight.problem) {
+      setWeightChecked(true);
+      haptic.warn();
+      return;
+    }
+    void analyse(false);
+  }
 
   const fail = (e: unknown, precise: boolean) => {
     haptic.warn();
@@ -215,7 +235,8 @@ export default function PhotoScreen() {
         // The careful pass gets more pixels: 1024 px instead of 768 px.
         image = precise ? (await prepareImage(photo, { precise: true })).base64 : preview.base64;
       }
-      const base = mode === 'photo' ? note.trim() || undefined : description.trim();
+      // A weighed total goes first, in the measured words (@/features/ai/weight).
+      const base = mode === 'photo' ? photoText(note, weight.grams) : description.trim();
       const text = fix?.trim() ? withCorrection(base, fix) : base;
       const res = await analyzeFood({ image, text, precise }, { signal: controller.signal, demoError });
       if (controller.signal.aborted) return;
@@ -225,6 +246,7 @@ export default function PhotoScreen() {
       const kept = rows.filter((r) => r.kind === 'added');
       setRows(applyAddedFat([...rowsFromResult(res.result), ...kept], fat));
       setPrecisePass(precise || (!!fix && precisePass));
+      setUsedWeight(mode === 'photo' ? weight.shown : null);
       if (fix) setCorrection('');
       setError(null);
       setStep('review');
@@ -337,7 +359,7 @@ export default function PhotoScreen() {
         icon={<Sparkles size={18} color={colors.onPrimary} />}
         disabled={!ready}
         loading={preparing}
-        onPress={() => void analyse(false)}
+        onPress={estimate}
       />
     );
   } else if (step === 'analysing') {
@@ -395,7 +417,7 @@ export default function PhotoScreen() {
                   </View>
                   <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                     <Button testID="ai-retake" title="Retake" variant="secondary" size="sm" full={false} style={{ flex: 1 }} icon={<Camera size={16} color={colors.text} />} onPress={() => void choose('camera')} />
-                    <Button testID="ai-repick" title="Choose another" variant="secondary" size="sm" full={false} style={{ flex: 1 }} icon={<ImagePlus size={16} color={colors.text} />} onPress={() => void choose('library')} />
+                    <Button testID="ai-repick" title={narrow ? 'Library' : 'Choose another'} accessibilityLabel="Choose another photo" variant="secondary" size="sm" full={false} style={{ flex: 1 }} icon={<ImagePlus size={16} color={colors.text} />} onPress={() => void choose('library')} />
                   </View>
                 </View>
               ) : (
@@ -413,6 +435,23 @@ export default function PhotoScreen() {
                   </View>
                 </Card>
               )}
+              <TextField
+                testID="ai-photo-weight"
+                label={units === 'imperial' ? 'Weighed it? Total ounces (optional)' : 'Weighed it? Total grams (optional)'}
+                accessibilityLabel={`Weighed it? Total ${units === 'imperial' ? 'ounces' : 'grams'} of food, without the plate. Optional`}
+                value={weightText}
+                onChangeText={(t) => {
+                  setWeightText(t);
+                  setWeightChecked(false);
+                }}
+                onBlur={() => setWeightChecked(true)}
+                keyboardType={units === 'imperial' ? 'decimal-pad' : 'number-pad'}
+                inputMode={units === 'imperial' ? 'decimal' : 'numeric'}
+                suffix={units === 'imperial' ? 'oz' : 'g'}
+                maxLength={8}
+                hint="Food only, without the plate or bowl."
+                error={weightError}
+              />
               <TextField
                 testID="ai-photo-note"
                 label="Anything the photo can't show? (optional)"
@@ -477,6 +516,12 @@ export default function PhotoScreen() {
                 <Text variant="caption" color="textSecondary">
                   {`AI estimate · ${CONFIDENCE_WORDS[conf]}${precisePass ? ' · checked carefully' : ''}`}
                 </Text>
+                {/* The weighed total went with the photo: say so, so the person knows the estimate leaned on it. */}
+                {usedWeight !== null && !isDemo ? (
+                  <Text variant="caption" color="textSecondary" testID="ai-weight-used">
+                    {`Made with your weighed total, ${usedWeight}`}
+                  </Text>
+                ) : null}
                 <MacroBar protein={sum.protein} carbs={sum.carbs} fat={sum.fat} />
                 <View style={{ flexDirection: 'row' }}>
                   <MacroStat label="Protein" value={sum.protein} color={colors.protein} />
@@ -707,7 +752,9 @@ export default function PhotoScreen() {
         id: 'describe',
         label: 'Describe it in words instead',
         onPress: () => {
-          if (note.trim() && !description.trim()) setDescription(note.trim());
+          // The note, with the weight before it, becomes the description; a weight alone names no food, so it is not carried.
+          const words = note.trim() ? photoText(note, weight.grams) : undefined;
+          if (words && !description.trim()) setDescription(words);
           switchMode('text');
         },
       });

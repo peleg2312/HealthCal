@@ -3,12 +3,13 @@ import { CalendarPlus, Copy, MoreHorizontal, Plus, Repeat2, Save, Trash2, X } fr
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import { ALSO_IN_WATER, waterPointingAt } from '@/features/drinks/rules';
 import { addDays, formatDayLabel } from '@/lib/dates';
 import { MEAL_LABEL, entriesTotal } from '@/lib/nutrition';
 import { useToday } from '@/store/clock';
 import type { DaySummary } from '@/store/selectors';
 import { cup, fonts, useTheme } from '@/theme';
-import type { FoodEntry, ISODate, MealType } from '@/types';
+import type { FoodEntry, ISODate, MealType, WaterEntry } from '@/types';
 import { AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, Hatch, IconButton, ListRow, PressableScale, ProgressBar, Sheet, Text, TextField, Trough } from '@/ui';
 
 import { clearEntries, copyEntries, saveMeal } from './actions';
@@ -121,7 +122,7 @@ const ROW_PAD = 18;
 /** Where the text column starts in a meal card: the padding, the 24 px emoji column and the gap. */
 const TEXT_INSET = ROW_PAD + 24 + 12;
 
-function EntryRow({ entry }: { entry: FoodEntry }) {
+function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry | null }) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   // On a narrow phone the name and the portion may take two lines rather than be cut.
@@ -129,8 +130,10 @@ function EntryRow({ entry }: { entry: FoodEntry }) {
   // Any entry that carries a range is an estimate, whatever food it was matched to afterwards.
   const ai = !!entry.kcalRange;
   const source = sourceInfo(ai ? 'ai' : entry.source);
+  // A volume ("250 ml", "8.5 fl oz") is the portion as it was drunk: its grams are left out.
+  const volume = /(ml|fl oz)$/.test(entry.servingLabel.trim());
   const portion =
-    entry.grams > 0 && entry.servingLabel !== `${Math.round(entry.grams)} g` && !/^\d+(\.\d+)?\s*g$/.test(entry.servingLabel.trim())
+    entry.grams > 0 && !volume && entry.servingLabel !== `${Math.round(entry.grams)} g` && !/^\d+(\.\d+)?\s*g$/.test(entry.servingLabel.trim())
       ? `${portionLabel(entry.servingLabel, entry.quantity)} · ${Math.round(entry.grams)} g`
       : portionLabel(entry.servingLabel, entry.quantity);
   return (
@@ -139,7 +142,7 @@ function EntryRow({ entry }: { entry: FoodEntry }) {
         testID={`entry-${entry.id}`}
         onPress={() => router.push(href('/food/detail', { entryId: entry.id, meal: entry.meal, date: entry.date }) as never)}
         scaleTo={0.985}
-        accessibilityLabel={`${entry.name}, ${ai ? 'about ' : ''}${Math.round(entry.nutrients.kcal)} kilocalories. Edit`}
+        accessibilityLabel={`${entry.name}, ${ai ? 'about ' : ''}${Math.round(entry.nutrients.kcal)} kilocalories${inWater ? ', also counted in Water' : ''}. Edit`}
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: 11 }}>
         <RowEmoji emoji={entry.emoji} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
@@ -149,10 +152,10 @@ function EntryRow({ entry }: { entry: FoodEntry }) {
           {/* On a narrow phone the calories move to the end of the portion line, so the name has the row's width. */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
             {/* The source's mark leads the line and its word ends it, so a portion that wraps never leaves the mark floating. */}
-            <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: 6 }} accessible accessibilityLabel={`${portion}, ${source.label}`}>
+            <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: 6 }} accessible accessibilityLabel={`${portion}${inWater ? `, ${ALSO_IN_WATER}` : ''}, ${source.label}`}>
               <CupKey color={colors.textSecondary} variant={sourceKeyVariant(ai ? 'ai' : entry.source)} size={8} style={{ marginTop: 5 }} />
-              <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1 }}>
-                {`${portion} · ${source.short}`}
+              <Text testID={inWater ? `entry-in-water-${entry.id}` : undefined} variant="caption" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1 }}>
+                {`${portion}${inWater ? ` · ${ALSO_IN_WATER}` : ''} · ${source.short}`}
               </Text>
             </View>
             {narrow ? <KcalTrail value={entry.nutrients.kcal} range={entry.kcalRange} /> : null}
@@ -178,6 +181,7 @@ export function MealCard({
   emoji,
   date,
   entries,
+  waterEntries,
   previous,
   onMenu,
   onRepeat,
@@ -187,6 +191,8 @@ export function MealCard({
   emoji: string;
   date: ISODate;
   entries: FoodEntry[];
+  /** The day's live water records: an entry one of them points at is marked "also in Water". */
+  waterEntries?: readonly WaterEntry[];
   previous: PreviousMeal | null;
   onMenu: () => void;
   onRepeat: () => void;
@@ -223,7 +229,7 @@ export function MealCard({
           {rows.map(({ item: e, leaving }, i) => (
             <FadeRow key={e.id} leaving={leaving}>
               {i > 0 ? <Divider inset={TEXT_INSET} /> : null}
-              <EntryRow entry={e} />
+              <EntryRow entry={e} inWater={waterEntries ? waterPointingAt(waterEntries, e.id) : null} />
             </FadeRow>
           ))}
         </AnimatedList>

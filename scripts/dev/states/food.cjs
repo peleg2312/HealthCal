@@ -100,6 +100,9 @@ module.exports = [
   // ---------------------------------------------------------------- Scan, photo, quick, custom
   { id: 'scan-lookup', route: '/food/scan', taps: [{ type: 'scan-manual-input', text: '5000112637922' }, 'scan-manual-submit', { wait: 4000 }], note: 'a typed barcode looked up (not found, or no network)' },
   { id: 'photo-describe', route: '/food/photo?mode=text', type: { 'ai-description': 'Two scrambled eggs with butter, one slice of sourdough toast and a flat white with oat milk' }, note: 'describe, filled in' },
+  { id: 'photo-weight', route: '/food/photo', taps: [{ choose: 'ai-choose-photo', files: ['assets/images/icon.png'] }, { type: 'ai-photo-weight', text: '418' }], waitFor: 'ai-photo-preview', note: 'a photo chosen, with its weighed total (optional field)' },
+  { id: 'photo-weight-error', route: '/food/photo', taps: [{ type: 'ai-photo-weight', text: '3' }, 'ai-photo-note'], note: 'a weighed total out of range: the field says so once it is left, not while typing' },
+  { id: 'photo-weight-imperial', route: '/food/photo', imperial: true, taps: [{ type: 'ai-photo-weight', text: '16' }, 'ai-photo-note'], note: 'the weighed total in ounces for imperial units' },
   { id: 'photo-review', route: '/food/photo?mode=text', taps: [{ type: 'ai-description', text: 'Chicken, rice and salad' }, 'ai-analyse', { wait: 2600 }], waitFor: 'ai-add-to-diary', note: 'the estimate rows with ranges (sample)' },
   { id: 'photo-review-imperial', route: '/food/photo?mode=text', imperial: true, taps: [{ type: 'ai-description', text: 'Chicken, rice and salad' }, 'ai-analyse', { wait: 2600 }], waitFor: 'ai-add-to-diary', note: 'the estimate in imperial units' },
   { id: 'photo-error-network', route: '/food/photo?mode=text&demoError=network', taps: [{ type: 'ai-description', text: 'Chicken, rice and salad' }, 'ai-analyse', { wait: 2600 }], waitFor: '^ai-error-', note: 'offline' },

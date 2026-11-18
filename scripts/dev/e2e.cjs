@@ -231,6 +231,31 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   const expectedBanana = (banana.grams * banana.food.per100g.kcal) / 100;
   check('entry calories equal grams x per-100 g value', near(banana.nutrients.kcal, expectedBanana, 0.01) && banana.food.per100g.kcal === 89 && banana.grams > 0, `${banana.grams} g -> ${banana.nutrients.kcal.toFixed(1)} kcal`);
 
+  // ------------------------------------- the photo screen's weighed total (optional field)
+  // A photo chosen, then the weight field: a tap anywhere in it focuses it, the faked keyboard keeps
+  // it above the pinned "Estimate nutrition", and a problem shows only once the field is left.
+  await page.goto(`${BASE}/food/photo?meal=lunch`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(800);
+  const photoChooser = page.waitForEvent('filechooser', { timeout: 10000 }).catch(() => null);
+  await tap('ai-choose-photo');
+  const photoFc = await photoChooser;
+  if (photoFc) await photoFc.setFiles(require('path').join(__dirname, '..', '..', 'assets', 'images', 'icon.png'));
+  await page.waitForSelector('[data-testid="ai-photo-preview"]', { timeout: 10000 }).catch(() => {});
+  check('a photo can be chosen on the photo screen', !!photoFc && (await page.getByTestId('ai-photo-preview').count()) > 0);
+  await tapsFocus('ai-photo-weight');
+  await keyboardRoom('ai-photo-weight', 320);
+  await fill('ai-photo-weight', '4');
+  const earlyError = await page.getByText('Enter 10 to 5,000 g, or leave it empty').count();
+  await blur();
+  await page.waitForTimeout(150);
+  const lateError = await page.getByText('Enter 10 to 5,000 g, or leave it empty').count();
+  check('the weight field does not turn red while typing, and says so once it is left', earlyError === 0 && lateError > 0, `while typing ${earlyError}, after leaving ${lateError}`);
+  await fill('ai-photo-weight', '1,500');
+  await blur();
+  await page.waitForTimeout(150);
+  check('a thousands separator in the weight is read as one', (await page.getByText('Enter 10 to 5,000 g, or leave it empty').count()) === 0 && (await page.getByText('Enter whole grams, e.g. 450').count()) === 0);
+  await shot('e2e-photo-weight');
+
   // --------------------------------------------------------- log activity
   await page.goto(`${BASE}/activity/log?activityId=running`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(800);

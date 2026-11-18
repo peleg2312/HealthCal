@@ -4,7 +4,8 @@ import { diffDays } from '@/lib/dates';
 import { isCompleteDay } from '@/lib/insights';
 import { useStore } from '@/store';
 import { useToday } from '@/store/clock';
-import { useConsistency, useDays, useLive } from '@/store/selectors';
+import { isWaterDrinkEntry } from '@/features/drinks/via';
+import { foodLoggedDates, useConsistency, useDays, useLive } from '@/store/selectors';
 import type { ISODate } from '@/types';
 
 import { cleanTargets, longestStreak, type CalendarDayInput, type RhythmKind, type RhythmTargets } from './consistency';
@@ -46,7 +47,7 @@ export function useConsistencyData() {
 
   return useMemo(() => {
     const sets: Record<RhythmKind, Set<ISODate>> = {
-      food: new Set(food.map((e) => e.date)),
+      food: foodLoggedDates(food),
       train: new Set(activities.map((a) => a.date)),
       weigh: new Set(weights.map((w) => w.date)),
     };
@@ -54,7 +55,7 @@ export function useConsistencyData() {
     for (const d of days) {
       byDate.set(d.date, {
         date: d.date,
-        logged: d.entries.length > 0,
+        logged: d.entries.some((e) => !isWaterDrinkEntry(e)),
         complete: isCompleteDay(d, t),
         kcal: d.eaten.kcal,
         budget: d.budget,

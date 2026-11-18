@@ -85,7 +85,7 @@ describe('CSV tables', () => {
     const w: WeightEntry = { id: 'w1', updatedAt: 'x', date: '2026-11-10', kg: 80.25, bodyFatPct: 18, note: 'after run' };
     expect(weightCsv([w]).split('\r\n')[1]).toBe('2026-11-10,80.25,18,,,,after run');
     const water: WaterEntry = { id: 'h1', updatedAt: '', date: '2026-11-10', ml: 250, beverage: 'coffee', loggedAt: '2026-11-10T08:00:00Z' };
-    expect(waterCsv([water]).split('\r\n')[1]).toBe('2026-11-10,coffee,250,225,2026-11-10T08:00:00Z');
+    expect(waterCsv([water]).split('\r\n')[1]).toBe('2026-11-10,coffee,250,225,2026-11-10T08:00:00Z,');
   });
 });
 

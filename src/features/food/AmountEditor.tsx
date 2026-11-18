@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { servingsFor } from '@/lib/nutrition';
 import { useTheme } from '@/theme';
 import type { Food, Serving } from '@/types';
-import { Chip, ChipWrap, NumberField, Stepper } from '@/ui';
+import { Chip, NumberField, Stepper } from '@/ui';
 
+import { balancedLines, chipWidth } from './chipLines';
 import { formatQty } from './helpers';
 
 export interface AmountValue {
@@ -40,6 +41,7 @@ export function AmountEditor({
   testIDPrefix?: string;
 }) {
   const { spacing } = useTheme();
+  const { width } = useWindowDimensions();
   const [typed, setTyped] = useState<number | null | undefined>(undefined);
   const { serving, quantity } = value;
   const options = servingsFor(food);
@@ -63,17 +65,28 @@ export function AmountEditor({
   return (
     <View style={{ gap: spacing.md }}>
       {/* Wrapped, not a sideways row: inside a card or sheet a scrolling row would run past the card's edge. */}
-      <ChipWrap>
-        {servingList.map((s, i) => (
-          <Chip
-            key={`${s.label}-${i}`}
-            testID={`${testIDPrefix}-serving-${i}`}
-            label={s.label === '1 g' ? 'grams' : s.label}
-            selected={s.label === serving.label}
-            onPress={() => chooseServing(s)}
-          />
+      {/* Laid out in lines ahead of drawing (in a card: the screen's 20 px sides and the card's 18), so no chip is left alone on the last one. */}
+      <View style={{ rowGap: 12 }}>
+        {balancedLines(
+          servingList.map((s) => chipWidth(s.label === '1 g' ? 'grams' : s.label)),
+          Math.min(width, 560) - 76,
+        ).map((line) => (
+          <View key={line.join('-')} style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, rowGap: 12 }}>
+            {line.map((i) => {
+              const s = servingList[i];
+              return (
+                <Chip
+                  key={`${s.label}-${i}`}
+                  testID={`${testIDPrefix}-serving-${i}`}
+                  label={s.label === '1 g' ? 'grams' : s.label}
+                  selected={s.label === serving.label}
+                  onPress={() => chooseServing(s)}
+                />
+              );
+            })}
+          </View>
         ))}
-      </ChipWrap>
+      </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, flexWrap: 'wrap' }}>
         {/* Compact, so the stepper and the grams field share one row in a card at 360 px; at 320 the field wraps under it, full width. */}
         <Stepper

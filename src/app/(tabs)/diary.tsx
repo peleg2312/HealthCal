@@ -133,6 +133,7 @@ export default function DiaryScreen() {
             emoji={m.emoji}
             date={date}
             entries={day.byMeal[m.id]}
+            waterEntries={day.waterEntries}
             previous={previousByMeal[m.id]}
             onMenu={() => setMenuMeal(m.id)}
             onRepeat={() => copyPreviousMeal(date, m.id)}

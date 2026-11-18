@@ -3,6 +3,7 @@ import { Info, Star, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
+import { detailDrinkNote, waterPointingAt } from '@/features/drinks/rules';
 import { updateEntryDirect } from '@/features/food/actions';
 import { AmountEditor } from '@/features/food/AmountEditor';
 import { UNKNOWN_AI_CONFIDENCE, bandSpread, estimateRange, scaleRange, spreadRange } from '@/features/food/build';
@@ -61,6 +62,21 @@ function nextBand(entries: FoodEntry[], foodId: string, kcalNow: number): [numbe
  */
 function estimateBandText([low, high]: [number, number]): string {
   return `Estimate, between ${kcal(low)} and ${kcal(high)} kcal`;
+}
+
+/**
+ * Under the amount of a drink logged on the water screen: it is also counted in Water, an amount or
+ * day saved here moves the water record with it, and a delete here keeps the water.
+ */
+function DrinkNote({ entryId }: { entryId?: string }) {
+  const water = useStore((s) => (entryId ? waterPointingAt(s.water, entryId) : null));
+  const units = useStore((s) => s.profile?.units ?? 'metric');
+  if (!water) return null;
+  return (
+    <Text testID="detail-drink-note" variant="caption" color="textSecondary">
+      {detailDrinkNote(water, units)}
+    </Text>
+  );
 }
 
 function Missing({ message }: { message: string }) {
@@ -322,6 +338,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
         <Divider />
         <AmountEditor food={food} value={portion} onChange={setPortion} onPendingChange={setGramsInvalid} testIDPrefix="detail" />
       </Card>
+      <DrinkNote entryId={entry?.id} />
 
       <ImpactLine date={date} kcalValue={n.kcal} replacing={entry} />
 
@@ -407,6 +424,7 @@ function ManualEditor({ entry }: { entry: FoodEntry }) {
           </Text>
         ) : null}
       </Card>
+      <DrinkNote entryId={entry.id} />
       <ImpactLine date={date} kcalValue={n.kcal} replacing={entry} />
       <Card style={{ gap: spacing.md }}>
         <Text variant="h3">Meal and day</Text>

@@ -19,6 +19,12 @@ const settle = { wait: 700 };
 // A toast with Undo stays 4.5 s, 12 s when the browser reports a screen reader (the test browser can);
 // states that are not about the toast wait for it to go.
 const toastGone = { wait: 12500 };
+/** Today at a clock time, for a state's `now` (the seed is built around the real today). */
+const todayAt = (h, m) => {
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return d.getTime();
+};
 const CSV = 'scripts/dev/states/files/garmin-activities.csv';
 const GPX = 'scripts/dev/states/files/morning-run.gpx';
 
@@ -150,7 +156,39 @@ const water = [
   { id: 'water-custom', route: '/water', imperial: true, type: { 'water-custom-input': '24' }, note: 'another amount typed in fl oz' },
   { id: 'water-sizes-sheet', route: '/water', taps: ['section-add-a-drink-action'], sheet: true, note: 'edit the glass sizes' },
   { id: 'water-sizes-imperial', route: '/water', imperial: true, taps: ['section-add-a-drink-action'], sheet: true, note: 'edit the glass sizes in fl oz' },
-  { id: 'water-sizes-error', route: '/water', taps: ['section-add-a-drink-action', ...[0, 1, 2, 3].map((i) => ({ type: `water-preset-${i}`, text: '' })), 'water-presets-save'], sheet: true, waitFor: 'water-presets-error', note: 'every size cleared: the error' },
+  // Drinks with calories (src/features/drinks): the choice row, the drink line, the glasses' calories,
+  // the pick sheet, the "already in the diary" notice, and the pair seen from both sides. A clock is
+  // set so the meal in the words is fixed (13:30 is lunch); values.drinks and values.diaryDrink are seed.mjs's knobs.
+  ...[
+    ['milk', 'milk_semi'],
+    ['coffee', 'coffee_black'],
+    ['tea', 'tea_plain'],
+    ['juice', 'juice_orange'],
+    ['sports', 'sports_zero'],
+    ['other', 'other_none'],
+  ].map(([b, first]) => ({ id: `water-${b}-choices`, route: '/water', now: todayAt(13, 30), taps: [`water-beverage-${b}`], waitFor: `water-choice-${first}`, note: `${b}: its choices, the default selected, the drink line` })),
+  { id: 'water-milk-whole', route: '/water', now: todayAt(13, 30), taps: ['water-beverage-milk', 'water-choice-milk_whole'], waitFor: 'water-drink-line', note: 'whole milk chosen: every glass shows its calories' },
+  { id: 'water-coffee-latte', route: '/water', now: todayAt(13, 30), taps: ['water-beverage-coffee', 'water-choice-latte'], waitFor: 'water-drink-line', note: 'a latte chosen: the glasses show 139 kcal and more' },
+  { id: 'water-milk-imperial', route: '/water', imperial: true, now: todayAt(13, 30), taps: ['water-beverage-milk'], waitFor: 'water-drink-line', note: 'milk in fl oz' },
+  { id: 'water-milk-custom', route: '/water', now: todayAt(13, 30), type: { 'water-custom-input': '330' }, taps: ['water-beverage-milk'], waitFor: 'water-drink-line', note: 'another amount typed: the line names it and its calories' },
+  { id: 'water-milk-past-day', route: '/water?date={day}', day: -1, now: todayAt(13, 30), taps: ['water-beverage-milk'], waitFor: 'water-drink-line', note: "yesterday: the calories go to yesterday's lunch" },
+  { id: 'water-milk-logged', route: '/water', now: todayAt(13, 30), taps: ['water-beverage-milk', 'water-add-1'], waitFor: 'toast-action', note: 'a glass of milk logged: the toast with its calories and Undo' },
+  { id: 'water-other-pick', route: '/water', now: todayAt(13, 30), taps: ['water-beverage-other', 'water-choice-pick'], sheet: true, waitFor: 'water-pick-sheet', note: 'Choose a drink: the drinks, then enter calories' },
+  { id: 'water-other-pick-juice', route: '/water', now: todayAt(13, 30), taps: ['water-beverage-juice', 'water-choice-pick'], sheet: true, waitFor: 'water-pick-sheet', note: 'Other juice: the sheet opens on "juice"' },
+  { id: 'water-other-pick-none', route: '/water', now: todayAt(13, 30), taps: ['water-beverage-other', 'water-choice-pick', { type: 'water-pick-search', text: 'zzqx drink' }], sheet: true, waitFor: 'water-pick-none', note: 'a search with no drink' },
+  { id: 'water-other-pick-kcal', route: '/water', now: todayAt(13, 30), taps: ['water-beverage-other', 'water-choice-pick', { type: 'water-pick-kcal', text: '140' }], sheet: true, waitFor: 'water-pick-sheet', note: 'calories entered: Add drink enabled' },
+  { id: 'water-other-picked', route: '/water', now: todayAt(13, 30), taps: ['water-beverage-other', 'water-choice-pick', 'water-pick-b_lemonade'], waitFor: 'water-choice-food', note: 'lemonade picked: its own chip, selected, and the glasses priced' },
+  { id: 'water-already-in-diary', route: '/water', values: { diaryDrink: 1 }, now: todayAt(9, 0), taps: ['water-beverage-milk'], waitFor: 'water-drink-notice', note: 'milk already in breakfast: the notice and Water only' },
+  { id: 'water-water-only', route: '/water', values: { diaryDrink: 1 }, now: todayAt(9, 0), taps: ['water-beverage-milk', 'water-water-only'], waitFor: 'water-drink-notice', note: 'Water only on: the glasses read No calories' },
+  { id: 'water-with-drinks', route: '/water', values: { drinks: 2 }, now: todayAt(14, 0), waitFor: 'water-entry-kcal-0', note: 'two drinks with calories: their rows name the diary entry' },
+  { id: 'water-with-drinks-imperial', route: '/water', imperial: true, values: { drinks: 2 }, now: todayAt(14, 0), waitFor: 'water-entry-kcal-0', note: 'the same in fl oz' },
+  { id: 'water-drink-removed', route: '/water', values: { drinks: 2 }, now: todayAt(14, 0), taps: ['^water-delete-'], waitFor: 'toast-action', note: 'a drink with calories deleted on Water: both go, one toast with Undo' },
+  { id: 'water-drink-open', route: '/water', values: { drinks: 2 }, now: todayAt(14, 0), taps: ['^water-entry-open-'], waitFor: 'detail-drink-note', note: 'the edit from the water side: the row opens its diary entry' },
+  { id: 'diary-with-drinks', route: '/diary', values: { drinks: 2 }, now: todayAt(14, 0), waitFor: 'entry-in-water-00000000-0000-4000-8000-00000000d001', note: 'the diary: the drinks marked "also in Water"' },
+  { id: 'diary-drink-removed', route: '/diary', values: { drinks: 2 }, now: todayAt(14, 0), taps: ['entry-delete-00000000-0000-4000-8000-00000000d001'], waitFor: 'toast-action', note: 'deleted in the diary: the water stays, and the toast says so' },
+  { id: 'detail-drink', route: '/food/detail?entryId=00000000-0000-4000-8000-00000000d001', values: { drinks: 1 }, now: todayAt(14, 0), waitFor: 'detail-drink-note', note: 'the edit from the diary side: the note on the water' },
+  { id: 'detail-drink-kcal', route: '/water', now: todayAt(13, 30), taps: ['water-beverage-other', 'water-choice-pick', { type: 'water-pick-kcal', text: '140' }, 'water-pick-kcal-add', toastGone, '^water-entry-open-'], waitFor: 'detail-drink-note', note: 'calories entered on Water, opened: the quick entry with the note' },
+  { id: 'water-sizes-error',route: '/water', taps: ['section-add-a-drink-action', ...[0, 1, 2, 3].map((i) => ({ type: `water-preset-${i}`, text: '' })), 'water-presets-save'], sheet: true, waitFor: 'water-presets-error', note: 'every size cleared: the error' },
 ];
 
 // ------------------------------------------------------------------ weight

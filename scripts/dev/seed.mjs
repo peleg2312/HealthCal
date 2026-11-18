@@ -243,8 +243,13 @@ function stressUp(state, { put, baselineTdee }) {
 //                so the newest weigh-in is exactly that many days before the page's today.
 //   onboardedToday  true sets profile.onboardedAt to the seed's today at 09:00 (the page's day 2).
 //   name         sets profile.name ('' for none).
+// For drinks with calories (src/features/drinks), written with the app's own planDrink:
+//   drinks       1: today 08:05, 250 ml semi-skimmed milk to breakfast (entry ...d001, water ...d101);
+//                2: also 13:10, 330 ml soft drink to lunch (...d002 / ...d102). Applied after water.
+//   diaryDrink   1: today 08:05, 250 ml semi-skimmed milk logged in the diary only (breakfast, entry ...d003,
+//                no water record, no `via`): the water screen's "already in breakfast" notice and "Water only".
 // Only what is named changes; everything else stays the demo's. Applied in that order: eatBack, spread, exercise and
-// the week first (they move the budget and the water goal), then food, water and the fast.
+// the week first (they move the budget and the water goal), then food, water, drinks and the fast.
 
 const APP = new URL('../../src/', import.meta.url);
 let appCache = null;
@@ -258,7 +263,8 @@ function appMaths() {
   if (appCache) return appCache;
   const require = createRequire(import.meta.url);
   const ts = require('typescript');
-  const stubs = { react: {}, './clock': {}, './index': {} };
+  // expo-crypto is native: the drink rules reach it through @/lib/id (buildEntry's nowISO); Node has randomUUID.
+  const stubs = { react: {}, './clock': {}, './index': {}, 'expo-crypto': { randomUUID } };
   const cache = new Map();
   const load = (file) => {
     if (cache.has(file)) return cache.get(file).exports;
@@ -277,11 +283,11 @@ function appMaths() {
     return module.exports;
   };
   const lib = (f) => load(fileURLToPath(new URL(f, APP)));
-  appCache = { ...lib('lib/dates.ts'), ...lib('lib/exercise.ts'), ...lib('store/selectors.ts') };
+  appCache = { ...lib('lib/dates.ts'), ...lib('lib/exercise.ts'), ...lib('store/selectors.ts'), drinks: lib('features/drinks/rules.ts'), choices: lib('features/drinks/choices.ts') };
   return appCache;
 }
 
-const VALUE_KEYS = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack', 'spread', 'lastNight', 'weighInGap', 'onboardedToday', 'name'];
+const VALUE_KEYS = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack', 'spread', 'lastNight', 'weighInGap', 'onboardedToday', 'name', 'drinks', 'diaryDrink'];
 /** Knobs that are not numbers: their type is checked on its own. */
 const VALUE_TYPES = { onboardedToday: 'boolean', name: 'string' };
 
@@ -384,6 +390,29 @@ function applyValues(state, values, { put, weightKg, baselineTdee }) {
       left -= ml;
     }
   }
+  if (values.drinks > 0) {
+    const { planDrink, selectChoice } = m.drinks;
+    const { choiceById } = m.choices;
+    const units = state.profile.units || 'metric';
+    const list = [
+      { n: 1, kind: 'milk', choice: 'milk_semi', ml: 250, h: 8, min: 5 },
+      { n: 2, kind: 'other', choice: 'soft_regular', ml: 330, h: 13, min: 10 },
+    ].slice(0, Math.min(2, Math.round(values.drinks)));
+    for (const d of list) {
+      const now = new Date(at(0, d.h, d.min));
+      const plan = planDrink({ kind: d.kind, drink: selectChoice(choiceById(d.choice)), ml: d.ml, date: day, now, today: day, units });
+      const entryId = `00000000-0000-4000-8000-00000000d00${d.n}`;
+      put('foodEntries', { ...plan.entry, id: entryId });
+      put('water', { ...plan.water, id: `00000000-0000-4000-8000-00000000d10${d.n}`, foodEntryId: entryId });
+    }
+  }
+  if (values.diaryDrink > 0) {
+    const { planDrink, selectChoice } = m.drinks;
+    const { choiceById } = m.choices;
+    const plan = planDrink({ kind: 'milk', drink: selectChoice(choiceById('milk_semi')), ml: 250, date: day, now: new Date(at(0, 8, 5)), today: day, units: state.profile.units || 'metric' });
+    const { via: _via, ...entry } = plan.entry;
+    put('foodEntries', { ...entry, id: '00000000-0000-4000-8000-00000000d003' });
+  }
   if (values.lastNight !== undefined) {
     const night = iso(daysAgo(-1));
     drop('sleep', (r) => r.date !== night);
@@ -410,7 +439,7 @@ function applyValues(state, values, { put, weightKg, baselineTdee }) {
 
 /**
  * @param {{ days?: number, empty?: boolean, theme?: 'system'|'light'|'dark'|'blossom', onboarded?: boolean, units?: 'metric'|'imperial', store?: boolean, stress?: boolean,
- *   values?: { eaten?: number, protein?: number, exercise?: number, water?: number, weekMinutes?: number, fasting?: number, eatBack?: number, spread?: number, lastNight?: number, weighInGap?: number, onboardedToday?: boolean, name?: string } }} opts
+ *   values?: { eaten?: number, protein?: number, exercise?: number, water?: number, weekMinutes?: number, fasting?: number, eatBack?: number, spread?: number, lastNight?: number, weighInGap?: number, onboardedToday?: boolean, name?: string, drinks?: number, diaryDrink?: number } }} opts
  */
 export function buildSeed(opts = {}) {
   const { days = 35, empty = false, theme = 'dark', onboarded = true, units = 'metric', store = false, stress = false, values = null } = opts;

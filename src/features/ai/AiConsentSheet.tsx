@@ -19,7 +19,7 @@ import { Button, Sheet, Text } from '@/ui';
 export const AI_CONSENT_PARTS: readonly { title: string; body: string }[] = [
   {
     title: 'What is sent',
-    body: 'A smaller copy of the meal photo with any note you add, or the words you type to describe a meal.',
+    body: 'A smaller copy of the meal photo with any note or weighed total you add, or the words you type to describe a meal.',
   },
   {
     title: 'Who receives it',
@@ -27,7 +27,7 @@ export const AI_CONSENT_PARTS: readonly { title: string; body: string }[] = [
   },
   {
     title: 'What is not sent',
-    body: 'Nothing else from your diary: not your name, email, weight, goals or history. The server checks that you are signed in, and only the photo or words go on to Anthropic.',
+    body: 'Nothing else from your diary: not your name, email, body weight, goals or history. The server checks that you are signed in, and only the photo or words go on to Anthropic.',
   },
   {
     title: 'What happens to it',

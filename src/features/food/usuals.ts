@@ -5,6 +5,7 @@
  * the same order.
  */
 import { BUILTIN_FOODS } from '@/data/foods';
+import { isWaterDrinkEntry } from '@/features/drinks/via';
 import { diffDays } from '@/lib/dates';
 import { scaleNutrients } from '@/lib/nutrition';
 import { formatNumber } from '@/lib/units';
@@ -85,14 +86,15 @@ export function foodKey(e: Pick<FoodEntry, 'foodId' | 'name' | 'brand'>): string
  * before `today`, weighted towards recent days. Today itself is left out, so
  * the order stays put while the user logs several of them in a row. A food
  * counts at most once per day, so three eggs logged as three lines do not
- * outrank a daily habit. Ties go to the most recently logged.
+ * outrank a daily habit. Ties go to the most recently logged. Drinks logged on
+ * the water screen are left out (they are logged there again, with their water).
  */
 export function usualFoods(entries: FoodEntry[], meal: MealType, today: ISODate, opts: UsualOptions = {}): UsualFood[] {
   const { limit = 6, days = 30, minEntries = 3, halfLifeDays = 14, withFood = false } = opts;
   const byFood = new Map<string, { last: FoodEntry; dates: Set<ISODate>; score: number }>();
   let total = 0;
   for (const e of entries) {
-    if (e.deleted || e.meal !== meal || !(e.quantity > 0)) continue;
+    if (e.deleted || e.meal !== meal || !(e.quantity > 0) || isWaterDrinkEntry(e)) continue;
     if (withFood && (!e.foodId || !e.food)) continue;
     const age = diffDays(e.date, today);
     if (age < 1 || age > days) continue;

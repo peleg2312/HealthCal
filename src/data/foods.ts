@@ -7,7 +7,7 @@
  * (foundation_food_json_2026-10-29, consulted but no record was chosen from it,
  * because the matching SR Legacy record carries the full nutrient set).
  *
- * 321 of 341 foods name the record they were checked against (`fdcId`) and are
+ * 322 of 348 foods name the record they were checked against (`fdcId`) and are
  * `verified: true`. For those, kcal, protein, carbs (by difference), fat,
  * fibre, total sugars, saturated fat and sodium were compared per 100 g and set
  * to the USDA values (grams to 0.1, kcal and sodium whole) where they differed
@@ -26,12 +26,20 @@
  * which are corrected here (soft drinks, for instance, weigh more than their
  * volume in ml).
  *
- * The other 20 foods have no honest USDA equivalent and stay `verified: false`
+ * The other 26 foods have no honest USDA equivalent and stay `verified: false`
  * with typical-label or recipe-based estimates: labneh, halloumi, gummy candy,
  * Caesar salads and Greek salad (USDA versions have no dressing or oil),
  * shakshuka, Israeli salad, chicken shawarma (both), chicken schnitzel,
  * bourekas, latte/cappuccino/mocha with whole milk (USDA's use unspecified
- * milk) and the five protein products.
+ * milk) and the five protein products, and six tea and coffee drinks.
+ *
+ * The six tea and coffee 'splash of milk / sugar' rows are computed from
+ * b_coffee_black or b_tea_brewed, b_milk_2pct and b_sugar_white (220 ml brew +
+ * 30 ml milk [+ 4.2 g sugar] per 250 ml cup; sugar only: 250 ml brew + 4.2 g);
+ * src/data/data-integrity.test.ts recomputes them. They are not USDA records
+ * because FNDDS "Tea, hot, with milk" (2710506) is a sweetened chai and
+ * "Coffee, pre-lightened" (2710464) uses powdered creamer. Milky coffees are
+ * Latte and Cappuccino. The water screen logs them (src/features/drinks).
  *
  * Tuple order: [kcal, protein, carbs, fat, fiber, sugar, satFat, sodiumMg]
  */
@@ -416,6 +424,13 @@ export const BUILTIN_FOODS: Food[] = [
   f('cappuccino', 'Cappuccino, whole milk', '☕', 'drinks', [41, 2.2, 3.6, 2.1, 0, 3.5, 1.2, 30], [['1 cup (6 fl oz)', 180], ['12 fl oz', 355]]),
   f('mocha', 'Cafe mocha, whole milk', '☕', 'drinks', [75, 2.7, 9.0, 3.0, 0.5, 8.0, 1.8, 45], [['12 fl oz', 355], ['16 fl oz', 473]]),
   f('tea_brewed', 'Tea, brewed, unsweetened', '🍵', 'drinks', [1, 0, 0.3, 0, 0, 0, 0, 3], [['1 cup', 237], ['1 mug', 355]], 173227),
+  // Computed from the rows above (see the header): a 250 ml cup is 220 ml brew + 30 ml 2% milk [+ 1 tsp sugar].
+  f('coffee_milk', 'Coffee with a splash of milk (2%)', '☕', 'drinks', [7.0, 0.51, 0.59, 0.26, 0, 0.59, 0.16, 8], [['1 cup (250 ml)', 251], ['1 mug (350 ml)', 351]]),
+  f('coffee_milk_sugar', 'Coffee with a splash of milk and 1 tsp sugar', '☕', 'drinks', [13.3, 0.5, 2.23, 0.26, 0, 2.22, 0.16, 7], [['1 cup (250 ml)', 255], ['1 mug (350 ml)', 357]]),
+  f('coffee_sugar', 'Coffee with 1 tsp sugar', '☕', 'drinks', [7.4, 0.12, 1.65, 0.02, 0, 1.65, 0, 2], [['1 cup (250 ml)', 254], ['1 mug (350 ml)', 356]]),
+  f('tea_milk', 'Tea with a splash of milk (2%)', '🍵', 'drinks', [7.0, 0.41, 0.85, 0.24, 0, 0.59, 0.16, 8], [['1 cup (250 ml)', 251], ['1 mug (350 ml)', 351]]),
+  f('tea_milk_sugar', 'Tea with a splash of milk and 1 tsp sugar', '🍵', 'drinks', [13.3, 0.4, 2.49, 0.24, 0, 2.22, 0.16, 8], [['1 cup (250 ml)', 255], ['1 mug (350 ml)', 357]]),
+  f('tea_sugar', 'Tea with 1 tsp sugar', '🍵', 'drinks', [7.4, 0, 1.95, 0, 0, 1.65, 0, 3], [['1 cup (250 ml)', 254], ['1 mug (350 ml)', 356]]),
   f('iced_tea_sweet', 'Iced tea, sweetened', '🧋', 'drinks', [32, 0, 7.9, 0, 0, 7.7, 0, 3], [['1 glass (12 fl oz)', 372], ['1 bottle (16.9 fl oz)', 524]], 2710515),
   f('orange_juice', 'Orange juice', '🧃', 'drinks', [49, 0.7, 11.5, 0.1, 0.3, 8.3, 0.02, 2], [['1 cup', 248], ['1 small glass (6 fl oz)', 186]], 169100),
   f('apple_juice', 'Apple juice', '🧃', 'drinks', [46, 0.1, 11.3, 0.13, 0.2, 9.62, 0.02, 4], [['1 cup', 248], ['1 small glass (6 fl oz)', 186]], 173933),
@@ -430,6 +445,7 @@ export const BUILTIN_FOODS: Food[] = [
   f('ginger_ale', 'Ginger ale', '🥤', 'drinks', [34, 0, 8.8, 0, 0, 8.8, 0, 7], [['1 can (12 fl oz)', 366], ['1 cup', 244]], 174846),
   f('energy_drink', 'Energy drink, sugared', '⚡', 'drinks', [43, 0.5, 10.2, 0, 0, 10.2, 0, 39], [['1 can (8.4 fl oz)', 250], ['1 can (16 fl oz)', 473]], 2710756),
   f('sports_drink', 'Sports drink (electrolyte)', '🥤', 'drinks', [26, 0, 6.4, 0, 0, 5.2, 0, 39], [['1 bottle (20 fl oz)', 620], ['1 bottle (12 fl oz)', 372]], 2710771),
+  f('sports_drink_low', 'Sports drink, low calorie', '🥤', 'drinks', [8, 0.05, 1.94, 0.01, 0, 1.3, 0, 45], [['1 bottle (20 fl oz)', 600], ['1 cup', 240]], 2710774),
   f('smoothie_fruit', 'Fruit smoothie (fruit and yogurt)', '🥤', 'drinks', [66, 2.3, 12, 1.1, 1.1, 8.9, 0.6, 28], [['1 cup', 216], ['16 fl oz', 432]], 2705513),
   f('milkshake_vanilla', 'Milkshake, vanilla', '🥤', 'drinks', [112, 3.9, 17.8, 3, 0, 17.8, 1.9, 95], [['small (12 fl oz)', 330], ['medium (16 fl oz)', 450]], 170884),
   f('hot_chocolate', 'Hot chocolate (cocoa mix with milk)', '☕', 'drinks', [97, 3.8, 15.5, 2.2, 0.5, 13.1, 1.3, 102], [['1 cup', 250], ['1 mug (12 fl oz)', 355]], 2705484),

@@ -5,6 +5,7 @@
 import { formatDayLabel, today } from '@/lib/dates';
 import { defaultServing, formatMacro, mealForTime, servingsFor } from '@/lib/nutrition';
 import { formatNumber } from '@/lib/units';
+import { isWaterDrinkEntry } from '@/features/drinks/via';
 import type { ThemeColors } from '@/theme';
 import type { Food, FoodEntry, FoodSource, ISODate, MealType, Serving } from '@/types';
 
@@ -134,11 +135,11 @@ export function matchServing(food: Food, label: string, gramsPerUnit: number): S
   );
 }
 
-/** Map foodId -> most recent entry of it, so re-logging repeats the amount last eaten. */
+/** Map foodId -> most recent entry of it, so re-logging repeats the amount last eaten. A glass from the water screen (an ml amount) is left out. */
 export function lastPortions(entries: FoodEntry[]): Map<string, FoodEntry> {
   const out = new Map<string, FoodEntry>();
   for (const e of entries) {
-    if (!e.foodId || e.quantity <= 0 || e.grams <= 0) continue;
+    if (!e.foodId || e.quantity <= 0 || e.grams <= 0 || isWaterDrinkEntry(e)) continue;
     const prev = out.get(e.foodId);
     if (!prev || e.loggedAt > prev.loggedAt) out.set(e.foodId, e);
   }

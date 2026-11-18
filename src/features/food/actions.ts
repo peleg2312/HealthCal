@@ -3,6 +3,9 @@
  * days, clearing a meal, saving a meal, and managing custom foods. Every one
  * of them can be undone from the toast.
  */
+import { followEntry, undoEdit } from '@/features/drinks/pair';
+import { DRINKS_NOT_COPIED, DRINKS_NOT_SAVED } from '@/features/drinks/rules';
+import { isWaterDrinkEntry } from '@/features/drinks/via';
 import { addDays } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
 import { MEAL_LABEL } from '@/lib/nutrition';
@@ -21,7 +24,7 @@ function liveEntries(): FoodEntry[] {
   return live(useStore.getState().foodEntries);
 }
 
-/** Most recent day before `date` (within `maxDays`) that has entries in `meal`. */
+/** Most recent day before `date` (within `maxDays`) that has entries in `meal`. Drinks from the water screen are left out. */
 export function findPreviousMeal(
   entries: FoodEntry[],
   date: ISODate,
@@ -31,7 +34,7 @@ export function findPreviousMeal(
   const byDate = new Map<ISODate, FoodEntry[]>();
   const floor = addDays(date, -maxDays);
   for (const e of entries) {
-    if (e.meal !== meal || e.date >= date || e.date < floor) continue;
+    if (e.meal !== meal || e.date >= date || e.date < floor || isWaterDrinkEntry(e)) continue;
     const list = byDate.get(e.date) ?? [];
     list.push(e);
     byDate.set(e.date, list);
@@ -40,13 +43,14 @@ export function findPreviousMeal(
   return latest ? { date: latest, entries: byDate.get(latest)!.sort(sortByLogged) } : null;
 }
 
-/** Most recent day before `date` with anything logged. */
+/** Most recent day before `date` with anything logged. Drinks from the water screen are left out (they are logged on Water again). */
 export function findPreviousDay(entries: FoodEntry[], date: ISODate, maxDays = 60): { date: ISODate; entries: FoodEntry[] } | null {
   const floor = addDays(date, -maxDays);
+  const food = entries.filter((e) => !isWaterDrinkEntry(e));
   let latest: ISODate | null = null;
-  for (const e of entries) if (e.date < date && e.date >= floor && (!latest || e.date > latest)) latest = e.date;
+  for (const e of food) if (e.date < date && e.date >= floor && (!latest || e.date > latest)) latest = e.date;
   if (!latest) return null;
-  return { date: latest, entries: entries.filter((e) => e.date === latest).sort(sortByLogged) };
+  return { date: latest, entries: food.filter((e) => e.date === latest).sort(sortByLogged) };
 }
 
 function undoAll(ids: string[]) {
@@ -54,11 +58,18 @@ function undoAll(ids: string[]) {
   ids.forEach((id) => s.remove('foodEntries', id));
 }
 
-/** Copy entries (any meals) onto a day, keeping each entry's meal unless `meal` is given. */
+/**
+ * Copy entries (any meals) onto a day, keeping each entry's meal unless `meal` is given. Drinks from
+ * the water screen are not copied: their water is not copied, and they are logged on Water again.
+ */
 export function copyEntries(entries: FoodEntry[], toDate: ISODate, meal?: MealType, message?: string): FoodEntry[] {
-  if (entries.length === 0) return [];
+  const food = entries.filter((e) => !isWaterDrinkEntry(e));
+  if (food.length === 0) {
+    if (entries.length > 0) toast(DRINKS_NOT_COPIED);
+    return [];
+  }
   const groups = new Map<MealType, FoodEntry[]>();
-  for (const e of [...entries].sort(sortByLogged)) {
+  for (const e of [...food].sort(sortByLogged)) {
     const m = meal ?? e.meal;
     groups.set(m, [...(groups.get(m) ?? []), e]);
   }
@@ -106,9 +117,15 @@ export function clearEntries(entries: FoodEntry[], label: string): void {
   toast(`Cleared ${label}`, { label: 'Undo', onPress: () => ids.forEach((id) => useStore.getState().restore('foodEntries', id)) });
 }
 
+/** Save entries as a meal. Drinks from the water screen are left out; with nothing else, no meal is saved and the toast says why. */
 export function saveMeal(name: string, entries: FoodEntry[]): SavedMeal | null {
   if (entries.length === 0) return null;
-  const meal = useStore.getState().upsert('savedMeals', { name: name.trim() || 'Saved meal', items: entries.map(toSavedMealItem) });
+  const food = entries.filter((e) => !isWaterDrinkEntry(e));
+  if (food.length === 0) {
+    toast(DRINKS_NOT_SAVED);
+    return null;
+  }
+  const meal = useStore.getState().upsert('savedMeals', { name: name.trim() || 'Saved meal', items: food.map(toSavedMealItem) });
   haptic.success();
   toast(`Saved "${meal.name}"`, { label: 'Undo', onPress: () => useStore.getState().remove('savedMeals', meal.id) });
   return meal;
@@ -177,7 +194,9 @@ export function updateEntryDirect(
     confidence: kcalChanged ? undefined : entry.confidence,
     loggedAt: entry.loggedAt ?? nowISO(),
   });
+  // A drink from Water: its water record follows the new day (an entered drink has no grams to scale).
+  const waterBefore = entry.deleted ? null : followEntry(entry, next);
   haptic.success();
-  toast('Entry updated', { label: 'Undo', onPress: () => useStore.getState().upsert('foodEntries', entry) });
+  toast('Entry updated', { label: 'Undo', onPress: () => undoEdit(entry, waterBefore) });
   return next;
 }

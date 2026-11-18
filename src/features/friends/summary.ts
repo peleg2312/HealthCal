@@ -9,7 +9,7 @@ import { ACTIVITY_BY_ID } from '@/data/activities';
 import { addDays, startOfWeek } from '@/lib/dates';
 import { guidelineMinutes } from '@/lib/exercise';
 import { sha256Hex } from '@/lib/sha256';
-import { computeConsistency } from '@/store/selectors';
+import { computeConsistency, foodLoggedDates } from '@/store/selectors';
 import type { ActivityEntry, FoodEntry, ISODate } from '@/types';
 
 export interface SocialSharing {
@@ -126,7 +126,7 @@ export function buildFriendSummary(input: { activities: ActivityEntry[]; foodEnt
     summary.sessions = thisWeek.length;
   }
   if (sharing.streak) {
-    const dates = new Set(input.foodEntries.filter((e) => !e.deleted).map((e) => e.date));
+    const dates = foodLoggedDates(input.foodEntries);
     summary.streak = computeConsistency(dates, today).streak;
   }
   // Without the owner's share key there is no safe reference, so no workouts rather than real ids.
