@@ -41,13 +41,15 @@ name: A drink in the diary also counts in Water
     timeout: 15000
 - takeScreenshot: 70-search-monster
 
-# One tap: the calories go to lunch and the volume to Water; the toast says both.
+# One tap: the calories go to lunch and the volume to Water; the toast says both. The picture is
+# taken at once, with the keyboard still up: the toast must be in it, above the keyboard and the
+# footer (run 44587317694 showed it hidden behind the keyboard before the toast learned to rise).
 - tapOn:
     id: result-0-add
+- takeScreenshot: 71-added-with-water-toast
 - assertVisible:
     text: '(?i).*to Water.*'
     optional: true
-- takeScreenshot: 71-added-with-water-toast
 - tapOn:
     id: search-done
 - waitForAnimationToEnd:
