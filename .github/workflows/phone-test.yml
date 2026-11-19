@@ -767,6 +767,13 @@ jobs:
               echo "App language: $(adb -s "$DEVICE" shell cmd locale get-app-locales "$APP_ID" --user 0 | tr -d '\r')"
               ;;
           esac
+          # The emulator's own "Pixel Launcher isn't responding" dialog can sit over the app and take a
+          # flow's first tap (runs 44336077179 and 44582333635): system error dialogs are not shown. The
+          # setting is read at the next configuration change, so the night mode is switched and put back.
+          adb -s "$DEVICE" shell settings put global hide_error_dialogs 1 || true
+          adb -s "$DEVICE" shell "cmd uimode night yes; sleep 2; cmd uimode night no" || true
+          sleep 3
+          echo "System error dialogs hidden: $(adb -s "$DEVICE" shell settings get global hide_error_dialogs | tr -d '\r'); night mode: $(adb -s "$DEVICE" shell cmd uimode night | tr -d '\r')"
           adb -s "$DEVICE" logcat -c || true
           nohup adb -s "$DEVICE" logcat -v threadtime -b main,system,crash > "$RUNNER_TEMP/logcat-full.txt" 2>&1 &
           echo $! > "$RUNNER_TEMP/logcat.pid"
