@@ -9,8 +9,10 @@
  * A drink logged in the diary (`fromEntryId`, ./diary.ts): the entry leads and is never refused. Its
  * live water is recomputed from the edited entry (`diaryDrinkMl`: floor 1 ml, cap 10,000 ml, never by
  * scaling the old volume) and takes the entry's day, future days included, written with the entry in
- * one act with one stamp (the store's `upsertEntriesWithWater`). An edit never creates this water and
- * never removes it; water deleted on Water stays deleted.
+ * one act with one stamp (the store's `upsertEntriesWithWater`), only when the amount, the serving or
+ * the day changed (`entryEditMovesWater`); an edit of the meal, the name or the calories alone leaves
+ * the water record untouched, stamp included. An edit never creates this water and never removes it;
+ * water deleted on Water stays deleted.
  *
  * Called by the food log's rewriteEntry and by updateEntryDirect in the same act as the entry's own
  * write; their Undo (`undoEdit`) puts back the snapshot this returns.
@@ -19,7 +21,7 @@ import { today } from '@/lib/dates';
 import { useStore } from '@/store';
 import type { FoodEntry, WaterEntry } from '@/types';
 
-import { diaryDrinkMl } from './diary';
+import { diaryDrinkMl, entryEditMovesWater, type EntryWaterFields } from './diary';
 import { pairEditProblem, waterForEntryEdit, waterFromEntry, waterPointingAt } from './rules';
 
 /**
@@ -41,7 +43,10 @@ export function pairEditBlocked(before: Pick<FoodEntry, 'id' | 'grams' | 'date' 
  * moves). `after` is the entry as just written (the callers pass the whole record). Returns the water
  * record as it was before (for Undo), or null when there is no live pair.
  */
-export function followEntry(before: Pick<FoodEntry, 'id' | 'grams' | 'date'> | undefined, after: Pick<FoodEntry, 'grams' | 'date'> & Partial<FoodEntry>): WaterEntry | null {
+export function followEntry(
+  before: (Pick<FoodEntry, 'id' | 'grams' | 'date'> & Partial<EntryWaterFields>) | undefined,
+  after: Pick<FoodEntry, 'grams' | 'date'> & Partial<FoodEntry>,
+): WaterEntry | null {
   if (!before) return null;
   const store = useStore.getState();
   const water = waterPointingAt(store.water, before.id);
@@ -56,8 +61,11 @@ export function followEntry(before: Pick<FoodEntry, 'id' | 'grams' | 'date'> | u
   const fromDiary = waterFromEntry(store.water, before.id);
   if (!fromDiary) return null;
   const entry: FoodEntry = after.id === before.id && after.name !== undefined ? (after as FoodEntry) : { ...store.foodEntries[before.id], grams: after.grams, date: after.date };
+  // A meal, name or calories change: the entry is already written; its water stays as it is. Still
+  // returned, so the edit's Undo can tell a pair deleted together since.
+  if (!entryEditMovesWater(before, entry)) return fromDiary;
   const ml = diaryDrinkMl(entry) ?? fromDiary.ml;
-  // The entry and its water written again together, one stamp: a meal change rewrites only the stamp.
+  // The entry and its water written again together, one stamp.
   store.upsertEntriesWithWater([{ entry, water: { ...fromDiary, ml } }]);
   return fromDiary;
 }
@@ -66,7 +74,7 @@ export function followEntry(before: Pick<FoodEntry, 'id' | 'grams' | 'date'> | u
  * Undo of an edit: the entry exactly as it was, and its water record as it was only when that water is
  * still live (water the person deleted on Water in between stays deleted; no edit removes water, so
  * "removed by this same edit" never arises). A drink logged in the diary is written back with its entry
- * in one act with one stamp. When the pair was deleted together since the edit, nothing comes back.
+ * in one act with one stamp, or the entry alone when only its meal, name or calories differ from now. When the pair was deleted together since the edit, nothing comes back.
  */
 export function undoEdit(entryBefore: FoodEntry, waterBefore: WaterEntry | null): void {
   const s = useStore.getState();
@@ -77,7 +85,9 @@ export function undoEdit(entryBefore: FoodEntry, waterBefore: WaterEntry | null)
   // edit's Undo does not bring back half of it.
   if (now && !live && entryNow?.deleted && entryNow.updatedAt === now.updatedAt) return;
   if (waterBefore && live && waterBefore.fromEntryId && !waterBefore.foodEntryId) {
-    s.upsertEntriesWithWater([{ entry: entryBefore, water: waterBefore }]);
+    // Undoing a meal, name or calories change: the water was not touched by the edit and is not now.
+    if (entryNow && !entryEditMovesWater(entryNow, entryBefore)) s.upsert('foodEntries', entryBefore);
+    else s.upsertEntriesWithWater([{ entry: entryBefore, water: waterBefore }]);
     return;
   }
   s.upsert('foodEntries', entryBefore);

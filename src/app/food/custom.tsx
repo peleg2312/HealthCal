@@ -3,9 +3,9 @@ import { Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { readLabelMl } from '@/features/drinks/rules';
 import { deleteCustomFood } from '@/features/food/actions';
 import { setFoodDraft, useFoodDraft } from '@/features/food/draft';
+import { drinkByDefault } from '@/features/food/drinkDefault';
 import { href, kcal, param, parseMeal, toPer100 } from '@/features/food/helpers';
 import { logFood } from '@/features/food/log';
 import { isolateRtl } from '@/lib/bidi';
@@ -60,10 +60,11 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
   const [values, setValues] = useState<Values>(() => initialValues(existing, basis, own?.grams ?? 100));
   const [tried, setTried] = useState(false);
   // "This is a drink": the person's own choice once made (or saved before); until then it follows the
-  // serving's name (on when it names ml, cl, L or fl oz). An own food saved before this switch existed
+  // serving's name and the food's name (`drinkByDefault`: on when the serving names ml, cl, L or fl oz
+  // and the name is not a soup, sauce, oil or cream). An own food saved before this switch existed
   // keeps no flag until it is edited and saved here.
   const [drinkChoice, setDrinkChoice] = useState<boolean | null>(existing?.beverage ?? null);
-  const isDrink = drinkChoice ?? readLabelMl(servingLabel, false) !== null;
+  const isDrink = drinkChoice ?? drinkByDefault(servingLabel, name);
 
   const set = (k: keyof Nutrients) => (v: number | null) => setValues((s) => ({ ...s, [k]: v }));
   const factor = basis === 'serving' ? servingGrams ?? 0 : 100;

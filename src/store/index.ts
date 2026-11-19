@@ -121,8 +121,9 @@ interface StoreActions {
   /**
    * Write diary entries and, for each one given water, the water record it adds as a drink logged in
    * the diary (src/features/drinks/diary.ts), in one act: each entry and its water carry one stamp. The
-   * water's id (`waterIdFromEntry`), `fromEntryId`, `date` and `loggedAt` come from its entry; `ml` is
-   * kept within 1..10,000. Also rewrites a pair after an edit (followEntry, undoEdit). The only writer
+   * water goes to the live record that already holds this entry's water, else under `waterIdFromEntry`
+   * (`diaryWaterIdFor`); `fromEntryId`, `date` and `loggedAt` come from its entry; `ml` is kept within
+   * 1..10,000. Also rewrites a pair after an edit (followEntry, undoEdit). The only writer
    * of such water: nothing else (upsert, sync, a restore or an import) ever creates it.
    */
   upsertEntriesWithWater: (
@@ -324,6 +325,26 @@ function restoreDrinkPair(s: StoreState, water: WaterEntry): Partial<StoreState>
   };
 }
 
+/**
+ * Where the water a diary entry adds is written: the live record that already holds it, so an edit
+ * never makes a second one; the deterministic id (`waterIdFromEntry`) for creation, or when none is
+ * live. A live record under another id comes from a hand-made or damaged backup or a later format.
+ * When more than one is live (such a backup already counted it twice), the deterministic one if it is
+ * live, else the latest logged (then the smallest id): one is written, the others are left as they
+ * are, since an edit never removes water; each stays a visible row the person can delete on Water.
+ */
+function diaryWaterIdFor(water: Record<string, WaterEntry>, entryId: string): string {
+  const own = waterIdFromEntry(entryId);
+  const holds = (w: WaterEntry | undefined): w is WaterEntry => !!w && !w.deleted && w.fromEntryId === entryId && !w.foodEntryId;
+  if (holds(water[own])) return own;
+  let best: WaterEntry | null = null;
+  for (const w of Object.values(water)) {
+    if (!holds(w)) continue;
+    if (!best || w.loggedAt > best.loggedAt || (w.loggedAt === best.loggedAt && w.id < best.id)) best = w;
+  }
+  return best?.id ?? own;
+}
+
 /** The water records a diary entry added (`fromEntryId`), live or not; the deterministic id first, then any other (a backup from elsewhere). */
 function waterFromEntryOf(s: StoreState, entryId: string): WaterEntry[] {
   const own = s.water[waterIdFromEntry(entryId)];
@@ -446,7 +467,7 @@ export const useStore = create<Store>()((set, get) => ({
       const dirtyWater = { ...s.dirty.water };
       for (const it of items) {
         const id = idFor('foodEntries', it.entry as { id?: string });
-        const waterId = it.water ? waterIdFromEntry(id) : null;
+        const waterId = it.water ? diaryWaterIdFor(water, id) : null;
         const t = nextStamp(later(foodEntries[id]?.updatedAt ?? '', (waterId && water[waterId]?.updatedAt) || ''));
         const entry = { ...it.entry, id, updatedAt: t, deleted: false } as FoodEntry;
         foodEntries[id] = entry;

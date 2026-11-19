@@ -110,7 +110,8 @@ iced tea	b_iced_tea_sweet	b_iced_tea_sweet
 hot chocolate	b_hot_chocolate	b_hot_chocolate
 sprite	-	-
 fanta	-	-
-red bull	b_bell_pepper_red	b_energy_drink	latin: 'red bull' is a Latin search name of the energy drink (it found the red bell pepper by a typo of bell)
+# red bull: the Latin name "red bull" was withdrawn (it made the bare words red and bull find the energy drink first); "redbull" is the name now, so red bull finds the red bell pepper again, as before this job.
+red bull	b_bell_pepper_red	b_bell_pepper_red
 gatorade	-	-
 coconut water	b_coconut_water	b_coconut_water
 soy milk	b_soy_milk	b_soy_milk

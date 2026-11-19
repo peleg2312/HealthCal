@@ -236,3 +236,26 @@ describe('reviewNote', () => {
     expect(reviewNote(facts({ kcal: 0, complete: false }))).toBe(NOTE_PART_LOGGED);
   });
 });
+
+// Drinks logged in the diary count in the water total but do not make a day water tracked
+// (hasWater false): the review then reads the day exactly as a day with no water at all.
+describe('a day whose only water came with drinks from the diary', () => {
+  const latte = (p: Partial<DayFacts>) => facts({ hasWater: false, ...p });
+  const none = (p: Partial<DayFacts>) => facts({ hasWater: false, ...p, waterMl: 0 });
+
+  it('to improve: "No water logged", as without the diary water', () => {
+    const y = { kcal: 2095, protein: 159, waterMl: 223, waterGoalMl: 3300 };
+    expect(texts(toAdjust(input({ y: latte(y) })))).toEqual(texts(toAdjust(input({ y: none(y) }))));
+    expect(texts(toAdjust(input({ y: latte(y) })))).toEqual(['No water logged, goal 3.3 L']);
+  });
+
+  it('went well: never "Water reached" from diary drinks alone', () => {
+    const y = { waterMl: 3400, waterGoalMl: 3300 };
+    expect(texts(wentWell(input({ y: latte(y) })))).toEqual(texts(wentWell(input({ y: none(y) }))));
+    expect(wentWell(input({ y: latte(y) })).map((i) => i.kind)).not.toContain('water');
+  });
+
+  it('a day with water logged on Water counts the diary drinks in its total', () => {
+    expect(texts(toAdjust(input({ y: facts({ waterMl: 473, hasWater: true }) })))).toEqual(['Water stopped at 0.5 of 3.3 L']);
+  });
+});

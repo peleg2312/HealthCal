@@ -47,3 +47,9 @@ laban	b_leben
 מונסטר	b_energy_drink
 מונסטר אנרגיה	b_energy_drink
 רד בול	b_energy_drink
+# The Latin name "red bull" made the bare words red and bull find the energy drink first: it is gone, the one word "redbull" stays (the first results of red, bull and red bull are again those of git 96c7e53).
+red	b_wine_red
+bull	b_bulgur_cooked
+red bull	b_bell_pepper_red
+redbull	b_energy_drink
+monster	b_energy_drink

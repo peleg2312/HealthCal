@@ -1,7 +1,8 @@
 /**
  * Whether a diary entry was written by the water screen with its drink (`via: 'water'`, see
- * src/features/drinks/rules.ts). Its own file with no imports beyond the types and the id hash, so the
- * store, the selectors and the food helpers can ask without loading the drink rules.
+ * src/features/drinks/rules.ts). Its own file with no imports beyond the types, the id hash and
+ * @/lib/hydration, so the store, the selectors and the food helpers can ask without loading the drink
+ * rules.
  *
  * Such an entry counts for calories, macros, the budget and isCompleteDay like any other, and is
  * left out of recents, usual foods, last portions, copied and saved meals.
@@ -21,10 +22,11 @@
  * tracked": a person who never logs on the Water screen must not start hearing about water because of
  * a coffee in the diary. Ask `isTrackedWater` / `hasWaterTracked` wherever the app decides whether to
  * talk about water or count a day as tracked (Progress's hydration insight and habits card, the share
- * card, the morning page, the recap); never test `waterEntries.length` for it.
+ * card, the morning page, the recap); never test `waterEntries.length` for it. The rule itself is in
+ * @/lib/hydration, re-exported here.
  */
 import { stableId } from '@/lib/hash';
-import type { FoodEntry, WaterEntry } from '@/types';
+import type { FoodEntry } from '@/types';
 
 export function isWaterDrinkEntry(e: Pick<FoodEntry, 'via'>): boolean {
   return e.via === 'water';
@@ -35,15 +37,8 @@ export function hasFoodLogged(entries: readonly Pick<FoodEntry, 'via'>[]): boole
   return entries.some((e) => !isWaterDrinkEntry(e));
 }
 
-/** Whether a water record was logged as water (on the Water screen, Today's button, the + sheet, a reminder), not added by a drink logged in the diary. */
-export function isTrackedWater(w: Pick<WaterEntry, 'fromEntryId'>): boolean {
-  return !w.fromEntryId;
-}
-
-/** Whether a day's water records make it a day with water tracked: at least one not from the diary. Totals still count them all. */
-export function hasWaterTracked(water: readonly Pick<WaterEntry, 'fromEntryId'>[]): boolean {
-  return water.some(isTrackedWater);
-}
+/** The "water tracked" rule lives in @/lib/hydration (src/lib may not import from src/features); every caller keeps this import. */
+export { hasWaterTracked, isTrackedWater } from '@/lib/hydration';
 
 /** The id of the water record a diary entry adds: the same on every phone, so no path can make two for one entry. */
 export function waterIdFromEntry(entryId: string): string {

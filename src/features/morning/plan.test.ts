@@ -149,3 +149,18 @@ describe('helpers', () => {
     expect(weekBeforeYesterday('2026-11-16')).toEqual({ from: '2026-11-09', to: '2026-11-14' });
   });
 });
+
+// Today's water that is only drinks from the diary (waterTracked false) reads as no water, as
+// before drinks from the diary counted in Water.
+describe('today with only drinks from the diary', () => {
+  it('the water row is the one of a day with no water', () => {
+    const latte = rows(input({ today: '2026-11-19', waterMl: 223, waterTracked: false }));
+    expect(latte).toEqual(rows(input({ today: '2026-11-19', waterMl: 0, waterTracked: false })));
+    expect(latte[0]).toEqual(['3.3 L of water to go', 'Nothing logged yet today']);
+    expect(todayPlan(input({ today: '2026-11-19', waterMl: 223, waterTracked: false }))[0].progress).toBe(0);
+  });
+
+  it('water logged on Water counts the diary drinks too', () => {
+    expect(rows(input({ today: '2026-11-19', waterMl: 473, waterTracked: true }))[0]).toEqual(['2.8 L of water to go', '0.5 of 3.3 L so far']);
+  });
+});

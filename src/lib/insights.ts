@@ -10,13 +10,12 @@
  * - Neutral, factual tone. Over a target is information, not failure.
  */
 // The one rule for "a day with water tracked" (no React, no store: ids and types only).
-import { hasWaterTracked } from '@/features/drinks/via';
 import type { GoalType, ISODate, Nutrients, UnitSystem, WaterEntry } from '@/types';
 
 import { addDays, diffDays, formatShortDate, fromISODate, startOfWeek } from './dates';
 import { KCAL_PER_KG, maxWeeklyRateKg } from './energy';
 import { guidelineMinutes, MODERATE_MET, VIGOROUS_MET } from './exercise';
-import { effectiveMl } from './hydration';
+import { effectiveMl, hasWaterTracked } from './hydration';
 import type { AdaptiveTdee, TrendPoint } from './trend';
 import { isCompleteDay as sharedIsCompleteDay } from './trend';
 import { formatNumber, formatVolume, formatWeight } from './units';

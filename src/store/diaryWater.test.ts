@@ -233,3 +233,72 @@ describe('merges, restores from elsewhere and a reset never cascade', () => {
     expect(S().water).toEqual({});
   });
 });
+
+describe('a live record for the entry under another id (a hand-made or damaged backup, a later format)', () => {
+  const OTHER = '11111111-1111-4111-8111-111111111111';
+  const OTHER2 = '22222222-2222-4222-8222-222222222222';
+  /** Puts a copy of the entry's water under `id`; `keepOwn` false removes the deterministic one. */
+  const copyWater = (water: WaterEntry, id: string, keepOwn: boolean, over: Partial<WaterEntry> = {}) =>
+    useStore.setState((s) => {
+      const next = { ...s.water };
+      if (!keepOwn) delete next[water.id];
+      next[id] = { ...water, id, ...over };
+      return { water: next };
+    });
+  const liveFor = (entryId: string) => Object.values(S().water).filter((x) => !x.deleted && x.fromEntryId === entryId);
+  /** An edit as followEntry writes it: the entry and its water again, with the volume recomputed. */
+  const edit = (entry: FoodEntry, water: WaterEntry, quantity: number) =>
+    S().upsertEntriesWithWater([{ entry: { ...e(entry.id), quantity, grams: 503 * quantity }, water: { ...water, ml: 500 * quantity } }]);
+
+  it('the checker\'s case 25: an edit writes to that record and never makes a second', () => {
+    const { entry, water } = logDiaryDrink();
+    copyWater(water, OTHER, false);
+    tick();
+    edit(entry, w(OTHER), 2);
+    expect(liveFor(entry.id).map((x) => [x.id, x.ml])).toEqual([[OTHER, 1000]]);
+    expect(w(waterIdFromEntry(entry.id))).toBeUndefined();
+    expect(w(OTHER).updatedAt).toBe(e(entry.id).updatedAt);
+    expect(S().dirty.water[OTHER]).toBe(true);
+  });
+
+  it('the deterministic record deleted on Water and another live: the live one is written, the deleted one stays deleted', () => {
+    const { entry, water } = logDiaryDrink();
+    copyWater(water, OTHER, true);
+    S().remove('water', water.id);
+    tick();
+    edit(entry, w(OTHER), 2);
+    expect(liveFor(entry.id).map((x) => [x.id, x.ml])).toEqual([[OTHER, 1000]]);
+    expect(w(water.id).deleted).toBe(true);
+  });
+
+  it('two already live: the edit makes no third; it writes the deterministic one and leaves the other as it was (an edit never removes water)', () => {
+    const { entry, water } = logDiaryDrink();
+    copyWater(water, OTHER, true);
+    const other = w(OTHER);
+    tick();
+    edit(entry, w(water.id), 2);
+    expect(liveFor(entry.id)).toHaveLength(2);
+    expect(w(water.id)).toMatchObject({ ml: 1000, updatedAt: e(entry.id).updatedAt });
+    expect(w(OTHER)).toEqual(other);
+    // Deleting the entry still takes every live water it added.
+    S().remove('foodEntries', entry.id);
+    expect(liveFor(entry.id)).toHaveLength(0);
+  });
+
+  it('two live, neither under the deterministic id: the latest logged is written, the other left as it was', () => {
+    const { entry, water } = logDiaryDrink();
+    copyWater(water, OTHER, false, { loggedAt: '2026-11-19T08:00:00.000Z' });
+    copyWater(water, OTHER2, false, { loggedAt: '2026-11-19T09:00:00.000Z' });
+    const older = w(OTHER);
+    tick();
+    edit(entry, w(OTHER2), 2);
+    expect(liveFor(entry.id).map((x) => [x.id, x.ml]).sort()).toEqual([[OTHER, 500], [OTHER2, 1000]]);
+    expect(w(OTHER)).toEqual(older);
+    expect(Object.keys(S().water)).toHaveLength(2);
+  });
+
+  it('a new entry still gets the deterministic id', () => {
+    const { entry, water } = logDiaryDrink();
+    expect(water.id).toBe(waterIdFromEntry(entry.id));
+  });
+});

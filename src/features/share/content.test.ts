@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { hasWaterTracked } from '@/features/drinks/via';
 import { darkColors } from '@/theme/tokens';
 
 import { DEFAULT_SHARE_CHOICES, dayCardContent, dayVerdict, foodList, weekCardContent, weekCups, type ShareDayInput, type ShareWeekInput } from './content';
@@ -61,6 +62,16 @@ describe('day card content', () => {
   it('drops a stat when its choice is off or there is nothing to show', () => {
     const c = dayCardContent(day({ activeMinutes: 0 }), { ...DEFAULT_SHARE_CHOICES, streak: false });
     expect(c.stats.map((s) => s.key)).toEqual(['water']);
+  });
+
+  it('shows water only on a day with water logged as water, then the whole total with the diary drinks', () => {
+    // waterLogged follows hasWaterTracked: a latte from the diary (fromEntryId) alone is not water tracked.
+    const latteOnly: { fromEntryId?: string; ml: number }[] = [{ fromEntryId: 'e1', ml: 223 }];
+    const withGlass: { fromEntryId?: string; ml: number }[] = [...latteOnly, { ml: 250 }];
+    const only = dayCardContent(day({ waterMl: 223, waterLogged: hasWaterTracked(latteOnly) }), DEFAULT_SHARE_CHOICES);
+    expect(only.stats.map((s) => s.key)).toEqual(['activity', 'streak']);
+    const both = dayCardContent(day({ waterMl: 473, waterLogged: hasWaterTracked(withGlass) }), DEFAULT_SHARE_CHOICES);
+    expect(both.stats[0]).toMatchObject({ key: 'water', value: '473', unit: 'ml' });
   });
 
   it('uses imperial units for water', () => {

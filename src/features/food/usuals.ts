@@ -6,7 +6,7 @@
  */
 import { BUILTIN_FOODS } from '@/data/foods';
 import { isWaterDrinkEntry } from '@/features/drinks/via';
-import { formatQty, matchServing } from '@/features/food/helpers';
+import { amountTotal, formatQty, matchServing } from '@/features/food/helpers';
 import { diffDays } from '@/lib/dates';
 import { scaleNutrients } from '@/lib/nutrition';
 import { formatNumber } from '@/lib/units';
@@ -158,6 +158,7 @@ export function usualLabel(u: UsualFood): string {
   const q = u.last.quantity;
   const label = u.last.servingLabel;
   const inGrams = /^\d+(?:\.\d+)? g$/.test(label);
-  const portion = q === 1 ? label : inGrams ? `${formatQty(Math.round(u.last.grams * 10) / 10)} g` : `${Number.isInteger(q) ? q : q.toFixed(1)} × ${label}`;
+  // A serving that is a volume ("500 ml", an online drink's pack) is said as the total ("1000 ml"); weights keep their own path.
+  const portion = q === 1 ? label : inGrams ? `${formatQty(Math.round(u.last.grams * 10) / 10)} g` : (amountTotal(label, q) ?? `${Number.isInteger(q) ? q : q.toFixed(1)} × ${label}`);
   return `${portion}, ${formatNumber(u.last.nutrients.kcal)} kcal`;
 }

@@ -83,7 +83,8 @@ function waterRun(days: DayFacts[], yesterday: ISODate): number {
   let r = 0;
   for (let d = yesterday; ; d = addDays(d, -1)) {
     const f = byDate.get(d);
-    if (!f || !goalMet(f.waterMl, f.waterGoalMl)) return r;
+    // Only a day with water logged as water counts (`hasWater`): drinks from the diary alone are not a water day.
+    if (!f || !f.hasWater || !goalMet(f.waterMl, f.waterGoalMl)) return r;
     r += 1;
   }
 }

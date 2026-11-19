@@ -26,6 +26,15 @@ import type { DayFacts } from './facts';
 import { waterFigures } from './figures';
 import { goalMet } from './line';
 
+/**
+ * The water the review judges: the day's whole total (drinks from the diary included) on a day with
+ * water logged as water (`hasWater`, `hasWaterTracked`), else nothing, so a day whose only water came
+ * with a latte in the diary reads exactly as a day with no water ("No water logged, goal 2.6 L").
+ */
+export function trackedWaterMl(y: Pick<DayFacts, 'waterMl' | 'hasWater'>): number {
+  return y.hasWater ? y.waterMl : 0;
+}
+
 export type ReviewKind = 'move' | 'sleep' | 'budget' | 'protein' | 'water' | 'logged' | 'cal';
 /** A theme colour name the screen looks up in colors (a CupKey's colour). */
 export type DataColor = 'calories' | 'protein' | 'water' | 'exercise' | 'sleep' | 'weight';
@@ -133,8 +142,9 @@ export function wentWell(i: ReviewInput): ReviewItem[] {
     items.push({ kind: 'protein', text: `Protein reached: ${round(y.protein)} of ${round(y.proteinG)} g`, color: 'protein', mark: 'filled' });
   }
 
-  if (goalMet(y.waterMl, y.waterGoalMl)) {
-    const w = waterFigures(y.waterMl, y.waterGoalMl, units);
+  const waterMl = trackedWaterMl(y);
+  if (goalMet(waterMl, y.waterGoalMl)) {
+    const w = waterFigures(waterMl, y.waterGoalMl, units);
     items.push({ kind: 'water', text: `Water reached: ${w.value} of ${w.goal}`, color: 'water', mark: 'filled' });
   }
 
@@ -170,10 +180,11 @@ export function toAdjust(i: ReviewInput): ReviewItem[] {
 
   // Food and water are judged only on a complete day; ranked by the share still missing, water first on a tie.
   const ranked: { item: ReviewItem; missing: number; order: number }[] = [];
-  if (y.complete && y.waterGoalMl > 0 && y.waterMl < y.waterGoalMl) {
-    const w = waterFigures(y.waterMl, y.waterGoalMl, units);
-    const text = y.waterMl <= 0 ? `No water logged, goal ${w.goal}` : `Water stopped at ${w.value} of ${w.goal}`;
-    ranked.push({ item: { kind: 'water', text, color: 'water', mark: 'outline' }, missing: 1 - Math.max(0, y.waterMl) / y.waterGoalMl, order: 0 });
+  const waterMl = trackedWaterMl(y);
+  if (y.complete && y.waterGoalMl > 0 && waterMl < y.waterGoalMl) {
+    const w = waterFigures(waterMl, y.waterGoalMl, units);
+    const text = waterMl <= 0 ? `No water logged, goal ${w.goal}` : `Water stopped at ${w.value} of ${w.goal}`;
+    ranked.push({ item: { kind: 'water', text, color: 'water', mark: 'outline' }, missing: 1 - Math.max(0, waterMl) / y.waterGoalMl, order: 0 });
   }
   if (y.complete && y.proteinG > 0 && y.protein < y.proteinG * PROTEIN_ADJUST_SHARE - 1e-9) {
     ranked.push({

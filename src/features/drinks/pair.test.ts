@@ -523,7 +523,7 @@ describe('a drink logged in the diary: edits, deletes and Undo through the real 
     expect(W(water.id).ml).toBe(10000);
   });
 
-  it('the day follows, future days included; a meal change rewrites only the stamp; Undo restores both exactly', () => {
+  it('the day follows, future days included; Undo restores both exactly', () => {
     const { entry, water } = logInDiary(useStore);
     const e0 = E(entry.id);
     const w0 = W(water.id);
@@ -536,11 +536,63 @@ describe('a drink logged in the diary: edits, deletes and Undo through the real 
     expect(E(entry.id).date).toBe(TODAY);
     expect(W(water.id).date).toBe(w0.date);
     expect(W(water.id).ml).toBe(w0.ml);
-    const stamp = W(water.id).updatedAt;
-    logFood({ food: energy(), serving: { label: e0.servingLabel, grams: e0.grams }, quantity: 1, meal: 'dinner', date: TODAY, entryId: entry.id });
-    expect(W(water.id).ml).toBe(500);
-    expect(W(water.id).updatedAt > stamp).toBe(true);
-    expect(W(water.id).updatedAt).toBe(E(entry.id).updatedAt);
+  });
+
+  // M2: the water is written again only when the amount, the serving or the day changed.
+  it('a meal-only change leaves the water record untouched, stamp and content; its Undo too', () => {
+    const { entry, water } = logInDiary(useStore);
+    const e0 = E(entry.id);
+    const w0 = W(water.id);
+    logFood({ food: energy(), serving: { label: e0.servingLabel, grams: e0.grams / e0.quantity }, quantity: e0.quantity, meal: 'dinner', date: TODAY, entryId: entry.id });
+    expect(E(entry.id).meal).toBe('dinner');
+    expect(W(water.id)).toEqual(w0);
+    updateEntryDirect(E(entry.id), { name: 'Monster', nutrients: { kcal: 250, protein: 0, carbs: 60, fat: 0 }, meal: 'snack', date: TODAY });
+    expect(E(entry.id)).toMatchObject({ meal: 'snack', name: 'Monster' });
+    expect(W(water.id)).toEqual(w0);
+    undo();
+    expect(E(entry.id).meal).toBe('dinner');
+    expect(W(water.id)).toEqual(w0);
+    // A meal-only edit, then the entry deleted (both go): the edit's Undo brings back neither.
+    logFood({ food: energy(), serving: { label: e0.servingLabel, grams: e0.grams / e0.quantity }, quantity: e0.quantity, meal: 'lunch', date: TODAY, entryId: entry.id });
+    const editUndo = last().opts!.onPress!;
+    S().remove('foodEntries', entry.id);
+    editUndo();
+    expect(E(entry.id).deleted).toBe(true);
+    expect(W(water.id).deleted).toBe(true);
+  });
+
+  it('an amount, a serving or a day change writes the water again with the entry\'s stamp', () => {
+    const { entry, water } = logInDiary(useStore);
+    const stampMoves = (before: string) => {
+      expect(W(water.id).updatedAt > before).toBe(true);
+      expect(W(water.id).updatedAt).toBe(E(entry.id).updatedAt);
+    };
+    let stamp = W(water.id).updatedAt;
+    setEntryAmount(E(entry.id), 2);
+    expect(W(water.id).ml).toBe(1000);
+    stampMoves(stamp);
+    stamp = W(water.id).updatedAt;
+    const can16 = energy().servings.find((x) => x.label === '1 can (16 fl oz)')!;
+    logFood({ food: energy(), serving: can16, quantity: 2, meal: 'lunch', date: TODAY, entryId: entry.id });
+    expect(W(water.id).ml).toBe(946);
+    stampMoves(stamp);
+    stamp = W(water.id).updatedAt;
+    logFood({ food: energy(), serving: can16, quantity: 2, meal: 'lunch', date: addDays(TODAY, -1), entryId: entry.id });
+    expect(W(water.id)).toMatchObject({ date: addDays(TODAY, -1), ml: 946 });
+    stampMoves(stamp);
+  });
+
+  it("the checker's case 25 through the food log: a live record under another id is the one the stepper writes", () => {
+    const { entry, water } = logInDiary(useStore);
+    const OTHER = '11111111-1111-4111-8111-111111111111';
+    useStore.setState((s) => {
+      const next = { ...s.water };
+      delete next[water.id];
+      next[OTHER] = { ...water, id: OTHER };
+      return { water: next };
+    });
+    setEntryAmount(E(entry.id), 2);
+    expect(liveWater().filter((w) => w.fromEntryId === entry.id).map((w) => [w.id, w.ml])).toEqual([[OTHER, 1000]]);
   });
 
   it('the manual editor moves the day; the calories alone never change the water', () => {
@@ -574,13 +626,17 @@ describe('a drink logged in the diary: edits, deletes and Undo through the real 
     expect(e0.quantity).toBe(1);
   });
 
-  it("an older app's edit (entry only) heals on the next edit here", () => {
+  it("an older app's edit (entry only) heals on the next edit here of the amount, the serving or the day", () => {
     const { entry, water } = logInDiary(useStore);
     // The older app doubles the amount and does not move the water.
     S().upsert('foodEntries', { ...E(entry.id), quantity: 2, grams: 1006 });
     expect(W(water.id).ml).toBe(500);
+    // A meal-only edit here leaves the water as it is (M2), lag included.
     logFood({ food: energy(), serving: { label: '1 can (500 ml)', grams: 503 }, quantity: 2, meal: 'snack', date: TODAY, entryId: entry.id });
-    expect(W(water.id).ml).toBe(1000);
+    expect(W(water.id).ml).toBe(500);
+    // The next amount edit recomputes it from the entry, never scaled from the old volume.
+    logFood({ food: energy(), serving: { label: '1 can (500 ml)', grams: 503 }, quantity: 3, meal: 'snack', date: TODAY, entryId: entry.id });
+    expect(W(water.id).ml).toBe(1500);
   });
 
   it('the Undo of a log, a clear and a copy reach the water through the store', () => {

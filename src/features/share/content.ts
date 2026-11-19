@@ -71,6 +71,7 @@ export interface ShareDayInput {
   mealFoods: Record<MealType, string[]>;
   waterMl: number;
   waterGoalMl: number;
+  /** Water logged as water that day (`hasWaterTracked`): the water stat shows only then, with the whole total (`waterMl`, diary drinks included). */
   waterLogged: boolean;
   activeMinutes: number;
   /** The forgiving streak from `useConsistency` (never re-computed here). */
@@ -213,7 +214,7 @@ export function dayCardContent(input: ShareDayInput, choices: ShareChoices): Day
     : { value: `${Math.round(level * 100)}%`, unit: inProgress ? 'of today’s budget' : 'of the day’s budget' };
 
   const stats: ShareStat[] = [];
-  if (choices.water && (input.waterLogged || input.waterMl > 0)) {
+  if (choices.water && input.waterLogged) {
     const reached = input.waterMl >= input.waterGoalMl && input.waterGoalMl > 0;
     const [value, ...unit] = formatVolume(input.waterMl, input.units).split(' ');
     stats.push({

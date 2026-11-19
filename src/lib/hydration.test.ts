@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { baseWaterGoalMl, effectiveMl, exerciseWaterMl, glassesLeft, HYDRATION_FACTOR } from './hydration';
+import * as via from '@/features/drinks/via';
+
+import { baseWaterGoalMl, effectiveMl, exerciseWaterMl, glassesLeft, hasWaterTracked, HYDRATION_FACTOR, isTrackedWater } from './hydration';
 
 describe('baseWaterGoalMl', () => {
   it('light man is lifted to the 2000 ml minimum (60 kg * 33 = 1980)', () => {
@@ -70,5 +72,19 @@ describe('beverages', () => {
     expect(glassesLeft(251)).toBe(2);
     expect(glassesLeft(-100)).toBe(0);
     expect(glassesLeft(600, 200)).toBe(3);
+  });
+});
+
+describe('water tracked: water from the diary never makes a day tracked', () => {
+  it('only a record not from the diary counts', () => {
+    expect(isTrackedWater({})).toBe(true);
+    expect(isTrackedWater({ fromEntryId: 'e1' })).toBe(false);
+    expect(hasWaterTracked([])).toBe(false);
+    expect(hasWaterTracked([{ fromEntryId: 'e1' }, { fromEntryId: 'e2' }])).toBe(false);
+    expect(hasWaterTracked([{ fromEntryId: 'e1' }, {}])).toBe(true);
+  });
+  it('is the same rule under its old import (@/features/drinks/via re-exports it)', () => {
+    expect(via.isTrackedWater).toBe(isTrackedWater);
+    expect(via.hasWaterTracked).toBe(hasWaterTracked);
   });
 });

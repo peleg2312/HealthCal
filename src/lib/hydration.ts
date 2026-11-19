@@ -6,7 +6,7 @@
  * supplies roughly 20-30% of the total. The goal here is for drinks only, so
  * it is scaled by body weight and bounded by those references.
  */
-import type { ActivityEntry, Beverage, Intensity, Sex } from '@/types';
+import type { ActivityEntry, Beverage, Intensity, Sex, WaterEntry } from '@/types';
 
 const ML_PER_KG = 33;
 
@@ -60,4 +60,20 @@ export function effectiveMl(ml: number, beverage: Beverage): number {
 /** Number of glasses left, for reminder copy. */
 export function glassesLeft(remainingMl: number, glassMl = 250): number {
   return Math.max(0, Math.ceil(remainingMl / glassMl));
+}
+
+/**
+ * Whether a water record was logged as water (on the Water screen, Today's button, the + sheet, a
+ * reminder), not added by a drink logged in the diary (`fromEntryId`, src/features/drinks/diary.ts).
+ * Such diary water counts in every total but never makes a day "water tracked": ask this (or
+ * `hasWaterTracked`) wherever the app decides whether to talk about water; never `waterEntries.length`.
+ * Re-exported from @/features/drinks/via.
+ */
+export function isTrackedWater(w: Pick<WaterEntry, 'fromEntryId'>): boolean {
+  return !w.fromEntryId;
+}
+
+/** Whether a day's water records make it a day with water tracked: at least one not from the diary. Totals still count them all. */
+export function hasWaterTracked(water: readonly Pick<WaterEntry, 'fromEntryId'>[]): boolean {
+  return water.some(isTrackedWater);
 }

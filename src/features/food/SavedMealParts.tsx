@@ -16,20 +16,14 @@ import { Button, Chip, ChipWrap, NumberField, PressableScale, Sheet, Stepper, Te
 import { AmountEditor } from './AmountEditor';
 import { RowEmoji } from './components';
 import { formatPortion, mealServings, planSavedMeal, setItemAmount } from './build';
-import { dayPhrase, formatQty, kcal, labelGrams, matchServing, portionLabel, servingText } from './helpers';
+import { dayPhrase, kcal, matchServing } from './helpers';
+import { itemLine, itemStepText } from './itemLine';
 import { logSavedMeal } from './log';
 import { currentValues } from './usuals';
 
 const PORTIONS = [0.5, 1, 2];
 
-/** "1 cup · 205 kcal" for a saved-meal line, with "~" for an estimate. */
-export function itemLine(it: SavedMealItem): string {
-  const portion = portionLabel(it.servingLabel, it.quantity);
-  const g = Math.round(it.grams);
-  // Show the weight too when the portion is a household measure ("1.5 × 1 cup · 240 g").
-  const weight = g > 0 && !/\bg$/.test(withoutMarks(portion)) && it.servingLabel !== '1 g' ? ` · ${g} g` : '';
-  return `${portion}${weight} · ${it.kcalRange ? '~' : ''}${kcal(it.nutrients.kcal)} kcal`;
-}
+export { itemLine } from './itemLine';
 
 /**
  * Pick how much of a saved meal to log: a portion for a recipe, a checklist
@@ -208,7 +202,7 @@ export function ItemAmountSheet({
             step={0.5}
             min={0.25}
             max={50}
-            format={(v) => (labelGrams(item.servingLabel) !== null ? `${formatQty(labelGrams(item.servingLabel)! * v)} g` : `${formatQty(v)} × ${servingText(item.servingLabel)}`)}
+            format={(v) => itemStepText(item.servingLabel, v)}
             onChange={(q) => onChange(setItemAmount(item, { label: item.servingLabel, grams: 0 }, q))}
           />
         </View>

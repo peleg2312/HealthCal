@@ -37,9 +37,16 @@
  * for display). Known and accepted, as for the pair above, while an older app is still in use:
  * - an older app deleting the entry leaves the water as a plain Water row (visible, counted once,
  *   deletable);
- * - an older app's edit of the entry does not move the water; it heals on the next edit here, because
- *   the water is recomputed from the entry, never scaled from its old volume;
- * - an older app's Water notice does not know the link and may offer "Water only" once more.
+ * - an older app's edit of the entry does not move the water; it heals on the next edit here of the
+ *   amount, the serving or the day, because the water is recomputed from the entry, never scaled from
+ *   its old volume (a meal-only edit leaves the water untouched, `entryEditMovesWater`);
+ * - an older app's Water notice does not know the link and may offer "Water only" once more;
+ * - two phones race: one deletes the water on Water while the other edits the entry's amount, serving
+ *   or day later; the edit's newer stamp brings the water back on both (counted once, visible on
+ *   Water, deletable);
+ * - the Undo of a water delete on Water, tapped after the entry was deleted on another phone, brings
+ *   the water back as a plain live row (counted once, deletable): restore('water') never revives an
+ *   entry that its own act did not remove.
  */
 import { BUILTIN_FOODS } from '@/data/foods';
 import { mealOnDay } from '@/features/food/addedTo';

@@ -15,9 +15,13 @@
  *   moment), written in one act with its entry by the store's `upsertEntriesWithWater`.
  * - An edit recomputes the volume from the edited entry (`diaryDrinkMl`: floor 1 ml, cap 10,000 ml,
  *   never by scaling the old volume), and the water takes the entry's day, future days included;
- *   applied by followEntry in ./pair.ts. The minimums apply at creation only.
+ *   applied by followEntry in ./pair.ts, only when the amount, the serving or the day changed
+ *   (`entryEditMovesWater`): a meal-only change leaves the water record untouched. The minimums apply
+ *   at creation only.
  * - The record stores the poured volume; the day's total adds `effectiveMl(ml, kind)` like every
  *   other water record (coffee, milk and other 90%, juice 95%), and the words name the poured volume.
+ * - Accepted: the same 240 g latte is 237 ml by its label ("1 cup (8 fl oz)") and 240 ml by its
+ *   weight (a "1 g" serving, as a swapped AI row is, where a density within 3% of 1 is taken as 1).
  * - Delete and restore: the store's cascade (src/store/index.ts). Nothing here writes.
  */
 import { MEAL_LABEL } from '@/lib/nutrition';
@@ -149,7 +153,9 @@ function labelVolume(entry: Pick<DiaryDrinkInput, 'servingLabel' | 'quantity' | 
 /**
  * Grams per ml for the grams route: the first serving whose label names a volume its grams agree
  * with (0.8 to 1.3 g per ml), else 1. Unlike `gramsPerMl`, a misread label ("1,5 L" over 300 g) is
- * skipped, not clamped, so it cannot bend the volume of every other amount of that food.
+ * skipped, not clamped, so it cannot bend the volume of every other amount of that food. It reads
+ * "cup" on every food, own and online ones too (where the label route does not): an own drink with a
+ * "1 cup" serving of 244 g logs 237 ml. Accepted: 237 ml is the real volume of a cup.
  */
 function drinkDensity(food: Pick<Food, 'servings'>): number {
   for (const s of food.servings) {
@@ -177,6 +183,20 @@ export function diaryDrinkMl(entry: Pick<DiaryDrinkInput, 'food' | 'servingLabel
   const bundled = !!entry.food && isBundled(entry.food);
   const ml = labelVolume(entry, bundled) ?? gramsVolume(entry.grams, entry.food);
   return ml === null ? null : clampMl(ml);
+}
+
+/** What of a diary entry its water follows: the amount (quantity and grams), the serving and the day. */
+export type EntryWaterFields = Pick<FoodEntry, 'quantity' | 'grams' | 'servingLabel' | 'date'>;
+
+/**
+ * Whether an edit from `before` to `after` changes what the entry's water holds: the amount, the
+ * serving or the day. False for a change of the meal, the name or the calories alone, which leaves
+ * the water record as it is (its words come from the entry, not from the record), so such an edit
+ * never stamps the water again. A field missing on either side counts as changed.
+ */
+export function entryEditMovesWater(before: Partial<EntryWaterFields>, after: Partial<EntryWaterFields>): boolean {
+  const keys: (keyof EntryWaterFields)[] = ['quantity', 'grams', 'servingLabel', 'date'];
+  return keys.some((k) => before[k] === undefined || before[k] !== after[k]);
 }
 
 // ---------------------------------------------------------------- the rule

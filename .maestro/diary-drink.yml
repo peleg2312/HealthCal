@@ -1,0 +1,82 @@
+# A drink logged as food in the diary also counts in Water, on a phone, after first-day.yml has set the
+# app up (no clearState: it needs the profile first-day made).
+#
+# Food search with "monster" typed on the phone's keyboard, the + on the first result (the bundled
+# energy drink), the toast that says both effects, the diary row with its "also in Water" mark, then
+# the Water screen with the row that came from the diary. The row on Water is the one required proof
+# (a toast is gone in a few seconds, so it is looked for, not required); the pictures are the rest.
+#
+#   GitHub (free):  Actions > Phone test > Run workflow, flows = first-day,diary-drink
+#   A phone or emulator on your desk:  maestro test .maestro/first-day.yml .maestro/diary-drink.yml
+appId: app.healthcal.mobile
+name: A drink in the diary also counts in Water
+---
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: today-energy
+    timeout: 120000
+# After midnight the morning page may open over Today (see health-and-about.yml).
+- tapOn:
+    id: morning-today
+    optional: true
+
+# Diary > lunch > search.
+- tapOn:
+    id: tab-diary
+- scrollUntilVisible:
+    element:
+      id: meal-add-lunch
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: meal-add-lunch
+- tapOn:
+    id: food-search-input
+- inputText: monster
+- extendedWaitUntil:
+    visible:
+      id: result-0-add
+    timeout: 15000
+- takeScreenshot: 70-search-monster
+
+# One tap: the calories go to lunch and the volume to Water; the toast says both.
+- tapOn:
+    id: result-0-add
+- assertVisible:
+    text: '(?i).*to Water.*'
+    optional: true
+- takeScreenshot: 71-added-with-water-toast
+- tapOn:
+    id: search-done
+- waitForAnimationToEnd:
+    timeout: 3000
+- scrollUntilVisible:
+    element:
+      text: '(?i).*also in water.*'
+    direction: DOWN
+    timeout: 20000
+    optional: true
+- takeScreenshot: 72-diary-drink-marked
+
+# Today > Water: the row that came from the diary, with where it came from.
+- tapOn:
+    id: tab-index
+- scrollUntilVisible:
+    element:
+      id: today-water
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: today-water
+- extendedWaitUntil:
+    visible:
+      id: water-beverage-milk
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: water-entry-from-0
+    direction: DOWN
+    timeout: 30000
+- takeScreenshot: 73-water-row-from-diary

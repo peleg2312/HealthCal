@@ -430,3 +430,23 @@ describe('every phrasing is reachable', () => {
     expect(targets.filter((a) => !GRID.some((g) => g.m.today?.startsWith(a)))).toEqual([]);
   });
 });
+
+// The coach reads the review and the plan: a day whose only water came with drinks from the
+// diary (hasWater false yesterday, waterTracked false today) gets the words of a day with no water.
+describe('drinks from the diary only', () => {
+  it('yesterday and today read as without the diary water', () => {
+    const base = { kcal: 2080, protein: 160, waterGoalMl: 3300, hasWater: false };
+    const latte = run({ y: facts({ ...base, waterMl: 223 }), lastNight: { hours: 7.5 }, plan: { waterMl: 223, waterTracked: false } });
+    const none = run({ y: facts({ ...base, waterMl: 0 }), lastNight: { hours: 7.5 }, plan: { waterMl: 0, waterTracked: false } });
+    expect(latte).toEqual(none);
+    expect(latte.improveKind).toBe('water');
+  });
+
+  it('diary drinks up to the goal never read as water on target', () => {
+    const base = { kcal: 2080, protein: 160, waterGoalMl: 3300, hasWater: false };
+    const latte = run({ y: facts({ ...base, waterMl: 3400 }), lastNight: { hours: 7.5 }, plan: { waterMl: 3400, waterTracked: false } });
+    const none = run({ y: facts({ ...base, waterMl: 0 }), lastNight: { hours: 7.5 }, plan: { waterMl: 0, waterTracked: false } });
+    expect(latte).toEqual(none);
+    expect(latte.goodKinds).not.toContain('water');
+  });
+});

@@ -41,6 +41,11 @@ export interface PlanInput {
   waterMl: number;
   /** useDay(today).waterGoalMl */
   waterGoalMl: number;
+  /**
+   * hasWaterTracked(useDay(today).waterEntries): water logged as water today. False when today's only
+   * water came with drinks from the diary: the row then reads as a day with no water. Absent counts as true.
+   */
+  waterTracked?: boolean;
   /** guidelineMinutes of the activities from startOfWeek(today) through today. */
   weekMinutes: number;
   /** useWeightSeries().latest?.date, or null when nothing was ever weighed. */
@@ -69,8 +74,9 @@ export function daysLeftInWeek(today: ISODate): number {
 }
 
 function waterItem(i: PlanInput): PlanItem | null {
-  if (!(i.waterGoalMl > 0) || i.waterMl >= i.waterGoalMl) return null;
-  const ml = Math.max(0, i.waterMl);
+  const waterMl = i.waterTracked === false ? 0 : i.waterMl;
+  if (!(i.waterGoalMl > 0) || waterMl >= i.waterGoalMl) return null;
+  const ml = Math.max(0, waterMl);
   const f = waterFigures(ml, i.waterGoalMl, i.units);
   return {
     kind: 'water',

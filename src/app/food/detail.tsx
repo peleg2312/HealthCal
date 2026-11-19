@@ -3,7 +3,7 @@ import { Info, Star, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
-import { detailWaterAdds, diaryDrink } from '@/features/drinks/diary';
+import { detailWaterAdds, diaryDrink, diaryDrinkMl } from '@/features/drinks/diary';
 import { detailDrinkNote, pairEditProblem, waterFor, waterPointingAt, type PairEditProblem } from '@/features/drinks/rules';
 import { updateEntryDirect } from '@/features/food/actions';
 import { AmountEditor } from '@/features/food/AmountEditor';
@@ -101,14 +101,18 @@ function WaterAdds({ food, serving, quantity }: { food: Food; serving: Serving; 
  * Under the amount of a drink logged on the water screen: it is also counted in Water, an amount or
  * day saved here moves the water record with it, and a delete here keeps the water. An amount the
  * pair cannot follow says why here, under the amount it is about (Save waits).
+ * A drink logged here in the diary names the volume of the amount on screen (`shown`, the same
+ * `diaryDrinkMl` the save recomputes its water with), as the Add line does; else the stored volume.
  */
-function DrinkNote({ water, problem, hasAmount }: { water: WaterEntry | null; problem: PairEditProblem | null; hasAmount: boolean }) {
+function DrinkNote({ water, problem, hasAmount, shown }: { water: WaterEntry | null; problem: PairEditProblem | null; hasAmount: boolean; shown?: { food: Food; serving: Serving; quantity: number } }) {
   const units = useStore((s) => s.profile?.units ?? 'metric');
   if (!water) return null;
+  const fromDiary = !!water.fromEntryId && !water.foodEntryId;
+  const ml = fromDiary && shown ? (diaryDrinkMl({ food: shown.food, servingLabel: shown.serving.label, quantity: shown.quantity, grams: shown.serving.grams * shown.quantity }) ?? water.ml) : water.ml;
   return (
     <View style={{ gap: 4 }}>
       <Text testID="detail-drink-note" variant="caption" color="textSecondary">
-        {detailDrinkNote(water, units, hasAmount)}
+        {detailDrinkNote({ ...water, ml }, units, hasAmount)}
       </Text>
       {problem?.field === 'amount' ? <PairProblem text={problem.text} /> : null}
     </View>
@@ -396,7 +400,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
         <Divider />
         <AmountEditor food={food} value={portion} onChange={setPortion} onPendingChange={setGramsInvalid} testIDPrefix="detail" />
       </Card>
-      <DrinkNote water={paired.water} problem={paired.problem} hasAmount />
+      <DrinkNote water={paired.water} problem={paired.problem} hasAmount shown={{ food, serving, quantity }} />
       {entry ? null : <WaterAdds food={food} serving={serving} quantity={quantity} />}
 
       <ImpactLine date={date} kcalValue={n.kcal} replacing={entry} />

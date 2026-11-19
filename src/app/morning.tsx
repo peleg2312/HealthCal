@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react-native';
 import React from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import { hasWaterTracked } from '@/features/drinks/via';
 import { fileStepsNote, shownSteps } from '@/features/health-sync/steps';
 import { useHealthSync } from '@/features/health-sync/store';
 import { coachMessage } from '@/features/morning/coach';
@@ -119,6 +120,8 @@ export default function MorningScreen() {
     today,
     waterMl: todayDay.waterMl,
     waterGoalMl: todayDay.waterGoalMl,
+    // A day with only drinks from the diary is not water-tracked: the plan reads it as a day with no water.
+    waterTracked: hasWaterTracked(todayDay.waterEntries),
     weekMinutes: minutesIn(activities, fromSetup(weekSoFar(today))),
     lastWeighIn: weights.latest?.date ?? null,
     lastNightLogged: !!sleep,
@@ -200,7 +203,7 @@ export default function MorningScreen() {
                   complete: y.complete,
                   foodLogged: y.foodLogged,
                   proteinMet: goalMet(day.eaten.protein, day.macros.proteinG),
-                  waterMet: goalMet(day.waterMl, day.waterGoalMl),
+                  waterMet: y.hasWater && goalMet(day.waterMl, day.waterGoalMl),
                 })}
           </Text>
           {nothing ? (

@@ -175,4 +175,13 @@ describe('usualFoods for the quick-log sheet', () => {
     expect(usualLabel(out[0])).toBe('2 × slice, 160 kcal');
     expect(usualLabel(out[1])).toBe('1 cup, 205 kcal');
   });
+
+  it('says a serving that is a volume as its total ("1000 ml", never "2 × 500 ml"); weights unchanged', () => {
+    const can = e('Energy drink', '2026-11-12', 'dinner', { servingLabel: '500 ml', quantity: 2, grams: 1000, nutrients: { kcal: 470, protein: 0, carbs: 110, fat: 0 } });
+    expect(usualLabel({ key: 'k', last: can, count: 1, score: 1 })).toBe('1000 ml, 470 kcal');
+    const one = { ...can, quantity: 1, grams: 500, nutrients: { ...can.nutrients, kcal: 235 } };
+    expect(usualLabel({ key: 'k', last: one, count: 1, score: 1 })).toBe('500 ml, 235 kcal');
+    const nuts = e('Almonds', '2026-11-12', 'dinner', { servingLabel: '30 g', quantity: 2, grams: 60, nutrients: { kcal: 348, protein: 12, carbs: 6, fat: 30 } });
+    expect(usualLabel({ key: 'k', last: nuts, count: 1, score: 1 })).toBe('60 g, 348 kcal');
+  });
 });

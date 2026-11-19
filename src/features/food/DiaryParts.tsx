@@ -157,7 +157,8 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
             {/* The source's mark leads the line and its word ends it, so a portion that wraps never leaves the mark floating. */}
             <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: 6 }} accessible accessibilityLabel={`${withoutMarks(portion)}${inWater ? `, ${ALSO_IN_WATER}` : ''}, ${source.label}`}>
               <CupKey color={colors.textSecondary} variant={sourceKeyVariant(ai ? 'ai' : entry.source)} size={8} style={{ marginTop: 5 }} />
-              <Text testID={inWater ? `entry-in-water-${entry.id}` : undefined} variant="caption" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1 }}>
+              {/* The mark "also in Water" may take one more line (on a 320 px phone "1 can (8.4 fl oz) · 250 g · also in Water · Reference" needs three), so the word Water is never cut. */}
+              <Text testID={inWater ? `entry-in-water-${entry.id}` : undefined} variant="caption" color="textSecondary" numberOfLines={inWater ? 3 : 2} style={{ flexShrink: 1 }}>
                 {`${portion}${inWater ? ` · ${ALSO_IN_WATER}` : ''} · ${source.short}`}
               </Text>
             </View>

@@ -467,7 +467,7 @@ export const SEARCH_NAMES: Readonly<Record<string, SearchNames>> = {
   b_cola_diet: { he: ['קולה דיאט', 'קולה זירו', 'קולה ללא סוכר', 'דיאט קולה', 'זירו', 'פפסי מקס', 'משקה מוגז דיאט'], latin: ['pepsi max', 'coke zero', 'diet coke'] },
   b_lemon_lime_soda: { he: ['ספרייט', 'סבן אפ'] },
   b_ginger_ale: { he: ["ג'ינג'ר אייל"] },
-  b_energy_drink: { he: ['משקה אנרגיה', 'רד בול', 'מונסטר'], latin: ['monster', 'monster energy drink', 'red bull'] },
+  b_energy_drink: { he: ['משקה אנרגיה', 'רד בול', 'מונסטר'], latin: ['monster', 'monster energy drink', 'redbull'] },
   b_sports_drink: { he: ['משקה ספורט', 'משקה איזוטוני', 'גטורייד'] },
   b_sports_drink_low: { he: ['משקה ספורט דל קלוריות', 'משקה ספורט לייט'] },
   b_smoothie_fruit: { he: ['שייק פירות', 'סמוזי'] },

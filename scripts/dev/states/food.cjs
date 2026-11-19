@@ -15,8 +15,6 @@ function isoDay(n) {
   d.setDate(d.getDate() + n);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
-/** The energy drink logged with the search row's + (the first result for "monster"). */
-const LOG_MONSTER = [{ type: 'food-search-input', text: 'monster' }, { wait: 1200 }, 'result-0-add'];
 const LONG_QUERY = 'greek yogurt with honey granola and fresh blueberries large';
 /** Today at this local clock time, for a state that needs the meal of the hour (the stress seed's Hebrew-named usual food is a lunch). */
 function todayAt(h, m = 0) {
@@ -194,10 +192,13 @@ module.exports = [
   { id: 'detail-drink-adds-imperial', route: '/food/search?meal=lunch', imperial: true, type: { 'food-search-input': 'latte' }, taps: [{ wait: 1200 }, 'result-0'], waitFor: 'detail-water-adds', note: 'a latte before Add, in fl oz' },
   { id: 'detail-not-drink', route: '/food/search?meal=lunch', type: { 'food-search-input': 'banana' }, taps: [{ wait: 1200 }, 'result-0'], waitFor: 'food-detail-screen', absent: ['detail-water-adds'], note: 'a banana before Add: no Water line' },
   { id: 'detail-soup-not-drink', route: '/food/search?meal=lunch', type: { 'food-search-input': 'lentil soup' }, taps: [{ wait: 1200 }, 'result-0'], waitFor: 'food-detail-screen', absent: ['detail-water-adds'], note: 'a soup before Add: no Water line' },
-  { id: 'detail-diary-drink', route: '/food/search?meal=lunch', data: 'empty', now: todayAt(14, 0), taps: [...LOG_MONSTER, { wait: 12500 }, 'search-done', '^entry-'], waitFor: 'detail-drink-note', note: 'editing a drink logged in the diary: "Also counted in Water as 500 ml. It changes with this entry and is removed with it."' },
-  { id: 'detail-diary-drink-imperial', route: '/food/search?meal=lunch', data: 'empty', imperial: true, now: todayAt(14, 0), taps: [...LOG_MONSTER, { wait: 12500 }, 'search-done', '^entry-'], waitFor: 'detail-drink-note', note: 'the same in fl oz' },
+  // A drink already in the diary comes from seed.mjs's values.diaryWater (a 500 ml can in today's lunch at 13:10, entry ...d004, and its water), so its ids are the same on every load.
+  { id: 'detail-diary-drink', route: '/diary', values: { diaryWater: 1 }, now: todayAt(14, 0), taps: ['entry-00000000-0000-4000-8000-00000000d004'], waitFor: 'detail-drink-note', note: 'editing a drink logged in the diary: "Also counted in Water as 500 ml. It changes with this entry and is removed with it."' },
+  { id: 'detail-diary-drink-imperial', route: '/diary', imperial: true, values: { diaryWater: 1 }, now: todayAt(14, 0), taps: ['entry-00000000-0000-4000-8000-00000000d004'], waitFor: 'detail-drink-note', note: 'the same in fl oz' },
+  { id: 'detail-diary-drink-amount', route: '/diary', values: { diaryWater: 1 }, now: todayAt(14, 0), taps: ['entry-00000000-0000-4000-8000-00000000d004', 'detail-serving-0'], waitFor: 'detail-drink-note', note: 'editing it with the first serving (the 250 ml can) chosen on screen: the note names that volume, before Save' },
   { id: 'toast-diary-drink-imperial', route: '/food/search?meal=lunch', imperial: true, type: { 'food-search-input': 'monster' }, taps: [{ wait: 1200 }, 'result-0-add'], waitFor: 'toast-action', note: 'an energy drink added with its +: "Added to lunch and 8.4 fl oz to Water" (320 px is the narrow case)' },
-  { id: 'toast-diary-copy', route: '/food/search?meal=lunch', data: 'empty', now: todayAt(14, 0), taps: [...LOG_MONSTER, 'search-done', { wait: 5000 }, `diary-day-${isoDay(1)}`, 'meal-repeat-lunch'], waitFor: 'toast-action', note: "tomorrow's lunch repeated from today: the copy's toast names the water" },
+  // Copied from the meal menu so the diary stays on today, whose entries have the seed's fixed ids (a copy's own rows are new on every load).
+  { id: 'toast-diary-copy', route: '/diary', values: { diaryWater: 1 }, now: todayAt(14, 0), taps: ['meal-menu-lunch', 'meal-menu-copy-to', 'copy-to-confirm'], waitFor: 'toast-action', note: "today's lunch (with the can of energy drink) copied to tomorrow: the copy's toast names the water" },
   { id: 'custom-drink-on', route: '/food/custom', type: { 'custom-name': 'Cold brew', 'custom-serving-label': '1 bottle (330 ml)', 'custom-serving-grams': '330' }, waitFor: 'custom-drink', note: 'an own food whose serving names ml: "This is a drink" on by itself' },
   { id: 'custom-drink-off', route: '/food/custom', type: { 'custom-name': 'Protein bar', 'custom-serving-label': '1 bar', 'custom-serving-grams': '40' }, waitFor: 'custom-drink', note: 'an own food with a bar serving: the switch off' },
 ];

@@ -19,6 +19,7 @@ import {
   detailWaterAdds,
   drinkChoiceId,
   drinkKind,
+  entryEditMovesWater,
   KIND_IDS,
   waterDeleteLabel,
   waterIdFromEntry,
@@ -26,7 +27,6 @@ import {
   type DiaryDrinkInput,
 } from './diary';
 import { BUNDLED_DRINK_IDS, builtinFood, isAlcohol, isBundledDrink, sheetDrinks } from './rules';
-import { hasWaterTracked, isTrackedWater } from './via';
 
 const B = (id: string): Food => {
   const f = builtinFood(id);
@@ -383,13 +383,21 @@ describe('the volume after an edit (diaryDrinkMl)', () => {
   });
 });
 
-describe('water tracked: water from the diary never makes a day tracked', () => {
-  it('only a record not from the diary counts', () => {
-    expect(isTrackedWater({})).toBe(true);
-    expect(isTrackedWater({ fromEntryId: 'e1' })).toBe(false);
-    expect(hasWaterTracked([])).toBe(false);
-    expect(hasWaterTracked([{ fromEntryId: 'e1' }, { fromEntryId: 'e2' }])).toBe(false);
-    expect(hasWaterTracked([{ fromEntryId: 'e1' }, {}])).toBe(true);
+describe('an edit moves the water only when the amount, the serving or the day changed', () => {
+  const before = { quantity: 1, grams: 503, servingLabel: '1 can (500 ml)', date: '2026-11-19' };
+  it('a meal, name or calories change (the four fields the same) does not', () => {
+    expect(entryEditMovesWater(before, { ...before })).toBe(false);
+    expect(entryEditMovesWater(before, { ...before, meal: 'dinner', name: 'Monster' } as typeof before)).toBe(false);
+  });
+  it('the quantity, the grams, the serving or the day does', () => {
+    expect(entryEditMovesWater(before, { ...before, quantity: 2, grams: 1006 })).toBe(true);
+    expect(entryEditMovesWater(before, { ...before, grams: 480 })).toBe(true);
+    expect(entryEditMovesWater(before, { ...before, servingLabel: '1 can (16 fl oz)' })).toBe(true);
+    expect(entryEditMovesWater(before, { ...before, date: '2026-11-18' })).toBe(true);
+  });
+  it('a field missing on either side counts as changed', () => {
+    expect(entryEditMovesWater({ grams: 503, date: '2026-11-19' }, before)).toBe(true);
+    expect(entryEditMovesWater(before, { grams: 503, date: '2026-11-19' })).toBe(true);
   });
 });
 
