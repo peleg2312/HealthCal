@@ -6,7 +6,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { waterIdFromEntry } from '@/features/drinks/via';
+import { diaryWaterOf, waterIdFromEntry } from '@/features/drinks/via';
 import type { FoodEntry, WaterEntry } from '@/types';
 
 import { useStore } from './index';
@@ -285,7 +285,7 @@ describe('a live record for the entry under another id (a hand-made or damaged b
     expect(liveFor(entry.id)).toHaveLength(0);
   });
 
-  it('two live, neither under the deterministic id: the latest logged is written, the other left as it was', () => {
+  it('two live, neither under the deterministic id: the record handed in is written, the other left as it was', () => {
     const { entry, water } = logDiaryDrink();
     copyWater(water, OTHER, false, { loggedAt: '2026-11-19T08:00:00.000Z' });
     copyWater(water, OTHER2, false, { loggedAt: '2026-11-19T09:00:00.000Z' });
@@ -295,6 +295,63 @@ describe('a live record for the entry under another id (a hand-made or damaged b
     expect(liveFor(entry.id).map((x) => [x.id, x.ml]).sort()).toEqual([[OTHER, 500], [OTHER2, 1000]]);
     expect(w(OTHER)).toEqual(older);
     expect(Object.keys(S().water)).toHaveLength(2);
+  });
+
+  it('one chooser: the deterministic record if live, else the newest stamp, then the smallest id; never water from Water or a deleted one', () => {
+    const { entry, water } = logDiaryDrink();
+    const at = (iso: string) => ({ updatedAt: iso });
+    copyWater(water, OTHER, true, at('2026-11-19T13:00:00.000Z'));
+    expect(diaryWaterOf(S().water, entry.id)?.id).toBe(water.id);
+    S().remove('water', water.id);
+    copyWater(water, OTHER2, true, at('2026-11-19T12:00:00.000Z'));
+    expect(diaryWaterOf(S().water, entry.id)?.id).toBe(OTHER);
+    copyWater(water, OTHER2, true, at('2026-11-19T13:00:00.000Z'));
+    expect(diaryWaterOf(Object.values(S().water), entry.id)?.id).toBe(OTHER);
+    copyWater(water, OTHER, true, { deleted: true });
+    copyWater(water, OTHER2, true, { foodEntryId: entry.id });
+    expect(diaryWaterOf(S().water, entry.id)).toBeNull();
+  });
+
+  it("the checker's c2 in the store: the record handed in is written, the other keeps its content and stamp", () => {
+    const { entry, water } = logDiaryDrink();
+    copyWater(water, OTHER, true, { ml: 300, updatedAt: '2026-11-19T12:41:00.000Z' });
+    const other = w(OTHER);
+    tick(120_000);
+    const before = w(water.id);
+    edit(entry, before, 2);
+    expect(w(water.id).ml).toBe(1000);
+    tick();
+    S().upsertEntriesWithWater([{ entry: { ...e(entry.id), quantity: 1, grams: 503 }, water: before }]);
+    expect(w(water.id).ml).toBe(500);
+    expect(w(OTHER)).toEqual(other);
+  });
+
+  it("the checker's c3 and c12 in the store: the newest is chosen, written, stamped after every other, and chosen again", () => {
+    const { entry, water } = logDiaryDrink();
+    S().remove('water', water.id);
+    // X carries a stamp from a clock ahead (a backup from elsewhere): the record written still lands after it.
+    copyWater(water, OTHER, true, { ml: 200, deleted: false, updatedAt: '2026-11-19T15:00:00.000Z' });
+    copyWater(water, OTHER2, true, { ml: 400, deleted: false, updatedAt: '2026-11-19T12:39:00.000Z' });
+    const x = w(OTHER);
+    tick();
+    edit(entry, w(OTHER2), 2);
+    expect(w(OTHER2).ml).toBe(1000);
+    expect(w(OTHER2).updatedAt > x.updatedAt).toBe(true);
+    expect(diaryWaterOf(S().water, entry.id)?.id).toBe(OTHER2);
+    tick();
+    edit(entry, diaryWaterOf(S().water, entry.id)!, 3);
+    expect(w(OTHER2).ml).toBe(1500);
+    expect(w(OTHER)).toEqual(x);
+  });
+
+  it('a record handed in that is deleted, from Water or for another entry is not written; the chooser decides', () => {
+    const { entry, water } = logDiaryDrink();
+    copyWater(water, OTHER, true, { deleted: true, ml: 1 });
+    const other = w(OTHER);
+    tick();
+    edit(entry, other, 2);
+    expect(w(water.id).ml).toBe(1000);
+    expect(w(OTHER)).toEqual(other);
   });
 
   it('a new entry still gets the deterministic id', () => {

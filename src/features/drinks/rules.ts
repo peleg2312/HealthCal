@@ -29,7 +29,9 @@
  *
  * The mirror, a drink logged as food in the diary (./diary.ts, `diaryDrink`): its water record carries
  * `fromEntryId` (never `foodEntryId`) and the id `waterIdFromEntry(entry.id)`, so no path on any phone
- * makes two. The diary entry leads: deleting it removes the water and its Undo brings back only water
+ * makes two. Should a hand-made or damaged backup hold two live, one rule (`diaryWaterOf`, ./via.ts)
+ * picks the one an edit writes and snapshots, so the edit and its Undo touch only that record and the
+ * other keeps its content and stamp; deleting the entry still takes them all. The diary entry leads: deleting it removes the water and its Undo brings back only water
  * the same act removed (the store's cascade, one stamp); deleting the water on Water leaves the entry,
  * an ordinary entry from then on; an edit of the entry recomputes the water from the entry
  * (`diaryDrinkMl`, followEntry in ./pair.ts) and is never refused because of it. Look a pair up by
@@ -60,6 +62,7 @@ import { formatNumber, formatVolume } from '@/lib/units';
 import type { Beverage, Food, FoodEntry, ISODate, MealType, UnitSystem, WaterEntry } from '@/types';
 
 import { ENTERED, PICKED, canPick, choiceById, choicesFor, defaultChoiceId, type DrinkChoice } from './choices';
+import { diaryWaterOf } from './via';
 
 export { isWaterDrinkEntry } from './via';
 
@@ -583,11 +586,12 @@ export function waterPointingAt(water: Iterable<WaterEntry> | Record<string, Wat
   return best;
 }
 
-/** The live water record a drink logged in the diary added (`fromEntryId`), or null (none, deleted on Water, or the switch was off). */
+/**
+ * The live water record a drink logged in the diary added (`fromEntryId`), or null (none, deleted on Water, or the switch was off).
+ * When a damaged backup holds more than one, the same one the store writes (`diaryWaterOf`, ./via.ts).
+ */
 export function waterFromEntry(water: Iterable<WaterEntry> | Record<string, WaterEntry>, entryId: string): WaterEntry | null {
-  let best: WaterEntry | null = null;
-  for (const w of liveRecords(water)) if (w.fromEntryId === entryId && !w.foodEntryId && (!best || w.loggedAt > best.loggedAt)) best = w;
-  return best;
+  return diaryWaterOf(water, entryId);
 }
 
 /** Where a diary entry's water came from: 'water' (logged on Water, the entry holds its calories) or 'diary' (logged as food, the water follows it). */

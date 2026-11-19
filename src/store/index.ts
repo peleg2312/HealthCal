@@ -6,7 +6,7 @@
  */
 import { create } from 'zustand';
 
-import { isWaterDrinkEntry, waterIdFromEntry } from '@/features/drinks/via';
+import { diaryWaterOf, isWaterDrinkEntry, waterIdFromEntry } from '@/features/drinks/via';
 import { stableId } from '@/lib/hash';
 import { newId } from '@/lib/id';
 import type {
@@ -121,8 +121,9 @@ interface StoreActions {
   /**
    * Write diary entries and, for each one given water, the water record it adds as a drink logged in
    * the diary (src/features/drinks/diary.ts), in one act: each entry and its water carry one stamp. The
-   * water goes to the live record that already holds this entry's water, else under `waterIdFromEntry`
-   * (`diaryWaterIdFor`); `fromEntryId`, `date` and `loggedAt` come from its entry; `ml` is kept within
+   * water goes to the record the caller hands in when it is live and holds this entry, else to the live
+   * record `diaryWaterOf` chooses, else under `waterIdFromEntry` (`diaryWaterTarget`), with a stamp after
+   * every live record holding this entry; `fromEntryId`, `date` and `loggedAt` come from its entry; `ml` is kept within
    * 1..10,000. Also rewrites a pair after an edit (followEntry, undoEdit). The only writer
    * of such water: nothing else (upsert, sync, a restore or an import) ever creates it.
    */
@@ -326,23 +327,35 @@ function restoreDrinkPair(s: StoreState, water: WaterEntry): Partial<StoreState>
 }
 
 /**
- * Where the water a diary entry adds is written: the live record that already holds it, so an edit
- * never makes a second one; the deterministic id (`waterIdFromEntry`) for creation, or when none is
+ * Where the water a diary entry adds is written when the caller names no record of its own: the live
+ * record that already holds it (`diaryWaterOf`, @/features/drinks/via: the deterministic id if live,
+ * else the greatest `updatedAt`, then the smallest id, the same rule the drink rules read with), so an
+ * edit never makes a second one; the deterministic id (`waterIdFromEntry`) for creation, when none is
  * live. A live record under another id comes from a hand-made or damaged backup or a later format.
- * When more than one is live (such a backup already counted it twice), the deterministic one if it is
- * live, else the latest logged (then the smallest id): one is written, the others are left as they
- * are, since an edit never removes water; each stays a visible row the person can delete on Water.
  */
 function diaryWaterIdFor(water: Record<string, WaterEntry>, entryId: string): string {
-  const own = waterIdFromEntry(entryId);
-  const holds = (w: WaterEntry | undefined): w is WaterEntry => !!w && !w.deleted && w.fromEntryId === entryId && !w.foodEntryId;
-  if (holds(water[own])) return own;
-  let best: WaterEntry | null = null;
-  for (const w of Object.values(water)) {
-    if (!holds(w)) continue;
-    if (!best || w.loggedAt > best.loggedAt || (w.loggedAt === best.loggedAt && w.id < best.id)) best = w;
-  }
-  return best?.id ?? own;
+  return diaryWaterOf(water, entryId)?.id ?? waterIdFromEntry(entryId);
+}
+
+/**
+ * The record `upsertEntriesWithWater` writes for an entry: the one the caller hands in (followEntry and
+ * undoEdit hand in the record they read, so an edit writes what it snapshotted and its Undo restores
+ * that same record) when it is live, holds this entry and has no `foodEntryId`; otherwise
+ * `diaryWaterIdFor`. When a damaged backup holds more than one live record, only this one is written;
+ * the others keep their content and stamp, since an edit never removes water (each stays a visible row
+ * the person can delete on Water, and deleting the entry takes them all).
+ */
+function diaryWaterTarget(water: Record<string, WaterEntry>, entryId: string, given: string | undefined): string {
+  const w = given ? water[given] : undefined;
+  if (w && !w.deleted && w.fromEntryId === entryId && !w.foodEntryId) return w.id;
+  return diaryWaterIdFor(water, entryId);
+}
+
+/** The newest stamp among the live water records holding this entry, so the record written lands after all of them and stays the one chosen. */
+function latestDiaryWaterStamp(water: Record<string, WaterEntry>, entryId: string): string {
+  let at = '';
+  for (const w of Object.values(water)) if (!w.deleted && w.fromEntryId === entryId && !w.foodEntryId) at = later(at, w.updatedAt);
+  return at;
 }
 
 /** The water records a diary entry added (`fromEntryId`), live or not; the deterministic id first, then any other (a backup from elsewhere). */
@@ -467,8 +480,9 @@ export const useStore = create<Store>()((set, get) => ({
       const dirtyWater = { ...s.dirty.water };
       for (const it of items) {
         const id = idFor('foodEntries', it.entry as { id?: string });
-        const waterId = it.water ? diaryWaterIdFor(water, id) : null;
-        const t = nextStamp(later(foodEntries[id]?.updatedAt ?? '', (waterId && water[waterId]?.updatedAt) || ''));
+        const waterId = it.water ? diaryWaterTarget(water, id, (it.water as { id?: string }).id) : null;
+        const waterAt = waterId ? later((water[waterId]?.updatedAt) || '', latestDiaryWaterStamp(water, id)) : '';
+        const t = nextStamp(later(foodEntries[id]?.updatedAt ?? '', waterAt));
         const entry = { ...it.entry, id, updatedAt: t, deleted: false } as FoodEntry;
         foodEntries[id] = entry;
         dirtyEntries[id] = true;

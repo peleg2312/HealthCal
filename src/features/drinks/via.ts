@@ -26,7 +26,7 @@
  * @/lib/hydration, re-exported here.
  */
 import { stableId } from '@/lib/hash';
-import type { FoodEntry } from '@/types';
+import type { FoodEntry, WaterEntry } from '@/types';
 
 export function isWaterDrinkEntry(e: Pick<FoodEntry, 'via'>): boolean {
   return e.via === 'water';
@@ -43,4 +43,26 @@ export { hasWaterTracked, isTrackedWater } from '@/lib/hydration';
 /** The id of the water record a diary entry adds: the same on every phone, so no path can make two for one entry. */
 export function waterIdFromEntry(entryId: string): string {
   return stableId('waterFromEntry', entryId);
+}
+
+/**
+ * The one water record a drink logged in the diary counts as its own (`fromEntryId`), among the live
+ * records that hold this entry and have no `foodEntryId`: the record under `waterIdFromEntry` when it is
+ * live; else the live one with the greatest `updatedAt`; then the smallest id. Null when none is live.
+ * The store's write (`upsertEntriesWithWater`) and the rules' read (`waterFromEntry`, so followEntry's
+ * snapshot and undoEdit) both ask this, so an edit writes the record it snapshotted and its Undo restores
+ * that same record. More than one live record only comes from a hand-made or damaged backup; the record
+ * just written carries the newest stamp, so it stays the one chosen, and the others are left as they are.
+ */
+export function diaryWaterOf(water: Iterable<WaterEntry> | Record<string, WaterEntry>, entryId: string): WaterEntry | null {
+  const holds = (w: WaterEntry | undefined): w is WaterEntry => !!w && !w.deleted && w.fromEntryId === entryId && !w.foodEntryId;
+  const own = waterIdFromEntry(entryId);
+  const list = Symbol.iterator in (water as object) ? [...(water as Iterable<WaterEntry>)] : Object.values(water as Record<string, WaterEntry>);
+  let best: WaterEntry | null = null;
+  for (const w of list) {
+    if (!holds(w)) continue;
+    if (w.id === own) return w;
+    if (!best || w.updatedAt > best.updatedAt || (w.updatedAt === best.updatedAt && w.id < best.id)) best = w;
+  }
+  return best;
 }

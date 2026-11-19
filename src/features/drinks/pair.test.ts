@@ -836,3 +836,131 @@ describe('two phones, a drink logged in the diary', () => {
     }
   });
 });
+
+// ------------------------------------------------- two live water records for one diary entry
+
+/**
+ * A hand-made or damaged backup can hold two live water records from one diary entry (`fromEntryId`);
+ * no app version writes that. One rule (`diaryWaterOf`, ./via.ts) picks the record an edit writes and
+ * snapshots; an edit and its Undo write that same record, and the other is left exactly as it was.
+ */
+describe('two live water records for one drink logged in the diary (damaged data), through the real food log', () => {
+  const X = '11111111-1111-4111-8111-111111111111';
+  const Y = '22222222-2222-4222-8222-222222222222';
+  const energy = () => builtinFood('b_energy_drink')!;
+  const can500 = { label: '1 can (500 ml)', grams: 503 };
+  const W = (id: string) => S().water[id];
+  const E = (id: string) => S().foodEntries[id];
+  const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
+  const totalFor = (entryId: string) => liveWater().filter((w) => w.fromEntryId === entryId).reduce((n, w) => n + w.ml, 0);
+  const put = (records: WaterEntry[]) => useStore.setState((s) => ({ water: { ...s.water, ...Object.fromEntries(records.map((r) => [r.id, r])) } }));
+  const amount = (entryId: string, quantity: number, serving: { label: string; grams: number } = can500) =>
+    logFood({ food: energy(), serving, quantity, meal: 'lunch', date: TODAY, entryId });
+
+  /** c3/c12's records: the deterministic one deleted on Water, X 200 ml (the entry's moment, older stamp), Y 400 ml (a minute later, newer stamp). */
+  function threeRecords() {
+    const { entry, water } = logInDiary(useStore);
+    S().remove('water', water.id);
+    put([
+      { ...water, id: X, ml: 200, deleted: false, updatedAt: ago(120_000) },
+      { ...water, id: Y, ml: 400, deleted: false, loggedAt: new Date(Date.parse(water.loggedAt) + 60_000).toISOString(), updatedAt: ago(60_000) },
+    ]);
+    return { entry, own: W(water.id), x: W(X), y: W(Y) };
+  }
+
+  it("the checker's c2: the deterministic 500 ml and X 300 ml; an amount edit and its Undo give Water back its 800 ml", () => {
+    const { entry, water } = logInDiary(useStore);
+    put([{ ...W(water.id), id: X, ml: 300, loggedAt: new Date(Date.parse(water.loggedAt) + 60_000).toISOString(), updatedAt: new Date(Date.parse(water.updatedAt) + 60_000).toISOString() }]);
+    const x = W(X);
+    expect(totalFor(entry.id)).toBe(800);
+    amount(entry.id, 2);
+    expect(W(water.id).ml).toBe(1000);
+    expect(W(X)).toEqual(x);
+    undo();
+    expect(W(water.id).ml).toBe(500);
+    expect(W(X)).toEqual(x);
+    expect(totalFor(entry.id)).toBe(800);
+  });
+
+  it("the checker's c3: deterministic deleted, X 200 and Y 400; the edit writes Y and its Undo restores Y, X untouched", () => {
+    const { entry, own, x } = threeRecords();
+    amount(entry.id, 2);
+    expect(W(Y).ml).toBe(1000);
+    expect(W(X)).toEqual(x);
+    undo();
+    expect(W(Y).ml).toBe(400);
+    expect(W(X)).toEqual(x);
+    expect(W(own.id)).toEqual(own);
+    expect(totalFor(entry.id)).toBe(600);
+  });
+
+  it("the checker's c12: two amount edits in a row write Y both times; the double count never grows", () => {
+    const { entry, x } = threeRecords();
+    amount(entry.id, 2);
+    amount(entry.id, 3);
+    expect(W(Y).ml).toBe(1500);
+    expect(W(X)).toEqual(x);
+    expect(totalFor(entry.id)).toBe(1700);
+    expect(Object.keys(S().water)).toHaveLength(3);
+  });
+
+  it('an amount edit, then a serving edit, then Undo of the last: the first record written is written each time, the other untouched throughout', () => {
+    const { entry, own, x } = threeRecords();
+    const can16 = energy().servings.find((s) => s.label === '1 can (16 fl oz)')!;
+    amount(entry.id, 2);
+    expect(W(Y).ml).toBe(1000);
+    expect(W(X)).toEqual(x);
+    const afterFirst = W(Y);
+    amount(entry.id, 1, can16);
+    expect(W(Y).ml).toBe(473);
+    expect(W(Y).updatedAt).toBe(E(entry.id).updatedAt);
+    expect(W(X)).toEqual(x);
+    undo();
+    expect(W(Y)).toMatchObject({ ml: 1000, beverage: afterFirst.beverage, drink: afterFirst.drink, date: afterFirst.date, deleted: false });
+    expect(W(Y).updatedAt).toBe(E(entry.id).updatedAt);
+    expect(W(X)).toEqual(x);
+    expect(W(own.id)).toEqual(own);
+    expect(E(entry.id)).toMatchObject({ quantity: 2, grams: 1006 });
+  });
+
+  it('the deterministic record deleted on Water and one other live: the edit writes the live one; the deleted one stays deleted', () => {
+    const { entry, water } = logInDiary(useStore);
+    S().remove('water', water.id);
+    put([{ ...W(water.id), id: X, deleted: false, updatedAt: ago(60_000) }]);
+    const deleted = W(water.id);
+    amount(entry.id, 2);
+    expect(W(X).ml).toBe(1000);
+    expect(W(water.id)).toEqual(deleted);
+    undo();
+    expect(W(X).ml).toBe(500);
+    expect(W(water.id)).toEqual(deleted);
+  });
+
+  it('deleting the entry takes both live records in one act; its Undo brings back exactly those', () => {
+    const { entry, own, x, y } = threeRecords();
+    deleteEntry(E(entry.id));
+    expect(W(X).deleted).toBe(true);
+    expect(W(Y).deleted).toBe(true);
+    expect(W(X).updatedAt).toBe(E(entry.id).updatedAt);
+    expect(W(own.id)).toEqual(own);
+    undo();
+    expect(E(entry.id).deleted).toBe(false);
+    expect(W(X)).toMatchObject({ deleted: false, ml: x.ml });
+    expect(W(Y)).toMatchObject({ deleted: false, ml: y.ml });
+    expect(W(own.id).deleted).toBe(true);
+  });
+
+  it('one record, as the app writes it: log, edit, Undo, delete, Undo', () => {
+    const { entry, water } = logInDiary(useStore);
+    amount(entry.id, 2);
+    expect(W(water.id)).toMatchObject({ ml: 1000, updatedAt: E(entry.id).updatedAt });
+    undo();
+    expect(W(water.id)).toMatchObject({ ml: 500, updatedAt: E(entry.id).updatedAt, deleted: false });
+    deleteEntry(E(entry.id));
+    expect(W(water.id).deleted).toBe(true);
+    undo();
+    expect(W(water.id)).toMatchObject({ ml: 500, deleted: false });
+    expect(liveWater()).toHaveLength(1);
+    expect(Object.keys(S().water)).toEqual([water.id]);
+  });
+});
