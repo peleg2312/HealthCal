@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Platform, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, Easing, Platform, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { create } from 'zustand';
 
 import { withoutMarks } from '@/lib/bidi';
 import { cup, isReducedMotion, MAX_CONTENT_WIDTH, motion, useTheme, type ThemeColors } from '@/theme';
 
+import { TOAST_GAP, toastBottom } from './keyboardInset';
 import { PressableScale } from './Pressable';
 import { Text } from './Text';
 
@@ -22,6 +23,13 @@ export interface ToastOptions {
   tint?: keyof ThemeColors | (string & {});
 }
 
+interface Dock {
+  id: number;
+  height: number;
+  cover: number;
+  rides: boolean;
+}
+
 interface ToastState {
   id: number;
   message: string | null;
@@ -30,8 +38,12 @@ interface ToastState {
   tint?: string;
   /** Open sheets that carry their own host, newest last. The newest one shows the toast. */
   sheetHosts: number[];
-  /** Height of the bottom chrome (tab bar, footer, home indicator) of each mounted Screen, newest last. */
-  docks: { id: number; height: number }[];
+  /**
+   * Each focused Screen's bottom: the height of its chrome (tab bar, footer, home indicator), the px
+   * the keyboard covers (what the Screen pads by) and whether that chrome is a footer riding on the
+   * keyboard. Newest last.
+   */
+  docks: Dock[];
   show: (message: string, options?: ToastOptions) => void;
   hide: () => void;
 }
@@ -63,20 +75,24 @@ let dockSeq = 0;
  * the screen's controls. `Screen` calls this with `active` set while the screen is focused: the
  * screen that is showing wins, even while the one it replaced is still mounted (a toast raised
  * on the sign-in screen moves above Today's tab bar the moment Today shows).
+ *
+ * `keyboard` is what the screen does for the on-screen keyboard: `cover`, the px it pads its
+ * bottom by (the part the keyboard covers), and `rides`, true when its chrome is a pinned footer
+ * that the padding lifts on top of the keyboard. The toast then rests 12 px above that footer, or
+ * 12 px above the keyboard itself when there is no footer (`toastBottom` in ./keyboardInset).
  */
-export function useToastDock(height: number, active = true) {
+export function useToastDock(height: number, active = true, keyboard?: { cover: number; rides: boolean }) {
   const [id] = useState(() => ++dockSeq);
+  const cover = keyboard?.cover ?? 0;
+  const rides = keyboard?.rides ?? false;
   useEffect(() => {
     useToast.setState((s) => {
       const others = s.docks.filter((d) => d.id !== id);
-      return { docks: active ? [...others, { id, height }] : others };
+      return { docks: active ? [...others, { id, height, cover, rides }] : others };
     });
-  }, [id, height, active]);
+  }, [id, height, active, cover, rides]);
   useEffect(() => () => useToast.setState((s) => ({ docks: s.docks.filter((d) => d.id !== id) })), [id]);
 }
-
-/** Space between the toast and the chrome under it. */
-const TOAST_GAP = 12;
 
 let hostSeq = 0;
 /** The toast last read out, so moving it between hosts does not read it twice. */
@@ -90,7 +106,13 @@ let announcedId = 0;
  * ('sheet'): a native modal covers the app's own layer, so a sheet has to show
  * the toast itself. On a screen it rests 12 px above the bottom chrome the
  * screen reported with `useToastDock` (tab bar, footer or home indicator),
- * never mid-screen on top of controls. In a sheet it sits in the layout right
+ * never mid-screen on top of controls. While the on-screen keyboard is up it
+ * rests 12 px above the footer that rides on the keyboard, or 12 px above the
+ * keyboard when the screen has no footer, by the same measure the screen pads
+ * itself with, and moves above the focused field when it would cover it and
+ * there is room. The root host is outside every ScrollView, so a tap on its
+ * action is never taken for a tap that dismisses the keyboard (only a
+ * ScrollView does that, by its keyboardShouldPersistTaps). In a sheet it sits in the layout right
  * above the sheet's top edge, and the host underneath steps aside so there is
  * only ever one toast on screen.
  */
@@ -99,11 +121,21 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
   const insets = useSafeAreaInsets();
   const { id, message, actionLabel, onAction, tint, hide } = useToast();
   const sheetHosts = useToast((s) => s.sheetHosts);
+  const inSheet = placement === 'sheet';
   const docks = useToast((s) => s.docks);
-  const dock = docks.length ? docks[docks.length - 1].height : insets.bottom;
+  const last = docks.length ? docks[docks.length - 1] : null;
+  const placed = last ? { dock: last.height, ridesKeyboard: last.rides, cover: last.cover } : { dock: insets.bottom, ridesKeyboard: false, cover: 0 };
+  const keyboardUp = !inSheet && placed.cover > 0;
+  // With the keyboard up: the focused field, as distances from the bottom of the host, and how
+  // high the host is (the toast may not rise into the status bar). Measured, so null until then.
+  // Kept with the toast and keyboard it was measured for, so a stale one is never used.
+  const [field, setField] = useState<{ top: number; bottom: number; hostBottom: number; key: string } | null>(null);
+  const key = `${id}:${placed.cover}:${placed.dock}`;
+  const [toastH, setToastH] = useState(0);
+  const outer = useRef<React.ComponentRef<typeof View>>(null);
+  const bottomNow = useRef(0);
   const [anim] = useState(() => new Animated.Value(0));
   const [hostId] = useState(() => ++hostSeq);
-  const inSheet = placement === 'sheet';
 
   useEffect(() => {
     if (!inSheet) return;
@@ -143,18 +175,52 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
     };
   }, [id, message, actionLabel, anim, hide, active]);
 
+  // The focused field while a toast shows over the keyboard, so the toast can keep clear of it.
+  const shown = !!message && active;
+  useEffect(() => {
+    if (!shown || !keyboardUp) return;
+    let cancelled = false;
+    const measure = () =>
+      focusedFieldBox(outer.current, bottomNow.current).then((f) => {
+        if (!cancelled) setField(f ? { ...f, key } : null);
+      });
+    const frame = requestAnimationFrame(() => void measure());
+    // On web the focus can move while the toast shows (a tap back into the field).
+    const doc = Platform.OS === 'web' && typeof document !== 'undefined' ? document : null;
+    const onFocus = () => requestAnimationFrame(() => void measure());
+    doc?.addEventListener('focusin', onFocus);
+    doc?.addEventListener('focusout', onFocus);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+      doc?.removeEventListener('focusin', onFocus);
+      doc?.removeEventListener('focusout', onFocus);
+    };
+  }, [shown, keyboardUp, key]);
+
+  const bottom = toastBottom(
+    placed,
+    keyboardUp && field && field.key === key && toastH > 0 ? { top: field.top, bottom: field.bottom, toastHeight: toastH, limit: field.hostBottom - insets.top } : null,
+    TOAST_GAP,
+  );
+  useEffect(() => {
+    bottomNow.current = bottom;
+  }, [bottom]);
+
   if (!message || !active) return null;
   return (
     <View
+      ref={outer}
       pointerEvents="box-none"
       style={
         inSheet
           ? { alignSelf: 'stretch', alignItems: 'center', paddingHorizontal: 20, marginBottom: 12 }
-          : { position: 'absolute', left: 0, right: 0, bottom: dock + TOAST_GAP, alignItems: 'center', paddingHorizontal: 20 }
+          : { position: 'absolute', left: 0, right: 0, bottom, alignItems: 'center', paddingHorizontal: 20 }
       }>
       <Animated.View
         testID="toast"
         accessibilityLiveRegion="polite"
+        onLayout={inSheet ? undefined : (e) => setToastH(Math.round(e.nativeEvent.layout.height))}
         style={{
           maxWidth: MAX_CONTENT_WIDTH - 40,
           flexDirection: 'row',
@@ -196,4 +262,42 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       </Animated.View>
     </View>
   );
+}
+
+/** A box in window coordinates: its top and bottom edge. */
+type Measurable = { measureInWindow?: (callback: (x: number, y: number, width: number, height: number) => void) => void };
+
+function measureBox(node: Measurable | null): Promise<{ y: number; h: number } | null> {
+  return new Promise((resolve) => {
+    const m = node?.measureInWindow;
+    if (!node || typeof m !== 'function') return resolve(null);
+    try {
+      m.call(node, (_x, y, _w, h) => resolve(Number.isFinite(y) && Number.isFinite(h) ? { y, h } : null));
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/**
+ * The focused text field, as distances from the bottom of the toast's host (the app's root), and
+ * where that bottom is in the window. `hostView` is the toast's own outer view and `placedBottom`
+ * its current `bottom`: the host's bottom edge is the outer view's bottom plus that, so both boxes
+ * are read in the same (window) coordinates on every platform. Null when no field has the focus.
+ */
+async function focusedFieldBox(hostView: Measurable | null, placedBottom: number): Promise<{ top: number; bottom: number; hostBottom: number } | null> {
+  if (Platform.OS === 'web') {
+    if (typeof document === 'undefined' || typeof window === 'undefined') return null;
+    const el = document.activeElement;
+    if (!(el instanceof HTMLElement) || !(/^(INPUT|TEXTAREA)$/.test(el.tagName) || el.isContentEditable)) return null;
+    const r = el.getBoundingClientRect();
+    const hostBottom = window.innerHeight;
+    return { top: hostBottom - r.top, bottom: hostBottom - r.bottom, hostBottom };
+  }
+  const input = TextInput.State?.currentlyFocusedInput?.() as unknown as Measurable | null | undefined;
+  if (!input) return null;
+  const [host, box] = await Promise.all([measureBox(hostView), measureBox(input)]);
+  if (!host || !box) return null;
+  const hostBottom = host.y + host.h + placedBottom;
+  return { top: hostBottom - box.y, bottom: hostBottom - (box.y + box.h), hostBottom };
 }

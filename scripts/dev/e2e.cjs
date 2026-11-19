@@ -18,6 +18,8 @@
  * that shrinks, as in a phone browser, where the layout does not), the pinned footer must rise
  * above it and the focused field must be in view above the footer, and all of it must go back
  * when the keyboard closes. No real keyboard is raised: a phone still has to confirm that part.
+ * With the keyboard faked open, a toast must rest 12 px above the footer riding on it (food search) or above
+ * the keyboard itself (Water's "Other amount"), its Undo must work, and with the keyboard down it stays where it was.
  *
  * The run uses reduced motion, so every animation is instant (the app also treats an
  * automated browser as reduced motion). The last section turns motion on and acts while
@@ -876,6 +878,96 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   );
   await page.keyboard.press('Escape');
   await page.waitForTimeout(500);
+
+  // ------------------------------------------- the toast with the keyboard up (src/ui/Toast.tsx, toastBottom in src/ui/keyboardInset.ts)
+  // With the faked keyboard open, a toast must rest 12 px above the footer that rides on the keyboard (food search),
+  // or above the keyboard itself where there is no footer (Water's "Other amount"), wholly in what can be seen, and
+  // its Undo must work. With the keyboard down it is where it always was: 85 px from the bottom on food search
+  // (the footer, 73, and 12), the number recorded before this change at 360, 320 and 390 px.
+  const KB = 320;
+  const toastBox = () => page.evaluate(() => {
+    const vis = (sel) => [...document.querySelectorAll(sel)].find((e) => e.getBoundingClientRect().height > 0);
+    const t = vis('[data-testid="toast"]');
+    if (!t) return null;
+    const r = t.getBoundingClientRect();
+    const a = vis('[data-testid="toast-action"]')?.getBoundingClientRect();
+    const f = vis('[data-testid="screen-footer"]')?.getBoundingClientRect();
+    return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, footerTop: f ? f.top : null, footerBottom: f ? f.bottom : null, visible: window.visualViewport.height, inner: window.innerHeight, width: window.innerWidth, action: a ? { x: a.x + a.width / 2, y: a.y + a.height / 2, w: a.width, h: a.height } : null };
+  });
+  const fmt = (b) => (b ? `toast ${Math.round(b.top)}-${Math.round(b.bottom)}, footer top ${b.footerTop == null ? '-' : Math.round(b.footerTop)}, keyboard top ${Math.round(b.visible)}, Undo ${b.action ? `${Math.round(b.action.w)} x ${Math.round(b.action.h)}` : 'none'}` : 'no toast');
+  await page.goto(`${BASE}/food/search?meal=snack`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(800);
+  await fill('food-search-input', 'apple');
+  await page.waitForTimeout(700);
+  {
+    const c = await cupOf('food-search-input');
+    await page.touchscreen.tap(c.x + c.w / 2, c.y + c.h / 2);
+  }
+  await page.evaluate((h) => window.__keyboard(h), KB);
+  await page.waitForTimeout(400);
+  before = await stored();
+  await tap('result-0-add');
+  await page.waitForTimeout(300);
+  let tb = await toastBox();
+  const addedUp = newIn(await stored(), before, 'foodEntries');
+  check(
+    'keyboard up, food search: the toast rests 12 to 24 px above the footer riding on the keyboard, wholly in view',
+    !!tb && tb.footerTop != null && Math.abs(tb.footerBottom - tb.visible) <= 1 && tb.bottom <= tb.footerTop - 12 && tb.bottom >= tb.footerTop - 24 && tb.bottom <= tb.visible && tb.top >= 0 && tb.left >= 0 && tb.right <= tb.width,
+    fmt(tb),
+  );
+  check('keyboard up, food search: the toast carries Undo, a 44 px target', !!tb?.action && tb.action.h >= 44 && tb.action.w >= 44, fmt(tb));
+  if (tb?.action) await page.touchscreen.tap(tb.action.x, tb.action.y);
+  await page.waitForTimeout(400);
+  s = await stored();
+  check('keyboard up, food search: Undo on the toast removes the entry', addedUp.length === 1 && !!s.foodEntries[addedUp[0].id]?.deleted, addedUp.map((e) => e.name).join(', ') || 'nothing added');
+  await page.evaluate(() => window.__keyboard(0));
+  await blur();
+  await page.waitForTimeout(400);
+  await page.locator('[data-testid^="result-"][data-testid$="-add"]').first().click();
+  await page.waitForTimeout(400);
+  tb = await toastBox();
+  check('keyboard down, food search: the toast is where it was before, 85 px from the bottom (footer 73 + 12)', !!tb && Math.round(tb.inner - tb.bottom) === 85 && Math.round(tb.inner - tb.footerTop) === 73, tb ? `${Math.round(tb.inner - tb.bottom)} px from the bottom, footer ${Math.round(tb.inner - tb.footerTop)} px` : 'no toast');
+  for (const e of newIn(await stored(), before, 'foodEntries')) await page.evaluate((id) => window.__healthcal.getState().remove('foodEntries', id), e.id);
+
+  await page.goto(`${BASE}/water`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(800);
+  await fill('water-custom-input', '300');
+  {
+    const c = await cupOf('water-custom-input');
+    await page.touchscreen.tap(c.x + c.w / 2, c.y + c.h / 2);
+  }
+  await page.evaluate((h) => window.__keyboard(h), KB);
+  await page.waitForTimeout(400);
+  before = await stored();
+  await tap('water-custom-add');
+  await page.waitForTimeout(300);
+  tb = await toastBox();
+  const waterUp = newIn(await stored(), before, 'water');
+  check(
+    'keyboard up, Water (no footer): the toast rests 12 to 24 px above the keyboard, wholly in view',
+    !!tb && tb.footerTop == null && tb.bottom <= tb.visible - 12 && tb.bottom >= tb.visible - 24 && tb.top >= 0,
+    fmt(tb),
+  );
+  // Back into the field with the toast still up (a finger at its left end, beside the toast): the toast moves
+  // clear of it, since there is room above. On a phone the field keeps the focus through the Add tap
+  // (keyboardShouldPersistTaps), so there the toast is clear of it from the start.
+  {
+    const c = await cupOf('water-custom-input');
+    await page.touchscreen.tap(c.x + 12, c.y + c.h / 2);
+    await page.waitForTimeout(300);
+    const t2 = await toastBox();
+    const f2 = await cupOf('water-custom-input');
+    const clear = !!t2 && !!f2 && (t2.bottom <= f2.y || t2.top >= f2.y + f2.h);
+    check('keyboard up, Water: with the field focused the toast keeps clear of it, above the keyboard', clear && t2.bottom <= t2.visible - 12 && t2.top >= 0 && (await focusedId()) === 'water-custom-input', `${fmt(t2)}, field ${f2 ? `${Math.round(f2.y)}-${Math.round(f2.y + f2.h)}` : '-'}, focus ${await focusedId()}`);
+    tb = t2 || tb;
+  }
+  if (tb?.action) await page.touchscreen.tap(tb.action.x, tb.action.y);
+  await page.waitForTimeout(400);
+  s = await stored();
+  check('keyboard up, Water: Undo on the toast removes the 300 ml', waterUp.length === 1 && Math.round(waterUp[0].ml) === 300 && !!s.water[waterUp[0].id]?.deleted, waterUp.map((w) => `${w.ml} ml`).join(', ') || 'nothing added');
+  await page.evaluate(() => window.__keyboard(0));
+  await blur();
+  await page.waitForTimeout(300);
 
   const real = errors.filter((e) => !/favicon|DevTools|useNativeDriver|pointerEvents is deprecated|shadow\*/i.test(e));
   check('no runtime or console errors during the whole run', real.length === 0, real.slice(0, 3).join(' || '));

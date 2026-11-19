@@ -1,6 +1,6 @@
 /**
- * The arithmetic behind `Screen`'s keyboard handling in phone browsers. No React,
- * no DOM, unit-tested.
+ * The arithmetic behind `Screen`'s keyboard handling in phone browsers, and where the
+ * toast rests while a keyboard is up (on every platform). No React, no DOM, unit-tested.
  *
  * In a phone browser the page's layout does not shrink when the on-screen keyboard
  * opens (iOS Safari and a Home Screen web app always; Android Chrome by default):
@@ -26,6 +26,46 @@ export function keyboardCover(v: { layoutHeight: number; viewportHeight: number;
   if ((v.scale ?? 1) > 1.05) return 0;
   const covered = Math.round(v.layoutHeight - v.viewportHeight);
   return covered >= KEYBOARD_MIN ? covered : 0;
+}
+
+/** Space between the toast and the chrome (or keyboard) under it. */
+export const TOAST_GAP = 12;
+
+/**
+ * Where the screen toast rests: its distance from the bottom of the window, in px. The toast
+ * host sits at the app's root, so it has to be told what the focused screen draws at the bottom.
+ *
+ *   dock          the height of the screen's bottom chrome as laid out without a keyboard: its
+ *                 pinned footer, or the tab bar with its + cup and the home indicator, or just
+ *                 the home indicator.
+ *   ridesKeyboard true when the dock is a pinned footer, which the screen lifts on top of the
+ *                 keyboard; the tab bar and the home indicator stay where they are, behind it.
+ *   cover         the px the keyboard covers at the bottom of the screen: exactly what `Screen`
+ *                 pads its bottom by (natively KeyboardAvoidingView's "padding", in a phone
+ *                 browser `keyboardCover`). 0 with no keyboard, with a hardware keyboard, and
+ *                 when the window has already shrunk for the keyboard (nothing is covered then:
+ *                 the chrome is drawn above it and the toast stays on the chrome).
+ *   avoid         optional: the focused field, as distances from the bottom of the window
+ *                 (`bottom` < `top`), with the toast's height and the highest the toast may
+ *                 reach (`limit`, the window less the top inset). Only read with the keyboard up:
+ *                 a toast that would lie over the field moves to 12 px above it when it fits.
+ *
+ * With no keyboard this is `dock + 12`, the same as before the keyboard counted.
+ */
+export function toastBottom(
+  v: { dock: number; ridesKeyboard: boolean; cover: number },
+  avoid?: { top: number; bottom: number; toastHeight: number; limit: number } | null,
+  gap = TOAST_GAP,
+): number {
+  const cover = v.cover > 0 ? v.cover : 0;
+  if (!cover) return v.dock + gap;
+  // A footer rides on the keyboard; anything else is behind it, unless it reaches higher than it.
+  const base = (v.ridesKeyboard ? v.dock + cover : Math.max(v.dock, cover)) + gap;
+  if (!avoid || !(avoid.top > avoid.bottom) || !(avoid.toastHeight > 0)) return base;
+  const overlaps = base < avoid.top && base + avoid.toastHeight > avoid.bottom;
+  if (!overlaps) return base;
+  const above = Math.round(avoid.top + gap);
+  return above + avoid.toastHeight <= avoid.limit ? above : base;
 }
 
 /**

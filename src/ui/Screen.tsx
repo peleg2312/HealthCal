@@ -55,13 +55,78 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
   };
   const bottomPad = (tabs ? TAB_BAR_SPACE : spacing.xxl) + (footer ? 0 : insets.bottom);
   // The toast rests 12 px above whatever this screen has at the bottom: the pinned footer,
-  // the tab bar with its + cup (14 px proud of the bar), or just the home indicator.
+  // the tab bar with its + cup (14 px proud of the bar), or just the home indicator; with the
+  // keyboard up, the footer riding on it or the keyboard itself (see `cover` below).
   const [footerH, setFooterH] = useState(0);
   const focused = useIsFocused();
-  useToastDock(footer ? footerH : insets.bottom + (tabs ? TAB_BAR_HEIGHT + 14 : 0), focused);
   // An id for this screen's element on web, so the keyboard handling only moves its own fields.
   const [domId] = useState(() => `screen-${++screenSeq}`);
   const webKeyboard = useWebKeyboard(domId, focused);
+  // What the keyboard covers, by the same measure this screen pads itself with, for the toast:
+  // in a phone browser the padding below; natively the padding KeyboardAvoidingView applied, read
+  // as its height less its content's (it computes the padding itself and does not report it).
+  // Where the window already shrank for the keyboard it pads nothing, so this is 0 and the toast
+  // stays on the chrome, which is then drawn above the keyboard: never counted twice.
+  const [outerH, setOuterH] = useState(0);
+  const [innerH, setInnerH] = useState(0);
+  const cover = Platform.OS === 'web' ? webKeyboard : outerH > 0 && innerH > 0 ? Math.max(0, outerH - innerH) : 0;
+  useToastDock(footer ? footerH : insets.bottom + (tabs ? TAB_BAR_HEIGHT + 14 : 0), focused, { cover, rides: !!footer });
+  const body = (
+    <FadeUp disabled={!enter} style={{ flex: 1 }}>
+      <View style={{ paddingTop: noTopInset ? 0 : insets.top }} />
+      {header ? <View style={inner}>{header}</View> : null}
+      {scroll ? (
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          {...scrollProps}
+          contentContainerStyle={[
+            inner,
+            {
+              paddingTop: spacing.sm,
+              paddingBottom: bottomPad,
+              gap: spacing.lg,
+            },
+            contentStyle,
+          ]}>
+          {children}
+        </ScrollView>
+      ) : (
+        <View
+          style={[
+            inner,
+            {
+              flex: 1,
+              paddingBottom: (tabs ? TAB_BAR_SPACE : 0) + (footer ? 0 : insets.bottom),
+            },
+            contentStyle,
+          ]}>
+          {children}
+        </View>
+      )}
+      {footer ? (
+        <View
+          testID="screen-footer"
+          onLayout={(e) => setFooterH(Math.round(e.nativeEvent.layout.height))}
+          style={{
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+            backgroundColor: colors.bg,
+          }}>
+          <View
+            style={[
+              inner,
+              {
+                paddingTop: spacing.md,
+                paddingBottom: Math.max(insets.bottom, spacing.lg),
+              },
+            ]}>
+            {footer}
+          </View>
+        </View>
+      ) : null}
+    </FadeUp>
+  );
   return (
     // The keyboard, natively: KeyboardAvoidingView with "padding" on both platforms. On iOS the keyboard
     // covers the app and "padding" lifts the content (and a pinned footer) above it. On Android the app is
@@ -81,61 +146,16 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
       nativeID={domId}
       testID={testID}
       style={[{ flex: 1, backgroundColor: colors.bg }, webKeyboard ? { paddingBottom: webKeyboard } : null]}
-      behavior={Platform.OS === 'web' ? undefined : 'padding'}>
-      <FadeUp disabled={!enter} style={{ flex: 1 }}>
-        <View style={{ paddingTop: noTopInset ? 0 : insets.top }} />
-        {header ? <View style={inner}>{header}</View> : null}
-        {scroll ? (
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            {...scrollProps}
-            contentContainerStyle={[
-              inner,
-              {
-                paddingTop: spacing.sm,
-                paddingBottom: bottomPad,
-                gap: spacing.lg,
-              },
-              contentStyle,
-            ]}>
-            {children}
-          </ScrollView>
-        ) : (
-          <View
-            style={[
-              inner,
-              {
-                flex: 1,
-                paddingBottom: (tabs ? TAB_BAR_SPACE : 0) + (footer ? 0 : insets.bottom),
-              },
-              contentStyle,
-            ]}>
-            {children}
-          </View>
-        )}
-        {footer ? (
-          <View
-            testID="screen-footer"
-            onLayout={(e) => setFooterH(Math.round(e.nativeEvent.layout.height))}
-            style={{
-              borderTopWidth: 1,
-              borderTopColor: colors.border,
-              backgroundColor: colors.bg,
-            }}>
-            <View
-              style={[
-                inner,
-                {
-                  paddingTop: spacing.md,
-                  paddingBottom: Math.max(insets.bottom, spacing.lg),
-                },
-              ]}>
-              {footer}
-            </View>
-          </View>
-        ) : null}
-      </FadeUp>
+      behavior={Platform.OS === 'web' ? undefined : 'padding'}
+      onLayout={Platform.OS === 'web' ? undefined : (e) => setOuterH(Math.round(e.nativeEvent.layout.height))}>
+      {Platform.OS === 'web' ? (
+        body
+      ) : (
+        // Natively only: a plain box around the content, whose height is the view's less the padding.
+        <View style={{ flex: 1 }} onLayout={(e) => setInnerH(Math.round(e.nativeEvent.layout.height))}>
+          {body}
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
