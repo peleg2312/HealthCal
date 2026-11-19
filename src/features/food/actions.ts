@@ -3,6 +3,7 @@
  * days, clearing a meal, saving a meal, and managing custom foods. Every one
  * of them can be undone from the toast.
  */
+import { withWater } from '@/features/drinks/diary';
 import { followEntry, pairEditBlocked, undoEdit } from '@/features/drinks/pair';
 import { DRINKS_NOT_COPIED, DRINKS_NOT_SAVED } from '@/features/drinks/rules';
 import { isWaterDrinkEntry } from '@/features/drinks/via';
@@ -17,7 +18,7 @@ import { haptic, toast } from '@/ui';
 
 import { dayPhrase } from './helpers';
 
-import { deleteEntry, logItems, toSavedMealItem } from './log';
+import { addItems, deleteEntry, toSavedMealItem } from './log';
 
 const sortByLogged = (a: FoodEntry, b: FoodEntry) => a.loggedAt.localeCompare(b.loggedAt);
 
@@ -75,10 +76,18 @@ export function copyEntries(entries: FoodEntry[], toDate: ISODate, meal?: MealTy
     groups.set(m, [...(groups.get(m) ?? []), e]);
   }
   const created: FoodEntry[] = [];
-  for (const [m, list] of groups) created.push(...logItems(list, m, toDate));
-  // One toast whose Undo covers every meal that was copied.
+  let ml = 0;
+  for (const [m, list] of groups) {
+    const added = addItems(list, m, toDate);
+    created.push(...added.entries);
+    ml += added.ml;
+  }
+  // One toast whose Undo covers every meal that was copied, and the water the drinks among them added
+  // (the store's cascade takes it with each entry).
   const ids = created.map((e) => e.id);
-  toast(message ?? `Copied ${created.length} ${created.length === 1 ? 'item' : 'items'} to ${dayPhrase(toDate)}`, {
+  haptic.success();
+  const units = useStore.getState().profile?.units ?? 'metric';
+  toast(withWater(message ?? `Copied ${created.length} ${created.length === 1 ? 'item' : 'items'} to ${dayPhrase(toDate)}`, ml, units), {
     label: 'Undo',
     onPress: () => undoAll(ids),
   });
@@ -184,7 +193,8 @@ export function updateEntryDirect(
   entry: FoodEntry,
   patch: { name: string; nutrients: Nutrients; meal: MealType; date: ISODate },
 ): FoodEntry {
-  // A drink also counted in Water stays on today or earlier (the water screen cannot show a future day).
+  // A drink from Water stays on today or earlier (the water screen cannot show a future day); a drink
+  // logged in the diary is never refused (its water follows the entry).
   const refused = pairEditBlocked(entry, { grams: entry.grams, date: patch.date });
   if (refused) {
     haptic.warn();
@@ -202,7 +212,8 @@ export function updateEntryDirect(
     confidence: kcalChanged ? undefined : entry.confidence,
     loggedAt: entry.loggedAt ?? nowISO(),
   });
-  // A drink from Water: its water record follows the new day (an entered drink has no grams to scale).
+  // A drink's water record follows the new day: one from Water (an entered drink has no grams to scale),
+  // or one logged in the diary (its volume recomputed from the entry).
   const waterBefore = entry.deleted ? null : followEntry(entry, next);
   haptic.success();
   toast('Entry updated', { label: 'Undo', onPress: () => undoEdit(entry, waterBefore) });

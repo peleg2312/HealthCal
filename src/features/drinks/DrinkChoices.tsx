@@ -3,7 +3,9 @@
  * (Milk: Semi-skimmed, Whole, ...; Coffee: Black, Splash of milk, Latte, ...), then one line that
  * always names what the next tap logs ("Semi-skimmed milk: 129 kcal per 250 ml, to lunch" or "Black
  * coffee: no calories added"), and, when the same food is already in the diary within 3 hours, that
- * notice with a "Water only" chip (off by default; nothing is linked or dropped by itself).
+ * notice with a "Water only" chip (off by default; nothing is linked or dropped by itself). When that
+ * entry is a drink logged in the diary that already added its water, the notice says so and no chip is
+ * offered (it would count the same water twice).
  *
  * Only places words: the choices are `choicesFor` and `PICK_CHIP` (./choices.ts), the words come from
  * `planDrink` and `noticeLine` (./rules.ts). The row wraps (a ChipWrap), so the selected chip is
@@ -81,6 +83,7 @@ export function DrinkChoices({
   units,
   line,
   notice,
+  waterOnlyOffered = true,
   waterOnly,
   onChoose,
   onPicked,
@@ -97,6 +100,8 @@ export function DrinkChoices({
   line: string;
   /** "Orange juice is already in breakfast (08:10).", or null. */
   notice: string | null;
+  /** Whether the notice offers "Water only" (`waterOnlyOffered`): not for an entry that already added its water. */
+  waterOnlyOffered?: boolean;
   waterOnly: boolean;
   onChoose: (choice: DrinkChoice) => void;
   onPicked: (food: Food) => void;
@@ -175,13 +180,15 @@ export function DrinkChoices({
           <Text testID="water-drink-notice" variant="caption" color="text" style={{ flex: 1, minWidth: 0 }}>
             {notice}
           </Text>
-          <DrinkChip
-            testID="water-water-only"
-            label="Water only"
-            a11y={waterOnly ? 'Water only, on: the next drink adds no calories' : 'Water only, off: the next drink adds its calories'}
-            selected={waterOnly}
-            onPress={() => onWaterOnly(!waterOnly)}
-          />
+          {waterOnlyOffered ? (
+            <DrinkChip
+              testID="water-water-only"
+              label="Water only"
+              a11y={waterOnly ? 'Water only, on: the next drink adds no calories' : 'Water only, off: the next drink adds its calories'}
+              selected={waterOnly}
+              onPress={() => onWaterOnly(!waterOnly)}
+            />
+          ) : null}
         </View>
       ) : null}
     </View>

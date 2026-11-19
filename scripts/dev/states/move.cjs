@@ -19,6 +19,11 @@ const settle = { wait: 700 };
 // A toast with Undo stays 4.5 s, 12 s when the browser reports a screen reader (the test browser can);
 // states that are not about the toast wait for it to go.
 const toastGone = { wait: 12500 };
+/** Log a food with the search row's + (the first result for `query`) on the route's meal. */
+const logDiary = (query) => [{ type: 'food-search-input', text: query }, { wait: 1200 }, 'result-0-add'];
+/** From food search to the water screen: Done (the diary), the + sheet, its Water row. */
+/** The log's toast (4.5 s) gone first, so the capture shows only what the next screen raises. */
+const toWater = [toastGone, 'search-done', 'tab-add', 'quick-water'];
 /** Today at a clock time, for a state's `now` (the seed is built around the real today). */
 const todayAt = (h, m) => {
   const d = new Date();
@@ -190,6 +195,20 @@ const water = [
   { id: 'detail-drink', route: '/food/detail?entryId=00000000-0000-4000-8000-00000000d001', values: { drinks: 1 }, now: todayAt(14, 0), waitFor: 'detail-drink-note', note: 'the edit from the diary side: the note on the water' },
   { id: 'detail-drink-future', route: '/food/detail?entryId=00000000-0000-4000-8000-00000000d001', values: { drinks: 1 }, now: todayAt(14, 0), taps: ['detail-day-next'], waitFor: 'detail-drink-problem', note: 'a paired drink moved to tomorrow: the reason under the day, Save waits' },
   { id: 'detail-drink-kcal', route: '/water', now: todayAt(13, 30), taps: ['water-beverage-other', 'water-choice-pick', 'water-pick-kcal-open', { type: 'water-pick-kcal', text: '140' }, 'water-pick-kcal-add', toastGone, '^water-entry-open-'], waitFor: 'detail-drink-note', note: 'calories entered on Water, opened: the quick entry with the note' },
+  // Drinks logged in the diary that also count in Water (src/features/drinks/diary.ts): the Water row from the diary
+  // ("<name> · from lunch", no kcal), its delete, the notice that says the diary's latte is already in Water (no "Water
+  // only"), the diary's mark and its delete toast, and the Goals switch. The drink is logged the way a person does it,
+  // with the search row's + (the profile but no other data, so the row and the entry are the only ones), then the + sheet's
+  // Water row opens the water screen. (seed.mjs's values.diaryWater writes the same records, for shot.mjs.)
+  { id: 'water-from-diary', route: '/food/search?meal=lunch', data: 'empty', now: todayAt(14, 0), taps: [...logDiary('monster'), ...toWater], waitFor: '^water-entry-from-', note: 'an energy drink logged in lunch: its Water row names it, from lunch, with no kcal' },
+  { id: 'water-from-diary-demo', route: '/food/search?meal=lunch', now: todayAt(14, 0), taps: [...logDiary('monster'), ...toWater], waitFor: '^water-entry-from-', note: 'the same among the demo day\'s water and drinks' },
+  { id: 'water-from-diary-imperial', route: '/food/search?meal=lunch', data: 'empty', imperial: true, now: todayAt(14, 0), taps: [...logDiary('monster'), ...toWater], waitFor: '^water-entry-from-', note: 'in fl oz' },
+  { id: 'water-from-diary-removed', route: '/food/search?meal=lunch', data: 'empty', now: todayAt(14, 0), taps: [...logDiary('monster'), ...toWater, toastGone, '^water-delete-'], waitFor: 'toast-action', note: 'its water deleted on Water: the drink stays in lunch, one toast with Undo' },
+  { id: 'water-from-diary-open', route: '/food/search?meal=lunch', data: 'empty', now: todayAt(14, 0), taps: [...logDiary('monster'), ...toWater, '^water-entry-open-'], waitFor: 'detail-drink-note', note: 'the row opens its diary entry: the note says it changes with the entry' },
+  { id: 'water-diary-latte-notice', route: '/food/search?meal=breakfast', now: todayAt(9, 0), taps: [...logDiary('latte'), ...toWater, 'water-beverage-coffee', 'water-choice-latte'], waitFor: 'water-drink-notice', absent: ['water-water-only'], note: 'a latte already in breakfast and in Water: the notice says so, no Water only' },
+  { id: 'diary-drink-in-water', route: '/food/search?meal=lunch', now: todayAt(14, 0), taps: [...logDiary('monster'), toastGone, 'search-done'], waitFor: '^entry-in-water-', note: 'the diary: a drink logged there marked "also in Water"' },
+  { id: 'diary-drink-removed-water', route: '/food/search?meal=lunch', data: 'empty', now: todayAt(14, 0), taps: [...logDiary('monster'), 'search-done', toastGone, '^entry-delete-'], waitFor: 'toast-action', note: 'deleted in the diary: its water goes too, and the toast says so' },
+  { id: 'goals-diary-drinks-off', route: '/settings/goals', taps: ['goals-diary-drinks'], waitFor: 'goals-diary-drinks', note: 'Goals > Water: "Count drinks from the diary" turned off (Save waits)' },
   { id: 'water-sizes-error',route: '/water', taps: ['section-add-a-drink-action', ...[0, 1, 2, 3].map((i) => ({ type: `water-preset-${i}`, text: '' })), 'water-presets-save'], sheet: true, waitFor: 'water-presets-error', note: 'every size cleared: the error' },
 ];
 

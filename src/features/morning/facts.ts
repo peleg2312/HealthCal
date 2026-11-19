@@ -10,9 +10,9 @@
 import { guidelineMinutes } from '@/lib/exercise';
 import { BUDGET_BAND } from '@/lib/insights';
 import { isCompleteDay } from '@/lib/trend';
-import { hasFoodLogged } from '@/features/drinks/via';
+import { hasFoodLogged, hasWaterTracked } from '@/features/drinks/via';
 import { isEstimate } from '@/features/today/meals';
-import type { ActivityEntry, FoodEntry, ISODate } from '@/types';
+import type { ActivityEntry, FoodEntry, ISODate, WaterEntry } from '@/types';
 
 export interface DayFacts {
   date: ISODate;
@@ -31,7 +31,7 @@ export interface DayFacts {
   proteinG: number;
   waterMl: number;
   waterGoalMl: number;
-  /** Any water entry on the day. */
+  /** Water logged as water on the day (`hasWaterTracked`): a drink logged in the diary is food, not tracked water. */
   hasWater: boolean;
   activities: { name: string; emoji: string; durationMin: number }[];
   /** guidelineMinutes(activities): the day's minutes toward the weekly 150. */
@@ -47,7 +47,7 @@ export interface DayFactsSource {
   macros: { proteinG: number };
   waterMl: number;
   waterGoalMl: number;
-  waterEntries: readonly unknown[];
+  waterEntries: readonly Pick<WaterEntry, 'fromEntryId'>[];
   activities: readonly Pick<ActivityEntry, 'name' | 'emoji' | 'durationMin' | 'met' | 'intensity'>[];
 }
 
@@ -74,7 +74,7 @@ export function dayFacts(d: DayFactsSource, approx: boolean = d.entries.some(isE
     proteinG: d.macros.proteinG,
     waterMl: d.waterMl,
     waterGoalMl: d.waterGoalMl,
-    hasWater: d.waterEntries.length > 0,
+    hasWater: hasWaterTracked(d.waterEntries),
     activities: d.activities.map((a) => ({ name: a.name, emoji: a.emoji, durationMin: a.durationMin })),
     guidelineMin: guidelineMinutes(d.activities),
   };

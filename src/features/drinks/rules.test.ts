@@ -33,6 +33,10 @@ import {
   selectChoice,
   selectFood,
   sheetDrinks,
+  entryFor,
+  waterFor,
+  waterFromEntry,
+  waterOnlyOffered,
   waterForEntryEdit,
   waterPointingAt,
   waterRowCaption,
@@ -116,6 +120,16 @@ describe('gramsPerMl', () => {
     expect(labelMl('1 bottle (1.5 L)')).toBe(1500);
     expect(labelMl('1 oz')).toBeNull();
     expect(labelMl('1 large')).toBeNull();
+    // Open Food Facts' European labels: a decimal comma, centilitres (specification 3e).
+    expect(labelMl('1 serving (0,5 l)')).toBe(500);
+    expect(labelMl('1 bottle (1,5 L)')).toBe(1500);
+    expect(labelMl('1,5l')).toBe(1500);
+    expect(labelMl('1 can (33 cl)')).toBe(330);
+    expect(labelMl('25cl')).toBe(250);
+    expect(labelMl('0,33 L')).toBe(330);
+    expect(labelMl('1 carton (1,000 ml)')).toBe(1000);
+    expect(labelMl('1 tbsp (15 ml)')).toBe(15);
+    expect(labelMl('1 serving (12 oz)')).toBeNull();
     near(gramsPerMl({ servings: [{ label: '1 glass (200 ml)', grams: 206 }] }).gPerMl, 1.03);
   });
 
@@ -261,6 +275,19 @@ describe('sameDrinkInDiary', () => {
     expect(sameDrinkInDiary([entry({})], [water({ foodEntryId: 'e1', deleted: true })], 'b_orange_juice', TODAY, now)?.id).toBe('e1');
     expect(sameDrinkInDiary([entry({})], [], null, TODAY, now)).toBeNull();
   });
+  it('an entry logged in the diary that already has its water is found, said to be in Water, and gets no "Water only"', () => {
+    const w = water({ id: 'w2', fromEntryId: 'e1', beverage: 'juice' });
+    const found = sameDrinkInDiary([entry({})], [w], 'b_orange_juice', TODAY, now);
+    expect(found?.id).toBe('e1');
+    expect(noticeLine(found!, null, undefined, waterFromEntry([w], found!.id) !== null)).toBe('Orange juice from breakfast (08:10) is already in Water.');
+    expect(noticeLine(found!, sel('juice_orange'), 'juice', true)).toBe('Orange juice from breakfast (08:10) is already in Water.');
+    expect(waterOnlyOffered(found, [w])).toBe(false);
+    // Its water deleted on Water: the notice is today's, and the chip is offered again.
+    expect(waterOnlyOffered(found, [{ ...w, deleted: true }])).toBe(true);
+    expect(waterOnlyOffered(entry({}), [])).toBe(true);
+    expect(waterOnlyOffered(null, [])).toBe(false);
+    expect(noticeLine(found!)).toBe('Orange juice is already in breakfast (08:10).');
+  });
   it('the 3 hour edge: exactly 3 h counts, a minute more does not, a later log does not', () => {
     const e = entry({ loggedAt: at(6, 0).toISOString() });
     expect(sameDrinkInDiary([e], [], 'b_orange_juice', TODAY, now)?.id).toBe('e1');
@@ -331,11 +358,14 @@ describe('calories typed in, a pick, a row title', () => {
   it('a pick logs nothing and says so', () => {
     expect(pickedToast(B('b_apple_juice'))).toBe(`${B('b_apple_juice').name} chosen. Tap a glass to add it.`);
   });
-  it("a row under Other with a known choice reads with the drink's own noun; the rest as before", () => {
+  it("a row under Other with a known choice reads with the drink's own noun; any other under Other reads \"drink\", never \"other\"", () => {
     expect(waterRowTitle({ ml: 330, beverage: 'other', drink: 'soft_regular' }, 'metric')).toBe('330 ml soft drink');
-    expect(waterRowTitle({ ml: 330, beverage: 'other', drink: 'kcal' }, 'metric')).toBe('330 ml other');
-    expect(waterRowTitle({ ml: 330, beverage: 'other', drink: 'food' }, 'metric')).toBe('330 ml other');
-    expect(waterRowTitle({ ml: 330, beverage: 'other' }, 'metric')).toBe('330 ml other');
+    // Specification section 7: "473 ml drink" (not "473 ml other") for kind other without a fixed food choice, both origins.
+    expect(waterRowTitle({ ml: 330, beverage: 'other', drink: 'kcal' }, 'metric')).toBe('330 ml drink');
+    expect(waterRowTitle({ ml: 330, beverage: 'other', drink: 'food' }, 'metric')).toBe('330 ml drink');
+    expect(waterRowTitle({ ml: 330, beverage: 'other' }, 'metric')).toBe('330 ml drink');
+    expect(waterRowTitle({ ml: 330, beverage: 'other', drink: 'other_none' }, 'metric')).toBe('330 ml drink');
+    expect(waterRowTitle({ ml: 473, beverage: 'other', drink: 'food', fromEntryId: 'e1' } as never, 'metric')).toBe('473 ml drink');
     expect(waterRowTitle({ ml: 250, beverage: 'milk', drink: 'milk_semi' }, 'metric')).toBe('250 ml milk');
     expect(waterRowTitle({ ml: 250, beverage: 'coffee', drink: 'latte' }, 'metric')).toBe('250 ml coffee');
   });
@@ -382,6 +412,36 @@ describe('the pair', () => {
     expect(choiceA11y('Black', null, 250, 'metric')).toBe('Black, no calories');
   });
 
+  it('a drink logged in the diary: its own lookup; waterPointingAt keeps meaning the Water-origin pair', () => {
+    const fromDiary = water({ id: 'w2', fromEntryId: 'e1', beverage: 'other' });
+    expect(waterPointingAt([fromDiary], 'e1')).toBeNull();
+    expect(waterFromEntry([fromDiary], 'e1')?.id).toBe('w2');
+    expect(waterFromEntry({ w2: { ...fromDiary, deleted: true } }, 'e1')).toBeNull();
+    expect(waterFromEntry([water({ foodEntryId: 'e1' })], 'e1')).toBeNull();
+    expect(waterFor([fromDiary], 'e1')).toEqual({ water: fromDiary, origin: 'diary' });
+    expect(waterFor([water({ foodEntryId: 'e1' })], 'e1')?.origin).toBe('water');
+    expect(waterFor([], 'e1')).toBeNull();
+    const entries = { e1: entry({}) };
+    expect(entryFor(fromDiary, entries)).toEqual({ entry: entries.e1, origin: 'diary' });
+    expect(entryFor(water({ foodEntryId: 'e1' }), entries)).toEqual({ entry: entries.e1, origin: 'water' });
+    expect(entryFor(fromDiary, { e1: entry({ deleted: true }) })).toBeNull();
+    expect(entryFor(water({}), entries)).toBeNull();
+    // livePartner keeps reading only the Water-origin link.
+    expect(livePartner(fromDiary, entries)).toBeNull();
+  });
+
+  it('words for a drink logged in the diary; the Water-origin words stay as they were', () => {
+    const cola = entry({ name: 'Cola, regular', meal: 'lunch', nutrients: { kcal: 155, protein: 0, carbs: 39, fat: 0 } });
+    const fromDiary = { ml: 370, beverage: 'other' as const, drink: 'soft_regular', fromEntryId: 'e1' };
+    expect(removedEntryToast('Cola, regular', fromDiary, 'metric')).toBe('Removed Cola, regular and its 370 ml from Water');
+    expect(removedWaterToast(fromDiary, cola, 'metric')).toBe('Removed 370 ml. The drink stays in lunch.');
+    expect(removedWaterToast(fromDiary, null, 'metric')).toBe('Removed 370 ml');
+    expect(detailDrinkNote({ ml: 500, fromEntryId: 'e1' }, 'metric')).toBe('Also counted in Water as 500 ml. It changes with this entry and is removed with it.');
+    expect(detailDrinkNote({ ml: 500, fromEntryId: 'e1' }, 'imperial')).toBe('Also counted in Water as 17 fl oz. It changes with this entry and is removed with it.');
+    // A record from Water reads as before even beside the new field's absence.
+    expect(removedEntryToast('Milk', { ml: 250, foodEntryId: 'e9' }, 'metric')).toBe('Removed Milk. The 250 ml stays in Water.');
+  });
+
   it('isWaterDrinkEntry', () => {
     expect(isWaterDrinkEntry({ via: 'water' })).toBe(true);
     expect(isWaterDrinkEntry({})).toBe(false);
@@ -403,6 +463,16 @@ describe('isAlcohol', () => {
     expect(n('Lager 0.0%')).toBe(false);
     expect(n('Orange juice')).toBe(false);
     expect(n('Rumbling tummy tea')).toBe(false);
+  });
+
+  it('cranberry juice cocktail is juice; Hebrew names of alcohol are alcohol, as whole words', () => {
+    const n = (name: string) => isAlcohol({ id: 'x', name });
+    expect(isAlcohol(B('b_cranberry_juice'))).toBe(false);
+    expect(n('Cranberry juice cocktail')).toBe(false);
+    expect(n('Margarita cocktail')).toBe(true);
+    for (const name of ['בירה גולדסטאר', 'יין אדום', 'היין של הבית', 'וודקה', 'ערק', 'ויסקי', 'ליקר קפה', 'קוניאק', "ג'ין טוניק", 'ג׳ין', 'סיידר תפוחים']) expect(n(name), name).toBe(true);
+    // Not a whole word, or said to be without alcohol.
+    for (const name of ['יינון', 'מיץ ענבים', 'בירה ללא אלכוהול', 'יין נטול אלכוהול', 'חלב', 'ציידר']) expect(n(name), name).toBe(false);
   });
 
   it('the drink sheet lists no alcohol and holds the milks', () => {

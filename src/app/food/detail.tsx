@@ -3,13 +3,14 @@ import { Info, Star, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
-import { detailDrinkNote, pairEditProblem, waterPointingAt, type PairEditProblem } from '@/features/drinks/rules';
+import { detailWaterAdds, diaryDrink } from '@/features/drinks/diary';
+import { detailDrinkNote, pairEditProblem, waterFor, waterPointingAt, type PairEditProblem } from '@/features/drinks/rules';
 import { updateEntryDirect } from '@/features/food/actions';
 import { AmountEditor } from '@/features/food/AmountEditor';
 import { UNKNOWN_AI_CONFIDENCE, bandSpread, estimateRange, scaleRange, spreadRange } from '@/features/food/build';
 import { DayStepper, KcalValue, MacroStat, MealPicker, SourceBadge } from '@/features/food/components';
 import { useFoodDraft } from '@/features/food/draft';
-import { dayPhrase, href, portionLabel, kcal, labelGrams, lastPortions, matchServing, param, parseDate, parseMeal, portionFor, sourceInfo, valuesUpdated } from '@/features/food/helpers';
+import { dayPhrase, href, portionLabel, kcal, labelAmount, lastPortions, matchServing, param, parseDate, parseMeal, portionFor, sourceInfo, valuesUpdated } from '@/features/food/helpers';
 import { deleteEntry, logFood } from '@/features/food/log';
 import { RequireProfile } from '@/features/food/RequireProfile';
 import { isolateRtl } from '@/lib/bidi';
@@ -67,15 +68,33 @@ function estimateBandText([low, high]: [number, number]): string {
 }
 
 /**
- * A drink logged on the water screen: its live water record, and why the edit on screen cannot be
- * saved (a future day, more than one water record holds), or null. Save is off while there is one.
+ * A drink also counted in Water: its live water record of either origin (logged on Water, or logged
+ * here as food), and why the edit on screen cannot be saved, or null. Only a drink logged on the water
+ * screen can be refused (a future day, more than one water record holds); Save is off while there is
+ * one. A drink logged in the diary is never refused: its water follows the entry.
  */
 function usePairedDrink(entry: FoodEntry | undefined, after: { grams: number; date: ISODate }): { water: WaterEntry | null; problem: PairEditProblem | null } {
-  const water = useStore((s) => (entry ? waterPointingAt(s.water, entry.id) : null));
+  const water = useStore((s) => (entry ? (waterFor(s.water, entry.id)?.water ?? null) : null));
+  const fromWater = useStore((s) => (entry ? waterPointingAt(s.water, entry.id) : null));
   const units = useStore((s) => s.profile?.units ?? 'metric');
   const todayDate = useToday();
-  const problem = water && entry ? pairEditProblem(water, entry, after, todayDate, units) : null;
+  const problem = fromWater && entry ? pairEditProblem(fromWater, entry, after, todayDate, units) : null;
   return { water, problem };
+}
+
+/**
+ * Before Add, under the amount: "Also adds 500 ml to Water." for a drink (`diaryDrink`, following the
+ * amount on screen); nothing for a food that is not a drink, or with "Count drinks from the diary" off.
+ */
+function WaterAdds({ food, serving, quantity }: { food: Food; serving: Serving; quantity: number }) {
+  const profile = useStore((s) => s.profile);
+  const text = detailWaterAdds(diaryDrink({ food, servingLabel: serving.label, quantity, grams: serving.grams * quantity }, profile), profile?.units ?? 'metric');
+  if (!text) return null;
+  return (
+    <Text testID="detail-water-adds" variant="caption" color="textSecondary">
+      {text}
+    </Text>
+  );
 }
 
 /**
@@ -373,11 +392,12 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
 
       {/* One card for the portion: what it holds, then how much. The amount stays in the first view at 360 x 740. */}
       <Card style={{ gap: spacing.lg }} testID="detail-portion">
-        <MacroSummary range={range} n={n} updated={updated} kcalNote={`${portionLabel(serving.label, quantity)}${perGram || labelGrams(serving.label) !== null || (quantity === 1 && /\d\s?g\)*$/.test(serving.label)) ? '' : ` · ${Math.round(totalGrams)} g`}`} />
+        <MacroSummary range={range} n={n} updated={updated} kcalNote={`${portionLabel(serving.label, quantity)}${perGram || labelAmount(serving.label) !== null || (quantity === 1 && /\d\s?g\)*$/.test(serving.label)) ? '' : ` · ${Math.round(totalGrams)} g`}`} />
         <Divider />
         <AmountEditor food={food} value={portion} onChange={setPortion} onPendingChange={setGramsInvalid} testIDPrefix="detail" />
       </Card>
       <DrinkNote water={paired.water} problem={paired.problem} hasAmount />
+      {entry ? null : <WaterAdds food={food} serving={serving} quantity={quantity} />}
 
       <ImpactLine date={date} kcalValue={n.kcal} replacing={entry} />
 

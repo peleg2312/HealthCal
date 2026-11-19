@@ -3,8 +3,9 @@
  * instead of touching the store directly so every entry is built the same way,
  * recents stay up to date, and every add or delete can be undone.
  */
+import { diaryDrink, withWater } from '@/features/drinks/diary';
 import { followEntry, pairEditBlocked, undoEdit } from '@/features/drinks/pair';
-import { livePartner, removedEntryToast, removedWaterToast, waterPointingAt, type DrinkPlan } from '@/features/drinks/rules';
+import { entryFor, removedEntryToast, removedWaterToast, waterFor, type DrinkPlan } from '@/features/drinks/rules';
 import { isolateRtl } from '@/lib/bidi';
 import { today } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
@@ -45,6 +46,8 @@ function lastEstimate(food: Food): { confidence?: number; spread?: number } {
 function where(meal: MealType, date: ISODate): string {
   return mealOnDay(meal, date, today());
 }
+
+const unitsNow = (): UnitSystem => useStore.getState().profile?.units ?? 'metric';
 
 function announce(message: string, ids: string[], alsoUndo?: () => void) {
   haptic.success();
@@ -107,10 +110,13 @@ export function logFood(input: LogFoodInput): FoodEntry {
     toast('Entry updated', before ? { label: 'Undo', onPress: () => undoEdit(before, waterBefore) } : undefined);
     return entry;
   }
-  const entry = store.upsert('foodEntries', buildEntry({ ...input, ...lastEstimate(input.food) }));
+  const built = buildEntry({ ...input, ...lastEstimate(input.food) });
+  // A drink logged as food also adds its volume to Water, written with the entry in one act (one of the
+  // two places that create this water; the store's cascade makes the toast's Undo take both back).
+  const [{ entry, water }] = store.upsertEntriesWithWater([{ entry: built, water: diaryDrink(built, store.profile) }]);
   const recentsBefore = store.recentFoods;
   store.rememberFood(input.food);
-  announce(`Added to ${where(input.meal, input.date)}`, [entry.id], () => {
+  announce(withWater(`Added to ${where(input.meal, input.date)}`, water?.ml, unitsNow()), [entry.id], () => {
     useStore.setState((s) => ({ recentFoods: [...recentsAfterUndo(s.recentFoods, recentsBefore, input.food.id)] }));
   });
   return entry;
@@ -158,33 +164,49 @@ export function logQuickAdd(input: { name: string; nutrients: Nutrients; meal: M
 }
 
 /**
- * Re-log a set of existing entries or saved-meal items onto a day and meal. A bundled food goes in at today's
- * values for its own grams (`currentValues`); everything else as it was stored.
+ * Write a set of existing entries or saved-meal items onto a day and meal, without a toast. A bundled food
+ * goes in at today's values for its own grams (`currentValues`); everything else as it was stored. Each
+ * drink among them also adds its volume to Water (`diaryDrink`), in the same act as its entry; `ml` is
+ * the water written in all, for the caller's toast (`withWater`). The second of the two places that
+ * create a diary drink's water.
+ */
+export function addItems(items: (SavedMealItem | FoodEntry)[], meal: MealType, date: ISODate): { entries: FoodEntry[]; ml: number } {
+  if (items.length === 0) return { entries: [], ml: 0 };
+  const store = useStore.getState();
+  const rows = items.map(currentValues).map((it) => ({
+    date,
+    meal,
+    name: it.name,
+    brand: it.brand,
+    emoji: it.emoji,
+    // A copied or saved estimate is still an estimate: keep its range and confidence.
+    ...(it.kcalRange ? { kcalRange: it.kcalRange, confidence: it.confidence } : null),
+    foodId: it.food?.id,
+    source: it.source,
+    verified: it.verified,
+    servingLabel: it.servingLabel,
+    quantity: it.quantity,
+    grams: it.grams,
+    nutrients: it.nutrients,
+    food: it.food,
+    loggedAt: nowISO(),
+  }));
+  const written = store.upsertEntriesWithWater(rows.map((r) => ({ entry: r, water: diaryDrink(r, store.profile) })));
+  return { entries: written.map((w) => w.entry), ml: written.reduce((n, w) => n + (w.water?.ml ?? 0), 0) };
+}
+
+/**
+ * Re-log a set of existing entries or saved-meal items onto a day and meal (`addItems`), with one toast
+ * that names the water the drinks among them added; its Undo removes every entry (and, by the store's
+ * cascade, their water).
  */
 export function logItems(items: (SavedMealItem | FoodEntry)[], meal: MealType, date: ISODate, label?: string): FoodEntry[] {
-  if (items.length === 0) return [];
-  const entries = useStore.getState().upsertMany(
-    'foodEntries',
-    items.map(currentValues).map((it) => ({
-      date,
-      meal,
-      name: it.name,
-      brand: it.brand,
-      emoji: it.emoji,
-      // A copied or saved estimate is still an estimate: keep its range and confidence.
-      ...(it.kcalRange ? { kcalRange: it.kcalRange, confidence: it.confidence } : null),
-      foodId: it.food?.id,
-      source: it.source,
-      verified: it.verified,
-      servingLabel: it.servingLabel,
-      quantity: it.quantity,
-      grams: it.grams,
-      nutrients: it.nutrients,
-      food: it.food,
-      loggedAt: nowISO(),
-    })),
+  const { entries, ml } = addItems(items, meal, date);
+  if (entries.length === 0) return entries;
+  announce(
+    withWater(label ?? `${entries.length} ${entries.length === 1 ? 'item' : 'items'} added to ${where(meal, date)}`, ml, unitsNow()),
+    entries.map((e) => e.id),
   );
-  announce(label ?? `${entries.length} ${entries.length === 1 ? 'item' : 'items'} added to ${where(meal, date)}`, entries.map((e) => e.id));
   return entries;
 }
 
@@ -203,14 +225,14 @@ export function logSavedMeal(
   return logItems(plan.items, mealType, date, `${isolateRtl(meal.name)} added to ${where(mealType, date)}`);
 }
 
-const unitsNow = (): UnitSystem => useStore.getState().profile?.units ?? 'metric';
-
 /**
- * Delete a diary entry (soft, with Undo). An entry a drink's water record points at goes alone: the
- * calories are removed and the water stays counted, and the toast says so.
+ * Delete a diary entry (soft, with Undo). An entry a drink from Water points at goes alone: the
+ * calories are removed and the water stays counted ("Removed Milk. The 250 ml stays in Water."). A drink
+ * logged in the diary takes its water with it (the store's cascade): "Removed Cola, regular and its 370 ml
+ * from Water", and Undo brings both back.
  */
 export function deleteEntry(entry: FoodEntry): void {
-  const water = waterPointingAt(useStore.getState().water, entry.id);
+  const water = waterFor(useStore.getState().water, entry.id)?.water ?? null;
   useStore.getState().remove('foodEntries', entry.id);
   haptic.tap();
   const message = water ? removedEntryToast(isolateRtl(entry.name), water, unitsNow()) : `Removed ${isolateRtl(entry.name)}`;
@@ -234,12 +256,14 @@ export function logDrink(plan: DrinkPlan): { water: WaterEntry; entry: FoodEntry
 }
 
 /**
- * Delete a drink on the water screen (soft, with Undo). A drink with live calories in the diary takes
- * them with it, in one store act ("Removed 250 ml of milk and its 129 kcal"); Undo brings both back.
+ * Delete a drink on the water screen (soft, with Undo). A drink logged on Water with live calories in
+ * the diary takes them with it, in one store act ("Removed 250 ml of milk and its 129 kcal"); Undo brings
+ * both back. Water a drink logged in the diary added goes alone ("Removed 370 ml. The drink stays in
+ * lunch."); Undo restores it with its link.
  */
 export function removeDrink(water: WaterEntry): void {
   const s = useStore.getState();
-  const partner = livePartner(water, s.foodEntries);
+  const partner = entryFor(water, s.foodEntries)?.entry ?? null;
   s.remove('water', water.id);
   haptic.tap();
   toast(removedWaterToast(water, partner, unitsNow()), { label: 'Undo', tint: 'water', onPress: () => useStore.getState().restore('water', water.id) });

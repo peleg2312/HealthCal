@@ -26,6 +26,20 @@
  *   record only; and two phones race, one deleting on Water while the other deletes the entry in
  *   the diary and taps Undo (restore('foodEntries') never touches water, so the entry's newer stamp
  *   wins). Tested in pair.test.ts, "two phones".
+ *
+ * The mirror, a drink logged as food in the diary (./diary.ts, `diaryDrink`): its water record carries
+ * `fromEntryId` (never `foodEntryId`) and the id `waterIdFromEntry(entry.id)`, so no path on any phone
+ * makes two. The diary entry leads: deleting it removes the water and its Undo brings back only water
+ * the same act removed (the store's cascade, one stamp); deleting the water on Water leaves the entry,
+ * an ordinary entry from then on; an edit of the entry recomputes the water from the entry
+ * (`diaryDrinkMl`, followEntry in ./pair.ts) and is never refused because of it. Look a pair up by
+ * origin: `waterPointingAt` (logged on Water), `waterFromEntry` (logged in the diary), `waterFor` (either,
+ * for display). Known and accepted, as for the pair above, while an older app is still in use:
+ * - an older app deleting the entry leaves the water as a plain Water row (visible, counted once,
+ *   deletable);
+ * - an older app's edit of the entry does not move the water; it heals on the next edit here, because
+ *   the water is recomputed from the entry, never scaled from its old volume;
+ * - an older app's Water notice does not know the link and may offer "Water only" once more.
  */
 import { BUILTIN_FOODS } from '@/data/foods';
 import { mealOnDay } from '@/features/food/addedTo';
@@ -61,25 +75,52 @@ export function builtinFood(id: string): Food | null {
 
 // ---------------------------------------------------------------- grams per ml
 
-const NUM = '(\\d+(?:\\.\\d+)?)';
+/** A number in a label: "500", "1.5", or with a decimal comma "1,5" (Open Food Facts' European labels). */
+const NUM = '(\\d+(?:[.,]\\d+)?)';
+
+/** "1,5" is 1.5; "1,000" before ml is a thousands comma (1000 ml). */
+function num(text: string, unit: 'ml' | 'other'): number {
+  if (unit === 'ml' && /^\d{1,3},\d{3}$/.test(text)) return Number(text.replace(',', ''));
+  return Number(text.replace(',', '.'));
+}
 
 /**
- * The volume in ml a serving label names, or null. In this order: "N ml" (also "(N ml)", and
- * "N L"), else "N fl oz", else "cup" / "N cups" / "1/2 cup" only when neither of the others is there.
+ * The volume in ml a serving label names, or null; `cups` false leaves "cup" unread. In this order:
+ * "N ml" (also "(N ml)"), else "N cl", else "N L", else "N fl oz", else "cup" / "N cups" / "1/2 cup".
+ * A decimal comma is read as a point ("0,5 l" is 500 ml, "1,5 L" 1500 ml).
  */
-export function labelMl(label: string): number | null {
+export function readLabelMl(label: string, cups: boolean): number | null {
   const ml = label.match(new RegExp(`${NUM}\\s*ml\\b`, 'i'));
-  if (ml) return Number(ml[1]);
+  if (ml) return num(ml[1], 'ml');
+  const cl = label.match(new RegExp(`${NUM}\\s*cl\\b`, 'i'));
+  if (cl) return num(cl[1], 'other') * 10;
   const litre = label.match(new RegExp(`${NUM}\\s*(?:l|litres?|liters?)\\b`, 'i'));
-  if (litre) return Number(litre[1]) * 1000;
+  if (litre) return num(litre[1], 'other') * 1000;
   const oz = label.match(new RegExp(`${NUM}\\s*fl\\.?\\s*oz\\b`, 'i'));
-  if (oz) return Number(oz[1]) * FL_OZ_ML;
+  if (oz) return num(oz[1], 'other') * FL_OZ_ML;
+  if (!cups) return null;
   const cup = label.match(/(?:(\d+(?:\.\d+)?)(?:\/(\d+))?\s+)?cups?\b/i);
   if (cup) {
     const n = cup[1] ? Number(cup[1]) / (cup[2] ? Number(cup[2]) : 1) : 1;
     return n > 0 ? n * CUP_ML : null;
   }
   return null;
+}
+
+/**
+ * The volume in ml a serving label names, or null. In this order: "N ml" (also "(N ml)"), "N cl",
+ * "N L", else "N fl oz", else "cup" / "N cups" / "1/2 cup" only when none of the others is there.
+ * A decimal comma reads as a point.
+ */
+export function labelMl(label: string): number | null {
+  return readLabelMl(label, true);
+}
+
+/** Whether `grams` for `ml` is a density a drink can have (0.8 to 1.3 g per ml), the band gramsPerMl keeps to. */
+export function plausibleDensity(grams: number, ml: number): boolean {
+  if (!(grams > 0) || !(ml > 0)) return false;
+  const d = grams / ml;
+  return d >= G_PER_ML_MIN && d <= G_PER_ML_MAX;
 }
 
 /**
@@ -113,26 +154,60 @@ export function drinkKcal(food: Pick<Food, 'servings' | 'per100g'>, ml: number):
 const ALCOHOL_IDS = new Set(['b_beer', 'b_beer_light', 'b_wine_red', 'b_wine_white', 'b_spirits']);
 const ALCOHOL_WORDS =
   /\b(beer|lager|stout|ipa|wine|prosecco|champagne|cider|vodka|gin|rum|whisk(e)?y|bourbon|tequila|brandy|liqueur|cocktail|margarita|mojito|sangria|hard seltzer|spirits?)\b/i;
-const NOT_ALCOHOL = /\b(root beer|ginger beer|non-alcoholic|alcohol-free)\b|\b0\.0\s*%?/i;
+const NOT_ALCOHOL = /\b(root beer|ginger beer|non-alcoholic|alcohol-free|juice cocktail)\b|\b0\.0\s*%?|ללא אלכוהול|נטול אלכוהול/i;
+/** A Hebrew letter, for whole-word matches (\b does not see Hebrew letters as word characters). */
+const HE = '\u05D0-\u05EA';
+/** Hebrew words for alcohol, each a whole word, with one of the prefix letters ה ו ב ל מ ש כ allowed before it. */
+const ALCOHOL_WORDS_HE = new RegExp(`(?:^|[^${HE}'\u05F3])[הובלמשכ]?(?:בירה|יין|וודקה|ערק|ויסקי|ליקר|קוניאק|ג['\u05F3]ין|סיידר)(?=$|[^${HE}'\u05F3])`);
 
 /**
- * Alcohol stays out of the water screen: the five bundled drinks, or a name with a common word for
- * one (unless it also says root beer, ginger beer, non-alcoholic, alcohol-free or 0.0). A name filter
- * cannot catch everything ("Aperol spritz"); that is accepted.
+ * Alcohol stays out of Water (the water screen, and a drink logged in the diary): the five bundled
+ * drinks, or a name with a common word for one, in English or in Hebrew (בירה, יין, וודקה, ערק, ויסקי,
+ * ליקר, קוניאק, ג'ין, סיידר, each a whole word), unless it also says root beer, ginger beer,
+ * non-alcoholic, alcohol-free, juice cocktail ("Cranberry juice cocktail" is juice), ללא אלכוהול,
+ * נטול אלכוהול or 0.0. A name filter cannot catch everything ("Aperol spritz"); that is accepted.
  */
 export function isAlcohol(food: Pick<Food, 'id' | 'name'>): boolean {
   if (ALCOHOL_IDS.has(food.id)) return true;
-  return ALCOHOL_WORDS.test(food.name) && !NOT_ALCOHOL.test(food.name);
+  return (ALCOHOL_WORDS.test(food.name) || ALCOHOL_WORDS_HE.test(food.name)) && !NOT_ALCOHOL.test(food.name);
 }
 
 export function withoutAlcohol<T extends Pick<Food, 'id' | 'name'>>(foods: readonly T[]): T[] {
   return foods.filter((f) => !isAlcohol(f));
 }
 
-/** The drink sheet with an empty search: every bundled non-alcoholic drink and the milks of the Milk row, by name. */
+/**
+ * Bundled foods outside the 'drinks' category that are drinks: the seven milks, shoko, kefir,
+ * buttermilk and the ready-to-drink protein shake. Leben, eshel, yogurts, creams, condensed milk, canned
+ * coconut milk, soups and the ice pop are not (they are eaten, with a spoon or as a meal).
+ */
+export const BUNDLED_DRINK_IDS: ReadonlySet<string> = new Set([
+  'b_milk_whole',
+  'b_milk_2pct',
+  'b_milk_skim',
+  'b_milk_1pct',
+  'b_almond_milk',
+  'b_soy_milk',
+  'b_oat_milk',
+  'b_shoko',
+  'b_kefir',
+  'b_buttermilk',
+  'b_protein_shake_rtd',
+]);
+
+/**
+ * Whether a bundled food is a drink: category 'drinks' or one of BUNDLED_DRINK_IDS, and not alcohol.
+ * The one list behind the water screen's drink sheet (`sheetDrinks`) and a drink logged in the diary
+ * (./diary.ts), so the two screens agree. Only for bundled foods: an online product or an own food
+ * says it with `beverage`.
+ */
+export function isBundledDrink(food: Pick<Food, 'id' | 'name' | 'category'>): boolean {
+  return (food.category === 'drinks' || BUNDLED_DRINK_IDS.has(food.id)) && !isAlcohol(food);
+}
+
+/** The drink sheet with an empty search: every bundled drink (`isBundledDrink`), by name. */
 export function sheetDrinks(): Food[] {
-  const milkIds = new Set(choicesFor('milk').map((x) => x.foodId));
-  return BUILTIN_FOODS.filter((f) => (f.category === 'drinks' || milkIds.has(f.id)) && !isAlcohol(f)).sort((a, b) => a.name.localeCompare(b.name));
+  return BUILTIN_FOODS.filter(isBundledDrink).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // ---------------------------------------------------------------- choices and memory
@@ -211,13 +286,15 @@ function noun(kind: Beverage, drinkId: string | null | undefined): string {
 }
 
 /**
- * A water row's title: the kind as always ("250 ml milk", "250 ml coffee"), except a drink under
- * Other with a known food choice, which reads with the drink's own noun as its toast does ("330 ml
- * soft drink"). A drink picked in the sheet, entered or unknown under Other keeps "other".
+ * A water row's title: the kind as always ("250 ml milk", "250 ml coffee"), except under Other: a
+ * known food choice reads with the drink's own noun as its toast does ("330 ml soft drink"), and
+ * anything else under Other (no calories, picked in the sheet, entered, logged in the diary, or from
+ * before choices) reads "473 ml drink", never "473 ml other".
  */
 export function waterRowTitle(water: Pick<WaterEntry, 'ml' | 'beverage' | 'drink'>, units: UnitSystem): string {
-  const choice = water.beverage === 'other' ? choiceById(water.drink) : undefined;
-  const name = choice?.foodId && choice.kind === 'other' ? choice.name : BEVERAGE_LABELS[water.beverage].label.toLowerCase();
+  if (water.beverage !== 'other') return `${formatVolume(water.ml, units)} ${BEVERAGE_LABELS[water.beverage].label.toLowerCase()}`;
+  const choice = choiceById(water.drink);
+  const name = choice?.foodId && choice.kind === 'other' ? choice.name : 'drink';
   return `${formatVolume(water.ml, units)} ${name}`;
 }
 
@@ -418,8 +495,10 @@ export function sameDrinkFoodIds(kind: Beverage, selected: SelectedDrink | null)
 /**
  * The same drink already in the diary: the latest live entry of one of `foodIds` (one id, or the
  * kind's set from `sameDrinkFoodIds`) on `date`, logged within the 3 hours before `nowIso`, that no
- * live water record points at. The water screen then says so before the tap (`noticeLine`) and
- * offers "Water only"; nothing is linked or dropped by itself.
+ * live water record points at (`foodEntryId`). The water screen then says so before the tap
+ * (`noticeLine`) and offers "Water only"; nothing is linked or dropped by itself. An entry logged in
+ * the diary that already has its water (`fromEntryId`) is still found: ask `waterFromEntry` (or
+ * `waterOnlyOffered`), and the notice says it is already in Water and offers no "Water only".
  */
 export function sameDrinkInDiary(
   entries: Iterable<FoodEntry> | Record<string, FoodEntry>,
@@ -451,12 +530,25 @@ function clock(iso: string): string {
  * "Orange juice is already in breakfast (08:10)." When the entry is the selected choice's own food,
  * it is named as the drink line above names it ("Semi-skimmed milk is already in ..."); any other
  * food (whole milk from the search, a picked drink) by the entry's own name.
+ *
+ * `inWater`: the entry is a drink logged in the diary that already has its water (`waterFromEntry`):
+ * "Latte from breakfast (08:10) is already in Water." The screen then does not offer "Water only"
+ * (it would add the same water again); a plain tap stays allowed (a second latte is real).
  */
-export function noticeLine(entry: Pick<FoodEntry, 'name' | 'meal' | 'loggedAt' | 'foodId'>, selected?: SelectedDrink | null, kind?: Beverage): string {
+export function noticeLine(entry: Pick<FoodEntry, 'name' | 'meal' | 'loggedAt' | 'foodId'>, selected?: SelectedDrink | null, kind?: Beverage, inWater = false): string {
   const choice = choiceById(selected?.id);
   const name = choice && kind && choice.foodId && choice.foodId === entry.foodId ? cap(choice.name) : entry.name;
   // Drawn text: a Hebrew or Arabic name is isolated, so the sentence still starts at the left.
+  if (inWater) return `${isolateRtl(name)} from ${MEAL_LABEL[entry.meal].toLowerCase()} (${clock(entry.loggedAt)}) is already in Water.`;
   return `${isolateRtl(name)} is already in ${MEAL_LABEL[entry.meal].toLowerCase()} (${clock(entry.loggedAt)}).`;
+}
+
+/**
+ * Whether the water screen offers "Water only" for the same drink found in the diary: not when that
+ * entry already has its water from the diary (the chip would count the same water twice).
+ */
+export function waterOnlyOffered(entry: Pick<FoodEntry, 'id'> | null, water: Iterable<WaterEntry> | Record<string, WaterEntry>): boolean {
+  return !!entry && !waterFromEntry(water, entry.id);
 }
 
 // ---------------------------------------------------------------- the pair
@@ -473,11 +565,51 @@ export function livePartner(water: Pick<WaterEntry, 'foodEntryId' | 'deleted'>, 
   return e && !e.deleted ? e : null;
 }
 
-/** The live water record that points at a diary entry, or null (the diary's "also in Water"). */
+/**
+ * The live water record of a drink logged on Water whose calories are this diary entry (`foodEntryId`),
+ * or null. Only that origin: it drives the edit refusals (`pairEditBlocked`) and the "water stays"
+ * delete toast. For a drink logged in the diary use `waterFromEntry`; for display, `waterFor`.
+ */
 export function waterPointingAt(water: Iterable<WaterEntry> | Record<string, WaterEntry>, entryId: string): WaterEntry | null {
   let best: WaterEntry | null = null;
   for (const w of liveRecords(water)) if (w.foodEntryId === entryId && (!best || w.loggedAt > best.loggedAt)) best = w;
   return best;
+}
+
+/** The live water record a drink logged in the diary added (`fromEntryId`), or null (none, deleted on Water, or the switch was off). */
+export function waterFromEntry(water: Iterable<WaterEntry> | Record<string, WaterEntry>, entryId: string): WaterEntry | null {
+  let best: WaterEntry | null = null;
+  for (const w of liveRecords(water)) if (w.fromEntryId === entryId && !w.foodEntryId && (!best || w.loggedAt > best.loggedAt)) best = w;
+  return best;
+}
+
+/** Where a diary entry's water came from: 'water' (logged on Water, the entry holds its calories) or 'diary' (logged as food, the water follows it). */
+export type PairOrigin = 'water' | 'diary';
+
+/**
+ * A diary entry's live water record of either origin, for display only (the diary's "also in Water",
+ * food detail's note, the Water row): a Water-origin pair first, else the diary's own water. Never use
+ * it to refuse an edit or word a delete; those differ by origin.
+ */
+export function waterFor(water: Iterable<WaterEntry> | Record<string, WaterEntry>, entryId: string): { water: WaterEntry; origin: PairOrigin } | null {
+  const own = waterPointingAt(water, entryId);
+  if (own) return { water: own, origin: 'water' };
+  const from = waterFromEntry(water, entryId);
+  return from ? { water: from, origin: 'diary' } : null;
+}
+
+/**
+ * A water record's live diary entry of either origin (the Water row's caption and open, removeDrink's
+ * toast): the entry holding its calories ('water', `foodEntryId`) or the entry it came from ('diary',
+ * `fromEntryId`); null when there is none, it is deleted, or it is not on this device.
+ */
+export function entryFor(water: Pick<WaterEntry, 'foodEntryId' | 'fromEntryId' | 'deleted'>, entries: Record<string, FoodEntry>): { entry: FoodEntry; origin: PairOrigin } | null {
+  if (water.foodEntryId) {
+    const e = livePartner(water, entries);
+    return e ? { entry: e, origin: 'water' } : null;
+  }
+  const e = water.fromEntryId ? entries[water.fromEntryId] : undefined;
+  return e && !e.deleted ? { entry: e, origin: 'diary' } : null;
 }
 
 /**
@@ -539,25 +671,44 @@ export function waterRowCaption(entry: Pick<FoodEntry, 'name' | 'meal' | 'date' 
   return `${entry.name} · ${formatNumber(Math.round(entry.nutrients.kcal))} kcal in ${MEAL_LABEL[entry.meal].toLowerCase()}${day}`;
 }
 
-/** The toast after deleting a water record: "Removed 250 ml of milk and its 129 kcal", or "Removed 250 ml" without calories. */
-export function removedWaterToast(water: Pick<WaterEntry, 'ml' | 'beverage' | 'drink'>, partner: Pick<FoodEntry, 'nutrients'> | null, units: UnitSystem): string {
+/**
+ * The toast after deleting a water record: "Removed 250 ml of milk and its 129 kcal", or "Removed 250
+ * ml" without calories. A drink logged in the diary (`fromEntryId`) whose entry is live (`partner`,
+ * from `entryFor`): only the water goes, "Removed 370 ml. The drink stays in lunch."; Undo restores the
+ * water and its link.
+ */
+export function removedWaterToast(
+  water: Pick<WaterEntry, 'ml' | 'beverage' | 'drink'> & Partial<Pick<WaterEntry, 'fromEntryId' | 'foodEntryId'>>,
+  partner: (Pick<FoodEntry, 'nutrients'> & Partial<Pick<FoodEntry, 'meal'>>) | null,
+  units: UnitSystem,
+): string {
   const vol = formatVolume(water.ml, units);
   if (!partner) return `Removed ${vol}`;
+  if (water.fromEntryId && !water.foodEntryId && partner.meal) return `Removed ${vol}. The drink stays in ${MEAL_LABEL[partner.meal].toLowerCase()}.`;
   return `Removed ${vol} of ${noun(water.beverage, water.drink)} and its ${formatNumber(Math.round(partner.nutrients.kcal))} kcal`;
 }
 
-/** The toast after deleting, in the diary, an entry a water record points at. */
-export function removedEntryToast(name: string, water: Pick<WaterEntry, 'ml'>, units: UnitSystem): string {
+/**
+ * The toast after deleting, in the diary, an entry that has water. A drink logged on Water: "Removed
+ * Milk. The 250 ml stays in Water." A drink logged in the diary (`fromEntryId`): its water goes with
+ * it, "Removed Cola, regular and its 370 ml from Water" (Undo restores both: the store's cascade).
+ * `name` is drawn text (isolateRtl'd by the caller, as before).
+ */
+export function removedEntryToast(name: string, water: Pick<WaterEntry, 'ml'> & Partial<Pick<WaterEntry, 'fromEntryId' | 'foodEntryId'>>, units: UnitSystem): string {
+  if (water.fromEntryId && !water.foodEntryId) return `Removed ${name} and its ${formatVolume(water.ml, units)} from Water`;
   return `Removed ${name}. The ${formatVolume(water.ml, units)} stays in Water.`;
 }
 
 /**
  * `detail-drink-note` on a paired entry's detail. An entry with an amount (a reference food) moves
  * its water with the amount and the day. One whose calories were typed in (grams 0) has no amount
- * the water could follow: its calories never change the water, only its day moves it.
+ * the water could follow: its calories never change the water, only its day moves it. A drink logged
+ * in the diary (`fromEntryId`): "Also counted in Water as 500 ml. It changes with this entry and is
+ * removed with it."
  */
-export function detailDrinkNote(water: Pick<WaterEntry, 'ml'>, units: UnitSystem, hasAmount = true): string {
+export function detailDrinkNote(water: Pick<WaterEntry, 'ml'> & Partial<Pick<WaterEntry, 'fromEntryId' | 'foodEntryId'>>, units: UnitSystem, hasAmount = true): string {
   const vol = formatVolume(water.ml, units);
+  if (water.fromEntryId && !water.foodEntryId) return `Also counted in Water as ${vol}. It changes with this entry and is removed with it.`;
   return hasAmount
     ? `Also counted in Water as ${vol}. Changing the amount here changes it there; deleting here keeps the water.`
     : `Also counted in Water as ${vol}. The calories here do not change it; changing the day moves it there, and deleting here keeps the water.`;

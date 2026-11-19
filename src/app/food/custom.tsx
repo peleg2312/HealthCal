@@ -3,6 +3,7 @@ import { Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import { readLabelMl } from '@/features/drinks/rules';
 import { deleteCustomFood } from '@/features/food/actions';
 import { setFoodDraft, useFoodDraft } from '@/features/food/draft';
 import { href, kcal, param, parseMeal, toPer100 } from '@/features/food/helpers';
@@ -13,7 +14,7 @@ import { atwaterKcal, GRAM_SERVING } from '@/lib/nutrition';
 import { useStore } from '@/store';
 import { cupFor, useTheme } from '@/theme';
 import type { CustomFood, Nutrients } from '@/types';
-import { Button, Card, EmptyState, Header, IconButton, NumberField, PressableScale, Screen, Segmented, Text, TextField, goBack, haptic, toast } from '@/ui';
+import { Button, Card, EmptyState, Header, IconButton, NumberField, PressableScale, Screen, Segmented, Text, TextField, ToggleRow, goBack, haptic, toast } from '@/ui';
 
 type Basis = 'serving' | 'per100';
 type Values = Record<keyof Nutrients, number | null>;
@@ -58,6 +59,11 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
   const [servingGrams, setServingGrams] = useState<number | null>(own?.grams ?? null);
   const [values, setValues] = useState<Values>(() => initialValues(existing, basis, own?.grams ?? 100));
   const [tried, setTried] = useState(false);
+  // "This is a drink": the person's own choice once made (or saved before); until then it follows the
+  // serving's name (on when it names ml, cl, L or fl oz). An own food saved before this switch existed
+  // keeps no flag until it is edited and saved here.
+  const [drinkChoice, setDrinkChoice] = useState<boolean | null>(existing?.beverage ?? null);
+  const isDrink = drinkChoice ?? readLabelMl(servingLabel, false) !== null;
 
   const set = (k: keyof Nutrients) => (v: number | null) => setValues((s) => ({ ...s, [k]: v }));
   const factor = basis === 'serving' ? servingGrams ?? 0 : 100;
@@ -115,6 +121,7 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
       source: 'custom',
       verified: false,
       category: 'custom',
+      beverage: isDrink,
     });
     haptic.success();
     if (existing) {
@@ -208,6 +215,7 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
             error={tried ? errors.grams : null}
           />
         </View>
+        <ToggleRow testID="custom-drink" title="This is a drink" subtitle="Its amount also counts in Water" value={isDrink} onChange={setDrinkChoice} />
       </Card>
 
       <Card style={{ gap: spacing.md }}>

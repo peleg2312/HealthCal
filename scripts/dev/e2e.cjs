@@ -5,7 +5,7 @@
  *
  *   welcome -> onboarding -> plan -> Today -> log food -> log a run -> add water -> reload
  *   -> the next morning: the morning page opens by itself once (greeting, quote, plan), closes onto Today, not again
- *   -> ... -> drinks -> an old portion after a reload: the + sheet's tile shows what its tap stores, and so does
+ *   -> ... -> drinks -> drinks logged in the diary count in Water -> an old portion after a reload: the + sheet's tile shows what its tap stores, and so does
  *      "Repeat yesterday's <meal>" (bundled foods at today's values, an own food and an online product as stored)
  *
  * The expected numbers are recomputed here from the published formulas, not
@@ -654,6 +654,151 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   s = await stored();
   const [wt] = newIn(s, before, 'water');
   check("drinks: Today's +250 ml stays plain water", !!wt && wt.beverage === 'water' && !wt.drink && newIn(s, before, 'foodEntries').length === 0, JSON.stringify(wt));
+
+  // ------------------------------------------- drinks logged in the diary also count in Water (src/features/drinks/diary.ts)
+  // The mirror: a drink logged as food adds its volume to Water in the same act (a water record with
+  // `fromEntryId`); the one toast says both and its Undo takes both. The entry leads: the stepper moves the
+  // water, a delete in the diary takes it, a delete on Water leaves the entry; a repeat copies it; the
+  // Goals switch stops new pairs.
+  const ymd = (offset) => page.evaluate((o) => {
+    const d = new Date();
+    d.setDate(d.getDate() + o);
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }, offset);
+  const pageDay = await ymd(0);
+  const yesterDay = await ymd(-1);
+  const consumedNow = async () => {
+    await page.goto(`${BASE}/water`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1000);
+    return text('water-consumed');
+  };
+  const fromDiaryRow = () => page.evaluate(() => {
+    const el = document.querySelector('[data-testid^="water-entry-from-"]');
+    return el ? el.getAttribute('data-testid').replace('water-entry-from-', '') : null;
+  });
+  const consumedBefore = await consumedNow();
+  await page.goto(`${BASE}/food/search?meal=lunch&date=${pageDay}`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(800);
+  await fill('food-search-input', 'monster');
+  await page.waitForTimeout(900);
+  const firstRow = await text('result-0').catch(() => '');
+  check('diary drinks: "monster" finds the energy drink first', /^\W*Energy drink, sugared/.test(firstRow), firstRow.split('\n').slice(0, 2).join(' / '));
+  before = await stored();
+  await tap('result-0-add');
+  s = await stored();
+  let [de] = newIn(s, before, 'foodEntries');
+  let [dw] = newIn(s, before, 'water');
+  check(
+    'diary drinks: its + writes the entry and its water together (fromEntryId, the same day, no via)',
+    !!de && !!dw && de.foodId === 'b_energy_drink' && !de.via && dw.fromEntryId === de.id && !dw.foodEntryId && dw.date === pageDay && dw.ml > 200 && dw.updatedAt === de.updatedAt,
+    JSON.stringify({ de: de && { foodId: de.foodId, via: de.via, label: de.servingLabel }, dw }).slice(0, 260),
+  );
+  // The toast's first line is its message (the action follows it).
+  const toastLine = async () => (await text('toast')).split('\n')[0].trim();
+  const logToast = await toastLine();
+  check('diary drinks: the toast says both', !!dw && logToast === `Added to lunch and ${dw.ml} ml to Water`, logToast);
+  await tap('toast-action');
+  s = await stored();
+  check('diary drinks: Undo of the log takes the entry and its water', !!de && !!s.foodEntries[de.id]?.deleted && !!s.water[dw.id]?.deleted);
+  // Again, then the row's stepper: the water follows the amount, silently.
+  before = await stored();
+  await tap('result-0-add');
+  s = await stored();
+  [de] = newIn(s, before, 'foodEntries');
+  [dw] = newIn(s, before, 'water');
+  const perUnit = dw ? dw.ml / de.quantity : 0;
+  await page.waitForTimeout(5000);
+  await tap('result-0-more');
+  s = await stored();
+  const stepped = de && s.foodEntries[de.id];
+  const steppedWater = dw && s.water[dw.id];
+  check(
+    'diary drinks: the stepper changes the amount and Water follows',
+    !!stepped && !!steppedWater && stepped.quantity > de.quantity && Math.abs(steppedWater.ml - perUnit * stepped.quantity) <= 1 && !steppedWater.deleted,
+    `${stepped?.quantity} x, ${steppedWater?.ml} ml`,
+  );
+  const consumedAfter = await consumedNow();
+  check("diary drinks: Water's total includes it", consumedAfter !== consumedBefore, `${consumedBefore} -> ${consumedAfter}`);
+  let row = await fromDiaryRow();
+  const caption = row !== null ? await text(`water-entry-from-${row}`) : '';
+  check('diary drinks: the Water row names the drink and its meal, with no calories', caption === 'Energy drink, sugared · from lunch', caption);
+  const openLabel = row !== null ? await page.getByTestId(`water-entry-open-${row}`).first().getAttribute('aria-label') : null;
+  check('diary drinks: the Water row opens the entry', !!openLabel && openLabel.endsWith('Energy drink, sugared, from lunch. Edit in diary'), String(openLabel));
+  // Delete in the diary: the water goes with it; Undo brings both.
+  await page.goto(`${BASE}/diary`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  const diaryMark = (await page.getByTestId(`entry-in-water-${de.id}`).count()) ? await text(`entry-in-water-${de.id}`) : '';
+  check('diary drinks: the diary row says "also in Water"', diaryMark.includes('also in Water'), diaryMark);
+  await tap(`entry-delete-${de.id}`);
+  s = await stored();
+  const delToast = await toastLine();
+  check('diary drinks: a delete in the diary takes the water too', !!s.foodEntries[de.id]?.deleted && !!s.water[dw.id]?.deleted);
+  check('diary drinks: and the toast says so', /^Removed Energy drink, sugared and its .+ from Water$/.test(delToast), delToast);
+  await tap('toast-action');
+  s = await stored();
+  check('diary drinks: Undo in the diary brings both back', !s.foodEntries[de.id]?.deleted && !s.water[dw.id]?.deleted);
+  await page.waitForTimeout(5000);
+  // Delete on Water: only the water; the entry stays; Undo restores the water with its link.
+  await page.goto(`${BASE}/water`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  row = await fromDiaryRow();
+  const delLabel = row !== null ? await page.getByTestId(`water-delete-${row}`).first().getAttribute('aria-label') : null;
+  check('diary drinks: the Water delete button says the drink stays', !!delLabel && delLabel.endsWith('. The drink stays in lunch'), String(delLabel));
+  if (row !== null) await tap(`water-delete-${row}`);
+  s = await stored();
+  const waterDelToast = await toastLine();
+  check('diary drinks: a delete on Water leaves the entry', row !== null && !!s.water[dw.id]?.deleted && !s.foodEntries[de.id]?.deleted, `row ${row}`);
+  check('diary drinks: and its toast says so', /^Removed .+\. The drink stays in lunch\.$/.test(waterDelToast), waterDelToast);
+  await tap('toast-action');
+  s = await stored();
+  check('diary drinks: Undo on Water brings the water back with its link', !s.water[dw.id]?.deleted && s.water[dw.id]?.fromEntryId === de.id);
+  await page.waitForTimeout(5000);
+  // Repeat yesterday's lunch that held a drink: the copy adds its water on today, and the toast says so.
+  await page.evaluate(({ e, y }) => {
+    const st = window.__healthcal.getState();
+    for (const x of Object.values(st.foodEntries)) if (!x.deleted && x.meal === 'lunch' && x.date === e.date) st.remove('foodEntries', x.id);
+    const { id: _id, updatedAt: _u, ...rest } = e;
+    st.upsert('foodEntries', { ...rest, date: y, loggedAt: `${y}T12:30:00.000Z` });
+  }, { e: s.foodEntries[de.id], y: yesterDay });
+  await page.goto(`${BASE}/diary`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  before = await stored();
+  await tap('meal-repeat-lunch');
+  s = await stored();
+  const [re] = newIn(s, before, 'foodEntries');
+  const [rw] = newIn(s, before, 'water');
+  const repeatToast = await toastLine();
+  check('diary drinks: repeating yesterday\'s lunch adds the drink\'s water on today', !!re && !!rw && rw.fromEntryId === re.id && rw.date === pageDay, JSON.stringify(rw));
+  check('diary drinks: the repeat toast names the water', !!rw && repeatToast === `Copied lunch from yesterday, ${rw.ml} ml to Water`, repeatToast);
+  // Yesterday's lunch as it was before this block (the "Repeat yesterday's" check further on counts its rows).
+  await page.evaluate((y) => {
+    const st = window.__healthcal.getState();
+    for (const x of Object.values(st.foodEntries)) if (!x.deleted && x.date === y && x.foodId === 'b_energy_drink') st.remove('foodEntries', x.id);
+  }, yesterDay);
+  await page.waitForTimeout(5000);
+  // The switch off (Goals > Water, saved with Save): a drink logged as food adds no water.
+  await page.goto(`${BASE}/settings/goals`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  await tap('goals-diary-drinks');
+  await tap('goals-save');
+  s = await stored();
+  check('diary drinks: the switch is saved with Goals', s.profile.diaryDrinksInWater === false, String(s.profile.diaryDrinksInWater));
+  await page.goto(`${BASE}/food/search?meal=dinner&date=${pageDay}`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(800);
+  await fill('food-search-input', 'energy drink');
+  await page.waitForTimeout(900);
+  before = await stored();
+  await tap('result-0-add');
+  s = await stored();
+  const offToast = await toastLine();
+  check('diary drinks: with the switch off, no water and the toast as before', newIn(s, before, 'foodEntries').length === 1 && newIn(s, before, 'water').length === 0 && offToast === 'Added to dinner', offToast);
+  await page.goto(`${BASE}/settings/goals`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(1200);
+  await tap('goals-diary-drinks');
+  await tap('goals-save');
+  s = await stored();
+  check('diary drinks: the switch on again', s.profile.diaryDrinksInWater !== false, String(s.profile.diaryDrinksInWater));
 
   // A remembered portion after a restart (lead's decision H1). Cheese bourekas logged before the Israeli foods
   // ("1 piece" 80 g at 335 kcal per 100 g, commit 3fa7914) on the three days before today, in every meal, so it is

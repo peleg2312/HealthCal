@@ -285,3 +285,46 @@ describe('backup validation', () => {
     }
   });
 });
+
+describe('a drink logged in the diary in a backup (src/features/drinks/diary.ts)', () => {
+  const wrap = (collections: Record<string, unknown[]>, extra: Record<string, unknown> = {}) =>
+    JSON.stringify({ format: 'healthcal-backup', version: 1, collections, ...extra });
+  const waterRec = (over: Record<string, unknown>) => ({ id: U1, updatedAt: '2026-11-19T12:40:00.000Z', date: '2026-11-19', ml: 500, beverage: 'other', drink: 'food', loggedAt: '2026-11-19T12:40:00.000Z', ...over });
+
+  it('keeps the water record\'s link to its entry, and refuses a link that is not an id', () => {
+    expect(isValidRecord('water', waterRec({ fromEntryId: U2 }))).toBe(true);
+    expect(isValidRecord('water', waterRec({}))).toBe(true);
+    expect(isValidRecord('water', waterRec({ fromEntryId: 'lunch' }))).toBe(false);
+    expect(isValidRecord('water', waterRec({ fromEntryId: 42 }))).toBe(false);
+    // Both links are not rejected (foodEntryId is read first).
+    expect(isValidRecord('water', waterRec({ fromEntryId: U2, foodEntryId: U3 }))).toBe(true);
+    const parsed = parseBackup(wrap({ water: [waterRec({ fromEntryId: U2 })], foodEntries: [food({ id: U2 })] }));
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.skipped).toBe(0);
+    expect((parsed.backup.collections.water[0] as WaterEntry).fromEntryId).toBe(U2);
+  });
+
+  it('a food\'s drink flag is a yes or a no, wherever a food is kept', () => {
+    const own = { id: U1, updatedAt: '2026-11-19T12:40:00.000Z', name: 'Home shake', per100g: { kcal: 70, protein: 5, carbs: 8, fat: 2 }, servings: [{ label: '1 glass', grams: 350 }], source: 'custom', verified: false };
+    expect(isValidRecord('customFoods', { ...own, beverage: true })).toBe(true);
+    expect(isValidRecord('customFoods', { ...own, beverage: false })).toBe(true);
+    expect(isValidRecord('customFoods', own)).toBe(true);
+    expect(isValidRecord('customFoods', { ...own, beverage: 'yes' })).toBe(false);
+    expect(isValidRecord('foodEntries', food({ id: U2, food: { ...own, beverage: true } as never }))).toBe(true);
+  });
+
+  it('the profile switch is optional and a yes or a no; the backup version stays 1 so older apps read it', () => {
+    const base = {
+      name: 'A', sex: 'female', birthDate: '1990-04-21', heightCm: 170, weightKg: 70, activityLevel: 'light', goal: 'lose', weeklyRateKg: 0.5,
+      units: 'metric', eatBackExercise: true, useAdaptiveTdee: true, updatedAt: '2026-11-10T10:00:00Z',
+    };
+    expect(isValidProfile(base)).toBe(true);
+    expect(isValidProfile({ ...base, diaryDrinksInWater: false })).toBe(true);
+    expect(isValidProfile({ ...base, diaryDrinksInWater: true })).toBe(true);
+    expect(isValidProfile({ ...base, diaryDrinksInWater: 'off' })).toBe(false);
+    const parsed = parseBackup(wrap({}, { profile: { ...base, diaryDrinksInWater: false } }));
+    expect(parsed.ok && parsed.backup.profile?.diaryDrinksInWater).toBe(false);
+    expect(JSON.parse(backupJson(emptySource())).version).toBe(1);
+  });
+});

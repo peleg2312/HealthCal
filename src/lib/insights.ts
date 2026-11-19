@@ -9,6 +9,8 @@
  * - Too little data produces "log a few more days", never a guess.
  * - Neutral, factual tone. Over a target is information, not failure.
  */
+// The one rule for "a day with water tracked" (no React, no store: ids and types only).
+import { hasWaterTracked } from '@/features/drinks/via';
 import type { GoalType, ISODate, Nutrients, UnitSystem, WaterEntry } from '@/types';
 
 import { addDays, diffDays, formatShortDate, fromISODate, startOfWeek } from './dates';
@@ -35,7 +37,7 @@ export interface InsightDay {
   /** MET and duration are used to count guideline minutes (moderate + 2 × vigorous). */
   activities: readonly { met?: number; durationMin?: number }[];
   activeMinutes: number;
-  waterEntries: readonly Pick<WaterEntry, 'ml' | 'beverage' | 'loggedAt'>[];
+  waterEntries: readonly Pick<WaterEntry, 'ml' | 'beverage' | 'loggedAt' | 'fromEntryId'>[];
   waterMl: number;
   waterGoalMl: number;
 }
@@ -210,7 +212,9 @@ export function summarizePeriod(input: {
     };
   }
 
-  const waterDays = closed.filter((d) => d.waterEntries.length > 0);
+  // A day counts as water tracked only with water logged as water: a drink logged in the diary adds to the
+  // totals but never makes a day tracked (a person who never logs water hears nothing new about it).
+  const waterDays = closed.filter((d) => hasWaterTracked(d.waterEntries));
   const water = waterDays.length
     ? {
         avgMl: avg(waterDays.map((d) => d.waterMl)),
@@ -320,7 +324,7 @@ export interface HydrationPattern {
  * the highest's across at least 3 tracked days.
  */
 export function hydrationPattern(days: InsightDay[], today: ISODate): HydrationPattern | null {
-  const tracked = days.filter((d) => d.date < today && d.waterEntries.length > 0);
+  const tracked = days.filter((d) => d.date < today && hasWaterTracked(d.waterEntries));
   if (tracked.length < 3) return null;
   const totals: Record<DayPart, number> = { morning: 0, afternoon: 0, evening: 0 };
   for (const d of tracked) {
@@ -1058,7 +1062,7 @@ export function computeMilestones(input: {
   const { days, goal, units } = input;
   const nth = <T,>(list: T[], n: number): T | undefined => list[n - 1];
   const loggedDates = days.filter(isLogged).map((d) => d.date);
-  const waterDates = days.filter((d) => d.waterEntries.length > 0 && d.waterMl >= d.waterGoalMl).map((d) => d.date);
+  const waterDates = days.filter((d) => hasWaterTracked(d.waterEntries) && d.waterMl >= d.waterGoalMl).map((d) => d.date);
   const sessionDates = days.flatMap((d) => d.activities.map(() => d.date));
   const weighIns = [...new Set(input.weighInDates)].sort();
 

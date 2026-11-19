@@ -3,7 +3,7 @@ import { CalendarPlus, Copy, MoreHorizontal, Plus, Repeat2, Save, Trash2, X } fr
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { ALSO_IN_WATER, waterPointingAt } from '@/features/drinks/rules';
+import { ALSO_IN_WATER, waterFor } from '@/features/drinks/rules';
 import { isWaterDrinkEntry } from '@/features/drinks/via';
 import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { addDays, formatDayLabel } from '@/lib/dates';
@@ -232,7 +232,7 @@ export function MealCard({
           {rows.map(({ item: e, leaving }, i) => (
             <FadeRow key={e.id} leaving={leaving}>
               {i > 0 ? <Divider inset={TEXT_INSET} /> : null}
-              <EntryRow entry={e} inWater={waterEntries ? waterPointingAt(waterEntries, e.id) : null} />
+              <EntryRow entry={e} inWater={waterEntries ? (waterFor(waterEntries, e.id)?.water ?? null) : null} />
             </FadeRow>
           ))}
         </AnimatedList>

@@ -269,6 +269,11 @@ function stressUp(state, { put, baselineTdee }) {
 //                2: also 13:10, 330 ml soft drink to lunch (...d002 / ...d102). Applied after water.
 //   diaryDrink   1: today 08:05, 250 ml semi-skimmed milk logged in the diary only (breakfast, entry ...d003,
 //                no water record, no `via`): the water screen's "already in breakfast" notice and "Water only".
+// For drinks logged in the diary that also count in Water (src/features/drinks/diary.ts), written with the app's
+// own diaryDrink and diaryWaterRecord (the water's id derived from the entry's, `fromEntryId`):
+//   diaryWater   1: today 13:10, a 500 ml can of energy drink logged in lunch (entry ...d004) and its water;
+//                2: also today 08:10, a latte (1 cup, 240 g) logged in breakfast (entry ...d005) and its water: at
+//                09:00 the water screen's Coffee > Latte says it is already in Water and offers no "Water only".
 // For a remembered portion whose food has changed since (lead's decision D1 of the Israeli foods review):
 //   oldBourekas  1: on each of the five days before today, at 16:30, one snack entry of cheese bourekas logged
 //                before the Israeli foods were added (commit 3fa7914: "1 piece" 80 g, 335 kcal per 100 g), in the
@@ -323,7 +328,7 @@ function appMaths() {
     return module.exports;
   };
   const lib = (f) => load(fileURLToPath(new URL(f, APP)));
-  appCache = { ...lib('lib/dates.ts'), ...lib('lib/exercise.ts'), ...lib('store/selectors.ts'), drinks: lib('features/drinks/rules.ts'), choices: lib('features/drinks/choices.ts') };
+  appCache = { ...lib('lib/dates.ts'), ...lib('lib/exercise.ts'), ...lib('store/selectors.ts'), drinks: lib('features/drinks/rules.ts'), choices: lib('features/drinks/choices.ts'), diary: lib('features/drinks/diary.ts') };
   return appCache;
 }
 
@@ -340,7 +345,7 @@ function bundledFood(id) {
   return JSON.parse(JSON.stringify(food));
 }
 
-const VALUE_KEYS = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack', 'spread', 'lastNight', 'weighInGap', 'onboardedToday', 'name', 'drinks', 'diaryDrink', 'oldBourekas'];
+const VALUE_KEYS = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack', 'spread', 'lastNight', 'weighInGap', 'onboardedToday', 'name', 'drinks', 'diaryDrink', 'diaryWater', 'oldBourekas'];
 /** Knobs that are not numbers: their type is checked on its own. */
 const VALUE_TYPES = { onboardedToday: 'boolean', name: 'string' };
 
@@ -466,6 +471,26 @@ function applyValues(state, values, { put, weightKg, baselineTdee }) {
     const { via: _via, ...entry } = plan.entry;
     put('foodEntries', { ...entry, id: '00000000-0000-4000-8000-00000000d003' });
   }
+  if (values.diaryWater > 0) {
+    const { diaryDrink, diaryWaterRecord } = m.diary;
+    const list = [
+      { n: 4, id: 'b_energy_drink', label: '1 can (500 ml)', meal: 'lunch', h: 13, min: 10 },
+      { n: 5, id: 'b_latte', label: '1 cup (8 fl oz)', meal: 'breakfast', h: 8, min: 10 },
+    ].slice(0, Math.min(2, Math.round(values.diaryWater)));
+    for (const d of list) {
+      const food = bundledFood(d.id);
+      const grams = food.servings.find((sv) => sv.label === d.label).grams;
+      const nutrients = Object.fromEntries(Object.entries(food.per100g).map(([k, v]) => [k, (v * grams) / 100]));
+      const entry = {
+        id: `00000000-0000-4000-8000-00000000d00${d.n}`, date: day, meal: d.meal, name: food.name, emoji: food.emoji, foodId: food.id,
+        source: 'builtin', verified: food.verified, servingLabel: d.label, quantity: 1, grams, nutrients, food, loggedAt: at(0, d.h, d.min),
+      };
+      put('foodEntries', entry);
+      const drink = diaryDrink(entry, state.profile);
+      if (!drink) throw new Error(`seed values: ${d.id} is not a diary drink`);
+      put('water', diaryWaterRecord(entry, drink));
+    }
+  }
   if (values.oldBourekas > 0) {
     // Logged from the row of src/data/foods.ts at 3fa7914 ("1 piece" 80 g, 335 kcal per 100 g), in the shape the
     // device holds after a restart: src/store/persistence.ts saves a bundled food's entry without its copy of the
@@ -544,7 +569,7 @@ function applyValues(state, values, { put, weightKg, baselineTdee }) {
 
 /**
  * @param {{ days?: number, empty?: boolean, theme?: 'system'|'light'|'dark'|'blossom', onboarded?: boolean, units?: 'metric'|'imperial', store?: boolean, stress?: boolean,
- *   values?: { eaten?: number, protein?: number, exercise?: number, water?: number, weekMinutes?: number, fasting?: number, eatBack?: number, spread?: number, lastNight?: number, weighInGap?: number, onboardedToday?: boolean, name?: string, drinks?: number, diaryDrink?: number, oldBourekas?: number } }} opts
+ *   values?: { eaten?: number, protein?: number, exercise?: number, water?: number, weekMinutes?: number, fasting?: number, eatBack?: number, spread?: number, lastNight?: number, weighInGap?: number, onboardedToday?: boolean, name?: string, drinks?: number, diaryDrink?: number, diaryWater?: number, oldBourekas?: number } }} opts
  */
 export function buildSeed(opts = {}) {
   const { days = 35, empty = false, theme = 'dark', onboarded = true, units = 'metric', store = false, stress = false, values = null } = opts;

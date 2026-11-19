@@ -658,7 +658,7 @@ export const BUILTIN_FOODS: Food[] = [
   f('cola_diet', 'Cola, diet', '🥤', 'drinks', [2, 0.1, 0.3, 0, 0, 0, 0, 8], [['1 can (12 fl oz)', 355], ['1 bottle (20 fl oz)', 591]], 175099),
   f('lemon_lime_soda', 'Lemon-lime soda', '🥤', 'drinks', [41, 0.1, 10.4, 0, 0, 10.4, 0, 10], [['1 can (12 fl oz)', 368], ['1 bottle (20 fl oz)', 613]], 173205),
   f('ginger_ale', 'Ginger ale', '🥤', 'drinks', [34, 0, 8.8, 0, 0, 8.8, 0, 7], [['1 can (12 fl oz)', 366], ['1 cup', 244]], 174846),
-  f('energy_drink', 'Energy drink, sugared', '⚡', 'drinks', [43, 0.5, 10.2, 0, 0, 10.2, 0, 39], [['1 can (8.4 fl oz)', 250], ['1 can (16 fl oz)', 473]], 2710756),
+  f('energy_drink', 'Energy drink, sugared', '⚡', 'drinks', [43, 0.5, 10.2, 0, 0, 10.2, 0, 39], [['1 can (8.4 fl oz)', 250], ['1 can (16 fl oz)', 473], ['1 can (500 ml)', 503]], 2710756),
   f('sports_drink', 'Sports drink (electrolyte)', '🥤', 'drinks', [26, 0, 6.4, 0, 0, 5.2, 0, 39], [['1 bottle (20 fl oz)', 620], ['1 bottle (12 fl oz)', 372]], 2710771),
   f('sports_drink_low', 'Sports drink, low calorie', '🥤', 'drinks', [8, 0.05, 1.94, 0.01, 0, 1.3, 0, 45], [['1 bottle (20 fl oz)', 600], ['1 cup', 240]], 2710774),
   f('smoothie_fruit', 'Fruit smoothie (fruit and yogurt)', '🥤', 'drinks', [66, 2.3, 12, 1.1, 1.1, 8.9, 0.6, 28], [['1 cup', 216], ['16 fl oz', 432]], 2705513),

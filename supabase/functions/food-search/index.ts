@@ -16,10 +16,15 @@
 import { offQueryText, offSearchQuery, usableHit } from './query.ts';
 
 const SEARCH = 'https://search.openfoodfacts.org/search';
-/** A field query also asks for the name fallbacks of `offToFood`. */
-const FIELDS = 'code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity,product_name_he,generic_name';
-/** A free-text search asks for exactly what it asked for before. */
-const TEXT_FIELDS = 'code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity';
+/**
+ * A field query also asks for the name fallbacks of `offToFood`. Both lists end with `categories_tags`
+ * (whether a product is a drink, `offBeverage` in src/services/openFoodFacts.ts), returned with each hit
+ * as the service sends it. The same lists as FIELDS and TEXT_FIELDS there (openFoodFacts.test.ts holds
+ * them equal). An app talking to an older copy of this function gets no tags and falls back.
+ */
+const FIELDS = 'code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity,product_name_he,generic_name,categories_tags';
+/** A free-text search asks for what it asked for before, and the categories. */
+const TEXT_FIELDS = 'code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity,categories_tags';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',

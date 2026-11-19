@@ -538,6 +538,15 @@ function GoalsForm() {
               : `From your body weight. More on days you log exercise.`}
           </Hint>
         </View>
+        {/* Absent means on. Off stops new pairs; drinks already counted stay (each can be deleted on Water). */}
+        <ToggleRow
+          testID="goals-diary-drinks"
+          title="Count drinks from the diary"
+          subtitle="A drink logged as food also adds its volume to Water."
+          value={draft.diaryDrinksInWater !== false}
+          // Choosing what is saved puts back exactly what is saved (an older profile has no value: on).
+          onChange={(v) => patch({ diaryDrinksInWater: v === (saved.diaryDrinksInWater !== false) ? saved.diaryDrinksInWater : v })}
+        />
       </Group>
 
       <View

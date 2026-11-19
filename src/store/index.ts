@@ -6,7 +6,7 @@
  */
 import { create } from 'zustand';
 
-import { isWaterDrinkEntry } from '@/features/drinks/via';
+import { isWaterDrinkEntry, waterIdFromEntry } from '@/features/drinks/via';
 import { stableId } from '@/lib/hash';
 import { newId } from '@/lib/id';
 import type {
@@ -119,11 +119,30 @@ interface StoreActions {
     records: (Omit<CollectionTypes[K], keyof SyncedRecord> & Partial<SyncedRecord>)[],
   ) => CollectionTypes[K][];
   /**
+   * Write diary entries and, for each one given water, the water record it adds as a drink logged in
+   * the diary (src/features/drinks/diary.ts), in one act: each entry and its water carry one stamp. The
+   * water's id (`waterIdFromEntry`), `fromEntryId`, `date` and `loggedAt` come from its entry; `ml` is
+   * kept within 1..10,000. Also rewrites a pair after an edit (followEntry, undoEdit). The only writer
+   * of such water: nothing else (upsert, sync, a restore or an import) ever creates it.
+   */
+  upsertEntriesWithWater: (
+    items: {
+      entry: Omit<FoodEntry, keyof SyncedRecord> & Partial<SyncedRecord>;
+      water?: (Omit<WaterEntry, keyof SyncedRecord | 'date' | 'loggedAt' | 'fromEntryId' | 'foodEntryId'> & Partial<Pick<WaterEntry, 'loggedAt'>>) | null;
+    }[],
+  ) => { entry: FoodEntry; water: WaterEntry | null }[];
+  /**
    * Soft-delete a record. A water record whose diary entry (`foodEntryId`, a drink with calories) is
-   * live takes that entry with it, both with one stamp; deleting a diary entry never touches water.
+   * live takes that entry with it, both with one stamp. A diary entry takes with it the live water it
+   * added as a drink logged in the diary (`fromEntryId`), both with one stamp; a water record from
+   * the diary goes alone (the entry stays), and deleting an entry never touches `foodEntryId` water.
    */
   remove: (collection: Collection, id: string) => void;
-  /** Bring a soft-deleted record back (undo). A water record brings back the entry its own delete removed (same stamp), never one deleted apart. */
+  /**
+   * Bring a soft-deleted record back (undo). A water record brings back the entry its own delete
+   * removed (same stamp), never one deleted apart. A diary entry brings back the water from the diary
+   * its own delete removed (same stamp); water deleted on Water before or since stays deleted.
+   */
   restore: (collection: Collection, id: string) => void;
   rememberFood: (food: Food) => void;
   toggleFavoriteFood: (food: Food) => void;
@@ -305,6 +324,62 @@ function restoreDrinkPair(s: StoreState, water: WaterEntry): Partial<StoreState>
   };
 }
 
+/** The water records a diary entry added (`fromEntryId`), live or not; the deterministic id first, then any other (a backup from elsewhere). */
+function waterFromEntryOf(s: StoreState, entryId: string): WaterEntry[] {
+  const own = s.water[waterIdFromEntry(entryId)];
+  const out = own && own.fromEntryId === entryId && !own.foodEntryId ? [own] : [];
+  for (const w of Object.values(s.water)) if (w !== own && w.fromEntryId === entryId && !w.foodEntryId) out.push(w);
+  return out;
+}
+
+/**
+ * Deleting a diary entry that added water as a drink logged in the diary: the entry and its live
+ * water go in one act with one stamp. Water already deleted (on Water) is not stamped again, but the
+ * entry's stamp lands after it, so the entry's Undo can never take the two for one act. Null when the
+ * entry added no water (the plain delete applies).
+ */
+function removeEntryWithWater(s: StoreState, entry: FoodEntry): Partial<StoreState> | null {
+  const waters = waterFromEntryOf(s, entry.id);
+  if (waters.length === 0) return null;
+  const t = nextStamp(waters.reduce((at, w) => later(at, w.updatedAt), entry.updatedAt));
+  const water = { ...s.water };
+  const dirtyWater = { ...s.dirty.water };
+  for (const w of waters) {
+    if (w.deleted) continue;
+    water[w.id] = { ...w, deleted: true, updatedAt: t };
+    dirtyWater[w.id] = true;
+  }
+  return {
+    foodEntries: { ...s.foodEntries, [entry.id]: { ...entry, deleted: true, updatedAt: t } },
+    water,
+    dirty: { ...s.dirty, foodEntries: { ...s.dirty.foodEntries, [entry.id]: true }, water: dirtyWater },
+  };
+}
+
+/**
+ * Undo of that delete: the entry comes back, and its water with it only when the water is deleted
+ * with the very stamp the entry's delete wrote (the same act removed it). Null when no such water
+ * exists (the plain restore applies).
+ */
+function restoreEntryWithWater(s: StoreState, entry: FoodEntry): Partial<StoreState> | null {
+  const same = waterFromEntryOf(s, entry.id).filter((w) => w.deleted && w.updatedAt === entry.updatedAt);
+  if (same.length === 0) return null;
+  const t = nextStamp(same.reduce((at, w) => later(at, w.updatedAt), entry.updatedAt));
+  const water = { ...s.water };
+  const dirtyWater = { ...s.dirty.water };
+  for (const w of same) {
+    water[w.id] = { ...w, deleted: false, updatedAt: t };
+    dirtyWater[w.id] = true;
+  }
+  return {
+    foodEntries: { ...s.foodEntries, [entry.id]: { ...entry, deleted: false, updatedAt: t } },
+    water,
+    dirty: { ...s.dirty, foodEntries: { ...s.dirty.foodEntries, [entry.id]: true }, water: dirtyWater },
+  };
+}
+
+const WATER_MAX_ML = 10000;
+
 export const useStore = create<Store>()((set, get) => ({
   ...initialState(),
 
@@ -362,12 +437,53 @@ export const useStore = create<Store>()((set, get) => ({
     return stamped;
   },
 
+  upsertEntriesWithWater: (items) => {
+    const out: { entry: FoodEntry; water: WaterEntry | null }[] = [];
+    set((s) => {
+      const foodEntries = { ...s.foodEntries };
+      const water = { ...s.water };
+      const dirtyEntries = { ...s.dirty.foodEntries };
+      const dirtyWater = { ...s.dirty.water };
+      for (const it of items) {
+        const id = idFor('foodEntries', it.entry as { id?: string });
+        const waterId = it.water ? waterIdFromEntry(id) : null;
+        const t = nextStamp(later(foodEntries[id]?.updatedAt ?? '', (waterId && water[waterId]?.updatedAt) || ''));
+        const entry = { ...it.entry, id, updatedAt: t, deleted: false } as FoodEntry;
+        foodEntries[id] = entry;
+        dirtyEntries[id] = true;
+        let w: WaterEntry | null = null;
+        if (it.water && waterId) {
+          const { foodEntryId: _drop, ...rest } = it.water as typeof it.water & { foodEntryId?: string };
+          w = {
+            ...rest,
+            id: waterId,
+            date: entry.date,
+            ml: Math.min(WATER_MAX_ML, Math.max(1, Math.round(rest.ml))),
+            loggedAt: entry.loggedAt,
+            fromEntryId: id,
+            updatedAt: t,
+            deleted: false,
+          } as WaterEntry;
+          water[waterId] = w;
+          dirtyWater[waterId] = true;
+        }
+        out.push({ entry, water: w });
+      }
+      return { foodEntries, water, dirty: { ...s.dirty, foodEntries: dirtyEntries, water: dirtyWater } };
+    });
+    return out;
+  },
+
   remove: (collection, id) =>
     set((s) => {
       const existing = (s[collection] as Record<string, SyncedRecord>)[id];
       if (!existing) return {};
       if (collection === 'water') {
         const pair = removeDrinkPair(s, existing as WaterEntry);
+        if (pair) return pair;
+      }
+      if (collection === 'foodEntries' && !existing.deleted) {
+        const pair = removeEntryWithWater(s, existing as FoodEntry);
         if (pair) return pair;
       }
       const next = { ...s[collection], [id]: { ...existing, deleted: true, updatedAt: nextStamp(existing.updatedAt) } };
@@ -382,6 +498,10 @@ export const useStore = create<Store>()((set, get) => ({
       if (!existing) return {};
       if (collection === 'water') {
         const pair = restoreDrinkPair(s, existing as WaterEntry);
+        if (pair) return pair;
+      }
+      if (collection === 'foodEntries' && existing.deleted) {
+        const pair = restoreEntryWithWater(s, existing as FoodEntry);
         if (pair) return pair;
       }
       let next = { ...s[collection], [id]: { ...existing, deleted: false, updatedAt: nextStamp(existing.updatedAt) } } as Record<string, SyncedRecord>;

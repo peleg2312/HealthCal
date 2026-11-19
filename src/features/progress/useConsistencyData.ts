@@ -4,7 +4,7 @@ import { diffDays } from '@/lib/dates';
 import { isCompleteDay } from '@/lib/insights';
 import { useStore } from '@/store';
 import { useToday } from '@/store/clock';
-import { hasFoodLogged } from '@/features/drinks/via';
+import { hasFoodLogged, hasWaterTracked } from '@/features/drinks/via';
 import { foodLoggedDates, useConsistency, useDays, useLive } from '@/store/selectors';
 import type { ISODate } from '@/types';
 
@@ -59,7 +59,7 @@ export function useConsistencyData() {
         complete: isCompleteDay(d, t),
         kcal: d.eaten.kcal,
         budget: d.budget,
-        waterMet: d.waterEntries.length > 0 && d.waterMl >= d.waterGoalMl,
+        waterMet: hasWaterTracked(d.waterEntries) && d.waterMl >= d.waterGoalMl,
         trained: d.activities.length > 0,
       });
     }

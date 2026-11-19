@@ -1,0 +1,191 @@
+# Real Open Food Facts products, for the drink rule of src/services/openFoodFacts.ts (offBeverage, packMl),
+# tested in openFoodFacts.test.ts. Untouched values from the service's own answers:
+#   q01..q14  the classification critic's 14 searches (search.openfoodfacts.org, this job): monster energy,
+#             coca cola, iced coffee, חלב תנובה, שוקו יטבתה (no product), protein shake, drinking yogurt,
+#             tomato soup, passata, olive oil, soy sauce, ice cream, syrup, instant coffee
+#   s1..s3    three more searches (2026-11-19): iced tea, orange juice, mineral water
+#   b1..b4    the barcode endpoint /api/v2/product/<code> (2026-11-19): a 0,5 l Monster can, a 500 ml
+#             Coca-Cola, an Israeli 1 L milk (no categories in the search index, en:milks here) and a 330 ml
+#             orange juice. Of the four, the cola has serving_quantity 500 with unit "g" for its 500 ml, the
+#             juice 100 with unit "ml", the milk 100 "g", the Monster no serving at all.
+# Columns: source, code, drink (judged by hand from the name, the pack and the calories: yes = a person
+# drinks it as it comes), quantity, energy-kcal_100g, energy_100g, proteins_100g, carbohydrates_100g,
+# fat_100g, serving_quantity, name, categories_tags ("(none)": the field was missing, "(empty)": an empty list).
+q01	0070847891857	yes	473 ml, 16 fl oz	2.11		0	1.27	0		Monster Energy Drink, Zero Sugar, Ultra Strawberry Dreams	en:beverages,en:artificially-sweetened-beverages,en:energy-drinks,en:energy-drink-without-sugar-and-with-artificial-sweeteners
+q01	5060947543607	yes	355ml	47		0	12	0		Monster energy	en:beverages-and-beverages-preparations,en:beverages,en:energy-drinks,en:energy-drink-with-sugar
+q01	5060166693534	yes	500ml							Monster Energy	en:beverages-and-beverages-preparations,en:beverages,en:energy-drinks
+q01	0070847033233	yes	473ml							Monster Energy	en:beverages
+q01	5060517882334	yes								Monster Energy	(none)
+q01	9342866000888	yes	1	49.2		0	12.4	0		monster energy	en:beverages,en:carbonated-drinks,en:energy-drinks
+q01	0070847000303	yes		47.887323943662		0	12.394366197183	0		Monster Energy	(none)
+q01	5060335634276	yes	0,5 l	47			12			Monster Energy	en:beverages,en:energy-drinks
+q02	57045399	yes	500ml	42		0	10.6	0		Coca-Cola	en:beverages,en:carbonated-drinks,en:sodas,en:colas,en:sweetened-beverages,es:refresco
+q02	0049000004632	yes	355ml	41.7		0	11	0		Coca-Cola	en:beverages,en:carbonated-drinks,en:sodas,en:colas,en:sweetened-beverages
+q02	4890008101306	yes	330 ml	0		0	1.6	0		Coca Cola Plus	en:beverages-and-beverages-preparations,en:beverages,en:carbonated-drinks,en:sodas,en:colas,zh:soft-drink
+q02	3948764012273	yes	750ml	44		0	10.9	0		Coca cola Soft Drink 750ml	en:beverages-and-beverages-preparations,en:beverages,en:carbonated-drinks,en:sodas,en:colas,en:cola-with-sugar-and-artificial-sweetener,en:sweetened-beverages
+q02	6415600567220	yes	330 ml	0.3		0	0	0		Coca-Cola Zero Sugar Kofeiiniton	en:soft-drinks
+q02	5000112594218	yes	1,5l			0	0	0		Coca cola Zero	en:beverages-and-beverages-preparations,en:beverages,en:carbonated-drinks,en:artificially-sweetened-beverages,en:sodas,en:diet-beverages,en:non-alcoholic-beverages,en:colas,en:diet-sodas,en:diet-cola-soft-drink,en:sweetened-beverages
+q02	7290000284316	yes	1.5 L	42		0	10.6	0		Coca-Cola Cachere- 1.5L- Klp -22	en:beverages,en:carbonated-drinks,en:sodas,en:colas,en:משקאות-קלים
+q02	6954767410494	yes	200 ml							coca-cola	en:beverages,en:sweetened-beverages
+q03	8850389301012	yes	180 ml	22.2		0.556	2.7800000000000002	0.8330000000000001		Iced coffee	en:beverages,en:artificially-sweetened-beverages,en:non-alcoholic-beverages,en:coffee-drinks,en:iced-coffees
+q03	0041271004953	yes	1.8l	45.83		1.25	7.92	0.83		Mocha iced coffee	en:beverages,en:coffee-drinks,en:iced-coffees,en:sweetened-beverages
+q03	4000349860125	yes	275ml	39		2.2	4.9	1.1		Iced Coffee Original	en:beverages,en:coffee-drinks,en:iced-coffees
+q03	9310232953618	yes	600 ml	57		2.6	8.1	1.5		Iced coffee strong	en:beverages,en:unsweetened-beverages,en:coffee-drinks,en:iced-coffees,en:sweetened-beverages
+q03	9342584072280	yes	600 mL	82.9		3.2	9.3	3.4		Iced coffee	en:beverages,en:dairies,en:dairy-drinks,en:evaporated-milks,en:coffee-drinks,en:coffee-milks,en:iced-coffees,en:sweetened-beverages
+q03	9310199080839	yes	750 ml	81.5488		3.4	9	3.52		Iced Coffee Espresso	en:beverages,en:dairies,en:dairy-drinks,en:milks,en:flavoured-milks,en:coffee-drinks,en:iced-coffees,en:sweetened-beverages
+q03	9311336030069	yes	500 ml	63.6		3.2	8.4	1.9		Iced coffee milk	en:beverages-and-beverages-preparations,en:beverages,en:dairies,en:dairy-drinks,en:flavoured-milks,en:unsweetened-beverages,en:coffee-drinks,en:iced-coffees
+q03	4000349860088	yes		39		2.2	4.9	1.1		Iced Coffee	en:beverages,en:coffee-drinks,en:iced-coffees
+q04	7290000042435	yes	1 Liter	43		3.35	5.1	1		חלב טרי	(none)
+q04	7290110325312	no		95		10	6	3		מעדן חלבון סויה (תות)	en:dairies,en:desserts,en:dairy-desserts
+q04	7290000040974	yes	1 l	50		3.2		2		חלב טרי דל לקטוז	(none)
+q04	7290110328887	yes		60		3.299999952316284	4.949999809265137	3		חלב תנובה 3%	(none)
+q04	7290110327033	yes		62		6.6	3	2.8		חלב סויה מועשר בחלבון	(none)
+q04	7290000051352	yes		67		3.3	5	3.8		חלב בטעם של פעם 3.8 אחוז	(none)
+q06	4906459636639	no	25 g							Cookie Cream Protein Shake	en:dietary-supplements,en:bodybuilding-supplements,en:protein-shakes
+q06	5056379505863	yes	330ml	50		7.6	5.4	0.6		Impact Protein Shake Chocolate Flavour	en:dietary-supplements,en:bodybuilding-supplements,en:protein-shakes
+q06	0888849008100	yes	325 ml	49.2308		9.2308	1.2308	1.0769		Protein Shake	en:dietary-supplements,en:bodybuilding-supplements,en:protein-shakes
+q06	8720892340849	no	480 g	382		82	1.6	7.6		Vanilla flavour vegan protein shake	en:dietary-supplements,en:bodybuilding-supplements,en:protein-powders,en:protein-shakes
+q06	0643843717157	yes	11.5 fl oz	47		8.82	1.47	0.882		Chocolate Flavor High Protein Shake	en:dietary-supplements,en:bodybuilding-supplements,en:protein-shakes,en:protien-drink
+q06	0000390204071	no	2.2 oz	403.22580645161		38.709677419355	35.483870967742	12.903225806452		Isagenix	en:dietary-supplements,en:bodybuilding-supplements,en:protein-shakes
+q06	390204071	no	2.2 oz	403.22580645161		38.709677419355	35.483870967742	12.903225806452		Isagenix	en:dietary-supplements,en:bodybuilding-supplements,en:protein-shakes
+q06	8595002110243	yes	250 g	45		6	4.9	0.1		Protein shake	en:dietary-supplements,en:bodybuilding-supplements,en:protein-shakes
+q07	4971777296919	yes		90.4		3.29	11.9	3.29		Drinking Yogurt	(none)
+q07	6923644287412	yes		96.3193116483		3	13.1	3.5		Drinking Yogurt	(none)
+q07	4893318070515	yes		78		2.8	9.5	3.3		Drinking Yogurt	(none)
+q07	3760128640829	yes	3 * 200 ml					3.4		Drinking yogurt	en:beverages,en:dairies,en:dairy-drinks
+q07	8718166007307	yes		53		3.200000047683716	8.199999809265137	0.5		Yoggi drinking yogurt	(none)
+q07	5901939103259	yes		78		6.5	9.5	1.5		Skyr drinking yogurt	(none)
+q07	4710088432933	yes		59.7		3.01	10.6	0.583		Original Drinking Yogurt	(none)
+q07	5710326020655	yes		50		7.1	4.6	0.3		Protein drinking yogurt	(none)
+q08	4779039730276	no	400 g	63		0.8	5.9	4		Tomato Soup	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fruits-and-vegetables-based-foods,en:vegetables-based-foods,en:meals,en:soups,en:reheatable-soups,en:vegetable-soups,en:reheatable-tomato-soup,en:tomato-soups,en:organic,en:organic-food,en:organic-soup,en:vegan,en:vegetarian
+q08	0051000000118	no	10.75oz	74		1.37	13.7	0		Tomato Soup	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fruits-and-vegetables-based-foods,en:meals,en:soups,en:vegetable-soups,en:tomato-soups
+q08	0063211214420	no	540 mL	190		3	25	9		Crème de tomates	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fruits-and-vegetables-based-foods,en:meals,en:soups,en:vegetable-soups,en:tomato-soups
+q08	0635302303612	no	12 oz (340 g)							Tomato Soup Condensed	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fruits-and-vegetables-based-foods,en:meals,en:soups,en:vegetable-soups,en:tomato-soups
+q08	00772303	no	600 g	55.2		1	5.9	2.8		Cream Of Tomato Soup	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fruits-and-vegetables-based-foods,en:meals,en:soups,en:cream-soups,en:vegetable-soups,en:cream-of-vegetable-soups,en:tomato-soups
+q08	5059977005704	no	100g	50		1.48	3.88	2.98		Souper tomato soup	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fruits-and-vegetables-based-foods,en:meals,en:soups,en:vegetable-soups
+q08	0070900402150	no	15 oz (425g)	90		2	17	2		Low sodium tomato soup	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fruits-and-vegetables-based-foods,en:canned-foods,en:meals,en:soups,en:vegetable-soups,en:canned-meals,en:canned-soups,en:canned-vegetable-soups,en:tomato-soups
+q08	5054070650202	no		58		1	7.3	2.7		Cream Of Tomato Soup	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fruits-and-vegetables-based-foods,en:vegetables-based-foods,en:meals,en:soups,en:tomatoes-and-their-products,en:cream-soups,en:vegetable-soups,en:cream-of-vegetable-soups,en:cream-of-tomato-soups,en:tomato-soups
+q09	01215397	no	700 gr	36		1.4	6	0.5		SO Organic Passata	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fruits-and-vegetables-based-foods,en:condiments,en:vegetables-based-foods,en:sauces,en:tomatoes-and-their-products,en:tomato-sauces,en:strained-tomatoes,en:groceries
+q09	5391517271515	no	700 g	30		1.2	4.9	0.1		Passata	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fruits-and-vegetables-based-foods,en:vegetables-based-foods,en:tomatoes-and-their-products,en:strained-tomatoes
+q09	5000169342527	no	500g	28		1.4	4.9	0.1		Passata	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fruits-and-vegetables-based-foods,en:vegetables-based-foods,en:tomatoes-and-their-products,en:strained-tomatoes
+q09	4006040293033	no	680g			1.3	4.6	0.5		Passata Purée de Tomates	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fruits-and-vegetables-based-foods,en:condiments,en:vegetables-based-foods,en:sauces,en:tomatoes-and-their-products,en:tomato-sauces,en:tomato-purees,en:strained-tomatoes,en:groceries
+q09	5400101260450	no	690 g	22		1.3	3	0		Passata	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fruits-and-vegetables-based-foods,en:condiments,en:vegetables-based-foods,en:sauces,en:tomatoes-and-their-products,en:tomato-sauces,en:tomato-purees,en:strained-tomatoes,en:groceries
+q09	4260348158450	no	500g	36		2	5.4	0.2		Passata	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fruits-and-vegetables-based-foods,en:condiments,en:vegetables-based-foods,en:sauces,en:tomatoes-and-their-products,en:tomato-sauces,en:strained-tomatoes,en:groceries
+q09	8000320990113	no	500g	36		1.4	5.9	0.1		Доматено пюре	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fruits-and-vegetables-based-foods,en:condiments,en:vegetables-based-foods,en:prepared-vegetables,en:purees,en:sauces,en:tomatoes-and-their-products,en:mashed-vegetables,en:tomato-sauces,en:strained-tomatoes,en:groceries
+q09	5000169202784	no		28		1.5	4.3	0.2		Passata	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fruits-and-vegetables-based-foods,en:condiments,en:vegetables-based-foods,en:sauces,en:tomatoes-and-their-products,en:tomato-sauces,en:strained-tomatoes,en:groceries
+q10	0634039000689	no		800		0	0	93.333333333333		Organic Extra Virgin Olive Oil	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fats,en:vegetable-fats,en:olive-tree-products,en:vegetable-oils,en:olive-oils,en:extra-virgin-olive-oils,en:virgin-olive-oils
+q10	0634039000702	no		800		0	0	93.333333333333		California Organic Extra Virgin Olive Oil	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fats,en:vegetable-fats,en:olive-tree-products,en:vegetable-oils,en:olive-oils,en:extra-virgin-olive-oils,en:virgin-olive-oils
+q10	5203922300301	no	0.75 l	824		0	0	91.6		Huile d'olive vierge extra	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fats,en:vegetable-fats,en:olive-tree-products,en:vegetable-oils,en:olive-oils,en:greek-oils-and-fats,en:olive-oils-from-greece,en:extra-virgin-olive-oils,en:virgin-olive-oils
+q10	6194620845616	no	34 fl oz/1L	800		0	0	93.3		Extra Virgin Olive Oil	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fats,en:vegetable-fats,en:olive-tree-products,en:vegetable-oils,en:olive-oils,en:extra-virgin-olive-oils,en:olive-oils-from-tunisia,en:virgin-olive-oils
+q10	20108144	no	1 litre			0	0	90.6		Extra Virgin Olive Oil	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fats,en:vegetable-fats,en:olive-tree-products,en:vegetable-oils,en:olive-oils,en:extra-virgin-olive-oils,en:virgin-olive-oils
+q10	25185003	no	750ml	828		0.5	0.5	92		Extra Virgin Olive Oil	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fats,en:vegetable-fats,en:olive-tree-products,en:vegetable-oils,en:olive-oils,en:extra-virgin-olive-oils,en:virgin-olive-oils
+q10	87202847	no	750 ml							Natives Oliven Öl extra	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fats,en:vegetable-fats,en:olive-tree-products,en:vegetable-oils,en:olive-oils,en:extra-virgin-olive-oils,en:virgin-olive-oils
+q10	0607766880336	no		800		0	0	90		extra virgin olive oil	en:plant-based-foods-and-beverages,en:plant-based-foods,en:fats,en:vegetable-fats,en:olive-tree-products,en:vegetable-oils,en:olive-oils,en:extra-virgin-olive-oils
+q11	0074261182164	no		66.666666666667		6.6666666666667	6.6666666666667	0		Soy Sauce	en:condiments,en:sauces,en:soy-sauces,en:groceries
+q11	5901882220614	no	150 ml	27		3.8	2.7	0.1		Soy Sauce	en:condiments,en:sauces,en:soy-sauces
+q11	0074261180153	no		73.33		6.67	6.67	0		Organic Soy Sauce	en:condiments,en:sauces,en:soy-sauces,en:groceries
+q11	0074261160162	no		107		6.67	20	0		Soy Sauce Paste	en:condiments,en:sauces,en:soy-sauces,en:groceries
+q11	0074261110334	no		76		9	10	0		Wanjashan, Soy Sauce	en:condiments,en:sauces,en:soy-sauces,en:groceries
+q11	6944941901016	no	250 ml	143		1	33	1		Dark soy sauce	en:condiments,en:sauces,en:soy-sauces,en:groceries
+q11	4903001017106	no	150 ml	85		9	7.6	0		Brewed Soy Sauce	en:condiments,en:sauces,en:soy-sauces
+q11	04139140	no	5 fl oz (148 ml)	66.7		13.3	6.67	0		Soy Sauce	en:condiments,en:sauces,en:soy-sauces
+q12	3850116007328	no	71g,90ml	440		5.8	32	31		Lino lada duo	en:desserts,en:frozen-foods,en:frozen-desserts,en:ice-creams-and-sorbets,en:ice-creams
+q12	0029839004751	no		286		1.79	28.57	19.64		Ice Cream Bars	en:desserts,en:frozen-foods,en:frozen-desserts,en:ice-creams-and-sorbets,en:ice-creams,en:ice-cream-bars
+q12	0077189059280	no		378		4.44	43.33	20		Ice Cream Sandwiches	en:desserts,en:frozen-foods,en:frozen-desserts,en:ice-creams-and-sorbets,en:ice-creams,en:ice-cream-sandwiches
+q12	0029839100033	no		309		3.64	30.91	21.82		Ice Cream Bars	en:desserts,en:frozen-foods,en:frozen-desserts,en:ice-creams-and-sorbets,en:ice-creams,en:ice-cream-bars
+q12	0072730620254	no		268		4.23	42.25	9.86		Pumpkin Spice, Ice Cream Sandwiches	en:desserts,en:frozen-foods,en:frozen-desserts,en:ice-creams-and-sorbets,en:ice-creams,en:ice-cream-sandwiches
+q12	7290006681089	no	270 Gram	181		4.44	40	3.33		ice cream sandwiches	en:desserts,en:frozen-foods,en:frozen-desserts,en:ice-creams-and-sorbets,en:ice-creams,en:ice-cream-sandwiches
+q12	0851522003211	no		244		2.56	29.49	14.1		Ice cream	en:desserts,en:frozen-foods,en:frozen-desserts,en:ice-creams-and-sorbets,en:ice-creams,en:ice-cream-tubs,en:vanilla-ice-cream-tubs
+q12	0851522003099	no		226		3.23	24.19	14.52		Ice Cream	en:desserts,en:frozen-foods,en:frozen-desserts,en:ice-creams-and-sorbets,en:ice-creams
+q13	5900397737679	no	400ml	311		0.5	77	0.5		Rasperry with Lemon Syrup	en:beverages,en:syrups,en:flavoured-syrups,en:syrup-with-sugar-to-be-diluted,en:syrups-with-fruits
+q13	0042400124962	no	354 g	379		3.45	86.21	1.72		Cereal	en:plant-based-foods-and-beverages,en:plant-based-foods,en:breakfasts,en:cereals-and-potatoes,en:cereals-and-their-products,en:breakfast-cereals,en:puffed-grains,en:puffed-cereals
+q13	0041490736130	no	32 FL. OZ.	130		0	32	0		Syrup golden	en:plant-based-foods-and-beverages,en:plant-based-foods,en:cereals-and-potatoes,en:cereals-and-their-products,en:sweeteners,en:syrups,en:simple-syrups,en:cereal-syrups,en:corn-syrups
+q13	0021000028276	no	16 FL OZ / 473 ml	235.29411764706		0	14.705882352941	17.647058823529		Zesty catalina salad dressing bottles	en:condiments,en:sauces,en:salad-dressings,en:tomato-sauces,en:groceries
+q13	5902476010055	yes	375 g	68		3	11	1.3		Kefir	en:beverages,en:dairies,en:fermented-foods,en:fermented-milk-products,en:dairy-drinks,en:fermented-drinks,en:fermented-milk-drinks,en:kefir
+q13	5407003034752	no	250ml	300		0.1	76	0.1		Bio agave syrup	en:sweeteners,en:syrups,en:simple-syrups,en:agave-syrups
+q13	5902596646165	no	300 g	430		7.7	61	16		Granola pineapple & coconut	en:plant-based-foods-and-beverages,en:plant-based-foods,en:breakfasts,en:cereals-and-potatoes,en:cereals-and-their-products,en:breakfast-cereals,en:mueslis,hr:whole-grain
+q13	5902884463153	no	400g	410		12.5	65.2	8.4		Granola chocolat framboises	en:plant-based-foods-and-beverages,en:plant-based-foods,en:breakfasts,en:cereals-and-potatoes,en:cereals-and-their-products,en:breakfast-cereals,en:mueslis
+q14	0810688010389	no	3.5 oz	0.588		0.176	0	0		Instant Coffee	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-foods,en:plant-based-beverages,en:coffees,en:freeze-dried-foods,en:instant-beverages,en:freeze-dried-plant-based-foods,en:instant-coffees,en:freeze-dried-instant-coffees
+q14	8690515514066	no								Jacobs Monarch Gold Instant Coffee	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-foods,en:coffees,en:instant-beverages,en:instant-coffees,en:instant-coffee-without-sugar
+q14	0850002532005	no	8 oz	0		0	0	0		Instant Coffee	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-foods,en:hot-beverages,en:plant-based-beverages,en:coffees,en:instant-beverages,en:capsules,en:instant-coffees,en:coffee-capsules
+q14	01399240	no	200g							Rich Roast instant coffee granules	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-foods,en:hot-beverages,en:coffees,en:instant-beverages,en:instant-coffees,en:instant-coffee-without-sugar
+q14	5060169982079	no	50g							Cookie dough flavour instant coffee	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-foods,en:coffees,en:instant-beverages,en:instant-coffees,en:instant-coffee-without-sugar
+q14	5060169982055	no	50g	3		0.5	0.5	0		Cinnamon hazelnut flavour instant coffee	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-foods,en:coffees,en:freeze-dried-foods,en:instant-beverages,en:freeze-dried-plant-based-foods,en:instant-coffees,en:freeze-dried-instant-coffees
+q14	5060169998025	no	50g							Cherry chocolate flavour instant coffee	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-foods,en:coffees,en:freeze-dried-foods,en:instant-beverages,en:freeze-dried-plant-based-foods,en:instant-coffees,en:freeze-dried-instant-coffees
+q14	5060169982109	no	50g							Amaretto Almond Flavour Instant Coffee	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-foods,en:coffees,en:freeze-dried-foods,en:instant-beverages,en:freeze-dried-plant-based-foods,en:instant-coffees,en:freeze-dried-instant-coffees
+s1	0020601407893	yes	16 OZ (473 mL)	0		0	0.422	0		Heinen's Organic Unsweetened With Lemon Iced Tea	en:plant-based-foods-and-beverages,en:beverages,en:hot-beverages,en:plant-based-beverages,en:teas,en:tea-based-beverages,en:iced-teas
+s1	0012000142451	yes	16.9 fl oz	1		0	0	0		Diet Iced Tea - Peach	en:plant-based-foods-and-beverages,en:beverages,en:hot-beverages,en:plant-based-beverages,en:teas,en:tea-based-beverages,en:iced-teas
+s1	5285000327356	yes	320 ml	1		0	0.1	0		Ice tea light	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:artificially-sweetened-beverages,en:tea-based-beverages,en:iced-teas
+s1	0012000112454	yes	16.9 fl oz	20		0	5	0		Half & Half Iced Tea & Lemonade	en:beverages,en:tea-based-beverages,en:iced-teas
+s1	5000382100683	yes	473ml							Iced Tea	en:beverages,en:tea-based-beverages,en:iced-teas
+s1	01275900	yes	12 fl oz	19.718309859155		0	4.7887323943662	0		Iced tea lemon flavor	en:beverages-and-beverages-preparations,en:beverages,en:artificially-sweetened-beverages,en:tea-based-beverages,en:iced-teas,en:sweetened-beverages
+s1	0613008730697	yes	500 ml	20		0	5.1	0		Iced tea lemon flavor	en:plant-based-foods-and-beverages,en:beverages,en:hot-beverages,en:plant-based-beverages,en:teas,en:herbal-teas,en:tea-based-beverages,en:iced-teas,en:sweetened-beverages
+s1	0613008725693	yes		42.253521126761		0	10.422535211268	0		Arizona iced tea	en:plant-based-foods-and-beverages,en:beverages,en:hot-beverages,en:plant-based-beverages,en:teas
+s1	0020735092736	yes		33.333333333333		0	8.6111111111111	0		Iced Tea	en:beverages,en:tea-based-beverages,en:iced-teas,en:lemon-flavored-iced-teas
+s1	0029313001511	yes		38		0	9.58	0		Iced tea	en:beverages,en:tea-based-beverages,en:iced-teas,en:lemon-flavored-iced-teas
+s1	0035036223000	yes		33		0	7.92	0		Iced tea	en:beverages,en:tea-based-beverages,en:iced-teas,en:iced-teas-with-raspberry-flavor
+s1	0041268172375	yes		41.666666666667		0	10.833333333333	0		Iced Tea	en:beverages,en:tea-based-beverages,en:iced-teas,en:iced-teas-with-raspberry-flavor
+s1	0021130455454	yes		37		0	9.01	0		Iced tea	en:beverages,en:tea-based-beverages,en:iced-teas,en:lemon-flavored-iced-teas
+s1	0041303056608	no		407		0	100	0		Iced tea	en:beverages,en:tea-based-beverages,en:iced-teas,en:lemon-flavored-iced-teas
+s1	0858252000053	yes		10		0	2.5	0		Organic white tea	en:beverages,en:tea-based-beverages,en:iced-teas
+s1	0858252000091	yes		0		0	0	0		Organic White Tea	en:beverages,en:tea-based-beverages,en:iced-teas
+s1	0858252000039	yes		10		0	2.5	0		Organic White Tea White Peach	en:beverages,en:tea-based-beverages,en:iced-teas
+s1	0858252000046	yes		10		0	2.5	0		Organic White Tea	en:beverages,en:tea-based-beverages,en:iced-teas
+s1	0858252000015	yes		10		0	2.5	0		Organic White Tea	en:beverages,en:tea-based-beverages,en:iced-teas
+s1	0858252000183	yes		10		0	2.5	0		Organic White Tea	en:beverages,en:tea-based-beverages,en:iced-teas
+s1	0858252000640	yes		10		0	2.5	0		Organic white tea	en:beverages,en:tea-based-beverages,en:iced-teas
+s1	0858252000657	yes		10		0	2.5	0		Organic White Tea	en:beverages,en:tea-based-beverages,en:iced-teas
+s1	0858252000107	yes		33		0	8.33	0		White Tea Energy Adult Energy Drink	en:beverages,en:tea-based-beverages,en:iced-teas
+s1	0012000023118	yes		20		0	5	0		Iced tea	en:beverages,en:tea-based-beverages,en:iced-teas
+s2	5010893701101	yes	1l			0.5	9.1	0.1		Orange juice	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:fruit-juices-from-concentrate,en:orange-juices,en:orange-juices-from-concentrate
+s2	0072846462694	yes	64 Fl Oz (2QT.) 1.89 L	50		0	12.083333333333	0		orange juice	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:fruit-juices-from-concentrate,en:orange-juices,en:orange-juices-from-concentrate
+s2	5000232018700	yes	6 x 150 ml	41		0.6	8.9	0.5		Orange Juice	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:fruit-juices-from-concentrate,en:orange-juices,en:orange-juices-from-concentrate
+s2	0016300210094	yes	1 Gal (3.78 L)	45.8		0.833	10.8	0		Fresh Orange Juice	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:orange-juices,en:squeezed-juices,en:squeezed-orange-juices
+s2	0070744009805	yes	1/2 Gallon 64 fl oz.	45.8		0.833	11.2	0		Orange juice	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:fruit-juices-from-concentrate,en:orange-juices,en:refrigerated-squeezed-juices,en:orange-juices-from-concentrate,en:refrigerated-squeezed-orange-juices
+s2	00012706	yes	500 ml	22.4						Freshly Squeezed Orange Juice	en:beverages-and-beverages-preparations,en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:orange-juices,en:squeezed-juices,en:squeezed-orange-juices
+s2	5038862100304	yes	330ml	44		0.7	9.7	0		Orange juice wit bits	en:beverages-and-beverages-preparations,en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:orange-juices,en:squeezed-juices,en:squeezed-orange-juices
+s2	5000128943895	yes	1 litre			0.5	9.2	0.1		Orange Juice Smooth	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:orange-juices,en:squeezed-juices,en:squeezed-orange-juices
+s2	4316268437530	yes	1 l	43		0.7	9	0.1		Blutorangensaft mit Fruchtfleisch	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:orange-juices,en:blood-orange-juices
+s2	0048500301029	yes	1.75 L	46		0.83	10.83	0		Pure Premium Orange Juice Original No Pulp	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:orange-juices,en:squeezed-juices,en:squeezed-orange-juices
+s2	4088600160023	yes	1.75L	32		0.333	7.33	0.333		Orange Juice	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:orange-juices
+s2	0016300220307	yes	64 Fl Oz (2QT.) 1.89 L	45.8		0.833	10.8	0		Orange Juice	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:orange-juices
+s2	77484030100	yes	4 oz	52.9		0	11.5	0		Orange Juice	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:orange-juices
+s2	0067311020110	yes	300 mL	43.3		0.333	10.7	0		Orange Juice	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:orange-juices
+s2	9311336020039	yes	250 mL			1	9.7	1		Orange juice	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:orange-juices
+s2	8901725100131	yes	12	48.7		0	12.5	0		B Natural Orange Juice 1ltr tpk	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:orange-juices,en:orange-juices-with-pulp
+s2	02502409	yes	11.5 oz	47.1		0.588	10.9	0		Pulp Free Orange Juice	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:carbonated-drinks,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:carbonated-fruit-soft-drink,en:orange-juices,en:carbonated-fruit-soft-drinks-with-sugar-with-10-50-of-fruit-juice,en:juice
+s2	5000128943710	yes	1l	41		0.7	8.8	0.5		Orange juice	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:orange-juices
+s2	2000000139590	yes	200 ml	41		0.5	8.9	0.5		Princes Orange Juice	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:orange-juices
+s2	5054781219354	yes	1 Litre	47		0.5	10	0.5		Just Essentials Orange Juice From Concentrate	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:fruit-juices-from-concentrate,en:orange-juices,en:orange-juices-from-concentrate
+s2	0077484030100	yes	4 fl oz (118 mL)	50.8		0	11.9	0		100% Orange Juice from Concentrate	en:beverages-and-beverages-preparations,en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:fruit-juices-from-concentrate,en:orange-juices,en:orange-juices-from-concentrate
+s2	0753792002102	yes	64 fl oz	50		0	12.1	0		Orange Juice	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:orange-juices
+s2	3560070333127	yes	1,5 l	36		0	8.4	0		Orange Jus à base de concentré	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-foods,en:fruits-and-vegetables-based-foods,en:fruits-based-foods,en:plant-based-beverages,en:fruit-based-beverages,en:fruits,en:juices-and-nectars,en:citrus,en:fruit-juices,en:non-alcoholic-beverages,en:fruit-juices-from-concentrate,en:orange-juices,en:oranges,en:orange-juices-from-concentrate
+s2	0712797519732	yes	28 fl oz	45.8		0.833	10.8	0		100% Valencia Orange Juice	en:plant-based-foods-and-beverages,en:beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:orange-juices
+s3	20384739	yes	0,5 l	0		0	0	0		Mineral water	en:beverages,en:carbonated-drinks,en:waters,en:spring-waters,en:mineral-waters,en:carbonated-waters,en:natural-mineral-waters,en:carbonated-natural-mineral-waters,en:drinking-water,en:mildly-carbonated-natural-mineral-water
+s3	4004042630085	yes								Mineral Water	en:beverages,en:carbonated-drinks,en:waters,en:spring-waters,en:mineral-waters,en:carbonated-waters,en:natural-mineral-waters,en:carbonated-natural-mineral-waters,en:mildly-carbonated-natural-mineral-water
+s3	5057753417147	yes								Ashbeck English natural mineral water	en:beverages,en:waters,en:spring-waters,en:mineral-waters,en:natural-mineral-waters,en:non-carbonated-natural-mineral-waters
+s3	4820017000024	yes	1,5 l							Morshynska Natural mineral water	en:beverages,en:carbonated-drinks,en:waters,en:spring-waters,en:mineral-waters,en:non-alcoholic-beverages,en:carbonated-waters,en:natural-mineral-waters,en:non-carbonated-natural-mineral-waters
+s3	20030995	yes	1.5l							Saskia mineralwasser classic	en:beverages,en:waters,en:spring-waters,en:mineral-waters
+s3	0041508800129	yes	750 ml	0		0	0	0		Sparkling natural mineral water	en:beverages,en:carbonated-drinks,en:waters,en:spring-waters,en:mineral-waters,en:carbonated-waters,en:carbonated-mineral-waters
+s3	07478545	yes	750 mL	0		0	0	0		Sparkling natural mineral water	en:beverages,en:carbonated-drinks,en:waters,en:spring-waters,en:mineral-waters,en:unsweetened-beverages,en:carbonated-waters,en:sparkling-mineral-water
+s3	5000462001022	yes	2 L							Mineral water	en:beverages,en:carbonated-drinks,en:waters,en:spring-waters,en:mineral-waters,en:carbonated-waters
+s3	0075502388055	yes		0		0	0	0		Mineral Water	en:beverages,en:carbonated-drinks,en:waters,en:spring-waters,en:mineral-waters,en:carbonated-waters,en:natural-mineral-waters,en:carbonated-natural-mineral-waters,en:mildly-carbonated-natural-mineral-water
+s3	5059697761935	yes		0		0	0	0		Mineral water	en:beverages,en:waters,en:spring-waters,en:mineral-waters,en:natural-mineral-waters
+s3	4056489641513	yes	0.5l							Mineral water	en:beverages-and-beverages-preparations,en:beverages,en:waters,en:spring-waters,en:mineral-waters,en:natural-mineral-waters
+s3	0021136010374	yes		0		0	0	0		Mineral water	en:beverages,en:carbonated-drinks,en:waters,en:spring-waters,en:mineral-waters,en:carbonated-waters,en:natural-mineral-waters,en:carbonated-mineral-waters,en:carbonated-natural-mineral-waters
+s3	8908003799285	yes	200 ml							Mineral Water	en:beverages,en:waters,en:spring-waters,en:mineral-waters,en:natural-mineral-waters
+s3	8997020120059	yes	1500ml							mineral water	en:beverages,en:carbonated-drinks,en:waters,en:spring-waters,en:mineral-waters,en:carbonated-waters,en:natural-mineral-waters,en:carbonated-natural-mineral-waters,en:mildly-carbonated-natural-mineral-water
+s3	3800091500130	yes	1,5 L							Mineral Water	en:beverages,en:waters,en:spring-waters,en:mineral-waters,en:natural-mineral-waters
+s3	8411497106113	yes	6L	0		0	0	0		Mineral water	en:beverages-and-beverages-preparations,en:beverages,en:waters,en:spring-waters,en:mineral-waters,en:natural-mineral-waters
+s3	5033022002016	yes	500 ml							natural mineral water	en:beverages,en:waters,en:spring-waters,en:mineral-waters,en:natural-mineral-waters,en:non-carbonated-natural-mineral-waters
+s3	5703828020995	yes	500 ml							Naturligt mineralvann uten kullsyre	en:beverages,en:waters,en:spring-waters,en:mineral-waters,en:natural-mineral-waters,en:non-carbonated-natural-mineral-waters
+s3	7640115250964	yes	1.5l	0		0	0	0		Mineralwasser ohne	en:beverages,en:carbonated-drinks,en:waters,en:spring-waters,en:mineral-waters,en:carbonated-waters,en:natural-mineral-waters
+s3	4770405227079	yes	1.5 l	0		0	0	0		Mineral water	en:beverages,en:carbonated-drinks,en:waters,en:spring-waters,en:mineral-waters,en:carbonated-waters,en:carbonated-mineral-waters
+s3	4770405226379	yes	1.5 l							Natural Mineral Water	en:beverages,en:waters,en:spring-waters,en:mineral-waters,en:natural-mineral-waters,en:non-carbonated-natural-mineral-waters
+s3	5212039100018	yes	0,5L							Natural Mineral Water	en:beverages-and-beverages-preparations,en:beverages,en:waters,en:spring-waters,en:mineral-waters,en:natural-mineral-waters,en:non-carbonated-natural-mineral-waters
+s3	4860019001414	yes	Отличное	0		0	0	0		Mineral Water	en:beverages-and-beverages-preparations,en:beverages,en:waters,en:spring-waters,en:mineral-waters
+s3	4580360133236	yes	2000ml	0		0	0	0		Natural Mineral Water	en:beverages,en:waters,en:spring-waters,en:mineral-waters,en:natural-mineral-waters,en:non-carbonated-natural-mineral-waters
+b1	5060335634276	yes	0,5 l	47	201		12			Monster Energy	en:beverages-and-beverages-preparations,en:beverages,en:non-alcoholic-beverages,en:functional-drinks,en:energy-drinks
+b2	57045399	yes	500ml	21	91.8	0	5.4	0	500	Coca-Cola	en:beverages-and-beverages-preparations,en:beverages,en:non-alcoholic-beverages,en:carbonated-drinks,en:soft-drinks,en:sodas,en:colas,en:sweetened-beverages
+b3	7290000042435	yes	1 Liter	43	181.5	3.4	5.1	1	100	חלב טרי	en:dairies,en:milks-liquid-and-powder,en:milks,en:homogenized-milks,en:pasteurised-products,en:uht-milks
+b4	5038862100304	yes	330ml	44	176.8	0.7	9.7	0	100	Orange juice wit bits	en:beverages-and-beverages-preparations,en:plant-based-foods-and-beverages,en:beverages,en:fruit-based-foods-and-beverages,en:plant-based-beverages,en:fruit-based-beverages,en:juices-and-nectars,en:fruit-juices,en:orange-juices,en:squeezed-fruit-juices,en:squeezed-orange-juices

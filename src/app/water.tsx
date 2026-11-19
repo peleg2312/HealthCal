@@ -22,7 +22,8 @@ import { ENTERED, type DrinkChoice } from '@/features/drinks/choices';
 import { DrinkChoices } from '@/features/drinks/DrinkChoices';
 import { DrinkPickSheet } from '@/features/drinks/DrinkPickSheet';
 import { loadDrinkMemory, rememberDrinkChoice, useDrinkMemory } from '@/features/drinks/memory';
-import { drinkMeal, livePartner, noticeLine, pickedFood, pickedToast, planDrink, rememberedChoice, sameDrinkFoodIds, sameDrinkInDiary, selectChoice, selectFood, waterRowCaption, waterRowTitle } from '@/features/drinks/rules';
+import { diaryWaterCaption, diaryWaterOpenLabel, waterDeleteLabel } from '@/features/drinks/diary';
+import { drinkMeal, entryFor, noticeLine, pickedFood, pickedToast, planDrink, rememberedChoice, sameDrinkFoodIds, sameDrinkInDiary, selectChoice, selectFood, waterFromEntry, waterOnlyOffered, waterRowCaption, waterRowTitle } from '@/features/drinks/rules';
 import { leftLitreDecimals, shownMl, volumeNumber, volumeUnitFor, waterLeftMl } from '@/features/today/volume';
 import { useTheme } from '@/theme';
 import type { Beverage, Food, WaterEntry } from '@/types';
@@ -141,10 +142,13 @@ function WaterScreen() {
   const resolve = (f: Food) => resolveFood(f, customById);
   const selected = rememberedChoice(memory, beverage, resolve);
   const picked = pickedFood(selected, memory, beverage, resolve);
-  // The same food already in the diary within 3 hours: said before the tap, with "Water only".
+  // The same food already in the diary within 3 hours: said before the tap, with "Water only" unless that
+  // entry already added its water (a drink logged in the diary: the chip would count the same water twice).
   // `now` ticks once a minute, so an entry logged since its last tick is still "before now" with a minute's grace.
   const sameEntry = selected?.food ? sameDrinkInDiary(foodEntries, waterRecords, sameDrinkFoodIds(beverage, selected), date, new Date(now.getTime() + 60_000).toISOString()) : null;
-  const waterOnlyOn = waterOnly && !!sameEntry;
+  const sameInWater = sameEntry ? waterFromEntry(waterRecords, sameEntry.id) !== null : false;
+  const waterOnlyAllowed = waterOnlyOffered(sameEntry, waterRecords);
+  const waterOnlyOn = waterOnly && waterOnlyAllowed;
   const customMl = custom && custom > 0 ? volumeToMl(custom, units) : 0;
   // The words before the tap, from the same plan the tap writes (clock from useNow, never read while rendering).
   const shownPlan = (ml: number, amount: 'glass' | 'custom') => planDrink({ kind: beverage, drink: selected, ml, date, now, today: todayDate, units, waterOnly: waterOnlyOn, amount });
@@ -326,7 +330,8 @@ function WaterScreen() {
           glassMl={glassMl}
           units={units}
           line={line}
-          notice={sameEntry && selected?.food ? noticeLine(sameEntry, selected, beverage) : null}
+          notice={sameEntry && selected?.food ? noticeLine(sameEntry, selected, beverage, sameInWater) : null}
+          waterOnlyOffered={waterOnlyAllowed}
           waterOnly={waterOnlyOn}
           onChoose={choose}
           onPicked={choosePicked}
@@ -406,8 +411,12 @@ function WaterScreen() {
           <AnimatedList key={date}>
           {rows.map(({ item: e, leaving }, i) => {
             const counts = Math.round(effectiveMl(e.ml, e.beverage));
-            // A drink whose calories are in the diary: the row opens that entry (the one place to change its amount).
-            const partner = livePartner(e, foodEntries);
+            // A drink whose calories are in the diary (logged on Water), or a drink logged in the diary that added
+            // this water: the row opens that entry (the one place to change its amount). The two read apart by
+            // their caption: "Milk · 129 kcal in breakfast" against "Energy drink · from lunch".
+            const linked = entryFor(e, foodEntries);
+            const partner = linked?.entry ?? null;
+            const fromDiary = linked?.origin === 'diary';
             const title = waterRowTitle(e, units);
             const text = (
               <>
@@ -422,7 +431,12 @@ function WaterScreen() {
                     {loggedLabel(e)}
                     {counts !== e.ml ? ` · counts as ${formatVolume(counts, units)}` : ''}
                   </Text>
-                  {partner ? (
+                  {partner && fromDiary ? (
+                    <Text testID={`water-entry-from-${i}`} variant="caption" color="textSecondary" numberOfLines={2}>
+                      {/* "from lunch" stays whole, so a wrap falls after the name and never leaves the meal alone on the last line. */}
+                      {diaryWaterCaption({ ...partner, name: isolateRtl(partner.name) }).replace(/from (\S+)$/, 'from\u00A0$1')}
+                    </Text>
+                  ) : partner ? (
                     <Text testID={`water-entry-kcal-${i}`} variant="caption" color="textSecondary" numberOfLines={2}>
                       {/* "129 kcal in breakfast" stays whole, so a wrap falls after the name and never leaves the meal alone on the last line.
                           The drink's name is drawn isolated (a name in Hebrew keeps the line's order); the label below keeps it raw. */}
@@ -441,7 +455,7 @@ function WaterScreen() {
                     <PressableScale
                       testID={`water-entry-open-${i}`}
                       scaleTo={0.985}
-                      accessibilityLabel={`${title}, ${waterRowCaption(partner, e.date).replace(' · ', ', ')}. Edit in diary`}
+                      accessibilityLabel={fromDiary ? diaryWaterOpenLabel(title, partner) : `${title}, ${waterRowCaption(partner, e.date).replace(' · ', ', ')}. Edit in diary`}
                       onPress={() => router.push(href('/food/detail', { entryId: partner.id, meal: partner.meal, date: partner.date }) as never)}
                       style={{ ...rowStyle, flex: 1, minWidth: 0 }}>
                       {text}
@@ -451,7 +465,7 @@ function WaterScreen() {
                   )}
                   <IconButton
                     testID={`water-delete-${i}`}
-                    accessibilityLabel={`Delete ${formatVolume(e.ml, units)}, ${loggedLabel(e)}`}
+                    accessibilityLabel={waterDeleteLabel(e, loggedLabel(e), units, fromDiary ? partner : null)}
                     tone="clear"
                     size={44}
                     onPress={() => removeDrink(e)}>

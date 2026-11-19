@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { hasFoodLogged } from '@/features/drinks/via';
+import { hasFoodLogged, hasWaterTracked } from '@/features/drinks/via';
 import { addDays, startOfWeek } from '@/lib/dates';
 import { isCompleteDay, type WeeklyRecap } from '@/lib/insights';
 import { useToday } from '@/store/clock';
@@ -39,7 +39,8 @@ export function useShareDayInput(date: ISODate): ShareDayInput {
       mealFoods,
       waterMl: day.waterMl,
       waterGoalMl: day.waterGoalMl,
-      waterLogged: day.waterEntries.length > 0,
+      // Water logged as water, not only drinks from the diary (their volume is still in waterMl).
+      waterLogged: hasWaterTracked(day.waterEntries),
       activeMinutes: day.activeMinutes,
       streak: consistency.streak,
       week: week.map((d) => shareDay(d, today)),

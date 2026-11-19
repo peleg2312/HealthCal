@@ -8,7 +8,7 @@ import { formatNumber } from '@/lib/units';
 import type { Food, FoodEntry } from '@/types';
 
 import { buildEntry } from './build';
-import { amountLabel, formatQty, lastPortions, matchServing, portionFor, portionKcal, portionLabel, servingText, sourceInfo, stepAmount, toPer100, valuesUpdated, labelGrams } from './helpers';
+import { amountLabel, amountTotal, formatQty, labelAmount, lastPortions, matchServing, portionFor, portionKcal, portionLabel, servingText, sourceInfo, stepAmount, toPer100, valuesUpdated, labelGrams } from './helpers';
 import { resolveUsuals, usualFoods, usualLabel } from './usuals';
 
 describe('stepAmount', () => {
@@ -56,6 +56,48 @@ describe('a serving that is a weight ("50 g", ruling G4)', () => {
     expect(amountLabel('1 piece', 2)).toBe('2 ×');
     expect(labelGrams('50 g')).toBe(50);
     expect(labelGrams('1 piece (50 g)')).toBeNull();
+  });
+});
+
+describe('a serving that is a volume ("500 ml", the pack serving of an online drink)', () => {
+  const can: Food = {
+    id: 'off_5060335634276',
+    name: 'Monster Energy',
+    per100g: { kcal: 47, protein: 0, carbs: 11, fat: 0 },
+    servings: [{ label: '500 ml', grams: 500 }],
+    source: 'openfoodfacts',
+    verified: false,
+    beverage: true,
+  };
+  it('reads as the total volume at every amount, never "1 × 500 ml" or "2 × 500 ml"', () => {
+    expect(portionLabel('500 ml', 1)).toBe('500 ml');
+    expect(portionLabel('500 ml', 1.5)).toBe('750 ml');
+    expect(portionLabel('500 ml', 2)).toBe('1000 ml');
+    expect(portionLabel('330 ml', 0.5)).toBe('165 ml');
+    expect(amountLabel('500 ml', 1)).toBe('500 ml');
+    expect(amountLabel('500 ml', 1.5)).toBe('750 ml');
+    expect(amountLabel('500 ml', 2)).toBe('1000 ml');
+    expect(servingText('500 ml')).toBe('500 ml');
+  });
+  it('labelAmount and amountTotal read a weight or a volume label and nothing else; labelGrams still reads weights only', () => {
+    expect(labelAmount('50 g')).toEqual({ n: 50, unit: 'g' });
+    expect(labelAmount('500 ml')).toEqual({ n: 500, unit: 'ml' });
+    expect(labelAmount('2.5 ml')).toEqual({ n: 2.5, unit: 'ml' });
+    for (const l of ['1 can (500 ml)', '1 cup (240 ml)', '500ml', '500 mL', '16 fl oz', '1 serving', '1 g x']) expect(labelAmount(l), l).toBeNull();
+    expect(amountTotal('500 ml', 2)).toBe('1000 ml');
+    expect(amountTotal('50 g', 3)).toBe('150 g');
+    expect(amountTotal('1 can (500 ml)', 2)).toBeNull();
+    expect(labelGrams('500 ml')).toBeNull();
+  });
+  it('steps by half a pack, and a remembered pack is logged as it was', () => {
+    expect(stepAmount(1, '500 ml', 1)).toBe(1.5);
+    expect(stepAmount(0.5, '500 ml', -1)).toBe(0);
+    expect(matchServing(can, '500 ml', 500)).toEqual({ label: '500 ml', grams: 500 });
+    const e = buildEntry({ food: can, serving: { label: '500 ml', grams: 500 }, quantity: 2, meal: 'lunch', date: '2026-11-19' });
+    const p = portionFor(can, lastPortions([{ ...e, id: 'e1', updatedAt: '2026-11-19T12:00:00.000Z' } as FoodEntry]));
+    expect(p).toEqual({ serving: { label: '500 ml', grams: 500 }, quantity: 2 });
+    expect(portionLabel(p.serving.label, p.quantity)).toBe('1000 ml');
+    expect(Math.round(portionKcal(can, p))).toBe(470);
   });
 });
 

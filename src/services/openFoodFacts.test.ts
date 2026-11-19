@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { lookupBarcode, offToFood, searchProductsWithStatus, searchRequestUrl } from './openFoodFacts';
+import { lookupBarcode, offBeverage, offToFood, packMl, searchProductsWithStatus, searchRequestUrl } from './openFoodFacts';
 
 // openFoodFacts.ts imports only @/lib/nutrition and types, so nothing needs mocking.
 const good = {
@@ -168,8 +171,11 @@ function fakeFetch(answers: (object | number | 'offline')[]) {
 }
 afterEach(() => vi.unstubAllGlobals());
 
-const TODAY_FIELDS = 'code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity';
-const NEW_FIELDS = `${TODAY_FIELDS},product_name_he,generic_name`;
+/** The fields a free-text search asked for before the drinks in the diary counted in Water. */
+const BEFORE_FIELDS = 'code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity';
+/** Both lists now end with the categories, which say whether a product is a drink (`offBeverage`). */
+const TODAY_FIELDS = `${BEFORE_FIELDS},categories_tags`;
+const NEW_FIELDS = `${BEFORE_FIELDS},product_name_he,generic_name,categories_tags`;
 
 describe('the incomplete message of the scanner uses the same names', () => {
   const noKcal = { ...good, nutriments: { proteins_100g: 1 } };
@@ -193,8 +199,9 @@ describe('the incomplete message of the scanner uses the same names', () => {
 });
 
 describe('the search request a phone sends', () => {
-  it('a query without a Hebrew letter is byte for byte the request sent before Hebrew support', () => {
-    // Literally the URL built by the previous code: `${SEARCH}?q=${encodeURIComponent(q)}&page_size=${limit}&fields=${FIELDS}`.
+  it('a query without a Hebrew letter is byte for byte the request sent before Hebrew support, with categories_tags added to its fields', () => {
+    // Literally the URL built by the previous code: `${SEARCH}?q=${encodeURIComponent(q)}&page_size=${limit}&fields=${FIELDS}`,
+    // whose field list now ends with categories_tags (a field asked for changes what comes back, not what is found).
     expect(searchRequestUrl('greek yogurt', 24)).toBe(`https://search.openfoodfacts.org/search?q=greek%20yogurt&page_size=24&fields=${TODAY_FIELDS}`);
     for (const q of ['cottage cheese (5%', 'Crème brûlée', 'coke', 'title:x OR *', '100% juice']) {
       expect(searchRequestUrl(q, 24)).toBe(`https://search.openfoodfacts.org/search?q=${encodeURIComponent(q)}&page_size=24&fields=${TODAY_FIELDS}`);
@@ -311,5 +318,247 @@ describe("the second review's cases (lead's decision D5)", () => {
   it('an empty list of hits is still "no matches"', async () => {
     fakeFetch([{ hits: [] }]);
     expect(await searchProductsWithStatus('bamba', 24)).toEqual({ foods: [], failed: false, unavailable: false });
+  });
+});
+
+describe('the food-search function asks for the same fields as the phones', () => {
+  it('its FIELDS and TEXT_FIELDS are the app\'s, categories_tags included', () => {
+    const read = (f: string) => readFileSync(path.join(__dirname, f), 'utf8');
+    const lists = (src: string) => ['FIELDS', 'TEXT_FIELDS'].map((k) => src.match(new RegExp(`^const ${k} = '([^']+)';$`, 'm'))?.[1]);
+    const app = lists(read('openFoodFacts.ts'));
+    expect(app).toEqual([NEW_FIELDS, TODAY_FIELDS]);
+    expect(lists(read('../../supabase/functions/food-search/index.ts'))).toEqual(app);
+  });
+});
+
+describe('offBeverage: whether a product is a drink, from its categories', () => {
+  it('no categories (missing, empty, not a list): not known', () => {
+    expect(offBeverage(undefined)).toBeUndefined();
+    expect(offBeverage(null)).toBeUndefined();
+    expect(offBeverage([])).toBeUndefined();
+    expect(offBeverage('en:beverages' as never)).toBeUndefined();
+    expect(offBeverage([3, null] as never)).toBeUndefined();
+  });
+  it.each([
+    [['en:beverages', 'en:energy-drinks'], true],
+    [['en:soft-drinks'], true],
+    [['en:dietary-supplements', 'en:protein-shakes'], true],
+    [['en:dairies', 'en:milks'], true],
+    [['en:beverages', 'en:waters', 'en:mineral-waters'], true],
+    [['en:beverages', 'en:teas', 'en:tea-based-beverages', 'en:iced-teas'], true],
+    [['en:beverages', 'en:coffee-drinks', 'en:iced-coffees'], true],
+    [['en:beverages', 'en:syrups'], false],
+    [['en:beverages', 'en:coffees', 'en:instant-beverages', 'en:instant-coffees'], false],
+    [['en:beverages', 'en:coffees'], false],
+    [['en:beverages', 'en:teas'], false],
+    [['en:protein-shakes', 'en:protein-powders'], false],
+    [['en:beverages', 'en:alcoholic-beverages', 'en:beers'], false],
+    [['en:beverages', 'en:wines'], false],
+    [['en:beverages', 'en:spirits'], false],
+    [['en:meals', 'en:soups'], false],
+    [['en:condiments', 'en:sauces', 'en:soy-sauces'], false],
+    [['en:desserts', 'en:ice-creams'], false],
+    [['en:dairies'], false],
+  ])('%j -> %s', (tags, want) => {
+    expect(offBeverage(tags)).toBe(want);
+  });
+  it('offToFood sets beverage only from a non-empty list, and never stores the categories', () => {
+    expect(offToFood(good)!).not.toHaveProperty('beverage');
+    expect(offToFood({ ...good, categories_tags: [] })!).not.toHaveProperty('beverage');
+    expect(offToFood({ ...good, categories_tags: ['en:snacks'] })!.beverage).toBe(false);
+    const drink = offToFood({ ...good, categories_tags: ['en:beverages'] })!;
+    expect(drink.beverage).toBe(true);
+    expect(drink).not.toHaveProperty('categories_tags');
+  });
+});
+
+describe('packMl: the one volume of a pack', () => {
+  it.each([
+    ['500 ml', 500],
+    ['500ml', 500],
+    ['0,5 l', 500],
+    ['0,5L', 500],
+    ['0.33l', 330],
+    ['33 cl', 330],
+    ['750 mL', 750],
+    ['1 Liter', null],
+    ['1,5 l', null],
+    ['1.5l', null],
+    ['2000ml', null],
+    ['6 x 330 ml', null],
+    ['6 x 150 ml', null],
+    ['3 * 200 ml', null],
+    ['4×250ml', null],
+    ['16.9 fl oz', 500],
+    ['12 fl oz', 355],
+    ['32 FL. OZ.', null],
+    ['473 ml, 16 fl oz', 473],
+    ['16 OZ (473 mL)', 473],
+    ['5 fl oz (148 ml)', 148],
+    ['500 ml (1 l)', null],
+    ['4 oz', null],
+    ['250 g', null],
+    ['1', null],
+    ['', null],
+    ['Отличное', null],
+  ])('%j -> %s', (q, want) => {
+    expect(packMl(q)).toBe(want);
+  });
+  it('not a string: none', () => {
+    expect(packMl(undefined)).toBeNull();
+    expect(packMl(500)).toBeNull();
+  });
+  it('a drink found by search with a one-person pack gets "<n> ml" at n grams; its own serving, a big pack or a non-drink gets none', () => {
+    const can = { ...good, serving_size: undefined, serving_quantity: undefined, quantity: '0,5 l', categories_tags: ['en:beverages', 'en:energy-drinks'] };
+    expect(offToFood(can)!.servings).toEqual([{ label: '500 ml', grams: 500 }]);
+    expect(offToFood({ ...can, quantity: '1,5 l' })!.servings).toEqual([]);
+    expect(offToFood({ ...can, quantity: '6 x 330 ml' })!.servings).toEqual([]);
+    expect(offToFood({ ...can, categories_tags: ['en:sauces'] })!.servings).toEqual([]);
+    expect(offToFood({ ...can, categories_tags: undefined })!.servings).toEqual([]);
+    // A scanned drink keeps its own serving and gets no second one.
+    expect(offToFood({ ...can, serving_size: '250 ml', serving_quantity: 250 })!.servings).toEqual([{ label: '1 serving (250 ml)', grams: 250 }]);
+  });
+});
+
+/**
+ * The real products of __fixtures__/off-drinks.tsv (the answers of Open Food Facts' own search and barcode
+ * endpoints, with a hand-judged "is it a drink" column). The numbers below are measured, not hoped for:
+ * a change to the rule that moves one of them must say why.
+ */
+describe('the drink rule on 178 real products (off-drinks.tsv)', () => {
+  const rows = readFileSync(path.join(__dirname, '__fixtures__', 'off-drinks.tsv'), 'utf8')
+    .split('\n')
+    .filter((l) => l && !l.startsWith('#'))
+    .map((l) => {
+      const [src, code, drink, quantity, kcal, kj, protein, carbs, fat, servingQuantity, name, tags] = l.split('\t');
+      const nutriments: Record<string, string> = {};
+      if (kcal) nutriments['energy-kcal_100g'] = kcal;
+      if (kj) nutriments['energy_100g'] = kj;
+      if (protein) nutriments.proteins_100g = protein;
+      if (carbs) nutriments.carbohydrates_100g = carbs;
+      if (fat) nutriments.fat_100g = fat;
+      const categories_tags = tags === '(none)' ? undefined : tags === '(empty)' ? [] : tags.split(',');
+      const food = offToFood({ code, product_name: name, quantity: quantity || undefined, serving_quantity: servingQuantity || undefined, nutriments, categories_tags });
+      return { src, code, name, quantity, drink: drink === 'yes', food };
+    });
+  const shown = rows.filter((r) => r.food);
+  /** The diary's cap for a food that is not bundled (src/features/drinks/diary.ts): at most 150 kcal per 100 ml. */
+  const counts = (r: (typeof shown)[number]) => r.food!.beverage === true && r.food!.per100g.kcal <= 150;
+  const tally = (list: typeof shown) => ({
+    drinks: list.filter((r) => r.drink).length,
+    caught: list.filter((r) => r.drink && r.food!.beverage === true).length,
+    others: list.filter((r) => !r.drink).length,
+    wrong: list.filter((r) => !r.drink && r.food!.beverage === true).length,
+    wrongAfterCap: list.filter((r) => !r.drink && counts(r)).length,
+  });
+
+  it('reads every row; 141 of the 178 products are ones the app would show', () => {
+    expect(rows).toHaveLength(178);
+    expect(shown).toHaveLength(141);
+  });
+
+  it("the critic's 14 searches: 22 of 34 drinks caught; 2 non-drinks tagged a drink, 0 after the 150 kcal cap", () => {
+    expect(tally(shown.filter((r) => r.src.startsWith('q')))).toEqual({ drinks: 34, caught: 22, others: 50, wrong: 2, wrongAfterCap: 0 });
+  });
+
+  it('all of them: 77 of 90 drinks caught; 3 of 51 non-drinks tagged a drink, 0 after the cap', () => {
+    expect(tally(shown)).toEqual({ drinks: 90, caught: 77, others: 51, wrong: 3, wrongAfterCap: 0 });
+  });
+
+  it('names every product on the wrong side', () => {
+    // Drinks the rule misses: 12 have no categories at all (4 Israeli milks, 7 drinking yogurts, 1 Monster
+    // can), and one iced tea is tagged only as tea (en:teas, without en:iced-teas), like tea bags.
+    expect(shown.filter((r) => r.drink && r.food!.beverage !== true).map((r) => `${r.code} ${r.name} (${r.food!.beverage})`)).toEqual([
+      '0070847000303 Monster Energy (undefined)',
+      '7290000042435 חלב טרי (undefined)',
+      '7290110328887 חלב תנובה 3% (undefined)',
+      '7290110327033 חלב סויה מועשר בחלבון (undefined)',
+      '7290000051352 חלב בטעם של פעם 3.8 אחוז (undefined)',
+      '4971777296919 Drinking Yogurt (undefined)',
+      '6923644287412 Drinking Yogurt (undefined)',
+      '4893318070515 Drinking Yogurt (undefined)',
+      '8718166007307 Yoggi drinking yogurt (undefined)',
+      '5901939103259 Skyr drinking yogurt (undefined)',
+      '4710088432933 Original Drinking Yogurt (undefined)',
+      '5710326020655 Protein drinking yogurt (undefined)',
+      '0613008725693 Arizona iced tea (false)',
+    ]);
+    // Not drinks the categories call one: two protein powders and an iced tea mix, all far above 150 kcal per 100 g.
+    expect(shown.filter((r) => !r.drink && r.food!.beverage === true).map((r) => `${r.code} ${r.name} ${r.food!.per100g.kcal}`)).toEqual([
+      '0000390204071 Isagenix 403',
+      '390204071 Isagenix 403',
+      '0041303056608 Iced tea 407',
+    ]);
+  });
+
+  it('which drinks get a serving from the pack, and which do not', () => {
+    const withPack = shown.filter((r) => r.food!.servings.some((s) => / ml$/.test(s.label)));
+    expect(withPack.map((r) => `${r.code} ${r.food!.servings[0].label}`)).toEqual([
+      '0070847891857 473 ml', // Monster Ultra, "473 ml, 16 fl oz"
+      '5060947543607 355 ml', // Monster, "355ml"
+      '57045399 500 ml',
+      '0049000004632 355 ml',
+      '4890008101306 330 ml',
+      '3948764012273 750 ml', // the largest pack that still counts
+      '6415600567220 330 ml',
+      '8850389301012 180 ml',
+      '4000349860125 275 ml',
+      '9310232953618 600 ml',
+      '9342584072280 600 ml',
+      '9310199080839 750 ml',
+      '9311336030069 500 ml',
+      '5056379505863 330 ml',
+      '0888849008100 325 ml',
+      '0643843717157 340 ml', // "11.5 fl oz"
+      '0020601407893 473 ml', // "16 OZ (473 mL)"
+      '0012000142451 500 ml', // "16.9 fl oz"
+      '5285000327356 320 ml',
+      '0012000112454 500 ml',
+      '01275900 355 ml', // "12 fl oz"
+      '0613008730697 500 ml',
+      '5038862100304 330 ml',
+      '0067311020110 300 ml',
+      '2000000139590 200 ml',
+      '0077484030100 118 ml',
+      '20384739 500 ml', // "0,5 l"
+      '0041508800129 750 ml',
+      '07478545 750 ml',
+    ]);
+    // Only drinks ever get one, and never a product with a serving of its own.
+    expect(withPack.every((r) => r.food!.beverage === true && r.food!.servings.length === 1)).toBe(true);
+    const none = shown.filter((r) => r.food!.beverage === true && !r.food!.servings.length);
+    // Drinks left to be logged by weight: 20 name no pack size at all, and these name one that is not one drink
+    // (above 750 ml, a multipack, a weight, or no unit).
+    expect(none.filter((r) => !r.quantity)).toHaveLength(20);
+    expect(none.filter((r) => r.quantity).map((r) => r.quantity)).toEqual([
+      '1',
+      '1.5 L',
+      '1.8l',
+      '2.2 oz',
+      '2.2 oz',
+      '250 g',
+      '375 g',
+      '64 Fl Oz (2QT.) 1.89 L',
+      '6 x 150 ml',
+      '1 Gal (3.78 L)',
+      '1/2 Gallon 64 fl oz.',
+      '1 l',
+      '1.75 L',
+      '1.75L',
+      '64 Fl Oz (2QT.) 1.89 L',
+      '4 oz',
+      '12',
+      '11.5 oz',
+      '1l',
+      '1 Litre',
+      '64 fl oz',
+      '1,5 l',
+      '28 fl oz',
+      '6L',
+      '1.5l',
+      '1.5 l',
+      'Отличное',
+      '2000ml',
+    ]);
   });
 });

@@ -15,6 +15,8 @@ function isoDay(n) {
   d.setDate(d.getDate() + n);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+/** The energy drink logged with the search row's + (the first result for "monster"). */
+const LOG_MONSTER = [{ type: 'food-search-input', text: 'monster' }, { wait: 1200 }, 'result-0-add'];
 const LONG_QUERY = 'greek yogurt with honey granola and fresh blueberries large';
 /** Today at this local clock time, for a state that needs the meal of the hour (the stress seed's Hebrew-named usual food is a lunch). */
 function todayAt(h, m = 0) {
@@ -185,4 +187,17 @@ module.exports = [
   { id: 'meal-edit-old', route: '/food/meals', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }, 'saved-meal-edit-0'], waitFor: 'meal-edit-screen', note: 'the builder of "Lunch plate": its total at today\'s values' },
   { id: 'detail-entry-agrees', route: '/diary?date={day}', day: -1, values: { oldBourekas: 1 }, taps: ['^entry-'], waitFor: 'food-detail-screen', absent: ['detail-values-updated'], note: 'an entry whose numbers agree: no line' },
   { id: 'detail-new-food-no-line', route: '/food/search?meal=snack', values: { oldBourekas: 1 }, type: { 'food-search-input': 'bourekas cheese' }, taps: [{ wait: 1200 }, 'result-0'], waitFor: 'food-detail-screen', absent: ['detail-values-updated'], note: 'the same food being added new: no line' },
+  // Drinks logged in the diary also count in Water (src/features/drinks/diary.ts): the line before Add, the note when
+  // editing one (logged with the search row's +, on a profile with no other data), the toasts that say both, and the
+  // own food's switch.
+  { id: 'detail-drink-adds', route: '/food/search?meal=lunch', type: { 'food-search-input': 'monster' }, taps: [{ wait: 1200 }, 'result-0'], waitFor: 'detail-water-adds', note: 'an energy drink before Add: "Also adds 248 ml to Water." under the amount' },
+  { id: 'detail-drink-adds-imperial', route: '/food/search?meal=lunch', imperial: true, type: { 'food-search-input': 'latte' }, taps: [{ wait: 1200 }, 'result-0'], waitFor: 'detail-water-adds', note: 'a latte before Add, in fl oz' },
+  { id: 'detail-not-drink', route: '/food/search?meal=lunch', type: { 'food-search-input': 'banana' }, taps: [{ wait: 1200 }, 'result-0'], waitFor: 'food-detail-screen', absent: ['detail-water-adds'], note: 'a banana before Add: no Water line' },
+  { id: 'detail-soup-not-drink', route: '/food/search?meal=lunch', type: { 'food-search-input': 'lentil soup' }, taps: [{ wait: 1200 }, 'result-0'], waitFor: 'food-detail-screen', absent: ['detail-water-adds'], note: 'a soup before Add: no Water line' },
+  { id: 'detail-diary-drink', route: '/food/search?meal=lunch', data: 'empty', now: todayAt(14, 0), taps: [...LOG_MONSTER, { wait: 12500 }, 'search-done', '^entry-'], waitFor: 'detail-drink-note', note: 'editing a drink logged in the diary: "Also counted in Water as 500 ml. It changes with this entry and is removed with it."' },
+  { id: 'detail-diary-drink-imperial', route: '/food/search?meal=lunch', data: 'empty', imperial: true, now: todayAt(14, 0), taps: [...LOG_MONSTER, { wait: 12500 }, 'search-done', '^entry-'], waitFor: 'detail-drink-note', note: 'the same in fl oz' },
+  { id: 'toast-diary-drink-imperial', route: '/food/search?meal=lunch', imperial: true, type: { 'food-search-input': 'monster' }, taps: [{ wait: 1200 }, 'result-0-add'], waitFor: 'toast-action', note: 'an energy drink added with its +: "Added to lunch and 8.4 fl oz to Water" (320 px is the narrow case)' },
+  { id: 'toast-diary-copy', route: '/food/search?meal=lunch', data: 'empty', now: todayAt(14, 0), taps: [...LOG_MONSTER, 'search-done', { wait: 5000 }, `diary-day-${isoDay(1)}`, 'meal-repeat-lunch'], waitFor: 'toast-action', note: "tomorrow's lunch repeated from today: the copy's toast names the water" },
+  { id: 'custom-drink-on', route: '/food/custom', type: { 'custom-name': 'Cold brew', 'custom-serving-label': '1 bottle (330 ml)', 'custom-serving-grams': '330' }, waitFor: 'custom-drink', note: 'an own food whose serving names ml: "This is a drink" on by itself' },
+  { id: 'custom-drink-off', route: '/food/custom', type: { 'custom-name': 'Protein bar', 'custom-serving-label': '1 bar', 'custom-serving-grams': '40' }, waitFor: 'custom-drink', note: 'an own food with a bar serving: the switch off' },
 ];

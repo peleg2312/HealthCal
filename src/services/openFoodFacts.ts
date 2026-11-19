@@ -20,13 +20,16 @@ const SEARCH = 'https://search.openfoodfacts.org/search';
  * `product_name_he`); the search index holds neither of them, so they matter
  * mostly to the barcode lookup.
  */
-const FIELDS = 'code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity,product_name_he,generic_name';
+const FIELDS = 'code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity,product_name_he,generic_name,categories_tags';
 /**
- * The fields of a free-text search: exactly the list sent before the name
- * fallbacks, so that request (and what it finds) stays byte for byte what it
- * was for every query without a Hebrew letter.
+ * The fields of a free-text search: the list sent before the name fallbacks,
+ * so that request finds what it found before for every query without a Hebrew
+ * letter (the query itself is unchanged; a field asked for changes what comes
+ * back, never what is found). Both lists end with `categories_tags`, which
+ * decides whether a product is a drink (`offBeverage`). The `food-search`
+ * function (supabase/functions/food-search/index.ts) asks for the same lists.
  */
-const TEXT_FIELDS = 'code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity';
+const TEXT_FIELDS = 'code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity,categories_tags';
 
 interface OffProduct {
   code?: string;
@@ -39,6 +42,10 @@ interface OffProduct {
   nutriments?: Record<string, number | string | undefined>;
   serving_size?: string;
   serving_quantity?: number | string;
+  /** The pack size as printed: "500 ml", "0,5 l", "6 x 330 ml". */
+  quantity?: string;
+  /** Open Food Facts' categories, most general first ("en:beverages", "en:energy-drinks"). Read, never stored. */
+  categories_tags?: string[];
 }
 
 function n(v: number | string | undefined): number | undefined {
@@ -55,6 +62,73 @@ function n(v: number | string | undefined): number | undefined {
 function productName(p: OffProduct): string {
   // Each candidate is trimmed before choosing: a name of spaces must not hide the Hebrew name behind it.
   return [p.product_name, p.product_name_he, p.product_name_en, p.generic_name].map((x) => (typeof x === 'string' ? x.trim() : '')).find(Boolean) ?? '';
+}
+
+// ---------------------------------------------------------------- drinks
+
+/** Categories that are never a drink as logged: syrups to dilute, powders, beans and bags, alcohol, soups and sauces. */
+const NOT_DRINK_TAGS = [
+  'en:syrups',
+  'en:instant-beverages',
+  'en:instant-coffees',
+  'en:protein-powders',
+  'en:alcoholic-beverages',
+  'en:beers',
+  'en:wines',
+  'en:spirits',
+  'en:soups',
+  'en:sauces',
+];
+/** Coffee and tea are beans, ground coffee and tea bags unless one of these says it is the drink. */
+const MADE_DRINK_TAGS = ['en:coffee-drinks', 'en:iced-coffees', 'en:iced-teas'];
+const DRINK_TAGS = ['en:beverages', 'en:soft-drinks', 'en:dairy-drinks', 'en:milks', 'en:protein-shakes', 'en:energy-drinks', 'en:waters'];
+
+/**
+ * Whether a product is a drink, from its Open Food Facts categories: undefined when it has none (not
+ * known: the diary's fallback rule decides, src/features/drinks/diary.ts), else false for a category in
+ * NOT_DRINK_TAGS or coffee or tea without one of MADE_DRINK_TAGS, true for one in DRINK_TAGS, false
+ * otherwise. Measured on real answers (src/services/__fixtures__/off-drinks.tsv, tested in
+ * openFoodFacts.test.ts): of the 141 products the app would show, 77 of 90 drinks are called a drink
+ * (the misses: 12 with no categories, one iced tea tagged only as tea) and 3 of 51 others are (two
+ * protein powders and an iced tea mix, all above the diary's 150 kcal per 100 ml). The kind of drink is not carried: an online drink is 'other' in Water
+ * (or 'water' by the name rule there), so Food gains no field for it.
+ */
+export function offBeverage(tags: readonly unknown[] | undefined | null): boolean | undefined {
+  if (!Array.isArray(tags)) return undefined;
+  const has = new Set(tags.filter((t): t is string => typeof t === 'string'));
+  if (has.size === 0) return undefined;
+  if (NOT_DRINK_TAGS.some((t) => has.has(t))) return false;
+  if ((has.has('en:coffees') || has.has('en:teas')) && !MADE_DRINK_TAGS.some((t) => has.has(t))) return false;
+  return DRINK_TAGS.some((t) => has.has(t));
+}
+
+const FL_OZ_ML = 29.5735;
+/** The largest pack that is one person's drink: a 750 ml bottle; a 1.5 L bottle is poured from. */
+const PACK_MAX_ML = 750;
+const VOLUME = /(\d+(?:[.,]\d+)?)\s*(ml|cl|l|lt|litres?|liters?|fl\.?\s*oz)(?![a-z])/gi;
+/** "6 x 330 ml", "3 * 200 ml", "4×250ml": a multipack, never one drink. */
+const MULTIPACK = /\d\s*[x×*]\s*\d/i;
+
+/**
+ * The one volume in ml a pack size names ("500 ml", "0,5 l", "33 cl", "16.9 fl oz", "473 ml, 16 fl oz"),
+ * or null: no volume, a multipack, two volumes that disagree by more than 3%, or more than 750 ml. When
+ * the pack names it in metric and in fl oz, the metric figure is kept.
+ */
+export function packMl(quantity: unknown): number | null {
+  if (typeof quantity !== 'string' || MULTIPACK.test(quantity)) return null;
+  const found: { ml: number; metric: boolean }[] = [];
+  for (const m of quantity.matchAll(VOLUME)) {
+    const v = Number(m[1].replace(',', '.'));
+    const unit = m[2].toLowerCase();
+    const metric = !unit.startsWith('fl');
+    const ml = unit === 'ml' ? v : unit === 'cl' ? v * 10 : metric ? v * 1000 : v * FL_OZ_ML;
+    if (ml > 0) found.push({ ml, metric });
+  }
+  if (!found.length) return null;
+  const first = found.find((f) => f.metric) ?? found[0];
+  if (found.some((f) => Math.abs(f.ml - first.ml) > first.ml * 0.03)) return null;
+  const ml = Math.round(first.ml);
+  return ml >= 1 && ml <= PACK_MAX_ML ? ml : null;
 }
 
 /** Map a product to our Food shape, or null when it lacks usable nutrition data. */
@@ -89,6 +163,11 @@ export function offToFood(p: OffProduct): Food | null {
   if (grams && grams > 0 && grams < 2000) {
     servings.push({ label: p.serving_size?.trim() ? `1 serving (${p.serving_size.trim()})` : '1 serving', grams });
   }
+  const beverage = offBeverage(p.categories_tags);
+  // A drink found by search has no serving at all: its one-person pack becomes one ("500 ml", grams =
+  // ml, as Open Food Facts gives a drink's values per 100 ml), so it is not logged by weight only.
+  const pack = beverage === true && servings.length === 0 ? packMl(p.quantity) : null;
+  if (pack) servings.push({ label: `${pack} ml`, grams: pack });
   return {
     id: `off_${p.code}`,
     name,
@@ -98,6 +177,7 @@ export function offToFood(p: OffProduct): Food | null {
     servings,
     source: 'openfoodfacts',
     verified: false,
+    ...(beverage !== undefined ? { beverage } : {}),
     emoji: '🛒',
   };
 }

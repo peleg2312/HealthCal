@@ -21,10 +21,13 @@ import { backupJson, mergeCollections, parseBackup } from '@/features/settings/e
 import { addDays, today } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
 import { COLLECTIONS, recentsFromEntries, useStore } from '@/store';
-import type { Beverage, Collection, FoodEntry, SyncedRecord, WaterEntry } from '@/types';
+import type { Beverage, Collection, FoodEntry, MealType, SyncedRecord, WaterEntry } from '@/types';
 
 import { choiceById } from './choices';
-import { builtinFood, planDrink, selectChoice, type PlanDrinkInput, type SelectedDrink } from './rules';
+import { diaryDrink, diaryDrinkMl } from './diary';
+import { undoEdit } from './pair';
+import { builtinFood, planDrink, selectChoice, waterFromEntry, type PlanDrinkInput, type SelectedDrink } from './rules';
+import { buildEntry } from '@/features/food/build';
 
 const TODAY = today();
 const sel = (id: string): SelectedDrink => selectChoice(choiceById(id)!);
@@ -461,6 +464,319 @@ describe('two phones', () => {
       const s = p.store.getState();
       expect(Object.values(s.foodEntries).filter((e) => !e.deleted)).toHaveLength(1);
       expect(Object.values(s.water).filter((w) => !w.deleted)).toHaveLength(1);
+    }
+  });
+});
+
+// ---------------------------------------------------------------- a drink logged in the diary
+
+/**
+ * Log a drink in the diary as logFood and logItems do (specification section 5): `diaryDrink` decides
+ * before the entry exists, the store writes the entry and its water in one act.
+ */
+function logInDiary(store: typeof useStore, label = '1 can (500 ml)', quantity = 1, meal: MealType = 'lunch', date = TODAY, foodId = 'b_energy_drink') {
+  const food = builtinFood(foodId)!;
+  const serving = food.servings.find((x) => x.label === label)!;
+  const built = buildEntry({ food, serving, quantity, meal, date });
+  const drink = diaryDrink(built, store.getState().profile);
+  const [{ entry, water }] = store.getState().upsertEntriesWithWater([{ entry: built, water: drink }]);
+  return { entry, water: water! };
+}
+
+describe('a drink logged in the diary: edits, deletes and Undo through the real food log', () => {
+  const energy = () => builtinFood('b_energy_drink')!;
+  const W = (id: string) => S().water[id];
+  const E = (id: string) => S().foodEntries[id];
+
+  it('logging writes the water with the deterministic id; the switch off writes none', () => {
+    const { entry, water } = logInDiary(useStore);
+    expect(water).toMatchObject({ ml: 500, beverage: 'other', fromEntryId: entry.id, date: TODAY });
+    expect(waterFromEntry(S().water, entry.id)?.id).toBe(water.id);
+    S().setProfile({ diaryDrinksInWater: false });
+    const off = logInDiary(useStore);
+    expect(off.water).toBeNull();
+    expect(liveWater()).toHaveLength(1);
+  });
+
+  it('the stepper: the water is recomputed (never scaled), one stamp, down to 1 ml, and 0 deletes both with Undo', () => {
+    const { entry, water } = logInDiary(useStore);
+    setEntryAmount(E(entry.id), 2);
+    expect(W(water.id).ml).toBe(1000);
+    expect(W(water.id).updatedAt).toBe(E(entry.id).updatedAt);
+    setEntryAmount(E(entry.id), 0.01);
+    expect(W(water.id).ml).toBe(5);
+    setEntryAmount(E(entry.id), 3);
+    expect(W(water.id).ml).toBe(1500);
+    toasts.length = 0;
+    setEntryAmount(E(entry.id), 0);
+    expect(E(entry.id).deleted).toBe(true);
+    expect(W(water.id).deleted).toBe(true);
+    undo();
+    expect(E(entry.id).deleted).toBe(false);
+    expect(W(water.id)).toMatchObject({ deleted: false, ml: 1500 });
+  });
+
+  it('never refused: past 10,000 ml the entry holds it and the water holds 10,000 ml', () => {
+    const { entry, water } = logInDiary(useStore);
+    setEntryAmount(E(entry.id), 25);
+    expect(E(entry.id).quantity).toBe(25);
+    expect(W(water.id).ml).toBe(10000);
+  });
+
+  it('the day follows, future days included; a meal change rewrites only the stamp; Undo restores both exactly', () => {
+    const { entry, water } = logInDiary(useStore);
+    const e0 = E(entry.id);
+    const w0 = W(water.id);
+    const tomorrow = addDays(TODAY, 1);
+    logFood({ food: energy(), serving: { label: e0.servingLabel, grams: e0.grams }, quantity: 1, meal: 'lunch', date: tomorrow, entryId: entry.id });
+    expect(last().message).toBe('Entry updated');
+    expect(E(entry.id).date).toBe(tomorrow);
+    expect(W(water.id)).toMatchObject({ date: tomorrow, ml: 500, deleted: false });
+    undo();
+    expect(E(entry.id).date).toBe(TODAY);
+    expect(W(water.id).date).toBe(w0.date);
+    expect(W(water.id).ml).toBe(w0.ml);
+    const stamp = W(water.id).updatedAt;
+    logFood({ food: energy(), serving: { label: e0.servingLabel, grams: e0.grams }, quantity: 1, meal: 'dinner', date: TODAY, entryId: entry.id });
+    expect(W(water.id).ml).toBe(500);
+    expect(W(water.id).updatedAt > stamp).toBe(true);
+    expect(W(water.id).updatedAt).toBe(E(entry.id).updatedAt);
+  });
+
+  it('the manual editor moves the day; the calories alone never change the water', () => {
+    const { entry, water } = logInDiary(useStore);
+    updateEntryDirect(E(entry.id), { name: 'Monster', nutrients: { kcal: 250, protein: 0, carbs: 60, fat: 0 }, meal: 'lunch', date: addDays(TODAY, -1) });
+    expect(W(water.id)).toMatchObject({ date: addDays(TODAY, -1), ml: 500 });
+  });
+
+  it('a serving change recomputes from the label: 1 can (16 fl oz) is 473 ml', () => {
+    const { entry, water } = logInDiary(useStore);
+    const can16 = energy().servings.find((x) => x.label === '1 can (16 fl oz)')!;
+    logFood({ food: energy(), serving: can16, quantity: 1, meal: 'lunch', date: TODAY, entryId: entry.id });
+    expect(W(water.id).ml).toBe(473);
+    expect(diaryDrinkMl(E(entry.id))).toBe(473);
+  });
+
+  it("an edit never brings back water deleted on Water; the edit's Undo leaves it deleted", () => {
+    const { entry, water } = logInDiary(useStore);
+    const e0 = E(entry.id);
+    setEntryAmount(E(entry.id), 2);
+    // A full edit with its toast, then the water deleted on Water, then the edit's Undo.
+    logFood({ food: energy(), serving: { label: '1 can (500 ml)', grams: 503 }, quantity: 3, meal: 'lunch', date: TODAY, entryId: entry.id });
+    const undoTheEdit = last().opts!.onPress!;
+    removeDrink(W(water.id));
+    expect(E(entry.id).deleted).toBe(false);
+    setEntryAmount(E(entry.id), 4);
+    expect(W(water.id).deleted).toBe(true);
+    undoTheEdit();
+    expect(E(entry.id).quantity).toBe(2);
+    expect(W(water.id).deleted).toBe(true);
+    expect(e0.quantity).toBe(1);
+  });
+
+  it("an older app's edit (entry only) heals on the next edit here", () => {
+    const { entry, water } = logInDiary(useStore);
+    // The older app doubles the amount and does not move the water.
+    S().upsert('foodEntries', { ...E(entry.id), quantity: 2, grams: 1006 });
+    expect(W(water.id).ml).toBe(500);
+    logFood({ food: energy(), serving: { label: '1 can (500 ml)', grams: 503 }, quantity: 2, meal: 'snack', date: TODAY, entryId: entry.id });
+    expect(W(water.id).ml).toBe(1000);
+  });
+
+  it('the Undo of a log, a clear and a copy reach the water through the store', () => {
+    const one = logInDiary(useStore);
+    const two = logInDiary(useStore, '1 can (8.4 fl oz)');
+    // "Cleared lunch" and its Undo remove and restore entries one by one.
+    for (const id of [one.entry.id, two.entry.id]) S().remove('foodEntries', id);
+    expect(liveWater()).toHaveLength(0);
+    for (const id of [one.entry.id, two.entry.id]) S().restore('foodEntries', id);
+    expect(liveWater().map((w) => w.ml).sort()).toEqual([248, 500]);
+  });
+
+  it('undoEdit on its own: both back with one stamp while the water is live', () => {
+    const { entry, water } = logInDiary(useStore);
+    const before = E(entry.id);
+    const waterBefore = W(water.id);
+    setEntryAmount(E(entry.id), 2);
+    undoEdit(before, waterBefore);
+    expect(E(entry.id).quantity).toBe(1);
+    expect(W(water.id).ml).toBe(500);
+    expect(W(water.id).updatedAt).toBe(E(entry.id).updatedAt);
+    // Deleted as a pair since (in the diary): the edit's Undo brings back neither.
+    setEntryAmount(E(entry.id), 2);
+    S().remove('foodEntries', entry.id);
+    undoEdit(before, waterBefore);
+    expect(E(entry.id).deleted).toBe(true);
+    expect(W(water.id).deleted).toBe(true);
+  });
+
+  it('a Water-origin pair keeps its rules: refused moves, and a pair deleted on Water is not half revived by an edit Undo', () => {
+    const { water, entry } = logDrink(plan());
+    const before = S().foodEntries[entry!.id];
+    setEntryAmount(before, 1.5);
+    const waterAfterEdit = S().water[water.id];
+    expect(waterAfterEdit.ml).toBe(375);
+    removeDrink(S().water[water.id]);
+    undoEdit(before, S().water[water.id].deleted ? { ...waterAfterEdit, ml: 250 } : null);
+    expect(S().foodEntries[entry!.id].deleted).toBe(true);
+    expect(S().water[water.id].deleted).toBe(true);
+  });
+
+  it('the export and an import carry the link; the restored pair cascades again', () => {
+    const { entry, water } = logInDiary(useStore);
+    const s = S();
+    const text = backupJson({
+      profile: null,
+      settings: s.settings,
+      collections: Object.fromEntries(COLLECTIONS.map((c) => [c, s[c]])) as unknown as { [K in Collection]: Record<string, SyncedRecord> },
+      favoriteFoodIds: [],
+      recentFoods: [],
+      recentActivityIds: [],
+    });
+    const parsed = parseBackup(text);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.skipped).toBe(0);
+    expect((parsed.backup.collections.water[0] as WaterEntry).fromEntryId).toBe(entry.id);
+    S().resetAll();
+    const merged = mergeCollections(Object.fromEntries(COLLECTIONS.map((c) => [c, {}])) as never, parsed.backup.collections);
+    S().hydrate(merged.collections as never);
+    deleteEntry(S().foodEntries[entry.id]);
+    expect(S().water[water.id].deleted).toBe(true);
+    undo();
+    expect(S().water[water.id].deleted).toBe(false);
+  });
+});
+
+describe('two phones, a drink logged in the diary', () => {
+  type Phone = { store: typeof useStore; log: typeof import('@/features/food/log') };
+  async function phone(): Promise<Phone> {
+    vi.resetModules();
+    return { store: (await import('@/store')).useStore, log: await import('@/features/food/log') };
+  }
+  function sync(a: Phone, b: Phone) {
+    const records = (p: Phone) =>
+      COLLECTIONS.flatMap((collection) => Object.values(p.store.getState()[collection] as Record<string, SyncedRecord>).map((record) => ({ collection, record })));
+    const fromA = records(a);
+    const fromB = records(b);
+    const pulledAt = new Date().toISOString();
+    a.store.getState().mergeRemote({ records: fromB, pulledAt });
+    b.store.getState().mergeRemote({ records: fromA, pulledAt });
+  }
+  const sleep = () => new Promise((r) => setTimeout(r, 3));
+  /** Never counted twice: at most one live water record per entry, and none for an entry that is not a drink. */
+  function once(p: Phone) {
+    const s = p.store.getState();
+    const linked = Object.values(s.water).filter((w) => !w.deleted && w.fromEntryId).map((w) => w.fromEntryId);
+    expect(new Set(linked).size).toBe(linked.length);
+  }
+  async function pairOnBoth() {
+    const a = await phone();
+    const b = await phone();
+    const { entry, water } = logInDiary(a.store);
+    sync(a, b);
+    await sleep();
+    return { a, b, entryId: entry.id, waterId: water.id };
+  }
+  const st = (p: Phone) => p.store.getState();
+
+  it('logged on one phone counts once on both', async () => {
+    const { a, b, waterId } = await pairOnBoth();
+    sync(a, b);
+    for (const p of [a, b]) {
+      expect(Object.values(st(p).water).filter((w) => !w.deleted).map((w) => w.id)).toEqual([waterId]);
+      once(p);
+    }
+  });
+
+  it('an older app deletes the entry (no cascade there): the water stays as a plain row on both', async () => {
+    const { a, b, entryId, waterId } = await pairOnBoth();
+    // The older app's remove: the entry alone, as its store does.
+    b.store.setState((s) => ({ foodEntries: { ...s.foodEntries, [entryId]: { ...s.foodEntries[entryId], deleted: true, updatedAt: new Date().toISOString() } } }));
+    sync(a, b);
+    for (const p of [a, b]) {
+      expect(st(p).foodEntries[entryId].deleted).toBe(true);
+      expect(st(p).water[waterId].deleted).toBe(false);
+      once(p);
+    }
+  });
+
+  it('an older app deletes the water: the entry stays on both', async () => {
+    const { a, b, entryId, waterId } = await pairOnBoth();
+    b.store.getState().remove('water', waterId);
+    sync(a, b);
+    for (const p of [a, b]) {
+      expect(st(p).water[waterId].deleted).toBe(true);
+      expect(st(p).foodEntries[entryId].deleted).toBe(false);
+    }
+  });
+
+  it('A deletes on Water, B edits the amount later: both live with B amount (the edit wins, as for the Water pair)', async () => {
+    const { a, b, entryId, waterId } = await pairOnBoth();
+    a.log.removeDrink(st(a).water[waterId]);
+    await sleep();
+    b.log.setEntryAmount(st(b).foodEntries[entryId], 2);
+    sync(a, b);
+    for (const p of [a, b]) {
+      expect(st(p).water[waterId]).toMatchObject({ deleted: false, ml: 1000 });
+      expect(st(p).foodEntries[entryId]).toMatchObject({ deleted: false, quantity: 2 });
+      once(p);
+    }
+  });
+
+  it('A deletes on Water after B edits: the water stays deleted, the entry keeps B amount', async () => {
+    const { a, b, entryId, waterId } = await pairOnBoth();
+    b.log.setEntryAmount(st(b).foodEntries[entryId], 2);
+    await sleep();
+    a.log.removeDrink(st(a).water[waterId]);
+    sync(a, b);
+    for (const p of [a, b]) {
+      expect(st(p).water[waterId].deleted).toBe(true);
+      expect(st(p).foodEntries[entryId]).toMatchObject({ deleted: false, quantity: 2 });
+    }
+  });
+
+  it("A deletes in the diary, B deletes on Water, B taps Undo: the water comes back alone, a plain row counted once", async () => {
+    const { a, b, entryId, waterId } = await pairOnBoth();
+    a.log.deleteEntry(st(a).foodEntries[entryId]);
+    await sleep();
+    b.log.removeDrink(st(b).water[waterId]);
+    const bUndo = toasts[toasts.length - 1].opts!.onPress!;
+    await sleep();
+    sync(a, b);
+    bUndo();
+    sync(a, b);
+    for (const p of [a, b]) {
+      expect(st(p).foodEntries[entryId].deleted).toBe(true);
+      expect(st(p).water[waterId].deleted).toBe(false);
+      once(p);
+    }
+  });
+
+  it("B deletes on Water, A deletes in the diary and taps Undo: A's Undo brings back only what A's act removed", async () => {
+    const { a, b, entryId, waterId } = await pairOnBoth();
+    b.log.removeDrink(st(b).water[waterId]);
+    sync(a, b);
+    await sleep();
+    a.log.deleteEntry(st(a).foodEntries[entryId]);
+    toasts[toasts.length - 1].opts!.onPress!();
+    sync(a, b);
+    for (const p of [a, b]) {
+      expect(st(p).foodEntries[entryId].deleted).toBe(false);
+      expect(st(p).water[waterId].deleted).toBe(true);
+    }
+  });
+
+  it('both phones write the same entry again (an edit on each): still one water record', async () => {
+    const { a, b, entryId } = await pairOnBoth();
+    a.log.setEntryAmount(st(a).foodEntries[entryId], 2);
+    await sleep();
+    b.log.setEntryAmount(st(b).foodEntries[entryId], 3);
+    sync(a, b);
+    for (const p of [a, b]) {
+      expect(Object.values(st(p).water).filter((w) => !w.deleted)).toHaveLength(1);
+      expect(Object.values(st(p).water).find((w) => !w.deleted)!.ml).toBe(1500);
+      once(p);
     }
   });
 });

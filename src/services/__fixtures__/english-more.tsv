@@ -110,7 +110,7 @@ iced tea	b_iced_tea_sweet	b_iced_tea_sweet
 hot chocolate	b_hot_chocolate	b_hot_chocolate
 sprite	-	-
 fanta	-	-
-red bull	b_bell_pepper_red	b_bell_pepper_red
+red bull	b_bell_pepper_red	b_energy_drink	latin: 'red bull' is a Latin search name of the energy drink (it found the red bell pepper by a typo of bell)
 gatorade	-	-
 coconut water	b_coconut_water	b_coconut_water
 soy milk	b_soy_milk	b_soy_milk
@@ -242,3 +242,5 @@ zhug	-	b_schug	new: a Latin search name of a new food
 sunflower seeds	b_sunflower_seeds	b_sunflower_seeds
 pumpkin seeds	b_pumpkin_seeds	b_pumpkin_seeds
 quark	-	b_white_cheese_5pct	latin: 'quark' is a Latin search name of white cheese (K3); the cheesecake made with it comes second
+monster	-	b_energy_drink	latin: 'monster' is a Latin search name of the energy drink (the owner's word for it)
+monster energy	-	b_energy_drink	latin: the beginning of the Latin search name 'monster energy drink'

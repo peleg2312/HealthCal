@@ -112,11 +112,27 @@ export function labelGrams(servingLabel: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
-/** Short amount for a compact stepper: "1.5 ×", or "150 g" for a serving that is a weight ("100 g", "50 g"). */
+/**
+ * The amount a serving label names when the label is itself an amount: a weight ("50 g") or a volume
+ * ("500 ml", the pack serving of an online drink, src/services/openFoodFacts.ts), else null.
+ */
+export function labelAmount(servingLabel: string): { n: number; unit: 'g' | 'ml' } | null {
+  const m = servingLabel.match(/^(\d+(?:\.\d+)?) (g|ml)$/);
+  return m ? { n: Number(m[1]), unit: m[2] as 'g' | 'ml' } : null;
+}
+
+/**
+ * A serving that is itself an amount, said as its total: "100 g" for 2 × "50 g", "1000 ml" for 2 × "500 ml"
+ * (never "2 × 500 ml"); null for any other serving. Display only.
+ */
+export function amountTotal(servingLabel: string, quantity: number): string | null {
+  const a = labelAmount(servingLabel);
+  return a ? `${formatQty(a.n * quantity)} ${a.unit}` : null;
+}
+
+/** Short amount for a compact stepper: "1.5 ×", or the total for a serving that is an amount ("150 g", "500 ml"). */
 export function amountLabel(servingLabel: string, quantity: number): string {
-  const g = labelGrams(servingLabel);
-  if (g !== null) return `${formatQty(g * quantity)} g`;
-  return `${formatQty(quantity)} ×`;
+  return amountTotal(servingLabel, quantity) ?? `${formatQty(quantity)} ×`;
 }
 
 // ------------------------------------------------------------- data source
