@@ -59,6 +59,8 @@ export interface Profile {
   eatBackExercise: boolean;
   /** How added workout calories are placed; absent = 'day'. Only read when eatBackExercise is true. */
   exerciseSpread?: ExerciseSpread;
+  /** A drink logged as food in the diary also adds its volume to Water; absent = on (src/features/drinks/diary.ts). */
+  diaryDrinksInWater?: boolean;
   /** Closed periods with the rule each had; written only by a Goals save (withRuleChange). */
   exerciseRuleHistory?: { until: ISODate; rule: 'day' | 'week' | 'off' }[];
   /** Use the adaptive (data-driven) expenditure estimate once it is reliable. */
@@ -107,6 +109,13 @@ export interface Food {
    */
   ilCode?: number;
   category?: string;
+  /**
+   * Whether this is a drink, for a food that is not bundled: true or false from an online product's
+   * categories or from the person's switch on their own food; absent = not known. A drink logged in
+   * the diary also adds its volume to Water (src/features/drinks/diary.ts). Bundled foods never
+   * carry it: their rule is the list there.
+   */
+  beverage?: boolean;
   /** Emoji shown in lists. */
   emoji?: string;
 }
@@ -257,6 +266,13 @@ export interface WaterEntry extends SyncedRecord {
   drink?: string;
   /** The diary entry holding this drink's calories (src/features/drinks). Absent: it added no calories. */
   foodEntryId?: string;
+  /**
+   * The diary entry this water came from: a drink logged as food in the diary also adds its volume
+   * here (src/features/drinks/diary.ts). The entry leads: it is removed with the entry and follows its
+   * amount and day; deleting this record leaves the entry. Never set together with `foodEntryId`,
+   * which is the other direction (a drink logged on the water screen).
+   */
+  fromEntryId?: string;
 }
 
 export interface WeightEntry extends SyncedRecord {
