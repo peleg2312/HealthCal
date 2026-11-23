@@ -3,12 +3,15 @@ import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { formatDayLabel, formatDuration, weekdayShort } from '@/lib/dates';
+import type { TrainingOverview } from '@/lib/trainingLoad';
 import { formatNumber } from '@/lib/units';
 import { cup, fonts, useTheme } from '@/theme';
 import type { ISODate } from '@/types';
-import { Card, CupKey, IconButton, levelY, MiniCup, Sheet, Text, Vessel, type VesselLabel } from '@/ui';
+import { Card, CupKey, IconButton, levelY, MiniCup, Text, Vessel, type VesselLabel } from '@/ui';
 
 import { WHO_WEEKLY_MINUTES, type WeekSummary } from './build';
+import { LoadMark } from './LoadMark';
+import { TrainingLoadSheet } from './TrainingLoadSheet';
 
 const VESSEL_H = 168;
 
@@ -16,9 +19,29 @@ const VESSEL_H = 168;
  * Train's week: guideline minutes poured into a vessel with the 150-minute
  * guideline drawn as a dashed level line across it (reaching it is the point,
  * so there is no "over"), the week's totals, then a cup per day filled with
- * that day's minutes.
+ * that day's minutes. Its last line is the training overview (the last 7 days against the
+ * person's recent weeks: three small cups and the state's title) when there is a state and the week
+ * shown is the current one; otherwise "Hard minutes count double" as before. Both info cups open
+ * the overview's sheet.
  */
-export function WeekCard({ week, dates, today, extra }: { week: WeekSummary; dates: ISODate[]; today: ISODate; /** A line under the totals (Train's steps). */ extra?: React.ReactNode }) {
+export function WeekCard({
+  week,
+  dates,
+  today,
+  extra,
+  overview,
+  current,
+}: {
+  week: WeekSummary;
+  dates: ISODate[];
+  today: ISODate;
+  /** A line under the totals (Train's steps). */
+  extra?: React.ReactNode;
+  /** The last 7 days (`trainingOverview`); its sheet opens from the card's last line. */
+  overview: TrainingOverview;
+  /** True when the week shown is this week: a past week keeps the old line. */
+  current: boolean;
+}) {
   const { colors, spacing } = useTheme();
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
@@ -28,8 +51,9 @@ export function WeekCard({ week, dates, today, extra }: { week: WeekSummary; dat
   const max = Math.max(WHO_WEEKLY_MINUTES * 2, minutes);
   const reached = minutes >= WHO_WEEKLY_MINUTES;
   const guideY = levelY(WHO_WEEKLY_MINUTES, max, VESSEL_H - 1.5);
-  // How the guideline counts minutes: one line on the card, the whole rule behind the info cup.
+  // The overview of the last 7 days: one line on the card, the whole of it (with how minutes count) behind the info cup.
   const [help, setHelp] = useState(false);
+  const load = current && overview.state && overview.position && overview.title ? { position: overview.position, title: overview.title } : null;
 
   const labels: VesselLabel[] = [
     {
@@ -141,22 +165,38 @@ export function WeekCard({ week, dates, today, extra }: { week: WeekSummary; dat
         Minutes each day
       </Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm, marginBottom: -spacing.sm }}>
-        <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flex: 1 }} testID="train-guideline-line">
-          Hard minutes count double
-        </Text>
-        <IconButton size={36} tone="clear" testID="train-guideline-help" accessibilityLabel="How minutes count toward the guideline" onPress={() => setHelp(true)}>
+        {load ? (
+          <View
+            testID="train-load"
+            accessible
+            accessibilityLabel={overview.cardLabel ?? undefined}
+            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <LoadMark position={load.position} />
+            {/* The cup above counts Monday to Sunday; this line counts the last 7 days, and says so. */}
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text variant="caption" color="textSecondary" numberOfLines={1} testID="train-load-span">
+                Last 7 days
+              </Text>
+              <Text variant="label" color="text" numberOfLines={2} testID="train-load-title">
+                {load.title}
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flex: 1 }} testID="train-guideline-line">
+            Hard minutes count double
+          </Text>
+        )}
+        <IconButton
+          size={36}
+          tone="clear"
+          testID={load ? 'train-load-info' : 'train-guideline-help'}
+          accessibilityLabel={load ? 'About your last 7 days of training' : 'How minutes count toward the guideline'}
+          onPress={() => setHelp(true)}>
           <Info size={20} color={colors.textSecondary} strokeWidth={1.9} />
         </IconButton>
       </View>
-      <Sheet visible={help} onClose={() => setHelp(false)} title="How minutes count">
-        <View style={{ gap: spacing.md }} testID="train-guideline-sheet">
-          <Text variant="body">{`WHO suggests ${WHO_WEEKLY_MINUTES} minutes of moderate activity a week.`}</Text>
-          <Text variant="body">Minutes of a session logged as hard (and 6 MET or more) count double.</Text>
-          <Text variant="body" color="textSecondary">
-            Light sessions (under 3 MET) are logged but not counted toward the guideline.
-          </Text>
-        </View>
-      </Sheet>
+      <TrainingLoadSheet overview={overview} visible={help} onClose={() => setHelp(false)} />
     </Card>
   );
 }

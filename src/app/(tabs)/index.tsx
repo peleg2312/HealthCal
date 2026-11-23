@@ -33,7 +33,7 @@ import { useNow, useToday } from '@/store/clock';
 import { useConsistency, useDay, useLive, useProfile, type DaySummary } from '@/store/selectors';
 import { motion, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
-import { AnimatedNumber, Button, Card, CupKey, IconButton, PressableScale, ProgressBar, Screen, Text, Vessel, type VesselLabel } from '@/ui';
+import { AnimatedNumber, Button, Card, Chip, CupKey, IconButton, levelY, placeLabels, PressableScale, ProgressBar, Screen, Text, Vessel, type VesselLabel } from '@/ui';
 
 
 export default function TodayScreen() {
@@ -276,9 +276,25 @@ function EnergyCard({
     }
   }
 
+  // "Ideas that fit" (opens What fits, ideas first): 8 px under the "eaten" line in the cup's label column, placed
+  // as the cup places its labels (placeLabels), so the cup, the number and every label above it stay where they are.
+  // Not over the budget (What fits then has no ideas), and only where there is an "eaten" line.
+  const sorted = [...labels].sort((a, b) => b.at - a.at);
+  const tops = placeLabels(
+    sorted.map((l) => levelY(l.at, budget, height - 1.5) - l.height / 2),
+    sorted.map((l) => l.height),
+    height,
+    8,
+  );
+  const eatenIdx = sorted.findIndex((l) => l.key === 'eaten');
+  const ideasChip = isToday && day.remaining >= 0 && eatenIdx >= 0;
+  const chipTop = eatenIdx >= 0 ? tops[eatenIdx] + sorted[eatenIdx].height + 8 : 0;
+  // Room the chip takes below the cup, keeping 12 px to the macros (16 under the cup).
+  const chipRoom = ideasChip ? Math.max(0, chipTop + 32 + 12 - (height + spacing.lg)) : 0;
+
   return (
     <Card testID="today-energy" padding={18}>
-      <View>
+      <View style={chipRoom ? { marginBottom: chipRoom } : undefined}>
         <Vessel
           value={eaten}
           max={budget}
@@ -293,6 +309,12 @@ function EnergyCard({
         />
         {/* Day one: the empty cup's open top is a dashed level line at the budget, "ready to fill". */}
         {firstDay && headroom === 0 ? <ReadyRim width={vesselW} /> : null}
+        {/* After the cup in the tree, so the cup's label column never sits over the chip and takes its tap. */}
+        {ideasChip ? (
+          <View style={{ position: 'absolute', left: vesselW + (narrow ? 14 : 16), top: chipTop, flexDirection: 'row' }}>
+            <Chip testID="today-ideas" label="Ideas that fit" accessibilityLabel="Ideas that fit: meals and foods for what is left" onPress={onFits} />
+          </View>
+        ) : null}
       </View>
       {/* The macros sit under the cup, not in its side column: beside the cup there is room only for
           the cup's own labels, each at the height it describes, whatever the day's numbers are. */}

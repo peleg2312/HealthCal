@@ -291,6 +291,24 @@ function stressUp(state, { put, baselineTdee }) {
 //                yesterday's lunch" is offered at lunch time (entries ...c001 to ...c005; look with the clock at 12:30).
 //                Also the newest saved meal, "Lunch plate" (...c101), saved then: the old bourekas and halloumi lines
 //                with their old food copies and the own food (lead's decision L2).
+// For Train's training overview (src/lib/trainingLoad.ts; every workout is hand-logged, on fixed days before the seed's
+// today, so a picture does not change with the date). Each rewrites the last 28 days (today and the 27 before) of the
+// demo's workouts; 'new' removes the older ones too. The past three 7-day blocks are the same "usual" week each time:
+// volleyball 75 min (the weekday of today), a run 38 min moderate (2 days later back), strength 55 min Hard (4 back),
+// a walk 45 min (5 back) = 268 guideline minutes, so the recent average is 268. Then the last 7 days:
+//   load 'steady'   the usual week again (volleyball today at 07:00 as in the demo): 268, "About your usual".
+//   load 'lighter'  volleyball today and a 30 min walk 3 days ago: 105, r 0.39, "Lighter than your recent weeks".
+//   load 'more'     the usual week, a run 38 min yesterday and a walk 60 min 3 days ago: 366, r 1.37, "More than
+//                   your recent weeks" (with the easy-day step, as it is above 150).
+//   load 'jump'     the usual week, a run 60 min yesterday, basketball 50 min Hard 3 days ago, a walk 60 min 6 days
+//                   ago: 488, r 1.82, no day with half of it, "A big step up".
+//   load 'hike'     the usual week and a 300 min hike (moderate) 3 days ago, a day with nothing else: 568, r 2.12, the
+//                   hike day 53%: "One big day", "300 of them on <that weekday>".
+//   load 'daily'    volleyball today and HIIT 30 min Hard on each of the 7 days: 495, 7 Hard days in a row: "A full
+//                   week, few easy days".
+//   load 'new'      nothing before 9 days ago: volleyball today, a run 3 days ago, a walk 6 days ago, strength 9 days
+//                   ago: no state (the first workout is under 21 days old), so Train keeps "Hard minutes count double".
+// Applied before exercise and weekMinutes, which change today and this week on top of it.
 // Only what is named changes; everything else stays the demo's. Applied in that order: eatBack, spread, exercise and
 // the week first (they move the budget and the water goal), then food, water, drinks and the fast.
 
@@ -345,9 +363,11 @@ function bundledFood(id) {
   return JSON.parse(JSON.stringify(food));
 }
 
-const VALUE_KEYS = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack', 'spread', 'lastNight', 'weighInGap', 'onboardedToday', 'name', 'drinks', 'diaryDrink', 'diaryWater', 'oldBourekas'];
+const VALUE_KEYS = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack', 'spread', 'lastNight', 'weighInGap', 'onboardedToday', 'name', 'drinks', 'diaryDrink', 'diaryWater', 'oldBourekas', 'load'];
 /** Knobs that are not numbers: their type is checked on its own. */
-const VALUE_TYPES = { onboardedToday: 'boolean', name: 'string' };
+const VALUE_TYPES = { onboardedToday: 'boolean', name: 'string', load: 'string' };
+/** The training overview's weeks (values.load, above). */
+const LOAD_KINDS = ['steady', 'lighter', 'more', 'jump', 'hike', 'daily', 'new'];
 
 /** Sets the day's amounts (see above). `put` writes a record the way buildSeed does. */
 function applyValues(state, values, { put, weightKg, baselineTdee }) {
@@ -356,6 +376,7 @@ function applyValues(state, values, { put, weightKg, baselineTdee }) {
   for (const [k, v] of Object.entries(values)) {
     if (VALUE_TYPES[k]) {
       if (typeof v !== VALUE_TYPES[k]) throw new Error(`seed values: ${k} must be a ${VALUE_TYPES[k]}`);
+      if (k === 'load' && !LOAD_KINDS.includes(v)) throw new Error(`seed values: load must be one of ${LOAD_KINDS.join(', ')}`);
     } else if (typeof v !== 'number' || !(v >= 0)) throw new Error(`seed values: ${k} must be a number of 0 or more`);
   }
   const m = appMaths();
@@ -381,6 +402,41 @@ function applyValues(state, values, { put, weightKg, baselineTdee }) {
   if (values.spread > 0) {
     state.profile.eatBackExercise = true;
     state.profile.exerciseSpread = 'week';
+  }
+  if (values.load !== undefined) {
+    const kind = values.load;
+    const fresh = kind === 'new';
+    const since = iso(daysAgo(27));
+    drop('activities', (a) => !fresh && a.date < since);
+    const KINDS = {
+      volleyball: SESSIONS[0],
+      running: SESSIONS[1],
+      strength: SESSIONS[2],
+      basketball: SESSIONS[4],
+      walking: walk,
+      hiit: { activityId: 'hiit', name: 'HIIT', emoji: '⚡', category: 'strength', intensity: 'vigorous', met: 11 },
+      hiking: { activityId: 'hiking', name: 'Hiking', emoji: '🥾', category: 'outdoor', intensity: 'moderate', met: 5.3 },
+    };
+    // A hand-logged session of `durationMin` at the template's MET, priced as the app prices it.
+    const lift = (n, key, durationMin, hour = 18) => {
+      const { distanceKm, durationMin: _d, ...s } = KINDS[key];
+      const gross = (s.met * 3.5 * kg * durationMin) / 200;
+      put('activities', { date: iso(daysAgo(n)), ...s, durationMin, ...(distanceKm ? { distanceKm: Math.round((distanceKm / _d) * durationMin * 10) / 10 } : null), kcalGross: gross, kcalNet: Math.max(0, gross - restPerMin * durationMin), weightKg: kg, baselineKcalPerDay: baselineTdee, loggedAt: at(n, hour) });
+    };
+    const usualWeek = (w) => { lift(7 * w, 'volleyball', 75, w ? 18 : 7); lift(7 * w + 2, 'running', 38); lift(7 * w + 4, 'strength', 55); lift(7 * w + 5, 'walking', 45); };
+    if (fresh) {
+      lift(0, 'volleyball', 75, 7); lift(3, 'running', 38); lift(6, 'walking', 45); lift(9, 'strength', 55);
+    } else {
+      for (const w of [1, 2, 3]) usualWeek(w);
+      if (kind === 'lighter') { lift(0, 'volleyball', 75, 7); lift(3, 'walking', 30); }
+      else if (kind === 'daily') { lift(0, 'volleyball', 75, 7); for (let n = 0; n < 7; n++) lift(n, 'hiit', 30, 17); }
+      else {
+        usualWeek(0);
+        if (kind === 'more') { lift(1, 'running', 38); lift(3, 'walking', 60); }
+        if (kind === 'jump') { lift(1, 'running', 60); lift(3, 'basketball', 50); lift(6, 'walking', 60); }
+        if (kind === 'hike') lift(3, 'hiking', 300, 9);
+      }
+    }
   }
   if (values.exercise !== undefined) {
     drop('activities', (a) => a.date !== day);
@@ -589,7 +645,7 @@ export function seedThemeIsDark(theme) {
 
 /**
  * @param {{ days?: number, empty?: boolean, theme?: 'system'|'light'|'dark'|'blossom'|'butter'|'honey'|'java', onboarded?: boolean, units?: 'metric'|'imperial', store?: boolean, stress?: boolean,
- *   values?: { eaten?: number, protein?: number, exercise?: number, water?: number, weekMinutes?: number, fasting?: number, eatBack?: number, spread?: number, lastNight?: number, weighInGap?: number, onboardedToday?: boolean, name?: string, drinks?: number, diaryDrink?: number, diaryWater?: number, oldBourekas?: number } }} opts
+ *   values?: { eaten?: number, protein?: number, exercise?: number, water?: number, weekMinutes?: number, fasting?: number, eatBack?: number, spread?: number, load?: 'steady' | 'lighter' | 'more' | 'jump' | 'hike' | 'daily' | 'new', lastNight?: number, weighInGap?: number, onboardedToday?: boolean, name?: string, drinks?: number, diaryDrink?: number, diaryWater?: number, oldBourekas?: number } }} opts
  */
 export function buildSeed(opts = {}) {
   const { days = 35, empty = false, theme = 'dark', onboarded = true, units = 'metric', store = false, stress = false, values = null } = opts;

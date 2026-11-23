@@ -16,6 +16,7 @@ import { StepsLine } from '@/features/health-sync/ui/StepsLine';
 import { SyncedFromLine } from '@/features/health-sync/ui/SyncedFromLine';
 import { TrainSyncLink } from '@/features/health-sync/ui/TrainSyncLink';
 import { addDays, formatDayLabel, formatDuration, formatShortDate, startOfWeek } from '@/lib/dates';
+import { trainingOverview } from '@/lib/trainingLoad';
 import { formatNumber } from '@/lib/units';
 import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
@@ -41,6 +42,8 @@ export default function TrainScreen() {
   const weekStart = startOfWeek(asked);
   const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
   const week = useMemo(() => summariseWeek(activities, weekDates), [activities, weekDates]);
+  // The last 7 days against the recent weeks, from every workout on the phone (today comes from the clock hook).
+  const overview = useMemo(() => trainingOverview(activities, t), [activities, t]);
 
   const history = useMemo(() => {
     const sorted = [...activities].sort((a, b) => b.date.localeCompare(a.date) || b.loggedAt.localeCompare(a.loggedAt));
@@ -79,7 +82,14 @@ export default function TrainScreen() {
         </View>
       ) : null}
 
-      <WeekCard week={week} dates={weekDates} today={t} extra={<StepsLine dates={weekDates} today={t} />} />
+      <WeekCard
+        week={week}
+        dates={weekDates}
+        today={t}
+        extra={<StepsLine dates={weekDates} today={t} />}
+        overview={overview}
+        current={weekStart === startOfWeek(t)}
+      />
 
       {/* Side by side when both labels fit (150 px each); stacked on a narrow phone rather than cut. */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>

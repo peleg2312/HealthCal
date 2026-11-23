@@ -972,6 +972,86 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   await page.keyboard.press('Escape');
   await page.waitForTimeout(500);
 
+  // ------------------------------------------- meals that fit (src/features/today/ideas.ts, FitsSheet)
+  // The demo's five weeks at dinner time, 60% of the budget eaten, in a context of its own: Today's "Ideas that fit" chip
+  // opens What fits with "Meals that fit" above the single foods; one tap logs an idea's foods to dinner with one Undo,
+  // its row turns into a tick and every row stays where it was; Undo takes the foods away. Over the budget the chip is
+  // not there, and the number opens one neutral line and "Search all foods", with no list at all.
+  {
+    // This file's folder from the command line (the lint setup does not define __dirname).
+    const here = require('path').dirname(require('path').resolve(process.argv[1]));
+    const { buildSeed } = await import(require('url').pathToFileURL(require('path').join(here, 'seed.mjs')).href);
+    const dinner = new Date();
+    dinner.setHours(19, 0, 0, 0);
+    const todayIso = `${dinner.getFullYear()}-${String(dinner.getMonth() + 1).padStart(2, '0')}-${String(dinner.getDate()).padStart(2, '0')}`;
+    const openIdeas = async (eaten) => {
+      const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, colorScheme: 'dark', reducedMotion: 'reduce' });
+      await ctx.addInitScript((value) => {
+        if (!window.sessionStorage.getItem('__seeded')) {
+          window.localStorage.setItem('healthcal-v1', value);
+          window.sessionStorage.setItem('__seeded', '1');
+        }
+      }, JSON.stringify(buildSeed({ onboarded: true, theme: 'dark', values: { eaten } })));
+      await ctx.clock.setFixedTime(dinner);
+      const p = await ctx.newPage();
+      p.on('pageerror', (e) => errors.push(e.message));
+      p.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 200)));
+      await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+      await p.getByTestId('today-energy').first().waitFor({ timeout: 20000 });
+      return { ctx, p };
+    };
+    const itext = async (p, id) => (await p.getByTestId(id).first().innerText({ timeout: 15000 })).replace(/ /g, ' ').replace(/[⁠‎⁨⁩]/g, '').trim();
+    const dinnerToday = async (p) =>
+      Object.values((await p.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())))).foodEntries).filter((e) => !e.deleted && e.date === todayIso && e.meal === 'dinner');
+
+    const { ctx, p } = await openIdeas(0.6);
+    const chip = await p.getByTestId('today-ideas').first().waitFor({ timeout: 15000 }).then(() => true, () => false);
+    check("ideas: Today shows the \"Ideas that fit\" chip in the energy card", chip && (await itext(p, 'today-ideas')) === 'Ideas that fit');
+    await p.getByTestId('today-ideas').first().click({ timeout: 15000 });
+    await p.waitForTimeout(500);
+    const block = await p.getByTestId('fits-ideas').first().waitFor({ timeout: 10000 }).then(() => true, () => false);
+    const ideaBox = block ? await p.getByTestId('fits-ideas').first().boundingBox() : null;
+    const listBox = (await p.getByTestId('fits-list').count()) ? await p.getByTestId('fits-list').first().boundingBox() : null;
+    check('ideas: the chip opens What fits with "Meals that fit" first, above the single foods', block && (!listBox || (ideaBox && ideaBox.y < listBox.y)), `${await p.getByTestId('fits-idea-0').count()} idea row(s)`);
+    const rowsBefore = await p.getByTestId(/^fits-idea-\d+$/).count();
+    const name0 = block ? await itext(p, 'fits-idea-0') : '';
+    const foods0 = block ? (await itext(p, 'fits-idea-foods-0')).split(' · ') : [];
+    const before = (await dinnerToday(p)).map((e) => e.id);
+    await p.getByTestId('fits-idea-add-0').first().click({ timeout: 15000 });
+    await p.waitForTimeout(500);
+    const after = await dinnerToday(p);
+    const added = after.filter((e) => !before.includes(e.id));
+    check(
+      "ideas: one tap logs the idea's foods to today's dinner",
+      added.length === foods0.length && added.length >= 1 && foods0.every((f) => added.some((e) => e.name === f)),
+      `${added.map((e) => e.name).join(', ')} | row: ${foods0.join(', ')}`,
+    );
+    const addLabel = (await p.getByTestId('fits-idea-add-0').first().getAttribute('aria-label')) || '';
+    check('ideas: the added row shows its tick and every row stays in its place', addLabel.endsWith(' added') && (await p.getByTestId(/^fits-idea-\d+$/).count()) === rowsBefore && (await itext(p, 'fits-idea-0')) === name0, `${addLabel} | ${rowsBefore} rows`);
+    await shot('ideas-added');
+    await p.getByTestId('toast-action').first().click({ timeout: 10000 });
+    await p.waitForTimeout(500);
+    const undone = (await dinnerToday(p)).filter((e) => !before.includes(e.id));
+    const labelAfterUndo = (await p.getByTestId('fits-idea-add-0').first().getAttribute('aria-label')) || '';
+    check("ideas: Undo removes the idea's foods and the row offers the add again", undone.length === 0 && labelAfterUndo.startsWith('Add '), `${undone.length} left | ${labelAfterUndo.slice(0, 60)}`);
+    await ctx.close();
+
+    const over = await openIdeas(1.1);
+    check('ideas: over the budget Today shows no ideas chip', (await over.p.getByTestId('today-ideas').count()) === 0);
+    await over.p.getByTestId('today-remaining-open').first().click({ timeout: 15000 });
+    await over.p.waitForTimeout(500);
+    const line = await over.p.getByTestId('fits-over').first().waitFor({ timeout: 10000 }).then(() => itext(over.p, 'fits-over'), () => '');
+    check(
+      'ideas: over the budget What fits shows one neutral line, "Search all foods" and no list',
+      /^Today is [\d,]+ kcal above the budget\. One day does not move the week's trend much\.$/.test(line) &&
+        (await over.p.getByTestId('fits-ideas').count()) === 0 &&
+        (await over.p.getByTestId('fits-list').count()) === 0 &&
+        (await over.p.getByTestId('fits-search').count()) > 0,
+      line,
+    );
+    await over.ctx.close();
+  }
+
   // ------------------------------------------- the toast with the keyboard up (src/ui/Toast.tsx, toastBottom in src/ui/keyboardInset.ts)
   // With the faked keyboard open, a toast must rest 12 px above the footer that rides on the keyboard (food search),
   // or above the keyboard itself where there is no footer (Water's "Other amount"), wholly in what can be seen, and
@@ -1089,6 +1169,65 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   await page.evaluate(() => window.__keyboard(0));
   await blur();
   await page.waitForTimeout(300);
+
+  // ------------------------------------------- the training overview on Train (src/lib/trainingLoad.ts)
+  // The demo's five weeks of workouts, in a context of their own (the first-day person has no history). The last 7 days
+  // and the 21 before are recomputed here from the published rule (moderate minutes from 3 MET, Hard minutes from 6 MET
+  // count double): the line shows the demo's state with the three cups, the sheet opens with those numbers, and a past
+  // week keeps the old line, whose info cup opens the same sheet.
+  {
+    const { buildSeed } = await import(require('url').pathToFileURL(require('path').join(__dirname, 'seed.mjs')).href);
+    const seed = buildSeed({ onboarded: true, theme: 'dark' });
+    const loadContext = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, colorScheme: 'dark', reducedMotion: 'reduce' });
+    await loadContext.addInitScript((value) => {
+      if (!window.sessionStorage.getItem('__seeded')) {
+        window.localStorage.setItem('healthcal-v1', value);
+        window.sessionStorage.setItem('__seeded', '1');
+      }
+    }, JSON.stringify(seed));
+    const lp = await loadContext.newPage();
+    lp.on('pageerror', (e) => errors.push(e.message));
+    lp.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 200)));
+    const ltext = async (id) => (await lp.getByTestId(id).first().innerText({ timeout: 15000 })).replace(/ /g, ' ').replace(/[⁠‎⁨⁩]/g, '').trim();
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const back = (n) => { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - n); return iso(d); };
+    const gmin = (a) => (a.met >= 6 && a.intensity === 'vigorous' ? 2 * a.durationMin : a.met >= 3 ? a.durationMin : 0);
+    const acts = Object.values(seed.state.activities).filter((a) => !a.deleted);
+    const sumOver = (from, to) => acts.filter((a) => a.date >= back(from) && a.date <= back(to)).reduce((t, a) => t + gmin(a), 0);
+    const a7 = sumOver(6, 0);
+    const c = sumOver(27, 7) / 3;
+    const r = a7 / c;
+    const want = r < 0.8 ? 'Lighter than your recent weeks' : r <= 1.3 ? 'About your usual' : 'More than your recent weeks';
+    await lp.goto(`${BASE}/train`, { waitUntil: 'networkidle' });
+    const hasLine = await lp.getByTestId('train-load').first().waitFor({ timeout: 15000 }).then(() => true, () => false);
+    const title = hasLine ? await ltext('train-load-title') : '';
+    const label = hasLine ? (await lp.getByTestId('train-load').first().getAttribute('aria-label')) || '' : '';
+    check(`training overview: Train's line shows the demo's state (${a7} against ${Math.round(c)}, r ${r.toFixed(2)})`, hasLine && title === want, `${title} | want ${want}`);
+    check('training overview: the line is read as "Last 7 days: ..." and the old line is gone', label.startsWith(`Last 7 days: ${want}.`) && (await lp.getByTestId('train-guideline-line').count()) === 0, label);
+    await lp.getByTestId('train-load-info').first().click({ timeout: 15000 });
+    await lp.waitForTimeout(400);
+    const sheetOpen = await lp.getByTestId('train-load-sheet').first().waitFor({ timeout: 10000 }).then(() => true, () => false);
+    const numbers = sheetOpen ? await ltext('train-load-numbers') : '';
+    check('training overview: the sheet opens with the last 7 days and the recent average', sheetOpen && numbers.startsWith(`${a7} guideline minutes in the last 7 days`) && numbers.includes(`recent average of ${Math.round(c)}`), numbers);
+    const sheetText = sheetOpen ? await ltext('train-load-sheet') : '';
+    check(
+      'training overview: the sheet has the three positions, the chart, the counts and the honest sentences, and no coach button',
+      (await lp.getByTestId('train-load-mark').count()) > 0 && (await lp.getByTestId('train-load-chart').count()) > 0 && /without a session|each of the last 7 days/.test(await ltext('train-load-counts')) &&
+        sheetText.includes('not a measure of injury risk') && sheetText.includes('Training you did not log'),
+      sheetText.slice(0, 160),
+    );
+    await lp.keyboard.press('Escape');
+    await lp.waitForTimeout(400);
+    // Two weeks back: the card is that week, so the line is "Hard minutes count double" as before, and its info cup opens the overview.
+    await lp.goto(`${BASE}/train?week=${back(14)}`, { waitUntil: 'networkidle' });
+    await lp.getByTestId('train-this-week').first().waitFor({ timeout: 15000 }).catch(() => {});
+    const oldLine = await lp.getByTestId('train-guideline-line').first().innerText({ timeout: 15000 }).catch(() => '');
+    check('training overview: a past week keeps the old line and no overview line', oldLine === 'Hard minutes count double' && (await lp.getByTestId('train-load').count()) === 0, oldLine);
+    await lp.getByTestId('train-guideline-help').first().click({ timeout: 15000 }).catch(() => {});
+    await lp.waitForTimeout(400);
+    check('training overview: the old line\'s info cup opens the same sheet', (await lp.getByTestId('train-load-sheet').count()) > 0 && (await ltext('train-load-numbers')).startsWith(`${a7} guideline minutes`));
+    await loadContext.close();
+  }
 
   // ------------------------------------------- Appearance: the newer looks (src/theme/resolve.ts)
   // A newer look is stored as `look` beside its fallback in `theme` (an older copy shows Light or Dark);

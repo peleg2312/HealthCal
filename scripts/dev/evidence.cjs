@@ -1043,9 +1043,9 @@ function runChecks() {
 // ------------------------------------------------------------------ states
 
 const STATE_FIELDS = ['id', 'route', 'data', 'imperial', 'day', 'values', 'health', 'type', 'taps', 'waitFor', 'sheet', 'note', 'now', 'flags', 'absent'];
-const VALUES = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack', 'spread', 'lastNight', 'weighInGap', 'onboardedToday', 'name', 'drinks', 'diaryDrink', 'diaryWater', 'oldBourekas'];
+const VALUES = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack', 'spread', 'lastNight', 'weighInGap', 'onboardedToday', 'name', 'drinks', 'diaryDrink', 'diaryWater', 'oldBourekas', 'load'];
 /** The morning page's knobs that are not numbers (seed.mjs checks them again). */
-const VALUE_TYPES = { onboardedToday: 'boolean', name: 'string' };
+const VALUE_TYPES = { onboardedToday: 'boolean', name: 'string', load: 'string' };
 const DATA = ['demo', 'empty', 'fresh', 'stress'];
 
 /** What is wrong with one state's form (empty when nothing), `where` naming it in each message. */
