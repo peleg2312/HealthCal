@@ -31,7 +31,7 @@ const FIELDS = 'code,product_name,product_name_en,brands,nutriments,serving_size
  */
 const TEXT_FIELDS = 'code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity,categories_tags';
 
-interface OffProduct {
+export interface OffProduct {
   code?: string;
   product_name?: string;
   product_name_en?: string;
@@ -218,16 +218,26 @@ export async function lookupBarcode(code: string): Promise<BarcodeResult> {
   return { status: 'found', food };
 }
 
-function toFoods(products: OffProduct[]): Food[] {
-  const seen = new Set<string>();
+/**
+ * The products as foods, one per name and brand, in the answer's order. When two collide, the one Open
+ * Food Facts files under beverages (`beverage === true`) is kept over one with no flag or false, in the
+ * place of the first (so an untagged "Monster" listed first does not hide the tagged ones from the water
+ * screen's drink sheet); among equals the first is kept.
+ */
+export function toFoods(products: readonly OffProduct[]): Food[] {
+  const at = new Map<string, number>();
   const out: Food[] = [];
   for (const p of products) {
     const food = offToFood(p);
     if (!food) continue;
     const key = `${food.name.toLowerCase()}|${food.brand?.toLowerCase() ?? ''}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(food);
+    const i = at.get(key);
+    if (i === undefined) {
+      at.set(key, out.length);
+      out.push(food);
+    } else if (food.beverage === true && out[i].beverage !== true) {
+      out[i] = food;
+    }
   }
   return out;
 }

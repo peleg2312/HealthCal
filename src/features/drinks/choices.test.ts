@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { BEVERAGE_LABELS } from '@/lib/hydration';
 import type { Beverage } from '@/types';
 
-import { CHOICE_KCAL_LINE, DRINK_CHOICES, PICK_CHIP, choiceById, choicesFor, defaultChoiceId } from './choices';
+import { CHOICE_KCAL_LINE, DRINK_CHOICES, PICK_CHIP, canPick, choiceById, choicesFor, defaultChoiceId } from './choices';
 import { builtinFood, choiceFood, drinkKcal, isAlcohol } from './rules';
 
 const KINDS = Object.keys(BEVERAGE_LABELS) as Beverage[];
@@ -93,5 +93,9 @@ describe('DRINK_CHOICES', () => {
 
   it('the sheet chip is on Juice and Other only', () => {
     expect(Object.keys(PICK_CHIP).sort()).toEqual(['juice', 'other']);
+  });
+
+  it('every kind but Water can hold a picked drink (the chip that opens the sheet is another matter)', () => {
+    for (const kind of KINDS) expect(canPick(kind), kind).toBe(kind !== 'water');
   });
 });

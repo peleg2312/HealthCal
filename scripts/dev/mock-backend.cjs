@@ -457,8 +457,10 @@ const api = http.createServer(async (req, res) => {
   if (route === 'GET /functions/v1/food-search') {
     if (!req.headers.apikey) return send(res, 401, { message: 'No API key found in request' });
     const q = (url.searchParams.get('q') || '').trim();
+    // One query with a fixed answer, so the drink sheet's online section is proved without the network.
+    if (q.toLowerCase() === FIXED_SEARCH_QUERY) return send(res, 200, { hits: FIXED_SEARCH_HITS });
     try {
-      const upstream = await fetch(`https://search.openfoodfacts.org/search?q=${encodeURIComponent(q)}&page_size=${Number(url.searchParams.get('limit')) || 24}&fields=code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity`);
+      const upstream = await fetch(`https://search.openfoodfacts.org/search?q=${encodeURIComponent(q)}&page_size=${Number(url.searchParams.get('limit')) || 24}&fields=code,product_name,product_name_en,brands,nutriments,serving_size,serving_quantity,quantity,categories_tags`);
       const data = await upstream.json();
       return send(res, 200, { hits: data.hits || [] });
     } catch {
@@ -468,6 +470,31 @@ const api = http.createServer(async (req, res) => {
 
   send(res, 404, { message: `mock backend has no handler for ${route}` });
 });
+
+/**
+ * The food-search function's fixed answer for one test query, "iced coffee": seven real products from
+ * Open Food Facts' public search (saved 2026-11-19 and 2026-11-23, values untouched, trimmed to the fields
+ * the app reads), in the order the service sent them. What the Water screen's drink sheet must make of
+ * them (src/features/drinks/pick.ts, `onlineDrinks` after `rankOnline`, tested in pick.test.ts, which
+ * lists them as Prew, Jimmy, Nippys, International Delight, Coca-Cola Zero):
+ * - Prew "Iced coffee", pack 180 ml: listed, "Prew · 180 ml · 55 kcal per 250 ml · Community";
+ * - Nippys "Iced coffee milk", pack 500 ml: listed with its brand and pack;
+ * - Jimmy "Iced Coffee", no volume at all: listed, brand only;
+ * - Old Orchard "Iced Coffee", 178 kcal per 100 ml: left out (above 150);
+ * - International Delight "Mocha iced coffee", a 1.8 L bottle: listed, no pack (poured from);
+ * - Cafe Diario "Instant Coffee" (instant coffees): left out, not a drink as logged;
+ * - Coca-Cola Zero, a 1.5 L bottle: listed last (its name does not match), no pack.
+ */
+const FIXED_SEARCH_QUERY = 'iced coffee';
+const FIXED_SEARCH_HITS = [
+  { code: '8850389301012', product_name: 'Iced coffee', product_name_en: 'Iced coffee', brands: ['Prew', '\u0e40\u0e1e\u0e23\u0e35\u0e22\u0e27'], quantity: '180 ml', categories_tags: ['en:beverages', 'en:artificially-sweetened-beverages', 'en:non-alcoholic-beverages', 'en:coffee-drinks', 'en:iced-coffees'], nutriments: { 'energy-kcal_100g': 22.2, proteins_100g: 0.556, carbohydrates_100g: 2.7800000000000002, fat_100g: 0.8330000000000001, fiber_100g: 0.556, sugars_100g: 0, 'saturated-fat_100g': 0.556, sodium_100g: 0.0677 } },
+  { code: '9311336030069', product_name: 'Iced coffee milk', product_name_en: 'Iced coffee milk', brands: ['Nippys'], quantity: '500 ml', categories_tags: ['en:beverages-and-beverages-preparations', 'en:beverages', 'en:dairies', 'en:dairy-drinks', 'en:flavoured-milks', 'en:unsweetened-beverages', 'en:coffee-drinks', 'en:iced-coffees'], nutriments: { 'energy-kcal_100g': 63.6, proteins_100g: 3.2, carbohydrates_100g: 8.4, fat_100g: 1.9, sugars_100g: 8, 'saturated-fat_100g': 1.3, sodium_100g: 0.038 } },
+  { code: '4000349860088', product_name: 'Iced Coffee', product_name_en: 'Iced Coffee', brands: ['Jimmy'], categories_tags: ['en:beverages', 'en:coffee-drinks', 'en:iced-coffees'], nutriments: { 'energy-kcal_100g': 39, proteins_100g: 2.2, carbohydrates_100g: 4.9, fat_100g: 1.1, sugars_100g: 4.9, 'saturated-fat_100g': 0.7, sodium_100g: 0.068 } },
+  { code: '0075355112586', product_name: 'Iced Coffee', product_name_en: 'Iced Coffee', brands: ['Old Orchard Brands Llc.'], categories_tags: ['en:beverages', 'en:coffee-drinks', 'en:iced-coffees'], nutriments: { 'energy-kcal_100g': 178, proteins_100g: 0, carbohydrates_100g: 40, fat_100g: 1.67, fiber_100g: 0, sugars_100g: 33.33, 'saturated-fat_100g': 1.67, sodium_100g: 0.011 } },
+  { code: '0041271004953', product_name: 'Mocha iced coffee', product_name_en: 'Mocha iced coffee', brands: ['International Delight', 'Dean Foods Company'], quantity: '1.8l', categories_tags: ['en:beverages', 'en:coffee-drinks', 'en:iced-coffees', 'en:sweetened-beverages'], nutriments: { 'energy-kcal_100g': 45.83, proteins_100g: 1.25, carbohydrates_100g: 7.92, fat_100g: 0.83, fiber_100g: 0, sugars_100g: 7.08, 'saturated-fat_100g': 0.42, sodium_100g: 0.044719999999999996 } },
+  { code: '0810688010389', product_name: 'Instant Coffee', product_name_en: 'Instant Coffee', brands: ['Cafe Diario', 'Maximus Coffee Group'], quantity: '3.5 oz', categories_tags: ['en:plant-based-foods-and-beverages', 'en:beverages', 'en:plant-based-foods', 'en:plant-based-beverages', 'en:coffees', 'en:freeze-dried-foods', 'en:instant-beverages', 'en:freeze-dried-plant-based-foods', 'en:instant-coffees', 'en:freeze-dried-instant-coffees'], nutriments: { 'energy-kcal_100g': 0.588, proteins_100g: 0.176, carbohydrates_100g: 0, fat_100g: 0, fiber_100g: 0, sugars_100g: 0, 'saturated-fat_100g': 0, sodium_100g: 0.00294 } },
+  { code: '5449000298157', product_name: 'Coca-Cola Zero', product_name_en: 'Coca-Cola Zero', brands: ['Coca-Cola'], quantity: '1.5 L', categories_tags: ['en:beverages-and-beverages-preparations', 'en:beverages', 'en:carbonated-drinks', 'en:artificially-sweetened-beverages', 'en:sodas', 'en:diet-beverages', 'en:colas', 'en:diet-sodas', 'en:diet-cola-soft-drink'], nutriments: { 'energy-kcal_100g': 0.2, proteins_100g: 0, carbohydrates_100g: 0, fat_100g: 0, sugars_100g: 0, 'saturated-fat_100g': 0, sodium_100g: 0.01 } },
+];
 
 api.listen(PORT, () => console.log(`mock backend on http://localhost:${PORT}`));
 

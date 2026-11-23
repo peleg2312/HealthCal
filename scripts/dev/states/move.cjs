@@ -30,6 +30,8 @@ const todayAt = (h, m) => {
   d.setHours(h, m, 0, 0);
   return d.getTime();
 };
+/** On Water: search, pick the drink with this id, log a 250 ml glass of it, and wait for the toasts to go. */
+const pickAndLog = (query, id) => ['water-search', { type: 'water-pick-search', text: query }, { wait: 900 }, `water-pick-${id}`, toastGone, 'water-add-1', toastGone];
 const CSV = 'scripts/dev/states/files/garmin-activities.csv';
 const GPX = 'scripts/dev/states/files/morning-run.gpx';
 
@@ -209,6 +211,25 @@ const water = [
   { id: 'diary-drink-in-water', route: '/diary', values: { diaryWater: 1 }, now: todayAt(14, 0), waitFor: 'entry-in-water-00000000-0000-4000-8000-00000000d004', note: 'the diary: a drink logged there marked "also in Water" (seed.mjs values.diaryWater: fixed ids)' },
   { id: 'diary-drink-removed-water', route: '/food/search?meal=lunch', data: 'empty', now: todayAt(14, 0), taps: [...logDiary('monster'), 'search-done', toastGone, '^entry-delete-'], waitFor: 'toast-action', note: 'deleted in the diary: its water goes too, and the toast says so' },
   { id: 'goals-diary-drinks-off', route: '/settings/goals', taps: ['goals-diary-drinks'], waitFor: 'goals-diary-drinks', note: 'Goals > Water: "Count drinks from the diary" turned off (Save waits)' },
+  // A search for any drink (src/features/drinks/pick.ts, DrinkPickSheet, DrinkTitleRow, DrinkKindRow, DrinkRecentChips):
+  // "Search" beside "Add a drink" opens the drink sheet from any kind; with a query the local drinks (three, then
+  // "Show all"), the honest line for foods and for alcohol, and "Online products" (in a build without the backend
+  // the line says it works in the phone app; the online answers are in drinksOnline below, --backend only). A pick
+  // goes to its own kind or to Other, the kind row scrolls it into view, and drinks picked before come back as
+  // "Your drinks" and, on the Water kind, as one line of chips. Reached by taps: a pick, a glass, the toasts gone.
+  { id: 'water-search-title', route: '/water', waitFor: 'water-search', note: 'the title row: "Add a drink", Search, Edit sizes' },
+  { id: 'water-search-sheet', route: '/water', now: todayAt(13, 30), taps: ['water-search'], sheet: true, waitFor: 'water-pick-all', note: 'Search: the empty sheet, "All drinks" (nothing picked before)' },
+  { id: 'water-search-yours', route: '/water', now: todayAt(13, 30), taps: [...pickAndLog('mocha', 'b_mocha'), ...pickAndLog('energy', 'b_energy_drink'), 'water-search'], sheet: true, waitFor: 'water-pick-yours', note: 'the empty sheet with "Your drinks": the energy drink and the mocha logged before' },
+  { id: 'water-search-show-all', route: '/water', now: todayAt(13, 30), taps: ['water-search', { type: 'water-pick-search', text: 'tea' }, { wait: 900 }], sheet: true, waitFor: 'water-pick-more', note: '"tea": three teas, "Show all 5", the online line (no backend here)' },
+  { id: 'water-search-all-shown', route: '/water', now: todayAt(13, 30), taps: ['water-search', { type: 'water-pick-search', text: 'milk' }, { wait: 900 }, 'water-pick-more'], sheet: true, waitFor: 'water-pick-b_milk_whole', note: '"milk" with every drink shown' },
+  { id: 'water-search-soup', route: '/water', now: todayAt(13, 30), taps: ['water-search', { type: 'water-pick-search', text: 'soup' }, { wait: 900 }], sheet: true, waitFor: 'water-pick-none', note: '"soup": no drink, foods are added in the diary' },
+  { id: 'water-search-beer', route: '/water', now: todayAt(13, 30), taps: ['water-search', { type: 'water-pick-search', text: 'beer' }, { wait: 900 }], sheet: true, waitFor: 'water-pick-alcohol', note: '"beer": alcohol is added in the diary' },
+  { id: 'water-search-hebrew', route: '/water', now: todayAt(13, 30), taps: ['water-search', { type: 'water-pick-search', text: 'שוקו' }, { wait: 900 }], sheet: true, waitFor: 'water-pick-b_shoko-matched', note: 'a Hebrew search: the matched names under the drinks' },
+  { id: 'water-search-no-backend', route: '/water', now: todayAt(13, 30), taps: ['water-search', { type: 'water-pick-search', text: 'monster' }, { wait: 900 }], sheet: true, waitFor: 'water-pick-online-empty', note: '"monster": the energy drink, and the online line of a build without the backend' },
+  { id: 'water-search-moved', route: '/water', now: todayAt(13, 30), taps: ['water-search', { type: 'water-pick-search', text: 'monster' }, { wait: 900 }, 'water-pick-b_energy_drink', toastGone], waitFor: 'water-choice-food', note: 'picked from Water: the screen on Other, the kind row scrolled to it, the drink chip and its line (the toast gone; e2e.cjs reads its words)' },
+  { id: 'water-search-coffee', route: '/water', now: todayAt(13, 30), taps: [...pickAndLog('mocha', 'b_mocha'), toastGone], waitFor: 'water-choice-food', note: 'a mocha picked: Coffee with the mocha chip after its choices, the glasses priced' },
+  { id: 'water-recent-chips', route: '/water', now: todayAt(13, 30), taps: [...pickAndLog('mocha', 'b_mocha'), ...pickAndLog('energy', 'b_energy_drink'), 'water-beverage-water'], waitFor: '^water-recent-', note: 'the Water kind with the drinks picked before as chips: the glasses still in the first view' },
+  { id: 'water-recent-chips-stress', route: '/water', data: 'stress', now: todayAt(13, 30), taps: [...pickAndLog('mocha', 'b_mocha'), ...pickAndLog('hot chocolate', 'b_hot_chocolate'), ...pickAndLog('coconut', 'b_coconut_water'), 'water-beverage-water'], waitFor: '^water-recent-', note: 'three recent chips with long names: what does not fit on the line is left out' },
   { id: 'water-sizes-error',route: '/water', taps: ['section-add-a-drink-action', ...[0, 1, 2, 3].map((i) => ({ type: `water-preset-${i}`, text: '' })), 'water-presets-save'], sheet: true, waitFor: 'water-presets-error', note: 'every size cleared: the error' },
 ];
 
@@ -315,8 +336,23 @@ const friendsSignedIn = [
   { id: 'friends-add-wrong', route: '/auth?mode=signin', taps: [...friends(FULL), 'friends-add-open', { type: 'friends-add-input', text: 'ZZZZ-ZZZZ' }, 'friends-add-send', { wait: 1200 }], waitFor: 'friends-add-outcome-not-found', note: 'a code nobody has' },
 ];
 
+// ------------------------------------------------------------------ online drinks (a build with a backend)
+// The drink sheet's "Online products" with answers: only with --backend, against a build exported with
+// EXPO_PUBLIC_SUPABASE_URL pointing at scripts/dev/mock-backend.cjs (README, "Testing accounts and sync
+// locally"); no account is needed. "iced coffee" has a fixed answer there (seven products, five of them
+// drinks), so nothing goes to the network. The other three need fixed answers of their own in
+// mock-backend.cjs ("flat white": no hits; "cold brew": a 502; "bubble tea": an answer held 20 s): until
+// it has them, they would reach the live service, so run them only against a stand-in that answers them.
+const drinksOnline = [
+  { id: 'water-search-online', route: '/water', now: todayAt(13, 30), taps: ['water-search', { type: 'water-pick-search', text: 'iced coffee' }, { wait: 1500 }], sheet: true, waitFor: 'water-pick-off_8850389301012', note: '"iced coffee": no local drink, five online drinks with their brand and pack' },
+  { id: 'water-search-online-picked', route: '/water', now: todayAt(13, 30), taps: ['water-search', { type: 'water-pick-search', text: 'iced coffee' }, { wait: 1500 }, 'water-pick-off_8850389301012', toastGone], waitFor: 'water-choice-food', note: 'an online drink picked from Water: Other, its chip, the line with its calories (the toast gone)' },
+  { id: 'water-search-online-none', route: '/water', now: todayAt(13, 30), taps: ['water-search', { type: 'water-pick-search', text: 'flat white' }, { wait: 1500 }], sheet: true, waitFor: 'water-pick-online-empty', note: '"flat white": nothing local, nothing online' },
+  { id: 'water-search-online-failed', route: '/water', now: todayAt(13, 30), taps: ['water-search', { type: 'water-pick-search', text: 'cold brew' }, { wait: 1500 }], sheet: true, waitFor: 'water-pick-online-empty', note: '"cold brew": the online products could not be reached' },
+  { id: 'water-search-online-loading', route: '/water', now: todayAt(13, 30), taps: ['water-search', { type: 'water-pick-search', text: 'bubble tea' }, { wait: 900 }], sheet: true, waitFor: 'water-pick-online-empty', note: '"bubble tea": still searching' },
+];
+
 module.exports = [
   ...train, ...pick, ...log, ...imports, ...strength, ...water, ...weight, ...body, ...sleep, ...fasting, ...friendsLocal,
   // Only with --backend: every run passes --url now, and builds from with-build.cjs have no accounts.
-  ...(process.argv.includes('--backend') ? friendsSignedIn : []),
+  ...(process.argv.includes('--backend') ? [...drinksOnline, ...friendsSignedIn] : []),
 ];

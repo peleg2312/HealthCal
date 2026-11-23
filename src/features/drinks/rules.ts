@@ -322,11 +322,16 @@ export function choiceA11y(label: string, food: Food | null, glassMl: number, un
   return food ? `${label}, ${formatNumber(drinkKcal(food, glassMl))} kcal per ${formatVolume(glassMl, units)}` : `${label}, no calories`;
 }
 
-/** A row in the drink sheet: "51 kcal per 250 ml · Reference", or "45 kcal per 250 ml, taken as 250 g · Your food". */
+/**
+ * A row in the drink sheet: "51 kcal per 250 ml · Reference", or "45 kcal per 250 ml, taken as 250 g ·
+ * Your food" for a food with no volume serving. A food known to be a drink (`beverage === true`, an
+ * online product filed under beverages) never says "taken as": Open Food Facts gives a drink's values
+ * per 100 ml, so 1 g per ml is the right reading, not a guess (the number itself is the same).
+ */
 export function pickCaption(food: Food, glassMl: number, units: UnitSystem): string {
   const { assumed } = gramsPerMl(food);
   const per = `${formatNumber(drinkKcal(food, glassMl))} kcal per ${formatVolume(glassMl, units)}`;
-  const taken = assumed ? `, taken as ${formatNumber(drinkGrams(food, glassMl))} g` : '';
+  const taken = assumed && food.beverage !== true ? `, taken as ${formatNumber(drinkGrams(food, glassMl))} g` : '';
   return `${per}${taken} · ${sourceInfo(food.source).short}`;
 }
 

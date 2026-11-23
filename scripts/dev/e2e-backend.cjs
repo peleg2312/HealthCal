@@ -407,6 +407,48 @@ async function device(browser, seedJson) {
   srv = await server();
   check('turning friends off removes the card and returns to the set-up', !srv.social[user2.id] && (await waitFor(D, 'friends-setup-save')));
 
+  // ------------------------------------------- a drink from the online products (Water's drink sheet)
+  // The stand-in answers "iced coffee" with seven fixed products (scripts/dev/mock-backend.cjs); the sheet
+  // lists the five that are drinks, each with its brand and pack, and a pick is logged with its own calories.
+  const E = await device(browser, JSON.stringify(buildSeed()));
+  await E.go('/water');
+  await E.tap('water-search');
+  await E.fill('water-pick-search', 'iced coffee');
+  await E.page.waitForTimeout(200);
+  const searching = (await E.has('water-pick-online-empty')) ? await E.text('water-pick-online-empty') : '';
+  check('drink sheet: while the online answer is on its way it says so, never "no match"', searching === 'Searching Open Food Facts…', searching);
+  const onlineIn = await E.page.waitForSelector('[data-testid="water-pick-off_8850389301012"]', { timeout: 15000 }).then(() => true).catch(() => false);
+  const onlineRows = await E.page.evaluate(() => [...document.querySelectorAll('[data-testid^="water-pick-off_"]')].filter((e) => e.getBoundingClientRect().height > 0).map((e) => e.getAttribute('data-testid').replace('water-pick-', '')));
+  check(
+    'drink sheet: "iced coffee" lists the five online drinks, in order, and leaves out the 178 kcal one and the instant coffee',
+    onlineIn && onlineRows.join(',') === 'off_8850389301012,off_4000349860088,off_9311336030069,off_0041271004953,off_5449000298157',
+    onlineRows.join(', '),
+  );
+  check('drink sheet: under "Online products", community data from Open Food Facts', (await E.text('water-pick-online')).replace(/\s+/g, ' ') === 'Online products Community data from Open Food Facts', await E.text('water-pick-online'));
+  check('drink sheet: nothing local matched, and it says so', (await E.text('water-pick-none')) === 'No drink in the list matches “iced coffee”.', await E.text('water-pick-none'));
+  const prew = await E.text('water-pick-off_8850389301012');
+  check('drink sheet: a row carries its brand and pack', /Prew · 180 ml · \d+ kcal per 250 ml · Community/.test(prew), prew.replace(/\n/g, ' / '));
+  const nippys = await E.text('water-pick-off_9311336030069');
+  check('drink sheet: another brand and pack', /Nippys · 500 ml · \d+ kcal per 250 ml · Community/.test(nippys), nippys.replace(/\n/g, ' / '));
+  const prewKcal = Number((prew.match(/(\d+) kcal per 250 ml/) || [])[1]);
+  await E.tap('water-pick-off_8850389301012');
+  check('drink sheet: the product goes to Other and the toast says so', (await E.text('toast')) === 'Iced coffee chosen, under Other. Tap a glass to add it.', await E.text('toast'));
+  const prewLine = await E.text('water-drink-line');
+  check('drink sheet: the line names it with the same calories as its row', prewLine.startsWith(`Iced coffee: ${prewKcal} kcal per 250 ml`), prewLine);
+  const eBefore = await E.state();
+  const glass = Math.max(0, eBefore.settings.waterPresets.indexOf(250));
+  await E.page.waitForTimeout(5000);
+  await E.tap(`water-add-${glass}`);
+  const eAfter = await E.state();
+  const newEntries = Object.values(eAfter.foodEntries).filter((x) => !x.deleted && !eBefore.foodEntries[x.id]);
+  const newWater = Object.values(eAfter.water).filter((x) => !x.deleted && !eBefore.water[x.id]);
+  check(
+    'drink sheet: a glass logs the product with its calories, paired with its water',
+    newEntries.length === 1 && newWater.length === 1 && newWater[0].foodEntryId === newEntries[0].id && newEntries[0].foodId === 'off_8850389301012' && Math.round(newEntries[0].nutrients.kcal) === prewKcal && newEntries[0].food?.brand === 'Prew',
+    JSON.stringify(newEntries.map((x) => ({ foodId: x.foodId, kcal: x.nutrients.kcal }))),
+  );
+  await E.page.context().close();
+
   // ------------------------------------------------------ delete account
   await A.go('/settings/account');
   await A.tap('account-delete');
@@ -417,7 +459,7 @@ async function device(browser, seedJson) {
   check('deleting the account erases the user and all their rows', !srv.users.some((u) => u.id === user.id) && srv.records.filter((r) => r.user_id === user.id).length === 0 && !srv.profiles[user.id]);
   check('device A is back at the welcome screen with no data', new URL(A.page.url()).pathname === '/welcome' && (await A.state()).profile === null, A.page.url());
 
-  const errs = [...A.errors, ...B.errors, ...C.errors, ...D.errors];
+  const errs = [...A.errors, ...B.errors, ...C.errors, ...D.errors, ...E.errors];
   check('no uncaught errors on any device', errs.length === 0, errs.slice(0, 2).join(' || '));
 
   await browser.close();

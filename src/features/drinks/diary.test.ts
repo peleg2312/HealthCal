@@ -16,6 +16,7 @@ import {
   diaryWaterCaption,
   diaryWaterOpenLabel,
   diaryWaterRecord,
+  drinkStatus,
   detailWaterAdds,
   drinkChoiceId,
   drinkKind,
@@ -430,5 +431,23 @@ describe('words', () => {
     // The old label, byte for byte, for every other row.
     expect(waterDeleteLabel({ ml: 473 }, '12:40', 'metric')).toBe('Delete 473 ml, 12:40');
     expect(waterDeleteLabel({ ml: 473 }, 'Added later', 'metric', null)).toBe('Delete 473 ml, Added later');
+  });
+});
+
+describe('drinkStatus and the diary: the sheet offers a food with no flag only when one of its servings would count', () => {
+  const untagged = (servings: Food['servings']): Food => ({ id: 'own-x', name: 'Iced hibiscus', per100g: { kcal: 30, protein: 0, carbs: 7, fat: 0 }, servings, source: 'custom', verified: false });
+
+  it('a serving that names at least 100 ml (never "cup") makes it a maybe; otherwise not', () => {
+    expect(drinkStatus(untagged([{ label: '1 bottle (330 ml)', grams: 330 }]))).toBe('maybe');
+    expect(drinkStatus(untagged([{ label: '1 glass', grams: 250 }]))).toBe('not');
+    expect(drinkStatus(untagged([{ label: '1 cup (8 fl oz)', grams: 240 }]))).toBe('maybe'); // fl oz is read, "cup" is not
+    expect(drinkStatus(untagged([{ label: '1 cup', grams: 240 }]))).toBe('not');
+    expect(drinkStatus(untagged([{ label: '1 shot (40 ml)', grams: 40 }]))).toBe('not');
+  });
+
+  it('diaryDrink still judges the serving actually logged, as before', () => {
+    const f = untagged([{ label: '1 glass', grams: 250 }]);
+    expect(diaryDrink({ food: f, servingLabel: '1 glass', quantity: 1, grams: 250 }, null)).toBeNull();
+    expect(diaryDrink({ food: f, servingLabel: '330 ml', quantity: 1, grams: 330 }, null)).toEqual({ ml: 330, beverage: 'other', drink: 'food' });
   });
 });

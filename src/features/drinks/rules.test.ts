@@ -486,6 +486,8 @@ describe('isAlcohol', () => {
   it('pickCaption names the source, and says when grams are taken as ml', () => {
     expect(pickCaption(B('b_lemonade'), 250, 'metric')).toBe('105 kcal per 250 ml · Reference');
     expect(pickCaption(own(), 250, 'metric')).toBe('45 kcal per 250 ml, taken as 250 g · Your food');
+    // A food known to be a drink (an online product filed under beverages): the same number, no "taken as".
+    expect(pickCaption(own({ beverage: true }), 250, 'metric')).toBe('45 kcal per 250 ml · Your food');
   });
 });
 
@@ -501,12 +503,14 @@ describe('rememberedChoice', () => {
     expect(rememberedChoice({ milk: { id: 'gone' } }, 'milk')).toEqual(sel('milk_semi'));
     expect(rememberedChoice({ milk: { id: 'latte' } }, 'milk')).toEqual(sel('milk_semi'));
   });
-  it('a picked food while it resolves; a deleted own food, alcohol, or a kind without the sheet falls back', () => {
+  it('a picked food while it resolves, under every kind but Water; a deleted own food or alcohol falls back', () => {
     const f = own();
     expect(rememberedChoice({ other: { id: 'food', food: f } }, 'other', resolveAll)).toEqual({ id: 'food', food: f });
     expect(rememberedChoice({ other: { id: 'food', food: f } }, 'other', () => null)).toEqual({ id: 'other_none', food: null });
     expect(rememberedChoice({ other: { id: 'food', food: B('b_beer') } }, 'other', resolveAll)).toEqual({ id: 'other_none', food: null });
-    expect(rememberedChoice({ milk: { id: 'food', food: f } }, 'milk', resolveAll)).toEqual(sel('milk_semi'));
+    // Since the title row's search places a pick under its own kind (pick.ts), Milk holds one too (it fell back before).
+    expect(rememberedChoice({ milk: { id: 'food', food: f } }, 'milk', resolveAll)).toEqual({ id: 'food', food: f });
+    expect(rememberedChoice({ water: { id: 'food', food: f } }, 'water', resolveAll)).toBeNull();
   });
   it('remember keeps a pick with its food and a choice by id, never an entered drink', () => {
     const m = remember({}, 'other', selectFood(own()));

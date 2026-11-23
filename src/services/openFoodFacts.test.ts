@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { lookupBarcode, offBeverage, offToFood, packMl, searchProductsWithStatus, searchRequestUrl } from './openFoodFacts';
+import { lookupBarcode, offBeverage, offToFood, packMl, searchProductsWithStatus, searchRequestUrl, toFoods } from './openFoodFacts';
 
 // openFoodFacts.ts imports only @/lib/nutrition and types, so nothing needs mocking.
 const good = {
@@ -560,5 +560,40 @@ describe('the drink rule on 178 real products (off-drinks.tsv)', () => {
       'Отличное',
       '2000ml',
     ]);
+  });
+});
+
+describe('toFoods: one per name and brand, the one filed under beverages kept', () => {
+  const product = (code: string, name: string, beverage?: boolean) => ({
+    ...good,
+    code,
+    product_name: name,
+    brands: 'Monster',
+    serving_size: undefined,
+    serving_quantity: undefined,
+    nutriments: { 'energy-kcal_100g': 45, proteins_100g: 0, carbohydrates_100g: 11, fat_100g: 0 },
+    ...(beverage === undefined ? {} : { categories_tags: beverage ? ['en:beverages', 'en:energy-drinks'] : ['en:snacks'] }),
+  });
+  const ids = (foods: { id: string }[]) => foods.map((f) => f.id);
+
+  it('an untagged product first: the tagged one later takes its place', () => {
+    const got = toFoods([product('1', 'Monster'), product('2', 'Other drink', true), product('3', 'Monster', true), product('4', 'Monster', true)]);
+    expect(ids(got)).toEqual(['off_3', 'off_2']);
+    expect(got[0].beverage).toBe(true);
+  });
+
+  it('the tagged product first: kept, the untagged one and a "false" one after it dropped', () => {
+    expect(ids(toFoods([product('3', 'Monster', true), product('2', 'Other drink', true), product('1', 'Monster'), product('5', 'MONSTER', false)]))).toEqual(['off_3', 'off_2']);
+  });
+
+  it('a "false" product first gives way to a tagged one; among equals the first is kept', () => {
+    expect(ids(toFoods([product('5', 'Monster', false), product('3', 'Monster', true)]))).toEqual(['off_3']);
+    expect(ids(toFoods([product('1', 'Monster'), product('5', 'Monster', false)]))).toEqual(['off_1']);
+    expect(ids(toFoods([product('3', 'Monster', true), product('4', 'Monster', true)]))).toEqual(['off_3']);
+  });
+
+  it('a list with no collisions is unchanged, in its order', () => {
+    const list = [product('1', 'A'), product('2', 'B', true), product('3', 'C', false), product('4', 'D')];
+    expect(toFoods(list)).toEqual(list.map((p) => offToFood(p)));
   });
 });

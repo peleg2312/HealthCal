@@ -135,6 +135,55 @@ export function notADrinkByName(name: string): boolean {
   return NOT_DRINK_WORDS.test(name) || NOT_DRINK_WORDS_HE.test(name);
 }
 
+/** What a food is as a drink: 'drink' (known), 'maybe' (not known either way) or 'not'. */
+export type DrinkStatus = 'drink' | 'maybe' | 'not';
+
+/**
+ * The one answer to "is this food a drink", for the diary (`diaryDrink`) and the water screen's drink
+ * sheet (./pick.ts) alike. Pure; it looks at the food only, never at an amount.
+ * - 'not': alcohol (`isAlcohol`), an AI estimate (source 'ai'), a recipe logged as one line (id
+ *   `meal_...`), a bundled food that is not `isBundledDrink`, `beverage === false`, a food with no
+ *   flag whose name says soup, sauce, oil, cream and the like (`notADrinkByName`), or any food that is
+ *   not bundled above 150 kcal per 100 ml (`kcalPer100ml`: powders and wrong data).
+ * - 'drink': a bundled drink, or `beverage === true`.
+ * - 'maybe': an own food or a remembered product with no flag, not refused above, that has a serving
+ *   the diary would count by its label (`countsByLabel`: ml, cl, L or fl oz, never "cup", at least
+ *   100 ml); with no such serving it is 'not' (a salad, apple slices, a pudding).
+ */
+export function drinkStatus(food: Food): DrinkStatus {
+  const status = foodStatus(food);
+  if (status !== 'maybe') return status;
+  return food.servings.some(countsByLabel) ? 'maybe' : 'not';
+}
+
+/**
+ * `drinkStatus` before the serving test: what the food itself says (its source, id, name, flag and
+ * calories). `diaryDrink` asks this, because the diary judges a food with no flag by the serving
+ * actually logged (the entry's label, at least 100 ml), which is the same test `countsByLabel` runs
+ * over the food's own servings.
+ */
+function foodStatus(food: Food): DrinkStatus {
+  if (food.source === 'ai') return 'not';
+  if (food.id.startsWith('meal_')) return 'not';
+  if (isAlcohol(food)) return 'not';
+  if (isBundled(food)) return isBundledDrink(food) ? 'drink' : 'not';
+  if (food.beverage === false) return 'not';
+  if (food.beverage !== true && notADrinkByName(food.name)) return 'not';
+  if (kcalPer100ml(food) > MAX_KCAL_PER_100ML) return 'not';
+  return food.beverage === true ? 'drink' : 'maybe';
+}
+
+/**
+ * Whether one serving of a food with no drink flag could count as a drink in the diary: the diary's own
+ * label test (`labelVolume`: a volume in ml, cl, L or fl oz, never "cup", that agrees with its grams)
+ * for one serving, at least `LABEL_DRINK_MIN_ML`. A food with no such serving is 'not' (a salad, a
+ * pudding, apple slices), so the sheet never offers what the diary would never count.
+ */
+function countsByLabel(s: Food['servings'][number]): boolean {
+  const ml = labelVolume({ servingLabel: s.label, quantity: 1, grams: s.grams }, false);
+  return ml !== null && Math.round(ml) >= LABEL_DRINK_MIN_ML;
+}
+
 // ---------------------------------------------------------------- the volume
 
 /**
@@ -220,24 +269,13 @@ export function diaryDrink(entry: DiaryDrinkInput, profile: Pick<Profile, 'diary
   const food = entry.food;
   if (!food) return null;
   if (entry.via === 'water') return null;
-  if (food.source === 'ai' || entry.source === 'ai') return null;
-  if (food.id.startsWith('meal_')) return null;
-  if (isAlcohol(food)) return null;
-
+  if (entry.source === 'ai') return null;
+  // b to d for the food itself: one rule with the water screen's drink sheet (whose extra serving
+  // test is e below, applied here to the serving actually logged).
+  const status = foodStatus(food);
+  if (status === 'not') return null;
+  const known = status === 'drink';
   const bundled = isBundled(food);
-  let known: boolean;
-  if (bundled) {
-    if (!isBundledDrink(food)) return null;
-    known = true;
-  } else if (food.beverage === true) {
-    known = true;
-  } else if (food.beverage === false) {
-    return null;
-  } else {
-    if (notADrinkByName(food.name)) return null;
-    known = false;
-  }
-  if (!bundled && kcalPer100ml(food) > MAX_KCAL_PER_100ML) return null;
 
   const fromLabel = labelVolume(entry, bundled);
   const ml = fromLabel ?? (known ? gramsVolume(entry.grams, food) : null);

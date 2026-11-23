@@ -1,0 +1,116 @@
+# The drink search on the Water screen, on a phone, after first-day.yml has set the app up (no
+# clearState: it needs the profile first-day made).
+#
+# Water > Search (beside "Add a drink") > "monster" typed on the phone's keyboard > the bundled energy
+# drink > a glass. What only a phone shows: the rows that stay above the keyboard, a row picked with
+# one tap while the keyboard is up, the kind row moving to the kind the drink landed on, and the toast
+# resting above whatever is at the bottom. The row in "Today's log" with its calories is the one
+# required proof; the pictures are the rest. Then, best effort: the drink offered again as a chip on
+# the Water kind, and a mocha from the same search landing on Coffee with its own calories.
+#
+#   GitHub (free):  Actions > Phone test > Run workflow, flows = first-day,drink-search
+#   A phone or emulator on your desk:  maestro test .maestro/first-day.yml .maestro/drink-search.yml
+appId: app.healthcal.mobile
+name: Search for any drink on the Water screen
+---
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: today-energy
+    timeout: 120000
+# After midnight the morning page may open over Today (see health-and-about.yml).
+- tapOn:
+    id: morning-today
+    optional: true
+
+# Today > Water: the Search button is there on the Water kind, without scrolling.
+- scrollUntilVisible:
+    element:
+      id: today-water
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: today-water
+- extendedWaitUntil:
+    visible:
+      id: water-search
+    timeout: 20000
+- takeScreenshot: 80-water-with-search
+
+# The sheet with nothing typed, then a search on the phone's keyboard.
+- tapOn:
+    id: water-search
+- extendedWaitUntil:
+    visible:
+      id: water-pick-search
+    timeout: 15000
+- takeScreenshot: 81-drink-sheet-empty
+- tapOn:
+    id: water-pick-search
+- inputText: monster
+- extendedWaitUntil:
+    visible:
+      id: water-pick-b_energy_drink
+    timeout: 15000
+- takeScreenshot: 82-drink-sheet-monster-keyboard
+
+# One tap on the row while the keyboard is up picks it. The picture is taken at once: the toast, the
+# kind the drink landed on and the line that names it with its calories.
+- tapOn:
+    id: water-pick-b_energy_drink
+- takeScreenshot: 83-picked-with-toast
+- extendedWaitUntil:
+    visible:
+      id: water-drink-line
+    timeout: 15000
+- assertVisible:
+    text: '(?i).*energy drink.*'
+    optional: true
+- takeScreenshot: 84-picked-line-and-kind
+
+# A glass: the water and the drink's calories are logged together.
+- scrollUntilVisible:
+    element:
+      id: water-add-1
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: water-add-1
+- takeScreenshot: 85-glass-added
+- scrollUntilVisible:
+    element:
+      id: water-entry-kcal-0
+    direction: DOWN
+    timeout: 30000
+- takeScreenshot: 86-log-row-with-calories
+
+# Best effort from here: every step is optional and the pictures are the evidence.
+# The drink is offered again on the Water kind, two taps from logged.
+- scrollUntilVisible:
+    element:
+      id: water-beverage-water
+    direction: UP
+    timeout: 20000
+    optional: true
+- tapOn:
+    id: water-beverage-water
+    optional: true
+- assertVisible:
+    id: water-recent-b_energy_drink
+    optional: true
+- takeScreenshot: 87-water-kind-recent-chip
+
+# A mocha from the same search lands on Coffee with its own calories, not black coffee's.
+- tapOn:
+    id: water-search
+    optional: true
+- tapOn:
+    id: water-pick-search
+    optional: true
+- inputText: mocha
+- takeScreenshot: 88-drink-sheet-mocha
+- tapOn:
+    id: water-pick-b_mocha
+    optional: true
+- takeScreenshot: 89-mocha-under-coffee

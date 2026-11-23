@@ -1,10 +1,17 @@
 /**
- * "Choose a drink" (`water-pick-sheet`): any drink for Juice's "Other juice" and Other's "Choose a
- * drink". Offline only: with an empty search the bundled non-alcoholic drinks and the milks
- * (`sheetDrinks`), with a query `searchLocal` (own foods, recents, favourites, bundled) without
- * alcohol (`withoutAlcohol`). Each row says what a glass adds and where its numbers come from
- * (`pickCaption`). A tap closes the sheet and makes that drink the kind's selected choice (the
- * screen remembers it); the person then taps a glass, so the calories are seen before they are added.
+ * "Choose a drink" (`water-pick-sheet`): any drink, from the "Search" button beside "Add a drink" (an
+ * empty search, whichever kind is showing), Juice's "Other juice" (opens on "juice") and Other's "Choose
+ * a drink". The sheet only places what `sheetList` (./pick.ts) returns: with an empty search "Your
+ * drinks" (the person's own, `yourDrinks`) and "All drinks" (the bundled drinks); with a query the
+ * local drinks (three, then "Show all N"), the honest line when only foods or only alcohol matched, and
+ * "Online products" (Open Food Facts, community data). Each row says what a glass adds and where its
+ * numbers come from (`pickDetail`). A tap closes the sheet and hands the food to the screen, which puts
+ * it where `placePick` says; the person then taps a glass, so the calories are seen before they are added.
+ *
+ * The online search runs only while the sheet is visible, from two characters, 450 ms after the typing
+ * stops; an answer for an earlier query is dropped (and, if one ever arrives late, `sheetList` reads it
+ * as still searching), and every opening starts with none, so "no online drinks" is said only of the
+ * query as typed.
  *
  * Directly under the search field, "Or enter calories" (`water-pick-kcal-open`, in the sheet's first
  * view) opens an amount and a calories field (under the quick-add screen's limit), logged at once as
@@ -13,12 +20,12 @@
  * before the tap ("Add 140 kcal to lunch"); the sheet never opens on a disabled button.
  */
 import { ChevronDown, ChevronUp, Search, X } from 'lucide-react-native';
-import React, { useDeferredValue, useMemo, useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { resolveFood } from '@/features/food/usuals';
-import { isolateRtl } from '@/lib/bidi';
-import { searchLocal } from '@/services/foodSearch';
+import { searchLocal, searchOnlineWithStatus } from '@/services/foodSearch';
+import { onlineSearchAvailable } from '@/services/openFoodFacts';
 import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
 import { formatNumber, volumeUnit, volumeValue } from '@/lib/units';
@@ -26,21 +33,25 @@ import { useTheme } from '@/theme';
 import type { Food, UnitSystem } from '@/types';
 import { Button, Divider, IconButton, NumberField, PressableScale, Sheet, Text, TextField } from '@/ui';
 
-import { enteredKcalError, pickCaption, sheetDrinks, withoutAlcohol } from './rules';
+import { sheetList, type OnlineAnswer, type SheetItem } from './pick';
+import { enteredKcalError } from './rules';
 
 export function DrinkPickSheet({
   visible,
   initialQuery,
   glassMl,
   units,
+  yours,
   onPick,
   onEntered,
   where,
   onClose,
 }: {
   visible: boolean;
-  /** "juice" for Juice's "Other juice", '' for Other. */
+  /** "juice" for Juice's "Other juice", '' for Other and for the "Search" button. */
   initialQuery: string;
+  /** "Your drinks" (`yourDrinks`), shown with an empty search. */
+  yours: readonly Food[];
   glassMl: number;
   units: UnitSystem;
   onPick: (food: Food) => void;
@@ -57,11 +68,15 @@ export function DrinkPickSheet({
   const [amount, setAmount] = useState<number | null>(glassShown);
   const [kcalTyped, setKcalTyped] = useState<number | null>(null);
   const [entering, setEntering] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const [online, setOnline] = useState<OnlineAnswer | null>(null);
   const [wasVisible, setWasVisible] = useState(visible);
   if (visible !== wasVisible) {
     setWasVisible(visible);
     if (visible) {
       setQuery(initialQuery);
+      setShowAll(false);
+      setOnline(null);
       setAmount(glassShown);
       setKcalTyped(null);
       setEntering(false);
@@ -76,13 +91,29 @@ export function DrinkPickSheet({
   const q = query.trim();
   // A slow search never holds up typing: the list follows a beat behind.
   const localQ = useDeferredValue(q);
-  // Each drink with the search name the query found, when that was not its stored name (a Hebrew name).
-  const rows: { food: Food; matched?: string }[] = useMemo(() => {
-    if (!localQ) return sheetDrinks().map((food) => ({ food }));
-    const hits = searchLocal(localQ, { customFoods, recentFoods: recents, favoriteIds }, 30);
-    const kept = new Set(withoutAlcohol(hits.map((h) => h.food)).map((f) => f.id));
-    return hits.filter((h) => kept.has(h.food.id)).map((h) => ({ food: h.food, matched: h.matched }));
-  }, [localQ, customFoods, recents, favoriteIds]);
+  // The local hits as the search gave them: sheetList keeps the drinks and picks the line for the rest.
+  const local = useMemo(() => (localQ ? searchLocal(localQ, { customFoods, recentFoods: recents, favoriteIds }, 30) : []), [localQ, customFoods, recents, favoriteIds]);
+  const list = sheetList({ query, localQuery: localQ, local, yours, online, onlineAvailable: onlineSearchAvailable, showAll, glassMl, units });
+  const exclude = list.exclude.join('|');
+  useEffect(() => {
+    if (!visible || !list.searchOnline || !onlineSearchAvailable) return;
+    const typed = q;
+    let live = true;
+    const timer = setTimeout(async () => {
+      const r = await searchOnlineWithStatus(typed, { exclude: exclude ? exclude.split('|') : [] });
+      // The sheet closed or the query changed meanwhile: this answer is stale and dropped.
+      if (!live) return;
+      setOnline({ query: typed, status: r.unavailable ? 'unavailable' : r.failed ? 'failed' : 'done', items: r.items });
+    }, 450);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [visible, q, list.searchOnline, exclude]);
+  const changeQuery = (text: string) => {
+    setQuery(text);
+    setShowAll(false);
+  };
   const kcalError = enteredKcalError(kcalTyped);
   const canAdd = !!(amount && amount > 0 && kcalTyped && kcalTyped > 0 && !kcalError);
 
@@ -108,7 +139,7 @@ export function DrinkPickSheet({
           testID="water-pick-search"
           placeholder={width < 340 ? 'Search' : 'Search drinks'}
           value={query}
-          onChangeText={setQuery}
+          onChangeText={changeQuery}
           autoCorrect={false}
           autoCapitalize="none"
           returnKeyType="search"
@@ -116,7 +147,7 @@ export function DrinkPickSheet({
           left={<Search size={18} color={colors.textTertiary} />}
           right={
             query ? (
-              <IconButton testID="water-pick-clear" accessibilityLabel="Clear search" tone="clear" size={32} onPress={() => setQuery('')}>
+              <IconButton testID="water-pick-clear" accessibilityLabel="Clear search" tone="clear" size={32} onPress={() => changeQuery('')}>
                 <X size={16} color={colors.textSecondary} />
               </IconButton>
             ) : null
@@ -162,48 +193,88 @@ export function DrinkPickSheet({
           </View>
         ) : null}
         <Divider />
-        <Text testID="water-pick-hint" variant="caption" color="textSecondary">
-          Tap a drink to choose it, then tap a glass to add it.
-        </Text>
+        {/* With a query the hint goes: the keyboard leaves room for about three rows. */}
+        {list.hint ? (
+          <Text testID="water-pick-hint" variant="caption" color="textSecondary">
+            Tap a drink to choose it, then tap a glass to add it.
+          </Text>
+        ) : null}
         <View>
-          {rows.length === 0 && localQ !== q ? null : rows.length === 0 ? (
-            // Judged only once the list has caught up with the typing: while it lags, nothing, never a false "No drink matches".
-            <Text testID="water-pick-none" variant="body" color="textSecondary" style={{ paddingVertical: spacing.md }}>
-              No drink matches “{isolateRtl(q)}”. Try another word, or enter the calories above.
-            </Text>
-          ) : (
-            rows.map(({ food, matched }, i) => (
-              <View key={food.id}>
-                {i > 0 ? <Divider inset={36} /> : null}
-                <PressableScale
-                  testID={`water-pick-${food.id}`}
-                  onPress={() => onPick(food)}
-                  scaleTo={0.985}
-                  accessibilityLabel={`${food.name}${matched ? `, ${matched}` : ''}, ${pickCaption(food, glassMl, units)}`}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 8 }}>
-                  <View style={{ width: 24, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 17, lineHeight: 24 }}>{food.emoji ?? '🥤'}</Text>
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                    <Text variant="bodyStrong" numberOfLines={2}>
-                      {isolateRtl(food.name)}
-                    </Text>
-                    {/* The name the query found, as on food search (FoodRow): one line under the name. */}
-                    {matched ? (
-                      <Text variant="caption" color="textSecondary" numberOfLines={1} testID={`water-pick-${food.id}-matched`}>
-                        {isolateRtl(matched)}
-                      </Text>
-                    ) : null}
-                    <Text variant="caption" color="textSecondary">
-                      {pickCaption(food, glassMl, units)}
-                    </Text>
-                  </View>
-                </PressableScale>
-              </View>
-            ))
-          )}
+          {list.items.map((item, i) => (
+            <SheetLine key={item.key} item={item} first={i === 0} onPick={onPick} onShowAll={() => setShowAll(true)} />
+          ))}
         </View>
       </View>
     </Sheet>
+  );
+}
+
+/** One item of `sheetList`, drawn as it says: a heading, a drink row, "Show all N" or a line of text. */
+function SheetLine({ item, first, onPick, onShowAll }: { item: SheetItem; first: boolean; onPick: (food: Food) => void; onShowAll: () => void }) {
+  const { spacing } = useTheme();
+  if (item.type === 'heading') {
+    return (
+      <View testID={item.testID} style={{ paddingTop: first ? 0 : spacing.lg, paddingBottom: spacing.xs, gap: 2 }}>
+        <Text variant="label" color="textSecondary">
+          {item.text}
+        </Text>
+        {item.caption ? (
+          <Text variant="caption" color="textSecondary">
+            {item.caption}
+          </Text>
+        ) : null}
+      </View>
+    );
+  }
+  if (item.type === 'message') {
+    return (
+      <Text testID={item.testID} variant="body" color="textSecondary" style={{ paddingVertical: spacing.md }}>
+        {item.text}
+      </Text>
+    );
+  }
+  if (item.type === 'more') {
+    return (
+      <PressableScale
+        testID={item.testID}
+        onPress={onShowAll}
+        scaleTo={0.985}
+        accessibilityRole="button"
+        accessibilityLabel={item.label}
+        style={{ minHeight: 44, justifyContent: 'center' }}>
+        <Text variant="bodyStrong" color="primaryInk">
+          {item.text}
+        </Text>
+      </PressableScale>
+    );
+  }
+  return (
+    <View>
+      {item.divider ? <Divider inset={36} /> : null}
+      <PressableScale
+        testID={item.testID}
+        onPress={() => onPick(item.food)}
+        scaleTo={0.985}
+        accessibilityLabel={item.label}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 8 }}>
+        <View style={{ width: 24, alignItems: 'center' }}>
+          <Text style={{ fontSize: 17, lineHeight: 24 }}>{item.food.emoji ?? '🥤'}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Text variant="bodyStrong" numberOfLines={2}>
+            {item.name}
+          </Text>
+          {/* The name the query found, as on food search (FoodRow): one line under the name. */}
+          {item.matched ? (
+            <Text variant="caption" color="textSecondary" numberOfLines={1} testID={item.matchedTestID}>
+              {item.matched}
+            </Text>
+          ) : null}
+          <Text variant="caption" color="textSecondary">
+            {item.detail}
+          </Text>
+        </View>
+      </PressableScale>
+    </View>
   );
 }

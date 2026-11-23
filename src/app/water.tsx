@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Check, GlassWater, Info, Trash2 } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { isolateRtl } from '@/lib/bidi';
@@ -20,10 +20,14 @@ import { logDrink, removeDrink } from '@/features/food/log';
 import { customFoodIndex, resolveFood } from '@/features/food/usuals';
 import { ENTERED, type DrinkChoice } from '@/features/drinks/choices';
 import { DrinkChoices } from '@/features/drinks/DrinkChoices';
+import { DrinkKindRow } from '@/features/drinks/DrinkKindRow';
 import { DrinkPickSheet } from '@/features/drinks/DrinkPickSheet';
+import { DrinkRecentChips } from '@/features/drinks/DrinkRecentChips';
+import { DrinkTitleRow } from '@/features/drinks/DrinkTitleRow';
+import { pickToast, placePick, yourDrinks } from '@/features/drinks/pick';
 import { loadDrinkMemory, rememberDrinkChoice, useDrinkMemory } from '@/features/drinks/memory';
 import { diaryWaterCaption, diaryWaterOpenLabel, waterDeleteLabel } from '@/features/drinks/diary';
-import { drinkMeal, entryFor, noticeLine, pickedFood, pickedToast, planDrink, rememberedChoice, sameDrinkFoodIds, sameDrinkInDiary, selectChoice, selectFood, waterFromEntry, waterOnlyOffered, waterRowCaption, waterRowTitle } from '@/features/drinks/rules';
+import { drinkMeal, entryFor, noticeLine, pickedFood, planDrink, rememberedChoice, sameDrinkFoodIds, sameDrinkInDiary, selectChoice, selectFood, waterFromEntry, waterOnlyOffered, waterRowCaption, waterRowTitle } from '@/features/drinks/rules';
 import { leftLitreDecimals, shownMl, volumeNumber, volumeUnitFor, waterLeftMl } from '@/features/today/volume';
 import { useTheme } from '@/theme';
 import type { Beverage, Food, WaterEntry } from '@/types';
@@ -33,8 +37,6 @@ import {
   BarChart,
   Button,
   Card,
-  Chip,
-  ChipRow,
   CupKey,
   Divider,
   EmptyState,
@@ -118,8 +120,12 @@ function WaterScreen() {
   const [showAllLog, setShowAllLog] = useState(false);
   // "Water only" (the same drink already in the diary): off by default, off again after each log and on any change.
   const [waterOnly, setWaterOnly] = useState(false);
-  // The drink sheet, open with its first search ("juice" for Other juice).
+  // The drink sheet, open with its first search ("juice" for Other juice), and the kind whose chip opened
+  // it (Juice, Other), or null for the "Search" button: where a pick with no kind of its own goes (placePick).
   const [pickQuery, setPickQuery] = useState<string | null>(null);
+  const [pickFrom, setPickFrom] = useState<Beverage | null>(null);
+  // Raised when a pick moves the screen to another kind: the kind row scrolls that kind into view.
+  const [reveal, setReveal] = useState(0);
   const now = useNow();
   const memory = useDrinkMemory((s) => s.memory);
   const foodEntries = useStore((s) => s.foodEntries);
@@ -138,7 +144,9 @@ function WaterScreen() {
   const glassMl = settings.waterPresets.includes(250) ? 250 : (settings.waterPresets[1] ?? settings.waterPresets[0] ?? 250);
 
   // What the next tap logs for the kind: the choice remembered on this device, else the kind's default (Water: none).
-  const customById = customFoodIndex(customFoods);
+  const customById = useMemo(() => customFoodIndex(customFoods), [customFoods]);
+  // "Your drinks": the person's own drinks from the diary (scans every entry, so kept until they change).
+  const yours = useMemo(() => yourDrinks(foodEntries, customById), [foodEntries, customById]);
   const resolve = (f: Food) => resolveFood(f, customById);
   const selected = rememberedChoice(memory, beverage, resolve);
   const picked = pickedFood(selected, memory, beverage, resolve);
@@ -172,6 +180,23 @@ function WaterScreen() {
   const choosePicked = (food: Food) => {
     rememberDrinkChoice(beverage, selectFood(food));
     setWaterOnly(false);
+  };
+  const openPick = (query: string, from: Beverage | null) => {
+    setPickFrom(from);
+    setPickQuery(query);
+  };
+  // A drink picked in the sheet or from a recent chip: it goes where placePick says (its own kind, the kind
+  // that opened the sheet, or Other), is remembered there, and the toast says where. Nothing is logged:
+  // the line above the glasses now names it, and a glass adds it.
+  const pick = (food: Food, from: Beverage | null) => {
+    const placed = placePick(food, from);
+    if (placed.kind !== 'water' && placed.selected) rememberDrinkChoice(placed.kind, placed.selected);
+    const words = pickToast(food, placed, beverage);
+    setBeverage(placed.kind);
+    setWaterOnly(false);
+    setPickQuery(null);
+    toast(words, { tint: 'water' });
+    setReveal((n) => n + 1);
   };
   const enterCalories = (amountShown: number, kcal: number) => {
     const ml = volumeToMl(amountShown, units);
@@ -310,19 +335,11 @@ function WaterScreen() {
       {/* A one-off acknowledgement; it leaves if intake drops back under the goal. */}
       {celebrate && reached ? <Celebration isToday={isToday} onDone={() => setCelebrate(false)} /> : null}
 
-      <SectionTitle title="Add a drink" action="Edit sizes" onAction={() => setEditing(true)} />
-      <ChipRow>
-        {BEVERAGES.map((b) => (
-          <Chip
-            key={b}
-            testID={`water-beverage-${b}`}
-            label={BEVERAGE_LABELS[b].label}
-            selected={beverage === b}
-            onPress={() => chooseKind(b)}
-          />
-        ))}
-      </ChipRow>
-      {beverage === 'water' ? null : (
+      <DrinkTitleRow onSearch={() => openPick('', null)} onEditSizes={() => setEditing(true)} />
+      <DrinkKindRow kind={beverage} onChoose={chooseKind} reveal={reveal} />
+      {beverage === 'water' ? (
+        <DrinkRecentChips yours={yours} glassMl={glassMl} units={units} onPick={(food) => pick(food, null)} />
+      ) : (
         <DrinkChoices
           kind={beverage}
           selected={selected}
@@ -335,7 +352,7 @@ function WaterScreen() {
           waterOnly={waterOnlyOn}
           onChoose={choose}
           onPicked={choosePicked}
-          onOpenPick={(q) => setPickQuery(q)}
+          onOpenPick={(q) => openPick(q, beverage)}
           onWaterOnly={setWaterOnly}
         />
       )}
@@ -533,12 +550,8 @@ function WaterScreen() {
         initialQuery={pickQuery ?? ''}
         glassMl={glassMl}
         units={units}
-        onPick={(food) => {
-          choosePicked(food);
-          setPickQuery(null);
-          // Choosing logs nothing: the line above the glasses now names it, and a glass adds it.
-          toast(pickedToast(food), { tint: 'water' });
-        }}
+        yours={yours}
+        onPick={(food) => pick(food, pickFrom)}
         onEntered={enterCalories}
         where={mealOnDay(drinkMeal(now), date, todayDate)}
         onClose={() => setPickQuery(null)}

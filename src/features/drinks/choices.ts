@@ -71,7 +71,7 @@ export const PICKED = 'food';
 /** `drink` on a water record whose calories were typed in ("Or enter calories"). */
 export const ENTERED = 'kcal';
 
-/** Kinds whose row ends in a chip that opens the drink sheet, with its words and the search it opens with. */
+/** Kinds whose row ends in a chip that opens the drink sheet, with its words and the search it opens with (not which kinds can hold a pick: `canPick`). */
 export const PICK_CHIP: Partial<Record<Beverage, { label: string; query: string }>> = {
   juice: { label: 'Other juice', query: 'juice' },
   other: { label: 'Choose a drink', query: '' },
@@ -94,7 +94,12 @@ export function choiceById(id: string | undefined | null): DrinkChoice | null {
   return DRINK_CHOICES.find((x) => x.id === id) ?? null;
 }
 
-/** Whether a kind's row offers a picked food (the drink sheet). */
+/**
+ * Whether a kind can hold a picked food (selected, remembered and shown as its own chip,
+ * `water-choice-food`): every kind but Water, since the drink sheet's search (the "Search" button
+ * beside "Add a drink") places a pick under its own kind (`placePick`, ./pick.ts): a mocha under
+ * Coffee, shoko under Milk. `PICK_CHIP` decides only which kinds show a chip that OPENS the sheet.
+ */
 export function canPick(kind: Beverage): boolean {
-  return PICK_CHIP[kind] !== undefined;
+  return kind !== 'water';
 }
