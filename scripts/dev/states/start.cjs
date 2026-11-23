@@ -96,6 +96,11 @@ const settings = [
   { id: 'data-import-profile', route: '/settings/data', taps: [{ choose: 'data-import', files: ['scripts/dev/states/files/start-older-profile.json'] }], sheet: true, note: 'the confirm sheet: use the backup profile or keep mine' },
   { id: 'about-imperial', route: '/settings/about', imperial: true, note: 'about, imperial' },
   { id: 'health-sync-web', route: '/settings/health-sync', note: 'health sync on the web: not available here' },
+  // The terms and the privacy page (src/features/legal): pushed screens, open without a profile (the public pages a payment company and Google link to).
+  { id: 'legal-terms', route: '/legal/terms', waitFor: 'legal-terms-renewal', note: 'the terms: the free plan, Plus, renewal, cancelling and refunds' },
+  { id: 'legal-privacy', route: '/legal/privacy', waitFor: 'legal-privacy-payments', note: 'the privacy page, written from what the app does' },
+  { id: 'legal-terms-fresh', route: '/legal/terms', data: 'fresh', waitFor: 'legal-terms-what', note: 'the terms before setup: the page stays (OPEN_WITHOUT_PROFILE)' },
+  { id: 'legal-privacy-fresh', route: '/legal/privacy', data: 'fresh', waitFor: 'legal-privacy-short', note: 'the privacy page before setup' },
 ];
 
 // ------------------------------------------------------------------ progress
@@ -148,6 +153,16 @@ const backend = [
   { id: 'auth-from-email-expired', route: '/auth?mode=signin&error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired', data: 'fresh', waitFor: 'auth-email-input', note: 'opened from an expired confirmation link' },
   { id: 'auth-forgot', route: '/auth?mode=forgot', data: 'fresh', taps: [{ type: 'auth-email-input', text: EMAIL }], waitFor: 'auth-submit', note: 'forgot password' },
   { id: 'auth-forgot-sent', route: '/auth?mode=forgot', data: 'fresh', taps: [{ type: 'auth-email-input', text: EMAIL }, 'auth-submit', { wait: 1500 }], waitFor: 'auth-done', note: 'reset email sent' },
+  // Continue with Google (the stand-in has Google on: GET /auth/v1/settings says google: true).
+  { id: 'auth-google-welcome', route: '/welcome', data: 'fresh', waitFor: 'welcome-google', note: 'welcome with Google on: Continue with Google as the second option' },
+  { id: 'auth-google-signin', route: '/auth?mode=signin', data: 'fresh', waitFor: 'auth-google', note: 'sign in: Continue with Google above the email form, with the "or" line' },
+  { id: 'auth-google-signup', route: '/auth?mode=signup', data: 'fresh', waitFor: 'auth-google', note: 'create an account: Continue with Google above the email form' },
+  { id: 'auth-google-declined', route: '/auth?mode=google&error=access_denied&error_description=The+user+denied+the+request', data: 'fresh', waitFor: 'auth-google-error', note: 'back from Google after declining: the words under the button' },
+  { id: 'auth-google-unverified', route: '/auth?mode=google&error=access_denied&error_code=provider_email_needs_verification&error_description=Unverified+email+with+google', data: 'fresh', waitFor: 'auth-google-error', note: 'back from Google with an address Google has not confirmed' },
+  // Set up on this device and signing in: the person's own look applies (fresh states show only the first-run looks).
+  { id: 'auth-google-set-up', route: '/auth?mode=signin', waitFor: 'auth-google', note: 'sign in on a device that is set up: Continue with Google in the chosen look' },
+  { id: 'auth-google-set-up-declined', route: '/auth?mode=google&error=access_denied&error_description=The+user+denied+the+request', waitFor: 'auth-google-error', note: 'back from Google after declining, on a device that is set up' },
+  { id: 'auth-google-replayed', route: '/auth?mode=google&code=from-another-browser', data: 'fresh', waitFor: 'auth-google-error', note: 'a Google return opened in a browser that did not start it' },
   { id: 'onb-account-offer', ...F, taps: [...plan('metric'), 'onb-finish'], waitFor: 'onb-account-offer', note: 'after set-up, the account offer (only with accounts)' },
   { id: 'auth-gate-demo', route: '/auth?mode=signin', taps: signIn, note: 'signing in on a device that already holds a diary: the sign-in gate' },
   { id: 'account-signed-out', route: '/settings/account', waitFor: 'account-signin', note: 'account, signed out' },

@@ -42,6 +42,7 @@ function friendly(message: string): string {
   if (m.includes('already registered') || m.includes('already been registered')) return 'An account with this email already exists. Sign in instead.';
   if (m.includes('email not confirmed')) return 'Confirm your email first: open the link we sent you, then sign in.';
   if (m.includes('password') && m.includes('6')) return 'Use a password with at least 8 characters.';
+  if (m.includes('signups not allowed') || m.includes('signup_disabled')) return 'New accounts are paused right now. Try again later.';
   if (m.includes('rate limit')) return 'Too many attempts. Wait a minute and try again.';
   if (m.includes('network') || m.includes('fetch')) return 'No connection. Check your internet and try again.';
   return message;
@@ -170,6 +171,7 @@ export async function updatePassword(password: string): Promise<AuthResult> {
  * (the browser build reads them by itself). Returns true when the link was a
  * recovery link and the session was set.
  */
+// A Google return (mode=google) never comes here: src/features/auth/google.ts exchanges it, once.
 export async function handleAuthLink(url: string | null): Promise<boolean> {
   if (!supabase || !url || !/mode=reset/.test(url)) return false;
   const code = new URLSearchParams(url.split('?')[1]?.split('#')[0] ?? '').get('code');

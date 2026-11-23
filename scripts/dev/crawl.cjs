@@ -43,7 +43,7 @@
  *
  *   node scripts/dev/crawl.cjs [--url=http://localhost:8081] [--out=<dir>]
  *        [--only=<route or state id>[,...]]   one or a few targets (a route is matched by its path)
- *        [--routes-only] [--states-only] [--lists=start,food,move,morning]
+ *        [--routes-only] [--states-only] [--lists=start,food,move,morning,plan]
  *        [--hosted=<page.html>] [--port=8125]  crawl the hosted preview's single page instead: it is
  *                                              served on --port inside a sandboxed iframe (scripts,
  *                                              same origin and forms only), as the preview viewer
@@ -76,7 +76,7 @@ const MAX = Number(flags.max || 60);
 /** Controls of one list (same testID but its last part) tapped per screen. */
 const GROUP_MAX = Number(flags.group || 3);
 const only = flags.only ? String(flags.only).split(',') : null;
-const lists = String(flags.lists || 'start,food,move,morning').split(',').filter(Boolean);
+const lists = String(flags.lists || 'start,food,move,morning,plan').split(',').filter(Boolean);
 
 // ------------------------------------------------------------------ targets
 

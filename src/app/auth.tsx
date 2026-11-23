@@ -1,8 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Eye, EyeOff, KeyRound, Lock, MailCheck, Smartphone, TriangleAlert } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { View, type TextInputInstance } from 'react-native';
+import { ActivityIndicator, Platform, View, type TextInputInstance } from 'react-native';
 
+import { clearGoogleProblem, finishGoogleCode, markReturnScreen, settleWebReturn, useGoogleFlow } from '@/features/auth/google';
+import { GoogleButton, OrLine } from '@/features/auth/GoogleButton';
+import { useGoogleSignIn } from '@/features/auth/useGoogleSignIn';
+import { GOOGLE_WAITING, inboxGoogleHint, googleProblemWords, googleReturnFrom, paramsOfUrl, type GoogleProblem, type GoogleReturn as GoogleArrival } from '@/features/auth/words';
 import { FadeIn } from '@/features/onboarding/components';
 import { SignInGate } from '@/features/onboarding/SignInGate';
 import { breakableEmail } from '@/features/settings/format';
@@ -16,7 +20,7 @@ type Mode = 'signin' | 'signup' | 'forgot';
 
 const COPY: Record<Mode, { title: string; subtitle: string; submit: string }> = {
   signin: { title: 'Welcome back', subtitle: 'Your plan and logs come back on this device.', submit: 'Sign in' },
-  signup: { title: 'Create your account', subtitle: 'Free, and used only to back up and sync.', submit: 'Create account' },
+  signup: { title: 'Create your account', subtitle: 'Free. It backs up and syncs your data.', submit: 'Create account' },
   forgot: { title: 'Reset your password', subtitle: "We'll email you a link to choose a new one.", submit: 'Send reset link' },
 };
 
@@ -42,11 +46,13 @@ export default function Auth() {
   const [arrivedSignedIn, setArrivedSignedIn] = useState(() => !!useAuth.getState().session && params.mode !== 'reset');
   if (!isBackendConfigured) return <NotConfigured />;
   if (params.mode === 'reset') return <ResetPassword />;
+  // Back from Google: the client may have finished the sign-in before this screen first drew, so this comes before `arrivedSignedIn`.
+  if (params.mode === 'google') return <GoogleReturn params={params} />;
   if (arrivedSignedIn) return <SignInGate waitFirst={useAuth.getState().restoring} onCancelled={() => setArrivedSignedIn(false)} />;
   return <AuthForm initial={initial} fromEmail={initial === 'signin' ? fromEmail : null} />;
 }
 
-function AuthForm({ initial, fromEmail }: { initial: Mode; fromEmail: FromEmail }) {
+function AuthForm({ initial, fromEmail, googleError = null }: { initial: Mode; fromEmail: FromEmail; googleError?: string | null }) {
   const { colors, spacing } = useTheme();
   const [mode, setMode] = useState<Mode>(initial);
   const [email, setEmail] = useState('');
@@ -58,6 +64,8 @@ function AuthForm({ initial, fromEmail }: { initial: Mode; fromEmail: FromEmail 
   const [signedIn, setSignedIn] = useState(false);
   const [done, setDone] = useState<null | 'confirm' | 'reset'>(null);
   const passwordRef = useRef<TextInputInstance>(null);
+  // On a phone the Google flow ends here with a session; on the web the page leaves for Google and comes back to /auth?mode=google.
+  const google = useGoogleSignIn({ onSignedIn: () => setSignedIn(true), initialError: googleError });
   // Opened from the confirmation email in the browser that asked for it: the backend client signs in by itself.
   const signedInByLink = useAuth((s) => !!s.session) && !!fromEmail && !signedIn && done === null;
 
@@ -130,6 +138,7 @@ function AuthForm({ initial, fromEmail }: { initial: Mode; fromEmail: FromEmail 
 
   if (done) {
     const confirm = done === 'confirm';
+    const googleHint = inboxGoogleHint(google.shown);
     return (
       <Screen
         testID="auth-done"
@@ -167,6 +176,12 @@ function AuthForm({ initial, fromEmail }: { initial: Mode; fromEmail: FromEmail 
               {confirm ? 'Open it to confirm your email, then sign in here.' : 'Open it on this device to choose a new password.'}
             </Text>
           </View>
+          {/* An address used only with Google gets no mail (a sign-up link or a reset link): the same line for everyone, so it says nothing about the address. */}
+          {googleHint ? (
+            <Text variant="caption" color="textSecondary" align="center" testID="auth-done-google">
+              {googleHint}
+            </Text>
+          ) : null}
         </FadeIn>
       </Screen>
     );
@@ -185,101 +200,121 @@ function AuthForm({ initial, fromEmail }: { initial: Mode; fromEmail: FromEmail 
         </Text>
       </FadeIn>
 
-      <View style={{ gap: spacing.lg }}>
-        <TextField
-          label="Email"
-          testID="auth-email-input"
-          placeholder="you@example.com"
-          value={email}
-          onChangeText={(t) => {
-            setEmail(t);
-            if (fieldErrors.email) setFieldErrors((e) => ({ ...e, email: null }));
-          }}
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="email"
-          keyboardType="email-address"
-          inputMode="email"
-          textContentType={mode === 'signup' ? 'username' : 'emailAddress'}
-          returnKeyType={mode === 'forgot' ? 'send' : 'next'}
-          onSubmitEditing={() => (mode === 'forgot' ? void submit() : passwordRef.current?.focus())}
-          editable={!busy}
-          error={fieldErrors.email}
-        />
-        {mode !== 'forgot' ? (
+      {/*
+        Nothing a person can tap or type in is drawn until this visit knows whether Google is
+        offered (the kept answer, the fresh one, or 1.5 s at most), so the button never pushes the
+        email field down under someone's finger. Only a tap that finds Google switched off changes it.
+      */}
+      {google.ready && google.shown && mode !== 'forgot' ? (
+        // The other way in, above the email form; never the primary (the footer holds that).
+        <View style={{ gap: spacing.lg }}>
           <View style={{ gap: spacing.sm }}>
-            <TextField
-              // TextField forwards unknown props (React 19 passes ref as a prop) to its TextInput.
-              {...({ ref: passwordRef } as object)}
-              label="Password"
-              testID="auth-password-input"
-              placeholder={mode === 'signup' ? 'At least 8 characters' : 'Your password'}
-              value={password}
-              onChangeText={(t) => {
-                setPassword(t);
-                if (fieldErrors.password) setFieldErrors((e) => ({ ...e, password: null }));
-              }}
-              secureTextEntry={!show}
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-              textContentType={mode === 'signup' ? 'newPassword' : 'password'}
-              returnKeyType="go"
-              onSubmitEditing={() => void submit()}
-              editable={!busy}
-              error={fieldErrors.password}
-              hint={mode === 'signup' ? 'A short phrase is easy to remember.' : undefined}
-              right={
-                <IconButton
-                  tone="clear"
-                  size={36}
-                  accessibilityLabel={show ? 'Hide password' : 'Show password'}
-                  testID="auth-password-toggle"
-                  onPress={() => setShow((s) => !s)}>
-                  {show ? <EyeOff size={20} color={colors.textSecondary} /> : <Eye size={20} color={colors.textSecondary} />}
-                </IconButton>
-              }
-            />
-            {/* An error from the server sits right under the fields it is about, not in a box of its own. */}
-            <FormError message={formError} testID="auth-error" />
-            {mode === 'signin' ? (
-              <Text
-                variant="label"
-                color="text"
-                accessibilityRole="button"
-                onPress={() => switchMode('forgot')}
-                testID="auth-forgot"
-                style={{ alignSelf: 'flex-end', paddingVertical: spacing.sm, textDecorationLine: 'underline' }}>
-                Forgot password?
-              </Text>
-            ) : null}
+            <GoogleButton testID="auth-google" onPress={google.press} busy={google.busy} disabled={busy} />
+            <FormError message={google.error} testID="auth-google-error" />
           </View>
-        ) : (
-          <FormError message={formError} testID="auth-error" />
-        )}
-      </View>
-
-      {mode !== 'forgot' ? (
-        // The other way in, below the form: the footer holds the one action.
-        <Button
-          title={mode === 'signin' ? 'New here? Create an account' : 'Already have an account? Sign in'}
-          variant="ghost"
-          size="md"
-          testID="auth-switch-mode"
-          disabled={busy}
-          onPress={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}
-        />
+          <OrLine testID="auth-or" />
+        </View>
+      ) : null}
+      {google.ready && google.notice && mode !== 'forgot' ? (
+        <Text variant="caption" color="textSecondary" accessibilityLiveRegion="polite" testID="auth-google-off">
+          {google.notice}
+        </Text>
       ) : null}
 
-      {mode === 'signup' ? (
-        <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
-          <Lock size={16} color={colors.textTertiary} />
-          <Text variant="caption" color="textTertiary" style={{ flex: 1 }}>
-            {useStore.getState().profile?.onboardedAt
-              ? 'Everything you have logged on this device is uploaded to your new account.'
-              : 'Your data is private to your account. You can export or delete it at any time.'}
-          </Text>
-        </View>
+      {google.ready ? (
+        <>
+          <View style={{ gap: spacing.lg }}>
+            <TextField
+              label="Email"
+              testID="auth-email-input"
+              placeholder="you@example.com"
+              value={email}
+              onChangeText={(t) => {
+                setEmail(t);
+                if (fieldErrors.email) setFieldErrors((e) => ({ ...e, email: null }));
+              }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="email"
+              keyboardType="email-address"
+              inputMode="email"
+              textContentType={mode === 'signup' ? 'username' : 'emailAddress'}
+              returnKeyType={mode === 'forgot' ? 'send' : 'next'}
+              onSubmitEditing={() => (mode === 'forgot' ? void submit() : passwordRef.current?.focus())}
+              editable={!busy}
+              error={fieldErrors.email}
+            />
+            {mode !== 'forgot' ? (
+              <View style={{ gap: spacing.sm }}>
+                <TextField
+                  // TextField forwards unknown props (React 19 passes ref as a prop) to its TextInput.
+                  {...({ ref: passwordRef } as object)}
+                  label="Password"
+                  testID="auth-password-input"
+                  placeholder={mode === 'signup' ? 'At least 8 characters' : 'Your password'}
+                  value={password}
+                  onChangeText={(t) => {
+                    setPassword(t);
+                    if (fieldErrors.password) setFieldErrors((e) => ({ ...e, password: null }));
+                  }}
+                  secureTextEntry={!show}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                  textContentType={mode === 'signup' ? 'newPassword' : 'password'}
+                  returnKeyType="go"
+                  onSubmitEditing={() => void submit()}
+                  editable={!busy}
+                  error={fieldErrors.password}
+                  hint={mode === 'signup' ? 'A short phrase is easy to remember.' : undefined}
+                  right={
+                    <IconButton tone="clear" size={36} accessibilityLabel={show ? 'Hide password' : 'Show password'} testID="auth-password-toggle" onPress={() => setShow((s) => !s)}>
+                      {show ? <EyeOff size={20} color={colors.textSecondary} /> : <Eye size={20} color={colors.textSecondary} />}
+                    </IconButton>
+                  }
+                />
+                {/* An error from the server sits right under the fields it is about, not in a box of its own. */}
+                <FormError message={formError} testID="auth-error" />
+                {mode === 'signin' ? (
+                  <Text
+                    variant="label"
+                    color="text"
+                    accessibilityRole="button"
+                    onPress={() => switchMode('forgot')}
+                    testID="auth-forgot"
+                    style={{ alignSelf: 'flex-end', paddingVertical: spacing.sm, textDecorationLine: 'underline' }}>
+                    Forgot password?
+                  </Text>
+                ) : null}
+              </View>
+            ) : (
+              <FormError message={formError} testID="auth-error" />
+            )}
+          </View>
+
+          {mode !== 'forgot' ? (
+            // The other way in, below the form: the footer holds the one action.
+            <Button
+              title={mode === 'signin' ? 'New here? Create an account' : 'Already have an account? Sign in'}
+              variant="ghost"
+              size="md"
+              testID="auth-switch-mode"
+              disabled={busy}
+              onPress={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}
+            />
+          ) : null}
+
+          {mode === 'signup' ? (
+            <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
+              <Lock size={16} color={colors.textTertiary} />
+              <Text variant="caption" color="textTertiary" style={{ flex: 1 }}>
+                {useStore.getState().profile?.onboardedAt
+                  ? 'Everything you have logged on this device is uploaded to your new account.'
+                  : 'Your data is private to your account. You can export or delete it at any time.'}
+              </Text>
+            </View>
+          ) : null}
+        </>
       ) : null}
     </Screen>
   );
@@ -298,6 +333,63 @@ function FormError({ message, testID }: { message: string | null; testID: string
         {message}
       </Text>
     </View>
+  );
+}
+
+/**
+ * Back from Google at /auth?mode=google: with a code (the sign-in finishes here, then the sign-in
+ * gate), with Google's or Supabase's error (the form, with the words under the Google button), or
+ * with nothing (closed: a toast, then the form). Never says "Email confirmed". On the web the client
+ * exchanged the code as the page loaded and `settleWebReturn` reports it; on a phone the code is
+ * exchanged once (`finishGoogleCode`, single-flight: the browser session, the app's link handler
+ * and this screen may all deliver the same link).
+ */
+function GoogleReturn({ params }: { params: Record<string, string | string[] | undefined> }) {
+  const { colors, spacing } = useTheme();
+  // Read once on arrival, before the client tidies the address (an error may sit in the fragment).
+  const [arrival] = useState<GoogleArrival>(() => {
+    const hash = Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.location?.hash === 'string' ? paramsOfUrl(window.location.hash) : {};
+    return googleReturnFrom({ ...hash, ...params });
+  });
+  const session = useAuth((s) => !!s.session);
+  const status = useGoogleFlow((s) => s.status);
+  const problem = useGoogleFlow((s) => s.problem);
+  const [formAgain, setFormAgain] = useState(false);
+
+  useEffect(() => {
+    markReturnScreen(true);
+    if (arrival.kind === 'code') {
+      if (Platform.OS === 'web') void settleWebReturn();
+      else void finishGoogleCode(arrival.code, arrival.flowId);
+    } else if (arrival.kind === 'none' && status !== 'working' && status !== 'done' && !useAuth.getState().session) {
+      toast(googleProblemWords('cancelled'));
+    }
+    return () => markReturnScreen(false);
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Held once seen: the flow's own state goes back to idle as soon as the form has the words.
+  const [failedWith, setFailedWith] = useState<GoogleProblem | null>(arrival.kind === 'error' ? arrival.problem : null);
+  if (!failedWith && status === 'failed' && problem) setFailedWith(problem);
+  useEffect(() => {
+    if (failedWith) clearGoogleProblem();
+  }, [failedWith]);
+
+  if (formAgain) return <AuthForm initial="signin" fromEmail={null} />;
+  if (failedWith) return <AuthForm initial="signin" fromEmail={null} googleError={failedWith === 'cancelled' ? null : googleProblemWords(failedWith)} />;
+  if (session) return <SignInGate onCancelled={() => setFormAgain(true)} />;
+  if (arrival.kind === 'none' && status !== 'working') return <AuthForm initial="signin" fromEmail={null} />;
+  return (
+    <Screen
+      testID="auth-google-waiting"
+      header={<Header title={GOOGLE_WAITING.title} subtitle={GOOGLE_WAITING.subtitle} onBack={() => goBack('/welcome')} />}
+      contentStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.lg }}>
+      <ActivityIndicator color={colors.primary} />
+      <Text variant="body" color="textSecondary" align="center" accessibilityLiveRegion="polite">
+        {GOOGLE_WAITING.body}
+      </Text>
+    </Screen>
   );
 }
 
@@ -334,7 +426,10 @@ function ResetPassword() {
   if (!recovery) {
     if (!waited) {
       return (
-        <Screen testID="auth-reset-checking" header={<Header title="New password" subtitle="Checking your link" onBack={() => goBack('/welcome')} />} contentStyle={{ flexGrow: 1, justifyContent: 'center' }}>
+        <Screen
+          testID="auth-reset-checking"
+          header={<Header title="New password" subtitle="Checking your link" onBack={() => goBack('/welcome')} />}
+          contentStyle={{ flexGrow: 1, justifyContent: 'center' }}>
           <Text variant="body" color="textSecondary" align="center">
             Checking your reset link...
           </Text>
@@ -465,13 +560,7 @@ function NotConfigured() {
       testID="auth-not-configured"
       header={<Header title="Accounts" subtitle="Not set up in this build" onBack={() => goBack(onboarded ? '/' : '/welcome')} />}
       contentStyle={{ flexGrow: 1, justifyContent: 'center', gap: spacing.xxl }}
-      footer={
-        <Button
-          title={onboarded ? 'Back to today' : 'Set up on this device'}
-          testID="auth-continue-local"
-          onPress={() => router.replace(onboarded ? '/' : '/onboarding')}
-        />
-      }>
+      footer={<Button title={onboarded ? 'Back to today' : 'Set up on this device'} testID="auth-continue-local" onPress={() => router.replace(onboarded ? '/' : '/onboarding')} />}>
       <View style={{ alignItems: 'center' }}>
         <View style={{ width: 80, height: 80, alignItems: 'center', justifyContent: 'center' }}>
           <Smartphone size={40} color={colors.text} strokeWidth={1.6} />

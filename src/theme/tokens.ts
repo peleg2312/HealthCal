@@ -69,7 +69,20 @@ export interface ThemeColors {
   heroEnd: string;
   /** @deprecated No gradients in Pour. Equals `calories`. */
   ringEnd: string;
+  /**
+   * "Continue with Google" only (src/features/auth/GoogleButton.tsx). Google's sign-in button rules fix
+   * its colours, so these three are Google's own values, the one sanctioned exception to the palette:
+   * its Light button (white fill, #747775 edge, #1F1F1F label) on the light papers and its Dark button
+   * (#131314 fill, #8E918F edge, #E3E3E3 label) on Dark and Java. Never use them for anything else.
+   */
+  googleFill: string;
+  googleEdge: string;
+  googleText: string;
 }
+
+/** Google's Light and Dark sign-in button colours (https://developers.google.com/identity/branding-guidelines). */
+const GOOGLE_LIGHT = { googleFill: '#FFFFFF', googleEdge: '#747775', googleText: '#1F1F1F' } as const;
+const GOOGLE_DARK = { googleFill: '#131314', googleEdge: '#8E918F', googleText: '#E3E3E3' } as const;
 
 /** Dark: warm black, not chocolate. The surfaces are neutral; the warmth lives in the cream text and the persimmon accent. */
 export const darkColors: ThemeColors = {
@@ -111,6 +124,7 @@ export const darkColors: ThemeColors = {
   heroStart: '#1F1E1C',
   heroEnd: '#1F1E1C',
   ringEnd: '#FF9466',
+  ...GOOGLE_DARK,
 };
 
 /** Light: oat paper, ink text and level line, a persimmon accent, fresh leaf-green carbs and caramel fat. */
@@ -153,6 +167,7 @@ export const lightColors: ThemeColors = {
   heroStart: '#FFFCF8',
   heroEnd: '#FFFCF8',
   ringEnd: '#E2683F',
+  ...GOOGLE_LIGHT,
 };
 
 /**
@@ -207,6 +222,7 @@ export const blossomColors: ThemeColors = {
   heroStart: '#FFFDFA',
   heroEnd: '#FFFDFA',
   ringEnd: blossom.ticklePink,
+  ...GOOGLE_LIGHT,
 };
 
 /**
@@ -269,6 +285,7 @@ export const butterColors: ThemeColors = {
   heroStart: '#FCF9E6',
   heroEnd: '#FCF9E6',
   ringEnd: '#C4475E',
+  ...GOOGLE_LIGHT,
 };
 
 /**
@@ -335,6 +352,7 @@ export const javaColors: ThemeColors = {
   heroStart: '#31221D',
   heroEnd: '#31221D',
   ringEnd: '#CC4F66',
+  ...GOOGLE_DARK,
 };
 
 /** Every palette by theme name. Look one up with `paletteFor(name)`. */

@@ -13,3 +13,10 @@ verify_jwt = true
 [functions.coach-chat]
 # The function verifies the user's token itself so it can return friendly errors (as analyze-food).
 verify_jwt = false
+
+[functions.billing]
+# Off on purpose, for two reasons. The app's actions: the function verifies the user's token itself
+# (as analyze-food and coach-chat do) so it can answer with friendly errors. The payment provider's
+# webhook (POST /functions/v1/billing/webhook) carries no Supabase token at all: it is verified by the
+# provider's signature over the raw body instead, and refused before the body is read without one.
+verify_jwt = false

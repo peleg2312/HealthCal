@@ -83,7 +83,7 @@ const FRAMES = [
   },
   { n: 6, slug: 'weekly-recap', shot: 'recap', lift: true, head: ['A weekly check-in,', 'no shame'], sub: 'Wins first. Over budget is just information.' },
   { n: 7, slug: 'friends', shot: 'friends', lift: true, head: ['Friends who', 'cheer you on'], sub: 'They see workouts, never food or weight' },
-  { n: 8, slug: 'free', three: true, head: ['Free. No ads.', 'No paywall.'], sub: 'Three looks, full export, your data stays yours' },
+  { n: 8, slug: 'free', three: true, head: ['No ads.', 'Yours to export.'], sub: 'Three looks, full export, your data stays yours' },
 ];
 
 // ------------------------------------------------------------------ captures

@@ -6,6 +6,8 @@
  */
 import type { AiFoodItem, AiFoodResult } from '@/types';
 
+import { limitInfoFrom, type LimitInfo } from './limit';
+
 export interface AnalyzeRequest {
   /** Base64 JPEG without a data: prefix. */
   image?: string;
@@ -42,6 +44,8 @@ export class AiError extends Error {
     /** Whether trying the same thing again soon has a fair chance of working. */
     public retryable: boolean,
     public remaining: number | null = null,
+    /** A limit answer's plan fields (./limit.ts), or null with plans off or from an older server. */
+    public limit: LimitInfo | null = null,
   ) {
     super(message);
     this.name = 'AiError';
@@ -82,8 +86,11 @@ export function errorFromResponse(status: number, body: unknown): AiError {
   const message = typeof b.message === 'string' && b.message.trim() ? b.message.trim().slice(0, 200) : undefined;
   const remaining = typeof b.remaining === 'number' ? b.remaining : null;
   switch (serverCode) {
-    case 'daily_limit':
-      return aiError('daily_limit', message, remaining ?? 0);
+    case 'daily_limit': {
+      const e = aiError('daily_limit', message, remaining ?? 0);
+      e.limit = limitInfoFrom(b);
+      return e;
+    }
     case 'unauthorized':
       // analyze-food answers 403 with this code for a signed-in account whose email is not confirmed yet:
       // signing in again would not help, so say what will.

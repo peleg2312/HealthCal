@@ -1,8 +1,11 @@
 import { Redirect, router } from 'expo-router';
-import { FileUp, HeartHandshake, ShieldCheck, TriangleAlert, Zap } from 'lucide-react-native';
-import React, { useState } from 'react';
+import { FileUp, HeartHandshake, Info, ShieldCheck, TriangleAlert, Zap } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import { returnScreenOpen } from '@/features/auth/google';
+import { GoogleButton } from '@/features/auth/GoogleButton';
+import { useGoogleSignIn } from '@/features/auth/useGoogleSignIn';
 import { ARRIVAL_POUR, CupMark, Note } from '@/features/onboarding/components';
 import { formatNumber } from '@/lib/units';
 import { pickAndImportBackup } from '@/services/export';
@@ -26,12 +29,14 @@ const BURNED = 290;
 const PROMISES = [
   { key: 'honest', Icon: ShieldCheck, title: 'Honest numbers' },
   { key: 'fast', Icon: Zap, title: 'Fast logging' },
-  { key: 'free', Icon: HeartHandshake, title: 'No paywalls, no ads' },
+  { key: 'free', Icon: HeartHandshake, title: 'Free to log, no ads' },
 ];
 
 /** Cup height the labels and the promises beside them need, with the regular and the small type. */
 const NEED = 206;
 const NEED_SMALL = 178;
+/** The shortest cup, with its three labels and no promises beside it (a short screen with a full footer, 320 x 640). */
+const NEED_TINY = 112;
 /** The overline above the cup with its gap, and the extra air under the cup (it sits a little above centre). */
 const OVERLINE = 26;
 const HERO_PAD = 8;
@@ -44,11 +49,14 @@ const HERO_PAD = 8;
  * too short for the small cup scrolls.
  */
 function fitHero(room: number, narrow: boolean, wide: boolean) {
+  // Too short even for the small cup with its promises: a shorter cup with its labels only (the
+  // promises are in its spoken label), so the first view ends above the footer.
+  if (room < NEED_SMALL) return { height: Math.round(Math.max(NEED_TINY, room)), small: true, tiny: true };
   const small = narrow || room < NEED;
   const need = small ? NEED_SMALL : NEED;
   // Up to 40 px of air around the cup, once there is room to spare.
   const air = Math.max(0, Math.min(40, room - NEED));
-  return { height: Math.round(Math.min(wide ? 380 : 340, Math.max(need, room - air))), small };
+  return { height: Math.round(Math.min(wide ? 380 : 340, Math.max(need, room - air))), small, tiny: false };
 }
 
 /**
@@ -58,12 +66,13 @@ function fitHero(room: number, narrow: boolean, wide: boolean) {
  * app promises sits beside the full part of the cup, so cup and words are one
  * block. Shown once per session: coming back here does not pour again.
  */
-function HeroCup({ height, narrow, small }: { height: number; narrow: boolean; small: boolean }) {
+function HeroCup({ height, narrow, small, tiny }: { height: number; narrow: boolean; small: boolean; tiny: boolean }) {
   const { colors, spacing } = useTheme();
-  const width = Math.round(height * (narrow ? 0.32 : 0.4));
-  const big = small ? 44 : 56;
+  // A short cup keeps a usable width.
+  const width = Math.round(Math.max(tiny ? 44 : 0, height * (narrow ? 0.32 : 0.4)));
+  const big = tiny ? 34 : small ? 44 : 56;
   return (
-    <View accessible accessibilityLabel="An example day: a budget of 2,160 kcal including 290 burned by exercise, 1,219 eaten, 941 left. Honest numbers. Fast logging. No paywalls, no ads.">
+    <View accessible accessibilityLabel="An example day: a budget of 2,160 kcal including 290 burned by exercise, 1,219 eaten, 941 left. Honest numbers. Fast logging. Free to log, no ads.">
       <Vessel
         value={EATEN}
         max={BUDGET}
@@ -137,16 +146,18 @@ function HeroCup({ height, narrow, small }: { height: number; narrow: boolean; s
             ),
           },
         ]}>
-        <View style={{ gap: small ? spacing.sm : spacing.md }}>
-          {PROMISES.map((p, i) => (
-            <FadeUp key={p.key} delay={POUR_DELAY + ARRIVAL_POUR / 2} index={i * 2} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-              <p.Icon size={18} color={colors.text} strokeWidth={1.9} />
-              <Text variant={small ? 'label' : 'bodyStrong'} style={{ flex: 1 }}>
-                {p.title}
-              </Text>
-            </FadeUp>
-          ))}
-        </View>
+        {tiny ? null : (
+          <View style={{ gap: small ? spacing.sm : spacing.md }}>
+            {PROMISES.map((p, i) => (
+              <FadeUp key={p.key} delay={POUR_DELAY + ARRIVAL_POUR / 2} index={i * 2} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                <p.Icon size={18} color={colors.text} strokeWidth={1.9} />
+                <Text variant={small ? 'label' : 'bodyStrong'} style={{ flex: 1 }}>
+                  {p.title}
+                </Text>
+              </FadeUp>
+            ))}
+          </View>
+        )}
       </Vessel>
     </View>
   );
@@ -157,15 +168,29 @@ export default function Welcome() {
   const onboarded = useStore((s) => !!s.profile?.onboardedAt);
   const [importing, setImporting] = useState(false);
   const [importNote, setImportNote] = useState<{ tone: 'neutral' | 'warning'; text: string } | null>(null);
-  // Height of the hero's place, known after the first layout; the cup mounts (and pours) once it is.
-  const [room, setRoom] = useState<number | null>(null);
+  // On a phone the Google flow ends with a session: the sign-in screen's waiting view then hands over to the sign-in gate.
+  // (On Android the app's own link may already have opened that screen.) On the web the page leaves for Google.
+  const google = useGoogleSignIn({ onSignedIn: () => !returnScreenOpen() && router.push('/auth?mode=google') });
+  // The actions are drawn once, when this visit knows whether Google is offered (the kept answer, the
+  // fresh one, or 1.5 s at most), so "Continue with Google" never pops in under a finger reaching for
+  // "Get started". Their entrance keeps its place in the sequence when that is known at once.
+  const [actionsAt] = useState(() => (google.ready ? ACTIONS_AT : 0));
+  // Height of the hero's place, measured with the actions in place (`final`); the cup mounts (and pours) once it is.
+  const [room, setRoom] = useState<{ height: number; final: boolean } | null>(null);
+  const ready = google.ready;
+  useEffect(() => {
+    if (!ready) return;
+    // The footer's arrival may leave the hero's height as it was (a page that scrolls): then no new layout comes.
+    const t = setTimeout(() => setRoom((r) => (r && !r.final ? { ...r, final: true } : r)), 120);
+    return () => clearTimeout(t);
+  }, [ready]);
   const window = useWindowDimensions();
   if (onboarded) return <Redirect href="/" />;
 
   const narrow = window.width < 360;
   // The cup takes the room the words and the actions leave, measured, so the whole welcome
   // fits one screen whatever the footer holds.
-  const fit = room === null ? null : fitHero(room - HERO_PAD - OVERLINE, narrow, window.width >= 400);
+  const fit = room === null || !room.final ? null : fitHero(room.height - HERO_PAD - OVERLINE, narrow, window.width >= 400);
 
   const restore = async () => {
     setImporting(true);
@@ -199,21 +224,23 @@ export default function Welcome() {
       enter={false}
       contentStyle={{ flexGrow: 1, gap: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.lg }}
       footer={
-        <FadeUp delay={ACTIONS_AT} style={{ gap: spacing.sm }}>
-          <Button title="Get started" testID="welcome-get-started" onPress={() => router.push('/onboarding')} />
-          {isBackendConfigured ? (
-            <Button title="I already have an account" variant="ghost" testID="welcome-sign-in" onPress={() => router.push('/auth?mode=signin')} />
-          ) : null}
-          <Button
-            title="Restore from a backup file"
-            variant="ghost"
-            size="sm"
-            testID="welcome-restore"
-            loading={importing}
-            icon={<FileUp size={16} color={colors.primaryInk} />}
-            onPress={() => void restore()}
-          />
-        </FadeUp>
+        ready ? (
+          <FadeUp delay={actionsAt} style={{ gap: spacing.sm }}>
+            <Button title="Get started" testID="welcome-get-started" onPress={() => router.push('/onboarding')} />
+            {/* The second option, never the primary: shown only once the backend says Google is on. */}
+            {isBackendConfigured && google.shown ? <GoogleButton testID="welcome-google" onPress={google.press} busy={google.busy} /> : null}
+            {isBackendConfigured ? <Button title="I already have an account" variant="ghost" testID="welcome-sign-in" onPress={() => router.push('/auth?mode=signin')} /> : null}
+            <Button
+              title="Restore from a backup file"
+              variant="ghost"
+              size="sm"
+              testID="welcome-restore"
+              loading={importing}
+              icon={<FileUp size={16} color={colors.primaryInk} />}
+              onPress={() => void restore()}
+            />
+          </FadeUp>
+        ) : undefined
       }>
       <View style={{ gap: spacing.xl }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
@@ -238,15 +265,29 @@ export default function Welcome() {
       {/* The hero's place: everything between the words and the actions. A little more air under the cup than over it. */}
       <View
         testID="welcome-hero"
-        onLayout={(e) => setRoom(Math.round(e.nativeEvent.layout.height))}
-        style={{ flex: 1, minHeight: OVERLINE + NEED_SMALL + HERO_PAD, justifyContent: 'center', paddingBottom: HERO_PAD }}>
+        onLayout={(e) => setRoom({ height: Math.round(e.nativeEvent.layout.height), final: ready })}
+        style={{ flex: 1, minHeight: OVERLINE + NEED_TINY + HERO_PAD, justifyContent: 'center', paddingBottom: HERO_PAD }}>
         {fit ? (
           <View style={{ gap: spacing.md }}>
             <Text variant="overline">An example day</Text>
-            <HeroCup height={fit.height} narrow={narrow} small={fit.small} />
+            <HeroCup height={fit.height} narrow={narrow} small={fit.small} tiny={fit.tiny} />
           </View>
         ) : null}
       </View>
+      {google.notice ? (
+        <Note tone="neutral" testID="welcome-google-off" icon={<Info size={18} color={colors.textSecondary} />}>
+          <Text variant="caption" color="textSecondary" accessibilityLiveRegion="polite">
+            {google.notice}
+          </Text>
+        </Note>
+      ) : null}
+      {google.error ? (
+        <Note tone="warning" testID="welcome-google-error" icon={<TriangleAlert size={18} color={colors.warningInk} />}>
+          <Text variant="caption" color="textSecondary" accessibilityLiveRegion="polite">
+            {google.error}
+          </Text>
+        </Note>
+      ) : null}
       {importNote ? (
         <Note
           tone={importNote.tone}

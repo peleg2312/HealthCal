@@ -10,11 +10,15 @@ import Anthropic from '@anthropic-ai/sdk';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import { AnalyzeError, analyzeFood, costOf, mailboxOf, validateInput } from './analyze.ts';
+import { ENTITLEMENT_COLUMNS, type EntitlementRow, type Limits, limitFields, planConfigFrom, resolveLimits } from './plans.ts';
 
-/** Units per person per day. A fast analysis uses 1, a careful one 5. */
-const DAILY_LIMIT = Number(Deno.env.get('AI_DAILY_LIMIT') ?? '40');
-/** Units per day across every user: a hard ceiling on what the project can spend. */
-const GLOBAL_DAILY_LIMIT = Number(Deno.env.get('AI_GLOBAL_DAILY_LIMIT') ?? '3000');
+/**
+ * Units per person per day (a fast analysis uses 1, a careful one 5) and the project's ceiling come
+ * from plans.ts `limitsFor`: with plans off (PLANS unset, or no known BILLING_PROVIDER), AI_DAILY_LIMIT
+ * (default 40) and AI_GLOBAL_DAILY_LIMIT (default 3000) for every account, as before plans, 0 meaning
+ * none; with plans on, by the caller's plan, a Plus call's ceiling above what free calls can reach.
+ */
+const PLAN_CONFIG = planConfigFrom((name) => Deno.env.get(name));
 
 /** Stable identity for the allowance: survives deleting the account and signing up again. */
 async function identityOf(email: string | undefined, userId: string): Promise<string> {
@@ -67,24 +71,44 @@ Deno.serve(async (req) => {
     const input = validateInput(await req.json().catch(() => null));
     cost = costOf(input);
 
+    const now = new Date();
+    let limits: Limits;
+    try {
+      limits = await resolveLimits({
+        read: async (id) => {
+          const { data, error } = await admin.from('billing_entitlements').select(ENTITLEMENT_COLUMNS).eq('user_id', id);
+          return { rows: (data ?? null) as unknown as EntitlementRow[] | null, error };
+        },
+        userId,
+        createdAt: user.created_at,
+        now,
+        config: PLAN_CONFIG,
+      });
+    } catch {
+      cost = 0;
+      return json(500, { error: 'quota_check_failed', message: 'Could not check your daily allowance.' });
+    }
+
     const { data: left, error: quotaError } = await admin.rpc('bump_ai_usage', {
       p_user: userId,
       p_identity: identity,
       p_cost: cost,
-      p_limit: DAILY_LIMIT,
-      p_global_limit: GLOBAL_DAILY_LIMIT,
+      p_limit: limits.estimates,
+      p_global_limit: limits.estimatesGlobal,
     });
     if (quotaError) {
       cost = 0;
       return json(500, { error: 'quota_check_failed', message: 'Could not check your daily allowance.' });
     }
+    // The units the refused call needed (1 quick, 5 careful), so the app can say a careful pass needs more than is left.
+    const needed = cost;
     if (left === -1) {
       cost = 0;
-      return json(429, { error: 'daily_limit', message: "You have used today's AI analyses. They reset at midnight UTC.", remaining: 0 });
+      return json(429, { error: 'daily_limit', message: "You have used today's AI analyses. They reset at midnight UTC.", remaining: 0, ...limitFields(limits, 'estimates', now, needed) });
     }
     if (left === -2) {
       cost = 0;
-      return json(429, { error: 'daily_limit', message: 'Food analysis has reached its shared limit for today. Search or scan instead, and try again tomorrow.', remaining: 0 });
+      return json(429, { error: 'daily_limit', message: 'Food analysis has reached its shared limit for today. Search or scan instead, and try again tomorrow.', remaining: 0, shared: true, ...limitFields(limits, 'estimates', now, needed) });
     }
 
     const client = new Anthropic({ apiKey });

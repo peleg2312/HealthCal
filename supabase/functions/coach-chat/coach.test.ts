@@ -24,9 +24,11 @@ import {
   cutAtSentence,
   dailyLimitMessage,
   failureResponse,
+  historyFor,
   isAdult,
   mailboxHash,
   mailboxOf,
+  MAX_TURNS,
   MESSAGES,
   modelRequest,
   NOTE_HEADER,
@@ -36,6 +38,7 @@ import {
   SYSTEM_PROMPT,
   takeReferTag,
 } from './coach';
+import { limitFields, limitsFor, planConfigFrom } from './plans';
 
 const err = (fn: () => unknown): CoachError => {
   try {
@@ -147,10 +150,14 @@ describe('checkRequest: every cap, each with its own code', () => {
     expect(checkRequest({ ...ok, message: 'x'.repeat(500) }).message).toHaveLength(500);
     expect(checkRequest({ ...ok, message: 'ש'.repeat(500) }).message).toHaveLength(500);
   });
-  it('history: a list of at most 6 turns', () => {
+  it('history: a list of at most 12 turns (6 pairs; the plan decides how many reach the model)', () => {
+    const pairs = (n: number) => Array.from({ length: n }, (_, i) => pair(`q${i}`, `a${i}`)).flat();
     expect(code({ ...ok, history: 'hi' })).toBe('400 history_invalid');
-    expect(code({ ...ok, history: [...pair('a', 'b'), ...pair('c', 'd'), ...pair('e', 'f'), ...pair('g', 'h')] })).toBe('400 history_too_long');
+    expect(code({ ...ok, history: pairs(7) })).toBe('400 history_too_long');
+    expect(checkRequest({ ...ok, history: pairs(6) }).history).toHaveLength(12);
     expect(checkRequest({ ...ok, history: [...pair('a', 'b'), ...pair('c', 'd'), ...pair('e', 'f')] }).history).toHaveLength(6);
+    expect(MAX_TURNS).toBe(12);
+    expect(MESSAGES.history_too_long).toBe('At most 12 earlier messages can be sent.');
   });
   it('history: each turn a role and a non-empty text', () => {
     expect(code({ ...ok, history: [{ role: 'system', text: 'x' }, { role: 'assistant', text: 'y' }] })).toBe('400 history_invalid');
@@ -489,5 +496,65 @@ describe('every fixed string a person can read', () => {
   });
   it('the limit reads as the specification writes it', () => {
     expect(MESSAGES.daily_limit).toBe('30 questions today. They reset at midnight UTC.');
+  });
+});
+
+// ------------------------------------------------------------- plans (plans.ts copy)
+describe('memory and limit answers by plan', () => {
+  const pairs = (n: number) => Array.from({ length: n }, (_, i) => pair(`q${i}`, `a${i}`)).flat();
+  const config = planConfigFrom(() => undefined);
+  const now = new Date('2026-11-23T15:00:00Z');
+
+  it('the model gets the last 3 pairs on free and while plans are off, the last 6 on Plus', () => {
+    const history = checkRequest({ ...ok, history: pairs(6) }).history;
+    const off = limitsFor({ plan: 'free', plansOn: false, createdAt: null, now, config });
+    const free = limitsFor({ plan: 'free', plansOn: true, createdAt: null, now, config });
+    const plus = limitsFor({ plan: 'plus', plansOn: true, createdAt: null, now, config });
+    expect(historyFor(history, off.memoryPairs).map((t) => t.text)).toEqual(['q3', 'a3', 'q4', 'a4', 'q5', 'a5']);
+    expect(historyFor(history, free.memoryPairs)).toHaveLength(6);
+    expect(historyFor(history, plus.memoryPairs)).toEqual(history);
+    // Fewer pairs than the memory: all of them, in order, and the request still ends with the question.
+    const short = checkRequest({ ...ok, history: pairs(2) }).history;
+    expect(historyFor(short, 3)).toEqual(short);
+    expect(historyFor(short, 0)).toEqual([]);
+    const sent = modelRequest({ ...ok, history: historyFor(history, free.memoryPairs) }, settingsFrom(() => undefined));
+    expect(sent.messages).toHaveLength(7);
+    expect(sent.messages[0]).toEqual({ role: 'user', content: 'q3' });
+  });
+
+  it('a phone that sends 3 pairs, as today, gets exactly what it sent while plans are off', () => {
+    const history = checkRequest({ ...ok, history: pairs(3) }).history;
+    expect(historyFor(history, limitsFor({ plan: 'free', plansOn: false, createdAt: null, now, config }).memoryPairs)).toEqual(history);
+  });
+
+  it('the limit answer keeps its words and adds the limit, the plan and the reset', () => {
+    const off = limitsFor({ plan: 'free', plansOn: false, createdAt: null, now, config });
+    expect(dailyLimitMessage(off.questions)).toBe(MESSAGES.daily_limit);
+    expect(limitFields(off, 'questions', now, 1)).toEqual({ limit: 30, plan: null, plansOn: false, resetsAt: '2026-11-24T00:00:00.000Z', cost: 1 });
+    const free = limitsFor({ plan: 'free', plansOn: true, createdAt: null, now, config });
+    expect(dailyLimitMessage(free.questions)).toBe('5 questions today. They reset at midnight UTC.');
+    expect(limitFields(free, 'questions', now, 1)).toEqual({ limit: 5, plan: 'free', plansOn: true, resetsAt: '2026-11-24T00:00:00.000Z', cost: 1 });
+    const plus = limitsFor({ plan: 'plus', plansOn: true, createdAt: null, now, config });
+    expect(limitFields(plus, 'questions', now, 1)).toMatchObject({ limit: 30, plan: 'plus', cost: 1 });
+    expect(BANNED.test(dailyLimitMessage(free.questions))).toBe(false);
+  });
+
+  it('R9: a Plus question is held to a ceiling above everything free estimates and questions can reach on the shared row', () => {
+    const plus = limitsFor({ plan: 'plus', plansOn: true, createdAt: null, now, config });
+    const free = limitsFor({ plan: 'free', plansOn: true, createdAt: null, now, config });
+    // Free estimates may fill the shared row to 3,000, so the old 1,000 + 500 could block a payer.
+    expect(free.estimatesGlobal).toBe(3000);
+    expect(plus.questionsGlobal).toBe(3500);
+    expect(plus.questionsGlobal).toBeGreaterThan(Math.max(free.estimatesGlobal, free.questionsGlobal));
+  });
+  it('the index sends the refused question its cost of 1 and keeps the plan memory', () => {
+    const src = readFileSync(join(__dirname, 'index.ts'), 'utf8');
+    expect(src).toContain("limitFields(limits, 'questions', now, 1)");
+    expect(src).toContain('history: historyFor(input.history, limits.memoryPairs)');
+  });
+
+  it("the copy of plans.ts here is the billing function's, byte for byte", () => {
+    const here = readFileSync(join(__dirname, 'plans.ts'), 'utf8');
+    expect(here).toBe(readFileSync(join(__dirname, '..', 'billing', 'plans.ts'), 'utf8'));
   });
 });

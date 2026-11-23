@@ -3,6 +3,7 @@ import { Info, SendHorizontal, Trash2 } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Platform, ScrollView, useWindowDimensions, View } from 'react-native';
 
+import { plusLimitOf } from '@/features/ai/limit';
 import { coachAgeAllowed } from '@/features/coach/age';
 import { CoachBubble } from '@/features/coach/CoachBubble';
 import { CoachSheet } from '@/features/coach/CoachSheet';
@@ -19,11 +20,13 @@ import {
 import { ideasAnswer, trainingAnswer } from '@/features/coach/local';
 import { aiAnswerMessage, localAnswerMessage, noticeMessage, questionMessage } from '@/features/coach/messages';
 import { buildCoachNote } from '@/features/coach/note';
+import { questionFor, REPORT_DEMO } from '@/features/coach/report';
 import { buildCoachRequest, CoachError, postCoach, type CoachMessage } from '@/features/coach/request';
 import { coachConnection } from '@/features/coach/send';
 import {
   CHAT_CLEARED,
   CLEAR_CHAT,
+  coachPlansLink,
   COACH_LINE,
   COACH_LINE_SHARING,
   COACH_SUBTITLE,
@@ -39,6 +42,7 @@ import {
   TYPING,
   type CoachNoticeKind,
 } from '@/features/coach/words';
+import { checkoutShown, PLAN_ROUTE, planNow, planVisible, refreshPlanAfterLimit, usePlan } from '@/features/plan';
 import { FitsSheet, useMealIdeas } from '@/features/today/FitsSheet';
 import { today } from '@/lib/dates';
 import { mealForTime } from '@/lib/nutrition';
@@ -60,7 +64,10 @@ import { Card, Chip, Header, IconButton, Screen, Text, TextField, toast } from '
  * label), and the footer with the field and the send button, which rides on the keyboard the way
  * every Screen footer does.
  */
-/** Test-hook builds only (a development build, or EXPO_PUBLIC_E2E): `?consentDemo=1` opens the consent sheet, so a build without accounts can show it. */
+/**
+ * Test-hook builds only (a development build, or EXPO_PUBLIC_E2E): `?consentDemo=1` opens the consent sheet, and
+ * `?reportDemo=1` shows one typed question with an AI answer (never stored), so a build without accounts can show them.
+ */
 const CONSENT_HOOK = (typeof __DEV__ !== 'undefined' && __DEV__) || process.env.EXPO_PUBLIC_E2E === '1';
 
 export default function CoachScreen() {
@@ -74,7 +81,9 @@ export default function CoachScreen() {
   const activities = useLive('activities');
   const owner = useStore((s) => coachOwner(s));
   const history = useCoachHistory();
-  const messages = history.owner === owner ? history.messages : [];
+  const { consentDemo, reportDemo } = useLocalSearchParams<{ consentDemo?: string; reportDemo?: string }>();
+  const stored = history.owner === owner ? history.messages : [];
+  const messages = CONSENT_HOOK && reportDemo === '1' ? [...stored, ...REPORT_DEMO] : stored;
   const share = useCoachConsent((s) => s.share);
   const consent = useCoachConsent((s) => s.consent);
   // "sees your week" only once the coach has been agreed to and sharing is on: before the agreement nothing is sent.
@@ -82,7 +91,7 @@ export default function CoachScreen() {
 
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
-  const { consentDemo } = useLocalSearchParams<{ consentDemo?: string }>();
+  const plan = usePlan();
   const [sheet, setSheet] = useState<'ask' | 'review' | null>(() => (CONSENT_HOOK && consentDemo === '1' ? 'ask' : null));
   const [askShare, setAskShare] = useState(false);
   /** The question waiting for the consent sheet (and the message it already is, when it was sent before). */
@@ -138,7 +147,9 @@ export default function CoachScreen() {
     // The week, only while sharing is on, built now from what the phone holds.
     const note = useCoachConsent.getState().share ? buildCoachNote(useStore.getState(), today(), Platform.OS) : null;
     try {
-      const a = await postCoach(fetch, buildCoachRequest({ message: q, messages: before, note, consentVersion: COACH_CONSENT_VERSION }), connection);
+      // The plan's coach memory (ruling R17): 3 pairs while the plan is not known, 6 on Plus, never more.
+      const pairs = planNow().limits.memoryPairs;
+      const a = await postCoach(fetch, buildCoachRequest({ message: q, messages: before, note, consentVersion: COACH_CONSENT_VERSION, pairs }), connection);
       const reply = aiAnswerMessage(said, a);
       addCoachMessages(reply);
       setAnswerTop(reply.id);
@@ -151,8 +162,12 @@ export default function CoachScreen() {
         setAskShare(false);
         setSheet('ask');
       } else {
-        addCoachMessages(noticeMessage(said, kind));
+        const limit = e instanceof CoachError ? e.limit : null;
+        const n = noticeMessage(said, kind);
+        addCoachMessages(limit && n.source === 'notice' ? { ...n, limit } : n);
         toEnd.current = true;
+        // The server decides the limit: ask it for the plan again, so the link and the memory are current.
+        if (kind === 'daily_limit' || kind === 'shared_limit') void refreshPlanAfterLimit();
       }
     } finally {
       setBusy(false);
@@ -289,6 +304,13 @@ export default function CoachScreen() {
             onFits={i === lastIdeas ? () => setFitsOpen(true) : undefined}
             onRetry={retryFor(m, i)}
             onSignIn={m.source === 'notice' && m.notice === 'account' && i === lastNotice ? () => router.push('/auth?mode=signin' as never) : undefined}
+            onPlans={
+              // One quiet link, on the newest limit notice of the free plan, where the plan is shown at all (R14, R15, R19).
+              m.source === 'notice' && m.notice === 'daily_limit' && m.limit?.plan === 'free' && i === lastNotice && planVisible(plan) && checkoutShown()
+                ? { label: coachPlansLink(plusLimitOf(plan, 'questions')), onPress: () => router.push(PLAN_ROUTE as never) }
+                : undefined
+            }
+            report={m.source === 'ai' ? { index: i, question: questionFor(m, messages) } : undefined}
           />
         ))}
         {busy ? (

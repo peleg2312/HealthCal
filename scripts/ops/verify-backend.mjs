@@ -3,8 +3,12 @@
  * Checks a real HealthCal backend end to end with two throwaway accounts:
  * sign-in, upload and download of records, that one account cannot read or
  * change another's rows, newest-edit-wins, friends (request, accept, what a
- * friend can and cannot see, cheering), both edge functions, and account
- * deletion. Everything it creates is deleted again at the end.
+ * friend can and cannot see, cheering), the edge functions (meal analysis,
+ * product search, the coach, and the plan service with its payment webhook), that
+ * the plan tables cannot be read or written with the public key, that an AI answer
+ * report can be filed for oneself only and never read back, and account deletion.
+ * Everything it creates is deleted again at the end. When plans are on it also warns, without
+ * failing, when the provider offers nothing to buy or no grace for earlier accounts is set.
  *
  *   node scripts/ops/verify-backend.mjs [--require-ai] [--chat] [--config path] [--via-management]
  *
@@ -59,6 +63,12 @@ const results = [];
 const check = (name, ok, detail = '') => {
   results.push({ name, ok: ok === true, skipped: ok === 'skip' });
   console.log(`${ok === 'skip' ? 'SKIP' : ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  (${detail})` : ''}`);
+};
+/** Something the owner should look at that is not a failure of the backend. */
+const warnings = [];
+const warn = (text) => {
+  warnings.push(text);
+  console.log(`WARN  ${text}`);
 };
 const options = { auth: { persistSession: false, autoRefreshToken: false } };
 let admin = SERVICE ? createClient(URL_, SERVICE, options) : null;
@@ -213,6 +223,77 @@ try {
   } else {
     check('the coach answers a question', 'skip', 'run with --chat to ask one real question (a paid call, about $0.0003)');
   }
+
+  // ------------------------------------------------ plans and payments
+  // The plan service refuses anyone without an account, answers the status for an account, and never
+  // lets the public key near the plan tables. Nothing here buys anything or calls a payment provider.
+  const billing = (token, body, path = 'billing', extra = {}) =>
+    fn(path, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: ANON, Authorization: `Bearer ${token}`, ...extra }, body: JSON.stringify(body) });
+  const billingAnon = await billing(ANON, { action: 'status' });
+  check('the plan service refuses a caller without an account', billingAnon.status === 401, billingAnon.status === 404 ? 'status 404: deploy the billing function (provision-supabase.mjs)' : `status ${billingAnon.status}`);
+  const status = await billing(a.token, { action: 'status' });
+  const statusBody = await status.json().catch(() => ({}));
+  const shaped = status.status === 200 && typeof statusBody.plansOn === 'boolean' && typeof statusBody.limits?.estimates === 'number' && Array.isArray(statusBody.offers);
+  check(
+    'the plan service answers the status (plansOn false while PLANS is off)',
+    shaped && (statusBody.plansOn === true || (statusBody.plan === 'free' && statusBody.canCheckout === false && statusBody.offers.length === 0)),
+    shaped ? `plansOn ${statusBody.plansOn}, plan ${statusBody.plan}, ${statusBody.limits.estimates} estimates and ${statusBody.limits.questions} questions a day, ${statusBody.offers.length} offers` : `status ${status.status} ${statusBody.error ?? ''}`,
+  );
+  // Plans on is a decision with consequences: say what is missing (docs/plans-and-payments.md).
+  if (shaped && statusBody.plansOn === true) {
+    if (statusBody.offers.length === 0) {
+      warn('Plans are on but the payment provider offers nothing to buy: free accounts are held to the free numbers with no way to buy Plus. Check the provider\'s product and prices, or set PLANS to off.');
+    }
+    // Plans are on only with a known BILLING_PROVIDER, so a provider is set here. Is there a grace for earlier accounts?
+    let names = null;
+    if (VIA_MANAGEMENT || process.env.SUPABASE_ACCESS_TOKEN) {
+      try {
+        names = new Set(((await management('GET', '/secrets')) || []).map((x) => x.name));
+      } catch {
+        names = null;
+      }
+    }
+    if (names === null) {
+      warn('Plans are on. Could not read the secret names (run with --via-management) to see whether PLANS_GRACE_BEFORE and PLANS_GRACE_UNTIL are set; without them every earlier account dropped to the free numbers when plans went on.');
+    } else if (!(names.has('PLANS_GRACE_BEFORE') && names.has('PLANS_GRACE_UNTIL'))) {
+      warn('Plans are on with a payment provider and no grace for earlier accounts (PLANS_GRACE_BEFORE and PLANS_GRACE_UNTIL are not both set): every account created before plans now has the free numbers.');
+    }
+  }
+  const foreign = await billing(a.token, { action: 'checkout', offerId: 'any', returnUrl: 'https://example.com/' });
+  const foreignBody = await foreign.json().catch(() => ({}));
+  check('a checkout is never made for a return address outside the app', foreign.status >= 400 && !foreignBody.url, `status ${foreign.status} ${foreignBody.error ?? ''}`);
+  const bigBody = await fn('billing', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: ANON, Authorization: `Bearer ${a.token}` }, body: JSON.stringify({ action: 'status', pad: 'x'.repeat(5000) }) });
+  check('the plan service refuses a body over 4 KB', bigBody.status === 413, `status ${bigBody.status}`);
+  // The webhook: no signature, and a wrong one, are refused (401, or 503 while no provider is set).
+  const unsigned = await fn('billing/webhook', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: 'evt_check', type: 'subscription.updated', userId: a.id }) });
+  const forgedHook = await fn('billing/webhook', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'healthcal-test-signature': `t=${Math.floor(Date.now() / 1000)},v1=${'0'.repeat(64)}` },
+    body: JSON.stringify({ id: 'evt_check', type: 'subscription.updated', userId: a.id, state: { source: 'test', state: 'active', periodEnd: '2099-01-01T00:00:00Z', updatedAt: new Date().toISOString() } }),
+  });
+  const refusedHook = (r) => r.status === 401 || r.status === 503;
+  check('the payment webhook refuses a missing or wrong signature', refusedHook(unsigned) && refusedHook(forgedHook), `statuses ${unsigned.status} and ${forgedHook.status}`);
+  const statusAfter = await billing(a.token, { action: 'status' });
+  const afterBody = await statusAfter.json().catch(() => ({}));
+  check('and the forged event changed nothing', statusAfter.status === 200 && afterBody.plan === 'free', `plan ${afterBody.plan ?? statusAfter.status}`);
+  // The tables, with the public key and a signed-in account: no read, no write, own rows included.
+  const readPlan = await a.client.from('billing_entitlements').select('user_id');
+  const readEvents = await a.client.from('billing_events').select('event_id');
+  const writePlan = await a.client.from('billing_entitlements').insert({ user_id: a.id, source: 'test', state: 'active', period_end: '2099-01-01T00:00:00Z', provider_updated_at: new Date().toISOString() });
+  const writeEvent = await a.client.from('billing_events').insert({ provider: 'test', event_id: `evt-${stamp}`, type: 'x' });
+  const grant = await a.client.rpc('billing_put_entitlement', { p_user: a.id, p_row: { source: 'test', state: 'active', period_end: '2099-01-01T00:00:00Z', provider_updated_at: '2099-01-01T00:00:00Z' } });
+  const anonRead = await createClient(URL_, ANON, options).from('billing_entitlements').select('user_id');
+  const noAccess = (r) => !!r.error || (r.data ?? []).length === 0;
+  check(
+    'the plan tables cannot be read or written with the public key',
+    !!readPlan.error && !!readEvents.error && !!writePlan.error && !!writeEvent.error && !!grant.error && noAccess(anonRead),
+    [readPlan, readEvents, writePlan, writeEvent, grant].map((r) => (r.error ? 'refused' : 'ALLOWED')).join(', '),
+  );
+  // "Report this answer": one's own report goes in; someone else's does not; nothing is read back.
+  const report = await a.client.from('ai_reports').insert({ user_id: a.id, kind: 'coach_answer', reason: 'other', answer: 'A check from verify-backend.mjs.' });
+  const reportForged = await a.client.from('ai_reports').insert({ user_id: b.id, kind: 'coach_answer', reason: 'other', answer: 'x' });
+  const reportRead = await a.client.from('ai_reports').select('id');
+  check('an AI answer report is accepted for oneself only and never read back', !report.error && !!reportForged.error && noAccess(reportRead), `own ${report.error ? `refused (${report.error.code})` : 'stored'}, other ${reportForged.error ? 'refused' : 'STORED'}, read ${reportRead.error ? 'refused' : `${reportRead.data?.length} rows`}`);
 } catch (e) {
   check('the run completed', false, e.message);
 } finally {
@@ -235,5 +316,5 @@ try {
 
 const failed = results.filter((r) => !r.ok && !r.skipped).length;
 const skipped = results.filter((r) => r.skipped).length;
-console.log(`\n${results.length - failed - skipped} passed, ${failed} failed, ${skipped} skipped`);
+console.log(`\n${results.length - failed - skipped} passed, ${failed} failed, ${skipped} skipped${warnings.length ? `, ${warnings.length} warning${warnings.length === 1 ? '' : 's'} (WARN above)` : ''}`);
 process.exit(failed ? 1 : 0);

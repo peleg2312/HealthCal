@@ -8,7 +8,10 @@
  * clock orders the pull cursor, and every row belongs to exactly one user.
  * The SQL itself is tested separately by scripts/dev/test-sql.sh.
  *
- *   node scripts/dev/mock-backend.cjs [--port=54321] [--static=<dir> --static-port=8090]
+ *   node scripts/dev/mock-backend.cjs [--port=54321] [--static=<dir> --static-port=8090] [--plans=on]
+ *
+ * Plans are off unless --plans=on or a test turns them on (POST /__billing { plansOn: true }); see
+ * "plans and payments (stand-in)" below for the billing function, its pages and test hooks.
  *
  * With --static it also serves an exported web build with single-page fallback.
  */
@@ -20,7 +23,7 @@ const crypto = require('node:crypto');
 const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith('--')).map((a) => a.slice(2).split('=')));
 const PORT = Number(flags.port || 54321);
 
-const state = { users: new Map(), records: [], profiles: new Map(), aiRequests: [], aiUsage: new Map(), coachRequests: [], coachUsage: new Map(), recoveries: [], social: new Map(), socialLimits: new Map(), friendships: [], declines: [], cheers: [], clock: Date.now() };
+const state = { users: new Map(), records: [], profiles: new Map(), aiRequests: [], aiUsage: new Map(), coachRequests: [], coachUsage: new Map(), recoveries: [], oauthCodes: [], google: { on: true, signupDisabled: false }, social: new Map(), socialLimits: new Map(), friendships: [], declines: [], cheers: [], clock: Date.now() };
 const tick = () => new Date((state.clock += 5)).toISOString();
 
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -34,8 +37,52 @@ function issueSession(user) {
     expires_in: 3600,
     expires_at: exp,
     refresh_token: `refresh-${user.id}`,
-    user: { id: user.id, aud: 'authenticated', role: 'authenticated', email: user.email, email_confirmed_at: now, app_metadata: { provider: 'email' }, user_metadata: {}, created_at: now, updated_at: now },
+    user: publicUser(user, now),
   };
+}
+/** The user as the auth server shows it: how they can sign in (identities) and which way came first (app_metadata.provider). */
+function publicUser(user, now = new Date().toISOString()) {
+  const identities = user.identities || [{ provider: 'email', created_at: now }];
+  return {
+    id: user.id,
+    aud: 'authenticated',
+    role: 'authenticated',
+    email: user.email,
+    email_confirmed_at: now,
+    app_metadata: { provider: identities[0].provider, providers: identities.map((i) => i.provider) },
+    user_metadata: {},
+    identities: identities.map((i) => ({ identity_id: `${user.id}-${i.provider}`, id: i.provider === 'email' ? user.id : `google-${user.email}`, user_id: user.id, provider: i.provider, identity_data: { email: user.email, sub: user.id }, created_at: i.created_at, last_sign_in_at: now, updated_at: now })),
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+// ------------------------------------------------- Google sign-in (stand-in)
+// Stands in for Google and Supabase's /authorize together: a "Choose an account" page whose
+// choices go back to redirect_to with a one-time code (or with Google's error), and the code is
+// exchanged at /auth/v1/token?grant_type=pkce against the challenge this browser sent. A verified
+// address that already has an account is linked to it (one user, two identities), as Supabase does.
+const GOOGLE_NEW = 'new.google.person@example.test';
+const escapeHtml = (v) => String(v).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
+function withParams(target, params) {
+  const u = new URL(target);
+  for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+  return u.toString();
+}
+function chooseAccountPage(query) {
+  const redirectTo = query.get('redirect_to') || '';
+  const pass = new URLSearchParams({ redirect_to: redirectTo, code_challenge: query.get('code_challenge') || '' });
+  const link = (testId, label, extra) => `<a data-testid="${testId}" href="/auth/v1/authorize/choose?${new URLSearchParams({ ...Object.fromEntries(pass), ...extra })}">${escapeHtml(label)}</a>`;
+  const people = [...state.users.values()].map((u) => link(`google-account-${u.email}`, u.email, { email: u.email }));
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Choose an account</title>
+<style>body{font:16px system-ui;margin:24px;max-width:420px}a{display:block;padding:14px;margin:8px 0;border:1px solid #747775;border-radius:6px;color:#1F1F1F;text-decoration:none}</style></head>
+<body><h1 data-testid="google-choose">Choose an account</h1><p>Stand-in for Google (scripts/dev/mock-backend.cjs).</p>
+${people.join('\n')}
+${link('google-account-new', `A new Google account (${GOOGLE_NEW})`, { email: GOOGLE_NEW })}
+${link('google-unverified', 'An address Google has not confirmed', { email: 'unverified.google@example.test', unverified: '1' })}
+${link('google-decline', 'Decline', { decline: '1' })}
+${link('google-cancel', 'Cancel', { cancel: '1' })}
+</body></html>`;
 }
 function userFromRequest(req) {
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
@@ -51,12 +98,15 @@ function send(res, status, body, headers = {}) {
   const data = body === undefined ? '' : JSON.stringify(body);
   res.writeHead(status, { 'Content-Type': 'application/json', ...headers });
   res.end(data);
+  return true;
 }
 const readBody = (req) =>
   new Promise((resolve) => {
     let raw = '';
     req.on('data', (c) => (raw += c));
     req.on('end', () => {
+      // The raw body, for a webhook's signature (signed over the exact bytes).
+      req.rawBody = raw;
       try {
         resolve(raw ? JSON.parse(raw) : {});
       } catch {
@@ -279,6 +329,308 @@ function friendsRpc(route, me, body) {
   }
 }
 
+// ------------------------------------------------------------------ plans and payments (stand-in)
+// The billing function (supabase/functions/billing, contract in docs/plans-and-payments.md) with the
+// test provider: the same actions, answers and refusals, a "Pay" page and a portal page of its own,
+// and webhooks signed with the test provider's fixed secret (testProvider.ts), verified the same way.
+// The limits follow plans.ts `limitsFor`. Plans are OFF by default, so every check written before
+// plans behaves as it did; a test turns them on with POST /__billing { plansOn: true }.
+const BILLING = {
+  secret: 'healthcal-test-webhook-secret-not-for-production',
+  header: 'healthcal-test-signature',
+  offers: [
+    { id: 'test-plus-month', plan: 'plus', period: 'month', amount: 399, currency: 'USD', taxIncluded: false },
+    { id: 'test-plus-year', plan: 'plus', period: 'year', amount: 2999, currency: 'USD', taxIncluded: false },
+  ],
+  limits: { plus: { estimates: 40, questions: 30, memoryPairs: 6 }, free: { estimates: 5, questions: 5, memoryPairs: 3 }, today: { estimates: 40, questions: 30, memoryPairs: 3 } },
+};
+state.billing = {
+  // --plans=on starts with plans on (for the evidence states in scripts/dev/states/limits.cjs).
+  plansOn: flags.plans === 'on',
+  /** The provider answers 502 provider_failed to checkout, portal, refresh and cancel-now. */
+  providerFails: false,
+  /** Deliver the "Pay" page's webhook this long after the redirect (to show the app's waiting state). */
+  webhookDelayMs: 0,
+  rows: new Map(),
+  events: new Set(),
+  sessions: new Map(),
+  releases: [],
+  webhooks: [],
+  /** Accounts whose plan cancel-now ended at the provider (before a delete). */
+  cancels: [],
+  seq: 0,
+};
+state.aiReports = [];
+const ACTIVE_STATES = ['active', 'trialing', 'in_grace', 'canceling', 'past_due'];
+const DAY_MS = 86400000;
+/** plans.ts `activeUntil`: grace, else period end (+ 7 days for a failed renewal with no grace). */
+function activeUntil(row) {
+  const grace = Date.parse(row.graceUntil || '');
+  if (Number.isFinite(grace)) return grace;
+  const end = Date.parse(row.periodEnd || '');
+  return row.state === 'past_due' && Number.isFinite(end) ? end + 7 * DAY_MS : end;
+}
+const rowIsPlus = (row) => !!row && ACTIVE_STATES.includes(row.state) && activeUntil(row) > Date.now();
+const planOfUser = (uid) => (rowIsPlus(state.billing.rows.get(uid)) ? 'plus' : 'free');
+/** plans.ts `limitsFor` (no earlier-account grace in the stand-in). */
+function limitsOfUser(uid) {
+  const plan = planOfUser(uid);
+  if (!state.billing.plansOn) return { plansOn: false, plan, ...BILLING.limits.today };
+  return { plansOn: true, plan, ...BILLING.limits[plan] };
+}
+const nextUtcMidnight = () => {
+  const n = new Date();
+  return new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate() + 1)).toISOString();
+};
+/** The fields every limit answer carries (plans.ts `limitFields`), plus `cost`. */
+const limitFields = (l, feature, cost = 1) => ({ limit: feature === 'estimates' ? l.estimates : l.questions, plan: l.plansOn ? l.plan : null, plansOn: l.plansOn, resetsAt: nextUtcMidnight(), cost });
+function billingStatus(uid) {
+  const row = state.billing.rows.get(uid) || null;
+  const l = limitsOfUser(uid);
+  const late = row && (row.state === 'past_due' || row.state === 'in_grace') && Number.isFinite(activeUntil(row)) ? new Date(activeUntil(row)).toISOString() : null;
+  return {
+    plansOn: l.plansOn,
+    plan: l.plan,
+    state: row ? row.state : 'none',
+    periodEnd: row ? row.periodEnd : null,
+    cancelAtPeriodEnd: row ? !!row.cancelAtPeriodEnd : false,
+    source: row ? row.source : null,
+    period: row ? row.period : null,
+    startedAt: row ? row.startedAt || null : null,
+    graceUntil: null,
+    paymentGraceUntil: late,
+    limits: { estimates: l.estimates, questions: l.questions, memoryPairs: l.memoryPairs },
+    // The configured numbers of both plans, sent with plans off too, so the app's two cards hard-code nothing.
+    planLimits: { free: { ...BILLING.limits.free }, plus: { ...BILLING.limits.plus } },
+    offers: l.plansOn ? BILLING.offers.map((o) => ({ ...o })) : [],
+    canCheckout: l.plansOn && l.plan === 'free',
+    canManage: !!row && !!row.customerId,
+  };
+}
+const BILLING_MESSAGES = {
+  unauthorized: 'Sign in to see your plan.',
+  plans_off: 'Plans are not on.',
+  already_subscribed: 'You already have Plus.',
+  offer_unknown: 'That offer is not available.',
+  return_url_invalid: 'That return address is not allowed.',
+  provider_failed: 'The payment company could not be reached. Nothing changed. Try again in a moment.',
+  nothing_to_manage: 'There is no subscription to manage.',
+  unknown_action: 'Unknown action.',
+  bad_signature: 'The signature could not be verified.',
+};
+const billingRefusal = (res, status, error, extra) => send(res, status, { error, message: BILLING_MESSAGES[error] || error, ...extra });
+const returnUrlOk = (u) => typeof u === 'string' && u.length <= 512 && !/[\s\\]/.test(u) && /^(https:\/\/|healthcal:\/\/|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/)/.test(u) && !/^[a-z]+:\/\/[^/]*@/i.test(u);
+const signWebhook = (raw, at = Date.now()) => {
+  const t = Math.floor(at / 1000);
+  return `t=${t},v1=${crypto.createHmac('sha256', BILLING.secret).update(`${t}.${raw}`).digest('hex')}`;
+};
+function verifyWebhook(raw, header) {
+  const parts = Object.fromEntries(String(header || '').split(',').map((p) => p.split('=').map((x) => x.trim())));
+  const t = Number(parts.t);
+  if (!Number.isInteger(t) || Math.abs(Date.now() / 1000 - t) > 300 || !/^[0-9a-f]{64}$/.test(parts.v1 || '')) return false;
+  const want = crypto.createHmac('sha256', BILLING.secret).update(`${t}.${raw}`).digest();
+  return crypto.timingSafeEqual(want, Buffer.from(parts.v1, 'hex'));
+}
+/** Sends a signed event to this stand-in's own webhook route, over HTTP, as the provider would. */
+async function deliverEvent(event) {
+  const raw = JSON.stringify(event);
+  const r = await fetch(`http://127.0.0.1:${PORT}/functions/v1/billing/webhook`, { method: 'POST', headers: { 'Content-Type': 'application/json', [BILLING.header]: signWebhook(raw) }, body: raw });
+  return r.status;
+}
+const providerState = (uid, patch) => {
+  const cur = state.billing.rows.get(uid) || {};
+  return { source: 'test', customerId: cur.customerId || `cus_${uid}`, subscriptionId: cur.subscriptionId || null, productId: cur.productId || null, period: cur.period || null, state: cur.state || 'active', periodEnd: cur.periodEnd || null, graceUntil: null, cancelAtPeriodEnd: false, environment: 'sandbox', startedAt: cur.startedAt || null, ...patch, updatedAt: new Date().toISOString() };
+};
+const userById = (uid) => [...state.users.values()].find((u) => u.id === uid);
+const page = (title, bodyHtml) =>
+  `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title>
+<style>body{font:16px system-ui;margin:24px;max-width:420px}a{display:block;padding:14px;margin:8px 0;border:1px solid #747775;border-radius:6px;color:#1F1F1F;text-decoration:none}</style></head><body>${bodyHtml}</body></html>`;
+const html = (res, status, text) => {
+  res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8' });
+  res.end(text);
+  return true;
+};
+
+/** The test hooks and the provider's own pages. Answers true when it handled the request. */
+async function billingPages(route, url, body, res) {
+  // Test hook: plans on or off, the provider failing, a slow webhook, a fresh day of AI use. Answers the switches.
+  if (route === 'POST /__billing') {
+    for (const k of ['plansOn', 'providerFails']) if (typeof body[k] === 'boolean') state.billing[k] = body[k];
+    if (typeof body.webhookDelayMs === 'number') state.billing.webhookDelayMs = Math.max(0, Math.min(20000, body.webhookDelayMs));
+    if (body.resetUsage === true) {
+      state.aiUsage.clear();
+      state.coachUsage.clear();
+    }
+    return send(res, 200, { plansOn: state.billing.plansOn, providerFails: state.billing.providerFails, webhookDelayMs: state.billing.webhookDelayMs });
+  }
+  // Test hook: the provider sends a signed event for an account (by email): { email, state, periodEnd?, cancelAtPeriodEnd? }.
+  if (route === 'POST /__billing/event') {
+    const user = state.users.get(String(body.email || '').toLowerCase());
+    if (!user) return send(res, 404, { error: 'no such account' });
+    const patch = {};
+    for (const k of ['state', 'periodEnd', 'graceUntil', 'cancelAtPeriodEnd', 'period']) if (body[k] !== undefined) patch[k] = body[k];
+    const status = await deliverEvent({ id: `evt_hook_${++state.billing.seq}`, type: 'subscription.updated', userId: user.id, state: providerState(user.id, patch) });
+    send(res, 200, { delivered: status });
+    return true;
+  }
+  if (route === 'GET /__checkout') {
+    const s = state.billing.sessions.get(url.searchParams.get('session'));
+    if (!s) return html(res, 404, page('Checkout', '<p>This checkout has ended.</p>'));
+    const offer = BILLING.offers.find((o) => o.id === s.offerId);
+    const q = (extra) => new URLSearchParams({ session: s.id, ...extra });
+    html(
+      res,
+      200,
+      page(
+        'Checkout',
+        `<h1 data-testid="checkout-title">Pay for HealthCal Plus</h1><p>Stand-in payment page (scripts/dev/mock-backend.cjs).</p>
+<p data-testid="checkout-amount">${(offer.amount / 100).toFixed(2)} ${offer.currency} a ${offer.period}</p>
+<a data-testid="checkout-pay" href="/__checkout/done?${q({ pay: '1' })}">Pay</a>
+<a data-testid="checkout-cancel" href="/__checkout/done?${q({})}">Cancel</a>`,
+      ),
+    );
+    return true;
+  }
+  if (route === 'GET /__checkout/done') {
+    const s = state.billing.sessions.get(url.searchParams.get('session'));
+    if (!s) return html(res, 404, page('Checkout', '<p>This checkout has ended.</p>'));
+    state.billing.sessions.delete(s.id);
+    if (url.searchParams.get('pay')) {
+      const offer = BILLING.offers.find((o) => o.id === s.offerId);
+      const now = new Date();
+      const end = new Date(now);
+      if (offer.period === 'year') end.setUTCFullYear(end.getUTCFullYear() + 1);
+      else end.setUTCMonth(end.getUTCMonth() + 1);
+      const event = {
+        id: `evt_${s.id}`,
+        type: 'checkout.paid',
+        userId: s.uid,
+        state: { source: 'test', state: 'active', period: offer.period, periodEnd: end.toISOString(), cancelAtPeriodEnd: false, environment: 'sandbox', updatedAt: now.toISOString(), customerId: `cus_${s.uid}`, subscriptionId: `sub_${s.id}`, productId: offer.id, graceUntil: null, startedAt: now.toISOString() },
+      };
+      if (state.billing.webhookDelayMs > 0) setTimeout(() => void deliverEvent(event), state.billing.webhookDelayMs);
+      else await deliverEvent(event);
+    }
+    // A closed or cancelled checkout comes back as the browser's Back would: the plan page, with no checkout=done.
+    const back = url.searchParams.get('pay') ? s.returnUrl : s.returnUrl.replace(/[?&]checkout=done\b/, '');
+    res.writeHead(302, { Location: back }).end();
+    return true;
+  }
+  if (route === 'GET /__portal') {
+    const uid = url.searchParams.get('user');
+    const row = state.billing.rows.get(uid);
+    const back = url.searchParams.get('return') || '';
+    const q = (extra) => new URLSearchParams({ user: uid || '', return: back, ...extra });
+    html(
+      res,
+      200,
+      page(
+        'Your subscription',
+        `<h1 data-testid="portal-title">Your subscription</h1><p>Stand-in customer portal (scripts/dev/mock-backend.cjs).</p>
+<p data-testid="portal-state">${escapeHtml(row ? `${row.state}, ${row.period}, until ${row.periodEnd}` : 'none')}</p>
+<a data-testid="portal-cancel" href="/__portal/act?${q({ act: 'cancel' })}">Cancel at period end</a>
+<a data-testid="portal-back" href="/__portal/act?${q({})}">Back to HealthCal</a>`,
+      ),
+    );
+    return true;
+  }
+  if (route === 'GET /__portal/act') {
+    const uid = url.searchParams.get('user');
+    if (url.searchParams.get('act') === 'cancel' && state.billing.rows.get(uid)) {
+      await deliverEvent({ id: `evt_portal_${++state.billing.seq}`, type: 'subscription.canceled', userId: uid, state: providerState(uid, { state: 'canceling', cancelAtPeriodEnd: true }) });
+    }
+    res.writeHead(302, { Location: url.searchParams.get('return') || '/' }).end();
+    return true;
+  }
+  return false;
+}
+
+/** POST /functions/v1/billing and its webhook. Answers true when it handled the request. */
+async function billingFunction(route, req, url, body, rawBody, uid, res) {
+  if (route === 'POST /functions/v1/billing/webhook') {
+    if (!req.headers[BILLING.header]) return billingRefusal(res, 401, 'bad_signature');
+    if (!verifyWebhook(rawBody, req.headers[BILLING.header])) return billingRefusal(res, 401, 'bad_signature');
+    const ev = body;
+    state.billing.webhooks.push({ id: ev.id, type: ev.type, userId: ev.userId, state: ev.state && ev.state.state });
+    if (!ev.userId || !userById(ev.userId)) return send(res, 200, { received: true, ignored: 'unknown_person' });
+    if (state.billing.events.has(ev.id)) return send(res, 200, { received: true, duplicate: true });
+    state.billing.events.add(ev.id);
+    if (ev.state && typeof ev.state === 'object') {
+      const prev = state.billing.rows.get(ev.userId);
+      state.billing.rows.set(ev.userId, { ...ev.state, startedAt: ev.state.startedAt || (prev && prev.startedAt) || null });
+    }
+    send(res, 200, { received: true });
+    return true;
+  }
+  if (route !== 'POST /functions/v1/billing') return false;
+  if (!uid) return billingRefusal(res, 401, 'unauthorized');
+  const action = body.action || 'status';
+  const fails = () => billingRefusal(res, 502, 'provider_failed');
+  switch (action) {
+    case 'status':
+      return send(res, 200, billingStatus(uid));
+    case 'refresh':
+      if (state.billing.providerFails) return fails();
+      return send(res, 200, billingStatus(uid));
+    case 'checkout': {
+      if (!state.billing.plansOn) return billingRefusal(res, 409, 'plans_off');
+      if (planOfUser(uid) === 'plus') return billingRefusal(res, 409, 'already_subscribed');
+      if (!BILLING.offers.some((o) => o.id === body.offerId)) return billingRefusal(res, 400, 'offer_unknown');
+      if (!returnUrlOk(body.returnUrl)) return billingRefusal(res, 400, 'return_url_invalid');
+      if (state.billing.providerFails) return fails();
+      const id = `s${++state.billing.seq}`;
+      state.billing.sessions.set(id, { id, uid, offerId: body.offerId, returnUrl: body.returnUrl });
+      return send(res, 200, { url: `http://localhost:${PORT}/__checkout?session=${id}` });
+    }
+    case 'portal': {
+      if (!returnUrlOk(body.returnUrl)) return billingRefusal(res, 400, 'return_url_invalid');
+      const row = state.billing.rows.get(uid);
+      if (!row || !row.customerId) return billingRefusal(res, 404, 'nothing_to_manage');
+      if (state.billing.providerFails) return fails();
+      return send(res, 200, { url: `http://localhost:${PORT}/__portal?${new URLSearchParams({ user: uid, return: body.returnUrl })}` });
+    }
+    case 'cancel-now': {
+      const row = state.billing.rows.get(uid);
+      const open = row && row.state !== 'expired' && row.state !== 'revoked';
+      if (!open) return send(res, 200, { cancelled: true, released: true, ended: false, customerRemoved: null });
+      if (state.billing.providerFails) {
+        if (body.force !== true) return fails();
+        // R4: released on our side, with a tombstone, so the account can go; the app says to cancel at the payment company.
+        state.billing.rows.set(uid, { ...row, state: 'revoked', cancelAtPeriodEnd: false });
+        state.billing.releases.push({ kind: 'released', customerId: row.customerId, subscriptionId: row.subscriptionId, userId: uid });
+        return send(res, 200, { cancelled: false, released: true, ended: false, customerRemoved: null });
+      }
+      state.billing.rows.set(uid, { ...row, state: 'expired', cancelAtPeriodEnd: false, updatedAt: new Date().toISOString() });
+      state.billing.cancels.push(userById(uid)?.email || uid);
+      return send(res, 200, { cancelled: true, released: true, ended: true, customerRemoved: true });
+    }
+    default:
+      return billingRefusal(res, 400, 'unknown_action');
+  }
+}
+
+/** The ai_reports table through PostgREST: insert only (no select), the caller's own rows, 20 a day. */
+function aiReportsTable(route, url, req, body, uid, res) {
+  if (url.pathname !== '/rest/v1/ai_reports') return false;
+  if (route !== 'POST /rest/v1/ai_reports' || url.searchParams.has('select') || /return=representation/.test(String(req.headers.prefer || ''))) {
+    send(res, 401, { code: '42501', message: 'permission denied for table ai_reports' });
+    return true;
+  }
+  const rows = Array.isArray(body) ? body : [body];
+  for (const r of rows) {
+    const userId = r.user_id === undefined ? uid : r.user_id;
+    if (userId !== uid) return send(res, 403, { code: '42501', message: 'new row violates row-level security policy for table "ai_reports"' });
+    const okText = (v, max) => typeof v === 'string' && v.length >= 1 && v.length <= max;
+    if (!['coach_answer', 'food_estimate'].includes(r.kind) || !['unsafe', 'wrong', 'offensive', 'off_topic', 'other'].includes(r.reason) || !okText(r.answer, 2000) || (r.question !== undefined && r.question !== null && !okText(r.question, 500))) {
+      return send(res, 400, { code: '23514', message: 'new row for relation "ai_reports" violates check constraint' });
+    }
+    const day = state.aiReports.filter((x) => x.user_id === uid && Date.now() - Date.parse(x.created_at) < DAY_MS).length;
+    if (day >= 20) return send(res, 400, { code: 'P0001', message: 'report_limit', details: null, hint: null });
+    state.aiReports.push({ id: crypto.randomUUID(), user_id: uid, kind: r.kind, reason: r.reason, answer: r.answer, ...(r.question ? { question: r.question } : {}), created_at: new Date().toISOString() });
+  }
+  res.writeHead(201).end();
+  return true;
+}
+
 const api = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
@@ -293,7 +645,10 @@ const api = http.createServer(async (req, res) => {
   // ------------------------------------------------------------- test hooks
   if (route === 'GET /__state') {
     return send(res, 200, {
-      users: [...state.users.values()].map((u) => ({ id: u.id, email: u.email })),
+      // identities: how each person can sign in ('email', 'google'); one user with both is a linked account.
+      users: [...state.users.values()].map((u) => ({ id: u.id, email: u.email, identities: (u.identities || [{ provider: 'email' }]).map((i) => i.provider) })),
+      // Google codes handed out and not yet exchanged.
+      oauthCodes: state.oauthCodes.map((c) => ({ email: c.email, code: c.code, redirectTo: c.redirectTo })),
       records: state.records,
       profiles: Object.fromEntries(state.profiles),
       aiRequests: state.aiRequests,
@@ -305,23 +660,49 @@ const api = http.createServer(async (req, res) => {
       friendships: state.friendships,
       declines: state.declines,
       cheers: state.cheers,
+      // Plans: the switches, each account's entitlement row (by email), the webhooks received, and the AI reports.
+      billing: {
+        plansOn: state.billing.plansOn,
+        providerFails: state.billing.providerFails,
+        rows: Object.fromEntries([...state.billing.rows].map(([id, row]) => [userById(id)?.email || id, row])),
+        webhooks: state.billing.webhooks,
+        releases: state.billing.releases,
+        cancels: state.billing.cancels,
+      },
+      aiReports: state.aiReports,
     });
   }
+  if (await billingPages(route, url, body, res)) return;
 
   // ------------------------------------------------------------------- auth
   if (route === 'POST /auth/v1/signup') {
     const email = String(body.email || '').toLowerCase();
     if (state.users.has(email)) return send(res, 422, { code: 422, error_code: 'user_already_exists', msg: 'User already registered' });
     if (String(body.password || '').length < 6) return send(res, 422, { code: 422, error_code: 'weak_password', msg: 'Password should be at least 6 characters.' });
-    const user = { id: crypto.randomUUID(), email, password: body.password };
+    const user = { id: crypto.randomUUID(), email, password: body.password, identities: [{ provider: 'email', created_at: new Date().toISOString() }] };
     state.users.set(email, user);
     return send(res, 200, issueSession(user));
   }
   if (route === 'POST /auth/v1/token') {
     if (url.searchParams.get('grant_type') === 'pkce') {
+      const challenge = crypto.createHash('sha256').update(String(body.code_verifier || '')).digest('base64url');
+      // A Google code: one use, only with the secret of the browser or phone that started the sign-in.
+      const oauth = state.oauthCodes.find((c) => c.code === body.auth_code);
+      if (oauth) {
+        state.oauthCodes = state.oauthCodes.filter((c) => c !== oauth);
+        if (oauth.challenge !== challenge) return send(res, 400, { code: 400, error_code: 'bad_code_verifier', msg: 'code challenge does not match previously saved code verifier' });
+        const now = new Date().toISOString();
+        let user = state.users.get(oauth.email);
+        if (!user) {
+          user = { id: crypto.randomUUID(), email: oauth.email, password: null, identities: [{ provider: 'google', created_at: now }] };
+          state.users.set(oauth.email, user);
+        } else if (!(user.identities || []).some((i) => i.provider === 'google')) {
+          user.identities = [...(user.identities || [{ provider: 'email', created_at: now }]), { provider: 'google', created_at: now }];
+        }
+        return send(res, 200, issueSession(user));
+      }
       // The emailed code only works with the secret kept by the browser that asked for it.
       const rec = state.recoveries.find((r) => r.code === body.auth_code);
-      const challenge = crypto.createHash('sha256').update(String(body.code_verifier || '')).digest('base64url');
       if (!rec || rec.challenge !== challenge) return send(res, 400, { code: 400, error_code: 'bad_code_verifier', msg: 'code challenge does not match previously saved code verifier' });
       state.recoveries = state.recoveries.filter((r) => r !== rec);
       const user = state.users.get(rec.email);
@@ -339,6 +720,36 @@ const api = http.createServer(async (req, res) => {
     const uid = userFromRequest(req);
     const user = [...state.users.values()].find((u) => u.id === uid);
     return user ? send(res, 200, issueSession(user).user) : send(res, 401, { code: 401, msg: 'invalid JWT' });
+  }
+  // Public settings, as GET /auth/v1/settings answers on Supabase: the app shows "Continue with Google" only when google is true.
+  if (route === 'GET /auth/v1/settings') {
+    return send(res, 200, { external: { email: true, phone: false, google: state.google.on, apple: false }, disable_signup: state.google.signupDisabled, mailer_autoconfirm: true, phone_autoconfirm: false });
+  }
+  if (route === 'GET /auth/v1/authorize') {
+    if (url.searchParams.get('provider') !== 'google' || !state.google.on) return send(res, 400, { code: 400, error_code: 'validation_failed', msg: 'Unsupported provider: provider is not enabled' });
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    return res.end(chooseAccountPage(url.searchParams));
+  }
+  if (route === 'GET /auth/v1/authorize/choose') {
+    const q = url.searchParams;
+    const target = q.get('redirect_to');
+    if (!target) return send(res, 400, { code: 400, msg: 'redirect_to is missing' });
+    const back = (params) => res.writeHead(302, { Location: withParams(target, params) }).end();
+    // Closing the page: the person comes back with nothing, as with the Back button.
+    if (q.get('cancel')) return back({});
+    if (q.get('decline')) return back({ error: 'access_denied', error_code: 'access_denied', error_description: 'The user denied the request' });
+    if (q.get('unverified')) return back({ error: 'access_denied', error_code: 'provider_email_needs_verification', error_description: 'Unverified email with google. A confirmation email has been sent to your google email' });
+    const email = String(q.get('email') || '').toLowerCase();
+    if (!state.users.has(email) && state.google.signupDisabled) return back({ error: 'access_denied', error_code: 'signup_disabled', error_description: 'Signups not allowed for this instance' });
+    const code = crypto.randomUUID();
+    state.oauthCodes.push({ code, email, challenge: q.get('code_challenge') || null, redirectTo: target });
+    return back({ code });
+  }
+  // Test hook: Google on or off, and new accounts paused.
+  if (route === 'POST /__google') {
+    if (typeof body.on === 'boolean') state.google.on = body.on;
+    if (typeof body.signupDisabled === 'boolean') state.google.signupDisabled = body.signupDisabled;
+    return send(res, 200, state.google);
   }
   if (route === 'POST /auth/v1/logout') return res.writeHead(204).end();
   if (route === 'POST /auth/v1/recover') {
@@ -364,6 +775,7 @@ const api = http.createServer(async (req, res) => {
   const uid = userFromRequest(req);
   if (url.pathname.startsWith('/rest/v1/')) {
     if (!uid) return send(res, 401, { message: 'JWT missing or invalid', code: 'PGRST301' });
+    if (aiReportsTable(route, url, req, body, uid, res)) return;
 
     if (route === 'POST /rest/v1/rpc/push_records') {
       // The database's check constraint: an unknown collection fails the whole batch.
@@ -399,6 +811,11 @@ const api = http.createServer(async (req, res) => {
     const social = friendsRpc(route, uid, body);
     if (social !== undefined) return social && social.__error ? send(res, social.__error.status, social.__error.body) : send(res, 200, social);
     if (route === 'POST /rest/v1/rpc/delete_my_account') {
+      // As the migration: refused while the person holds a plan row that is not expired or revoked (ruling R5).
+      const row = state.billing.rows.get(uid);
+      if (row && row.state !== 'expired' && row.state !== 'revoked') return send(res, 400, { code: 'P0001', message: 'plan_active', details: null, hint: null });
+      state.billing.rows.delete(uid);
+      state.aiReports = state.aiReports.filter((r) => r.user_id !== uid);
       state.records = state.records.filter((r) => r.user_id !== uid);
       state.profiles.delete(uid);
       forgetSocial(uid);
@@ -434,13 +851,21 @@ const api = http.createServer(async (req, res) => {
   }
 
   // -------------------------------------------------------- edge functions
+  if (await billingFunction(route, req, url, body, req.rawBody || '', uid, res)) return;
   if (route === 'POST /functions/v1/analyze-food') {
     if (!uid) return send(res, 401, { error: 'unauthorized', message: 'Sign in to analyse food.' });
-    // As on the real function: a careful analysis uses five units of the daily allowance.
-    const used = (state.aiUsage.get(uid) || 0) + (body.precise === true ? 5 : 1);
-    const LIMIT = 40;
+    // As on the real function: a careful analysis uses five units of the daily allowance, and the
+    // allowance is the plan's (plans.ts `limitsFor`: 40 for everyone while plans are off, else 5 free and 40 Plus).
+    const cost = body.precise === true ? 5 : 1;
+    const used = (state.aiUsage.get(uid) || 0) + cost;
+    const lim = limitsOfUser(uid);
+    const LIMIT = lim.estimates;
     state.aiRequests.push({ user: uid, hasImage: typeof body.image === 'string' && body.image.length > 0, imageChars: (body.image || '').length, mediaType: body.mediaType ?? null, text: body.text ?? null, precise: body.precise === true });
-    if (/daily limit/i.test(body.text || '')) return send(res, 429, { error: 'daily_limit', message: `You have used today's ${LIMIT} AI analyses. They reset at midnight UTC.`, remaining: 0 });
+    if (/shared limit/i.test(body.text || '')) return send(res, 429, { error: 'daily_limit', message: 'Food analysis has reached its shared limit for today. Search or scan instead, and try again tomorrow.', remaining: 0, shared: true, ...limitFields(lim, 'estimates', cost) });
+    if (/daily limit/i.test(body.text || '') || used > LIMIT) {
+      const message = lim.plansOn ? "You have used today's AI analyses. They reset at midnight UTC." : `You have used today's ${LIMIT} AI analyses. They reset at midnight UTC.`;
+      return send(res, 429, { error: 'daily_limit', message, remaining: 0, ...limitFields(lim, 'estimates', cost) });
+    }
     if (!body.image && !body.text) return send(res, 400, { error: 'bad_request', message: 'Send a photo, a description, or both.' });
     state.aiUsage.set(uid, used);
     return send(res, 200, {
@@ -464,14 +889,16 @@ const api = http.createServer(async (req, res) => {
      *   - the account's email starts with "unconfirmed" (sign up as unconfirmed-...@...): 403 unconfirmed;
      *   - the profile pushed for the account has a birthDate under 18 or not a valid date: 403 under_18
      *     (no profile, or a profile with no data, is allowed, as on the real function);
-     *   - the 31st question of a run for one account, or a message containing "daily limit": 429 daily_limit;
+     *   - the question past the plan's daily number (30 while plans are off, 5 free, 30 Plus), or a message containing
+     *     "daily limit": 429 daily_limit, with the plan fields (limit, plan, plansOn, resetsAt);
      *   - "shared limit": 429 shared_limit;   "busy now": 503 busy;   "too slow": 504 timeout;
      *   - "server error": 502 upstream;   "please decline": 422 declined;
      *   - "cut short": 200 with truncated: true;   "refer me": 200 with refer: true;
      *   - anything else: 200 with a fixed answer naming what was received (Hebrew when the question starts with a Hebrew letter).
      * Every request is kept in state.coachRequests (GET /__state), with its body exactly as received.
      */
-    const COACH_LIMIT = 30;
+    const lim = limitsOfUser(uid);
+    const COACH_LIMIT = lim.questions;
     const user = [...state.users.values()].find((u) => u.id === uid);
     const entry = { user: uid, at: new Date().toISOString(), apikey: !!req.headers.apikey, body, status: 0, error: null };
     state.coachRequests.push(entry);
@@ -490,7 +917,7 @@ const api = http.createServer(async (req, res) => {
       message_empty: 'Type a question first.',
       message_too_long: 'A question can be up to 500 characters.',
       history_invalid: 'The earlier messages could not be read.',
-      history_too_long: 'At most 6 earlier messages can be sent.',
+      history_too_long: 'At most 12 earlier messages can be sent.',
       history_order: 'Earlier messages must be whole question and answer pairs, question first.',
       history_turn_too_long: 'Each earlier message can be up to 1200 characters.',
       note_invalid: 'The summary of your week holds characters that cannot be sent.',
@@ -513,7 +940,7 @@ const api = http.createServer(async (req, res) => {
     if (body.message.length > 500) return refuse(400, 'message_too_long');
     const history = body.history === undefined ? [] : body.history;
     if (!Array.isArray(history)) return refuse(400, 'history_invalid');
-    if (history.length > 6) return refuse(400, 'history_too_long');
+    if (history.length > 12) return refuse(400, 'history_too_long');
     if (history.some((t) => !t || (t.role !== 'user' && t.role !== 'assistant') || typeof t.text !== 'string' || !t.text.trim())) return refuse(400, 'history_invalid');
     if (history.some((t) => t.text.length > 1200)) return refuse(400, 'history_turn_too_long');
     if (history.length % 2 || history.some((t, i) => t.role !== (i % 2 ? 'assistant' : 'user'))) return refuse(400, 'history_order');
@@ -533,8 +960,8 @@ const api = http.createServer(async (req, res) => {
       if (!adult) return refuse(403, 'under_18');
     }
     const used = state.coachUsage.get(uid) || 0;
-    if (used >= COACH_LIMIT || /daily limit/i.test(message)) return refuse(429, 'daily_limit', { remaining: 0 });
-    if (/shared limit/i.test(message)) return refuse(429, 'shared_limit', { remaining: 0 });
+    if (used >= COACH_LIMIT || /daily limit/i.test(message)) return refuse(429, 'daily_limit', { remaining: 0, ...limitFields(lim, 'questions') });
+    if (/shared limit/i.test(message)) return refuse(429, 'shared_limit', { remaining: 0, ...limitFields(lim, 'questions') });
     const left = COACH_LIMIT - used;
     // As on the real function: a busy model, a timeout or a server error gives the unit back.
     if (/busy now/i.test(message)) return refuse(503, 'busy', { remaining: left });

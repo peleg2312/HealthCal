@@ -20,13 +20,13 @@ const ROUTES = [
   '/food/custom', '/food/meals?meal=lunch', '/food/meal-edit', '/food/meal-pick',
   '/activity/pick', '/activity/log?activityId=running', '/activity/strength', '/activity/import',
   '/water', '/weight', '/body', '/sleep', '/fasting',
-  '/profile', '/settings/goals', '/settings/reminders', '/settings/account', '/settings/data', '/settings/about', '/settings/health-sync',
+  '/profile', '/settings/goals', '/settings/reminders', '/settings/account', '/settings/data', '/settings/about', '/settings/health-sync', '/settings/plan', '/legal/terms', '/legal/privacy',
   '/morning', '/morning?first=1', '/coach',
   '/recap', '/consistency', '/friends', '/friends/add?invite=ABCD2345', '/friends/add?code=ABCD2345', '/no-such-page',
 ];
 
 /** Without a profile only these may stay where they are; everything else must end on /welcome. */
-const OPEN_WITHOUT_PROFILE = ['/welcome', '/auth', '/onboarding', '/friends/add', '/settings/data', '/settings/about', '/no-such-page'];
+const OPEN_WITHOUT_PROFILE = ['/welcome', '/auth', '/onboarding', '/friends/add', '/settings/data', '/settings/about', '/legal/terms', '/legal/privacy', '/no-such-page'];
 
 (async () => {
   const { buildSeed } = await import('./seed.mjs');

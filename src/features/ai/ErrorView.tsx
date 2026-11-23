@@ -76,22 +76,43 @@ export interface ErrorAction {
   onPress: () => void;
 }
 
-/** A designed failure: what happened, and every reasonable way forward. The first action is primary. */
-export function ErrorView({ code, message, actions, footnote }: { code: ScreenErrorCode; message: string; actions: ErrorAction[]; footnote?: string }) {
+/**
+ * A designed failure: what happened, and every reasonable way forward. The first action is primary.
+ * `title` and `body` replace the stock words (the limit's plan-aware words, ./limit.ts); `link` is one
+ * quiet ghost link after the actions (the plan link at the limit, `ai-limit-plans`), never a filled button.
+ */
+export function ErrorView({
+  code,
+  message,
+  actions,
+  footnote,
+  title,
+  body,
+  link,
+}: {
+  code: ScreenErrorCode;
+  message: string;
+  actions: ErrorAction[];
+  footnote?: string;
+  title?: string;
+  body?: string;
+  link?: { testID: string; label: string; onPress: () => void };
+}) {
   const { colors, spacing } = useTheme();
   // Every failure is information, not alarm: the icon stands alone in the text colour.
   const tone = code === 'daily_limit' || code === 'not_food' ? colors.textSecondary : colors.text;
   return (
     <Card testID={`ai-error-${code}`} style={{ gap: spacing.md, alignItems: 'stretch' }}>
       <Icon code={code} color={tone} />
-      <Text variant="h3">{TITLE[code]}</Text>
+      <Text variant="h3">{title ?? TITLE[code]}</Text>
       <Text variant="body" color="textSecondary">
-        {bodyFor(code, message)}
+        {body ?? bodyFor(code, message)}
       </Text>
       <View style={{ gap: spacing.sm, marginTop: spacing.xs }}>
         {actions.map((a, i) => (
           <Button key={a.id} testID={`ai-error-${a.id}`} title={a.label} size="md" variant={i === 0 ? 'primary' : 'secondary'} onPress={a.onPress} />
         ))}
+        {link ? <Button testID={link.testID} title={link.label} size="md" variant="ghost" onPress={link.onPress} /> : null}
       </View>
       {footnote ? (
         <Text variant="caption" color="textTertiary">

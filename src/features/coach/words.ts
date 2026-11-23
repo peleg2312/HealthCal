@@ -8,6 +8,7 @@
  * words. If what is sent or who receives it changes, change these words and raise
  * COACH_CONSENT_VERSION (./consent.ts) together with the server's.
  */
+import { graceLine, moreAfter, plusLink, type LimitInfo } from '@/features/ai/limit';
 import type { MealType } from '@/types';
 
 export const COACH_TITLE = 'Coach';
@@ -76,6 +77,26 @@ export const NOTICE: Record<CoachNoticeKind, { text: string; retry: boolean }> =
   failed: { text: 'The question could not be sent.', retry: true },
 };
 
+// ------------------------------------------------------------------ the limit with plans on (@/features/ai/limit)
+// With plans off, or from a server that does not send the plan fields, the notice is NOTICE's, as before.
+
+/**
+ * The limit notice with plans on: the number of questions, the free way first (the two buttons), the
+ * reset in the phone's clock, and the earlier allowance's end while it applies. The plan link is apart
+ * (`coachPlansLink`, `coach-limit-plans`), only on the free plan.
+ */
+export function coachLimitText(info: LimitInfo): string {
+  const after = moreAfter(info.resetsAt);
+  if (info.shared) return `The AI coach is busy for today. The two buttons above still answer from your phone. ${after}`;
+  const count = info.limit === 1 ? '1 question today.' : `${info.limit} questions today.`;
+  return [count, 'The two buttons above still answer from your phone.', after, graceLine(info.graceUntil)].filter(Boolean).join(' ');
+}
+
+/** The coach's plan link: "Plus gives 30 a day" (the number from the plan the app was told about). */
+export function coachPlansLink(plusQuestions: number | null): string {
+  return plusLink(plusQuestions);
+}
+
 // ------------------------------------------------------------------ what the coach sees, and the consent
 
 export const ABOUT_TITLE = 'What the coach sees';
@@ -133,3 +154,45 @@ export const EXPORT_NOTE = 'The coach chat is kept on this phone and is not in t
 
 export const PROFILE_ROW_TITLE = 'Coach';
 export const PROFILE_ROW_SUBTITLE = 'Ask about training and food';
+
+// ------------------------------------------------------------------ "Report this answer" (./report.ts, ./ReportSheet.tsx)
+// On the AI's answers only, never on a phone answer or a notice. What a report holds is `buildReportRow`.
+
+export const REPORT_OPEN = 'Report';
+export const REPORT_OPEN_LABEL = 'Report this answer';
+export const REPORTED = 'Reported';
+export const REPORT_TITLE = 'Report this answer';
+export const REPORT_REASON_LABEL = 'What is the problem?';
+/** The reasons, in the order shown; the ids are the ai_reports table's (supabase/migrations/20261123000100_ai_reports.sql). */
+export const REPORT_REASONS: Record<'unsafe' | 'wrong' | 'offensive' | 'off_topic' | 'other', { text: string }> = {
+  unsafe: { text: 'Unsafe' },
+  wrong: { text: 'Wrong' },
+  offensive: { text: 'Offensive' },
+  off_topic: { text: 'Off topic' },
+  other: { text: 'Something else' },
+};
+export const REPORT_WITH_QUESTION = 'Also send my question';
+export const REPORT_WHAT_IS_SENT = 'This answer goes to HealthCal so it can be looked at. Your question is added if you tick the box, and left out if you do not.';
+export const REPORT_SEND = 'Send';
+export const REPORT_SENT = 'Report sent. Thank you.';
+/** A report that did not go: what the app says (a toast; the sheet stays open so it can be sent again). */
+export const REPORT_NOT_SENT: Record<'network' | 'limit' | 'account' | 'failed', { text: string }> = {
+  network: { text: 'No connection. The report was not sent.' },
+  limit: { text: 'That is today’s limit of reports.' },
+  account: { text: 'Sign in to send a report.' },
+  failed: { text: 'The report could not be sent. Try again later.' },
+};
+
+/**
+ * The line over the preview in "What is sent" (ruling R17): how many earlier exchanges go with a typed
+ * question for this person now. `pairs` is `pairsToSend(usePlan().limits.memoryPairs)`.
+ */
+export function sentWithLine(pairs: number): string {
+  const earlier =
+    pairs <= 0
+      ? 'Each question you type goes to the AI coach by itself.'
+      : pairs === 1
+        ? 'Each question you type goes to the AI coach with your last question and its answer.'
+        : `Each question you type goes to the AI coach with your last ${pairs} questions and their answers.`;
+  return `${earlier} The summary below goes with it while "Share my week" is on.`;
+}

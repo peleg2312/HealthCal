@@ -19,12 +19,14 @@ import {
   CoachError,
   dailyLimitMessage,
   failureResponse,
+  historyFor,
   MESSAGES,
   readCapped,
   refundsUnit,
   settingsFrom,
   type Usage,
 } from './coach.ts';
+import { ENTITLEMENT_COLUMNS, type EntitlementRow, type Limits, limitFields, planConfigFrom, resolveLimits } from './plans.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -89,25 +91,46 @@ Deno.serve(async (req) => {
   const today = new Date().toISOString().slice(0, 10);
   if (ageVerdict(profile.data as { data: unknown } | null, today) === 'under_18') return fail(403, 'under_18');
 
+  // The limits by plan (plans.ts): with plans off (PLANS unset, or no known BILLING_PROVIDER),
+  // COACH_DAILY_LIMIT and COACH_GLOBAL_LIMIT for every account and 3 pairs of memory, as before plans;
+  // with plans on, by the caller's plan, a Plus question's ceiling above what free calls can reach.
+  const now = new Date();
+  let limits: Limits;
+  try {
+    limits = await resolveLimits({
+      read: async (id) => {
+        const { data, error } = await admin.from('billing_entitlements').select(ENTITLEMENT_COLUMNS).eq('user_id', id);
+        return { rows: (data ?? null) as unknown as EntitlementRow[] | null, error };
+      },
+      userId: user.id,
+      createdAt: user.created_at,
+      now,
+      config: planConfigFrom((name) => Deno.env.get(name)),
+    });
+  } catch (error) {
+    logError('entitlements read failed', error);
+    return fail(500, 'quota_check_failed');
+  }
+
   const identity = await coachIdentityOf(user.email, user.id);
   const { data: left, error: quotaError } = await admin.rpc('bump_ai_usage', {
     p_user: user.id,
     p_identity: identity,
     p_cost: 1,
-    p_limit: settings.dailyLimit,
-    p_global_limit: settings.globalLimit,
+    p_limit: limits.questions,
+    p_global_limit: limits.questionsGlobal,
   });
   if (quotaError) {
     logError('bump_ai_usage failed', quotaError);
     return fail(500, 'quota_check_failed');
   }
-  if (left === -1) return json(429, { error: 'daily_limit', message: dailyLimitMessage(settings.dailyLimit), remaining: 0 });
-  if (left === -2) return fail(429, 'shared_limit', { remaining: 0 });
+  if (left === -1) return json(429, { error: 'daily_limit', message: dailyLimitMessage(limits.questions), remaining: 0, ...limitFields(limits, 'questions', now, 1) });
+  if (left === -2) return fail(429, 'shared_limit', { remaining: 0, ...limitFields(limits, 'questions', now, 1) });
   const remaining = Math.max(0, left as number);
 
   let outcome;
   try {
-    outcome = await askCoach(new Anthropic({ apiKey }), input, settings);
+    outcome = await askCoach(new Anthropic({ apiKey }), { ...input, history: historyFor(input.history, limits.memoryPairs) }, settings);
   } catch (error) {
     // Not an Anthropic error, so whether the model was reached is unknown: the unit is kept.
     logError('coach-chat failed', error);

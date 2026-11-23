@@ -5,6 +5,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 
+import { moreAfter } from '@/features/ai/limit';
 import type { ActivityEntry } from '@/types';
 
 import { trainingAnswer } from './local';
@@ -14,11 +15,13 @@ import {
   CoachError,
   cutAtSentence,
   historyFor,
+  MAX_PAIRS,
+  pairsToSend,
   postCoach,
   shownAnswer,
   type CoachMessage,
 } from './request';
-import { LOCAL_TRAINING_QUESTION, NOTICE } from './words';
+import { coachLimitText, LOCAL_TRAINING_QUESTION, NOTICE } from './words';
 
 const TODAY = '2026-11-23';
 let seq = 0;
@@ -73,7 +76,7 @@ describe('what a question sends', () => {
     // The phone pair at every position: before, between and after the typed pairs, and twice.
     for (let at = 0; at <= typedChat.length; at++) {
       const chat = [...typedChat.slice(0, at), ...localPair(), ...typedChat.slice(at), ...localPair()];
-      const body = buildCoachRequest({ message: 'Next?', messages: chat, note: null, consentVersion: 1 });
+      const body = buildCoachRequest({ message: 'Next?', messages: chat, note: null, consentVersion: 1, pairs: 3 });
       const sent = JSON.stringify(body);
       expect(sent).not.toContain(LOCAL_TRAINING_QUESTION);
       expect(sent).not.toMatch(/guideline minutes|146|From the workouts on this phone/);
@@ -115,6 +118,28 @@ describe('what a question sends', () => {
     expect(h[5]).toEqual({ role: 'assistant', text: 'A4.' });
   });
 
+  it('sends the plan’s memory: 3 pairs on the free plan, 6 on Plus, never more than the server’s 12 turns', () => {
+    const chat: CoachMessage[] = [];
+    for (let i = 0; i < 9; i++) {
+      const q = typed(`Q${i}`);
+      chat.push(q, ai(q, `A${i}.`));
+    }
+    const three = buildCoachRequest({ message: 'Next?', messages: chat, note: null, consentVersion: 1, pairs: 3 }).history ?? [];
+    expect(three).toHaveLength(6);
+    expect(three[0]).toEqual({ role: 'user', text: 'Q6' });
+    const six = buildCoachRequest({ message: 'Next?', messages: chat, note: null, consentVersion: 1, pairs: 6 }).history ?? [];
+    expect(six).toHaveLength(12);
+    expect(six[0]).toEqual({ role: 'user', text: 'Q3' });
+    expect(six[11]).toEqual({ role: 'assistant', text: 'A8.' });
+    // A stale or odd number never sends more than 12 turns, and an unreadable one sends 3 pairs.
+    expect(buildCoachRequest({ message: 'x', messages: chat, note: null, consentVersion: 1, pairs: 40 }).history).toHaveLength(12);
+    expect(buildCoachRequest({ message: 'x', messages: chat, note: null, consentVersion: 1, pairs: Number.NaN }).history).toHaveLength(6);
+    expect(buildCoachRequest({ message: 'x', messages: chat, note: null, consentVersion: 1, pairs: 0 })).not.toHaveProperty('history');
+    expect(MAX_PAIRS * 2).toBe(12);
+    expect(pairsToSend(4.7)).toBe(4);
+    expect(pairsToSend(-2)).toBe(0);
+  });
+
   it('cuts each turn to 1,200 characters at a sentence end', () => {
     const sentence = 'Rest days let the work settle. ';
     const long = sentence.repeat(60);
@@ -131,22 +156,22 @@ describe('what a question sends', () => {
     const he = 'מנוחה עוזרת לגוף להתאושש. '.repeat(80);
     expect(cutAtSentence(he).length).toBeLessThanOrEqual(1200);
     const q = typed(long);
-    const body = buildCoachRequest({ message: 'x', messages: [q, ai(q, long)], note: null, consentVersion: 1 });
+    const body = buildCoachRequest({ message: 'x', messages: [q, ai(q, long)], note: null, consentVersion: 1, pairs: 3 });
     for (const t of body.history ?? []) expect(t.text.length).toBeLessThanOrEqual(1200);
   });
 
   it('carries the note exactly when sharing is on, and the consent version always', () => {
-    const off = buildCoachRequest({ message: '  How much protein?  ', messages: [], note: null, consentVersion: 1 });
+    const off = buildCoachRequest({ message: '  How much protein?  ', messages: [], note: null, consentVersion: 1, pairs: 3 });
     expect(off).toEqual({ message: 'How much protein?', consentVersion: 1 });
     expect('note' in off).toBe(false);
     expect('history' in off).toBe(false);
-    const on = buildCoachRequest({ message: 'How much protein?', messages: [], note: 'Goal: keep weight steady.', consentVersion: 1 });
+    const on = buildCoachRequest({ message: 'How much protein?', messages: [], note: 'Goal: keep weight steady.', consentVersion: 1, pairs: 3 });
     expect(on.note).toBe('Goal: keep weight steady.');
-    expect(buildCoachRequest({ message: 'x', messages: [], note: '   ', consentVersion: 1 })).not.toHaveProperty('note');
+    expect(buildCoachRequest({ message: 'x', messages: [], note: '   ', consentVersion: 1, pairs: 3 })).not.toHaveProperty('note');
   });
 
   it('caps the message at 500 characters', () => {
-    expect(buildCoachRequest({ message: 'a'.repeat(700), messages: [], note: null, consentVersion: 1 }).message).toHaveLength(500);
+    expect(buildCoachRequest({ message: 'a'.repeat(700), messages: [], note: null, consentVersion: 1, pairs: 3 }).message).toHaveLength(500);
   });
 });
 
@@ -189,7 +214,20 @@ describe('every answer of coach-chat in the app', () => {
   });
 
   it('the limit says the words of the specification; a refusal offers no "Try again", a failure does', () => {
+    // With plans off (or an older server) the notice is today's, word for word.
     expect(NOTICE.daily_limit.text).toBe('30 questions today. They reset at midnight UTC.');
+    expect(coachErrorFrom(429, { error: 'daily_limit', remaining: 0, limit: 30, plan: null, plansOn: false, resetsAt: '2026-11-24T00:00:00.000Z' }).limit).toBeNull();
+    expect(coachErrorFrom(429, { error: 'daily_limit', remaining: 0 }).limit).toBeNull();
+    // With plans on the answer's fields travel with the error, and the words come from them.
+    const free = coachErrorFrom(429, { error: 'daily_limit', remaining: 0, limit: 5, plan: 'free', plansOn: true, resetsAt: '2026-11-24T00:00:00.000Z' });
+    expect(free.kind).toBe('daily_limit');
+    expect(free.limit).toMatchObject({ limit: 5, plan: 'free', shared: false });
+    expect(coachLimitText(free.limit!)).toBe(`5 questions today. The two buttons above still answer from your phone. ${moreAfter('2026-11-24T00:00:00.000Z')}`);
+    const plus = coachErrorFrom(429, { error: 'daily_limit', remaining: 0, limit: 30, plan: 'plus', plansOn: true, resetsAt: '2026-11-24T00:00:00.000Z' });
+    expect(coachLimitText(plus.limit!)).toMatch(/^30 questions today\. The two buttons above still answer from your phone\. More after \d\d:\d\d\.$/);
+    const shared = coachErrorFrom(429, { error: 'shared_limit', remaining: 0, limit: 5, plan: 'free', plansOn: true, resetsAt: '2026-11-24T00:00:00.000Z' });
+    expect(shared.limit?.shared).toBe(true);
+    expect(coachLimitText(shared.limit!)).toMatch(/^The AI coach is busy for today\./);
     expect(NOTICE.declined.retry).toBe(false);
     for (const k of ['busy', 'timeout', 'upstream', 'network', 'failed'] as const) expect(NOTICE[k].retry).toBe(true);
     expect(coachErrorFrom(422, { error: 'declined', remaining: 12 }).remaining).toBe(12);

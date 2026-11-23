@@ -4,13 +4,17 @@
  * `fetch` passed in, so it is tested against a fake one (the shape of `postAnalyze` in
  * @/features/ai/api, with its own codes and words: none of the food estimate's are reused).
  *
- * WHAT IS SENT. The typed question; the last 3 completed pairs of a TYPED question and the AI's
+ * WHAT IS SENT. The typed question; the last `pairs` completed pairs (the plan's `memoryPairs`: 3 on
+ * the free plan, while plans are off and while the plan is not known, 6 on Plus; never more than
+ * `MAX_PAIRS`, the server's 12 turns) of a TYPED question and the AI's
  * answer to it (user first, each cut to 1,200 characters at a sentence end); the consent version; and
  * the note from `buildCoachNote`, only while "Share my week" is on. An answer given on the phone (the
  * two buttons) and its button's question are never part of it, in any position, and neither is the
  * app's own line for a question the AI did not answer (that question is left out too, so the pairs
  * stay whole). The server checks the same caps (supabase/functions/coach-chat/coach.ts).
  */
+import { limitInfoFrom, type LimitInfo } from '@/features/ai/limit';
+
 import type { CoachNoticeKind } from './words';
 
 export type CoachMessage =
@@ -21,9 +25,12 @@ export type CoachMessage =
   /** An answer worked out on the phone from the person's data. Never sent. */
   | { id: string; role: 'assistant'; source: 'local'; replyTo: string; text: string; at: number; topic: 'training' | 'ideas' }
   /** The app's own line when the AI did not answer (no account, the limit, a failure). Never sent. */
-  | { id: string; role: 'assistant'; source: 'notice'; replyTo: string; notice: CoachNoticeKind; at: number };
+  | { id: string; role: 'assistant'; source: 'notice'; replyTo: string; notice: CoachNoticeKind; at: number; limit?: LimitInfo | null };
 
+/** Pairs sent while the plan is not known (and on the free plan). */
 export const HISTORY_PAIRS = 3;
+/** The server accepts at most 12 earlier turns (supabase/functions/coach-chat/coach.ts `MAX_TURNS`). */
+export const MAX_PAIRS = 6;
 export const TURN_MAX = 1200;
 export const NOTE_MAX = 900;
 export const MESSAGE_MAX = 500;
@@ -81,13 +88,22 @@ export function historyFor(messages: readonly CoachMessage[], pairs = HISTORY_PA
       { role: 'assistant', text: answer },
     ]);
   }
-  return found.slice(-pairs).flat();
+  return pairs > 0 ? found.slice(-pairs).flat() : [];
 }
 
-/** The body of one question. `note` is passed only while sharing is on; an empty one is left out. */
-export function buildCoachRequest(input: { message: string; messages: readonly CoachMessage[]; note: string | null; consentVersion: number }): CoachBody {
+/** How many pairs a request carries: the plan's number, whole, between 0 and `MAX_PAIRS`; 3 when it cannot be read. */
+export function pairsToSend(memoryPairs: number | null | undefined): number {
+  if (typeof memoryPairs !== 'number' || !Number.isFinite(memoryPairs)) return HISTORY_PAIRS;
+  return Math.max(0, Math.min(MAX_PAIRS, Math.floor(memoryPairs)));
+}
+
+/**
+ * The body of one question. `pairs` is the plan's `memoryPairs` (`usePlan().limits.memoryPairs`, 3 while
+ * not known), held to `pairsToSend`. `note` is passed only while sharing is on; an empty one is left out.
+ */
+export function buildCoachRequest(input: { message: string; messages: readonly CoachMessage[]; note: string | null; consentVersion: number; pairs: number }): CoachBody {
   const body: CoachBody = { message: input.message.trim().slice(0, MESSAGE_MAX), consentVersion: input.consentVersion };
-  const history = historyFor(input.messages);
+  const history = historyFor(input.messages, pairsToSend(input.pairs));
   if (history.length) body.history = history;
   const note = input.note?.trim();
   if (note) body.note = note.slice(0, NOTE_MAX);
@@ -107,6 +123,8 @@ export class CoachError extends Error {
   constructor(
     public kind: CoachNoticeKind | 'consent_outdated',
     public remaining: number | null = null,
+    /** A limit answer's plan fields (@/features/ai/limit), or null with plans off or from an older server. */
+    public limit: LimitInfo | null = null,
   ) {
     super(kind);
     this.name = 'CoachError';
@@ -128,9 +146,9 @@ export function coachErrorFrom(status: number, body: unknown): CoachError {
     case 'consent_outdated':
       return new CoachError('consent_outdated');
     case 'daily_limit':
-      return new CoachError('daily_limit', remaining ?? 0);
+      return new CoachError('daily_limit', remaining ?? 0, limitInfoFrom(b));
     case 'shared_limit':
-      return new CoachError('shared_limit', remaining ?? 0);
+      return new CoachError('shared_limit', remaining ?? 0, limitInfoFrom(b));
     case 'busy':
       return new CoachError('busy', remaining);
     case 'timeout':

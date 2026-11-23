@@ -57,7 +57,12 @@ const TAKES_DISABLED_THINKING = new Set(['claude-haiku-5-5']);
 /** The caps. Characters are UTF-16 code units (`.length`), as the phone counts them. */
 export const BODY_CAP_BYTES = 32 * 1024;
 export const MAX_MESSAGE = 500;
-export const MAX_TURNS = 6;
+/**
+ * Earlier messages a request may carry (6 pairs). How many reach the model depends on the plan:
+ * `historyFor` keeps the last `Limits.memoryPairs` pairs (plans.ts: 3 free and while plans are off,
+ * 6 on Plus), so a phone may always send its last 6 pairs.
+ */
+export const MAX_TURNS = 12;
 export const MAX_TURN = 1200;
 export const MAX_NOTE = 900;
 
@@ -247,6 +252,12 @@ export function checkRequest(body: unknown, currentConsent = COACH_CONSENT_VERSI
   }
 
   return { message: b.message.trim(), history, note, consentVersion: b.consentVersion };
+}
+
+/** The history the model gets: the last `memoryPairs` completed pairs of an already checked history. */
+export function historyFor(history: readonly Turn[], memoryPairs: number): Turn[] {
+  const keep = Math.max(0, Math.floor(memoryPairs)) * 2;
+  return keep === 0 ? [] : history.slice(Math.max(0, history.length - keep));
 }
 
 // ----------------------------------------------------------------- the age

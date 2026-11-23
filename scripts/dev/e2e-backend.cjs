@@ -9,6 +9,8 @@
  *     npx expo export --platform web --output-dir /tmp/healthcal-mock
  *   node scripts/dev/mock-backend.cjs --static=/tmp/healthcal-mock --static-port=8090 &
  *   node scripts/dev/e2e-backend.cjs [--url=http://localhost:8090] [--api=http://localhost:54321] [--shots=<dir>]
+ *
+ * Plans: the stand-in starts with plans off; the "plans" block turns them on (POST /__billing) and off again.
  */
 const { chromium } = require('playwright');
 const path = require('node:path');
@@ -517,6 +519,8 @@ async function device(browser, seedJson) {
     await K.tap('coach-note-preview');
     const preview = norm(await K.page.getByTestId('coach-note-text').first().innerText());
     await K.shot('backend-coach-preview');
+    // "See what is sent" opens its own sheet over the coach's (src/features/coach/CoachSheet.tsx): close it first.
+    if (await K.has('coach-note-done')) await K.tap('coach-note-done');
     await K.tap('coach-about-done');
     check('coach: with sharing on the line under the header says the coach sees your week', (await K.text('coach-line')) === 'AI coach · not medical advice · sees your week');
     const q3 = 'What should I eat after training?';
@@ -607,6 +611,409 @@ async function device(browser, seedJson) {
     check('coach: no uncaught errors in the coach run', [...K.errors, ...U.errors].length === 0, [...K.errors, ...U.errors].slice(0, 2).join(' || '));
     await K.page.context().close();
     await U.page.context().close();
+  }
+
+  // ------------------------------------------------------ Google sign-in (the stand-in's "Choose an account" page)
+  // No Google involved: scripts/dev/mock-backend.cjs answers /auth/v1/settings, serves its own account page at
+  // /auth/v1/authorize and exchanges the code it hands out only with the verifier of the browser that started.
+  {
+    const google = (body) => fetch(`${API}/__google`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const WORDS = {
+      cancelled: 'Google sign-in cancelled. Nothing changed.',
+      declined: 'Google sign-in was not completed. Try again, or use your email.',
+      unverified: 'Google has not confirmed this address yet. Confirm it with Google, or sign up with your email.',
+      signupsOff: 'New accounts are paused right now. Try again later.',
+      notFinished: 'That sign-in did not finish on this device. Try Continue with Google again.',
+    };
+    // Tap Continue with Google, wait for the account page, choose there, and wait to be back in the app.
+    const viaGoogle = async (d, button, choice) => {
+      await d.tap(button);
+      await d.page.waitForURL(/\/auth\/v1\/authorize/, { timeout: 20000 });
+      await d.page.getByTestId(choice).click({ timeout: 15000 });
+      await d.page.waitForURL((u) => new URL(u).pathname === '/auth' || new URL(u).pathname === '/' || new URL(u).pathname === '/onboarding', { timeout: 30000 });
+      await d.page.waitForTimeout(2500);
+    };
+    // A toast stays about two seconds: every toast text a page shows is kept, across the redirects to Google and back.
+    const watchToasts = (d) =>
+      d.page.context().addInitScript(() => {
+        const seen = [];
+        window.__toasts = seen;
+        new MutationObserver(() => {
+          for (const n of document.querySelectorAll('[data-testid="toast"]')) if (n.innerText && !seen.includes(n.innerText)) seen.push(n.innerText);
+        }).observe(document, { subtree: true, childList: true, characterData: true });
+      });
+    const toastsSeen = (d) => d.page.evaluate(() => (window.__toasts || []).join(' | ').replace(/\u00A0/g, ' '));
+    const visible = async (d, id) => (await d.page.getByTestId(id).count()) > 0 && (await d.page.getByTestId(id).first().isVisible());
+
+    // Off on the backend: the button is not shown anywhere.
+    await google({ on: false, signupDisabled: false });
+    const off = await device(browser, null);
+    await off.go('/welcome');
+    const offWelcome = await visible(off, 'welcome-google');
+    await off.go('/auth?mode=signin');
+    check('google: hidden on welcome and the sign-in form while the backend has Google off', !offWelcome && !(await visible(off, 'auth-google')) && (await visible(off, 'auth-email-input')));
+    await off.page.context().close();
+    await google({ on: true });
+
+    // Cancel, decline, an unconfirmed address and paused sign-ups each come back to the form with their own words.
+    const G = await device(browser, null);
+    await G.go('/auth?mode=signin');
+    check('google: shown above the email form once the backend has it on', (await visible(G, 'auth-google')) && (await visible(G, 'auth-or')));
+    const box = await G.page.getByTestId('auth-google').boundingBox();
+    check('google: the button is 50 px high', !!box && Math.round(box.height) === 50, box ? `${box.height}` : 'no box');
+    await viaGoogle(G, 'auth-google', 'google-cancel');
+    const toastText = (await G.has('toast')) ? await G.text('toast') : '';
+    check('google: a cancel comes back to the form with "Google sign-in cancelled. Nothing changed."', toastText.includes(WORDS.cancelled) && (await visible(G, 'auth-email-input')) && !(await G.has('auth-google-error')), toastText);
+    await viaGoogle(G, 'auth-google', 'google-decline');
+    check('google: declining on the account page shows its words under the button', (await G.has('auth-google-error')) && (await G.text('auth-google-error')) === WORDS.declined);
+    await viaGoogle(G, 'auth-google', 'google-unverified');
+    check('google: an address Google has not confirmed shows its words', (await G.has('auth-google-error')) && (await G.text('auth-google-error')) === WORDS.unverified);
+    await google({ signupDisabled: true });
+    await viaGoogle(G, 'auth-google', 'google-account-new');
+    check('google: paused sign-ups show "New accounts are paused right now. Try again later."', (await G.has('auth-google-error')) && (await G.text('auth-google-error')) === WORDS.signupsOff);
+    await google({ signupDisabled: false });
+    check('google: no failed return signed the device in', (await G.state()).ownerId == null && G.pkce.length === 0, `${G.pkce.length} exchanges`);
+
+    // A new Google person lands in onboarding, signed in, with a Google-only account and no password.
+    await G.go('/auth?mode=signin');
+    let returnUrl = '';
+    G.page.on('framenavigated', (f) => {
+      if (f === G.page.mainFrame() && /[?&]code=/.test(f.url()) && /mode=google/.test(f.url())) returnUrl = f.url();
+    });
+    await viaGoogle(G, 'auth-google', 'google-account-new');
+    await G.untilPath('/onboarding', 20000);
+    srv = await server();
+    const newcomer = srv.users.find((u) => u.email === 'new.google.person@example.test');
+    check('google: a new Google person lands in onboarding', new URL(G.page.url()).pathname === '/onboarding', G.page.url());
+    check('google: the new account has the Google identity only', !!newcomer && newcomer.identities.join(',') === 'google', newcomer ? newcomer.identities.join(',') : 'no user');
+    check('google: the browser exchanged the code once, and the return said "Signing in with Google", never "Email confirmed"', G.pkce.length === 1 && !(await G.page.getByText('Email confirmed').count()), `${G.pkce.length} exchanges`);
+
+    // The same code again: refused in another browser (it holds no verifier) and by the server (one use).
+    const R = await device(browser, null);
+    const replayPath = returnUrl ? new URL(returnUrl).pathname + new URL(returnUrl).search : '/auth?mode=google&code=missing';
+    await R.go(replayPath);
+    await R.page.waitForSelector('[data-testid="auth-google-error"]', { timeout: 20000 }).catch(() => {});
+    const replayWords = (await R.has('auth-google-error')) ? await R.text('auth-google-error') : '';
+    check('google: a replayed return in another browser is refused with its words and signs nothing in', !!returnUrl && replayWords === WORDS.notFinished && (await R.state()).ownerId == null, replayWords || returnUrl);
+    const replayCode = returnUrl ? new URL(returnUrl).searchParams.get('code') : 'missing';
+    const replay = await fetch(`${API}/auth/v1/token?grant_type=pkce`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ auth_code: replayCode, code_verifier: 'x'.repeat(43) }) });
+    check('google: the server refuses a code used once already', replay.status === 400);
+    await R.page.context().close();
+    await G.page.context().close();
+
+    // An existing email person: the same account, its data on a fresh device, one user with two identities.
+    const L = await device(browser, null);
+    await watchToasts(L);
+    await L.go('/welcome');
+    check('google: the welcome screen offers Continue with Google as its second option', await visible(L, 'welcome-google'));
+    const order = await L.page.evaluate(() => ['welcome-get-started', 'welcome-google', 'welcome-sign-in'].map((id) => document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect().top ?? -1));
+    check('google: under Get started and above I already have an account', order[0] >= 0 && order[0] < order[1] && order[1] < order[2], order.join(' < '));
+    await viaGoogle(L, 'welcome-google', `google-account-${EMAIL.toLowerCase()}`);
+    const linkedHome = await L.untilPath('/', 20000);
+    const linkedToast = await toastsSeen(L);
+    srv = await server();
+    const alex = srv.users.find((u) => u.email === EMAIL.toLowerCase());
+    const lState = await L.state();
+    check('google: an existing email person keeps the same account (one user, two identities)', !!alex && alex.id === user.id && alex.identities.join(',') === 'email,google' && srv.users.filter((u) => u.email === EMAIL.toLowerCase()).length === 1, alex ? alex.identities.join(',') : 'no user');
+    check("google: and their plan and logs arrive on the new device (straight to Today)", linkedHome && lState.ownerId === user.id && lState.profile?.name === 'Alex', L.page.url());
+    check('google: the sign-in that joined them says "Signed in. Google now also opens this account."', linkedToast.includes('Signed in. Google now also opens this account.'), linkedToast);
+    const password = await fetch(`${API}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: EMAIL, password: NEW_PASSWORD }) });
+    check('google: the password still opens the linked account', password.status === 200);
+    check('google: no uncaught errors in the Google runs', [...L.errors].length === 0, L.errors.slice(0, 2).join(' || '));
+    await L.page.context().close();
+  }
+
+  // ------------------------------------------------------ plans (src/features/plan, the stand-in's billing function)
+  // Plans are off on the stand-in until this block turns them on (POST /__billing), so every check above ran on
+  // today's limits. Off: nothing about a plan anywhere and today's words. On: a new account is Free with 5 and 5;
+  // the limit words for free (with the plan link) and for Plus (without); buying monthly (with the waiting state)
+  // and yearly from the plan screen; a second device; "Manage or cancel" and cancelling in the stand-in's portal;
+  // a failed payment; the careful estimate's line; deleting an account that holds Plus, with the payment company
+  // answering and failing; and a report of an AI answer arriving as one row.
+  {
+    const billing = (b) => fetch(`${API}/__billing`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }).then((r) => r.json());
+    const billingEvent = (b) => fetch(`${API}/__billing/event`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }).then((r) => r.json());
+    const norm = (t) => String(t).replace(/ /g, ' ').replace(/[⁠‎⁨⁩]/g, '').trim();
+    const visible = async (d, id) => (await d.page.getByTestId(id).count()) > 0 && (await d.page.getByTestId(id).first().isVisible());
+    const textOf = async (d, id) => ((await d.has(id)) ? norm(await d.page.getByTestId(id).first().innerText()) : '');
+    // The server's last status answer as the device keeps it (the plan's display cache).
+    const status = (d) => d.page.evaluate(() => { try { return JSON.parse(localStorage.getItem('healthcal-plan') || 'null')?.status ?? null; } catch { return null; } });
+    const planOf = async (d) => (await status(d))?.plan ?? null;
+    const clock = (iso) => {
+      const t = new Date(iso);
+      return `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+    };
+    const resets = (() => {
+      const n = new Date();
+      return clock(new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate() + 1)).toISOString());
+    })();
+    const signUp = async (d, email) => {
+      await d.go('/auth?mode=signup');
+      await d.fill('auth-email-input', email);
+      await d.fill('auth-password-input', PASSWORD);
+      await d.tap('auth-submit');
+      const ok = await d.untilPath('/');
+      await d.page.waitForTimeout(2500);
+      return ok;
+    };
+    const estimate = async (d, words) => {
+      await d.go('/food/photo?mode=text&meal=snack');
+      await d.fill('ai-description', words);
+      await d.tap('ai-analyse');
+      if (await d.has('ai-consent-agree')) await d.tap('ai-consent-agree');
+      await d.page.waitForSelector('[data-testid="ai-add-to-diary"], [data-testid^="ai-error-"]', { timeout: 20000 }).catch(() => {});
+      await d.page.waitForTimeout(600);
+    };
+    const settle = async (d) => {
+      await d.page.waitForFunction(() => !document.querySelector('[data-testid="coach-typing"]'), null, { timeout: 60000 }).catch(() => {});
+      await d.page.waitForTimeout(500);
+    };
+    const ask = async (d, words) => {
+      await d.fill('coach-input', words);
+      await d.tap('coach-send');
+      if (await d.has('coach-consent-agree')) await d.tap('coach-consent-agree');
+      await settle(d);
+    };
+    const nothingAboutPlans = async (d) => {
+      await d.go('/profile');
+      const profile = await d.has('profile-plan');
+      await d.go('/settings/account');
+      const account = (await d.has('account-plan')) || (await d.has('account-plan-manage'));
+      await d.go('/settings/about');
+      const about = await d.has('about-plan');
+      return !profile && !account && !about;
+    };
+
+    // Plans off: an account sees nothing about a plan, and today's words.
+    await billing({ plansOn: false, providerFails: false, webhookDelayMs: 0, resetUsage: true });
+    const P = await device(browser, JSON.stringify(buildSeed()));
+    const pEmail = `plus+${Date.now()}@example.com`;
+    check('plans: an account signs up for the plans run', await signUp(P, pEmail), P.page.url());
+    check('plans off: nothing about a plan on Profile, Account or About', await nothingAboutPlans(P));
+    await estimate(P, 'daily limit check');
+    check('plans off: the estimate’s limit keeps today’s words and offers no plan', (await textOf(P, 'ai-error-daily_limit')).includes("You've used today's analyses") && !(await P.has('ai-limit-plans')), (await textOf(P, 'ai-error-daily_limit')).slice(0, 120));
+    await P.go('/coach');
+    await ask(P, 'daily limit please');
+    check('plans off: the coach’s limit keeps today’s words and offers no plan', (await textOf(P, 'coach-notice')) === '30 questions today. They reset at midnight UTC.' && !(await P.has('coach-limit-plans')), await textOf(P, 'coach-notice'));
+
+    // Plans on: a new account is Free with 5 and 5.
+    await billing({ plansOn: true, resetUsage: true });
+    await P.go('/profile');
+    await P.page.waitForTimeout(1500);
+    const freeRow = await textOf(P, 'profile-plan');
+    check('plans on: Profile shows the Plan row, Free', /Free/.test(freeRow), freeRow);
+    await P.go('/settings/plan');
+    const freeCard = await textOf(P, 'plan-free-card');
+    const plusCard = await textOf(P, 'plan-plus-card');
+    check('plans on: the plan screen shows Free with 5 estimates and 5 questions, and Plus with 40 and 30', /\b5\b/.test(freeCard) && /\b40\b/.test(plusCard) && /\b30\b/.test(plusCard), `${freeCard.replace(/\n/g, ' / ')} | ${plusCard.replace(/\n/g, ' / ')}`);
+    await P.shot('backend-plan-free');
+
+    // The estimate on the free plan: the careful line, a careful estimate that needs more than is left, then the limit.
+    await estimate(P, 'two scrambled eggs on sourdough toast');
+    check('plans on, free: the careful check says what it uses', (await textOf(P, 'ai-careful-uses')) === "Uses 5 of today's 5", await textOf(P, 'ai-careful-uses'));
+    check('plans on, free: no plan words after a successful estimate', !(await P.has('ai-limit-plans')) && !/Plus/.test(await textOf(P, 'ai-remaining')));
+    await P.tap('ai-check-again');
+    await P.page.waitForSelector('[data-testid^="ai-error-"]', { timeout: 20000 }).catch(() => {});
+    const careful = await textOf(P, 'ai-error-daily_limit');
+    check(
+      'plans on, free: a careful estimate that needed more than is left says so (R18), never "used"',
+      careful.includes('Too few left for a careful estimate') && careful.includes('A careful estimate needs 5 units and fewer are left today. A quick estimate still works.') && !/used/.test(careful),
+      careful.slice(0, 160),
+    );
+    await estimate(P, 'daily limit check');
+    const freeLimit = await textOf(P, 'ai-error-daily_limit');
+    const plansLink = await textOf(P, 'ai-limit-plans');
+    const order = await P.page.evaluate(() => ['ai-error-search', 'ai-limit-plans'].map((id) => document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect().top ?? -1));
+    check(
+      'plans on, free: the estimate’s limit names the number, the free way first and the reset in local time',
+      freeLimit.includes("Today's 5 estimates are used") && freeLimit.includes(`Search, scan or quick add still log this meal. More after ${resets}.`),
+      freeLimit.slice(0, 200),
+    );
+    check('plans on, free: one quiet link, "Plus gives 40 a day", after the free ways', plansLink === 'Plus gives 40 a day' && order[0] >= 0 && order[0] < order[1], `${plansLink} ${order.join(' < ')}`);
+    await P.shot('backend-plan-ai-limit-free');
+    await P.tap('ai-limit-plans');
+    check('plans on, free: the link opens the plan screen', await P.untilPath('/settings/plan', 10000), P.page.url());
+
+    await P.go('/coach');
+    await ask(P, 'daily limit please');
+    const coachFree = await textOf(P, 'coach-notice');
+    // The notice's card also holds its link, so its text starts with the words.
+    check('plans on, free: the coach’s limit words', coachFree.split('\n')[0] === `5 questions today. The two buttons above still answer from your phone. More after ${resets}.`, coachFree);
+    check('plans on, free: the coach’s plan link, "Plus gives 30 a day"', (await textOf(P, 'coach-limit-plans')) === 'Plus gives 30 a day', await textOf(P, 'coach-limit-plans'));
+    await P.shot('backend-plan-coach-limit-free');
+
+    // A report of an AI answer: one row, the answer, and the question only when ticked.
+    const reportQ = 'How long should a warm-up be?';
+    await billing({ resetUsage: true });
+    await ask(P, reportQ);
+    const reportAnswerIndex = await P.page.evaluate(() => {
+      const ids = [...document.querySelectorAll('[data-testid^="coach-report-"]')].map((n) => n.getAttribute('data-testid')).filter((id) => /^coach-report-\d+$/.test(id));
+      return ids.length ? ids[ids.length - 1] : null;
+    });
+    const reportsBefore = (await server()).aiReports.length;
+    if (reportAnswerIndex) {
+      await P.tap(reportAnswerIndex);
+      await P.tap('coach-report-reason-wrong');
+      await P.tap('coach-report-send');
+      await P.page.waitForTimeout(1200);
+    }
+    let reports = (await server()).aiReports;
+    const pUser = (await server()).users.find((u) => u.email === pEmail.toLowerCase());
+    const row = reports[reports.length - 1];
+    check(
+      'report: one row arrives with the answer, the reason and no question (not ticked)',
+      !!reportAnswerIndex && reports.length === reportsBefore + 1 && row.user_id === pUser?.id && row.kind === 'coach_answer' && row.reason === 'wrong' && row.answer.includes(reportQ) && !('question' in row),
+      row ? JSON.stringify({ reason: row.reason, question: row.question ?? null, answer: row.answer.slice(0, 60) }) : 'no row',
+    );
+    await ask(P, 'And a cool-down?');
+    const second = await P.page.evaluate(() => {
+      const ids = [...document.querySelectorAll('[data-testid^="coach-report-"]')].map((n) => n.getAttribute('data-testid')).filter((id) => /^coach-report-\d+$/.test(id));
+      return ids.length ? ids[ids.length - 1] : null;
+    });
+    if (second) {
+      await P.tap(second);
+      await P.tap('coach-report-reason-other');
+      await P.tap('coach-report-question');
+      await P.tap('coach-report-send');
+      await P.page.waitForTimeout(1200);
+    }
+    reports = (await server()).aiReports;
+    check('report: with the box ticked the question goes too', reports.length === reportsBefore + 2 && reports[reports.length - 1].question === 'And a cool-down?', reports.length ? JSON.stringify(reports[reports.length - 1].question ?? null) : '');
+
+    // A checkout that is cancelled comes back to the plan page with nothing bought and the offer still there.
+    await P.go('/settings/plan');
+    await P.tap('plan-subscribe');
+    await P.page.waitForURL(/\/__checkout\?/, { timeout: 20000 }).catch(() => {});
+    await P.page.getByTestId('checkout-cancel').click({ timeout: 15000 });
+    await P.page.waitForURL((u) => new URL(u).pathname === '/settings/plan', { timeout: 30000 }).catch(() => {});
+    await waitFor(P, 'plan-subscribe');
+    check('buy: a cancelled checkout returns with no "checkout=done", still Free, and Subscribe still offered', !/checkout=done/.test(P.page.url()) && (await visible(P, 'plan-subscribe')) && !(await visible(P, 'plan-waiting')) && (await planOf(P)) === 'free', P.page.url());
+    const sheet = await status(P);
+    check('status: the server sends both plans\u2019 numbers, so the cards hard-code nothing', sheet?.planLimits?.plus?.estimates === 40 && sheet?.planLimits?.free?.questions === 5, JSON.stringify(sheet?.planLimits ?? null));
+
+    // Buying monthly from the plan screen, with the payment arriving a few seconds after the return.
+    await billing({ webhookDelayMs: 5000 });
+    await P.go('/settings/plan');
+    await P.tap('plan-period-month');
+    const monthPrice = await textOf(P, 'plan-price');
+    const renewal = await textOf(P, 'plan-renewal-line');
+    check('buy: the monthly price and the renewal sentence come from the server', monthPrice.includes('$3.99') && renewal.length > 20, `${monthPrice.replace(/\n/g, ' / ')} | ${renewal}`);
+    await P.tap('plan-subscribe');
+    await P.page.waitForURL(/\/__checkout\?/, { timeout: 20000 }).catch(() => {});
+    check('buy: Subscribe goes to the payment page', /\/__checkout\?/.test(P.page.url()) && /3\.99 USD a month/.test(await P.page.getByTestId('checkout-amount').innerText().catch(() => '')), P.page.url());
+    await P.page.getByTestId('checkout-pay').click({ timeout: 15000 });
+    await P.page.waitForURL((u) => new URL(u).pathname === '/settings/plan', { timeout: 30000 }).catch(() => {});
+    await P.page.waitForTimeout(1500);
+    check('buy: back on the plan screen the app waits for the payment', await visible(P, 'plan-waiting'), P.page.url());
+    await P.shot('backend-plan-waiting');
+    await P.page.waitForFunction(() => !document.querySelector('[data-testid="plan-waiting"]'), null, { timeout: 40000 }).catch(() => {});
+    await P.page.waitForTimeout(800);
+    const plusStatus = await textOf(P, 'plan-status');
+    check('buy: Plus is on, with its date', /Plus/.test(plusStatus) && /[A-Z][a-z]{2} \d{1,2}/.test(plusStatus), plusStatus.replace(/\n/g, ' / '));
+    await P.shot('backend-plan-plus');
+    await billing({ webhookDelayMs: 0 });
+    srv = await server();
+    check('buy: the stand-in holds an active monthly row from a signed webhook', srv.billing.rows[pEmail.toLowerCase()]?.state === 'active' && srv.billing.rows[pEmail.toLowerCase()]?.period === 'month' && srv.billing.webhooks.some((w) => w.userId === pUser?.id && w.type === 'checkout.paid'));
+    await P.go('/profile');
+    const plusRow = await textOf(P, 'profile-plan');
+    check('buy: the Profile row says Plus until a date', /Plus until [A-Z][a-z]{2} \d{1,2}/.test(plusRow), plusRow);
+
+    // Plus at its limits: the same words with its own numbers, and no link.
+    await estimate(P, 'daily limit check');
+    const plusLimit = await textOf(P, 'ai-error-daily_limit');
+    check('Plus: the estimate’s limit says 40 and offers no plan', plusLimit.includes("Today's 40 estimates are used") && !(await P.has('ai-limit-plans')), plusLimit.slice(0, 120));
+    await P.go('/coach');
+    await ask(P, 'daily limit please');
+    const coachPlus = await textOf(P, 'coach-notice');
+    check('Plus: the coach’s limit says 30 and offers no plan', coachPlus === `30 questions today. The two buttons above still answer from your phone. More after ${resets}.` && !(await P.has('coach-limit-plans')), coachPlus);
+    await billing({ resetUsage: true });
+    await ask(P, 'Plus memory check');
+    const plusReq = (await server()).coachRequests.filter((x) => x.user === pUser?.id).pop();
+    check('Plus: the coach may send up to 6 earlier pairs, never more than 12 turns', (plusReq?.body.history || []).length <= 12 && plusReq?.status === 200, `${(plusReq?.body.history || []).length} turns`);
+
+    // A second device signed in to the same account sees Plus after its refresh.
+    const Q = await device(browser, null);
+    await Q.go('/auth?mode=signin');
+    await Q.fill('auth-email-input', pEmail);
+    await Q.fill('auth-password-input', PASSWORD);
+    await Q.tap('auth-submit');
+    await Q.untilPath('/');
+    await Q.page.waitForTimeout(2500);
+    await Q.go('/profile');
+    await Q.page.waitForTimeout(1500);
+    check('second device: Plus after its refresh', /Plus until/.test(await textOf(Q, 'profile-plan')), await textOf(Q, 'profile-plan'));
+    await Q.page.context().close();
+
+    // Manage or cancel: the stand-in's portal, "Cancel at period end", back: "Plus, ends ..." and Plus stays.
+    await P.go('/settings/plan');
+    await P.tap('plan-manage');
+    await P.page.waitForURL(/\/__portal\?/, { timeout: 20000 }).catch(() => {});
+    check('manage: "Manage or cancel" opens the payment company’s page', /\/__portal\?/.test(P.page.url()), P.page.url());
+    await P.page.getByTestId('portal-cancel').click({ timeout: 15000 });
+    await P.page.waitForURL((u) => new URL(u).pathname === '/settings/plan', { timeout: 30000 }).catch(() => {});
+    await P.page.waitForTimeout(2500);
+    const ending = await textOf(P, 'plan-status');
+    await P.shot('backend-plan-ending');
+    srv = await server();
+    await P.go('/profile');
+    const endingRow = await textOf(P, 'profile-plan');
+    check(
+      'manage: after cancelling, "Plus, ends ..." on Profile and Plus stays on the plan screen',
+      /Plus, ends [A-Z][a-z]{2} \d{1,2}/.test(endingRow) && /Plus stays on until/.test(ending) && srv.billing.rows[pEmail.toLowerCase()]?.state === 'canceling',
+      `${endingRow} | ${ending.replace(/\n/g, ' / ')}`,
+    );
+
+    // Buying yearly, and a failed renewal, on a second account.
+    const Y = await device(browser, JSON.stringify(buildSeed()));
+    const yEmail = `yearly+${Date.now()}@example.com`;
+    check('yearly: a second account signs up', await signUp(Y, yEmail), Y.page.url());
+    await Y.go('/settings/plan');
+    await Y.tap('plan-period-year');
+    check('yearly: the yearly price', (await textOf(Y, 'plan-price')).includes('$29.99'), await textOf(Y, 'plan-price'));
+    await Y.tap('plan-subscribe');
+    await Y.page.waitForURL(/\/__checkout\?/, { timeout: 20000 }).catch(() => {});
+    await Y.page.getByTestId('checkout-pay').click({ timeout: 15000 });
+    await Y.page.waitForURL((u) => new URL(u).pathname === '/settings/plan', { timeout: 30000 }).catch(() => {});
+    await Y.page.waitForFunction(() => !document.querySelector('[data-testid="plan-waiting"]'), null, { timeout: 40000 }).catch(() => {});
+    await Y.page.waitForTimeout(800);
+    srv = await server();
+    check('yearly: Plus is on for a year', /Plus/.test(await textOf(Y, 'plan-status')) && srv.billing.rows[yEmail.toLowerCase()]?.period === 'year', (await textOf(Y, 'plan-status')).replace(/\n/g, ' / '));
+    await billingEvent({ email: yEmail, state: 'past_due', periodEnd: new Date(Date.now() - 86400000).toISOString() });
+    await Y.go('/settings/plan');
+    await Y.page.waitForTimeout(1500);
+    const late = await textOf(Y, 'plan-payment-line');
+    check('failed payment: the plan screen says so in neutral words and Plus stays', late.length > 10 && !/fail|!/i.test(late) && /Plus/.test(await textOf(Y, 'plan-status')), late);
+    await Y.shot('backend-plan-past-due');
+
+    // Deleting an account that holds Plus: the plan is ended at the payment company first, then the account goes.
+    await P.go('/settings/account');
+    await P.tap('account-delete');
+    if (await P.has('confirm-yes')) await P.tap('confirm-yes');
+    await P.untilPath('/welcome', 20000);
+    srv = await server();
+    check('delete with Plus: the plan is ended first, then the account is deleted', srv.billing.cancels.includes(pEmail.toLowerCase()) && !srv.users.some((u) => u.email === pEmail.toLowerCase()) && !srv.billing.rows[pEmail.toLowerCase()], JSON.stringify(srv.billing.cancels));
+
+    // With the payment company failing: nothing is deleted, the screen says why and offers the second step.
+    await billing({ providerFails: true });
+    await Y.go('/settings/account');
+    await Y.tap('account-delete');
+    if (await Y.has('confirm-yes')) await Y.tap('confirm-yes');
+    await Y.page.waitForTimeout(2500);
+    srv = await server();
+    const blocked = await textOf(Y, 'account-delete-blocked');
+    check('delete with the payment company failing: the account stays and the screen says why', srv.users.some((u) => u.email === yEmail.toLowerCase()) && blocked.length > 10 && (await Y.has('account-delete-anyway')), blocked);
+    await Y.shot('backend-plan-delete-blocked');
+    await Y.tap('account-delete-anyway');
+    if (await Y.has('confirm-yes')) await Y.tap('confirm-yes');
+    await Y.untilPath('/welcome', 20000);
+    srv = await server();
+    check('delete anyway: the plan is released on the server’s side and the account goes', !srv.users.some((u) => u.email === yEmail.toLowerCase()) && srv.billing.releases.some((r) => r.kind === 'released'), JSON.stringify(srv.billing.releases.slice(-1)));
+    await billing({ providerFails: false, plansOn: false, resetUsage: true });
+
+    const errs = [...P.errors, ...Y.errors];
+    check('plans: no uncaught errors in the plans run', errs.length === 0, errs.slice(0, 2).join(' || '));
+    await P.page.context().close();
+    await Y.page.context().close();
   }
 
   // ------------------------------------------------------ delete account

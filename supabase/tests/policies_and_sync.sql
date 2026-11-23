@@ -295,4 +295,7 @@ begin
   if n <> 3 then raise exception 'quota was reset by deleting the account (used = %)', n; end if;
 end $$;
 
+-- Plans (billing_entitlements, billing_events) and AI answer reports: their own file, same session.
+\ir billing.sql
+
 do $$ begin raise notice 'ALL DATABASE TESTS PASSED'; end $$;

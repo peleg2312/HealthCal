@@ -11,11 +11,15 @@ import {
   Stethoscope,
   Target,
 } from 'lucide-react-native';
+import { router } from 'expo-router';
 import React from 'react';
 import { View } from 'react-native';
 
 import { AiConsentAbout } from '@/features/ai/AiConsentAbout';
 import { CoachConsentAbout } from '@/features/coach/CoachConsentAbout';
+import { usePlan } from '@/features/plan/cache';
+import { PlanRow } from '@/features/plan/PlanRow';
+import { planVisible } from '@/features/plan/view';
 import { storesRead } from '@/features/health-sync/reach';
 import { IconTile } from '@/features/settings/components';
 import { AboutVersion } from '@/features/updates/AboutVersion';
@@ -26,7 +30,7 @@ import { useStore } from '@/store';
 import { useEnergyModel } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
 import type { ActivityLevel } from '@/types';
-import { Card, Header, Screen, Text } from '@/ui';
+import { Button, Card, Header, Screen, Text } from '@/ui';
 
 function Section({
   icon,
@@ -285,6 +289,10 @@ export default function AboutScreen() {
           The coach chat is kept on this phone. Anthropic handles what it receives under Anthropic&apos;s terms.
         </P>
         <P>
+          If you pay for Plus, the payment is handled by a payment company; HealthCal&apos;s server keeps only whether your plan is active and until
+          when.
+        </P>
+        <P>
           With Workout sync switched on, HealthCal reads your workouts from {stores.from}: each session with its calories and its distance. They
           are stored like sessions you log by hand. It also reads your daily steps, which stay on this phone only, for 35 days, and are never
           added to your calories. And it reads how long you slept each night, kept in your sleep log like a night you enter yourself (in your
@@ -297,6 +305,8 @@ export default function AboutScreen() {
         <CoachConsentAbout />
       </Section>
 
+      <LegalLinks />
+
       <Section icon={(c) => <Stethoscope size={20} color={c} />} color={colors.warningInk} keep title="Not medical advice">
         <P>
           HealthCal is a tracking tool, not a medical device. Its numbers are estimates for healthy adults. If you are pregnant or breastfeeding,
@@ -305,7 +315,32 @@ export default function AboutScreen() {
         </P>
       </Section>
 
+      <AboutPlan />
+
       <AboutVersion />
     </Screen>
+  );
+}
+
+/** The whole texts: the privacy page and the terms, as screens of their own. */
+function LegalLinks() {
+  const { spacing } = useTheme();
+  return (
+    <View testID="about-legal" style={{ flexDirection: 'row', gap: spacing.md }}>
+      <Button testID="about-privacy-full" title="Privacy in full" variant="secondary" size="sm" full={false} style={{ flex: 1 }} onPress={() => router.push('/legal/privacy' as never)} />
+      <Button testID="about-terms" title="Terms of use" variant="secondary" size="sm" full={false} style={{ flex: 1 }} onPress={() => router.push('/legal/terms' as never)} />
+    </View>
+  );
+}
+
+/** One line about the plan, while plans are on or a plan is held (ruling R14). */
+function AboutPlan() {
+  const view = usePlan();
+  const { spacing } = useTheme();
+  if (!planVisible(view)) return null;
+  return (
+    <Card padding={0} style={{ paddingHorizontal: spacing.lg }}>
+      <PlanRow testID="about-plan" title="Your plan" />
+    </Card>
   );
 }

@@ -304,3 +304,23 @@ describe.each(STRICT)('%s, held to the full rule', (name) => {
     expect(failures(rows)).toEqual([]);
   });
 });
+
+describe("Google's sign-in button", () => {
+  // Its colours are Google's (tokens.ts, GOOGLE_LIGHT and GOOGLE_DARK), chosen by the paper's darkness, never by a branch in code.
+  it("uses Google's Light button on the light papers and its Dark button on Dark and Java", () => {
+    for (const name of NAMES) {
+      const c = PALETTES[name];
+      expect([c.googleFill, c.googleEdge, c.googleText], name).toEqual(isDarkTheme(name) ? ['#131314', '#8E918F', '#E3E3E3'] : ['#FFFFFF', '#747775', '#1F1F1F']);
+    }
+  });
+
+  it('keeps its label at 4.5:1 and its edge at 3:1 on the page and the card it sits on', () => {
+    for (const name of NAMES) {
+      const c = PALETTES[name];
+      expect(contrast(c.googleText, c.googleFill), `${name} label`).toBeGreaterThanOrEqual(4.5);
+      // The edge draws the button: it must read against its own fill and against what is around it.
+      expect(contrast(c.googleEdge, c.googleFill), `${name} edge on its fill`).toBeGreaterThanOrEqual(3);
+      for (const ground of ['bg', 'surface'] as const) expect(contrast(c.googleEdge, c[ground]), `${name} edge on ${ground}`).toBeGreaterThanOrEqual(3);
+    }
+  });
+});

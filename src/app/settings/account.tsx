@@ -1,11 +1,19 @@
 import { router } from 'expo-router';
-import { Cloud, CloudOff, LogOut, RefreshCw, ShieldCheck, Smartphone, Trash2 } from 'lucide-react-native';
+import { Cloud, CloudOff, CreditCard, KeyRound, LogOut, RefreshCw, ShieldCheck, Smartphone, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
+import { deleteAccountWithPlan, sendAddPassword } from '@/features/plan/account';
+import { needsPassword } from '@/features/plan/accountRules';
+import { usePlan } from '@/features/plan/cache';
+import { PLAN_ROUTE } from '@/features/plan/channel';
+import { openManage } from '@/features/plan/checkout';
+import { PlanRow } from '@/features/plan/PlanRow';
+import { canManageHere, holdsPlus, planVisible } from '@/features/plan/view';
+import { ADD_PASSWORD_HINT, ADD_PASSWORD_LABEL, DELETE_ANYWAY_LABEL, DELETE_PLAN_LINE, MANAGE_LABEL, RELEASED_LINE } from '@/features/plan/words';
 import { Group, IconTile } from '@/features/settings/components';
 import { breakableEmail, timeAgo } from '@/features/settings/format';
-import { deleteAccount, signOut, useAuth } from '@/services/auth';
+import { signOut, useAuth } from '@/services/auth';
 import { cancelAllReminders } from '@/services/notifications';
 import { isBackendConfigured } from '@/services/supabase';
 import { syncNow, useSyncState } from '@/services/sync';
@@ -136,6 +144,13 @@ function SignedIn({ email }: { email: string }) {
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState<'signout' | 'delete' | null>(null);
+  /** Ending the plan did not work, so the account was kept: why, and whether "Delete anyway" is offered. */
+  const [deleteBlocked, setDeleteBlocked] = useState<{ message: string; offerForce: boolean } | null>(null);
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const user = useAuth((s) => s.session?.user ?? null);
+  const plan = usePlan();
+  const showPlan = planVisible(plan);
+  const holds = holdsPlus(plan);
   /** Message from a sign-out that stopped because changes are not backed up. */
   const [signOutBlocked, setSignOutBlocked] = useState<string | null>(null);
 
@@ -166,17 +181,32 @@ function SignedIn({ email }: { email: string }) {
     router.replace('/welcome');
   };
 
-  const doDelete = async () => {
+  // With a plan held, the plan is ended first (no further charge) and the account goes only then.
+  const doDelete = async (force = false) => {
     setConfirmDelete(false);
+    setDeleteBlocked(null);
     setBusy('delete');
-    const res = await deleteAccount();
+    const res = await deleteAccountWithPlan({ force });
     setBusy(null);
-    if (!res.ok) {
+    if (res.kind === 'blocked') {
+      setDeleteBlocked({ message: res.message, offerForce: res.offerForce });
+      return;
+    }
+    if (res.kind === 'failed') {
       toast(res.message);
       return;
     }
     await cancelAllReminders();
     router.replace('/welcome');
+    if (res.released) toast(RELEASED_LINE);
+  };
+
+  const addPassword = async () => {
+    if (!user?.email || passwordBusy) return;
+    setPasswordBusy(true);
+    const r = await sendAddPassword(user.email);
+    setPasswordBusy(false);
+    toast(r.message);
   };
 
   return (
@@ -217,7 +247,47 @@ function SignedIn({ email }: { email: string }) {
         />
       </Card>
 
+      {showPlan ? (
+        <Group title="Plan">
+          <PlanRow testID="account-plan" />
+          {holds ? (
+            <ListRow
+              testID="account-plan-manage"
+              title={MANAGE_LABEL}
+              subtitle={canManageHere(plan) ? "On the payment company's page" : 'Where the plan was bought'}
+              left={
+                <IconTile color={colors.textSecondary}>
+                  <CreditCard size={20} color={colors.textSecondary} />
+                </IconTile>
+              }
+              onPress={() => {
+                if (!canManageHere(plan)) {
+                  router.push(PLAN_ROUTE as never);
+                  return;
+                }
+                void openManage().then((r) => {
+                  if (!r.ok) toast(r.message);
+                });
+              }}
+            />
+          ) : null}
+        </Group>
+      ) : null}
+
       <Group title="Session">
+        {needsPassword(user) ? (
+          <ListRow
+            testID="account-add-password"
+            title={ADD_PASSWORD_LABEL}
+            subtitle={passwordBusy ? 'Sending the link' : ADD_PASSWORD_HINT}
+            left={
+              <IconTile color={colors.textSecondary}>
+                <KeyRound size={20} color={colors.textSecondary} />
+              </IconTile>
+            }
+            onPress={() => void addPassword()}
+          />
+        ) : null}
         <ListRow
           testID="account-sign-out"
           title="Sign out"
@@ -282,14 +352,29 @@ function SignedIn({ email }: { email: string }) {
       <ConfirmSheet
         visible={confirmDelete}
         title="Delete your account?"
-        message={
-          'This permanently erases your account and everything stored with it: every food, activity, weight, water, sleep and fasting entry, your custom foods and saved meals, your profile, goals and settings. It also removes the data from this device and turns off reminders. This cannot be undone.'
-        }
+        message={`${holds ? `${DELETE_PLAN_LINE} ` : ''}This permanently erases your account and everything stored with it: every food, activity, weight, water, sleep and fasting entry, your custom foods and saved meals, your profile, goals and settings. It also removes the data from this device and turns off reminders. This cannot be undone.`}
         confirmLabel="Delete account and data"
         destructive
         onConfirm={() => void doDelete()}
         onCancel={() => setConfirmDelete(false)}
       />
+      <Sheet
+        visible={deleteBlocked !== null}
+        onClose={() => setDeleteBlocked(null)}
+        title="Account not deleted"
+        footer={
+          <View style={{ gap: 10 }}>
+            <Button testID="account-delete-retry" title="Try again" onPress={() => void doDelete()} />
+            {deleteBlocked?.offerForce ? (
+              <Button testID="account-delete-anyway" title={DELETE_ANYWAY_LABEL} variant="danger" onPress={() => void doDelete(true)} />
+            ) : null}
+            <Button testID="account-delete-keep" title="Keep the account" variant="ghost" onPress={() => setDeleteBlocked(null)} />
+          </View>
+        }>
+        <Text variant="body" color="textSecondary" testID="account-delete-blocked">
+          {deleteBlocked?.message}
+        </Text>
+      </Sheet>
     </>
   );
 }

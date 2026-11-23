@@ -12,6 +12,7 @@ import { AnalysingView } from '@/features/ai/AnalysingView';
 import { agreeToAi, checkAiConsent, loadAiConsent, useAiConsent, withdrawAiConsent } from '@/features/ai/consent';
 import { availability, DEMO_ERROR_CODES } from '@/features/ai/demo';
 import { ErrorView, type ErrorAction, type ScreenErrorCode } from '@/features/ai/ErrorView';
+import { CAREFUL_COST, carefulUses, estimateLimitWords, plusLimitOf, plusLink, type LimitInfo } from '@/features/ai/limit';
 import {
   ADDED_FAT_OPTIONS,
   applyAddedFat,
@@ -40,6 +41,7 @@ import { PhotoHero } from '@/features/ai/PhotoHero';
 import { SampleNotice } from '@/features/ai/SampleNotice';
 import { photoText, readWeight } from '@/features/ai/weight';
 import { MealPicker } from '@/features/food/components';
+import { checkoutShown, PLAN_ROUTE, planVisible, refreshPlanAfterLimit, usePlan } from '@/features/plan';
 import { logItems } from '@/features/food/log';
 import { BUILTIN_FOODS } from '@/data/foods';
 import { isolateRtl } from '@/lib/bidi';
@@ -63,6 +65,10 @@ interface ScreenError {
   retryable: boolean;
   /** The failed attempt was the careful pass over an existing result. */
   precise: boolean;
+  /** A limit answer's plan fields (@/features/ai/limit), or null: today's words. */
+  limit?: LimitInfo | null;
+  /** The allowance last heard of before the refused call ("N analyses left today"), or null. */
+  leftBefore?: number | null;
 }
 
 const isMeal = (v: unknown): v is MealType => MEALS.some((m) => m.id === v);
@@ -98,6 +104,7 @@ export default function PhotoScreen() {
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [fat, setFat] = useState<AddedFat>('none');
   const [remaining, setRemaining] = useState<number | null>(null);
+  const plan = usePlan();
   const [precisePass, setPrecisePass] = useState(false);
   const [error, setError] = useState<ScreenError | null>(null);
   const [addingAi, setAddingAi] = useState(false);
@@ -175,7 +182,9 @@ export default function PhotoScreen() {
     haptic.warn();
     if (e instanceof AiError) {
       if (e.remaining !== null) setRemaining(e.remaining);
-      setError({ code: e.code, message: e.message, retryable: e.retryable, precise });
+      setError({ code: e.code, message: e.message, retryable: e.retryable, precise, limit: e.limit, leftBefore: remaining });
+      // The server decides the limit: ask it for the plan again, so the link and the numbers are current.
+      if (e.code === 'daily_limit') void refreshPlanAfterLimit();
     } else if (e instanceof PhotoError) {
       setError({ code: e.code, message: e.message, retryable: false, precise });
     } else {
@@ -349,6 +358,15 @@ export default function PhotoScreen() {
   const isDemo = !!result?.demo;
   // The sample result is not about the photo, so it does not wear it.
   const heroPhoto = mode === 'photo' && preview && !isDemo ? preview.uri : null;
+  // At the limit with plans on: the plan-aware words, and on the free plan one quiet link to the plan
+  // (only where the plan is shown at all and this copy may show the checkout, rulings R14, R15, R19).
+  const limitWords = error?.code === 'daily_limit' && error.limit ? estimateLimitWords(error.limit, error.leftBefore ?? null) : null;
+  const plansLink =
+    limitWords?.offerPlans && planVisible(plan) && checkoutShown()
+      ? { testID: 'ai-limit-plans', label: plusLink(plusLimitOf(plan, 'estimates')), onPress: () => router.push(PLAN_ROUTE as never) }
+      : undefined;
+  // On the free plan the careful check says what it uses (ruling R18).
+  const carefulLine = plan.known && plan.plansOn && plan.plan === 'free' ? carefulUses(CAREFUL_COST, plan.limits.estimates) : null;
   const allowance = remaining !== null ? `${remaining} ${remaining === 1 ? 'analysis' : 'analyses'} left today` : null;
 
   let footer: React.ReactNode = null;
@@ -495,7 +513,15 @@ export default function PhotoScreen() {
 
       {step === 'error' && error ? (
         <>
-          <ErrorView code={error.code} message={error.message} actions={errorActions()} footnote={error.code === 'daily_limit' ? undefined : (allowance ?? undefined)} />
+          <ErrorView
+            code={error.code}
+            message={error.message}
+            actions={errorActions()}
+            footnote={error.code === 'daily_limit' ? undefined : (allowance ?? undefined)}
+            title={limitWords?.title}
+            body={limitWords?.body}
+            link={plansLink}
+          />
         </>
       ) : null}
 
@@ -690,9 +716,14 @@ export default function PhotoScreen() {
                 variant="ghost"
                 size="md"
                 icon={<Sparkles size={16} color={colors.text} />}
-                accessibilityLabel={`Check again more carefully with a stronger model${mode === 'photo' ? ' and a sharper copy of the photo' : ''}. Uses one analysis and keeps the items you added`}
+                accessibilityLabel={`Check again more carefully with a stronger model${mode === 'photo' ? ' and a sharper copy of the photo' : ''}. Uses ${CAREFUL_COST} of today's analyses and keeps the items you added`}
                 onPress={() => void analyse(true)}
               />
+            ) : null}
+            {!precisePass && carefulLine ? (
+              <Text variant="caption" color="textSecondary" testID="ai-careful-uses">
+                {carefulLine}
+              </Text>
             ) : null}
             {allowance ? (
               <Text variant="caption" color="textTertiary" testID="ai-remaining">

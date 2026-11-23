@@ -68,7 +68,7 @@ Upload them in this order. Frame 1 is the one shown in search results. The figur
 | 5 | `05-workouts.png` | Workouts from / your watch | App Store: Import Garmin files with measured calories. Play: From Garmin files or Health Connect | Train (`/train`): the week's 287 minutes against the 150-minute guideline, and the "Import workouts from Garmin" and "Automatic sync" links. Lifted out is yesterday's run: 46 min, 8.2 km, "Garmin · measured", 522 kcal net. |
 | 6 | `06-weekly-recap.png` | A weekly check-in, / no shame | Wins first. Over budget is just information. | The weekly check-in (`/recap`). Lifted out are the win of the week (for example "Protein averaged 151 g, on your 152 g target") and the four tiles. Behind it is the day-by-day chart, where one day over budget wears an amber lip. |
 | 7 | `07-friends.png` | Friends who / cheer you on | They see workouts, never food or weight | Friends (`/friends`): the invite code with its privacy line. Lifted out are Maya's week (270 min, 33 day streak, mini cups, a cheered volleyball session) and "Maya cheered your volleyball". |
-| 8 | `08-free.png` | Free. No ads. / No paywall. | Three looks, full export, your data stays yours | Three whole devices showing Today: Blossom in front, dark and light behind. |
+| 8 | `08-free.png` | No ads. / Yours to export. | Three looks, full export, your data stays yours | Three whole devices showing Today: Blossom in front, dark and light behind. |
 
 Each support line fits on one line at every size. On the App Store, frame 5 does not name Health Connect, because Apple refuses metadata that names another mobile platform.
 
@@ -87,7 +87,7 @@ HealthCal: Calorie Counter
 **First sentence of the description**:
 
 ```
-Log a meal in two taps and watch your day fill up: calories, macros, water and workouts in one place, free and with no ads.
+Log a meal in two taps and watch your day fill up: calories, macros, water and workouts in one place, with no ads.
 ```
 
 ### App Store
@@ -98,10 +98,10 @@ Log a meal in two taps and watch your day fill up: calories, macros, water and w
 Food, water, workouts. No ads.
 ```
 
-**Promotional text** (170): 129
+**Promotional text** (170): 162
 
 ```
-Log a meal in two taps and watch your day fill up: calories, macros, water and workouts in one place, with no ads and no paywall.
+Log a meal in two taps and watch your day fill up: calories, macros, water and workouts in one place, with no ads. Logging, scanning and export are free for good.
 ```
 
 **Keywords** (100 bytes): 96. They are comma-separated, with no words from the name and no trademarks.
@@ -114,20 +114,20 @@ food diary,macro,protein,water tracker,diet,weight loss,nutrition,meal log,worko
 
 ### Google Play
 
-**Short description** (80): 79
+**Short description** (80): 67
 
 ```
-Log food in two taps. Calories, macros, water and workouts. No ads, no paywall.
+Log food in two taps. Calories, macros, water and workouts. No ads.
 ```
 
 **Full description** (4,000): the full description below, with the Health Connect paragraph.
 
 ### Full description
 
-App Store: 2,542 characters. Play, with the Health Connect paragraph: 2,716.
+App Store: 2,659 characters. Play, with the Health Connect paragraph: 3,077 (both counted on 23 November 2026, after the plans change).
 
 ```
-Log a meal in two taps and watch your day fill up: calories, macros, water and workouts in one place, free and with no ads.
+Log a meal in two taps and watch your day fill up: calories, macros, water and workouts in one place, with no ads.
 
 YOUR DAY AS A CUP
 Today shows your day as one cup: what you have eaten, what is left, and the exercise you added on top. Protein, carbs and fat sit beside it, and a strip of small cups shows the week at a glance.
@@ -139,7 +139,7 @@ FAST LOGGING
 - Every food shows where its numbers come from: built-in reference data, the community, your own foods or an estimate.
 
 HONEST NUMBERS
-- Describe a meal or take a photo, and get an estimate with a likely range rather than one exact number. You check and change every item before it is logged. (Needs a free account. There is a daily allowance.)
+- Describe a meal or take a photo, and get an estimate with a likely range rather than one exact number. You check and change every item before it is logged. (Needs a free account. There is a daily allowance, larger with Plus.)
 - Exercise adds only the calories above resting to your budget, so nothing is counted twice.
 - Calorie burn is shown as an estimate with a range, unless a device measured it.
 
@@ -164,7 +164,7 @@ YOURS
 - Works without an account; your data lives on your phone. Sign in only if you want sync across devices, friends, meal estimates or the AI coach.
 - Full export of your data, and delete your account at any time.
 - Three looks: Blossom, light and dark. Metric or imperial units.
-- No ads. No paywall. No premium tier.
+- No ads. Logging, barcode scanning, sync and export are free. Plus, an optional subscription, raises the daily AI estimates and coach questions.
 
 HealthCal gives estimates for everyday tracking. It is not a medical device and does not give medical advice.
 ```
@@ -214,7 +214,7 @@ To leave the photo out, run with `--describe`. Frame 3 then shows the same estim
 
 The stores will ask for these, and only you can provide them:
 
-1. **A hosted privacy policy URL.** Both stores require one, and Play requires it for health data. It should say:
+1. **A hosted privacy policy URL.** Both stores require one, and Play requires it for health data. The app now has the page itself: `/legal/privacy` (`src/features/legal/content.ts`), so once the web app is deployed the URL is `https://healthcal.expo.app/legal/privacy`. Before giving that URL, add the owner's name or company, a postal address and the support address (`CONTACT_EMAIL` in the same file), and have it read by someone who knows the law where you sell. It says:
    - the app works on the device without an account;
    - with an account, data syncs to your Supabase project;
    - a meal photo or description is sent to the analyse-food function and on to the AI model provider to make an estimate;
@@ -228,6 +228,7 @@ The stores will ask for these, and only you can provide them:
    - User Content: meal photos and descriptions, sent for analysis; HealthCal's server does not store them;
    - Other User Content: questions to the AI coach, sent to the AI provider to answer them; HealthCal's server does not store them. With "Share my week" on, Health and Fitness (calories against the budget, protein and water as shares of the targets, training and sleep averages, the weight trend's direction) is shared likewise, as a summary, after the person's explicit agreement;
    - Identifiers: the user ID.
+   - Purchases: purchase history (whether Plus is active, its period and until when), linked to the user, once Plus is sold. The payment company holds the payment details; HealthCal never receives them.
 
    No tracking and no ads. Declare Photos (or Other User Content) as shared with a third-party AI provider, Anthropic, for app functionality only and not used for tracking. Apple's guideline 5.1.2 also asks that people are told, and agree, before personal data goes to a third-party AI service: the app asks once per device before the first estimate (`src/features/ai/AiConsentSheet.tsx`), says on the estimate screen where the photo or description goes, and lets people withdraw in About HealthCal, under Privacy. The AI coach asks apart, before the first typed question (`src/features/coach/CoachSheet.tsx`, its own agreement and version), shows the line "AI coach · not medical advice" on its screen, shows word for word what "Share my week" sends, and has its own withdraw row in About, "Coach chat".
    **Apple Health (HealthKit), for the review, once the Apple Health build is the one submitted** (the library is installed and bound, but no signed iPhone build has read Apple Health on a phone yet: docs/health-sync.md, "State of the iPhone side"). These lines are what App Review checks for an app that reads HealthKit (App Store Review Guidelines 2.5.1 and 5.1.3, read 16 November 2026):
@@ -250,13 +251,17 @@ The stores will ask for these, and only you can provide them:
    - The Health apps declaration.
    - The Data safety form, with the same facts as Apple's answers. Health info: weight and body fat (collected, stored on the device and in the account when there is one); Fitness info: workouts, steps, sleep and heart rate. Health and fitness info is shared with an AI service only as a summary, only after the person's explicit agreement, for coaching ("Share my week" in the AI coach); otherwise not shared. Messages: "Other in-app messages", the questions typed to the AI coach, sent to the AI provider (Anthropic) to answer them, not stored on the server.
 4. **Account deletion web link (Play).** Play asks for a web page where someone can request deletion without the app. The in-app "Delete account" is not enough on its own there.
-5. **Age rating answers.** Apple's questionnaire and Play's IARC questionnaire. The app has no ads, no purchases, no gambling and no mature content. Friends can see a chosen display name and send cheers; there is no messaging between people; the coach is a chat with an AI, labelled as one. Answer the user-to-user questions with that in mind.
-6. **A support address.** Apple needs a support URL that leads to real contact details, and Play needs a contact email. Neither is in this repository.
+5. **Age rating answers.** Apple's questionnaire and Play's IARC questionnaire. The app has no ads and one optional subscription (Plus, which raises the daily AI allowance), no gambling and no mature content. Friends can see a chosen display name and send cheers; there is no messaging between people; the coach is a chat with an AI, labelled as one. Answer the user-to-user questions with that in mind.
+6. **A support address.** Apple needs a support URL that leads to real contact details, and Play needs a contact email. Neither is in this repository. Once you have one, set `CONTACT_EMAIL` in `src/features/legal/content.ts`: the terms and the privacy page then show it.
 7. **Recapture frame 3 against the real backend before release.** That makes the estimate on the screen the real model's answer for that photo. Sign in on the web build of the production project, analyse `store/source/scrambled-eggs-on-toast-cc0.jpg`, and check that the screen reads as sensible as the stand-in's answer.
-8. **Two wording risks to decide on:**
-   - Frame 8 says "Free" in a screenshot. That is not the name, subtitle or keywords, which Apple's 2.3.7 covers, but some reviewers still object to price words.
-   - Frame 5 names Garmin, a trademark, to state compatibility. If either worries you, the captions are in `FRAMES` at the top of `scripts/dev/store-frames.cjs`.
+8. **A wording risk to decide on:**
+   - Frame 5 names Garmin, a trademark, to state compatibility. If it worries you, the captions are in `FRAMES` at the top of `scripts/dev/store-frames.cjs`. (Frame 8's headline is now "No ads. / Yours to export.", with no price word; regenerate the frames once `FRAMES` carries it.)
 9. **The app icon** in the stores is the one in `assets/images`. It is not changed here.
 10. **The AI coach before a store submission.**
-   - Play's policy for AI-generated content asks for a way to report an answer inside the app. A "Report this answer" control is not in this version: it is needed before a Play submission.
+   - Play's policy for AI-generated content asks for a way to report an answer inside the app. Every AI answer in the coach now has "Report this answer" (`src/features/coach/ReportSheet.tsx`): the answer, a reason and, if ticked, the question go to the `ai_reports` table, which you read from the Supabase dashboard. Read new reports there regularly.
    - The iPhone permission sentence in app.json ("never sends this data to the AI functions") changes with the next iPhone build. With it, the iPhone rule's constant changes too (`APPLE_HEALTH_LEFT_OUT` and `APPLE_HEALTH_PROMISE` in `src/features/coach/note.ts`; its test reads app.json and fails while the two disagree).
+11. **Plus, before a store submission.**
+   - *Terms of Use URL.* Apple asks for a link to the terms in the app and in the listing for any subscription. The app has `/legal/terms` (`src/features/legal/content.ts`), at `https://healthcal.expo.app/legal/terms` once the web app is deployed. Add the owner's name or company and the support address first, as for the privacy page. On the App Store, put the link in the description (or the EULA field).
+   - *Subscription disclosure in the description.* Add one paragraph at the end of YOURS: "HealthCal Plus is an optional subscription, monthly or yearly, that raises the daily allowance of AI estimates and coach questions. The price is shown before you pay. It renews until you cancel, and you can cancel at any time; Plus then stays until the end of the paid period. Terms: <terms URL>. Privacy: <privacy URL>." Keep prices out of the name, subtitle, keywords and screenshots (Apple 2.3.7).
+   - *App Privacy answers.* Add "Purchases" (item 2 above). Play's Data safety form: "Purchase history", collected, linked to the account, for app functionality.
+   - *Sign in with Apple, then store billing.* An App Store build that offers Google sign-in must also offer a privacy-focused sign-in such as Sign in with Apple (guideline 4.8), and a build sold through the App Store or Google Play must sell Plus through the store's own billing (Apple 3.1.1; Play's payments policy). Both need a native module and a new build, so neither is in this version: the web checkout is for the web app and for builds installed outside the stores. Do both before a store submission that shows Plus.

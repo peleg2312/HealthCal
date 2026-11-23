@@ -63,8 +63,22 @@ describe('the coach’s words', () => {
     expect(W.COACH_LINE).toBe('AI coach · not medical advice');
     expect(W.COACH_LINE_SHARING).toBe('AI coach · not medical advice · sees your week');
     expect(W.REFER_LINE).toBe('If you are in danger now, call your local emergency number. findahelpline.com lists free lines in every country.');
+    // The limit: today's words with plans off (or from an older server), the plan-aware ones with plans on.
     expect(W.NOTICE.daily_limit.text).toBe('30 questions today. They reset at midnight UTC.');
+    const free = { limit: 5, plan: 'free' as const, cost: 1, resetsAt: null, graceUntil: null, shared: false };
+    expect(W.coachLimitText(free)).toBe('5 questions today. The two buttons above still answer from your phone. More after midnight UTC.');
+    expect(W.coachLimitText({ ...free, limit: 30, plan: 'plus' })).toBe('30 questions today. The two buttons above still answer from your phone. More after midnight UTC.');
+    expect(W.coachPlansLink(30)).toBe('Plus gives 30 a day');
     expect(W.LOCAL_MARK).toBe('From your data, on this phone');
     expect(W.localIdeasQuestion('dinner')).toBe('Ideas for dinner');
+  });
+});
+
+describe('what goes with a typed question (R17)', () => {
+  it('names the real number of earlier exchanges', () => {
+    expect(W.sentWithLine(3)).toBe('Each question you type goes to the AI coach with your last 3 questions and their answers. The summary below goes with it while "Share my week" is on.');
+    expect(W.sentWithLine(6)).toContain('your last 6 questions and their answers');
+    expect(W.sentWithLine(1)).toContain('your last question and its answer');
+    expect(W.sentWithLine(0)).toContain('by itself');
   });
 });

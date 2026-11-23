@@ -19,7 +19,10 @@ import { AppState, Platform, Pressable, Text as RNText, View } from 'react-nativ
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { finishGoogleReturn } from '@/features/auth/google';
+import { isGoogleReturnUrl } from '@/features/auth/words';
 import { startCoach } from '@/features/coach/history';
+import { startPlan } from '@/features/plan/start';
 import { usePendingInvite } from '@/features/friends/usePendingInvite';
 import { startHealthSync } from '@/features/health-sync/sync';
 import { startUpdates, useReportScreen } from '@/features/updates/updates';
@@ -98,7 +101,7 @@ const TASK_SCREENS = ['food/search', 'food/quick', 'food/scan', 'food/photo', 'a
  * profile (budget, units, goals), so a link opened before setup goes to the welcome screen
  * instead of a screen that cannot draw. The tabs have the same rule in their own layout.
  */
-const OPEN_WITHOUT_PROFILE = new Set(['welcome', 'auth', 'onboarding', 'friends/add', 'settings/data', 'settings/about', '+not-found', '_sitemap']);
+const OPEN_WITHOUT_PROFILE = new Set(['welcome', 'auth', 'onboarding', 'friends/add', 'settings/data', 'settings/about', 'legal/terms', 'legal/privacy', '+not-found', '_sitemap']);
 
 function ProfileGate({ name, children }: { name: string; children: React.ReactNode }) {
   const onboarded = useStore((s) => !!s.profile?.onboardedAt);
@@ -202,6 +205,8 @@ export default function RootLayout() {
     startHealthSync();
     // The coach's chat and agreement go whenever the profile goes away (erase, sign out, account switch).
     startCoach();
+    // The plan's device copy: asked at sign-in and on a return after five minutes, wiped with the account.
+    startPlan();
     startUpdates();
     const stopSnapshots = startDaySnapshots();
     // Reminder text carries live numbers ("620 ml left"), so it is rebuilt whenever data changes.
@@ -235,6 +240,12 @@ export default function RootLayout() {
   const link = Linking.useURL();
   useEffect(() => {
     if (Platform.OS === 'web' || !ready || !link) return;
+    // Back from Google in the system browser (healthcal://auth?mode=google&code=...), also on a cold start:
+    // the code is exchanged once however many times the link arrives (src/features/auth/google.ts).
+    if (isGoogleReturnUrl(link)) {
+      void finishGoogleReturn(link);
+      return;
+    }
     void handleAuthLink(link).then((ok) => {
       if (ok) router.replace('/auth?mode=reset');
     });

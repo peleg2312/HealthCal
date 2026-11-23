@@ -27,6 +27,9 @@ import { syncReach } from '@/features/health-sync/reach';
 import { useHealthSync } from '@/features/health-sync/store';
 import { healthAdapter, useHealthStatus } from '@/features/health-sync/sync';
 import { profileSubtitle } from '@/features/health-sync/ui/format';
+import { usePlan } from '@/features/plan/cache';
+import { PlanRow } from '@/features/plan/PlanRow';
+import { planVisible } from '@/features/plan/view';
 import { Group, IconTile, InitialsAvatar } from '@/features/settings/components';
 import { THEME_HINTS, ThemeSwatches } from '@/features/settings/ThemeSwatches';
 import { timeAgo } from '@/features/settings/format';
@@ -68,6 +71,8 @@ function ProfileHub() {
   // Under 360 px the three header stats have about 70 px each: one-word labels keep them on one line.
   const narrow = useWindowDimensions().width < 360;
   const profile = useProfile();
+  // Shown while plans are on, or while the person holds a plan (ruling R14).
+  const showPlan = planVisible(usePlan());
   const settings = useStore((s) => s.settings);
   const setSettings = useStore((s) => s.setSettings);
   const setProfile = useStore((s) => s.setProfile);
@@ -122,6 +127,7 @@ function ProfileHub() {
       {/* Four groups in the order a new person looks for things: you, your plan, what you track, the app. */}
       <Group title="You">
         <AccountRow />
+        {showPlan ? <PlanRow testID="profile-plan" /> : null}
         <ListRow
           testID="profile-friends"
           title="Friends"

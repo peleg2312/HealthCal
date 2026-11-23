@@ -1,13 +1,15 @@
-import React, { useRef, useState } from 'react';
-import { Platform, View } from 'react-native';
+import React, { useState } from 'react';
+import { View } from 'react-native';
 
 import { toISODate } from '@/lib/dates';
 import { useStore } from '@/store';
 import { useNow } from '@/store/clock';
 import { useTheme } from '@/theme';
+import { usePlan } from '@/features/plan';
 import { Button, Card, PressableScale, Sheet, Text, ToggleRow } from '@/ui';
 
 import { coachNote } from './note';
+import { pairsToSend } from './request';
 import {
   ABOUT_DONE,
   ABOUT_TITLE,
@@ -18,12 +20,12 @@ import {
   CONSENT_NOT_NOW,
   CONSENT_NOT_NOW_HINT,
   CONSENT_TITLE,
-  HIDE_WHAT_IS_SENT,
   NOTE_APPLE,
   NOTE_EMPTY,
   SEE_WHAT_IS_SENT,
   SHARE_HINT,
   SHARE_LABEL,
+  sentWithLine,
 } from './words';
 
 /**
@@ -35,8 +37,11 @@ import {
  *
  * Order: the switch, the line saying what it shares and "See what is sent" come first, above the
  * longer facts, so the choice is in the first view of the sheet at 320, 360 and 390 px wide (the
- * consent cannot be given without seeing it). Opening the preview scrolls it into view (on the web;
- * natively the kit's Sheet keeps its scroller to itself, and the preview sits right under the link).
+ * consent cannot be given without seeing it). "See what is sent" opens the preview as a sheet of its
+ * own over this one (`coach-note-sheet`, closed with `coach-note-done`, the drag or the backdrop), so the
+ * whole note is in view at its top on a phone, with no scrolling by hand: the kit's Sheet keeps its
+ * scroller to itself, so a preview placed lower in this sheet could not be brought into view natively.
+ * The inner sheet is drawn inside this sheet's content, so on iPhone it is presented from this one.
  */
 export function CoachSheet({
   visible,
@@ -56,6 +61,7 @@ export function CoachSheet({
   const { spacing } = useTheme();
   const ask = mode === 'ask';
   const [preview, setPreview] = useState(false);
+  const plan = usePlan();
   // The preview is the note as it would be sent now: built when the sheet draws, from the clock hook's minute.
   const now = useNow();
   const profile = useStore((s) => s.profile);
@@ -66,19 +72,6 @@ export function CoachSheet({
   const sleep = useStore((s) => s.sleep);
   const days = useStore((s) => s.days);
   const note = preview ? coachNote({ profile, foodEntries, activities, weights, water, sleep, days }, toISODate(now)) : null;
-  // The preview box, scrolled into view once when it opens (react-native-web's View is the DOM element).
-  const box = useRef<React.ComponentRef<typeof View>>(null);
-  const reveal = useRef(false);
-  const showPreview = () => {
-    reveal.current = !preview;
-    setPreview((p) => !p);
-  };
-  const revealBox = () => {
-    if (!reveal.current || Platform.OS !== 'web') return;
-    reveal.current = false;
-    const el = box.current as unknown as { scrollIntoView?: (o: { block: string }) => void } | null;
-    requestAnimationFrame(() => el?.scrollIntoView?.({ block: 'nearest' }));
-  };
 
   const close = () => {
     setPreview(false);
@@ -116,29 +109,14 @@ export function CoachSheet({
         </Text>
         <PressableScale
           testID="coach-note-preview"
-          accessibilityLabel={preview ? HIDE_WHAT_IS_SENT : SEE_WHAT_IS_SENT}
-          onPress={showPreview}
+          accessibilityLabel={SEE_WHAT_IS_SENT}
+          onPress={() => setPreview(true)}
           hitSlop={6}
           style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }}>
           <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
-            {preview ? HIDE_WHAT_IS_SENT : SEE_WHAT_IS_SENT}
+            {SEE_WHAT_IS_SENT}
           </Text>
         </PressableScale>
-        {note ? (
-          <View ref={box} onLayout={revealBox}>
-            <Card tone="alt" testID="coach-note-box" style={{ gap: spacing.sm }}>
-              {/* The note exactly as sent: an array child, so the kit adds no mark to it. */}
-              <Text variant="caption" color="text" testID="coach-note-text" selectable>
-                {[note.text || NOTE_EMPTY]}
-              </Text>
-              {note.appleNote ? (
-                <Text variant="caption" color="textSecondary" testID="coach-note-apple">
-                  {NOTE_APPLE}
-                </Text>
-              ) : null}
-            </Card>
-          </View>
-        ) : null}
         {COACH_FACTS.map((p, i) => (
           <View key={p.title} style={i === 0 ? { marginTop: spacing.xs } : undefined}>
             <Text variant="bodyStrong">{p.title}</Text>
@@ -151,6 +129,25 @@ export function CoachSheet({
           {ask ? CONSENT_NOT_NOW_HINT : ABOUT_WITHDRAW_HINT}
         </Text>
       </View>
+      {/* "What is sent": the first of the facts' titles, the same words. */}
+      <Sheet visible={preview} onClose={() => setPreview(false)} title={COACH_FACTS[0].title} footer={<Button testID="coach-note-done" title={ABOUT_DONE} onPress={() => setPreview(false)} />}>
+        <Text variant="caption" color="textSecondary" testID="coach-note-with" style={{ marginBottom: spacing.md }}>
+          {sentWithLine(pairsToSend(plan.limits.memoryPairs))}
+        </Text>
+        {note ? (
+          <Card tone="alt" testID="coach-note-box" style={{ gap: spacing.sm }}>
+            {/* The note exactly as sent: an array child, so the kit adds no mark to it. */}
+            <Text variant="caption" color="text" testID="coach-note-text" selectable>
+              {[note.text || NOTE_EMPTY]}
+            </Text>
+            {note.appleNote ? (
+              <Text variant="caption" color="textSecondary" testID="coach-note-apple">
+                {NOTE_APPLE}
+              </Text>
+            ) : null}
+          </Card>
+        ) : null}
+      </Sheet>
     </Sheet>
   );
 }

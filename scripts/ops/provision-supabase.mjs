@@ -2,13 +2,17 @@
 /**
  * Sets up a Supabase project for HealthCal through Supabase's management API
  * (https://api.supabase.com/api/v1): creates the project if there is none,
- * applies the database migrations, deploys both edge functions, allows the
+ * applies the database migrations, deploys every edge function in
+ * supabase/functions (analyze-food, coach-chat, food-search, billing), allows the
  * app's links for password reset, and writes .env with the project's public
  * URL and key. Safe to run again: every step first checks what is there.
  *
  *   SUPABASE_ACCESS_TOKEN=sbp_... node scripts/ops/provision-supabase.mjs \
  *     [--name healthcal] [--org <organization slug>] [--region emea|americas|apac|<region code>] \
- *     [--site-url https://your.site] [--dry-run]
+ *     [--site-url https://your.site] [--dry-run] [--dev]
+ *     [--dev]                                 also allow sign-in links back to http://localhost:8081 (a
+ *                                             development machine); without it, localhost entries are
+ *                                             taken off the project's allow list
  *     [--migrations-through 20261114000000]   apply migrations up to and including this version only
  *     [--write-env path]                      write the app configuration there instead of .env
  *
@@ -22,6 +26,10 @@
  *
  * One thing it cannot do: store your Anthropic API key for meal analysis.
  * Add it yourself in the dashboard; the script prints the exact page.
+ * It sets no secret at all: plans (PLANS) and payments (BILLING_PROVIDER and the
+ * provider's keys) are switched on by the owner in the same page, as
+ * docs/plans-and-payments.md describes. The script only reports which are set,
+ * by name, never a value.
  */
 import { randomBytes } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -184,14 +192,19 @@ async function deployFunctions(ref) {
 async function configureAuth(ref) {
   step('Sign-in links');
   const current = await call('GET', `/v1/projects/${ref}/config/auth`);
-  const wanted = ['healthcal://**', 'http://localhost:8081/**', ...(args['site-url'] ? [`${args['site-url'].replace(/\/$/, '')}/**`] : [])];
+  // A sign-in or reset link may land on localhost only for a development project (--dev): on a real
+  // project it is an unneeded way to land a sign-in on a machine that is not HealthCal's.
+  const DEV = args.dev === 'true';
+  const isLocal = (u) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(u);
+  const wanted = ['healthcal://**', ...(DEV ? ['http://localhost:8081/**'] : []), ...(args['site-url'] ? [`${args['site-url'].replace(/\/$/, '')}/**`] : [])];
   const have = String(current.uri_allow_list || '').split(',').map((s) => s.trim()).filter(Boolean);
-  const merged = [...new Set([...have, ...wanted])];
+  const merged = [...new Set([...have.filter((u) => DEV || !isLocal(u)), ...wanted])];
+  const removed = have.filter((u) => !merged.includes(u));
   const patch = {};
-  if (merged.length !== have.length) patch.uri_allow_list = merged.join(',');
+  if (merged.length !== have.length || removed.length > 0) patch.uri_allow_list = merged.join(',');
   if (args['site-url'] && current.site_url !== args['site-url']) patch.site_url = args['site-url'];
   if (Object.keys(patch).length === 0) {
-    note('Already allow the app and the local web build.');
+    note(DEV ? 'Already allow the app and the local web build.' : "Already allow the app's own addresses.");
     return;
   }
   if (DRY) {
@@ -200,6 +213,7 @@ async function configureAuth(ref) {
   }
   await call('PATCH', `/v1/projects/${ref}/config/auth`, { json: patch });
   note(`Password-reset links may now return to: ${merged.join(', ')}.`);
+  if (removed.length) note(`Taken off the list (localhost is allowed only with --dev): ${removed.join(', ')}.`);
   note(`Email confirmation on sign-up is ${current.mailer_autoconfirm ? 'OFF (anyone can sign up with any address)' : 'on'}; change it in the dashboard under Authentication if you want.`);
 }
 
@@ -222,16 +236,34 @@ async function writeEnv(ref) {
   return url;
 }
 
+/** The plan and payment secrets the billing function reads (docs/plans-and-payments.md). Names only. */
+const PLAN_SECRETS = ['PLANS', 'BILLING_PROVIDER', 'BILLING_ENVIRONMENT', 'BILLING_SITE_URL', 'AI_FREE_DAILY_LIMIT', 'COACH_FREE_DAILY_LIMIT', 'AI_GLOBAL_PAID_EXTRA', 'COACH_GLOBAL_PAID_EXTRA', 'PLANS_GRACE_BEFORE', 'PLANS_GRACE_UNTIL'];
+
 async function reportSecrets(ref) {
   step('Meal analysis');
   const secrets = await call('GET', `/v1/projects/${ref}/secrets`);
-  if (secrets.some((s) => s.name === 'ANTHROPIC_API_KEY')) {
+  const names = new Set(secrets.map((s) => s.name));
+  let ai = true;
+  if (names.has('ANTHROPIC_API_KEY')) {
     note('ANTHROPIC_API_KEY is set: photo and text analysis will run.');
-    return true;
+  } else {
+    note('ANTHROPIC_API_KEY is not set yet, so the AI screen will answer "not set up".');
+    note(`Add it here (name ANTHROPIC_API_KEY): https://supabase.com/dashboard/project/${ref}/functions/secrets`);
+    ai = false;
   }
-  note('ANTHROPIC_API_KEY is not set yet, so the AI screen will answer "not set up".');
-  note(`Add it here (name ANTHROPIC_API_KEY): https://supabase.com/dashboard/project/${ref}/functions/secrets`);
-  return false;
+  step('Plans and payments');
+  const set = PLAN_SECRETS.filter((n) => names.has(n));
+  if (!names.has('PLANS')) note('PLANS is not set, so plans are off: every account keeps today\'s AI allowance and the app shows no plan.');
+  else note('PLANS is set (its value is not shown here; "on" switches plans on, but only together with a BILLING_PROVIDER the code knows).');
+  if (!names.has('BILLING_PROVIDER')) note('BILLING_PROVIDER is not set: plans stay off whatever PLANS says, nothing can be bought, and the payment webhook answers "not set up".');
+  if (!names.has('BILLING_ENVIRONMENT')) note('BILLING_ENVIRONMENT is not set, so only live purchases count (set it to "sandbox" only while trying a provider\'s sandbox).');
+  if (names.has('PLANS') && names.has('BILLING_PROVIDER') && !(names.has('PLANS_GRACE_BEFORE') && names.has('PLANS_GRACE_UNTIL'))) {
+    note('WARNING: no grace for earlier accounts (PLANS_GRACE_BEFORE and PLANS_GRACE_UNTIL). If PLANS is on, every existing account drops to the free numbers today. See docs/plans-and-payments.md.');
+  }
+  if (set.length) note(`Set: ${set.join(', ')}.`);
+  note(`The address to give a payment provider for its events: https://${ref}.supabase.co/functions/v1/billing/webhook`);
+  note(`What each one means, with its default: docs/plans-and-payments.md. Add them here: https://supabase.com/dashboard/project/${ref}/functions/secrets`);
+  return ai;
 }
 
 try {
