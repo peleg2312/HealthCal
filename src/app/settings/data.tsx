@@ -94,7 +94,7 @@ export default function DataScreen() {
         </Text>
       </Card>
 
-      <Group title="Full backup" footer="One JSON file with every entry, your profile, goals and settings. Import it here or on another device.">
+      <Group title="Full backup" footer="One JSON file with every entry, your profile, goals and settings. Import it here or on another device. The coach chat is kept on this phone and is not in the export.">
         <ListRow
           testID="data-export-backup"
           title="Export everything"
@@ -204,7 +204,7 @@ export default function DataScreen() {
       <ConfirmSheet
         visible={confirmErase}
         title="Erase everything on this device?"
-        message={`This removes every food, activity, weight, water, sleep and fasting entry, your custom foods, saved meals, profile, goals and settings from this device, and turns off reminders. ${
+        message={`This removes every food, activity, weight, water, sleep and fasting entry, your custom foods, saved meals, the coach chat and the coach's agreement, profile, goals and settings from this device, and turns off reminders. ${
           signedIn
             ? 'You will also be signed out, and changes that have not been uploaded yet are lost. Your account is not affected: the synced copy stays there and returns when you sign in again. To remove it everywhere, delete your account instead.'
             : 'Without an account there is no other copy, so export a backup first if you might want it later.'

@@ -6,7 +6,10 @@
  * friend can and cannot see, cheering), both edge functions, and account
  * deletion. Everything it creates is deleted again at the end.
  *
- *   node scripts/ops/verify-backend.mjs [--require-ai] [--config path] [--via-management]
+ *   node scripts/ops/verify-backend.mjs [--require-ai] [--chat] [--config path] [--via-management]
+ *
+ * --chat also asks the AI coach one real question (a paid call, about $0.0003); without it the
+ * coach is only checked for its two free refusals.
  *
  * Reads EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY from the
  * environment, from the file given with --config, or from .env (written by
@@ -43,6 +46,7 @@ const URL_ = process.env.EXPO_PUBLIC_SUPABASE_URL || fromFile.EXPO_PUBLIC_SUPABA
 const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || fromFile.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const REQUIRE_AI = process.argv.includes('--require-ai');
+const CHAT = process.argv.includes('--chat');
 const VIA_MANAGEMENT = process.argv.includes('--via-management');
 // In some managed environments a proxy adds the real token; any value then satisfies this header.
 const MANAGEMENT_TOKEN = process.env.SUPABASE_ACCESS_TOKEN || `sbp_${'0'.repeat(40)}`;
@@ -189,6 +193,26 @@ try {
   const search = await fn('food-search?q=oat%20milk&limit=5', { headers: { apikey: ANON, Authorization: `Bearer ${ANON}` } });
   const searchBody = await search.json().catch(() => ({}));
   check('product search answers', search.status === 200 && Array.isArray(searchBody.hits), search.status === 200 ? `${searchBody.hits.length} products` : `status ${search.status} (the product database may be busy)`);
+
+  // The AI coach. Both refusals are free: they come before a unit is taken and before the model.
+  const coach = (token, body) => fn('coach-chat', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: ANON, Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+  const coachAnon = await coach(ANON, { message: 'How many rest days a week?', consentVersion: 1 });
+  check('the coach refuses a caller who is not signed in', coachAnon.status === 401, `status ${coachAnon.status}`);
+  // Account A's profile has no date of birth, which the coach counts as under 18.
+  const coachYoung = await coach(a.token, { message: 'How many rest days a week?', consentVersion: 1 });
+  const youngBody = await coachYoung.json().catch(() => ({}));
+  if (coachYoung.status === 500 && youngBody.error === 'not_configured') check('the coach refuses a profile without a valid date of birth', 'skip', 'the coach is not set up: deploy coach-chat and set ANTHROPIC_API_KEY');
+  else check('the coach refuses a profile without a valid date of birth', coachYoung.status === 403 && youngBody.error === 'under_18', `status ${coachYoung.status} ${youngBody.error ?? ''}`);
+  if (CHAT) {
+    // A real question (a paid call, about $0.0003). Account B has no profile row, which is allowed.
+    const started = Date.now();
+    const asked = await coach(b.token, { message: 'How many rest days a week suit someone who started running last month?', consentVersion: 1 });
+    const askedBody = await asked.json().catch(() => ({}));
+    const fine = asked.status === 200 && typeof askedBody.text === 'string' && askedBody.text.length > 20 && typeof askedBody.remaining === 'number';
+    check('the coach answers a question', fine, fine ? `${askedBody.text.split(/\s+/).length} words in ${((Date.now() - started) / 1000).toFixed(1)} s, ${askedBody.remaining} left today${askedBody.truncated ? ', cut short' : ''}` : `status ${asked.status}: ${String(askedBody.message ?? askedBody.error ?? '').slice(0, 140)}`);
+  } else {
+    check('the coach answers a question', 'skip', 'run with --chat to ask one real question (a paid call, about $0.0003)');
+  }
 } catch (e) {
   check('the run completed', false, e.message);
 } finally {

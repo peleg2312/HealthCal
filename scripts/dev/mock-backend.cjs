@@ -20,7 +20,7 @@ const crypto = require('node:crypto');
 const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith('--')).map((a) => a.slice(2).split('=')));
 const PORT = Number(flags.port || 54321);
 
-const state = { users: new Map(), records: [], profiles: new Map(), aiRequests: [], aiUsage: new Map(), recoveries: [], social: new Map(), socialLimits: new Map(), friendships: [], declines: [], cheers: [], clock: Date.now() };
+const state = { users: new Map(), records: [], profiles: new Map(), aiRequests: [], aiUsage: new Map(), coachRequests: [], coachUsage: new Map(), recoveries: [], social: new Map(), socialLimits: new Map(), friendships: [], declines: [], cheers: [], clock: Date.now() };
 const tick = () => new Date((state.clock += 5)).toISOString();
 
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -297,6 +297,8 @@ const api = http.createServer(async (req, res) => {
       records: state.records,
       profiles: Object.fromEntries(state.profiles),
       aiRequests: state.aiRequests,
+      // Every request the coach-chat route received, refused ones included, with its body as sent.
+      coachRequests: state.coachRequests,
       // What the reset email would carry: lets a test follow the link without a mailbox.
       recoveries: state.recoveries.map((r) => ({ email: r.email, code: r.code, redirectTo: r.redirectTo })),
       social: Object.fromEntries(state.social),
@@ -453,6 +455,104 @@ const api = http.createServer(async (req, res) => {
       usage: { inputTokens: body.image ? 1100 : 310, outputTokens: 180 },
       remaining: LIMIT - used,
     });
+  }
+  if (route === 'POST /functions/v1/coach-chat') {
+    /*
+     * The AI coach (supabase/functions/coach-chat), with fixed answers and no model. The same checks,
+     * codes and limits as coach.ts, except the 32 KB cap, which is checked only from content-length.
+     * Triggers, for the app's tests:
+     *   - the account's email starts with "unconfirmed" (sign up as unconfirmed-...@...): 403 unconfirmed;
+     *   - the profile pushed for the account has a birthDate under 18 or not a valid date: 403 under_18
+     *     (no profile, or a profile with no data, is allowed, as on the real function);
+     *   - the 31st question of a run for one account, or a message containing "daily limit": 429 daily_limit;
+     *   - "shared limit": 429 shared_limit;   "busy now": 503 busy;   "too slow": 504 timeout;
+     *   - "server error": 502 upstream;   "please decline": 422 declined;
+     *   - "cut short": 200 with truncated: true;   "refer me": 200 with refer: true;
+     *   - anything else: 200 with a fixed answer naming what was received (Hebrew when the question starts with a Hebrew letter).
+     * Every request is kept in state.coachRequests (GET /__state), with its body exactly as received.
+     */
+    const COACH_LIMIT = 30;
+    const user = [...state.users.values()].find((u) => u.id === uid);
+    const entry = { user: uid, at: new Date().toISOString(), apikey: !!req.headers.apikey, body, status: 0, error: null };
+    state.coachRequests.push(entry);
+    const reply = (status, out) => {
+      entry.status = status;
+      entry.error = out.error ?? null;
+      return send(res, status, out);
+    };
+    const MSG = {
+      unauthorized: 'Sign in to use the AI coach.',
+      unconfirmed: 'Confirm your email address to use the AI coach.',
+      under_18: 'The AI coach is for people aged 18 and over. The two buttons above the field still work.',
+      body_too_large: 'That message is too long to send.',
+      bad_body: 'Send the question as JSON.',
+      consent_outdated: 'What the coach sees has changed. Read it and agree again to keep chatting.',
+      message_empty: 'Type a question first.',
+      message_too_long: 'A question can be up to 500 characters.',
+      history_invalid: 'The earlier messages could not be read.',
+      history_too_long: 'At most 6 earlier messages can be sent.',
+      history_order: 'Earlier messages must be whole question and answer pairs, question first.',
+      history_turn_too_long: 'Each earlier message can be up to 1200 characters.',
+      note_invalid: 'The summary of your week holds characters that cannot be sent.',
+      note_too_long: 'The summary of your week can be up to 900 characters.',
+      daily_limit: `${COACH_LIMIT} questions today. They reset at midnight UTC.`,
+      shared_limit: 'The AI coach has reached its shared limit for today. It is back after midnight UTC.',
+      busy: 'The AI coach is busy right now. Try again in a moment.',
+      timeout: 'The AI coach took too long to answer. Try again.',
+      upstream: 'The AI coach could not answer right now. Try again.',
+      declined: 'The coach cannot help with that question. Try asking it another way.',
+    };
+    const refuse = (status, error, extra) => reply(status, { error, message: MSG[error], ...extra });
+    if (!uid || !user) return refuse(401, 'unauthorized');
+    if (/^unconfirmed/i.test(user.email)) return refuse(403, 'unconfirmed');
+    if (Number(req.headers['content-length'] || 0) > 32 * 1024) return refuse(413, 'body_too_large');
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return refuse(400, 'bad_body');
+    if (!Number.isInteger(body.consentVersion) || body.consentVersion < 1) return refuse(403, 'consent_outdated');
+    const message = typeof body.message === 'string' ? body.message.trim() : '';
+    if (!message) return refuse(400, 'message_empty');
+    if (body.message.length > 500) return refuse(400, 'message_too_long');
+    const history = body.history === undefined ? [] : body.history;
+    if (!Array.isArray(history)) return refuse(400, 'history_invalid');
+    if (history.length > 6) return refuse(400, 'history_too_long');
+    if (history.some((t) => !t || (t.role !== 'user' && t.role !== 'assistant') || typeof t.text !== 'string' || !t.text.trim())) return refuse(400, 'history_invalid');
+    if (history.some((t) => t.text.length > 1200)) return refuse(400, 'history_turn_too_long');
+    if (history.length % 2 || history.some((t, i) => t.role !== (i % 2 ? 'assistant' : 'user'))) return refuse(400, 'history_order');
+    const note = body.note === undefined || body.note === null || body.note === '' ? '' : body.note;
+    if (note !== '' && (typeof note !== 'string' || /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\p{Co}\p{Cn}]/u.test(note.replace(/\n/g, '')))) return refuse(400, 'note_invalid');
+    if (note.length > 900) return refuse(400, 'note_too_long');
+    const profile = state.profiles.get(uid);
+    if (profile && profile.data) {
+      const born = profile.data.birthDate;
+      const today = utcDay(0);
+      let adult = isDay(born) && born < today;
+      if (adult) {
+        const [by, bm, bd] = born.split('-').map(Number);
+        const [ty, tm, td] = today.split('-').map(Number);
+        adult = ty - by - (tm < bm || (tm === bm && td < bd) ? 1 : 0) >= 18;
+      }
+      if (!adult) return refuse(403, 'under_18');
+    }
+    const used = state.coachUsage.get(uid) || 0;
+    if (used >= COACH_LIMIT || /daily limit/i.test(message)) return refuse(429, 'daily_limit', { remaining: 0 });
+    if (/shared limit/i.test(message)) return refuse(429, 'shared_limit', { remaining: 0 });
+    const left = COACH_LIMIT - used;
+    // As on the real function: a busy model, a timeout or a server error gives the unit back.
+    if (/busy now/i.test(message)) return refuse(503, 'busy', { remaining: left });
+    if (/too slow/i.test(message)) return refuse(504, 'timeout', { remaining: left });
+    if (/server error/i.test(message)) return refuse(502, 'upstream', { remaining: left });
+    state.coachUsage.set(uid, used + 1);
+    const remaining = COACH_LIMIT - used - 1;
+    if (/please decline/i.test(message)) return refuse(422, 'declined', { remaining });
+    if (/cut short/i.test(message)) {
+      return reply(200, { text: 'This is the stand-in coach. A long answer was cut at its last full sentence. An easy day after two hard ones lets the work settle.', remaining, truncated: true });
+    }
+    if (/refer me/i.test(message)) {
+      return reply(200, { text: 'This is the stand-in coach. This is worth talking about with a doctor, and you deserve support.', remaining, refer: true });
+    }
+    const text = /^[א-ת]/.test(message)
+      ? `זו תשובה של מאמן לדוגמה. התקבלו ${history.length} הודעות קודמות, ו${note ? 'סיכום השבוע שלך' : 'בלי סיכום של השבוע'}. אפשר לנסות יום קל השבוע.`
+      : `This is the stand-in coach. It received your question "${message}", ${history.length} earlier messages, and ${note ? `a summary of your week (${note.length} characters)` : 'no summary of your week'}. Try one easy day this week.`;
+    return reply(200, { text, remaining });
   }
   if (route === 'GET /functions/v1/food-search') {
     if (!req.headers.apikey) return send(res, 401, { message: 'No API key found in request' });

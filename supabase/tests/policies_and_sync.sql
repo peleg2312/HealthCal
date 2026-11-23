@@ -244,6 +244,27 @@ begin
   select used into everyone from public.ai_quota where identity = '*';
   if mine <> 0 or everyone <> 8 then raise exception 'refund wrong: mine %, project %', mine, everyone; end if;
 end $$;
+
+do $$
+declare r int; everyone int; u uuid := 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+begin
+  -- The AI coach (supabase/functions/coach-chat) passes its own, smaller project ceiling
+  -- (COACH_GLOBAL_LIMIT) to the same function, under its own identity: the chat stops at it while
+  -- the food estimate, with its larger ceiling, still passes. The project has used 8 units; with a
+  -- chat ceiling of 9, one chat question fits and the next is refused...
+  r := public.bump_ai_usage(u, 'coach:b', 1, 30, 9);
+  if r <> 29 then raise exception 'a chat question under its ceiling should leave 29, left %', r; end if;
+  r := public.bump_ai_usage(u, 'coach:b', 1, 30, 9);
+  if r <> -2 then raise exception 'the chat ceiling should stop chat, got %', r; end if;
+  -- ...while a food estimate, with the food ceiling, still passes.
+  r := public.bump_ai_usage(u, 'user:b', 1, 40, 100);
+  if r < 0 then raise exception 'the chat ceiling stopped the food estimate, got %', r; end if;
+  select used into everyone from public.ai_quota where identity = '*';
+  if everyone <> 10 then raise exception 'project counter should be 10, is %', everyone; end if;
+  -- The chat's own count is apart from the food estimate's.
+  select used into r from public.ai_quota where identity = 'coach:b';
+  if r <> 1 then raise exception 'the chat counter should be 1, is %', r; end if;
+end $$;
 reset role;
 set role authenticated;
 do $$

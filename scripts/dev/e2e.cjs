@@ -1229,6 +1229,118 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     await loadContext.close();
   }
 
+  // ------------------------------------------- the coach (src/app/coach.tsx, src/features/coach)
+  // Without a backend: the ways in (Train's link, the overview sheet's button, Profile's row), the two questions answered on
+  // the phone (the training answer carries the same minutes as the overview sheet, the ideas answer opens What fits), a typed
+  // question answered by the needs-an-account line with no request to coach-chat, the under-18 line, a Hebrew question laid
+  // out right to left, the footer on the faked keyboard with the two buttons above it, and Clear chat with its Undo.
+  {
+    const { buildSeed } = await import(require('url').pathToFileURL(require('path').join(__dirname, 'seed.mjs')).href);
+    const seed = buildSeed({ onboarded: true, theme: 'dark' });
+    const cctx = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, colorScheme: 'dark', reducedMotion: 'reduce' });
+    await cctx.addInitScript((value) => {
+      if (!window.sessionStorage.getItem('__seeded')) {
+        window.localStorage.setItem('healthcal-v1', value);
+        window.sessionStorage.setItem('__seeded', '1');
+      }
+      // The same controllable keyboard as the first-day run above.
+      const fake = new EventTarget();
+      let kb = 0;
+      const num = (get) => ({ configurable: true, get });
+      Object.defineProperties(fake, {
+        height: num(() => window.innerHeight - kb), width: num(() => window.innerWidth), offsetTop: num(() => 0), offsetLeft: num(() => 0),
+        pageTop: num(() => window.scrollY), pageLeft: num(() => window.scrollX), scale: num(() => 1),
+      });
+      Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => fake });
+      window.__keyboard = (h) => { kb = h; fake.dispatchEvent(new Event('resize')); };
+    }, JSON.stringify(seed));
+    const cp = await cctx.newPage();
+    cp.on('pageerror', (e) => errors.push(e.message));
+    cp.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 200)));
+    const sent = [];
+    cp.on('request', (r) => /coach-chat/.test(r.url()) && sent.push(r.url()));
+    const ctext = async (id) => (await cp.getByTestId(id).first().innerText({ timeout: 15000 })).replace(/\u00A0/g, ' ').replace(/[\u2060\u200E\u2068\u2069]/g, '').trim();
+    const ctap = async (id) => { await cp.getByTestId(id).first().click({ timeout: 15000 }); await cp.waitForTimeout(450); };
+    const onCoach = () => cp.waitForURL((u) => new URL(u).pathname === '/coach', { timeout: 15000 }).then(() => true, () => false);
+
+    await cp.goto(`${BASE}/train`, { waitUntil: 'networkidle' });
+    await ctap('train-coach');
+    check('coach: Train\'s "Coach" link opens the coach', await onCoach(), cp.url());
+    await cp.goto(`${BASE}/train`, { waitUntil: 'networkidle' });
+    const infoId = (await cp.getByTestId('train-load-info').count()) ? 'train-load-info' : 'train-guideline-help';
+    await ctap(infoId);
+    const sheetNumbers = await ctext('train-load-numbers');
+    await ctap('train-load-coach');
+    check('coach: the overview sheet\'s "Ask the coach" closes the sheet and opens the coach', (await onCoach()) && (await cp.getByTestId('train-load-sheet').count()) === 0, cp.url());
+    await cp.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
+    await ctap('profile-coach');
+    check('coach: Profile\'s "Coach" row opens the coach', await onCoach(), cp.url());
+    await cp.waitForTimeout(500);
+    check('coach: the fixed line says what it is', (await ctext('coach-line')) === 'AI coach · not medical advice' && (await cp.getByTestId('coach-empty').count()) === 1);
+
+    await ctap('coach-local-training');
+    const training = await ctext('coach-local-answer');
+    check('coach: "How is my training week?" is answered on the phone with the overview\'s own numbers', training.includes(sheetNumbers.split(',')[0]) && training.includes('From your data, on this phone'), training.slice(0, 160));
+    await ctap('coach-local-ideas');
+    const ideasText = await ctext('coach-local-answer');
+    check('coach: the ideas button is answered on the phone with the meals that fit (or the neutral line)', /Meals that fit|above the budget|Under 150 kcal left/.test(ideasText), ideasText.slice(0, 120));
+    await ctap('coach-local-fits');
+    check('coach: the ideas answer opens What fits', (await cp.getByTestId('fits-intro').count()) + (await cp.getByTestId('fits-over').count()) > 0);
+    await cp.keyboard.press('Escape');
+    await cp.waitForTimeout(400);
+    check('coach: the phone answers sent nothing', sent.length === 0, `${sent.length} requests`);
+
+    await cp.getByTestId('coach-input').first().fill('How many rest days a week?');
+    await ctap('coach-send');
+    const noAccount = await ctext('coach-notice');
+    check('coach: without an account a typed question gets the needs-an-account line and a sign-in button, and nothing is sent', /needs an account/.test(noAccount) && (await cp.getByTestId('coach-sign-in').count()) === 1 && sent.length === 0, noAccount);
+    check('coach: the field is empty again after sending', (await cp.getByTestId('coach-input').first().inputValue()) === '');
+
+    await cp.getByTestId('coach-input').first().fill('כמה ימי מנוחה בשבוע?');
+    await ctap('coach-send');
+    const dir = await cp.evaluate(() => {
+      const box = document.querySelector('[data-testid="coach-question"]');
+      const t = box && [...box.querySelectorAll('div')].find((d) => /כמה/.test(d.textContent) && !d.querySelector('div'));
+      return t ? getComputedStyle(t).textAlign + '|' + getComputedStyle(t).direction : 'none';
+    });
+    check('coach: a question that starts with a Hebrew letter is laid out right to left', /^right\|rtl|^right\|/.test(dir), dir);
+
+    // Under 18 (a date of birth changed in Goals): the phone answers, the AI does not, and one neutral line says so.
+    const born = await cp.evaluate(() => window.__healthcal.getState().profile.birthDate);
+    await cp.evaluate(() => window.__healthcal.getState().setProfile({ birthDate: '2012-04-01' }));
+    await cp.getByTestId('coach-input').first().fill('Can you give me a plan?');
+    await ctap('coach-send');
+    check('coach: under 18 the typed question gets the 18-and-over line and nothing is sent', /18 and over/.test(await ctext('coach-notice')) && sent.length === 0, await ctext('coach-notice'));
+    await cp.evaluate((b) => window.__healthcal.getState().setProfile({ birthDate: b }), born);
+
+    // The keyboard: the footer (field and send) sits on it and the two phone buttons stay above the footer.
+    await cp.getByTestId('coach-input').first().click();
+    await cp.evaluate(() => window.__keyboard(320));
+    await cp.waitForTimeout(450);
+    const kbm = await cp.evaluate(() => {
+      const vis = (sel) => [...document.querySelectorAll(sel)].find((e) => e.getBoundingClientRect().height > 0)?.getBoundingClientRect();
+      const f = vis('[data-testid="screen-footer"]');
+      return { visible: window.visualViewport.height, footerTop: f.top, footerBottom: f.bottom, input: vis('[data-testid="coach-input"]').bottom, chip: vis('[data-testid="coach-local-training"]').bottom, line: vis('[data-testid="coach-line"]').top, focus: document.activeElement?.getAttribute('data-testid') };
+    });
+    check('coach: keyboard (faked, 320 px): the footer rides on it with the field, and the two buttons are above it', Math.abs(kbm.footerBottom - kbm.visible) <= 1 && kbm.input <= kbm.footerBottom && kbm.chip <= kbm.footerTop && kbm.line >= 0 && kbm.focus === 'coach-input', JSON.stringify(kbm));
+    await cp.evaluate(() => window.__keyboard(0));
+    await cp.waitForTimeout(400);
+
+    // Kept on the phone: a reload keeps the chat; Clear chat empties it and its Undo puts it back.
+    await cp.evaluate(() => window.__healthcal.flush && window.__healthcal.flush());
+    await cp.reload({ waitUntil: 'networkidle' });
+    await cp.waitForTimeout(800);
+    const kept = await cp.getByTestId('coach-local-answer').count();
+    check('coach: the chat is kept on this phone through a reload', kept === 1 && (await cp.evaluate(() => !!localStorage.getItem('healthcal-coach-history'))));
+    await ctap('coach-clear');
+    check('coach: Clear chat empties the chat and the stored copy', (await cp.getByTestId('coach-empty').count()) === 1 && (await cp.evaluate(() => localStorage.getItem('healthcal-coach-history'))) === null);
+    await ctap('toast-action');
+    await cp.waitForTimeout(300);
+    check('coach: the Undo of Clear chat puts the chat back', (await cp.getByTestId('coach-local-answer').count()) === 1);
+    check('coach: no request ever reached coach-chat without a backend', sent.length === 0);
+    await cctx.close();
+  }
+
   // ------------------------------------------- Appearance: the newer looks (src/theme/resolve.ts)
   // A newer look is stored as `look` beside its fallback in `theme` (an older copy shows Light or Dark);
   // the four older choices write `theme` and remove `look`. The page's ground is the palette's own bg,

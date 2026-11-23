@@ -184,6 +184,13 @@ describe('error mapping', () => {
     expect(e.retryable).toBe(retryable);
     expect(e.message.length).toBeGreaterThan(10);
   });
+  it('an unconfirmed email (403 unauthorized) says to confirm it, never that the session expired', () => {
+    const e = errorFromResponse(403, { error: 'unauthorized', message: 'Confirm your email address to use food analysis.' });
+    expect(e.code).toBe('unauthorized');
+    expect(e.message).toBe('Confirm your email address to use food analysis.');
+    expect(e.message).not.toMatch(/expired/);
+    expect(errorFromResponse(401, { error: 'unauthorized', message: 'x' }).message).toMatch(/expired/);
+  });
   it('keeps the specific server message for not_food and daily_limit', () => {
     expect(errorFromResponse(422, { error: 'not_food', message: 'That looks like a cat.' }).message).toBe('That looks like a cat.');
     const limit = errorFromResponse(429, { error: 'daily_limit', message: 'Used all 40.', remaining: 0 });

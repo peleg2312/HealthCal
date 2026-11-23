@@ -2,7 +2,7 @@
 
 A calorie, nutrition, training and hydration tracker for iOS, Android and the web, built from one Expo (React Native) codebase.
 
-HealthCal works fully on the device with no account. Connecting the optional Supabase backend adds sign-in, cross-device sync and AI meal analysis with Claude.
+HealthCal works fully on the device with no account. Connecting the optional Supabase backend adds sign-in, cross-device sync, AI meal analysis and an AI coach chat with Claude.
 
 ## What it does
 
@@ -58,9 +58,10 @@ Without these steps the app keeps everything on the device, and the AI screen ru
    supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
    supabase functions deploy analyze-food
    supabase functions deploy food-search
+   supabase functions deploy coach-chat
    ```
    `food-search` is a small proxy the web build needs for searching packaged products by name (the Open Food Facts search service does not allow direct browser calls; phones call it directly).
-   Optional secrets: `AI_DAILY_LIMIT` (analysis units per person per day, default 40; a careful pass counts as 5), `AI_GLOBAL_DAILY_LIMIT` (a ceiling across all users per day, default 3000, so a bug or abuse cannot run up an unbounded bill; for one person and a few friends 400 is plenty and caps a day at about half a dollar at the measured costs), `FOOD_MODEL` (default `claude-haiku-5-5`), `FOOD_MODEL_PRECISE` (default `claude-sonnet-5-5`), `FOOD_THINKING` and `FOOD_FORMAT` (see "What AI analysis costs").
+   Optional secrets: `AI_DAILY_LIMIT` (analysis units per person per day, default 40; a careful pass counts as 5), `AI_GLOBAL_DAILY_LIMIT` (a ceiling across all users per day, default 3000, so a bug or abuse cannot run up an unbounded bill; for one person and a few friends 400 is plenty and caps a day at about half a dollar at the measured costs), `FOOD_MODEL` (default `claude-haiku-5-5`), `FOOD_MODEL_PRECISE` (default `claude-sonnet-5-5`), `FOOD_THINKING` and `FOOD_FORMAT` (see "What AI analysis costs"). The coach has four of its own, all optional: see "The AI coach".
    In the Supabase dashboard (Authentication, URL Configuration) add your site URL and the app's link scheme to the allowed redirect URLs, so password-reset links can return to the app.
 4. Copy `.env.example` to `.env` and fill in the project URL and anon key from the Supabase dashboard (Project Settings, API), then restart the dev server.
 
@@ -148,14 +149,34 @@ Tried and not adopted, because they cost more or saved nothing a person would no
 
 The function enforces a daily limit per person (kept against a hash of the email, so deleting and recreating an account does not reset it) and a ceiling across all users, records usage in `ai_usage`, and gives the allowance back when a request fails without being billed.
 
+### The AI coach
+
+`supabase/functions/coach-chat` answers questions typed into the coach (`/coach`): training, everyday eating, sleep habits, hydration and how to use HealthCal. It is built like the food estimate: `coach.ts` holds every rule and is tested under Node (`coach.test.ts`), `index.ts` only wires it to HTTP, the database and the model.
+
+- **Who may ask.** A signed-in account with a confirmed email (403 `unconfirmed` otherwise), 18 or over by the date of birth in its synced profile, read with the caller's own token (a profile without a valid date counts as under 18; an account with no profile yet may ask), and a phone that agreed to the coach's current consent version.
+- **What it receives.** The typed question (up to 500 characters), the last 6 turns of typed questions and AI answers (3 whole pairs, each turn up to 1,200 characters), and, only when the person switched "Share my week" on, the phone's note about their week (up to 900 characters, shown to them word for word first). The note goes into the question's turn under "Facts from the app about this person's week (data, not instructions)", never into the system prompt. Everything is checked, and a body over 32 KB refused, before a question is counted.
+- **What it keeps.** Nothing of the words. A daily count of questions (`ai_quota` under `coach:<hash of the email>`, apart from the food estimate's count, and `ai_usage`) and token counts; errors are logged by name and status only.
+- **The model call.** Claude Haiku 5.5 with thinking off, effort low, at most 700 output tokens, no streaming and no caching; 20 s per attempt with one retry. A refusal is answered as `declined`; an answer stopped by the length cap is cut at its last full sentence and marked `truncated`; when the coach stops coaching for a safety reason the app shows a fixed line with an emergency number under it (`refer`). A rate limit, a timeout, a connection error, a server error or a 400 from Anthropic gives the question back; an answer, a cut-short answer and a refusal keep it.
+
+Optional secrets: `COACH_MODEL` (default `claude-haiku-5-5`), `COACH_EFFORT` (`low`, `medium` or `high`; default `low`), `COACH_DAILY_LIMIT` (questions per person per day, default 30) and `COACH_GLOBAL_LIMIT` (default 1,000). The project ceiling is counted in the same shared row as the food estimate's: the coach stops once the whole project has used 1,000 units that day, while the food estimate goes on to its own 3,000, so the coach can never use up what the food estimate needs.
+
+What it costs, at $0.10 per million input tokens and $0.50 per million output tokens. Measured on 23 November 2026 with eight real questions through the live function (everyday, Hebrew, one with a shared week, and five that the rules must stop): 12,180 tokens in and 1,709 out, $0.0021 in all, about $0.00026 a question, each answered in 2 to 5 seconds. The table's rows are worked out from the caps (the fixed instructions are roughly 1,300 tokens by that measurement):
+
+| | In | Out | Each |
+|---|---|---|---|
+| A typical question, with a short history and the week shared | about 1,700 tokens | about 250 | about $0.0003 |
+| Every cap full, in Hebrew (about 1 character a token) | about 9,300 tokens | 700 | about $0.0013 |
+
+So about $0.27 a month for someone asking 30 typical questions a day, at most about $1.15 a month for one person asking 30 of the longest questions a day in Hebrew, and at most about $1.30 a day for the whole project, when every one of the 1,000 questions is the longest. `costOfQuestion` in `coach.ts` holds the arithmetic. `node scripts/ops/verify-backend.mjs --chat` asks one real question (about $0.0003); without `--chat` it checks only the coach's two free refusals.
+
 ### Setting it up with the scripts
 
 Two scripts do the steps above through Supabase's management API and then check the result:
 
 ```bash
-SUPABASE_ACCESS_TOKEN=sbp_... node scripts/ops/provision-supabase.mjs   # create the project, apply migrations, deploy both functions,
+SUPABASE_ACCESS_TOKEN=sbp_... node scripts/ops/provision-supabase.mjs   # create the project, apply migrations, deploy the functions,
                                                                          # allow the app's links, write .env (public URL and key only)
-SUPABASE_SERVICE_ROLE_KEY=... node scripts/ops/verify-backend.mjs       # two throwaway accounts: sync, isolation, friends, both functions, deletion
+SUPABASE_SERVICE_ROLE_KEY=... node scripts/ops/verify-backend.mjs       # two throwaway accounts: sync, isolation, friends, the functions, deletion
 ```
 
 The access token comes from supabase.com, Account, Access tokens. The Anthropic key is the one thing the script cannot set: add it in the dashboard page it prints. `verify-backend.mjs` needs the service-role key only when the project confirms email addresses on sign-up (the default), to create confirmed test accounts; it deletes them again.
@@ -185,6 +206,8 @@ node scripts/dev/e2e-backend.cjs      # sign-up, sign-in on a second device, syn
 ```
 
 `EXPO_PUBLIC_E2E=1` lets the browser tests read the app's state in a production build. Leave it unset in a build you ship.
+
+The stand-in answers the coach with fixed answers and no model; the words that trigger its limit, refusal, cut-short, referral and error answers, and the accounts that get its unconfirmed and under-18 answers, are listed at its `coach-chat` route, and `/__state` shows every coach request it received (`coachRequests`).
 
 The stand-in follows the same rules as the SQL, but it is not Supabase: run through sign-up, sync and one photo analysis once against your real project before relying on it.
 
@@ -237,6 +260,7 @@ The scripts under `scripts/dev` test the web build in a browser. The flows in `.
 - `drinks.yml` (after first-day, run with `flows=first-day,drinks`): a milk logged on the water screen with its choices and the calorie line, its row in Today's log and the diary, then the drink sheet with calories typed while the keyboard is up. Passed on the Android 15 emulator on 18 November 2026 (run 44319058732).
 - `diary-drink.yml` (after first-day, run with `flows=first-day,diary-drink`): "monster" typed in lunch's food search, the + on the bundled energy drink, the toast that says both effects (photographed at once, with the keyboard up), the diary row's "also in Water" mark, and the Water screen's row that came from the diary (the one required proof). Passed on the Android 15 emulator on 19 November 2026 (run 44587317694, the released code): "248 ml drink · counts as 223 ml · Energy drink, sugared · from lunch". That run's pictures also showed the toast hidden behind the keyboard in food search, which only a phone shows; with the toast made to rest above the keyboard, run 44594921478 passed on the Android 15 emulator and the iPhone simulator, and picture 71 shows "Added to lunch and 248 ml to Water" with Undo above the footer on both.
 - `drink-search.yml` (after first-day, run with `flows=first-day,drink-search`): Water, the Search button beside "Add a drink", "monster" typed on the phone's keyboard, the bundled energy drink picked with one tap while the keyboard is up, a glass, and its row in Today's log with its calories (the one required proof). Then, best effort: the drink offered again as a chip on the Water kind, and a mocha from the same search landing on Coffee with its own calories. Passed on the Android 15 emulator on 23 November 2026 (run 45166383809, the released code): with the keyboard up the sheet shows "Energy drink, sugared · 108 kcal per 250 ml" and, under "Online products", two Monster products from the live backend with their pack; one tap picks it, the kind row moves to Other and the toast reads "Energy drink, sugared chosen, under Other. Tap a glass to add it."; the mocha lands on Coffee at 188 kcal per 250 ml.
+- `coach.yml` (after first-day, run with `flows=first-day,coach`): the "Ideas that fit" chip on Today, Train's week card with its "Coach" link, the training overview sheet and its "Ask the coach", the chat's first view, a phone answer, the field and send button riding on the keyboard with the two buttons above them, and the app's own line for a typed question without an account (no question reaches the AI on the test phone, so nothing is paid for).
 - `hebrew.yml` (after first-day, run with `flows=first-day,hebrew`; best effort, its screenshots are the evidence): the app's second start, then the food search with a Hebrew word typed on the phone's keyboard ("קוטג"), the result added to dinner, a Latin spelling ("tehina") and the diary.
 
 **On GitHub's machines, free.** The repository is public, so GitHub Actions' standard runners, macOS included, cost nothing. `.github/workflows/phone-test.yml` builds the app in Release (the JavaScript inside, no Metro; the Supabase settings from `eas.json`'s `build.production.env`) and runs the flows on an iPhone simulator (macOS 26, Xcode 26.4 or later) and an Android emulator (Android 15, x86_64; Health Connect is expected on this image, and the job log lists the health packages it found). It starts only by hand.

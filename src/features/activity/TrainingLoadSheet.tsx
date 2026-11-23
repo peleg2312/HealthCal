@@ -1,9 +1,10 @@
+import { router } from 'expo-router';
 import React from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { CHART_CAPTION, type TrainingOverview } from '@/lib/trainingLoad';
 import { useTheme } from '@/theme';
-import { BarChart, Sheet, Text } from '@/ui';
+import { BarChart, Button, Sheet, Text } from '@/ui';
 
 import { WHO_WEEKLY_MINUTES } from './build';
 import { LoadMark } from './LoadMark';
@@ -64,6 +65,16 @@ export function TrainingLoadSheet({ overview: o, visible, onClose }: { overview:
             </Text>
           ))}
         </View>
+        {/* Stage two's way into the chat: the sheet closes, then the coach opens over Train. */}
+        <Button
+          testID="train-load-coach"
+          title="Ask the coach"
+          variant="secondary"
+          onPress={() => {
+            onClose();
+            setTimeout(() => router.push('/coach' as never), 60);
+          }}
+        />
       </View>
     </Sheet>
   );

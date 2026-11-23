@@ -449,6 +449,166 @@ async function device(browser, seedJson) {
   );
   await E.page.context().close();
 
+  // ------------------------------------------------------ the coach chat (src/app/coach.tsx, supabase/functions/coach-chat)
+  // A device of its own, signed in. What the stand-in received (/__state coachRequests) proves what the phone sent: nothing
+  // before agreeing; with sharing off exactly the typed question (and earlier typed pairs), never an answer given on the phone
+  // or a figure from the app; with sharing on the question and the note word for word as "See what is sent" showed it. Then
+  // the limit, a refusal, a cut-short answer, a referral, a failure with Try again, Clear chat, under 18 on the server and on
+  // the phone, an unconfirmed email, and erasing the device clearing the chat and the agreement.
+  {
+    const K = await device(browser, JSON.stringify(buildSeed()));
+    const coachEmail = `coach+${Date.now()}@example.com`;
+    await K.go('/auth?mode=signup');
+    await K.fill('auth-email-input', coachEmail);
+    await K.fill('auth-password-input', PASSWORD);
+    await K.tap('auth-submit');
+    check('coach: a second account signs up for the coach run', await K.untilPath('/'), K.page.url());
+    await K.page.waitForTimeout(2500);
+    const coachUser = (await server()).users.find((u) => u.email === coachEmail.toLowerCase());
+    const reqs = async () => (await server()).coachRequests.filter((r) => r.user === coachUser?.id);
+    const settle = async (d) => {
+      await d.page.waitForFunction(() => !document.querySelector('[data-testid="coach-typing"]'), null, { timeout: 60000 }).catch(() => {});
+      await d.page.waitForTimeout(500);
+    };
+    const askIt = async (d, words) => {
+      await d.fill('coach-input', words);
+      await d.tap('coach-send');
+      await settle(d);
+    };
+    const norm = (t) => String(t).replace(/\u00A0/g, ' ').replace(/[\u2060\u200E\u2068\u2069]/g, '');
+    // The same JSON whatever the order of its keys.
+    const canon = (v) => (Array.isArray(v) ? v.map(canon) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v);
+    const same = (x, y) => JSON.stringify(canon(x)) === JSON.stringify(canon(y));
+
+    await K.go('/coach');
+    await K.tap('coach-local-training');
+    await K.tap('coach-local-ideas');
+    const localTraining = await K.text('coach-local-answer-1').catch(() => '');
+    check('coach: the two phone answers are there and sent nothing', (await K.has('coach-local-answer')) && (await reqs()).length === 0, localTraining.slice(0, 80));
+
+    const q1 = 'How many rest days a week?';
+    await K.fill('coach-input', q1);
+    await K.tap('coach-send');
+    check('coach: the first typed question asks for consent, and nothing is sent before agreeing', (await K.has('coach-consent')) && (await reqs()).length === 0);
+    await K.shot('backend-coach-consent');
+    await K.tap('coach-consent-agree');
+    await settle(K);
+    const a1 = await K.text('coach-answer');
+    let r = await reqs();
+    const first = r[r.length - 1];
+    check('coach: after agreeing the question is sent at once and its answer shown, marked AI', r.length === 1 && first.status === 200 && a1.includes(`It received your question "${q1}", 0 earlier messages`) && (await K.has('coach-mark-ai')), a1.slice(0, 120));
+    check('coach: with sharing off the server received exactly the typed question and the consent version', same(first.body, { message: q1, consentVersion: 1 }), JSON.stringify(first.body));
+
+    const q2 = 'And stretching after a run?';
+    await askIt(K, q2);
+    r = await reqs();
+    const second = r[r.length - 1].body;
+    const firstAnswer = `This is the stand-in coach. It received your question "${q1}", 0 earlier messages, and no summary of your week. Try one easy day this week.`;
+    check(
+      'coach: the next question carries the earlier typed pair and nothing else: no phone answer, no button question, no note',
+      same(second, { message: q2, history: [{ role: 'user', text: q1 }, { role: 'assistant', text: firstAnswer }], consentVersion: 1 }),
+      JSON.stringify(second).slice(0, 240),
+    );
+    check('coach: no figure from the app went with sharing off', !/guideline|kcal|Meals that fit|training week|Ideas for/.test(JSON.stringify(r.map((x) => x.body))));
+
+    // Share my week: on in "What the coach sees", its text read from the preview, then sent word for word.
+    await K.tap('coach-about');
+    await K.tap('coach-share');
+    await K.tap('coach-note-preview');
+    const preview = norm(await K.page.getByTestId('coach-note-text').first().innerText());
+    await K.shot('backend-coach-preview');
+    await K.tap('coach-about-done');
+    check('coach: with sharing on the line under the header says the coach sees your week', (await K.text('coach-line')) === 'AI coach · not medical advice · sees your week');
+    const q3 = 'What should I eat after training?';
+    await askIt(K, q3);
+    r = await reqs();
+    const third = r[r.length - 1].body;
+    check('coach: with sharing on the server received the question and the note word for word as previewed', third.message === q3 && typeof third.note === 'string' && third.note === preview && third.note.startsWith('Goal:') && third.note.length <= 900, `${third.note?.length} characters`);
+    check('coach: with sharing on still no phone answer in what was sent', !/Last 7 days: |Meals that fit|How is my training week|Ideas for/.test(JSON.stringify(third.history || [])) && (third.history || []).length === 4);
+    check('coach: the note holds no name or email', !/Alex|@/.test(third.note || ''), (third.note || '').slice(0, 80));
+    await K.tap('coach-about');
+    await K.tap('coach-share');
+    await K.tap('coach-about-done');
+
+    await askIt(K, 'daily limit please');
+    check('coach: the daily limit has its own words', (await K.text('coach-notice')) === '30 questions today. They reset at midnight UTC.' && !(await K.has('coach-retry')));
+    await askIt(K, 'please decline this');
+    check('coach: a refusal has its own words and no "Try again"', /cannot help with that question/.test(await K.text('coach-notice')) && !(await K.has('coach-retry')));
+    await askIt(K, 'cut short answer');
+    check('coach: an answer cut short by the length cap shows what arrived with "…"', (await K.text('coach-answer')).endsWith('…'), (await K.text('coach-answer')).slice(-60));
+    await askIt(K, 'refer me please');
+    check('coach: a referral shows the fixed line under the answer', (await K.text('coach-refer')) === 'If you are in danger now, call your local emergency number. findahelpline.com lists free lines in every country.');
+    await askIt(K, 'busy now?');
+    const before = (await reqs()).length;
+    const busyOk = /busy right now/.test(await K.text('coach-notice')) && (await K.has('coach-retry'));
+    await K.tap('coach-retry');
+    await settle(K);
+    r = await reqs();
+    check('coach: a busy answer offers "Try again", which sends the same question once more', busyOk && r.length === before + 1 && r[r.length - 1].body.message === 'busy now?', `${r.length - before} more`);
+    const fourth = r[r.length - 1].body;
+    check('coach: unanswered questions are left out of the history, so the pairs stay whole', (fourth.history || []).every((t, i) => t.role === (i % 2 ? 'assistant' : 'user')) && !JSON.stringify(fourth.history || []).includes('daily limit please') && !JSON.stringify(fourth.history || []).includes('please decline'));
+    await K.shot('backend-coach-chat');
+
+    await K.tap('coach-clear');
+    check('coach: Clear chat empties the chat and keeps the agreement', (await K.has('coach-empty')) && (await K.page.evaluate(() => localStorage.getItem('healthcal-coach-history'))) === null && (await K.page.evaluate(() => !!localStorage.getItem('healthcal-coach-consent'))));
+
+    // Under 18 on the server: the synced profile says 2012 (pushed straight to the stand-in, newer than the phone's).
+    const token = await K.page.evaluate(() => {
+      for (const k of Object.keys(localStorage)) {
+        try {
+          const v = JSON.parse(localStorage.getItem(k));
+          if (v && v.access_token) return v.access_token;
+        } catch {}
+      }
+      return null;
+    });
+    const prof = (await K.state()).profile;
+    await fetch(`${API}/rest/v1/rpc/push_profile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, apikey: 'mock-anon-key-for-local-end-to-end-tests' },
+      body: JSON.stringify({ p_profile: { ...prof, birthDate: '2012-03-01' }, p_profile_updated_at: '2099-01-01T00:00:00.000Z', p_settings: null, p_settings_updated_at: null }),
+    });
+    await askIt(K, 'Hello coach');
+    r = await reqs();
+    check('coach: the server refuses a profile under 18, and the app says so neutrally', r[r.length - 1].error === 'under_18' && /18 and over/.test(await K.text('coach-notice')), r[r.length - 1].error);
+    // Under 18 on the phone: nothing is sent at all.
+    const sentBefore = r.length;
+    await K.page.evaluate(() => window.__healthcal.getState().setProfile({ birthDate: '2011-06-01' }));
+    await askIt(K, 'Hello again');
+    check('coach: under 18 on the phone nothing is sent', (await reqs()).length === sentBefore && /18 and over/.test(await K.text('coach-notice')));
+    await K.page.evaluate(() => window.__healthcal.getState().setProfile({ birthDate: '1994-05-12' }));
+
+    // Erase this device: the chat and the coach's agreement go with the profile.
+    await K.tap('coach-local-training');
+    await K.page.waitForTimeout(600);
+    await K.go('/settings/data');
+    await K.tap('data-erase');
+    const eraseWords = await K.page.getByText(/the coach chat and the coach's agreement/).count();
+    await K.tap('confirm-yes');
+    await K.untilPath('/welcome', 15000);
+    await K.page.waitForTimeout(800);
+    const leftAfter = await K.page.evaluate(() => [localStorage.getItem('healthcal-coach-history'), localStorage.getItem('healthcal-coach-consent')]);
+    check('coach: the erase sheet names the coach chat, and erasing clears the chat and the agreement', eraseWords > 0 && leftAfter.every((v) => v === null), JSON.stringify(leftAfter));
+
+    // An unconfirmed email: the server's 403 has its own words.
+    const U = await device(browser, JSON.stringify(buildSeed()));
+    await U.go('/auth?mode=signup');
+    await U.fill('auth-email-input', `unconfirmed-${Date.now()}@example.com`);
+    await U.fill('auth-password-input', PASSWORD);
+    await U.tap('auth-submit');
+    await U.untilPath('/');
+    await U.page.waitForTimeout(2000);
+    await U.go('/coach');
+    await U.fill('coach-input', 'How many rest days a week?');
+    await U.tap('coach-send');
+    await U.tap('coach-consent-agree');
+    await settle(U);
+    check('coach: an unconfirmed email gets "Confirm your email address to use the AI coach."', (await U.text('coach-notice')) === 'Confirm your email address to use the AI coach.');
+    check('coach: no uncaught errors in the coach run', [...K.errors, ...U.errors].length === 0, [...K.errors, ...U.errors].slice(0, 2).join(' || '));
+    await K.page.context().close();
+    await U.page.context().close();
+  }
+
   // ------------------------------------------------------ delete account
   await A.go('/settings/account');
   await A.tap('account-delete');

@@ -126,6 +126,17 @@ export default function TrainScreen() {
           </Text>
         </PressableScale>
         <TrainSyncLink />
+        <PressableScale
+          testID="train-coach"
+          accessibilityLabel="Coach: ask about training and food"
+          accessibilityRole="link"
+          onPress={() => router.push('/coach' as never)}
+          hitSlop={6}
+          style={{ minHeight: 44, justifyContent: 'center' }}>
+          <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
+            Coach
+          </Text>
+        </PressableScale>
       </View>
 
       {routines.length > 0 ? (

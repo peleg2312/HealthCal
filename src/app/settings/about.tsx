@@ -15,6 +15,7 @@ import React from 'react';
 import { View } from 'react-native';
 
 import { AiConsentAbout } from '@/features/ai/AiConsentAbout';
+import { CoachConsentAbout } from '@/features/coach/CoachConsentAbout';
 import { storesRead } from '@/features/health-sync/reach';
 import { IconTile } from '@/features/settings/components';
 import { AboutVersion } from '@/features/updates/AboutVersion';
@@ -276,20 +277,24 @@ export default function AboutScreen() {
           it at any time.
         </P>
         <P>
-          A meal photo or description leaves this device only when you ask for an AI estimate, and only after you have agreed once on this device.
-          It goes to HealthCal&apos;s server, which passes it to Anthropic, the maker of Claude, to estimate the food; nothing else from your diary
-          goes with it. HealthCal&apos;s server does not store the photo or the words, only how many analyses you ran and how large they were, for
-          the daily allowance. Anthropic handles what it receives under Anthropic&apos;s terms.
+          A meal photo or description leaves this device only when you ask for an AI estimate, and a question to the coach only when you send it;
+          each only after you have agreed once on this device. A meal goes to HealthCal&apos;s server, which passes it to Anthropic, the maker of
+          Claude, to estimate the food; nothing else from your diary goes with it. A question to the coach goes the same way with your last few
+          questions and its answers, and with a summary of your week only while &quot;Share my week&quot; is on in the coach. HealthCal&apos;s server
+          does not store the photo or the words, only how many analyses and questions you sent and how large they were, for the daily allowance.
+          The coach chat is kept on this phone. Anthropic handles what it receives under Anthropic&apos;s terms.
         </P>
         <P>
           With Workout sync switched on, HealthCal reads your workouts from {stores.from}: each session with its calories and its distance. They
           are stored like sessions you log by hand. It also reads your daily steps, which stay on this phone only, for 35 days, and are never
           added to your calories. And it reads how long you slept each night, kept in your sleep log like a night you enter yourself (in your
           account if you have one) and never added to your calories. With your permission it also reads your weigh-ins with body fat (kept like ones you enter), the
-          calories you burn in a day (on this phone only, shown beside HealthCal&apos;s estimate and never added) and each workout&apos;s heart rate. Nothing is written back to {stores.notBack}, and this data is never sent for AI analysis, used for ads or shared
-          with anyone else; friends see only what the Friends screen says they see.
+          calories you burn in a day (on this phone only, shown beside HealthCal&apos;s estimate and never added) and each workout&apos;s heart rate. Nothing is written back to {stores.notBack}. This data is never sent to the AI food estimate, used for ads or shared
+          with anyone else; it reaches the AI coach only inside the summary of your week you choose to share there (on iPhone, never anything
+          from Apple Health), and friends see only what the Friends screen says they see.
         </P>
         <AiConsentAbout />
+        <CoachConsentAbout />
       </Section>
 
       <Section icon={(c) => <Stethoscope size={20} color={c} />} color={colors.warningInk} keep title="Not medical advice">

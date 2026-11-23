@@ -19,6 +19,7 @@ import { AppState, Platform, Pressable, Text as RNText, View } from 'react-nativ
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { startCoach } from '@/features/coach/history';
 import { usePendingInvite } from '@/features/friends/usePendingInvite';
 import { startHealthSync } from '@/features/health-sync/sync';
 import { startUpdates, useReportScreen } from '@/features/updates/updates';
@@ -199,6 +200,8 @@ export default function RootLayout() {
     const stopSync = startAutoSync();
     startFriends();
     startHealthSync();
+    // The coach's chat and agreement go whenever the profile goes away (erase, sign out, account switch).
+    startCoach();
     startUpdates();
     const stopSnapshots = startDaySnapshots();
     // Reminder text carries live numbers ("620 ml left"), so it is rebuilt whenever data changes.

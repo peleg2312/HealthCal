@@ -6,6 +6,7 @@ import {
   Database,
   History,
   Info,
+  MessageCircle,
   Moon,
   PartyPopper,
   RefreshCw,
@@ -156,6 +157,17 @@ function ProfileHub() {
             </IconTile>
           }
           onPress={() => router.push('/settings/reminders')}
+        />
+        <ListRow
+          testID="profile-coach"
+          title="Coach"
+          subtitle="Ask about training and food"
+          left={
+            <IconTile color={colors.exercise}>
+              <MessageCircle size={20} color={colors.exercise} />
+            </IconTile>
+          }
+          onPress={() => router.push('/coach' as never)}
         />
       </Group>
 

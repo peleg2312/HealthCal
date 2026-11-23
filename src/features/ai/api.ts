@@ -63,6 +63,9 @@ const COPY: Record<AiErrorCode, { message: string; retryable: boolean }> = {
   unknown: { message: 'Something went wrong analysing that. Try again.', retryable: true },
 };
 
+/** The 403 of an account whose email address is not confirmed yet. */
+export const UNCONFIRMED_MESSAGE = 'Confirm your email address to use food analysis.';
+
 /** Server codes whose own message is more specific than ours and safe to show. */
 const SERVER_MESSAGE_WINS = new Set<AiErrorCode>(['daily_limit', 'not_food', 'bad_request', 'truncated']);
 
@@ -81,11 +84,15 @@ export function errorFromResponse(status: number, body: unknown): AiError {
   switch (serverCode) {
     case 'daily_limit':
       return aiError('daily_limit', message, remaining ?? 0);
+    case 'unauthorized':
+      // analyze-food answers 403 with this code for a signed-in account whose email is not confirmed yet:
+      // signing in again would not help, so say what will.
+      if (status === 403) return new AiError('unauthorized', UNCONFIRMED_MESSAGE, false);
+      return aiError('unauthorized', message);
     case 'not_food':
     case 'declined':
     case 'truncated':
     case 'rate_limited':
-    case 'unauthorized':
     case 'not_configured':
     case 'bad_request':
     case 'upstream':
