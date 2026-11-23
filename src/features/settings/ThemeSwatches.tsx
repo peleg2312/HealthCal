@@ -1,16 +1,24 @@
 import React from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { blossomColors, cup, darkColors, fonts, lightColors, radius, useTheme, vesselBase, type ThemeColors } from '@/theme';
-import type { ThemePreference } from '@/types';
+import { cup, fonts, LOOK_HINTS, paletteFor, radius, THEME_CHOICES, THEME_LABELS, themeNameOfChoice, useTheme, vesselBase, type ThemeChoice, type ThemeColors } from '@/theme';
 import { PressableScale, Text } from '@/ui';
 
-export const THEME_OPTIONS: { value: ThemePreference; label: string; hint: string }[] = [
-  { value: 'system', label: 'System', hint: 'Light or dark, following your device' },
-  { value: 'light', label: 'Light', hint: 'Oat paper with a persimmon accent' },
-  { value: 'dark', label: 'Dark', hint: 'Warm black with a persimmon accent' },
-  { value: 'blossom', label: 'Blossom', hint: 'Champagne, pink and raspberry' },
-];
+/** The name on each tile. "Match my phone" is too long for a tile a quarter of a 320 px phone wide, so it is "System" here. */
+const TILE_LABELS: Record<ThemeChoice, string> = { ...THEME_LABELS, system: 'System' };
+
+/** One line about each choice: under Appearance for the selected one, and in each tile's screen-reader label. */
+export const THEME_HINTS: Record<ThemeChoice, string> = {
+  system: 'Light or dark, following your device',
+  light: 'Oat paper with a persimmon accent',
+  dark: 'Warm black with a persimmon accent',
+  blossom: 'Champagne, pink and raspberry',
+  ...LOOK_HINTS,
+};
+
+/** Four tiles a row: the four first looks, then the three newer ones. */
+const ROWS: ThemeChoice[][] = [THEME_CHOICES.slice(0, 4), THEME_CHOICES.slice(4)];
+const PER_ROW = 4;
 
 /**
  * A miniature of a palette in its own Pour colours: the background, a card
@@ -69,57 +77,67 @@ function Mini({ c, half }: { c: ThemeColors; half?: 'left' | 'right' }) {
 }
 
 /**
- * Appearance picker: one cup per palette that previews it. The chosen one has a 2 px ink edge and its
- * name in bold ink. The name stays inside its tile's width (a check beside "Blossom" ran past the tile).
+ * Appearance picker: one cup per choice that previews it, four a row (the seven choices take two
+ * rows, the second with an empty last place so every tile has the same width). The chosen one has a
+ * 2 px ink edge and its name in bold ink. The name stays inside its tile's width (a check beside
+ * "Blossom" ran past the tile). The value is a `ThemeChoice`: the caller reads it with
+ * `themeChoiceOf(settings)` and writes a pick with `setSettings(themeChoicePatch(choice))`.
  */
-export function ThemeSwatches({ value, onChange }: { value: ThemePreference; onChange: (v: ThemePreference) => void }) {
+export function ThemeSwatches({ value, onChange }: { value: ThemeChoice; onChange: (v: ThemeChoice) => void }) {
   const { colors, spacing } = useTheme();
   const narrow = useWindowDimensions().width < 360;
   return (
-    <View accessibilityRole="radiogroup" accessibilityLabel="Appearance" style={{ flexDirection: 'row', gap: spacing.sm }}>
-      {THEME_OPTIONS.map((o) => {
-        const selected = value === o.value;
-        return (
-          <PressableScale
-            key={o.value}
-            testID={`profile-theme-${o.value}`}
-            accessibilityRole="radio"
-            accessibilityState={{ checked: selected, selected }}
-            aria-checked={selected}
-            accessibilityLabel={`${o.label}. ${o.hint}`}
-            feedback="select"
-            onPress={() => onChange(o.value)}
-            style={{ flex: 1, minWidth: 0, alignItems: 'center', gap: spacing.xs }}>
-            <View
-              style={{
-                width: '100%',
-                height: 70,
-                ...cup(radius.tile, 5),
-                borderWidth: selected ? 2 : 1,
-                borderColor: selected ? colors.text : colors.border,
-                padding: selected ? 2 : 3,
-              }}>
-              <View style={{ flex: 1, flexDirection: 'row' }}>
-                {o.value === 'system' ? (
-                  <>
-                    <Mini c={lightColors} half="left" />
-                    <Mini c={darkColors} half="right" />
-                  </>
-                ) : (
-                  <Mini c={o.value === 'dark' ? darkColors : o.value === 'blossom' ? blossomColors : lightColors} />
-                )}
-              </View>
-            </View>
-            <Text
-              variant="label"
-              color={selected ? 'text' : 'textSecondary'}
-              numberOfLines={1}
-              style={{ maxWidth: '100%', fontFamily: selected ? fonts.bold : fonts.semibold, ...(narrow ? { fontSize: 13 } : null) }}>
-              {o.label}
-            </Text>
-          </PressableScale>
-        );
-      })}
+    <View accessibilityRole="radiogroup" accessibilityLabel="Appearance" style={{ gap: spacing.md }}>
+      {ROWS.map((row, r) => (
+        <View key={r} style={{ flexDirection: 'row', gap: spacing.sm }}>
+          {row.map((choice) => {
+            const selected = value === choice;
+            return (
+              <PressableScale
+                key={choice}
+                testID={`profile-theme-${choice}`}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected, selected }}
+                aria-checked={selected}
+                accessibilityLabel={`${TILE_LABELS[choice]}. ${THEME_HINTS[choice]}`}
+                feedback="select"
+                onPress={() => onChange(choice)}
+                style={{ flex: 1, minWidth: 0, alignItems: 'center', gap: spacing.xs }}>
+                <View
+                  style={{
+                    width: '100%',
+                    height: 70,
+                    ...cup(radius.tile, 5),
+                    borderWidth: selected ? 2 : 1,
+                    borderColor: selected ? colors.text : colors.border,
+                    padding: selected ? 2 : 3,
+                  }}>
+                  <View style={{ flex: 1, flexDirection: 'row' }}>
+                    {choice === 'system' ? (
+                      <>
+                        <Mini c={paletteFor(themeNameOfChoice('system', 'light'))} half="left" />
+                        <Mini c={paletteFor(themeNameOfChoice('system', 'dark'))} half="right" />
+                      </>
+                    ) : (
+                      <Mini c={paletteFor(themeNameOfChoice(choice, null))} />
+                    )}
+                  </View>
+                </View>
+                <Text
+                  variant="label"
+                  color={selected ? 'text' : 'textSecondary'}
+                  numberOfLines={1}
+                  style={{ maxWidth: '100%', fontFamily: selected ? fonts.bold : fonts.semibold, ...(narrow ? { fontSize: 13 } : null) }}>
+                  {TILE_LABELS[choice]}
+                </Text>
+              </PressableScale>
+            );
+          })}
+          {Array.from({ length: PER_ROW - row.length }, (_, i) => (
+            <View key={`gap-${i}`} style={{ flex: 1 }} />
+          ))}
+        </View>
+      ))}
     </View>
   );
 }

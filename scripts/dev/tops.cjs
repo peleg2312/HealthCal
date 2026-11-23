@@ -21,7 +21,7 @@
  * sheet shows each screen once per row with its widths side by side in the order asked, and
  * tops.json has one row per screen and width.
  *
- *   node scripts/dev/tops.cjs <outDir> [--theme=blossom|light|dark] [--width=360,390,320]
+ *   node scripts/dev/tops.cjs <outDir> [--theme=blossom|light|dark|butter|honey|java] [--width=360,390,320]
  *        [--height=150]   pixels of each screen to keep in the sheet
  *        [--routes=/,/diary]   only these routes (default: every screen with a header)
  *        [--url=http://localhost:8081]
@@ -112,7 +112,7 @@ function measure() {
   const browser = await chromium.launch();
   const rows = [];
   for (const [w, width] of widths.entries()) {
-    const context = await browser.newContext({ viewport: { width, height: HEIGHTS[width] || 844 }, reducedMotion: 'reduce', colorScheme: theme === 'dark' ? 'dark' : 'light', isMobile: true, hasTouch: true });
+    const context = await browser.newContext({ viewport: { width, height: HEIGHTS[width] || 844 }, reducedMotion: 'reduce', colorScheme: theme === 'dark' || theme === 'java' ? 'dark' : 'light', isMobile: true, hasTouch: true });
     await context.addInitScript((v) => { if (!sessionStorage.getItem('seeded')) { localStorage.setItem('healthcal-v1', v); sessionStorage.setItem('seeded', '1'); } }, seed);
     let i = 0;
     for (const route of ROUTES) {

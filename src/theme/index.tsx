@@ -4,9 +4,9 @@ import { Platform, useColorScheme } from 'react-native';
 import type { ThemePreference } from '@/types';
 
 import { resolveThemeName, type ThemeName } from './resolve';
-import { blossomColors, chartFillOpacity, darkColors, lightColors, radius, spacing, typography, type ThemeColors } from './tokens';
+import { chartFillOpacity, darkColors, isDarkTheme, paletteFor, radius, spacing, typography, type ThemeColors } from './tokens';
 
-export { resolveThemeName, type ThemeName } from './resolve';
+export * from './resolve';
 
 export interface Theme {
   /** Which palette is active. */
@@ -21,8 +21,6 @@ export interface Theme {
   typography: typeof typography;
 }
 
-const PALETTES: Record<ThemeName, ThemeColors> = { dark: darkColors, light: lightColors, blossom: blossomColors };
-
 const ThemeContext = createContext<Theme>({
   name: 'dark',
   dark: true,
@@ -35,18 +33,21 @@ const ThemeContext = createContext<Theme>({
 
 export function ThemeProvider({
   preference,
+  look,
   lead = false,
   children,
 }: {
   preference: ThemePreference;
+  /** `Settings.look`: a newer look, drawn while `preference` holds its fallback (see resolveThemeName). */
+  look?: unknown;
   /** True until setup is finished: nobody has picked a look yet (see resolveThemeName). */
   lead?: boolean;
   children: React.ReactNode;
 }) {
   const system = useColorScheme();
-  const name: ThemeName = resolveThemeName(preference, system, lead);
+  const name: ThemeName = resolveThemeName(preference, system, lead, look);
   const value = useMemo<Theme>(
-    () => ({ name, dark: name === 'dark', colors: PALETTES[name], chartFill: chartFillOpacity[name], spacing, radius, typography }),
+    () => ({ name, dark: isDarkTheme(name), colors: paletteFor(name), chartFill: chartFillOpacity[name] ?? chartFillOpacity.light, spacing, radius, typography }),
     [name],
   );
   // On web the browser draws around the app: the status bar of an app added to a phone's home
@@ -54,7 +55,7 @@ export function ThemeProvider({
   // of the active look (public/index.html starts them at the Blossom paper).
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
-    const bg = PALETTES[name].bg;
+    const bg = paletteFor(name).bg;
     document.documentElement.style.backgroundColor = bg;
     document.body.style.backgroundColor = bg;
     let meta = document.querySelector('meta[name="theme-color"]');

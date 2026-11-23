@@ -184,6 +184,8 @@ export default function RootLayout() {
   const hydration = useHydration((h) => h.status);
   const hydrated = hydration === 'ready';
   const theme = useStore((s) => s.settings.theme);
+  // A newer look (Butter, Honey, Java) beside the stored preference; it applies while theme holds its fallback.
+  const look = useStore((s) => s.settings.look);
   // Until setup is finished nobody has picked a look, so the app shows its lead one.
   const firstRun = useStore((s) => !s.profile?.onboardedAt);
   const ready = (fontsLoaded || !!fontError) && hydrated;
@@ -246,7 +248,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ThemeProvider preference={theme} lead={firstRun}>
+        <ThemeProvider preference={theme} look={look} lead={firstRun}>
           <Navigation />
         </ThemeProvider>
       </SafeAreaProvider>

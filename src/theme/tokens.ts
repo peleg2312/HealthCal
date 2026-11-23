@@ -10,6 +10,8 @@
  */
 import type { ViewStyle } from 'react-native';
 
+import type { ThemeName } from './resolve';
+
 export interface ThemeColors {
   bg: string;
   bgElevated: string;
@@ -208,11 +210,163 @@ export const blossomColors: ThemeColors = {
 };
 
 /**
+ * The owner's five-colour palette, the source of Butter, Honey and Java: Transparent Yellow (a
+ * pale butter), Sceptre Red (a deep oxblood wine), Cerulean Blue (a soft grey-blue), Potting Soil
+ * (a warm brown) and Java Brown (nearly black). Butter and cerulean are the two lights against
+ * three deep darks; nothing bright, nothing pink, nothing orange.
+ */
+export const ownerPalette = {
+  transparentYellow: '#F5EFC6',
+  sceptreRed: '#4D0E12',
+  ceruleanBlue: '#A5BCD6',
+  pottingSoil: '#4A2E27',
+  javaBrown: '#231815',
+};
+
+/**
+ * Butter: butter paper (Transparent Yellow), Java Brown ink, Potting Soil as the second voice,
+ * Sceptre Red as the brand colour and the level line, Cerulean as the soft surface (tab bar, soft
+ * cards, progress tracks). The calorie fill is a deep raspberry lifted from Sceptre Red. Every data
+ * fill and the amber sit between luminance 0.158 and 0.28, so the Sceptre Red line is 3:1 on each
+ * and each is 3:1 on the butter card: the guide's full rule, with no exception.
+ */
+export const butterColors: ThemeColors = {
+  bg: ownerPalette.transparentYellow,
+  bgElevated: '#F8F3D3',
+  surface: '#FCF9E6',
+  surfaceAlt: ownerPalette.ceruleanBlue,
+  surfacePressed: '#ECE4B8',
+  border: '#E4DAB0',
+  borderStrong: '#B9A27F',
+  text: ownerPalette.javaBrown,
+  textSecondary: ownerPalette.pottingSoil,
+  textTertiary: '#5E4339',
+  primary: ownerPalette.sceptreRed,
+  onPrimary: ownerPalette.transparentYellow,
+  primarySoft: '#A5BCD666',
+  primaryInk: ownerPalette.sceptreRed,
+  calories: '#C4475E',
+  protein: '#9A5CAA',
+  carbs: '#5E8A2A',
+  fat: '#A27C5E',
+  water: '#3F80B4',
+  exercise: '#24877A',
+  sleep: '#6D6FC4',
+  weight: '#737880',
+  success: ownerPalette.javaBrown,
+  warning: '#C08410',
+  warningInk: '#6E3F00',
+  danger: '#8F1F0E',
+  overlay: '#000000A6',
+  track: ownerPalette.ceruleanBlue,
+  vesselEmpty: '#FCF9E6',
+  tabBar: ownerPalette.ceruleanBlue,
+  shadow: '#000000',
+  rim: ownerPalette.sceptreRed,
+  headroom: '#24877A',
+  vesselEdge: ownerPalette.pottingSoil,
+  caloriesInk: '#93263D',
+  heroStart: '#FCF9E6',
+  heroEnd: '#FCF9E6',
+  ringEnd: '#C4475E',
+};
+
+/**
+ * Honey: Butter with a gold calorie cup in place of the raspberry. The mark for "over" is a burnt
+ * amber, 22 (CIEDE2000) from the gold, so the lip on a cup and the over part of a bar are told from
+ * the gold at a glance (contrast.test.ts holds the new looks to at least 20). Fat is a touch cooler
+ * than Butter's so it stays clear of both, and the over number has its own burnt-amber ink.
+ */
+export const honeyColors: ThemeColors = {
+  ...butterColors,
+  calories: '#B48820',
+  fat: '#9E7A6A',
+  warning: '#B85414',
+  // Its own burnt-amber ink: Butter's would sit 7.9 from the honey number ink, so "over" would not change colour.
+  warningInk: '#703406',
+  caloriesInk: '#7A5512',
+  ringEnd: '#B48820',
+};
+
+/**
+ * Java: the owner's palette in the dark. Java Brown is the ground, the cards one step toward
+ * Potting Soil, Potting Soil the pressed surface and borders, Sceptre Red the soft cards
+ * (surfaceAlt) and the tab bar, butter the ink and the level line, Cerulean the brand colour.
+ * Its bar charts are drawn solid (chartFillOpacity.java is 1): that is what lets every fill sit in
+ * the band where the butter line is 3:1 on it and it is 3:1 on the brown card, so the calorie cup
+ * is a raspberry and not a pale rose.
+ */
+export const javaColors: ThemeColors = {
+  bg: ownerPalette.javaBrown,
+  bgElevated: '#2A1D19',
+  surface: '#31221D',
+  surfaceAlt: ownerPalette.sceptreRed,
+  surfacePressed: ownerPalette.pottingSoil,
+  border: ownerPalette.pottingSoil,
+  borderStrong: '#7A5A4C',
+  text: ownerPalette.transparentYellow,
+  textSecondary: '#DCD0AE',
+  textTertiary: '#BBAC8E',
+  primary: ownerPalette.ceruleanBlue,
+  onPrimary: ownerPalette.javaBrown,
+  primarySoft: '#A5BCD62E',
+  primaryInk: ownerPalette.ceruleanBlue,
+  calories: '#CC4F66',
+  protein: '#A664B6',
+  carbs: '#6A9438',
+  fat: '#A0806E',
+  water: '#4A8CC4',
+  exercise: '#3A9682',
+  sleep: '#7C78D0',
+  weight: '#82868C',
+  success: ownerPalette.transparentYellow,
+  warning: '#B87800',
+  warningInk: '#E9B04A',
+  danger: '#FF6A3D',
+  overlay: '#000000B3',
+  track: ownerPalette.pottingSoil,
+  vesselEmpty: '#31221D',
+  tabBar: ownerPalette.sceptreRed,
+  shadow: '#000000',
+  rim: ownerPalette.transparentYellow,
+  headroom: '#3A9682',
+  vesselEdge: '#A08672',
+  caloriesInk: '#F27A90',
+  heroStart: '#31221D',
+  heroEnd: '#31221D',
+  ringEnd: '#CC4F66',
+};
+
+/** Every palette by theme name. Look one up with `paletteFor(name)`. */
+export const PALETTES: Record<ThemeName, ThemeColors> = {
+  dark: darkColors,
+  light: lightColors,
+  blossom: blossomColors,
+  butter: butterColors,
+  honey: honeyColors,
+  java: javaColors,
+};
+
+/** Palettes with a dark background: the status bar, the keyboard and the like follow this. */
+export const THEME_IS_DARK: Record<ThemeName, boolean> = { dark: true, light: false, blossom: false, butter: false, honey: false, java: true };
+
+/** The palette for a theme name; Light for a name this version does not know, so a screen always has colours. */
+export function paletteFor(name: ThemeName): ThemeColors {
+  return Object.prototype.hasOwnProperty.call(PALETTES, name) ? PALETTES[name] : lightColors;
+}
+
+/** True when the theme's background is dark (false for a name this version does not know, as `paletteFor` draws Light). */
+export function isDarkTheme(name: ThemeName): boolean {
+  return THEME_IS_DARK[name] === true;
+}
+
+/**
  * Opacity of a bar-chart cup's fill (the solid rim sits on top), read as `useTheme().chartFill`.
  * 42% is a clean tint on the light papers. On the dark surface 42% turns every data colour
  * brown, so dark uses 70%: the bar keeps its colour and the cream rim still reads on top of it.
+ * Butter and Honey are light papers (42%); Java is a dark one with its own value (up to 1).
  */
-export const chartFillOpacity: Record<'dark' | 'light' | 'blossom', number> = { dark: 0.7, light: 0.42, blossom: 0.42 };
+export const chartFillOpacity: Record<ThemeName, number> = { dark: 0.7, light: 0.42, blossom: 0.42, butter: 0.42, honey: 0.42, java: 1 };
 
 /**
  * A six-digit hex colour at an opacity, as '#RRGGBBAA'. For a tint that matches the bar charts

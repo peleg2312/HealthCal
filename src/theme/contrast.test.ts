@@ -1,7 +1,10 @@
 /**
  * The contrast rules of the project guide, as a test. Every pair the guide
- * promises is computed for all three palettes, so a palette change that
- * breaks one fails here instead of in a review.
+ * promises is computed for all six palettes, so a palette change that
+ * breaks one fails here instead of in a review. The three original palettes
+ * (dark, light, Blossom) keep their two recorded exceptions; the three added
+ * from the owner's five-colour palette (Butter, Honey, Java) are held to the
+ * full rule with none (the last block).
  *
  * WCAG ratios: 4.5:1 for text, 3:1 for large numbers and for the lines and
  * outlines that carry meaning (the level line, the cup's outline, a fill on
@@ -10,11 +13,39 @@
 import { describe, expect, it } from 'vitest';
 
 import { contrast, deltaE, luminance, over, parseHex } from './contrast';
-import { blossomColors, chartFillOpacity, darkColors, lightColors, type ThemeColors } from './tokens';
+import { THEME_NAMES, type ThemeName } from './resolve';
+import {
+  blossomColors,
+  butterColors,
+  chartFillOpacity,
+  darkColors,
+  honeyColors,
+  isDarkTheme,
+  javaColors,
+  lightColors,
+  paletteFor,
+  PALETTES as THEME_PALETTES,
+  THEME_IS_DARK,
+  type ThemeColors,
+} from './tokens';
 
-const PALETTES = { dark: darkColors, light: lightColors, blossom: blossomColors } as const;
+const PALETTES = { dark: darkColors, light: lightColors, blossom: blossomColors, butter: butterColors, honey: honeyColors, java: javaColors } as const;
 type Name = keyof typeof PALETTES;
 const NAMES = Object.keys(PALETTES) as Name[];
+/** The palettes made from the owner's five colours: the guide's full rule, no exception. */
+const STRICT = ['butter', 'honey', 'java'] as const satisfies readonly Name[];
+
+/**
+ * Checks parked for the colour designer while Honey and Java had their first values (the lead's
+ * D6: Java's raspberry cup, Honey's over mark that cannot be missed). They all pass now, so the
+ * list is empty and every check runs as an ordinary `it`. Nothing may be added to this list.
+ */
+const FOR_THE_DESIGNER = new Set<string>([]);
+
+/** `it`, or `it.fails` for a check listed for the colour designer. */
+function check(name: string, title: string) {
+  return FOR_THE_DESIGNER.has(`${name}: ${title}`) ? it.fails : it;
+}
 
 const DATA = ['calories', 'protein', 'carbs', 'fat', 'water', 'exercise', 'sleep', 'weight'] as const;
 type Key = keyof ThemeColors;
@@ -118,7 +149,7 @@ describe.each(NAMES)('%s palette', (name) => {
     expect(failures(pairs(name, ['headroom'], ['vesselEmpty'], 3))).toEqual([]);
   });
 
-  it('keeps every data fill at 3:1 on a card', () => {
+  check(name, 'keeps every data fill at 3:1 on a card')('keeps every data fill at 3:1 on a card', () => {
     const rows = [...DATA, 'warning' as const].map((k) => ({ what: `${name} ${k} fill on surface`, ratio: contrast(c[k], c.surface), min: 3 }));
     // The one documented exception: Blossom's tickle-pink calorie fill is 2.4:1 on the card. It is
     // the owner's colour, it is never text, and the raspberry rim and outline carry its shape.
@@ -127,7 +158,7 @@ describe.each(NAMES)('%s palette', (name) => {
     for (const r of known) expect(r.ratio, r.what).toBeGreaterThan(2.3);
   });
 
-  it('keeps status colours apart from the accent and from each other', () => {
+  check(name, 'keeps status colours apart from the accent and from each other')('keeps status colours apart from the accent and from each other', () => {
     // Destructive must not look like the brand button.
     expect(deltaE(c.danger, c.primary), 'danger vs primary').toBeGreaterThanOrEqual(15);
     expect(deltaE(c.danger, c.warning), 'danger vs warning').toBeGreaterThanOrEqual(15);
@@ -209,5 +240,67 @@ describe('the level line on a fill', () => {
     }
     // Dark bars keep their colour: the tint stays at least 3.5:1 off the dark card (42% would be about 2:1, a brown).
     for (const k of DATA) expect(contrast(over(darkColors[k], darkColors.surface, chartFillOpacity.dark), darkColors.surface), `dark ${k} bar`).toBeGreaterThanOrEqual(3.5);
+  });
+});
+
+describe('the palettes by name', () => {
+  it('has a palette, a dark flag and a chart opacity for every theme name', () => {
+    expect(Object.keys(THEME_PALETTES).sort()).toEqual([...THEME_NAMES].sort());
+    expect(Object.keys(THEME_IS_DARK).sort()).toEqual([...THEME_NAMES].sort());
+    expect(Object.keys(chartFillOpacity).sort()).toEqual([...THEME_NAMES].sort());
+    for (const name of THEME_NAMES) {
+      expect(paletteFor(name)).toBe(PALETTES[name]);
+      expect(THEME_PALETTES[name]).toBe(PALETTES[name]);
+    }
+  });
+
+  it('marks the dark-background palettes as dark: dark and Java', () => {
+    expect(THEME_NAMES.filter(isDarkTheme).sort()).toEqual(['dark', 'java']);
+    // The flag agrees with the paper: a dark palette has a dark page and light text.
+    for (const name of THEME_NAMES) expect(luminance(PALETTES[name].bg) < luminance(PALETTES[name].text), name).toBe(isDarkTheme(name));
+  });
+
+  it('keeps the original chart opacities', () => {
+    expect([chartFillOpacity.dark, chartFillOpacity.light, chartFillOpacity.blossom]).toEqual([0.7, 0.42, 0.42]);
+  });
+
+  it('gives Light for a name it does not know, so a screen always has colours', () => {
+    expect(paletteFor('sepia' as ThemeName)).toBe(lightColors);
+    expect(paletteFor('toString' as ThemeName)).toBe(lightColors);
+    expect(isDarkTheme('sepia' as ThemeName)).toBe(false);
+  });
+});
+
+/**
+ * The palettes made from the owner's five colours meet the guide's full rule, with no exception:
+ * every data fill and the amber at 3:1 on the card (in the per-palette block above, which keeps
+ * Blossom's exception to Blossom), the level line at 3:1 against every data fill and the amber and
+ * against the empty cup, a dark palette's bar tints at 3.5:1 off its card at its own chart opacity,
+ * and an over mark that cannot be taken for the calorie fill.
+ */
+describe.each(STRICT)('%s, held to the full rule', (name) => {
+  const c = PALETTES[name];
+
+  check(name, 'the level line is 3:1 against every data fill and the amber')('the level line is 3:1 against every data fill and the amber', () => {
+    expect(failures([...DATA, 'warning' as const].map((k) => ({ what: `${name} rim on ${k}`, ratio: contrast(c.rim, c[k]), min: 3 })))).toEqual([]);
+  });
+
+  it('the level line is 3:1 against the empty cup and the progress track', () => {
+    expect(failures(pairs(name, ['rim'], ['vesselEmpty', 'track', 'surface', 'bg'], 3))).toEqual([]);
+  });
+
+  check(name, 'the over mark stands apart from the calorie fill')('the over mark stands apart from the calorie fill', () => {
+    // The amber lip sits right on the calorie cup and the over part of a bar right on its fill:
+    // at least 20 apart (CIEDE2000), more than the 15 every data colour keeps from the amber.
+    expect(deltaE(c.warning, c.calories), `${name} warning vs calories`).toBeGreaterThanOrEqual(20);
+  });
+
+  it('a dark palette keeps its bar tints at 3.5:1 off its card at its own chart opacity', () => {
+    const opacity = chartFillOpacity[name];
+    expect(opacity).toBeGreaterThan(0);
+    expect(opacity).toBeLessThanOrEqual(1);
+    if (!isDarkTheme(name)) return;
+    const rows = [...DATA, 'warning' as const].map((k) => ({ what: `${name} ${k} bar at ${opacity}`, ratio: contrast(over(c[k], c.surface, opacity), c.surface), min: 3.5 }));
+    expect(failures(rows)).toEqual([]);
   });
 });

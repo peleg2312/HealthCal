@@ -187,6 +187,24 @@ describe('backup validation', () => {
     expect(settingsOf({ morningSeenDay: 20261116 })).toBeNull();
   });
 
+  it('keeps a known look and drops an unknown or malformed one without losing the settings', () => {
+    const base = { theme: 'light', haptics: true, updatedAt: '2026-11-10T10:00:00Z' };
+    const settingsOf = (extra: Record<string, unknown>) => {
+      const parsed = parseBackup(wrap({}, { settings: { ...base, ...extra } }));
+      return parsed.ok ? parsed.backup.settings : 'not ok';
+    };
+    expect(settingsOf({ look: 'butter' })).toEqual({ ...base, look: 'butter' });
+    expect(settingsOf({ look: 'honey' })).toEqual({ ...base, look: 'honey' });
+    expect(settingsOf({ theme: 'dark', look: 'java' })).toEqual({ ...base, theme: 'dark', look: 'java' });
+    for (const look of ['sepia', 'Java', '', null, 3, { name: 'java' }, ['butter'], 'toString']) {
+      const got = settingsOf({ look });
+      expect(got, JSON.stringify(look)).toEqual(base);
+      expect(got !== null && typeof got === 'object' && 'look' in got, JSON.stringify(look)).toBe(false);
+    }
+    // A backup without a look is unchanged.
+    expect(settingsOf({})).toEqual(base);
+  });
+
   it('checks a night\'s rating and the fields of a synced night', () => {
     const night = (extra: Record<string, unknown> = {}) => ({ id: U1, updatedAt: '2026-11-10T10:00:00Z', date: '2026-11-10', hours: 7.25, ...extra });
     const synced = {

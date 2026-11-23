@@ -10,6 +10,13 @@ export type ISODateTime = string; // full ISO-8601 timestamp
 export type Sex = 'male' | 'female';
 export type UnitSystem = 'metric' | 'imperial';
 export type ThemePreference = 'system' | 'light' | 'dark' | 'blossom';
+/**
+ * A look added after the four preferences above. Stored in `Settings.look`, never in
+ * `Settings.theme`, so an older copy of the app (which knows only the four) still draws a
+ * palette: it reads `theme`, which holds the look's fallback ('light' or 'dark'). The rules are
+ * in src/theme/resolve.ts.
+ */
+export type ThemeLook = 'butter' | 'honey' | 'java';
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'athlete';
 export type GoalType = 'lose' | 'maintain' | 'gain';
@@ -380,7 +387,15 @@ export interface ReminderSettings {
 }
 
 export interface Settings {
+  /** Only ever one of the four preferences: a newer look is stored in `look`, with its fallback here. */
   theme: ThemePreference;
+  /**
+   * A newer look ('butter', 'honey', 'java'). It applies only while `theme` equals its fallback
+   * ('light' for butter and honey, 'dark' for java); choosing one of the four preferences removes
+   * it. A value this version does not know is ignored. Read and write it only through
+   * src/theme/resolve.ts (`resolveThemeName`, `themeChoiceOf`, `themeChoicePatch`).
+   */
+  look?: ThemeLook;
   reminders: ReminderSettings;
   haptics: boolean;
   celebrations: boolean;

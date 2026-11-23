@@ -73,7 +73,7 @@
  * card's SVG) is measured at the size it is drawn, its font size times the drawing's scale.
  *
  *   node scripts/dev/evidence.cjs --out=<dir> --routes=/,/diary,/water
- *        [--themes=blossom,light,dark] [--widths=360,390,320] [--empty] [--fresh] [--stress] [--imperial]
+ *        [--themes=blossom,light,dark] (also butter, honey, java) [--widths=360,390,320] [--empty] [--fresh] [--stress] [--imperial]
  *        [--states=<list>[,<list>]] [--only=<state id>[,<id>]]
  *        [--backend]  also the states that need accounts (start.cjs's "accounts"): only against a build
  *                     with a backend; with-build.cjs builds have none
@@ -173,6 +173,14 @@ const base = flags.url || 'http://localhost:8081';
 // Without --routes: the Today screen, unless states were asked for (then only the states).
 const routes = String(flags.routes || (flags.states ? '' : '/')).split(',').filter(Boolean);
 const themes = String(flags.themes || 'blossom,light,dark').split(',');
+// The theme names buildSeed takes (seed.mjs SEED_THEMES): a newer look is seeded as the app stores it.
+const KNOWN_THEMES = ['system', 'light', 'dark', 'blossom', 'butter', 'honey', 'java'];
+for (const t of themes) {
+  if (!KNOWN_THEMES.includes(t)) {
+    console.error(`Unknown theme "${t}" in --themes. Use any of: ${KNOWN_THEMES.join(', ')}.`);
+    process.exit(2);
+  }
+}
 // 360 first: the most common Android width, and the owner's phone. Each width has a phone's height.
 const widths = String(flags.widths || '360,390,320').split(',').map(Number);
 const HEIGHTS = { 320: 640, 360: 740, 390: 844 };
@@ -1270,7 +1278,7 @@ async function main() {
   for (const theme of themes) {
     for (const width of widths) {
       // One browser context per theme and width keeps the app's bundle cached; every page clears and seeds its own storage.
-      const options = { viewport: { width, height: heightFor(width) }, deviceScaleFactor: 1, reducedMotion: 'reduce', colorScheme: theme === 'dark' ? 'dark' : 'light', isMobile: true, hasTouch: true };
+      const options = { viewport: { width, height: heightFor(width) }, deviceScaleFactor: 1, reducedMotion: 'reduce', colorScheme: theme === 'dark' || theme === 'java' ? 'dark' : 'light', isMobile: true, hasTouch: true };
       const context = await browser.newContext(options);
       for (const job of jobs) {
         const name = `${job.stem}__${theme}__${width}${job.tag}`;

@@ -27,7 +27,7 @@ import { useHealthSync } from '@/features/health-sync/store';
 import { healthAdapter, useHealthStatus } from '@/features/health-sync/sync';
 import { profileSubtitle } from '@/features/health-sync/ui/format';
 import { Group, IconTile, InitialsAvatar } from '@/features/settings/components';
-import { THEME_OPTIONS, ThemeSwatches } from '@/features/settings/ThemeSwatches';
+import { THEME_HINTS, ThemeSwatches } from '@/features/settings/ThemeSwatches';
 import { timeAgo } from '@/features/settings/format';
 import { toISODate } from '@/lib/dates';
 import { usePlannedReminders } from '@/features/settings/usePlannedReminders';
@@ -39,7 +39,7 @@ import { useSyncState } from '@/services/sync';
 import { useNow, useToday } from '@/store/clock';
 import { pendingChanges, useStore } from '@/store';
 import { useEnergyModel, useProfile, useWeightSeries } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { themeChoiceOf, themeChoicePatch, useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
 import { Card, CupKey, EmptyState, Header, ListRow, Screen, Segmented, Text, ToggleRow } from '@/ui';
 
@@ -227,12 +227,12 @@ function ProfileHub() {
             <View style={{ flex: 1 }}>
               <Text variant="bodyStrong">Appearance</Text>
               <Text variant="caption" color="textSecondary">
-                {THEME_OPTIONS.find((o) => o.value === settings.theme)?.hint ?? 'Follows your device'}
+                {THEME_HINTS[themeChoiceOf(settings)]}
               </Text>
             </View>
           </View>
           <View style={{ paddingTop: spacing.xs }}>
-            <ThemeSwatches value={settings.theme} onChange={(theme) => setSettings({ theme })} />
+            <ThemeSwatches value={themeChoiceOf(settings)} onChange={(choice) => setSettings(themeChoicePatch(choice))} />
           </View>
         </View>
         <ToggleRow

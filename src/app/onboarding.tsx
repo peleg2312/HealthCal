@@ -71,11 +71,12 @@ export default function Onboarding() {
  */
 function ChosenLook({ children }: { children: React.ReactNode }) {
   const preference = useStore((s) => s.settings.theme);
+  const look = useStore((s) => s.settings.look);
   const matchPhone = useMatchPhone((s) => s.picked);
   // Once set-up is finished the lead look is over, as it is for the rest of the app.
   const onboarded = useStore((s) => !!s.profile?.onboardedAt);
   return (
-    <ThemeProvider preference={preference} lead={!matchPhone && !onboarded}>
+    <ThemeProvider preference={preference} look={look} lead={!matchPhone && !onboarded}>
       {children}
     </ThemeProvider>
   );

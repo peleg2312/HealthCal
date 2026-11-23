@@ -5,8 +5,9 @@
  *
  *   welcome -> onboarding -> plan -> Today -> log food -> log a run -> add water -> reload
  *   -> the next morning: the morning page opens by itself once (greeting, quote, plan), closes onto Today, not again
- *   -> ... -> drinks -> drinks logged in the diary count in Water -> an old portion after a reload: the + sheet's tile shows what its tap stores, and so does
+ *   -> ... -> drinks -> a search for any drink on Water -> drinks logged in the diary count in Water -> an old portion after a reload: the + sheet's tile shows what its tap stores, and so does
  *      "Repeat yesterday's <meal>" (bundled foods at today's values, an own food and an online product as stored)
+ *   -> Appearance in Profile: Java (kept through a reload), Honey, Butter, Blossom, then back to System
  *
  * The expected numbers are recomputed here from the published formulas, not
  * read back from the app's own calculation code, so a mistake in the engine
@@ -640,7 +641,13 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   await tap('water-pick-b_apple_juice');
   s = await stored();
   const chosenToast = await text('toast');
-  check('drinks: a drink tapped in the sheet is chosen, not logged, and the toast says so', chosenToast.endsWith('chosen. Tap a glass to add it.') && newIn(s, before, 'water').length === 0 && newIn(s, before, 'foodEntries').length === 0, chosenToast);
+  // Apple juice is one of Juice's own choices: picked from Other's sheet it goes to Juice (placePick), and the toast says so.
+  check(
+    'drinks: a drink tapped in the sheet is chosen, not logged, and the toast says where',
+    chosenToast === 'Apple juice chosen, under Juice. Tap a glass to add it.' && newIn(s, before, 'water').length === 0 && newIn(s, before, 'foodEntries').length === 0,
+    chosenToast,
+  );
+  check('drinks: and the screen shows Juice with Apple selected', (await pressed('water-beverage-juice')) && (await pressed('water-choice-juice_apple')));
   // The choice is remembered on this device.
   await tap('water-beverage-milk');
   await tap('water-choice-milk_whole');
@@ -648,6 +655,92 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   await page.waitForTimeout(1500);
   await tap('water-beverage-milk');
   check('drinks: the last milk chosen is selected after a reload', await pressed('water-choice-milk_whole'));
+
+  // ------------------------------------------- a search for any drink (src/features/drinks/pick.ts, DrinkPickSheet, DrinkTitleRow)
+  // "Search" beside "Add a drink" opens the drink sheet from any kind. A pick goes to its own kind (a bundled
+  // drink), or to Other; the kind row shows it, the line names it with its calories, and a glass logs it.
+  const rowsOf = () => page.evaluate(() => [...document.querySelectorAll('[data-testid^="water-pick-"]')]
+    .filter((e) => e.getBoundingClientRect().height > 0 && !/^water-pick-(sheet|search|kcal|hint|clear)/.test(e.getAttribute('data-testid')) && !/-matched$/.test(e.getAttribute('data-testid')))
+    .map((e) => e.getAttribute('data-testid')));
+  const inView = (id) => page.evaluate((id) => {
+    const r = [...document.querySelectorAll(`[data-testid="${id}"]`)].find((e) => e.getBoundingClientRect().height > 0)?.getBoundingClientRect();
+    return !!r && r.left >= 0 && r.right <= window.innerWidth;
+  }, id);
+  await tap('water-beverage-water');
+  await page.waitForTimeout(5000);
+  check('drink search: "Search" sits beside "Edit sizes" on the Water kind', (await page.getByTestId('water-search').count()) > 0 && (await page.getByTestId('section-add-a-drink-action').count()) > 0 && (await page.getByTestId('water-search').first().getAttribute('aria-label')) === 'Search drinks');
+  await tap('water-search');
+  check('drink search: it opens the drink sheet with an empty search and "All drinks"', (await page.getByTestId('water-pick-search').first().inputValue()) === '' && (await page.getByTestId('water-pick-all').count()) > 0);
+  await fill('water-pick-search', 'soup');
+  await page.waitForTimeout(700);
+  check('drink search: "soup" lists no soup and says foods are added in the diary', (await text('water-pick-none')) === 'No drink matches “soup”. Foods are added in the diary.' && !(await rowsOf()).some((id) => /soup/.test(id)), (await rowsOf()).join(', '));
+  check('drink search: the online part says it works in the phone app (no backend here)', (await text('water-pick-online-empty')) === 'Product search by name works in the phone app. Here, enter the calories above.', await text('water-pick-online-empty'));
+  check('drink search: the hint line goes while a query is typed', (await page.getByTestId('water-pick-hint').count()) === 0);
+  await fill('water-pick-search', 'beer');
+  await page.waitForTimeout(700);
+  check('drink search: "beer" says alcohol is added in the diary', (await text('water-pick-alcohol')) === 'Drinks with alcohol are added in the diary, not in Water.' && (await page.getByTestId('water-pick-none').count()) === 0, (await rowsOf()).join(', '));
+  await fill('water-pick-search', 'tea');
+  await page.waitForTimeout(700);
+  const teaRows = (await rowsOf()).filter((id) => /^water-pick-b_/.test(id));
+  check('drink search: "tea" shows three teas, then "Show all 5"', teaRows.length === 3 && (await text('water-pick-more')) === 'Show all 5', `${teaRows.join(', ')} / ${(await page.getByTestId('water-pick-more').count()) ? await text('water-pick-more') : 'no more row'}`);
+  await tap('water-pick-more');
+  check('drink search: "Show all" shows the rest', (await rowsOf()).filter((id) => /^water-pick-b_/.test(id)).length === 5 && (await page.getByTestId('water-pick-more').count()) === 0);
+  await fill('water-pick-search', 'monster');
+  await page.waitForTimeout(700);
+  const monsterRows = (await rowsOf()).filter((id) => /^water-pick-b_/.test(id));
+  check('drink search: "monster" finds the energy drink first', monsterRows[0] === 'water-pick-b_energy_drink', monsterRows.join(', '));
+  before = await stored();
+  await tap('water-pick-b_energy_drink');
+  s = await stored();
+  check('drink search: a pick logs nothing', newIn(s, before, 'water').length === 0 && newIn(s, before, 'foodEntries').length === 0);
+  const pickToastText = await text('toast');
+  check('drink search: the toast says where it went', pickToastText === 'Energy drink, sugared chosen, under Other. Tap a glass to add it.', pickToastText);
+  check('drink search: the screen is on Other, its chip in view', (await pressed('water-beverage-other')) && (await inView('water-beverage-other')));
+  check('drink search: the drink is its own chip, selected', (await pressed('water-choice-food')) && (await text('water-choice-food')) === 'Energy drink, sugared', await text('water-choice-food'));
+  const monsterLine = await text('water-drink-line');
+  check('drink search: the line names it with its calories before a glass', monsterLine.startsWith('Energy drink, sugared: 108 kcal per 250 ml'), monsterLine);
+  await page.waitForTimeout(5000);
+  before = await stored();
+  await tap(`water-add-${gi}`);
+  s = await stored();
+  const [wm] = newIn(s, before, 'water');
+  const [em] = newIn(s, before, 'foodEntries');
+  check(
+    'drink search: a glass logs the picked drink: one water record and its diary entry',
+    !!wm && !!em && wm.foodEntryId === em.id && em.via === 'water' && em.foodId === 'b_energy_drink' && Math.round(em.nutrients.kcal) === 108 && wm.ml === 250,
+    JSON.stringify({ wm: wm && { ml: wm.ml, drink: wm.drink }, em: em && { foodId: em.foodId, kcal: em.nutrients.kcal } }),
+  );
+  await page.waitForTimeout(5000);
+  const monsterRow = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="water-entry-kcal-"]')].map((e) => e.innerText.replace(/[ ]/g, ' ').replace(/[⁠‎⁨⁩]/g, '')).find((t) => t.includes('Energy drink')) || '');
+  check("drink search: the Water row names the drink's diary entry", /^Energy drink, sugared · 108 kcal in /.test(monsterRow), monsterRow);
+  // "mocha" from the title row, while Other shows: a bundled coffee goes to Coffee with its calories.
+  await tap('water-search');
+  await fill('water-pick-search', 'mocha');
+  await page.waitForTimeout(700);
+  await tap('water-pick-b_mocha');
+  check('drink search: "mocha" lands on Coffee', (await pressed('water-beverage-coffee')) && (await inView('water-beverage-coffee')) && (await text('toast')) === 'Cafe mocha, whole milk chosen, under Coffee. Tap a glass to add it.', await text('toast'));
+  const mochaLine = await text('water-drink-line');
+  check('drink search: under Coffee the mocha keeps its calories (not black coffee)', (await pressed('water-choice-food')) && mochaLine.startsWith('Cafe mocha, whole milk: 188 kcal per 250 ml'), mochaLine);
+  await page.waitForTimeout(5000);
+  // The next visit: the Water kind offers the drinks picked before as chips, one tap from a glass.
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(1500);
+  await tap('water-beverage-coffee');
+  check('drink search: after a reload Coffee keeps the mocha', (await text('water-drink-line')).startsWith('Cafe mocha, whole milk'), await text('water-drink-line'));
+  check('drink search: no recent chips on a kind other than Water', (await page.locator('[data-testid^="water-recent-"]').count()) === 0);
+  await tap('water-beverage-water');
+  const recentIds = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="water-recent-"]')].filter((e) => e.getBoundingClientRect().height > 0).map((e) => e.getAttribute('data-testid')));
+  check('drink search: the Water kind shows the energy drink as a recent chip, on one line', recentIds.includes('water-recent-b_energy_drink') && recentIds.length <= 3, recentIds.join(', '));
+  const recentLabel = await page.getByTestId('water-recent-b_energy_drink').first().getAttribute('aria-label');
+  check('drink search: the chip says its calories to a screen reader', recentLabel === 'Energy drink, sugared, 108 kcal per 250 ml, choose', String(recentLabel));
+  await tap('water-recent-b_energy_drink');
+  check('drink search: a recent chip is a pick: Other, the drink selected, the line', (await pressed('water-beverage-other')) && (await pressed('water-choice-food')) && (await text('water-drink-line')).startsWith('Energy drink, sugared: 108 kcal'));
+  // Leave the day as it was for what follows: the energy drink's water and entry go.
+  await page.evaluate(([w, e]) => {
+    window.__healthcal.getState().remove('water', w);
+    window.__healthcal.getState().remove('foodEntries', e);
+  }, [wm.id, em.id]);
+  await page.waitForTimeout(400);
   // Today's water button stays plain water.
   await page.goto(BASE + '/', { waitUntil: 'networkidle' });
   await page.waitForTimeout(1200);
@@ -968,6 +1061,77 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   await page.evaluate(() => window.__keyboard(0));
   await blur();
   await page.waitForTimeout(300);
+  // A drink picked in the sheet with the keyboard up: the sheet closes, the toast rests above the keyboard;
+  // and a glass tapped while it is still up: the same.
+  await page.waitForTimeout(5000);
+  await tap('water-search');
+  await fill('water-pick-search', 'mocha');
+  await page.waitForTimeout(700);
+  {
+    const c = await cupOf('water-pick-search');
+    await page.touchscreen.tap(c.x + c.w / 2, c.y + c.h / 2);
+  }
+  await page.evaluate((h) => window.__keyboard(h), KB);
+  await page.waitForTimeout(400);
+  await tap('water-pick-b_mocha');
+  await page.waitForTimeout(300);
+  tb = await toastBox();
+  check('keyboard up, drink sheet: the toast after a pick rests 12 to 24 px above the keyboard, wholly in view', !!tb && tb.bottom <= tb.visible - 12 && tb.bottom >= tb.visible - 24 && tb.top >= 0, fmt(tb));
+  await page.waitForTimeout(5000);
+  before = await stored();
+  await tap(`water-add-${gi}`);
+  await page.waitForTimeout(300);
+  tb = await toastBox();
+  const mochaUp = newIn(await stored(), before, 'foodEntries');
+  check('keyboard up, Water: the toast after a glass of the picked drink rests 12 to 24 px above the keyboard', !!tb && tb.bottom <= tb.visible - 12 && tb.bottom >= tb.visible - 24 && tb.top >= 0 && mochaUp.length === 1 && mochaUp[0].foodId === 'b_mocha', fmt(tb));
+  if (tb?.action) await page.touchscreen.tap(tb.action.x, tb.action.y);
+  await page.waitForTimeout(400);
+  await page.evaluate(() => window.__keyboard(0));
+  await blur();
+  await page.waitForTimeout(300);
+
+  // ------------------------------------------- Appearance: the newer looks (src/theme/resolve.ts)
+  // A newer look is stored as `look` beside its fallback in `theme` (an older copy shows Light or Dark);
+  // the four older choices write `theme` and remove `look`. The page's ground is the palette's own bg,
+  // read from src/theme/tokens.ts itself (Node strips its types), so a new colour value needs no edit here.
+  {
+    const { execFileSync } = require('child_process');
+    const grounds = JSON.parse(
+      execFileSync(process.execPath, ['--no-warnings', '--input-type=module', '-e', "const t = await import('./src/theme/tokens.ts'); console.log(JSON.stringify(Object.fromEntries(Object.keys(t.PALETTES).map((n) => [n, t.paletteFor(n).bg]))))"], {
+        cwd: require('path').join(__dirname, '..', '..'),
+      }).toString(),
+    );
+    const rgb = (hex) => `rgb(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ')})`;
+    const ground = async () => page.evaluate(() => document.body.style.backgroundColor);
+    const picked = async (choice) => (await page.getByTestId(`profile-theme-${choice}`).first().getAttribute('aria-checked')) === 'true';
+    const look = async (choice, theme, lookName, palette) => {
+      const st = (await stored()).settings;
+      const bg = await ground();
+      check(
+        `Appearance: ${choice} stores theme '${theme}'${lookName ? ` and look '${lookName}'` : ' and no look'}, is marked, and the page is on its ground`,
+        st.theme === theme && (st.look ?? null) === lookName && (await picked(choice)) && bg === rgb(grounds[palette]),
+        `theme ${st.theme}, look ${st.look ?? '-'}, ground ${bg} (want ${rgb(grounds[palette])})`,
+      );
+    };
+    await page.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
+    await page.getByTestId('profile-theme-java').first().waitFor({ timeout: 15000 });
+    check('Appearance: Profile offers System and the six looks', (await page.locator('[data-testid^="profile-theme-"]').count()) === 7);
+    await tap('profile-theme-java');
+    await look('java', 'dark', 'java', 'java');
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.getByTestId('profile-theme-java').first().waitFor({ timeout: 15000 });
+    await page.waitForTimeout(500);
+    await look('java', 'dark', 'java', 'java');
+    await tap('profile-theme-honey');
+    await look('honey', 'light', 'honey', 'honey');
+    await tap('profile-theme-butter');
+    await look('butter', 'light', 'butter', 'butter');
+    await tap('profile-theme-blossom');
+    await look('blossom', 'blossom', null, 'blossom');
+    // The run's phone is dark, so "Match my phone" draws Dark again, as the first-day flow left it.
+    await tap('profile-theme-system');
+    await look('system', 'system', null, 'dark');
+  }
 
   const real = errors.filter((e) => !/favicon|DevTools|useNativeDriver|pointerEvents is deprecated|shadow\*/i.test(e));
   check('no runtime or console errors during the whole run', real.length === 0, real.slice(0, 3).join(' || '));

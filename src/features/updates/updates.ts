@@ -20,7 +20,7 @@ import { today } from '@/lib/dates';
 import { useStore } from '@/store';
 import { flushPersistence, useHydration } from '@/store/persistence';
 import { useSyncState } from '@/services/sync';
-import { blossomColors, darkColors, lightColors, resolveThemeName } from '@/theme';
+import { paletteFor, resolveThemeName } from '@/theme';
 import { sheetOnScreen } from '@/ui';
 
 import { createFakePort, DEMO_PRESETS, type FakeUpdates } from './fake';
@@ -65,8 +65,8 @@ export function useReportScreen(): void {
 
 function background(): string {
   const s = useStore.getState();
-  const name = resolveThemeName(s.settings.theme, Appearance.getColorScheme(), !s.profile?.onboardedAt);
-  return (name === 'dark' ? darkColors : name === 'blossom' ? blossomColors : lightColors).bg;
+  const name = resolveThemeName(s.settings.theme, Appearance.getColorScheme(), !s.profile?.onboardedAt, s.settings.look);
+  return paletteFor(name).bg;
 }
 
 function adopt(port: UpdatesPort): void {

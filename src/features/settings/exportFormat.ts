@@ -3,6 +3,7 @@
  * complete JSON backup that can be imported again (merge by id, newer wins).
  */
 import { effectiveMl } from '@/lib/hydration';
+import { isThemeLook } from '@/theme/resolve';
 import type {
   ActivityEntry,
   Collection,
@@ -330,6 +331,17 @@ function isValidSettings(x: unknown): x is Settings {
   );
 }
 
+/**
+ * Settings as a backup restores them. A `look` this version does not know (a later version's look,
+ * or a malformed value) is dropped rather than making the settings invalid: the theme beside it is
+ * the look's fallback, which this version draws.
+ */
+function knownLook(settings: Settings): Settings {
+  if (!('look' in settings) || isThemeLook(settings.look)) return settings;
+  const { look: _dropped, ...rest } = settings;
+  return rest;
+}
+
 /** Validate an imported file. Unknown fields are kept; malformed records are skipped and counted. */
 export function parseBackup(text: string): ParseResult {
   let raw: unknown;
@@ -367,7 +379,7 @@ export function parseBackup(text: string): ParseResult {
       units: 'metric',
       profile,
       // Null when missing or malformed: the device keeps its own settings.
-      settings: isValidSettings(o.settings) ? o.settings : null,
+      settings: isValidSettings(o.settings) ? knownLook(o.settings) : null,
       collections,
       favoriteFoodIds: Array.isArray(o.favoriteFoodIds) ? o.favoriteFoodIds.filter((x) => typeof x === 'string') : [],
       recentFoods: recent.filter(isFood),

@@ -83,6 +83,10 @@ const settings = [
   { id: 'goals-calories-manual', route: '/settings/goals', taps: ['goals-calories-mode-manual'], waitFor: 'goals-calories', note: 'calorie target: set my own' },
   { id: 'goals-water-manual-imperial', route: '/settings/goals', imperial: true, taps: ['goals-water-mode-manual'], waitFor: 'goals-water', note: 'water goal: set my own, in fl oz' },
   { id: 'profile-units-switch', route: '/profile', taps: ['profile-units-imperial'], note: 'units switched to imperial on Profile' },
+  // Appearance: seven tiles in two rows of four. Run with --themes=butter,honey,java to see each newer look selected in its own colours.
+  { id: 'profile-appearance', route: '/profile', waitFor: 'profile-theme-java', note: 'Appearance: System and the six looks, the one in use marked, its hint under the heading' },
+  { id: 'profile-appearance-pick-java', route: '/profile', taps: ['profile-theme-java'], waitFor: 'profile-theme-java', note: 'Java picked on Profile: the whole page turns Java at once' },
+  { id: 'profile-appearance-pick-honey', route: '/profile', taps: ['profile-theme-honey'], waitFor: 'profile-theme-honey', note: 'Honey picked on Profile' },
   { id: 'goals-errors-imperial', route: '/settings/goals', imperial: true, taps: [{ type: 'goals-target-weight', text: '20' }, { type: 'goals-height-ft', text: '12' }, { type: 'goals-birth-date', text: '1890-13-45' }, { type: 'goals-body-fat', text: '90' }], waitFor: 'goals-height-error', note: 'every field with an error, imperial (Save turns off)' },
   { id: 'reminders-on', route: '/settings/reminders', taps: ['reminders-master', 'reminders-weighin', 'reminders-movement'], waitFor: 'reminders-movement-time', note: 'reminders on, every reminder expanded' },
   { id: 'reminders-on-imperial', route: '/settings/reminders', imperial: true, taps: ['reminders-master', 'reminders-weighin', 'reminders-movement'], waitFor: 'reminders-movement-time', note: 'the same with the 12-hour clock and fl oz' },

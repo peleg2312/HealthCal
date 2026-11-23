@@ -568,7 +568,27 @@ function applyValues(state, values, { put, weightKg, baselineTdee }) {
 }
 
 /**
- * @param {{ days?: number, empty?: boolean, theme?: 'system'|'light'|'dark'|'blossom', onboarded?: boolean, units?: 'metric'|'imperial', store?: boolean, stress?: boolean,
+ * The themes a seed can be asked for. The four preferences go into `settings.theme`; a newer look
+ * ('butter', 'honey', 'java') is written as the app writes it (src/theme/resolve.ts,
+ * `themeChoicePatch`): `settings.look` with its fallback in `settings.theme`, so an older build
+ * shown the same seed draws Light or Dark.
+ */
+export const SEED_THEMES = ['system', 'light', 'dark', 'blossom', 'butter', 'honey', 'java'];
+const LOOK_FALLBACK = { butter: 'light', honey: 'light', java: 'dark' };
+
+/** The `settings` fields for a theme name: `{ theme }`, or `{ theme: fallback, look }` for a newer look. */
+export function themeSettings(theme) {
+  if (!SEED_THEMES.includes(theme)) throw new Error(`Unknown theme "${theme}". Use one of: ${SEED_THEMES.join(', ')}.`);
+  return LOOK_FALLBACK[theme] ? { theme: LOOK_FALLBACK[theme], look: theme } : { theme };
+}
+
+/** True for a theme with a dark page (the browser's colour scheme in the scripts follows it). */
+export function seedThemeIsDark(theme) {
+  return theme === 'dark' || theme === 'java';
+}
+
+/**
+ * @param {{ days?: number, empty?: boolean, theme?: 'system'|'light'|'dark'|'blossom'|'butter'|'honey'|'java', onboarded?: boolean, units?: 'metric'|'imperial', store?: boolean, stress?: boolean,
  *   values?: { eaten?: number, protein?: number, exercise?: number, water?: number, weekMinutes?: number, fasting?: number, eatBack?: number, spread?: number, lastNight?: number, weighInGap?: number, onboardedToday?: boolean, name?: string, drinks?: number, diaryDrink?: number, diaryWater?: number, oldBourekas?: number } }} opts
  */
 export function buildSeed(opts = {}) {
@@ -589,7 +609,7 @@ export function buildSeed(opts = {}) {
         }
       : null,
     settings: {
-      theme, haptics: true, celebrations: true, waterPresets: units === 'imperial' ? [237, 355, 473, 710] : [150, 250, 330, 500], fastingTargetHours: 16,
+      ...themeSettings(theme), haptics: true, celebrations: true, waterPresets: units === 'imperial' ? [237, 355, 473, 710] : [150, 250, 330, 500], fastingTargetHours: 16,
       reminders: {
         enabled: false, quietStart: '22:00', quietEnd: '07:30',
         water: { enabled: true, everyMinutes: 120 },

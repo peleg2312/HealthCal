@@ -1,22 +1,46 @@
 import { Check } from 'lucide-react-native';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useColorScheme, useWindowDimensions, View } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { create } from 'zustand';
 
 import { useStore } from '@/store';
-import { blossomColors, cup, darkColors, fonts, lightColors, motion, useTheme, vesselBase, type ThemeColors } from '@/theme';
-import type { ThemePreference } from '@/types';
+import {
+  cup,
+  fonts,
+  isThemeLook,
+  LOOK_HINTS,
+  motion,
+  paletteFor,
+  THEME_LABELS,
+  themeChoiceOf,
+  themeChoicePatch,
+  themeNameOfChoice,
+  useTheme,
+  vesselBase,
+  type ThemeChoice,
+  type ThemeColors,
+} from '@/theme';
 import { FadeUp, Hatch, PressableScale, Text, usePour } from '@/ui';
 
 import { StepTitle } from './components';
 
-export const THEME_CHOICES: { value: ThemePreference; title: string; hint: string }[] = [
+export const SETUP_THEME_CHOICES: { value: ThemeChoice; title: string; hint: string }[] = [
   { value: 'blossom', title: 'Blossom', hint: 'Champagne and raspberry' },
   { value: 'light', title: 'Oat', hint: 'Light oat paper' },
   { value: 'dark', title: 'Espresso', hint: 'Warm and dark' },
   { value: 'system', title: 'Match my phone', hint: 'Light by day, dark at night, following your phone' },
 ];
+
+/**
+ * The card for a newer look (Butter, Honey, Java). Set-up offers only the four above, so that every
+ * card and Continue stay in the first view at 360 x 740; the newer looks are in Profile, and the
+ * note under the cards says so. A look already stored (settings that came with a backup or a
+ * sign-in) is shown as a fifth card, selected, so the step never shows one look and marks another.
+ */
+function lookCard(look: ThemeChoice): { value: ThemeChoice; title: string; hint: string } | null {
+  return isThemeLook(look) ? { value: look, title: THEME_LABELS[look], hint: LOOK_HINTS[look] } : null;
+}
 
 /**
  * True once "Match my phone" was tapped here. The stored value for it is
@@ -32,16 +56,20 @@ export const useMatchPhone = create<{ picked: boolean }>(() => ({ picked: false 
  * "Match my phone" on a dark phone, and Blossom (the app's lead look, the one
  * on the icon) on a light phone or one that does not say.
  */
-export function preselectedTheme(stored: ThemePreference, scheme: string | null | undefined, matchPhone = useMatchPhone.getState().picked): ThemePreference {
+export function preselectedTheme(stored: ThemeChoice, scheme: string | null | undefined, matchPhone = useMatchPhone.getState().picked): ThemeChoice {
   if (stored !== 'system') return stored;
   return matchPhone || scheme === 'dark' ? 'system' : 'blossom';
 }
 
-/** Write the shown choice, so finishing set-up always leaves an explicit look stored. */
+/**
+ * Write the shown choice, so finishing set-up always leaves an explicit look stored. The stored
+ * choice is read and written only through the theme's helpers (`themeChoiceOf`, `themeChoicePatch`).
+ */
 export function commitThemeChoice(scheme: string | null | undefined) {
   const { settings, setSettings } = useStore.getState();
-  const pick = preselectedTheme(settings.theme, scheme);
-  if (pick !== settings.theme) setSettings({ theme: pick });
+  const stored = themeChoiceOf(settings);
+  const pick = preselectedTheme(stored, scheme);
+  if (pick !== stored) setSettings(themeChoicePatch(pick));
 }
 
 /**
@@ -54,33 +82,36 @@ export function ThemeStep() {
   const window = useWindowDimensions();
   // All four looks should be on screen at once, so the miniatures give way on a short or narrow phone.
   const mini = window.height < 700 ? { w: 108, h: 72 } : window.height < 800 || window.width < 360 ? { w: 120, h: 84 } : { w: 136, h: 96 };
-  const stored = useStore((s) => s.settings.theme);
+  const settings = useStore((s) => s.settings);
   const matchPhone = useMatchPhone((s) => s.picked);
   const scheme = useColorScheme();
-  const selected = preselectedTheme(stored, scheme, matchPhone);
+  const selected = preselectedTheme(themeChoiceOf(settings), scheme, matchPhone);
+  // A look stored when the step appeared keeps its card for as long as the step is up, also once another card is tapped.
+  const [stored] = useState(() => lookCard(selected));
+  const choices = stored ? [...SETUP_THEME_CHOICES, stored] : SETUP_THEME_CHOICES;
 
   // Shown means chosen: store the preselected look as soon as the step appears.
   useEffect(() => {
     commitThemeChoice(scheme);
   }, [scheme]);
 
-  const choose = (theme: ThemePreference) => {
-    useMatchPhone.setState({ picked: theme === 'system' });
-    useStore.getState().setSettings({ theme });
+  const choose = (choice: ThemeChoice) => {
+    useMatchPhone.setState({ picked: choice === 'system' });
+    useStore.getState().setSettings(themeChoicePatch(choice));
   };
 
   return (
     <View style={{ gap: window.height < 700 ? spacing.lg : spacing.xl }}>
       <StepTitle title="Pick how your day looks" subtitle="Tap one to see the whole app change." />
       <View accessibilityRole="radiogroup" accessibilityLabel="Appearance" style={{ gap: spacing.sm }}>
-        {THEME_CHOICES.map((o, i) => (
+        {choices.map((o, i) => (
           <FadeUp key={o.value} index={i}>
             <ThemeCard title={o.title} hint={o.hint} value={o.value} selected={selected === o.value} onPress={() => choose(o.value)} index={i} width={mini.w} height={mini.h} />
           </FadeUp>
         ))}
       </View>
       <Text variant="caption" color="textSecondary" testID="onb-theme-note">
-        You can change this any time in Profile, under Appearance.
+        Three more looks are in Profile, under Appearance.
       </Text>
     </View>
   );
@@ -98,7 +129,7 @@ function ThemeCard({
 }: {
   title: string;
   hint: string;
-  value: ThemePreference;
+  value: ThemeChoice;
   selected: boolean;
   onPress: () => void;
   index: number;
@@ -132,16 +163,16 @@ function ThemeCard({
         {value === 'system' ? (
           <>
             <View style={{ position: 'absolute', left: 0, top: 0, width: w / 2, height: h, overflow: 'hidden' }}>
-              <MiniToday c={lightColors} width={w} height={h} index={index} />
+              <MiniToday c={paletteFor(themeNameOfChoice('system', 'light'))} width={w} height={h} index={index} />
             </View>
             <View style={{ position: 'absolute', left: w / 2, top: 0, width: w / 2, height: h, overflow: 'hidden' }}>
               <View style={{ position: 'absolute', left: -w / 2, top: 0 }}>
-                <MiniToday c={darkColors} width={w} height={h} index={index} />
+                <MiniToday c={paletteFor(themeNameOfChoice('system', 'dark'))} width={w} height={h} index={index} />
               </View>
             </View>
           </>
         ) : (
-          <MiniToday c={value === 'dark' ? darkColors : value === 'blossom' ? blossomColors : lightColors} width={w} height={h} index={index} />
+          <MiniToday c={paletteFor(themeNameOfChoice(value, null))} width={w} height={h} index={index} />
         )}
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>

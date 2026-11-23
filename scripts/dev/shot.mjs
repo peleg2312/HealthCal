@@ -7,7 +7,7 @@
 //   --empty        onboarded profile but no logged data (check empty states)
 //   --fresh        no profile at all (welcome / onboarding flow)
 //   --light        light theme (default is dark)
-//   --theme=name   any theme by name: dark, light, blossom
+//   --theme=name   any theme by name: dark, light, blossom, butter, honey, java (system follows --light)
 //   --imperial     demo profile uses imperial units (lb, ft/in, fl oz, mi)
 //   --stress       the demo weeks with long content: long names, big numbers (buildSeed stress in seed.mjs)
 //   --full         capture the full scrollable page
