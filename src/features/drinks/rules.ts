@@ -318,9 +318,17 @@ export function drinkName(selected: SelectedDrink | null, kind: Beverage): strin
   return selected.food?.name ?? 'drink';
 }
 
-/** A choice chip's spoken label: "Whole, 157 kcal per 250 ml" or "Black, no calories". */
+/** A choice chip's spoken label, units in full: "Whole, 157 kilocalories per 250 millilitres" or "Black, no calories". */
 export function choiceA11y(label: string, food: Food | null, glassMl: number, units: UnitSystem): string {
-  return food ? `${label}, ${formatNumber(drinkKcal(food, glassMl))} kcal per ${formatVolume(glassMl, units)}` : `${label}, no calories`;
+  return food ? `${label}, ${formatNumber(drinkKcal(food, glassMl))} kilocalories per ${spokenVolume(formatVolume(glassMl, units))}` : `${label}, no calories`;
+}
+
+/** A volume as drawn ("250 ml", "8 fl oz", "1.5 L") spoken in full ("250 millilitres", "8 fluid ounces", "1.5 litres"). */
+export function spokenVolume(volume: string): string {
+  return volume
+    .replace(/(\d)\s?fl oz\b/g, '$1 fluid ounces')
+    .replace(/(\d)\s?ml\b/g, '$1 millilitres')
+    .replace(/(\d)\s?L\b/g, '$1 litres');
 }
 
 /**

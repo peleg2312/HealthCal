@@ -318,7 +318,7 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
         // 10 px between labels keeps 8 px between their letters at every plan (keeping weight puts
         // "Matches your burn" right under the number; gaining puts the surplus over the burn).
         labelSpacing={10}
-        accessibilityLabel={`Daily target ${formatNumber(target)} kcal${showBurn ? `, against about ${formatNumber(burn)} kcal you burn` : ', matched to what you burn'}`}
+        accessibilityLabel={`Daily target ${formatNumber(target)} kilocalories${showBurn ? `, against about ${formatNumber(burn)} kilocalories you burn` : ', matched to what you burn'}`}
         labels={[
           ...(showBurn ? [{ key: 'burn', at: burn, height: 40, tick: burnInside ? undefined : colors.vesselEdge, content: burnLabel }] : []),
           ...(showBurn && goal !== 'maintain'

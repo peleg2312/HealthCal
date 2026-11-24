@@ -431,7 +431,7 @@ describe('the pair', () => {
     expect(detailDrinkNote({ ml: 330 }, 'metric', false)).toBe(
       'Also counted in Water as 330 ml. The calories here do not change it; changing the day moves it there, and deleting here keeps the water.',
     );
-    expect(choiceA11y('Whole', B('b_milk_whole'), 250, 'metric')).toBe('Whole, 157 kcal per 250 ml');
+    expect(choiceA11y('Whole', B('b_milk_whole'), 250, 'metric')).toBe('Whole, 157 kilocalories per 250 millilitres');
     expect(choiceA11y('Black', null, 250, 'metric')).toBe('Black, no calories');
   });
 

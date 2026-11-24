@@ -771,7 +771,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   const recentIds = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="water-recent-"]')].filter((e) => e.getBoundingClientRect().height > 0).map((e) => e.getAttribute('data-testid')));
   check('drink search: the Water kind shows the energy drink as a recent chip, on one line', recentIds.includes('water-recent-b_energy_drink') && recentIds.length <= 3, recentIds.join(', '));
   const recentLabel = await page.getByTestId('water-recent-b_energy_drink').first().getAttribute('aria-label');
-  check('drink search: the chip says its calories to a screen reader', recentLabel === 'Energy drink, sugared, 108 kcal per 250 ml, choose', String(recentLabel));
+  check('drink search: the chip says its calories to a screen reader', recentLabel === 'Energy drink, sugared, 108 kilocalories per 250 millilitres, choose', String(recentLabel));
   await tap('water-recent-b_energy_drink');
   check('drink search: a recent chip is a pick: Other, the drink selected, the line', (await pressed('water-beverage-other')) && (await pressed('water-choice-food')) && (await text('water-drink-line')).startsWith('Energy drink, sugared: 108 kcal'));
   // Leave the day as it was for what follows: the energy drink's water and entry go.

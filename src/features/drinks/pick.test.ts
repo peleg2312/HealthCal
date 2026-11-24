@@ -648,9 +648,9 @@ describe('recentChips (the Water kind)', () => {
     const yours = [B('b_mocha'), B('b_shoko'), B('b_kefir'), B('b_lemonade')];
     const chips = recentChips(yours, 250, 'metric', 1000);
     expect(chips.map((c) => c.testID)).toEqual(['water-recent-b_mocha', 'water-recent-b_shoko', 'water-recent-b_kefir']);
-    expect(chips[0].label).toBe('Cafe mocha, whole milk, 188 kcal per 250 ml, choose');
+    expect(chips[0].label).toBe('Cafe mocha, whole milk, 188 kilocalories per 250 millilitres, choose');
     expect(chips[0].text).toBe('Cafe mocha, whole milk');
-    expect(recentChips(yours, 236.588, 'imperial', 1000)[0].label).toBe('Cafe mocha, whole milk, 178 kcal per 8 fl oz, choose');
+    expect(recentChips(yours, 236.588, 'imperial', 1000)[0].label).toBe('Cafe mocha, whole milk, 178 kilocalories per 8 fluid ounces, choose');
   });
 
   it('a chip that does not fit is left out, the next one tried; none without your drinks', () => {

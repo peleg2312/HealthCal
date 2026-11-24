@@ -80,10 +80,10 @@ export function calorieView(c: Pick<ImportCandidate, 'workout' | 'entry' | 'stat
   const measured = gross !== null && gross > 0;
   // A row that is the same workout again adds nothing, so it shows only what the file says.
   if (!c.entry || c.status === 'already-imported' || c.status === 'duplicate-in-file') {
-    if (measured) return { added: null, estimate: false, detail: `${formatNumber(gross)} by watch`, spoken: `${formatNumber(gross)} kcal measured by the watch` };
+    if (measured) return { added: null, estimate: false, detail: `${formatNumber(gross)} by watch`, spoken: `${formatNumber(gross)} kilocalories measured by the watch` };
     // A file that states 0 kcal does have a calorie figure; it is just zero.
     return gross === 0
-      ? { added: null, estimate: true, detail: '0 kcal in file', spoken: 'The file states 0 kcal' }
+      ? { added: null, estimate: true, detail: '0 kcal in file', spoken: 'The file states 0 kilocalories' }
       : { added: null, estimate: true, detail: 'No calories in file', spoken: 'No calories in the file' };
   }
   const net = Math.round(c.entry.kcalNet);
@@ -93,7 +93,7 @@ export function calorieView(c: Pick<ImportCandidate, 'workout' | 'entry' | 'stat
       added: `~${formatNumber(net)}`,
       estimate: false,
       detail: `${formatNumber(gross ?? c.entry.kcalGross)} by watch`,
-      spoken: `${formatNumber(gross ?? c.entry.kcalGross)} kcal burned, measured by the watch, about ${formatNumber(net)} kcal added`,
+      spoken: `${formatNumber(gross ?? c.entry.kcalGross)} kilocalories burned, measured by the watch, about ${formatNumber(net)} kilocalories added`,
     };
   }
   const [lo, hi] = kcalRange(net);
@@ -101,7 +101,7 @@ export function calorieView(c: Pick<ImportCandidate, 'workout' | 'entry' | 'stat
     added: `~${formatNumber(net)}`,
     estimate: true,
     detail: `est. ${formatNumber(lo)}–${formatNumber(hi)}`,
-    spoken: `${gross === 0 ? 'The file states 0 kcal. ' : ''}About ${formatNumber(net)} kcal added, an estimate between ${formatNumber(lo)} and ${formatNumber(hi)}`,
+    spoken: `${gross === 0 ? 'The file states 0 kilocalories. ' : ''}About ${formatNumber(net)} kilocalories added, an estimate between ${formatNumber(lo)} and ${formatNumber(hi)}`,
   };
 }
 

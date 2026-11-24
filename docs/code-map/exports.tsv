@@ -825,6 +825,7 @@ src/features/drinks/rules.ts	sameDrinkInDiary	function
 src/features/drinks/rules.ts	selectChoice	function
 src/features/drinks/rules.ts	selectFood	function
 src/features/drinks/rules.ts	sheetDrinks	function
+src/features/drinks/rules.ts	spokenVolume	function
 src/features/drinks/rules.ts	waterAfter	function
 src/features/drinks/rules.ts	waterFor	function
 src/features/drinks/rules.ts	waterForEntryEdit	function

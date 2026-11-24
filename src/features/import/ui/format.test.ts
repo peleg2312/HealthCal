@@ -80,7 +80,7 @@ describe('import screen formatting', () => {
     expect(calorieView(row({ workout: workout({ format: 'gpx', kcal: null }), entry: null, activityId: null })).detail).toBe('No calories in file');
     // With an activity it is still an estimate with its range, and says why.
     const r = row({ workout: workout({ kcal: 0 }), entry: { ...row().entry!, measured: undefined, kcalNet: 10 } });
-    expect(calorieView(r).spoken).toMatch(/^The file states 0 kcal\. About 10 kcal added, an estimate/);
+    expect(calorieView(r).spoken).toMatch(/^The file states 0 kilocalories\. About 10 kilocalories added, an estimate/);
   });
 
   it('counts and filters rows', () => {

@@ -25,7 +25,7 @@ import type { Beverage, Food, FoodEntry, UnitSystem } from '@/types';
 
 import { DRINK_CHOICES, choiceById } from './choices';
 import { drinkChoiceId, drinkKind, drinkStatus, isBundled } from './diary';
-import { builtinFood, drinkKcal, isAlcohol, pickCaption, pickedToast, selectChoice, selectFood, sheetDrinks, type SelectedDrink } from './rules';
+import { builtinFood, drinkKcal, isAlcohol, pickCaption, pickedToast, selectChoice, selectFood, sheetDrinks, spokenVolume, type SelectedDrink } from './rules';
 
 /** "Your drinks" at the top of the empty sheet: at most this many. */
 export const YOUR_DRINKS_LIMIT = 5;
@@ -462,7 +462,8 @@ export function recentChips(yours: readonly Food[], glassMl: number, units: Unit
       food,
       testID: `water-recent-${food.id}`,
       text: isolateRtl(food.name),
-      label: `${food.name}, ${formatNumber(drinkKcal(food, glassMl))} kcal per ${formatVolume(glassMl, units)}, choose`,
+      // Spoken in full: "108 kilocalories per 250 millilitres".
+      label: `${food.name}, ${formatNumber(drinkKcal(food, glassMl))} kilocalories per ${spokenVolume(formatVolume(glassMl, units))}, choose`,
       width,
     });
   }
