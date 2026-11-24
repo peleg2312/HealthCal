@@ -2338,7 +2338,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   // Sam?", Friends settings -> "Turn friends off?"); with no backend the friends store is set directly
   // (window.__healthcalFriends, a test-hook build only), so nothing is sent.
   {
-    const { buildSeed } = await import(require('url').pathToFileURL(require('path').join(__dirname, 'seed.mjs')).href);
+    const { buildSeed } = await import(require('url').pathToFileURL(require.resolve('./seed.mjs')).href);
     const seed = buildSeed({ onboarded: true, theme: 'dark' });
     const sctx = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, colorScheme: 'dark', reducedMotion: 'reduce' });
     await sctx.addInitScript((value) => {

@@ -110,7 +110,7 @@ export function ProjectionChart({ projection: p, units, delay = 0, now }: { proj
                 <Text variant="caption" color="textSecondary" tabular>
                   {shortDate(wp.date)}
                 </Text>
-                <Text variant="caption" color="textSecondary" tabular style={{ fontSize: 11, lineHeight: 14 }}>
+                <Text variant="caption" color="textSecondary" tabular style={{ fontSize: 12, lineHeight: 15 }}>
                   {formatWeight(wp.kg, units)}
                 </Text>
               </View>

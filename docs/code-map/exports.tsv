@@ -3441,7 +3441,7 @@ src/ui/Text.tsx	ColorName	type
 src/ui/Text.tsx	MAX_FONT_SCALE	const
 src/ui/Text.tsx	Text	component
 src/ui/Text.tsx	TextProps	interface
-src/ui/Text.tsx	useLargeText	function
+src/ui/Text.tsx	useGrownText	function
 src/ui/Toast.tsx	TOAST_ACTION_GUARD_MS	const
 src/ui/Toast.tsx	TOAST_ACTION_MS	const
 src/ui/Toast.tsx	TOAST_MS	const

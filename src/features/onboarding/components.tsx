@@ -605,7 +605,7 @@ export function BigNumberField({
           ...cup(radius.tile, 5),
           backgroundColor: colors.surface,
           borderWidth: 1.5,
-          borderColor: error ? colors.danger : focused ? colors.rim : colors.borderStrong,
+          borderColor: error ? colors.danger : focused ? colors.rim : colors.fieldEdge,
           overflow: 'hidden',
         }}>
         {/* The sizer: the same text in the same type, unseen. With the unit it sets where the number is drawn. */}
@@ -737,7 +737,7 @@ export function BigTextField({
           ...cup(radius.tile, 5),
           backgroundColor: colors.surface,
           borderWidth: 1.5,
-          borderColor: error ? colors.danger : focused ? colors.rim : colors.borderStrong,
+          borderColor: error ? colors.danger : focused ? colors.rim : colors.fieldEdge,
         }}>
         <TextInput
           testID={testID}

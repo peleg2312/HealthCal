@@ -333,7 +333,7 @@ function MathRow({ label, detail, value, testID }: { label: string; detail: stri
  * you burn, labelled with what it is for. For gain the cup is the budget, and
  * what you burn is a dashed mark across it with the surplus labelled above.
  * A budget equal to the burn fills the cup and says so. `note` sits beside the
- * foot of the cup, under the labels.
+ * foot of the cup, under the labels; under 360 px it goes under the cup, full width.
  */
 function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: number; goal: 'lose' | 'maintain' | 'gain'; note: string }) {
   const { colors, spacing } = useTheme();
@@ -436,7 +436,11 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
       </View>
     );
   }
-  return (
+  // Under 360 px the label column is about 140 px wide: the note would wrap to seven lines there and take, from
+  // the bottom of the column, the height the labels need beside the cup (Vessel keeps its children's height), so
+  // the figures would be drawn over it. There it goes under the cup, full width.
+  const noteUnder = narrow;
+  const cupWithLabels = (
     <View>
       <Vessel
         value={target}
@@ -508,9 +512,16 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
               ]),
         ]}>
         {/* The room beside the foot of the cup holds the one thing the cup does not show yet. */}
-        {budgetNote}
+        {noteUnder ? null : budgetNote}
       </Vessel>
       {burnMark(width, height)}
+    </View>
+  );
+  if (!noteUnder) return cupWithLabels;
+  return (
+    <View style={{ gap: spacing.lg }}>
+      {cupWithLabels}
+      {budgetNote}
     </View>
   );
 }

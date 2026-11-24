@@ -271,7 +271,7 @@ function GramsInput({ value, onChange, label, testID }: { value: number; onChang
             height: 44,
             ...cup(radius.buttonSm, 5),
             borderWidth: 1.5,
-            borderColor: focused ? colors.rim : colors.borderStrong,
+            borderColor: focused ? colors.rim : colors.fieldEdge,
             backgroundColor: colors.surface,
             color: colors.text,
             fontFamily: fonts.bold,

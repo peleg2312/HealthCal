@@ -57,6 +57,18 @@ const SCROLLED_SHEET = ({ scrolled = false, toastTop = null } = {}) => `
   <script>document.getElementById('scrolled-body').scrollTop = ${scrolled ? 60 : 0};</script>
 </body>`;
 
+/**
+ * The save sheet's foods (SaveMealSheet: numberOfLines={2}) in a sheet pinned with its top at `top` on the 844 px
+ * window, its body not scrolling: sixteen lines of names clamped to two, a Hebrew name (its own span, as Text
+ * marks one) near the end. The lines after the clamp are laid out under its box, below the bottom of the screen,
+ * but not drawn. At top 640 the sheet ends 20 px above the bottom; at 780 the clamp's two shown lines run off it.
+ */
+const CLAMPED_SHEET = (top) => {
+  const foods = 'Chicken breast, grilled, White rice, cooked, Israeli salad, Hummus, Pita bread, Salmon, baked, Sweet potato, baked, Pasta, cooked, Apple, Almonds, Whey protein shake, Dark chocolate, Beef and vegetable stir fry, Oats, rolled, dry, Banana, Greek yogurt, plain, 2%, ';
+  const clamp = `<div data-testid="save-meal-foods" style="font-weight:700;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden">${foods}${foods}<span lang="he" dir="auto">\u2068קוטג' 5% עם זיתים ושמן זית\u2069</span></div>`;
+  return sheetPage({ top, scrolls: false, extra: clamp });
+};
+
 const BODY = 'margin:0;font:15px/20px sans-serif;color:#222;background:#fff';
 /** A card holding more than three pieces of text, so only the structure under test decides. */
 const CARD = (inner) => `<body style="${BODY}"><div style="margin:20px;padding:16px;border:1px solid #888;background:#fafafa"><div style="font-size:12px;margin-bottom:16px">Card heading</div>${inner}<div style="margin-top:16px">Card footer</div></div></body>`;
@@ -82,6 +94,9 @@ const cases = [
   { name: 'sheet top above the screen', html: sheetPage({ top: -30 }), run: 'sheet', expect: 'above the screen' },
   { name: 'content cut by the bottom, nothing scrolls', html: sheetPage({ top: 100, scrolls: false, tall: true }), run: 'sheet', expect: 'cut by the bottom of the screen' },
   { name: 'tall content in a scrolling body is fine', html: sheetPage({ tall: true }), run: 'sheet', expect: '' },
+  // A name in the lines a clamp hides (diary-save-meal, stress data, 360 px): laid out below the screen, never drawn.
+  { name: 'lines a clamp hides below the screen are not cut by the bottom', html: CLAMPED_SHEET(640), run: 'sheet', expect: '' },
+  { name: 'a clamp whose shown lines run off the screen is still cut by the bottom', html: CLAMPED_SHEET(780), run: 'sheet', expect: 'save-meal-foods cut by the bottom of the screen' },
   { name: 'last control 4 px from the bottom', html: sheetPage({ bottomPad: 4 }), run: 'sheet', expect: 'from the bottom of the screen' },
   { name: 'text closer than the side padding', html: sheetPage({ extra: '<p style="margin:0 0 0 -14px">Pushed to the edge</p>' }), run: 'sheet', expect: "from the sheet's left edge" },
   { name: 'toast over a sheet control', html: sheetPage({ toast: '<div data-testid="toast" style="position:fixed;left:20px;right:20px;bottom:30px;height:44px;background:#eee;color:#111">Added 250 ml</div>' }), run: 'toast', expect: 'covers' },

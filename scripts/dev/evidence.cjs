@@ -790,7 +790,8 @@ function hiddenAtEnd() {
 /**
  * Runs in the page at its real height, with a sheet open: what only a sheet can get wrong.
  *   its top above the top of the screen;
- *   content cut by the bottom of the screen where nothing scrolls to reach it;
+ *   content cut by the bottom of the screen where nothing scrolls to reach it (lines a text clamp hides
+ *   are not drawn, so they are not judged here nor in the check for a body that almost fits);
  *   its last control (with the sheet scrolled to its end) closer than 12 px to the bottom of the screen;
  *   content closer to the sheet's left or right edge than the sheet's own side padding.
  */
@@ -836,14 +837,28 @@ function sheetScan() {
     return c;
   };
   const content = all.filter((el) => ownText(el) || isControl(el) || el.tagName === 'svg');
+  // What a text clamp around an element (numberOfLines: -webkit-line-clamp with its overflow hidden, on the
+  // element or a box holding it inside the sheet) leaves drawn of a box from `t` to `b`: the lines after the
+  // ellipsis are laid out under the clamp's box but not drawn (a name inside a two-line list of foods).
+  const unclamped = (el, t, b) => {
+    for (let p = el; p && p !== sheet.parentElement; p = p.parentElement) {
+      const s = getComputedStyle(p);
+      if (!s.webkitLineClamp || s.webkitLineClamp === 'none' || (s.overflowX === 'visible' && s.overflowY === 'visible')) continue;
+      const q = p.getBoundingClientRect();
+      t = Math.max(t, q.top);
+      b = Math.min(b, q.bottom);
+    }
+    return { t, b };
+  };
 
-  // Cut by the bottom of the screen with no scroller to bring it up.
+  // Cut by the bottom of the screen with no scroller to bring it up. Only what is drawn: lines a clamp hides are left out.
   for (const el of content) {
     const r = el.getBoundingClientRect();
-    if (r.height < 1 || r.bottom <= vh + 0.5) continue;
+    const { t, b } = unclamped(el, r.top, r.bottom);
+    if (r.height < 1 || b - t < 1 || b <= vh + 0.5) continue;
     let reachable = false;
     for (let p = el.parentElement; p && p !== sheet.parentElement; p = p.parentElement) if (scrollsY(p)) { reachable = true; break; }
-    if (!reachable) add(`${name(el)} cut by the bottom of the screen (${Math.round(r.bottom - vh)}px below)`);
+    if (!reachable) add(`${name(el)} cut by the bottom of the screen (${Math.round(b - vh)}px below)`);
   }
 
   // Almost fits: the body scrolls by only a little, so at rest its last line shows half cut at the bottom
@@ -863,7 +878,10 @@ function sheetScan() {
         if (n.nodeType !== 3 || !n.textContent.trim()) continue;
         const range = document.createRange();
         range.selectNodeContents(n);
-        for (const q of range.getClientRects()) if (q.width > 0 && q.top < edge - 3 && q.bottom > edge + 3) across = el;
+        for (const q of range.getClientRects()) {
+          const { t, b } = unclamped(el, q.top, q.bottom);
+          if (q.width > 0 && b - t >= 1 && t < edge - 3 && b > edge + 3) across = el;
+        }
       }
     }
     if (across && hidden > 2 && hidden <= 80) add(`sheet body almost fits: ${Math.round(hidden)}px hidden under its bottom edge at rest, and ${name(across)} shows cut there`);
