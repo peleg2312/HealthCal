@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import Svg, { Line, Path, Polygon, Rect } from 'react-native-svg';
 
 import { formatWeight } from '@/lib/units';
-import { useTheme } from '@/theme';
+import { useTextGrowth, useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
 import { DrawReveal, Text } from '@/ui';
 
@@ -27,6 +27,9 @@ const PAD_X = 10;
 export function ProjectionChart({ projection: p, units, delay = 0, now }: { projection: Projection; units: UnitSystem; delay?: number; now?: Date }) {
   const { colors, spacing } = useTheme();
   const [width, setWidth] = useState(0);
+  // The date labels under the chart grow with the text (`useTextGrowth`): their boxes, the room between them and
+  // the row's height grow with them, so nothing under the chart runs into the caption below it.
+  const growth = useTextGrowth();
   const when = rangeShort(p, now);
   // The goal's months, right-aligned under the band's end; measured once drawn (about 7 px a character before that).
   const [whenW, setWhenW] = useState(0);
@@ -42,10 +45,10 @@ export function ProjectionChart({ projection: p, units, delay = 0, now }: { proj
   const end = { x: x(p.weeks), y: y(p.targetKg) };
   const band = [start, { x: x(p.fastWeeks), y: end.y }, { x: x(p.slowWeeks), y: end.y }].map((pt) => `${pt.x},${pt.y}`).join(' ');
   const axisY = PLOT_H - 2;
-  const labelW = 64;
+  const labelW = Math.round(64 * growth);
   // Each waypoint's date and weight keep clear of the next label and of the goal's months; on a narrow
   // phone only the halfway one is labelled (its dot and the others' stay on the line).
-  const minLabelGap = 58;
+  const minLabelGap = Math.round(58 * growth);
   const whenLeft = width - PAD_X - (whenW || when.length * 7);
   const clearOfWhen = (at: number) => at + labelW / 2 <= whenLeft;
   const xs = p.waypoints.map((wp) => x(wp.weeks));
@@ -99,7 +102,7 @@ export function ProjectionChart({ projection: p, units, delay = 0, now }: { proj
           </>
         ) : null}
       </View>
-      <View style={{ height: 34, marginTop: spacing.xs }}>
+      <View style={{ minHeight: Math.ceil(34 * growth), marginTop: spacing.xs }}>
         {width > 0 ? (
           <>
             {p.waypoints.filter((wp) => labelled.has(wp.share)).map((wp) => (
@@ -112,7 +115,8 @@ export function ProjectionChart({ projection: p, units, delay = 0, now }: { proj
                 </Text>
               </View>
             ))}
-            <View style={{ position: 'absolute', right: PAD_X, maxWidth: width - 2 * PAD_X, alignItems: 'flex-end' }}>
+            {/* In the flow, so the row is as tall as the range's words at any text size. */}
+            <View style={{ alignSelf: 'flex-end', marginRight: PAD_X, maxWidth: width - 2 * PAD_X, alignItems: 'flex-end' }}>
               <Text
                 variant="label"
                 color="text"

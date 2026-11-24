@@ -3,7 +3,7 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { Platform, Text as RNText, TextInput, View, type LayoutChangeEvent, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { cup, fonts, motion, useReducedMotion, useTheme } from '@/theme';
+import { cup, fonts, motion, phoneCapFor, scaledFontSize, useLargeText, useReducedMotion, useTextSize, useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
 import { cssBezier, FadeUp, FOCUS_CUP, MiniCup, parseNumber, PressableScale, ProgressBar, Text, useFocusRing } from '@/ui';
 
@@ -537,9 +537,12 @@ export function BigNumberField({
   placeholder,
   inputRef,
   errorId,
+  grow,
   ...rest
 }: Omit<TextInputProps, 'value' | 'onChange' | 'style'> & {
   label: string;
+  /** Its share of a `FieldRow` (flex), dropped when large text stacks the row. */
+  grow?: number;
   value: number | null;
   onChange: (n: number | null) => void;
   /** The nativeID of an error said under a row of fields (a boolean `error`), so the input is tied to it. */
@@ -568,8 +571,14 @@ export function BigNumberField({
     setLastValue(value);
     if (parseNumber(text) !== value) setText(fieldFormat(value, decimals));
   }
-  const fontSize = size === 'lg' ? 32 : 24;
-  const lineHeight = size === 'lg' ? 38 : 30;
+  // The figure grows with the app's text size as the kit's type does (`scaledFontSize`; not drawn by the kit's
+  // Text), and the cup with it; the phone's own setting adds only up to 2x in all (`phoneCapFor`).
+  const scale = useTextSize();
+  const large = useLargeText();
+  const baseSize = size === 'lg' ? 32 : 24;
+  const fontSize = scaledFontSize(baseSize, scale);
+  const lineHeight = Math.round(((size === 'lg' ? 38 : 30) * fontSize) / baseSize);
+  const grown = lineHeight - (size === 'lg' ? 38 : 30);
   const type = {
     fontFamily: fonts.numBold,
     fontSize,
@@ -579,7 +588,7 @@ export function BigNumberField({
   };
   const padX = spacing.sm;
   return (
-    <View {...FIELD_LABEL} style={[{ gap: 6 }, style]}>
+    <View {...FIELD_LABEL} style={[{ gap: 6 }, grow !== undefined && !large ? { flex: grow } : null, style]}>
       <Text variant="label" color="textSecondary" numberOfLines={1}>
         {label}
       </Text>
@@ -590,8 +599,8 @@ export function BigNumberField({
           alignItems: 'flex-end',
           justifyContent: 'center',
           gap: UNIT_GAP,
-          minHeight: size === 'lg' ? 68 : 60,
-          paddingVertical: size === 'lg' ? 15 : 15,
+          minHeight: (size === 'lg' ? 68 : 60) + grown,
+          paddingVertical: 15,
           paddingHorizontal: padX,
           ...cup(radius.tile, 5),
           backgroundColor: colors.surface,
@@ -601,7 +610,13 @@ export function BigNumberField({
         }}>
         {/* The sizer: the same text in the same type, unseen. With the unit it sets where the number is drawn. */}
         <View style={{ minWidth: 32, flexShrink: 1 }}>
-          <RNText aria-hidden accessibilityElementsHidden importantForAccessibility="no" numberOfLines={1} style={[type, { opacity: 0, paddingHorizontal: 3, textAlign: 'center' }]}>
+          <RNText
+            aria-hidden
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            numberOfLines={1}
+            maxFontSizeMultiplier={phoneCapFor(scale)}
+            style={[type, { opacity: 0, paddingHorizontal: 3, textAlign: 'center' }]}>
             {text || placeholder || '0'}
           </RNText>
         </View>
@@ -622,6 +637,7 @@ export function BigNumberField({
         <TextInput
           ref={inputRef}
           testID={testID}
+          maxFontSizeMultiplier={phoneCapFor(scale)}
           keyboardType={decimals > 0 ? 'decimal-pad' : 'number-pad'}
           inputMode={decimals > 0 ? 'decimal' : 'numeric'}
           placeholder={placeholder}
@@ -671,6 +687,17 @@ export function BigNumberField({
 }
 
 /**
+ * Big fields side by side (a date of birth, height and weight, the tape measures), each taking its `grow` share
+ * of the row. With large text (`useLargeText`) they stack, each the full width, so a figure at its grown size
+ * is never cut (three side by side would not hold one at 320 px).
+ */
+export function FieldRow({ children }: { children: React.ReactNode }) {
+  const { spacing } = useTheme();
+  const large = useLargeText();
+  return <View style={{ flexDirection: large ? 'column' : 'row', gap: spacing.sm }}>{children}</View>;
+}
+
+/**
  * One large text field (the name): h2-size type in a cup, the rim edge on focus. The input
  * fills the cup, its 16 px side room is the input's own padding, so a tap anywhere in the cup
  * is a tap on the field.
@@ -692,7 +719,11 @@ export function BigTextField({
   // A long answer (a double-barrelled name) steps the type down so it still fits a 320 px phone
   // whole; the field keeps its height.
   const length = typeof rest.value === 'string' ? rest.value.length : 0;
-  const fontSize = length > 18 ? 18 : length > 14 ? 21 : 24;
+  // It grows with the app's text size as the kit's type does (`scaledFontSize`), and the cup with it.
+  const scale = useTextSize();
+  const fontSize = scaledFontSize(length > 18 ? 18 : length > 14 ? 21 : 24, scale);
+  const lineHeight = Math.round((30 * scaledFontSize(24, scale)) / 24);
+  const grown = lineHeight - 30;
   return (
     <View {...FIELD_LABEL} style={{ gap: 6 }}>
       <Text variant="label" color="textSecondary">
@@ -701,7 +732,7 @@ export function BigTextField({
       <View
         {...FOCUS_CUP}
         style={{
-          minHeight: 64,
+          minHeight: 64 + grown,
           justifyContent: 'center',
           ...cup(radius.tile, 5),
           backgroundColor: colors.surface,
@@ -710,6 +741,7 @@ export function BigTextField({
         }}>
         <TextInput
           testID={testID}
+          maxFontSizeMultiplier={phoneCapFor(scale)}
           placeholderTextColor={colors.textTertiary}
           selectionColor={colors.primary}
           {...rest}
@@ -729,10 +761,10 @@ export function BigTextField({
               color: colors.text,
               fontFamily: fonts.display,
               fontSize,
-              lineHeight: 30,
+              lineHeight,
               paddingVertical: 12,
               paddingHorizontal: 16,
-              minHeight: 61,
+              minHeight: 61 + grown,
               letterSpacing: -0.3,
             },
             Platform.OS === 'android' ? { textAlignVertical: 'center' as const } : null,

@@ -508,7 +508,10 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
           <PressableScale
             testID="toast-action"
             accessibilityLabel={actionLabel}
-            hitSlop={10}
+            // Wider to touch, never taller: the action is already 44 px tall inside the toast's own box, so its touch
+            // area ends where the toast does and the toast's 8 px of clear room (`toastSpot`) reaches the touch area
+            // of the control it rests beside (Today's "+ 250 ml"), which an area 10 px taller used to cover.
+            hitSlop={{ left: 10, right: 10, top: 0, bottom: 0 }}
             // The timer waits while the action has the focus or a finger on it.
             onFocus={() => {
               focusOn.current = true;

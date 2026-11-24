@@ -9,11 +9,11 @@ import { ACTIVITY_LABELS, calorieFloor, KCAL_PER_KG, maxWeeklyRateKg } from '@/l
 import { formatNumber, kgToLb, lbToKg, round, weightUnit } from '@/lib/units';
 import { remindersSupported } from '@/services/notifications';
 import { useNow, useToday } from '@/store/clock';
-import { cup, useTheme } from '@/theme';
+import { cup, useLargeText, useTheme } from '@/theme';
 import type { ActivityLevel, GoalType } from '@/types';
 import { Card, Divider, MiniCup, PressableScale, ProgressBar, Stepper, Text, ToggleRow } from '@/ui';
 
-import { BigNumberField, BigTextField, ChoiceCard, ErrorText, GoalCup, Note, StepTitle, UnitsToggle, useFieldChain, WhyWeAsk } from './components';
+import { BigNumberField, BigTextField, ChoiceCard, ErrorText, FieldRow, GoalCup, Note, StepTitle, UnitsToggle, useFieldChain, WhyWeAsk } from './components';
 import { birthDateOf, buildPlan, heightRangeText, rateKgOf, tapeEstimate, toMetric, weightRangeText, type BodyFatMode, type Draft, type Errors } from './model';
 import { looseDate } from './projection';
 import { nudgeExamples, WEIGH_IN_TIME, type NudgeKind, type Routine } from './routine';
@@ -43,6 +43,8 @@ const Group = ({ children, gap }: { children: React.ReactNode; gap?: number }) =
 
 export function BasicsStep({ draft, set, errors, submit }: StepProps) {
   const { spacing } = useTheme();
+  // With large text the units' words take their own line over the two chips, so neither is split (`useLargeText`).
+  const large = useLargeText();
   return (
     <Group gap={spacing.xl}>
       <StepTitle title="What do we call you?" subtitle="About a minute. Change any answer later." />
@@ -60,8 +62,8 @@ export function BasicsStep({ draft, set, errors, submit }: StepProps) {
         onSubmitEditing={submit}
         error={errors.name}
       />
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-        <View style={{ flex: 1, minWidth: 0 }}>
+      <View style={large ? { gap: spacing.sm } : { flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+        <View style={large ? null : { flex: 1, minWidth: 0 }}>
           <Text variant="label" color="textSecondary">
             Units
           </Text>
@@ -126,13 +128,15 @@ export function GoalStep({ draft, set, errors, advance }: StepProps) {
 
 export function SexStep({ draft, set, errors, advance }: StepProps) {
   const { spacing } = useTheme();
+  // With large text the two choices stack, each the full width, so "Female" is never split (`useLargeText`).
+  const large = useLargeText();
   return (
     <Group gap={spacing.xl}>
       <StepTitle title="Which sex should the estimate use?" subtitle="The one closest to your body." />
       <Group gap={spacing.sm}>
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+        <View style={{ flexDirection: large ? 'column' : 'row', gap: spacing.sm }}>
           {(['female', 'male'] as const).map((s) => (
-            <View key={s} style={{ flex: 1 }}>
+            <View key={s} style={large ? null : { flex: 1 }}>
               <ChoiceCard
                 compact
                 testID={`onb-sex-${s}`}
@@ -172,7 +176,7 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
   const day = (
     <BigNumberField
       key="d"
-      style={{ flex: 1 }}
+      grow={1}
       label="Day"
       placeholder="DD"
       testID="onb-dob-day"
@@ -189,7 +193,7 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
   const month = (
     <BigNumberField
       key="m"
-      style={{ flex: 1 }}
+      grow={1}
       label="Month"
       placeholder="MM"
       testID="onb-dob-month"
@@ -206,7 +210,7 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
   const year = (
     <BigNumberField
       key="y"
-      style={{ flex: 1.45 }}
+      grow={1.45}
       label="Year"
       placeholder="YYYY"
       testID="onb-dob-year"
@@ -224,7 +228,7 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
     <Group gap={spacing.xl}>
       <StepTitle title="When were you born?" subtitle="Age keeps the metabolism estimate current." />
       <Group gap={spacing.sm}>
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>{draft.units === 'imperial' ? [month, day, year] : [day, month, year]}</View>
+        <FieldRow>{draft.units === 'imperial' ? [month, day, year] : [day, month, year]}</FieldRow>
         {errors.dob ? (
           <ErrorText testID="onb-dob-error" nativeID="onb-dob-error-words">
             {errors.dob}
@@ -263,9 +267,9 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
       <Group gap={spacing.sm}>
         {imp ? (
           // Three in a row: the unit is in each label, so "10.5" and "250.5" fit their cups at 320 px.
-          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <FieldRow>
             <BigNumberField
-              style={{ flex: 1 }}
+              grow={1}
               size="md"
               label="Height, ft"
               accessibilityLabel="Height, feet"
@@ -279,7 +283,7 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
               {...field(0)}
             />
             <BigNumberField
-              style={{ flex: 1 }}
+              grow={1}
               size="md"
               label="in"
               accessibilityLabel="Height, inches"
@@ -293,7 +297,7 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
               {...field(1)}
             />
             <BigNumberField
-              style={{ flex: 1.25 }}
+              grow={1.25}
               size="md"
               label="Weight, lb"
               accessibilityLabel="Current weight, pounds"
@@ -306,11 +310,11 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
               errorId="onb-weight-error-words"
               {...field(2)}
             />
-          </View>
+          </FieldRow>
         ) : (
-          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <FieldRow>
             <BigNumberField
-              style={{ flex: 1 }}
+              grow={1}
               size={width < 360 ? 'md' : 'lg'}
               label="Height"
               testID="onb-height-cm"
@@ -324,7 +328,7 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
               {...field(0)}
             />
             <BigNumberField
-              style={{ flex: 1 }}
+              grow={1}
               size={width < 360 ? 'md' : 'lg'}
               label="Weight"
               accessibilityLabel={`Current weight, ${weightUnit(draft.units)}`}
@@ -338,7 +342,7 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
               errorId="onb-weight-error-words"
               {...field(1)}
             />
-          </View>
+          </FieldRow>
         )}
         <ErrorText testID="onb-height-error" nativeID="onb-height-error-words">
           {heightError}
@@ -440,9 +444,9 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
       ) : null}
       {draft.bodyFatMode === 'tape' ? (
         <Card style={{ gap: spacing.lg }}>
-          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <FieldRow>
             <BigNumberField
-              style={{ flex: 1 }}
+              grow={1}
               label={`Neck, ${lu}`}
               accessibilityLabel={`Neck, ${imp ? 'inches' : 'centimetres'}`}
               testID="onb-neck-input"
@@ -457,7 +461,7 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
               {...tape(0)}
             />
             <BigNumberField
-              style={{ flex: 1 }}
+              grow={1}
               label={`Waist, ${lu}`}
               accessibilityLabel={`Waist, ${imp ? 'inches' : 'centimetres'}`}
               testID="onb-waist-input"
@@ -472,7 +476,7 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
             />
             {draft.sex === 'female' ? (
               <BigNumberField
-                style={{ flex: 1 }}
+                grow={1}
                 label={`Hips, ${lu}`}
                 accessibilityLabel={`Hips, ${imp ? 'inches' : 'centimetres'}`}
                 testID="onb-hip-input"
@@ -486,7 +490,7 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
                 {...tape(2)}
               />
             ) : null}
-          </View>
+          </FieldRow>
           <ErrorText nativeID="onb-tape-error-words">{errors.neck ?? errors.waist ?? errors.hip ?? errors.tape}</ErrorText>
           <View
             style={{
