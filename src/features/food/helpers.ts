@@ -45,6 +45,27 @@ export function href(path: string, params: Record<string, string | number | unde
 export const kcal = (n: number) => formatNumber(Math.round(n));
 /** Calories typed in for one entry stay under this (quick add, a drink's "Or enter calories"). */
 export const QUICK_KCAL_LIMIT = 10000;
+
+/**
+ * Quick add's calories field, as typed: neutral words under the field for what it cannot add (WCAG 3.3.1),
+ * or null while it is empty or can be added. A minus is kept and named, never turned into a plus.
+ */
+export function quickKcalError(text: string): string | null {
+  const t = text.trim();
+  if (!t) return null;
+  if (t.includes('-')) return "Calories can't be negative. To take some off, change or delete an entry.";
+  if (!/^\d+([.,]\d+)?$/.test(t)) return 'Numbers only, such as 350.';
+  const n = Number(t.replace(',', '.'));
+  if (!(n >= 1) || n >= QUICK_KCAL_LIMIT) return `Enter 1 to ${formatNumber(QUICK_KCAL_LIMIT - 1)} kcal.`;
+  return null;
+}
+
+/** Quick add's calories as typed, or null when the text is empty or not a number it can take (`quickKcalError` says why). */
+export function quickKcalValue(text: string): number | null {
+  const t = text.trim();
+  if (!/^\d+([.,]\d+)?$/.test(t)) return null;
+  return Number(t.replace(',', '.'));
+}
 export const grams = (n: number) => `${formatMacro(n)} g`;
 
 /** "1.5" not "1.50", "0.25" kept. */

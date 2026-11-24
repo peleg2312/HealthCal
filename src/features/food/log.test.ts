@@ -131,7 +131,7 @@ describe('edits follow the entry (rewriteEntry, setEntryAmount, updateEntryDirec
     expect(setEntryAmount(S().foodEntries[entry.id], 0)).toBeNull();
     expect(S().foodEntries[entry.id].deleted).toBe(true);
     expect(S().water[id].deleted).toBe(true);
-    expect(lastToast().message).toBe('Removed Energy drink, sugared and its 1 L from Water');
+    expect(lastToast().message).toBe('Energy drink removed from lunch and its 1 L from Water');
     undo();
     expect(S().foodEntries[entry.id].deleted).toBe(false);
     expect(S().water[id]).toMatchObject({ deleted: false, ml: 1000 });
@@ -197,7 +197,7 @@ describe('deletes', () => {
     const entry = logCan();
     tick();
     deleteEntry(S().foodEntries[entry.id]);
-    expect(lastToast().message).toBe('Removed Energy drink, sugared and its 500 ml from Water');
+    expect(lastToast().message).toBe('Energy drink removed from lunch and its 500 ml from Water');
     expect(liveWater()).toHaveLength(0);
     undo();
     expect(liveWater()).toHaveLength(1);
@@ -223,7 +223,7 @@ describe('deletes', () => {
     removeDrink(S().water[id]);
     tick();
     deleteEntry(S().foodEntries[entry.id]);
-    expect(lastToast().message).toBe('Removed Energy drink, sugared');
+    expect(lastToast().message).toBe('Energy drink removed from lunch');
     undo();
     expect(S().foodEntries[entry.id].deleted).toBe(false);
     expect(S().water[id].deleted).toBe(true);
@@ -249,7 +249,7 @@ describe('deletes', () => {
     expect(S().water[waterIdFromEntry(entry!.id)]).toBeUndefined();
     tick();
     deleteEntry(S().foodEntries[entry!.id]);
-    expect(lastToast().message).toBe('Removed Milk, reduced fat (2%). The 250 ml stays in Water.');
+    expect(lastToast().message).toBe('Milk removed from lunch. The 250 ml stays in Water.');
     expect(S().water[water.id].deleted).toBe(false);
   });
 });

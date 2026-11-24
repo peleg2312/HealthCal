@@ -28,7 +28,8 @@ export function RoutineCards({ onStart, testID = 'routines' }: { onStart: (t: Ro
   const items = useRoutineTemplates();
   if (items.length === 0) return null;
   return (
-    <View style={{ gap: 12 }} testID={testID}>
+    // Stacked cards 16 px apart, as on the diary and Progress.
+    <View style={{ gap: 16 }} testID={testID}>
       {items.map(({ template, id }) => (
         <RoutineCard key={id ?? 'last'} template={template} id={id} onStart={() => onStart(template)} testID={`routine-${id ? slug(template.name) : 'last'}`} />
       ))}

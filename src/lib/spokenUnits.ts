@@ -22,10 +22,16 @@ const UNITS: [RegExp, string, string][] = [
 
 const MACROS: Record<string, string> = { P: 'protein', C: 'carbs', F: 'fat' };
 
+/** An amount of grams: a number (with "~" or "≈" before it, and a range's second number), then "g" as a word. */
+const GRAMS = String.raw`[~≈]?\d[\d,]*(?:\.\d+)?(?:\s?[-–]\s?[~≈]?\d[\d,]*(?:\.\d+)?)?\s?g\b`;
+/** A macro letter at the start of a word, spaces, then a gram amount (word joiners from `keepTogether` allowed). */
+const MACRO_BEFORE_GRAMS = new RegExp(String.raw`(^|[\s(·,])([PCF])([\s\u2060]+)(?=${GRAMS})`, 'g');
+
 /** The unit after a number, in full: "290 kcal" -> "290 kilocalories", "1 kcal" -> "1 kilocalorie". */
 export function spokenUnits(label: string): string {
-  // Macro letters before a number ("P 47 g") are said as their names first.
-  let out = label.replace(/(^|[\s(·,])([PCF])(\s+)(?=[~≈]?\d)/g, (_m, pre: string, letter: string, sp: string) => `${pre}${MACROS[letter]}${sp}`);
+  // Macro letters before a gram amount ("P 47 g", "F ~12 g", "C 20-30 g") are said as their names first. Only
+  // before grams: a letter before a bare number is something else ("F 27, Friday" is a day in the week strip).
+  let out = label.replace(MACRO_BEFORE_GRAMS, (_m, pre: string, letter: string, sp: string) => `${pre}${MACROS[letter]}${sp}`);
   out = out.replace(/(\d[\d,]*(?:\.\d+)?)(\s?)([A-Za-z][A-Za-z ]{0,5})/g, (whole, num: string, sp: string, rest: string) => {
     for (const [re, one, many] of UNITS) {
       const m = rest.match(re);

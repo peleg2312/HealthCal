@@ -17,6 +17,7 @@ import { ReadyRim } from '@/features/today/ReadyRim';
 import { SHARE_CUP } from '@/features/today/ShareCup';
 import { RecapReadyCard } from '@/features/today/RecapReadyCard';
 import { FirstLogInvite } from '@/features/today/FirstLogInvite';
+import { AiGlyph } from '@/features/ai/mark';
 import { MorningWatcher } from '@/features/morning/useMorningPage';
 import { useBackToToday } from '@/features/today/useBackToToday';
 import { startDate } from '@/features/today/week';
@@ -74,7 +75,8 @@ export default function TodayScreen() {
       tabs
       testID="today-screen"
       header={<TabHeader tab="today" overline={tabDay(date)} title={title.text} titleSize={title.size} />}>
-      <View testID="today-swipe" style={{ gap: spacing.md }}>
+      {/* Cards 16 px apart, as on the diary, Progress and the check-in. */}
+      <View testID="today-swipe" style={{ gap: spacing.lg }}>
       {/* The first visit on a new morning opens yesterday's summary (rule in @/features/morning/rule). Draws nothing. */}
       <MorningWatcher />
       {/* The one date control, the same as the diary's: the strip, then the week's caption with the streak or "Back to today". */}
@@ -84,12 +86,11 @@ export default function TodayScreen() {
         onSelect={select}
         start={start}
         jumpTestID="today-jump-today"
-        // 16 px to what follows, as on the diary, so the first card starts at the same height on both tabs.
-        style={{ marginBottom: spacing.xs }}
+        // 16 px to what follows (the page's gap), as on the diary, so the first card starts at the same height on both tabs.
         accessory={streak.streak > 1 ? <StreakMark days={streak.streak} filled={streak.filled} /> : null}
         // Said in the caption's place once the streak cup has poured and its number ticked up, so
         // logging never pushes the page down and the line never runs ahead of the count.
-        note={isToday && streak.line ? { text: streak.line, delay: AFTER_STRIP_MS + motion.duration.pourSmall, testID: 'today-streak-line' } : null}
+        note={isToday && streak.line ? { text: streak.line, delay: AFTER_STRIP_MS, testID: 'today-streak-line' } : null}
       />
 
       <EnergyCard
@@ -102,9 +103,10 @@ export default function TodayScreen() {
       {/* Water and the other pillars directly under the calorie card, so the one-tap glass is in the first
           view at 360 x 740 on every day, day one included. */}
       <StatusRail day={day} isToday={isToday} quiet={firstDay} />
-      {/* Early in the week "Your week is ready" first, then the coach's one line with its one action and "Ask the
-          coach", under the two cards whose numbers it talks about, so the coach is always in reach of the thumb on
-          Today, not only at the header's top. Day one has neither: the invite in the card is the one thing to do. */}
+      {/* Early in the week "Your week is ready" first, then the coach's one line with its one action, under the two
+          cards whose numbers it talks about. "Ask the coach" is in the calorie card's action row, so the coach has a
+          worded way in within the thumb's reach in the first view, not only the header's cup. Day one has neither:
+          the invite in the card is the one thing to do. */}
       {isToday && !firstDay && recap.announce ? <RecapReadyCard /> : null}
       {isToday && !firstDay ? (
         <CoachLine
@@ -149,12 +151,15 @@ const VESSEL_H_FIRST_NARROW = 100;
 const VESSEL_H_NARROW = 126;
 const NARROW = { padding: 12, paddingV: 10, labelSpacing: 4, labelH: 20, macrosTop: 12, macroGap: 4 };
 /**
- * The card's action row, under the "eaten" line in the cup's label column: "Ideas that fit" (a 32 px chip) and the
- * day's share cup, as tall as the chip, at the column's right end. The card has no footer row: the budget is said in
- * the "eaten" line ("1,219 eaten of 2,160", as the diary's summary says it), so the water row under the card sits
- * higher and the toast a glass raises rests clear of its "+ 250 ml".
+ * The card's action rows, under the "eaten" line in the cup's label column: "Ideas that fit" (a 32 px chip) and the
+ * day's share cup, as tall as the chip, at the column's right end; on today, "Ask the coach" (a chip with the coach's
+ * glyph) on a row of its own under them, ACTION_GAP lower, so the 44 px touch areas of the two rows meet and never
+ * overlap. The coach's worded way in is then in the first view's lower part at 320, 360 and 390 px. The card has no
+ * footer row: the budget is said in the "eaten" line ("1,219 eaten of 2,160", as the diary's summary says it), so the
+ * water row under the card sits higher and the toast a glass raises rests clear of its "+ 250 ml".
  */
 const ACTION_H = Math.max(32, SHARE_CUP);
+const ACTION_GAP = 12;
 
 function EnergyCard({
   day,
@@ -345,9 +350,20 @@ function EnergyCard({
   const eatenIdx = sorted.findIndex((l) => l.key === 'eaten');
   const actions = eatenIdx >= 0;
   const ideasChip = actions && isToday && day.remaining >= 0;
+  // "Ask the coach" on today (the coach card is today's too): a row of its own under "Ideas that fit" and the share.
+  const coachAsk = actions && isToday;
+  const actionsH = coachAsk ? 2 * ACTION_H + ACTION_GAP : ACTION_H;
   const actionsTop = actions ? tops[eatenIdx] + sorted[eatenIdx].height + labelSpacing : 0;
-  // Room the row takes below the cup, keeping 12 px to the macros (16 under the cup, 12 on a narrow phone).
-  const actionsRoom = actions ? Math.max(0, actionsTop + ACTION_H + 12 - (height + macrosTop)) : 0;
+  // Room the rows take below the cup, keeping 12 px to the macros (16 under the cup, 12 on a narrow phone).
+  const actionsRoom = actions ? Math.max(0, actionsTop + actionsH + 12 - (height + macrosTop)) : 0;
+  const askChip = coachAsk ? (
+    <Chip
+      testID="today-coach-ask"
+      label="Ask the coach"
+      icon={<AiGlyph name="coach" size={18} color={colors.text} strokeWidth={2.2} />}
+      onPress={() => router.push('/coach' as never)}
+    />
+  ) : null;
   const labelLeft = vesselW + (narrow ? 14 : 16);
 
   if (large) {
@@ -455,9 +471,9 @@ function EnergyCard({
                 icon={<CookingPot size={18} color={colors.text} strokeWidth={2.2} />}
                 onPress={onFits}
               />
-            ) : (
-              <View />
-            )}
+            ) : null}
+            {askChip}
+            {ideasChip || askChip ? null : <View />}
             <ShareDayButton date={day.date} size={SHARE_CUP} />
           </View>
         ) : null}
@@ -494,24 +510,26 @@ function EnergyCard({
         />
         {/* Day one: the empty cup's open top is a dashed level line at the budget, "ready to fill". */}
         {firstDay && headroom === 0 ? <ReadyRim width={vesselW} /> : null}
-        {/* After the cup in the tree, so the cup's label column never sits over the row and takes its taps. */}
+        {/* After the cup in the tree, so the cup's label column never sits over the rows and takes their taps. */}
         {actions ? (
-          <View
-            testID="today-actions"
-            style={{ position: 'absolute', left: labelLeft, right: 0, top: actionsTop, height: ACTION_H, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm }}>
-            {/* A pot, not the AI mark: these ideas are worked out on the phone from the person's own meals and fixed plates. */}
-            {ideasChip ? (
-              <Chip
-                testID="today-ideas"
-                label="Ideas that fit"
-                accessibilityLabel="Ideas that fit: meals and foods for what is left"
-                icon={<CookingPot size={18} color={colors.text} strokeWidth={2.2} />}
-                onPress={onFits}
-              />
-            ) : (
-              <View />
-            )}
-            <ShareDayButton date={day.date} size={SHARE_CUP} />
+          <View testID="today-actions" style={{ position: 'absolute', left: labelLeft, right: 0, top: actionsTop, height: actionsH, gap: ACTION_GAP }}>
+            <View style={{ height: ACTION_H, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm }}>
+              {/* A pot, not the AI mark: these ideas are worked out on the phone from the person's own meals and fixed plates. */}
+              {ideasChip ? (
+                <Chip
+                  testID="today-ideas"
+                  label="Ideas that fit"
+                  accessibilityLabel="Ideas that fit: meals and foods for what is left"
+                  icon={<CookingPot size={18} color={colors.text} strokeWidth={2.2} />}
+                  onPress={onFits}
+                />
+              ) : (
+                <View />
+              )}
+              <ShareDayButton date={day.date} size={SHARE_CUP} />
+            </View>
+            {/* The coach's worded way in, with its own glyph (the AI's speech cup): it leads to the AI coach. */}
+            {askChip ? <View style={{ height: ACTION_H, flexDirection: 'row', alignItems: 'center' }}>{askChip}</View> : null}
           </View>
         ) : null}
       </View>
@@ -587,7 +605,7 @@ function relativeTo(date: ISODate, from: ISODate): string {
  * The coach's line under the water card, in a card of its own: one sentence pair in at most two lines ("Had dinner
  * yet? It is not in today's log.") and its one action as a small button directly under it
  * (a glass of water, repeat a meal, see what fits, or where the tip points). No chevron, no chips:
- * one thing to read, one thing to tap, with "Ask the coach" (`today-coach-ask`) beside it as a ghost button.
+ * one thing to read, one thing to tap. "Ask the coach" (`today-coach-ask`) is in the calorie card's action row.
  */
 function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: ClosedDay | null; onFits: () => void }) {
   const { colors, spacing } = useTheme();
@@ -652,23 +670,8 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
         <Text variant="bodyStrong">{/[.!?]$/.test(tip.title) ? tip.title : `${tip.title}.`}</Text>
         <Text variant="body" color="textSecondary">{` ${tip.body}`}</Text>
       </Text>
-      {/* The worded way into the coach, in the tip's own row and voice, always there: beside the tip's action (at 320
-          it may wrap under), or on its own when the tip has none. It is the coach's way in within reach of the
-          thumb on Today; the header's Coach cup is at the top. The ghost has no fill or edge, so it is drawn without
-          side padding and kept 12 px from the action: "Repeat yesterday's breakfast" and "Ask the coach" then share
-          one row at 360 px. */}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.sm }}>
-        {button}
-        <Button
-          size="sm"
-          variant="ghost"
-          full={false}
-          testID="today-coach-ask"
-          title="Ask the coach"
-          onPress={() => router.push('/coach' as never)}
-          style={{ paddingHorizontal: 0 }}
-        />
-      </View>
+      {/* "Ask the coach" is in the calorie card's action row, in the first view; the card keeps the tip's one action. */}
+      {button}
     </Card>
   );
 }

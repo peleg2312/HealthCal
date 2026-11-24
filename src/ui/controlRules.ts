@@ -7,6 +7,16 @@
 /** Android's touch target (Core App Quality, Touch_Target_Size): 48 dp. Elsewhere the kit keeps 44 px. */
 export const ANDROID_TARGET = 48;
 
+/**
+ * Whether the kit's touch areas grow to Android's 48 dp: in the Android app, and in a browser on an Android phone
+ * or tablet that is used by touch (its primary pointer is coarse). A browser elsewhere (an iPhone, a computer, a
+ * Chromebook with a mouse) keeps the 44 px target.
+ */
+export function wantsAndroidTarget(os: string, userAgent: string | undefined, coarsePointer: boolean): boolean {
+  if (os === 'android') return true;
+  return os === 'web' && coarsePointer && /\bAndroid\b/i.test(userAgent ?? '');
+}
+
 export type SlopInsets = { top: number; right: number; bottom: number; left: number };
 type SlopIn = number | Partial<SlopInsets> | null | undefined;
 

@@ -1,4 +1,6 @@
 import { formatShortDate, toISODate } from '@/lib/dates';
+import { formatNumber, weightUnit, weightValue } from '@/lib/units';
+import type { UnitSystem } from '@/types';
 
 /** "just now", "12 min ago", "3 h ago", "yesterday", "Nov 2". */
 export function timeAgo(iso: string | null | undefined, now: Date = new Date()): string | null {
@@ -28,4 +30,13 @@ export function formatMonthDayYear(d: Date): string {
  */
 export function breakableEmail(email: string): string {
   return email.replace(/([@.])/g, '$1​');
+}
+
+/**
+ * A weight as every weigh-in shows it: always one decimal, never trimmed ("74.0 kg", "163.1 lb"; rubric
+ * D11-07), so a goal or a projected weight beside a measured one reads the same. `formatWeight` drops a
+ * trailing ".0", which suits a pace or a range but not a weight set beside "78.8 kg".
+ */
+export function weightFixed(kg: number, units: UnitSystem): string {
+  return `${formatNumber(weightValue(kg, units), 1)} ${weightUnit(units)}`;
 }

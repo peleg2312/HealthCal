@@ -4,7 +4,7 @@ import { Animated, Platform, Pressable as RNPressable, StyleSheet, type GestureR
 import { spokenUnits } from '@/lib/spokenUnits';
 import { useReducedMotion, useTheme } from '@/theme';
 
-import { ANDROID_TARGET, ariaFromState, fixedSize, isSpaceKey, pressesOnSpace, slopToReach } from './controlRules';
+import { ANDROID_TARGET, ariaFromState, fixedSize, isSpaceKey, pressesOnSpace, slopToReach, wantsAndroidTarget } from './controlRules';
 import { haptic } from './haptics';
 import { passRef, useToastControl } from './toastControls';
 
@@ -126,10 +126,18 @@ export const FOCUS_CUP: object = Platform.OS === 'web' ? { dataSet: { focusCup: 
 // Android asks for 48 dp touch targets; the kit draws its controls at 44 (or 32 and 36 with slop
 // to 44). On Android the slop grows by itself to reach 48 on every axis whose size the control's
 // style fixes in numbers (width and height, or their minimums), so nothing is drawn or laid out
-// differently. Other platforms keep the 44 px target.
+// differently. A browser on an Android phone used by touch does the same through the web's hit
+// area (`wantsAndroidTarget`). Other platforms keep the 44 px target.
+
+/** True where the kit's touch areas grow to 48: the Android app, and an Android browser used by touch. Read once. */
+export const ANDROID_TOUCH = wantsAndroidTarget(
+  Platform.OS,
+  typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+  Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(pointer: coarse)').matches : false,
+);
 
 function androidSlop(hitSlop: PressableProps['hitSlop'], style: StyleProp<ViewStyle>): PressableProps['hitSlop'] {
-  if (Platform.OS !== 'android') return hitSlop;
+  if (!ANDROID_TOUCH) return hitSlop;
   const flat = (StyleSheet.flatten(style) ?? {}) as Record<string, unknown>;
   return slopToReach(hitSlop as Insets | number | null | undefined, fixedSize(flat), ANDROID_TARGET) as PressableProps['hitSlop'];
 }
@@ -139,6 +147,11 @@ export interface PressableScaleProps extends Omit<PressableProps, 'style' | 'chi
   children?: React.ReactNode;
   /** Scale while pressed. 1 disables the effect. */
   scaleTo?: number;
+  /**
+   * A haptic played by the press itself. None by default: a haptic means something (a choice made: 'select'), so a
+   * plain press plays none, and what a press brings about (a log, a refusal, a delete) plays its own `haptic.*`
+   * in the handler, where its meaning is known.
+   */
   feedback?: 'tap' | 'press' | 'select' | 'none';
   /** Fade to 45% when disabled (default). Turn off when the content already shows it is unavailable (a dashed future day). */
   dimDisabled?: boolean;
@@ -153,7 +166,7 @@ export interface PressableScaleProps extends Omit<PressableProps, 'style' | 'chi
 }
 
 /**
- * Pressable with a spring scale and optional haptic, the base of every
+ * Pressable with a spring scale and an optional haptic (none unless `feedback` asks), the base of every
  * tappable surface. It renders a single node, so layout styles (flex, width,
  * margins) passed in `style` behave exactly as on a View.
  *
@@ -161,15 +174,16 @@ export interface PressableScaleProps extends Omit<PressableProps, 'style' | 'chi
  * where it sits, on every platform: natively through the platform, on web as
  * an invisible area around the control (react-native-web ignores the prop).
  * Use it to bring a control that is drawn smaller than 44 px up to a 44 px
- * target: `hitSlop={(44 - size) / 2}`. On Android it then grows to 48 dp by
- * itself where the style fixes the control's size (see `androidSlop`).
+ * target: `hitSlop={(44 - size) / 2}`. On Android, and in a browser on an
+ * Android phone used by touch, it then grows to 48 by itself where the style
+ * fixes the control's size (see `androidSlop`).
  *
  * On the web it also carries what react-native-web leaves out: `accessibilityState`
  * as the ARIA state the role reads (selected on a tab, checked on a radio or a
  * switch, pressed on a button, expanded), Space on a switch, a radio, a tab or a
  * checkbox (react-native-web presses only buttons on Space), and the focus ring.
  */
-export function PressableScale({ style, scaleTo = 0.97, feedback = 'tap', dimDisabled = true, dip = 0, expanded, focusRing, onKeyDown, onPressIn, onPressOut, onPress, disabled, children, ...rest }: PressableScaleProps) {
+export function PressableScale({ style, scaleTo = 0.97, feedback = 'none', dimDisabled = true, dip = 0, expanded, focusRing, onKeyDown, onPressIn, onPressOut, onPress, disabled, children, ...rest }: PressableScaleProps) {
   // Held in state, not a ref: the value is read while rendering. 1 at rest, 0 fully pressed.
   const [press] = useState(() => new Animated.Value(1));
   const reduce = useReducedMotion();
@@ -181,7 +195,9 @@ export function PressableScale({ style, scaleTo = 0.97, feedback = 'tap', dimDis
   };
   const scale = scaleTo === 1 ? 1 : press.interpolate({ inputRange: [0, 1], outputRange: [scaleTo, 1] });
   const transform = dip ? [{ scale }, { translateY: press.interpolate({ inputRange: [0, 1], outputRange: [dip, 0] }) }] : [{ scale }];
-  const hit = useWebHitArea(rest.hitSlop, style);
+  // The touch area past the drawn edge: what the caller gave, grown to 48 where Android asks for it.
+  const slop = androidSlop(rest.hitSlop, style);
+  const hit = useWebHitArea(slop, style);
   // On a phone the control is on its screen's list, so a toast rests clear of it (./toastControls).
   const ownRef = useToastControl<unknown>();
   const given = (rest as { ref?: unknown }).ref;
@@ -220,7 +236,7 @@ export function PressableScale({ style, scaleTo = 0.97, feedback = 'tap', dimDis
       accessibilityLabel={typeof rest.accessibilityLabel === 'string' ? spokenUnits(rest.accessibilityLabel) : rest.accessibilityLabel}
       {...web}
       ref={setRef as never}
-      hitSlop={androidSlop(rest.hitSlop, style)}
+      hitSlop={slop}
       accessibilityState={state}
       disabled={disabled}
       accessibilityRole={rest.accessibilityRole ?? 'button'}

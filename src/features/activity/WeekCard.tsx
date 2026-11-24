@@ -2,25 +2,32 @@ import { ChevronRight, Info } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { ScrollView, useWindowDimensions, View } from 'react-native';
 
-import { formatDayLabel, formatDuration, weekdayShort } from '@/lib/dates';
+import { formatDuration, weekdayShort } from '@/lib/dates';
 import { OVERVIEW_ABOUT, type TrainingOverview } from '@/lib/trainingLoad';
 import { formatNumber } from '@/lib/units';
 import { cup, fonts, LARGE_TEXT, useTextGrowth, useTheme } from '@/theme';
 import { useProfile } from '@/store/selectors';
 import type { ISODate } from '@/types';
-import { Card, CupKey, IconButton, levelY, MiniCup, PressableScale, Text, Vessel, type VesselLabel } from '@/ui';
+import { Card, CupKey, IconButton, MiniCup, PressableScale, Text, Vessel, type VesselLabel } from '@/ui';
 
 import { WHO_WEEKLY_MINUTES, type WeekSummary } from './build';
+import { weekStripLabel } from './history';
 import { LoadMark } from './LoadMark';
 import { TrainingLoadSheet } from './TrainingLoadSheet';
 
 const VESSEL_H = 168;
+/**
+ * Under 360 px the cup is shorter (as Today's calorie cup is), so the card leaves Log activity and Workout in the
+ * first view at 320 x 640; its three labels (20, 40 and 44 px) still fit beside it at every level.
+ */
+const VESSEL_H_NARROW = 116;
 
 /**
- * Train's week: active minutes (the guideline's, `guidelineMinutes`) poured into a vessel with the 150-minute
- * guideline drawn as a dashed level line across it (reaching it is the point,
- * so there is no "over"), the week's totals, then a cup per day filled with
- * that day's minutes. Its last line is the training overview (the last 7 days against the
+ * Train's week: active minutes (the guideline's, `guidelineMinutes`) poured into a cup whose brim is the
+ * 150-minute guideline, a goal meant to be reached (`goalKind="reach"`): at 150 minutes or more the cup is
+ * brim-full and wears the brim line, as Water and Today's activity cell do, never "over". Then the week's
+ * totals, then a cup per day filled with that day's minutes, read to a screen reader as one image whose name
+ * holds the seven values (`weekStripLabel`). Its last line is the training overview (the last 7 days against the
  * person's recent weeks: the sheet's scale drawn small, `LoadMark`, and the state's title) when there is a state and the week
  * shown is the current one: the whole line is one button (`train-load-info`, a chevron at its end)
  * that opens the overview's sheet. Otherwise "Hard minutes count double" as before, whose info cup
@@ -48,11 +55,12 @@ export function WeekCard({
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
   const vesselW = narrow ? 58 : 70;
+  const vesselH = narrow ? VESSEL_H_NARROW : VESSEL_H;
   const minutes = week.guidelineMinutes;
-  // The vessel holds twice the guideline (the upper end of WHO's 150 to 300 minutes), more if needed.
-  const max = Math.max(WHO_WEEKLY_MINUTES * 2, minutes);
+  // The cup holds the guideline: its brim is the 150 minutes, and past it the cup stays brim-full (the real
+  // value is passed, so the Vessel draws the brim line and flashes once when the week crosses it on screen).
+  const max = WHO_WEEKLY_MINUTES;
   const reached = minutes >= WHO_WEEKLY_MINUTES;
-  const guideY = levelY(WHO_WEEKLY_MINUTES, max, VESSEL_H - 1.5);
   // The overview of the last 7 days: one line on the card, the whole of it (with how minutes count) behind the info cup.
   const [help, setHelp] = useState(false);
   const load = current && overview.state && overview.position && overview.title ? { position: overview.position, title: overview.title } : null;
@@ -84,7 +92,8 @@ export function WeekCard({
       key: 'guide',
       at: WHO_WEEKLY_MINUTES,
       height: 20,
-      tick: colors.borderStrong,
+      // The guideline is the brim; once it is reached the brim line marks it, and a tick there would run into it.
+      tick: reached ? undefined : colors.borderStrong,
       content: (
         <Text variant="caption" color="textSecondary" numberOfLines={1}>
           {`${WHO_WEEKLY_MINUTES} min guideline`}
@@ -125,22 +134,18 @@ export function WeekCard({
     <Card testID="train-week-card" padding={18}>
       {stacked ? (
         // Large text: the labels no longer fit at their levels, so they stand in a column beside the cup, in
-        // the order they are read, and wrap; the dashed line in the cup still marks the guideline.
+        // the order they are read, and wrap; the cup's brim is the guideline.
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: narrow ? 14 : 16 }}>
-          <View>
-            <Vessel
-              value={minutes}
-              max={max}
-              color={colors.exercise}
-              width={vesselW}
-              height={VESSEL_H}
-              accessibilityLabel={`${minutes} active minutes this week, of the ${WHO_WEEKLY_MINUTES} minutes a week guideline`}
-            />
-            <View
-              pointerEvents="none"
-              style={{ position: 'absolute', left: -4, width: vesselW + 8, top: guideY - 1, height: 0, borderTopWidth: 2, borderStyle: 'dashed', borderColor: colors.borderStrong }}
-            />
-          </View>
+          <Vessel
+            value={minutes}
+            max={max}
+            goalKind="reach"
+            memoryKey={`train-week-${dates[0]}`}
+            color={colors.exercise}
+            width={vesselW}
+            height={vesselH}
+            accessibilityLabel={`${minutes} active minutes this week, of the ${WHO_WEEKLY_MINUTES} minutes a week guideline`}
+          />
           <View style={{ flex: 1, minWidth: 0, gap: spacing.sm }}>
             <Text variant="numXL" testID="train-guideline-minutes" style={{ fontSize: 40, lineHeight: 42, letterSpacing: -1.2 }}>
               {formatNumber(minutes)}
@@ -152,28 +157,24 @@ export function WeekCard({
               {status}
             </Text>
             <Text variant="caption" color="textSecondary">
-              {`Dashed line: ${WHO_WEEKLY_MINUTES} min guideline`}
+              {`A full cup: the ${WHO_WEEKLY_MINUTES} min guideline`}
             </Text>
           </View>
         </View>
       ) : (
-        <View>
-          <Vessel
-            value={minutes}
-            max={max}
-            color={colors.exercise}
-            width={vesselW}
-            height={VESSEL_H}
-            labels={[...labels].sort((x, y) => y.at - x.at)}
-            labelGap={narrow ? 14 : 16}
-            accessibilityLabel={`${minutes} active minutes this week, of the ${WHO_WEEKLY_MINUTES} minutes a week guideline`}
-          />
-          {/* The guideline as a dashed level line across the open vessel. */}
-          <View
-            pointerEvents="none"
-            style={{ position: 'absolute', left: -4, width: vesselW + 8, top: guideY - 1, height: 0, borderTopWidth: 2, borderStyle: 'dashed', borderColor: colors.borderStrong }}
-          />
-        </View>
+        // The guideline is the cup's brim: no line of its own is drawn over the level line.
+        <Vessel
+          value={minutes}
+          max={max}
+          goalKind="reach"
+          memoryKey={`train-week-${dates[0]}`}
+          color={colors.exercise}
+          width={vesselW}
+          height={vesselH}
+          labels={[...labels].sort((x, y) => y.at - x.at)}
+          labelGap={narrow ? 14 : 16}
+          accessibilityLabel={`${minutes} active minutes this week, of the ${WHO_WEEKLY_MINUTES} minutes a week guideline`}
+        />
       )}
 
       {/* Three totals in a row; on a phone too narrow for that the third wraps under the first two, so nothing is cut. */}
@@ -188,44 +189,46 @@ export function WeekCard({
 
       {/* Seven columns across the card; at large text on a narrow phone a column would be narrower than its
           number (two days' "75" ran into each other at 320 px and 200%), so the strip keeps 22 px a column per
-          100% of text and scrolls sideways, its last column cut at the card's edge to show there is more. */}
-      {wrapStrip(
-        dates.map((d) => {
-          const day = week.byDate[d];
-          const isToday = d === today;
-          const future = d > today;
-          return (
-            <View
-              key={d}
-              style={[scrollStrip ? { width: colMin } : { flex: 1 }, { alignItems: 'center', gap: 6 }]}
-              accessible
-              accessibilityLabel={`${formatDayLabel(d)}: ${future ? 'still to come' : `${day.minutes} minutes`}`}>
-              <Text variant="label" color={isToday ? 'text' : 'textSecondary'} style={{ fontSize: 12, lineHeight: 16, fontFamily: isToday ? fonts.bold : fonts.semibold }}>
-                {weekdayShort(d).slice(0, 1)}
-              </Text>
-              <MiniCup progress={Math.min(1, day.minutes / maxDay)} over={false} future={future} color={colors.exercise} />
-              <View
-                style={{
-                  minWidth: 32,
-                  minHeight: 22,
-                  paddingHorizontal: 2,
-                  ...cup(9, 4),
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderWidth: isToday ? 1.5 : 0,
-                  borderColor: colors.text,
-                }}>
-                <Text variant="numM" color={future ? 'textTertiary' : day.minutes ? 'text' : 'textSecondary'} style={{ fontSize: 13, lineHeight: 18, letterSpacing: 0 }}>
-                  {future ? '' : day.minutes ? `${day.minutes}` : '–'}
-                </Text>
-              </View>
-            </View>
-          );
-        }),
-      )}
-      <Text variant="caption" color="textSecondary" align="center" style={{ marginTop: 4 }}>
-        Minutes each day
-      </Text>
+          100% of text and scrolls sideways, its last column cut at the card's edge to show there is more.
+          To a screen reader the strip and its caption are one image, as the kit charts are: its name holds the
+          seven values (`weekStripLabel`), and what it draws is hidden. */}
+      <View testID="train-week-minutes" accessible accessibilityRole="image" accessibilityLabel={weekStripLabel(dates, week.byDate, today)}>
+        <View aria-hidden importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+          {wrapStrip(
+            dates.map((d) => {
+              const day = week.byDate[d];
+              const isToday = d === today;
+              const future = d > today;
+              return (
+                <View key={d} style={[scrollStrip ? { width: colMin } : { flex: 1 }, { alignItems: 'center', gap: 6 }]}>
+                  <Text variant="label" color={isToday ? 'text' : 'textSecondary'} style={{ fontSize: 12, lineHeight: 16, fontFamily: isToday ? fonts.bold : fonts.semibold }}>
+                    {weekdayShort(d).slice(0, 1)}
+                  </Text>
+                  <MiniCup progress={Math.min(1, day.minutes / maxDay)} over={false} future={future} color={colors.exercise} />
+                  <View
+                    style={{
+                      minWidth: 32,
+                      minHeight: 22,
+                      paddingHorizontal: 2,
+                      ...cup(9, 4),
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: isToday ? 1.5 : 0,
+                      borderColor: colors.text,
+                    }}>
+                    <Text variant="numM" color={future ? 'textTertiary' : day.minutes ? 'text' : 'textSecondary'} style={{ fontSize: 13, lineHeight: 18, letterSpacing: 0 }}>
+                      {future ? '' : day.minutes ? `${day.minutes}` : '–'}
+                    </Text>
+                  </View>
+                </View>
+              );
+            }),
+          )}
+          <Text variant="caption" color="textSecondary" align="center" style={{ marginTop: 4 }}>
+            Minutes each day
+          </Text>
+        </View>
+      </View>
       {load ? (
         // The whole line is the way into the overview: one button, 44 px tall, with a chevron where the info cup was.
         // Its text sits where the old row's did (4 px of the 44 are above and below it), so the card is no taller.

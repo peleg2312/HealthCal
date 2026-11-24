@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { DayStepper, MealPicker } from '@/features/food/components';
-import { QUICK_KCAL_LIMIT, href, kcal, parseDate, parseMeal } from '@/features/food/helpers';
+import { QUICK_KCAL_LIMIT, href, kcal, parseDate, parseMeal, quickKcalError, quickKcalValue } from '@/features/food/helpers';
 import { logQuickAdd } from '@/features/food/log';
 import { atwaterKcal, MEAL_LABEL } from '@/lib/nutrition';
 import { useLargeText, useTheme } from '@/theme';
@@ -18,7 +18,9 @@ export default function QuickAddScreen() {
   // With large text a shorter placeholder, so it is never cut mid-word in its field.
   const big = useLargeText();
   const macroCell = big ? { flexGrow: 1, flexBasis: 110 } : { flex: 1 };
-  const [kcalV, setKcal] = useState<number | null>(null);
+  // The calories as typed: a minus or a letter is kept and named under the field (`quickKcalError`), never dropped.
+  const [kcalText, setKcalText] = useState('');
+  const kcalV = quickKcalValue(kcalText);
   const [protein, setProtein] = useState<number | null>(null);
   const [carbs, setCarbs] = useState<number | null>(null);
   const [fat, setFat] = useState<number | null>(null);
@@ -27,9 +29,14 @@ export default function QuickAddScreen() {
   const implied = Math.round(atwaterKcal({ protein: protein ?? 0, carbs: carbs ?? 0, fat: fat ?? 0 }));
   const calories = kcalV ?? (hasMacros ? implied : null);
   const mismatch = kcalV !== null && hasMacros && implied > 40 && Math.abs(implied - kcalV) > Math.max(50, kcalV * 0.2);
-  const valid = calories !== null && calories > 0 && calories < QUICK_KCAL_LIMIT;
+  const valid = calories !== null && calories > 0 && calories < QUICK_KCAL_LIMIT && !quickKcalError(kcalText);
+  // Why Add cannot add yet, in words under the calories field and tied to it (WCAG 3.3.1): what was typed, or macros
+  // alone that add up to no calories or too many.
+  const kcalError =
+    quickKcalError(kcalText) ??
+    (!kcalText.trim() && hasMacros && !(implied > 0 && implied < QUICK_KCAL_LIMIT) ? `These macros add up to ${kcal(implied)} kcal. Enter 1 to ${kcal(QUICK_KCAL_LIMIT - 1)} kcal.` : null);
   // Typed numbers or a name are not dropped without asking (the X, back, a swipe back).
-  const typed = kcalV !== null || hasMacros || name.trim().length > 0;
+  const typed = kcalText.trim().length > 0 || hasMacros || name.trim().length > 0;
   const leave = useLeaveGuard(typed ? 'Discard this quick add?' : null);
 
   const save = () => {
@@ -45,16 +52,18 @@ export default function QuickAddScreen() {
       header={<Header title="Quick add" subtitle="When you just know the numbers" close />}
       footer={<Button testID="quick-save" title={`Add to ${MEAL_LABEL[meal].toLowerCase()}`} disabled={!valid} onPress={save} />}>
       <Card style={{ gap: spacing.md }}>
-        <NumberField
+        <TextField
           testID="quick-kcal"
           label="Calories"
           suffix="kcal"
-          decimals={0}
-          value={kcalV}
-          onChange={setKcal}
+          keyboardType="number-pad"
+          inputMode="numeric"
+          value={kcalText}
+          onChangeText={setKcalText}
           autoFocus
           placeholder={hasMacros ? String(implied) : 'e.g. 350'}
-          hint={kcalV === null && hasMacros ? `Worked out from the macros: ${kcal(implied)} kcal` : undefined}
+          error={kcalError}
+          hint={!kcalText.trim() && hasMacros ? `Worked out from the macros: ${kcal(implied)} kcal` : undefined}
           onSubmitEditing={save}
         />
         <TextField testID="quick-name" label="Name (optional)" placeholder={big ? 'e.g. Cake' : 'e.g. Office birthday cake'} value={name} onChangeText={setName} maxLength={80} />

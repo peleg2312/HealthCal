@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ANDROID_TARGET, ariaFromState, fixedSize, pressesOnSpace, rovingIndex, rowStacks, slopToReach, spokenFieldName, stepperKey, webAutoComplete } from './controlRules';
+import { ANDROID_TARGET, ariaFromState, fixedSize, pressesOnSpace, rovingIndex, rowStacks, slopToReach, spokenFieldName, stepperKey, wantsAndroidTarget, webAutoComplete } from './controlRules';
 
 describe('slopToReach (48 dp on Android)', () => {
   it('grows a 44 px cup to 48 on both axes', () => {
@@ -23,6 +23,23 @@ describe('slopToReach (48 dp on Android)', () => {
     expect(fixedSize({ width: 44, height: 44 })).toEqual({ width: 44, height: 44 });
     expect(fixedSize({ minHeight: 44, width: '50%' })).toEqual({ width: undefined, height: 44 });
     expect(fixedSize(null)).toEqual({});
+  });
+});
+
+describe('wantsAndroidTarget (where touch areas grow to 48)', () => {
+  const pixel = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36';
+  const iphone = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1';
+  it('in the Android app, whatever the pointer', () => {
+    expect(wantsAndroidTarget('android', undefined, false)).toBe(true);
+  });
+  it('in a browser on an Android phone used by touch', () => {
+    expect(wantsAndroidTarget('web', pixel, true)).toBe(true);
+  });
+  it('not on an Android browser driven by a mouse, an iPhone, a computer or in the iPhone app', () => {
+    expect(wantsAndroidTarget('web', pixel, false)).toBe(false);
+    expect(wantsAndroidTarget('web', iphone, true)).toBe(false);
+    expect(wantsAndroidTarget('web', 'Mozilla/5.0 (X11; Linux x86_64) Chrome/124.0', true)).toBe(false);
+    expect(wantsAndroidTarget('ios', pixel, true)).toBe(false);
   });
 });
 

@@ -71,7 +71,7 @@ export function ItemRow({
         </View>
         {unsure && !row.food ? <Badge label="Unsure" color={colors.warning} /> : null}
         {/* A row's delete is the trash can, as in the diary, Water and Train; an X only closes. */}
-        <IconButton testID={`${id}-remove`} accessibilityLabel={`Remove ${name}`} size={32} tone="clear" onPress={onRemove}>
+        <IconButton testID={`${id}-remove`} accessibilityLabel={`Delete ${name}`} size={32} tone="clear" onPress={onRemove}>
           <Trash2 size={18} color={colors.textSecondary} strokeWidth={1.9} />
         </IconButton>
       </View>

@@ -426,7 +426,7 @@ describe('the pair', () => {
     expect(waterRowCaption({ ...milk, date: '2026-11-20' }, TODAY)).toBe('Milk, reduced fat (2%) · 129 kcal in breakfast, Fri Nov 20');
     expect(removedWaterToast(water({ beverage: 'milk', drink: 'milk_semi' }), milk, 'metric')).toBe('Removed 250 ml of milk and its 129 kcal');
     expect(removedWaterToast(water({ beverage: 'milk' }), null, 'metric')).toBe('Removed 250 ml');
-    expect(removedEntryToast('Milk, reduced fat (2%)', { ml: 250 }, 'metric')).toBe('Removed Milk, reduced fat (2%). The 250 ml stays in Water.');
+    expect(removedEntryToast('Milk removed from breakfast', { ml: 250 }, 'metric')).toBe('Milk removed from breakfast. The 250 ml stays in Water.');
     expect(detailDrinkNote({ ml: 250 }, 'metric')).toBe('Also counted in Water as 250 ml. Changing the amount here changes it there; deleting here keeps the water.');
     expect(detailDrinkNote({ ml: 330 }, 'metric', false)).toBe(
       'Also counted in Water as 330 ml. The calories here do not change it; changing the day moves it there, and deleting here keeps the water.',
@@ -456,13 +456,13 @@ describe('the pair', () => {
   it('words for a drink logged in the diary; the Water-origin words stay as they were', () => {
     const cola = entry({ name: 'Cola, regular', meal: 'lunch', nutrients: { kcal: 155, protein: 0, carbs: 39, fat: 0 } });
     const fromDiary = { ml: 370, beverage: 'other' as const, drink: 'soft_regular', fromEntryId: 'e1' };
-    expect(removedEntryToast('Cola, regular', fromDiary, 'metric')).toBe('Removed Cola, regular and its 370 ml from Water');
+    expect(removedEntryToast('Cola removed from lunch', fromDiary, 'metric')).toBe('Cola removed from lunch and its 370 ml from Water');
     expect(removedWaterToast(fromDiary, cola, 'metric')).toBe('Removed 370 ml. The drink stays in lunch.');
     expect(removedWaterToast(fromDiary, null, 'metric')).toBe('Removed 370 ml');
     expect(detailDrinkNote({ ml: 500, fromEntryId: 'e1' }, 'metric')).toBe('Also counted in Water as 500 ml. It changes with this entry and is removed with it.');
     expect(detailDrinkNote({ ml: 500, fromEntryId: 'e1' }, 'imperial')).toBe('Also counted in Water as 17 fl oz. It changes with this entry and is removed with it.');
     // A record from Water reads as before even beside the new field's absence.
-    expect(removedEntryToast('Milk', { ml: 250, foodEntryId: 'e9' }, 'metric')).toBe('Removed Milk. The 250 ml stays in Water.');
+    expect(removedEntryToast('Milk removed from lunch', { ml: 250, foodEntryId: 'e9' }, 'metric')).toBe('Milk removed from lunch. The 250 ml stays in Water.');
   });
 
   it('isWaterDrinkEntry', () => {

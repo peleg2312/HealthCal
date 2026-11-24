@@ -14,7 +14,7 @@ import { live } from '@/store/selectors';
 import type { Food, FoodEntry, ISODate, MealType, Nutrients, SavedMeal, SavedMealItem, Serving, UnitSystem, WaterEntry } from '@/types';
 import { haptic, toast } from '@/ui';
 
-import { entryUpdatedToast, foodAddedToast, mealOnDay, quickAddedToast } from './addedTo';
+import { entryRemovedToast, entryUpdatedToast, foodAddedToast, mealOnDay, quickAddedToast } from './addedTo';
 import { bandSpread, buildEntry, planSavedMeal } from './build';
 import { displayFoodName } from './displayName';
 import { addedAndSavedToast } from './saveWords';
@@ -264,16 +264,18 @@ export function logSavedMeal(
 }
 
 /**
- * Delete a diary entry (soft, with Undo). An entry a drink from Water points at goes alone: the
- * calories are removed and the water stays counted ("Removed Milk. The 250 ml stays in Water."). A drink
- * logged in the diary takes its water with it (the store's cascade): "Removed Cola, regular and its 370 ml
- * from Water", and Undo brings both back.
+ * Delete a diary entry (soft, with Undo). The toast says what and where in the words of the meal card's
+ * Restore row ("Almonds removed from breakfast", `entryRemovedToast`). An entry a drink from Water points
+ * at goes alone: the calories are removed and the water stays counted ("Milk removed from lunch. The
+ * 250 ml stays in Water."). A drink logged in the diary takes its water with it (the store's cascade):
+ * "Cola removed from lunch and its 370 ml from Water", and Undo brings both back.
  */
 export function deleteEntry(entry: FoodEntry): void {
   const water = waterFor(useStore.getState().water, entry.id)?.water ?? null;
   useStore.getState().remove('foodEntries', entry.id);
   haptic.tap();
-  const message = water ? removedEntryToast(isolateRtl(entry.name), water, unitsNow()) : `Removed ${isolateRtl(entry.name)}`;
+  const removed = entryRemovedToast(displayFoodName(entry), mealOnDay(entry.meal, entry.date, today()));
+  const message = water ? removedEntryToast(removed, water, unitsNow()) : removed;
   toast(message, { label: 'Undo', onPress: () => useStore.getState().restore('foodEntries', entry.id) });
 }
 

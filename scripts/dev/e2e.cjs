@@ -876,7 +876,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   s = await stored();
   const delToast = await toastLine();
   check('diary drinks: a delete in the diary takes the water too', !!s.foodEntries[de.id]?.deleted && !!s.water[dw.id]?.deleted);
-  check('diary drinks: and the toast says so', /^Removed Energy drink, sugared and its .+ from Water$/.test(delToast), delToast);
+  check('diary drinks: and the toast says so', /^Energy drink removed from .+ and its .+ from Water$/.test(delToast), delToast);
   await tap('toast-action');
   s = await stored();
   check('diary drinks: Undo in the diary brings both back', !s.foodEntries[de.id]?.deleted && !s.water[dw.id]?.deleted);

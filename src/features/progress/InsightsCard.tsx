@@ -32,15 +32,18 @@ export function InsightsCard({ insights, rangeDays }: { insights: Insight[]; ran
         ))}
       </View>
       {more > 0 ? (
-        <PressableScale
+        // The kit's "show more": a small ghost button centred under the list, as every other list that opens its rest.
+        <Button
           testID="progress-insights-toggle"
-          onPress={() => setOpen((o) => !o)}
-          accessibilityLabel={open ? 'Show fewer insights' : `Show all ${insights.length} insights`}
+          title={open ? 'Show fewer' : `Show all ${insights.length} insights`}
+          variant="ghost"
+          size="sm"
+          full={false}
           expanded={open}
-          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, borderTopWidth: 1, borderTopColor: colors.border, marginBottom: -spacing.sm }}>
-          <Text variant="label">{open ? 'Show fewer' : `All ${insights.length} insights`}</Text>
-          {open ? <ChevronUp size={18} color={colors.textSecondary} /> : <ChevronDown size={18} color={colors.textSecondary} />}
-        </PressableScale>
+          icon={open ? <ChevronUp size={16} color={colors.primaryInk} strokeWidth={2.2} /> : <ChevronDown size={16} color={colors.primaryInk} strokeWidth={2.2} />}
+          onPress={() => setOpen((o) => !o)}
+          style={{ alignSelf: 'center', marginTop: -spacing.xs, marginBottom: -spacing.xs }}
+        />
       ) : null}
     </SectionCard>
   );
@@ -68,7 +71,8 @@ function InsightRow({ insight }: { insight: Insight }) {
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         <Text variant="bodyStrong">{noWidow(insight.title)}</Text>
-        <Text variant="body" color="textSecondary" style={{ fontSize: 14, lineHeight: 20 }} testID={`insight-${insight.id}-step`}>
+        {/* Reading text at the body size (15 px), never smaller. */}
+        <Text variant="body" color="textSecondary" testID={`insight-${insight.id}-step`}>
           {noWidow(insight.step)}
         </Text>
         {open ? (

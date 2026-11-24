@@ -1,7 +1,7 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ChevronDown, ChevronRight, Dumbbell, Plus, Timer } from 'lucide-react-native';
 import React, { useCallback, useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { TabHeader } from '@/components/TabHeader';
 import { ACTIVITY_BY_ID, POPULAR_ACTIVITY_IDS } from '@/data/activities';
@@ -29,6 +29,8 @@ import { Button, Card, Chip, ConfirmSheet, EmptyState, RestoreRow, Screen, Secti
 export default function TrainScreen() {
   const { colors, spacing } = useTheme();
   const grow = useTextGrowth();
+  const narrow = useWindowDimensions().width < 360;
+  const actionStyle = narrow ? { flexGrow: 1, flexBasis: 'auto' as const, paddingHorizontal: 14 } : { flexGrow: 1, flexBasis: 150 * grow };
   const profile = useProfile();
   const activities = useLive('activities');
   const recentIds = useStore((s) => s.recentActivityIds);
@@ -93,9 +95,11 @@ export default function TrainScreen() {
         current={weekStart === startOfWeek(t)}
       />
 
-      {/* Side by side when both labels fit (150 px each, more as text grows); stacked on a narrow phone or at large text rather than cut. Both are
-          secondary, Log activity with the exercise colour on its edge: the tab bar's + is the screen's one
-          filled primary button. */}
+      {/* Side by side when both labels fit (150 px each, more as text grows); stacked at large text rather than cut.
+          Under 360 px each is as wide as its own label with tighter side room, so the two still sit side by side
+          at 320 and both are in the first view at 320 x 640 (a label that does not fit wraps the pair, never cut).
+          Both are secondary, Log activity with the exercise colour on its edge: the tab bar's + is the screen's
+          one filled primary button. */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
         <Button
           testID="train-log-activity"
@@ -104,7 +108,7 @@ export default function TrainScreen() {
           tint={colors.exercise}
           icon={<Plus size={18} color={colors.text} strokeWidth={2.2} />}
           onPress={() => router.push('/activity/pick')}
-          style={{ flexGrow: 1, flexBasis: 150 * grow }}
+          style={actionStyle}
         />
         <Button
           testID="train-start-workout"
@@ -112,7 +116,7 @@ export default function TrainScreen() {
           variant="secondary"
           icon={draftActive ? <Timer size={18} color={colors.exercise} /> : <Dumbbell size={18} color={colors.text} />}
           onPress={() => router.push('/activity/strength')}
-          style={{ flexGrow: 1, flexBasis: 150 * grow }}
+          style={actionStyle}
         />
       </View>
       {draftActive ? (
@@ -167,7 +171,8 @@ export default function TrainScreen() {
           />
         </Card>
       ) : (
-        <View style={{ gap: spacing.md }} testID="train-history">
+        // Stacked cards 16 px apart, as on the diary and Progress.
+        <View style={{ gap: spacing.lg }} testID="train-history">
           {visibleWeeks.map((w) => (
             // A week as the diary shows a meal: its title and total time in the card's head, its workouts as rows.
             <Card key={w.start} testID={`train-week-${w.start}`} padding={0} style={{ paddingTop: 12, paddingBottom: 2 }}>

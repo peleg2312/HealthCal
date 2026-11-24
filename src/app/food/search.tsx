@@ -1,5 +1,5 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { Check, ChevronRight, PenLine, Plus, Pointer, ScanBarcode, Search, Utensils, X, Zap } from 'lucide-react-native';
+import { ChevronRight, PenLine, Plus, Pointer, ScanBarcode, Search, Utensils, X, Zap } from 'lucide-react-native';
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, type TextInput, useWindowDimensions, View } from 'react-native';
 
@@ -16,8 +16,9 @@ import { useOneTap } from '@/features/food/oneTap';
 import { FavoriteStar } from '@/features/food/FavoriteStar';
 import { toggleFoodFavorite } from '@/features/food/favoriteActions';
 import { favoriteFoodsInVisit, isFavoriteMeal, mealToSave } from '@/features/food/favorites';
-import { favoriteActionLabel, favoriteLabel, FAVOURITE_GROUPS, FAVOURITES_EMPTY } from '@/features/food/favoriteWords';
+import { favoriteActionLabel, FAVOURITE_GROUPS, FAVOURITES_EMPTY } from '@/features/food/favoriteWords';
 import { FAVOURITES_EMPTY_WITH_HINT, HOLD_HINT, markHoldHintDone, useHoldHint } from '@/features/food/holdHint';
+import { useLangName } from '@/features/food/langName';
 import { LogSavedMealSheet } from '@/features/food/SavedMealParts';
 import { SaveCurrentMealRow, SavedMealRow, useVisitOrder } from '@/features/food/SavedMealRow';
 import { loadSearchTab, openingTab, rememberSearchTab, SEARCH_CHIPS, usualEmpty, useSearchTab, type SearchTab } from '@/features/food/searchTab';
@@ -31,7 +32,7 @@ import { favoriteRecordId, useStore } from '@/store';
 import { useDay, useLive } from '@/store/selectors';
 import { cup, motion, useLargeText, useTheme } from '@/theme';
 import type { Food, FoodEntry, MealType, SavedMeal } from '@/types';
-import { AnimatedNumber, Button, Chip, ChipRow, Divider, EmptyState, Header, IconButton, PressableScale, Screen, Sheet, Text, TextField } from '@/ui';
+import { AnimatedNumber, Button, Chip, ChipRow, CupKey, Divider, EmptyState, Header, IconButton, PressableScale, Screen, Sheet, Text, TextField } from '@/ui';
 import { spokenUnits } from '@/lib/spokenUnits';
 
 type Tab = SearchTab;
@@ -131,8 +132,12 @@ export default function FoodSearchScreen() {
     [localQ, customFoods, recents, favoriteIds],
   );
   // "No matches" is judged only once the local list has caught up with the typing; while it lags,
-  // the previous list stays (or nothing shows), never the empty state for a query that has matches.
+  // the previous list stays, never the empty state for a query that has matches.
   const noLocal = localQ === q && local.length === 0;
+  // What the screen draws follows the deferred query: on the first letter the tab's list stays drawn until that
+  // letter's results are ready, so no frame shows an empty list or "Can't find it?" before a search has run.
+  // Clearing the field shows the tabs at once.
+  const listQ = q ? localQ : '';
 
   // Online products arrive after a pause in typing; stale answers are dropped.
   const latest = useRef('');
@@ -304,7 +309,7 @@ export default function FoodSearchScreen() {
     <Screen header={header} footer={footer} testID="food-search-screen">
       <MealPicker value={meal} onChange={setMeal} testIDPrefix="search-meal" />
 
-      {!q ? (
+      {!listQ ? (
         <>
           {escapes}
           {/* One fixed set in one fixed order on every visit (SEARCH_CHIPS): a chip with nothing behind it opens its empty state. */}
@@ -366,7 +371,7 @@ export default function FoodSearchScreen() {
                         return row(
                           f,
                           `favorite-${i}`,
-                          <FavoriteStar testID={`favorite-${i}-favorite`} on={on} label={favoriteLabel(displayFoodName(f), on)} onPress={() => toggleFoodFavorite(f)} style={{ marginRight: 4 }} />,
+                          <FavoriteStar testID={`favorite-${i}-favorite`} on={on} name={displayFoodName(f)} onPress={() => toggleFoodFavorite(f)} style={{ marginRight: 4 }} />,
                         );
                       })}
                     </List>
@@ -625,10 +630,13 @@ function ActionTile({ icon, label, a11y, onPress, testID }: { icon: React.ReactN
 
 /**
  * The best match's one-tap Add at the foot of search (`search-add-top`): a plus, the food's name and what one
- * tap adds; once added, a tick in the same place that takes no press (the row above has the amount).
+ * tap adds; once added, the done mark (the small filled ink cup, never a check, which means only a day on
+ * budget) in the same place, taking no press (the row above has the amount). A name in Hebrew or Arabic is
+ * spoken in its own language (`useLangName`).
  */
 function BestMatchAdd({ name, kcalValue, added, spoken, onPress }: { name: string; kcalValue: number; added: boolean; spoken: string; onPress: () => void }) {
   const { colors, radius, spacing } = useTheme();
+  const lang = useLangName(added ? `${name} added` : spoken);
   return (
     <PressableScale
       testID="search-add-top"
@@ -638,7 +646,8 @@ function BestMatchAdd({ name, kcalValue, added, spoken, onPress }: { name: strin
       feedback="none"
       scaleTo={0.98}
       accessibilityRole="button"
-      accessibilityLabel={added ? `${name} added` : spoken}
+      accessibilityLabel={lang.label}
+      {...lang.props}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -650,7 +659,14 @@ function BestMatchAdd({ name, kcalValue, added, spoken, onPress }: { name: strin
         borderWidth: 1.5,
         borderColor: added ? colors.success : colors.borderStrong,
       }}>
-      {added ? <Check size={20} color={colors.success} strokeWidth={2.4} /> : <Plus size={20} color={colors.text} strokeWidth={2.2} />}
+      {lang.hidden}
+      {added ? (
+        <View style={{ width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}>
+          <CupKey color={colors.text} size={12} />
+        </View>
+      ) : (
+        <Plus size={20} color={colors.text} strokeWidth={2.2} />
+      )}
       <Text variant="bodyStrong" numberOfLines={1} style={{ flex: 1, minWidth: 0 }}>
         {added ? `${isolateRtl(name)} added` : `Add ${isolateRtl(name)}`}
       </Text>

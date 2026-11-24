@@ -133,7 +133,7 @@ describe('deleting from either side', () => {
   it('in the diary: the calories go, the water stays, and Undo puts the entry back with its link', () => {
     const { water, entry } = logDrink(plan());
     deleteEntry(S().foodEntries[entry!.id]);
-    expect(last().message).toBe('Removed Milk, reduced fat (2%). The 250 ml stays in Water.');
+    expect(last().message).toBe('Milk removed from snacks. The 250 ml stays in Water.');
     expect(S().foodEntries[entry!.id].deleted).toBe(true);
     expect(S().water[water.id].deleted).toBe(false);
     expect(kcalOn(TODAY)).toBe(0);
@@ -452,7 +452,7 @@ describe('two phones', () => {
       toasts.length = 0;
       p.log.deleteEntry(e);
       expect(p.store.getState().foodEntries[entryId].deleted).toBe(true);
-      expect(toasts[0].message).toBe(`Removed ${e.name}`);
+      expect(toasts[0].message).toBe('Milk removed from snacks');
     }
   });
 

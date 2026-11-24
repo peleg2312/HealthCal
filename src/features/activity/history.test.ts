@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ActivityEntry } from '@/types';
 
-import { historyDaySpoken, historyDayWord, historyFigureBeside, historyFigureWords, historyMetaLines, historyWeekLabel, historyWeeks, historyWeekTitle } from './history';
+import { historyDaySpoken, historyDayWord, historyFigureBeside, historyFigureWords, historyMetaLines, historyWeekLabel, historyWeeks, historyWeekTitle, weekStripLabel } from './history';
 
 // Tuesday, Nov 24 2026: its week starts on Monday, Nov 23.
 const TODAY = '2026-11-24';
@@ -109,5 +109,24 @@ describe("a history row's figure", () => {
     expect(historyFigureWords('added')).toBe('\u00A0added');
     expect(historyFigureWords('not added')).toBe('\u00A0not\u00A0added');
     expect(historyFigureWords('added over 7 days')).toBe('\u00A0added over\u00A07\u00A0days');
+  });
+});
+
+describe("the week card's strip, read as one image", () => {
+  // Monday Nov 23 to Sunday Nov 29, 2026.
+  const dates = ['2026-11-23', '2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27', '2026-11-28', '2026-11-29'];
+  const byDate = Object.fromEntries(dates.map((d) => [d, { minutes: 0 }]));
+  byDate['2026-11-23'] = { minutes: 75 };
+  byDate['2026-11-24'] = { minutes: 1 };
+  it('names what it shows, then every day with its value and units in full', () => {
+    expect(weekStripLabel(dates, byDate, '2026-11-25')).toBe(
+      'Minutes each day, this week: Monday, 75 minutes; Tuesday, 1 minute; Wednesday, today, none; Thursday, still to come; Friday, still to come; Saturday, still to come; Sunday, still to come',
+    );
+  });
+  it('names a past week by its Monday, with no day still to come', () => {
+    const label = weekStripLabel(dates, byDate, '2026-12-10');
+    expect(label.startsWith('Minutes each day, week of Nov 23: Monday, 75 minutes;')).toBe(true);
+    expect(label).not.toMatch(/to come|today/);
+    expect(label.split(';')).toHaveLength(7);
   });
 });

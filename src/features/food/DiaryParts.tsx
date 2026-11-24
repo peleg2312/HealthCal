@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { CalendarPlus, Copy, MoreHorizontal, Plus, Repeat2, Save, Trash2 } from 'lucide-react-native';
+import { CalendarPlus, ChevronDown, ChevronUp, Copy, MoreHorizontal, Plus, Repeat2, Save, Trash2 } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
@@ -31,24 +31,28 @@ import { currentKcal } from './usuals';
 import { removedToday } from './restore';
 import { FadeRow, Unfold, useLeavingRows } from './rowMotion';
 
+/** Whether the summary's details (the day as a trough, the target, workouts and macros) are open: kept for the session, so paging days keeps it. */
+let summaryOpen = false;
+
 /**
- * The diary summary: calories left as a big number, the day as a trough
- * (eaten poured in from the left, exercise headroom hatched at the right end),
- * then the three macros with their level ticks.
- */
-/**
- * The day's numbers at the top of the diary. `share` (the day's share button) sits at the top right, beside the big
- * number; `action` (on a day with nothing logged, "Copy yesterday") is the card's last row, under a divider.
+ * The day's numbers at the top of the diary, compact so the meals lead the first view (Lunch's add is in it at
+ * 360 x 740): calories left as the figure and "eaten of" the budget under it, the day's share button and a chevron
+ * cup that opens the rest in place (`diary-summary-details`, `aria-expanded`): the day as a trough (eaten poured in
+ * from the left, exercise headroom hatched at the right end), the target and what workouts add, and the three macros
+ * with their level ticks. `action` (on a day with nothing logged, "Copy yesterday") is the card's last row, under a
+ * divider, open or not.
  */
 export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?: React.ReactNode; action?: React.ReactNode }) {
   const { colors, spacing } = useTheme();
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
-  // On a phone "eaten of" always sits under the big number. Wrapping only when the number grew
-  // a digit would make the whole page jump by a line as a log or a delete ticks it past 999.
-  const stacked = screenW < 480;
   // With large text the three macros wrap (each at least 120 wide), so a name or "/ 152 g" is never split.
   const big = useLargeText();
+  const [open, setOpenState] = useState(summaryOpen);
+  const setOpen = (v: boolean) => {
+    summaryOpen = v;
+    setOpenState(v);
+  };
   const over = day.remaining < 0;
   const budget = Math.max(0, day.budget);
   // Calories workouts add to this day (its own and shares carried from the six days before), drawn as
@@ -58,9 +62,9 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?
   // The run log's words for what workouts add (`budgetAdds`, @/features/activity/logWords), always "~": an estimate.
   const addedLine = day.exerciseRule === 'week' ? `~${kcal(headroom)} kcal added over 7 days` : `~${kcal(headroom)} kcal added`;
   return (
-    <Card testID="diary-summary" padding={18}>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
-        <View style={stacked ? { flex: 1, minWidth: 0, gap: 2 } : { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md }}>
+    <Card testID="diary-summary" padding={0} style={{ paddingHorizontal: 16, paddingVertical: 14 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
           <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', alignItems: 'baseline', columnGap: 6 }}>
             <AnimatedNumber
               variant="numXL"
@@ -70,63 +74,76 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?
               value={day.remaining}
               format={(n) => kcal(Math.abs(n))}
               accessibilityLabel={`${kcal(Math.abs(day.remaining))} kilocalories ${over ? 'above the budget' : 'left'}`}
-              style={{ fontSize: narrow ? 40 : 46, lineHeight: narrow ? 44 : 50, letterSpacing: -1.4 }}
+              style={{ fontSize: narrow ? 30 : 32, lineHeight: 36, letterSpacing: -1 }}
             />
             <Text variant="unit" style={{ fontSize: 15 }}>{over ? 'kcal above' : 'kcal left'}</Text>
           </View>
-          <Text variant="caption" color="textSecondary" style={{ paddingBottom: stacked ? 0 : 4 }}>
-            <AnimatedNumber variant="numM" style={{ fontSize: 16, lineHeight: 20 }} testID="diary-eaten" value={day.eaten.kcal} format={kcal} />
+          <Text variant="caption" color="textSecondary">
+            <AnimatedNumber variant="numM" style={{ fontSize: 14, lineHeight: 18 }} testID="diary-eaten" value={day.eaten.kcal} format={kcal} />
             {' eaten of '}
-            <Text variant="numM" style={{ fontSize: 16, lineHeight: 20 }}>
+            <Text variant="numM" style={{ fontSize: 14, lineHeight: 18 }}>
               {kcal(budget)}
             </Text>
           </Text>
         </View>
         {share}
+        <IconButton
+          testID="diary-summary-details"
+          tone="clear"
+          size={44}
+          expanded={open}
+          accessibilityLabel={open ? "Hide the day's details" : "Show the day's details: the target, workouts and macros"}
+          onPress={() => setOpen(!open)}>
+          {open ? <ChevronUp size={20} color={colors.text} strokeWidth={2.2} /> : <ChevronDown size={20} color={colors.text} strokeWidth={2.2} />}
+        </IconButton>
       </View>
-      <Trough value={day.eaten.kcal} max={budget} headroom={headroom} color={colors.calories} memoryKey={`diary-${day.date}`} style={{ marginTop: spacing.md }} />
-      {/* On a narrow phone a long exercise line moves under the target, whole, rather than squeezing both. */}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: spacing.md, rowGap: 4, marginTop: 10 }}>
-        <Text variant="caption" color="textSecondary" tabular numberOfLines={1}>
-          {`Target ${kcal(day.target)}`}
-        </Text>
-        {headroom > 0 || notAdded ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
-            {headroom > 0 ? (
-              <View style={{ width: 11, height: 11, overflow: 'hidden', borderWidth: 1, borderColor: colors.headroom, borderRadius: 2 }}>
-                <Hatch width={11} height={11} color={colors.headroom} step={4} opacity={1} />
+      {open ? (
+        <View testID="diary-summary-more">
+          <Trough value={day.eaten.kcal} max={budget} headroom={headroom} color={colors.calories} memoryKey={`diary-${day.date}`} style={{ marginTop: spacing.md }} />
+          {/* On a narrow phone a long exercise line moves under the target, whole, rather than squeezing both. */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: spacing.md, rowGap: 4, marginTop: 10 }}>
+            <Text variant="caption" color="textSecondary" tabular numberOfLines={1}>
+              {`Target ${kcal(day.target)}`}
+            </Text>
+            {headroom > 0 || notAdded ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
+                {headroom > 0 ? (
+                  <View style={{ width: 11, height: 11, overflow: 'hidden', borderWidth: 1, borderColor: colors.headroom, borderRadius: 2 }}>
+                    <Hatch width={11} height={11} color={colors.headroom} step={4} opacity={1} />
+                  </View>
+                ) : null}
+                <Text variant="caption" color="textSecondary" tabular numberOfLines={2} style={{ flexShrink: 1 }} testID="diary-exercise">
+                  {headroom > 0 ? addedLine : `~${kcal(day.exerciseNet)} kcal not added`}
+                </Text>
               </View>
             ) : null}
-            <Text variant="caption" color="textSecondary" tabular numberOfLines={2} style={{ flexShrink: 1 }} testID="diary-exercise">
-              {headroom > 0 ? addedLine : `~${kcal(day.exerciseNet)} kcal not added`}
-            </Text>
           </View>
-        ) : null}
-      </View>
-      <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
-      <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', columnGap: narrow ? spacing.md : spacing.lg, rowGap: spacing.md }}>
-        {(
-          [
-            ['Protein', day.eaten.protein, day.macros.proteinG, colors.protein, 'reach'],
-            ['Carbs', day.eaten.carbs, day.macros.carbsG, colors.carbs, 'limit'],
-            ['Fat', day.eaten.fat, day.macros.fatG, colors.fat, 'limit'],
-          ] as const
-        ).map(([label, value, target, color, goalKind]) => (
-          <View key={label} style={[big ? { flexGrow: 1, flexBasis: 120 } : { flex: 1 }, { minWidth: 0, gap: 8 }]} accessible accessibilityLabel={`${label}, ${Math.round(value)} of ${target} grams`}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <CupKey color={color} />
-              <Text variant="label" numberOfLines={1}>
-                {label}
-              </Text>
-            </View>
-            <ProgressBar progress={target > 0 ? value / target : 0} color={color} height={6} goalKind={goalKind} />
-            {/* The target may wrap under the number on a narrow phone, whole ("/ 493 g"); it is never cut. */}
-            <AnimatedNumber variant="numM" value={Math.round(value)} style={{ fontSize: narrow ? 15 : 17, lineHeight: narrow ? 20 : 22 }}>
-              <Text variant="caption" color="textSecondary">{` /\u00A0${Math.round(target)}\u00A0g`}</Text>
-            </AnimatedNumber>
+          <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
+          <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', columnGap: narrow ? spacing.md : spacing.lg, rowGap: spacing.md }}>
+            {(
+              [
+                ['Protein', day.eaten.protein, day.macros.proteinG, colors.protein, 'reach'],
+                ['Carbs', day.eaten.carbs, day.macros.carbsG, colors.carbs, 'limit'],
+                ['Fat', day.eaten.fat, day.macros.fatG, colors.fat, 'limit'],
+              ] as const
+            ).map(([label, value, target, color, goalKind]) => (
+              <View key={label} style={[big ? { flexGrow: 1, flexBasis: 120 } : { flex: 1 }, { minWidth: 0, gap: 8 }]} accessible accessibilityLabel={`${label}, ${Math.round(value)} of ${target} grams`}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <CupKey color={color} />
+                  <Text variant="label" numberOfLines={1}>
+                    {label}
+                  </Text>
+                </View>
+                <ProgressBar progress={target > 0 ? value / target : 0} color={color} height={6} goalKind={goalKind} />
+                {/* The target may wrap under the number on a narrow phone, whole ("/ 493 g"); it is never cut. */}
+                <AnimatedNumber variant="numM" value={Math.round(value)} style={{ fontSize: narrow ? 15 : 17, lineHeight: narrow ? 20 : 22 }}>
+                  <Text variant="caption" color="textSecondary">{` /\u00A0${Math.round(target)}\u00A0g`}</Text>
+                </AnimatedNumber>
+              </View>
+            ))}
           </View>
-        ))}
-      </View>
+        </View>
+      ) : null}
       {action ? (
         <>
           <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
@@ -369,7 +386,8 @@ export function MealCard({
             testID={`meal-add-${meal}`}
             onPress={add}
             scaleTo={0.985}
-            accessibilityLabel={`Add food to ${label.toLowerCase()}`}
+            // Its name starts with its visible words (WCAG 2.5.3): "Log breakfast", then the note when it shows one.
+            accessibilityLabel={`Log ${label.toLowerCase()}${slotNote ? `. ${slotNote}` : ''}`}
             style={{
               minHeight: 48,
               paddingVertical: slotNote ? 10 : 0,

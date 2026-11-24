@@ -741,14 +741,15 @@ export function removedWaterToast(
 }
 
 /**
- * The toast after deleting, in the diary, an entry that has water. A drink logged on Water: "Removed
- * Milk. The 250 ml stays in Water." A drink logged in the diary (`fromEntryId`): its water goes with
- * it, "Removed Cola, regular and its 370 ml from Water" (Undo restores both: the store's cascade).
- * `name` is drawn text (isolateRtl'd by the caller, as before).
+ * The toast after deleting, in the diary, an entry that has water, led by the words of every delete
+ * toast (`removed`: "Milk removed from lunch", `entryRemovedToast` in @/features/food/addedTo). A drink
+ * logged on Water: "Milk removed from lunch. The 250 ml stays in Water." A drink logged in the diary
+ * (`fromEntryId`): its water goes with it, "Cola removed from lunch and its 370 ml from Water" (Undo
+ * restores both: the store's cascade).
  */
-export function removedEntryToast(name: string, water: Pick<WaterEntry, 'ml'> & Partial<Pick<WaterEntry, 'fromEntryId' | 'foodEntryId'>>, units: UnitSystem): string {
-  if (water.fromEntryId && !water.foodEntryId) return `Removed ${name} and its ${formatVolume(water.ml, units)} from Water`;
-  return `Removed ${name}. The ${formatVolume(water.ml, units)} stays in Water.`;
+export function removedEntryToast(removed: string, water: Pick<WaterEntry, 'ml'> & Partial<Pick<WaterEntry, 'fromEntryId' | 'foodEntryId'>>, units: UnitSystem): string {
+  if (water.fromEntryId && !water.foodEntryId) return `${removed} and its ${formatVolume(water.ml, units)} from Water`;
+  return `${removed}. The ${formatVolume(water.ml, units)} stays in Water.`;
 }
 
 /**

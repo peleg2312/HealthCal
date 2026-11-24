@@ -75,6 +75,14 @@ export function foodAddedToast(name: string, where: string): string {
 }
 
 /**
+ * A deleted entry, said in the words of its meal card's Restore row: "Almonds removed from breakfast",
+ * "Banana removed from yesterday's lunch". `where` is `mealOnDay` of the entry.
+ */
+export function entryRemovedToast(name: string, where: string): string {
+  return `${toastFoodName(name)} removed from ${where}`;
+}
+
+/**
  * An edit of an entry, saved: "Israeli salad moved to lunch", "Banana moved to yesterday's lunch" when its meal or
  * day changed, else "Israeli salad updated in lunch" (its amount or numbers). `where` is `mealOnDay` after the edit.
  */

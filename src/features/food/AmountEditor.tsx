@@ -117,6 +117,8 @@ export function AmountEditor({
           }}
           onBlur={() => setTypedState(undefined)}
           suffix="g"
+          // An amount it cannot take is said under the field and tied to it (WCAG 3.3.1); on blur the last good amount returns.
+          error={typed !== undefined && typed !== null && !(typed > 0 && typed <= MAX_GRAMS) ? `Enter more than 0 g, up to ${MAX_GRAMS.toLocaleString('en-US')} g.` : null}
           accessibilityLabel="Amount in grams"
           style={{ flexGrow: 1, flexBasis: 104, maxWidth: 200 }}
         />

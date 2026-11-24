@@ -58,6 +58,24 @@ export function deleteSessionLabel(entry: { name: string; date: ISODate; duratio
   return `Delete ${entry.name}, ${WEEKDAYS_LONG[fromISODate(entry.date).getDay()]}, ${formatShortDate(entry.date)}, ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
 }
 
+/**
+ * Train's week strip as one image for a screen reader, as the kit charts are: what it shows, then the seven
+ * values, each day by name ("Minutes each day, this week: Monday, 75 minutes; Tuesday, today, 75 minutes;
+ * Wednesday, still to come; ..."). A day with nothing logged says "none"; a day after today "still to come".
+ * Units in full. `today` comes from the screen's clock hook.
+ */
+export function weekStripLabel(dates: readonly ISODate[], byDate: Readonly<Record<string, { minutes: number }>>, today: ISODate): string {
+  const days = dates.map((d) => {
+    const name = WEEKDAYS_LONG[fromISODate(d).getDay()];
+    const day = d === today ? `${name}, today` : name;
+    if (d > today) return `${day}, still to come`;
+    const m = Math.round(byDate[d]?.minutes ?? 0);
+    return `${day}, ${m === 0 ? 'none' : `${m} ${m === 1 ? 'minute' : 'minutes'}`}`;
+  });
+  const which = dates.includes(today) ? 'this week' : `week of ${formatShortDate(dates[0])}`;
+  return `Minutes each day, ${which}: ${days.join('; ')}`;
+}
+
 /** Every workout in week groups, newest week first; empty weeks are left out. */
 export function historyWeeks(activities: readonly ActivityEntry[], today: ISODate): HistoryWeek[] {
   const sorted = [...activities].sort((a, b) => b.date.localeCompare(a.date) || b.loggedAt.localeCompare(a.loggedAt));

@@ -287,8 +287,9 @@ export function Stepper({
       <IconButton accessibilityLabel={`Decrease ${label}`} tone="surface" onPress={() => set(value - step)} disabled={value <= min}>
         <Minus size={18} color={colors.text} />
       </IconButton>
-      {/* Label corners, so the web's focus ring round the value is a label's shape. */}
-      <View {...(adjustable as object)} style={{ borderRadius: radius.chip }}>
+      {/* Label corners, so the web's focus ring round the value is a label's shape. 44 tall, as the cups beside it,
+          so the value is a 44 x 44 target at least (it is 52 or 72 wide); the number stays centred, drawn as before. */}
+      <View {...(adjustable as object)} style={{ borderRadius: radius.chip, minHeight: 44, justifyContent: 'center' }}>
         <Text variant="numL" align="center" style={compact ? { minWidth: 52, fontSize: 22, lineHeight: 28 } : { minWidth: 72, fontSize: 26, lineHeight: 30 }}>
           {shown}
         </Text>

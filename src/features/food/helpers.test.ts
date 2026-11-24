@@ -8,7 +8,7 @@ import { formatNumber } from '@/lib/units';
 import type { Food, FoodEntry } from '@/types';
 
 import { buildEntry } from './build';
-import { amountLabel, amountTotal, formatQty, labelAmount, lastPortions, matchServing, portionFor, portionKcal, portionLabel, rowSourceWord, servingText, sourceInfo, stepAmount, toPer100, valuesUpdated, labelGrams, withSourceWord } from './helpers';
+import { amountLabel, amountTotal, formatQty, quickKcalError, quickKcalValue, labelAmount, lastPortions, matchServing, portionFor, portionKcal, portionLabel, rowSourceWord, servingText, sourceInfo, stepAmount, toPer100, valuesUpdated, labelGrams, withSourceWord } from './helpers';
 import { resolveUsuals, usualFoods, usualLabel } from './usuals';
 
 describe('stepAmount', () => {
@@ -397,5 +397,25 @@ describe('a remembered portion after a reload: the stored shape', () => {
     }));
     expect(usualLabel(resolveUsuals(usualFoods(es, 'breakfast', TODAY), new Map([[mine.id, mine]]))[0])).toBe('1 bowl, 270 kcal');
     expect(usualLabel(resolveUsuals(usualFoods(es, 'breakfast', TODAY), new Map([[mine.id, edited]]))[0])).toBe('1 bowl, 300 kcal');
+  });
+});
+
+describe('quick add: the calories field says why it cannot add (WCAG 3.3.1)', () => {
+  it('empty or a number in range: no words', () => {
+    expect(quickKcalError('')).toBeNull();
+    expect(quickKcalError('350')).toBeNull();
+    expect(quickKcalError('9999')).toBeNull();
+    expect(quickKcalError('12.5')).toBeNull();
+    expect(quickKcalValue('350')).toBe(350);
+    expect(quickKcalValue('12,5')).toBe(12.5);
+  });
+  it('0, 10,000 and more, letters and a minus each get neutral words, and a minus is never turned into a plus', () => {
+    expect(quickKcalError('0')).toBe('Enter 1 to 9,999 kcal.');
+    expect(quickKcalError('25000')).toBe('Enter 1 to 9,999 kcal.');
+    expect(quickKcalError('abc')).toBe('Numbers only, such as 350.');
+    expect(quickKcalError('12abc')).toBe('Numbers only, such as 350.');
+    expect(quickKcalError('-50')).toBe("Calories can't be negative. To take some off, change or delete an entry.");
+    expect(quickKcalValue('-50')).toBeNull();
+    expect(quickKcalValue('abc')).toBeNull();
   });
 });

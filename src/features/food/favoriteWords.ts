@@ -18,9 +18,13 @@ export function favoriteToast(name: string, on: boolean, kind: FavoriteKind): st
   return `${on ? 'Added to' : 'Removed from'} favourites: ${who}`;
 }
 
-/** The star's label: what a tap does. */
-export function favoriteLabel(name: string, on: boolean): string {
-  return on ? `Remove ${name} from favourites` : `Add ${name} to favourites`;
+/**
+ * The star's name, one fixed name whatever its state ("Favourite Usual breakfast"): the star is a toggle, and
+ * on or off is told by its pressed state alone (`aria-pressed`, `accessibilityState.selected`), never by a
+ * name that changes with it (WAI-ARIA's button pattern).
+ */
+export function favoriteLabel(name: string): string {
+  return `Favourite ${name}`;
 }
 
 /** A saved-meal row's "+" (search's Saved meals and Favourites): "Log Usual breakfast" (it logs the meal at once, `logSavedMeal`). */
@@ -44,14 +48,14 @@ export const FAVOURITES_EMPTY = {
 export const FAVOURITE_GROUPS = { meals: 'Meals', foods: 'Foods' } as const;
 
 /**
- * The + sheet's overline over its row of one-tap tiles, naming the groups in the order they are drawn.
- * Favourite tiles (meals, then foods) always lead the row, so a row with one reads "Favourites and usual
- * for lunch"; "Usual for lunch" as before when no favourite is in the row; never "usual" for a row
- * without usual foods.
+ * The + sheet's overline over its row of one-tap tiles, naming the groups in the order they are drawn. The
+ * meal's first usual food leads the row (so it is whole in the first view at every width), then the
+ * favourites (meals, then foods), then the other usual foods: a row with both reads "Usual for lunch and
+ * favourites"; "Usual for lunch" when no favourite is in the row; never "usual" for a row without usual foods.
  */
 export function quickRowTitle(o: { meal: string; favourites: boolean; usual: boolean; saved: boolean }): string {
-  if (o.favourites) return o.usual ? `Favourites and usual for ${o.meal}` : o.saved ? 'Favourites and saved meals' : 'Favourites';
-  if (o.usual) return `Usual for ${o.meal}`;
+  if (o.usual) return o.favourites ? `Usual for ${o.meal} and favourites` : `Usual for ${o.meal}`;
+  if (o.favourites) return o.saved ? 'Favourites and saved meals' : 'Favourites';
   return 'Saved meal';
 }
 

@@ -1,25 +1,30 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import React, { useRef, useState } from 'react';
-import { View, type ScrollView, type ScrollViewProps, type TextInputProps } from 'react-native';
+import { Platform, useWindowDimensions, View, type ScrollView, type ScrollViewProps, type TextInputProps } from 'react-native';
 
 import { Group, Hint, OptionRow } from '@/features/settings/components';
 import { planGoalLine } from '@/features/progress/goalDate';
 import { spreadChangeNote, spreadRuleNote } from '@/features/settings/spreadWords';
 import { BIRTH_AUTOCOMPLETE, BIRTH_INCOMPLETE, birthDateWords, birthIso, birthParts, type BirthParts } from '@/features/settings/birthDate';
 import { TARGET_CARE_NOTE } from '@/features/settings/careNote';
+import { weightFixed } from '@/features/settings/format';
 import { birthDateError, customSplitError, heightError, rateForGoal, targetWeightError } from '@/features/settings/goalsValidation';
 import { markSpreadHintDone } from '@/features/activity/spreadHint';
 import { ageFromBirthDate, today } from '@/lib/dates';
 import { effectiveFrom, exerciseRuleOf, ruleFieldsOnSave } from '@/lib/exerciseBudget';
 import { ACTIVITY_LABELS, macroTargets, maxWeeklyRateKg } from '@/lib/energy';
 import { baseWaterGoalMl } from '@/lib/hydration';
-import { cmToFtIn, formatNumber, formatVolume, formatWeight, ftInToCm, volumeToMl, volumeUnit, volumeValue, weightToKg, weightUnit, weightValue } from '@/lib/units';
+import { cmToFtIn, formatNumber, formatVolume, ftInToCm, volumeToMl, volumeUnit, volumeValue, weightToKg, weightUnit, weightValue } from '@/lib/units';
 import { useStore } from '@/store';
 import { useToday } from '@/store/clock';
 import { computeEnergyModel, useLive, useProfile } from '@/store/selectors';
 import { useTextSize, useTheme } from '@/theme';
 import type { ActivityLevel, ExerciseSpread, GoalType, MacroSplit, Profile, Sex } from '@/types';
 import { Button, Card, Chip, ChipWrap, CupKey, goBack, Header, MacroBar, NumberField, Screen, Segmented, Stepper, Text, ToggleRow, toast } from '@/ui';
+
+/** The nativeID of the words under the three birth-date fields. */
+const BIRTH_ERROR_ID = 'goals-birth-error-words';
 
 type MacroMode = 'auto' | 'balanced' | 'protein' | 'lowcarb' | 'custom';
 
@@ -105,11 +110,25 @@ function GoalsForm() {
   });
   const [manualCalories, setManualCalories] = useState(!!saved.calorieTargetOverride);
   const [manualWater, setManualWater] = useState(!!saved.waterGoalMlOverride);
+  // Under 360 px the preview is compact, so the goal and its first field are in the first view at 320 x 640
+  // (rubric D2-01): the figure, why and the macros stay, the notes under them are one tap away ("Details").
+  const { width } = useWindowDimensions();
+  const compact = width < 360;
+  const [details, setDetails] = useState(false);
+  const notesShown = !compact || details;
 
   const birthText = birthIso(birth);
   const todayNoon = new Date(`${todayDate}T12:00:00`);
   const birthError = birthText === null ? BIRTH_INCOMPLETE : birthDateError(birthText, todayNoon);
   const birthValid = birthError === null && birthText !== null;
+  // One line of words under the three birth fields: each field is tied to it as onboarding's are
+  // (`aria-invalid` and `aria-describedby` on the web, the hint natively), so the error is said with the field.
+  const birthTie = birthValid
+    ? null
+    : {
+        accessibilityHint: birthError ?? undefined,
+        ...(Platform.OS === 'web' ? { 'aria-invalid': true, 'aria-describedby': BIRTH_ERROR_ID } : null),
+      };
   const splitError = customSplitError(custom);
   const macroValid = macroMode !== 'custom' || splitError === null;
   const heightMessage = heightError(draft.heightCm, u);
@@ -246,6 +265,7 @@ function GoalsForm() {
             <PreviewStat label="Fat" value={`${macros.fatG} g`} color={colors.fat} half={textSize >= 1.3} />
             <PreviewStat label="Water" value={formatVolume(water, u)} color={colors.water} half={textSize >= 1.3} />
           </View>
+          {notesShown ? (
           <Text variant="caption" color="textSecondary" testID="goals-preview-note">
             {draftRule === 'week'
               ? 'On a day without recent workouts. Each workout adds a seventh of its calories to the budget of its own day and the next six.'
@@ -253,8 +273,9 @@ function GoalsForm() {
                 ? 'On a day without workouts. A logged workout adds its calories to that day’s budget.'
                 : 'On a day without workouts. A workout raises that day’s water.'}
           </Text>
+          ) : null}
         </View>
-        {draft.goal !== 'maintain' ? (
+        {notesShown && draft.goal !== 'maintain' ? (
           <Text variant="label" color="text" style={{ marginTop: spacing.md }}>
             {!targetValid
               ? 'Enter a goal weight to see when this plan reaches it.'
@@ -262,9 +283,26 @@ function GoalsForm() {
           </Text>
         ) : null}
         {/* Where the target is set, said plainly: an estimate, not medical advice, and who checks with a doctor first. */}
-        <Text variant="caption" color="textSecondary" style={{ marginTop: spacing.md }} testID="goals-care-note">
-          {TARGET_CARE_NOTE}
-        </Text>
+        {notesShown ? (
+          <Text variant="caption" color="textSecondary" style={{ marginTop: spacing.md }} testID="goals-care-note">
+            {TARGET_CARE_NOTE}
+          </Text>
+        ) : null}
+        {compact ? (
+          // The kit's way to open more: a small ghost button centred under what it opens, with its state.
+          <Button
+            testID="goals-preview-more"
+            title={details ? 'Fewer details' : 'Details'}
+            accessibilityLabel={details ? 'Fewer details about this target' : 'Details about this target, its plan and a care note'}
+            variant="ghost"
+            size="sm"
+            full={false}
+            expanded={details}
+            icon={details ? <ChevronUp size={18} color={colors.primaryInk} strokeWidth={2.2} /> : <ChevronDown size={18} color={colors.primaryInk} strokeWidth={2.2} />}
+            style={{ alignSelf: 'center', marginTop: spacing.sm }}
+            onPress={() => setDetails((d) => !d)}
+          />
+        ) : null}
       </Card>
 
       <Group title="Goal">
@@ -291,7 +329,7 @@ function GoalsForm() {
                 value={draft.targetWeightKg ? Math.round(weightValue(draft.targetWeightKg, u) * 10) / 10 : null}
                 onChange={(v) => patch({ targetWeightKg: v ? weightToKg(v, u) : undefined })}
                 error={targetMessage}
-                hint={`Now ${formatWeight(draft.weightKg, u)}`}
+                hint={`Now ${weightFixed(draft.weightKg, u)}`}
               />
               <View style={{ gap: spacing.sm }}>
                 <Text variant="label" color="textSecondary">
@@ -309,12 +347,12 @@ function GoalsForm() {
                     step={rateStep}
                     min={rateStep}
                     max={maxRate}
-                    format={(n) => formatWeight(n, u, 1)}
+                    format={(n) => weightFixed(n, u)}
                     onChange={(weeklyRateKg) => patch({ weeklyRateKg })}
                   />
                 </View>
                 <Hint>
-                  Safe maximum {formatWeight(maxRate, u, 1)} a week ({draft.goal === 'lose' ? '1%' : '0.5%'} of body weight)
+                  Safe maximum {weightFixed(maxRate, u)} a week ({draft.goal === 'lose' ? '1%' : '0.5%'} of body weight)
                 </Hint>
               </View>
             </>
@@ -413,6 +451,7 @@ function GoalsForm() {
                   style={{ flex: part === 'year' ? 1.45 : 1 }}
                   value={birth[part]}
                   onChange={(v) => setBirth((b) => ({ ...b, [part]: v }))}
+                  {...(birthTie as object)}
                 />
               ))}
             </View>
@@ -421,7 +460,7 @@ function GoalsForm() {
                 {`${birthDateWords(birthText)} · ${ageFromBirthDate(birthText, todayNoon)} years old`}
               </Text>
             ) : (
-              <Text variant="caption" color="danger" testID="goals-birth-error">
+              <Text variant="caption" color="danger" testID="goals-birth-error" nativeID={BIRTH_ERROR_ID} accessibilityLiveRegion="polite">
                 {birthError}
               </Text>
             )}
@@ -599,7 +638,17 @@ function GoalsForm() {
             animated: false,
           });
         }}>
-        <Group title="How the budget works" footer={model.adaptive.observed === null ? `Learning starts after ${model.adaptive.needs ?? 'a little more data'}.` : undefined}>
+        {/* The row's own line keeps to two lines at 320 px (a ListRow subtitle is clamped there); what the switch
+            does with the figure is the group's footer, so neither is cut. */}
+        <Group
+          title="How the budget works"
+          footer={
+            model.adaptive.observed === null
+              ? `Learning starts after ${model.adaptive.needs ?? 'a little more data'}.`
+              : draft.useAdaptiveTdee
+                ? 'Your target blends what your logs show with the formula.'
+                : 'Turned on, your target blends what your logs show with the formula.'
+          }>
           <ToggleRow
             testID="goals-eat-back"
             title="Add exercise to my budget"
@@ -633,7 +682,7 @@ function GoalsForm() {
             title="Learn from my data"
             subtitle={
               model.adaptive.observed !== null
-                ? `Your logs and weigh-ins suggest you burn about ${formatNumber(model.adaptive.observed)} kcal a day. ${draft.useAdaptiveTdee ? 'Your target blends this with the formula.' : 'On, your target blends this with the formula.'}`
+                ? `Your logs suggest you burn about ${formatNumber(model.adaptive.observed)} kcal a day.`
                 : 'Compares what you log with your weight trend.'
             }
             value={draft.useAdaptiveTdee}

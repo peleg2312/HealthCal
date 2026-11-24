@@ -28,9 +28,8 @@ describe('favourite words', () => {
     expect(favoriteToast('Usual breakfast', true, 'meal')).toBe('Added to favourites: "Usual breakfast"');
     expect(favoriteToast('Usual breakfast', false, 'meal')).toBe('Removed from favourites: "Usual breakfast"');
   });
-  it('labels say what a tap does', () => {
-    expect(favoriteLabel('Usual breakfast', false)).toBe('Add Usual breakfast to favourites');
-    expect(favoriteLabel('Usual breakfast', true)).toBe('Remove Usual breakfast from favourites');
+  it('labels: the star keeps one name whatever its state; the long press says what it does', () => {
+    expect(favoriteLabel('Usual breakfast')).toBe('Favourite Usual breakfast');
     expect(favoriteActionLabel(false)).toBe('Add to favourites');
     expect(favoriteActionLabel(true)).toBe('Remove from favourites');
     // A saved-meal row's "+" names the meal it logs.
@@ -39,7 +38,8 @@ describe('favourite words', () => {
   it("the + sheet's overline names favourites only when one is in the row, and never 'usual' without usual foods", () => {
     expect(quickRowTitle({ meal: 'lunch', favourites: false, usual: true, saved: true })).toBe('Usual for lunch');
     expect(quickRowTitle({ meal: 'lunch', favourites: false, usual: false, saved: true })).toBe('Saved meal');
-    expect(quickRowTitle({ meal: 'lunch', favourites: true, usual: true, saved: false })).toBe('Favourites and usual for lunch');
+    expect(quickRowTitle({ meal: 'lunch', favourites: true, usual: true, saved: false })).toBe('Usual for lunch and favourites');
+    expect(quickRowTitle({ meal: 'lunch', favourites: true, usual: true, saved: true })).toBe('Usual for lunch and favourites');
     expect(quickRowTitle({ meal: 'lunch', favourites: true, usual: false, saved: true })).toBe('Favourites and saved meals');
     expect(quickRowTitle({ meal: 'lunch', favourites: true, usual: false, saved: false })).toBe('Favourites');
   });
