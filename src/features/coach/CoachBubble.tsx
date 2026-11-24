@@ -1,33 +1,38 @@
-import { Flag } from 'lucide-react-native';
+import { Flag, Info, LifeBuoy } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { useWindowDimensions, View, type LayoutChangeEvent } from 'react-native';
+import { View, type LayoutChangeEvent } from 'react-native';
 
 import { limitInfoFrom } from '@/features/ai/limit';
 import { startsRtl } from '@/lib/bidi';
 import { cup, useTheme } from '@/theme';
-import { Button, CupKey, PressableScale, Text } from '@/ui';
+import { Button, Card, CupKey, FadeUp, PressableScale, Text } from '@/ui';
 
+import { AnswerText } from './AnswerText';
+import { CoachMark } from './CoachMark';
 import { reportable } from './report';
 import { useReportedAnswers } from './reportSend';
 import { ReportSheet } from './ReportSheet';
 import { shownAnswer, type CoachMessage } from './request';
-import { AI_MARK, coachLimitText, LOCAL_MARK, NOTICE, REFER_LINE, REPORT_OPEN, REPORT_OPEN_LABEL, REPORTED, SEE_WHAT_FITS, SIGN_IN, TRY_AGAIN } from './words';
+import { AI_MARK, coachLimitText, LOCAL_MARK, NOTICE, REFER_LINE, REPORT_OPEN, REPORT_OPEN_LABEL, REPORTED, SIGN_IN, TRY_AGAIN } from './words';
 
 /**
- * A message drawn as a cup card: the person's on the right on surfaceAlt, the coach's across the column
- * on surface, each answer with its mark ("AI" or "From your data, on this phone"). A message that starts
- * with a Hebrew letter is laid out right to left. Its actions (open What fits, try again, sign in)
- * are buttons beside the card's text, never a pressable card.
- *
- * An AI answer (and nothing else) carries a quiet "Report" control at the right of its mark
- * (`coach-report-<i>`), which opens "Report this answer" (./ReportSheet.tsx); once sent, the control
- * reads "Reported" (`coach-reported-<i>`) for the rest of this run of the app.
+ * One message of the chat, each kind looking like what it is (spec section 3.2):
+ * - the person's words: a tinted bubble on the right (primarySoft over the page, ink text);
+ * - an answer from the phone: a card with the level line across its top, its live content (the
+ *   training chart, the idea rows) or its stored text, and the mark "From your data, on this phone";
+ * - the AI's answer: unboxed text under the small coach cup and "AI coach", laid out by
+ *   `answerBlocks` (./format.ts), with the emergency line when the server flags it and a quiet
+ *   "Report" under it (`coach-report-<i>`, then `coach-reported-<i>`);
+ * - the app's own line (a notice): a quiet caption row with its one action.
+ * A message that starts with a Hebrew letter is laid out right to left. Actions are siblings of the
+ * text, never a pressable card.
  */
 export function CoachBubble({
   message,
   testID,
   onLayout,
-  onFits,
+  live,
+  arrive = false,
   onRetry,
   onSignIn,
   onPlans,
@@ -36,8 +41,10 @@ export function CoachBubble({
   message: CoachMessage;
   testID: string;
   onLayout?: (e: LayoutChangeEvent) => void;
-  /** The ideas answer's "See what fits" (only on the newest one). */
-  onFits?: () => void;
+  /** A phone answer's live card content (the newest of today); else its stored text is shown. */
+  live?: React.ReactNode;
+  /** An AI answer that has just arrived: its blocks fade up one after another (ruling L5). */
+  arrive?: boolean;
   /** "Try again" on the newest failure that may work a second time. */
   onRetry?: () => void;
   onSignIn?: () => void;
@@ -49,79 +56,107 @@ export function CoachBubble({
   const { colors, radius, spacing } = useTheme();
   const [reporting, setReporting] = useState(false);
   const reported = useReportedAnswers((s) => s.ids.includes(message.id));
-  const canReport = !!report && reportable(message);
-  const width = useWindowDimensions().width;
-  const mine = message.role === 'user';
-  // A limit notice with plans on is worded from the limit answer's fields; anything else is NOTICE's words.
-  const limit = message.source === 'notice' && (message.notice === 'daily_limit' || message.notice === 'shared_limit') ? limitInfoFrom(message.limit ? { plansOn: true, ...message.limit } : null) : null;
-  const text =
-    message.source === 'notice' ? (limit ? coachLimitText(limit) : NOTICE[message.notice].text) : message.source === 'ai' ? shownAnswer(message) : message.text;
-  const rtl = startsRtl(text);
-  const mark = message.source === 'ai' ? AI_MARK : message.source === 'local' && message.role === 'assistant' ? LOCAL_MARK : null;
-  return (
-    <View
-      testID={testID}
-      onLayout={onLayout}
-      style={{
-        // The coach's answers take the column's width; the person's own message sits at the right,
-        // at most about two thirds of the screen, so the two read apart at a glance.
-        alignSelf: mine ? 'flex-end' : 'stretch',
-        maxWidth: mine ? Math.round(Math.min(width, 560) * 0.68) : undefined,
-        ...cup(radius.card),
-        backgroundColor: mine ? colors.surfaceAlt : colors.surface,
-        borderWidth: mine ? 0 : 1,
-        borderColor: colors.border,
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
-        gap: spacing.sm,
-      }}>
-      {mark ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <CupKey color={message.source === 'ai' ? colors.primary : colors.exercise} size={8} variant={message.source === 'ai' ? 'dashed' : 'filled'} />
-          <Text variant="caption" color="textSecondary" testID={message.source === 'ai' ? 'coach-mark-ai' : 'coach-mark-local'} style={{ flex: 1 }}>
-            {mark}
+
+  if (message.role === 'user') {
+    const rtl = startsRtl(message.text);
+    return (
+      <View
+        testID={testID}
+        onLayout={onLayout}
+        style={{ alignSelf: 'flex-end', maxWidth: '80%', ...cup(radius.buttonSm, 5), backgroundColor: colors.primarySoft, paddingVertical: 10, paddingHorizontal: 14 }}>
+        {/* An array child: the kit leaves a right-to-left message's direction alone (it marks a lone string as left to right). */}
+        <Text variant="body" color="text" style={rtl ? { writingDirection: 'rtl', textAlign: 'right' } : null} selectable>
+          {[message.text]}
+        </Text>
+      </View>
+    );
+  }
+
+  if (message.source === 'local') {
+    return (
+      <Card testID={testID} onLayout={onLayout} padding={16} accessibilityLabel={live ? message.text : undefined} style={{ gap: spacing.md }}>
+        {/* The chat's signature: the level line across the card's top. */}
+        <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: colors.rim }} />
+        {live ?? (
+          <Text variant="body" selectable>
+            {[message.text]}
           </Text>
-          {canReport && report ? (
-            reported ? (
-              <Text variant="caption" color="textSecondary" testID={`coach-reported-${report.index}`}>
-                {REPORTED}
-              </Text>
+        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <CupKey color={colors.exercise} size={8} />
+          <Text variant="caption" color="textSecondary" testID="coach-mark-local">
+            {LOCAL_MARK}
+          </Text>
+        </View>
+      </Card>
+    );
+  }
+
+  if (message.source === 'ai') {
+    const canReport = !!report && reportable(message);
+    return (
+      <View testID={testID} onLayout={onLayout} style={{ gap: spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <CoachMark size="small" />
+          <Text variant="caption" color="textSecondary" testID="coach-mark-ai">
+            {AI_MARK}
+          </Text>
+        </View>
+        <AnswerText text={shownAnswer(message)} arrive={arrive} />
+        {message.refer ? (
+          <Card tone="alt" testID="coach-refer" padding={12} style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
+            <LifeBuoy size={16} color={colors.warningInk} strokeWidth={1.9} style={{ marginTop: 2 }} />
+            <Text variant="body" color="text" style={{ flex: 1 }}>
+              {REFER_LINE}
+            </Text>
+          </Card>
+        ) : null}
+        {canReport && report ? (
+          <FadeUp disabled={!arrive} delay={240}>
+            {reported ? (
+              <View style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }}>
+                <Text variant="caption" color="textSecondary" testID={`coach-reported-${report.index}`}>
+                  {REPORTED}
+                </Text>
+              </View>
             ) : (
-              // Quiet: a small flag and a word in the mark's colour. Its box is 44 px tall for the touch, and its
-              // negative margins keep the mark's row at the mark's own height (the card's 12 px padding holds the rest).
               <PressableScale
                 testID={`coach-report-${report.index}`}
                 accessibilityRole="button"
                 accessibilityLabel={REPORT_OPEN_LABEL}
                 onPress={() => setReporting(true)}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 44, marginVertical: -12, paddingLeft: spacing.sm }}>
-                <Flag size={18} color={colors.textSecondary} strokeWidth={1.9} />
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44, alignSelf: 'flex-start', paddingRight: spacing.sm }}>
+                <Flag size={16} color={colors.textSecondary} strokeWidth={1.9} />
                 <Text variant="caption" color="textSecondary">
                   {REPORT_OPEN}
                 </Text>
               </PressableScale>
-            )
-          ) : null}
-        </View>
-      ) : null}
-      {/* An array child: the kit leaves a right-to-left message's direction alone (it marks a lone string as left to right). */}
-      <Text variant="body" color={message.source === 'notice' ? 'textSecondary' : 'text'} style={rtl ? { writingDirection: 'rtl', textAlign: 'right' } : null} selectable>
-        {[text]}
-      </Text>
-      {message.source === 'ai' && message.refer ? (
-        <Text variant="caption" color="text" testID="coach-refer">
-          {REFER_LINE}
+            )}
+            <ReportSheet visible={reporting} message={message} question={report.question} onClose={() => setReporting(false)} />
+          </FadeUp>
+        ) : null}
+      </View>
+    );
+  }
+
+  // A notice: the app's own line, quiet, with at most one action under it.
+  const limit = message.notice === 'daily_limit' || message.notice === 'shared_limit' ? limitInfoFrom(message.limit ? { plansOn: true, ...message.limit } : null) : null;
+  const text = limit ? coachLimitText(limit) : NOTICE[message.notice].text;
+  return (
+    <View testID={testID} onLayout={onLayout} style={{ gap: spacing.sm }}>
+      <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
+        <Info size={16} color={colors.textSecondary} strokeWidth={1.9} style={{ marginTop: 3 }} />
+        <Text variant="body" color="textSecondary" style={{ flex: 1 }}>
+          {text}
         </Text>
-      ) : null}
-      {onFits || onRetry || onSignIn ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-          {onFits ? <Button testID="coach-local-fits" title={SEE_WHAT_FITS} variant="secondary" size="sm" full={false} onPress={onFits} /> : null}
+      </View>
+      {onRetry || onSignIn || onPlans ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingLeft: 24 }}>
           {onRetry ? <Button testID="coach-retry" title={TRY_AGAIN} variant="secondary" size="sm" full={false} onPress={onRetry} /> : null}
           {onSignIn ? <Button testID="coach-sign-in" title={SIGN_IN} variant="secondary" size="sm" full={false} onPress={onSignIn} /> : null}
+          {onPlans ? <Button testID="coach-limit-plans" title={onPlans.label} variant="ghost" size="sm" full={false} onPress={onPlans.onPress} /> : null}
         </View>
       ) : null}
-      {onPlans ? <Button testID="coach-limit-plans" title={onPlans.label} variant="ghost" size="sm" full={false} onPress={onPlans.onPress} style={{ alignSelf: 'flex-start' }} /> : null}
-      {canReport && report ? <ReportSheet visible={reporting} message={message} question={report.question} onClose={() => setReporting(false)} /> : null}
     </View>
   );
 }

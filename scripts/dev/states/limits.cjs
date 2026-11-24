@@ -27,7 +27,7 @@ const backend = [
   {
     id: 'limits-coach-free',
     route: '/auth?mode=signin',
-    taps: [...signIn, 'today-profile', 'profile-coach', { wait: 800 }, { type: 'coach-input', text: 'daily limit please' }, 'coach-send', 'coach-consent-agree', { wait: 2500 }],
+    taps: [...signIn, 'today-coach-open', { wait: 800 }, { type: 'coach-input', text: 'daily limit please' }, 'coach-send', 'coach-consent-agree', { wait: 2500 }],
     waitFor: 'coach-limit-plans',
     note: 'the coach at the free plan’s limit: the notice and its quiet link',
   },

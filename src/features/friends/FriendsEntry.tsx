@@ -13,9 +13,10 @@ import { friendsAttention, loadFriendsSeen, useFriendsSeen } from './attention';
 /**
  * The way into Friends, in the same place on every tab header. A small count marks
  * requests waiting for an answer and cheers received since Friends was last opened;
- * there is no count while friends are off, signed out or loading.
+ * there is no count while friends are off, signed out or loading. `size` is the cup's visible
+ * size (the tab header's cups are 36 px; IconButton keeps the touch area at 44).
  */
-export function FriendsEntry({ testID }: { testID: string }) {
+export function FriendsEntry({ testID, size = 44, hitSlop }: { testID: string; size?: number; hitSlop?: { top: number; bottom: number; left: number; right: number } }) {
   const { colors } = useTheme();
   const status = useFriends((s) => s.status);
   const overview = useFriends((s) => s.overview);
@@ -25,7 +26,7 @@ export function FriendsEntry({ testID }: { testID: string }) {
   const count = friendsAttention(status, overview, seenAt, now.getTime());
   return (
     <View>
-      <IconButton testID={testID} accessibilityLabel={count ? `Friends, ${count} new` : 'Friends'} onPress={() => router.push('/friends' as never)}>
+      <IconButton testID={testID} size={size} hitSlop={hitSlop} accessibilityLabel={count ? `Friends, ${count} new` : 'Friends'} onPress={() => router.push('/friends' as never)}>
         <Users size={20} color={colors.text} strokeWidth={1.9} />
       </IconButton>
       {count ? (

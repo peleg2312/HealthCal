@@ -99,6 +99,7 @@ export function IconButton({
   style,
   testID,
   disabled,
+  hitSlop,
 }: {
   children: React.ReactNode;
   onPress?: () => void;
@@ -108,6 +109,8 @@ export function IconButton({
   style?: StyleProp<ViewStyle>;
   testID?: string;
   disabled?: boolean;
+  /** The touch area past the cup's edge, when it must differ from the default (44 px in all). The tab header's cups pass theirs. */
+  hitSlop?: { top: number; bottom: number; left: number; right: number };
 }) {
   const { colors } = useTheme();
   const bg = tone === 'primary' ? colors.primary : tone === 'alt' ? colors.surfaceAlt : tone === 'surface' ? colors.surface : 'transparent';
@@ -117,7 +120,7 @@ export function IconButton({
       onPress={onPress}
       disabled={disabled}
       scaleTo={0.92}
-      hitSlop={Math.max(0, Math.ceil((44 - size) / 2))}
+      hitSlop={hitSlop ?? Math.max(0, Math.ceil((44 - size) / 2))}
       accessibilityLabel={accessibilityLabel}
       style={[
         {

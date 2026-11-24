@@ -222,9 +222,9 @@ describe('every answer of coach-chat in the app', () => {
     const free = coachErrorFrom(429, { error: 'daily_limit', remaining: 0, limit: 5, plan: 'free', plansOn: true, resetsAt: '2026-11-24T00:00:00.000Z' });
     expect(free.kind).toBe('daily_limit');
     expect(free.limit).toMatchObject({ limit: 5, plan: 'free', shared: false });
-    expect(coachLimitText(free.limit!)).toBe(`5 questions today. The two buttons above still answer from your phone. ${moreAfter('2026-11-24T00:00:00.000Z')}`);
+    expect(coachLimitText(free.limit!)).toBe(`5 questions today. Questions marked From your data still work. ${moreAfter('2026-11-24T00:00:00.000Z')}`);
     const plus = coachErrorFrom(429, { error: 'daily_limit', remaining: 0, limit: 30, plan: 'plus', plansOn: true, resetsAt: '2026-11-24T00:00:00.000Z' });
-    expect(coachLimitText(plus.limit!)).toMatch(/^30 questions today\. The two buttons above still answer from your phone\. More after \d\d:\d\d\.$/);
+    expect(coachLimitText(plus.limit!)).toMatch(/^30 questions today\. Questions marked From your data still work\. More after \d\d:\d\d\.$/);
     const shared = coachErrorFrom(429, { error: 'shared_limit', remaining: 0, limit: 5, plan: 'free', plansOn: true, resetsAt: '2026-11-24T00:00:00.000Z' });
     expect(shared.limit?.shared).toBe(true);
     expect(coachLimitText(shared.limit!)).toMatch(/^The AI coach is busy for today\./);

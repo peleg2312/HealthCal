@@ -8,7 +8,9 @@
  *
  *   top   distance from the top of the page to the first visible thing in the header
  *   h     the header's visible height (its first to its last visible pixel)
- *   gap   from the header's last visible pixel to the first visible content under it
+ *   gap   from the header's last visible pixel to the first visible content under it (on the coach,
+ *         to the top of the hero's room, `coach-hello`, whose mark and greeting are centred in it on purpose;
+ *         its row says "+ hero")
  *   title where the title's text starts, below the header's top
  *   lines the lines of text in the title block (a title and its one short line make 2)
  *
@@ -45,7 +47,7 @@ const PUSHED = [
   '/profile', '/friends', '/water', '/weight', '/body', '/sleep', '/fasting', '/recap', '/consistency',
   '/settings/goals', '/settings/reminders', '/settings/account', '/settings/data', '/settings/about', '/settings/health-sync',
   '/food/search?meal=lunch', '/food/quick?meal=lunch', '/food/custom?meal=lunch', '/food/meals?meal=lunch', '/food/photo?meal=lunch&mode=text',
-  '/activity/pick', '/activity/log?activityId=running', '/activity/strength', '/activity/import', '/friends/add?invite=ABCD2345', '/morning',
+  '/activity/pick', '/activity/log?activityId=running', '/activity/strength', '/activity/import', '/friends/add?invite=ABCD2345', '/morning', '/coach',
 ];
 const ROUTES = flags.routes ? String(flags.routes).split(',').filter(Boolean) : [...TABS, ...PUSHED];
 
@@ -84,8 +86,16 @@ function measure() {
     bottom = Math.max(bottom, r.bottom);
   }
   let next = Infinity;
+  // The coach's hero (`coach-hello`) is centred in the room above the starters by design: its room
+  // starts where the content does, so the gap is measured to the hero's box, not to its centred mark.
+  const hero = document.querySelector('[data-testid="coach-hello"]');
+  const heroBox = hero && hero.getBoundingClientRect();
+  if (heroBox && heroBox.height > 0 && heroBox.top >= bottom - 1 && heroBox.top <= window.innerHeight) {
+    next = heroBox.top;
+    how += ' + hero';
+  }
   for (const el of document.querySelectorAll('body *')) {
-    if (root.contains(el) || el.contains(root)) continue;
+    if (root.contains(el) || el.contains(root) || (hero && hero.contains(el))) continue;
     const r = visible(el);
     if (!r || isBackdrop(r) || r.top < bottom - 1 || r.top > window.innerHeight) continue;
     next = Math.min(next, r.top);

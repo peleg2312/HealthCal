@@ -894,6 +894,7 @@ const api = http.createServer(async (req, res) => {
      *   - "shared limit": 429 shared_limit;   "busy now": 503 busy;   "too slow": 504 timeout;
      *   - "server error": 502 upstream;   "please decline": 422 declined;
      *   - "cut short": 200 with truncated: true;   "refer me": 200 with refer: true;
+     *   - "wait N seconds" (N up to 20): the ordinary answer, N seconds later;
      *   - anything else: 200 with a fixed answer naming what was received (Hebrew when the question starts with a Hebrew letter).
      * Every request is kept in state.coachRequests (GET /__state), with its body exactly as received.
      */
@@ -976,6 +977,9 @@ const api = http.createServer(async (req, res) => {
     if (/refer me/i.test(message)) {
       return reply(200, { text: 'This is the stand-in coach. This is worth talking about with a doctor, and you deserve support.', remaining, refer: true });
     }
+    // "wait 3 seconds" (up to 20): the answer comes that much later, for the app's waiting row and the unread mark.
+    const pause = /wait (\d+) seconds?/i.exec(message);
+    if (pause) await new Promise((done) => setTimeout(done, Math.min(20, Number(pause[1])) * 1000));
     const text = /^[א-ת]/.test(message)
       ? `זו תשובה של מאמן לדוגמה. התקבלו ${history.length} הודעות קודמות, ו${note ? 'סיכום השבוע שלך' : 'בלי סיכום של השבוע'}. אפשר לנסות יום קל השבוע.`
       : `This is the stand-in coach. It received your question "${message}", ${history.length} earlier messages, and ${note ? `a summary of your week (${note.length} characters)` : 'no summary of your week'}. Try one easy day this week.`;

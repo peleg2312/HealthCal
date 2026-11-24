@@ -1230,10 +1230,16 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   }
 
   // ------------------------------------------- the coach (src/app/coach.tsx, src/features/coach)
-  // Without a backend: the ways in (Train's link, the overview sheet's button, Profile's row), the two questions answered on
-  // the phone (the training answer carries the same minutes as the overview sheet, the ideas answer opens What fits), a typed
-  // question answered by the needs-an-account line with no request to coach-chat, the under-18 line, a Hebrew question laid
-  // out right to left, the footer on the faked keyboard with the two buttons above it, and Clear chat with its Undo.
+  // Without a backend: the way in (the Coach cup first on every tab header, rising as a task screen whose X returns to the
+  // same tab, scroll and day, with an unsent question kept), no other way in left (Train's link, Profile's row), the two
+  // questions answered on the phone (the training answer carries the same minutes as the overview sheet, the ideas answer
+  // opens What fits), the overview sheet's "Ask the coach" arriving already answered (?ask=training), Today's "Ask the
+  // coach" beside the coach card's action, the Coach cup as the one accented cup, no "the coach moved" toast in an
+  // automated browser that did not ask, a typed question with no backend (the placeholder says typed questions need the
+  // app with an account, Send is the outline cup and does nothing, no sign-in is offered, no request to coach-chat), the
+  // footer on the faked keyboard under a visible header, and Clear chat (in "What the coach sees") with its Undo. The AI
+  // starters, sending after consent, the signed-out Send that opens sign-in, the under-18 line, a Hebrew question laid
+  // out right to left and the unread mark need a backend: e2e-backend.cjs.
   {
     const { buildSeed } = await import(require('url').pathToFileURL(require('path').join(__dirname, 'seed.mjs')).href);
     const seed = buildSeed({ onboarded: true, theme: 'dark' });
@@ -1262,81 +1268,191 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     const ctext = async (id) => (await cp.getByTestId(id).first().innerText({ timeout: 15000 })).replace(/\u00A0/g, ' ').replace(/[\u2060\u200E\u2068\u2069]/g, '').trim();
     const ctap = async (id) => { await cp.getByTestId(id).first().click({ timeout: 15000 }); await cp.waitForTimeout(450); };
     const onCoach = () => cp.waitForURL((u) => new URL(u).pathname === '/coach', { timeout: 15000 }).then(() => true, () => false);
+    const onPath = (path) => cp.waitForURL((u) => new URL(u).pathname === path, { timeout: 15000 }).then(() => true, () => false);
+    const subtitle = async () => ((await ctext('screen-header')).split('\n').map((l) => l.trim()).filter(Boolean)[1] || '');
+    // The tab's own scroll position (the tallest scrolling box, the Screen's ScrollView), moved to `set` when given.
+    const scrollBox = (set) =>
+      cp.evaluate((to) => {
+        const boxes = [...document.querySelectorAll('div')].filter((d) => {
+          const o = getComputedStyle(d).overflowY;
+          return (o === 'auto' || o === 'scroll') && d.scrollHeight > d.clientHeight + 40 && d.getBoundingClientRect().height > 200;
+        });
+        const box = boxes.sort((x, y) => y.scrollHeight - x.scrollHeight)[0];
+        if (!box) return -1;
+        if (to != null) box.scrollTop = to;
+        return Math.round(box.scrollTop);
+      }, set ?? null);
+
+    // The way in: the Coach cup, first of the three cups on every tab's header.
+    for (const tab of ['today', 'diary', 'train', 'progress']) {
+      await cp.goto(`${BASE}/${tab === 'today' ? '' : tab}`, { waitUntil: 'networkidle' });
+      await cp.getByTestId(`${tab}-coach-open`).first().waitFor({ timeout: 15000 });
+      const order = await cp.evaluate((t) => {
+        const ids = [`${t}-coach-open`, `${t}-friends`, `${t}-profile`];
+        const boxes = ids.map((id) => [...document.querySelectorAll(`[data-testid="${id}"]`)].find((e) => e.getBoundingClientRect().width > 0)?.getBoundingClientRect());
+        if (boxes.some((b) => !b)) return 'missing';
+        const header = document.querySelector('[data-testid="tab-header"]').getBoundingClientRect();
+        return boxes.map((b) => `${Math.round(b.left)}:${Math.round(b.width)}x${Math.round(b.height)}`).join(' ') + ` h${Math.round(header.height)}`;
+      }, tab);
+      const xs = order === 'missing' ? [] : order.split(' ').slice(0, 3).map((t) => t.split(':'));
+      check(
+        `coach: ${tab}'s header has Coach, Friends and the profile tile, 36 px cups 4 px apart, in a 68 px header`,
+        xs.length === 3 && xs.every(([, wh]) => wh === '36x36') && Number(xs[1][0]) - Number(xs[0][0]) === 40 && Number(xs[2][0]) - Number(xs[1][0]) === 40 && / h68$/.test(order),
+        order,
+      );
+      check(`coach: ${tab}'s Coach cup is labelled "Coach"`, (await cp.getByTestId(`${tab}-coach-open`).first().getAttribute('aria-label')) === 'Coach');
+      const fills = await cp.evaluate((t) => [`${t}-coach-open`, `${t}-friends`].map((id) => { const e = [...document.querySelectorAll(`[data-testid="${id}"]`)].find((x) => x.getBoundingClientRect().width > 0); return e ? getComputedStyle(e).backgroundColor : 'none'; }), tab);
+      check(`coach: ${tab}'s Coach cup is the one tinted cup (Friends keeps its plain fill)`, fills[0] !== 'none' && fills[0] !== fills[1], fills.join(' vs '));
+    }
+    await cp.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+    await cp.waitForTimeout(2600);
+    check('coach: no "the coach is now at the top" toast in an automated browser that did not ask for it', !/The coach is now at the top/.test(await cp.evaluate(() => document.body.innerText)) && (await cp.evaluate(() => localStorage.getItem('healthcal.coachMovedSaid'))) === null);
+    // Early in the week "Your week is ready" stands in the coach card's place: mark last week's check-in seen so the card shows.
+    await cp.evaluate(() => {
+      const d = new Date();
+      d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - 7);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      window.__healthcal.getState().setSettings({ recapSeenWeek: key });
+    });
+    await cp.getByTestId('today-coach').first().waitFor({ timeout: 10000 }).catch(() => {});
+    const coachAction = await cp.locator('[data-testid="today-coach-action"], [data-testid="today-coach-water"], [data-testid="today-coach-repeat"]').count();
+    if (!coachAction) {
+      check('coach: a coach card with no action of its own gets no "Ask the coach" (nothing is added)', (await cp.getByTestId('today-coach-ask').count()) === 0);
+    } else if (await cp.getByTestId('today-coach-ask').count()) {
+      const row = await cp.evaluate(() => {
+        const a = document.querySelector('[data-testid="today-coach-ask"]').getBoundingClientRect();
+        const card = document.querySelector('[data-testid="today-coach"]');
+        const other = [...card.querySelectorAll('[data-testid^="today-coach-"]')].find((e) => e.getAttribute('data-testid') !== 'today-coach-ask').getBoundingClientRect();
+        return { same: Math.abs(a.top - other.top) < 1 };
+      });
+      check('coach: Today\'s "Ask the coach" sits in the same row as the coach card\'s action at 360 px', row.same, JSON.stringify(row));
+      await ctap('today-coach-ask');
+      check('coach: Today\'s "Ask the coach" opens the coach', await onCoach(), cp.url());
+      await ctap('header-close');
+      await onPath('/');
+    } else {
+      check('coach: Today shows the coach card with "Ask the coach" beside its action (the demo day at this hour has one)', false, 'today-coach-ask not found');
+    }
+    check('coach: Train has no "Coach" link in its content any more', (await cp.getByTestId('train-coach').count()) === 0);
+    await cp.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
+    await cp.getByTestId('profile-goals').first().waitFor({ timeout: 15000 }).catch(() => {});
+    check('coach: Profile has no "Coach" row any more', (await cp.getByTestId('profile-coach').count()) === 0);
 
     await cp.goto(`${BASE}/train`, { waitUntil: 'networkidle' });
-    await ctap('train-coach');
-    check('coach: Train\'s "Coach" link opens the coach', await onCoach(), cp.url());
-    await cp.goto(`${BASE}/train`, { waitUntil: 'networkidle' });
-    const infoId = (await cp.getByTestId('train-load-info').count()) ? 'train-load-info' : 'train-guideline-help';
-    await ctap(infoId);
-    const sheetNumbers = await ctext('train-load-numbers');
-    await ctap('train-load-coach');
-    check('coach: the overview sheet\'s "Ask the coach" closes the sheet and opens the coach', (await onCoach()) && (await cp.getByTestId('train-load-sheet').count()) === 0, cp.url());
-    await cp.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
-    await ctap('profile-coach');
-    check('coach: Profile\'s "Coach" row opens the coach', await onCoach(), cp.url());
-    await cp.waitForTimeout(500);
-    check('coach: the fixed line says what it is', (await ctext('coach-line')) === 'AI coach · not medical advice' && (await cp.getByTestId('coach-empty').count()) === 1);
+    await ctap('train-coach-open');
+    check('coach: Train\'s Coach cup opens the coach, before anything is asked', (await onCoach()) && (await cp.getByTestId('coach-empty').count()) === 1, cp.url());
+    check('coach: without an account the short line under the title says the answers come from this phone', (await subtitle()) === 'Answers from this phone', await subtitle());
+    await ctap('header-close');
+    check('coach: its X goes back to Train', await onPath('/train'), cp.url());
+
+    // The diary under the coach is the one that was left: the same day and the same scroll.
+    await cp.goto(`${BASE}/diary`, { waitUntil: 'networkidle' });
+    const yesterdayDate = await cp.evaluate(() => {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    });
+    await ctap(`diary-day-${yesterdayDate}`);
+    const scrolled = await scrollBox(240);
+    await cp.waitForTimeout(300);
+    await ctap('diary-coach-open');
+    const diaryOpened = await onCoach();
+    await ctap('header-close');
+    await onPath('/diary');
+    await cp.waitForTimeout(400);
+    const dayShown = await cp.getByTestId(`diary-day-${yesterdayDate}`).first().getAttribute('aria-selected');
+    const scrollAfter = await scrollBox();
+    check('coach: from the diary and back with the X, the diary shows the same day at the same scroll', diaryOpened && dayShown === 'true' && scrolled > 0 && Math.abs(scrollAfter - scrolled) <= 2, `day ${dayShown}, scroll ${scrolled} -> ${scrollAfter}`);
+
+    // An unsent question is kept when the coach closes and opens again (memory only, src/features/coach/session.ts).
+    await cp.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+    await ctap('today-coach-open');
+    await onCoach();
+    await cp.getByTestId('coach-input').first().fill('Half a question');
+    await cp.waitForTimeout(200);
+    await ctap('header-close');
+    await onPath('/');
+    await ctap('today-coach-open');
+    await onCoach();
+    check('coach: an unsent question is still in the field after closing and opening the coach', (await cp.getByTestId('coach-input').first().inputValue()) === 'Half a question');
+    await cp.getByTestId('coach-input').first().fill('');
+    // No account here: the AI starters are not offered as questions to send; at most the one sign-in tile.
+    const aiTiles = await cp.getByTestId('coach-ai-starter-0').count();
+    check('coach: without an account no AI starter is offered, and nothing was sent', aiTiles === 0 && sent.length === 0, `${aiTiles} AI tiles, sign-in tile ${await cp.getByTestId('coach-sign-in-starter').count()}`);
 
     await ctap('coach-local-training');
     const training = await ctext('coach-local-answer');
-    check('coach: "How is my training week?" is answered on the phone with the overview\'s own numbers', training.includes(sheetNumbers.split(',')[0]) && training.includes('From your data, on this phone'), training.slice(0, 160));
+    check('coach: "How is my training week?" is answered on the phone, marked as from your data', /From your data, on this phone/.test(training), training.slice(0, 160));
+    check('coach: the starters leave once the chat has a message today', (await cp.getByTestId('coach-empty').count()) === 0);
     await ctap('coach-local-ideas');
     const ideasText = await ctext('coach-local-answer');
-    check('coach: the ideas button is answered on the phone with the meals that fit (or the neutral line)', /Meals that fit|above the budget|Under 150 kcal left/.test(ideasText), ideasText.slice(0, 120));
+    check('coach: the ideas question (a follow-up chip now) is answered on the phone with what fits (or the neutral line)', /kcal left|above the budget|over|Under 150 kcal left|Meals that fit/.test(ideasText) && /From your data, on this phone/.test(ideasText), ideasText.slice(0, 160));
     await ctap('coach-local-fits');
     check('coach: the ideas answer opens What fits', (await cp.getByTestId('fits-intro').count()) + (await cp.getByTestId('fits-over').count()) > 0);
     await cp.keyboard.press('Escape');
     await cp.waitForTimeout(400);
     check('coach: the phone answers sent nothing', sent.length === 0, `${sent.length} requests`);
 
+    // No backend at all (this build, like the hosted preview): typed questions cannot go anywhere, and the composer says so.
+    const placeholder = await cp.getByTestId('coach-input').first().getAttribute('placeholder');
+    check('coach: with no backend the field\'s placeholder says typed questions need an account (its short form on a narrow field)', /^(Typed questions need the app with an account|Typing needs an account)$/.test(placeholder || ''), placeholder);
+    const before = await cp.locator('[data-testid^="coach-question"], [data-testid^="coach-notice"]').count();
     await cp.getByTestId('coach-input').first().fill('How many rest days a week?');
-    await ctap('coach-send');
-    const noAccount = await ctext('coach-notice');
-    check('coach: without an account a typed question gets the needs-an-account line and a sign-in button, and nothing is sent', /needs an account/.test(noAccount) && (await cp.getByTestId('coach-sign-in').count()) === 1 && sent.length === 0, noAccount);
-    check('coach: the field is empty again after sending', (await cp.getByTestId('coach-input').first().inputValue()) === '');
+    await cp.getByTestId('coach-send').first().click({ timeout: 15000, force: true });
+    await cp.waitForTimeout(500);
+    const after = await cp.locator('[data-testid^="coach-question"], [data-testid^="coach-notice"]').count();
+    check(
+      'coach: with no backend Send does nothing: no question, no notice, no sign-in, the words stay, nothing is sent',
+      after === before && (await cp.getByTestId('coach-sign-in').count()) === 0 && (await onPath('/coach')) && (await cp.getByTestId('coach-input').first().inputValue()) === 'How many rest days a week?' && sent.length === 0,
+      `${before} -> ${after} messages, ${cp.url()}`,
+    );
+    await cp.getByTestId('coach-input').first().fill('');
 
-    await cp.getByTestId('coach-input').first().fill('כמה ימי מנוחה בשבוע?');
-    await ctap('coach-send');
-    const dir = await cp.evaluate(() => {
-      const box = document.querySelector('[data-testid="coach-question"]');
-      const t = box && [...box.querySelectorAll('div')].find((d) => /כמה/.test(d.textContent) && !d.querySelector('div'));
-      return t ? getComputedStyle(t).textAlign + '|' + getComputedStyle(t).direction : 'none';
-    });
-    check('coach: a question that starts with a Hebrew letter is laid out right to left', /^right\|rtl|^right\|/.test(dir), dir);
-
-    // Under 18 (a date of birth changed in Goals): the phone answers, the AI does not, and one neutral line says so.
-    const born = await cp.evaluate(() => window.__healthcal.getState().profile.birthDate);
-    await cp.evaluate(() => window.__healthcal.getState().setProfile({ birthDate: '2012-04-01' }));
-    await cp.getByTestId('coach-input').first().fill('Can you give me a plan?');
-    await ctap('coach-send');
-    check('coach: under 18 the typed question gets the 18-and-over line and nothing is sent', /18 and over/.test(await ctext('coach-notice')) && sent.length === 0, await ctext('coach-notice'));
-    await cp.evaluate((b) => window.__healthcal.getState().setProfile({ birthDate: b }), born);
-
-    // The keyboard: the footer (field and send) sits on it and the two phone buttons stay above the footer.
+    // The keyboard: the footer (field and send) sits on it, and the header stays in view above the chat.
     await cp.getByTestId('coach-input').first().click();
     await cp.evaluate(() => window.__keyboard(320));
     await cp.waitForTimeout(450);
     const kbm = await cp.evaluate(() => {
       const vis = (sel) => [...document.querySelectorAll(sel)].find((e) => e.getBoundingClientRect().height > 0)?.getBoundingClientRect();
       const f = vis('[data-testid="screen-footer"]');
-      return { visible: window.visualViewport.height, footerTop: f.top, footerBottom: f.bottom, input: vis('[data-testid="coach-input"]').bottom, chip: vis('[data-testid="coach-local-training"]').bottom, line: vis('[data-testid="coach-line"]').top, focus: document.activeElement?.getAttribute('data-testid') };
+      const h = vis('[data-testid="screen-header"]');
+      return { visible: window.visualViewport.height, footerTop: f.top, footerBottom: f.bottom, input: vis('[data-testid="coach-input"]').bottom, header: h ? h.top : -999, headerBottom: h ? h.bottom : 0, focus: document.activeElement?.getAttribute('data-testid') };
     });
-    check('coach: keyboard (faked, 320 px): the footer rides on it with the field, and the two buttons are above it', Math.abs(kbm.footerBottom - kbm.visible) <= 1 && kbm.input <= kbm.footerBottom && kbm.chip <= kbm.footerTop && kbm.line >= 0 && kbm.focus === 'coach-input', JSON.stringify(kbm));
+    check('coach: keyboard (faked, 320 px): the footer rides on it with the field, and the header stays in view', Math.abs(kbm.footerBottom - kbm.visible) <= 1 && kbm.input <= kbm.footerBottom && kbm.header >= 0 && kbm.headerBottom <= kbm.footerTop && kbm.focus === 'coach-input', JSON.stringify(kbm));
     await cp.evaluate(() => window.__keyboard(0));
     await cp.waitForTimeout(400);
 
-    // Kept on the phone: a reload keeps the chat; Clear chat empties it and its Undo puts it back.
+    // Kept on the phone: a reload keeps the chat; Clear chat (in "What the coach sees") empties it and its Undo puts it back.
     await cp.evaluate(() => window.__healthcal.flush && window.__healthcal.flush());
     await cp.reload({ waitUntil: 'networkidle' });
     await cp.waitForTimeout(800);
     const kept = await cp.getByTestId('coach-local-answer').count();
     check('coach: the chat is kept on this phone through a reload', kept === 1 && (await cp.evaluate(() => !!localStorage.getItem('healthcal-coach-history'))));
+    await ctap('coach-about');
     await ctap('coach-clear');
-    check('coach: Clear chat empties the chat and the stored copy', (await cp.getByTestId('coach-empty').count()) === 1 && (await cp.evaluate(() => localStorage.getItem('healthcal-coach-history'))) === null);
+    check('coach: Clear chat, in "What the coach sees", empties the chat and the stored copy', (await cp.getByTestId('coach-empty').count()) === 1 && (await cp.evaluate(() => localStorage.getItem('healthcal-coach-history'))) === null);
     await ctap('toast-action');
     await cp.waitForTimeout(300);
-    check('coach: the Undo of Clear chat puts the chat back', (await cp.getByTestId('coach-local-answer').count()) === 1);
+    check('coach: the Undo of Clear chat puts the chat back', (await cp.getByTestId('coach-local-answer').count()) >= 1 && (await cp.getByTestId('coach-empty').count()) === 0);
+
+    // The training overview's "Ask the coach": the sheet closes and the coach rises already answering, with the sheet's own numbers.
+    await cp.goto(`${BASE}/train`, { waitUntil: 'networkidle' });
+    const infoId = (await cp.getByTestId('train-load-info').count()) ? 'train-load-info' : 'train-guideline-help';
+    await ctap(infoId);
+    const sheetNumbers = await ctext('train-load-numbers');
+    await ctap('train-load-coach');
+    const arrived = await onCoach();
+    await cp.getByTestId('coach-local-answer').first().waitFor({ timeout: 15000 }).catch(() => {});
+    const numbers = (await cp.getByTestId('coach-training-numbers').count()) ? await ctext('coach-training-numbers') : '';
+    check(
+      'coach: the overview sheet\'s "Ask the coach" closes the sheet and opens the coach already answering, with the sheet\'s own numbers',
+      arrived && (await cp.getByTestId('train-load-sheet').count()) === 0 && numbers === sheetNumbers,
+      `${cp.url()} | ${numbers} | ${sheetNumbers}`,
+    );
+    await cp.waitForTimeout(300);
+    check('coach: ?ask is cleared once answered, so the arrival asks once', !/ask=/.test(cp.url()), cp.url());
+    await ctap('header-close');
+    check('coach: its X returns to Train', await onPath('/train'), cp.url());
     check('coach: no request ever reached coach-chat without a backend', sent.length === 0);
     await cctx.close();
   }

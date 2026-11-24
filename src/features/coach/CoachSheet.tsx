@@ -1,3 +1,4 @@
+import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
@@ -6,7 +7,7 @@ import { useStore } from '@/store';
 import { useNow } from '@/store/clock';
 import { useTheme } from '@/theme';
 import { usePlan } from '@/features/plan';
-import { Button, Card, PressableScale, Sheet, Text, ToggleRow } from '@/ui';
+import { Button, Card, CupKey, PressableScale, Sheet, Text, ToggleRow } from '@/ui';
 
 import { coachNote } from './note';
 import { pairsToSend } from './request';
@@ -14,8 +15,12 @@ import {
   ABOUT_DONE,
   ABOUT_TITLE,
   ABOUT_WITHDRAW_HINT,
+  CLEAR_CHAT,
   COACH_FACTS,
   CONSENT_AGREE,
+  CONSENT_DETAILS,
+  CONSENT_DETAILS_HIDE,
+  CONSENT_LEAD,
   CONSENT_INTRO,
   CONSENT_NOT_NOW,
   CONSENT_NOT_NOW_HINT,
@@ -29,15 +34,17 @@ import {
 } from './words';
 
 /**
- * "What the coach sees" (`mode="review"`, from the info cup beside the coach's line and from About)
+ * "What the coach sees" (`mode="review"`, from the coach header's info cup and from About)
  * and the consent asked before the first typed question (`mode="ask"`): the same facts, the "Share
  * my week" switch (`coach-share`) and, under it, the exact text that would go with a question now
  * (`coach-note-preview`, built by `buildCoachNote` at this moment: the same function the send uses).
  * In "ask" the switch is the sheet's own until the person agrees; in "review" it is the stored one.
  *
- * Order: the switch, the line saying what it shares and "See what is sent" come first, above the
- * longer facts, so the choice is in the first view of the sheet at 320, 360 and 390 px wide (the
- * consent cannot be given without seeing it). "See what is sent" opens the preview as a sheet of its
+ * Layered (fix X12): the sheet opens on two sentences that are true and complete by themselves
+ * (`CONSENT_LEAD`), the switch with "See what is sent", and the two buttons, all in view at 360 x 740 and
+ * 320 x 640 without scrolling; one row, "Details" (`coach-details`), opens the facts exactly as worded
+ * (`COACH_FACTS`, with the share hint and the closing hint) in `coach-details-body`. "What the coach
+ * sees" opens with the details open. "See what is sent" opens the preview as a sheet of its
  * own over this one (`coach-note-sheet`, closed with `coach-note-done`, the drag or the backdrop), so the
  * whole note is in view at its top on a phone, with no scrolling by hand: the kit's Sheet keeps its
  * scroller to itself, so a preview placed lower in this sheet could not be brought into view natively.
@@ -50,6 +57,7 @@ export function CoachSheet({
   onShare,
   onAgree,
   onClose,
+  onClear,
 }: {
   visible: boolean;
   mode: 'ask' | 'review';
@@ -57,10 +65,15 @@ export function CoachSheet({
   onShare: (on: boolean) => void;
   onAgree?: () => void;
   onClose: () => void;
+  /** Review mode with messages in the chat: "Clear chat" above Done (it closes the sheet first). */
+  onClear?: () => void;
 }) {
-  const { spacing } = useTheme();
+  const { colors, spacing } = useTheme();
   const ask = mode === 'ask';
   const [preview, setPreview] = useState(false);
+  /** The facts under "Details": closed on the consent's first layer, open in "What the coach sees" (fix X12). */
+  const [detailsSet, setDetails] = useState<boolean | null>(null);
+  const detailsOpen = detailsSet ?? !ask;
   const plan = usePlan();
   // The preview is the note as it would be sent now: built when the sheet draws, from the clock hook's minute.
   const now = useNow();
@@ -75,6 +88,7 @@ export function CoachSheet({
 
   const close = () => {
     setPreview(false);
+    setDetails(null);
     onClose();
   };
 
@@ -91,43 +105,87 @@ export function CoachSheet({
               <Button testID="coach-consent-not-now" title={CONSENT_NOT_NOW} variant="secondary" onPress={close} />
             </>
           ) : (
-            <Button testID="coach-about-done" title={ABOUT_DONE} onPress={close} />
+            <>
+              {onClear ? (
+                <Button
+                  testID="coach-clear"
+                  title={CLEAR_CHAT}
+                  variant="secondary"
+                  onPress={() => {
+                    close();
+                    onClear();
+                  }}
+                />
+              ) : null}
+              <Button testID="coach-about-done" title={ABOUT_DONE} onPress={close} />
+            </>
           )}
         </View>
       }>
       <View testID={ask ? 'coach-consent' : 'coach-about-sheet'} style={{ gap: spacing.sm }}>
-        {ask ? (
-          <Text variant="body" color="textSecondary">
-            {CONSENT_INTRO}
-          </Text>
-        ) : null}
-        <Card tone="alt" padding={0} style={{ paddingHorizontal: spacing.lg }}>
+        {/* The first layer (fix X12): two sentences true by themselves, the switch, then the details on one row. */}
+        <View testID="coach-consent-lead" style={{ gap: spacing.sm }}>
+          {CONSENT_LEAD.map((line, i) => (
+            <Text key={i} variant="body" color={i === 0 ? 'text' : 'textSecondary'}>
+              {line}
+            </Text>
+          ))}
+        </View>
+        <Card tone="alt" padding={0} style={{ paddingHorizontal: spacing.lg, marginTop: spacing.xs }}>
           <ToggleRow testID="coach-share" title={SHARE_LABEL} value={share} onChange={onShare} />
         </Card>
-        <Text variant="caption" color="textSecondary">
-          {SHARE_HINT}
-        </Text>
-        <PressableScale
-          testID="coach-note-preview"
-          accessibilityLabel={SEE_WHAT_IS_SENT}
-          onPress={() => setPreview(true)}
-          hitSlop={6}
-          style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }}>
-          <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
-            {SEE_WHAT_IS_SENT}
-          </Text>
-        </PressableScale>
-        {COACH_FACTS.map((p, i) => (
-          <View key={p.title} style={i === 0 ? { marginTop: spacing.xs } : undefined}>
-            <Text variant="bodyStrong">{p.title}</Text>
-            <Text variant="body" color="textSecondary">
-              {p.body}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md }}>
+          <PressableScale
+            testID="coach-note-preview"
+            accessibilityLabel={SEE_WHAT_IS_SENT}
+            onPress={() => setPreview(true)}
+            hitSlop={6}
+            style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }}>
+            <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
+              {SEE_WHAT_IS_SENT}
+            </Text>
+          </PressableScale>
+          <PressableScale
+            testID="coach-details"
+            accessibilityRole="button"
+            accessibilityLabel={detailsOpen ? CONSENT_DETAILS_HIDE : CONSENT_DETAILS}
+            accessibilityState={{ expanded: detailsOpen }}
+            {...({ 'aria-expanded': detailsOpen } as object)}
+            onPress={() => setDetails(!detailsOpen)}
+            hitSlop={6}
+            style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: spacing.sm }}>
+            <Text variant="label" color="text">
+              {CONSENT_DETAILS}
+            </Text>
+            {detailsOpen ? <ChevronUp size={18} color={colors.textSecondary} strokeWidth={1.9} /> : <ChevronDown size={18} color={colors.textSecondary} strokeWidth={1.9} />}
+          </PressableScale>
+        </View>
+        {detailsOpen ? (
+          <View testID="coach-details-body" style={{ gap: spacing.sm }}>
+            {ask ? (
+              <Text variant="body" color="textSecondary">
+                {CONSENT_INTRO}
+              </Text>
+            ) : null}
+            <Text variant="caption" color="textSecondary">
+              {SHARE_HINT}
+            </Text>
+            {COACH_FACTS.map((p, i) => (
+              <View key={p.title} style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start', marginTop: i === 0 ? spacing.xs : 0 }}>
+                <CupKey color={colors.primary} variant="outline" size={9} style={{ marginTop: 6 }} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text variant="bodyStrong">{p.title}</Text>
+                  <Text variant="caption" color="textSecondary">
+                    {p.body}
+                  </Text>
+                </View>
+              </View>
+            ))}
+            <Text variant="caption" color="textSecondary">
+              {ask ? CONSENT_NOT_NOW_HINT : ABOUT_WITHDRAW_HINT}
             </Text>
           </View>
-        ))}
-        <Text variant="caption" color="textSecondary">
-          {ask ? CONSENT_NOT_NOW_HINT : ABOUT_WITHDRAW_HINT}
-        </Text>
+        ) : null}
       </View>
       {/* "What is sent": the first of the facts' titles, the same words. */}
       <Sheet visible={preview} onClose={() => setPreview(false)} title={COACH_FACTS[0].title} footer={<Button testID="coach-note-done" title={ABOUT_DONE} onPress={() => setPreview(false)} />}>

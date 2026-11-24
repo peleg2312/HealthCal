@@ -6,7 +6,9 @@ import { ActivityIndicator, View } from 'react-native';
 import { cancelAccountSwitch, confirmAccountSwitch, retryRestore, signOut, useAuth } from '@/services/auth';
 import { useStore } from '@/store';
 import { useTheme } from '@/theme';
-import { Button, Screen, Sheet, Text, toast } from '@/ui';
+import { Button, goBack, Screen, Sheet, Text, toast } from '@/ui';
+
+import { returnsToCoach, takeReturnToCoach } from '@/features/coach/session';
 
 import { waitForRestore } from './afterSignIn';
 import { FadeIn, Note } from './components';
@@ -41,11 +43,27 @@ export function SignInGate({ onCancelled, waitFirst = true }: { onCancelled: () 
     if (outcome === 'cancelled') onCancelled();
   }, [outcome, onCancelled]);
 
-  if (outcome === 'home') return <Redirect href="/" />;
+
+  if (outcome === 'home') return <HomeAfterSignIn />;
   if (outcome === 'onboarding') return <Redirect href="/onboarding" />;
   if (outcome === 'restoreFailed') return <RestoreFailed />;
   if (outcome === 'switchBlocked') return <SwitchBlocked count={switchBlocked ?? 0} />;
   return <Restoring />;
+}
+
+/**
+ * Home is Today, unless this sign-in began in the coach (its Send or its "Sign in"): then it goes back
+ * to the coach, where the person's words are waiting in the field. Read once when the outcome is known;
+ * the mark is cleared as the person is taken there.
+ */
+function HomeAfterSignIn() {
+  const [toCoach] = useState(() => returnsToCoach());
+  useEffect(() => {
+    if (!toCoach) return;
+    takeReturnToCoach();
+    goBack('/coach');
+  }, [toCoach]);
+  return toCoach ? <Restoring /> : <Redirect href="/" />;
 }
 
 function Restoring() {

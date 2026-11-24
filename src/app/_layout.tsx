@@ -94,7 +94,7 @@ function LoadFailed() {
  * everything else keeps the platform's push. On web the native stack does not animate, so
  * `Screen`'s fade-up is the page change there. Reduced motion turns every transition off.
  */
-const TASK_SCREENS = ['food/search', 'food/quick', 'food/scan', 'food/photo', 'activity/import', 'friends/add', 'morning'] as const;
+const TASK_SCREENS = ['food/search', 'food/quick', 'food/scan', 'food/photo', 'activity/import', 'friends/add', 'morning', 'coach'] as const;
 
 /**
  * The only screens someone without a finished setup may open. Every other screen reads the

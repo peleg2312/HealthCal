@@ -1,18 +1,19 @@
 # The coach on a phone, after first-day.yml has set the app up (no clearState: it needs the profile
 # first-day made).
 #
-# What only a phone shows: the chat's field and send button riding on the keyboard with the two
-# phone buttons above them, a phone answer landing above the footer, and the meal ideas sheet opened
-# from Today. No account is signed in on the test phone, so a typed question gets the app's own line
-# about needing an account: no question reaches the AI and nothing is paid for.
+# What only a phone shows: the Coach cup in the tab header under a finger, the chat rising from the
+# bottom and closing back to the same tab, the field and the send cup riding on the keyboard, a phone
+# answer landing as a card, and the chat arriving already answered from the training overview. No
+# account is signed in on the test phone, so a typed question gets the app's own line about needing
+# an account: no question reaches the AI and nothing is paid for.
 #
-# The training line's sheet and the coach screen are the required proofs; the rest is best effort,
-# and the pictures are the evidence.
+# The way in and the first view are the required proofs; the rest is best effort, and the pictures
+# are the evidence.
 #
 #   GitHub (free):  Actions > Phone test > Run workflow, flows = first-day,coach
 #   A phone or emulator on your desk:  maestro test .maestro/first-day.yml .maestro/coach.yml
 appId: app.healthcal.mobile
-name: The coach, the training overview and ideas that fit
+name: The coach, from every tab
 ---
 - launchApp:
     clearState: false
@@ -25,31 +26,80 @@ name: The coach, the training overview and ideas that fit
     id: morning-today
     optional: true
 
-# Today: the chip under the calories eaten opens What fits with meals first. On a first day the
-# chip is hidden (nothing to build on yet), so every step here is optional.
+# Today: the Coach cup is the first of three cups on the right of the header.
+- extendedWaitUntil:
+    visible:
+      id: today-coach-open
+    timeout: 20000
+- takeScreenshot: 90-today-with-coach-cup
 - tapOn:
-    id: today-ideas
-    optional: true
-- takeScreenshot: 90-ideas-that-fit
+    id: today-coach-open
+- extendedWaitUntil:
+    visible:
+      id: coach-input
+    timeout: 20000
+- takeScreenshot: 91-coach-first-view
+
+# A phone answer: free, from the data on the phone, as a card.
 - tapOn:
-    id: fits-search
-    optional: true
+    id: coach-local-training
+- extendedWaitUntil:
+    visible:
+      id: coach-local-answer
+    timeout: 15000
+- takeScreenshot: 92-coach-training-answer
+# The follow-up under it asks the other phone question.
 - tapOn:
-    id: header-close
+    id: coach-local-ideas
     optional: true
+- takeScreenshot: 93-coach-ideas-answer
+
+# The keyboard: the field and the send cup ride on it.
+- tapOn:
+    id: coach-input
+- inputText: How many rest days a week
+- takeScreenshot: 94-coach-keyboard-up
+- tapOn:
+    id: coach-send
+# No account on the test phone: Send keeps the words and opens sign-in. Nothing is sent.
+- takeScreenshot: 95-coach-send-opens-sign-in
 - tapOn:
     id: header-back
     optional: true
-
-# Train: the week card's last line and its sheet. A new person has too little history for a state,
-# so the line is the old one and its info cup opens the same sheet.
-- tapOn:
-    id: tab-train
 - extendedWaitUntil:
     visible:
-      id: train-coach
+      id: coach-input
     timeout: 20000
-- takeScreenshot: 91-train-with-coach-link
+- takeScreenshot: 95b-coach-words-kept
+
+# The X closes back to Today.
+- tapOn:
+    id: header-close
+- extendedWaitUntil:
+    visible:
+      id: today-energy
+    timeout: 20000
+
+# The diary has the same cup in the same place, and the conversation is still there.
+- tapOn:
+    id: tab-diary
+- extendedWaitUntil:
+    visible:
+      id: diary-coach-open
+    timeout: 20000
+- tapOn:
+    id: diary-coach-open
+- extendedWaitUntil:
+    visible:
+      id: coach-input
+    timeout: 20000
+- takeScreenshot: 96-coach-reopened-from-diary
+- tapOn:
+    id: header-close
+
+# Train: the overview sheet's "Ask the coach" opens the chat already answering.
+- tapOn:
+    id: tab-train
 - tapOn:
     id: train-guideline-help
     optional: true
@@ -60,39 +110,14 @@ name: The coach, the training overview and ideas that fit
     visible:
       id: train-load-sheet
     timeout: 15000
-- takeScreenshot: 92-training-overview-sheet
-
-# "Ask the coach" closes the sheet and opens the chat.
+    optional: true
 - scrollUntilVisible:
     element:
       id: train-load-coach
     direction: DOWN
     timeout: 20000
+    optional: true
 - tapOn:
     id: train-load-coach
-- extendedWaitUntil:
-    visible:
-      id: coach-input
-    timeout: 20000
-- takeScreenshot: 93-coach-first-view
-
-# A phone answer: free, from the data on the phone.
-- tapOn:
-    id: coach-local-training
-- extendedWaitUntil:
-    visible:
-      id: coach-local-answer
-    timeout: 15000
-- takeScreenshot: 94-coach-phone-answer
-
-# The keyboard: the field and the send button ride on it, the two buttons stay above them.
-- tapOn:
-    id: coach-input
-- inputText: How many rest days a week
-- takeScreenshot: 95-coach-keyboard-up
-- tapOn:
-    id: coach-send
-- takeScreenshot: 96-coach-needs-account
-- assertVisible:
-    id: coach-notice
     optional: true
+- takeScreenshot: 97-coach-from-training-sheet

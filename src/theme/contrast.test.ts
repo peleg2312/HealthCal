@@ -12,6 +12,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { coachMarkFill } from '@/features/coach/markFill';
+
 import { contrast, deltaE, luminance, over, parseHex } from './contrast';
 import { THEME_NAMES, type ThemeName } from './resolve';
 import {
@@ -134,6 +136,10 @@ describe.each(NAMES)('%s palette', (name) => {
 
   it('draws the level line at 3:1 against the empty part of every cup and bar', () => {
     expect(failures(pairs(name, ['rim'], ['vesselEmpty', 'track', 'surface', 'bg'], 3))).toEqual([]);
+  });
+
+  it("draws the coach cup's unread level line at 3:1 on its primarySoft tint over the page (the tab header)", () => {
+    expect(contrast(c.rim, over(c.primarySoft, c.bg)), `${name} rim on primarySoft over bg`).toBeGreaterThanOrEqual(3);
   });
 
   it('draws the cup outline at 3:1 on the page and on a card', () => {
@@ -322,5 +328,29 @@ describe("Google's sign-in button", () => {
       expect(contrast(c.googleEdge, c.googleFill), `${name} edge on its fill`).toBeGreaterThanOrEqual(3);
       for (const ground of ['bg', 'surface'] as const) expect(contrast(c.googleEdge, c[ground]), `${name} edge on ${ground}`).toBeGreaterThanOrEqual(3);
     }
+  });
+});
+
+/**
+ * The coach's cup (src/features/coach/CoachMark.tsx, its fill from `coachMarkFill`): a tint of the
+ * primary with the level line on top, on the page. The line 3:1 on the fill and the fill 3:1 on the
+ * page in every palette but Blossom, whose line is under 9:1 on its page, so no fill can hold both;
+ * there the two stay above 2:1 each and the cup's outline (3:1 on the page, above) draws its shape.
+ */
+describe("the coach's cup", () => {
+  it.each(NAMES)('%s: the level line on the fill and the fill on the page', (name) => {
+    const c = PALETTES[name];
+    const f = coachMarkFill(c, chartFillOpacity[name]);
+    const rim = contrast(c.rim, f.color);
+    const page = contrast(f.color, c.bg);
+    if (name === 'blossom') {
+      expect(contrast(c.rim, c.bg)).toBeLessThan(9);
+      expect(Math.min(rim, page), 'blossom, both as even as they go').toBeGreaterThanOrEqual(2);
+      return;
+    }
+    expect(failures([
+      { what: `${name} rim on the coach cup`, ratio: rim, min: 3 },
+      { what: `${name} coach cup on bg`, ratio: page, min: 3 },
+    ])).toEqual([]);
   });
 });

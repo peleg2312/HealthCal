@@ -269,7 +269,9 @@ function scan(rootSel) {
         if ((p.scrollTop > 0 && cy - 21 < q.top) || (p.scrollTop + p.clientHeight < p.scrollHeight - 1 && cy + 21 > q.bottom)) open = false;
         break;
       }
-      if (!off && inside && open && r.top >= 0 && r.bottom + 21 <= chromeTop && (r.width < 44 || r.height < 44) && !(hits(-21, 0) && hits(21, 0) && hits(0, -21) && hits(0, 21))) {
+      // The three cups of a tab header sit 40 px apart, so each is 40 px wide to touch (44 tall): the one stated exception.
+      const side = el.closest('[data-testid="tab-header"]') ? 19 : 21;
+      if (!off && inside && open && r.top >= 0 && r.bottom + 21 <= chromeTop && (r.width < 44 || r.height < 44) && !(hits(-side, 0) && hits(side, 0) && hits(0, -21) && hits(0, 21))) {
         small.push({ id: label(el) || ownText.slice(0, 30), w: Math.round(r.width), h: Math.round(r.height) });
       }
     }
@@ -511,7 +513,14 @@ function layoutScan(rootSel) {
 
   // 4. Cards: painted, at least 120 x 40, not a control, not the page, not inside another card.
   // A text field's box (its border around an input) is a field, not a card.
-  const fieldBox = (el) => h(R(el.getBoundingClientRect())) < 90 && !!el.querySelector('input, textarea');
+  // A field's own box: a one-line field, or a text area that grows with its words (the coach's composer, up to five
+  // lines) and fills its box, so a tall field beside its send cup is still a field, not a card.
+  const fieldBox = (el) => {
+    const bh = h(R(el.getBoundingClientRect()));
+    if (bh < 90 && !!el.querySelector('input, textarea')) return true;
+    const ta = el.querySelector('textarea');
+    return !!ta && el.querySelectorAll('textarea, input').length === 1 && ta.getBoundingClientRect().height >= bh - 24;
+  };
   const cardLike = boxes.filter((b) => !b.art && !isControl(b.el) && !b.el.closest('button,[role="button"]') && w(b.r) >= 120 && h(b.r) >= 40 && !fullPage(b.r) && boxed(b.el) && !fieldBox(b.el));
   const cardSet = new Set(cardLike.map((b) => b.el));
   const cardOf = (el) => { for (let e = el.parentElement; e && e !== document.body; e = e.parentElement) if (cardSet.has(e)) return e; return null; };
@@ -526,8 +535,9 @@ function layoutScan(rootSel) {
       if (!best || gap < best.gap) best = { b, gap };
     }
     if (best && best.gap < 8) add('gaps', `${Math.round(best.gap)}px between card ${name(a.el)} and ${name(best.b.el)}`);
-    // A card as wide as the content: the same margin each side.
-    if (w(a.r) >= vw * 0.7) {
+    // A card as wide as the content: the same margin each side. Not the coach's question bubble
+    // (`coach-question`, `coach-question-<i>`): it sits on the right on purpose, as in every chat.
+    if (w(a.r) >= vw * 0.7 && !/^coach-question(-\d+)?$/.test(a.el.getAttribute('data-testid') || '')) {
       const left = a.r.l;
       const right = vw - a.r.r;
       if (Math.abs(left - right) > 2) add('gaps', `card ${name(a.el)} sits ${Math.round(left)}px from the left, ${Math.round(right)}px from the right`);
@@ -947,7 +957,9 @@ function headerScan() {
     return false;
   };
   for (const el of document.querySelectorAll('body *')) {
-    if (head.contains(el) || !visible(el) || el.closest('[data-testid="sheet"], [data-testid="toast"], [data-testid="tab-bar"], svg, [aria-hidden="true"]')) continue;
+    // The coach's hero greeting (`coach-hello`) is the one stated exception: a greeting by name in the
+    // middle of an empty chat, not a screen title (AGENTS.md, "The top of a screen").
+    if (head.contains(el) || !visible(el) || el.closest('[data-testid="sheet"], [data-testid="toast"], [data-testid="tab-bar"], [data-testid="coach-hello"], svg, [aria-hidden="true"]')) continue;
     const text = own(el);
     if (!text || !/[A-Za-z]{3,}/.test(text)) continue;
     const fs = parseFloat(getComputedStyle(el).fontSize);

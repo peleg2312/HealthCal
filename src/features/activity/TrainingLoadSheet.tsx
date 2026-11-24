@@ -65,14 +65,14 @@ export function TrainingLoadSheet({ overview: o, visible, onClose }: { overview:
             </Text>
           ))}
         </View>
-        {/* Stage two's way into the chat: the sheet closes, then the coach opens over Train. */}
+        {/* The sheet closes, then the coach rises over Train already answering the training question. */}
         <Button
           testID="train-load-coach"
           title="Ask the coach"
           variant="secondary"
           onPress={() => {
             onClose();
-            setTimeout(() => router.push('/coach' as never), 60);
+            setTimeout(() => router.push('/coach?ask=training' as never), 60);
           }}
         />
       </View>

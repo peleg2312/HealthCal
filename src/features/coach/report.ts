@@ -94,6 +94,7 @@ export const REPORT_DEMO: readonly CoachMessage[] = [
     source: 'ai',
     replyTo: 'report-demo-q',
     at: 0,
-    text: 'Most people training three to five times a week do well with one or two rest days. Put an easy day after your hardest session, and take an extra one when your legs still feel heavy the next morning. Sleep counts as part of recovery too.',
+    text:
+      'Most people training three to five times a week do well with **one or two rest days**.\n\n- Put an easy day after your hardest session.\n- Take an extra one when your legs still feel heavy the next morning.\n- Keep a short walk on rest days if you like moving.\n\nSleep counts as part of recovery too.',
   },
 ];

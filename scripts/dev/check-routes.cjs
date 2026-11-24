@@ -21,7 +21,7 @@ const ROUTES = [
   '/activity/pick', '/activity/log?activityId=running', '/activity/strength', '/activity/import',
   '/water', '/weight', '/body', '/sleep', '/fasting',
   '/profile', '/settings/goals', '/settings/reminders', '/settings/account', '/settings/data', '/settings/about', '/settings/health-sync', '/settings/plan', '/legal/terms', '/legal/privacy',
-  '/morning', '/morning?first=1', '/coach',
+  '/morning', '/morning?first=1', '/coach', '/coach?ask=training', '/coach?ask=ideas',
   '/recap', '/consistency', '/friends', '/friends/add?invite=ABCD2345', '/friends/add?code=ABCD2345', '/no-such-page',
 ];
 

@@ -482,7 +482,20 @@ async function device(browser, seedJson) {
     const canon = (v) => (Array.isArray(v) ? v.map(canon) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v);
     const same = (x, y) => JSON.stringify(canon(x)) === JSON.stringify(canon(y));
 
-    await K.go('/coach');
+    const subtitle = async (d) => ((await d.text('screen-header')).split('\n').map((l) => l.trim()).filter(Boolean)[1] || '');
+    await K.go('/');
+    await K.tap('today-coach-open');
+    check('coach: the Coach cup on Today opens the coach', await K.untilPath('/coach', 15000), K.page.url());
+    check('coach: signed in with sharing off, the line under the title says the coach does not see your week', (await subtitle(K)) === 'Does not see your week', await subtitle(K));
+    // An AI starter before agreeing takes the path of a sent question: its words go into the field and the consent sheet
+    // asks first; "Not now" sends nothing and leaves the words in the field.
+    const starter = (await K.text('coach-ai-starter-0')).split('\n')[0].trim();
+    await K.tap('coach-ai-starter-0');
+    const askedFirst = await K.has('coach-consent');
+    if (askedFirst) await K.tap('coach-consent-not-now');
+    const kept = await K.page.getByTestId('coach-input').first().inputValue();
+    check('coach: before agreeing, an AI starter asks for consent first, sends nothing, and leaves its words in the field', askedFirst && kept === starter && (await reqs()).length === 0, `${askedFirst} | ${kept} | ${starter}`);
+    await K.fill('coach-input', '');
     await K.tap('coach-local-training');
     await K.tap('coach-local-ideas');
     const localTraining = await K.text('coach-local-answer-1').catch(() => '');
@@ -522,7 +535,7 @@ async function device(browser, seedJson) {
     // "See what is sent" opens its own sheet over the coach's (src/features/coach/CoachSheet.tsx): close it first.
     if (await K.has('coach-note-done')) await K.tap('coach-note-done');
     await K.tap('coach-about-done');
-    check('coach: with sharing on the line under the header says the coach sees your week', (await K.text('coach-line')) === 'AI coach · not medical advice · sees your week');
+    check('coach: with sharing on the line under the title says the coach sees your week', (await subtitle(K)) === 'Sees your week', await subtitle(K));
     const q3 = 'What should I eat after training?';
     await askIt(K, q3);
     r = await reqs();
@@ -535,11 +548,13 @@ async function device(browser, seedJson) {
     await K.tap('coach-about-done');
 
     await askIt(K, 'daily limit please');
-    check('coach: the daily limit has its own words', (await K.text('coach-notice')) === '30 questions today. They reset at midnight UTC.' && !(await K.has('coach-retry')));
+    check('coach: the daily limit has its own words', /^30 questions today\. .*midnight UTC\.$/.test(await K.text('coach-notice')) && !(await K.has('coach-retry')), await K.text('coach-notice'));
     await askIt(K, 'please decline this');
     check('coach: a refusal has its own words and no "Try again"', /cannot help with that question/.test(await K.text('coach-notice')) && !(await K.has('coach-retry')));
     await askIt(K, 'cut short answer');
-    check('coach: an answer cut short by the length cap shows what arrived with "…"', (await K.text('coach-answer')).endsWith('…'), (await K.text('coach-answer')).slice(-60));
+    // The answer's words, without the Report control under them.
+    const answerWords = (await K.text('coach-answer')).split('\n').map((l) => l.trim()).filter((l) => l && !/^Report(ed)?$/.test(l)).join('\n');
+    check('coach: an answer cut short by the length cap shows what arrived with "…"', answerWords.endsWith('…'), JSON.stringify(answerWords.slice(-60)));
     await askIt(K, 'refer me please');
     check('coach: a referral shows the fixed line under the answer', (await K.text('coach-refer')) === 'If you are in danger now, call your local emergency number. findahelpline.com lists free lines in every country.');
     await askIt(K, 'busy now?');
@@ -553,8 +568,110 @@ async function device(browser, seedJson) {
     check('coach: unanswered questions are left out of the history, so the pairs stay whole', (fourth.history || []).every((t, i) => t.role === (i % 2 ? 'assistant' : 'user')) && !JSON.stringify(fourth.history || []).includes('daily limit please') && !JSON.stringify(fourth.history || []).includes('please decline'));
     await K.shot('backend-coach-chat');
 
+    await K.tap('coach-about');
     await K.tap('coach-clear');
-    check('coach: Clear chat empties the chat and keeps the agreement', (await K.has('coach-empty')) && (await K.page.evaluate(() => localStorage.getItem('healthcal-coach-history'))) === null && (await K.page.evaluate(() => !!localStorage.getItem('healthcal-coach-consent'))));
+    check('coach: Clear chat (in "What the coach sees") empties the chat and keeps the agreement', (await K.has('coach-empty')) && (await K.page.evaluate(() => localStorage.getItem('healthcal-coach-history'))) === null && (await K.page.evaluate(() => !!localStorage.getItem('healthcal-coach-consent'))));
+
+    // After agreeing, an AI starter sends at once: exactly its own words, with the earlier pairs gone with the chat.
+    const starter2 = (await K.text('coach-ai-starter-0')).split('\n')[0].trim();
+    const sentBeforeStarter = (await reqs()).length;
+    await K.tap('coach-ai-starter-0');
+    await settle(K);
+    r = await reqs();
+    check(
+      'coach: after agreeing, an AI starter is sent at once with exactly its words, and answered',
+      r.length === sentBeforeStarter + 1 && same(r[r.length - 1].body, { message: starter2, consentVersion: 1 }) && (await K.text('coach-question')) === starter2 && (await K.has('coach-answer')),
+      JSON.stringify(r[r.length - 1]?.body).slice(0, 160),
+    );
+
+    // An answer that arrives while the coach is closed marks the Coach cup until the coach is opened again.
+    await K.go('/');
+    await K.tap('today-coach-open');
+    await K.untilPath('/coach', 15000);
+    await K.fill('coach-input', 'wait 3 seconds before answering');
+    await K.tap('coach-send');
+    await K.tap('header-close');
+    const backHome = await K.untilPath('/', 15000);
+    const marked = await K.page.getByTestId('today-coach-open-unread').first().waitFor({ timeout: 10000 }).then(() => true, () => false);
+    const markedLabel = await K.page.getByTestId('today-coach-open').first().getAttribute('aria-label');
+    await K.shot('backend-coach-unread');
+    check('coach: an answer that lands with the coach closed puts the level line on the Coach cup, labelled "Coach, new answer"', backHome && marked && markedLabel === 'Coach, new answer', `${marked} ${markedLabel}`);
+    await K.tap('today-coach-open');
+    await K.untilPath('/coach', 15000);
+    const waited = await K.text('coach-answer');
+    await K.tap('header-close');
+    await K.untilPath('/', 15000);
+    check('coach: opening the coach shows that answer and takes the mark away', /wait 3 seconds before answering/.test(waited) && !(await K.has('today-coach-open-unread')) && (await K.page.getByTestId('today-coach-open').first().getAttribute('aria-label')) === 'Coach', waited.slice(0, 100));
+    // Signed out with a backend (fix X11): the field says to sign in; Send keeps the words and opens sign-in; back in the
+    // coach, signed in, the words are in the field and go out only on the next Send, through the consent first (layered:
+    // its "Details" row opens the four facts). Then a question that starts with a Hebrew letter is laid out right to left.
+    {
+      const L = await device(browser, JSON.stringify(buildSeed()));
+      // Sign-in pushes Today over the stack it came from, so hidden copies of Today and the coach stay in the page:
+      // this device acts on what is visible.
+      // The topmost (last) visible copy, so a sheet over another is the one acted on.
+      const vis = (id) => L.page.locator(`[data-testid="${id}"]:visible`).last();
+      L.tap = async (id) => { await vis(id).click({ timeout: 15000 }); await L.page.waitForTimeout(400); };
+      L.fill = async (id, value) => { await vis(id).fill(String(value), { timeout: 15000 }); await L.page.waitForTimeout(150); };
+      L.text = async (id) => (await vis(id).innerText({ timeout: 15000 })).replace(/\u00A0/g, ' ').replace(/[\u2060\u200E\u2068\u2069]/g, '').trim();
+      L.has = async (id) => (await L.page.locator(`[data-testid="${id}"]:visible`).count()) > 0;
+      await L.go('/');
+      await L.tap('today-coach-open');
+      await L.untilPath('/coach', 15000);
+      const ph = await L.page.getByTestId('coach-input').first().getAttribute('placeholder');
+      check('coach: signed out with a backend, the field says "Sign in to ask the AI coach"', ph === 'Sign in to ask the AI coach', ph);
+      const beforeL = (await server()).coachRequests.length;
+      await L.fill('coach-input', 'How many rest days a week?');
+      await L.tap('coach-send');
+      check('coach: signed out, Send opens sign-in and sends nothing', (await L.untilPath('/auth', 15000)) && (await server()).coachRequests.length === beforeL, L.page.url());
+      await L.fill('auth-email-input', coachEmail);
+      await L.fill('auth-password-input', PASSWORD);
+      await L.tap('auth-submit');
+      await L.page.waitForURL((u) => !/\/auth/.test(new URL(u).pathname), { timeout: 30000 }).catch(() => {});
+      await L.page.waitForTimeout(2500);
+      // A sign-in that began in the coach comes back to the coach, with the words in the field.
+      check('coach: signing in from the coach returns to the coach, not to Today', await L.untilPath('/coach', 5000), L.page.url());
+      if (!(await L.untilPath('/coach', 1000))) {
+        // Sign-in pushes Today over the stack it came from, so the cup of the Today underneath is still in the page, hidden.
+        await L.tap('today-coach-open');
+        await L.untilPath('/coach', 15000);
+      }
+      await L.page.waitForTimeout(600);
+      const back = await vis('coach-input').inputValue();
+      check('coach: back in the coach, signed in, the words are in the field and nothing was sent by itself', back === 'How many rest days a week?' && (await server()).coachRequests.length === beforeL, `${back} | ${L.page.url()}`);
+      await L.tap('coach-send');
+      await L.page.waitForTimeout(500);
+      const sheets = await L.page.locator('[data-testid="coach-consent-lead"]:visible').count();
+      check('coach: back from sign-in, one consent sheet rises (not one per coach screen left in the stack)', sheets === 1, `${sheets} consent sheets on screen`);
+      const consentFirst = await L.has('coach-consent');
+      const leadText = consentFirst ? norm(await L.text('coach-consent-lead')) : '';
+      const closedDetails = await L.has('coach-details-body');
+      await L.tap('coach-details');
+      const facts = consentFirst ? norm(await L.text('coach-details-body')) : '';
+      check(
+        'coach: the next Send asks for the consent first, whose first layer is the two sentences with the details closed, and "Details" opens the four facts',
+        consentFirst && /Anthropic’s AI, Claude/.test(leadText) && /not medical advice/.test(leadText) && !closedDetails && ['What is sent', 'What is not sent', 'Who receives it', 'What happens to it'].every((t) => facts.includes(t)) && (await server()).coachRequests.length === beforeL,
+        leadText.slice(0, 120),
+      );
+      await L.shot('backend-coach-consent-details');
+      await L.tap('coach-consent-agree');
+      await L.page.waitForFunction(() => !document.querySelector('[data-testid="coach-typing"]'), null, { timeout: 60000 }).catch(() => {});
+      await L.page.waitForTimeout(500);
+      const lastL = (await server()).coachRequests.slice(-1)[0];
+      check('coach: after agreeing, the kept words are sent once, exactly', (await server()).coachRequests.length === beforeL + 1 && lastL.body.message === 'How many rest days a week?', JSON.stringify(lastL?.body || {}).slice(0, 120));
+      await L.fill('coach-input', 'כמה ימי מנוחה בשבוע?');
+      await L.tap('coach-send');
+      await L.page.waitForTimeout(600);
+      const dir = await L.page.evaluate(() => {
+        const box = [...document.querySelectorAll('[data-testid="coach-question"]')].find((e) => e.getBoundingClientRect().width > 0);
+        const t = box && [...box.querySelectorAll('div')].find((d) => /כמה/.test(d.textContent) && !d.querySelector('div'));
+        return t ? getComputedStyle(t).textAlign + '|' + getComputedStyle(t).direction : 'none';
+      });
+      check('coach: a question that starts with a Hebrew letter is laid out right to left', /^right\|/.test(dir), dir);
+      await L.page.context().close();
+    }
+
+    await K.go('/coach');
 
     // Under 18 on the server: the synced profile says 2012 (pushed straight to the stand-in, newer than the phone's).
     const token = await K.page.evaluate(() => {
@@ -838,7 +955,7 @@ async function device(browser, seedJson) {
     await ask(P, 'daily limit please');
     const coachFree = await textOf(P, 'coach-notice');
     // The notice's card also holds its link, so its text starts with the words.
-    check('plans on, free: the coach’s limit words', coachFree.split('\n')[0] === `5 questions today. The two buttons above still answer from your phone. More after ${resets}.`, coachFree);
+    check('plans on, free: the coach’s limit words', coachFree.split('\n')[0] === `5 questions today. Questions marked From your data still work. More after ${resets}.`, coachFree);
     check('plans on, free: the coach’s plan link, "Plus gives 30 a day"', (await textOf(P, 'coach-limit-plans')) === 'Plus gives 30 a day', await textOf(P, 'coach-limit-plans'));
     await P.shot('backend-plan-coach-limit-free');
 
@@ -925,7 +1042,7 @@ async function device(browser, seedJson) {
     await P.go('/coach');
     await ask(P, 'daily limit please');
     const coachPlus = await textOf(P, 'coach-notice');
-    check('Plus: the coach’s limit says 30 and offers no plan', coachPlus === `30 questions today. The two buttons above still answer from your phone. More after ${resets}.` && !(await P.has('coach-limit-plans')), coachPlus);
+    check('Plus: the coach’s limit says 30 and offers no plan', coachPlus === `30 questions today. Questions marked From your data still work. More after ${resets}.` && !(await P.has('coach-limit-plans')), coachPlus);
     await billing({ resetUsage: true });
     await ask(P, 'Plus memory check');
     const plusReq = (await server()).coachRequests.filter((x) => x.user === pUser?.id).pop();

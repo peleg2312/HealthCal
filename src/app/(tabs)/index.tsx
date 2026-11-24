@@ -18,7 +18,7 @@ import { MorningWatcher } from '@/features/morning/useMorningPage';
 import { useBackToToday } from '@/features/today/useBackToToday';
 import { startDate } from '@/features/today/week';
 import { ShareDayButton } from '@/features/share';
-import { greetingTitle } from '@/features/today/greetingTitle';
+import { todayTitle } from '@/features/today/greetingTitle';
 import { TabHeader, tabDay, tabTitleRoom, tabTitleSize } from '@/components/TabHeader';
 import { MilestoneSheet } from '@/features/streak/MilestoneSheet';
 import { AFTER_STRIP_MS, StreakMark } from '@/features/streak/StreakMark';
@@ -59,7 +59,7 @@ export default function TodayScreen() {
   const [fits, setFits] = useState<{ proteinFirst: boolean } | null>(null);
 
   const { width } = useWindowDimensions();
-  const title = greetingTitle(greeting(now), profile.name ?? '', tabTitleRoom(width), tabTitleSize(width));
+  const title = todayTitle(greeting(now), profile.name ?? '', tabTitleRoom(width), tabTitleSize(width));
   const select = (d: ISODate) => setPicked(d === todayDate ? null : d);
   // The day changes only from the week strip: no page swipe here, so scrolling or reaching for a
   // row never moves Today to another day. Back in front after five minutes or more away, or on
@@ -70,7 +70,7 @@ export default function TodayScreen() {
     <Screen
       tabs
       testID="today-screen"
-      header={<TabHeader tab="today" overline={tabDay(date)} title={title} />}>
+      header={<TabHeader tab="today" overline={tabDay(date)} title={title.text} titleSize={title.size} />}>
       <View testID="today-swipe" style={{ gap: spacing.md }}>
       {/* The first visit on a new morning opens yesterday's summary (rule in @/features/morning/rule). Draws nothing. */}
       <MorningWatcher />
@@ -392,7 +392,7 @@ function relativeTo(date: ISODate, from: ISODate): string {
  * The coach's line under the calorie card: one sentence pair in at most two lines ("Had dinner
  * yet? It is not in today's log.") and its one action as a small button directly under it
  * (a glass of water, repeat a meal, see what fits, or where the tip points). No chevron, no chips:
- * one thing to read, one thing to tap.
+ * one thing to read, one thing to tap, with "Ask the coach" (`today-coach-ask`) beside it as a ghost button.
  */
 function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: ClosedDay | null; onFits: () => void }) {
   const { colors, spacing } = useTheme();
@@ -440,7 +440,7 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
     button = (
       <Button
         {...small}
-        testID="today-coach-open"
+        testID="today-coach-action"
         title={action?.label ?? 'See what fits'}
         onPress={quick?.kind === 'fits' ? onFits : () => router.push(action!.href as never)}
       />
@@ -453,7 +453,24 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
         <Text variant="bodyStrong">{/[.!?]$/.test(tip.title) ? tip.title : `${tip.title}.`}</Text>
         <Text variant="body" color="textSecondary">{` ${tip.body}`}</Text>
       </Text>
-      {button}
+      {button ? (
+        // The worded way into the coach, in the tip's own row and voice: beside the tip's action, so the
+        // card is no taller at 360 and 390 px (at 320 it may wrap under). A tip with no action adds nothing.
+        // The ghost has no fill or edge, so it is drawn without side padding and kept 12 px from the action:
+        // "Repeat yesterday's breakfast" and "Ask the coach" then share one row at 360 px.
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.sm }}>
+          {button}
+          <Button
+            size="sm"
+            variant="ghost"
+            full={false}
+            testID="today-coach-ask"
+            title="Ask the coach"
+            onPress={() => router.push('/coach' as never)}
+            style={{ paddingHorizontal: 0 }}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }

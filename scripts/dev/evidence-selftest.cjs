@@ -148,6 +148,18 @@ const cases = [
     expect: '',
   },
   {
+    name: 'a tab header cup 36 px wide with a 40 x 44 touch area is not small',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div data-testid="tab-header" style="display:flex;gap:4px;padding:20px"><button aria-label="coach" style="position:relative;width:36px;height:36px;padding:0;border:0"><span style="position:absolute;left:-2px;right:-2px;top:-4px;bottom:-4px"></span></button><button aria-label="friends" style="position:relative;width:36px;height:36px;padding:0;border:0"><span style="position:absolute;left:-2px;right:-2px;top:-4px;bottom:-4px"></span></button></div></body>',
+    run: 'small',
+    expect: '',
+  },
+  {
+    name: 'the same two cups outside a tab header are still small (a tap 21 px from one lands on the other)',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div style="display:flex;gap:4px;padding:20px"><button aria-label="coach" style="position:relative;width:36px;height:36px;padding:0;border:0"><span style="position:absolute;left:-2px;right:-2px;top:-4px;bottom:-4px"></span></button><button aria-label="friends" style="position:relative;width:36px;height:36px;padding:0;border:0"><span style="position:absolute;left:-2px;right:-2px;top:-4px;bottom:-4px"></span></button></div></body>',
+    run: 'small',
+    expect: 'coach',
+  },
+  {
     name: 'a small control in the open is still seen',
     html: '<body style="margin:0;font:15px/20px sans-serif"><div data-testid="screen-header" style="height:60px;background:#eee">Header</div><div style="height:600px;overflow-y:auto"><div style="height:100px"></div><button style="width:32px;height:32px;padding:0">x</button><div style="height:1200px"></div></div></body>',
     run: 'small',
@@ -286,10 +298,46 @@ const cases = [
     expect: 'second title',
   },
   {
+    name: "the coach's hero greeting under the header is not a second title",
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div data-testid="screen-header" style="display:flex;gap:12px"><button data-testid="header-close" style="width:44px;height:44px">x</button><div><div style="font-size:18px">Coach</div><div style="font-size:13px">Answers from this phone</div></div></div><div data-testid="coach-hello" style="text-align:center;padding-top:40px"><div style="font-size:26px;line-height:32px">Good evening, Alex</div><div>4 workouts, 270 min in 7 days</div></div></body>',
+    run: 'header',
+    expect: '',
+  },
+  {
+    name: 'the same greeting outside coach-hello is still a second title',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div data-testid="screen-header" style="display:flex;gap:12px"><button data-testid="header-close" style="width:44px;height:44px">x</button><div><div style="font-size:18px">Coach</div><div style="font-size:13px">Answers from this phone</div></div></div><div data-testid="coach-hi" style="text-align:center;padding-top:40px"><div style="font-size:26px;line-height:32px">Good evening, Alex</div><div>4 workouts, 270 min in 7 days</div></div></body>',
+    run: 'header',
+    expect: 'second title',
+  },
+  {
+    name: "the coach's right-aligned question bubble is not a card with uneven margins",
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div style="padding:0 20px;display:flex;flex-direction:column"><div data-testid="coach-question-2" style="align-self:flex-end;width:80%;height:60px;box-sizing:border-box;background:#fde;padding:10px 14px">How is my training week going, with the long run?</div></div></body>',
+    run: 'gaps',
+    expect: '',
+  },
+  {
+    name: 'a right-aligned card with another testID is still uneven',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div style="padding:0 20px;display:flex;flex-direction:column"><div data-testid="coach-answer" style="align-self:flex-end;width:80%;height:60px;box-sizing:border-box;background:#fde;padding:10px 14px">How is my training week going, with the long run?</div></div></body>',
+    run: 'gaps',
+    expect: 'from the left',
+  },
+  {
     name: 'a text field box is not a card with uneven margins',
     html: '<body style="margin:0;font:15px/20px sans-serif"><div style="display:flex;gap:8px;padding:0 20px"><div style="flex:1;height:50px;border:1px solid #888;display:flex"><input style="flex:1;border:0"></div><button style="width:74px;height:50px">Set</button></div></body>',
     run: 'gaps',
     expect: '',
+  },
+  {
+    name: 'a text area grown to four lines beside its send cup is a field, not a card with uneven margins',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div style="display:flex;gap:8px;padding:0 20px;align-items:flex-end"><div style="flex:1;height:118px;border:1px solid #888;display:flex"><textarea style="flex:1;border:0;height:110px">How many rest days should I take when I run three times a week and lift twice?</textarea></div><button style="width:50px;height:50px">Send</button></div></body>',
+    run: 'gaps',
+    expect: '',
+  },
+  {
+    name: 'a card holding a small text area with uneven margins is still seen',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div style="margin:0 94px 0 20px;height:160px;border:1px solid #888;background:#eee"><p>Notes</p><textarea style="height:40px"></textarea></div></body>',
+    run: 'gaps',
+    expect: 'from the left',
   },
   {
     name: 'a full-width card with uneven margins is still seen',

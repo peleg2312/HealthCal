@@ -41,7 +41,7 @@ export default function ProgressScreen() {
     const weekStart = startOfWeek(d.today);
     const loggedThisWeek = d.weekDays.filter((x) => x.date >= weekStart && hasFoodLogged(x.entries)).length;
     return (
-      <Screen tabs testID="progress-screen" header={<TabHeader tab="progress" overline="Trends and insights" title="Progress" />}>
+      <Screen tabs testID="progress-screen" header={<TabHeader tab="progress" overline="Trends and insights" overlineShort="Trends" title="Progress" />}>
         <EarlyState
           completeDays={d.completeEver}
           weighIns={d.series.entries.length}
