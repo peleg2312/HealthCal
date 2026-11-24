@@ -143,10 +143,13 @@ name: First day on a phone
 - takeScreenshot: 13-diary-lunch
 # Two different foods in lunch: the diary offers its one-time "Save lunch as a meal" line under the
 # lunch card. Scrolled to and photographed; never required (it is hidden once dealt with).
+# centerElement: at the end of the page the line can sit behind the tab bar, where Maestro already
+# counts it as visible and would not scroll (run 45368765531 found it at y 2305 of 2400).
 - scrollUntilVisible:
     element:
       id: diary-save-hint
     direction: DOWN
+    centerElement: true
     timeout: 10000
     optional: true
 - takeScreenshot: 13b-diary-save-hint
