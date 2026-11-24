@@ -2957,6 +2957,7 @@ src/lib/nutrition.ts	servingsFor	function
 src/lib/nutrition.ts	sumNutrients	function
 src/lib/sha256.ts	sha256Hex	function
 src/lib/sha256.ts	utf8Bytes	function
+src/lib/spokenUnits.ts	spokenUnits	function
 src/lib/text.ts	NBSP	const
 src/lib/text.ts	WJ	const
 src/lib/text.ts	keepTogether	function
@@ -3461,6 +3462,7 @@ src/ui/index.ts	*	re-export-all	src/ui/Sheet.tsx
 src/ui/index.ts	*	re-export-all	src/ui/Text.tsx
 src/ui/index.ts	*	re-export-all	src/ui/Toast.tsx
 src/ui/index.ts	*	re-export-all	src/ui/Vessel.tsx
+src/ui/index.ts	ANDROID_TARGET	re-export	src/ui/controlRules.ts:ANDROID_TARGET
 src/ui/index.ts	AnimatedItem	re-export	src/ui/motion.tsx:AnimatedItem
 src/ui/index.ts	AnimatedList	re-export	src/ui/motion.tsx:AnimatedList
 src/ui/index.ts	AnimatedNumber	re-export	src/ui/motion.tsx:AnimatedNumber
@@ -3486,6 +3488,7 @@ src/ui/index.ts	useFadeAfter	re-export	src/ui/motion.tsx:useFadeAfter
 src/ui/index.ts	usePour	re-export	src/ui/motion.tsx:usePour
 src/ui/index.ts	useReachFlash	re-export	src/ui/motion.tsx:useReachFlash
 src/ui/index.ts	useReducedMotion	re-export	src/theme/motion.ts:useReducedMotion
+src/ui/index.ts	webAutoComplete	re-export	src/ui/controlRules.ts:webAutoComplete
 src/ui/keyboardInset.ts	ControlBox	interface
 src/ui/keyboardInset.ts	KEYBOARD_MIN	const
 src/ui/keyboardInset.ts	REVEAL_MARGIN	const
