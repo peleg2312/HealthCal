@@ -1,30 +1,55 @@
 import { router } from 'expo-router';
-import { Cloud, CloudOff, CreditCard, KeyRound, LogOut, RefreshCw, ShieldCheck, Smartphone, Trash2 } from 'lucide-react-native';
+import { Cloud, CloudOff, CreditCard, Info, KeyRound, LogOut, RefreshCw, ShieldCheck, Smartphone, Trash2, TriangleAlert } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
+import { authDemo, demoEmail, syncDemo } from '@/features/auth/demo';
+import { returnScreenOpen } from '@/features/auth/google';
+import { GoogleButton } from '@/features/auth/GoogleButton';
+import { lastWordsTogether } from '@/features/auth/lines';
+import { syncMark, syncPendingLine, syncStatusLine } from '@/features/auth/syncRow';
+import { useGoogleSignIn } from '@/features/auth/useGoogleSignIn';
+import { ACCOUNT_UPLOAD_LINE, SIGN_IN, signInMethodLine } from '@/features/auth/words';
+import { Note } from '@/features/onboarding/components';
 import { deleteAccountWithPlan, sendAddPassword } from '@/features/plan/account';
 import { needsPassword } from '@/features/plan/accountRules';
 import { usePlan } from '@/features/plan/cache';
 import { PLAN_ROUTE } from '@/features/plan/channel';
 import { openManage } from '@/features/plan/checkout';
+import { PlanGlyph } from '@/features/plan/PlanGlyph';
 import { PlanRow } from '@/features/plan/PlanRow';
 import { canManageHere, holdsPlus, planVisible } from '@/features/plan/view';
 import { ADD_PASSWORD_HINT, ADD_PASSWORD_LABEL, DELETE_ANYWAY_LABEL, DELETE_PLAN_LINE, MANAGE_LABEL, RELEASED_LINE } from '@/features/plan/words';
-import { Group, IconTile } from '@/features/settings/components';
+import { Group, IconTile, InitialsAvatar } from '@/features/settings/components';
 import { breakableEmail, timeAgo } from '@/features/settings/format';
 import { signOut, useAuth } from '@/services/auth';
 import { cancelAllReminders } from '@/services/notifications';
 import { isBackendConfigured } from '@/services/supabase';
 import { syncNow, useSyncState } from '@/services/sync';
 import { pendingChanges, useStore } from '@/store';
-import { useTheme } from '@/theme';
-import { Button, Card, ConfirmSheet, Header, ListRow, Screen, Sheet, Text, toast } from '@/ui';
+import { useNow } from '@/store/clock';
+import { fonts, MAX_CONTENT_WIDTH, useTheme } from '@/theme';
+import { Button, Card, ConfirmSheet, CupKey, Divider, Header, ListRow, Screen, Sheet, Text, toast } from '@/ui';
+
+/** The words of the delete confirmation: what is erased. With a plan held, the plan's line stands over them, set apart. */
+const DELETE_ERASES =
+  'This permanently erases your account and everything stored with it: every food, activity, weight, water, sleep and fasting entry, your custom foods and saved meals, your profile, goals and settings. It also removes the data from this device and turns off reminders. This cannot be undone.';
+
+/** The sync button's width, so the row does not jump while its title gives way to the spinner. */
+const SYNC_BUTTON_W = 116;
+/** The least room the sync status needs beside the button before the button goes under it. */
+const SYNC_STATUS_MIN = 160;
 
 export default function AccountScreen() {
   const session = useAuth((s) => s.session);
+  // A test build's picture of the signed-in view, with no backend (src/features/auth/demo.ts); never in a release.
+  const demo = authDemo() === 'signed-in' && !session;
+  // The line under the title says how this account signs in.
+  const subtitle = session ? signInMethodLine(session.user.identities) : demo ? signInMethodLine([{ provider: 'google' }]) : 'Not signed in';
   return (
-    <Screen header={<Header title="Account and sync" subtitle={session ? 'Signed in' : 'Not signed in'} />}>{session ? <SignedIn email={session.user.email ?? 'Signed in'} /> : <SignedOut />}</Screen>
+    <Screen header={<Header title="Account and sync" subtitle={subtitle} />}>
+      {session || demo ? <SignedIn email={session?.user.email ?? (demo ? demoEmail() : 'Signed in')} /> : <SignedOut />}
+    </Screen>
   );
 }
 
@@ -47,6 +72,9 @@ function SignedOut() {
   const { colors, spacing } = useTheme();
   const sessionLost = useAuth((s) => s.sessionLost);
   const pending = useStore(pendingChanges);
+  // The same Google way in as welcome and sign-in: on a phone it ends with a session and the sign-in screen's gate takes over.
+  const google = useGoogleSignIn({ onSignedIn: () => !returnScreenOpen() && router.push('/auth?mode=google' as never) });
+  const accounts = isBackendConfigured || authDemo() !== null;
   if (sessionLost && isBackendConfigured) {
     return (
       <>
@@ -79,7 +107,7 @@ function SignedOut() {
   return (
     <>
       <Card>
-        <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center', marginBottom: spacing.md }}>
+        <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
           <IconTile color={colors.warningInk} keep>
             <Smartphone size={20} color={colors.warningInk} />
           </IconTile>
@@ -115,14 +143,34 @@ function SignedOut() {
         </View>
       </Card>
 
-      {isBackendConfigured ? (
-        <View style={{ gap: spacing.sm }}>
-          <Button testID="account-signup" title="Create an account" onPress={() => router.push('/auth?mode=signup' as never)} />
-          <Button testID="account-signin" title="I already have an account" variant="secondary" onPress={() => router.push('/auth?mode=signin' as never)} />
-          <Text variant="caption" color="textTertiary" align="center">
-            What you have logged so far is uploaded to the new account.
-          </Text>
-        </View>
+      {accounts ? (
+        // Drawn once this visit knows whether Google is offered, so its button never pushes the others down under a finger.
+        google.ready ? (
+          <View style={{ gap: spacing.sm }}>
+            <Button testID="account-signup" title="Create an account" onPress={() => router.push('/auth?mode=signup' as never)} />
+            {/* Never the primary: between the two, as wide and as tall as they are. */}
+            {google.shown ? <GoogleButton testID="account-google" onPress={google.press} busy={google.busy} /> : null}
+            {google.error ? (
+              <Note tone="warning" surface="card" testID="account-google-error" icon={<TriangleAlert size={18} color={colors.warningInk} />}>
+                <Text variant="caption" color="textSecondary" accessibilityLiveRegion="polite">
+                  {google.error}
+                </Text>
+              </Note>
+            ) : null}
+            {google.notice ? (
+              <Note tone="neutral" testID="account-google-off" icon={<Info size={18} color={colors.textSecondary} />}>
+                <Text variant="caption" color="textSecondary" accessibilityLiveRegion="polite">
+                  {google.notice}
+                </Text>
+              </Note>
+            ) : null}
+            {/* One name for one action: "Sign in", as welcome and the form say it. */}
+            <Button testID="account-signin" title={SIGN_IN} variant="secondary" onPress={() => router.push('/auth?mode=signin' as never)} />
+            <Text variant="caption" color="textTertiary" align="center" accessibilityLabel={ACCOUNT_UPLOAD_LINE}>
+              {lastWordsTogether(ACCOUNT_UPLOAD_LINE)}
+            </Text>
+          </View>
+        ) : null
       ) : (
         <Card tone="alt">
           <Text variant="bodyStrong">Accounts are not set up in this build</Text>
@@ -138,9 +186,15 @@ function SignedOut() {
 
 function SignedIn({ email }: { email: string }) {
   const { colors, spacing } = useTheme();
-  const sync = useSyncState();
+  const { width } = useWindowDimensions();
+  const name = useStore((s) => s.profile?.name ?? '');
+  const liveSync = useSyncState();
   const lastSyncedAt = useStore((s) => s.lastSyncedAt);
-  const pending = useStore(pendingChanges);
+  const livePending = useStore(pendingChanges);
+  // A test build's picture of the sync row in one of its states (src/features/auth/syncRow.ts); never in a release.
+  const demoSync = syncDemo();
+  const sync = demoSync ? { ...liveSync, status: demoSync.status, error: demoSync.error } : liveSync;
+  const pending = demoSync ? demoSync.pending : livePending;
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState<'signout' | 'delete' | null>(null);
@@ -154,17 +208,12 @@ function SignedIn({ email }: { email: string }) {
   /** Message from a sign-out that stopped because changes are not backed up. */
   const [signOutBlocked, setSignOutBlocked] = useState<string | null>(null);
 
-  const when = timeAgo(sync.lastRunAt ?? lastSyncedAt);
-  const status =
-    sync.status === 'syncing'
-      ? 'Syncing now'
-      : sync.status === 'offline'
-        ? 'Offline. Changes upload when you are back online.'
-        : sync.status === 'error'
-          ? `Sync paused: ${sync.error ?? 'unknown error'}`
-          : when
-            ? `Last synced ${when}`
-            : 'Not synced yet';
+  // "Last synced 3 min ago" moves on while the screen stays open (never the render's own clock).
+  const now = useNow();
+  const when = demoSync ? demoSync.when : timeAgo(sync.lastRunAt ?? lastSyncedAt, now);
+  const status = syncStatusLine(sync.status, sync.error, when);
+  // The key says what the words say: done, waiting or stopped.
+  const mark = syncMark({ status: sync.status, pending, synced: !!when });
 
   const doSignOut = async (discardPending = false) => {
     setConfirmSignOut(false);
@@ -209,42 +258,63 @@ function SignedIn({ email }: { email: string }) {
     toast(r.message);
   };
 
+  // The card's inner width: the status keeps at least SYNC_STATUS_MIN beside the button, or the button goes under it, full width.
+  const inner = Math.min(width, MAX_CONTENT_WIDTH) - 2 * spacing.xl - 2 * spacing.lg;
+  const stacked = inner < SYNC_STATUS_MIN + spacing.md + SYNC_BUTTON_W;
+  const KEY = 9;
+
   return (
     <>
-      <Card>
+      <Card testID="account-card">
+        {/* Who: your tile and your address. A long address wraps at its @ and dots rather than losing its end. */}
         <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-          <IconTile color={sync.status === 'idle' ? colors.success : colors.warningInk} keep={sync.status !== 'idle'}>
-            {sync.status === 'offline' ? <CloudOff size={20} color={colors.warningInk} /> : <Cloud size={20} color={sync.status === 'idle' ? colors.success : colors.warningInk} />}
-          </IconTile>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            {/* A long address wraps at its @ and dots rather than losing its end. */}
-            <Text variant="title" numberOfLines={3} testID="account-email" accessibilityLabel={email}>
-              {breakableEmail(email)}
-            </Text>
-            <Text variant="caption" color={sync.status === 'error' ? 'warningInk' : 'textSecondary'}>
-              {status}
-            </Text>
-          </View>
+          <InitialsAvatar name={name} size={48} />
+          <Text variant="body" numberOfLines={3} testID="account-email" accessibilityLabel={email} style={{ flex: 1, minWidth: 0, fontFamily: fonts.semibold }}>
+            {breakableEmail(email)}
+          </Text>
         </View>
-        <Text variant="caption" color="textSecondary" style={{ marginTop: spacing.md }}>
-          {pending === 0 ? 'Everything on this device is backed up.' : `${pending} change${pending === 1 ? '' : 's'} waiting to upload.`}
-        </Text>
+        <View style={{ marginVertical: spacing.md }}>
+          <Divider />
+        </View>
+        {/*
+          Sync in one row: a key for the state (a mark, never the words' colour), what it is, and the one action.
+          The key is filled ink only when nothing waits and the last sync succeeded, an ink outline while
+          changes wait or a sync runs, and amber only when sync is paused or the device is offline.
+        */}
+        <View style={{ flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'stretch' : 'center', gap: spacing.md }}>
+          <View style={{ flex: stacked ? undefined : 1, minWidth: 0, flexDirection: 'row', gap: spacing.sm }}>
+            {/* The key sits on the first line of the status (a 17 px caption line). */}
+            <View style={{ height: 17, justifyContent: 'center' }}>
+              <CupKey size={KEY} variant={mark === 'waiting' ? 'outline' : 'filled'} color={mark === 'stopped' ? colors.warning : colors.success} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              {/* Both lines keep their last two words together: beside the button the column is narrow, and no line ends on one word alone. */}
+              <Text variant="caption" color={sync.status === 'error' ? 'warningInk' : 'text'} testID="account-sync-status" accessibilityLiveRegion="polite" accessibilityLabel={status}>
+                {lastWordsTogether(status)}
+              </Text>
+              <Text variant="caption" color="textSecondary" testID="account-sync-pending" accessibilityLabel={syncPendingLine(pending)}>
+                {lastWordsTogether(syncPendingLine(pending))}
+              </Text>
+            </View>
+          </View>
+          <Button
+            testID="account-sync-now"
+            title="Sync now"
+            variant="secondary"
+            size="sm"
+            full={stacked}
+            loading={sync.status === 'syncing'}
+            icon={<RefreshCw size={16} color={colors.text} />}
+            style={stacked ? undefined : { width: SYNC_BUTTON_W }}
+            onPress={() => void syncNow().then(() => useSyncState.getState().status === 'idle' && toast('Synced'))}
+          />
+        </View>
         {sync.rejected > 0 ? (
-          <Text variant="caption" color="warningInk" style={{ marginTop: spacing.xs }} testID="account-sync-rejected">
+          <Text variant="caption" color="warningInk" style={{ marginTop: spacing.sm, marginLeft: KEY + spacing.sm }} testID="account-sync-rejected">
             {sync.rejected === 1 ? '1 item was not accepted by the server.' : `${sync.rejected} items were not accepted by the server.`} {sync.rejected === 1 ? 'It is' : 'They are'} safe on this
             device and will be tried again. Everything else is backed up.
           </Text>
         ) : null}
-        <Button
-          testID="account-sync-now"
-          title="Sync now"
-          variant="secondary"
-          size="md"
-          loading={sync.status === 'syncing'}
-          icon={<RefreshCw size={18} color={colors.text} />}
-          style={{ marginTop: spacing.md }}
-          onPress={() => void syncNow().then(() => useSyncState.getState().status === 'idle' && toast('Synced'))}
-        />
       </Card>
 
       {showPlan ? (
@@ -291,7 +361,7 @@ function SignedIn({ email }: { email: string }) {
         <ListRow
           testID="account-sign-out"
           title="Sign out"
-          subtitle="Clears this device; your account keeps it"
+          subtitle="Clears this device, not your account"
           left={
             <IconTile color={colors.textSecondary}>
               <LogOut size={20} color={colors.textSecondary} />
@@ -349,15 +419,45 @@ function SignedIn({ email }: { email: string }) {
           {signOutBlocked}
         </Text>
       </Sheet>
-      <ConfirmSheet
-        visible={confirmDelete}
-        title="Delete your account?"
-        message={`${holds ? `${DELETE_PLAN_LINE} ` : ''}This permanently erases your account and everything stored with it: every food, activity, weight, water, sleep and fasting entry, your custom foods and saved meals, your profile, goals and settings. It also removes the data from this device and turns off reminders. This cannot be undone.`}
-        confirmLabel="Delete account and data"
-        destructive
-        onConfirm={() => void doDelete()}
-        onCancel={() => setConfirmDelete(false)}
-      />
+      {holds ? (
+        // With a plan held, what happens to it comes first and is set apart, not buried in the paragraph. The buttons are ConfirmSheet's own.
+        <Sheet
+          visible={confirmDelete}
+          onClose={() => setConfirmDelete(false)}
+          title="Delete your account?"
+          footer={
+            <View style={{ gap: 10 }}>
+              <Button testID="confirm-yes" title="Delete account and data" variant="danger" onPress={() => void doDelete()} />
+              <Button testID="confirm-no" title="Cancel" variant="secondary" onPress={() => setConfirmDelete(false)} />
+            </View>
+          }>
+          <View style={{ gap: spacing.md }}>
+            <Card tone="alt" padding={14} testID="account-delete-plan">
+              <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
+                <View style={{ height: 21, justifyContent: 'center' }}>
+                  <PlanGlyph size={20} color={colors.text} />
+                </View>
+                <Text variant="bodyStrong" style={{ flex: 1 }}>
+                  {DELETE_PLAN_LINE}
+                </Text>
+              </View>
+            </Card>
+            <Text variant="body" color="textSecondary">
+              {DELETE_ERASES}
+            </Text>
+          </View>
+        </Sheet>
+      ) : (
+        <ConfirmSheet
+          visible={confirmDelete}
+          title="Delete your account?"
+          message={DELETE_ERASES}
+          confirmLabel="Delete account and data"
+          destructive
+          onConfirm={() => void doDelete()}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
       <Sheet
         visible={deleteBlocked !== null}
         onClose={() => setDeleteBlocked(null)}

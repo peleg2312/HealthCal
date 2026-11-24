@@ -7,11 +7,15 @@
 /** One label everywhere: it both signs in and creates an account (Google's own wording). */
 export const GOOGLE_LABEL = 'Continue with Google';
 
-/** The waiting view while a Google return is exchanged for a session. Never "Email confirmed". */
+/**
+ * The waiting view while a Google return is exchanged for a session. Never "Email confirmed".
+ * `lead` over `body` is the pattern of every wait (`WaitLines`): what is happening, then what comes of it.
+ */
 export const GOOGLE_WAITING = {
   title: 'Signing in with Google',
   subtitle: 'Account and sync',
-  body: 'Finishing your sign-in. Your plan and logs come next.',
+  lead: 'Finishing your sign-in',
+  body: 'Your plan and logs come next.',
 } as const;
 
 /**
@@ -31,6 +35,52 @@ export const GOOGLE_OFF_NOW = 'Google sign-in is not available right now. Use yo
 /** What a tap leads to: the Google flow, or the button gone with GOOGLE_OFF_NOW in its place. */
 export function tapOutcomeWords(verdict: 'go' | 'off'): string | null {
   return verdict === 'off' ? GOOGLE_OFF_NOW : null;
+}
+
+/**
+ * The waits that are not Google's, in the same pattern: a strong line, then a secondary one.
+ * A reset link signs the device in within a few seconds or is called expired (RECOVERY_GRACE_MS in the screen).
+ */
+export const RESET_CHECKING = { title: 'Checking your reset link', body: 'This takes a few seconds.' } as const;
+/** Signed in, the first sync still running: what happened, then what is happening. */
+export const RESTORING = { title: 'Signed in', body: 'Bringing your plan and logs to this device.' } as const;
+
+/**
+ * At the end of the sign-in and sign-up forms, over the two links: what an account agrees to.
+ * Worded for both forms (signing in uses an account as much as creating one does).
+ */
+export const AUTH_TERMS_LINE = 'Using an account means you accept the Terms of use and the Privacy page.';
+export const AUTH_TERMS_LABEL = 'Terms of use';
+export const AUTH_PRIVACY_LABEL = 'Privacy';
+
+/** Under the sign-up form, above the terms line: what happens to the data, with a plan on this device and without. */
+export function signUpDataLine(setUp: boolean): string {
+  return setUp ? 'Everything you have logged on this device is uploaded to your new account.' : 'Your data is private to your account. You can export or delete it at any time.';
+}
+
+/** One name for one action: welcome, Account and the sign-in form all say "Sign in". */
+export const SIGN_IN = 'Sign in';
+/** Under Account's three ways in, signed out: true for a new account and for one signed in to. */
+export const ACCOUNT_UPLOAD_LINE = 'What you have logged so far goes to your account.';
+
+/** Welcome's quiet row under the two full-width ways in. */
+export const WELCOME_SIGN_IN = SIGN_IN;
+export const WELCOME_SIGN_IN_LABEL = 'Sign in to an existing account';
+export const WELCOME_RESTORE = 'Restore a backup';
+
+/**
+ * The line under Account's title: how this account signs in, from its identities (Supabase lists one
+ * per way in). Google alone, email alone, both, or plainly "Signed in" when the list is missing or
+ * holds a way this app does not offer.
+ */
+export function signInMethodLine(identities: readonly { provider?: string | null }[] | null | undefined): string {
+  const ways = new Set((identities ?? []).map((i) => i.provider));
+  const google = ways.has('google');
+  const email = ways.has('email');
+  if (google && email) return 'Signed in with Google or email';
+  if (google) return 'Signed in with Google';
+  if (email) return 'Signed in with email';
+  return 'Signed in';
 }
 
 /** After a Google sign-in that joined an existing email account. */

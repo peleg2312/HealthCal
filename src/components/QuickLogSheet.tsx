@@ -1,8 +1,10 @@
 import { router } from 'expo-router';
-import { Activity, Camera, Check, Droplets, PenLine, Plus, Repeat2, Scale, ScanBarcode, Search } from 'lucide-react-native';
+import { Activity, Check, Droplets, Plus, Repeat2, Scale, ScanBarcode, Search, type LucideIcon } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { ScrollView, useWindowDimensions, View } from 'react-native';
 
+import { AiGlyph, type AiGlyphName } from '@/features/ai/mark';
+import { AI_TILE_HINT } from '@/features/ai/words';
 import { hasFoodLogged } from '@/features/drinks/via';
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
 import { matchServing, servingText } from '@/features/food/helpers';
@@ -86,14 +88,17 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   const mark = (key: string) => setDone((d) => [...d, key]);
 
   const food = '{food}';
-  const actions = [
+  // The two AI ways in wear the AI's own glyphs (the cup with its drop) and say "AI estimate", so the AI
+  // is recognised before the tap; every other tile keeps its lucide icon.
+  const actions: { id: string; label: string; hint: string; icon?: LucideIcon; glyph?: AiGlyphName; color: string; href: string }[] = [
     { id: 'search', label: 'Search food', hint: 'Database and your recents', icon: Search, color: colors.calories, href: `/food/search?${food}` },
-    { id: 'photo', label: 'Snap a meal', hint: 'Photo, AI estimate', icon: Camera, color: colors.calories, href: `/food/photo?${food}` },
+    { id: 'photo', label: 'Snap a meal', hint: AI_TILE_HINT.photo, glyph: 'photo', color: colors.calories, href: `/food/photo?${food}` },
     { id: 'scan', label: 'Scan barcode', hint: 'Packaged products', icon: ScanBarcode, color: colors.calories, href: `/food/scan?${food}` },
-    { id: 'describe', label: 'Describe it', hint: 'Type what you ate', icon: PenLine, color: colors.calories, href: `/food/photo?mode=text&${food}` },
+    { id: 'describe', label: 'Describe it', hint: AI_TILE_HINT.describe, glyph: 'describe', color: colors.calories, href: `/food/photo?mode=text&${food}` },
     { id: 'activity', label: 'Log activity', hint: 'Sport, gym, walk', icon: Activity, color: colors.exercise, href: '/activity/pick?{past}' },
     { id: 'weight', label: 'Weigh in', hint: 'Weight and body fat', icon: Scale, color: colors.weight, href: '/weight?{past}' },
   ];
+  const tileIcon = (a: (typeof actions)[number], size: number) => (a.glyph ? <AiGlyph name={a.glyph} size={size} color={a.color} /> : a.icon ? <a.icon size={size} color={a.color} strokeWidth={1.9} /> : null);
 
   // Every tile is a small cup: square shoulders, round base, 1 px border, flat.
   const tile = {
@@ -210,7 +215,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
               {wide ? (
                 <>
                   <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
-                    <a.icon size={22} color={a.color} strokeWidth={1.9} />
+                    {tileIcon(a, 22)}
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text variant="bodyStrong">{a.label}</Text>
@@ -223,7 +228,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                 <>
                   <View style={{ flexDirection: narrow ? 'column' : 'row', alignItems: narrow ? 'flex-start' : 'center', gap: narrow ? 6 : 8, minHeight: 24 }}>
                     <View style={{ width: 20, height: 24, alignItems: 'center', justifyContent: 'center' }}>
-                      <a.icon size={20} color={a.color} strokeWidth={1.9} />
+                      {tileIcon(a, 20)}
                     </View>
                     <Text variant="bodyStrong" style={{ flexShrink: 1 }}>
                       {a.label}

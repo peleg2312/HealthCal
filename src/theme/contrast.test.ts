@@ -354,3 +354,25 @@ describe("the coach's cup", () => {
     ])).toEqual([]);
   });
 });
+
+/**
+ * The plan's allowance cups (src/features/plan/PlanCup.tsx, filled with the AI cup's fill) stand on
+ * the comparison card itself (src/features/plan/AllowanceTable.tsx), never on a tint: the Plus column
+ * is set apart by a hairline, because on surfaceAlt the outline and the fill fell under 3:1 in
+ * Blossom, Butter and Honey. On the card the outline is 3:1 everywhere and the fill 3:1 in every
+ * palette but Blossom, where no fill can hold the level line and the page both (the coach's cup,
+ * above) and the outline draws the shape.
+ */
+describe("the plan's allowance cups on the card", () => {
+  it.each(NAMES)('%s: the outline and the fill on surface', (name) => {
+    const c = PALETTES[name];
+    const fill = coachMarkFill(c, chartFillOpacity[name]).color;
+    const rows = [{ what: `${name} vesselEdge on surface`, ratio: contrast(c.vesselEdge, c.surface), min: 3 }];
+    if (name === 'blossom') {
+      expect(contrast(fill, c.surface), 'blossom, the fill as far as it goes').toBeGreaterThanOrEqual(2);
+    } else {
+      rows.push({ what: `${name} allowance fill on surface`, ratio: contrast(fill, c.surface), min: 3 });
+    }
+    expect(failures(rows)).toEqual([]);
+  });
+});

@@ -9,6 +9,13 @@
 // account screen's sheets need a build with a backend (see the README, "Testing accounts and sync
 // locally"; export it with EXPO_PUBLIC_E2E=1 as well, or the runner never sees the app start), then
 // run this list with --backend --url=<that build> and --only=<the ids under "accounts">.
+//
+// How those views LOOK is drawn without a backend too: a build with the test hooks reads
+// `?authDemo=<view>` (src/features/auth/demo.ts) and draws welcome with Google on, the sign-in form
+// with Continue with Google and its note, the three waits with the waiting cup, "Check your inbox",
+// and Account signed in and signed out, with `&syncDemo=<state>` for each state of its sync row and
+// `&demoEmail=long` for a 55-letter address. They are the ids under "accounts as pictures"; what they
+// DO is still proved against the stand-in backend (--backend here, and e2e-backend.cjs).
 
 // ------------------------------------------------------------------ onboarding, step by step
 // Single-choice tiles move on by themselves 250 ms after the tap, so no Continue after them.
@@ -65,8 +72,37 @@ const onboarding = [
 
 // ------------------------------------------------------------------ welcome, auth (no backend here)
 const firstRun = [
-  { id: 'welcome-fresh', route: '/welcome', data: 'fresh', waitFor: 'welcome-get-started', note: 'welcome with nothing stored' },
-  { id: 'auth-no-backend', route: '/auth?mode=signin', data: 'fresh', waitFor: 'auth-not-configured', note: 'sign in on a build without accounts' },
+  { id: 'welcome-fresh', route: '/welcome', data: 'fresh', waitFor: 'welcome-get-started', note: 'welcome with nothing stored: Get started, and Restore a backup alone on its row' },
+  { id: 'auth-no-backend', route: '/auth?mode=signin', data: 'fresh', waitFor: 'auth-not-configured', note: 'sign in on a build without accounts: the phone in a cup tile' },
+];
+
+// ------------------------------------------------------------------ accounts as pictures (?authDemo=, no backend)
+// The buttons of these views are the real ones with no backend behind them, so the crawl (which taps
+// every control and fails on one that does nothing) leaves them out: it gets the list without them.
+const crawling = /crawl\.cjs$/.test((require.main && require.main.filename) || '');
+const pictures = [
+  { id: 'welcome-google-demo', route: '/welcome?authDemo=google', data: 'fresh', waitFor: 'welcome-google', note: 'welcome with accounts and Google on: two full-width ways in, then Sign in and Restore a backup on one quiet row; the cup keeps its room' },
+  { id: 'welcome-google-declined', route: '/welcome?authDemo=declined', data: 'fresh', waitFor: 'welcome-google-error', note: 'welcome after a Google sign-in that was not completed: the neutral note on the card surface, scrolled whole into view above the pinned buttons' },
+  { id: 'auth-demo-signin', route: '/auth?authDemo=signin', data: 'fresh', waitFor: 'auth-terms', note: 'sign in: Continue with Google over the email form; the form ends with one centred caption (what an account agrees to) over "Terms of use · Privacy" as underlined ink links, seen together or not at all' },
+  { id: 'auth-demo-signup', route: '/auth?authDemo=signup', data: 'fresh', waitFor: 'auth-terms', note: 'create an account: the data line, the same caption and the same two links, all centred' },
+  { id: 'auth-demo-declined', route: '/auth?authDemo=declined', data: 'fresh', waitFor: 'auth-google-error', note: 'back from Google after declining: a neutral note under the button, never red' },
+  { id: 'auth-demo-declined-set-up', route: '/auth?authDemo=declined', waitFor: 'auth-google-error', note: 'the same on a device that is set up (the chosen look): the note on the card surface with the amber lip in all six looks (--themes=blossom,light,dark,butter,honey,java)' },
+  { id: 'auth-demo-waiting', route: '/auth?authDemo=waiting', data: 'fresh', waitFor: 'auth-google-waiting-cup', note: 'signing in with Google: the waiting cup, "Finishing your sign-in" strong, then what comes next' },
+  { id: 'auth-demo-checking', route: '/auth?authDemo=checking', data: 'fresh', waitFor: 'auth-reset-checking-cup', note: 'a reset link being checked: the same pattern' },
+  { id: 'auth-demo-restoring', route: '/auth?authDemo=restoring', data: 'fresh', waitFor: 'auth-restoring-cup', note: 'signed in, the plan and logs on their way: the same pattern' },
+  { id: 'auth-demo-inbox', route: '/auth?authDemo=inbox&demoEmail=long', data: 'fresh', waitFor: 'auth-done-sent', note: 'check your inbox: the envelope in a cup tile, a 55-character address; the Google hint keeps the button\'s name on one line' },
+  { id: 'account-demo-signed-in', route: '/settings/account?authDemo=signed-in', waitFor: 'account-email', note: 'account, signed in: how you sign in under the title, your tile and an everyday address on one line, one sync row (never synced, changes waiting: the ink outline key)' },
+  { id: 'account-demo-signed-in-stress', route: '/settings/account?authDemo=signed-in&demoEmail=long', data: 'stress', waitFor: 'account-email', note: 'the same with a 22-character name and a 55-character address' },
+  // The sync row's key says what its words say: one picture of each state.
+  { id: 'account-demo-sync-synced', route: '/settings/account?authDemo=signed-in&syncDemo=synced', waitFor: 'account-sync-status', note: 'sync row, synced and nothing waiting: the filled ink key' },
+  { id: 'account-demo-sync-waiting', route: '/settings/account?authDemo=signed-in&syncDemo=waiting', waitFor: 'account-sync-status', note: 'sync row, changes waiting: the ink outline key' },
+  { id: 'account-demo-sync-syncing', route: '/settings/account?authDemo=signed-in&syncDemo=syncing', waitFor: 'account-sync-status', note: 'sync row while a sync runs: the ink outline key, the button busy' },
+  { id: 'account-demo-sync-paused', route: '/settings/account?authDemo=signed-in&syncDemo=paused', waitFor: 'account-sync-status', note: 'sync row, paused by an error: the amber key' },
+  { id: 'account-demo-sync-offline', route: '/settings/account?authDemo=signed-in&syncDemo=offline', waitFor: 'account-sync-status', note: 'sync row, offline: the amber key' },
+  { id: 'account-demo-signed-in-plus', route: '/settings/account?authDemo=signed-in&planDemo=plus', waitFor: 'account-plan-manage', note: 'signed in with Plus: the Plan group under the card' },
+  { id: 'account-demo-signed-out', route: '/settings/account?authDemo=signed-out', waitFor: 'account-google', note: 'account, signed out: Continue with Google between "Create an account" and "Sign in"' },
+  { id: 'account-demo-delete-sheet', route: '/settings/account?authDemo=signed-in', taps: ['account-delete'], sheet: true, note: 'delete account, no plan: the confirm sheet as it was' },
+  { id: 'account-demo-delete-plan', route: '/settings/account?authDemo=signed-in&planDemo=plus', taps: ['account-delete'], sheet: true, note: 'delete account with Plus: what happens to the plan first, set apart, then what is erased' },
 ];
 
 // ------------------------------------------------------------------ profile and settings
@@ -97,10 +133,12 @@ const settings = [
   { id: 'about-imperial', route: '/settings/about', imperial: true, note: 'about, imperial' },
   { id: 'health-sync-web', route: '/settings/health-sync', note: 'health sync on the web: not available here' },
   // The terms and the privacy page (src/features/legal): pushed screens, open without a profile (the public pages a payment company and Google link to).
-  { id: 'legal-terms', route: '/legal/terms', waitFor: 'legal-terms-renewal', note: 'the terms: the free plan, Plus, renewal, cancelling and refunds' },
-  { id: 'legal-privacy', route: '/legal/privacy', waitFor: 'legal-privacy-payments', note: 'the privacy page, written from what the app does' },
+  { id: 'legal-terms', route: '/legal/terms', waitFor: 'legal-terms-renewal', note: 'the terms: "In short" with the date, "On this page" with two or three short labels to a line, then the full text as one reading column' },
+  { id: 'legal-privacy', route: '/legal/privacy', waitFor: 'legal-privacy-payments', note: 'the privacy page, written from what the app does: "In short" with the AI mark on its AI line' },
   { id: 'legal-terms-fresh', route: '/legal/terms', data: 'fresh', waitFor: 'legal-terms-what', note: 'the terms before setup: the page stays (OPEN_WITHOUT_PROFILE)' },
   { id: 'legal-privacy-fresh', route: '/legal/privacy', data: 'fresh', waitFor: 'legal-privacy-short', note: 'the privacy page before setup' },
+  { id: 'legal-terms-jump', route: '/legal/terms', taps: ['legal-terms-jump-renewal', { wait: 600 }], waitFor: 'legal-terms-renewal', note: 'the terms after a tap on "Cancelling" (Renewal and cancelling) in "On this page": that section at the top of the page' },
+  { id: 'legal-privacy-jump', route: '/legal/privacy', taps: ['legal-privacy-jump-coach', { wait: 600 }], waitFor: 'legal-privacy-coach', note: 'the privacy page after a tap on "AI coach" (The AI coach)' },
 ];
 
 // ------------------------------------------------------------------ progress
@@ -172,4 +210,4 @@ const backend = [
   { id: 'profile-signed-out', route: '/profile', data: 'stress', waitFor: 'profile-account', note: 'profile with the account row, signed out' },
 ];
 
-module.exports = [...firstRun, ...onboarding, ...settings, ...progress, ...weeks, ...(process.argv.includes('--backend') ? backend : [])];
+module.exports = [...firstRun, ...(crawling ? [] : pictures), ...onboarding, ...settings, ...progress, ...weeks, ...(process.argv.includes('--backend') ? backend : [])];

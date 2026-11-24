@@ -256,10 +256,19 @@ export function withCorrection(base: string | undefined, correction: string): st
 // ------------------------------------------------------------ logging
 
 /**
+ * The row mark of an estimated food when no food in the list is like it: a pot of food, a dish with
+ * colour that can be seen on every card (the white plate all but vanished on the light papers). Never
+ * a sparkle: that an entry is an AI estimate is said by its source mark (`SourceMark`, the small AI
+ * cup), not by its emoji.
+ */
+export const AI_FOOD_EMOJI = '🍲';
+
+/**
  * A food definition for an estimated item, so the diary entry can be
  * re-portioned later in the grams editor and found again in Recent.
+ * `emoji` is the mark of the food in the list that the item names, when the caller found one.
  */
-export function aiFoodDefinition(item: AiFoodItem, id: string): Food {
+export function aiFoodDefinition(item: AiFoodItem, id: string, emoji: string = AI_FOOD_EMOJI): Food {
   const g = item.grams > 0 ? item.grams : 100;
   const per = (v: number) => Math.round(((v * 100) / g) * 10) / 10;
   return {
@@ -269,7 +278,7 @@ export function aiFoodDefinition(item: AiFoodItem, id: string): Food {
     servings: [{ label: `${Math.round(g)} g`, grams: Math.round(g) }],
     source: 'ai',
     verified: false,
-    emoji: '✨',
+    emoji,
   };
 }
 
@@ -283,9 +292,11 @@ export function itemRange(item: AiFoodItem, widen = 1): [number, number] {
  * The diary lines for the reviewed rows. Estimated rows carry a derived
  * definition and their range (wider for rows read from a photo, `fromPhoto`); rows matched to a database food are logged
  * with that food per gram, keeping the range because the portion is still a
- * guess. Rows without a name or weight are left out.
+ * guess. Rows without a name or weight are left out. `emojiOf` gives an estimated
+ * row the mark of the food it names (`emojiLike`, ./localMatch.ts: "Grilled chicken
+ * breast" wears the chicken's), so the diary's rows read as food; without one it wears the plate.
  */
-export function rowsToLogItems(rows: ReviewRow[], makeId: () => string, fromPhoto = false): SavedMealItem[] {
+export function rowsToLogItems(rows: ReviewRow[], makeId: () => string, fromPhoto = false, emojiOf?: (name: string) => string | undefined): SavedMealItem[] {
   const out: SavedMealItem[] = [];
   for (const r of rows) {
     const it = { ...r.item, name: r.item.name.trim() };
@@ -308,10 +319,10 @@ export function rowsToLogItems(rows: ReviewRow[], makeId: () => string, fromPhot
       });
       continue;
     }
-    const food = aiFoodDefinition(it, `ai_${makeId()}`);
+    const food = aiFoodDefinition(it, `ai_${makeId()}`, emojiOf?.(it.name) || AI_FOOD_EMOJI);
     out.push({
       name: it.name,
-      emoji: '✨',
+      emoji: food.emoji,
       servingLabel: food.servings[0].label,
       quantity: 1,
       grams: it.grams,

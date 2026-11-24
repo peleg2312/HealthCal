@@ -22,9 +22,12 @@ export function ItemRow({
   matches = [],
   onSwap,
   onUnswap,
+  sample = false,
 }: {
   row: ReviewRow;
   index: number;
+  /** The fixed sample result: not the AI, so its estimated rows wear the plain dashed key, not the AI's mark. */
+  sample?: boolean;
   onGrams: (grams: number) => void;
   onRename: (name: string) => void;
   onRemove: () => void;
@@ -89,7 +92,7 @@ export function ItemRow({
       {/* The source on the left, the macros on the right; on a narrow phone the macros wrap under the source rather than run over the stepper. */}
       <View testID={`${id}-source`} style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: spacing.sm, rowGap: 4 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1 }}>
-          <SourceTag source={row.food ? row.food.source : 'ai'} />
+          <SourceTag source={row.food ? row.food.source : 'ai'} plain={sample} />
           {row.food && row.estimate ? (
             <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
               · portion still estimated

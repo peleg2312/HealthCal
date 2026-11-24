@@ -20,6 +20,7 @@ import {
   PHOTO_SPREAD,
   rangeWord,
   rescaleItem,
+  AI_FOOD_EMOJI,
   aiFoodDefinition,
   renameRow,
   rowsFromResult,
@@ -450,6 +451,18 @@ describe('logging reviewed rows', () => {
     expect(items[0].kcalRange![1]).toBeGreaterThan(260);
     expect(items[1]).toMatchObject({ name: cauli.name, source: cauli.source, servingLabel: '1 g', quantity: 150, grams: 150, confidence: 1 });
     expect(items[1].food?.id).toBe(cauli.id);
+  });
+  it('gives an estimated row the plate, or the mark of the food it is most like, never a sparkle', () => {
+    expect(aiFoodDefinition(rice, 'ai_x').emoji).toBe(AI_FOOD_EMOJI);
+    const rows = [makeRow(rice, 'detected'), makeRow(chicken, 'detected')];
+    const items = rowsToLogItems(rows, id, false, (name) => (name === rice.name ? '🍚' : undefined));
+    expect(items.map((i) => i.emoji)).toEqual(['🍚', AI_FOOD_EMOJI]);
+    // The entry and the food it can be logged again from wear the same mark.
+    expect(items.map((i) => i.food?.emoji)).toEqual(['🍚', AI_FOOD_EMOJI]);
+    expect(rowsToLogItems(rows, id).map((i) => i.emoji)).toEqual([AI_FOOD_EMOJI, AI_FOOD_EMOJI]);
+    expect(AI_FOOD_EMOJI).not.toBe('✨');
+    // A dish with colour, not the white plate that all but vanishes on the light papers.
+    expect(AI_FOOD_EMOJI).not.toBe('🍽️');
   });
   it('logs a photo answer with the wider band on what the model read, the plain one on what the person added', () => {
     const rows = [makeRow(chicken, 'detected'), makeRow(chicken, 'added')];

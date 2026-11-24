@@ -22,14 +22,14 @@ const signIn = [{ type: 'auth-email-input', text: EMAIL }, { type: 'auth-passwor
 const describe = (words) => ['tab-add', 'quick-describe', { wait: 800 }, { type: 'ai-description', text: words }, 'ai-analyse', 'ai-consent-agree', { wait: 2500 }];
 
 const backend = [
-  { id: 'limits-ai-free', route: '/auth?mode=signin', taps: [...signIn, ...describe('daily limit check')], waitFor: 'ai-limit-plans', note: 'the estimate at the free plan’s limit: the number, the free ways first, the reset in local time, one quiet link' },
-  { id: 'limits-ai-shared', route: '/auth?mode=signin', taps: [...signIn, ...describe('shared limit check')], waitFor: 'ai-error-daily_limit', absent: ['ai-limit-plans'], note: 'the shared ceiling: busy for today, no plan link' },
+  { id: 'limits-ai-free', route: '/auth?mode=signin', taps: [...signIn, ...describe('daily limit check')], waitFor: 'ai-limit-cup', note: 'the estimate at the free plan’s limit: today’s allowance as a full cup with its level line (ai-limit-cup) in the icon’s place, the number said once in the title, the free ways first, the reset in local time, one quiet link (ai-limit-plans)' },
+  { id: 'limits-ai-shared', route: '/auth?mode=signin', taps: [...signIn, ...describe('shared limit check')], waitFor: 'ai-error-daily_limit', absent: ['ai-limit-plans', 'ai-limit-cup'], note: 'the shared ceiling: busy for today, no plan link and no allowance cup (it is not the person’s own allowance)' },
   {
     id: 'limits-coach-free',
     route: '/auth?mode=signin',
     taps: [...signIn, 'today-coach-open', { wait: 800 }, { type: 'coach-input', text: 'daily limit please' }, 'coach-send', 'coach-consent-agree', { wait: 2500 }],
-    waitFor: 'coach-limit-plans',
-    note: 'the coach at the free plan’s limit: the notice and its quiet link',
+    waitFor: 'coach-limit-cup',
+    note: 'the coach at the free plan’s limit: the notice with the small full cup (coach-limit-cup, only beside a notice from today) and its quiet link (coach-limit-plans), its label on the notice text’s left edge',
   },
 ];
 

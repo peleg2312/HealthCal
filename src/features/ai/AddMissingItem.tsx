@@ -1,4 +1,4 @@
-import { Plus, Sparkles } from 'lucide-react-native';
+import { Plus } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
@@ -9,6 +9,7 @@ import { Divider, ListRow, Text, TextField } from '@/ui';
 import { RowEmoji } from '@/features/food/components';
 
 import { foodToItem, matchFoods } from './localMatch';
+import { AiGlyph } from './mark';
 
 /**
  * Add something the analysis missed. Matches against the bundled reference
@@ -80,7 +81,7 @@ export function AddMissingItem({
                 testID="ai-add-ask-ai"
                 left={
                   <View style={{ width: 24, alignItems: 'center' }}>
-                    <Sparkles size={19} color={colors.text} strokeWidth={1.9} />
+                    <AiGlyph name="estimate" size={19} color={colors.text} />
                   </View>
                 }
                 title={aiBusy ? 'Estimating…' : `Estimate “${q}” with AI`}

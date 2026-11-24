@@ -39,3 +39,11 @@ export async function waitForPlus(d: WaitDeps): Promise<WaitOutcome> {
     await d.sleep(WAIT_EVERY_MS);
   }
 }
+
+/** Plus arriving is shown on the plan screen only this soon after the payment arrived; later the page is just the page. */
+export const ARRIVAL_WINDOW_MS = 10_000;
+
+/** Whether an arrival stamped at `arrivedAt` is still the moment to show at `now`. */
+export function arrivalFresh(arrivedAt: number | null, now: number): boolean {
+  return arrivedAt !== null && now >= arrivedAt && now - arrivedAt < ARRIVAL_WINDOW_MS;
+}

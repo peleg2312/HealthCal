@@ -12,7 +12,7 @@ const BANNED =
   /\b(bad|fail|failed|failure|cheat|cheated|should|guilty|lazy|great|amazing|well done|keep it up|too much|missed your|goal missed|over budget|make up|only|unfortunately|oops|sorry)\b/i;
 const PAYMENT_COMPANIES = /\b(stripe|paddle|polar|revenuecat|lemon ?squeezy|paypal|braintree|adyen|fastspring|gumroad|chargebee)\b/i;
 
-const all = (d: LegalDocument) => [d.title, d.subtitle, d.intro, ...d.sections.flatMap((s) => [s.heading, ...s.paragraphs])];
+const all = (d: LegalDocument) => [d.title, d.subtitle, ...d.summary.map((s) => s.text), d.intro, ...d.sections.flatMap((s) => [s.heading, ...s.paragraphs])];
 const text = (d: LegalDocument) => all(d).join('\n');
 const section = (d: LegalDocument, id: string) => d.sections.find((s) => s.id === id)?.paragraphs.join(' ') ?? '';
 
@@ -92,6 +92,134 @@ describe('both documents', () => {
       }
       expect(new Set(d.sections.map((s) => s.id)).size).toBe(d.sections.length);
     }
+  });
+
+  it('open with a short layer: three to six plain lines, each short, each with its own id', () => {
+    for (const d of [TERMS, PRIVACY]) {
+      expect(d.summary.length).toBeGreaterThanOrEqual(3);
+      expect(d.summary.length).toBeLessThanOrEqual(6);
+      expect(new Set(d.summary.map((s) => s.id)).size).toBe(d.summary.length);
+      for (const s of d.summary) {
+        expect(s.text.length).toBeLessThan(130);
+        expect(BANNED.test(s.text) || s.text.includes('!')).toBe(false);
+        expect(s.text).toMatch(/^[A-Z0-9"].*\.$/);
+      }
+    }
+  });
+
+  it('the short layer holds no price', () => {
+    for (const d of [TERMS, PRIVACY]) expect(d.summary.map((s) => s.text).join(' ')).not.toMatch(/[$€£]|\d+[.,]\d{2}/);
+  });
+
+  /**
+   * Each line of the short layer, by its id: what the line itself must say (`says`), and for each of
+   * those facts the section of the full text that holds it (`held`). A line cannot be changed to say
+   * something else without failing `says`, and a section cannot drop the fact without failing `held`.
+   */
+  const FACTS: Record<LegalDocument['id'], Record<string, { says: RegExp[]; held: [section: string, fact: RegExp][] }>> = {
+    terms: {
+      medical: {
+        says: [/tracking tool, not medical advice/, /numbers are estimates/],
+        held: [
+          ['medical', /tracking tool, not a medical device, and nothing in it is medical advice/],
+          ['medical', /calorie and nutrient figures, calorie burn and AI estimates are estimates/],
+        ],
+      },
+      free: {
+        says: [/Everything on your phone is free/, /no ads/, /So are the account and sync/],
+        held: [
+          ['free', /Everything HealthCal does on your phone is free/],
+          ['free', /There are no ads/],
+          ['free', /So are the account with backup and sync/],
+        ],
+      },
+      plus: {
+        says: [/Plus is optional/, /renews until you cancel/, /cancel in the plan screen/],
+        held: [
+          ['plus', /Plus is an optional subscription/],
+          ['renewal', /renews by itself at the end of each period, until you cancel/],
+          ['renewal', /cancel at any time from the plan screen/],
+        ],
+      },
+      yours: {
+        says: [/export your data/, /delete your account at any time/],
+        held: [
+          ['free', /full export/],
+          ['account', /delete your account at any time/],
+        ],
+      },
+      age: {
+        says: [/aged 16 and over/, /AI coach is for 18 and over/],
+        held: [
+          ['who', /for people aged 16 and over/],
+          ['who', /AI coach is for people aged 18 and over/],
+        ],
+      },
+    },
+    privacy: {
+      device: {
+        says: [/Without an account/, /stays on this device/],
+        held: [
+          ['short', /stays on this device unless you create an account/],
+          ['device', /Without an account, .* stored on this device and nowhere else/],
+        ],
+      },
+      account: {
+        says: [/With an account/, /private space/, /back up and sync/, /No other account can read it/],
+        held: [
+          ['short', /With an account it is kept in your private space/],
+          ['short', /so it can back up and sync/],
+          ['short', /no other account can read it/],
+          ['account', /Each account can read and change its own data and nothing else/],
+        ],
+      },
+      ads: {
+        says: [/No ads, no tracking, no analytics and no selling of data/],
+        held: [['short', /No ads, no tracking, no analytics and no selling of data/]],
+      },
+      ai: {
+        // What you give it, after agreeing; and what the coach sends beyond the typed question.
+        says: [/gets what you give it once you agree/, /coach adds your last few questions and answers/, /if shared, a week summary/],
+        held: [
+          ['ai-estimate', /after you have agreed once on this device/],
+          ['ai-estimate', /What is sent is a smaller copy of the photo .* or the words you typed/],
+          ['coach', /A question you type goes .* after you have agreed once on this device/],
+          ['coach', /with your last few typed questions and the coach’s answers to them/],
+          ['coach', /A short summary of your week goes with it while "Share my week" is on, and never otherwise/],
+        ],
+      },
+      yours: {
+        says: [/export everything or delete it at any time/],
+        held: [
+          ['short', /export everything or delete it at any time/],
+          ['export', /exports everything you logged as a file you keep/],
+          ['export', /removes your account and everything stored with it/],
+        ],
+      },
+    },
+  };
+
+  it('every line of the short layer says its own fact, and a section of the full text holds the same fact', () => {
+    for (const d of [TERMS, PRIVACY]) {
+      const facts = FACTS[d.id];
+      // Every line is pinned, and nothing is pinned that is not a line.
+      expect(d.summary.map((s) => s.id).sort()).toEqual(Object.keys(facts).sort());
+      for (const item of d.summary) {
+        const { says, held } = facts[item.id];
+        expect(says.length).toBeGreaterThan(0);
+        // At least one section fact for each thing the line says.
+        expect(held.length).toBeGreaterThanOrEqual(says.length);
+        for (const fact of says) expect(item.text, `${d.id}.${item.id} says`).toMatch(fact);
+        for (const [id, fact] of held) expect(section(d, id), `${d.id}.${item.id} held in ${id}`).toMatch(fact);
+      }
+    }
+  });
+
+  it('the AI line covers what the coach sends beyond the typed question', () => {
+    const line = PRIVACY.summary.find((s) => s.id === 'ai')?.text ?? '';
+    expect(line).toBe('The AI gets what you give it once you agree; the coach adds your last few questions and answers and, if shared, a week summary.');
+    // One sentence.
+    expect(line.match(/[.!?]/g)).toEqual(['.']);
   });
 
   it('show a contact line only when an address is set', () => {

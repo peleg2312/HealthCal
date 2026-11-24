@@ -13,7 +13,7 @@ import { BUILTIN_FOODS } from '@/data/foods';
 import { searchLocal } from '@/services/foodSearch';
 import type { Food } from '@/types';
 
-import { matchFoods, parseAmount } from './localMatch';
+import { emojiLike, matchFoods, parseAmount } from './localMatch';
 
 // ---- the scorer of git 3fa7914, word for word (only its amount reader is shared, unchanged since)
 const oldWords = (s: string) =>
@@ -124,5 +124,57 @@ describe('matchFoods after Hebrew search', () => {
       return;
     }
     expect(now.filter((r) => r.got !== r.now).map((r) => `${r.q}: recorded ${r.now}, now ${r.got}`)).toEqual([]);
+  });
+});
+
+describe('emojiLike: the row mark of an estimated item', () => {
+  const mark = (name: string) => emojiLike(name, BUILTIN_FOODS);
+  const emojiOf = (id: RegExp) => BUILTIN_FOODS.find((f) => id.test(f.name))!.emoji;
+
+  it('is the mark of the food the item names outright', () => {
+    expect(mark('Grilled chicken breast')).toBe(emojiOf(/^Chicken breast, skinless, COOKED/));
+    expect(mark('White rice, cooked')).toBe(emojiOf(/^White rice, long-grain, COOKED/));
+    expect(mark('Scrambled eggs')).toBe(emojiOf(/^Egg, scrambled/));
+    expect(mark('Olive oil')).toBe(emojiOf(/^Olive oil$/));
+    expect(mark('2 fried eggs')).toBe(emojiOf(/^Egg, fried/));
+  });
+
+  it('is the mark of a food named with one of its own portions, and only then', () => {
+    // "1 cherry tomato" is a portion of the tomato, "1 slice" of the bread, "1 glass" of the milk.
+    expect(mark('Cherry tomatoes')).toBe(emojiOf(/^Tomato, red, raw/));
+    expect(mark('Slice of bread')).toBe(emojiOf(/^Bread, white, sliced/));
+    expect(mark('Glass of milk')).toBe(emojiOf(/^Milk, whole/));
+    // The food's own name must be the item's food: a cup of rice is never rice noodles.
+    expect(mark('Cup of rice')).not.toBe(emojiOf(/^Rice noodles/));
+    // A word that is no portion of the food, or a last word that is not the food, gives nothing.
+    for (const name of ['Grape tomatoes', 'Baby carrots', 'Apple slices', 'Pepperoni pizza slice', 'Cherry pie', 'Bowl of soup']) expect(mark(name), name).toBeUndefined();
+  });
+
+  it('is nothing when the list only holds a food that is near, so the row wears the pot', () => {
+    // The best matches of these are another food: Green peas, Beef jerky, Lamb leg, Corn flakes.
+    for (const name of ['Mixed green salad', 'Beef stew', 'Roasted vegetables', 'Corn on the cob', 'Coleslaw', 'Gravy']) expect(mark(name), name).toBeUndefined();
+    expect(mark('grilled')).toBeUndefined();
+    expect(mark('')).toBeUndefined();
+    expect(mark('סלט ירקות')).toBeUndefined();
+  });
+
+  it('for every typical item name: a mark only from a food whose name holds each of its words', () => {
+    const names = readFileSync(path.join(__dirname, '__fixtures__/ai-items.tsv'), 'utf8')
+      .split('\n')
+      .filter((l) => l && !l.startsWith('#'))
+      .map((l) => l.split('\t')[0]);
+    expect(names.length).toBeGreaterThanOrEqual(50);
+    const stem = (w: string) => w.replace(/e?s$/, '');
+    let given = 0;
+    for (const name of names) {
+      const e = mark(name);
+      if (!e) continue;
+      given++;
+      const q = oldWords(name).filter((w) => !GENERIC.has(w) && !COOKED_WORDS.has(w) && !RAW_WORDS.has(w));
+      const from = BUILTIN_FOODS.filter((f) => f.emoji === e && q.every((w) => oldWords(f.name).map(stem).includes(stem(w))));
+      expect(from.length, name).toBeGreaterThan(0);
+    }
+    // Enough of them to be worth it: about half of a typical meal's items read as food.
+    expect(given).toBeGreaterThanOrEqual(20);
   });
 });

@@ -1,18 +1,20 @@
 import { Redirect, router } from 'expo-router';
 import { FileUp, HeartHandshake, Info, ShieldCheck, TriangleAlert, Zap } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { useWindowDimensions, View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
 
+import { authDemo } from '@/features/auth/demo';
 import { returnScreenOpen } from '@/features/auth/google';
 import { GoogleButton } from '@/features/auth/GoogleButton';
 import { useGoogleSignIn } from '@/features/auth/useGoogleSignIn';
+import { googleProblemWords, WELCOME_RESTORE, WELCOME_SIGN_IN, WELCOME_SIGN_IN_LABEL } from '@/features/auth/words';
 import { ARRIVAL_POUR, CupMark, Note } from '@/features/onboarding/components';
 import { formatNumber } from '@/lib/units';
 import { pickAndImportBackup } from '@/services/export';
 import { VIEWER_BLOCKED } from '@/services/viewer';
 import { isBackendConfigured } from '@/services/supabase';
 import { useStore } from '@/store';
-import { useTheme } from '@/theme';
+import { useReducedMotion, useTheme } from '@/theme';
 import { AnimatedNumber, Button, FadeUp, Screen, Text, Vessel } from '@/ui';
 
 /** The cup starts pouring as the screen opens; everything else follows it. */
@@ -170,7 +172,11 @@ export default function Welcome() {
   const [importNote, setImportNote] = useState<{ tone: 'neutral' | 'warning'; text: string } | null>(null);
   // On a phone the Google flow ends with a session: the sign-in screen's waiting view then hands over to the sign-in gate.
   // (On Android the app's own link may already have opened that screen.) On the web the page leaves for Google.
-  const google = useGoogleSignIn({ onSignedIn: () => !returnScreenOpen() && router.push('/auth?mode=google') });
+  // (A test build's `?authDemo=declined` draws the note of a sign-in that was not completed, as a picture.)
+  const google = useGoogleSignIn({
+    onSignedIn: () => !returnScreenOpen() && router.push('/auth?mode=google'),
+    initialError: authDemo() === 'declined' ? googleProblemWords('declined') : null,
+  });
   // The actions are drawn once, when this visit knows whether Google is offered (the kept answer, the
   // fresh one, or 1.5 s at most), so "Continue with Google" never pops in under a finger reaching for
   // "Get started". Their entrance keeps its place in the sequence when that is known at once.
@@ -185,9 +191,24 @@ export default function Welcome() {
     return () => clearTimeout(t);
   }, [ready]);
   const window = useWindowDimensions();
+  const reduce = useReducedMotion();
+  // A note that appears is seen. The notes are the last thing on the page and the pinned actions can
+  // cover them on a short screen, so the page scrolls to its end when one appears or changes (at once
+  // under reduced motion): then, and again when the page's height settles, since the hero gives up its
+  // room a moment later (it is measured). The page's own scroll area, handed over through `scrollProps`.
+  const scroll = useRef<ScrollViewInstance>(null);
+  const noteWords = [google.notice, google.error, importNote?.text].filter(Boolean).join('|');
+  useEffect(() => {
+    if (!noteWords) return;
+    // After this frame's layout, so the end of the page is where the new note ends.
+    const frame = requestAnimationFrame(() => scroll.current?.scrollToEnd({ animated: !reduce }));
+    return () => cancelAnimationFrame(frame);
+  }, [noteWords, reduce]);
   if (onboarded) return <Redirect href="/" />;
 
   const narrow = window.width < 360;
+  // Accounts are offered with a backend (a test build's demo view draws them without one).
+  const accounts = isBackendConfigured || authDemo() !== null;
   // The cup takes the room the words and the actions leave, measured, so the whole welcome
   // fits one screen whatever the footer holds.
   const fit = room === null || !room.final ? null : fitHero(room.height - HERO_PAD - OVERLINE, narrow, window.width >= 400);
@@ -222,23 +243,44 @@ export default function Welcome() {
       testID="welcome-screen"
       // The screen runs its own entrance: the cup first, then the headline, then the actions.
       enter={false}
+      scrollProps={{ ref: scroll, onContentSizeChange: () => (noteWords ? scroll.current?.scrollToEnd({ animated: !reduce }) : undefined) } as ScrollViewProps}
       contentStyle={{ flexGrow: 1, gap: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.lg }}
       footer={
         ready ? (
           <FadeUp delay={actionsAt} style={{ gap: spacing.sm }}>
             <Button title="Get started" testID="welcome-get-started" onPress={() => router.push('/onboarding')} />
             {/* The second option, never the primary: shown only once the backend says Google is on. */}
-            {isBackendConfigured && google.shown ? <GoogleButton testID="welcome-google" onPress={google.press} busy={google.busy} /> : null}
-            {isBackendConfigured ? <Button title="I already have an account" variant="ghost" testID="welcome-sign-in" onPress={() => router.push('/auth?mode=signin')} /> : null}
-            <Button
-              title="Restore from a backup file"
-              variant="ghost"
-              size="sm"
-              testID="welcome-restore"
-              loading={importing}
-              icon={<FileUp size={16} color={colors.primaryInk} />}
-              onPress={() => void restore()}
-            />
+            {accounts && google.shown ? <GoogleButton testID="welcome-google" onPress={google.press} busy={google.busy} /> : null}
+            {/*
+              Two full-width ways in at most, then one quiet row: the hero keeps its room. With accounts the
+              row holds "Sign in" beside the restore; the two stack, Sign in first, if large text makes one wrap.
+            */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+              {accounts ? (
+                <Button
+                  title={WELCOME_SIGN_IN}
+                  accessibilityLabel={WELCOME_SIGN_IN_LABEL}
+                  variant="ghost"
+                  size="sm"
+                  full={false}
+                  testID="welcome-sign-in"
+                  style={{ flexGrow: 1, flexBasis: 96, minWidth: 96 }}
+                  onPress={() => router.push('/auth?mode=signin')}
+                />
+              ) : null}
+              <Button
+                title={WELCOME_RESTORE}
+                variant="ghost"
+                size="sm"
+                full={false}
+                testID="welcome-restore"
+                loading={importing}
+                // Under 340 px the row has no room for the mark beside the words.
+                icon={accounts && window.width < 340 ? undefined : <FileUp size={16} color={colors.primaryInk} />}
+                style={{ flexGrow: 1, flexBasis: accounts ? 148 : '100%', minWidth: 148 }}
+                onPress={() => void restore()}
+              />
+            </View>
           </FadeUp>
         ) : undefined
       }>
@@ -282,7 +324,8 @@ export default function Welcome() {
         </Note>
       ) : null}
       {google.error ? (
-        <Note tone="warning" testID="welcome-google-error" icon={<TriangleAlert size={18} color={colors.warningInk} />}>
+        // On the card surface: neutral in every look (a sign-in that was not completed is not an alarm).
+        <Note tone="warning" surface="card" testID="welcome-google-error" icon={<TriangleAlert size={18} color={colors.warningInk} />}>
           <Text variant="caption" color="textSecondary" accessibilityLiveRegion="polite">
             {google.error}
           </Text>

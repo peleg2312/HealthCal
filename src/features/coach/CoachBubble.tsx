@@ -2,8 +2,11 @@ import { Flag, Info, LifeBuoy } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
 
-import { limitInfoFrom } from '@/features/ai/limit';
+import { limitInfoFrom, type LimitInfo } from '@/features/ai/limit';
+import { usedUpNow } from '@/features/plan/allowance';
+import { PlanCup } from '@/features/plan/PlanCup';
 import { startsRtl } from '@/lib/bidi';
+import { useNow } from '@/store/clock';
 import { cup, useTheme } from '@/theme';
 import { Button, Card, CupKey, FadeUp, PressableScale, Text } from '@/ui';
 
@@ -14,6 +17,27 @@ import { useReportedAnswers } from './reportSend';
 import { ReportSheet } from './ReportSheet';
 import { shownAnswer, type CoachMessage } from './request';
 import { AI_MARK, coachLimitText, LOCAL_MARK, NOTICE, REFER_LINE, REPORT_OPEN, REPORT_OPEN_LABEL, REPORTED, SIGN_IN, TRY_AGAIN } from './words';
+
+/** The notice's text starts after its 16 px mark and an 8 px gap. */
+const NOTICE_INDENT = 24;
+/** A small ghost button's own side padding (src/ui/Button.tsx). */
+const GHOST_SM_PAD = 12;
+
+/**
+ * The notice's mark. At the person's own daily limit, while the notice still speaks of today's
+ * allowance (`usedUpNow`: written today, not yet reset), it is that allowance used up: the plan's
+ * small cup, full. Otherwise (an older notice kept in the chat, the shared ceiling, plans off) the
+ * plain info mark. Its own component, so only a notice reads the clock.
+ */
+function NoticeMark({ limit, at }: { limit: LimitInfo | null; at: number }) {
+  const { colors } = useTheme();
+  const now = useNow();
+  return usedUpNow(limit, at, now) ? (
+    <PlanCup size="small" level={1} goalKind="limit" animate={false} testID="coach-limit-cup" style={{ marginTop: 1 }} />
+  ) : (
+    <Info size={16} color={colors.textSecondary} strokeWidth={1.9} style={{ marginTop: 3 }} />
+  );
+}
 
 /**
  * One message of the chat, each kind looking like what it is (spec section 3.2):
@@ -145,13 +169,14 @@ export function CoachBubble({
   return (
     <View testID={testID} onLayout={onLayout} style={{ gap: spacing.sm }}>
       <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
-        <Info size={16} color={colors.textSecondary} strokeWidth={1.9} style={{ marginTop: 3 }} />
+        <NoticeMark limit={limit} at={message.at} />
         <Text variant="body" color="textSecondary" style={{ flex: 1 }}>
           {text}
         </Text>
       </View>
       {onRetry || onSignIn || onPlans ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingLeft: 24 }}>
+        // Under the notice's text: a ghost link that leads the row has no edge, so its label (not its padding) starts on the text's left edge.
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingLeft: onRetry || onSignIn ? NOTICE_INDENT : NOTICE_INDENT - GHOST_SM_PAD }}>
           {onRetry ? <Button testID="coach-retry" title={TRY_AGAIN} variant="secondary" size="sm" full={false} onPress={onRetry} /> : null}
           {onSignIn ? <Button testID="coach-sign-in" title={SIGN_IN} variant="secondary" size="sm" full={false} onPress={onSignIn} /> : null}
           {onPlans ? <Button testID="coach-limit-plans" title={onPlans.label} variant="ghost" size="sm" full={false} onPress={onPlans.onPress} /> : null}

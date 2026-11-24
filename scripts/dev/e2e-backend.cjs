@@ -824,7 +824,7 @@ async function device(browser, seedJson) {
     await L.go('/welcome');
     check('google: the welcome screen offers Continue with Google as its second option', await visible(L, 'welcome-google'));
     const order = await L.page.evaluate(() => ['welcome-get-started', 'welcome-google', 'welcome-sign-in'].map((id) => document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect().top ?? -1));
-    check('google: under Get started and above I already have an account', order[0] >= 0 && order[0] < order[1] && order[1] < order[2], order.join(' < '));
+    check('google: under Get started and above Sign in', order[0] >= 0 && order[0] < order[1] && order[1] < order[2], order.join(' < '));
     await viaGoogle(L, 'welcome-google', `google-account-${EMAIL.toLowerCase()}`);
     const linkedHome = await L.untilPath('/', 20000);
     const linkedToast = await toastsSeen(L);

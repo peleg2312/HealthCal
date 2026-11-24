@@ -1,8 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Camera, PenLine, ScanBarcode, Search, Star, Utensils, X, Zap } from 'lucide-react-native';
+import { PenLine, ScanBarcode, Search, Star, Utensils, X, Zap } from 'lucide-react-native';
 import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 
+import { AiGlyph } from '@/features/ai/mark';
 import { AmountEditor } from '@/features/food/AmountEditor';
 import { FoodRow, MealPicker } from '@/features/food/components';
 import { setFoodDraft } from '@/features/food/draft';
@@ -158,7 +159,7 @@ export default function FoodSearchScreen() {
   const escapes = (
     <View style={{ flexDirection: 'row', gap: spacing.sm }}>
       <ActionTile testID="search-scan" icon={<ScanBarcode size={20} color={colors.text} strokeWidth={1.9} />} label="Scan barcode" onPress={() => go('/food/scan')} />
-      <ActionTile testID="search-photo" icon={<Camera size={20} color={colors.text} strokeWidth={1.9} />} label="Photo or describe" onPress={() => go('/food/photo', { mode: 'photo' })} />
+      <ActionTile testID="search-photo" icon={<AiGlyph name="photo" size={20} color={colors.text} />} label="Photo or describe" onPress={() => go('/food/photo', { mode: 'photo' })} />
       <ActionTile testID="search-quick" icon={<Zap size={20} color={colors.text} strokeWidth={1.9} />} label="Quick add" onPress={() => go('/food/quick')} />
       <ActionTile testID="search-create" icon={<PenLine size={20} color={colors.text} strokeWidth={1.9} />} label="Create food" onPress={() => go('/food/custom', q ? { name: q } : {})} />
     </View>

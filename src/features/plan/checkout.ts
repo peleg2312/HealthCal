@@ -9,6 +9,13 @@
  * arrived yet" and one more look at the next return to the front. A closed or cancelled checkout
  * changes nothing and says nothing more than that nothing was charged.
  *
+ * Arriving: the moment Plus arrives after a payment is stamped (./arrival.ts) in the same step that
+ * puts Plus in the plan store while this checkout is waiting or late (`watchArrival`, wired below),
+ * so the plan screen's membership card knows of it on its first frame. The card takes it while the
+ * page is in front (`takeArrival`): within ARRIVAL_WINDOW_MS (./wait.ts) its cup pours from the Free
+ * level to the brim, once. It is memory only, never stored, so a later visit or another screen shows
+ * nothing of it.
+ *
  * Managing: "Manage or cancel", "Cancel subscription" and "Withdraw from the contract" all open the
  * payment company's own page (the portal), and the plan is read again on return.
  */
@@ -20,6 +27,7 @@ import { flushPersistence } from '@/store/persistence';
 import { toast } from '@/ui/Toast';
 
 import { billingCall } from './api';
+import { watchArrival, type CheckoutPhase } from './arrival';
 import { planNow, refreshPlan, usePlanStore } from './cache';
 import { checkoutBlockedHere, checkoutShown, PLAN_ROUTE } from './channel';
 import { demoPreset } from './demo';
@@ -27,7 +35,7 @@ import { waitForPlus } from './wait';
 import { notBuyableHere, plusOnToast, refusalLine } from './words';
 import type { PlanOffer } from './view';
 
-export type CheckoutPhase = 'idle' | 'working' | 'waiting' | 'late';
+export type { CheckoutPhase } from './arrival';
 
 interface CheckoutState {
   phase: CheckoutPhase;
@@ -41,6 +49,10 @@ function initialPhase(): CheckoutPhase {
 }
 
 export const useCheckout = create<CheckoutState>(() => ({ phase: initialPhase(), busy: null }));
+
+// Plus put in the plan store while this checkout waits (or is late) is the arrival: stamped in that
+// same step, before the plan screen draws the subscriber page.
+watchArrival(usePlanStore, () => useCheckout.getState().phase);
 
 export const NATIVE_RETURN = 'healthcal://settings/plan?checkout=done';
 export const NATIVE_PORTAL_RETURN = 'healthcal://settings/plan';

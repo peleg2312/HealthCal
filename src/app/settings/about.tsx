@@ -7,7 +7,6 @@ import {
   HeartPulse,
   Lock,
   Scale,
-  Sparkles,
   Stethoscope,
   Target,
 } from 'lucide-react-native';
@@ -16,6 +15,7 @@ import React from 'react';
 import { View } from 'react-native';
 
 import { AiConsentAbout } from '@/features/ai/AiConsentAbout';
+import { AiGlyph } from '@/features/ai/mark';
 import { CoachConsentAbout } from '@/features/coach/CoachConsentAbout';
 import { usePlan } from '@/features/plan/cache';
 import { PlanRow } from '@/features/plan/PlanRow';
@@ -250,7 +250,7 @@ export default function AboutScreen() {
       </Section>
 
       <Section
-        icon={(c) => <Sparkles size={20} color={c} />}
+        icon={(c) => <AiGlyph name="estimate" size={20} color={c} />}
         color={colors.fat}
         title="AI food estimates"
         source="Claude vision models by Anthropic, with server-side checks.">
@@ -340,7 +340,7 @@ function AboutPlan() {
   if (!planVisible(view)) return null;
   return (
     <Card padding={0} style={{ paddingHorizontal: spacing.lg }}>
-      <PlanRow testID="about-plan" title="Your plan" />
+      <PlanRow testID="about-plan" />
     </Card>
   );
 }

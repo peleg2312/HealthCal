@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Plus, Repeat2 } from 'lucide-react-native';
+import { CookingPot, Plus, Repeat2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
@@ -312,7 +312,14 @@ function EnergyCard({
         {/* After the cup in the tree, so the cup's label column never sits over the chip and takes its tap. */}
         {ideasChip ? (
           <View style={{ position: 'absolute', left: vesselW + (narrow ? 14 : 16), top: chipTop, flexDirection: 'row' }}>
-            <Chip testID="today-ideas" label="Ideas that fit" accessibilityLabel="Ideas that fit: meals and foods for what is left" onPress={onFits} />
+            {/* A pot, not the AI mark: these ideas are worked out on the phone from the person's own meals and fixed plates. */}
+            <Chip
+              testID="today-ideas"
+              label="Ideas that fit"
+              accessibilityLabel="Ideas that fit: meals and foods for what is left"
+              icon={<CookingPot size={18} color={colors.text} strokeWidth={1.9} />}
+              onPress={onFits}
+            />
           </View>
         ) : null}
       </View>

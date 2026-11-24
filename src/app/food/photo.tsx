@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Camera, ChevronDown, ChevronUp, Droplet, FlaskConical, ImagePlus, Info, Lightbulb, MessageSquareText, RefreshCw, Sparkles } from 'lucide-react-native';
+import { Camera, ChevronDown, ChevronUp, Droplet, FlaskConical, ImagePlus, Info, Lightbulb, MessageSquareText, RefreshCw } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { useWindowDimensions, View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
 
@@ -36,7 +36,8 @@ import {
   type ReviewRow,
 } from '@/features/ai/estimate';
 import { ItemRow } from '@/features/ai/ItemRow';
-import { matchFoods } from '@/features/ai/localMatch';
+import { emojiLike, matchFoods } from '@/features/ai/localMatch';
+import { AiGlyph, AiMark } from '@/features/ai/mark';
 import { PhotoHero } from '@/features/ai/PhotoHero';
 import { SampleNotice } from '@/features/ai/SampleNotice';
 import { photoText, readWeight } from '@/features/ai/weight';
@@ -55,7 +56,7 @@ import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
 import type { AiFoodResult, Food, MealType } from '@/types';
-import { Button, Card, Chip, CupKey, Divider, goBack, haptic, Header, MacroBar, PressableScale, Screen, Segmented, Text, TextField, toast } from '@/ui';
+import { AnimatedNumber, Button, Card, Chip, CupKey, Divider, FadeUp, goBack, haptic, Header, MacroBar, PressableScale, Screen, Segmented, Text, TextField, toast } from '@/ui';
 
 type InputMode = 'photo' | 'text';
 type Step = 'capture' | 'analysing' | 'review' | 'error';
@@ -73,9 +74,15 @@ interface ScreenError {
 
 const isMeal = (v: unknown): v is MealType => MEALS.some((m) => m.id === v);
 const isAbort = (e: unknown) => e instanceof Error && e.name === 'AbortError';
+/** The total as it is shown, "~507": an estimate, never a bare number. */
+const approx = (n: number) => `~${Math.round(n)}`;
+/** The review's blocks enter one after another, 60 ms apart (the coach's rhythm); the last starts at 300 ms. */
+const ARRIVE_STEP = 60;
+/** Cancel ignores a press this soon after the wait starts: it is the second tap of a double tap on Estimate. */
+const CANCEL_AFTER_MS = 400;
 
 export default function PhotoScreen() {
-  const params = useLocalSearchParams<{ meal?: string; date?: string; mode?: string; demoError?: string }>();
+  const params = useLocalSearchParams<{ meal?: string; date?: string; mode?: string; demoError?: string; demoWait?: string; demoLive?: string }>();
   const { colors, radius, spacing } = useTheme();
   // A 320 px phone gets the short forms of the longest labels, so none is cut.
   const narrow = useWindowDimensions().width < 360;
@@ -83,6 +90,13 @@ export default function PhotoScreen() {
   const access = availability(isBackendConfigured, !!session);
   const date = typeof params.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : today();
   const demoError = (__DEV__ || process.env.EXPO_PUBLIC_E2E === '1') && DEMO_ERROR_CODES.includes(params.demoError as AiErrorCode) ? (params.demoError as AiErrorCode) : undefined;
+  // Test-hook builds only: `?demoWait=1` holds the wait for an estimate (`careful`: only the careful
+  // check's) until Cancel, so the waiting view can be looked at and scanned. Nothing is sent meanwhile.
+  const demoWait = (__DEV__ || process.env.EXPO_PUBLIC_E2E === '1') && (params.demoWait === '1' || params.demoWait === 'careful') ? params.demoWait : undefined;
+  // Test-hook builds only: `?demoLive=1` draws the sample result the way a live estimate is drawn (the
+  // AI's mark beside the dish, the photo as the hero), so the live review can be looked at and scanned
+  // without an account. Still the fixed sample, and nothing is sent.
+  const demoLive = (__DEV__ || process.env.EXPO_PUBLIC_E2E === '1') && params.demoLive === '1';
 
   const [mode, setMode] = useState<InputMode>(params.mode === 'text' ? 'text' : 'photo');
   const [step, setStep] = useState<Step>('capture');
@@ -111,7 +125,19 @@ export default function PhotoScreen() {
   const [pendingPrecise, setPendingPrecise] = useState(false);
   const [correction, setCorrection] = useState('');
   const [highlight, setHighlight] = useState<string | null>(null);
+  // One arrival of an estimate: when it came and the order of the rows it brought. The review's blocks
+  // and those rows enter one after another once per arrival (keyed by it), and the total counts up
+  // from the low end of its range; an edit, a swap or a row added later never replays it.
+  const [arrival, setArrival] = useState<{ at: number; order: Record<string, number> }>({ at: 0, order: {} });
+  // The arrival the review has already shown in parts (noted when a new wait starts): when the review
+  // comes back with the same one (a re-estimate or the careful check cancelled, or failed), it is drawn
+  // at once, since nothing arrived.
+  const [arrivalShown, setArrivalShown] = useState(0);
+  const replay = arrival.at !== arrivalShown;
   const abortRef = useRef<AbortController | null>(null);
+  // When the wait began: Cancel takes Estimate's place in the footer, so the second tap of a double tap
+  // would land on it; a press in the first `CANCEL_AFTER_MS` is ignored (read in the handler).
+  const waitStartedAt = useRef(0);
   // Before the first live estimate on this device, ask (see @/features/ai/consent).
   const agreed = useAiConsent();
   const [consentOpen, setConsentOpen] = useState(false);
@@ -238,8 +264,15 @@ export default function PhotoScreen() {
     const controller = new AbortController();
     abortRef.current = controller;
     setPendingPrecise(precise);
+    waitStartedAt.current = Date.now();
+    // The review on screen (if any) has been shown in parts: should this wait be cancelled, it comes back at once.
+    setArrivalShown(arrival.at);
     setStep('analysing');
     try {
+      if (demoWait && (precise || demoWait === '1')) {
+        await new Promise<void>((resolve) => controller.signal.addEventListener('abort', () => resolve()));
+        return;
+      }
       let image: string | undefined;
       if (mode === 'photo' && photo && preview) {
         // The careful pass gets more pixels: 1024 px instead of 768 px.
@@ -254,7 +287,9 @@ export default function PhotoScreen() {
       if (res.remaining !== null) setRemaining(res.remaining);
       // A new pass replaces what the model found; items the user added stay.
       const kept = rows.filter((r) => r.kind === 'added');
-      setRows(applyAddedFat([...rowsFromResult(res.result), ...kept], fat));
+      const next = applyAddedFat([...rowsFromResult(res.result), ...kept], fat);
+      setRows(next);
+      setArrival({ at: Date.now(), order: Object.fromEntries(next.map((r, i) => [r.key, i])) });
       setPrecisePass(precise || (!!fix && precisePass));
       setUsedWeight(mode === 'photo' ? weight.shown : null);
       if (fix) setCorrection('');
@@ -270,6 +305,7 @@ export default function PhotoScreen() {
   }
 
   function cancel() {
+    if (Date.now() - waitStartedAt.current < CANCEL_AFTER_MS) return;
     abortRef.current?.abort();
     abortRef.current = null;
     setStep(result ? 'review' : 'capture');
@@ -298,7 +334,8 @@ export default function PhotoScreen() {
   }
 
   function add() {
-    const items = rowsToLogItems(rows, newId, mode === 'photo');
+    // An estimated row wears the mark of the food in the list it names outright, so the diary reads as food.
+    const items = rowsToLogItems(rows, newId, mode === 'photo', (name) => emojiLike(name, matchPool));
     if (items.length === 0) return;
     logItems(items, meal, date);
     // Estimates and matched foods show up in Recent, ready to log again.
@@ -354,8 +391,10 @@ export default function PhotoScreen() {
     rows.map((r) => rowWiden(r, mode === 'photo')),
   );
   const word = rangeWord(mode === 'photo', precisePass);
+  // The total counts up from the low end of its range, so it never shows a number outside it; with no range it is drawn at once.
+  const countFrom = range[1] > range[0] ? range[0] : undefined;
   const conf = confidenceLevel(overallConfidence(rows.filter((r) => r.kind === 'detected').map((r) => r.item)));
-  const isDemo = !!result?.demo;
+  const isDemo = !!result?.demo && !demoLive;
   // The sample result is not about the photo, so it does not wear it.
   const heroPhoto = mode === 'photo' && preview && !isDemo ? preview.uri : null;
   // At the limit with plans on: the plan-aware words, and on the free plan one quiet link to the plan
@@ -375,7 +414,7 @@ export default function PhotoScreen() {
       <Button
         testID="ai-analyse"
         title="Estimate nutrition"
-        icon={<Sparkles size={18} color={colors.onPrimary} />}
+        icon={<AiGlyph name="estimate" size={18} color={colors.onPrimary} strokeWidth={2.2} />}
         disabled={!ready}
         loading={preparing}
         onPress={estimate}
@@ -441,7 +480,7 @@ export default function PhotoScreen() {
                 </View>
               ) : (
                 <Card style={{ alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xxl }}>
-                  <Camera size={32} color={colors.text} strokeWidth={1.9} />
+                  <AiGlyph name="photo" size={32} color={colors.text} />
                   <Text variant="h3" align="center">
                     Photograph your meal
                   </Text>
@@ -521,34 +560,84 @@ export default function PhotoScreen() {
             title={limitWords?.title}
             body={limitWords?.body}
             link={plansLink}
+            limit={error.limit}
+            leftBefore={error.leftBefore}
           />
         </>
       ) : null}
 
       {step === 'review' && result ? (
         <>
-          {isDemo ? <SampleNotice reason={access.live ? 'signed_out' : access.reason} variant="result" /> : null}
+          {/* The estimate arrives in parts, once per arrival: the summary, then the fat question, the items, the note, the meal and the second tries. */}
+          <FadeUp key={`a0-${arrival.at}`} disabled={!replay} style={{ gap: spacing.lg }}>
+            {isDemo ? <SampleNotice reason={access.live ? 'signed_out' : access.reason} variant="result" /> : null}
 
-          {heroPhoto ? (
-            <>
-              <PhotoHero
-                uri={heroPhoto}
-                dish={result.dish}
-                kcal={sum.kcal}
-                range={`${formatKcalRange(range, word)} kcal`}
-                items={rows.filter((r) => r.kind !== 'fat').map((r) => ({ key: r.key, item: r.item }))}
-                onItemPress={showRow}
-              />
-              <Card style={{ gap: spacing.md }}>
-                <Text variant="caption" color="textSecondary">
-                  {`AI estimate · ${CONFIDENCE_WORDS[conf]}${precisePass ? ' · checked carefully' : ''}`}
-                </Text>
-                {/* The weighed total went with the photo: say so, so the person knows the estimate leaned on it. */}
-                {usedWeight !== null && !isDemo ? (
-                  <Text variant="caption" color="textSecondary" testID="ai-weight-used">
-                    {`Made with your weighed total, ${usedWeight}`}
+            {heroPhoto ? (
+              <>
+                <PhotoHero
+                  uri={heroPhoto}
+                  dish={result.dish}
+                  kcal={sum.kcal}
+                  from={countFrom}
+                  arrival={arrival.at}
+                  range={`${formatKcalRange(range, word)} kcal`}
+                  items={rows.filter((r) => r.kind !== 'fat').map((r) => ({ key: r.key, item: r.item }))}
+                  onItemPress={showRow}
+                />
+                <Card style={{ gap: spacing.md }}>
+                  {/* The AI's mark leads the line that says so, as it leads each estimated row below. */}
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+                    <AiMark size="small" testID="ai-result-mark" style={{ marginTop: 1 }} />
+                    <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
+                      {`AI estimate · ${CONFIDENCE_WORDS[conf]}${precisePass ? ' · checked carefully' : ''}`}
+                    </Text>
+                  </View>
+                  {/* The weighed total went with the photo: say so, so the person knows the estimate leaned on it. */}
+                  {usedWeight !== null && !isDemo ? (
+                    <Text variant="caption" color="textSecondary" testID="ai-weight-used">
+                      {`Made with your weighed total, ${usedWeight}`}
+                    </Text>
+                  ) : null}
+                  <MacroBar protein={sum.protein} carbs={sum.carbs} fat={sum.fat} />
+                  <View style={{ flexDirection: 'row' }}>
+                    <MacroStat label="Protein" value={sum.protein} color={colors.protein} />
+                    <MacroStat label="Carbs" value={sum.carbs} color={colors.carbs} />
+                    <MacroStat label="Fat" value={sum.fat} color={colors.fat} />
+                  </View>
+                </Card>
+              </>
+            ) : (
+              <Card style={{ gap: spacing.lg }}>
+                <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+                  {/* The AI's cup says "the AI made this, check it". The sample is not the AI and does not wear its mark. */}
+                  {isDemo ? (
+                    <FlaskConical size={24} color={colors.text} strokeWidth={1.9} />
+                  ) : (
+                    <View style={{ width: 24, alignItems: 'center' }}>
+                      <AiMark size="row" testID="ai-result-mark" />
+                    </View>
+                  )}
+                  <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                    <Text variant="h3" numberOfLines={2} testID="ai-dish">
+                      {/* The notice above already says it is a sample. */}
+                      {result.dish}
+                    </Text>
+                    <Text variant="caption" color="textSecondary">
+                      {isDemo ? 'Example data' : `AI estimate · ${CONFIDENCE_WORDS[conf]}${precisePass ? ' · checked carefully' : ''}`}
+                    </Text>
+                  </View>
+                </View>
+                <View>
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+                    <AnimatedNumber variant="numXL" tabular color="caloriesInk" testID="ai-total-kcal" value={sum.kcal} from={countFrom} format={approx} memoryKey={`ai-total-${arrival.at}`} />
+                    <Text variant="unit" style={{ fontSize: 15 }}>
+                      kcal
+                    </Text>
+                  </View>
+                  <Text variant="label" color="textSecondary" testID="ai-total-range">
+                    {formatKcalRange(range, word)} kcal
                   </Text>
-                ) : null}
+                </View>
                 <MacroBar protein={sum.protein} carbs={sum.carbs} fat={sum.fat} />
                 <View style={{ flexDirection: 'row' }}>
                   <MacroStat label="Protein" value={sum.protein} color={colors.protein} />
@@ -556,181 +645,162 @@ export default function PhotoScreen() {
                   <MacroStat label="Fat" value={sum.fat} color={colors.fat} />
                 </View>
               </Card>
-            </>
-          ) : (
-            <Card style={{ gap: spacing.lg }}>
-              <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-                {isDemo ? <FlaskConical size={24} color={colors.text} strokeWidth={1.9} /> : <Sparkles size={24} color={colors.text} strokeWidth={1.9} />}
-                <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                  <Text variant="h3" numberOfLines={2} testID="ai-dish">
-                    {/* The notice above already says it is a sample. */}
-                    {result.dish}
-                  </Text>
+            )}
+          </FadeUp>
+
+          <FadeUp key={`a1-${arrival.at}`} disabled={!replay} delay={ARRIVE_STEP}>
+            <Card style={{ gap: spacing.md, borderColor: result.hiddenFatQuestion ? colors.borderStrong : colors.border }}>
+              <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
+                <Droplet size={18} color={colors.fat} style={{ marginTop: 2 }} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text variant="title">{result.hiddenFatQuestion ?? 'Cooked or dressed with fat?'}</Text>
                   <Text variant="caption" color="textSecondary">
-                    {isDemo ? 'Example data' : `AI estimate · ${CONFIDENCE_WORDS[conf]}${precisePass ? ' · checked carefully' : ''}`}
+                    Rarely visible. 1 tsp is about 40 kcal.
                   </Text>
                 </View>
               </View>
-              <View>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                  <Text variant="numXL" tabular color="caloriesInk" testID="ai-total-kcal">
-                    {`~${sum.kcal}`}
-                  </Text>
-                  <Text variant="unit" style={{ fontSize: 15 }}>
-                    kcal
-                  </Text>
-                </View>
-                <Text variant="label" color="textSecondary" testID="ai-total-range">
-                  {formatKcalRange(range, word)} kcal
-                </Text>
-              </View>
-              <MacroBar protein={sum.protein} carbs={sum.carbs} fat={sum.fat} />
-              <View style={{ flexDirection: 'row' }}>
-                <MacroStat label="Protein" value={sum.protein} color={colors.protein} />
-                <MacroStat label="Carbs" value={sum.carbs} color={colors.carbs} />
-                <MacroStat label="Fat" value={sum.fat} color={colors.fat} />
+              {/* 12 px between the two lines a 320 px phone has: each chip is 44 px tall to touch, and one line never takes the other's taps. */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.sm, rowGap: spacing.md }}>
+                {ADDED_FAT_OPTIONS.map((o) => (
+                  <Chip
+                    key={o.value}
+                    testID={`ai-fat-${o.value}`}
+                    label={o.label}
+                    selected={fat === o.value}
+                    onPress={() => chooseFat(o.value)}
+                    // At 320 px the four do not fit one line: two by two, rather than "2 tbsp" alone on a second line.
+                    style={narrow ? { flexBasis: '40%', flexGrow: 1, justifyContent: 'center' } : undefined}
+                  />
+                ))}
               </View>
             </Card>
-          )}
+          </FadeUp>
 
-          <Card style={{ gap: spacing.md, borderColor: result.hiddenFatQuestion ? colors.borderStrong : colors.border }}>
-            <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
-              <Droplet size={18} color={colors.fat} style={{ marginTop: 2 }} />
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text variant="title">{result.hiddenFatQuestion ?? 'Cooked or dressed with fat?'}</Text>
-                <Text variant="caption" color="textSecondary">
-                  Rarely visible. 1 tsp is about 40 kcal.
+          {/* The plain View keeps the section's place in the scroll content for the hero's chips. */}
+          <View onLayout={(e) => (layout.current.section = e.nativeEvent.layout.y)}>
+            <FadeUp key={`a2-${arrival.at}`} disabled={!replay} delay={2 * ARRIVE_STEP} style={{ gap: spacing.sm }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.md }}>
+                <Text variant="h3">Items</Text>
+                <Text variant="caption" color="textSecondary" align="right" style={{ flexShrink: 1 }} numberOfLines={1}>
+                  {narrow ? 'Tap to correct' : 'Tap a name or weight to correct'}
                 </Text>
               </View>
-            </View>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-              {ADDED_FAT_OPTIONS.map((o) => (
-                <Chip
-                  key={o.value}
-                  testID={`ai-fat-${o.value}`}
-                  label={o.label}
-                  selected={fat === o.value}
-                  onPress={() => chooseFat(o.value)}
-                  // At 320 px the four do not fit one line: two by two, rather than "2 tbsp" alone on a second line.
-                  style={narrow ? { flexBasis: '40%', flexGrow: 1, justifyContent: 'center' } : undefined}
-                />
-              ))}
-            </View>
-          </Card>
-
-          <View style={{ gap: spacing.sm }} onLayout={(e) => (layout.current.section = e.nativeEvent.layout.y)}>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.md }}>
-              <Text variant="h3">Items</Text>
-              <Text variant="caption" color="textSecondary" align="right" style={{ flexShrink: 1 }} numberOfLines={1}>
-                {narrow ? 'Tap to correct' : 'Tap a name or weight to correct'}
-              </Text>
-            </View>
-            <Card padding={spacing.lg} style={{ paddingVertical: spacing.xs }} onLayout={(e) => (layout.current.card = e.nativeEvent.layout.y)}>
-              {rows.length === 0 ? (
-                <Text variant="body" color="textSecondary" style={{ paddingVertical: spacing.lg }}>
-                  No items left. Add what you ate below, or go back and try again.
-                </Text>
-              ) : (
-                rows.map((r, i) => (
-                  <View
-                    key={r.key}
-                    onLayout={(e) => (layout.current.rows[r.key] = e.nativeEvent.layout.y)}
-                    style={{
-                      marginHorizontal: -spacing.md,
-                      paddingHorizontal: spacing.md,
-                      ...cup(radius.tile, 5),
-                      backgroundColor: highlight === r.key ? colors.surfaceAlt : 'transparent',
-                    }}>
-                    {i > 0 ? <Divider /> : null}
-                    <ItemRow
-                      row={r}
-                      index={i}
-                      matches={swappable(r) ? matchFoods(r.estimate?.name ?? r.item.name, matchPool, 3) : []}
-                      onSwap={!swappable(r) ? undefined : (food) => setRows((rs) => rs.map((x) => (x.key === r.key ? swapRow(x, food) : x)))}
-                      onUnswap={() => setRows((rs) => rs.map((x) => (x.key === r.key ? unswapRow(x) : x)))}
-                      onGrams={(g) => setRows((rs) => rs.map((x) => (x.key === r.key ? setRowGrams(x, g) : x)))}
-                      onRename={(name) => setRows((rs) => rs.map((x) => (x.key === r.key ? renameRow(x, name) : x)))}
-                      onRemove={() => removeRow(r)}
-                    />
-                  </View>
-                ))
-              )}
-            </Card>
-            <AddMissingItem
-              foods={matchPool}
-              onAdd={(item, food) => setRows((rs) => [...rs.filter((r) => r.kind !== 'fat'), makeRow(item, 'added', food), ...rs.filter((r) => r.kind === 'fat')])}
-              onAskAi={access.live ? askAiForItem : undefined}
-              aiBusy={addingAi}
-            />
+              <Card padding={spacing.lg} style={{ paddingVertical: spacing.xs }} onLayout={(e) => (layout.current.card = e.nativeEvent.layout.y)}>
+                {rows.length === 0 ? (
+                  <Text variant="body" color="textSecondary" style={{ paddingVertical: spacing.lg }}>
+                    No items left. Add what you ate below, or go back and try again.
+                  </Text>
+                ) : (
+                  rows.map((r, i) => (
+                    <View
+                      key={r.key}
+                      onLayout={(e) => (layout.current.rows[r.key] = e.nativeEvent.layout.y)}
+                      style={{
+                        marginHorizontal: -spacing.md,
+                        paddingHorizontal: spacing.md,
+                        ...cup(radius.tile, 5),
+                        backgroundColor: highlight === r.key ? colors.surfaceAlt : 'transparent',
+                      }}>
+                      {/* A row the estimate brought enters in its turn (once: not again when the review comes back); one added later enters at once. */}
+                      <FadeUp
+                        key={`${r.key}-${arrival.at}`}
+                        disabled={!replay && r.key in arrival.order}
+                        delay={r.key in arrival.order ? Math.min((2 + arrival.order[r.key]) * ARRIVE_STEP, 400) : 0}>
+                        {i > 0 ? <Divider /> : null}
+                        <ItemRow
+                          row={r}
+                          index={i}
+                          sample={isDemo}
+                          matches={swappable(r) ? matchFoods(r.estimate?.name ?? r.item.name, matchPool, 3) : []}
+                          onSwap={!swappable(r) ? undefined : (food) => setRows((rs) => rs.map((x) => (x.key === r.key ? swapRow(x, food) : x)))}
+                          onUnswap={() => setRows((rs) => rs.map((x) => (x.key === r.key ? unswapRow(x) : x)))}
+                          onGrams={(g) => setRows((rs) => rs.map((x) => (x.key === r.key ? setRowGrams(x, g) : x)))}
+                          onRename={(name) => setRows((rs) => rs.map((x) => (x.key === r.key ? renameRow(x, name) : x)))}
+                          onRemove={() => removeRow(r)}
+                        />
+                      </FadeUp>
+                    </View>
+                  ))
+                )}
+              </Card>
+              <AddMissingItem
+                foods={matchPool}
+                onAdd={(item, food) => setRows((rs) => [...rs.filter((r) => r.kind !== 'fat'), makeRow(item, 'added', food), ...rs.filter((r) => r.kind === 'fat')])}
+                onAskAi={access.live ? askAiForItem : undefined}
+                aiBusy={addingAi}
+              />
+            </FadeUp>
           </View>
 
           {result.note ? (
-            <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }} testID="ai-note">
+            <FadeUp key={`a3-${arrival.at}`} disabled={!replay} delay={3 * ARRIVE_STEP} style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }} testID="ai-note">
               <Info size={16} color={colors.textSecondary} style={{ marginTop: 2 }} />
               <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
                 {result.note}
               </Text>
-            </View>
+            </FadeUp>
           ) : null}
 
-          <View style={{ gap: spacing.sm }}>
+          <FadeUp key={`a4-${arrival.at}`} disabled={!replay} delay={4 * ARRIVE_STEP} style={{ gap: spacing.sm }}>
             <Text variant="h3">Meal</Text>
             {/* The diary's meal tabs: "Breakfast" fits whole in a quarter of a 320 px phone. */}
             <MealPicker value={meal} onChange={setMeal} testIDPrefix="ai-meal" />
-          </View>
+          </FadeUp>
 
           {/* Second tries, below the meal: say what it got wrong, or run the careful check. Each uses one analysis. */}
-          <Card style={{ gap: spacing.md }} testID="ai-correction">
-            <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
-              <MessageSquareText size={18} color={colors.text} strokeWidth={1.9} style={{ marginTop: 2 }} />
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text variant="title">Not quite right?</Text>
-                <Text variant="caption" color="textSecondary">
-                  Each try uses one analysis.
-                </Text>
+          <FadeUp key={`a5-${arrival.at}`} disabled={!replay} delay={5 * ARRIVE_STEP}>
+            <Card style={{ gap: spacing.md }} testID="ai-correction">
+              <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
+                <MessageSquareText size={18} color={colors.text} strokeWidth={1.9} style={{ marginTop: 2 }} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text variant="title">Not quite right?</Text>
+                  <Text variant="caption" color="textSecondary">
+                    Each try uses one analysis.
+                  </Text>
+                </View>
               </View>
-            </View>
-            <TextField
-              testID="ai-correction-input"
-              placeholder={narrow ? 'e.g. no cheese' : 'e.g. cauliflower rice, no cheese'}
-              value={correction}
-              onChangeText={setCorrection}
-              maxLength={300}
-              accessibilityLabel="What the estimate got wrong"
-              returnKeyType="send"
-              onSubmitEditing={() => correction.trim().length >= 3 && void analyse(precisePass, correction)}
-            />
-            <Button
-              testID="ai-reestimate"
-              title="Re-estimate"
-              variant="secondary"
-              size="md"
-              disabled={correction.trim().length < 3}
-              icon={<RefreshCw size={16} color={colors.text} />}
-              onPress={() => void analyse(precisePass, correction)}
-            />
-            {!precisePass ? (
-              <Button
-                testID="ai-check-again"
-                title={narrow ? 'Check more carefully' : 'Check again more carefully'}
-                variant="ghost"
-                size="md"
-                icon={<Sparkles size={16} color={colors.text} />}
-                accessibilityLabel={`Check again more carefully with a stronger model${mode === 'photo' ? ' and a sharper copy of the photo' : ''}. Uses ${CAREFUL_COST} of today's analyses and keeps the items you added`}
-                onPress={() => void analyse(true)}
+              <TextField
+                testID="ai-correction-input"
+                placeholder={narrow ? 'e.g. no cheese' : 'e.g. cauliflower rice, no cheese'}
+                value={correction}
+                onChangeText={setCorrection}
+                maxLength={300}
+                accessibilityLabel="What the estimate got wrong"
+                returnKeyType="send"
+                onSubmitEditing={() => correction.trim().length >= 3 && void analyse(precisePass, correction)}
               />
-            ) : null}
-            {!precisePass && carefulLine ? (
-              <Text variant="caption" color="textSecondary" testID="ai-careful-uses">
-                {carefulLine}
-              </Text>
-            ) : null}
-            {allowance ? (
-              <Text variant="caption" color="textTertiary" testID="ai-remaining">
-                {allowance}
-              </Text>
-            ) : null}
-          </Card>
+              <Button
+                testID="ai-reestimate"
+                title="Re-estimate"
+                variant="secondary"
+                size="md"
+                disabled={correction.trim().length < 3}
+                icon={<RefreshCw size={16} color={colors.text} />}
+                onPress={() => void analyse(precisePass, correction)}
+              />
+              {!precisePass ? (
+                <Button
+                  testID="ai-check-again"
+                  title={narrow ? 'Check more carefully' : 'Check again more carefully'}
+                  variant="ghost"
+                  size="md"
+                  icon={<AiGlyph name="estimate" size={16} color={colors.primaryInk} strokeWidth={2.2} />}
+                  accessibilityLabel={`Check again more carefully with a stronger model${mode === 'photo' ? ' and a sharper copy of the photo' : ''}. Uses ${CAREFUL_COST} of today's analyses and keeps the items you added`}
+                  onPress={() => void analyse(true)}
+                />
+              ) : null}
+              {!precisePass && carefulLine ? (
+                <Text variant="caption" color="textSecondary" testID="ai-careful-uses">
+                  {carefulLine}
+                </Text>
+              ) : null}
+              {allowance ? (
+                <Text variant="caption" color="textTertiary" testID="ai-remaining">
+                  {allowance}
+                </Text>
+              ) : null}
+            </Card>
+          </FadeUp>
         </>
       ) : null}
       <AiConsentSheet

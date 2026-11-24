@@ -38,7 +38,7 @@ export function Card({ onPress, padding, gradient: _gradient, tone = 'surface', 
     );
   }
   return (
-    <View {...rest} style={[base, style]}>
+    <View {...rest} accessibilityLabel={accessibilityLabel} style={[base, style]}>
       {children}
     </View>
   );

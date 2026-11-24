@@ -43,6 +43,15 @@ function all(): Set<string> {
       add(r.value);
     }
     add(W.cardLabel(W.PLUS_CARD_TITLE, v.planLimits.plus, true));
+    // The table's row label with its unit under it, as it reads on the screen.
+    for (const r of W.cardRows(v.limits)) add(`${r.label} ${W.rowUnit(r.key)}`);
+    add(W.pastDueDetail(v));
+    add(W.memberSince(v.startedAt, 2026));
+    add(W.memberSince(v.startedAt, 2030));
+    add(W.eachDayUntil(v.periodEnd));
+    if (v.startedAt) add(W.withdrawSub(v.startedAt));
+    add(W.freeAiLine(v.planLimits.free));
+    add(W.savingAndTax(v.offers.find((o) => o.period === 'month'), v.offers.find((o) => o.period === 'year'), { taxIncluded: false }));
   }
   for (const o of offers) {
     add(W.priceLine(o));
@@ -51,7 +60,12 @@ function all(): Set<string> {
     add(W.subscribeLabel(o));
     add(W.renewalLine(o));
     add(W.periodLabel(o.period));
+    add(W.tileLabel(o, true));
+    add(W.tileLabel(o, false));
+    add(`${W.amountText(o)} ${W.unitText(o.period)}`);
   }
+  add(W.yearSavingLine(offers[0], offers[1]));
+  add(W.freeAiLine({ estimates: 1, questions: 1 }));
   for (const c of CODES) {
     for (const ctx of ['checkout', 'manage', 'status'] as const) for (const src of [undefined, 'app_store', 'play_store', 'promotional', 'polar']) add(W.refusalLine(c, ctx, src));
     for (const src of [undefined, 'app_store', 'play_store']) add(W.deleteBlockedLine(c, src));
@@ -64,6 +78,8 @@ function all(): Set<string> {
     W.MANAGE_LABEL, W.CANCEL_LABEL, W.WITHDRAW_LABEL, W.TERMS_LABEL, W.PRIVACY_LABEL, W.DELETE_PLAN_LINE, W.DELETE_ANYWAY_LABEL,
     W.RELEASED_LINE, W.PLAN_ACTIVE_LINE, W.ADD_PASSWORD_LABEL, W.ADD_PASSWORD_HINT, W.addPasswordSent('a@b.co'),
     W.notBuyableHere('channel'), W.notBuyableHere('frame'),
+    W.PLAN_INTRO_LEAD, W.PLAN_INTRO_MORE, W.YOUR_PLAN_TAG, W.STAYS_FREE_TITLE, W.STAYS_FREE_IF_CANCEL, W.STAYS_FREE_AFTER_END, ...W.STAYS_FREE_ROWS, W.STAYS_FREE_NOTE,
+    W.EACH_DAY_TITLE, W.PAST_DUE_HEAD, W.CANCEL_SUB, W.BOTH_LEAD, W.SIGNED_OUT_TITLE, W.SIGNED_OUT_BODY, W.SIGN_IN_ACTION, W.OFF_TITLE, W.LATE_TITLE, W.LATE_MORE,
   ])
     add(s);
   return out;
@@ -96,6 +112,16 @@ describe('money', () => {
     expect(W.formatMoney(450, 'CHF')).toBe('CHF 4.50');
     expect(W.formatMoney(500, 'JPY')).toBe('¥500');
   });
+  it("keeps a tile's amount unbroken and its unit whole", () => {
+    expect(W.amountText({ amount: 12990, currency: 'CHF' })).toBe('CHF\u00A0129.90');
+    expect(W.amountText({ amount: 12990, currency: 'CAD' })).toBe('CA$129.90');
+    expect(W.amountText({ amount: 2999, currency: 'USD' })).toBe('$29.99');
+    expect(W.unitText('month')).toBe('a\u00A0month');
+    expect(W.unitText('year')).toBe('a\u00A0year');
+    expect(W.tieMoney('About CHF 10.83 a month')).toBe('About CHF\u00A010.83 a\u00A0month');
+    expect(W.tieMoney('About $2.50 a month')).toBe('About $2.50 a\u00A0month');
+    expect(W.tieMoney(null)).toBe(null);
+  });
   it('says the price, the period, the monthly equivalent and the tax', () => {
     const year = offers[1];
     expect(W.priceLine(year)).toBe('$29.99 a year');
@@ -107,6 +133,19 @@ describe('money', () => {
     expect(W.subscribeLabel(year)).toBe('Subscribe for $29.99 a year');
     expect(W.renewalLine(year)).toBe('Renews every year at $29.99 until you cancel. Cancel any time; Plus then stays to the end of the paid year.');
     expect(W.subscribeLabel(offers[3])).toBe('Subscribe for ₪14.90 a month');
+  });
+
+  it('the button drops the period, never the price, when a long price would be cut on a narrow phone', () => {
+    const chf = { amount: 1490, currency: 'CHF', period: 'month' as const };
+    expect(W.subscribeLabel(chf)).toMatch(/^Subscribe for CHF.14\.90 a month$/);
+    const narrow = W.subscribeLabel(chf, W.subscribeLabelRoom(320));
+    expect(narrow.startsWith('Subscribe for CHF')).toBe(true);
+    expect(narrow).not.toMatch(/month/);
+    expect(narrow.length).toBeLessThanOrEqual(W.subscribeLabelRoom(320));
+    // The usual price keeps its period at every width.
+    const usd = { amount: 399, currency: 'USD', period: 'month' as const };
+    expect(W.subscribeLabel(usd, W.subscribeLabelRoom(320))).toBe('Subscribe for $3.99 a month');
+    expect(W.subscribeLabel(usd, W.subscribeLabelRoom(390))).toBe('Subscribe for $3.99 a month');
   });
 });
 
@@ -127,5 +166,40 @@ describe('rows and dates', () => {
       'Coach memory: 3 exchanges',
     ]);
     expect(W.cardRows({ estimates: 40, questions: 30, memoryPairs: 1 })[2].value).toBe('1 exchange');
+    expect(W.cardRows({ estimates: 5, questions: 5, memoryPairs: 3 }).map((r) => W.rowUnit(r.key))).toEqual(['a day', 'a day', 'earlier exchanges']);
+  });
+  it('says a failed renewal in two parts that together are the one sentence', () => {
+    const now = Date.parse('2026-11-23T12:00:00Z');
+    const late = demoView('past_due', now);
+    expect(`${W.PAST_DUE_HEAD} ${W.pastDueDetail(late)}`).toBe(W.subscriberLine(late));
+    expect(W.pastDueDetail(late)).toMatch(/^Plus stays on until [A-Z][a-z]{2} \d{1,2}, \d{4} while it is tried again\. You can change the card in Manage or cancel\.$/);
+    const noDate = { ...late, paymentGraceUntil: null, periodEnd: null };
+    expect(W.pastDueDetail(noDate)).toBe('You can change the card in Manage or cancel.');
+    expect(`${W.PAST_DUE_HEAD} ${W.pastDueDetail(noDate)}`).toBe(W.subscriberLine(noDate));
+  });
+  it('says since when, with the year only when it is another one', () => {
+    expect(W.memberSince('2026-11-21T12:00:00Z', 2026)).toBe('Since Nov 21');
+    expect(W.memberSince('2025-11-21T12:00:00Z', 2026)).toBe('Since Nov 21, 2025');
+    expect(W.memberSince(null, 2026)).toBe(null);
+    expect(W.eachDayUntil('2026-12-24T12:00:00Z')).toBe('Each day until Dec 24, 2026');
+    expect(W.eachDayUntil(null)).toBe('Each day with Plus');
+    expect(W.withdrawSub('2026-11-21T12:00:00Z')).toBe('Within 14 days of buying, until Dec 5');
+  });
+  it('keeps the last words of a wrapping line together', () => {
+    expect(W.tieEnd('Logging, food search, barcode and the diary')).toBe('Logging, food search, barcode and\u00A0the\u00A0diary');
+    expect(W.tieEnd("On the payment company's page", 2)).toBe("On the payment company's\u00A0page");
+    expect(W.tieDates('Plus stays on until Nov 29, 2026 while it is tried again.')).toBe('Plus stays on until Nov\u00A029,\u00A02026 while it is tried again.');
+    expect(W.tieDates('Within 14 days of buying, until Dec 5')).toBe('Within 14 days of buying, until Dec\u00A05');
+    expect(W.tieDates('Nothing to tie here.')).toBe('Nothing to tie here.');
+    // Too short to wrap badly: left alone.
+    expect(W.tieEnd('No ads, on any')).toBe('No ads, on any');
+    expect(W.tieEnd('Sign in', 2)).toBe('Sign in');
+  });
+  it('names the tiles and the free AI allowance', () => {
+    expect(W.tileLabel(offers[0], true)).toBe('Monthly, $3.99 a month, selected');
+    expect(W.tileLabel(offers[1], false)).toBe('Yearly, $29.99 a year, about $2.50 a month');
+    expect(W.freeAiLine({ estimates: 5, questions: 5 })).toBe('5 AI estimates and 5 coach questions a day');
+    expect(W.freeAiLine({ estimates: 1, questions: 1 })).toBe('1 AI estimate and 1 coach question a day');
+    expect(W.PLAN_INTRO).toBe('Everything on your phone stays free. Plus gives the AI estimate and the coach more each day.');
   });
 });

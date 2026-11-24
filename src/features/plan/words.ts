@@ -7,7 +7,26 @@
  * No sentence names a payment company.
  */
 import { PLAN_FULL_NAME, PLAN_NAME } from './channel';
+import { yearSaving } from './saving';
 import { isEnding, paymentLate, holdsPlus, type PlanLimits, type PlanOffer, type PlanPeriod, type PlanSource, type PlanView } from './view';
+
+// ------------------------------------------------------------------ lines
+
+/**
+ * A line that may wrap keeps its last words together (no-break spaces), so its last line never holds
+ * one word alone: "… barcode / and the diary", not "… and the / diary". Short lines are left as they
+ * are. For the screen only: a screen reader's label and a test compare the plain words.
+ */
+export function tieEnd(text: string, words = 3): string {
+  const parts = text.split(' ');
+  if (words < 2 || parts.length < words + 2) return text;
+  return `${parts.slice(0, -words).join(' ')} ${parts.slice(-words).join('\u00A0')}`;
+}
+
+/** A date inside a sentence stays on one line: "Nov 29, 2026" never breaks after the comma, nor "Dec 5" after the month. For the screen only. */
+export function tieDates(text: string): string {
+  return text.replace(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?:, (\d{4}))?/g, (_m, mon: string, day: string, year?: string) => (year ? `${mon}\u00A0${day},\u00A0${year}` : `${mon}\u00A0${day}`));
+}
 
 // ------------------------------------------------------------------ dates
 
@@ -46,6 +65,21 @@ export function formatMoney(amount: number, currency: string): string {
 
 const EVERY: Record<PlanPeriod, string> = { month: 'month', year: 'year' };
 
+/** A price tile's amount, one unbroken run: "CHF 129.90" never parts its code from its number. For the screen only. */
+export function amountText(o: Pick<PlanOffer, 'amount' | 'currency'>): string {
+  return formatMoney(o.amount, o.currency).replace(/ /g, '\u00A0');
+}
+
+/** A line about money keeps a currency code with its number and its last two words together: "About CHF 10.83 a month". For the screen only. */
+export function tieMoney(text: string | null): string | null {
+  return text === null ? null : tieEnd(text.replace(/\b([A-Z]{2,3}) (?=\d)/g, '$1\u00A0'), 2);
+}
+
+/** A price tile's unit, kept whole when it goes under the amount: "a month". For the screen only. */
+export function unitText(period: PlanPeriod): string {
+  return `a\u00A0${EVERY[period]}`;
+}
+
 /** "$29.99 a year". */
 export function priceLine(o: Pick<PlanOffer, 'amount' | 'currency' | 'period'>): string {
   return `${formatMoney(o.amount, o.currency)} a ${EVERY[o.period]}`;
@@ -65,9 +99,19 @@ export function taxNote(o: Pick<PlanOffer, 'taxIncluded'>): string | null {
   return o.taxIncluded === true ? null : 'Tax is added where it applies';
 }
 
-/** The pinned button: names the price and the period. */
-export function subscribeLabel(o: Pick<PlanOffer, 'amount' | 'currency' | 'period'>): string {
-  return `Subscribe for ${priceLine(o)}`;
+/**
+ * The pinned button: names the price and the period. When that is longer than `maxChars` (a long price on a
+ * narrow phone, "CHF 14.90 a month" at 320 px) it names the price only: the renewal sentence directly above it
+ * names the period in full, so the button is never cut short with an ellipsis.
+ */
+export function subscribeLabel(o: Pick<PlanOffer, 'amount' | 'currency' | 'period'>, maxChars = Infinity): string {
+  const full = `Subscribe for ${priceLine(o)}`;
+  return full.length <= maxChars ? full : `Subscribe for ${formatMoney(o.amount, o.currency)}`;
+}
+
+/** How many characters the pinned button holds before `subscribeLabel` drops the period. */
+export function subscribeLabelRoom(windowWidth: number): number {
+  return windowWidth < 360 ? 27 : 34;
 }
 
 /** The full renewal sentence, directly above the button. */
@@ -81,10 +125,43 @@ export function periodLabel(p: PlanPeriod): string {
   return p === 'month' ? 'Monthly' : 'Yearly';
 }
 
+/** Under the monthly tile's price, where the yearly tile says its price per month. */
+
+type Priced = Pick<PlanOffer, 'amount' | 'currency' | 'period' | 'taxIncluded'>;
+
+/**
+ * "Yearly costs $17.89 less than 12 monthly payments.": the plain sum from the two prices the server
+ * sent (./saving.ts), or null when it would not be exact (another currency, another answer about tax,
+ * or a year that is not the smaller sum).
+ */
+export function yearSavingLine(month: Priced | null | undefined, year: Priced | null | undefined): string | null {
+  const less = yearSaving(month, year);
+  if (less === null || !year) return null;
+  return `Yearly costs ${formatMoney(less, year.currency)} less than 12 monthly payments.`;
+}
+
+/** Under the two tiles: the saving, then the tax note of the price chosen. */
+export function savingAndTax(month: Priced | null | undefined, year: Priced | null | undefined, chosen: Pick<PlanOffer, 'taxIncluded'>): string | null {
+  const tax = taxNote(chosen);
+  const line = [yearSavingLine(month, year), tax ? `${tax}.` : null].filter(Boolean).join(' ');
+  return line || null;
+}
+
+/** What a price tile reads to a screen reader: "Monthly, $3.99 a month, selected". */
+export function tileLabel(o: Pick<PlanOffer, 'amount' | 'currency' | 'period'>, selected: boolean): string {
+  const per = monthlyEquivalent(o);
+  return [periodLabel(o.period), priceLine(o), per ? per.charAt(0).toLowerCase() + per.slice(1) : null, selected ? 'selected' : null].filter(Boolean).join(', ');
+}
+
 // ------------------------------------------------------------------ the screen
 
 export const PLAN_TITLE = 'Plan';
-export const PLAN_INTRO = `Everything on your phone is free. ${PLAN_NAME} pays for the AI.`;
+export const PLAN_INTRO_LEAD = 'Everything on your phone stays free.';
+export const PLAN_INTRO_MORE = `${PLAN_NAME} gives the AI estimate and the coach more each day.`;
+/** The two lines as one sentence pair (a screen reader, an older reader). */
+export const PLAN_INTRO = `${PLAN_INTRO_LEAD} ${PLAN_INTRO_MORE}`;
+/** Under a column's title, on the plan the person holds. */
+export const YOUR_PLAN_TAG = 'Your plan';
 export const FREE_CARD_TITLE = 'Free';
 export const PLUS_CARD_TITLE = PLAN_NAME;
 export const SELLER_LINE = `The payment page is run by the payment company that sells ${PLAN_NAME} on HealthCal's behalf. Its name is on that page.`;
@@ -95,9 +172,17 @@ export const CANCEL_LABEL = 'Cancel subscription';
 export const WITHDRAW_LABEL = 'Withdraw from the contract';
 export const NOTHING_TO_CHOOSE = 'There is no plan to choose right now. Everything in HealthCal works as it is.';
 export const SIGNED_OUT_LINE = 'Plans come with an account. Sign in from Profile > Account, then open this page again.';
+/** The signed-out page: a title, one sentence and the button that does it. */
+export const SIGNED_OUT_TITLE = 'Plans come with an account';
+export const SIGNED_OUT_BODY = 'Everything on your phone works without one.';
+export const SIGN_IN_ACTION = 'Sign in';
+export const OFF_TITLE = 'Nothing to choose';
 export const LOADING_LINE = 'Reading your plan.';
 export const WAITING_LINE = 'Waiting for the payment to arrive. This takes a few seconds.';
-export const LATE_LINE = 'The payment has not arrived yet. It can take a minute, and this page looks again when you come back to it. If you closed the payment page, nothing was charged.';
+/** The payment that has not arrived, as a title and what follows it; `LATE_LINE` is the two as one line. */
+export const LATE_TITLE = 'The payment has not arrived yet';
+export const LATE_MORE = 'It can take a minute, and this page looks again when you come back to it. If you closed the payment page, nothing was charged.';
+export const LATE_LINE = `${LATE_TITLE}. ${LATE_MORE}`;
 export const CHECKOUT_CLOSED = 'Nothing was charged.';
 
 /** The header's short line. */
@@ -136,6 +221,11 @@ export function cardRows(l: PlanLimits): CardRow[] {
   ];
 }
 
+/** The unit under a row's label in the comparison table, shared by both columns. */
+export function rowUnit(key: CardRow['key']): string {
+  return key === 'memory' ? 'earlier exchanges' : 'a day';
+}
+
 /** What a card reads to a screen reader, once. */
 export function cardLabel(title: string, l: PlanLimits, current: boolean): string {
   const rows = cardRows(l).map((r) => `${r.label}: ${r.value}`).join(', ');
@@ -156,14 +246,17 @@ export function sourceLine(s: PlanSource | null): string | null {
   return s ? SOURCE_LINE[s] : null;
 }
 
+/** A failed renewal, said in two parts: the fact, then what happens and what the person can do. */
+export const PAST_DUE_HEAD = 'The last renewal payment did not go through.';
+export function pastDueDetail(v: Pick<PlanView, 'periodEnd' | 'paymentGraceUntil'>): string {
+  const until = v.paymentGraceUntil ?? v.periodEnd;
+  const card = `You can change the card in ${MANAGE_LABEL}.`;
+  return until ? `${PLAN_NAME} stays on until ${fullDate(until)} while it is tried again. ${card}` : card;
+}
+
 /** For a subscriber: when the plan renews, ends, or is waiting on a payment. */
 export function subscriberLine(v: Pick<PlanView, 'plan' | 'state' | 'periodEnd' | 'cancelAtPeriodEnd' | 'paymentGraceUntil' | 'period' | 'offers'>): string {
-  if (paymentLate(v)) {
-    const until = v.paymentGraceUntil ?? v.periodEnd;
-    return until
-      ? `The last renewal payment did not go through. ${PLAN_NAME} stays on until ${fullDate(until)} while it is tried again. You can change the card in ${MANAGE_LABEL}.`
-      : `The last renewal payment did not go through. You can change the card in ${MANAGE_LABEL}.`;
-  }
+  if (paymentLate(v)) return `${PAST_DUE_HEAD} ${pastDueDetail(v)}`;
   if (!v.periodEnd) return `${PLAN_FULL_NAME} is on.`;
   if (isEnding(v)) return `Cancelled. ${PLAN_NAME} stays on until ${fullDate(v.periodEnd)}, then the Free allowance applies. Nothing you logged changes.`;
   const offer = v.period ? v.offers.find((o) => o.period === v.period) : undefined;
@@ -171,6 +264,30 @@ export function subscriberLine(v: Pick<PlanView, 'plan' | 'state' | 'periodEnd' 
     ? `Renews on ${fullDate(v.periodEnd)} at ${formatMoney(offer.amount, offer.currency)}. Cancel any time before then.`
     : `Renews on ${fullDate(v.periodEnd)}. Cancel any time before then.`;
 }
+
+/** The membership card's second line: "Since Nov 21", with the year when it is not this one. */
+export function memberSince(startedAt: string | null, thisYear: number): string | null {
+  if (!startedAt) return null;
+  const d = new Date(startedAt);
+  if (!Number.isFinite(d.getTime())) return null;
+  return `Since ${d.getFullYear() === thisYear ? monthDay(startedAt) : fullDate(startedAt)}`;
+}
+
+/** Over the allowance table of someone who holds Plus. */
+export const EACH_DAY_TITLE = `Each day with ${PLAN_NAME}`;
+/** The same title once the plan is cancelled and runs to its end. */
+export function eachDayUntil(periodEnd: string | null): string {
+  return periodEnd ? `Each day until ${fullDate(periodEnd)}` : EACH_DAY_TITLE;
+}
+
+/** Under "Cancel subscription" and, alone, under either row: where the row leads. */
+export const CANCEL_SUB = "On the payment company's page";
+/** Under "Withdraw from the contract": "Within 14 days of buying, until Dec 5". */
+export function withdrawSub(startedAt: string): string {
+  return `Within 14 days of buying, until ${monthDay(new Date(Date.parse(startedAt) + 14 * 86_400_000).toISOString())}`;
+}
+/** Under the two rows when both show. */
+export const BOTH_LEAD = "Both lead to the payment company's own page.";
 
 /** Under "Withdraw from the contract": until when it is offered. */
 export function withdrawLine(startedAt: string): string {
@@ -190,6 +307,26 @@ export function notBuyableHere(reason: 'channel' | 'frame'): string {
   return reason === 'frame'
     ? `${PLAN_NAME} can be bought when HealthCal is open in its own browser tab or in the app.`
     : `${PLAN_NAME} can be bought in HealthCal on the web, signed in with this account.`;
+}
+
+// ------------------------------------------------------------------ what stays free
+
+export const STAYS_FREE_TITLE = 'Free for good';
+export const STAYS_FREE_IF_CANCEL = 'Stays yours if you cancel';
+/** The same card once the plan is cancelled, or for a plan that ends by itself: there is nothing left to cancel. */
+export const STAYS_FREE_AFTER_END = `Stays yours when ${PLAN_NAME} ends`;
+/** Principle 7, as four rows; the fifth is the free AI allowance (`freeAiLine`). */
+export const STAYS_FREE_ROWS = [
+  'Logging, food search, barcode and the diary',
+  'Water, drinks, sleep, fasting and weight',
+  'Training, Health sync and workout import',
+  'Your account, backup, sync, friends and full export',
+] as const;
+export const STAYS_FREE_NOTE = 'No ads, on any plan.';
+
+/** "5 AI estimates and 5 coach questions a day": the free plan's own AI allowance. */
+export function freeAiLine(l: Pick<PlanLimits, 'estimates' | 'questions'>): string {
+  return `${l.estimates} AI ${l.estimates === 1 ? 'estimate' : 'estimates'} and ${l.questions} coach ${l.questions === 1 ? 'question' : 'questions'} a day`;
 }
 
 // ------------------------------------------------------------------ refusals

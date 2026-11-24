@@ -18,14 +18,18 @@ import {
   HONEST_COUNTING,
   HONEST_PHONE,
   HONEST_WHO,
+  HOW_COUNTED,
   LIGHTER_NOTE,
   LOAD_TITLES,
   NEEDS_HISTORY,
+  OVERVIEW_ABOUT,
+  POSITIONS,
   POSITION_WORDS,
   STEP_EASY,
   STEP_SETTLE,
   STRENGTH_IDS,
   overviewAnswer,
+  positionLabel,
   strengthWho,
   trainingOverview,
   type LoadSession,
@@ -350,6 +354,9 @@ describe('words', () => {
       ...Object.values(POSITION_WORDS),
       NEEDS_HISTORY,
       CHART_CAPTION,
+      HOW_COUNTED,
+      OVERVIEW_ABOUT,
+      ...POSITIONS.map(positionLabel),
       HONEST_PHONE,
       HONEST_COMPARE,
       HONEST_WHO,
@@ -375,6 +382,11 @@ describe('words', () => {
     const all = strings();
     expect(all.size).toBeGreaterThan(40);
     expect([...all].filter((x) => BANNED.test(x) || (OWN.test(x) && !x.includes(HONEST_COMPARE)) || x.includes('!'))).toEqual([]);
+  });
+  it('the sheet\'s heading, the line\'s hint and the marks\' spoken labels', () => {
+    expect(HOW_COUNTED).toBe('How this is counted');
+    expect(OVERVIEW_ABOUT).toBe('About your last 7 days of training');
+    expect(POSITIONS.map(positionLabel)).toEqual(['Lighter, of lighter, usual and more', 'Usual, of lighter, usual and more', 'More, of lighter, usual and more']);
   });
   it('say "risk" in one sentence only, the one that says this is not a measure of it', () => {
     const risky = [...strings()].filter((x) => /\brisk\b/i.test(x));

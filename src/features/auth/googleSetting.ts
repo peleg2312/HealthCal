@@ -18,6 +18,8 @@ import { create } from 'zustand';
 
 import { FUNCTIONS_URL, SUPABASE_ANON_KEY, isBackendConfigured } from '@/services/supabase';
 
+import { authDemo } from './demo';
+
 /** This device's last answer: '1' on, '0' off. Never synced, never in the export. */
 export const GOOGLE_SETTING_KEY = 'healthcal.googleSignIn';
 
@@ -134,5 +136,7 @@ export function useGoogleChoice(): { ready: boolean; shown: boolean } {
   const on = useGoogleSignInOn();
   const [choice, setChoice] = useState<boolean | null>(() => (settled ? on : null));
   if (choice === null && settled) setChoice(on);
+  // A test build's demo view (./demo.ts) draws the button with no backend to ask.
+  if (authDemo()) return { ready: true, shown: true };
   return { ready: choice !== null, shown: choice === true };
 }

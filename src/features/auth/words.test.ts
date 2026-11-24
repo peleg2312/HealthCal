@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { GOOGLE_SETTLE_CAP_MS, GOOGLE_TAP_CHECK_MS, googleOnFrom, googleSettled, keptGoogleOn, showGoogle, tapVerdict, type GoogleSettingState } from './googleSetting';
 import {
+  ACCOUNT_UPLOAD_LINE,
+  AUTH_PRIVACY_LABEL,
+  AUTH_TERMS_LABEL,
+  AUTH_TERMS_LINE,
   GOOGLE_INBOX_HINT,
   GOOGLE_LABEL,
   GOOGLE_LINKED_TOAST,
@@ -16,6 +20,14 @@ import {
   paramsOfUrl,
   problemFromError,
   problemIsToast,
+  RESET_CHECKING,
+  RESTORING,
+  SIGN_IN,
+  signInMethodLine,
+  signUpDataLine,
+  WELCOME_RESTORE,
+  WELCOME_SIGN_IN,
+  WELCOME_SIGN_IN_LABEL,
   type GoogleProblem,
 } from './words';
 
@@ -160,5 +172,80 @@ describe('the words around a tap and the sent view', () => {
   it('carries the Google line under "Check your inbox" only while Google is offered', () => {
     expect(inboxGoogleHint(true)).toBe('Used Google before? Go back and choose Continue with Google.');
     expect(inboxGoogleHint(false)).toBeNull();
+  });
+});
+
+describe('the words of this round: the waits, the terms line, how an account signs in', () => {
+  const NEW = [
+    RESET_CHECKING.title,
+    RESET_CHECKING.body,
+    RESTORING.title,
+    RESTORING.body,
+    GOOGLE_WAITING.lead,
+    GOOGLE_WAITING.body,
+    AUTH_TERMS_LINE,
+    AUTH_TERMS_LABEL,
+    AUTH_PRIVACY_LABEL,
+    signUpDataLine(true),
+    signUpDataLine(false),
+    ACCOUNT_UPLOAD_LINE,
+    SIGN_IN,
+    WELCOME_SIGN_IN,
+    WELCOME_SIGN_IN_LABEL,
+    WELCOME_RESTORE,
+  ];
+
+  it('are sentence case, with no exclamation mark, no ellipsis and none of the banned words', () => {
+    for (const line of NEW) {
+      expect(line, line).toMatch(/^[A-Z]/);
+      expect(line, line).not.toMatch(/!|\.\.\.|…/);
+      expect(line, line).not.toMatch(/\b(oops|sorry|unfortunately|should|must|only|great|failed|bad)\b/i);
+    }
+  });
+
+  it('says what an account agrees to with the names of the two pages, in words that fit sign-in and sign-up alike', () => {
+    expect(AUTH_TERMS_LINE).toBe('Using an account means you accept the Terms of use and the Privacy page.');
+    expect(AUTH_TERMS_LINE).toContain(AUTH_TERMS_LABEL);
+    expect(AUTH_TERMS_LINE).toContain(AUTH_PRIVACY_LABEL);
+    // On "Welcome back" nobody is creating anything.
+    expect(AUTH_TERMS_LINE).not.toMatch(/creat/i);
+  });
+
+  it('gives the three waits one pattern: a strong line with no full stop over one short sentence', () => {
+    const waits = [
+      { title: GOOGLE_WAITING.lead, body: GOOGLE_WAITING.body },
+      { title: RESET_CHECKING.title, body: RESET_CHECKING.body },
+      { title: RESTORING.title, body: RESTORING.body },
+    ];
+    expect(waits.map((w) => w.title)).toEqual(['Finishing your sign-in', 'Checking your reset link', 'Signed in']);
+    expect(waits.map((w) => w.body)).toEqual(['Your plan and logs come next.', 'This takes a few seconds.', 'Bringing your plan and logs to this device.']);
+    for (const w of waits) {
+      expect(w.title, w.title).not.toMatch(/[.!?]$/);
+      expect(w.body, w.body).toMatch(/^[A-Z][^.!?]*\.$/);
+      expect(w.title).not.toBe(w.body);
+    }
+  });
+
+  it('has one name for signing in, on welcome and on Account', () => {
+    expect(SIGN_IN).toBe('Sign in');
+    expect(WELCOME_SIGN_IN).toBe(SIGN_IN);
+  });
+
+  it('says what happens to the data under the sign-up form, with a plan on this device and without', () => {
+    expect(signUpDataLine(true)).toBe('Everything you have logged on this device is uploaded to your new account.');
+    expect(signUpDataLine(false)).toBe('Your data is private to your account. You can export or delete it at any time.');
+    expect(ACCOUNT_UPLOAD_LINE).toBe('What you have logged so far goes to your account.');
+  });
+
+  it('names how the account signs in: Google, email, both, or plainly signed in', () => {
+    expect(signInMethodLine([{ provider: 'google' }])).toBe('Signed in with Google');
+    expect(signInMethodLine([{ provider: 'email' }])).toBe('Signed in with email');
+    expect(signInMethodLine([{ provider: 'email' }, { provider: 'google' }])).toBe('Signed in with Google or email');
+    expect(signInMethodLine([])).toBe('Signed in');
+    expect(signInMethodLine(null)).toBe('Signed in');
+    expect(signInMethodLine(undefined)).toBe('Signed in');
+    // A way in this app does not offer is not named.
+    expect(signInMethodLine([{ provider: 'apple' }])).toBe('Signed in');
+    expect(signInMethodLine([{ provider: null }, { provider: 'google' }])).toBe('Signed in with Google');
   });
 });

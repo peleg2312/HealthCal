@@ -111,6 +111,8 @@ name: The coach, from every tab
       id: train-load-sheet
     timeout: 15000
     optional: true
+# The sheet itself: the scale under the title, the chart, and "Ask the coach" in its first view.
+- takeScreenshot: 96b-training-sheet
 - scrollUntilVisible:
     element:
       id: train-load-coach

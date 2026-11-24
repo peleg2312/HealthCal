@@ -1211,7 +1211,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     check('training overview: the sheet opens with the last 7 days and the recent average', sheetOpen && numbers.startsWith(`${a7} guideline minutes in the last 7 days`) && numbers.includes(`recent average of ${Math.round(c)}`), numbers);
     const sheetText = sheetOpen ? await ltext('train-load-sheet') : '';
     check(
-      'training overview: the sheet has the three positions, the chart, the counts and the honest sentences, and no coach button',
+      'training overview: the sheet has the three positions, the chart, the counts and the honest sentences',
       (await lp.getByTestId('train-load-mark').count()) > 0 && (await lp.getByTestId('train-load-chart').count()) > 0 && /without a session|each of the last 7 days/.test(await ltext('train-load-counts')) &&
         sheetText.includes('not a measure of injury risk') && sheetText.includes('Training you did not log'),
       sheetText.slice(0, 160),
@@ -1440,6 +1440,8 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     const infoId = (await cp.getByTestId('train-load-info').count()) ? 'train-load-info' : 'train-guideline-help';
     await ctap(infoId);
     const sheetNumbers = await ctext('train-load-numbers');
+    // "Ask the coach" takes no press in its first 450 ms (a double tap on Train's line opens only the sheet).
+    await cp.waitForTimeout(300);
     await ctap('train-load-coach');
     const arrived = await onCoach();
     await cp.getByTestId('coach-local-answer').first().waitFor({ timeout: 15000 }).catch(() => {});
@@ -1455,6 +1457,154 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     check('coach: its X returns to Train', await onPath('/train'), cp.url());
     check('coach: no request ever reached coach-chat without a backend', sent.length === 0);
     await cctx.close();
+  }
+
+  // ------------------------------------------- lists with motion on (AnimatedList and AnimatedItem in src/ui/motion.tsx, FadeRow in src/features/food/rowMotion.tsx)
+  // Everything above runs reduced motion. Here motion is on (window.__healthcalMotion), as for a person, and a row added
+  // to a list must stay in the layout once its entrance is over. On the web, Reanimated tidies up after a custom Keyframe
+  // entrance about five times its length later by pinning the row with position: absolute where it was measured: the row
+  // leaves the layout, what holds it closes up and the next rows are drawn over it (the coach's question under its own
+  // answer card, a diary row over the next meal, a glass over the section under Water's log). Each step waits past that
+  // moment, then reads the boxes: the coach's questions above their answers with no row over another (three questions,
+  // then Clear chat and its Undo), a diary row added to lunch, deleted and brought back by Undo, inside lunch's card with
+  // the meal cards apart, and a glass added on Water, deleted and brought back, inside its card. No row may be left
+  // pinned (inline position absolute from a Reanimated animation).
+  {
+    const { buildSeed } = await import(require('url').pathToFileURL(require('path').join(__dirname, 'seed.mjs')).href);
+    const seed = buildSeed({ onboarded: true, theme: 'blossom' });
+    const lctx = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, reducedMotion: 'no-preference' });
+    await lctx.addInitScript((value) => {
+      window.__healthcalMotion = true;
+      if (!window.sessionStorage.getItem('__seeded')) {
+        window.localStorage.setItem('healthcal-v1', value);
+        window.sessionStorage.setItem('__seeded', '1');
+      }
+    }, JSON.stringify(seed));
+    const lp = await lctx.newPage();
+    lp.on('pageerror', (e) => errors.push(e.message));
+    lp.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 200)));
+    // Past Reanimated's tidy-up: five times a row's entrance (220 ms; FadeRow's starts 110 ms late), plus room.
+    const SETTLE = 2000;
+    const lshot = async (name) => SHOTS && lp.screenshot({ path: `${SHOTS}/${name}.png` });
+    const show = (rows) => rows.map((r) => `${r.id} ${r.top}-${r.bottom}`).join(', ');
+    // Rows in page order, each below the one before (1 px of rounding allowed).
+    const inOrder = (rows) => rows.every((r, i) => i === 0 || rows[i - 1].bottom <= r.top + 1);
+    const rowBoxes = (selector, pattern) =>
+      lp.evaluate(
+        ([s, p]) =>
+          [...document.querySelectorAll(s)]
+            .filter((e) => new RegExp(p).test(e.getAttribute('data-testid') || '') && e.getBoundingClientRect().height > 0)
+            .map((e) => {
+              const r = e.getBoundingClientRect();
+              return { id: e.getAttribute('data-testid'), top: Math.round(r.top), bottom: Math.round(r.bottom) };
+            }),
+        [selector, pattern],
+      );
+    // Rows that do not lie inside the card that holds them (the nearest ancestor drawing an edge).
+    const outsideCard = (pattern) =>
+      lp.evaluate((p) => {
+        const out = [];
+        for (const e of document.querySelectorAll('[data-testid]')) {
+          if (!new RegExp(p).test(e.getAttribute('data-testid')) || e.getBoundingClientRect().height === 0) continue;
+          let card = e.parentElement;
+          while (card && parseFloat(getComputedStyle(card).borderTopWidth) < 1) card = card.parentElement;
+          if (!card) continue;
+          const r = e.getBoundingClientRect();
+          const c = card.getBoundingClientRect();
+          if (r.top < c.top - 1 || r.bottom > c.bottom + 1) out.push(`${e.getAttribute('data-testid')} ${Math.round(r.top)}-${Math.round(r.bottom)} in a card ${Math.round(c.top)}-${Math.round(c.bottom)}`);
+        }
+        return out;
+      }, pattern);
+    // Elements a Reanimated animation left with an inline position: absolute (a leaving row's stand-in is gone by now).
+    const pinned = () => lp.evaluate(() => [...document.querySelectorAll('div')].filter((e) => e.style.position === 'absolute' && /^REA-/.test(e.style.animationName || '') && !e.isDummy).length);
+    const today = await lp.evaluate(() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    });
+
+    // A tap that reports instead of throwing, so one stuck row does not hide what the later steps find.
+    const ltap = async (id, what) => {
+      const ok = await lp.getByTestId(id).first().click({ timeout: 8000 }).then(() => true, () => false);
+      if (!ok) check(`lists with motion: ${what} can be tapped`, false, id);
+      return ok;
+    };
+    const pinnedLine = async () => `${await pinned()} pinned`;
+
+    // The coach: a question and its answer are two rows; three questions, then Clear chat and its Undo.
+    await lp.goto(`${BASE}/coach`, { waitUntil: 'networkidle' });
+    await lp.getByTestId('coach-local-training').first().waitFor({ timeout: 15000 });
+    check('lists with motion: the page runs with animation on', (await lp.evaluate(() => typeof window.__healthcalMotionOn === 'function' && window.__healthcalMotionOn())) === true);
+    const chat = async () => rowBoxes('[data-testid="coach-chat"] [data-testid]', '^coach-(question|local-answer)(-\\d+)?$');
+    const questionsFirst = (rows) => rows.length % 2 === 0 && rows.every((r, i) => r.id.startsWith(i % 2 ? 'coach-local-answer' : 'coach-question'));
+    for (const [n, ask] of [[1, 'coach-local-training'], [2, 'coach-local-ideas'], [3, 'coach-local-training']]) {
+      await ltap(ask, `question ${n}`);
+      await lp.waitForTimeout(SETTLE);
+      const rows = await chat();
+      check(`lists with motion: after question ${n}, each coach question sits above its answer and no row lies over another`, rows.length === 2 * n && questionsFirst(rows) && inOrder(rows), show(rows));
+    }
+    await lshot('e2e-lists-motion-coach');
+    check('lists with motion: no coach row is left pinned by its entrance', (await pinned()) === 0, await pinnedLine());
+    if ((await ltap('coach-about', 'the coach\'s info cup')) && (await ltap('coach-clear', 'Clear chat')) && (await ltap('toast-action', "Clear chat's Undo"))) {
+      await lp.waitForTimeout(SETTLE);
+      const back = await chat();
+      check('lists with motion: after Clear chat and its Undo, the coach rows are back in order with none over another', back.length === 6 && questionsFirst(back) && inOrder(back) && (await pinned()) === 0, `${show(back)}; ${await pinnedLine()}`);
+    }
+
+    // The diary: a row added to lunch while the diary is on screen (written to the store: this is about the list, not
+    // logging), deleted, then brought back by Undo.
+    await lp.goto(`${BASE}/diary`, { waitUntil: 'networkidle' });
+    await lp.getByTestId('meal-card-lunch').first().waitFor({ timeout: 15000 });
+    await lp.waitForTimeout(600);
+    const addedId = await lp.evaluate((day) => {
+      const s = window.__healthcal.getState();
+      const from = Object.values(s.foodEntries).find((e) => !e.deleted && !e.via);
+      const { id, updatedAt, ...rest } = from;
+      return s.upsert('foodEntries', { ...rest, date: day, meal: 'lunch' }).id;
+    }, today);
+    const entryRows = '^entry-(?!delete-|in-water-)';
+    const diaryStep = async (what) => {
+      await lp.waitForTimeout(SETTLE);
+      const cards = await rowBoxes('[data-testid^="meal-card-"]', '^meal-card-');
+      const rows = await rowBoxes('[data-testid^="entry-"]', entryRows);
+      const outside = await outsideCard(entryRows);
+      check(
+        `lists with motion: diary, ${what}: the rows in order inside their meal's card, the cards apart`,
+        inOrder(cards) && inOrder(rows) && outside.length === 0 && (await pinned()) === 0,
+        outside.length ? outside.join('; ') : `${show(cards)}; ${show(rows)}; ${await pinnedLine()}`,
+      );
+    };
+    await lp.getByTestId(`entry-${addedId}`).first().scrollIntoViewIfNeeded().catch(() => {});
+    await diaryStep('a row added to lunch');
+    await lshot('e2e-lists-motion-diary');
+    if (await ltap(`entry-delete-${addedId}`, "the added row's delete")) {
+      await diaryStep('the row deleted');
+      if (await ltap('toast-action', "the delete's Undo")) {
+        await diaryStep("the row back from the delete's Undo");
+        check('lists with motion: diary, the Undo brought the row back', (await lp.getByTestId(`entry-${addedId}`).count()) === 1);
+      }
+    }
+
+    // Water: a glass added, deleted, then brought back by Undo.
+    await lp.goto(`${BASE}/water`, { waitUntil: 'networkidle' });
+    await lp.getByTestId('water-add-0').first().waitFor({ timeout: 15000 });
+    await lp.waitForTimeout(600);
+    const waterRows = '^water-entry-\\d+$';
+    const waterStep = async (what) => {
+      await lp.waitForTimeout(SETTLE);
+      const rows = await rowBoxes('[data-testid^="water-entry-"]', waterRows);
+      const outside = await outsideCard(waterRows);
+      check(`lists with motion: Water, ${what}: the log's rows in order inside their card`, rows.length > 0 && inOrder(rows) && outside.length === 0 && (await pinned()) === 0, outside.length ? outside.join('; ') : `${show(rows)}; ${await pinnedLine()}`);
+      return rows.length;
+    };
+    await ltap('water-add-0', 'a glass size');
+    const glasses = await waterStep('a glass added');
+    await lp.getByTestId('water-entry-0').first().scrollIntoViewIfNeeded().catch(() => {});
+    await lshot('e2e-lists-motion-water');
+    if (await ltap(`water-delete-${glasses - 1}`, "the last glass's delete")) {
+      await waterStep('the glass deleted');
+      if (await ltap('toast-action', "the delete's Undo")) check('lists with motion: Water, the Undo brought the glass back', (await waterStep("the glass back from the delete's Undo")) === glasses);
+    }
+    await lctx.close();
   }
 
   // ------------------------------------------- Appearance: the newer looks (src/theme/resolve.ts)

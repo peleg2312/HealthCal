@@ -123,7 +123,7 @@ function ProfileHub() {
         </View>
       </Card>
 
-      {/* Four groups in the order a new person looks for things: you, your plan, what you track, the app. */}
+      {/* Four groups in the order a new person looks for things: you (with the Plan row), goals and reminders, what you track, the app. */}
       <Group title="You">
         <AccountRow />
         {showPlan ? <PlanRow testID="profile-plan" /> : null}
@@ -140,7 +140,7 @@ function ProfileHub() {
         />
       </Group>
 
-      <Group title="Your plan">
+      <Group title="Goals and reminders">
         <ListRow
           testID="profile-goals"
           title="Goals and targets"

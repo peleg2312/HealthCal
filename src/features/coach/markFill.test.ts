@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { contrast } from '@/theme/contrast';
+import { contrast, deltaE, over } from '@/theme/contrast';
 import { blossomColors, butterColors, chartFillOpacity, darkColors, honeyColors, javaColors, lightColors } from '@/theme/tokens';
 
 import { coachMarkFill } from './markFill';
@@ -16,7 +16,32 @@ describe('coachMarkFill', () => {
       expect(f.fillOnPage).toBeCloseTo(contrast(f.color, c.bg), 5);
       if (name === 'blossom') continue;
       expect(f.holds, name).toBe(true);
-      expect(f.of, name).toBe('primary');
+      // Butter and Honey: their primary is an ink (Sceptre Red), so their cup is their calorie colour.
+      expect(f.of, name).toBe(name === 'butter' || name === 'honey' ? 'calories' : 'primary');
+    }
+  });
+
+  it("in Butter and Honey is the look's own cup colour (raspberry, gold), never a tint of the dark primary", () => {
+    for (const [name, c] of [['butter', butterColors], ['honey', honeyColors]] as const) {
+      const f = coachMarkFill(c, chartFillOpacity[name]);
+      expect(f.of, name).toBe('calories');
+      // Close to the look's calorie cup: the same colour, a little lighter (Butter) or darker (Honey).
+      expect(deltaE(f.color, c.calories), name).toBeLessThan(10);
+      // Far from what it was: the dark primary's tint, a mud brown.
+      for (const o of [0.42, 0.5]) expect(deltaE(f.color, over(c.primary, c.bg, o)), name).toBeGreaterThan(15);
+    }
+    // Honey's gold is too light for butter paper even solid (2.8:1): it is darkened by a few per cent, not swapped.
+    const honey = coachMarkFill(honeyColors, chartFillOpacity.honey);
+    expect(honey.shade).toBeGreaterThan(0);
+    expect(honey.shade).toBeLessThanOrEqual(0.1);
+    const butter = coachMarkFill(butterColors, chartFillOpacity.butter);
+    expect(butter.shade).toBe(0);
+  });
+
+  it('keeps the primary in the other four looks, as before', () => {
+    for (const [name, c] of [['dark', darkColors], ['light', lightColors], ['blossom', blossomColors], ['java', javaColors]] as const) {
+      expect(coachMarkFill(c, chartFillOpacity[name]).of, name).toBe('primary');
+      expect(coachMarkFill(c, chartFillOpacity[name]).shade, name).toBe(0);
     }
   });
 

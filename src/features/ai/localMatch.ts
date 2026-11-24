@@ -108,6 +108,37 @@ export function matchFoods(query: string, foods: Food[], limit = 3): Food[] {
     .map((s) => s.food);
 }
 
+const stem = (w: string) => w.replace(/e?s$/, '');
+
+/**
+ * The row mark for an estimated item: the emoji of the food in the list that the item names
+ * outright ("Grilled chicken breast" wears the chicken breast's, "White rice, cooked" the rice's), so
+ * an estimated meal's rows read as food in the diary. Only from one of the five best matches, and only
+ * when the item is plainly that food, state words such as "grilled" aside:
+ * - the food's name holds every word of the item's name, or
+ * - the item is that food named with one of its own portions: the food's name before its first comma
+ *   ("Tomato") holds only words of the item and ends on the item's last word, and every other word of
+ *   the item names one of the food's portions ("cherry" in the tomato's "1 cherry tomato", "slice" in
+ *   the bread's "1 slice"). "Cherry tomatoes" wears the tomato; "Cup of rice" never wears rice noodles.
+ * A food that is merely near ("Mixed green salad" beside "Green peas", "Beef stew" beside "Beef
+ * jerky") gives nothing, and the row wears the pot (`AI_FOOD_EMOJI`). Names in Hebrew give nothing
+ * here. A mark only: it never changes a number.
+ */
+export function emojiLike(name: string, foods: Food[]): string | undefined {
+  const content = (s: string) => words(s).filter((w) => !GENERIC.has(w) && !COOKED_WORDS.has(w) && !RAW_WORDS.has(w));
+  const q = content(parseAmount(name).rest).map(stem);
+  if (q.length === 0) return undefined;
+  for (const food of matchFoods(name, foods, 5)) {
+    const named = new Set(words(food.name).map(stem));
+    if (q.every((w) => named.has(w))) return food.emoji;
+    const head = content(food.name.split(/[,(]/)[0]).map(stem);
+    if (head.length === 0 || head[head.length - 1] !== q[q.length - 1] || !head.every((w) => q.includes(w))) continue;
+    const portions = new Set(food.servings.flatMap((s) => words(s.label)).map(stem));
+    if (q.every((w) => named.has(w) || portions.has(w))) return food.emoji;
+  }
+  return undefined;
+}
+
 /** Convert a matched food to a review item, honouring a typed amount. */
 export function foodToItem(food: Food, query: string): AiFoodItem {
   const { count, grams } = parseAmount(query);

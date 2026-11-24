@@ -1,18 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import Animated, { Keyframe, LinearTransition, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { Platform } from 'react-native';
+import Animated, { FadeIn, Keyframe, LinearTransition, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { motion, useReducedMotion } from '@/theme';
 import { ease } from '@/ui';
 
 const { duration: D, distance: X } = motion;
 
-const rowEnter = new Keyframe({
-  0: { opacity: 0, transform: [{ translateY: -X.row }] },
-  100: { opacity: 1, transform: [{ translateY: 0 }], easing: ease.enter },
-})
-  .duration(D.row)
-  // The rows below make room first, then the new row fades into the space.
-  .delay(D.row / 2);
+// On the web a row only fades in, with Reanimated's own FadeIn: a custom Keyframe entrance is pinned with
+// position: absolute by Reanimated's web tidy-up afterwards and leaves the layout (see `rowEnter` in src/ui/motion.tsx).
+// The rows below make room first, then the new row fades into the space.
+const rowEnter =
+  Platform.OS === 'web'
+    ? FadeIn.duration(D.row).delay(D.row / 2).easing(ease.enter)
+    : new Keyframe({
+        0: { opacity: 0, transform: [{ translateY: -X.row }] },
+        100: { opacity: 1, transform: [{ translateY: 0 }], easing: ease.enter },
+      })
+        .duration(D.row)
+        .delay(D.row / 2);
 const move = LinearTransition.duration(D.row).easing(ease.move);
 
 /**
@@ -69,9 +75,9 @@ export function FadeRow({ children, leaving, testID }: { children: React.ReactNo
       accessibilityElementsHidden={leaving}
       importantForAccessibility={leaving ? 'no-hide-descendants' : 'auto'}
       entering={reduce ? undefined : rowEnter}
-      layout={reduce ? undefined : move}
-      style={style}>
-      {children}
+      layout={reduce ? undefined : move}>
+      {/* The leaving fade on a view of its own: on the web the entrance animates the outer view's opacity. */}
+      <Animated.View style={style}>{children}</Animated.View>
     </Animated.View>
   );
 }

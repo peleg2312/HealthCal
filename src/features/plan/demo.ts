@@ -8,7 +8,12 @@ import { Platform } from 'react-native';
 
 import { UNKNOWN_PLAN, type PlanOffer, type PlanView } from './view';
 
-export const DEMO_PRESETS = ['off', 'free', 'plus', 'canceling', 'past_due', 'grace', 'waiting', 'late'] as const;
+/**
+ * 'arriving' is 'plus' at the moment the payment arrived: the membership cup pours to the brim once
+ * (./arrival.ts `arrivedAt`). 'long_prices' is 'free' with prices in a currency shown by its code
+ * ("CHF 129.90 a year"), the widest the tiles hold: at 320 px they stack.
+ */
+export const DEMO_PRESETS = ['off', 'free', 'plus', 'canceling', 'past_due', 'grace', 'waiting', 'late', 'arriving', 'long_prices'] as const;
 export type PlanDemo = (typeof DEMO_PRESETS)[number];
 
 const DAY = 86_400_000;
@@ -16,6 +21,12 @@ const DAY = 86_400_000;
 export const DEMO_OFFERS: PlanOffer[] = [
   { id: 'test-plus-month', plan: 'plus', period: 'month', amount: 399, currency: 'USD', taxIncluded: false },
   { id: 'test-plus-year', plan: 'plus', period: 'year', amount: 2999, currency: 'USD', taxIncluded: false },
+];
+
+/** Prices shown by a three-letter code, for the long-price preset. */
+export const DEMO_LONG_OFFERS: PlanOffer[] = [
+  { id: 'test-plus-month-chf', plan: 'plus', period: 'month', amount: 1490, currency: 'CHF', taxIncluded: false },
+  { id: 'test-plus-year-chf', plan: 'plus', period: 'year', amount: 12990, currency: 'CHF', taxIncluded: false },
 ];
 
 const FREE_LIMITS = { estimates: 5, questions: 5, memoryPairs: 3 };
@@ -45,9 +56,12 @@ export function demoView(preset: PlanDemo, now: number): PlanView {
     case 'waiting':
     case 'late':
       return free;
+    case 'long_prices':
+      return { ...free, offers: DEMO_LONG_OFFERS };
     case 'grace':
       return { ...free, limits: { estimates: 40, questions: 30, memoryPairs: 3 }, graceUntil: iso(now + 69 * DAY) };
     case 'plus':
+    case 'arriving':
       return plus;
     case 'canceling':
       return { ...plus, state: 'canceling', cancelAtPeriodEnd: true, startedAt: iso(now - 40 * DAY), periodEnd: iso(now + 30 * DAY), period: 'month' };

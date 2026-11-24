@@ -43,6 +43,8 @@ src/app/sleep.tsx	default	default
 src/app/water.tsx	default	default
 src/app/weight.tsx	default	default
 src/app/welcome.tsx	default	default
+src/components/PourWait.tsx	PourWait	component
+src/components/PourWait.tsx	WaitLines	component
 src/components/QuickLogSheet.tsx	QuickLogSheet	component
 src/components/TabBar.tsx	TabBar	component
 src/components/TabHeader.tsx	HEADER_CUP	const
@@ -70,6 +72,8 @@ src/features/activity/RoutineCards.tsx	useRoutineTemplates	function
 src/features/activity/SpreadHint.tsx	SpreadHint	component
 src/features/activity/TrainingLoadSheet.tsx	TrainingLoadSheet	component
 src/features/activity/WeekCard.tsx	WeekCard	component
+src/features/activity/ZoneScale.tsx	ZoneScale	component
+src/features/activity/ZoneScale.tsx	ZoneTrack	component
 src/features/activity/build.ts	BuildActivityInput	interface
 src/features/activity/build.ts	BuiltActivity	type
 src/features/activity/build.ts	MODERATE_MET	re-export	src/lib/exercise.ts:MODERATE_MET
@@ -118,6 +122,16 @@ src/features/activity/session.ts	deleteActivity	function
 src/features/activity/session.ts	leaveFlow	function
 src/features/activity/session.ts	openSession	function
 src/features/activity/session.ts	saveActivity	function
+src/features/activity/sheetFit.ts	ACTION_ROOM_PX	const
+src/features/activity/sheetFit.ts	CLEAR_BY_PX	const
+src/features/activity/sheetFit.ts	FITS_PX	const
+src/features/activity/sheetFit.ts	GROW_MAX_PX	const
+src/features/activity/sheetFit.ts	SHRINK_MAX_PX	const
+src/features/activity/sheetFit.ts	SLIVER_PX	const
+src/features/activity/sheetFit.ts	SheetMeasure	interface
+src/features/activity/sheetFit.ts	chartChange	function
+src/features/activity/sheetFit.ts	nextChange	function
+src/features/activity/sheetFit.ts	readFit	function
 src/features/activity/spreadHint.ts	SPREAD_HINT_KEY	const
 src/features/activity/spreadHint.ts	SPREAD_HINT_TEXT	const
 src/features/activity/spreadHint.ts	markSpreadHintDone	function
@@ -200,6 +214,7 @@ src/features/ai/demo.ts	availability	function
 src/features/ai/demo.ts	demoResult	function
 src/features/ai/estimate.ts	ADDED_FAT_NAME	const
 src/features/ai/estimate.ts	ADDED_FAT_OPTIONS	const
+src/features/ai/estimate.ts	AI_FOOD_EMOJI	const
 src/features/ai/estimate.ts	AddedFat	type
 src/features/ai/estimate.ts	AiTotals	type
 src/features/ai/estimate.ts	CONFIDENCE_WORDS	const
@@ -245,10 +260,53 @@ src/features/ai/limit.ts	localClock	function
 src/features/ai/limit.ts	moreAfter	function
 src/features/ai/limit.ts	plusLimitOf	function
 src/features/ai/limit.ts	plusLink	function
+src/features/ai/localMatch.ts	emojiLike	function
 src/features/ai/localMatch.ts	foodToItem	function
 src/features/ai/localMatch.ts	itemFromFood	function
 src/features/ai/localMatch.ts	matchFoods	function
 src/features/ai/localMatch.ts	parseAmount	function
+src/features/ai/mark/AiGlyph.tsx	AiGlyph	component
+src/features/ai/mark/AiGlyph.tsx	AiGlyphName	type
+src/features/ai/mark/AiMark.tsx	AI_MARK_BOX	const
+src/features/ai/mark/AiMark.tsx	AiMark	component
+src/features/ai/mark/AiMark.tsx	AiMarkSize	type
+src/features/ai/mark/AiMark.tsx	aiMarkHeadroom	function
+src/features/ai/mark/SourceMark.tsx	SourceMark	component
+src/features/ai/mark/SourceMark.tsx	sourceKeyVariant	function
+src/features/ai/mark/SourceMark.tsx	sourceMarkTop	function
+src/features/ai/mark/fill.ts	INK_LUMINANCE	const
+src/features/ai/mark/fill.ts	MarkFill	interface
+src/features/ai/mark/fill.ts	MarkPalette	interface
+src/features/ai/mark/fill.ts	aiMarkFill	function
+src/features/ai/mark/fill.ts	coachMarkFill	function
+src/features/ai/mark/fill.ts	dropColor	function
+src/features/ai/mark/fill.ts	markColorOf	function
+src/features/ai/mark/index.ts	AI_MARK_BOX	re-export	src/features/ai/mark/AiMark.tsx:AI_MARK_BOX
+src/features/ai/mark/index.ts	AiGlyph	re-export	src/features/ai/mark/AiGlyph.tsx:AiGlyph
+src/features/ai/mark/index.ts	AiGlyphName	re-export	src/features/ai/mark/AiGlyph.tsx:AiGlyphName
+src/features/ai/mark/index.ts	AiMark	re-export	src/features/ai/mark/AiMark.tsx:AiMark
+src/features/ai/mark/index.ts	AiMarkSize	re-export	src/features/ai/mark/AiMark.tsx:AiMarkSize
+src/features/ai/mark/index.ts	MarkFill	re-export	src/features/ai/mark/fill.ts:MarkFill
+src/features/ai/mark/index.ts	MarkPalette	re-export	src/features/ai/mark/fill.ts:MarkPalette
+src/features/ai/mark/index.ts	SourceMark	re-export	src/features/ai/mark/SourceMark.tsx:SourceMark
+src/features/ai/mark/index.ts	WAIT_HIGH	re-export	src/features/ai/mark/loop.ts:WAIT_HIGH
+src/features/ai/mark/index.ts	WAIT_LOOP_MS	re-export	src/features/ai/mark/loop.ts:WAIT_LOOP_MS
+src/features/ai/mark/index.ts	WAIT_LOW	re-export	src/features/ai/mark/loop.ts:WAIT_LOW
+src/features/ai/mark/index.ts	WAIT_REST	re-export	src/features/ai/mark/loop.ts:WAIT_REST
+src/features/ai/mark/index.ts	aiMarkFill	re-export	src/features/ai/mark/fill.ts:aiMarkFill
+src/features/ai/mark/index.ts	aiMarkHeadroom	re-export	src/features/ai/mark/AiMark.tsx:aiMarkHeadroom
+src/features/ai/mark/index.ts	coachMarkFill	re-export	src/features/ai/mark/fill.ts:coachMarkFill
+src/features/ai/mark/index.ts	dropColor	re-export	src/features/ai/mark/fill.ts:dropColor
+src/features/ai/mark/index.ts	sourceKeyVariant	re-export	src/features/ai/mark/SourceMark.tsx:sourceKeyVariant
+src/features/ai/mark/index.ts	sourceMarkTop	re-export	src/features/ai/mark/SourceMark.tsx:sourceMarkTop
+src/features/ai/mark/index.ts	startWaitLoop	re-export	src/features/ai/mark/loop.ts:startWaitLoop
+src/features/ai/mark/index.ts	waitDuration	re-export	src/features/ai/mark/loop.ts:waitDuration
+src/features/ai/mark/loop.ts	WAIT_HIGH	const
+src/features/ai/mark/loop.ts	WAIT_LOOP_MS	const
+src/features/ai/mark/loop.ts	WAIT_LOW	const
+src/features/ai/mark/loop.ts	WAIT_REST	const
+src/features/ai/mark/loop.ts	startWaitLoop	function
+src/features/ai/mark/loop.ts	waitDuration	function
 src/features/ai/weight.ts	GRAMS_PER_OZ	const
 src/features/ai/weight.ts	OZ_MAX	const
 src/features/ai/weight.ts	OZ_MIN	const
@@ -260,11 +318,27 @@ src/features/ai/weight.ts	readWeight	function
 src/features/ai/weight.ts	sentWeight	function
 src/features/ai/weight.ts	weightProblem	function
 src/features/ai/weight.ts	weightSentence	function
+src/features/ai/words.ts	AI_TILE_HINT	const
+src/features/ai/words.ts	ANALYSING	const
+src/features/ai/words.ts	analysingLabel	function
+src/features/ai/words.ts	analysingNote	function
+src/features/ai/words.ts	analysingSteps	function
+src/features/ai/words.ts	slowAfterMs	function
 src/features/auth/GoogleButton.tsx	GOOGLE_BUTTON_HEIGHT	const
 src/features/auth/GoogleButton.tsx	GoogleButton	component
 src/features/auth/GoogleButton.tsx	GoogleMark	component
 src/features/auth/GoogleButton.tsx	OrLine	component
 src/features/auth/GoogleButton.tsx	useGoogleButtonChoice	function
+src/features/auth/demo.ts	AUTH_DEMOS	const
+src/features/auth/demo.ts	AuthDemo	type
+src/features/auth/demo.ts	DEMO_EMAIL	const
+src/features/auth/demo.ts	DEMO_EMAIL_LONG	const
+src/features/auth/demo.ts	authDemo	function
+src/features/auth/demo.ts	authDemoFrom	function
+src/features/auth/demo.ts	demoEmail	function
+src/features/auth/demo.ts	demoEmailFrom	function
+src/features/auth/demo.ts	syncDemo	function
+src/features/auth/demo.ts	syncDemoFrom	function
 src/features/auth/google.ts	GoogleOutcome	type
 src/features/auth/google.ts	clearGoogleProblem	function
 src/features/auth/google.ts	finishGoogleCode	function
@@ -288,7 +362,24 @@ src/features/auth/googleSetting.ts	showGoogle	function
 src/features/auth/googleSetting.ts	tapVerdict	function
 src/features/auth/googleSetting.ts	useGoogleChoice	function
 src/features/auth/googleSetting.ts	useGoogleSignInOn	function
+src/features/auth/lines.ts	foldPush	function
+src/features/auth/lines.ts	lastWordsTogether	function
+src/features/auth/lines.ts	nameTogether	function
+src/features/auth/syncRow.ts	SYNC_DEMOS	const
+src/features/auth/syncRow.ts	SYNC_DEMO_STATES	const
+src/features/auth/syncRow.ts	SyncDemo	type
+src/features/auth/syncRow.ts	SyncDemoState	interface
+src/features/auth/syncRow.ts	SyncMark	type
+src/features/auth/syncRow.ts	SyncRowState	interface
+src/features/auth/syncRow.ts	SyncStatus	type
+src/features/auth/syncRow.ts	syncMark	function
+src/features/auth/syncRow.ts	syncPendingLine	function
+src/features/auth/syncRow.ts	syncStatusLine	function
 src/features/auth/useGoogleSignIn.ts	useGoogleSignIn	function
+src/features/auth/words.ts	ACCOUNT_UPLOAD_LINE	const
+src/features/auth/words.ts	AUTH_PRIVACY_LABEL	const
+src/features/auth/words.ts	AUTH_TERMS_LABEL	const
+src/features/auth/words.ts	AUTH_TERMS_LINE	const
 src/features/auth/words.ts	GOOGLE_INBOX_HINT	const
 src/features/auth/words.ts	GOOGLE_LABEL	const
 src/features/auth/words.ts	GOOGLE_LINKED_TOAST	const
@@ -296,6 +387,12 @@ src/features/auth/words.ts	GOOGLE_OFF_NOW	const
 src/features/auth/words.ts	GOOGLE_WAITING	const
 src/features/auth/words.ts	GoogleProblem	type
 src/features/auth/words.ts	GoogleReturn	type
+src/features/auth/words.ts	RESET_CHECKING	const
+src/features/auth/words.ts	RESTORING	const
+src/features/auth/words.ts	SIGN_IN	const
+src/features/auth/words.ts	WELCOME_RESTORE	const
+src/features/auth/words.ts	WELCOME_SIGN_IN	const
+src/features/auth/words.ts	WELCOME_SIGN_IN_LABEL	const
 src/features/auth/words.ts	googleProblemWords	function
 src/features/auth/words.ts	googleReturnFrom	function
 src/features/auth/words.ts	inboxGoogleHint	function
@@ -305,6 +402,8 @@ src/features/auth/words.ts	paramsOfUrl	function
 src/features/auth/words.ts	problemFromError	function
 src/features/auth/words.ts	problemFromReturnError	function
 src/features/auth/words.ts	problemIsToast	const
+src/features/auth/words.ts	signInMethodLine	function
+src/features/auth/words.ts	signUpDataLine	function
 src/features/auth/words.ts	tapOutcomeWords	function
 src/features/coach/AnswerText.tsx	AnswerText	component
 src/features/coach/CoachBubble.tsx	CoachBubble	component
@@ -361,9 +460,7 @@ src/features/coach/history.ts	useCoachHistory	const
 src/features/coach/history.ts	writeHistory	function
 src/features/coach/local.ts	ideasAnswer	function
 src/features/coach/local.ts	trainingAnswer	function
-src/features/coach/markFill.ts	MarkFill	interface
-src/features/coach/markFill.ts	MarkPalette	interface
-src/features/coach/markFill.ts	coachMarkFill	function
+src/features/coach/markFill.ts	*	re-export-all	src/features/ai/mark/fill.ts
 src/features/coach/messages.ts	aiAnswerMessage	function
 src/features/coach/messages.ts	localAnswerMessage	function
 src/features/coach/messages.ts	noticeMessage	function
@@ -445,14 +542,14 @@ src/features/coach/starters.ts	helloLine	function
 src/features/coach/starters.ts	messageDay	function
 src/features/coach/starters.ts	shareLine	function
 src/features/coach/starters.ts	weekNumbers	function
-src/features/coach/waiting.ts	WAIT_HIGH	const
+src/features/coach/waiting.ts	WAIT_HIGH	re-export	src/features/ai/mark/loop.ts:WAIT_HIGH
 src/features/coach/waiting.ts	WAIT_LONG_AFTER_MS	const
-src/features/coach/waiting.ts	WAIT_LOOP_MS	const
-src/features/coach/waiting.ts	WAIT_LOW	const
-src/features/coach/waiting.ts	WAIT_REST	const
+src/features/coach/waiting.ts	WAIT_LOOP_MS	re-export	src/features/ai/mark/loop.ts:WAIT_LOOP_MS
+src/features/coach/waiting.ts	WAIT_LOW	re-export	src/features/ai/mark/loop.ts:WAIT_LOW
+src/features/coach/waiting.ts	WAIT_REST	re-export	src/features/ai/mark/loop.ts:WAIT_REST
 src/features/coach/waiting.ts	WAIT_SHOW_AFTER_MS	const
-src/features/coach/waiting.ts	startWaitLoop	function
-src/features/coach/waiting.ts	waitDuration	function
+src/features/coach/waiting.ts	startWaitLoop	re-export	src/features/ai/mark/loop.ts:startWaitLoop
+src/features/coach/waiting.ts	waitDuration	re-export	src/features/ai/mark/loop.ts:waitDuration
 src/features/coach/waiting.ts	waitWords	function
 src/features/coach/words.ts	ABOUT_DONE	const
 src/features/coach/words.ts	ABOUT_OPEN_LABEL	const
@@ -743,7 +840,6 @@ src/features/food/components.tsx	RowAmount	interface
 src/features/food/components.tsx	RowEmoji	component
 src/features/food/components.tsx	SourceBadge	component
 src/features/food/components.tsx	SourceTag	component
-src/features/food/components.tsx	sourceKeyVariant	function
 src/features/food/draft.ts	setFoodDraft	function
 src/features/food/draft.ts	useFoodDraft	const
 src/features/food/drinkDefault.ts	drinkByDefault	function
@@ -1536,10 +1632,14 @@ src/features/legal/content.ts	LEGAL_DOCUMENTS	const
 src/features/legal/content.ts	LEGAL_UPDATED	const
 src/features/legal/content.ts	LegalDocument	interface
 src/features/legal/content.ts	LegalSection	interface
+src/features/legal/content.ts	LegalSummaryItem	interface
 src/features/legal/content.ts	PRIVACY	const
 src/features/legal/content.ts	TERMS	const
 src/features/legal/content.ts	contactLine	function
+src/features/legal/content.ts	jumpLabel	const
 src/features/legal/content.ts	updatedLine	function
+src/features/legal/jumpLines.ts	jumpLines	function
+src/features/legal/jumpLines.ts	jumpWidth	const
 src/features/morning/MoveRow.tsx	MoveRow	component
 src/features/morning/PlanCard.tsx	PlanCard	component
 src/features/morning/QuoteBlock.tsx	QuoteBlock	component
@@ -1708,6 +1808,7 @@ src/features/morning/weekLabel.ts	weekLabel	function
 src/features/onboarding/PlanReveal.tsx	PlanReveal	component
 src/features/onboarding/ProjectionChart.tsx	ProjectionChart	component
 src/features/onboarding/SignInGate.tsx	RestoreFailed	component
+src/features/onboarding/SignInGate.tsx	Restoring	component
 src/features/onboarding/SignInGate.tsx	SignInGate	component
 src/features/onboarding/ThemeStep.tsx	SETUP_THEME_CHOICES	const
 src/features/onboarding/ThemeStep.tsx	ThemeStep	component
@@ -1794,7 +1895,18 @@ src/features/onboarding/steps.tsx	RoutineStep	component
 src/features/onboarding/steps.tsx	SexStep	component
 src/features/onboarding/steps.tsx	StepProps	interface
 src/features/onboarding/steps.tsx	TargetStep	component
+src/features/plan/AllowanceTable.tsx	AllowanceTable	component
+src/features/plan/AllowanceUsed.tsx	AllowanceUsed	component
+src/features/plan/MembershipCard.tsx	MembershipCard	component
+src/features/plan/MembershipCard.tsx	useArrival	function
+src/features/plan/PeriodTiles.tsx	PeriodTiles	component
+src/features/plan/PlanCup.tsx	PlanCup	component
+src/features/plan/PlanCup.tsx	PlanCupSize	type
+src/features/plan/PlanCup.tsx	fullLevel	function
+src/features/plan/PlanCup.tsx	useAllowanceFill	function
+src/features/plan/PlanGlyph.tsx	PlanGlyph	component
 src/features/plan/PlanRow.tsx	PlanRow	component
+src/features/plan/StaysFree.tsx	StaysFree	component
 src/features/plan/account.ts	DeleteOutcome	type
 src/features/plan/account.ts	deleteAccountWithPlan	function
 src/features/plan/account.ts	sendAddPassword	function
@@ -1803,6 +1915,10 @@ src/features/plan/accountRules.ts	decideAfterCancel	function
 src/features/plan/accountRules.ts	isPlanActiveRefusal	function
 src/features/plan/accountRules.ts	needsCancel	function
 src/features/plan/accountRules.ts	needsPassword	function
+src/features/plan/allowance.ts	UsedAllowance	interface
+src/features/plan/allowance.ts	shareOfPlus	function
+src/features/plan/allowance.ts	usedAllowance	function
+src/features/plan/allowance.ts	usedUpNow	function
 src/features/plan/api.ts	BILLING_TIMEOUT_MS	const
 src/features/plan/api.ts	BillingAction	type
 src/features/plan/api.ts	BillingAnswer	type
@@ -1811,6 +1927,14 @@ src/features/plan/api.ts	BillingConnection	interface
 src/features/plan/api.ts	billingCall	function
 src/features/plan/api.ts	currentUserId	function
 src/features/plan/api.ts	postBilling	function
+src/features/plan/arrival.ts	ArrivalState	interface
+src/features/plan/arrival.ts	CheckoutPhase	type
+src/features/plan/arrival.ts	arrivedWith	function
+src/features/plan/arrival.ts	endArrival	function
+src/features/plan/arrival.ts	stampArrival	function
+src/features/plan/arrival.ts	takeArrival	function
+src/features/plan/arrival.ts	useArrivalStore	const
+src/features/plan/arrival.ts	watchArrival	function
 src/features/plan/cache.ts	PLAN_AFTER_LIMIT_MS	const
 src/features/plan/cache.ts	PLAN_CACHE_KEY	const
 src/features/plan/cache.ts	PLAN_RETURN_MS	const
@@ -1831,7 +1955,7 @@ src/features/plan/channel.ts	channelAllowsCheckout	function
 src/features/plan/channel.ts	checkoutBlockedHere	function
 src/features/plan/channel.ts	checkoutShown	function
 src/features/plan/checkout.ts	ActionResult	type
-src/features/plan/checkout.ts	CheckoutPhase	type
+src/features/plan/checkout.ts	CheckoutPhase	re-export	src/features/plan/arrival.ts:CheckoutPhase
 src/features/plan/checkout.ts	NATIVE_PORTAL_RETURN	const
 src/features/plan/checkout.ts	NATIVE_RETURN	const
 src/features/plan/checkout.ts	checkoutReturnUrl	function
@@ -1840,6 +1964,7 @@ src/features/plan/checkout.ts	startCheckout	function
 src/features/plan/checkout.ts	useCheckout	const
 src/features/plan/checkout.ts	waitAfterCheckout	function
 src/features/plan/checkout.ts	watchLateCheckout	function
+src/features/plan/demo.ts	DEMO_LONG_OFFERS	const
 src/features/plan/demo.ts	DEMO_OFFERS	const
 src/features/plan/demo.ts	DEMO_PRESETS	const
 src/features/plan/demo.ts	PlanDemo	type
@@ -1873,6 +1998,7 @@ src/features/plan/index.ts	refreshPlanAfterLimit	re-export	src/features/plan/cac
 src/features/plan/index.ts	startPlan	re-export	src/features/plan/start.ts:startPlan
 src/features/plan/index.ts	usePlan	re-export	src/features/plan/cache.ts:usePlan
 src/features/plan/index.ts	viewFromStatus	re-export	src/features/plan/view.ts:viewFromStatus
+src/features/plan/saving.ts	yearSaving	function
 src/features/plan/start.ts	startPlan	function
 src/features/plan/view.ts	EVERYDAY_LIMITS	const
 src/features/plan/view.ts	PLAN_DEFAULTS	const
@@ -1893,48 +2019,73 @@ src/features/plan/view.ts	offerFor	function
 src/features/plan/view.ts	paymentLate	function
 src/features/plan/view.ts	planVisible	function
 src/features/plan/view.ts	viewFromStatus	function
+src/features/plan/wait.ts	ARRIVAL_WINDOW_MS	const
 src/features/plan/wait.ts	WAIT_EVERY_MS	const
 src/features/plan/wait.ts	WAIT_FOR_MS	const
 src/features/plan/wait.ts	WaitDecision	type
 src/features/plan/wait.ts	WaitDeps	interface
 src/features/plan/wait.ts	WaitOutcome	type
+src/features/plan/wait.ts	arrivalFresh	function
 src/features/plan/wait.ts	waitDecision	function
 src/features/plan/wait.ts	waitForPlus	function
 src/features/plan/words.ts	ADD_PASSWORD_HINT	const
 src/features/plan/words.ts	ADD_PASSWORD_LABEL	const
+src/features/plan/words.ts	BOTH_LEAD	const
 src/features/plan/words.ts	CANCEL_LABEL	const
+src/features/plan/words.ts	CANCEL_SUB	const
 src/features/plan/words.ts	CHECKOUT_CLOSED	const
 src/features/plan/words.ts	CardRow	interface
 src/features/plan/words.ts	DELETE_ANYWAY_LABEL	const
 src/features/plan/words.ts	DELETE_PLAN_LINE	const
+src/features/plan/words.ts	EACH_DAY_TITLE	const
 src/features/plan/words.ts	FREE_CARD_TITLE	const
 src/features/plan/words.ts	LATE_LINE	const
+src/features/plan/words.ts	LATE_MORE	const
+src/features/plan/words.ts	LATE_TITLE	const
 src/features/plan/words.ts	LOADING_LINE	const
 src/features/plan/words.ts	MANAGE_LABEL	const
 src/features/plan/words.ts	NOTHING_TO_CHOOSE	const
+src/features/plan/words.ts	OFF_TITLE	const
+src/features/plan/words.ts	PAST_DUE_HEAD	const
 src/features/plan/words.ts	PERIOD_LABELS	const
 src/features/plan/words.ts	PLAN_ACTIVE_LINE	const
 src/features/plan/words.ts	PLAN_INTRO	const
+src/features/plan/words.ts	PLAN_INTRO_LEAD	const
+src/features/plan/words.ts	PLAN_INTRO_MORE	const
 src/features/plan/words.ts	PLAN_TITLE	const
 src/features/plan/words.ts	PLUS_CARD_TITLE	const
 src/features/plan/words.ts	PRIVACY_LABEL	const
 src/features/plan/words.ts	RELEASED_LINE	const
 src/features/plan/words.ts	RefusalContext	type
 src/features/plan/words.ts	SELLER_LINE	const
+src/features/plan/words.ts	SIGNED_OUT_BODY	const
 src/features/plan/words.ts	SIGNED_OUT_LINE	const
+src/features/plan/words.ts	SIGNED_OUT_TITLE	const
+src/features/plan/words.ts	SIGN_IN_ACTION	const
+src/features/plan/words.ts	STAYS_FREE_AFTER_END	const
+src/features/plan/words.ts	STAYS_FREE_IF_CANCEL	const
+src/features/plan/words.ts	STAYS_FREE_NOTE	const
+src/features/plan/words.ts	STAYS_FREE_ROWS	const
+src/features/plan/words.ts	STAYS_FREE_TITLE	const
 src/features/plan/words.ts	TERMS_LABEL	const
 src/features/plan/words.ts	WAITING_LINE	const
 src/features/plan/words.ts	WITHDRAW_LABEL	const
+src/features/plan/words.ts	YOUR_PLAN_TAG	const
 src/features/plan/words.ts	addPasswordSent	function
+src/features/plan/words.ts	amountText	function
 src/features/plan/words.ts	cardLabel	function
 src/features/plan/words.ts	cardRows	function
 src/features/plan/words.ts	deleteBlockedLine	function
+src/features/plan/words.ts	eachDayUntil	function
 src/features/plan/words.ts	formatMoney	function
+src/features/plan/words.ts	freeAiLine	function
 src/features/plan/words.ts	fullDate	function
 src/features/plan/words.ts	graceLine	function
+src/features/plan/words.ts	memberSince	function
 src/features/plan/words.ts	monthDay	function
 src/features/plan/words.ts	monthlyEquivalent	function
 src/features/plan/words.ts	notBuyableHere	function
+src/features/plan/words.ts	pastDueDetail	function
 src/features/plan/words.ts	periodLabel	function
 src/features/plan/words.ts	planRowLine	function
 src/features/plan/words.ts	planShortLine	function
@@ -1942,11 +2093,21 @@ src/features/plan/words.ts	plusOnToast	function
 src/features/plan/words.ts	priceLine	function
 src/features/plan/words.ts	refusalLine	function
 src/features/plan/words.ts	renewalLine	function
+src/features/plan/words.ts	rowUnit	function
+src/features/plan/words.ts	savingAndTax	function
 src/features/plan/words.ts	sourceLine	function
 src/features/plan/words.ts	subscribeLabel	function
+src/features/plan/words.ts	subscribeLabelRoom	function
 src/features/plan/words.ts	subscriberLine	function
 src/features/plan/words.ts	taxNote	function
+src/features/plan/words.ts	tieDates	function
+src/features/plan/words.ts	tieEnd	function
+src/features/plan/words.ts	tieMoney	function
+src/features/plan/words.ts	tileLabel	function
+src/features/plan/words.ts	unitText	function
 src/features/plan/words.ts	withdrawLine	function
+src/features/plan/words.ts	withdrawSub	function
+src/features/plan/words.ts	yearSavingLine	function
 src/features/progress/CaloriesADay.tsx	CaloriesADay	component
 src/features/progress/CaloriesCard.tsx	CaloriesCard	component
 src/features/progress/ConsistencyCard.tsx	ConsistencyCard	component
@@ -2606,6 +2767,7 @@ src/lib/trainingLoad.ts	HONEST_COMPARE	const
 src/lib/trainingLoad.ts	HONEST_COUNTING	const
 src/lib/trainingLoad.ts	HONEST_PHONE	const
 src/lib/trainingLoad.ts	HONEST_WHO	const
+src/lib/trainingLoad.ts	HOW_COUNTED	const
 src/lib/trainingLoad.ts	LIGHTER_BELOW	const
 src/lib/trainingLoad.ts	LIGHTER_NOTE	const
 src/lib/trainingLoad.ts	LOAD_TITLES	const
@@ -2616,6 +2778,7 @@ src/lib/trainingLoad.ts	LoadSession	type
 src/lib/trainingLoad.ts	LoadStateKey	type
 src/lib/trainingLoad.ts	MIN_RECENT_AVERAGE	const
 src/lib/trainingLoad.ts	NEEDS_HISTORY	const
+src/lib/trainingLoad.ts	OVERVIEW_ABOUT	const
 src/lib/trainingLoad.ts	POSITIONS	const
 src/lib/trainingLoad.ts	POSITION_OF	const
 src/lib/trainingLoad.ts	POSITION_WORDS	const
@@ -2627,6 +2790,7 @@ src/lib/trainingLoad.ts	STRENGTH_IDS	const
 src/lib/trainingLoad.ts	TrainingOverview	interface
 src/lib/trainingLoad.ts	USUAL_UP_TO	const
 src/lib/trainingLoad.ts	overviewAnswer	function
+src/lib/trainingLoad.ts	positionLabel	function
 src/lib/trainingLoad.ts	strengthWho	function
 src/lib/trainingLoad.ts	trainingOverview	function
 src/lib/trend.ts	AdaptiveInput	interface

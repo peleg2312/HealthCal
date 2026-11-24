@@ -75,6 +75,12 @@ export const POSITION_OF: Record<LoadStateKey, LoadPosition> = {
 
 export const POSITIONS: readonly LoadPosition[] = ['lighter', 'usual', 'more'];
 export const POSITION_WORDS: Record<LoadPosition, string> = { lighter: 'Lighter', usual: 'Usual', more: 'More' };
+/** How the three-position marks (the card's small cups, the sheet's scale) are read aloud: "Usual, of lighter, usual and more". */
+export function positionLabel(position: LoadPosition): string {
+  return `${POSITION_WORDS[position]}, of lighter, usual and more`;
+}
+/** What Train's line opens, said after the line itself (the line is one button). */
+export const OVERVIEW_ABOUT = 'About your last 7 days of training';
 
 export const NEEDS_HISTORY = 'Your usual needs 3 weeks of workouts.';
 export const LIGHTER_NOTE = 'A lighter week is part of training too.';
@@ -88,6 +94,8 @@ export const HONEST_WHO = "WHO's guideline for adults is 150 to 300 minutes a we
 export const HONEST_COUNTING = 'Hard minutes (6 MET or more) count double; light sessions (under 3 MET) are not counted.';
 /** Under the sheet's chart of the five 7-day blocks. */
 export const CHART_CAPTION = 'Each bar is 7 days, weeks back. The band is 150 to 300.';
+/** The heading over the honest sentences, which close the sheet under its one action. */
+export const HOW_COUNTED = 'How this is counted';
 export function strengthWho(days: number): string {
   return `Strength on ${plural(days, 'day')}. WHO counts strength days apart from the 150 to 300 aerobic minutes.`;
 }

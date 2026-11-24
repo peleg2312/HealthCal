@@ -1,20 +1,37 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Eye, EyeOff, KeyRound, Lock, MailCheck, Smartphone, TriangleAlert } from 'lucide-react-native';
+import { Eye, EyeOff, KeyRound, MailCheck, Smartphone, TriangleAlert } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, View, type TextInputInstance } from 'react-native';
+import { Platform, View, type TextInputInstance } from 'react-native';
 
+import { WaitLines } from '@/components/PourWait';
+import { authDemo, demoEmail, type AuthDemo } from '@/features/auth/demo';
 import { clearGoogleProblem, finishGoogleCode, markReturnScreen, settleWebReturn, useGoogleFlow } from '@/features/auth/google';
 import { GoogleButton, OrLine } from '@/features/auth/GoogleButton';
+import { foldPush, lastWordsTogether, nameTogether } from '@/features/auth/lines';
 import { useGoogleSignIn } from '@/features/auth/useGoogleSignIn';
-import { GOOGLE_WAITING, inboxGoogleHint, googleProblemWords, googleReturnFrom, paramsOfUrl, type GoogleProblem, type GoogleReturn as GoogleArrival } from '@/features/auth/words';
-import { FadeIn } from '@/features/onboarding/components';
-import { SignInGate } from '@/features/onboarding/SignInGate';
+import {
+  AUTH_PRIVACY_LABEL,
+  AUTH_TERMS_LABEL,
+  AUTH_TERMS_LINE,
+  GOOGLE_LABEL,
+  GOOGLE_WAITING,
+  inboxGoogleHint,
+  googleProblemWords,
+  googleReturnFrom,
+  paramsOfUrl,
+  RESET_CHECKING,
+  signUpDataLine,
+  type GoogleProblem,
+  type GoogleReturn as GoogleArrival,
+} from '@/features/auth/words';
+import { FadeIn, Note } from '@/features/onboarding/components';
+import { Restoring, SignInGate } from '@/features/onboarding/SignInGate';
 import { breakableEmail } from '@/features/settings/format';
 import { sendPasswordReset, signIn, signUp, updatePassword, useAuth, validateEmail, validatePassword } from '@/services/auth';
 import { isBackendConfigured } from '@/services/supabase';
 import { useStore } from '@/store';
 import { useTheme } from '@/theme';
-import { Button, goBack, haptic, Header, IconButton, Screen, Text, TextField, toast } from '@/ui';
+import { Avatar, Button, goBack, haptic, Header, IconButton, PressableScale, Screen, Text, TextField, toast } from '@/ui';
 
 type Mode = 'signin' | 'signup' | 'forgot';
 
@@ -44,12 +61,24 @@ export default function Auth() {
   const initial: Mode = params.mode === 'signup' ? 'signup' : params.mode === 'forgot' ? 'forgot' : 'signin';
   // Someone already signed in has nothing to do here.
   const [arrivedSignedIn, setArrivedSignedIn] = useState(() => !!useAuth.getState().session && params.mode !== 'reset');
+  // A test build's picture of one view, with no backend (src/features/auth/demo.ts); never in a release.
+  const demo = authDemo();
+  if (demo) return <DemoView demo={demo} />;
   if (!isBackendConfigured) return <NotConfigured />;
   if (params.mode === 'reset') return <ResetPassword />;
   // Back from Google: the client may have finished the sign-in before this screen first drew, so this comes before `arrivedSignedIn`.
   if (params.mode === 'google') return <GoogleReturn params={params} />;
   if (arrivedSignedIn) return <SignInGate waitFirst={useAuth.getState().restoring} onCancelled={() => setArrivedSignedIn(false)} />;
   return <AuthForm initial={initial} fromEmail={initial === 'signin' ? fromEmail : null} />;
+}
+
+/** One view of this screen as a picture, for a test build with no backend behind it. */
+function DemoView({ demo }: { demo: AuthDemo }) {
+  if (demo === 'waiting') return <GoogleWaiting />;
+  if (demo === 'checking') return <ResetChecking />;
+  if (demo === 'restoring') return <Restoring />;
+  if (demo === 'inbox') return <Inbox confirm email={demoEmail()} googleHint={inboxGoogleHint(true)} onBack={() => goBack('/welcome')} />;
+  return <AuthForm initial={demo === 'signup' ? 'signup' : 'signin'} fromEmail={null} googleError={demo === 'declined' ? googleProblemWords('declined') : null} />;
 }
 
 function AuthForm({ initial, fromEmail, googleError = null }: { initial: Mode; fromEmail: FromEmail; googleError?: string | null }) {
@@ -64,6 +93,12 @@ function AuthForm({ initial, fromEmail, googleError = null }: { initial: Mode; f
   const [signedIn, setSignedIn] = useState(false);
   const [done, setDone] = useState<null | 'confirm' | 'reset'>(null);
   const passwordRef = useRef<TextInputInstance>(null);
+  // Where the terms block sits and how tall the first view is, from layout: the block is never cut by the bottom of the first view (foldPush).
+  const [fold, setFold] = useState(0);
+  const [termsTop, setTermsTop] = useState(0);
+  const [termsHeight, setTermsHeight] = useState(0);
+  // The links' touch area reaches LINK_REACH px under their words, so the block counts as that much taller: a link in the first view is 44 px to touch.
+  const termsPush = foldPush(termsTop, termsHeight + LINK_REACH, fold);
   // On a phone the Google flow ends here with a session; on the web the page leaves for Google and comes back to /auth?mode=google.
   const google = useGoogleSignIn({ onSignedIn: () => setSignedIn(true), initialError: googleError });
   // Opened from the confirmation email in the browser that asked for it: the backend client signs in by itself.
@@ -137,54 +172,11 @@ function AuthForm({ initial, fromEmail, googleError = null }: { initial: Mode; f
   }
 
   if (done) {
-    const confirm = done === 'confirm';
-    const googleHint = inboxGoogleHint(google.shown);
-    return (
-      <Screen
-        testID="auth-done"
-        header={
-          <Header
-            title="Check your inbox"
-            subtitle="Account and sync"
-            onBack={() => {
-              setDone(null);
-              switchMode('signin');
-            }}
-          />
-        }
-        contentStyle={{ flexGrow: 1, justifyContent: 'center', gap: spacing.xxl }}
-        footer={
-          <Button
-            title={confirm ? 'I confirmed, sign in' : 'Back to sign in'}
-            testID="auth-done-continue"
-            onPress={() => {
-              setDone(null);
-              switchMode('signin');
-            }}
-          />
-        }>
-        <FadeIn style={{ alignItems: 'center', gap: spacing.lg }}>
-          <View style={{ width: 72, height: 72, alignItems: 'center', justifyContent: 'center' }}>
-            <MailCheck size={40} color={colors.text} strokeWidth={1.6} />
-          </View>
-          {/* Two lines: where the link went, and what to do with it. */}
-          <View style={{ gap: spacing.xs }}>
-            <Text variant="bodyStrong" align="center" testID="auth-done-sent">
-              {confirm ? `We sent a link to ${breakableEmail(email.trim())}.` : `If ${breakableEmail(email.trim())} has an account, a link is on its way.`}
-            </Text>
-            <Text variant="body" color="textSecondary" align="center" testID="auth-done-next">
-              {confirm ? 'Open it to confirm your email, then sign in here.' : 'Open it on this device to choose a new password.'}
-            </Text>
-          </View>
-          {/* An address used only with Google gets no mail (a sign-up link or a reset link): the same line for everyone, so it says nothing about the address. */}
-          {googleHint ? (
-            <Text variant="caption" color="textSecondary" align="center" testID="auth-done-google">
-              {googleHint}
-            </Text>
-          ) : null}
-        </FadeIn>
-      </Screen>
-    );
+    const back = () => {
+      setDone(null);
+      switchMode('signin');
+    };
+    return <Inbox confirm={done === 'confirm'} email={email} googleHint={inboxGoogleHint(google.shown)} onBack={back} />;
   }
 
   return (
@@ -192,6 +184,7 @@ function AuthForm({ initial, fromEmail, googleError = null }: { initial: Mode; f
       testID="auth-screen"
       header={<Header title={copy.title} subtitle="Account and sync" onBack={() => (mode === 'forgot' && initial !== 'forgot' ? switchMode('signin') : goBack('/welcome'))} />}
       contentStyle={{ gap: spacing.xl }}
+      scrollProps={{ onLayout: (e) => setFold(Math.round(e.nativeEvent.layout.height)) }}
       footer={<Button title={copy.submit} testID="auth-submit" onPress={submit} loading={busy} />}>
       {/* The title is the header's; what the form is for is the line under it here. */}
       <FadeIn key={mode}>
@@ -210,7 +203,14 @@ function AuthForm({ initial, fromEmail, googleError = null }: { initial: Mode; f
         <View style={{ gap: spacing.lg }}>
           <View style={{ gap: spacing.sm }}>
             <GoogleButton testID="auth-google" onPress={google.press} busy={google.busy} disabled={busy} />
-            <FormError message={google.error} testID="auth-google-error" />
+            {/* Not a field error and nothing went wrong: the same neutral note welcome uses, never red, on the card surface in every look. */}
+            {google.error ? (
+              <Note tone="warning" surface="card" testID="auth-google-error" icon={<TriangleAlert size={18} color={colors.warningInk} />}>
+                <Text variant="caption" color="textSecondary" accessibilityLiveRegion="polite">
+                  {google.error}
+                </Text>
+              </Note>
+            ) : null}
           </View>
           <OrLine testID="auth-or" />
         </View>
@@ -304,18 +304,93 @@ function AuthForm({ initial, fromEmail, googleError = null }: { initial: Mode; f
             />
           ) : null}
 
+          {/*
+            The end of the form is one quiet, centred block of captions: what happens to the data (sign-up),
+            what an account agrees to, and the two pages as underlined ink links. The only bold link on the
+            form is the one above, which switches form.
+          */}
           {mode === 'signup' ? (
-            <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
-              <Lock size={16} color={colors.textTertiary} />
-              <Text variant="caption" color="textTertiary" style={{ flex: 1 }}>
-                {useStore.getState().profile?.onboardedAt
-                  ? 'Everything you have logged on this device is uploaded to your new account.'
-                  : 'Your data is private to your account. You can export or delete it at any time.'}
-              </Text>
+            <Text variant="caption" color="textSecondary" align="center" testID="auth-data-line">
+              {signUpDataLine(!!useStore.getState().profile?.onboardedAt)}
+            </Text>
+          ) : null}
+
+          {mode !== 'forgot' ? (
+            // Last on the page. The sentence and its links are seen together or not at all: when the bottom of
+            // the first view would cut the block, it starts just under it (the padding; the block's own place
+            // and height are measured without it, so the rule cannot chase itself).
+            <View onLayout={(e) => setTermsTop(Math.round(e.nativeEvent.layout.y))} style={{ paddingTop: termsPush }}>
+              <View onLayout={(e) => setTermsHeight(Math.round(e.nativeEvent.layout.height))} style={{ alignItems: 'center', gap: spacing.sm }}>
+                <Text variant="caption" color="textSecondary" align="center" testID="auth-terms-line">
+                  {AUTH_TERMS_LINE}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                  <LegalLink label={AUTH_TERMS_LABEL} to="/legal/terms" testID="auth-terms" />
+                  <Text variant="caption" color="textSecondary" style={{ marginHorizontal: spacing.md }} accessibilityElementsHidden importantForAccessibility="no">
+                    ·
+                  </Text>
+                  <LegalLink label={AUTH_PRIVACY_LABEL} to="/legal/privacy" testID="auth-privacy" />
+                </View>
+              </View>
             </View>
           ) : null}
         </>
       ) : null}
+    </Screen>
+  );
+}
+
+/** How far a legal link's touch area reaches above and below its 17 px line of caption: 14 + 17 + 14 is the 44 px target. */
+const LINK_REACH = 14;
+
+/**
+ * One of the two pages under the terms line: an underlined ink link in caption weight, like "Forgot
+ * password?". Its touch area reaches LINK_REACH px past its words above and below without moving
+ * anything (the kit turns `hitSlop` into a real area on the web too).
+ */
+function LegalLink({ label, to, testID }: { label: string; to: '/legal/terms' | '/legal/privacy'; testID: string }) {
+  return (
+    <PressableScale testID={testID} accessibilityRole="link" accessibilityLabel={label} hitSlop={{ top: LINK_REACH, bottom: LINK_REACH, left: 6, right: 6 }} onPress={() => router.push(to as never)}>
+      <Text variant="caption" color="text" style={{ textDecorationLine: 'underline' }}>
+        {label}
+      </Text>
+    </PressableScale>
+  );
+}
+
+/**
+ * "Check your inbox", after a sign-up that needs its address confirmed (`confirm`) and after
+ * "Forgot password?": a cup tile, where the link went, and what to do with it.
+ */
+function Inbox({ confirm, email, googleHint, onBack }: { confirm: boolean; email: string; googleHint: string | null; onBack: () => void }) {
+  const { colors, spacing } = useTheme();
+  return (
+    <Screen
+      testID="auth-done"
+      header={<Header title="Check your inbox" subtitle="Account and sync" onBack={onBack} />}
+      contentStyle={{ flexGrow: 1, justifyContent: 'center', gap: spacing.xxl }}
+      footer={<Button title={confirm ? 'I confirmed, sign in' : 'Back to sign in'} testID="auth-done-continue" onPress={onBack} />}>
+      <FadeIn style={{ alignItems: 'center', gap: spacing.lg }}>
+        <Avatar size={72}>
+          <MailCheck size={30} color={colors.text} strokeWidth={1.9} />
+        </Avatar>
+        {/* Two lines: where the link went, and what to do with it. */}
+        <View style={{ gap: spacing.xs }}>
+          <Text variant="bodyStrong" align="center" testID="auth-done-sent">
+            {confirm ? `We sent a link to ${breakableEmail(email.trim())}.` : `If ${breakableEmail(email.trim())} has an account, a link is on its way.`}
+          </Text>
+          <Text variant="body" color="textSecondary" align="center" testID="auth-done-next">
+            {lastWordsTogether(confirm ? 'Open it to confirm your email, then sign in here.' : 'Open it on this device to choose a new password.')}
+          </Text>
+        </View>
+        {/* An address used only with Google gets no mail (a sign-up link or a reset link): the same line for everyone, so it says nothing about the address. */}
+        {googleHint ? (
+          // The button's name stays on one line, so the hint never ends on "Google." alone.
+          <Text variant="caption" color="textSecondary" align="center" testID="auth-done-google" accessibilityLabel={googleHint}>
+            {nameTogether(googleHint, GOOGLE_LABEL)}
+          </Text>
+        ) : null}
+      </FadeIn>
     </Screen>
   );
 }
@@ -345,7 +420,6 @@ function FormError({ message, testID }: { message: string | null; testID: string
  * and this screen may all deliver the same link).
  */
 function GoogleReturn({ params }: { params: Record<string, string | string[] | undefined> }) {
-  const { colors, spacing } = useTheme();
   // Read once on arrival, before the client tidies the address (an error may sit in the fragment).
   const [arrival] = useState<GoogleArrival>(() => {
     const hash = Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.location?.hash === 'string' ? paramsOfUrl(window.location.hash) : {};
@@ -380,15 +454,29 @@ function GoogleReturn({ params }: { params: Record<string, string | string[] | u
   if (failedWith) return <AuthForm initial="signin" fromEmail={null} googleError={failedWith === 'cancelled' ? null : googleProblemWords(failedWith)} />;
   if (session) return <SignInGate onCancelled={() => setFormAgain(true)} />;
   if (arrival.kind === 'none' && status !== 'working') return <AuthForm initial="signin" fromEmail={null} />;
+  return <GoogleWaiting />;
+}
+
+/** While a Google return becomes a session: the waiting cup over what is happening and what comes of it (the pattern of every wait). */
+function GoogleWaiting() {
   return (
     <Screen
       testID="auth-google-waiting"
       header={<Header title={GOOGLE_WAITING.title} subtitle={GOOGLE_WAITING.subtitle} onBack={() => goBack('/welcome')} />}
-      contentStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.lg }}>
-      <ActivityIndicator color={colors.primary} />
-      <Text variant="body" color="textSecondary" align="center" accessibilityLiveRegion="polite">
-        {GOOGLE_WAITING.body}
-      </Text>
+      contentStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <WaitLines title={GOOGLE_WAITING.lead} body={GOOGLE_WAITING.body} cupTestID="auth-google-waiting-cup" />
+    </Screen>
+  );
+}
+
+/** While a reset link signs the device in (4 s at most): the same pattern. */
+function ResetChecking() {
+  return (
+    <Screen
+      testID="auth-reset-checking"
+      header={<Header title="New password" subtitle="Password reset" onBack={() => goBack('/welcome')} />}
+      contentStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <WaitLines title={RESET_CHECKING.title} body={RESET_CHECKING.body} cupTestID="auth-reset-checking-cup" />
     </Screen>
   );
 }
@@ -424,18 +512,7 @@ function ResetPassword() {
   if (doneReset) return <SignInGate onCancelled={() => router.replace('/auth?mode=signin')} />;
 
   if (!recovery) {
-    if (!waited) {
-      return (
-        <Screen
-          testID="auth-reset-checking"
-          header={<Header title="New password" subtitle="Checking your link" onBack={() => goBack('/welcome')} />}
-          contentStyle={{ flexGrow: 1, justifyContent: 'center' }}>
-          <Text variant="body" color="textSecondary" align="center">
-            Checking your reset link...
-          </Text>
-        </Screen>
-      );
-    }
+    if (!waited) return <ResetChecking />;
     return (
       <Screen
         testID="auth-reset-expired"
@@ -448,9 +525,9 @@ function ResetPassword() {
           </View>
         }>
         <FadeIn style={{ alignItems: 'center', gap: spacing.lg }}>
-          <View style={{ width: 72, height: 72, alignItems: 'center', justifyContent: 'center' }}>
-            <KeyRound size={40} color={colors.warningInk} strokeWidth={1.6} />
-          </View>
+          <Avatar size={72}>
+            <KeyRound size={30} color={colors.warningInk} strokeWidth={1.9} />
+          </Avatar>
           <Text variant="body" color="textSecondary" align="center">
             A link works once, for about an hour, on the device that asked for it. Send a new one.
           </Text>
@@ -561,12 +638,10 @@ function NotConfigured() {
       header={<Header title="Accounts" subtitle="Not set up in this build" onBack={() => goBack(onboarded ? '/' : '/welcome')} />}
       contentStyle={{ flexGrow: 1, justifyContent: 'center', gap: spacing.xxl }}
       footer={<Button title={onboarded ? 'Back to today' : 'Set up on this device'} testID="auth-continue-local" onPress={() => router.replace(onboarded ? '/' : '/onboarding')} />}>
-      <View style={{ alignItems: 'center' }}>
-        <View style={{ width: 80, height: 80, alignItems: 'center', justifyContent: 'center' }}>
-          <Smartphone size={40} color={colors.text} strokeWidth={1.6} />
-        </View>
-      </View>
-      <FadeIn>
+      <FadeIn style={{ alignItems: 'center', gap: spacing.lg }}>
+        <Avatar size={72}>
+          <Smartphone size={30} color={colors.text} strokeWidth={1.9} />
+        </Avatar>
         <Text variant="body" color="textSecondary" align="center">
           HealthCal works fully on this device: logging, targets, trends and export. Your data is saved here and never leaves it.
         </Text>

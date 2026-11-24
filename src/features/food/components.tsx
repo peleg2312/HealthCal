@@ -2,6 +2,7 @@ import { CalendarDays, Check, ChevronLeft, ChevronRight, Minus, Plus } from 'luc
 import React, { useEffect, useState } from 'react';
 import { useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { SourceMark, sourceMarkTop } from '@/features/ai/mark';
 import { useToday } from '@/store/clock';
 import { isolateRtl } from '@/lib/bidi';
 import { addDays, formatDayLabel, formatLongDate, today } from '@/lib/dates';
@@ -12,14 +13,10 @@ import { CupKey, IconButton, PressableScale, Text } from '@/ui';
 
 import { kcal, sourceInfo } from './helpers';
 
-/** How a data source is marked: a filled cup key for reference data, an outline for community or your own numbers, dashed for an AI estimate. */
-export function sourceKeyVariant(source: FoodSource): 'filled' | 'outline' | 'dashed' {
-  if (source === 'builtin' || source === 'usda') return 'filled';
-  if (source === 'ai') return 'dashed';
-  return 'outline';
-}
+// How a data source is marked lives with the mark itself (`SourceMark`, `@/features/ai/mark`): a filled cup
+// key for reference data, an outline for community or your own numbers, the small AI mark for an AI estimate.
 
-/** A cup key plus the source's name, on a faint tint (the detail page). */
+/** The source's mark plus its name, on a faint tint (the detail page). */
 export function SourceBadge({ source, style }: { source: FoodSource; style?: StyleProp<ViewStyle> }) {
   const { colors } = useTheme();
   const info = sourceInfo(source);
@@ -31,7 +28,7 @@ export function SourceBadge({ source, style }: { source: FoodSource; style?: Sty
         { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, height: 26, borderRadius: 4, backgroundColor: colors.surfaceAlt, alignSelf: 'flex-start' },
         style,
       ]}>
-      <CupKey color={colors.textSecondary} variant={sourceKeyVariant(source)} />
+      <SourceMark source={source} color={colors.textSecondary} size={9} />
       <Text variant="label" color="text">
         {info.label}
       </Text>
@@ -39,13 +36,13 @@ export function SourceBadge({ source, style }: { source: FoodSource; style?: Sty
   );
 }
 
-/** Cup key and short source name for list captions: present but quiet. */
-export function SourceTag({ source }: { source: FoodSource }) {
+/** The source's mark and its short name for list captions: present but quiet. `plain`: the kit's key even for an AI estimate (the sample result, which is not the AI). */
+export function SourceTag({ source, plain = false }: { source: FoodSource; plain?: boolean }) {
   const { colors } = useTheme();
   const info = sourceInfo(source);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-      <CupKey color={colors.textSecondary} variant={sourceKeyVariant(source)} size={8} />
+      <SourceMark source={source} plain={plain} color={colors.textSecondary} size={8} />
       <Text variant="caption" color="textSecondary" numberOfLines={1}>
         {info.short}
       </Text>
@@ -235,7 +232,7 @@ export function FoodRow({
           {/* The source's mark leads the line and its word ends it, so a long portion or brand wraps
               to a second line instead of cutting the calories, and the mark never floats. */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
-            <CupKey color={colors.textSecondary} variant={sourceKeyVariant(food.source)} size={8} style={{ marginTop: 5 }} />
+            <SourceMark source={food.source} color={colors.textSecondary} size={8} style={{ marginTop: sourceMarkTop(food.source) }} />
             <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1 }}>
               {/* Once added, the live kcal leads. */}
               {amount ? `${kcal(kcalValue)} kcal · ` : food.brand ? `${isolateRtl(food.brand)} · ` : ''}

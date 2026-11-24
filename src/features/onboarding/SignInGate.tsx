@@ -1,8 +1,10 @@
 import { Redirect, router, useFocusEffect } from 'expo-router';
 import { CloudOff, Download, RefreshCw, ShieldAlert } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 
+import { WaitLines } from '@/components/PourWait';
+import { RESTORING } from '@/features/auth/words';
 import { cancelAccountSwitch, confirmAccountSwitch, retryRestore, signOut, useAuth } from '@/services/auth';
 import { useStore } from '@/store';
 import { useTheme } from '@/theme';
@@ -66,14 +68,11 @@ function HomeAfterSignIn() {
   return toCoach ? <Restoring /> : <Redirect href="/" />;
 }
 
-function Restoring() {
-  const { colors, spacing } = useTheme();
+/** Signed in, the first sync still running: the waiting cup over what happened and what is happening (the pattern of every wait). */
+export function Restoring() {
   return (
-    <Screen testID="auth-restoring" contentStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.lg }}>
-      <ActivityIndicator color={colors.primary} />
-      <Text variant="body" color="textSecondary" align="center">
-        Signed in. Bringing your plan and logs to this device...
-      </Text>
+    <Screen testID="auth-restoring" contentStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <WaitLines title={RESTORING.title} body={RESTORING.body} cupTestID="auth-restoring-cup" />
     </Screen>
   );
 }

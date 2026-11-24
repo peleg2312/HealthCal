@@ -10,10 +10,11 @@
  * - Nothing loops, bounces or glows.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
+  FadeIn,
   Keyframe,
   LayoutAnimationConfig,
   LinearTransition,
@@ -388,10 +389,24 @@ export function DrawReveal({ width, height, children, duration = D.draw, delay =
 
 // ---------------------------------------------------------------- lists
 
-const rowEnter = new Keyframe({
-  0: { opacity: 0, transform: [{ translateY: -X.row }] },
-  100: { opacity: 1, transform: [{ translateY: 0 }], easing: ease.enter },
-}).duration(D.row);
+/**
+ * A row added to a list: on a phone it fades in as it slides `motion.distance.row` px down into place.
+ *
+ * On the web it only fades, with Reanimated's own `FadeIn`, never a custom `Keyframe`. After a custom
+ * entering keyframe has run, Reanimated's web code tidies it up about five times its length later
+ * (`scheduleAnimationCleanup` in react-native-reanimated's layoutReanimation/web), and that tidy-up pins
+ * the row with `position: absolute` at the box it measured (`setElementPosition`). The row then leaves the
+ * layout: what holds it closes up, the rows after it are drawn over it, and the coach's question ended
+ * under its own answer card. Its predefined animations are never tidied that way. Phones run layout
+ * animations natively and keep the keyframe.
+ */
+const rowEnter =
+  Platform.OS === 'web'
+    ? FadeIn.duration(D.row).easing(ease.enter)
+    : new Keyframe({
+        0: { opacity: 0, transform: [{ translateY: -X.row }] },
+        100: { opacity: 1, transform: [{ translateY: 0 }], easing: ease.enter },
+      }).duration(D.row);
 const rowExit = new Keyframe({
   0: { opacity: 1, transform: [{ scale: 1 }] },
   100: { opacity: 0, transform: [{ scale: 0.98 }], easing: ease.exit },
@@ -414,9 +429,11 @@ export function AnimatedList({ children, animateFirst = false }: { children: Rea
 }
 
 /**
- * One row of an animated list: it fades and slides in when added, fades out
- * when removed, and moves smoothly when rows around it change (Reanimated
- * layout animations: native UI thread, CSS on web). Give it the row's stable
+ * One row of an animated list: it fades and slides in when added (on the web
+ * it only fades, see `rowEnter`), fades out when removed, and moves smoothly
+ * when rows around it change (Reanimated layout animations: native UI thread,
+ * CSS on web). Never give a row a custom `Keyframe` as `entering` on the web
+ * (`scripts/dev/e2e.cjs`, "lists with motion on"). Give it the row's stable
  * key. Instant under reduced motion. A removed row stays in the tree for
  * ~120 ms while it fades, so tests that count rows should read the store.
  */

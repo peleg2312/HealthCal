@@ -1,6 +1,7 @@
 /**
  * The terms and the privacy text (`/legal/terms`, `/legal/privacy`) as data: one document each, made of
- * sections with a heading and short paragraphs. The screens only place them (./LegalScreen.tsx).
+ * a short layer (`summary`, a few lines that restate the sections under them) and sections with a
+ * heading and short paragraphs. The screens only place them (./LegalScreen.tsx).
  *
  * WRITTEN FROM WHAT THE APP DOES. Every fact here is one the code keeps: what is sent to the AI is the
  * coach's `COACH_FACTS` and the food estimate's consent sheet; health data is docs/health-sync.md; the
@@ -15,8 +16,13 @@
  * The words pass the app's banned list and sentence case (content.test.ts).
  */
 
-/** The day these texts last changed (YYYY-MM-DD). */
-export const LEGAL_UPDATED = '2026-11-23';
+/**
+ * The day these texts last changed (YYYY-MM-DD). 2026-11-24: each page gained its short layer (`summary`),
+ * and on the privacy page it stands where the "In short" section was drawn. No fact changed and the
+ * sections are word for word as they were. A section's `jump` label is navigation, not text of the page:
+ * adding or changing one does not move the date.
+ */
+export const LEGAL_UPDATED = '2026-11-24';
 
 /** The support address the pages give. Empty until the owner supplies one: never a personal address. */
 export const CONTACT_EMAIL = '';
@@ -29,7 +35,22 @@ export interface LegalSection {
   /** Stable id, for the test and the screen's testIDs (`legal-<doc>-<id>`). */
   id: string;
   heading: string;
+  /**
+   * A short label of one to three words for the "On this page" list, where the heading is long. For
+   * navigation only: never drawn as the section's heading, and made of words of its own heading, so it
+   * cannot say something the heading does not (content.test.ts). Without one the heading is the label.
+   */
+  jump?: string;
   paragraphs: readonly string[];
+}
+
+/** The label a section wears in the "On this page" list. */
+export const jumpLabel = (section: LegalSection): string => section.jump ?? section.heading;
+
+/** One line of the short layer at the top of a page. The screen gives each id its mark; the words hold none. */
+export interface LegalSummaryItem {
+  id: string;
+  text: string;
 }
 
 export interface LegalDocument {
@@ -37,6 +58,11 @@ export interface LegalDocument {
   /** The header's title and the short line under it. */
   title: string;
   subtitle: string;
+  /**
+   * The short layer ("In short"): a few plain lines first, the full text under them. Each line
+   * restates a fact a section below already holds and adds none, so the full text stays what applies.
+   */
+  summary: readonly LegalSummaryItem[];
   intro: string;
   sections: readonly LegalSection[];
 }
@@ -60,6 +86,13 @@ export const TERMS: LegalDocument = {
   id: 'terms',
   title: 'Terms',
   subtitle: 'Terms of use',
+  summary: [
+    { id: 'medical', text: 'A tracking tool, not medical advice. Its numbers are estimates.' },
+    { id: 'free', text: 'Everything on your phone is free, with no ads. So are the account and sync.' },
+    { id: 'plus', text: `${PLUS} is optional. It renews until you cancel in the plan screen.` },
+    { id: 'yours', text: 'You can export your data or delete your account at any time.' },
+    { id: 'age', text: 'For people aged 16 and over. The AI coach is for 18 and over.' },
+  ],
   intro: 'These terms are the agreement between you and HealthCal for using the app on Android, iPhone and the web. They are written to be read. Using HealthCal means you accept them.',
   sections: [
     {
@@ -94,6 +127,7 @@ export const TERMS: LegalDocument = {
     {
       id: 'free',
       heading: 'The free plan',
+      jump: 'Free plan',
       paragraphs: [
         'Everything HealthCal does on your phone is free: logging, search, barcodes, the diary, water, training, health sync, progress, reminders, every look and full export. So are the account with backup and sync, friends, the coach’s answers worked out on your phone, and a daily allowance of AI estimates and coach questions. There are no ads.',
         `Nothing that runs on your phone becomes paid. The size of the daily AI allowance is set by HealthCal and is shown wherever a limit is reached, and ${PLUS} is offered where the app shows it and nowhere else.`,
@@ -102,6 +136,7 @@ export const TERMS: LegalDocument = {
     {
       id: 'plus',
       heading: PLUS_FULL,
+      jump: 'Plus',
       paragraphs: [
         `${PLUS} is an optional subscription. It adds a larger daily allowance of AI estimates and coach questions, and the coach remembers more of your chat. The plan screen in the app shows the current figures for both plans.`,
         `Before you pay, the plan screen and the checkout show the price, the currency and the period, a month or a year. ${PLUS} is sold by a payment company that acts as the seller: it takes the payment and sends the receipt, and its checkout terms apply to the purchase as well.`,
@@ -110,6 +145,7 @@ export const TERMS: LegalDocument = {
     {
       id: 'renewal',
       heading: 'Renewal and cancelling',
+      jump: 'Cancelling',
       paragraphs: [
         `${PLUS} renews by itself at the end of each period, until you cancel, at the price you subscribed at unless you are told of a change before it applies to a renewal.`,
         `You can cancel at any time from the plan screen, with "Manage or cancel". ${PLUS} then stays until the end of the period you have paid for, and nothing more is charged. After that your account carries on with the free plan and all its data.`,
@@ -119,6 +155,7 @@ export const TERMS: LegalDocument = {
     {
       id: 'refunds',
       heading: 'Refunds and the right to withdraw',
+      jump: 'Refunds',
       paragraphs: [
         'Refunds are handled by the payment company under its checkout terms. Where the law where you live gives you a right to withdraw from the purchase or to a refund, you have that right, and nothing in these terms takes it away.',
         'Soon after you subscribe, the plan screen also offers "Withdraw from the contract", which leads to the payment company’s page for it.',
@@ -127,6 +164,7 @@ export const TERMS: LegalDocument = {
     {
       id: 'fair-use',
       heading: 'Fair use of the AI',
+      jump: 'AI fair use',
       paragraphs: [
         'Every AI estimate and coach answer runs on paid servers, so each account has a daily allowance that starts again each day. Use the AI for your own food and training questions. Do not share an account, send questions by script or other automation, or try to get around the allowance or the AI’s safeguards.',
         'HealthCal may pause the AI features for an account used that way, or for everyone on a day the AI service is busy. The rest of the app keeps working. The daily figures can change, and the plan screen always shows the current ones.',
@@ -159,6 +197,7 @@ export const TERMS: LegalDocument = {
     {
       id: 'changes',
       heading: 'Changes to these terms',
+      jump: 'Changes',
       paragraphs: [
         `If these terms change, the date at the top changes with them. A change that affects what you pay or what ${PLUS} gives is shown in the app before it applies to you.`,
       ],
@@ -170,6 +209,13 @@ export const PRIVACY: LegalDocument = {
   id: 'privacy',
   title: 'Privacy',
   subtitle: 'What happens to your data',
+  summary: [
+    { id: 'device', text: 'Without an account, everything you log stays on this device.' },
+    { id: 'account', text: 'With an account, it is kept in your private space so it can back up and sync. No other account can read it.' },
+    { id: 'ads', text: 'No ads, no tracking, no analytics and no selling of data.' },
+    { id: 'ai', text: 'The AI gets what you give it once you agree; the coach adds your last few questions and answers and, if shared, a week summary.' },
+    { id: 'yours', text: 'You can export everything or delete it at any time.' },
+  ],
   intro: 'HealthCal is built to keep your data on your phone. This page says what leaves it, when, where it goes and what is kept, for the app on Android, iPhone and the web.',
   sections: [
     {
@@ -201,6 +247,7 @@ export const PRIVACY: LegalDocument = {
     {
       id: 'food-data',
       heading: 'Food search and barcodes',
+      jump: 'Food search',
       paragraphs: [
         'Searching the built-in foods happens on the phone. When you scan a barcode or search for a packaged product online, the barcode or the words you typed are sent to Open Food Facts, a free public database of products, either straight from the phone or through HealthCal’s server. Nothing else goes with them.',
       ],
@@ -208,6 +255,7 @@ export const PRIVACY: LegalDocument = {
     {
       id: 'ai-estimate',
       heading: 'AI food estimates',
+      jump: 'AI estimates',
       paragraphs: [
         'A meal photo or description leaves the phone when you ask for an estimate, after you have agreed once on this device. What is sent is a smaller copy of the photo with any note or weighed total you add, or the words you typed.',
         'It goes to HealthCal’s server, which passes it to Anthropic, the maker of Claude, so its AI can estimate the foods and portions. Nothing else from your diary goes with it: not your name, email, body weight, goals or history.',
@@ -217,6 +265,7 @@ export const PRIVACY: LegalDocument = {
     {
       id: 'coach',
       heading: 'The AI coach',
+      jump: 'AI coach',
       paragraphs: [
         'Answers marked "From your data, on this phone" are worked out on the phone and never sent.',
         'A question you type goes to HealthCal’s server and on to Anthropic, after you have agreed once on this device, with your last few typed questions and the coach’s answers to them. A short summary of your week goes with it while "Share my week" is on, and never otherwise; the coach shows that summary word for word. It never holds your name, email, body weight, age, notes or food names.',
@@ -226,6 +275,7 @@ export const PRIVACY: LegalDocument = {
     {
       id: 'reports',
       heading: 'Reporting an AI answer',
+      jump: 'Reporting',
       paragraphs: [
         'If you report an answer, HealthCal’s server keeps the answer as it was shown, the reason you chose and, if you tick the box, your question, so the report can be looked at. Nothing else goes with it. Reports are kept with your account and deleted with it. Up to 20 reports can be sent in any 24 hours.',
       ],
@@ -233,6 +283,7 @@ export const PRIVACY: LegalDocument = {
     {
       id: 'health',
       heading: 'Health Connect and Apple Health',
+      jump: 'Health',
       paragraphs: [
         'Workout sync is off until you switch it on. It then reads what you allow: workouts with their calories, distance and heart rate, daily steps, how long you slept, weigh-ins with body fat, and the calories you burn in a day. Nothing is ever written back.',
         'Workouts, nights of sleep and weigh-ins are kept like ones you enter yourself, in your account if you have one. Steps stay on the phone for 35 days and the day’s calories burned for 14. The Health app’s export file is read on the phone, when you pick it and not before. Steps, sleep and the day’s calories burned are never added to your calories.',
@@ -273,6 +324,7 @@ export const PRIVACY: LegalDocument = {
     {
       id: 'changes',
       heading: 'Changes to this page',
+      jump: 'Changes',
       paragraphs: ['If this page changes, the date at the top changes with it. Before anything new is sent to the AI, the app asks you again.'],
     },
   ],

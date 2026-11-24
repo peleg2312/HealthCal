@@ -1,54 +1,72 @@
 /**
- * Plan (/settings/plan): Free and Plus side by side, the price from the server, one primary button
- * pinned in the footer, and for a subscriber the plan, its date, and the payment company's page.
+ * Plan (/settings/plan): what stays free in one line, each day's AI allowance as cups (Free poured to
+ * its share of Plus, Plus brim-full), Monthly and Yearly as two price tiles with the smaller charge
+ * chosen first, and one primary button pinned in the footer under its renewal sentence. For a
+ * subscriber: the membership card with its full cup, the allowance, and the cancel controls as plain
+ * rows. Plus arriving after a payment is the page's one moment (the cup pours to the brim, once).
  * Reached from Profile, Account, About and the two limit messages; never shown elsewhere.
- * Every word is in @/features/plan/words; the plan is decided on the server only.
+ * Every word is in @/features/plan/words; the plan is decided on the server only, and every price,
+ * currency and period on this page is the server's.
  */
 import { router, useLocalSearchParams } from 'expo-router';
+import { CalendarX, Undo2 } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
+import { PourWait } from '@/components/PourWait';
+import { AllowanceTable } from '@/features/plan/AllowanceTable';
 import { refreshPlan, usePlan, usePlanStore } from '@/features/plan/cache';
-import { checkoutBlockedHere, checkoutShown, PLAN_FULL_NAME } from '@/features/plan/channel';
-import { openManage, startCheckout, useCheckout, waitAfterCheckout } from '@/features/plan/checkout';
-import { canManageHere, canWithdraw, holdsPlus, offerFor, paymentLate, isEnding, planVisible, type PlanLimits, type PlanPeriod, type PlanView } from '@/features/plan/view';
+import { checkoutBlockedHere, checkoutShown } from '@/features/plan/channel';
+import { openManage, startCheckout, useCheckout, waitAfterCheckout, type CheckoutPhase } from '@/features/plan/checkout';
+import { MembershipCard, useArrival } from '@/features/plan/MembershipCard';
+import { PeriodTiles } from '@/features/plan/PeriodTiles';
+import { StaysFree } from '@/features/plan/StaysFree';
+import { canManageHere, canWithdraw, holdsPlus, isEnding, offerFor, planVisible, type PlanPeriod, type PlanView } from '@/features/plan/view';
 import {
+  BOTH_LEAD,
   CANCEL_LABEL,
-  FREE_CARD_TITLE,
+  CANCEL_SUB,
+  EACH_DAY_TITLE,
   LATE_LINE,
+  LATE_MORE,
+  LATE_TITLE,
   LOADING_LINE,
   MANAGE_LABEL,
   NOTHING_TO_CHOOSE,
-  PLAN_INTRO,
+  OFF_TITLE,
+  PLAN_INTRO_LEAD,
+  PLAN_INTRO_MORE,
   PLAN_TITLE,
-  PLUS_CARD_TITLE,
   PRIVACY_LABEL,
   SELLER_LINE,
-  SIGNED_OUT_LINE,
+  SIGNED_OUT_BODY,
+  SIGNED_OUT_TITLE,
+  SIGN_IN_ACTION,
+  STAYS_FREE_AFTER_END,
+  STAYS_FREE_IF_CANCEL,
+  STAYS_FREE_TITLE,
   TERMS_LABEL,
   WAITING_LINE,
   WITHDRAW_LABEL,
-  cardLabel,
-  cardRows,
-  formatMoney,
+  eachDayUntil,
   graceLine,
-  monthlyEquivalent,
   notBuyableHere,
-  periodLabel,
   planShortLine,
-  priceLine,
   refusalLine,
   renewalLine,
-  sourceLine,
+  savingAndTax,
   subscribeLabel,
-  subscriberLine,
-  taxNote,
-  withdrawLine,
+  subscribeLabelRoom,
+  tieDates,
+  tieEnd,
+  withdrawSub,
 } from '@/features/plan/words';
+import { IconTile } from '@/features/settings/components';
 import { useAuth } from '@/services/auth';
+import { isBackendConfigured } from '@/services/supabase';
 import { useNow } from '@/store/clock';
 import { useTheme } from '@/theme';
-import { Button, Card, Header, Screen, Segmented, Text, toast } from '@/ui';
+import { Button, Card, Divider, EmptyState, Header, ListRow, Screen, SectionTitle, Text, toast } from '@/ui';
 
 let returnHandled = false;
 
@@ -74,38 +92,77 @@ export default function PlanScreen() {
   const header = <Header title={PLAN_TITLE} subtitle={planShortLine(view)} />;
 
   if (!view.known || !planVisible(view)) {
-    // Back from the payment page before the plan was read on this load: the wait's own words.
-    const waitLine = phase === 'waiting' ? WAITING_LINE : phase === 'late' ? LATE_LINE : null;
-    const line = waitLine ?? (!signedIn ? SIGNED_OUT_LINE : !view.known && !asked ? LOADING_LINE : NOTHING_TO_CHOOSE);
     return (
       <Screen header={header} testID="plan-screen">
-        <Card>
-          <Text variant="body" color="textSecondary" testID={phase === 'waiting' ? 'plan-waiting' : phase === 'late' ? 'plan-late' : 'plan-status'}>
-            {line}
-          </Text>
-        </Card>
+        <StatusOnly phase={phase} signedIn={signedIn} loading={!view.known && !asked} />
       </Screen>
     );
   }
   return holdsPlus(view) ? <Subscriber view={view} header={header} /> : <Choose view={view} header={header} />;
 }
 
-/** The person holds no plan: Free and Plus, the period, the price, and the button. */
+/**
+ * Nothing to show a plan from yet: back from the payment page before the plan was read on this load
+ * (the wait's own words), no account, the first answer still on its way, or plans off. One centred
+ * block: the waiting cup while something is on its way, else the app's empty cup with one sentence
+ * and, where there is one, the button that does it.
+ */
+function StatusOnly({ phase, signedIn, loading }: { phase: CheckoutPhase; signedIn: boolean; loading: boolean }) {
+  const { spacing } = useTheme();
+  if (phase === 'waiting' || (phase !== 'late' && signedIn && loading)) {
+    const waiting = phase === 'waiting';
+    return (
+      <View testID={waiting ? 'plan-waiting' : 'plan-status'} accessibilityLiveRegion="polite" style={{ alignItems: 'center', gap: spacing.lg, paddingTop: spacing.xl + 28, paddingHorizontal: spacing.md }}>
+        <PourWait size="tile" />
+        <Text variant="body" color="textSecondary" align="center">
+          {waiting ? WAITING_LINE : LOADING_LINE}
+        </Text>
+      </View>
+    );
+  }
+  if (phase === 'late') {
+    return (
+      <View testID="plan-late" style={{ paddingTop: spacing.xl }}>
+        <EmptyState title={LATE_TITLE} message={LATE_MORE} />
+      </View>
+    );
+  }
+  if (!signedIn) {
+    return (
+      <View testID="plan-status" style={{ paddingTop: spacing.xl }}>
+        {isBackendConfigured ? (
+          <EmptyState title={SIGNED_OUT_TITLE} message={tieEnd(SIGNED_OUT_BODY)} action={SIGN_IN_ACTION} actionTestID="plan-sign-in" onAction={() => router.push('/auth?mode=signin')} />
+        ) : (
+          <EmptyState title={SIGNED_OUT_TITLE} message={refusalLine('no_backend', 'status')} />
+        )}
+      </View>
+    );
+  }
+  return (
+    <View testID="plan-status" style={{ paddingTop: spacing.xl }}>
+      <EmptyState title={OFF_TITLE} message={NOTHING_TO_CHOOSE} />
+    </View>
+  );
+}
+
+/** The person holds no plan: what stays free, the allowance as cups, the two prices, and the button. */
 function Choose({ view, header }: { view: PlanView; header: React.ReactNode }) {
-  const { spacing, colors } = useTheme();
+  const { spacing } = useTheme();
+  const { width } = useWindowDimensions();
   const phase = useCheckout((s) => s.phase);
   const busy = useCheckout((s) => s.busy);
-  const [period, setPeriod] = useState<PlanPeriod>(() => (offerFor(view, 'year') ? 'year' : 'month'));
+  // Ruling D2: the smaller charge is the one chosen when the page opens; both prices are in view.
+  const [period, setPeriod] = useState<PlanPeriod>(() => (offerFor(view, 'month') ? 'month' : 'year'));
   const offer = offerFor(view, period) ?? view.offers[0] ?? null;
-  const periods = (['month', 'year'] as const).filter((p) => offerFor(view, p));
   const grace = graceLine(view.graceUntil);
   const blocked = !checkoutShown() ? 'channel' : checkoutBlockedHere() ? 'frame' : null;
+  const saving = offer ? savingAndTax(offerFor(view, 'month'), offerFor(view, 'year'), offer) : null;
 
   let footer: React.ReactNode = null;
   if (phase === 'waiting') {
     footer = (
-      <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center', minHeight: 50 }} testID="plan-waiting">
-        <ActivityIndicator color={colors.textSecondary} />
+      <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center', minHeight: 50 }} testID="plan-waiting" accessibilityLiveRegion="polite">
+        <PourWait size="inline" />
         <Text variant="body" color="textSecondary" style={{ flex: 1 }}>
           {WAITING_LINE}
         </Text>
@@ -119,7 +176,8 @@ function Choose({ view, header }: { view: PlanView; header: React.ReactNode }) {
     );
   } else if (offer && view.canCheckout) {
     footer = (
-      <View style={{ gap: spacing.md }}>
+      // The renewal sentence is the legal one and is never shortened; a narrow phone only closes the gap.
+      <View style={{ gap: width < 360 ? spacing.sm : spacing.md }}>
         {/* A payment that has not arrived: said above the offer, which stays (the person may have closed the page without paying). */}
         {phase === 'late' ? (
           <Text variant="caption" color="text" testID="plan-late">
@@ -131,7 +189,7 @@ function Choose({ view, header }: { view: PlanView; header: React.ReactNode }) {
         </Text>
         <Button
           testID="plan-subscribe"
-          title={subscribeLabel(offer)}
+          title={subscribeLabel(offer, subscribeLabelRoom(width))}
           loading={busy === 'subscribe'}
           onPress={() =>
             void startCheckout(offer).then((r) => {
@@ -145,47 +203,39 @@ function Choose({ view, header }: { view: PlanView; header: React.ReactNode }) {
 
   return (
     <Screen header={header} footer={footer} testID="plan-screen">
-      <Text variant="body" testID="plan-intro">
-        {PLAN_INTRO}
-      </Text>
-      {grace ? (
-        <Text variant="body" color="textSecondary" testID="plan-grace-line">
-          {grace}
+      {/* 12 px to the card (the page's blocks are 16 apart). */}
+      <View testID="plan-intro" style={{ gap: spacing.xs, marginBottom: -spacing.xs }}>
+        <Text variant="bodyStrong">{PLAN_INTRO_LEAD}</Text>
+        <Text variant="body" color="textSecondary">
+          {tieEnd(PLAN_INTRO_MORE)}
+        </Text>
+        {grace ? (
+          <Text variant="body" color="textSecondary" testID="plan-grace-line">
+            {tieDates(grace)}
+          </Text>
+        ) : null}
+      </View>
+      <AllowanceTable free={view.planLimits.free} plus={view.planLimits.plus} current="free" />
+      {offer ? (
+        <View style={{ gap: spacing.sm }}>
+          <PeriodTiles offers={view.offers} value={offer.period} onChange={setPeriod} />
+          {saving ? (
+            <Text variant="caption" color="textSecondary" testID="plan-saving">
+              {saving}
+            </Text>
+          ) : null}
+          {/* The two links a careful buyer looks for, right under the prices; the seller line stays last. */}
+          <LegalLinks />
+        </View>
+      ) : (
+        <LegalLinks />
+      )}
+      <StaysFree free={view.planLimits.free} title={STAYS_FREE_TITLE} />
+      {offer ? (
+        <Text variant="caption" color="textSecondary" testID="plan-seller-line">
+          {SELLER_LINE}
         </Text>
       ) : null}
-      <PlanCards view={view} />
-      {offer ? (
-        <>
-          {periods.length > 1 ? (
-            <Segmented
-              testID="plan-period"
-              options={periods.map((p) => ({ value: p, label: periodLabel(p) }))}
-              value={offer.period}
-              onChange={(p) => setPeriod(p)}
-            />
-          ) : null}
-          <View testID="plan-price" accessible accessibilityLabel={[priceLine(offer), monthlyEquivalent(offer), taxNote(offer)].filter(Boolean).join('. ')}>
-            <Text variant="numL">
-              {formatMoney(offer.amount, offer.currency)}
-              <Text variant="unit">{` a ${offer.period}`}</Text>
-            </Text>
-            {monthlyEquivalent(offer) ? (
-              <Text variant="body" color="textSecondary">
-                {monthlyEquivalent(offer)}
-              </Text>
-            ) : null}
-            {taxNote(offer) ? (
-              <Text variant="caption" color="textSecondary" style={{ marginTop: spacing.xs }}>
-                {taxNote(offer)}
-              </Text>
-            ) : null}
-          </View>
-          <Text variant="caption" color="textSecondary" testID="plan-seller-line">
-            {SELLER_LINE}
-          </Text>
-        </>
-      ) : null}
-      <LegalLinks />
     </Screen>
   );
 }
@@ -195,93 +245,67 @@ function Subscriber({ view, header }: { view: PlanView; header: React.ReactNode 
   const { spacing } = useTheme();
   const now = useNow();
   const busy = useCheckout((s) => s.busy);
+  const arriving = useArrival();
   const manageable = canManageHere(view);
   const outside = !manageable && view.source ? refusalLine('cancel_elsewhere', 'manage', view.source) : null;
   const withdraw = manageable && canWithdraw(view, now.getTime()) && view.startedAt ? view.startedAt : null;
+  const cancel = manageable && !isEnding(view);
   const manage = () =>
     void openManage().then((r) => {
       if (!r.ok) toast(r.message);
     });
   const footer = manageable ? <Button testID="plan-manage" title={MANAGE_LABEL} variant="secondary" loading={busy === 'manage'} onPress={manage} /> : null;
-  const source = sourceLine(view.source);
   return (
     <Screen header={header} footer={footer} testID="plan-screen">
-      <Card testID="plan-status">
-        <Text variant="h3">{PLAN_FULL_NAME}</Text>
-        <Text variant="body" color={paymentLate(view) ? 'warningInk' : 'text'} style={{ marginTop: spacing.sm }} testID={paymentLate(view) ? 'plan-payment-line' : 'plan-status-line'}>
-          {subscriberLine(view)}
-        </Text>
-        {source ? (
-          <Text variant="caption" color="textSecondary" style={{ marginTop: spacing.sm }}>
-            {source}
-          </Text>
-        ) : null}
-        {outside ? (
-          <Text variant="caption" color="textSecondary" style={{ marginTop: spacing.sm }} testID="plan-manage-elsewhere">
-            {outside}
-          </Text>
-        ) : null}
-      </Card>
-      {manageable ? (
+      {/* Keyed, so an arrival seen on a return to the front starts the card afresh at the Free level. */}
+      <MembershipCard key={arriving ? 'arriving' : 'held'} view={view} arriving={arriving} outside={outside} />
+      <View style={{ gap: spacing.sm }}>
+        <SectionTitle title={isEnding(view) ? eachDayUntil(view.periodEnd) : EACH_DAY_TITLE} />
+        <AllowanceTable free={view.planLimits.free} plus={view.planLimits.plus} current="plus" />
+      </View>
+      {/* The contract's two controls as plain rows; only the ones that apply, and no card with none. */}
+      {cancel || withdraw ? (
         <View style={{ gap: spacing.sm }}>
-          {!isEnding(view) ? <Button testID="plan-cancel" title={CANCEL_LABEL} variant="ghost" size="md" onPress={manage} /> : null}
-          {withdraw ? (
-            <>
-              <Button testID="plan-withdraw" title={WITHDRAW_LABEL} variant="ghost" size="md" onPress={manage} />
-              <Text variant="caption" color="textSecondary" align="center">
-                {withdrawLine(withdraw)}
-              </Text>
-            </>
+          <Card padding={0} testID="plan-actions" style={{ paddingHorizontal: spacing.lg }}>
+            {cancel ? (
+              <ListRow
+                testID="plan-cancel"
+                title={CANCEL_LABEL}
+                subtitle={tieEnd(CANCEL_SUB, 2)}
+                left={
+                  <IconTile>
+                    <CalendarX />
+                  </IconTile>
+                }
+                onPress={manage}
+              />
+            ) : null}
+            {cancel && withdraw ? <Divider /> : null}
+            {withdraw ? (
+              <ListRow
+                testID="plan-withdraw"
+                title={WITHDRAW_LABEL}
+                subtitle={tieDates(withdrawSub(withdraw))}
+                left={
+                  <IconTile>
+                    <Undo2 />
+                  </IconTile>
+                }
+                onPress={manage}
+              />
+            ) : null}
+          </Card>
+          {cancel && withdraw ? (
+            <Text variant="caption" color="textSecondary">
+              {BOTH_LEAD}
+            </Text>
           ) : null}
         </View>
       ) : null}
-      <PlanCards view={view} />
+      {/* A plan that is already cancelled, or one that ends by itself, has nothing left to cancel: the title says when instead. */}
+      <StaysFree free={view.planLimits.free} title={isEnding(view) || view.source === 'promotional' ? STAYS_FREE_AFTER_END : STAYS_FREE_IF_CANCEL} />
       <LegalLinks />
     </Screen>
-  );
-}
-
-function PlanCard({ title, limits, current, testID }: { title: string; limits: PlanLimits; current: boolean; testID: string }) {
-  const { spacing, colors } = useTheme();
-  return (
-    <Card
-      testID={testID}
-      padding={spacing.md}
-      style={{ flex: 1, minWidth: 0, borderColor: current ? colors.borderStrong : colors.border }}
-      accessible
-      accessibilityLabel={cardLabel(title, limits, current)}>
-      <Text variant="h3">{title}</Text>
-      <Text variant="caption" color="textSecondary" style={{ minHeight: 16 }}>
-        {current ? 'Your plan' : ' '}
-      </Text>
-      <View style={{ gap: spacing.md, marginTop: spacing.md }}>
-        {cardRows(limits).map((r) => {
-          const i = r.value.indexOf(' ');
-          return (
-            <View key={r.key}>
-              <Text variant="caption" color="textSecondary">
-                {r.label}
-              </Text>
-              <Text variant="numM" tabular>
-                {r.value.slice(0, i)}
-                <Text variant="unit">{` ${r.value.slice(i + 1)}`}</Text>
-              </Text>
-            </View>
-          );
-        })}
-      </View>
-    </Card>
-  );
-}
-
-function PlanCards({ view }: { view: PlanView }) {
-  const { spacing } = useTheme();
-  const plus = holdsPlus(view);
-  return (
-    <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-      <PlanCard title={FREE_CARD_TITLE} limits={view.planLimits.free} current={!plus} testID="plan-free-card" />
-      <PlanCard title={PLUS_CARD_TITLE} limits={view.planLimits.plus} current={plus} testID="plan-plus-card" />
-    </View>
   );
 }
 

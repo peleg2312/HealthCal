@@ -1,0 +1,45 @@
+/**
+ * The words of the estimate's wait (./AnalysingView.tsx), pure: three steps that are true and one
+ * note. Only the first step is ever done (the phone knows the photo or the words are ready); the
+ * second stays "now" until the answer arrives, and the third is where the screen goes next. Nothing
+ * here claims a share done or a time left beyond "usually". Held to the banned list in ./words.test.ts.
+ */
+export const ANALYSING = {
+  inputPhoto: 'Photo ready',
+  inputText: 'Description ready',
+  estimate: 'Estimating each food and its portion',
+  estimateCareful: 'Checking each food more carefully',
+  review: 'Nothing is added until you check it',
+  note: 'Usually a few seconds.',
+  noteCareful: 'The careful check can take up to half a minute.',
+  noteSlow: 'Still working. Busy plates and the careful check take a little longer.',
+} as const;
+
+/** After this long the note says it is still working: 10 s, or 20 s for the careful check. */
+export function slowAfterMs(precise: boolean): number {
+  return precise ? 20_000 : 10_000;
+}
+
+/** The three steps, in order: the input (done), the estimate (now), the review (next). */
+export function analysingSteps(photo: boolean, precise: boolean): { input: string; estimate: string; review: string } {
+  return {
+    input: photo ? ANALYSING.inputPhoto : ANALYSING.inputText,
+    estimate: precise ? ANALYSING.estimateCareful : ANALYSING.estimate,
+    review: ANALYSING.review,
+  };
+}
+
+/** The line under the steps. */
+export function analysingNote(precise: boolean, slow: boolean): string {
+  if (slow) return ANALYSING.noteSlow;
+  return precise ? ANALYSING.noteCareful : ANALYSING.note;
+}
+
+/** The steps as one sentence for a screen reader: what is done, what is happening, what comes next. */
+export function analysingLabel(photo: boolean, precise: boolean): string {
+  const s = analysingSteps(photo, precise);
+  return `${s.input}. ${s.estimate}. ${s.review}.`;
+}
+
+/** The + sheet's hints for the two AI tiles: both say that the numbers are an AI estimate, and "Describe it" says what to do. */
+export const AI_TILE_HINT = { photo: 'Photo, AI estimate', describe: 'Type it, AI estimate' } as const;

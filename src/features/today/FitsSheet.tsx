@@ -16,7 +16,7 @@ import { useToday } from '@/store/clock';
 import { useDay, useLive } from '@/store/selectors';
 import { fonts, useTheme } from '@/theme';
 import type { ISODate, MealType } from '@/types';
-import { Button, CupKey, Divider, EmptyState, IconButton, SectionTitle, Sheet, Text } from '@/ui';
+import { Button, CupKey, Divider, EmptyState, IconButton, ProgressBar, SectionTitle, Sheet, Text } from '@/ui';
 
 import { fitCandidates, rankFits, type Fit } from './fits';
 import { IDEAS_TITLE, PLATE_NOTE, ideaRow, mealIdeas, overLine, type MealIdea, type MealIdeas } from './ideas';
@@ -32,6 +32,8 @@ function portionLabel(f: Fit, shown = false): string {
 }
 
 const SOURCE_LABEL: Record<Fit['from'], string> = { usual: 'Usual', favourite: 'Favourite', recent: 'Recent' };
+/** Every idea's bar is this wide, so two rows' shares can be compared by eye. */
+const FIT_BAR_W = 64;
 
 /**
  * The meals that fit what is left of `date` now, for `meal` (`mealIdeas`, @/features/today/ideas), from
@@ -48,7 +50,8 @@ export function useMealIdeas(date: ISODate, meal: MealType, proteinGap = false):
 
 /**
  * "What fits": first up to three meals that fit (the person's own meals and saved meals, else fixed
- * plates; `mealIdeas`), each logged in one tap with one Undo, then up to eight of the person's own
+ * plates; `mealIdeas`), each with a thin bar directly under its kcal figure for its share of what is
+ * left (`fits-idea-bar-<i>`) and logged in one tap with one Undo, then up to eight of the person's own
  * foods that fit in the calories left, each one tap from the diary. Opened from Today's "Ideas that
  * fit" chip and the calories-left number, and from the coach's protein tip (ranked by protein per kcal).
  * Over the budget it shows one neutral line and "Search all foods", never a list.
@@ -126,19 +129,37 @@ export function FitsSheet({
     if (written.length) setAdded((a) => [...a, { key: `idea:${idea.key}`, kcal: idea.kcal, ids: written.map((e) => e.id) }]);
   };
 
+  const kcalFigure = (kcal: number, size: number) => (
+    <Text variant="numM" style={{ fontSize: size, lineHeight: size + 5 }}>
+      {formatNumber(Math.round(kcal))}
+      <Text variant="unit">{' kcal'}</Text>
+    </Text>
+  );
+  const proteinLine = (protein: number) => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+      <CupKey color={colors.protein} size={8} />
+      <Text variant="caption" color="textSecondary">
+        {`${Math.round(protein)} g protein`}
+      </Text>
+    </View>
+  );
   const numbers = (kcal: number, protein: number, size: number) => (
     <>
-      <Text variant="numM" style={{ fontSize: size, lineHeight: size + 5 }}>
-        {formatNumber(Math.round(kcal))}
-        <Text variant="unit">{' kcal'}</Text>
-      </Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-        <CupKey color={colors.protein} size={8} />
-        <Text variant="caption" color="textSecondary">
-          {`${Math.round(protein)} g protein`}
-        </Text>
-      </View>
+      {kcalFigure(kcal, size)}
+      {proteinLine(protein)}
     </>
+  );
+
+  // The share of what is left that a meal takes, as one thin bar directly under its kcal figure, in that
+  // figure's own column and on its side (right in the numbers column, left on a narrow phone), with the protein
+  // line after it: the bar belongs to the kcal, never to the protein. Its track is every progress bar's `track`.
+  // Against the budget the sheet opened with (the figure its first line prints), so a bar never moves while the
+  // sheet is open. A row that no longer fits draws none, so no amber appears in a list of suggestions.
+  // The margins are the bar's own room: its tick stands 4 px proud above and below.
+  const fitBar = (idea: MealIdea, i: number, bottom: number) => (
+    <View testID={`fits-idea-bar-${i}`} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden style={{ width: FIT_BAR_W, marginTop: 2, marginBottom: bottom }}>
+      <ProgressBar progress={budget > 0 ? idea.kcal / budget : 0} color={colors.calories} height={4} memoryKey={`fit-${idea.key}`} />
+    </View>
   );
 
   return (
@@ -185,7 +206,17 @@ export function FitsSheet({
                     <Text variant="bodyStrong" color={dim ? 'textSecondary' : 'text'} numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
                       {idea.name}
                     </Text>
-                    {narrow ? <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 8 }}>{numbers(idea.kcal, idea.protein, 15)}</View> : null}
+                    {narrow ? (
+                      // A narrow phone has no room for a numbers column: they lead the line under the name, the bar
+                      // under the kcal figure in the figure's own column and the protein beside the figure, on its line.
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', flexWrap: 'wrap', columnGap: 8 }}>
+                        <View>
+                          {kcalFigure(idea.kcal, 15)}
+                          {dim ? null : fitBar(idea, i, 4)}
+                        </View>
+                        <View style={{ minHeight: 20, justifyContent: 'center' }}>{proteinLine(idea.protein)}</View>
+                      </View>
+                    ) : null}
                     <Text variant="caption" color="textSecondary" numberOfLines={2} testID={`fits-idea-foods-${i}`}>
                       {idea.foods.map(isolateRtl).join(' · ')}
                     </Text>
@@ -195,7 +226,14 @@ export function FitsSheet({
                       </Text>
                     ) : null}
                   </View>
-                  {narrow ? null : <View style={{ alignItems: 'flex-end' }}>{numbers(idea.kcal, idea.protein, 17)}</View>}
+                  {narrow ? null : (
+                    // The numbers column: the kcal figure, its bar, then the protein line.
+                    <View style={{ alignItems: 'flex-end' }}>
+                      {kcalFigure(idea.kcal, 17)}
+                      {dim ? null : fitBar(idea, i, 8)}
+                      {proteinLine(idea.protein)}
+                    </View>
+                  )}
                   <IconButton
                     testID={`fits-idea-add-${i}`}
                     accessibilityLabel={

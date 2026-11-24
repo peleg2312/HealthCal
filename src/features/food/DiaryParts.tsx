@@ -3,6 +3,7 @@ import { CalendarPlus, Copy, MoreHorizontal, Plus, Repeat2, Save, Trash2, X } fr
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import { SourceMark, sourceMarkTop } from '@/features/ai/mark';
 import { ALSO_IN_WATER, waterFor } from '@/features/drinks/rules';
 import { isWaterDrinkEntry } from '@/features/drinks/via';
 import { isolateRtl, withoutMarks } from '@/lib/bidi';
@@ -15,7 +16,7 @@ import type { FoodEntry, ISODate, MealType, WaterEntry } from '@/types';
 import { AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, Hatch, IconButton, ListRow, PressableScale, ProgressBar, Sheet, Text, TextField, Trough } from '@/ui';
 
 import { clearEntries, copyEntries, saveMeal } from './actions';
-import { DayStepper, KcalTrail, MealPicker, RowEmoji, sourceKeyVariant } from './components';
+import { DayStepper, KcalTrail, MealPicker, RowEmoji } from './components';
 import { dayPhrase, href, kcal, portionLabel, sourceInfo } from './helpers';
 import { deleteEntry } from './log';
 import { currentKcal } from './usuals';
@@ -156,7 +157,7 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
             {/* The source's mark leads the line and its word ends it, so a portion that wraps never leaves the mark floating. */}
             <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: 6 }} accessible accessibilityLabel={`${withoutMarks(portion)}${inWater ? `, ${ALSO_IN_WATER}` : ''}, ${source.label}`}>
-              <CupKey color={colors.textSecondary} variant={sourceKeyVariant(ai ? 'ai' : entry.source)} size={8} style={{ marginTop: 5 }} />
+              <SourceMark source={ai ? 'ai' : entry.source} color={colors.textSecondary} size={8} style={{ marginTop: sourceMarkTop(ai ? 'ai' : entry.source) }} />
               {/* The mark "also in Water" may take one more line (on a 320 px phone "1 can (8.4 fl oz) · 250 g · also in Water · Reference" needs three), so the word Water is never cut. */}
               <Text testID={inWater ? `entry-in-water-${entry.id}` : undefined} variant="caption" color="textSecondary" numberOfLines={inWater ? 3 : 2} style={{ flexShrink: 1 }}>
                 {`${portion}${inWater ? ` · ${ALSO_IN_WATER}` : ''} · ${source.short}`}

@@ -190,19 +190,28 @@ export function GoalCup({ goal, index = 0 }: { goal: 'lose' | 'maintain' | 'gain
  * Information panel with a leading icon: an alt cup (surfaceAlt, no border).
  * `warning` wears a 3 px amber lip along its top, as a cup does when it is
  * over (never red, and no stripe down the side).
+ *
+ * `surface="card"` draws it on the card surface inside the card's 1 px line
+ * instead: for a note that must stay neutral in every look (a Google sign-in
+ * that was not completed), since a look's alt surface can be a strong colour
+ * of its own (maroon in Java, blue in Butter and Honey) and would read as an
+ * alarm under the amber lip.
  */
 export function Note({
   icon,
   children,
   tone = 'neutral',
+  surface = 'alt',
   testID,
 }: {
   icon?: React.ReactNode;
   children: React.ReactNode;
   tone?: 'neutral' | 'warning';
+  surface?: 'alt' | 'card';
   testID?: string;
 }) {
   const { colors, radius, spacing } = useTheme();
+  const card = surface === 'card';
   return (
     <View
       testID={testID}
@@ -211,7 +220,9 @@ export function Note({
         gap: spacing.md,
         padding: spacing.lg,
         ...cup(radius.tile, 5),
-        backgroundColor: colors.surfaceAlt,
+        backgroundColor: card ? colors.surface : colors.surfaceAlt,
+        // On the card surface the note is outlined like a card; the amber lip, when there is one, is its top edge.
+        ...(card ? { borderWidth: 1, borderTopWidth: tone === 'warning' ? 0 : 1, borderColor: colors.border } : null),
         overflow: 'hidden',
       }}>
       {tone === 'warning' ? <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 3, backgroundColor: colors.warning }} /> : null}

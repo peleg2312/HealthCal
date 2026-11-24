@@ -1,13 +1,13 @@
-import { Info } from 'lucide-react-native';
+import { ChevronRight, Info } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { formatDayLabel, formatDuration, weekdayShort } from '@/lib/dates';
-import type { TrainingOverview } from '@/lib/trainingLoad';
+import { OVERVIEW_ABOUT, type TrainingOverview } from '@/lib/trainingLoad';
 import { formatNumber } from '@/lib/units';
 import { cup, fonts, useTheme } from '@/theme';
 import type { ISODate } from '@/types';
-import { Card, CupKey, IconButton, levelY, MiniCup, Text, Vessel, type VesselLabel } from '@/ui';
+import { Card, CupKey, IconButton, levelY, MiniCup, PressableScale, Text, Vessel, type VesselLabel } from '@/ui';
 
 import { WHO_WEEKLY_MINUTES, type WeekSummary } from './build';
 import { LoadMark } from './LoadMark';
@@ -20,9 +20,10 @@ const VESSEL_H = 168;
  * guideline drawn as a dashed level line across it (reaching it is the point,
  * so there is no "over"), the week's totals, then a cup per day filled with
  * that day's minutes. Its last line is the training overview (the last 7 days against the
- * person's recent weeks: three small cups and the state's title) when there is a state and the week
- * shown is the current one; otherwise "Hard minutes count double" as before. Both info cups open
- * the overview's sheet.
+ * person's recent weeks: the sheet's scale drawn small, `LoadMark`, and the state's title) when there is a state and the week
+ * shown is the current one: the whole line is one button (`train-load-info`, a chevron at its end)
+ * that opens the overview's sheet. Otherwise "Hard minutes count double" as before, whose info cup
+ * (`train-guideline-help`) opens the same sheet.
  */
 export function WeekCard({
   week,
@@ -164,38 +165,38 @@ export function WeekCard({
       <Text variant="caption" color="textSecondary" align="center" style={{ marginTop: 4 }}>
         Minutes each day
       </Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm, marginBottom: -spacing.sm }}>
-        {load ? (
-          <View
-            testID="train-load"
-            accessible
-            accessibilityLabel={overview.cardLabel ?? undefined}
-            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <LoadMark position={load.position} />
-            {/* The cup above counts Monday to Sunday; this line counts the last 7 days, and says so. */}
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text variant="caption" color="textSecondary" numberOfLines={1} testID="train-load-span">
-                Last 7 days
-              </Text>
-              <Text variant="label" color="text" numberOfLines={2} testID="train-load-title">
-                {load.title}
-              </Text>
-            </View>
+      {load ? (
+        // The whole line is the way into the overview: one button, 44 px tall, with a chevron where the info cup was.
+        // Its text sits where the old row's did (4 px of the 44 are above and below it), so the card is no taller.
+        <PressableScale
+          testID="train-load-info"
+          scaleTo={0.985}
+          accessibilityLabel={overview.cardLabel ?? OVERVIEW_ABOUT}
+          accessibilityHint={OVERVIEW_ABOUT}
+          onPress={() => setHelp(true)}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, paddingVertical: spacing.xs, marginTop: spacing.xs, marginBottom: -spacing.md }}>
+          <LoadMark position={load.position} />
+          {/* The cup above counts Monday to Sunday; this line counts the last 7 days, and says so. */}
+          <View testID="train-load" accessibilityLabel={overview.cardLabel ?? undefined} style={{ flex: 1, minWidth: 0 }}>
+            <Text variant="caption" color="textSecondary" numberOfLines={1} testID="train-load-span">
+              Last 7 days
+            </Text>
+            <Text variant="label" color="text" numberOfLines={2} testID="train-load-title">
+              {load.title}
+            </Text>
           </View>
-        ) : (
+          <ChevronRight size={18} color={colors.textSecondary} strokeWidth={1.9} />
+        </PressableScale>
+      ) : (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm, marginBottom: -spacing.sm }}>
           <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flex: 1 }} testID="train-guideline-line">
             Hard minutes count double
           </Text>
-        )}
-        <IconButton
-          size={36}
-          tone="clear"
-          testID={load ? 'train-load-info' : 'train-guideline-help'}
-          accessibilityLabel={load ? 'About your last 7 days of training' : 'How minutes count toward the guideline'}
-          onPress={() => setHelp(true)}>
-          <Info size={20} color={colors.textSecondary} strokeWidth={1.9} />
-        </IconButton>
-      </View>
+          <IconButton size={36} tone="clear" testID="train-guideline-help" accessibilityLabel="How minutes count toward the guideline" onPress={() => setHelp(true)}>
+            <Info size={20} color={colors.textSecondary} strokeWidth={1.9} />
+          </IconButton>
+        </View>
+      )}
       <TrainingLoadSheet overview={overview} visible={help} onClose={() => setHelp(false)} />
     </Card>
   );

@@ -28,7 +28,7 @@ const header = [
 
 module.exports = [
   ...header,
-  // Train: how the guideline counts minutes, behind the info cup under the week.
+  // Train: the overview's sheet (with how the guideline counts minutes), behind the week card's last line, which is one button.
   { id: 'train-guideline-sheet', route: '/train', taps: ['train-load-info'], sheet: true, note: 'how minutes count toward the guideline' },
   { id: 'train-guideline-sheet-stress', route: '/train', data: 'stress', taps: ['train-load-info'], sheet: true, note: 'the same sheet over the long-content week' },
   // Today with "Your week is ready" hidden, so the coach line shows under the calorie card (the demo week is otherwise Monday to Wednesday).

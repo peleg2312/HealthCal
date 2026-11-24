@@ -41,7 +41,8 @@ const train = [
   { id: 'train-stress-imperial', route: '/train', data: 'stress', imperial: true, note: 'the same week in miles' },
   { id: 'train-empty', route: '/train', data: 'empty', note: 'nothing logged: an empty week and the history invite' },
   { id: 'train-past-week', route: '/train?week={day}', day: -14, waitFor: 'train-this-week', note: 'two weeks ago, with "Back to this week"' },
-  // The training overview (src/lib/trainingLoad.ts): the week card's last line in each state (seed.mjs values.load), then its sheet.
+  // The training overview (src/lib/trainingLoad.ts): the week card's last line in each state (seed.mjs values.load;
+  // with a state the whole line is the button `train-load-info`, a chevron at its end), then its sheet.
   { id: 'train-load-steady', route: '/train', values: { load: 'steady' }, waitFor: 'train-load', note: 'overview: about your usual (268 against 268)' },
   { id: 'train-load-lighter', route: '/train', values: { load: 'lighter' }, waitFor: 'train-load', note: 'overview: lighter than your recent weeks (105 against 268)' },
   { id: 'train-load-more', route: '/train', values: { load: 'more' }, waitFor: 'train-load', note: 'overview: more than your recent weeks (366, r 1.37)' },
@@ -49,7 +50,10 @@ const train = [
   { id: 'train-load-hike', route: '/train', values: { load: 'hike' }, waitFor: 'train-load', note: 'overview: one big day (a 300 min hike)' },
   { id: 'train-load-daily', route: '/train', values: { load: 'daily' }, waitFor: 'train-load', note: 'overview: a full week, few easy days (Hard on all 7 days)' },
   { id: 'train-load-new', route: '/train', values: { load: 'new' }, waitFor: 'train-guideline-line', absent: ['train-load'], note: 'overview: under 3 weeks of workouts, the old line' },
-  { id: 'train-load-sheet', route: '/train', taps: ['train-load-info'], sheet: true, note: "the overview's sheet over the demo (about your usual)" },
+  // The sheet: the answer first (the scale under the title: one slim track in thirds), "Ask the coach" in the first view
+  // at 360 x 740, then "How this is counted". One state per third of the scale: usual (the demo), lighter, more (daily, hike).
+  { id: 'train-load-sheet', route: '/train', taps: ['train-load-info'], sheet: true, note: "the overview's sheet over the demo (about your usual): the scale on its middle third" },
+  { id: 'train-load-sheet-lighter', route: '/train', values: { load: 'lighter' }, taps: ['train-load-info'], sheet: true, note: 'the sheet for a lighter week: the scale on its first third' },
   { id: 'train-load-sheet-daily', route: '/train', values: { load: 'daily' }, taps: ['train-load-info'], sheet: true, note: 'the sheet with a fact and a next step (a full week)' },
   { id: 'train-load-sheet-hike', route: '/train', values: { load: 'hike' }, taps: ['train-load-info'], sheet: true, note: 'the sheet for one big day' },
   { id: 'train-load-sheet-new', route: '/train', values: { load: 'new' }, taps: ['train-guideline-help'], sheet: true, note: 'the sheet with too little history: "Your usual needs 3 weeks of workouts."' },
