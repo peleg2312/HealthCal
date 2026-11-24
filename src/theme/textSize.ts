@@ -14,7 +14,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
-import { Platform, type TextStyle } from 'react-native';
+import { Platform, useWindowDimensions, type TextStyle } from 'react-native';
 
 import { fonts } from './tokens';
 
@@ -165,6 +165,35 @@ export function useTextSize(): TextSize {
 /** The app's text size now (outside React). */
 export function textSize(): TextSize {
   return size;
+}
+
+/**
+ * Large text, the one rule every screen shares: how much reading text has grown on this device is the app's
+ * size times the phone's own setting as far as `phoneCapFor` lets it add (the browser leaves the phone's
+ * setting to its own zoom, so the web counts the app's size only); measured on reading text, which grows by
+ * exactly the app's size. Past `LARGE_TEXT` (the sizes 130% and up, or a phone set to 1.3 and up at 100%), a
+ * layout measured at the designed size gives way: a side-by-side row becomes rows, tiles stack or wrap, a strip
+ * scrolls. Text is never drawn smaller for it, and at 100% nothing changes.
+ */
+export const LARGE_TEXT = 1.2;
+
+/** Reading text's growth for an app size and the phone's font scale: 1 at the designed size, 2 at 200%. Pure. */
+export function textGrowth(appSize: number, phoneScale = 1): number {
+  const phone = Number.isFinite(phoneScale) && phoneScale > 0 ? Math.max(1, phoneScale) : 1;
+  const app = scaledFontSize(15, appSize) / 15;
+  return Math.round(app * Math.min(phone, phoneCapFor(appSize)) * 100) / 100;
+}
+
+/** `textGrowth` now, live. */
+export function useTextGrowth(): number {
+  const size = useTextSize();
+  const { fontScale } = useWindowDimensions();
+  return textGrowth(size, Platform.OS === 'web' ? 1 : fontScale);
+}
+
+/** True while text is large (`LARGE_TEXT`), live. */
+export function useLargeText(): boolean {
+  return useTextGrowth() > LARGE_TEXT;
 }
 
 /** Choose a text size: drawn at once and kept on this device. */

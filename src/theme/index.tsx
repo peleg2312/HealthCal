@@ -105,6 +105,7 @@ export { isReducedMotion, motion, useReducedMotion } from './motion';
 export { legibility, useLegibility, type Legibility } from './legibility';
 export {
   bolder,
+  LARGE_TEXT,
   MAX_TEXT_GROWTH,
   normaliseTextSize,
   phoneCapFor,
@@ -113,8 +114,11 @@ export {
   setTextSize,
   TEXT_SIZE_KEY,
   TEXT_SIZES,
+  textGrowth,
   textSize,
   textSizeLabel,
+  useLargeText,
+  useTextGrowth,
   useTextSize,
   type TextSize,
 } from './textSize';

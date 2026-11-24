@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import { bolder, MAX_TEXT_GROWTH, normaliseTextSize, phoneCapFor, scaledFontSize, scaleTextStyle, TEXT_SIZES, textSizeLabel } from './textSize';
+import {
+  bolder,
+  LARGE_TEXT,
+  MAX_TEXT_GROWTH,
+  normaliseTextSize,
+  phoneCapFor,
+  scaledFontSize,
+  scaleTextStyle,
+  TEXT_SIZES,
+  textGrowth,
+  textSizeLabel,
+} from './textSize';
 import { fonts } from './tokens';
 
 describe('the app text size', () => {
@@ -53,5 +64,32 @@ describe('the app text size', () => {
     expect(bolder(fonts.bold)).toBe(fonts.bold);
     expect(bolder(fonts.display)).toBe(fonts.extrabold);
     expect(scaleTextStyle({ fontFamily: fonts.medium, fontSize: 13 }, 1, true)).toEqual({ fontFamily: fonts.semibold, fontSize: 13, lineHeight: undefined, letterSpacing: undefined });
+  });
+});
+
+describe('large text (textGrowth, LARGE_TEXT)', () => {
+  it('is 1 at the designed size and the app size when the phone adds nothing', () => {
+    expect(textGrowth(1)).toBe(1);
+    expect(textGrowth(1, 1)).toBe(1);
+    expect(textGrowth(1.5, 1)).toBe(1.5);
+    expect(textGrowth(2)).toBe(2);
+  });
+
+  it("adds the phone's setting only as far as the two together stay at 2x", () => {
+    expect(textGrowth(1, 1.3)).toBe(1.3);
+    expect(textGrowth(1, 3)).toBe(2);
+    expect(textGrowth(2, 1.5)).toBe(2);
+    expect(textGrowth(1.5, 2)).toBeCloseTo(2, 1);
+  });
+
+  it('reads an unreadable phone scale as 1', () => {
+    expect(textGrowth(1.15, Number.NaN)).toBe(1.15);
+    expect(textGrowth(1.15, 0)).toBe(1.15);
+  });
+
+  it('turns the large layouts on from 130%, never at 115%', () => {
+    expect(textGrowth(1.15)).toBeLessThanOrEqual(LARGE_TEXT);
+    for (const s of TEXT_SIZES.filter((x) => x >= 1.3)) expect(textGrowth(s)).toBeGreaterThan(LARGE_TEXT);
+    expect(textGrowth(1, 1.3)).toBeGreaterThan(LARGE_TEXT);
   });
 });
