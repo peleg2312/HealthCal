@@ -141,6 +141,21 @@ name: First day on a phone
       id: meal-total-lunch
     timeout: 20000
 - takeScreenshot: 13-diary-lunch
+# Two different foods in lunch: the diary offers its one-time "Save lunch as a meal" line under the
+# lunch card. Scrolled to and photographed; never required (it is hidden once dealt with).
+- scrollUntilVisible:
+    element:
+      id: diary-save-hint
+    direction: DOWN
+    timeout: 10000
+    optional: true
+- takeScreenshot: 13b-diary-save-hint
+- scrollUntilVisible:
+    element:
+      id: meal-total-lunch
+    direction: UP
+    timeout: 10000
+    optional: true
 - tapOn:
     id: 'entry-(?!delete-).*'
     index: 0
