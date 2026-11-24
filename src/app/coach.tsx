@@ -301,7 +301,8 @@ export default function CoachScreen() {
   };
 
   // ------------------------------------------------------------------ actions
-  // The tiles, chips and the send cup give their own haptic (the kit's press), so these add none.
+  // The starter tiles and chips play the choice haptic (their `feedback="select"`); sending plays none (a kit press has
+  // no haptic of its own), so these add none.
   const answerHere = (topic: 'training' | 'ideas') => {
     const q = questionMessage(topic === 'training' ? LOCAL_TRAINING_QUESTION : localIdeasQuestion(meal), 'local');
     const a = localAnswerMessage(q, topic, topic === 'training' ? trainingAnswer(activities, today()) : ideasAnswer(ideas, meal, ideasBudget));

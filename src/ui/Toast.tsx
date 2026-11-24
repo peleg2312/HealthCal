@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Platform, Text as PlainText, TextInput, useWindowDimensions, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Platform, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { create } from 'zustand';
 
@@ -278,10 +278,10 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
   const life = useRef<Life>({ id: 0, holds: new Set(), left: 0, deadline: 0 });
   // Whether keyboard focus is on the action (web): it goes back where it came from when the toast leaves.
   const focusOn = useRef(false);
-  // Web: the words of the toast this host announced, written into its live region (below), which is mounted
-  // before any toast shows: a region added together with its words is often not read, and the web's
-  // announceForAccessibility does nothing. Keyed by the toast, so the same words twice are read twice.
-  const [said, setSaid] = useState<{ id: number; text: string } | null>(null);
+  // Web: this host's polite live region (below), mounted before any toast shows: a region added together with its
+  // words is often not read, and the web's announceForAccessibility does nothing. A new toast's words go in as a new
+  // text node, so the same words twice are read twice.
+  const live = useRef<React.ComponentRef<typeof View>>(null);
   const { height: winH } = useWindowDimensions();
 
   useEffect(() => {
@@ -304,7 +304,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       // full ("250 millilitres added to Water"); the toast drawn keeps its short units.
       const spoken = spokenUnits(withoutMarks(message));
       const line = actionLabel ? `${spoken}. ${actionLabel} available.` : spoken;
-      if (Platform.OS === 'web') setSaid({ id, text: line });
+      if (Platform.OS === 'web') speakIn(live.current, line);
       else AccessibilityInfo.announceForAccessibility(line);
     }
     // Rises 16 px and fades in, ease-out, no bounce; instant under reduced motion. A toast raised while the
@@ -348,6 +348,11 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       life.current.holds.delete('hover');
     };
   }, [shownNow, id]);
+
+  // Web: the live region holds nothing once its toast has gone (the words are said once, as it arrives).
+  useEffect(() => {
+    if (!shownNow) speakIn(live.current, '');
+  }, [shownNow]);
 
   // Web: focus that was on the action goes back to where it came from when the toast leaves.
   useEffect(() => {
@@ -475,15 +480,18 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
     bottomNow.current = bottom;
   }, [bottom]);
 
-  // Web: one polite live region per host, mounted while the host is (the app's root, an open sheet), holding the
-  // words of the toast it shows and nothing once that toast has gone.
-  const region =
-    Platform.OS === 'web' ? (
-      <View testID="toast-live" pointerEvents="none" style={SPOKEN_ONLY} {...({ role: 'status', 'aria-live': 'polite', 'aria-atomic': true } as object)}>
-        {said && message && active && said.id === id ? <PlainText key={said.id}>{said.text}</PlainText> : null}
-      </View>
-    ) : null;
-  if (!message || !active) return region;
+  // Web: one polite live region per host, mounted while the host is (the app's root, an open sheet). Its words are
+  // written by `speakIn`, never rendered, and it stays the same element whether a toast shows or not (the same
+  // two children below either way).
+  const region = Platform.OS === 'web' ? <View ref={live} testID="toast-live" pointerEvents="none" style={SPOKEN_ONLY} {...({ role: 'status', 'aria-live': 'polite', 'aria-atomic': true } as object)} /> : null;
+  if (!message || !active) {
+    return (
+      <>
+        {region}
+        {null}
+      </>
+    );
+  }
   return (
     <>
     {region}
@@ -572,6 +580,14 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
     </View>
     </>
   );
+}
+
+/** Web: puts `text` in a live region as a new text node (read out once), or empties it. */
+function speakIn(node: unknown, text: string) {
+  const el = node as { replaceChildren?: (...nodes: unknown[]) => void } | null;
+  if (Platform.OS !== 'web' || typeof document === 'undefined' || !el || typeof el.replaceChildren !== 'function') return;
+  if (text) el.replaceChildren(document.createTextNode(text));
+  else el.replaceChildren();
 }
 
 /** Heard, never seen: a 1 px box with nothing drawn (the browser scans skip what is fully transparent). */
