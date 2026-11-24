@@ -9,6 +9,7 @@ import { approxKcal, approxKcalSpoken, hasEstimate } from '@/features/food/favor
 import { amountTotal, lastPortions, servingText } from '@/features/food/helpers';
 import { logFood, logItems } from '@/features/food/log';
 import { customFoodIndex, resolveFood, resolveUsuals, usualFoods } from '@/features/food/usuals';
+import { spokenUnits } from '@/features/progress/chartWords';
 import { isolateRtl } from '@/lib/bidi';
 import { today } from '@/lib/dates';
 import { MEAL_LABEL } from '@/lib/nutrition';
@@ -303,7 +304,7 @@ export function FitsSheet({
                   {narrow ? null : <View style={{ alignItems: 'flex-end' }}>{numbers(f.kcal, f.protein, 17)}</View>}
                   <IconButton
                     testID={`fits-add-${i}`}
-                    accessibilityLabel={row.kind === 'added' ? `${displayFoodName(f.food)} added` : `Add ${displayFoodName(f.food)}, ${portionLabel(f)}, ${Math.round(f.kcal)} kilocalories, to ${mealName}`}
+                    accessibilityLabel={row.kind === 'added' ? `${displayFoodName(f.food)} added` : `Add ${displayFoodName(f.food)}, ${spokenUnits(portionLabel(f))}, ${Math.round(f.kcal)} kilocalories, to ${mealName}`}
                     tone={row.kind === 'added' ? 'primary' : 'surface'}
                     size={44}
                     disabled={row.kind === 'added'}

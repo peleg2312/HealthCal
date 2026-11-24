@@ -27,6 +27,7 @@ import { AFTER_STRIP_MS, StreakMark } from '@/features/streak/StreakMark';
 import { useStreakMoment } from '@/features/streak/useStreakMoment';
 import { addWater, defaultGlass, StatusRail } from '@/features/today/StatusRail';
 import { useReportViewedDay } from '@/features/today/viewedDay';
+import { spokenUnits } from '@/features/progress/chartWords';
 import { addDays, formatShortDate, greeting } from '@/lib/dates';
 import { MEALS, MEAL_LABEL, MEAL_SHARE, mealForTime } from '@/lib/nutrition';
 import { formatNumber, formatVolume } from '@/lib/units';
@@ -462,7 +463,7 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
         tint={colors.water}
         icon={<Plus size={18} color={colors.water} strokeWidth={2.2} />}
         title={`Add ${formatVolume(glass, profile.units)}`}
-        accessibilityLabel={`Add ${formatVolume(glass, profile.units)} of water`}
+        accessibilityLabel={spokenUnits(`Add ${formatVolume(glass, profile.units)} of water`)}
         onPress={oneTap(() => addWater(day.date, glass, profile.units, day.waterGoalMl))}
       />
     );
@@ -558,7 +559,7 @@ function MealsSection({ day }: { day: DaySummary }) {
                   testID={`today-meal-${m.id}`}
                   scaleTo={0.99}
                   onPress={() => (entries.length ? router.push(`/diary?date=${day.date}&meal=${m.id}` as never) : open(m.id))}
-                  accessibilityLabel={`${m.label}, ${entries.length ? `${line.approx ? 'about ' : ''}${Math.round(line.kcal)} kilocalories, ${line.detail}` : 'not logged yet'}`}
+                  accessibilityLabel={spokenUnits(`${m.label}, ${entries.length ? `${line.approx ? 'about ' : ''}${Math.round(line.kcal)} kilocalories, ${line.detail}` : 'not logged yet'}`)}
                   style={{ flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm }}>
                     <Text variant="title" style={{ flex: 1 }} numberOfLines={1}>

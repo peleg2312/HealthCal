@@ -5,6 +5,7 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { waterAddedToast } from '@/features/food/addedTo';
 import { useOneTap } from '@/features/food/oneTap';
+import { spokenUnits } from '@/features/progress/chartWords';
 import { startOfWeek, today } from '@/lib/dates';
 import { guidelineMinutes } from '@/lib/exercise';
 import { effectiveMl } from '@/lib/hydration';
@@ -145,7 +146,7 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
           <PressableScale
             testID="today-water"
             onPress={() => router.push(`/water${dateQuery}` as never)}
-            accessibilityLabel={`Water, ${formatVolume(day.waterMl, units)} of ${goal}`}
+            accessibilityLabel={spokenUnits(`Water, ${formatVolume(day.waterMl, units)} of ${goal}`)}
             scaleTo={0.98}
             style={{ flex: 1, minWidth: 0, minHeight: 44 }}>
             <KeyLabel color={colors.water} label="Water" />
@@ -155,14 +156,14 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
               style={{ marginTop: 3 }}
               value={day.waterMl}
               format={(ml) => volumeNumber(ml, day.waterMl, units)}
-              accessibilityLabel={`${formatVolume(day.waterMl, units)} of ${goal}`}>
+              accessibilityLabel={spokenUnits(`${formatVolume(day.waterMl, units)} of ${goal}`)}>
               <Text variant="unit">{`${!sameUnit ? ` ${waterUnit}` : ''} of ${goalValue} ${goalUnit}`}</Text>
             </AnimatedNumber>
           </PressableScale>
           <Button
             testID={`today-water-${glass}`}
             title={formatVolume(glass, units)}
-            accessibilityLabel={`Add ${formatVolume(glass, units)} of water`}
+            accessibilityLabel={spokenUnits(`Add ${formatVolume(glass, units)} of water`)}
             variant={quiet ? 'ghost' : 'secondary'}
             tint={quiet ? undefined : colors.water}
             size="sm"

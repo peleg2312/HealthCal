@@ -97,7 +97,7 @@ export function FirstLogInvite({ meal, date, budget, narrow = false }: { meal: M
       key={p.key}
       testID={`today-first-${p.key}`}
       label={`${isolateRtl(p.label)} · ${formatNumber(Math.round(p.kcal))} kcal`}
-      accessibilityLabel={`Add ${p.label}, ${formatNumber(Math.round(p.kcal))} kcal, to ${label.toLowerCase()}`}
+      accessibilityLabel={`Add ${p.label}, ${formatNumber(Math.round(p.kcal))} kilocalories, to ${label.toLowerCase()}`}
       icon={<Plus size={18} color={colors.text} strokeWidth={2.2} />}
       onPress={() => logFood({ food: p.food, serving: p.serving, quantity: p.quantity, meal, date })}
     />

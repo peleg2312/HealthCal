@@ -336,18 +336,19 @@ export function MealCard({
       {hint && rows.length > 0 ? <SaveHintRow meal={meal} onSave={hint.onSave} onClose={hint.onClose} /> : null}
       {removed.length ? (
         <View testID={`meal-removed-${meal}`}>
-          {filled ? <Divider inset={ROW_PAD} /> : null}
-          <View style={{ paddingLeft: ROW_PAD, paddingRight: 8, paddingTop: filled ? 2 : 8, paddingBottom: filled ? 6 : 0 }}>
-            {removed.map((e) => (
-              <Unfold key={e.id} animate={!shownAtMount.has(`${date}:${e.id}`)}>
+          {/* Each row brings its own room (and the first its divider), so nothing appears at once around them. */}
+          {removed.map((e, i) => (
+            <Unfold key={e.id} animate={!shownAtMount.has(`${date}:${e.id}`)}>
+              {i === 0 && filled ? <Divider inset={ROW_PAD} /> : null}
+              <View style={{ paddingLeft: ROW_PAD, paddingRight: 8, paddingTop: i === 0 ? (filled ? 2 : 8) : 0, paddingBottom: i === removed.length - 1 && filled ? 6 : 0 }}>
                 <RestoreRow
                   testID={`entry-restore-${e.id}`}
                   label={`${isolateRtl(foodNameHead(displayFoodName(e)))} removed from ${mealWord}`}
                   onRestore={() => useStore.getState().restore('foodEntries', e.id)}
                 />
-              </Unfold>
-            ))}
-          </View>
+              </View>
+            </Unfold>
+          ))}
         </View>
       ) : null}
       {filled ? null : (
