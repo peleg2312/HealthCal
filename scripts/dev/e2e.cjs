@@ -597,9 +597,10 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   );
   const addedToast = await text('toast');
   // With the day's new water total the toast names the drink and where it went, held to two lines at 320 px
-  // ("Milk added to lunch and Water · 1.48 of 3.3 L", planDrink in src/features/drinks/rules.ts); the
+  // ("Milk added to lunch and Water · 1.48 of 3.3 L", or "· 725 ml of 2.55 L" under a litre; planDrink in
+  // src/features/drinks/rules.ts, the total from waterOfGoal); the
   // calories and the amount are on the tile just tapped.
-  check('drinks: the toast says what was added and where', new RegExp(`^Milk added to ${mealWord} and Water · [\\d.]+ of [\\d.]+ L`).test(addedToast), addedToast);
+  check('drinks: the toast says what was added and where', new RegExp(`^Milk added to ${mealWord} and Water · [\\d.,]+( ml| L)? of [\\d.,]+ L`).test(addedToast), addedToast);
   await tap('toast-action');
   s = await stored();
   check('drinks: Undo removes both', !!s.water[w1.id]?.deleted && !!s.foodEntries[e1.id]?.deleted);

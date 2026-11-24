@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ANDROID_TARGET, ariaFromState, fixedSize, pressesOnSpace, rovingIndex, slopToReach, stepperKey, webAutoComplete } from './controlRules';
+import { ANDROID_TARGET, ariaFromState, fixedSize, pressesOnSpace, rovingIndex, slopToReach, spokenFieldName, stepperKey, webAutoComplete } from './controlRules';
 
 describe('slopToReach (48 dp on Android)', () => {
   it('grows a 44 px cup to 48 on both axes', () => {
@@ -90,5 +90,25 @@ describe('webAutoComplete', () => {
   it('passes the names the browser knows', () => {
     for (const v of ['email', 'name', 'given-name', 'current-password', 'new-password', 'off', 'username']) expect(webAutoComplete(v)).toBe(v);
     expect(webAutoComplete(undefined)).toBeUndefined();
+  });
+});
+
+describe('spokenFieldName', () => {
+  it('says a short unit at the end of the label in full', () => {
+    expect(spokenFieldName('Neck, in')).toBe('Neck, inches');
+    expect(spokenFieldName('Height, ft')).toBe('Height, feet');
+    expect(spokenFieldName('Weight (kg)')).toBe('Weight (kilograms)');
+    expect(spokenFieldName('Water, fl oz')).toBe('Water, fluid ounces');
+  });
+  it("adds the field's own unit when the label does not name it", () => {
+    expect(spokenFieldName('Protein', 'g')).toBe('Protein, grams');
+    expect(spokenFieldName('Calories', 'kcal')).toBe('Calories, kilocalories');
+    expect(spokenFieldName('Weight, kg', 'kg')).toBe('Weight, kilograms');
+  });
+  it('leaves a label alone when there is no unit to say', () => {
+    expect(spokenFieldName('Name')).toBe('Name');
+    expect(spokenFieldName('Servings', 'servings')).toBe('Servings');
+    expect(spokenFieldName('Login')).toBe('Login');
+    expect(spokenFieldName(undefined, 'g')).toBeUndefined();
   });
 });

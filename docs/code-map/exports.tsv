@@ -3256,11 +3256,14 @@ src/theme/index.tsx	TEXT_SIZE_KEY	re-export	src/theme/textSize.ts:TEXT_SIZE_KEY
 src/theme/index.tsx	TextSize	re-export	src/theme/textSize.ts:TextSize
 src/theme/index.tsx	Theme	interface
 src/theme/index.tsx	ThemeProvider	component
+src/theme/index.tsx	bolder	re-export	src/theme/textSize.ts:bolder
 src/theme/index.tsx	isReducedMotion	re-export	src/theme/motion.ts:isReducedMotion
 src/theme/index.tsx	legibility	re-export	src/theme/legibility.ts:legibility
 src/theme/index.tsx	motion	re-export	src/theme/motion.ts:motion
+src/theme/index.tsx	normaliseTextSize	re-export	src/theme/textSize.ts:normaliseTextSize
 src/theme/index.tsx	phoneCapFor	re-export	src/theme/textSize.ts:phoneCapFor
 src/theme/index.tsx	scaleTextStyle	re-export	src/theme/textSize.ts:scaleTextStyle
+src/theme/index.tsx	scaledFontSize	re-export	src/theme/textSize.ts:scaledFontSize
 src/theme/index.tsx	setTextSize	re-export	src/theme/textSize.ts:setTextSize
 src/theme/index.tsx	textSize	re-export	src/theme/textSize.ts:textSize
 src/theme/index.tsx	textSizeLabel	re-export	src/theme/textSize.ts:textSizeLabel
@@ -3434,6 +3437,7 @@ src/ui/Text.tsx	ColorName	type
 src/ui/Text.tsx	MAX_FONT_SCALE	const
 src/ui/Text.tsx	Text	component
 src/ui/Text.tsx	TextProps	interface
+src/ui/Text.tsx	useLargeText	function
 src/ui/Toast.tsx	TOAST_ACTION_GUARD_MS	const
 src/ui/Toast.tsx	TOAST_ACTION_MS	const
 src/ui/Toast.tsx	TOAST_MS	const
@@ -3459,6 +3463,7 @@ src/ui/controlRules.ts	isSpaceKey	function
 src/ui/controlRules.ts	pressesOnSpace	function
 src/ui/controlRules.ts	rovingIndex	function
 src/ui/controlRules.ts	slopToReach	function
+src/ui/controlRules.ts	spokenFieldName	function
 src/ui/controlRules.ts	stepperKey	function
 src/ui/controlRules.ts	webAutoComplete	function
 src/ui/haptics.ts	haptic	const

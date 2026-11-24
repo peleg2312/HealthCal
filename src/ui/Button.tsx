@@ -1,10 +1,10 @@
 import React from 'react';
-import { ActivityIndicator, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { cup, cupFor, fonts, useTheme } from '@/theme';
 
 import { PressableScale } from './Pressable';
-import { Text } from './Text';
+import { Text, useLargeText } from './Text';
 
 export interface ButtonProps {
   title: string;
@@ -39,6 +39,12 @@ export function Button({ title, onPress, variant = 'primary', size = 'lg', icon,
   const { colors, radius } = useTheme();
   const sm = size === 'sm';
   const height = size === 'lg' ? 48 : size === 'md' ? 44 : 36;
+  // Large text (the app's size above 100% or the phone's setting): the label wraps onto more lines and the
+  // button grows to hold them, never cut with an ellipsis. A height the caller set (a button beside a field)
+  // becomes the least height then. At the designed size the button is exactly as before: one line, its height.
+  const large = useLargeText();
+  const given = large ? StyleSheet.flatten(style) : undefined;
+  const callerHeight = typeof given?.height === 'number' ? given.height : undefined;
   const bg = variant === 'primary' ? colors.primary : variant === 'soft' ? colors.primarySoft : 'transparent';
   const fg =
     variant === 'primary'
@@ -61,7 +67,7 @@ export function Button({ title, onPress, variant = 'primary', size = 'lg', icon,
       hitSlop={sm ? 4 : undefined}
       style={[
         {
-          height,
+          ...(large ? { minHeight: height, paddingVertical: sm ? 4 : 8, maxWidth: '100%' as const } : { height }),
           ...(sm ? cup(radius.buttonSm, 5) : cup(radius.button)),
           backgroundColor: bg,
           paddingHorizontal: sm ? 12 : 20,
@@ -73,14 +79,18 @@ export function Button({ title, onPress, variant = 'primary', size = 'lg', icon,
           borderWidth: edge === 'transparent' ? 0 : 1.5,
           borderColor: edge,
         },
-        style,
+        large && given ? { ...given, height: undefined, minHeight: Math.max(height, callerHeight ?? 0, typeof given.minHeight === 'number' ? given.minHeight : 0) } : style,
       ]}>
       {loading ? (
         <ActivityIndicator color={fg} />
       ) : (
         <>
           {icon ? <View>{icon}</View> : null}
-          <Text variant="title" color={fg} numberOfLines={1} style={sm ? { fontSize: 14, lineHeight: 18, fontFamily: fonts.bold } : undefined}>
+          <Text
+            variant="title"
+            color={fg}
+            numberOfLines={large ? undefined : 1}
+            style={[sm ? { fontSize: 14, lineHeight: 18, fontFamily: fonts.bold } : null, large ? { flexShrink: 1, textAlign: 'center' } : null]}>
             {title}
           </Text>
           {iconRight ? <View>{iconRight}</View> : null}

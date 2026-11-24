@@ -2,6 +2,7 @@ import { ChevronRight } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Animated, Easing, Platform, View, type AccessibilityRole, type AccessibilityState, type StyleProp, type ViewStyle } from 'react-native';
 
+import { spokenUnits } from '@/lib/spokenUnits';
 import { cup, cupFor, fonts, motion, useReducedMotion, useTheme } from '@/theme';
 
 import { Button } from './Button';
@@ -22,6 +23,7 @@ export function ListRow({
   accessibilityRole,
   accessibilityState,
   accessibilityHint,
+  accessibilityLabel,
 }: {
   title: string;
   subtitle?: string;
@@ -37,6 +39,8 @@ export function ListRow({
   accessibilityRole?: AccessibilityRole;
   accessibilityState?: AccessibilityState;
   accessibilityHint?: string;
+  /** What a screen reader says for a row you can tap. By default its title, subtitle and value, with every unit said in full. */
+  accessibilityLabel?: string;
 }) {
   const { colors, spacing } = useTheme();
   const content = (
@@ -73,7 +77,7 @@ export function ListRow({
         accessibilityRole={accessibilityRole}
         accessibilityState={accessibilityState}
         accessibilityHint={accessibilityHint}
-        accessibilityLabel={[title, subtitle, value].filter(Boolean).join(', ')}>
+        accessibilityLabel={accessibilityLabel ?? spokenUnits([title, subtitle, value].filter(Boolean).join(', '))}>
         {content}
       </PressableScale>
     );
@@ -182,7 +186,7 @@ export function ToggleRow({
   left?: React.ReactNode;
   testID?: string;
 }) {
-  return <ListRow title={title} subtitle={subtitle} left={left} chevron={false} right={<Toggle testID={testID} value={value} onChange={onChange} accessibilityLabel={title} />} />;
+  return <ListRow title={title} subtitle={subtitle} left={left} chevron={false} right={<Toggle testID={testID} value={value} onChange={onChange} accessibilityLabel={spokenUnits(title)} />} />;
 }
 
 /**

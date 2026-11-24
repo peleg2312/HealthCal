@@ -1,6 +1,6 @@
 import { ChevronRight, Info } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { ScrollView, useWindowDimensions, View } from 'react-native';
 
 import { formatDayLabel, formatDuration, weekdayShort } from '@/lib/dates';
 import { OVERVIEW_ABOUT, type TrainingOverview } from '@/lib/trainingLoad';
@@ -65,7 +65,21 @@ export function WeekCard({
 
   const status = reached ? 'Weekly activity guideline reached' : `${WHO_WEEKLY_MINUTES - minutes} min to the weekly guideline`;
   // Above 115% text the labels placed at their levels would run into each other (they are 20, 40 and 44 px tall).
-  const stacked = useTextGrowth() > 1.15;
+  const grow = useTextGrowth();
+  const stacked = grow > 1.15;
+  // The week strip: a column per day, at least 22 px per 100% of text above 115%; it scrolls when seven do not fit.
+  const colMin = stacked ? 22 * grow : 0;
+  const scrollStrip = colMin > (Math.min(screenW, 560) - 40 - 36) / 7;
+  const wrapStrip = (columns: React.ReactNode) =>
+    scrollStrip ? (
+      <ScrollView horizontal testID="train-week-strip" contentContainerStyle={{ flexDirection: 'row' }}>
+        {columns}
+      </ScrollView>
+    ) : (
+      <View style={{ flexDirection: 'row' }} testID="train-week-strip">
+        {columns}
+      </View>
+    );
   const labels: VesselLabel[] = [
     {
       key: 'guide',
@@ -173,15 +187,18 @@ export function WeekCard({
 
       <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
 
-      <View style={{ flexDirection: 'row' }} testID="train-week-strip">
-        {dates.map((d) => {
+      {/* Seven columns across the card; at large text on a narrow phone a column would be narrower than its
+          number (two days' "75" ran into each other at 320 px and 200%), so the strip keeps 22 px a column per
+          100% of text and scrolls sideways, its last column cut at the card's edge to show there is more. */}
+      {wrapStrip(
+        dates.map((d) => {
           const day = week.byDate[d];
           const isToday = d === today;
           const future = d > today;
           return (
             <View
               key={d}
-              style={{ flex: 1, alignItems: 'center', gap: 6 }}
+              style={[scrollStrip ? { width: colMin } : { flex: 1 }, { alignItems: 'center', gap: 6 }]}
               accessible
               accessibilityLabel={`${formatDayLabel(d)}: ${future ? 'still to come' : `${day.minutes} minutes`}`}>
               <Text variant="label" color={isToday ? 'text' : 'textSecondary'} style={{ fontSize: 12, lineHeight: 16, fontFamily: isToday ? fonts.bold : fonts.semibold }}>
@@ -205,8 +222,8 @@ export function WeekCard({
               </View>
             </View>
           );
-        })}
-      </View>
+        }),
+      )}
       <Text variant="caption" color="textSecondary" align="center" style={{ marginTop: 4 }}>
         Minutes each day
       </Text>

@@ -6,7 +6,7 @@ import { fonts, useTheme } from '@/theme';
 
 import { rovingIndex } from './controlRules';
 import { PressableScale } from './Pressable';
-import { Text } from './Text';
+import { Text, useLargeText } from './Text';
 
 /**
  * A label you can tap: 32 visible (a 44 px touch target through hitSlop, on
@@ -35,6 +35,8 @@ export function Chip({
 }) {
   const { colors, radius } = useTheme();
   const fg = selected ? colors.bg : colors.text;
+  // Large text: the chip grows to its label's lines (32 at least) and the label wraps at its spaces, never cut.
+  const large = useLargeText();
   return (
     <PressableScale
       testID={testID}
@@ -53,7 +55,7 @@ export function Chip({
           flexDirection: 'row',
           alignItems: 'center',
           gap: 6,
-          height: 32,
+          ...(large ? { minHeight: 32, paddingVertical: 3, maxWidth: '100%' as const } : { height: 32 }),
           paddingHorizontal: 12,
           borderRadius: radius.chip,
           backgroundColor: selected ? colors.text : 'transparent',
@@ -63,7 +65,7 @@ export function Chip({
         style,
       ]}>
       {icon}
-      <Text variant="label" color={fg} numberOfLines={1} style={{ fontSize: 13.5, flexShrink: 1 }}>
+      <Text variant="label" color={fg} numberOfLines={large ? undefined : 1} style={{ fontSize: 13.5, flexShrink: 1 }}>
         {label}
       </Text>
       {dropdown ? <ChevronDown size={16} color={fg} strokeWidth={2.2} /> : null}
@@ -100,6 +102,10 @@ export function ChipWrap({ children, style }: { children: React.ReactNode; style
  * "Goal"). Either way it is one tab stop: on the web the arrow keys move the
  * choice and focus along the row (Home and End to its ends), and Space or Enter
  * picks the focused one.
+ *
+ * At large text (`useLargeText`) no label is cut: each segment is as wide as its label, the extra room is
+ * shared, and segments that do not fit go on to a second row (a label wider than the whole row wraps at its
+ * spaces). At the designed size the segments share the row equally on one line, as always.
  */
 export function Segmented<T extends string>({
   options,
@@ -125,12 +131,13 @@ export function Segmented<T extends string>({
   const radio = role === 'radiogroup';
   const current = options.findIndex((o) => o.value === value);
   const web = Platform.OS === 'web';
+  const large = useLargeText();
   return (
     <View
       accessibilityRole={radio ? 'radiogroup' : 'tablist'}
       {...(web ? { role } : null)}
       accessibilityLabel={accessibilityLabel}
-      style={[{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border }, style]}>
+      style={[{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border }, large ? { flexWrap: 'wrap' } : null, style]}>
       {options.map((o, i) => {
         const active = o.value === value;
         return (
@@ -158,8 +165,15 @@ export function Segmented<T extends string>({
                   },
                 }
               : null)}
-            style={{ flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
-            <Text variant="label" color={active ? 'text' : 'textSecondary'} numberOfLines={1} style={{ fontSize: 14.5, lineHeight: 20, fontFamily: active ? fonts.bold : fonts.semibold }}>
+            style={[
+              { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+              large ? { flexGrow: 1, flexShrink: 0, flexBasis: 'auto', maxWidth: '100%', paddingHorizontal: 8, paddingVertical: 4 } : { flex: 1, paddingHorizontal: 4 },
+            ]}>
+            <Text
+              variant="label"
+              color={active ? 'text' : 'textSecondary'}
+              numberOfLines={large ? undefined : 1}
+              style={[{ fontSize: 14.5, lineHeight: 20, fontFamily: active ? fonts.bold : fonts.semibold }, large ? { textAlign: 'center' } : null]}>
               {o.label}
             </Text>
             {active ? <Underline /> : null}

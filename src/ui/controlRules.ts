@@ -163,3 +163,38 @@ export function webAutoComplete(value: string | undefined): string | undefined {
   if (!value) return value;
   return WEB_AUTOCOMPLETE[value] ?? value;
 }
+
+/** A field's unit, said in full (its suffix, or the short unit at the end of its label). */
+const FIELD_UNITS: Record<string, string> = {
+  g: 'grams',
+  mg: 'milligrams',
+  kg: 'kilograms',
+  lb: 'pounds',
+  lbs: 'pounds',
+  oz: 'ounces',
+  'fl oz': 'fluid ounces',
+  ml: 'millilitres',
+  L: 'litres',
+  kcal: 'kilocalories',
+  '%': 'percent',
+  min: 'minutes',
+  h: 'hours',
+  cm: 'centimetres',
+  in: 'inches',
+  ft: 'feet',
+  km: 'kilometres',
+  mi: 'miles',
+};
+
+/**
+ * A text field's spoken name with its unit in full: a short unit at the end of the label ("Neck, in",
+ * "Weight (kg)") is said as its word ("Neck, inches"), and the unit drawn inside the field (`suffix`, "g")
+ * is added when the label does not name it ("Protein, grams"). A suffix that is not a unit ("servings")
+ * adds nothing. The label as drawn keeps its short unit.
+ */
+export function spokenFieldName(label: string | undefined, suffix?: string): string | undefined {
+  if (!label) return label;
+  const name = label.replace(/(,\s*|\s\()(fl oz|kcal|kg|lbs?|oz|ml|mg|g|L|cm|in|ft|km|mi|min|h|%)(\)?)$/, (_m, pre: string, unit: string, close: string) => `${pre}${FIELD_UNITS[unit]}${close}`);
+  const word = suffix ? FIELD_UNITS[suffix.trim()] : undefined;
+  return word && !name.includes(word) ? `${name}, ${word}` : name;
+}

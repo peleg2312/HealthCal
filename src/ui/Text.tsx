@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform, Text as RNText, StyleSheet, type StyleProp, type TextProps as RNTextProps, type TextStyle } from 'react-native';
+import { Platform, Text as RNText, StyleSheet, useWindowDimensions, type StyleProp, type TextProps as RNTextProps, type TextStyle } from 'react-native';
 
 import { leftToRightStart } from '@/lib/bidi';
 import { keepTogether, keepUnitWithNumber } from '@/lib/text';
@@ -25,6 +25,18 @@ export interface TextProps extends RNTextProps {
  * browser's zoom and the app's text size scale the page there.
  */
 export const MAX_FONT_SCALE = MAX_TEXT_GROWTH;
+
+/**
+ * True while text is drawn above its designed size: the app's own text size above 100% (Profile > App) or the
+ * phone's text-size setting above its default. Kit controls that hold their label to one line at the designed
+ * size (Button, Segmented, the field's placeholder) let it wrap, grow or end with an ellipsis then, so large
+ * text is never cut; at the designed size nothing changes.
+ */
+export function useLargeText(): boolean {
+  const scale = useTextSize();
+  const { fontScale } = useWindowDimensions();
+  return scale > 1 || fontScale > 1;
+}
 
 const SECONDARY_BY_DEFAULT: Partial<Record<TextVariant, true>> = { overline: true, unit: true };
 

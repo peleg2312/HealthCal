@@ -2,13 +2,13 @@ import { Minus, Plus } from 'lucide-react-native';
 import React, { useId, useState } from 'react';
 import { Platform, TextInput, View, type AccessibilityActionEvent, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 
-import { cup, fonts, phoneCapFor, useTextSize, useTheme } from '@/theme';
-import { scaledFontSize } from '@/theme/textSize';
+import { spokenUnits } from '@/lib/spokenUnits';
+import { cup, fonts, phoneCapFor, scaledFontSize, useTextSize, useTheme } from '@/theme';
 
 import { IconButton } from './Button';
-import { stepperKey, webAutoComplete } from './controlRules';
+import { spokenFieldName, stepperKey, webAutoComplete } from './controlRules';
 import { FOCUS_CUP, useFocusRing } from './Pressable';
-import { Text } from './Text';
+import { Text, useLargeText } from './Text';
 
 export interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   label?: string;
@@ -54,6 +54,9 @@ export function TextField({ label, suffix, error, hint, left, right, style, line
   const [focused, setFocused] = useState(false);
   useFocusRing();
   const scale = useTextSize();
+  // At large text a one-line placeholder that no longer fits ends with an ellipsis (web) instead of being
+  // clipped mid-word; at the designed size it must fit the field at 320 px, so nothing hides that there.
+  const large = useLargeText();
   const fontSize = scaledFontSize(16, scale);
   const lineHeight = Math.round((22 * fontSize) / 16);
   const noteId = `field-note-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
@@ -98,7 +101,8 @@ export function TextField({ label, suffix, error, hint, left, right, style, line
           maxFontSizeMultiplier={phoneCapFor(scale)}
           {...rest}
           {...(web as object)}
-          accessibilityLabel={rest.accessibilityLabel ?? label ?? rest.placeholder}
+          // Its name says the unit in full: the label's short unit or the one drawn in the field ("Protein, grams").
+          accessibilityLabel={spokenUnits(rest.accessibilityLabel ?? spokenFieldName(label, suffix) ?? rest.placeholder ?? '') || undefined}
           accessibilityHint={error || rest.accessibilityHint || hint}
           onFocus={(e) => {
             setFocused(true);
@@ -126,6 +130,7 @@ export function TextField({ label, suffix, error, hint, left, right, style, line
             rest.multiline && lines ? { minHeight: lines * lineHeight + 24, textAlignVertical: 'top' as const } : null,
             // Removes the default focus outline on web; the border shows focus instead.
             { outlineStyle: 'none' } as object,
+            large && !rest.multiline && Platform.OS === 'web' ? ({ textOverflow: 'ellipsis' } as object) : null,
           ]}
         />
         {left ? (
@@ -243,7 +248,7 @@ export function Stepper({
           tabIndex: 0,
           'aria-label': name,
           'aria-valuenow': value,
-          'aria-valuetext': shown,
+          'aria-valuetext': spokenUnits(shown),
           ...(Number.isFinite(min) ? { 'aria-valuemin': min } : null),
           ...(Number.isFinite(max) ? { 'aria-valuemax': max } : null),
           onKeyDown: (e: { key: string; preventDefault: () => void }) => {
@@ -261,7 +266,7 @@ export function Stepper({
           accessible: true,
           accessibilityRole: 'adjustable' as const,
           accessibilityLabel: name,
-          accessibilityValue: { ...range, now: value, text: shown },
+          accessibilityValue: { ...range, now: value, text: spokenUnits(shown) },
           accessibilityActions: [{ name: 'increment' }, { name: 'decrement' }],
           onAccessibilityAction: (e: AccessibilityActionEvent) => {
             if (e.nativeEvent.actionName === 'increment' && value < max) set(value + step);
