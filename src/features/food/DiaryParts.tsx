@@ -30,6 +30,7 @@ import { SAVE_HINT_NOT_NOW, SAVE_HINT_NOT_NOW_A11Y, saveHintA11y, saveHintLabel 
 import { currentKcal } from './usuals';
 import { removedToday } from './restore';
 import { FadeRow, Unfold, useLeavingRows } from './rowMotion';
+import { useBigText } from './textGrowth';
 
 /**
  * The diary summary: calories left as a big number, the day as a trough
@@ -47,6 +48,8 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?
   // On a phone "eaten of" always sits under the big number. Wrapping only when the number grew
   // a digit would make the whole page jump by a line as a log or a delete ticks it past 999.
   const stacked = screenW < 480;
+  // With large text the three macros wrap (each at least 120 wide), so a name or "/ 152 g" is never split.
+  const big = useBigText();
   const over = day.remaining < 0;
   const budget = Math.max(0, day.budget);
   // Calories workouts add to this day (its own and shares carried from the six days before), drawn as
@@ -102,7 +105,7 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?
         ) : null}
       </View>
       <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
-      <View style={{ flexDirection: 'row', gap: narrow ? spacing.md : spacing.lg }}>
+      <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', columnGap: narrow ? spacing.md : spacing.lg, rowGap: spacing.md }}>
         {(
           [
             ['Protein', day.eaten.protein, day.macros.proteinG, colors.protein, 'reach'],
@@ -110,7 +113,7 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?
             ['Fat', day.eaten.fat, day.macros.fatG, colors.fat, 'limit'],
           ] as const
         ).map(([label, value, target, color, goalKind]) => (
-          <View key={label} style={{ flex: 1, minWidth: 0, gap: 8 }} accessible accessibilityLabel={`${label}, ${Math.round(value)} of ${target} grams`}>
+          <View key={label} style={[big ? { flexGrow: 1, flexBasis: 120 } : { flex: 1 }, { minWidth: 0, gap: 8 }]} accessible accessibilityLabel={`${label}, ${Math.round(value)} of ${target} grams`}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <CupKey color={color} />
               <Text variant="label" numberOfLines={1}>
@@ -149,6 +152,8 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
   const { width } = useWindowDimensions();
   // On a narrow phone the name and the portion may take two lines rather than be cut.
   const narrow = width < 360;
+  // With large text the calories take a line of their own under the portion, so neither is squeezed.
+  const big = useBigText();
   // Any entry that carries a range is an estimate, whatever food it was matched to afterwards.
   const ai = !!entry.kcalRange;
   const source = sourceInfo(ai ? 'ai' : entry.source);
@@ -196,10 +201,15 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
                 {caption}
               </Text>
             </View>
-            {narrow ? <KcalTrail value={entry.nutrients.kcal} range={entry.kcalRange} /> : null}
+            {narrow && !big ? <KcalTrail value={entry.nutrients.kcal} range={entry.kcalRange} /> : null}
           </View>
+          {big ? (
+            <View style={{ alignSelf: 'flex-start' }}>
+              <KcalTrail value={entry.nutrients.kcal} range={entry.kcalRange} />
+            </View>
+          ) : null}
         </View>
-        {narrow ? null : <KcalTrail value={entry.nutrients.kcal} range={entry.kcalRange} />}
+        {narrow || big ? null : <KcalTrail value={entry.nutrients.kcal} range={entry.kcalRange} />}
       </PressableScale>
       {/* Delete on a list row is the trash can everywhere (Water, Train, Saved meals); an X only closes or dismisses. */}
       <IconButton testID={`entry-delete-${entry.id}`} accessibilityLabel={`Delete ${name}`} tone="clear" size={44} onPress={() => deleteEntry(entry)}>

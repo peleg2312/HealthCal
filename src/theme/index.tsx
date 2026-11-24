@@ -104,8 +104,11 @@ export * from './tokens';
 export { isReducedMotion, motion, useReducedMotion } from './motion';
 export { legibility, useLegibility, type Legibility } from './legibility';
 export {
+  bolder,
   MAX_TEXT_GROWTH,
+  normaliseTextSize,
   phoneCapFor,
+  scaledFontSize,
   scaleTextStyle,
   setTextSize,
   TEXT_SIZE_KEY,
