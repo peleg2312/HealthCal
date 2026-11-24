@@ -367,7 +367,8 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   // quick second tap meant for "+ 250 ml" never undoes the first glass. Timed in the page from the moment the toast's
   // action is drawn to the finger going down on it; these two taps go straight to the button, past toastGuard.cjs.
   {
-    await page.locator('[data-testid="toast"]').first().waitFor({ state: 'detached', timeout: 10000 });
+    // An action toast stays 12 s in a browser (react-native-web reports a screen reader as on), 4.5 s on a phone.
+    await page.locator('[data-testid="toast"]').first().waitFor({ state: 'detached', timeout: 16000 });
     await page.evaluate(() => {
       window.__toastAt = null;
       window.__undoDownAt = null;

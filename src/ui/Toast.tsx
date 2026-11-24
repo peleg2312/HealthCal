@@ -105,8 +105,13 @@ export const TOAST_ACTION_GUARD_MS = 600;
 let hostSeq = 0;
 /** The toast last read out, so moving it between hosts does not read it twice. */
 let announcedId = 0;
-/** When that toast was first on screen (ms since the epoch): its action's guard counts from here. */
+/** When that toast was first on screen: its action's guard counts from here. */
 let shownAt = 0;
+/**
+ * A monotonic clock for the guard: it never jumps when the phone's time is changed, and a test that fixes the
+ * page's date (Playwright's clock.setFixedTime freezes Date.now) still sees the 600 ms pass.
+ */
+const monotonicNow = () => (typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now());
 
 /**
  * Shows the current toast: an ink cup (square shoulders, round base) with a
@@ -161,7 +166,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
     if (!message || !active) return;
     if (announcedId !== id) {
       announcedId = id;
-      shownAt = Date.now();
+      shownAt = monotonicNow();
       // Live regions are Android-only; announcing explicitly covers iOS as well. A name isolated for
       // drawing (`isolateRtl`) is announced raw: screen readers get no direction marks.
       const spoken = withoutMarks(message);
@@ -267,7 +272,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
             hitSlop={10}
             onPress={() => {
               // A press in the toast's first moments was meant for what it rose beside: ignored, the toast stays.
-              if (Date.now() - shownAt < TOAST_ACTION_GUARD_MS) return;
+              if (monotonicNow() - shownAt < TOAST_ACTION_GUARD_MS) return;
               onAction?.();
               hide();
             }}
