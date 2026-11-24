@@ -2,12 +2,11 @@ import { useIsFocused } from 'expo-router';
 import type { BottomTabBarProps } from 'expo-router/build/layouts/Tabs';
 import { Activity, BookOpen, ChartLine, Dumbbell, House, Plus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Animated, Easing, Platform, View } from 'react-native';
+import { Animated, Easing, Platform, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { cup, fonts, LARGE_TEXT, MAX_CONTENT_WIDTH, motion, useReducedMotion, useTextGrowth, useTheme } from '@/theme';
-import { PressableScale, TAB_BAR_HEIGHT, Text, useToastDock } from '@/ui';
-
+import { PressableScale, setTabBarExtra, TAB_BAR_HEIGHT, Text, useToastDock } from '@/ui';
 
 import { QuickLogSheet } from './QuickLogSheet';
 
@@ -21,6 +20,11 @@ const ICON_TOP = 9;
 /** With large text: the + cup's own width (its 56 px cup and 2 px either side), and the row's side padding. */
 const PLUS_W_LARGE = 60;
 const PAD_LARGE = 4;
+/** With large text, a tab's side padding, and a label letter's width at the designed size (Hanken Grotesk bold at 11.5 px). */
+const TAB_PAD_LARGE = 3;
+const LABEL_LETTER = 5.8;
+/** The band the + cup has over the four tabs when they cannot hold their labels whole beside it (the cup still rises 14 px above it). */
+const PLUS_BAND = 40;
 
 /**
  * The active-tab mark: one level line that slides from tab to tab. It waits
@@ -68,19 +72,28 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
   // The bar docks the toast itself, from the moment it shows: a toast raised on a screen without a tab
   // bar (signing in) moves above the bar at once, before the tab's own screen has mounted.
   const focused = useIsFocused();
-  useToastDock(insets.bottom + TAB_BAR_HEIGHT + 14, focused);
+  const winW = useWindowDimensions().width;
 
-  // Large text (the app's size or the phone's, `useTextGrowth`): the bar stays TAB_BAR_HEIGHT tall, so the room
-  // over the icon gives way to the taller label, and each tab is as wide as its label needs, the room left shared
-  // out evenly, so "Today", "Diary" and "Train" keep their words whole beside "Progress". Only the longest label
-  // gives way when the row is still too narrow (320 px at 200%), with an ellipsis; its full name is the tab's
-  // accessible name. At 100% the five places are as before: four equal tabs and the + at 1.1.
+  // Large text (the app's size or the phone's, `useTextGrowth`): the tab row stays TAB_BAR_HEIGHT tall, so the
+  // room over the icon gives way to the taller label, and each tab is as wide as its label needs, the room left
+  // shared out evenly, so "Today", "Diary" and "Train" keep their words whole beside "Progress". Where the four
+  // labels and the + cannot share one row (320 px from 175%), the + moves to a band of its own over the four tabs
+  // (`PLUS_BAND`, the bar that much taller; tab screens pad for it through `setTabBarExtra`), so every label stays
+  // whole. At 100% the five places are as before: four equal tabs and the + at 1.1.
   const growth = useTextGrowth();
   const large = growth > LARGE_TEXT;
   const labelLine = Math.round(LABEL_LINE * growth);
   const iconTop = large ? Math.max(2, ICON_TOP - (labelLine - LABEL_LINE)) : ICON_TOP;
   const labels = state.routes.map((route) => descriptors[route.key].options.title ?? route.name);
   const longest = Math.max(...labels.map((l) => l.length));
+  const labelsW = labels.reduce((sum, l) => sum + l.length * LABEL_LETTER * growth + 2 * TAB_PAD_LARGE, 0);
+  const band = large && labelsW + PLUS_W_LARGE > Math.min(winW, MAX_CONTENT_WIDTH) - 2 * PAD_LARGE;
+  const extra = band ? PLUS_BAND : 0;
+  useEffect(() => {
+    setTabBarExtra(extra);
+  }, [extra]);
+  useEffect(() => () => setTabBarExtra(0), []);
+  useToastDock(insets.bottom + TAB_BAR_HEIGHT + 14 + extra, focused);
 
   const tabs = state.routes.map((route, index) => {
     const focused = state.index === index;
@@ -105,7 +118,7 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
         }}
         style={[
           { alignItems: 'center', justifyContent: 'flex-start', paddingTop: iconTop, gap: 3, height: TAB_BAR_HEIGHT },
-          large ? { flexGrow: 1, flexShrink: label.length === longest ? 1 : 0, flexBasis: 'auto', minWidth: 44, paddingHorizontal: 3 } : { flex: 1 },
+          large ? { flexGrow: 1, flexShrink: label.length === longest ? 1 : 0, flexBasis: 'auto', minWidth: 44, paddingHorizontal: TAB_PAD_LARGE } : { flex: 1 },
         ]}>
         <Icon size={22} color={focused ? colors.text : colors.textTertiary} strokeWidth={focused ? 2.2 : 1.9} />
         <Text
@@ -118,6 +131,27 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
       </PressableScale>
     );
   });
+
+  const plus = (
+    <PressableScale
+      testID="tab-add"
+      feedback="press"
+      scaleTo={0.94}
+      dip={motion.distance.dip}
+      accessibilityLabel="Log something"
+      onPress={() => setOpen(true)}
+      style={{
+        width: 56,
+        height: 50,
+        marginTop: -14,
+        ...cup(radius.plus, 5),
+        backgroundColor: colors.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+      <Plus size={22} color={colors.onPrimary} strokeWidth={2.2} />
+    </PressableScale>
+  );
 
   return (
     <>
@@ -134,6 +168,7 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
           borderTopColor: colors.border,
           paddingBottom: insets.bottom,
         }}>
+        {band ? <View style={{ height: PLUS_BAND, alignItems: 'center' }}>{plus}</View> : null}
         <View style={{ width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', flexDirection: 'row', paddingHorizontal: large ? PAD_LARGE : 10, height: TAB_BAR_HEIGHT }}>
           <Animated.View
             pointerEvents="none"
@@ -152,26 +187,7 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
             }}
           />
           {tabs.slice(0, 2)}
-          <View style={large ? { width: PLUS_W_LARGE, flexShrink: 0, alignItems: 'center' } : { flex: 1.1, alignItems: 'center' }}>
-            <PressableScale
-              testID="tab-add"
-              feedback="press"
-              scaleTo={0.94}
-              dip={motion.distance.dip}
-              accessibilityLabel="Log something"
-              onPress={() => setOpen(true)}
-              style={{
-                width: 56,
-                height: 50,
-                marginTop: -14,
-                ...cup(radius.plus, 5),
-                backgroundColor: colors.primary,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-              <Plus size={22} color={colors.onPrimary} strokeWidth={2.2} />
-            </PressableScale>
-          </View>
+          {band ? null : <View style={large ? { width: PLUS_W_LARGE, flexShrink: 0, alignItems: 'center' } : { flex: 1.1, alignItems: 'center' }}>{plus}</View>}
           {tabs.slice(2)}
         </View>
       </View>

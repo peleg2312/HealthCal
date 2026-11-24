@@ -1,6 +1,6 @@
 import { router, useIsFocused, usePreventRemove } from 'expo-router';
 import { ChevronLeft, X } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View, type ScrollViewProps, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,6 +19,30 @@ import { ToastScope } from './toastControls';
 export const TAB_BAR_HEIGHT = 58;
 /** Height reserved at the bottom of tab screens for the docked tab bar, plus breathing room. */
 export const TAB_BAR_SPACE = TAB_BAR_HEIGHT + 28;
+
+/**
+ * What the tab bar adds to its height now: 0, or with large text on a window too narrow for its four labels whole
+ * beside the + cup, the band the + then has over them (the tab bar sets it). Tab screens pad for it and the toast
+ * rests above it.
+ */
+let tabBarExtra = 0;
+const tabBarListeners = new Set<() => void>();
+export function setTabBarExtra(px: number): void {
+  if (px === tabBarExtra) return;
+  tabBarExtra = px;
+  for (const l of tabBarListeners) l();
+}
+/** The tab bar's extra height (`setTabBarExtra`), live. */
+export function useTabBarExtra(): number {
+  return useSyncExternalStore(
+    (l) => {
+      tabBarListeners.add(l);
+      return () => tabBarListeners.delete(l);
+    },
+    () => tabBarExtra,
+    () => tabBarExtra,
+  );
+}
 
 export interface ScreenProps {
   children: React.ReactNode;
@@ -55,7 +79,8 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
     alignSelf: 'center',
     paddingHorizontal: padded ? spacing.xl : 0,
   };
-  const bottomPad = (tabs ? TAB_BAR_SPACE : spacing.xxl) + (footer ? 0 : insets.bottom);
+  const barExtra = useTabBarExtra();
+  const bottomPad = (tabs ? TAB_BAR_SPACE + barExtra : spacing.xxl) + (footer ? 0 : insets.bottom);
   // The toast rests 12 px above whatever this screen has at the bottom: the pinned footer,
   // the tab bar with its + cup (14 px proud of the bar), or just the home indicator; with the
   // keyboard up, the footer riding on it or the keyboard itself (see `cover` below).
@@ -72,7 +97,7 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
   const [outerH, setOuterH] = useState(0);
   const [innerH, setInnerH] = useState(0);
   const cover = Platform.OS === 'web' ? webKeyboard : outerH > 0 && innerH > 0 ? Math.max(0, outerH - innerH) : 0;
-  const dock = footer ? footerH : insets.bottom + (tabs ? TAB_BAR_HEIGHT + 14 : 0);
+  const dock = footer ? footerH : insets.bottom + (tabs ? TAB_BAR_HEIGHT + 14 + barExtra : 0);
   useToastDock(dock, focused, { cover, rides: !!footer }, domId);
   // Keyboard focus is never left under the tab bar (WCAG 2.4.11): the tab bar lies over the scroll area.
   useFocusClear(domId, focused && !!tabs && !footer, dock);
@@ -102,7 +127,7 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
             inner,
             {
               flex: 1,
-              paddingBottom: (tabs ? TAB_BAR_SPACE : 0) + (footer ? 0 : insets.bottom),
+              paddingBottom: (tabs ? TAB_BAR_SPACE + barExtra : 0) + (footer ? 0 : insets.bottom),
             },
             contentStyle,
           ]}>
