@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { CookingPot, Plus, Repeat2 } from 'lucide-react-native';
+import { ChevronRight, CookingPot, Plus, Repeat2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
@@ -528,20 +528,22 @@ function MealsSection({ day }: { day: DaySummary }) {
   const open = (meal: MealType) => router.push(`/food/search?meal=${meal}&date=${day.date}`);
   return (
     <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Text variant="h3" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>
           Meals
         </Text>
-        <PressableScale
+        {/* A section's way to another screen: the kit's small ghost Button with a chevron (as Water's "Edit sizes"), its
+            44 px touch area from the kit; pulled up and right so the row is no taller and the chevron meets the cards' edge. */}
+        <Button
           testID="section-meals-action"
+          title="Open diary"
+          variant="ghost"
+          size="sm"
+          full={false}
+          iconRight={<ChevronRight size={18} color={colors.primaryInk} strokeWidth={2.2} />}
           onPress={() => router.push(`/diary?date=${day.date}` as never)}
-          accessibilityLabel="Open diary"
-          hitSlop={8}
-          style={{ minHeight: 44, justifyContent: 'center', marginVertical: -12, paddingLeft: 12 }}>
-          <Text variant="label" color="textSecondary">
-            Open diary
-          </Text>
-        </PressableScale>
+          style={{ marginVertical: -8, marginRight: -6, paddingHorizontal: 6 }}
+        />
       </View>
       <Card testID="today-meals" padding={0} style={{ paddingVertical: 2 }}>
         {MEALS.map((m, i) => {
