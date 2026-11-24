@@ -48,6 +48,8 @@ function onLeftEntry(): boolean {
   return left;
 }
 let historyPatched = false;
+/** How long after opening a sheet adds its history entry (the router's own wait for a move is 100 ms). */
+const PUSH_AFTER_MS = 120;
 /**
  * Web, once: the router's own history moves step over an entry a closed sheet left on top. A screen the
  * sheet opened takes that entry's place (pushState becomes replaceState), and a step back from it counts
@@ -99,7 +101,13 @@ function useBackCloses(visible: boolean, close: () => void, stillOpen: () => boo
       openEntries.add(token);
       window.history.pushState({ ...(base && typeof base === 'object' ? base : {}), [SHEET_ENTRY]: token }, '');
     };
-    push();
+    // A beat after opening, so a router move still on its way (one that opened this sheet, such as a
+    // back the screen refused) lands first and this entry goes on top of the right one.
+    let pushed = false;
+    const first = setTimeout(() => {
+      pushed = true;
+      push();
+    }, PUSH_AFTER_MS);
     let popped = false;
     let again: ReturnType<typeof setTimeout> | undefined;
     const onPop = () => {
@@ -122,8 +130,9 @@ function useBackCloses(visible: boolean, close: () => void, stillOpen: () => boo
     return () => {
       window.removeEventListener('popstate', onPop);
       clearTimeout(again);
+      clearTimeout(first);
       openEntries.delete(token);
-      if (popped) return;
+      if (popped || !pushed) return;
       setTimeout(() => {
         const used = usedEntries.delete(token);
         if (!used && historyState()?.[SHEET_ENTRY] === token) window.history.back();

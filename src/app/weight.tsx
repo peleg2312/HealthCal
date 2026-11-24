@@ -319,6 +319,8 @@ function WeighInSheet({
     setError(null);
   }
   const unit = weightUnit(units);
+  // A changed value is not dropped without asking (the backdrop, a drag, Escape, back).
+  const changed = date !== null && (weight !== (existing ? display(existing.kg) : display(fallbackKg)) || fat !== (existing?.bodyFatPct ?? null));
 
   const save = () => {
     if (!date) return;
@@ -335,6 +337,7 @@ function WeighInSheet({
     <Sheet
       visible={date !== null}
       onClose={onClose}
+      unsaved={changed ? 'Discard this weigh-in?' : null}
       title={existing ? 'Edit weigh-in' : 'Log weigh-in'}
       footer={
         <View style={{ gap: 8 }}>

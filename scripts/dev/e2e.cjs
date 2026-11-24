@@ -1352,7 +1352,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     await cp.goto(`${BASE}/`, { waitUntil: 'networkidle' });
     await cp.waitForTimeout(2600);
     check('coach: no "the coach is now at the top" toast in an automated browser that did not ask for it', !/The coach is now at the top/.test(await cp.evaluate(() => document.body.innerText)) && (await cp.evaluate(() => localStorage.getItem('healthcal.coachMovedSaid'))) === null);
-    // Early in the week "Your week is ready" stands in the coach card's place: mark last week's check-in seen so the card shows.
+    // Early in the week "Your week is ready" sits above the coach card: mark last week's check-in seen, as the rest of the week reads.
     await cp.evaluate(() => {
       const d = new Date();
       d.setDate(d.getDate() - ((d.getDay() + 6) % 7) - 7);
@@ -1362,7 +1362,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     await cp.getByTestId('today-coach').first().waitFor({ timeout: 10000 }).catch(() => {});
     const coachAction = await cp.locator('[data-testid="today-coach-action"], [data-testid="today-coach-water"], [data-testid="today-coach-repeat"]').count();
     if (!coachAction) {
-      check('coach: a coach card with no action of its own gets no "Ask the coach" (nothing is added)', (await cp.getByTestId('today-coach-ask').count()) === 0);
+      check('coach: a coach card with no action of its own still offers "Ask the coach" on its own', (await cp.getByTestId('today-coach-ask').count()) === 1);
     } else if (await cp.getByTestId('today-coach-ask').count()) {
       const row = await cp.evaluate(() => {
         const a = document.querySelector('[data-testid="today-coach-ask"]').getBoundingClientRect();
@@ -1740,9 +1740,9 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
         `footer ${Math.round(offGeo.footer?.height)} -> ${Math.round(onGeo.footer?.height)}, field ${JSON.stringify(onGeo.field && [Math.round(onGeo.field.left), Math.round(onGeo.field.top), Math.round(onGeo.field.right)])}, switch ${JSON.stringify(onGeo.toggle && [Math.round(onGeo.toggle.left), Math.round(onGeo.toggle.top)])}`,
       );
       check('save meals: with it on, the first item is in view above the footer at 360 x 740', !!onGeo.item && onGeo.item.top >= 0 && onGeo.item.bottom <= onGeo.footer.top, `item ${Math.round(onGeo.item?.top)}-${Math.round(onGeo.item?.bottom)}, footer top ${Math.round(onGeo.footer.top)}`);
-      // At 320 x 640 the review's own cards (the total, the oil question with its chips on two lines) already
-      // reach below where even a button-only footer starts, so the first item is a scroll away whatever the
-      // footer does: what the switch may cost there is the same one row, no taller than at 360.
+      // At 320 x 640 the items come straight under the compact total (the oil question follows them), so the
+      // first item's name is in view with the switch on as well: what the switch may cost there is the same
+      // one row, no taller than at 360.
       await p.setViewportSize({ width: 320, height: 640 });
       await p.waitForTimeout(400);
       const small = await footerGeo();
@@ -1751,7 +1751,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
       await ptap(p, 'ai-save-meal');
       check(
         'save meals: at 320 x 640 still one row, and the switch adds no more to the footer than at 360',
-        oneRow(small) && !!smallOff.words && small.footer.height - smallOff.footer.height <= 50 - 36 + 1 && Math.abs(small.footer.height - onGeo.footer.height) <= 1,
+        oneRow(small) && !!smallOff.words && small.footer.height - smallOff.footer.height <= 50 - 36 + 1 && Math.abs(small.footer.height - onGeo.footer.height) <= 1 && !!small.item && small.item.top >= 0 && small.item.bottom <= small.footer.top,
         `footer ${Math.round(smallOff.footer?.height)} -> ${Math.round(small.footer?.height)} (360: ${Math.round(onGeo.footer.height)}), first item at ${Math.round(small.item?.top)}, footer top ${Math.round(small.footer?.top)}`,
       );
       await p.setViewportSize({ width: 360, height: 740 });

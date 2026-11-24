@@ -1,4 +1,4 @@
-import { router, useIsFocused } from 'expo-router';
+import { router, useIsFocused, usePreventRemove } from 'expo-router';
 import { ChevronLeft, X } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View, type ScrollViewProps, type StyleProp, type ViewStyle } from 'react-native';
@@ -10,6 +10,7 @@ import { IconButton } from './Button';
 import { keyboardCover, revealDelta } from './keyboardInset';
 import { FadeUp } from './motion';
 import { PressableScale } from './Pressable';
+import { ConfirmSheet } from './Sheet';
 import { Text } from './Text';
 import { useToastDock } from './Toast';
 
@@ -70,7 +71,10 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
   const [outerH, setOuterH] = useState(0);
   const [innerH, setInnerH] = useState(0);
   const cover = Platform.OS === 'web' ? webKeyboard : outerH > 0 && innerH > 0 ? Math.max(0, outerH - innerH) : 0;
-  useToastDock(footer ? footerH : insets.bottom + (tabs ? TAB_BAR_HEIGHT + 14 : 0), focused, { cover, rides: !!footer });
+  const dock = footer ? footerH : insets.bottom + (tabs ? TAB_BAR_HEIGHT + 14 : 0);
+  useToastDock(dock, focused, { cover, rides: !!footer }, domId);
+  // Keyboard focus is never left under the tab bar (WCAG 2.4.11): the tab bar lies over the scroll area.
+  useFocusClear(domId, focused && !!tabs && !footer, dock);
   const body = (
     <FadeUp disabled={!enter} style={{ flex: 1 }}>
       <View style={{ paddingTop: noTopInset ? 0 : insets.top }} />
@@ -233,6 +237,79 @@ function useWebKeyboard(domId: string, active: boolean): number {
     };
   }, [cover, domId]);
   return cover;
+}
+
+/**
+ * Web only: a control reached with the keyboard (Tab) that lies under the tab bar, which is drawn over the
+ * bottom of a tab screen's scroll area, is scrolled up into the part of the screen that shows, with
+ * REVEAL_MARGIN to spare. Only for keyboard focus (`:focus-visible`), so a tap never moves the page.
+ */
+function useFocusClear(domId: string, active: boolean, chrome: number) {
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !active || typeof document === 'undefined') return;
+    const clear = () => {
+      const el = document.activeElement;
+      const host = document.getElementById(domId);
+      if (!(el instanceof HTMLElement) || !host || !host.contains(el)) return;
+      let keyboard = true;
+      try {
+        keyboard = el.matches(':focus-visible');
+      } catch {
+        // An old browser without :focus-visible: treat it as keyboard focus.
+      }
+      if (!keyboard) return;
+      const scroller = scrollerOf(el);
+      if (!scroller) return;
+      const r = el.getBoundingClientRect();
+      const v = scroller.getBoundingClientRect();
+      const delta = revealDelta({ top: r.top, bottom: r.bottom }, { top: v.top, bottom: Math.min(v.bottom, window.innerHeight - chrome) });
+      if (delta) scroller.scrollTop += delta;
+    };
+    const onFocus = () => requestAnimationFrame(clear);
+    document.addEventListener('focusin', onFocus);
+    return () => document.removeEventListener('focusin', onFocus);
+  }, [domId, active, chrome]);
+}
+
+/**
+ * A task screen that holds something typed and not saved (quick add's numbers) asks before it is left:
+ * by its X, the back button, a swipe back or the browser's back. Pass the question while there is
+ * something to lose ("Discard this quick add?"), else null. Render `guard` inside the screen, and call
+ * `allowLeave()` right before the screen's own Save leaves it, so saving never asks.
+ *
+ *   const leave = useLeaveGuard(dirty ? 'Discard this quick add?' : null);
+ *   ... onSave: () => { save(); leave.allowLeave(); goBack(); }
+ *   ... {leave.guard}
+ */
+export function useLeaveGuard(unsaved: string | false | null | undefined): { allowLeave: () => void; guard: React.ReactElement } {
+  const [released, setReleased] = useState(false);
+  const [asking, setAsking] = useState<{ go: () => void } | null>(null);
+  const [question, setQuestion] = useState('');
+  const disable = usePreventRemove(!!unsaved && !released, ({ repeat }) => {
+    setQuestion(unsaved || '');
+    setAsking({ go: repeat });
+  });
+  const allowLeave = () => {
+    setReleased(true);
+    disable();
+  };
+  const guard = (
+    <ConfirmSheet
+      visible={!!asking}
+      title={question}
+      confirmLabel="Discard"
+      cancelLabel="Keep editing"
+      destructive
+      onConfirm={() => {
+        const go = asking?.go;
+        setAsking(null);
+        allowLeave();
+        go?.();
+      }}
+      onCancel={() => setAsking(null)}
+    />
+  );
+  return { allowLeave, guard };
 }
 
 export function goBack(fallback: string = '/') {

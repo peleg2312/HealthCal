@@ -812,7 +812,8 @@ src/features/food/mealDraft.ts	setDraftServings	1	src/app/food/meal-edit.tsx
 src/features/food/mealDraft.ts	updateDraftItem	2	src/app/food/meal-edit.tsx	src/app/food/meal-pick.tsx
 src/features/food/mealDraft.ts	useMealDraft	3	src/app/food/meal-edit.tsx	src/app/food/meal-pick.tsx	src/features/food/copies.test.ts
 src/features/food/oneTap.ts	ONE_TAP_GUARD_MS	1	src/components/QuickLogSheet.tsx
-src/features/food/oneTap.ts	useOneTap	5	src/app/(tabs)/index.tsx	src/app/food/search.tsx	src/app/water.tsx	src/components/QuickLogSheet.tsx	src/features/today/StatusRail.tsx
+src/features/food/oneTap.ts	tooSoon	1	src/components/QuickLogSheet.tsx
+src/features/food/oneTap.ts	useOneTap	4	src/app/(tabs)/index.tsx	src/app/food/search.tsx	src/app/water.tsx	src/features/today/StatusRail.tsx
 src/features/food/restore.ts	RESTORE_MAX	1	src/features/food/restore.test.ts
 src/features/food/restore.ts	removedToday	2	src/features/food/DiaryParts.tsx	src/features/food/restore.test.ts
 src/features/food/rowMotion.tsx	FadeRow	2	src/app/water.tsx	src/features/food/DiaryParts.tsx
@@ -2561,6 +2562,7 @@ src/theme/textSize.ts	bolder	1	src/theme/textSize.test.ts
 src/theme/textSize.ts	normaliseTextSize	1	src/theme/textSize.test.ts
 src/theme/textSize.ts	phoneCapFor	2	src/ui/Text.tsx	src/theme/textSize.test.ts
 src/theme/textSize.ts	scaleTextStyle	2	src/ui/Text.tsx	src/theme/textSize.test.ts
+src/theme/textSize.ts	scaledFontSize	1	src/theme/textSize.test.ts
 src/theme/textSize.ts	setTextSize	1	src/features/textSize/TextSizeRow.tsx
 src/theme/textSize.ts	textSizeLabel	2	src/features/textSize/TextSizeRow.tsx	src/theme/textSize.test.ts
 src/theme/textSize.ts	useTextSize	2	src/features/textSize/TextSizeRow.tsx	src/ui/Text.tsx
@@ -2663,7 +2665,8 @@ src/ui/Screen.tsx	Screen	43	src/app/(tabs)/diary.tsx	src/app/(tabs)/index.tsx	sr
 src/ui/Screen.tsx	SectionTitle	15	src/app/(tabs)/train.tsx	src/app/activity/pick.tsx	src/app/body.tsx	src/app/fasting.tsx	src/app/friends/index.tsx	src/app/settings/health-sync.tsx	src/app/settings/plan.tsx	src/app/sleep.tsx	src/app/water.tsx	src/app/weight.tsx	src/features/health-sync/ui/ActivityPickSheet.tsx	src/features/import/ui/ActivitySheet.tsx	src/features/morning/PlanCard.tsx	src/features/morning/ReviewList.tsx	src/features/today/FitsSheet.tsx
 src/ui/Screen.tsx	TAB_BAR_HEIGHT	1	src/components/TabBar.tsx
 src/ui/Screen.tsx	goBack	15	src/app/activity/strength.tsx	src/app/auth.tsx	src/app/food/custom.tsx	src/app/food/detail.tsx	src/app/food/meal-edit.tsx	src/app/food/meal-pick.tsx	src/app/food/photo.tsx	src/app/food/quick.tsx	src/app/food/scan.tsx	src/app/friends/add.tsx	src/app/friends/index.tsx	src/app/morning.tsx	src/app/onboarding.tsx	src/app/settings/goals.tsx	src/features/onboarding/SignInGate.tsx
-src/ui/Sheet.tsx	ConfirmSheet	5	src/app/(tabs)/train.tsx	src/app/activity/strength.tsx	src/app/friends/index.tsx	src/app/settings/account.tsx	src/app/settings/data.tsx
+src/ui/Screen.tsx	useLeaveGuard	1	src/app/food/quick.tsx
+src/ui/Sheet.tsx	ConfirmSheet	6	src/app/(tabs)/train.tsx	src/app/activity/strength.tsx	src/app/friends/index.tsx	src/app/settings/account.tsx	src/app/settings/data.tsx	src/ui/Screen.tsx
 src/ui/Sheet.tsx	Sheet	33	src/app/activity/pick.tsx	src/app/activity/strength.tsx	src/app/consistency.tsx	src/app/fasting.tsx	src/app/food/search.tsx	src/app/recap.tsx	src/app/settings/account.tsx	src/app/sleep.tsx	src/app/water.tsx	src/app/weight.tsx	src/components/QuickLogSheet.tsx	src/features/activity/BringIn.tsx	src/features/activity/TrainingLoadSheet.tsx	src/features/ai/AiConsentSheet.tsx	src/features/coach/CoachSheet.tsx	src/features/coach/ReportSheet.tsx	src/features/drinks/DrinkPickSheet.tsx	src/features/food/DiaryParts.tsx	src/features/food/SaveMealSheet.tsx	src/features/food/SavedMealParts.tsx	src/features/friends/sheets.tsx	src/features/health-sync/ui/ActivityPickSheet.tsx	src/features/health-sync/ui/ExplainSheet.tsx	src/features/import/ui/ActivitySheet.tsx	src/features/import/ui/TimeZoneSheet.tsx	src/features/onboarding/SignInGate.tsx	src/features/progress/CaloriesCard.tsx	src/features/progress/parts.tsx	src/features/settings/components.tsx	src/features/share/ShareSheet.tsx	src/features/streak/MilestoneSheet.tsx	src/features/today/DayRingStrip.tsx	src/features/today/FitsSheet.tsx
 src/ui/Sheet.tsx	sheetOnScreen	4	src/features/coach/movedToast.ts	src/features/morning/useMorningPage.ts	src/features/today/useDaySwipe.tsx	src/features/updates/updates.ts
 src/ui/Text.tsx	MAX_FONT_SCALE	2	src/features/activity/components.tsx	src/ui/Field.tsx

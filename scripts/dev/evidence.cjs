@@ -272,8 +272,8 @@ function scan(rootSel) {
         if ((p.scrollTop > 0 && cy - 21 < q.top) || (p.scrollTop + p.clientHeight < p.scrollHeight - 1 && cy + 21 > q.bottom)) open = false;
         break;
       }
-      // The three cups of a tab header sit 40 px apart, so each is 40 px wide to touch (44 tall): the one stated exception.
-      const side = el.closest('[data-testid="tab-header"]') ? 19 : 21;
+      // Every control, the tab header's three cups included (36 px, 8 px apart, 44 x 44 to touch), is held to 44 px.
+      const side = 21;
       if (!off && inside && open && r.top >= 0 && r.bottom + 21 <= chromeTop && (r.width < 44 || r.height < 44) && !(hits(-side, 0) && hits(side, 0) && hits(0, -21) && hits(0, 21))) {
         small.push({ id: label(el) || ownText.slice(0, 30), w: Math.round(r.width), h: Math.round(r.height) });
       }

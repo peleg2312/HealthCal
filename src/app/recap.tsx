@@ -95,7 +95,12 @@ function Tile({ t, index, week }: { t: RecapTile; index: number; week: string })
             gap: 4,
             marginTop: 4,
           }}>
-          {t.delta !== null ? <Arrow size={12} color={colors.textSecondary} /> : null}
+          {/* Decorative: the tile's spoken label says the change in words. */}
+          {t.delta !== null ? (
+            <View aria-hidden>
+              <Arrow size={12} color={colors.textSecondary} />
+            </View>
+          ) : null}
           <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1 }}>
             {deltaText(t)}
           </Text>

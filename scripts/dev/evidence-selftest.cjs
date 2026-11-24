@@ -172,8 +172,8 @@ const cases = [
     expect: '',
   },
   {
-    name: 'a tab header cup 36 px wide with a 40 x 44 touch area is not small',
-    html: '<body style="margin:0;font:15px/20px sans-serif"><div data-testid="tab-header" style="display:flex;gap:4px;padding:20px"><button aria-label="coach" style="position:relative;width:36px;height:36px;padding:0;border:0"><span style="position:absolute;left:-2px;right:-2px;top:-4px;bottom:-4px"></span></button><button aria-label="friends" style="position:relative;width:36px;height:36px;padding:0;border:0"><span style="position:absolute;left:-2px;right:-2px;top:-4px;bottom:-4px"></span></button></div></body>',
+    name: 'a tab header cup 36 px wide, 8 px apart, with a 44 x 44 touch area is not small',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><div data-testid="tab-header" style="display:flex;gap:8px;padding:20px"><button aria-label="coach" style="position:relative;width:36px;height:36px;padding:0;border:0"><span style="position:absolute;left:-4px;right:-4px;top:-4px;bottom:-4px"></span></button><button aria-label="friends" style="position:relative;width:36px;height:36px;padding:0;border:0"><span style="position:absolute;left:-4px;right:-4px;top:-4px;bottom:-4px"></span></button></div></body>',
     run: 'small',
     expect: '',
   },

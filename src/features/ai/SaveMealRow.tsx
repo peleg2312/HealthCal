@@ -53,6 +53,8 @@ export function SaveMealRow({ on, onChange, name, onName }: { on: boolean; onCha
           accessible={false}
           focusable={false}
           importantForAccessibility="no-hide-descendants"
+          // Out of the web's accessibility tree too: the switch is the one control with this name.
+          {...({ 'aria-hidden': true } as object)}
           style={{ flex: 1, minWidth: 0, minHeight: 36, justifyContent: 'center' }}>
           <Text variant="body" numberOfLines={1}>
             {SAVE_TOGGLE}

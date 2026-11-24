@@ -2,8 +2,9 @@
  * The app's own text size (Profile > Appearance, "Text size"): 100% to 200%, kept on this device only
  * (a per-device convenience under its own key, never the store, never synced, never in the backup).
  *
- * Every kit `Text` draws its size and line height times this scale (`scaleTextStyle`), on every platform,
- * so text reaches 200% without the phone's setting and without browser zoom (WCAG 1.4.4). The phone's own
+ * Every kit `Text` draws its size and line height through this scale (`scaleTextStyle`), on every platform,
+ * so reading text reaches 200% without the phone's setting and without browser zoom (WCAG 1.4.4); text
+ * that is already large grows less, as Android 14's nonlinear font scaling does (`scaledFontSize`). The phone's own
  * text-size setting still applies on top, capped so the two together stay at 2x (`phoneCapFor`): at 100%
  * here the phone may scale the kit's type up to 2x (`MAX_TEXT_GROWTH`), at 200% here not at all.
  *
@@ -66,12 +67,47 @@ export function bolder(family: string | undefined): string | undefined {
 }
 
 /**
- * A flattened text style at the app's text size, and one weight heavier under Bold Text: the size, the line
- * height and the letter spacing grow together, so a line keeps its proportions.
+ * Nonlinear font scaling at 200%, after Android 14's (its FontScaleConverter table): every reading size up
+ * to 16 px (body 15, title 16) doubles exactly, and text that is already large grows less (a 30 px number
+ * to 50, a 100 px one not at all), so headings and big figures stay on their lines. Pairs of [designed
+ * size, size at 200%].
+ */
+const AT_200: [number, number][] = [
+  [8, 16],
+  [10, 20],
+  [12, 24],
+  [14, 28],
+  [16, 32],
+  [18, 33],
+  [20, 35],
+  [24, 40],
+  [30, 50],
+  [100, 100],
+];
+
+/** A designed font size at the app's text size: twice a reading size at 200%, less for large text (`AT_200`). */
+export function scaledFontSize(size: number, scale: number): number {
+  if (scale === 1 || size <= 0) return size;
+  let doubled = size * 2;
+  if (size >= AT_200[AT_200.length - 1][0]) doubled = size;
+  else if (size > AT_200[0][0]) {
+    const j = AT_200.findIndex(([from]) => from >= size);
+    const [a, ta] = AT_200[j - 1];
+    const [b, tb] = AT_200[j];
+    doubled = ta + ((size - a) / (b - a)) * (tb - ta);
+  }
+  // Between 100% and 200%, the same share of the way.
+  return Math.round((size + (doubled - size) * Math.min(1, Math.max(0, scale - 1))) * 10) / 10;
+}
+
+/**
+ * A flattened text style at the app's text size, and one weight heavier under Bold Text: the size grows by
+ * `scaledFontSize`, and the line height and the letter spacing by the same ratio, so a line keeps its proportions.
  */
 export function scaleTextStyle(style: TextStyle, scale: number, bold: boolean): TextStyle {
   if (scale === 1 && !bold) return style;
-  const grow = (v: number | undefined, step: number) => (typeof v === 'number' && scale !== 1 ? Math.round(v * scale * step) / step : v);
+  const ratio = typeof style.fontSize === 'number' && style.fontSize > 0 ? scaledFontSize(style.fontSize, scale) / style.fontSize : scale;
+  const grow = (v: number | undefined, step: number) => (typeof v === 'number' && scale !== 1 ? Math.round(v * ratio * step) / step : v);
   return {
     ...style,
     fontSize: grow(style.fontSize, 10),

@@ -68,15 +68,17 @@ function useWebHitArea(hitSlop: PressableProps['hitSlop'], style: StyleProp<View
 
 // ------------------------------------------------------------ web focus ring
 //
-// A keyboard user sees where focus is by one ring, the same on every control: a 2 px line in the
-// look's `rim` (the level line) 2 px outside the control, so it never touches the control's own
-// fill (WCAG 2.4.13: a 2 px perimeter that changes at 3:1 or more; `rim` is at least 3.9:1 on bg,
-// bgElevated, surface, surfaceAlt and the tab bar in all six looks). It shows only for
-// `:focus-visible`, so a tap or a click never draws it, and an element focused by code that is not
-// a tab stop (tabindex -1, a sheet or a heading) is left alone. A kit text field draws it around
-// its cup instead of the bare input (`FOCUS_CUP`), right against the cup's edge, so the field's
-// rim-coloured border and the ring read as one heavier edge. A control inside a strip that clips
-// (a horizontal scroller) passes `focusRing="inside"` to have it drawn 2 px inside its edge.
+// A keyboard user sees where focus is by one ring, the same on every control: the level line's
+// 3 px in the look's `rim`, 2 px outside the control, so it never touches the control's own fill
+// (WCAG 2.4.13: at least a 2 px perimeter that changes at 3:1 or more; `rim` is at least 3.9:1 on
+// bg, bgElevated, surface, surfaceAlt and the tab bar in all six looks, and 3 px keeps that area
+// at a rounded cup's corners too). It shows only for `:focus-visible`, so a tap or a click never
+// draws it, and an element focused by code that is not a tab stop (tabindex -1: a sheet, a
+// heading) is left alone. A kit text field draws it round its cup instead of the bare input
+// (`FOCUS_CUP`), right against the cup's edge, so the field's rim-coloured border and the ring
+// read as one heavier edge. A tab, and a control that passes `focusRing="inside"`, has it drawn
+// just inside its edge: tabs fill their row edge to edge, and a strip or a bar that clips (the week
+// strip, the tab bar at the bottom of the window) would cut a ring drawn outside.
 
 const FOCUS_VAR = '--healthcal-focus-ring';
 let focusColor: string | null = null;
@@ -85,12 +87,12 @@ function ensureFocusRule() {
   if (typeof document === 'undefined' || document.getElementById('healthcal-focus-ring')) return;
   const el = document.createElement('style');
   el.id = 'healthcal-focus-ring';
-  const ring = `outline:2px solid var(${FOCUS_VAR},currentColor)!important`;
+  const ring = `outline:3px solid var(${FOCUS_VAR},currentColor)!important`;
   el.appendChild(
     document.createTextNode(
       [
         `:focus-visible:not([tabindex="-1"]){${ring};outline-offset:2px!important}`,
-        `[data-focus-ring="inside"]:focus-visible{outline-offset:-2px!important}`,
+        `[data-focus-ring="inside"]:focus-visible{outline-offset:-3px!important}`,
         `[data-focus-cup]:has(>input:focus,>textarea:focus){${ring};outline-offset:0!important}`,
         // A browser without :has() rings the cup whenever focus is inside it.
         `@supports not selector(:has(a)){[data-focus-cup]:focus-within{${ring};outline-offset:0!important}}`,
@@ -142,7 +144,7 @@ export interface PressableScaleProps extends Omit<PressableProps, 'style' | 'chi
   dip?: number;
   /** For a control that opens or closes something ("Show all"): sets the expanded state, `aria-expanded` on the web. */
   expanded?: boolean;
-  /** Web: where the keyboard focus ring is drawn. 'inside' for a control in a strip that clips what reaches past it. */
+  /** Web: where the keyboard focus ring is drawn. 'inside' (the default for a tab) for a control in a strip or a bar that clips what reaches past it. */
   focusRing?: 'outside' | 'inside';
   /** Web only: a key handler (react-native-web forwards it to the element). */
   onKeyDown?: (e: { key: string; repeat?: boolean; target: unknown; currentTarget: unknown; defaultPrevented?: boolean; preventDefault: () => void }) => void;
@@ -189,7 +191,7 @@ export function PressableScale({ style, scaleTo = 0.97, feedback = 'tap', dimDis
     const explicit = rest as Record<string, unknown>;
     const data: Record<string, string> = {};
     if (hit) data.hit = hit;
-    if (focusRing === 'inside') data.focusRing = 'inside';
+    if ((focusRing ?? (role === 'tab' ? 'inside' : 'outside')) === 'inside') data.focusRing = 'inside';
     web = {
       ...ariaFromState(role, state, explicit),
       ...(Object.keys(data).length ? { dataSet: data } : null),

@@ -7,7 +7,7 @@ import { QUICK_KCAL_LIMIT, href, kcal, parseDate, parseMeal } from '@/features/f
 import { logQuickAdd } from '@/features/food/log';
 import { atwaterKcal, MEAL_LABEL } from '@/lib/nutrition';
 import { useTheme } from '@/theme';
-import { Button, Card, CupKey, Header, NumberField, Screen, Text, TextField, goBack } from '@/ui';
+import { Button, Card, CupKey, Header, NumberField, Screen, Text, TextField, goBack, useLeaveGuard } from '@/ui';
 
 export default function QuickAddScreen() {
   const { colors, spacing } = useTheme();
@@ -25,10 +25,14 @@ export default function QuickAddScreen() {
   const calories = kcalV ?? (hasMacros ? implied : null);
   const mismatch = kcalV !== null && hasMacros && implied > 40 && Math.abs(implied - kcalV) > Math.max(50, kcalV * 0.2);
   const valid = calories !== null && calories > 0 && calories < QUICK_KCAL_LIMIT;
+  // Typed numbers or a name are not dropped without asking (the X, back, a swipe back).
+  const typed = kcalV !== null || hasMacros || name.trim().length > 0;
+  const leave = useLeaveGuard(typed ? 'Discard this quick add?' : null);
 
   const save = () => {
     if (!valid) return;
     logQuickAdd({ name, meal, date, nutrients: { kcal: calories!, protein: protein ?? 0, carbs: carbs ?? 0, fat: fat ?? 0 } });
+    leave.allowLeave();
     goBack(href('/diary', { date }));
   };
 
@@ -80,6 +84,7 @@ export default function QuickAddScreen() {
         <MealPicker value={meal} onChange={setMeal} testIDPrefix="quick-meal" />
         <DayStepper value={date} onChange={setDate} testIDPrefix="quick-day" />
       </Card>
+      {leave.guard}
     </Screen>
   );
 }

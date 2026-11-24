@@ -555,6 +555,7 @@ async function gestureChecks(browser, seeds) {
       const r = await open(ctx, route);
       const f = r.frame;
       check(`${name}: no week arrows on touch`, (await f.locator(sel(`${pre}-week-prev`)).count()) === 0);
+      check(`${name}: another week is a visible tap away on touch (the week picker)`, (await f.locator(sel(`${pre}-week-pick`)).count()) === 1);
       check(`${name}: no "Back to today" on today`, (await f.locator(sel(jump)).count()) === 0);
       const selected = await f.evaluate((p) => [...document.querySelectorAll(`[data-testid^="${p}-day-"]`)].filter((e) => e.getAttribute('aria-selected') === 'true').length, pre);
       check(`${name}: the selected day is the one tab with aria-selected`, selected === 1, `${selected}`);

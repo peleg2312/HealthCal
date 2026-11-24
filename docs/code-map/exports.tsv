@@ -3289,6 +3289,7 @@ src/theme/textSize.ts	bolder	function
 src/theme/textSize.ts	normaliseTextSize	function
 src/theme/textSize.ts	phoneCapFor	function
 src/theme/textSize.ts	scaleTextStyle	function
+src/theme/textSize.ts	scaledFontSize	function
 src/theme/textSize.ts	setTextSize	function
 src/theme/textSize.ts	textSize	function
 src/theme/textSize.ts	textSizeLabel	function
@@ -3408,6 +3409,7 @@ src/ui/Screen.tsx	SectionTitle	component
 src/ui/Screen.tsx	TAB_BAR_HEIGHT	const
 src/ui/Screen.tsx	TAB_BAR_SPACE	const
 src/ui/Screen.tsx	goBack	function
+src/ui/Screen.tsx	useLeaveGuard	function
 src/ui/Sheet.tsx	ConfirmSheet	component
 src/ui/Sheet.tsx	Sheet	component
 src/ui/Sheet.tsx	sheetDragCloses	function
