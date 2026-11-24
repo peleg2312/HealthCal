@@ -43,7 +43,7 @@ function cellLabel(cell: CalendarCell): string {
   // Above the budget says by how much (the amber lip), never a rounded share that could read as on it.
   const above = Math.round(cell.kcal - cell.budget);
   const share = cell.ratio > 1 ? `${formatNumber(Math.max(1, above))} kcal above the budget` : `${Math.floor(cell.ratio * 100)}% of the budget`;
-  const food = cell.future ? 'upcoming' : !cell.logged ? 'not logged' : cell.isToday ? `${share} so far` : cell.partial ? `partly logged, ${share}` : `${share}${cell.onBudget ? ', within 10%' : ''}`;
+  const food = cell.future ? 'upcoming' : !cell.logged ? 'not logged' : cell.isToday ? `${share} so far` : cell.partial ? `partly logged, ${share}` : `${share}${cell.onBudget ? ', on budget' : ''}`;
   return [formatDayLabel(cell.date), food, cell.waterMet ? 'water goal met' : '', cell.trained ? 'workout logged' : ''].filter(Boolean).join(', ');
 }
 
@@ -51,7 +51,8 @@ function cellLabel(cell: CalendarCell): string {
  * One day of the month: the date above a small cup filled to that day's own
  * budget, in the calorie colour (the recap's rule: the lighter fill is a
  * partly logged day, hatching is today, amber at the top a day above its
- * budget). Below it, a check for a fully logged day within 10% and cup keys
+ * budget). Below it, a check for a fully logged day on budget (90 to 100% of
+ * it, `budgetMark`; never under an amber day) and cup keys
  * for the water goal and a workout. Today's date is an ink box.
  * The month pours in a diagonal wave from the top left (`index`), and each
  * day remembers its level for the session, so reopening the page or coming
@@ -263,8 +264,8 @@ export default function ConsistencyScreen() {
             rowGap: spacing.xs,
           }}>
           <Legend swatch={<CupKey color={colors.calories} />} label="Filled to that day's budget" />
-          <Legend swatch={<Check size={11} color={colors.success} strokeWidth={3} />} label="Within 10%" />
-          <Legend swatch={<CupKey color={colors.warning} />} label="Above it" />
+          <Legend swatch={<Check size={11} color={colors.success} strokeWidth={3} />} label="On budget, 90 to 100%" />
+          <Legend swatch={<CupKey color={colors.warning} />} label="Above budget" />
           {rows.some((r) => r.some((c) => c?.partial)) ? <Legend swatch={<CupKey color={withOpacity(colors.calories, PARTIAL)} />} label="Partly logged" /> : null}
           <Legend swatch={<CupKey color={colors.water} size={7} />} label="Water goal met" />
           <Legend swatch={<CupKey color={colors.exercise} size={7} />} label="Workout" />

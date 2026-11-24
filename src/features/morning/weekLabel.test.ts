@@ -20,9 +20,10 @@ describe('weekLabel', () => {
     expect(weekLabel(cells(before, c('2026-11-18')))).toBe('Your week: 6 of 7 days logged. Yesterday 2,062 of 2,170 kilocalories, within the budget. Today so far, nothing logged.');
   });
 
-  it('says above the budget and within 10% in neutral words', () => {
+  it('says above the budget for anything over it, in neutral words, never "within 10%"', () => {
     expect(weekLabel(cells([], c('2026-11-18', { kcal: 2900, over: true })))).toContain('Yesterday 2,900 of 2,170 kilocalories, above the budget.');
-    expect(weekLabel(cells([], c('2026-11-18', { kcal: 2300, over: true })))).toContain('within 10% of the budget.');
+    expect(weekLabel(cells([], c('2026-11-18', { kcal: 2300, over: true })))).toContain('Yesterday 2,300 of 2,170 kilocalories, above the budget.');
+    expect(weekLabel(cells([], c('2026-11-18', { kcal: 2300, over: true })))).not.toMatch(/within 10%/);
   });
 
   it('says partly logged, about and a day with no budget', () => {

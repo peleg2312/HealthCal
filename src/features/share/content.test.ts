@@ -94,7 +94,9 @@ describe('day card content', () => {
 
   it('judges the day against its own budget, in neutral words', () => {
     expect(dayVerdict(2000, 2160, false, true)).toBe('Within the day’s budget');
-    expect(dayVerdict(2300, 2160, false, true)).toBe('Within 10% of the budget');
+    // Above is anything over the budget, as everywhere ("on budget" is 90 to 100%): never "within 10%".
+    expect(dayVerdict(2300, 2160, false, true)).toBe('Above the day’s budget');
+    expect(dayVerdict(2160, 2160, false, true)).toBe('Within the day’s budget');
     expect(dayVerdict(2600, 2160, false, true)).toBe('Above the day’s budget');
     expect(dayVerdict(900, 2160, true, true)).toBe('So far today');
     expect(dayVerdict(0, 2160, true, false)).toBe('Nothing logged yet today');
@@ -116,10 +118,18 @@ describe('week cups', () => {
   it('fills each day against its own budget, with future days dashed', () => {
     const cups = weekCups('2026-11-09', day().week, '2026-11-12');
     expect(cups).toHaveLength(7);
-    expect(cups[1]).toMatchObject({ ratio: 1.15, over: true, inBand: false });
-    expect(cups[0]).toMatchObject({ ratio: 1, inBand: true });
-    expect(cups[2]).toMatchObject({ complete: false, inBand: false });
+    expect(cups[1]).toMatchObject({ ratio: 1.15, over: true, onBudget: false });
+    expect(cups[0]).toMatchObject({ ratio: 1, onBudget: true });
+    expect(cups[2]).toMatchObject({ complete: false, onBudget: false });
     expect(cups[4].future).toBe(true);
+  });
+
+  it("checks a day by the app's one rule: 90 to 100% of its budget, never a day above it (budgetMark)", () => {
+    const ratios = [0.89, 0.9, 1, 1.01, 1.08, 0.5, 1.2];
+    const days = ratios.map((r, i) => ({ date: `2026-11-0${i + 2}`, logged: true, kcal: 2000 * r, budget: 2000, complete: true }));
+    const cups = weekCups('2026-11-02', days, '2026-11-14');
+    expect(cups.map((c) => c.onBudget)).toEqual([false, true, true, false, false, false, false]);
+    for (const c of cups) if (c.over) expect(c.onBudget).toBe(false);
   });
 });
 
@@ -141,7 +151,9 @@ const week = (over: Partial<ShareWeekInput> = {}): ShareWeekInput => ({
 describe('week card content', () => {
   it('writes its own headline from facts it may show', () => {
     const c = weekCardContent(week(), DEFAULT_SHARE_CHOICES);
-    expect(c.headline).toBe('Every full day within 10% of its budget.');
+    // Six of the seven days are at 90 to 100% of the budget; 2,120 of 2,100 is above it.
+    expect(c.headline).toBe('Most full days on budget.');
+    expect(weekCardContent(week({ days: week().days.map((d) => ({ ...d, kcal: 2000 })) }), DEFAULT_SHARE_CHOICES).headline).toBe('Every full day on budget.');
     expect(c.overline).toBe('WEEK OF NOV 2 – 8');
   });
 
@@ -243,7 +255,7 @@ describe('week card, review fixes', () => {
 
   it('says "full day" for one', () => {
     const c = weekCardContent(week({ days: week().days.map((d, i) => ({ ...d, complete: i === 0 })) }), DEFAULT_SHARE_CHOICES);
-    expect(c.stats[0]).toMatchObject({ value: '1', unit: 'of 1', label: 'full day within 10%' });
+    expect(c.stats[0]).toMatchObject({ value: '1', unit: 'of 1', label: 'full day on budget' });
   });
 });
 

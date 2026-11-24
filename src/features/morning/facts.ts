@@ -4,7 +4,8 @@
  * so every rule after it is tested without the store.
  *
  * The shared rules are used, never re-implemented: a fully logged day is isCompleteDay
- * (@/lib/trend), the band around the budget is BUDGET_BAND (@/lib/insights), the minutes toward
+ * (@/lib/trend), how far above the budget calories become a thing to improve is BUDGET_BAND
+ * (@/lib/insights; never words on screen, which say "above" for anything over, `budgetMark`), the minutes toward
  * the weekly 150 are guidelineMinutes (@/lib/exercise).
  */
 import { guidelineMinutes } from '@/lib/exercise';

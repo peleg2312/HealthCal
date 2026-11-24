@@ -6,7 +6,6 @@
  * "over", "failed", "cheat", praise, an exclamation mark or advice. Sleep is not in the
  * sentence: last night belongs to today, and its cup speaks for it.
  */
-import { BUDGET_BAND } from '@/lib/insights';
 import { NBSP } from '@/lib/text';
 import { formatNumber } from '@/lib/units';
 import type { ActivityEntry } from '@/types';
@@ -37,8 +36,7 @@ function caloriePart({ kcal, budget, complete, foodLogged }: MorningLineInput): 
   // Entries that add up to 0 kcal (water-only drinks, a black coffee): the cup and its number already say 0.
   if (!complete) return kcal > 0 ? `Part of the day logged, ${formatNumber(kcal)} kcal` : 'Part of the day logged';
   if (kcal <= budget) return "Within the day's budget";
-  // The same band as the insights and the share card; a hair of float slack keeps exactly 110% inside it.
-  if (kcal - budget <= budget * BUDGET_BAND + 1e-9) return 'Within 10% of the budget';
+  // Above is anything over the budget, as on the recap, Progress and the share card (`budgetMark`): the amount, never "within 10%".
   return `${formatNumber(kcal - budget)} kcal above the day's budget`;
 }
 

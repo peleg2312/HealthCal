@@ -92,10 +92,11 @@ export function CaloriesCard({
           <StatStrip
             items={[
               {
-                label: 'Within 10%',
-                value: `${c.inBand}`,
+                // The headline's count, by the same rule (`budgetMark`: 90 to 100% of each day's own budget).
+                label: 'On budget',
+                value: `${c.onBudget}`,
                 unit: `of ${summary.completeDays}`,
-                trend: previous?.calories ? direction(c.inBand / Math.max(1, summary.completeDays), previous.calories.inBand / Math.max(1, previous.completeDays), 0.05) : null,
+                trend: previous?.calories ? direction(c.onBudget / Math.max(1, summary.completeDays), previous.calories.onBudget / Math.max(1, previous.completeDays), 0.05) : null,
               },
               { label: 'Average budget', value: formatNumber(Math.round(c.avgBudget)), unit: 'kcal', trend: direction(c.avgBudget, previous?.calories?.avgBudget, 20) },
               {
@@ -110,7 +111,7 @@ export function CaloriesCard({
           <Sheet visible={help} onClose={() => setHelp(false)} title="Reading the chart">
             <View style={{ gap: spacing.md }} testID="progress-calories-help-text">
               <Text variant="body">
-                Each bar is one {weekly ? "week's average day" : 'day'}, and it is amber only above its own {weekly ? "week's" : "day's"} budget. The dashed line is the average budget, for reference.
+                Each bar is one {weekly ? "week's average day" : 'day'}, and it is amber only above its own {weekly ? "week's" : "day's"} budget. A fully logged day is on budget at 90 to 100% of its own budget. The dashed line is the average budget, for reference.
               </Text>
               {usual ? <Text variant="body">The grey band is your usual intake: the middle half of your fully logged days in the last 4 weeks.</Text> : null}
               <Text variant="body" color="textSecondary">

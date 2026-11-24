@@ -260,7 +260,8 @@ function weekRow(c: CardColors, cups: WeekCup[], x: number, y: number, width: nu
         future: d.future,
       }),
     );
-    if (checks && d.inBand) {
+    // The check is the recap's: a fully logged day on budget (`budgetMark`), never a day above it.
+    if (checks && d.onBudget) {
       const mx = cx + cupW / 2;
       prims.push({ k: 'path', d: `M ${r1(mx - 4.5)} ${r1(y - 9)} l 3.2 3.2 l 5.8 -6.6`, stroke: c.text, sw: 2 });
     }

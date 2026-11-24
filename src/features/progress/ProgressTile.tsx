@@ -1,13 +1,18 @@
 import React from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import type { Direction } from '@/lib/insights';
 import { useTheme } from '@/theme';
 import { CupKey, FadeUp, PressableScale, Text } from '@/ui';
 
+import { TrendMark } from './parts';
+
 /**
  * One cell of the overview card: a cup key and title, one large value with
- * its unit small inside it, a caption and a one-line comparison with the
- * previous equal period. Cells share one card and are divided by hairlines
+ * its unit small inside it and the Nutrition card's trend mark beside it (a
+ * triangle against the previous equal period, explained once under the grid),
+ * and one caption line. The comparison in words is read out with the cell and
+ * shown in full one tap away. Cells share one card and are divided by hairlines
  * (drawn by the grid). The whole cell is one pressable; it holds nothing else
  * that can be pressed.
  */
@@ -18,7 +23,10 @@ export function ProgressTile({
   value,
   unit,
   caption,
+  captionShort,
   compare,
+  trend,
+  period,
   onPress,
   keyVariant,
   valueColor = 'text',
@@ -32,10 +40,16 @@ export function ProgressTile({
   /** Null shows a dash. */
   value: string | null;
   unit?: string;
-  /** Short context under the value, e.g. 'a day · budget 2,171'. */
+  /** One line of context under the value, e.g. 'a day · budget 2,171'. */
   caption?: string;
-  /** Neutral comparison line, or null when there is nothing to compare with. */
+  /** The same line for a phone under 360 px, where a cell is about 108 px wide. */
+  captionShort?: string;
+  /** Neutral comparison sentence, read out with the cell; null when there is nothing to compare with. */
   compare: string | null;
+  /** The triangle beside the value: the shown number against the previous equal period. */
+  trend?: Direction | null;
+  /** e.g. '30 days', for the triangle's spoken words. */
+  period?: string;
   onPress: () => void;
   /** An outlined key marks an estimate (expenditure), as on the designer's board. */
   keyVariant?: 'filled' | 'outline';
@@ -49,16 +63,16 @@ export function ProgressTile({
   const { colors, spacing } = useTheme();
   // At 320 px a tile is about 108 px wide: the number steps down instead of being cut.
   const narrow = useWindowDimensions().width < 360;
+  const line = narrow && captionShort ? captionShort : caption;
   return (
     <FadeUp index={index + 1} style={{ width: '50%' }}>
     <PressableScale
       testID={testID}
       onPress={onPress}
       scaleTo={0.98}
-      accessibilityLabel={`${title}: ${value === null ? 'no data' : `${value} ${unit ?? ''}`}${caption ? `, ${caption}` : ''}. ${compare ?? ''} Open details.`}
+      accessibilityLabel={`${title}: ${value === null ? 'no data' : `${value} ${unit ?? ''}`}${caption ? `, ${caption}` : ''}.${compare ? ` ${compare}.` : ''} Open details.`}
       style={{
         flexGrow: 1,
-        minHeight: 132,
         paddingHorizontal: spacing.lg,
         paddingTop: 14,
         paddingBottom: spacing.lg,
@@ -73,20 +87,19 @@ export function ProgressTile({
           {title}
         </Text>
       </View>
-      <Text variant="numL" color={value === null ? 'textTertiary' : valueColor} style={[{ marginTop: 2 }, narrow ? { fontSize: 24, lineHeight: 28 } : null]}>
-        {value ?? '–'}
-        {unit && value !== null ? <Text variant="unit">{` ${unit}`}</Text> : null}
-      </Text>
-      {caption ? (
-        <Text variant="caption" color="textSecondary">
-          {/* A number keeps its unit on its line ("152 g", "2.29 L"), so a unit never sits alone below. */}
-          {caption.replace(/(\d) (?=[a-zA-Z%])/g, '$1\u00A0')}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+        <Text variant="numL" color={value === null ? 'textTertiary' : valueColor} style={[{ flexShrink: 1 }, narrow ? { fontSize: 24, lineHeight: 28 } : null]}>
+          {value ?? '–'}
+          {unit && value !== null ? <Text variant="unit">{` ${unit}`}</Text> : null}
+        </Text>
+        {value !== null ? <TrendMark trend={trend} period={period} /> : null}
+      </View>
+      {line ? (
+        // One line: what the number counts. The comparison is the triangle, and in full one tap away.
+        <Text variant="caption" color="textSecondary" numberOfLines={1}>
+          {line}
         </Text>
       ) : null}
-      <View style={{ flex: 1 }} />
-      <Text variant="caption" color="textTertiary" style={{ marginTop: 4 }}>
-        {compare ?? 'Nothing to compare with yet'}
-      </Text>
     </PressableScale>
     </FadeUp>
   );

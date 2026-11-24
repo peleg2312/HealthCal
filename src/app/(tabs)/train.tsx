@@ -11,21 +11,18 @@ import { summariseWeek } from '@/features/activity/build';
 import { deleteActivity, openSession } from '@/features/activity/session';
 import { RoutineCards, useRoutineTemplates } from '@/features/activity/RoutineCards';
 import { WeekCard } from '@/features/activity/WeekCard';
+import { historyDaySpoken, historyDayWord, historyWeekLabel, historyWeeks, WEEKS_PER_PAGE } from '@/features/activity/history';
 import { startRoutineDraft, type RoutineTemplate } from '@/features/activity/routines';
 import { draftHasContent, useStrengthDrafts } from '@/features/activity/strengthDraft';
 import { StepsLine } from '@/features/health-sync/ui/StepsLine';
 import { SyncedFromLine } from '@/features/health-sync/ui/SyncedFromLine';
-import { addDays, formatDayLabel, formatDuration, formatShortDate, startOfWeek } from '@/lib/dates';
+import { addDays, formatDuration, formatShortDate, startOfWeek } from '@/lib/dates';
 import { trainingOverview } from '@/lib/trainingLoad';
-import { formatNumber } from '@/lib/units';
 import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
 import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
-import type { ActivityEntry } from '@/types';
 import { Button, Card, Chip, ConfirmSheet, EmptyState, Screen, SectionTitle, Text } from '@/ui';
-
-const DAYS_PER_PAGE = 14;
 
 export default function TrainScreen() {
   const { colors, spacing } = useTheme();
@@ -45,23 +42,15 @@ export default function TrainScreen() {
   // The last 7 days against the recent weeks, from every workout on the phone (today comes from the clock hook).
   const overview = useMemo(() => trainingOverview(activities, t), [activities, t]);
 
-  const history = useMemo(() => {
-    const sorted = [...activities].sort((a, b) => b.date.localeCompare(a.date) || b.loggedAt.localeCompare(a.loggedAt));
-    const groups: { date: string; entries: ActivityEntry[] }[] = [];
-    for (const e of sorted) {
-      const last = groups[groups.length - 1];
-      if (last && last.date === e.date) last.entries.push(e);
-      else groups.push({ date: e.date, entries: [e] });
-    }
-    return groups;
-  }, [activities]);
+  // One card per calendar week, newest first, its workouts as rows (./history.ts; today from the clock hook).
+  const history = useMemo(() => historyWeeks(activities, t), [activities, t]);
 
   const quick = useMemo(() => {
     const ids = [...recentIds, ...POPULAR_ACTIVITY_IDS].filter((id, i, all) => ACTIVITY_BY_ID[id] && all.indexOf(id) === i);
     return ids.slice(0, 8).map((id) => ACTIVITY_BY_ID[id]);
   }, [recentIds]);
 
-  const visibleGroups = history.slice(0, pages * DAYS_PER_PAGE);
+  const visibleWeeks = history.slice(0, pages * WEEKS_PER_PAGE);
   const draftActive = draftHasContent(draft);
   const routines = useRoutineTemplates();
   const [replace, setReplace] = useState<RoutineTemplate | null>(null);
@@ -154,34 +143,39 @@ export default function TrainScreen() {
         </Card>
       ) : (
         <View style={{ gap: spacing.md }} testID="train-history">
-          {visibleGroups.map((g) => {
-            const net = g.entries.reduce((s, e) => s + e.kcalNet, 0);
-            const minutes = g.entries.reduce((s, e) => s + e.durationMin, 0);
-            return (
-              <View key={g.date} style={{ gap: spacing.xs }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingHorizontal: spacing.xs }}>
-                  <Text variant="overline">
-                    {formatDayLabel(g.date)}
-                  </Text>
-                  {g.entries.length > 1 ? (
-                    <Text variant="caption" color="textSecondary" tabular>
-                      {formatDuration(minutes)} · ~{formatNumber(net)} kcal
-                    </Text>
-                  ) : null}
-                </View>
-                <Card padding={0} style={{ paddingVertical: 2 }}>
-                  {g.entries.map((e, i) => (
-                    <View key={e.id}>
-                      {i > 0 ? <View style={{ height: 1, backgroundColor: colors.border, marginLeft: 18 + 24 + 12 }} /> : null}
-                      <SessionRow entry={e} units={profile.units} onPress={() => openSession(e)} onDelete={() => deleteActivity(e)} />
-                      <SyncedFromLine entry={e} />
-                    </View>
-                  ))}
-                </Card>
+          {visibleWeeks.map((w) => (
+            // A week as the diary shows a meal: its title and total time in the card's head, its workouts as rows.
+            <Card key={w.start} testID={`train-week-${w.start}`} padding={0} style={{ paddingTop: 12, paddingBottom: 2 }}>
+              <View
+                accessible
+                accessibilityRole="header"
+                accessibilityLabel={historyWeekLabel(w)}
+                style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10, paddingLeft: 18, paddingRight: 18, paddingBottom: 2 }}>
+                <Text variant="h3" numberOfLines={1} style={{ flexShrink: 1 }}>
+                  {w.title}
+                </Text>
+                <Text variant="numM" color="textSecondary" testID={`train-week-total-${w.start}`} style={{ fontSize: 15, lineHeight: 20 }}>
+                  {formatDuration(w.minutes)
+                    .split(' ')
+                    .map((part, i) => (/^\d/.test(part) ? `${i ? ' ' : ''}${part}` : <Text key={i} variant="unit">{` ${part}`}</Text>))}
+                </Text>
               </View>
-            );
-          })}
-          {history.length > visibleGroups.length ? (
+              {w.entries.map((e, i) => (
+                <View key={e.id}>
+                  {i > 0 ? <View style={{ height: 1, backgroundColor: colors.border, marginLeft: 18 + 24 + 12 }} /> : null}
+                  <SessionRow
+                    entry={e}
+                    units={profile.units}
+                    day={{ word: historyDayWord(e.date, t), spoken: historyDaySpoken(e.date, t) }}
+                    onPress={() => openSession(e)}
+                    onDelete={() => deleteActivity(e)}
+                  />
+                  <SyncedFromLine entry={e} />
+                </View>
+              ))}
+            </Card>
+          ))}
+          {history.length > visibleWeeks.length ? (
             <Button
               testID="train-show-more"
               title="Show earlier sessions"

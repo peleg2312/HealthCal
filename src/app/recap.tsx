@@ -123,6 +123,7 @@ export default function RecapScreen() {
   const r = d.recap;
   const [help, setHelp] = useState(false);
   const cups = r ? recapDayCups(r.weekStart, r.days, d.today) : [];
+  const verdict = recapDaysVerdict(cups);
 
   // Opening last week's check-in clears "Your week is ready" on Today.
   useEffect(() => {
@@ -174,11 +175,12 @@ export default function RecapScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
                 <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                   <Text variant="h3">Day by day</Text>
+                  {/* Plain words in the headline ("3 of 7 days on budget, 2 above"); what they count and the week's balance in the caption. */}
                   <Text variant="title" testID="recap-days-verdict">
-                    {recapDaysVerdict(cups)}
+                    {verdict.line}
                   </Text>
-                  <Text variant="caption" color="textSecondary">
-                    {budgetBalanceText(r.budgetBalance)}
+                  <Text variant="caption" color="textSecondary" testID="recap-days-note">
+                    {[verdict.note, budgetBalanceText(r.budgetBalance)].filter(Boolean).join('. ')}
                   </Text>
                 </View>
                 <IconButton size={36} tone="clear" testID="recap-chart-help" accessibilityLabel="How to read the cups" onPress={() => setHelp(true)}>
@@ -264,7 +266,7 @@ export default function RecapScreen() {
       <Sheet visible={help} onClose={() => setHelp(false)} title="Reading the cups">
         <View style={{ gap: spacing.md }} testID="recap-help">
           <Text variant="body">Each cup is one day, filled to how much of that day&apos;s own budget you ate. The dashed line across the tops is each day&apos;s budget, so a full cup is a day right on it.</Text>
-          <Text variant="body">A check marks a fully logged day at 90 to 100% of its budget. Amber at the top marks a day above its budget, and such a day has no check. A lighter fill is a day only partly logged (under 800 kcal or half the budget), and a hatched cup is today, still in progress.</Text>
+          <Text variant="body">A check marks a fully logged day on budget: 90 to 100% of its own budget. Amber at the top marks a day above its budget, and such a day has no check. A lighter fill is a day only partly logged (under 800 kcal or half the budget), and a hatched cup is today, still in progress.</Text>
           <Text variant="body" color="textSecondary">Budgets change with exercise and with your plan, which is why each day is measured against its own and never against the week&apos;s average.</Text>
         </View>
       </Sheet>

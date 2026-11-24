@@ -29,6 +29,7 @@
  *   node scripts/dev/e2e.cjs [--url=http://localhost:8081] [--shots=<dir>]
  */
 const { chromium } = require('playwright');
+const { toastActionReady } = require('./toastGuard.cjs');
 
 const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith('--')).map((a) => a.slice(2).split('=')));
 const BASE = flags.url || 'http://localhost:8081';
@@ -71,7 +72,9 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 200)));
 
+  // A toast's action takes no press in its first moments on screen (toastGuard.cjs): every helper below waits for it.
   const tap = async (id) => {
+    if (id === 'toast-action') await toastActionReady(page);
     await page.getByTestId(id).first().click({ timeout: 15000 });
     await page.waitForTimeout(350);
   };
@@ -359,6 +362,41 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   s = await stored();
   check('one tap adds 250 ml of water', live(s.water).length === 1 && live(s.water)[0].ml === 250);
   check('water card shows the goal from body weight plus exercise', water.includes('250 ml') && water.includes(`${(base + extra) / 1000} L`), `${water.replace(/\n/g, ' | ').slice(0, 120)} ; expected goal ${(base + extra) / 1000} L`);
+
+  // The toast's Undo takes no press in its first 600 ms on screen (TOAST_ACTION_GUARD_MS in src/ui/Toast.tsx), so a
+  // quick second tap meant for "+ 250 ml" never undoes the first glass. Timed in the page from the moment the toast's
+  // action is drawn to the finger going down on it; these two taps go straight to the button, past toastGuard.cjs.
+  {
+    await page.locator('[data-testid="toast"]').first().waitFor({ state: 'detached', timeout: 10000 });
+    await page.evaluate(() => {
+      window.__toastAt = null;
+      window.__undoDownAt = null;
+      new MutationObserver(() => {
+        if (window.__toastAt == null && document.querySelector('[data-testid="toast-action"]')) window.__toastAt = performance.now();
+      }).observe(document.body, { childList: true, subtree: true });
+      document.addEventListener('pointerdown', (e) => e.target instanceof Element && e.target.closest('[data-testid="toast-action"]') && (window.__undoDownAt = performance.now()), { capture: true });
+    });
+    const glassesBefore = live((await stored()).water).length;
+    await page.getByTestId('today-water-250').first().click({ timeout: 15000 });
+    await page.waitForFunction(() => window.__toastAt != null, null, { timeout: 5000 });
+    const glassesAdded = live((await stored()).water).length;
+    const undoAt = async (ms) => {
+      await page.waitForFunction((ms) => performance.now() - window.__toastAt >= ms, ms, { polling: 'raf', timeout: 5000 });
+      await page.getByTestId('toast-action').first().click({ timeout: 2000 });
+      await page.waitForTimeout(120);
+      return Math.round(await page.evaluate(() => window.__undoDownAt - window.__toastAt));
+    };
+    const early = await undoAt(100);
+    s = await stored();
+    check(
+      'toast guard: Undo tapped about 100 ms after the toast appears does nothing (the glass stays, the toast stays)',
+      glassesAdded === glassesBefore + 1 && live(s.water).length === glassesAdded && early < 600 && (await page.getByTestId('toast-action').count()) > 0,
+      `tapped ${early} ms after the toast appeared, ${glassesBefore} -> ${glassesAdded} -> ${live(s.water).length} glasses`,
+    );
+    const late = await undoAt(700);
+    s = await stored();
+    check('toast guard: Undo tapped at 700 ms takes the glass back', late >= 700 && live(s.water).length === glassesBefore, `tapped ${late} ms after the toast appeared, ${live(s.water).length} glasses`);
+  }
 
   // --------------------------------------------------------------- diary
   await tap('tab-diary');
@@ -1032,6 +1070,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     const addLabel = (await p.getByTestId('fits-idea-add-0').first().getAttribute('aria-label')) || '';
     check('ideas: the added row shows its tick and every row stays in its place', addLabel.endsWith(' added') && (await p.getByTestId(/^fits-idea-\d+$/).count()) === rowsBefore && (await itext(p, 'fits-idea-0')) === name0, `${addLabel} | ${rowsBefore} rows`);
     await shot('ideas-added');
+    await toastActionReady(p, 10000);
     await p.getByTestId('toast-action').first().click({ timeout: 10000 });
     await p.waitForTimeout(500);
     const undone = (await dinnerToday(p)).filter((e) => !before.includes(e.id));
@@ -1092,6 +1131,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     fmt(tb),
   );
   check('keyboard up, food search: the toast carries Undo, a 44 px target', !!tb?.action && tb.action.h >= 44 && tb.action.w >= 44, fmt(tb));
+  if (tb?.action) await toastActionReady(page);
   if (tb?.action) await page.touchscreen.tap(tb.action.x, tb.action.y);
   await page.waitForTimeout(400);
   s = await stored();
@@ -1137,6 +1177,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     check('keyboard up, Water: with the field focused the toast keeps clear of it, above the keyboard', clear && t2.bottom <= t2.visible - 12 && t2.top >= 0 && (await focusedId()) === 'water-custom-input', `${fmt(t2)}, field ${f2 ? `${Math.round(f2.y)}-${Math.round(f2.y + f2.h)}` : '-'}, focus ${await focusedId()}`);
     tb = t2 || tb;
   }
+  if (tb?.action) await toastActionReady(page);
   if (tb?.action) await page.touchscreen.tap(tb.action.x, tb.action.y);
   await page.waitForTimeout(400);
   s = await stored();
@@ -1167,6 +1208,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   tb = await toastBox();
   const mochaUp = newIn(await stored(), before, 'foodEntries');
   check('keyboard up, Water: the toast after a glass of the picked drink rests 12 to 24 px above the keyboard', !!tb && tb.bottom <= tb.visible - 12 && tb.bottom >= tb.visible - 24 && tb.top >= 0 && mochaUp.length === 1 && mochaUp[0].foodId === 'b_mocha', fmt(tb));
+  if (tb?.action) await toastActionReady(page);
   if (tb?.action) await page.touchscreen.tap(tb.action.x, tb.action.y);
   await page.waitForTimeout(400);
   await page.evaluate(() => window.__keyboard(0));
@@ -1269,7 +1311,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     const sent = [];
     cp.on('request', (r) => /coach-chat/.test(r.url()) && sent.push(r.url()));
     const ctext = async (id) => (await cp.getByTestId(id).first().innerText({ timeout: 15000 })).replace(/\u00A0/g, ' ').replace(/[\u2060\u200E\u2068\u2069]/g, '').trim();
-    const ctap = async (id) => { await cp.getByTestId(id).first().click({ timeout: 15000 }); await cp.waitForTimeout(450); };
+    const ctap = async (id) => { if (id === 'toast-action') await toastActionReady(cp); await cp.getByTestId(id).first().click({ timeout: 15000 }); await cp.waitForTimeout(450); };
     const onCoach = () => cp.waitForURL((u) => new URL(u).pathname === '/coach', { timeout: 15000 }).then(() => true, () => false);
     const onPath = (path) => cp.waitForURL((u) => new URL(u).pathname === path, { timeout: 15000 }).then(() => true, () => false);
     const subtitle = async () => ((await ctext('screen-header')).split('\n').map((l) => l.trim()).filter(Boolean)[1] || '');
@@ -1527,6 +1569,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
 
     // A tap that reports instead of throwing, so one stuck row does not hide what the later steps find.
     const ltap = async (id, what) => {
+      if (id === 'toast-action') await toastActionReady(lp, 8000).catch(() => {});
       const ok = await lp.getByTestId(id).first().click({ timeout: 8000 }).then(() => true, () => false);
       if (!ok) check(`lists with motion: ${what} can be tapped`, false, id);
       return ok;
@@ -1657,6 +1700,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     const pstate = (p) => p.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())));
     const liveOf = (map) => Object.values(map).filter((r) => !r.deleted);
     const ptap = async (p, id) => {
+      if (id === 'toast-action') await toastActionReady(p);
       await p.getByTestId(id).first().click({ timeout: 15000 });
       await p.waitForTimeout(350);
     };
@@ -1989,6 +2033,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     const ftext = async (p, id) => (await p.getByTestId(id).first().innerText({ timeout: 15000 })).replace(/ /g, ' ').replace(/[⁠‎⁨⁩]/g, '').trim();
     const fstate = (p) => p.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())));
     const ftap = async (p, id) => {
+      if (id === 'toast-action') await toastActionReady(p);
       await p.getByTestId(id).first().click({ timeout: 15000 });
       await p.waitForTimeout(350);
     };
@@ -2062,11 +2107,22 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
       const foodBox = await p.getByTestId('favorite-0').first().boundingBox();
       check('favourites: search\'s Favourites tab counts foods and meals ("Favourites 3") and lists Meals above Foods', chip === 'Favourites 3' && mealsLabel && mealBox && foodBox && mealBox.y < foodBox.y, `${chip}`);
       check('favourites: the meal row names the meal and carries its star (pressed) and Log', (await ftext(p, 'favorite-meal-0')).includes('Usual breakfast') && (await starLook(p, 'favorite-meal-0-favorite')).pressed === 'true' && (await p.getByTestId('favorite-meal-0-log').count()) === 1);
-      const lunchBefore = Object.values((await fstate(p)).foodEntries).filter((e) => !e.deleted && e.meal === 'lunch').length;
+      const lunchNow = async () => Object.values((await fstate(p)).foodEntries).filter((e) => !e.deleted && e.meal === 'lunch').length;
+      const lunchBefore = await lunchNow();
+      // The row's body opens the review sheet (servings, items) and logs nothing by itself.
+      await ftap(p, 'favorite-meal-0');
+      const review = (await p.getByTestId('log-meal-confirm').count()) > 0 && (await lunchNow()) === lunchBefore;
+      await p.keyboard.press('Escape');
+      await p.getByTestId('log-meal-confirm').first().waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+      check('favourites: a tap on the meal row opens its review sheet and logs nothing', review);
+      // The "+" logs at once, as a food's "+" does: one toast naming the meal, with Undo for both items.
       await ftap(p, 'favorite-meal-0-log');
-      await ftap(p, 'log-meal-confirm');
-      const lunchAfter = Object.values((await fstate(p)).foodEntries).filter((e) => !e.deleted && e.meal === 'lunch').length;
-      check('favourites: Log on the favourite meal adds its two items to lunch', lunchAfter - lunchBefore === 2, `${lunchAfter - lunchBefore} added`);
+      const lunchAfter = await lunchNow();
+      const mealToast = await ftext(p, 'toast').catch(() => '');
+      check('favourites: the "+" on the favourite meal adds its two items to lunch at once, with no sheet', lunchAfter - lunchBefore === 2 && (await p.getByTestId('log-meal-confirm').count()) === 0, `${lunchAfter - lunchBefore} added`);
+      check('favourites: its one toast names the meal ("Usual breakfast added to lunch") with Undo', mealToast.startsWith('Usual breakfast added to lunch') && (await p.getByTestId('toast-action').count()) > 0, mealToast);
+      await ftap(p, 'toast-action');
+      check('favourites: its Undo takes both items back', (await lunchNow()) === lunchBefore, `${await lunchNow()} vs ${lunchBefore}`);
       await p.goto(`${BASE}/food/search?meal=lunch`, { waitUntil: 'networkidle' });
       await p.getByTestId('search-tab-favorites').first().waitFor({ timeout: 20000 });
       await p.waitForTimeout(400);

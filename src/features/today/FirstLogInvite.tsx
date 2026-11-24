@@ -4,6 +4,8 @@ import React from 'react';
 import { View } from 'react-native';
 
 import { BUILTIN_FOODS } from '@/data/foods';
+import { foodNameHead } from '@/features/food/addedTo';
+import { displayFoodName } from '@/features/food/displayName';
 import { logFood } from '@/features/food/log';
 import { matchServing } from '@/features/food/helpers';
 import { customFoodIndex, resolveUsuals, usualFoods } from '@/features/food/usuals';
@@ -61,7 +63,8 @@ function picks(entries: Parameters<typeof usualFoods>[0], meal: MealType, today:
     if (!food) return [];
     const quantity = u.last.quantity || 1;
     const serving = matchServing(food, u.last.servingLabel, u.last.grams / quantity);
-    return [{ key: u.key, label: food.name.split(',')[0], food, serving, quantity, kcal: scaleNutrients(food.per100g, serving.grams * quantity).kcal }];
+    // The name as drawn, up to its first comma outside brackets (never "Israeli salad (tomato").
+    return [{ key: u.key, label: foodNameHead(displayFoodName(food)), food, serving, quantity, kcal: scaleNutrients(food.per100g, serving.grams * quantity).kcal }];
   });
   if (usual.length >= 3) return usual;
   const staples = STAPLES[meal].flatMap((s) => {

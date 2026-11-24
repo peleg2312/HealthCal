@@ -23,7 +23,7 @@ export function favoriteLabel(name: string, on: boolean): string {
   return on ? `Remove ${name} from favourites` : `Add ${name} to favourites`;
 }
 
-/** A saved-meal row's "+" (search's Saved meals and Favourites): "Log Usual breakfast" (it opens the log sheet). */
+/** A saved-meal row's "+" (search's Saved meals and Favourites): "Log Usual breakfast" (it logs the meal at once, `logSavedMeal`). */
 export function logMealLabel(name: string): string {
   return `Log ${name}`;
 }

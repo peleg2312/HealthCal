@@ -38,9 +38,9 @@ describe('dayRing', () => {
       progress: 0.5,
     });
   });
-  it('keeps the band as "close" but never hides the over lip', () => {
-    // 5% over: still close to budget, and drawn over with its lip (one rule for over everywhere).
-    expect(dayRing(d('2026-11-12', 2100), TODAY)).toMatchObject({ state: 'over', progress: 1.05, close: true });
+  it('marks on budget at 90 to 100% and never hides the over lip', () => {
+    // 5% over: above the budget, drawn over with its lip, never on budget (one rule everywhere).
+    expect(dayRing(d('2026-11-12', 2100), TODAY)).toMatchObject({ state: 'over', progress: 1.05, close: false });
     expect(dayRing(d('2026-11-12', 1850), TODAY)).toMatchObject({ state: 'band', progress: 0.925, close: true });
     expect(dayRing(d('2026-11-12', 2000), TODAY)).toMatchObject({ state: 'band', progress: 1, close: true });
     expect(dayRing(d('2026-11-12', 1500), TODAY)).toMatchObject({ state: 'under', close: false });
@@ -85,8 +85,11 @@ describe('weekCaption', () => {
   it('reports over budget neutrally', () => {
     expect(weekCaption(week([2400, 2400]), TODAY)).toBe('Week so far: 400 kcal a day over budget, 2 full days');
   });
-  it('calls a small average difference on budget', () => {
-    expect(weekCaption(week([2030, 1980, 2010]), TODAY)).toBe('Week so far: on budget, 3 full days');
+  it('says on budget only when every full day was on budget, by the one rule', () => {
+    expect(weekCaption(week([1930, 1980, 2000]), TODAY)).toBe('Week so far: 3 full days on budget');
+    // 2,030 and 2,010 are above their budget: the average is said instead.
+    expect(weekCaption(week([2030, 1980, 2010]), TODAY)).toBe('Week so far: 10 kcal a day over budget, 3 full days');
+    expect(weekCaption(week([2200, 1800]), TODAY)).toBe('Week so far: at budget on average, 2 full days');
   });
   it('says so when no complete day exists yet', () => {
     expect(weekCaption(week([null, null, null, null, 900]), TODAY)).toBe('Week so far: no full days logged yet');
@@ -100,11 +103,12 @@ describe('weekCaption', () => {
   it('starts a new user at day 1, and leaves days before the start out', () => {
     expect(weekCaption(week([null, null, null, null, null]), TODAY, TODAY)).toBe('Day 1. Your week starts here.');
     // Started on Wednesday: Monday and Tuesday are not missed days.
-    expect(weekCaption(week([null, null, 1900, 1950, 300]), TODAY, '2026-11-11')).toBe('Week so far: on budget, 2 full days');
+    expect(weekCaption(week([null, null, 1900, 1950, 300]), TODAY, '2026-11-11')).toBe('Week so far: 2 full days on budget');
     expect(weekCaption(weekDates(TODAY, 2).map((x) => d(x, null)), TODAY, '2026-11-11')).toBe('Before you started');
   });
   it('labels a past week as that week', () => {
-    const past = weekDates(TODAY, 1).map((x) => d(x, 1800));
-    expect(weekCaption(past, TODAY)).toBe('That week: 200 kcal a day under budget, 7 full days');
+    const past = weekDates(TODAY, 1).map((x) => d(x, 1700));
+    expect(weekCaption(past, TODAY)).toBe('That week: 300 kcal a day under budget, 7 full days');
+    expect(weekCaption(weekDates(TODAY, 1).map((x) => d(x, 1800)), TODAY)).toBe('That week: 7 full days on budget');
   });
 });

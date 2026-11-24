@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { BUDGET_BAND } from '@/lib/insights';
-
 import { goalMet, moveAccessibilityLabel, moveLine, morningLine, NO_WORKOUT, type MorningLineInput, type MoveActivity } from './line';
 
 const base: MorningLineInput = { kcal: 1840, budget: 2160, complete: true, foodLogged: true, proteinMet: false, waterMet: false };
@@ -13,12 +11,12 @@ describe('morningLine', () => {
     expect(line({ kcal: 2160 })).toBe("Within the day's budget.");
   });
 
-  it('within the 10% band, its edge exactly 110% included', () => {
-    expect(BUDGET_BAND).toBe(0.1);
-    expect(line({ kcal: 2290 })).toBe('Within 10% of the budget.');
-    expect(line({ kcal: 2376 })).toBe('Within 10% of the budget.');
-    expect(line({ kcal: 2200, budget: 2000 })).toBe('Within 10% of the budget.');
+  it('anything over the budget is above it, with the amount, never "within 10%" (budgetMark)', () => {
+    expect(line({ kcal: 2161 })).toBe("1 kcal above the day's budget.");
+    expect(line({ kcal: 2290 })).toBe("130 kcal above the day's budget.");
+    expect(line({ kcal: 2200, budget: 2000 })).toBe("200 kcal above the day's budget.");
     expect(line({ kcal: 2377 })).toBe("217 kcal above the day's budget.");
+    for (const kcal of [2161, 2290, 2376, 2377]) expect(line({ kcal })).not.toMatch(/within 10%/i);
   });
 
   it('above the budget names the amount in plain words', () => {

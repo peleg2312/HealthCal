@@ -62,6 +62,7 @@ const { chromium, devices } = require('playwright');
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
+const { toastActionReady } = require('./toastGuard.cjs');
 
 const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith('--')).map((a) => { const [k, ...v] = a.slice(2).split('='); return [k, v.join('=') || true]; }));
 const ROOT = path.join(__dirname, '..', '..');
@@ -372,6 +373,7 @@ async function load(ctx, target, seeds) {
   for (const t of target.taps || []) {
     if (problem) break;
     if (typeof t === 'string') {
+      if (t === 'toast-action') await toastActionReady(frame).catch(() => {});
       problem = await step(`tap ${t}`, () => frame.locator(sel(t)).first().tap({ timeout: 10000 }));
       await page.waitForTimeout(650);
     } else if (t.type) {
@@ -430,6 +432,8 @@ async function tapOnce(page, frame, ev, control) {
   const before = await frame.evaluate(snapshot);
   const callsBefore = before.calls;
   const counts = { popups: ev.popups.length, downloads: ev.downloads.length, choosers: ev.choosers.length, errors: ev.errors.length };
+  // A toast's action takes no press in its first moments on screen (toastGuard.cjs): a tap on it waits for that.
+  if (control.testid === 'toast-action') await toastActionReady(frame, 5000).catch(() => {});
   const handle = await frame.evaluateHandle(findControl, control);
   const el = handle.asElement();
   if (!el) return { before, result: ['GONE (not found again on a fresh load)'] };
@@ -579,6 +583,8 @@ async function gestureChecks(browser, seeds) {
         check('diary: a fast 120 px flick right shows the day before', d1 !== d0, `${d0} -> ${d1}`);
         check('diary: the move is said in a toast naming the day, with "Today"', /^(Yesterday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), [A-Z][a-z]{2} \d{1,2}/.test(said) && /Today$/.test(said), said.replace(/\n/g, ' | '));
         check('diary: away from today, "Back to today" shows', (await f.locator(sel(jump)).count()) > 0);
+        // The toast's action takes no press in its first moments on screen (toastGuard.cjs).
+        await toastActionReady(f);
         await f.locator(sel('toast-action')).first().tap();
         await r.page.waitForTimeout(600);
         check('diary: the toast\'s "Today" goes back to today', (await overline(f)) === d0, await overline(f));

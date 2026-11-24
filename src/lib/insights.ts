@@ -50,8 +50,14 @@ export interface SleepLike {
 
 // ------------------------------------------------------------- thresholds
 
-/** Days within this share of the budget count as "on budget". */
+/**
+ * How far above its own budget a complete day goes before the morning page lists calories to improve
+ * (`overBudget` in `@/features/morning/facts`). A rule about advice, never words on screen: "on budget"
+ * and "above" are `budgetMark`.
+ */
 export const BUDGET_BAND = 0.1;
+/** A day at this share of its own budget or more, up to the budget itself, is on budget (`budgetMark`). */
+export const ON_BUDGET_FROM = 0.9;
 /**
  * A logged day under this share of its budget (or under 800 kcal) is treated as
  * partly logged and left out of averages. The rule itself is `isCompleteDay` in
@@ -103,8 +109,11 @@ export interface PeriodSummary {
     avgBudget: number;
     /** avgKcal - avgBudget; positive means above budget. */
     avgDiff: number;
-    inBand: number;
+    /** Fully logged days on budget, at 90 to 100% of their own budget (`budgetMark`). */
+    onBudget: number;
+    /** Fully logged days above their own budget. */
     above: number;
+    /** Fully logged days under 90% of their own budget. */
     below: number;
   } | null;
   macros: {
@@ -153,8 +162,18 @@ export function isCompleteDay(d: InsightDay, today: ISODate): boolean {
   return d.date < today && isLogged(d) && sharedIsCompleteDay(d.eaten.kcal, d.budget);
 }
 
-export function inBudgetBand(kcal: number, budget: number): boolean {
-  return budget > 0 && Math.abs(kcal - budget) <= budget * BUDGET_BAND;
+/**
+ * How a day stands against its own budget: the one rule behind every "on budget", every check and
+ * every "above" (the recap's cups and headline, Progress's headline and Nutrition card, the Consistency
+ * calendar and its legend, Today's week caption and "Your week is ready"). 'on' is 90 to 100% of the
+ * budget (the check, counted only on a fully logged day), 'above' is over 100% (the amber lip, never a
+ * check), and under 90% or with no budget there is no mark (null).
+ */
+export type BudgetMark = 'on' | 'above';
+export function budgetMark(kcal: number, budget: number): BudgetMark | null {
+  if (!(budget > 0)) return null;
+  if (kcal > budget) return 'above';
+  return kcal >= budget * ON_BUDGET_FROM ? 'on' : null;
 }
 
 /**
@@ -194,9 +213,9 @@ export function summarizePeriod(input: {
       avgKcal,
       avgBudget,
       avgDiff: avgKcal - avgBudget,
-      inBand: complete.filter((d) => inBudgetBand(d.eaten.kcal, d.budget)).length,
-      above: complete.filter((d) => d.eaten.kcal > d.budget * (1 + BUDGET_BAND)).length,
-      below: complete.filter((d) => d.eaten.kcal < d.budget * (1 - BUDGET_BAND)).length,
+      onBudget: complete.filter((d) => budgetMark(d.eaten.kcal, d.budget) === 'on').length,
+      above: complete.filter((d) => budgetMark(d.eaten.kcal, d.budget) === 'above').length,
+      below: complete.filter((d) => budgetMark(d.eaten.kcal, d.budget) === null).length,
     };
     const allEntries = complete.flatMap((d) => d.entries);
     const withFiber = allEntries.filter((e) => typeof e.nutrients.fiber === 'number').length;
@@ -487,13 +506,18 @@ function caloriesInsight({ summary: s, days, today, units }: InsightContext): In
   const n = s.completeDays;
   const base = `You averaged ${kcalText(c.avgKcal)} on ${n} fully logged days against a ${kcalText(c.avgBudget)} budget`;
   if (Math.abs(rel) <= 0.05) {
-    return {
-      id: 'calories-on-budget',
-      tone: 'positive',
-      title: 'Calories on budget',
-      body: `${base}, and ${c.inBand} of ${n} days landed within 10% of it. Keep the same routine.`,
-      score: 50,
-    };
+    // "On budget" means one thing everywhere (`budgetMark`: 90 to 100% of the budget), so an average
+    // a little above the budget is said as above it, with the days counted by the same rule.
+    const counted = `${c.onBudget} of ${n} days were on budget, at 90 to 100% of it${c.above ? `, and ${c.above} above it` : ''}`;
+    return rel <= 0
+      ? { id: 'calories-on-budget', tone: 'positive', title: 'Calories on budget', body: `${base}, and ${counted}. Keep the same routine.`, score: 50 }
+      : {
+          id: 'calories-on-budget',
+          tone: 'neutral',
+          title: 'Calories just above budget',
+          body: `${base}: ${kcalText(c.avgDiff)} a day above. ${counted.charAt(0).toUpperCase()}${counted.slice(1)}.`,
+          score: 50,
+        };
   }
   if (rel > 0.05) {
     const diff = c.avgDiff;
@@ -501,7 +525,7 @@ function caloriesInsight({ summary: s, days, today, units }: InsightContext): In
     const pattern = weekendPattern(days, today);
     const weekdaysOnPlan = pattern && pattern.diff >= 150 && Math.abs(pattern.weekdayAvg - c.avgBudget) <= c.avgBudget * 0.05;
     const step = weekdaysOnPlan
-      ? 'Weekdays are close to budget, so planning one weekend meal ahead would make the biggest difference.'
+      ? 'On weekdays you average about your budget, so planning one weekend meal ahead would make the biggest difference.'
       : `Trimming one ${diff <= 250 ? 'snack' : 'portion'} of about ${round50(diff)} kcal a day would bring the average back to budget.`;
     return {
       id: 'calories-above',
@@ -990,8 +1014,8 @@ export function recapWinFocus(s: PeriodSummary, units: UnitSystem, goal: GoalTyp
   const focuses: { score: number; text: string }[] = [];
   const c = s.calories;
   if (c && s.completeDays >= 2) {
-    const share = c.inBand / s.completeDays;
-    if (share >= 0.6) wins.push({ score: share, text: `${c.inBand} of ${s.completeDays} fully logged days landed within 10% of your budget.` });
+    const share = c.onBudget / s.completeDays;
+    if (share >= 0.6) wins.push({ score: share, text: `${c.onBudget} of ${s.completeDays} fully logged days on budget, at 90 to 100% of it.` });
     if (c.avgDiff > c.avgBudget * 0.05)
       focuses.push({
         score: Math.min(1, c.avgDiff / c.avgBudget / 0.2),

@@ -43,7 +43,7 @@ describe('month helpers', () => {
       map.set(date, { date, logged: true, complete: true, kcal: 2000, budget: 2000, waterMet: false, trained: false, ...o });
     add('2026-11-01'); // Sunday, alone at the end of row 1
     add('2026-11-02'); // Monday, starts row 2: a new pill
-    add('2026-11-03', { kcal: 2600 }); // over the band: logged but not on budget
+    add('2026-11-03', { kcal: 2600 }); // above its budget: logged but not on budget
     add('2026-11-05', { waterMet: true, trained: true });
     add('2026-11-20'); // future: ignored
     const rows = monthGrid('2026-11', map, TODAY);
@@ -65,12 +65,14 @@ describe('month helpers', () => {
     const add = (date: string, o: Partial<CalendarDayInput> = {}) =>
       map.set(date, { date, logged: true, complete: true, kcal: 2000, budget: 2000, waterMet: false, trained: false, ...o });
     add('2026-11-02', { kcal: 2300 }); // 15% above its budget
-    add('2026-11-03', { kcal: 2150 }); // 7.5% above: within 10%
+    add('2026-11-03', { kcal: 2150 }); // 7.5% above: above its budget, never a check
+    add('2026-11-06', { kcal: 1850 }); // 92.5%: on budget
     add('2026-11-04', { kcal: 500, complete: false }); // partly logged
     add('2026-11-13', { kcal: 900, complete: false }); // today, still open
     const cells = new Map(monthGrid('2026-11', map, TODAY).flat().filter((c) => c).map((c) => [c!.date, c!]));
     expect(cells.get('2026-11-02')).toMatchObject({ ratio: 1.15, onBudget: false, partial: false });
-    expect(cells.get('2026-11-03')).toMatchObject({ ratio: 1.075, onBudget: true });
+    expect(cells.get('2026-11-03')).toMatchObject({ ratio: 1.075, onBudget: false });
+    expect(cells.get('2026-11-06')).toMatchObject({ ratio: 0.925, onBudget: true });
     // A partly logged day near its budget is never checked: the check is for fully logged days.
     expect(cells.get('2026-11-04')).toMatchObject({ ratio: 0.25, onBudget: false, partial: true });
     expect(cells.get('2026-11-13')).toMatchObject({ ratio: 0.45, partial: false, isToday: true });

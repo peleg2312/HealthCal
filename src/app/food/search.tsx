@@ -1,5 +1,5 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { PenLine, ScanBarcode, Search, Utensils, X, Zap } from 'lucide-react-native';
+import { PenLine, Pointer, ScanBarcode, Search, Utensils, X, Zap } from 'lucide-react-native';
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 
@@ -10,11 +10,12 @@ import { FoodRow, MealPicker } from '@/features/food/components';
 import { displayFoodName } from '@/features/food/displayName';
 import { setFoodDraft } from '@/features/food/draft';
 import { amountLabel, href, kcal, lastPortions, matchServing, parseDate, parseMeal, portionFor, portionKcal, portionLabel, stepAmount } from '@/features/food/helpers';
-import { deleteEntry, logFood, setEntryAmount } from '@/features/food/log';
+import { deleteEntry, logFood, logSavedMeal, setEntryAmount } from '@/features/food/log';
 import { FavoriteStar } from '@/features/food/FavoriteStar';
 import { toggleFoodFavorite } from '@/features/food/favoriteActions';
 import { favoriteFoodsInVisit, isFavoriteMeal, mealToSave } from '@/features/food/favorites';
 import { favoriteActionLabel, favoriteLabel, FAVOURITE_GROUPS, FAVOURITES_EMPTY } from '@/features/food/favoriteWords';
+import { FAVOURITES_EMPTY_WITH_HINT, HOLD_HINT, markHoldHintDone, useHoldHint } from '@/features/food/holdHint';
 import { LogSavedMealSheet } from '@/features/food/SavedMealParts';
 import { SaveCurrentMealRow, SavedMealRow, useVisitOrder } from '@/features/food/SavedMealRow';
 import { loadSearchTab, openingTab, rememberSearchTab, useSearchTab, type SearchTab } from '@/features/food/searchTab';
@@ -34,7 +35,7 @@ type Tab = SearchTab;
 type Online = { query: string; status: 'idle' | 'loading' | 'done'; items: Food[] };
 
 export default function FoodSearchScreen() {
-  const { colors, spacing } = useTheme();
+  const { colors, radius, spacing } = useTheme();
   // A 320 px phone cannot fit the long hint; it keeps the words that matter.
   const narrow = useWindowDimensions().width < 360;
   const params = useLocalSearchParams<{ meal?: string; date?: string }>();
@@ -110,6 +111,8 @@ export default function FoodSearchScreen() {
   const tab: Tab = openingTab(pickedTab, rememberedTab, { usual: usuals.length > 0, favorites: favMeals.length + favorites.length > 0 });
   // What is starred now (a food unstarred on this visit keeps its row, not its count).
   const favCount = favorites.filter((f) => favoriteIds.includes(f.id)).length + savedMeals.filter(isFavoriteMeal).length;
+  // The empty Favourites tab's one-line tip about the long press, until it is dealt with on this device.
+  const holdHint = useHoldHint(favMeals.length + favorites.length === 0);
   // "Save lunch as a meal": the meal shown on this day, while it holds two foods or more that are not a saved meal yet.
   const toSave = mealToSave(entries, meal, date, savedMeals);
   const mine = useMemo(() => [...customFoods].sort((a, b) => a.name.localeCompare(b.name)), [customFoods]);
@@ -180,8 +183,12 @@ export default function FoodSearchScreen() {
         kcalValue={e ? e.nutrients.kcal : portionKcal(food, p)}
         onPress={() => open(food)}
         onQuickAdd={() => quickAdd(food)}
-        // Press and hold stars it (or unstars it), with a toast and Undo; the row does not open.
-        onLongPress={() => toggleFoodFavorite(food)}
+        // Press and hold stars it (or unstars it), with a toast and Undo; the row does not open. The empty
+        // Favourites tab's tip about it is then learnt (./holdHint).
+        onLongPress={() => {
+          markHoldHintDone();
+          toggleFoodFavorite(food);
+        }}
         longPressLabel={favoriteActionLabel(favoriteIds.includes(food.id))}
         trailing={trailing}
         matched={matched}
@@ -203,7 +210,7 @@ export default function FoodSearchScreen() {
   const escapes = (
     <View style={{ flexDirection: 'row', gap: spacing.sm }}>
       <ActionTile testID="search-scan" icon={<ScanBarcode size={18} color={colors.text} strokeWidth={1.9} />} label="Barcode" a11y="Scan barcode" onPress={() => go('/food/scan')} />
-      {/* "AI" with nothing typed (Photo and Describe are both behind it); "Describe" once words are typed, carrying them. */}
+      {/* "Estimate" under the AI's estimate cup with nothing typed (Photo and Describe are both behind it); "Describe" once words are typed, carrying them. */}
       <ActionTile testID="search-photo" icon={<AiGlyph name={aiTile.glyph} size={18} color={colors.text} />} label={aiTile.label} a11y={aiTile.a11y} onPress={() => go('/food/photo', aiTile.params)} />
       <ActionTile testID="search-quick" icon={<Zap size={18} color={colors.text} strokeWidth={1.9} />} label="Quick add" a11y="Quick add" onPress={() => go('/food/quick')} />
       <ActionTile testID="search-create" icon={<PenLine size={18} color={colors.text} strokeWidth={1.9} />} label="Create" a11y="Create food" onPress={() => go('/food/custom', q ? { name: q } : {})} />
@@ -295,7 +302,7 @@ export default function FoodSearchScreen() {
                     ) : null}
                     <List>
                       {favMeals.map((m, i) => (
-                        <SavedMealRow key={m.id} meal={m} testID={`favorite-meal-${i}`} onOpen={() => go('/food/meals')} onLog={() => setLogging(m)} />
+                        <SavedMealRow key={m.id} meal={m} testID={`favorite-meal-${i}`} onReview={() => setLogging(m)} onLog={() => logSavedMeal(m, meal, date)} onHold={markHoldHintDone} />
                       ))}
                     </List>
                   </View>
@@ -322,7 +329,32 @@ export default function FoodSearchScreen() {
                 ) : null}
               </View>
             ) : (
-              <Hint title={FAVOURITES_EMPTY.title} message={FAVOURITES_EMPTY.message} />
+              // Nothing starred yet: the long press is taught once, in one line over the empty state (./holdHint), and
+              // the empty state then names the star only, so the long press is said once.
+              <View>
+                {holdHint ? (
+                  <View
+                    testID="search-fav-hint"
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 48, paddingLeft: 14, paddingRight: 4, ...cup(radius.tile, 5), backgroundColor: colors.surfaceAlt }}>
+                    <Pointer size={17} color={colors.text} strokeWidth={1.9} />
+                    <Text variant="label" style={{ flex: 1, minWidth: 0 }} testID="search-fav-hint-text">
+                      {narrow ? HOLD_HINT.short : HOLD_HINT.text}
+                    </Text>
+                    <PressableScale
+                      testID="search-fav-hint-close"
+                      onPress={markHoldHintDone}
+                      scaleTo={0.97}
+                      feedback="select"
+                      accessibilityLabel={HOLD_HINT.doneA11y}
+                      style={{ minHeight: 44, minWidth: 44, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center' }}>
+                      <Text variant="label" color="textSecondary">
+                        {HOLD_HINT.done}
+                      </Text>
+                    </PressableScale>
+                  </View>
+                ) : null}
+                <Hint title={FAVOURITES_EMPTY.title} message={holdHint ? FAVOURITES_EMPTY_WITH_HINT : FAVOURITES_EMPTY.message} />
+              </View>
             )
           ) : null}
           {tab === 'mine' ? (
@@ -356,7 +388,7 @@ export default function FoodSearchScreen() {
             {savedMeals.length ? (
               <List>
                 {ordered.map((m, i) => (
-                  <SavedMealRow key={m.id} meal={m} testID={`saved-meal-${i}`} onOpen={() => go('/food/meals')} onLog={() => setLogging(m)} />
+                  <SavedMealRow key={m.id} meal={m} testID={`saved-meal-${i}`} onReview={() => setLogging(m)} onLog={() => logSavedMeal(m, meal, date)} onHold={markHoldHintDone} />
                 ))}
               </List>
             ) : (
@@ -370,6 +402,8 @@ export default function FoodSearchScreen() {
               icon={<Utensils size={18} color={colors.text} />}
               onPress={() => go('/food/meal-edit')}
             />
+            {/* A row's tap reviews it before logging, so changing or deleting a meal has its own way in: the saved meals screen. */}
+            {savedMeals.length ? <Button testID="search-edit-meals" variant="ghost" size="md" title="Edit or delete saved meals" icon={<PenLine size={18} color={colors.text} />} onPress={() => go('/food/meals')} /> : null}
             </>
           ) : null}
         </>
@@ -402,7 +436,7 @@ export default function FoodSearchScreen() {
               ) : online.status === 'done' ? (
                 <Text variant="body" color="textTertiary" testID="search-online-empty" style={{ paddingVertical: spacing.sm }}>
                   {onlineResult.unavailable
-                    ? 'Product search by name works in the phone app. Here, scan or type a barcode, or create the food.'
+                    ? 'Search them by name in the phone app.'
                     : onlineResult.failed
                       ? 'Could not reach the online products. Your own and bundled foods still work.'
                       : 'No online products match that search.'}

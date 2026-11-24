@@ -1,8 +1,10 @@
 /**
  * The saved-meal row of food search (the Saved meals tab and the Favourites tab): the kind mark, the name
- * and its caption (an estimate's calories with "~"), a star and the "+" cup (as on a food row; it opens the
- * log sheet), side by side (never one pressable inside another). The body opens the saved meals screen; a long press, or the named accessibility action,
- * stars it as the star does. Also here: the "Save lunch as a meal" row (R5) and the order fixed per visit.
+ * and its caption (an estimate's calories with "~"), a star and the "+" cup, side by side (never one
+ * pressable inside another). The "+" logs at once, as a food row's "+" and the + sheet's meal tile do (one
+ * serving for a recipe, one toast with Undo: `logSavedMeal`); the body opens the review sheet (servings,
+ * which items); a long press, or the named accessibility action, stars it as the star does. Also here: the
+ * "Save lunch as a meal" row (R5) and the order fixed per visit.
  */
 import { useFocusEffect } from 'expo-router';
 import { ChevronRight, Plus, Save, Utensils } from 'lucide-react-native';
@@ -51,7 +53,11 @@ function rowFigures(m: SavedMeal) {
   return { count, total, estimate: !!itemsRange(m.items) };
 }
 
-export function SavedMealRow({ meal, testID, onOpen, onLog }: { meal: SavedMeal; testID: string; onOpen: () => void; onLog: () => void }) {
+/**
+ * `onReview` opens the review sheet (the body's tap); `onLog` logs the meal at once (the "+"); `onHold`
+ * runs before a long press stars it (search marks its hold hint learnt).
+ */
+export function SavedMealRow({ meal, testID, onReview, onLog, onHold }: { meal: SavedMeal; testID: string; onReview: () => void; onLog: () => void; onHold?: () => void }) {
   const { colors, spacing } = useTheme();
   const on = isFavoriteMeal(meal);
   const { count, total, estimate } = rowFigures(meal);
@@ -61,10 +67,13 @@ export function SavedMealRow({ meal, testID, onOpen, onLog }: { meal: SavedMeal;
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
       <PressableScale
         testID={testID}
-        onPress={onOpen}
-        onLongPress={star}
+        onPress={onReview}
+        onLongPress={() => {
+          onHold?.();
+          star();
+        }}
         scaleTo={0.985}
-        accessibilityLabel={`${meal.name}, ${meal.items.length} items, ${approxKcalSpoken(total, estimate)}${on ? ', favourite' : ''}. Open saved meals`}
+        accessibilityLabel={`${meal.name}, ${meal.items.length} items, ${approxKcalSpoken(total, estimate)}${on ? ', favourite' : ''}. Choose servings and items before logging`}
         accessibilityActions={[{ name: FAVOURITE_ACTION.name, label: favoriteActionLabel(on) }]}
         onAccessibilityAction={(e) => {
           if (e.nativeEvent.actionName === FAVOURITE_ACTION.name) star();
@@ -85,8 +94,8 @@ export function SavedMealRow({ meal, testID, onOpen, onLog }: { meal: SavedMeal;
       </PressableScale>
       {/* 12 px to the "+": the star's touch area reaches 4 px past its edge, so neither takes the other's taps. */}
       <FavoriteStar testID={`${testID}-favorite`} on={on} label={favoriteLabel(meal.name, on)} onPress={star} style={{ marginRight: 4 }} />
-      {/* The same "+" cup as a food row's, so one list has one add control; it opens the log sheet (servings, meal). */}
-      <IconButton testID={`${testID}-log`} accessibilityLabel={logMealLabel(meal.name)} tone="surface" size={44} onPress={onLog}>
+      {/* The same "+" cup as a food row's, and it does the same: it adds at once, with one toast and Undo. */}
+      <IconButton testID={`${testID}-log`} accessibilityLabel={count > 1 ? `Log one serving of ${meal.name}` : logMealLabel(meal.name)} tone="surface" size={44} onPress={onLog}>
         <Plus size={20} color={colors.text} strokeWidth={2.2} />
       </IconButton>
     </View>

@@ -9,7 +9,7 @@ import { BEVERAGE_LABELS, baseWaterGoalMl, effectiveMl, exerciseWaterMl, glasses
 import { formatVolume, formatWeight, volumeToMl, volumeUnit, volumeValue } from '@/lib/units';
 import { useNow, useToday } from '@/store/clock';
 import { DEFAULT_SETTINGS, useStore } from '@/store';
-import { useDay, useDays, useLive, useProfile } from '@/store/selectors';
+import { computeDayFromStore, useDay, useDays, useLive, useProfile } from '@/store/selectors';
 import { Note, RequireProfile, splitUnit, Tile } from '@/features/trackers/components';
 import { dayTitle, resolveDateParam } from '@/features/trackers/dateParam';
 import { keepOrConvert, MAX_PRESET_ML, MIN_PRESET_ML, normalizePresets } from '@/features/trackers/helpers';
@@ -27,7 +27,7 @@ import { DrinkTitleRow } from '@/features/drinks/DrinkTitleRow';
 import { pickToast, placePick, yourDrinks } from '@/features/drinks/pick';
 import { loadDrinkMemory, rememberDrinkChoice, useDrinkMemory } from '@/features/drinks/memory';
 import { diaryWaterCaption, diaryWaterOpenLabel, waterDeleteLabel } from '@/features/drinks/diary';
-import { drinkMeal, entryFor, noticeLine, pickedFood, planDrink, rememberedChoice, sameDrinkFoodIds, sameDrinkInDiary, selectChoice, selectFood, waterFromEntry, waterOnlyOffered, waterRowCaption, waterRowTitle } from '@/features/drinks/rules';
+import { drinkMeal, entryFor, noticeLine, pickedFood, planDrink, rememberedChoice, sameDrinkFoodIds, sameDrinkInDiary, selectChoice, selectFood, waterAfter, waterFromEntry, waterOnlyOffered, waterRowCaption, waterRowTitle, type WaterAfter } from '@/features/drinks/rules';
 import { leftLitreDecimals, shownMl, volumeNumber, volumeUnitFor, waterLeftMl } from '@/features/today/volume';
 import { useTheme } from '@/theme';
 import type { Beverage, Food, WaterEntry } from '@/types';
@@ -170,10 +170,16 @@ function WaterScreen() {
   const shownPlan = (ml: number, amount: 'glass' | 'custom') => planDrink({ kind: beverage, drink: selected, ml, date, now, today: todayDate, units, waterOnly: waterOnlyOn, amount });
   const line = beverage === 'water' ? '' : customMl > 0 && customMl <= 5000 ? shownPlan(customMl, 'custom').line : shownPlan(glassMl, 'glass').line;
 
+  // The day's water after this glass, read from the store at the tap, so the toast names the new total as
+  // every water toast does ("250 ml added to Water · 1.48 of 3.3 L").
+  const after = (ml: number, kind: Beverage): WaterAfter | undefined => {
+    const d = computeDayFromStore(useStore.getState(), date);
+    return d ? waterAfter(d.waterMl, d.waterGoalMl, ml, kind, units) : undefined;
+  };
   const add = (ml: number, amount: 'glass' | 'custom' = 'glass') => {
     if (!(ml > 0)) return;
     // Crossing the goal is marked by the vessel itself (its onReached adds the success haptic).
-    logDrink(planDrink({ kind: beverage, drink: selected, ml, date, now: new Date(), today: today(), units, waterOnly: waterOnlyOn, amount }));
+    logDrink(planDrink({ kind: beverage, drink: selected, ml, date, now: new Date(), today: today(), units, waterOnly: waterOnlyOn, amount, after: after(ml, beverage) }));
     setWaterOnly(false);
   };
 
@@ -213,7 +219,7 @@ function WaterScreen() {
       return;
     }
     setPickQuery(null);
-    logDrink(planDrink({ kind: beverage, drink: { id: ENTERED, food: null }, ml, kcal, date, now: new Date(), today: today(), units, amount: 'custom' }));
+    logDrink(planDrink({ kind: beverage, drink: { id: ENTERED, food: null }, ml, kcal, date, now: new Date(), today: today(), units, amount: 'custom', after: after(ml, beverage) }));
     setWaterOnly(false);
   };
 

@@ -43,9 +43,18 @@ const water = [
   { id: 'today-water-toast-past', route: '/', taps: [`today-day-${isoDay(-1)}`, '^today-water-', { wait: 300 }], waitFor: 'toast', note: 'a glass on yesterday, picked on the strip: the day and the total, two lines at 320 (on a Monday the strip shows only today)' },
 ];
 
+// Today's rail: every label one line ("Activity", the week in its caption: "this week, 75 today"), so the
+// three values share a baseline at 320, 360 and 390, a fast running ("Fast of 16 h") and a past day included.
+// At 320 x 640 the tighter calorie card leaves the water row and its "+ 250 ml" in the first view.
+const rail = [
+  { id: 'today-rail-fast', route: '/', values: { fasting: 0.4 }, waitFor: 'today-fasting', note: 'a fast running: "Fast of 16 h" on one line beside "Activity" and "Sleep", the values level' },
+  { id: 'today-rail-past', route: '/', taps: [`today-day-${isoDay(-1)}`, { wait: 300 }], waitFor: 'today-rail', note: 'yesterday picked on the strip: "that week, 45 that day" under the week\'s minutes' },
+];
+
 module.exports = [
   ...header,
   ...water,
+  ...rail,
   // Train: the overview's sheet (with how the guideline counts minutes), behind the week card's last line, which is one button.
   { id: 'train-guideline-sheet', route: '/train', taps: ['train-load-info'], sheet: true, note: 'how minutes count toward the guideline' },
   { id: 'train-guideline-sheet-stress', route: '/train', data: 'stress', taps: ['train-load-info'], sheet: true, note: 'the same sheet over the long-content week' },

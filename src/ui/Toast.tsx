@@ -94,9 +94,19 @@ export function useToastDock(height: number, active = true, keyboard?: { cover: 
   useEffect(() => () => useToast.setState((s) => ({ docks: s.docks.filter((d) => d.id !== id) })), [id]);
 }
 
+/**
+ * The toast's action (Undo) takes no press in its first 600 ms on screen: a quick second tap meant for
+ * the button the toast rose beside (Today's "+ 250 ml", a "+" on a row) must never undo the first one.
+ * The stamp is taken when the toast is first shown, and the clock is read in the press handler.
+ * Scripts that tap `toast-action` wait for this (scripts/dev/toastGuard.cjs reads the number here).
+ */
+export const TOAST_ACTION_GUARD_MS = 600;
+
 let hostSeq = 0;
 /** The toast last read out, so moving it between hosts does not read it twice. */
 let announcedId = 0;
+/** When that toast was first on screen (ms since the epoch): its action's guard counts from here. */
+let shownAt = 0;
 
 /**
  * Shows the current toast: an ink cup (square shoulders, round base) with a
@@ -151,6 +161,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
     if (!message || !active) return;
     if (announcedId !== id) {
       announcedId = id;
+      shownAt = Date.now();
       // Live regions are Android-only; announcing explicitly covers iOS as well. A name isolated for
       // drawing (`isolateRtl`) is announced raw: screen readers get no direction marks.
       const spoken = withoutMarks(message);
@@ -255,6 +266,8 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
             accessibilityLabel={actionLabel}
             hitSlop={10}
             onPress={() => {
+              // A press in the toast's first moments was meant for what it rose beside: ignored, the toast stays.
+              if (Date.now() - shownAt < TOAST_ACTION_GUARD_MS) return;
               onAction?.();
               hide();
             }}

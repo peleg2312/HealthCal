@@ -19,6 +19,7 @@ import {
   usualWeightRange,
   weekdayUsual,
   budgetBalanceText,
+  budgetMark,
   planChangeText,
   recapTiles,
   recapWeeks,
@@ -126,17 +127,28 @@ describe('summarizePeriod', () => {
     expect(s.partialDays).toBe(1);
     expect(s.calories!.avgKcal).toBe(2100);
     expect(s.calories!.avgDiff).toBe(100);
-    expect(s.calories!.inBand).toBe(4);
+    // 2,100 of 2,000 is above the budget: never on it.
+    expect(s.calories!.onBudget).toBe(0);
+    expect(s.calories!.above).toBe(4);
     expect(s.macros!.protein.avg).toBe(120);
   });
 
-  it('counts days within 10% of budget, above and below', () => {
-    const kcals = [2000, 2250, 1700, 2150, 2000];
+  it('counts days on budget (90 to 100%), above and below by the one rule', () => {
+    const kcals = [2000, 2250, 1700, 2150, 1800];
     const days = run(6, (d, i) => (i < 5 ? day(d, { kcal: kcals[i] }) : day(d, { logged: false })));
     const c = summarizePeriod({ days, trend: [], sleep: [], today: TODAY }).calories!;
-    expect(c.inBand).toBe(3);
-    expect(c.above).toBe(1);
+    expect(c.onBudget).toBe(2);
+    expect(c.above).toBe(2);
     expect(c.below).toBe(1);
+  });
+
+  it('marks a day on budget at 90 to 100% of its budget, above over 100%, nothing under 90%', () => {
+    expect(budgetMark(1800, 2000)).toBe('on');
+    expect(budgetMark(2000, 2000)).toBe('on');
+    expect(budgetMark(2001, 2000)).toBe('above');
+    expect(budgetMark(2190, 2000)).toBe('above');
+    expect(budgetMark(1799, 2000)).toBeNull();
+    expect(budgetMark(500, 0)).toBeNull();
   });
 
   it('drops fibre when most foods carry no value', () => {
@@ -224,9 +236,15 @@ describe('insight content cites the numbers', () => {
     expect(c.body).not.toMatch(/fail|cheat|bad/i);
   });
 
-  it('calories on budget are positive', () => {
-    const out = generateInsights(ctx(base({ kcal: 2050, budget: 2000 })));
-    expect(find(out, 'calories-on-budget')?.body).toContain('7 of 7 days landed within 10%');
+  it('calories on budget are positive, counted by the one rule', () => {
+    const on = find(generateInsights(ctx(base({ kcal: 1950, budget: 2000 }))), 'calories-on-budget');
+    expect(on).toMatchObject({ tone: 'positive', title: 'Calories on budget' });
+    expect(on?.body).toContain('and 7 of 7 days were on budget, at 90 to 100% of it.');
+    // A little above on average is said as above, never "on budget".
+    const above = find(generateInsights(ctx(base({ kcal: 2050, budget: 2000 }))), 'calories-on-budget');
+    expect(above).toMatchObject({ tone: 'neutral', title: 'Calories just above budget' });
+    expect(above?.body).toContain('50 kcal a day above. 0 of 7 days were on budget, at 90 to 100% of it, and 7 above it.');
+    expect(above?.body).not.toMatch(/within 10%|near budget/);
   });
 
   it('activity measured against 150 weekly minutes', () => {

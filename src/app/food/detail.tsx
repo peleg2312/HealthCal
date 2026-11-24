@@ -169,8 +169,10 @@ function ImpactLine({ date, kcalValue, replacing }: { date: ISODate; kcalValue: 
 
 /**
  * `whole`: an estimate (an AI food, or an entry with a range) gives its grams whole, never a false tenth ("47 g", not "46.5 g").
- * Protein, carbohydrates and fat are whole grams in both columns, as the stats above them show them ("8 g" in both
- * places, never "8 g" and "7.9 g"); the lines under them (fibre, sugar, saturated fat), which no stat shows, keep one decimal.
+ * Every gram row is whole grams in both columns: protein, carbohydrates and fat as the stats above them show them
+ * ("8 g" in both places, never "8 g" and "7.9 g"), and the lines under them (fibre, sugar, saturated fat) like
+ * their parents, so one table has one precision ("Carbohydrates 41 g", "Fibre 6 g"). Under the quick add's own
+ * fields (`asStats` false) every gram row is said as typed.
  */
 function NutritionFacts({
   portion,
@@ -187,19 +189,19 @@ function NutritionFacts({
   asStats?: boolean;
 }) {
   const { spacing } = useTheme();
-  // [label, key, unit, a line under a macro, whole grams as the macro stats show them]
-  const rows: [string, keyof Nutrients, string, boolean, boolean][] = [
-    ['Calories', 'kcal', 'kcal', false, true],
-    ['Protein', 'protein', 'g', false, true],
-    ['Carbohydrates', 'carbs', 'g', false, true],
-    ['Fibre', 'fiber', 'g', true, false],
-    ['Sugar', 'sugar', 'g', true, false],
-    ['Fat', 'fat', 'g', false, true],
-    ['Saturated fat', 'satFat', 'g', true, false],
-    ['Sodium', 'sodium', 'mg', false, true],
+  // [label, key, unit, a line under a macro]
+  const rows: [string, keyof Nutrients, string, boolean][] = [
+    ['Calories', 'kcal', 'kcal', false],
+    ['Protein', 'protein', 'g', false],
+    ['Carbohydrates', 'carbs', 'g', false],
+    ['Fibre', 'fiber', 'g', true],
+    ['Sugar', 'sugar', 'g', true],
+    ['Fat', 'fat', 'g', false],
+    ['Saturated fat', 'satFat', 'g', true],
+    ['Sodium', 'sodium', 'mg', false],
   ];
-  const fmt = (v: number | undefined, unit: string, round: boolean) =>
-    v === undefined ? '–' : unit === 'kcal' || unit === 'mg' ? `${kcal(v)} ${unit}` : `${whole || (round && asStats) ? Math.round(v) : formatMacro(v)} ${unit}`;
+  const fmt = (v: number | undefined, unit: string) =>
+    v === undefined ? '–' : unit === 'kcal' || unit === 'mg' ? `${kcal(v)} ${unit}` : `${whole || asStats ? Math.round(v) : formatMacro(v)} ${unit}`;
   return (
     <Card testID="detail-facts">
       <View style={{ flexDirection: 'row', paddingBottom: spacing.sm }}>
@@ -217,7 +219,7 @@ function NutritionFacts({
       </View>
       {rows
         .filter(([, key]) => portion[key] !== undefined || per100g?.[key] !== undefined)
-        .map(([label, key, unit, sub, round]) => (
+        .map(([label, key, unit, sub]) => (
           <View key={key}>
             <Divider />
             <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 36 }}>
@@ -225,11 +227,11 @@ function NutritionFacts({
                 {label}
               </Text>
               <Text variant="body" tabular style={{ width: 84, textAlign: 'right' }}>
-                {fmt(portion[key], unit, round)}
+                {fmt(portion[key], unit)}
               </Text>
               {showPer100 ? (
                 <Text variant="body" color="textSecondary" tabular style={{ width: 76, textAlign: 'right' }}>
-                  {fmt(per100g?.[key], unit, round)}
+                  {fmt(per100g?.[key], unit)}
                 </Text>
               ) : null}
             </View>

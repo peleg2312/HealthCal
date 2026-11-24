@@ -25,18 +25,48 @@ export function mealOnDay(meal: MealType, date: ISODate, today: ISODate): string
 export const TOAST_NAME_MAX = 32;
 
 /**
- * A food's name as a toast says it: the part before the first comma ("Banana" for "Banana, raw",
- * "Greek yogurt" for "Greek yogurt, plain, 2%"), shortened at a word with "…" past
- * `TOAST_NAME_MAX` letters, and isolated when it is written in Hebrew or Arabic. Pass the name as
- * it is drawn (`displayFoodName`).
+ * The part of a food's name before its first comma outside brackets: "Banana" for "Banana, raw",
+ * "Israeli salad (tomato, cucumber, onion, oil, lemon)" whole (its commas are inside the brackets),
+ * "Sushi roll" for "Sushi roll, California (crab, avocado, cucumber)". The whole name when it starts
+ * with a comma. A bracket left open (a name someone typed) holds the rest of the name.
+ */
+export function foodNameHead(name: string): string {
+  const whole = name.replace(/\s+/g, ' ').trim();
+  let depth = 0;
+  for (let i = 0; i < whole.length; i++) {
+    const c = whole[i];
+    if (c === '(' || c === '[') depth++;
+    else if ((c === ')' || c === ']') && depth > 0) depth--;
+    else if (c === ',' && depth === 0) return whole.slice(0, i).trim() || whole;
+  }
+  return whole;
+}
+
+/** Shortened at a word with "…", never inside a bracket: a cut that leaves a bracket open ends before it. */
+function shortenAtWord(text: string): string {
+  const cut = text.slice(0, TOAST_NAME_MAX);
+  const atWord = cut.lastIndexOf(' ');
+  let kept = atWord > TOAST_NAME_MAX / 2 ? cut.slice(0, atWord) : cut;
+  const open = Math.max(kept.lastIndexOf('('), kept.lastIndexOf('['));
+  if (open > 0 && !/[)\]]/.test(kept.slice(open))) kept = kept.slice(0, open);
+  return `${kept.replace(/[\s,.;:(\[–-]+$/, '')}…`;
+}
+
+/**
+ * A food's name as a toast says it, never cut inside brackets: the part before the first comma
+ * outside brackets (`foodNameHead`: "Banana" for "Banana, raw", "Greek yogurt" for "Greek yogurt,
+ * plain, 2%"); when that is longer than `TOAST_NAME_MAX` letters and holds a bracket, the words before
+ * the bracket ("Israeli salad" for "Israeli salad (tomato, cucumber, onion, oil, lemon)"); else, past
+ * `TOAST_NAME_MAX` letters, shortened at a word with "…". Isolated when it is written in Hebrew or
+ * Arabic. Pass the name as it is drawn (`displayFoodName`).
  */
 export function toastFoodName(name: string): string {
-  const whole = name.replace(/\s+/g, ' ').trim();
-  const head = whole.split(',')[0].trim() || whole;
+  const head = foodNameHead(name);
   if (head.length <= TOAST_NAME_MAX) return isolateRtl(head);
-  const cut = head.slice(0, TOAST_NAME_MAX);
-  const atWord = cut.lastIndexOf(' ');
-  return isolateRtl(`${(atWord > TOAST_NAME_MAX / 2 ? cut.slice(0, atWord) : cut).replace(/[\s,.;:–-]+$/, '')}…`);
+  const bracket = head.search(/[([]/);
+  const before = bracket > 0 ? head.slice(0, bracket).trim() : '';
+  if (before && before.length <= TOAST_NAME_MAX) return isolateRtl(before);
+  return isolateRtl(shortenAtWord(before || head));
 }
 
 /** "Banana added to breakfast", "Banana added to yesterday's lunch": `where` is `mealOnDay`. */
@@ -50,16 +80,26 @@ export function quickAddedToast(name: string, kcal: number, where: string): stri
 }
 
 /**
- * A glass from Today or the + sheet: "250 ml added to Water", on another day "250 ml added to Water for
- * yesterday" (or "for Sat Nov 14"); the glass that reaches the goal adds ". Goal reached". `volume` is
- * already formatted in the person's units. With `total` (the day's water against its goal as the water
- * row prints it, `waterOfGoal`) the toast names the new total too, because on Today it rests over that
- * row: "250 ml added to Water · 1.48 of 3.3 L", and "· 3.3 of 3.3 L, goal reached" for the glass that
+ * A glass from Today, the + sheet, the Water screen or the reminder: "250 ml added to Water", on another day
+ * "250 ml added to Water for yesterday" (or "for Sat Nov 14"); the glass that reaches the goal adds ". Goal
+ * reached". `volume` is already formatted in the person's units. With `total` (the day's water against its
+ * goal as the water row prints it, `waterOfGoal`) the toast names the new total too, the same on every way
+ * in: "250 ml added to Water · 1.48 of 3.3 L", and "· 3.3 of 3.3 L, goal reached" for the glass that
  * reaches the goal; the total never breaks over two lines.
  */
 export function waterAddedToast(volume: string, date: ISODate, today: ISODate, reaches = false, total?: string): string {
   const day = date === today ? '' : date === addDays(today, -1) ? ' for yesterday' : ` for ${weekdayShort(date)} ${formatShortDate(date)}`;
+  return withWaterTotal(`${volume} added to Water${day}`, reaches, total);
+}
+
+/**
+ * The end of every toast that adds water (`waterAddedToast`, and a drink with calories from the Water
+ * screen: "Milk, 129 kcal, added to lunch and 250 ml to Water · 1.48 of 3.3 L"): the day's new total
+ * against its goal when it is known, ", goal reached" for the glass that reaches it; without a total,
+ * ". Goal reached" alone.
+ */
+export function withWaterTotal(line: string, reaches: boolean, total?: string): string {
   // The total is held on one line (no-break spaces), so a two-line toast breaks before it, never inside "1.48 of 3.3 L".
-  if (total) return `${volume} added to Water${day} · ${total.replace(/ /g, '\u00A0')}${reaches ? ', goal reached' : ''}`;
-  return `${volume} added to Water${day}${reaches ? '. Goal reached' : ''}`;
+  if (total) return `${line} · ${total.replace(/ /g, '\u00A0')}${reaches ? ', goal reached' : ''}`;
+  return `${line}${reaches ? '. Goal reached' : ''}`;
 }

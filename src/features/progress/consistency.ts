@@ -6,7 +6,7 @@
  * day is bridged, every time; only two missed days in a row end a streak.
  */
 import { addDays, diffDays, startOfWeek } from '@/lib/dates';
-import { inBudgetBand } from '@/lib/insights';
+import { budgetMark } from '@/lib/insights';
 import type { ISODate } from '@/types';
 
 // ------------------------------------------------------------------ streaks
@@ -59,7 +59,7 @@ export interface CalendarCell {
   budget: number;
   /** Logged, closed and not fully logged: the lighter fill. */
   partial: boolean;
-  /** Fully logged and within 10% of that day's budget: the check. */
+  /** Fully logged and on budget, at 90 to 100% of that day's own budget (`budgetMark`): the check. Never on a day above it. */
   onBudget: boolean;
   waterMet: boolean;
   trained: boolean;
@@ -113,7 +113,7 @@ export function monthGrid(month: string, byDate: ReadonlyMap<ISODate, CalendarDa
       kcal: logged && d ? d.kcal : 0,
       budget: logged && d ? d.budget : 0,
       partial: logged && !!d && !d.complete && date !== today,
-      onBudget: logged && !!d && d.complete && inBudgetBand(d.kcal, d.budget),
+      onBudget: logged && !!d && d.complete && budgetMark(d.kcal, d.budget) === 'on',
       waterMet: !future && !!d?.waterMet,
       trained: !future && !!d?.trained,
       joinPrev: false,

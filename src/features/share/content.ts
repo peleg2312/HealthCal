@@ -11,6 +11,7 @@
  * - Food names appear only with `choices.foods`.
  */
 import { addDays, fromISODate, startOfWeek } from '@/lib/dates';
+import { budgetMark } from '@/lib/insights';
 import { formatNumber, formatVolume } from '@/lib/units';
 import type { ISODate, MealType, UnitSystem } from '@/types';
 
@@ -104,8 +105,8 @@ export interface WeekCup {
   isToday: boolean;
   /** Logged, closed and not fully logged: drawn in the lighter fill, as on the recap. */
   partial: boolean;
-  /** Fully logged and within 10% of its own budget. */
-  inBand: boolean;
+  /** Fully logged and on budget, at 90 to 100% of its own budget (`budgetMark`): the check. A day above it never has one. */
+  onBudget: boolean;
 }
 
 export interface DayCardContent {
@@ -138,7 +139,6 @@ const MONTH_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'Jul
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-const BAND = 0.1;
 const plural = (n: number, one: string, many = `${one}s`) => (n === 1 ? one : many);
 
 export function weekCups(weekStart: ISODate, days: ShareDay[], today: ISODate): WeekCup[] {
@@ -159,7 +159,7 @@ export function weekCups(weekStart: ISODate, days: ShareDay[], today: ISODate): 
       future: date > today,
       isToday: date === today,
       partial: logged && !complete && date !== today,
-      inBand: complete && Math.abs(ratio - 1) <= BAND,
+      onBudget: complete && !!d && budgetMark(d.kcal, d.budget) === 'on',
     };
   });
 }
@@ -169,8 +169,8 @@ export function dayVerdict(kcal: number, budget: number, inProgress: boolean, lo
   if (!logged) return inProgress ? 'Nothing logged yet today' : 'Nothing logged that day';
   const r = budget > 0 ? kcal / budget : 0;
   if (inProgress) return r > 1 ? 'Past the budget so far today' : 'So far today';
+  // Above is anything over the budget (`budgetMark`): the cup's amber lip carries it, the words stay neutral.
   if (r <= 1) return 'Within the day’s budget';
-  if (r <= 1 + BAND) return 'Within 10% of the budget';
   return 'Above the day’s budget';
 }
 
@@ -301,12 +301,12 @@ export interface WeekCardContent {
  */
 export function weekHeadline(input: ShareWeekInput, cups: WeekCup[], choices: ShareChoices): string {
   const complete = cups.filter((c) => c.complete).length;
-  const inBand = cups.filter((c) => c.inBand).length;
+  const onBudget = cups.filter((c) => c.onBudget).length;
   const logged = cups.filter((c) => c.logged).length;
   const inProgress = cups.some((c) => c.isToday);
   const lines: { score: number; text: string }[] = [];
-  if (complete >= 2 && inBand / complete >= 0.6)
-    lines.push({ score: inBand / complete, text: inBand === complete ? 'Every full day within 10% of its budget.' : 'Most full days within 10% of their budget.' });
+  if (complete >= 2 && onBudget / complete >= 0.6)
+    lines.push({ score: onBudget / complete, text: onBudget === complete ? 'Every full day on budget.' : 'Most full days on budget.' });
   if (choices.activity && input.guidelineMinutes >= 150) lines.push({ score: 0.85, text: `Past the weekly 150 active minutes${inProgress ? ' already' : ''}.` });
   if (choices.water && input.waterDaysTracked >= 2 && input.waterDaysAtGoal / input.waterDaysTracked >= 0.7)
     lines.push({ score: input.waterDaysAtGoal / input.waterDaysTracked, text: input.waterDaysAtGoal === input.waterDaysTracked ? 'Water goal met every day it was tracked.' : 'Water goal met on most days.' });
@@ -326,11 +326,11 @@ export function weekCardContent(input: ShareWeekInput, choices: ShareChoices): W
       ? `${MONTH_SHORT[start.getMonth()]} ${start.getDate()} – ${end.getDate()}`
       : `${MONTH_SHORT[start.getMonth()]} ${start.getDate()} – ${MONTH_SHORT[end.getMonth()]} ${end.getDate()}`;
   const complete = cups.filter((c) => c.complete).length;
-  const inBand = cups.filter((c) => c.inBand).length;
+  const onBudget = cups.filter((c) => c.onBudget).length;
   const inProgress = cups.some((c) => c.isToday);
 
   // With no fully logged day there is nothing to measure, so no "0 of 0".
-  const stats: ShareStat[] = complete ? [{ key: 'budget', value: `${inBand}`, unit: `of ${complete}`, label: `full ${plural(complete, 'day')} within 10%` }] : [];
+  const stats: ShareStat[] = complete ? [{ key: 'budget', value: `${onBudget}`, unit: `of ${complete}`, label: `full ${plural(complete, 'day')} on budget` }] : [];
   if (choices.kcal && input.avgKcal !== null) stats.push({ key: 'kcal', value: formatNumber(Math.round(input.avgKcal)), unit: 'kcal', label: 'a day on average' });
   if (choices.water && input.waterDaysTracked > 0)
     stats.push({ key: 'water', value: `${input.waterDaysAtGoal}`, unit: `of ${input.waterDaysTracked}`, label: 'days at water goal', progress: input.waterDaysAtGoal / Math.max(1, input.waterDaysTracked) });

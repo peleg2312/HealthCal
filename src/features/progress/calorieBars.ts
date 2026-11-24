@@ -1,7 +1,9 @@
 import { formatShortDate, startOfWeek, weekdayShort } from '@/lib/dates';
-import { inBudgetBand, isCompleteDay, type InsightDay } from '@/lib/insights';
+import { isCompleteDay, type InsightDay } from '@/lib/insights';
 import { formatNumber } from '@/lib/units';
 import type { BarDatum } from '@/ui/Charts';
+
+import { budgetDaysVerdict, countBudgetDays } from './recapDays';
 
 /** The colours a calorie bar is drawn in. */
 export interface BarFills {
@@ -75,17 +77,10 @@ export function buildBars(days: InsightDay[], today: string, fills: BarFills): {
 }
 
 /**
- * What the bars show, true of every bar, each full day against its own budget: a short headline
- * ("19 of 27 full days near budget") and the line under it that says what "near" counts and how
- * many days were well above ("Within 10% of each day's own budget; 1 more than 10% above").
+ * What the bars show, true of every bar, each full day against its own budget, in the recap's words
+ * (`budgetDaysVerdict`): a short headline ("19 of 27 days on budget, 3 above") and what it counts in
+ * the caption under it ("On budget: a full day at 90 to 100% of its budget").
  */
 export function daysVerdict(days: InsightDay[], today: string): { line: string; note: string | null } {
-  const complete = days.filter((d) => isCompleteDay(d, today));
-  if (!complete.length) return { line: 'No fully logged days yet', note: null };
-  const inBand = complete.filter((d) => inBudgetBand(d.eaten.kcal, d.budget)).length;
-  const above = complete.filter((d) => d.eaten.kcal > d.budget * 1.1).length;
-  const n = complete.length;
-  const line = inBand === n && n > 1 ? `All ${n} full days near budget` : `${inBand} of ${n} full ${n === 1 ? 'day' : 'days'} near budget`;
-  const near = n === 1 ? "Within 10% of the day's own budget" : "Within 10% of each day's own budget";
-  return { line, note: above ? `${near}; ${above} more than 10% above` : near };
+  return budgetDaysVerdict(countBudgetDays(days, today));
 }

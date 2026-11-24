@@ -17,6 +17,7 @@ import type { FoodEntry, ISODate, MealType, WaterEntry } from '@/types';
 import { AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, Hatch, IconButton, ListRow, PressableScale, ProgressBar, Sheet, Text, Trough } from '@/ui';
 
 import { clearEntries, copyEntries } from './actions';
+import { foodNameHead } from './addedTo';
 import { DayStepper, KcalTrail, MealPicker, RowEmoji } from './components';
 import { displayFoodName } from './displayName';
 import { toggleFoodFavorite } from './favoriteActions';
@@ -374,7 +375,8 @@ export function MealCard({
 function RepeatRow({ meal, label, previous, onRepeat }: { meal: MealType; label: string; previous: PreviousMeal; onRepeat(): void }) {
   const { colors, spacing } = useTheme();
   const when = dayPhrase(previous.date);
-  const foods = previous.entries.map((e) => displayFoodName(e).split(',')[0].trim()).filter(Boolean);
+  // Each name up to its first comma outside brackets: "Israeli salad (tomato, cucumber, ...)" is never cut to "Israeli salad (tomato".
+  const foods = previous.entries.map((e) => foodNameHead(displayFoodName(e))).filter(Boolean);
   const total = kcal(currentKcal(previous.entries));
   return (
     <View testID={`meal-repeat-row-${meal}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>

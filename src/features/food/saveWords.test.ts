@@ -155,6 +155,22 @@ describe('defaultMealName', () => {
   it('a drink logged on Water is left out, as the save leaves it out', () => {
     expect(defaultMealName([e('Milk', 'water'), e('Toast')], 'breakfast')).toBe('Toast');
   });
+
+  it('never cuts a name inside its brackets (foodNameHead)', () => {
+    // The commas inside the brackets are not the name's first comma: the whole name or nothing.
+    expect(saveSheetFoods([e('Israeli salad (tomato, cucumber, onion, oil, lemon)'), e('Pita bread, white')])).toEqual([
+      'Israeli salad (tomato, cucumber, onion, oil, lemon)',
+      'Pita bread',
+    ]);
+    expect(saveSheetFoods([e('Sushi roll, California (crab, avocado, cucumber)')])).toEqual(['Sushi roll']);
+    expect(defaultMealName([e('Chicken curry (sauce, no rice)'), e('Rice, cooked')], 'dinner')).toBe('Chicken curry (sauce, no rice), Rice');
+    // Too long whole: "My lunch", never "Israeli salad (tomato".
+    const salad = defaultMealName([e('Israeli salad (tomato, cucumber, onion, oil, lemon)'), e('Hummus')], 'lunch');
+    expect(salad).toBe('My lunch');
+    for (const name of [salad, ...saveSheetFoods([e('Israeli salad (tomato, cucumber, onion, oil, lemon)')])]) {
+      expect((name.match(/\(/g) ?? []).length).toBe((name.match(/\)/g) ?? []).length);
+    }
+  });
 });
 
 describe('the hint and the sheet', () => {

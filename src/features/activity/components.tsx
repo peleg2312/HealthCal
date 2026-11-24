@@ -57,12 +57,29 @@ export function sessionSubtitle(e: ActivityEntry, units: UnitSystem): string {
   } else {
     parts.push(INTENSITY_LABELS[e.intensity].title);
   }
-  // Non-breaking spaces keep each value with its unit when the line wraps.
+  // Non-breaking spaces keep each value with its unit when the line wraps, and each "·" with the value before it,
+  // so a wrapped line never starts with a separator ("Sun · 45 min · Moderate ·" / "3.9 km").
   if (e.distanceKm) parts.push(formatDistance(e.distanceKm, units));
-  return parts.map((p) => p.replace(/ /g, '\u00A0')).join(' · ');
+  return parts.map((p) => p.replace(/ /g, '\u00A0')).join('\u00A0· ');
 }
 
-export function SessionRow({ entry, units, onPress, onDelete }: { entry: ActivityEntry; units: UnitSystem; onPress: () => void; onDelete: () => void }) {
+/**
+ * One workout as a row. `day` (Train's history, where a week's card holds its rows) leads the row's line
+ * ("Sun · 45 min · Moderate") and is spoken in its label.
+ */
+export function SessionRow({
+  entry,
+  units,
+  day,
+  onPress,
+  onDelete,
+}: {
+  entry: ActivityEntry;
+  units: UnitSystem;
+  day?: { word: string; spoken: string };
+  onPress: () => void;
+  onDelete: () => void;
+}) {
   const { colors, spacing } = useTheme();
   const garmin = entry.source === 'garmin';
   // A device-measured burn is shown as it is; an estimate from a MET table carries "~" and its range.
@@ -72,7 +89,7 @@ export function SessionRow({ entry, units, onPress, onDelete }: { entry: Activit
     <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 18, paddingRight: 4 }}>
       <PressableScale
         testID={`session-${entry.activityId}`}
-        accessibilityLabel={`Edit ${entry.name}${garmin ? ', imported from Garmin' : ''}, ${measured ? '' : 'about '}${formatNumber(entry.kcalNet)} kilocalories`}
+        accessibilityLabel={`Edit ${entry.name}${day ? `, ${day.spoken}` : ''}${garmin ? ', imported from Garmin' : ''}, ${measured ? '' : 'about '}${formatNumber(entry.kcalNet)} kilocalories`}
         onPress={onPress}
         scaleTo={0.985}
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>
@@ -85,7 +102,7 @@ export function SessionRow({ entry, units, onPress, onDelete }: { entry: Activit
             {entry.name}
           </Text>
           <Text variant="caption" color="textSecondary">
-            {sessionSubtitle(entry, units)}
+            {day ? `${day.word}\u00A0· ${sessionSubtitle(entry, units)}` : sessionSubtitle(entry, units)}
           </Text>
           {garmin ? (
             <View testID={`session-source-${entry.id}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>

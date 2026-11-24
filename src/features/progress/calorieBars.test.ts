@@ -66,14 +66,14 @@ describe('calorie bars', () => {
     for (const b of data) for (const s of b.segments ?? []) if (s.color === 'AMBER') expect(b.value).toBeGreaterThan(s.value);
   });
 
-  it('say in words what the bars show: a short headline, and what it counts under it', () => {
-    expect(daysVerdict(days, '2026-11-14')).toEqual({ line: '1 of 2 full days near budget', note: "Within 10% of each day's own budget" });
-    expect(daysVerdict([day('2026-11-10', 2600, 2000), day('2026-11-11', 2000, 2000)], '2026-11-14')).toEqual({
-      line: '1 of 2 full days near budget',
-      note: "Within 10% of each day's own budget; 1 more than 10% above",
-    });
-    expect(daysVerdict([day('2026-11-10', 2050, 2000), day('2026-11-11', 2000, 2000)], '2026-11-14').line).toBe('All 2 full days near budget');
-    expect(daysVerdict([day('2026-11-11', 2000, 2000)], '2026-11-14')).toEqual({ line: '1 of 1 full day near budget', note: "Within 10% of the day's own budget" });
+  it('say in words what the bars show: the recap headline, and the band under it', () => {
+    // Oct 27 is 86% of its budget (no mark), Nov 11 above its own.
+    expect(daysVerdict(days, '2026-11-14')).toEqual({ line: '0 of 2 days on budget, 1 above', note: 'On budget: a full day at 90 to 100% of its budget' });
+    expect(daysVerdict([day('2026-11-10', 2600, 2000), day('2026-11-11', 2000, 2000)], '2026-11-14').line).toBe('1 of 2 days on budget, 1 above');
+    // 2,050 of 2,000 is above its budget, never on it.
+    expect(daysVerdict([day('2026-11-10', 2050, 2000), day('2026-11-11', 2000, 2000)], '2026-11-14').line).toBe('1 of 2 days on budget, 1 above');
+    expect(daysVerdict([day('2026-11-10', 1850, 2000), day('2026-11-11', 2000, 2000)], '2026-11-14').line).toBe('All 2 days on budget');
+    expect(daysVerdict([day('2026-11-11', 2000, 2000)], '2026-11-14')).toEqual({ line: 'The one full day on budget', note: 'On budget: a full day at 90 to 100% of its budget' });
     expect(daysVerdict([], '2026-11-14')).toEqual({ line: 'No fully logged days yet', note: null });
   });
 });

@@ -65,7 +65,7 @@ module.exports = [
 
   // Yesterday at chosen values (the seed's today, seen from tomorrow 08:10): no sleep for last night.
   { id: 'morning-within', route: '/morning', now, values: { eaten: 0.95, protein: 1.05, water: 1.1 }, waitFor: 'morning-card', note: "within the budget, protein and water reached (brim lines), last night's sleep missing: Add" },
-  { id: 'morning-band', route: '/morning', now, values: { eaten: 1.06 }, waitFor: 'morning-card', note: '6% above the budget: "Within 10% of the budget"' },
+  { id: 'morning-band', route: '/morning', now, values: { eaten: 1.06 }, waitFor: 'morning-card', note: '6% above the budget: "N kcal above the day\'s budget" (anything over the budget is above it, budgetMark), never "within 10%"' },
   { id: 'morning-over', route: '/morning', now, values: { eaten: 1.3, exercise: 400 }, waitFor: 'morning-card', note: '30% above the budget with 400 kcal of exercise: the amber lip and the hatched headroom' },
   { id: 'morning-noeatback', route: '/morning', now, values: { eaten: 0.9, exercise: 300, eatBack: 0 }, waitFor: 'morning-card', note: 'exercise not added to the budget: no hatched headroom' },
   { id: 'morning-week', route: '/morning', now, values: { eaten: 0.9, exercise: 400, spread: 1 }, waitFor: 'morning-card', note: 'workout calories over 7 days: the headroom of yesterday is its first share and the carried ones' },

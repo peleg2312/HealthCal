@@ -23,7 +23,7 @@ import { MEAL_LABEL, mealForTime } from '@/lib/nutrition';
 import { formatNumber, formatVolume } from '@/lib/units';
 import { useStore } from '@/store';
 import { useNow, useToday } from '@/store/clock';
-import { live, useLive, useProfile } from '@/store/selectors';
+import { computeDayFromStore, live, useLive, useProfile } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
 import type { Food, FoodEntry, ISODate, SavedMeal } from '@/types';
 import { PressableScale, Sheet, Text } from '@/ui';
@@ -325,7 +325,11 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                 testID={`quick-water-${ml}`}
                 feedback="none"
                 hitSlop={4}
-                onPress={() => addWater(quickLogPastDate(), ml, profile.units)}
+                onPress={() => {
+                  // With the day's goal, so the toast names the new total as Today's glass does ("250 ml added to Water · 1.48 of 3.3 L").
+                  const day = quickLogPastDate();
+                  addWater(day, ml, profile.units, computeDayFromStore(useStore.getState(), day)?.waterGoalMl);
+                }}
                 accessibilityLabel={`Add ${formatVolume(ml, profile.units)} of water`}
                 style={{ minWidth: 30 + formatVolume(ml, profile.units).length * 7, paddingHorizontal: 10, height: 36, ...cup(radius.buttonSm, 5), borderWidth: 1.5, borderColor: colors.water, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
                 <Plus size={14} color={colors.water} strokeWidth={2.6} />

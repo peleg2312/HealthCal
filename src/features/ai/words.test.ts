@@ -52,9 +52,11 @@ describe('the words of the wait', () => {
 });
 
 describe("food search's AI tile", () => {
-  it('with nothing typed names the AI and both inputs, and opens on Photo', () => {
-    expect(searchAiTile('')).toEqual({ label: 'AI', a11y: 'AI estimate from a photo or a description', glyph: 'photo', params: { mode: 'photo' } });
-    expect(searchAiTile('   ').label).toBe('AI');
+  it('with nothing typed says what it does ("Estimate", under the estimate cup, never a camera), names both inputs to a screen reader, and opens on Photo', () => {
+    expect(searchAiTile('')).toEqual({ label: 'Estimate', a11y: 'AI estimate from a photo or from words', glyph: 'estimate', params: { mode: 'photo' } });
+    expect(searchAiTile('   ').label).toBe('Estimate');
+    expect(searchAiTile('').a11y).toMatch(/photo/);
+    expect(searchAiTile('').a11y).toMatch(/words/);
   });
 
   it('with words typed is Describe and carries them, trimmed, to the describe field', () => {

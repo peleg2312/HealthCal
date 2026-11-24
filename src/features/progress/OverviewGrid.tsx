@@ -1,10 +1,13 @@
 import React from 'react';
+import { View } from 'react-native';
 
-import { compareText, hoursText, kcalText, WEEKLY_ACTIVE_MINUTES, type PeriodSummary } from '@/lib/insights';
+import { compareText, direction, hoursText, kcalText, WEEKLY_ACTIVE_MINUTES, type PeriodSummary } from '@/lib/insights';
 import { formatNumber, formatVolume, formatWeight, weightUnit, weightValue } from '@/lib/units';
 import { useTheme } from '@/theme';
 import type { TrendPoint } from '@/lib/trend';
 import { Card } from '@/ui';
+
+import { TrendLegend } from './parts';
 
 import { weeklyRateText } from './goalDate';
 import { ProgressTile } from './ProgressTile';
@@ -17,9 +20,13 @@ function avgTrend(trend: TrendPoint[], start: string, end: string): number | nul
   return pts.length ? pts.reduce((s, t) => s + t.trend, 0) / pts.length : null;
 }
 
-/** Eight tiles, one number each, built from what useProgressData already returns. */
+/**
+ * Eight tiles, one number each, built from what useProgressData already returns. Each tile is its
+ * number, a triangle against the previous equal period and one line of context; the comparison in
+ * words is read out with the tile, and every detail is one tap away (Nutrition, Body, Habits).
+ */
 export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: number; onOpen: (s: ProgressSegment) => void }) {
-  const { colors } = useTheme();
+  const { colors, spacing } = useTheme();
   const s: PeriodSummary = d.summary;
   const p = d.previous;
   const period = `${range} days`;
@@ -48,6 +55,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         : `${Math.abs(loggedDiff)} ${loggedDiff > 0 ? 'more' : 'fewer'} logged ${Math.abs(loggedDiff) === 1 ? 'day' : 'days'} than the previous ${period}`;
 
   const adaptive = d.model.usingAdaptive;
+  const waterShare = (x: PeriodSummary['water']) => (x && x.daysTracked > 0 ? x.daysAtGoal / x.daysTracked : null);
 
   return (
     // One card divided by hairlines, two columns (the designer's 2 x 4 grid).
@@ -61,8 +69,11 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         valueColor="caloriesInk"
         value={c ? formatNumber(Math.round(c.avgKcal)) : null}
         unit="kcal"
-        caption={c ? `a day · budget ${formatNumber(Math.round(c.avgBudget))}` : 'No fully logged days yet'}
+        caption={c ? `a day · budget ${formatNumber(Math.round(c.avgBudget))}` : 'No full days yet'}
+        captionShort={c ? `budget ${formatNumber(Math.round(c.avgBudget))}` : 'No full days yet'}
         compare={compareText(c?.avgKcal, p?.calories?.avgKcal, { period, format: (n) => kcalText(n), same: 20 })}
+        trend={direction(c?.avgKcal, p?.calories?.avgKcal, 20)}
+        period={period}
         onPress={() => onOpen('nutrition')}
       />
       <ProgressTile
@@ -72,8 +83,10 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         color={colors.weight}
         value={d.series.trendKg !== null ? weightValue(d.series.trendKg, units).toFixed(1) : null}
         unit={weightUnit(units)}
-        caption={rate !== null ? weeklyRateText(rate, units) : 'Rate after a week of weigh-ins'}
+        caption={rate !== null ? weeklyRateText(rate, units) : 'Rate after a week'}
         compare={compareText(trendNow, trendPrev, { period, format: (n) => formatWeight(n, units), same: 0.05, more: 'higher', less: 'lower' })}
+        trend={direction(trendNow, trendPrev, 0.05)}
+        period={period}
         onPress={() => onOpen('body')}
       />
       <ProgressTile
@@ -85,8 +98,11 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         color={colors.protein}
         value={protein ? `${Math.round(protein.avg)}` : null}
         unit="g"
-        caption={protein ? `a day · target ${Math.round(protein.target)} g` : 'No fully logged days yet'}
+        caption={protein ? `a day · target ${Math.round(protein.target)} g` : 'No full days yet'}
+        captionShort={protein ? `target ${Math.round(protein.target)} g` : 'No full days yet'}
         compare={compareText(protein?.avg, p?.macros?.protein.avg, { period, format: (n) => `${Math.round(n)} g`, same: 2 })}
+        trend={direction(protein?.avg, p?.macros?.protein.avg, 2)}
+        period={period}
         onPress={() => onOpen('nutrition')}
       />
       <ProgressTile
@@ -98,8 +114,10 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         keyVariant="outline"
         value={formatNumber(Math.round(d.model.tdee))}
         unit="kcal"
-        caption={adaptive ? 'a day, from your logs and weigh-ins' : 'a day, from your body and activity'}
-        // Plain words here; how the number is worked out is under "Where this number comes from" on Body.
+        // An estimate, said so in its one line (and by the outlined key); how it is worked out is under
+        // "Where this number comes from" on Body.
+        caption="a day, an estimate"
+        captionShort="an estimate"
         compare={
           adaptive
             ? d.model.adaptive.confidence >= 0.75
@@ -121,6 +139,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         value={w ? `${w.daysAtGoal}` : null}
         unit={w ? `of ${w.daysTracked} days` : undefined}
         caption={w ? `at goal · ${formatVolume(w.avgMl, units)} a day` : 'No drinks logged yet'}
+        captionShort={w ? 'at goal' : 'No drinks yet'}
         compare={compareText(w?.avgMl, p?.water?.avgMl, {
           period,
           format: (n) => formatVolume(n, units),
@@ -128,6 +147,9 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
           more: 'more a day',
           less: 'less a day',
         })}
+        // The triangle compares the number shown: the share of tracked days at the goal.
+        trend={direction(waterShare(w), waterShare(p?.water ?? null), 0.05)}
+        period={period}
         onPress={() => onOpen('habits')}
       />
       <ProgressTile
@@ -138,8 +160,15 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         color={colors.exercise}
         value={a.minutes ? `${weekly}` : null}
         unit="min"
-        caption={a.minutes ? `a week · guideline ${WEEKLY_ACTIVE_MINUTES} · ${a.sessions} ${a.sessions === 1 ? 'session' : 'sessions'}` : 'No workouts logged yet'}
-        compare={a.minutes || (p && p.activity.minutes) ? compareText(weekly, p ? Math.round(p.activity.weeklyMinutes) : null, { period, format: (n) => `${Math.round(n)} min a week`, same: 5 }) : null}
+        caption={a.minutes ? `a week · guideline ${WEEKLY_ACTIVE_MINUTES}` : 'No workouts yet'}
+        captionShort={a.minutes ? `a week, of ${WEEKLY_ACTIVE_MINUTES}` : 'No workouts yet'}
+        compare={
+          a.minutes || (p && p.activity.minutes)
+            ? `${a.sessions} ${a.sessions === 1 ? 'session' : 'sessions'}. ${compareText(weekly, p ? Math.round(p.activity.weeklyMinutes) : null, { period, format: (n) => `${Math.round(n)} min a week`, same: 5 }) ?? ''}`.replace(/\. $/, '')
+            : null
+        }
+        trend={a.minutes || (p && p.activity.minutes) ? direction(weekly, p ? Math.round(p.activity.weeklyMinutes) : null, 5) : null}
+        period={period}
         onPress={() => onOpen('habits')}
       />
       <ProgressTile
@@ -151,8 +180,11 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         color={colors.sleep}
         value={sl ? hoursText(sl.avgHours).replace(' h', '') : null}
         unit="h"
-        caption={sl ? `a night · ${sl.nights} ${sl.nights === 1 ? 'night' : 'nights'} logged` : 'No sleep logged yet'}
+        caption={sl ? `a night · ${sl.nights} ${sl.nights === 1 ? 'night' : 'nights'}` : 'No sleep logged yet'}
+        captionShort={sl ? `a night · ${sl.nights} logged` : 'No sleep yet'}
         compare={compareText(sl?.avgHours, p?.sleep?.avgHours, { period, format: (n) => hoursText(n), same: 0.1, more: 'longer', less: 'shorter' })}
+        trend={direction(sl?.avgHours, p?.sleep?.avgHours, 0.1)}
+        period={period}
         onPress={() => onOpen('habits')}
       />
       <ProgressTile
@@ -164,9 +196,17 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         value={`${d.consistency.streak}`}
         unit={d.consistency.streak === 1 ? 'day streak' : 'day streak'}
         caption={`${s.loggedDaysInclToday} of ${Math.max(s.effectiveDays, s.loggedDaysInclToday)} days logged`}
+        captionShort={`${s.loggedDaysInclToday} of ${Math.max(s.effectiveDays, s.loggedDaysInclToday)} logged`}
+        // No triangle: the number shown is the streak, which has no earlier period; the logged days are compared in words.
         compare={loggedCompare}
         onPress={() => onOpen('habits')}
       />
+      {p ? (
+        // The triangles, explained once for the whole grid (as under the Nutrition card's figures).
+        <View style={{ width: '100%', borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: spacing.lg, paddingVertical: spacing.md }} testID="progress-overview-trend-legend">
+          <TrendLegend period={period} />
+        </View>
+      ) : null}
     </Card>
   );
 }

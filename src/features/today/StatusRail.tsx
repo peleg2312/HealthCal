@@ -115,9 +115,10 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
   // "1.23 of 3.3 L": the unit is said once when both amounts share it ("250 ml of 2.55 L" otherwise).
   const sameUnit = goalUnit === waterUnit;
   const dateQuery = isToday ? '' : `?date=${day.date}`;
-  // With guideline minutes this week the cell is the week's: "Activity this week" over the week's
-  // minutes, the bar toward the guideline and one short caption with the guideline and the day's
-  // own minutes ("of 150 min, 75 today"), so no line is a three-line wrap at 360 or 320 px.
+  // With guideline minutes this week the cell is the week's: "Activity" over the week's minutes, the
+  // bar toward the guideline and one short caption that says whose minutes they are and the day's
+  // own ("this week, 75 today"). Every label in the row is one line, so the three values share a
+  // baseline at 320, 360 and 390 px.
   const week = weekMinutes > 0;
   const thisWeek = isToday ? 'this week' : 'that week';
   const dayWord = isToday ? 'today' : 'that day';
@@ -131,13 +132,11 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
   ]
     .filter(Boolean)
     .join('. ');
-  // "Activity / this week" is two lines: every label then keeps two lines' height, as on a narrow phone,
-  // so the three values stay level.
-  const tall = narrow || week;
 
   return (
     <Card testID="today-rail" padding={0}>
-      <View style={{ paddingTop: 14, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
+      {/* 10 px over the water row on a narrow phone (14 otherwise), so the row and its "+ 250 ml" are in the first view at 320 x 640. */}
+      <View style={{ paddingTop: narrow ? 10 : 14, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
           <PressableScale
             testID="today-water"
@@ -182,10 +181,8 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
         <Cell
           testID="today-activity"
           narrow={narrow}
-          tall={tall}
-          // A little wider on a narrow phone, so "that week" keeps its line at 320 px.
-          flex={narrow ? 1.1 : 1}
-          label={week ? `Activity\n${thisWeek}` : 'Activity'}
+          flex={narrow ? ACTIVITY_FLEX_NARROW : 1}
+          label="Activity"
           color={colors.exercise}
           accessibilityLabel={activityLabel}
           onPress={() => router.push(cheers ? ('/friends' as never) : day.activities.length ? '/train' : (`/activity/pick?date=${day.date}` as never))}
@@ -202,7 +199,7 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
                 onReached={() => reached(`${WEEKLY_ACTIVE_MINUTES} active minutes ${thisWeek}. That meets the weekly guideline.`)}
               />
               <Text variant="caption" color="textSecondary" numberOfLines={2} testID="today-activity-week">
-                {`of ${WEEKLY_ACTIVE_MINUTES} min${day.activities.length ? `, ${formatNumber(day.activeMinutes)} ${dayWord}` : ''}`}
+                {`${thisWeek}${day.activities.length ? `, ${formatNumber(day.activeMinutes)} ${dayWord}` : ''}`}
               </Text>
             </View>
           ) : null}
@@ -216,8 +213,7 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
         <Cell
           testID="today-sleep"
           narrow={narrow}
-          tall={tall}
-          flex={0.8}
+          flex={narrow ? SLEEP_FLEX_NARROW : 0.8}
           label="Sleep"
           color={colors.sleep}
           accessibilityLabel={night ? `Sleep, ${night.hours.toFixed(1)} hours` : 'Sleep, not logged. Add a night'}
@@ -227,13 +223,12 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
         />
         <Hairline />
         {fast ? (
-          <FastCell start={fast.start} targetHours={fast.targetHours} narrow={narrow} tall={tall} />
+          <FastCell start={fast.start} targetHours={fast.targetHours} narrow={narrow} />
         ) : (
           <Cell
             testID="today-weight"
             narrow={narrow}
-            tall={tall}
-            flex={narrow ? 1.1 : 1.2}
+            flex={narrow ? LAST_FLEX_NARROW : 1.2}
             label={weight?.label ?? 'Weight trend'}
             color={colors.weight}
             accessibilityLabel={weight ? `${weight.label}, ${weightValue(weight.kg, units).toFixed(1)} ${weightUnit(units)}` : 'Weight, no weigh-ins. Add your weight'}
@@ -255,15 +250,23 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
 }
 
 /**
- * A cup-key square in the data colour, then the label: data colours mark, text
- * stays text. It wraps rather than cutting a word; on a narrow phone every
- * label in the row keeps two lines' height so the values stay level.
+ * On a narrow phone (under 360 px) the row is about 220 px: the last cell ("Weight trend", "Fast of
+ * 16 h") takes the most, so every label keeps one line and the three values stay level.
  */
-function KeyLabel({ color, label, tall }: { color: string; label: string; tall?: boolean }) {
+const ACTIVITY_FLEX_NARROW = 1;
+const SLEEP_FLEX_NARROW = 0.7;
+const LAST_FLEX_NARROW = 1.35;
+
+/**
+ * A cup-key square in the data colour, then the label: data colours mark, text
+ * stays text. Every label in the rail is one line (the week's words are in the
+ * activity cell's caption), so the values under them share one baseline.
+ */
+function KeyLabel({ color, label }: { color: string; label: string }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, minHeight: tall ? 34 : undefined }}>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
       <CupKey color={color} size={10} style={{ marginTop: 4 }} />
-      <Text variant="label" color="textSecondary" numberOfLines={2} style={{ fontSize: 13, lineHeight: 17, flexShrink: 1 }}>
+      <Text variant="label" color="textSecondary" numberOfLines={1} style={{ fontSize: 13, lineHeight: 17, flexShrink: 1 }}>
         {label}
       </Text>
     </View>
@@ -289,13 +292,10 @@ function Cell({
   unit,
   children,
   narrow,
-  tall,
   flex = 1,
 }: {
   testID: string;
   narrow?: boolean;
-  /** Every label in the row keeps two lines' height (a narrow phone, or the week's two-line label). */
-  tall?: boolean;
   flex?: number;
   label: string;
   color: string;
@@ -307,7 +307,7 @@ function Cell({
 }) {
   return (
     <PressableScale testID={testID} onPress={onPress} accessibilityLabel={accessibilityLabel} scaleTo={0.96} style={{ flex, minWidth: 0, minHeight: 44 }}>
-      <KeyLabel color={color} label={label} tall={tall ?? narrow} />
+      <KeyLabel color={color} label={label} />
       {value !== null ? (
         // A four-digit week ("1,240 min") steps down on a narrow phone, so it is never cut.
         <Text variant="numM" numberOfLines={1} style={[{ marginTop: 3 }, narrow && value.length > 4 ? { fontSize: 17, lineHeight: 24 } : null]}>
@@ -324,7 +324,7 @@ function Cell({
   );
 }
 
-function FastCell({ start, targetHours, narrow, tall }: { start: string; targetHours: number; narrow: boolean; tall: boolean }) {
+function FastCell({ start, targetHours, narrow }: { start: string; targetHours: number; narrow: boolean }) {
   const { colors } = useTheme();
   // The clock lives in state so rendering stays pure; it ticks while the fast runs.
   const [now, setNow] = useState(() => Date.now());
@@ -339,8 +339,7 @@ function FastCell({ start, targetHours, narrow, tall }: { start: string; targetH
     <Cell
       testID="today-fasting"
       narrow={narrow}
-      tall={tall}
-      flex={narrow ? 1.1 : 1.2}
+      flex={narrow ? LAST_FLEX_NARROW : 1.2}
       label={`Fast of ${targetHours} h`}
       color={colors.fat}
       accessibilityLabel={`Fasting, ${h} hours ${m} minutes of ${targetHours}`}

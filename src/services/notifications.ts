@@ -19,6 +19,7 @@ import { AndroidImportance } from 'expo-notifications';
 import { router } from 'expo-router';
 import { Platform } from 'react-native';
 
+import { waterAfter } from '@/features/drinks/rules';
 import { waterAddedToast } from '@/features/food/addedTo';
 import { logItems } from '@/features/food/log';
 import { planFromStore } from '@/features/settings/planFromStore';
@@ -27,7 +28,7 @@ import { today } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
 import { formatVolume } from '@/lib/units';
 import { useStore } from '@/store';
-import { live } from '@/store/selectors';
+import { computeDayFromStore, live } from '@/store/selectors';
 import { haptic } from '@/ui/haptics';
 import { toast } from '@/ui/Toast';
 
@@ -69,10 +70,13 @@ function addWaterFromReminder(ml: number) {
   const s = useStore.getState();
   const units = s.profile?.units ?? 'metric';
   const day = today();
+  // The day before this glass, counted as the water row counts it (each drink by its hydration factor).
+  const d = computeDayFromStore(s, day);
+  const after = d ? waterAfter(d.waterMl, d.waterGoalMl, ml, 'water', units) : undefined;
   const entry = s.upsert('water', { date: day, ml, beverage: 'water', loggedAt: nowISO() });
   haptic.success();
-  // Worded as a glass on Today is: "250 ml added to Water".
-  toast(waterAddedToast(formatVolume(ml, units), day, day), { label: 'Undo', onPress: () => useStore.getState().remove('water', entry.id) });
+  // Worded as a glass on Today is, with the day's new total: "250 ml added to Water · 1.48 of 3.3 L".
+  toast(waterAddedToast(formatVolume(ml, units), day, day, after?.reaches, after?.total), { label: 'Undo', onPress: () => useStore.getState().remove('water', entry.id), tint: 'water' });
 }
 
 function repeatMealFromReminder(meal: 'breakfast' | 'lunch' | 'dinner', date: string) {

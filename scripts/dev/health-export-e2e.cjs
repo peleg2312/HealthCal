@@ -30,6 +30,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { chromium } = require('playwright');
+const { toastActionReady } = require('./toastGuard.cjs');
 
 const HERE = path.dirname(path.resolve(process.argv[1]));
 const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith('--')).map((a) => { const [k, ...v] = a.slice(2).split('='); return [k, v.join('=') || true]; }));
@@ -70,6 +71,8 @@ const check = (ok, what) => {
 const plain = (s) => s.replace(/\u00A0/g, ' ').replace(/[\u2060\u200E\u2068\u2069]/g, '').replace(/\s+/g, ' ').trim();
 const state = (page) => page.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())));
 const tap = async (page, id) => {
+  // A toast's action takes no press in its first moments on screen (toastGuard.cjs).
+  if (id === 'toast-action') await toastActionReady(page, 20_000);
   const el = page.getByTestId(id).first();
   await el.waitFor({ state: 'visible', timeout: 20_000 });
   await el.tap();

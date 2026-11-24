@@ -37,6 +37,26 @@ const sheetPage = ({ top = null, pad = 20, bottomPad = 16, scrolls = true, tall 
   </div>
 </body>`;
 
+/**
+ * A sheet 400 px tall whose title stays put over a scrolling body, its first control a 48 px tile, and a
+ * toast resting 12 px above the sheet. With `scrolled` the body is scrolled 60 px, so the tile's box runs
+ * up past the body's top and on under the toast, but the body clips it and none of it shows (the + sheet
+ * at 320 px after a tap scrolled it). With `toastTop` the toast is moved down onto the sheet instead.
+ */
+const SCROLLED_SHEET = ({ scrolled = false, toastTop = null } = {}) => `
+<body style="margin:0;background:#111;color:#eee;font:15px/20px sans-serif">
+  <div style="position:fixed;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center">
+    <div data-testid="toast" style="${toastTop !== null ? `position:fixed;left:30px;top:${toastTop}px;` : 'margin-bottom:12px;'}height:44px;width:300px;background:#eee;color:#111">250 ml added to Water</div>
+    <div data-testid="sheet" style="width:100%;height:400px;box-sizing:border-box;background:#222;padding-bottom:16px;display:flex;flex-direction:column">
+      <div style="font-size:22px;line-height:28px;padding:0 20px">Log something</div>
+      <div data-testid="sheet-body" id="scrolled-body" style="overflow-y:auto;flex:1 1 auto;min-height:0">
+        <div style="padding:0 20px"><button data-testid="quick-fav-food-0" style="width:100%;height:48px">Chicken breast</button><div style="height:900px">More</div></div>
+      </div>
+    </div>
+  </div>
+  <script>document.getElementById('scrolled-body').scrollTop = ${scrolled ? 60 : 0};</script>
+</body>`;
+
 const BODY = 'margin:0;font:15px/20px sans-serif;color:#222;background:#fff';
 /** A card holding more than three pieces of text, so only the structure under test decides. */
 const CARD = (inner) => `<body style="${BODY}"><div style="margin:20px;padding:16px;border:1px solid #888;background:#fafafa"><div style="font-size:12px;margin-bottom:16px">Card heading</div>${inner}<div style="margin-top:16px">Card footer</div></div></body>`;
@@ -72,6 +92,10 @@ const cases = [
     run: 'toast',
     expect: 'covers',
   },
+  // A tile scrolled up out of the sheet's body: its box reaches under the toast, but the body clips it.
+  { name: 'toast over a tile scrolled out of the sheet body is fine (the body clips it)', html: SCROLLED_SHEET({ scrolled: true }), run: 'toast', expect: '' },
+  // The same tile in view, with the toast moved onto it: the clip still leaves what shows to be judged.
+  { name: 'toast over a tile showing in the sheet body is still found', html: SCROLLED_SHEET({ toastTop: 480 }), run: 'toast', expect: 'covers quick-fav-food-0' },
   { name: 'the page behind a sheet is not judged', html: sheetPage(), run: 'layoutSheet', expect: '' },
   { name: 'the page alone is judged', html: sheetPage().replace(/<div style="position:fixed;left:0;right:0;bottom:0[\s\S]*$/, '</body>'), run: 'layoutPage', expect: 'over' },
   {

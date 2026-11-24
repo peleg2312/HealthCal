@@ -2,7 +2,6 @@ import { router } from 'expo-router';
 import React from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { BUDGET_BAND } from '@/lib/insights';
 import { formatNumber } from '@/lib/units';
 import { SLEEP_RANGE } from '@/features/trackers/helpers';
 import { motion, useTheme, withOpacity } from '@/theme';
@@ -35,7 +34,7 @@ function calorieLabel(d: FiguresDay): string {
   const head = `Eaten, ${about}${kcal} of ${formatNumber(d.budget)} kilocalories`;
   if (!d.complete) return `${head}, partly logged`;
   if (d.kcal <= d.budget) return `${head}, within the day's budget`;
-  if (d.kcal - d.budget <= d.budget * BUDGET_BAND + 1e-9) return `${head}, within 10% of the budget`;
+  // Above is anything over the budget (`budgetMark`), said with its amount, never "within 10%".
   return `${head}, ${formatNumber(d.kcal - d.budget)} kilocalories above the day's budget`;
 }
 

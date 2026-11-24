@@ -58,7 +58,9 @@
  *               21 px or more with words, outside a card, in the first 160 px under the header)
  *   toast       a toast that covers a control in an open sheet, a pinned footer or the tab bar, or
  *               that starts above the top of the screen: judged after each tap and at the capture,
- *               always at the real window height (never against the page grown to its full height)
+ *               always at the real window height (never against the page grown to its full height);
+ *               a control is measured by what of it shows, its box cut by every ancestor that clips
+ *               (overflow not visible), so a tile scrolled out of a sheet's body is not under the toast
  * Text cut with no ellipsis is `cut`, and so are a field's placeholder wider than the field, a number
  * field's value wider than the field (a long name in a text field scrolls as fields do), and a clamped
  * name whose box is taller than its clamp (the lines after the ellipsis show under it). A name
@@ -166,6 +168,7 @@ const { chromium } = require('playwright');
 const { execSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const { toastActionReady } = require('./toastGuard.cjs');
 
 const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith('--')).map((a) => { const [k, ...v] = a.slice(2).split('='); return [k, v.join('=') || true]; }));
 const out = path.resolve(flags.out || 'evidence');
@@ -974,7 +977,10 @@ function headerScan() {
 /**
  * Runs in the page: whether a toast now on screen covers a control. With a sheet open the
  * sheet's controls are judged; otherwise those in a pinned footer and the tab bar (content
- * that scrolls under a toast is not, it moves).
+ * that scrolls under a toast is not, it moves). A control is measured by the part of it that
+ * shows: its box cut by every ancestor whose overflow is not visible (a sheet's scrolling body),
+ * so a tile scrolled up out of the body, under the sheet's title, is not "covered" by a toast
+ * resting just above the sheet.
  */
 function toastScan() {
   const t = document.querySelector('[data-testid="toast"]');
@@ -987,11 +993,34 @@ function toastScan() {
   const sheet = [...document.querySelectorAll('[data-testid="sheet"]')].pop();
   const roots = sheet ? [sheet] : [...document.querySelectorAll('[data-testid="screen-footer"], [data-testid="tab-bar"]')];
   const isControl = (el) => el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || ['button', 'link', 'switch', 'tab', 'checkbox', 'radio', 'slider'].includes(el.getAttribute('role'));
+  // What of a control shows: its box cut by every ancestor that clips its content (overflow not visible,
+  // per axis), up to a fixed box, which no ancestor above it clips. Measured inside the ancestor's border.
+  // The body is left out: its overflow is the window's (it propagates to the viewport).
+  const shown = (el) => {
+    const b = el.getBoundingClientRect();
+    const r = { left: b.left, top: b.top, right: b.right, bottom: b.bottom };
+    let child = el;
+    for (let a = el.parentElement; a && a !== document.body && a !== document.documentElement; a = a.parentElement) {
+      if (getComputedStyle(child).position === 'fixed') break;
+      const cs = getComputedStyle(a);
+      const ar = a.getBoundingClientRect();
+      if (cs.overflowX !== 'visible') {
+        r.left = Math.max(r.left, ar.left + a.clientLeft);
+        r.right = Math.min(r.right, ar.left + a.clientLeft + a.clientWidth);
+      }
+      if (cs.overflowY !== 'visible') {
+        r.top = Math.max(r.top, ar.top + a.clientTop);
+        r.bottom = Math.min(r.bottom, ar.top + a.clientTop + a.clientHeight);
+      }
+      child = a;
+    }
+    return r;
+  };
   for (const root of roots) {
     for (const el of root.querySelectorAll('*')) {
       if (!isControl(el) || t.contains(el) || el.contains(t)) continue;
       if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
-      const r = el.getBoundingClientRect();
+      const r = shown(el);
       const w = Math.min(r.right, tr.right) - Math.max(r.left, tr.left);
       const h = Math.min(r.bottom, tr.bottom) - Math.max(r.top, tr.top);
       const id = (el.getAttribute('data-testid') || el.getAttribute('aria-label') || el.textContent.trim()).slice(0, 40);
@@ -1183,6 +1212,8 @@ async function open(context, job, seed) {
   for (const t of job.taps || []) {
     if (problem) break;
     if (typeof t === 'string') {
+      // A toast's action takes no press in its first moments on screen (toastGuard.cjs).
+      if (t === 'toast-action') await toastActionReady(page).catch(() => {});
       problem = await step(`tap ${t}`, () => page.locator(sel(t)).first().click({ timeout: 10000 }));
       if (!problem) { await tapped(); await page.waitForTimeout(350); }
     } else if (t.type) {

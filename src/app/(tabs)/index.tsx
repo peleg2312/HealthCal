@@ -135,6 +135,14 @@ export default function TodayScreen() {
 const VESSEL_H = 150;
 /** Day one: a shorter, empty cup, so the first-log invite under it and the water row under the card stay in the first view at 360 x 740. */
 const VESSEL_H_FIRST = 120;
+/**
+ * Under 360 px only (320 x 640): a tighter card, so the water row and its "+ 250 ml" are in the first
+ * view there too. The cup is as short as its label column allows (the three labels and "Ideas that
+ * fit" 6 px apart), the card's padding and inner gaps step down, and the budget row follows the macros
+ * 12 px under them with no hairline; at 360 and wider nothing changes.
+ */
+const VESSEL_H_NARROW = 126;
+const NARROW = { padding: 12, labelSpacing: 6, macrosTop: 12, macroGap: 5, footerTop: 12 };
 
 function EnergyCard({
   day,
@@ -173,7 +181,9 @@ function EnergyCard({
   const emptyTop = inBand ? budget : budget - headroom;
   const numSize = narrow ? (left.length >= 5 ? 40 : 44) : left.length >= 5 ? 50 : 60;
   const unitWord = over ? 'over' : isToday ? 'left' : 'under';
-  const height = firstDay ? VESSEL_H_FIRST : VESSEL_H;
+  const height = firstDay ? VESSEL_H_FIRST : narrow ? VESSEL_H_NARROW : VESSEL_H;
+  const labelSpacing = narrow ? NARROW.labelSpacing : 8;
+  const macrosTop = narrow ? NARROW.macrosTop : spacing.lg;
   const vesselW = narrow ? 66 : 84;
   // Burned in activity but left out of the budget (exercise is not added in Goals).
   const notAdded = day.exerciseRule === 'off' ? Math.max(0, day.exerciseNet) : 0;
@@ -286,16 +296,16 @@ function EnergyCard({
     sorted.map((l) => levelY(l.at, budget, height - 1.5) - l.height / 2),
     sorted.map((l) => l.height),
     height,
-    8,
+    labelSpacing,
   );
   const eatenIdx = sorted.findIndex((l) => l.key === 'eaten');
   const ideasChip = isToday && day.remaining >= 0 && eatenIdx >= 0;
-  const chipTop = eatenIdx >= 0 ? tops[eatenIdx] + sorted[eatenIdx].height + 8 : 0;
-  // Room the chip takes below the cup, keeping 12 px to the macros (16 under the cup).
-  const chipRoom = ideasChip ? Math.max(0, chipTop + 32 + 12 - (height + spacing.lg)) : 0;
+  const chipTop = eatenIdx >= 0 ? tops[eatenIdx] + sorted[eatenIdx].height + labelSpacing : 0;
+  // Room the chip takes below the cup, keeping 12 px to the macros (16 under the cup, 12 on a narrow phone).
+  const chipRoom = ideasChip ? Math.max(0, chipTop + 32 + 12 - (height + macrosTop)) : 0;
 
   return (
-    <Card testID="today-energy" padding={18}>
+    <Card testID="today-energy" padding={narrow ? NARROW.padding : 18}>
       <View style={chipRoom ? { marginBottom: chipRoom } : undefined}>
         <Vessel
           value={eaten}
@@ -306,7 +316,7 @@ function EnergyCard({
           height={height}
           labels={labels}
           labelGap={narrow ? 14 : 16}
-          labelSpacing={8}
+          labelSpacing={labelSpacing}
           memoryKey={`hero-${day.date}`}
         />
         {/* Day one: the empty cup's open top is a dashed level line at the budget, "ready to fill". */}
@@ -328,7 +338,7 @@ function EnergyCard({
       {/* The macros sit under the cup, not in its side column: beside the cup there is room only for
           the cup's own labels, each at the height it describes, whatever the day's numbers are. */}
       {firstDay || notLogged ? null : (
-        <View style={{ flexDirection: 'row', gap: narrow ? spacing.md : spacing.lg, marginTop: spacing.lg }} testID="today-macros">
+        <View style={{ flexDirection: 'row', gap: narrow ? spacing.md : spacing.lg, marginTop: macrosTop }} testID="today-macros">
           <MacroColumn label="Protein" value={day.eaten.protein} target={day.macros.proteinG} color={colors.protein} narrow={narrow} reach />
           <MacroColumn label="Carbs" value={day.eaten.carbs} target={day.macros.carbsG} color={colors.carbs} narrow={narrow} />
           <MacroColumn label="Fat" value={day.eaten.fat} target={day.macros.fatG} color={colors.fat} narrow={narrow} />
@@ -340,18 +350,18 @@ function EnergyCard({
         </View>
       ) : (
         // Day one ends with the invite: no budget line and no share for a day with nothing in it yet.
-        <BudgetFooter day={day} budgetLabel={budgetLabel} notAdded={notAdded} share={share} />
+        <BudgetFooter day={day} budgetLabel={budgetLabel} notAdded={notAdded} share={share} narrow={narrow} />
       )}
     </Card>
   );
 }
 
 /** The card's last row: the budget in one short line (the whole sum is read out) and the day's share button. */
-function BudgetFooter({ day, budgetLabel, notAdded, share }: { day: DaySummary; budgetLabel: string; notAdded: number; share: React.ReactNode }) {
+function BudgetFooter({ day, budgetLabel, notAdded, share, narrow }: { day: DaySummary; budgetLabel: string; notAdded: number; share: React.ReactNode; narrow: boolean }) {
   const { colors, spacing } = useTheme();
   return (
     <>
-      <View style={{ height: 1, backgroundColor: colors.border, marginTop: 16, marginBottom: 8 }} />
+      {narrow ? <View style={{ height: NARROW.footerTop }} /> : <View style={{ height: 1, backgroundColor: colors.border, marginTop: 16, marginBottom: 8 }} />}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
         {/* One short line: the hatching and its label already say what exercise added; the whole sum is read out.
             When exercise is not added to the budget, a second short line says what was burned and left out. */}
@@ -378,7 +388,7 @@ function BudgetFooter({ day, budgetLabel, notAdded, share }: { day: DaySummary; 
 /** One macro as a column: its key and name, its bar, then the amount of its target. The same shape as the diary's summary card. */
 function MacroColumn({ label, value, target, color, reach, narrow }: { label: string; value: number; target: number; color: string; reach?: boolean; narrow: boolean }) {
   return (
-    <View style={{ flex: 1, minWidth: 0, gap: 8 }} accessible accessibilityLabel={`${label}, ${Math.round(value)} of ${target} grams`}>
+    <View style={{ flex: 1, minWidth: 0, gap: narrow ? NARROW.macroGap : 8 }} accessible accessibilityLabel={`${label}, ${Math.round(value)} of ${target} grams`}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <CupKey color={color} />
         <Text variant="label" numberOfLines={1}>

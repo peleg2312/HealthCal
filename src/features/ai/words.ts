@@ -48,14 +48,15 @@ export const AI_TILE_HINT = { photo: 'Photo, AI estimate', describe: 'Type it, A
 export const DESCRIPTION_MAX = 500;
 
 /**
- * Food search's AI tile (the row of four). With nothing typed it is the way to both inputs: "AI" under the
- * AI's camera, opening the photo screen on Photo, with Describe one tab away; its full name says both. Once
- * words are typed (results or none) it is "Describe" and carries them (`words`), so the person never types
- * them twice; nothing is sent until they tap Estimate there.
+ * Food search's AI tile (the row of four). With nothing typed it is the way to both inputs: "Estimate" under
+ * the AI's estimate cup (not a camera, which reads as photo only), opening the photo screen on Photo, with
+ * Describe one tab away; its full name says both. Once words are typed (results or none) it is "Describe"
+ * and carries them (`words`), so the person never types them twice; nothing is sent until they tap
+ * Estimate there.
  */
-export function searchAiTile(query: string): { label: string; a11y: string; glyph: 'photo' | 'describe'; params: Record<string, string> } {
+export function searchAiTile(query: string): { label: string; a11y: string; glyph: 'estimate' | 'describe'; params: Record<string, string> } {
   const words = query.trim().slice(0, DESCRIPTION_MAX);
-  if (!words) return { label: 'AI', a11y: 'AI estimate from a photo or a description', glyph: 'photo', params: { mode: 'photo' } };
+  if (!words) return { label: 'Estimate', a11y: 'AI estimate from a photo or from words', glyph: 'estimate', params: { mode: 'photo' } };
   return { label: 'Describe', a11y: `Describe ${words} for an AI estimate`, glyph: 'describe', params: { mode: 'text', words } };
 }
 

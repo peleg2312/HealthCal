@@ -9,6 +9,7 @@
  */
 import { withWater } from '@/features/drinks/diary';
 import { isWaterDrinkEntry } from '@/features/drinks/via';
+import { foodNameHead } from '@/features/food/addedTo';
 import { isolateRtl } from '@/lib/bidi';
 import { MEAL_LABEL } from '@/lib/nutrition';
 import { MAX_CONTENT_WIDTH } from '@/theme/tokens';
@@ -115,8 +116,8 @@ export function aiMealName(dish: string | undefined | null, items: readonly { na
 }
 
 /**
- * The name the diary's save sheet offers: the first three foods' names (each up to its first comma),
- * or, when they run over 40 characters, "My lunch". Drinks logged on Water are left out, as the save
+ * The name the diary's save sheet offers: the first three foods' names (each up to its first comma
+ * outside brackets, `foodNameHead`), or, when they run over 40 characters, "My lunch". Drinks logged on Water are left out, as the save
  * leaves them out.
  */
 export function defaultMealName(entries: readonly Pick<FoodEntry, 'name' | 'via'>[], meal: MealType): string {
@@ -151,11 +152,15 @@ export function saveSheetLine(count: number, kcal: string, estimate: boolean): s
   return `${itemCount(count)} · ${estimate ? '~' : ''}${kcal} kcal. Find it any time in Saved meals.`;
 }
 
-/** The save sheet's foods: each food's name up to its first comma, all of them, drinks logged on Water left out. */
+/**
+ * The save sheet's foods: each food's name up to its first comma outside brackets (`foodNameHead`, so
+ * "Israeli salad (tomato, cucumber, onion, oil, lemon)" is never cut to "Israeli salad (tomato"), all
+ * of them, drinks logged on Water left out.
+ */
 export function saveSheetFoods(entries: readonly Pick<FoodEntry, 'name' | 'via'>[]): string[] {
   return entries
     .filter((e) => !isWaterDrinkEntry(e))
-    .map((e) => e.name.split(',')[0].trim())
+    .map((e) => foodNameHead(e.name))
     .filter(Boolean);
 }
 

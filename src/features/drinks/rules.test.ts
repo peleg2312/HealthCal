@@ -37,6 +37,7 @@ import {
   waterFor,
   waterFromEntry,
   waterOnlyOffered,
+  waterAfter,
   waterForEntryEdit,
   waterPointingAt,
   waterRowCaption,
@@ -240,6 +241,26 @@ describe('planDrink', () => {
     const p = planDrink(base({ ml: 237, units: 'imperial' }));
     expect(p.toast).toBe('Milk, 122 kcal, added to lunch and 8 fl oz to Water');
     expect(p.entry!.servingLabel).toBe('8 fl oz');
+  });
+
+  it("every toast names the day's new total, as a glass on Today does, when the tap knows it", () => {
+    const plain = (s: string) => s.replace(/\u00A0/g, ' ');
+    // 1.23 L before, a 3.3 L goal: plain water counts whole.
+    const water = waterAfter(1230, 3300, 250, 'water', 'metric');
+    expect(water).toEqual({ total: '1.48 of 3.3 L', reaches: false });
+    expect(plain(planDrink(base({ kind: 'water', drink: null, after: water })).toast)).toBe('250 ml added to Water · 1.48 of 3.3 L');
+    // A drink with calories: the same ending after its words.
+    expect(plain(planDrink(base({ after: water })).toast)).toBe('Milk, 129 kcal, added to lunch and 250 ml to Water · 1.48 of 3.3 L');
+    expect(plain(planDrink(base({ kind: 'juice', drink: sel('juice_orange'), waterOnly: true, after: water })).toast)).toBe('250 ml of juice added to Water only · 1.48 of 3.3 L');
+    // The glass that reaches the goal says so once.
+    const reach = waterAfter(3100, 3300, 250, 'water', 'metric');
+    expect(reach.reaches).toBe(true);
+    expect(plain(planDrink(base({ kind: 'water', drink: null, after: reach })).toast)).toBe('250 ml added to Water · 3.35 of 3.3 L, goal reached');
+    // Counted as the day counts it: each drink by its hydration factor, so the total agrees with the water row.
+    expect(waterAfter(1000, 3300, 250, 'coffee', 'metric').total).toBe('1.23 of 3.3 L');
+    // No goal, no total; the toast is as before.
+    expect(waterAfter(1000, 0, 250, 'water', 'metric')).toEqual({ reaches: false });
+    expect(planDrink(base({ kind: 'water', drink: null, after: { reaches: false } })).toast).toBe('250 ml added to Water');
   });
 });
 

@@ -6,7 +6,6 @@
  *   "Your week: 6 of 7 days logged. Yesterday 2,062 of 2,170 kilocalories, within the budget.
  *    Today so far, nothing logged."
  */
-import { BUDGET_BAND } from '@/lib/insights';
 import { formatNumber } from '@/lib/units';
 
 import type { WeekCell, WeekCells } from './weekCells';
@@ -17,12 +16,11 @@ function kcalOf(c: WeekCell): string {
   return c.budget > 0 ? `${about}${kcal} of ${formatNumber(Math.round(c.budget))} kilocalories` : `${about}${kcal} kilocalories`;
 }
 
-/** "within the budget", "within 10% of the budget", "above the budget" or "partly logged"; empty without a budget. */
+/** "within the budget", "above the budget" (anything over it, `budgetMark`) or "partly logged"; empty without a budget. */
 function standing(c: WeekCell): string {
   if (c.budget <= 0) return '';
   if (c.partial) return ', partly logged';
   if (c.kcal <= c.budget) return ', within the budget';
-  if (c.kcal - c.budget <= c.budget * BUDGET_BAND + 1e-9) return ', within 10% of the budget';
   return ', above the budget';
 }
 
