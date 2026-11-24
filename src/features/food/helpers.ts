@@ -2,7 +2,7 @@
  * Pure helpers shared by the food screens: route params, number formatting,
  * data-source labels and the "last portion" used for one-tap re-logging.
  */
-import { NATIONAL_LABELS, NATIONAL_RECIPES } from '@/data/foods';
+import { BUILTIN_FOODS, NATIONAL_LABELS, NATIONAL_RECIPES } from '@/data/foods';
 import { hasRtl, isolateRtl } from '@/lib/bidi';
 import { formatDayLabel, today } from '@/lib/dates';
 import { defaultServing, formatMacro, mealForTime, scaleNutrients, servingsFor } from '@/lib/nutrition';
@@ -192,17 +192,24 @@ export function referenceExplain(food: Pick<Food, 'fdcId' | 'ilCode'>): string {
  */
 export type SourceKind = FoodSource | 'typical';
 
-/** The source kind of a food, an entry or a saved line (`SourceKind`): 'typical' for a bundled food with no record. */
-export function sourceKindOf(x: { source: FoodSource; verified?: boolean; food?: { source?: FoodSource; verified?: boolean } | null }): SourceKind {
+let bundledById: Map<string, Food> | null = null;
+
+/**
+ * The source kind of a food, an entry or a saved line (`SourceKind`): 'typical' for a bundled food the app's list
+ * holds with no record, read from the list by id (an entry's or saved line's own flag may be older than the list);
+ * a bundled id the list no longer holds keeps 'builtin', as before.
+ */
+export function sourceKindOf(x: { source: FoodSource; id?: string; foodId?: string; food?: { id?: string } | null }): SourceKind {
   if (x.source !== 'builtin') return x.source;
-  const verified = x.food && x.food.source === 'builtin' && typeof x.food.verified === 'boolean' ? x.food.verified : x.verified;
-  return verified === false ? 'typical' : 'builtin';
+  bundledById = bundledById ?? new Map(BUILTIN_FOODS.map((f) => [f.id, f]));
+  const bundled = bundledById.get(x.food?.id ?? x.foodId ?? x.id ?? '');
+  return bundled && !bundled.verified ? 'typical' : 'builtin';
 }
 
 /** A data source's names and colour; with the food, a bundled food's `explain` names its own record (`referenceExplain`). */
-export function sourceInfo(source: SourceKind, food?: Pick<Food, 'fdcId' | 'ilCode'> & { verified?: boolean }): SourceInfo {
-  // A bundled food passed with its record flag says what it is, wherever the caller took `source` from.
-  if (source === 'builtin' && food && food.verified === false) source = 'typical';
+export function sourceInfo(source: SourceKind, food?: Pick<Food, 'fdcId' | 'ilCode'> & { id?: string }): SourceInfo {
+  // A bundled food passed with it says what it is, wherever the caller took `source` from.
+  if (source === 'builtin' && food) source = sourceKindOf({ source, id: food.id });
   switch (source) {
     case 'typical':
       return {

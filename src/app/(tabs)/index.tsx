@@ -350,9 +350,12 @@ function EnergyCard({
   const eatenIdx = sorted.findIndex((l) => l.key === 'eaten');
   const actions = eatenIdx >= 0;
   const ideasChip = actions && isToday && day.remaining >= 0;
-  // "Ask the coach" on today (the coach card is today's too): a row of its own under "Ideas that fit" and the share.
+  // "Ask the coach" on today (the coach card is today's too): a row of its own under "Ideas that fit" and the share,
+  // or in the chip's place beside the share when there is no "Ideas that fit" (over the budget) and the column holds
+  // both (360 px and wider; at 320 it keeps its own row).
   const coachAsk = actions && isToday;
-  const actionsH = coachAsk ? 2 * ACTION_H + ACTION_GAP : ACTION_H;
+  const askBeside = coachAsk && !ideasChip && !narrow;
+  const actionsH = coachAsk && !askBeside ? 2 * ACTION_H + ACTION_GAP : ACTION_H;
   const actionsTop = actions ? tops[eatenIdx] + sorted[eatenIdx].height + labelSpacing : 0;
   // Room the rows take below the cup, keeping 12 px to the macros (16 under the cup, 12 on a narrow phone).
   const actionsRoom = actions ? Math.max(0, actionsTop + actionsH + 12 - (height + macrosTop)) : 0;
@@ -521,13 +524,15 @@ function EnergyCard({
                   icon={<CookingPot size={18} color={colors.text} strokeWidth={2.2} />}
                   onPress={onFits}
                 />
+              ) : askBeside ? (
+                askChip
               ) : (
                 <View />
               )}
               <ShareDayButton date={day.date} size={SHARE_CUP} />
             </View>
             {/* The coach's worded way in, with its own glyph (the AI's speech cup): it leads to the AI coach. */}
-            {askChip ? <View style={{ height: ACTION_H, flexDirection: 'row', alignItems: 'center' }}>{askChip}</View> : null}
+            {askChip && !askBeside ? <View style={{ height: ACTION_H, flexDirection: 'row', alignItems: 'center' }}>{askChip}</View> : null}
           </View>
         ) : null}
       </View>

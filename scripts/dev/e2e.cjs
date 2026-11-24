@@ -1371,30 +1371,23 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
       window.__healthcal.getState().setSettings({ recapSeenWeek: key });
     });
     await cp.getByTestId('today-coach').first().waitFor({ timeout: 10000 }).catch(() => {});
-    const coachAction = await cp.locator('[data-testid="today-coach-action"], [data-testid="today-coach-water"], [data-testid="today-coach-repeat"]').count();
-    if (!coachAction) {
-      check('coach: a coach card with no action of its own still offers "Ask the coach" on its own', (await cp.getByTestId('today-coach-ask').count()) === 1);
-    } else if (await cp.getByTestId('today-coach-ask').count()) {
-      // Beside the action when the two fit on one row (12 px apart); a long action ("Repeat yesterday's dinner",
-      // about 212 px at 360) puts it on the row under, at the card's left edge, never over or cut.
-      const row = await cp.evaluate(() => {
-        const a = document.querySelector('[data-testid="today-coach-ask"]').getBoundingClientRect();
-        const card = document.querySelector('[data-testid="today-coach"]');
-        const other = [...card.querySelectorAll('[data-testid^="today-coach-"]')].find((e) => e.getAttribute('data-testid') !== 'today-coach-ask').getBoundingClientRect();
-        const inner = card.getBoundingClientRect();
-        const pad = parseFloat(getComputedStyle(card).paddingLeft) + parseFloat(getComputedStyle(card).paddingRight) + 2;
-        const fits = other.width + 12 + a.width <= inner.width - pad + 0.5;
-        const same = Math.abs(a.top - other.top) < 1;
-        const under = a.top >= other.bottom + 4 && Math.abs(a.left - other.left) < 1;
-        return { fits, same, under, action: Math.round(other.width), ask: Math.round(a.width), room: Math.round(inner.width - pad) };
-      });
-      check('coach: Today\'s "Ask the coach" sits beside the coach card\'s action when both fit, else directly under it', row.fits ? row.same : row.under, JSON.stringify(row));
+    // "Ask the coach" is in the calorie card's action rows (not the coach card): one control, whole in the first view
+    // (360 x 740) with its centre in the window's lower 60%, so the coach has a worded way in within the thumb's reach.
+    const ask = await cp.evaluate(() => {
+      const all = [...document.querySelectorAll('[data-testid="today-coach-ask"]')].filter((e) => e.getBoundingClientRect().width > 0);
+      const e = all[0];
+      if (!e) return null;
+      const r = e.getBoundingClientRect();
+      const bar = document.querySelector('[data-testid="tab-bar"]').getBoundingClientRect();
+      return { count: all.length, inEnergy: !!e.closest('[data-testid="today-actions"]'), inCoachCard: !!e.closest('[data-testid="today-coach"]'), top: Math.round(r.top), bottom: Math.round(r.bottom), cy: Math.round(r.top + r.height / 2), barTop: Math.round(bar.top), h: window.innerHeight, text: e.innerText.trim() };
+    });
+    check('coach: Today\'s "Ask the coach" is one control in the calorie card\'s action rows', !!ask && ask.count === 1 && ask.inEnergy && !ask.inCoachCard && ask.text === 'Ask the coach', JSON.stringify(ask));
+    check('coach: Today\'s "Ask the coach" is whole in the first view, its centre in the lower 60%', !!ask && ask.top >= 0 && ask.bottom <= ask.barTop && ask.cy > 0.4 * ask.h, JSON.stringify(ask));
+    if (ask) {
       await ctap('today-coach-ask');
       check('coach: Today\'s "Ask the coach" opens the coach', await onCoach(), cp.url());
       await ctap('header-close');
       await onPath('/');
-    } else {
-      check('coach: Today shows the coach card with "Ask the coach" beside its action (the demo day at this hour has one)', false, 'today-coach-ask not found');
     }
     check('coach: Train has no "Coach" link in its content any more', (await cp.getByTestId('train-coach').count()) === 0);
     await cp.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });

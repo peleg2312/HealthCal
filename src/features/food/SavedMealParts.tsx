@@ -28,7 +28,7 @@ const PORTIONS = [0.5, 1, 2];
 export { itemLine } from './itemLine';
 
 /** Where a saved line's numbers come from (principle 3): an estimate kept with its range is the AI's. */
-export function itemSource(it: Pick<SavedMealItem, 'source' | 'kcalRange' | 'verified' | 'food'>): SourceKind {
+export function itemSource(it: Pick<SavedMealItem, 'source' | 'kcalRange' | 'food'>): SourceKind {
   return it.kcalRange ? 'ai' : sourceKindOf(it);
 }
 

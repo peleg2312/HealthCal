@@ -63,9 +63,14 @@ export interface ButtonProps {
    * expanded state (`aria-expanded` on the web). Leave it out on every other button.
    */
   expanded?: boolean;
+  /**
+   * Web: the id of an element whose words name the button instead of `accessibilityLabel` (a hidden copy of a name
+   * that carries its own `lang`). Passed through as `aria-labelledby`; nothing changes when it is left out.
+   */
+  'aria-labelledby'?: string;
 }
 
-export function Button({ title, onPress, variant = 'primary', size = 'lg', icon, iconRight, loading, disabled, full = true, tint, style, testID, accessibilityLabel, expanded }: ButtonProps) {
+export function Button({ title, onPress, variant = 'primary', size = 'lg', icon, iconRight, loading, disabled, full = true, tint, style, testID, accessibilityLabel, expanded, 'aria-labelledby': labelledBy }: ButtonProps) {
   const { colors, radius } = useTheme();
   const sm = size === 'sm';
   const height = size === 'lg' ? 48 : size === 'md' ? 44 : 36;
@@ -93,6 +98,7 @@ export function Button({ title, onPress, variant = 'primary', size = 'lg', icon,
       onPress={onPress}
       disabled={disabled || loading}
       accessibilityLabel={accessibilityLabel ?? title}
+      {...(labelledBy ? { 'aria-labelledby': labelledBy } : null)}
       expanded={expanded}
       hitSlop={sm ? 4 : undefined}
       style={[
@@ -151,6 +157,7 @@ export function IconButton({
   disabled,
   hitSlop,
   expanded,
+  'aria-labelledby': labelledBy,
 }: {
   children: React.ReactNode;
   onPress?: () => void;
@@ -164,6 +171,8 @@ export function IconButton({
   hitSlop?: { top: number; bottom: number; left: number; right: number };
   /** For a cup that opens or closes something: the expanded state (`aria-expanded` on the web). */
   expanded?: boolean;
+  /** Web: the id of an element whose words name the cup (`aria-labelledby`), as on `Button`. Nothing changes when left out. */
+  'aria-labelledby'?: string;
 }) {
   const { colors } = useTheme();
   const bg = tone === 'primary' ? colors.primary : tone === 'alt' ? colors.surfaceAlt : tone === 'surface' ? colors.surface : 'transparent';
@@ -176,6 +185,7 @@ export function IconButton({
       expanded={expanded}
       hitSlop={hitSlop ?? Math.max(0, Math.ceil((44 - size) / 2))}
       accessibilityLabel={accessibilityLabel}
+      {...(labelledBy ? { 'aria-labelledby': labelledBy } : null)}
       style={[
         {
           width: size,

@@ -5,7 +5,7 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { waterAddedShort, waterAddedToast } from '@/features/food/addedTo';
 import { useOneTap } from '@/features/food/oneTap';
-import { hoursFigure, hoursSpoken } from '@/features/trackers/helpers';
+import { hoursFigure, hoursParts, hoursSpoken } from '@/features/trackers/helpers';
 import { startOfWeek, today } from '@/lib/dates';
 import { guidelineMinutes } from '@/lib/exercise';
 import { effectiveMl } from '@/lib/hydration';
@@ -96,6 +96,9 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
   const glass = defaultGlass(presets);
   const sleep = useLive('sleep');
   const night = sleep.find((s) => s.date === day.date);
+  // Last night in hours and minutes: the minutes under the hours in the narrow cell (see the sleep cell).
+  const nightHm = night ? hoursParts(night.hours) : null;
+  const nightTwoLines = !large && nightHm !== null && nightHm.h > 0 && nightHm.m > 0;
   const fasting = useLive('fasting');
   const fast = isToday ? fasting.find((f) => !f.end) : undefined;
   const series = useWeightSeries();
@@ -231,10 +234,18 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
           color={colors.sleep}
           accessibilityLabel={night ? `Sleep, ${hoursSpoken(night.hours)}` : 'Sleep, not logged. Add a night'}
           onPress={() => router.push(`/sleep${dateQuery}` as never)}
-          // Hours and minutes ("7 h 48 min"), as Sleep, the morning page and Progress draw a night.
-          value={night ? hoursFigure(night.hours).value : null}
-          unit={night ? hoursFigure(night.hours).unit : 'h'}
-        />
+          // Hours and minutes, as Sleep, the morning page and Progress draw a night, never decimal hours. The
+          // cell is too narrow for "7 h 45 min" on one line at 320 to 390 px, so the minutes go under the hours
+          // ("7 h" over "45 min") and the three values keep one baseline; stacked rows (large text) hold one line.
+          value={night ? (nightTwoLines ? String(nightHm!.h) : hoursFigure(night.hours).value) : null}
+          unit={night ? (nightTwoLines ? 'h' : hoursFigure(night.hours).unit) : 'h'}>
+          {nightTwoLines ? (
+            <Text variant="numM" numberOfLines={1} testID="today-sleep-minutes">
+              {nightHm!.m}
+              <Text variant="unit"> min</Text>
+            </Text>
+          ) : null}
+        </Cell>
         <Hairline across={large} />
         {fast ? (
           <FastCell start={fast.start} targetHours={fast.targetHours} narrow={narrow} large={large} />

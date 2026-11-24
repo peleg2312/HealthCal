@@ -51,18 +51,20 @@ export function formatHours(hours: number): string {
  * Never decimal hours ('7.3 h').
  */
 export function hoursFigure(hours: number): { value: string; unit: string } {
-  const mins = Math.round(hours * 60);
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
+  const { h, m } = hoursParts(hours);
   if (h === 0) return { value: String(m), unit: 'min' };
   return m === 0 ? { value: String(h), unit: 'h' } : { value: `${h} h ${m}`, unit: 'min' };
 }
 
+/** A night as whole hours and the minutes after them, to the nearest minute: 7.75 -> { h: 7, m: 45 }. */
+export function hoursParts(hours: number): { h: number; m: number } {
+  const mins = Math.round(hours * 60);
+  return { h: Math.floor(mins / 60), m: mins % 60 };
+}
+
 /** What a screen reader says for a night's length: '7 hours 15 minutes', '1 hour', '45 minutes'. */
 export function hoursSpoken(hours: number): string {
-  const mins = Math.round(hours * 60);
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
+  const { h, m } = hoursParts(hours);
   const hw = `${h} ${h === 1 ? 'hour' : 'hours'}`;
   const mw = `${m} ${m === 1 ? 'minute' : 'minutes'}`;
   if (h === 0) return mw;

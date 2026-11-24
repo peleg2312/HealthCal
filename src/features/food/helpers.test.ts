@@ -433,9 +433,12 @@ describe('a bundled food with no record reads as typical values, never as refere
       expect(sourceKindOf(f)).toBe('builtin');
       expect(sourceInfo(f.source, f).label).toBe('Reference data');
     }
-    // An entry or saved line carries the flag it was logged with, or its food's.
-    expect(sourceKindOf({ source: 'builtin', verified: false })).toBe('typical');
-    expect(sourceKindOf({ source: 'builtin', verified: true, food: typical[0] })).toBe('typical');
-    expect(sourceKindOf({ source: 'custom', verified: false })).toBe('custom');
+    // An entry or saved line is read by its food's id in the list, whatever flag it was logged with.
+    expect(sourceKindOf({ source: 'builtin', foodId: typical[0].id })).toBe('typical');
+    expect(sourceKindOf({ source: 'builtin', food: { id: typical[0].id } })).toBe('typical');
+    expect(sourceKindOf({ source: 'builtin', foodId: 'b_banana' })).toBe('builtin');
+    // A bundled id the list no longer holds keeps reading as before; other sources are themselves.
+    expect(sourceKindOf({ source: 'builtin', foodId: 'b_gone' })).toBe('builtin');
+    expect(sourceKindOf({ source: 'custom', foodId: typical[0].id })).toBe('custom');
   });
 });
