@@ -53,6 +53,26 @@ let historyPatched = false;
 /** How long after opening a sheet adds its history entry (the router's own wait for a move is 100 ms). */
 const PUSH_AFTER_MS = 120;
 /**
+ * Web: the history.back() calls closed sheets made to take their entries off, by when each was made, until its
+ * popstate arrives. That popstate is the app's own step, never the person's Back: a sheet opened in the same tap
+ * that closed another (a sheet's row that opens a confirmation) must not take it as Back and close at once. A
+ * step whose popstate never came is forgotten after `OWN_BACK_MS`.
+ */
+const ownBacks: number[] = [];
+const OWN_BACK_MS = 1000;
+/** The popstate events that were the app's own steps back (marked by the first listener, before any sheet's). */
+const ownPops = new WeakSet<Event>();
+const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+function pendingOwnBack(): boolean {
+  while (ownBacks.length && now() - ownBacks[0] > OWN_BACK_MS) ownBacks.shift();
+  return ownBacks.length > 0;
+}
+/** A closed sheet takes its entry off: one history.back(), noted as the app's own. */
+function ownBack() {
+  ownBacks.push(now());
+  window.history.back();
+}
+/**
  * Web, once: the router's own history moves step over an entry a closed sheet left on top. A screen the
  * sheet opened takes that entry's place (pushState becomes replaceState), and a step back from it counts
  * the entry too (go(-1) becomes go(-2)). Without this, a sheet closed in the same tap that navigates (a
@@ -62,6 +82,12 @@ const PUSH_AFTER_MS = 120;
 function patchHistory() {
   if (historyPatched || typeof window === 'undefined') return;
   historyPatched = true;
+  // Added before any sheet's own listener, so it marks the app's own step before a sheet reads it.
+  window.addEventListener('popstate', (e) => {
+    if (!pendingOwnBack()) return;
+    ownBacks.shift();
+    ownPops.add(e);
+  });
   const h = window.history;
   const push = h.pushState.bind(h);
   const go = h.go.bind(h);
@@ -105,14 +131,22 @@ function useBackCloses(visible: boolean, close: () => void, stillOpen: () => boo
     };
     // A beat after opening, so a router move still on its way (one that opened this sheet, such as a
     // back the screen refused) lands first and this entry goes on top of the right one.
+    // Not while another sheet's own step back is still on its way: that step would take this entry off instead.
     let pushed = false;
-    const first = setTimeout(() => {
+    let first: ReturnType<typeof setTimeout> = setTimeout(function pushWhenStill() {
+      if (pendingOwnBack()) {
+        first = setTimeout(pushWhenStill, 30);
+        return;
+      }
       pushed = true;
       push();
     }, PUSH_AFTER_MS);
     let popped = false;
     let again: ReturnType<typeof setTimeout> | undefined;
-    const onPop = () => {
+    const onPop = (e: Event) => {
+      // The app's own step back (a sheet closed in the tap that opened this one), or any step before this
+      // sheet has its own entry, is not the person's Back for this sheet.
+      if (ownPops.has(e) || !pushed) return;
       const at = historyState()?.[SHEET_ENTRY];
       // Still on this sheet's entry, or on a sheet opened over it.
       if (typeof at === 'number' && at >= token) return;
@@ -137,7 +171,7 @@ function useBackCloses(visible: boolean, close: () => void, stillOpen: () => boo
       if (popped || !pushed) return;
       setTimeout(() => {
         const used = usedEntries.delete(token);
-        if (!used && historyState()?.[SHEET_ENTRY] === token) window.history.back();
+        if (!used && historyState()?.[SHEET_ENTRY] === token) ownBack();
       }, 0);
     };
   }, [visible]);
