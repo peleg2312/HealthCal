@@ -54,8 +54,12 @@ name: First day on a phone
 - tapOn:
     id: onb-dob-year
 - inputText: '1990'
-- assertVisible:
-    id: onb-dob-summary
+# The summary line draws a moment after the last digit; on a cold iPhone simulator that
+# moment outlasted assertVisible's short wait while the line was on screen (run 45460198538).
+- extendedWaitUntil:
+    visible:
+      id: onb-dob-summary
+    timeout: 10000
 - takeScreenshot: 03-born-keyboard
 - tapOn:
     id: onb-next
