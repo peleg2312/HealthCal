@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { KEYBOARD_MIN, keyboardCover, revealDelta, TOAST_GAP, toastBottom, toastReachTop, toastSpot } from './keyboardInset';
+import { KEYBOARD_MIN, keyboardCover, revealDelta, TOAST_GAP, toastBottom, toastBottomAmong, toastReachTop, toastSpot } from './keyboardInset';
 
 describe('keyboardCover', () => {
   it('is what the keyboard takes from the bottom of the page', () => {
@@ -116,5 +116,38 @@ describe('toastSpot', () => {
   });
   it('is null for a toast not measured yet', () => {
     expect(toastSpot({ ...base, height: 0, controls: [] })).toBeNull();
+  });
+});
+
+describe('toastBottomAmong (phones: the same rule from measured window boxes)', () => {
+  // Today at 360 x 740 on a phone: the toast (309 x 44, x 25) rests 84 px above the bottom (12 over the tab bar).
+  const toast = { x: 25, y: 0, width: 309, height: 44 };
+  const box = (c: { top: number; bottom: number; left: number; right: number }) => ({ x: c.left, y: c.top, width: c.right - c.left, height: c.bottom - c.top });
+  const cells = [
+    { top: 610, bottom: 703, left: 37, right: 116 },
+    { top: 610, bottom: 703, left: 141, right: 204 },
+    { top: 610, bottom: 703, left: 229, right: 323 },
+  ].map(box);
+  const waterRow = [{ top: 519, bottom: 563, left: 37, right: 181 }].map(box);
+  it('rests where it always rests when nothing is under it (null)', () => {
+    expect(toastBottomAmong({ windowBottom: 740, resting: 84, toast, controls: [box({ top: 100, bottom: 140, left: 25, right: 334 })] })).toBeNull();
+  });
+  it('rises to the lowest band clear of every control, as a distance from the bottom', () => {
+    const bottom = toastBottomAmong({ windowBottom: 740, resting: 84, toast, controls: [...cells, ...waterRow] });
+    // Top 519 - 4 - 44 = 471: its bottom edge 740 - 515 = 225 px above the bottom of the window.
+    expect(bottom).toBe(740 - (519 - 4));
+    const top = 740 - bottom! - 44;
+    for (const c of [...cells, ...waterRow]) expect(top + 44 <= c.y - 4 || top >= c.y + c.height + 4).toBe(true);
+  });
+  it('keeps the action in thumb reach: with no clear band it stays where it rests', () => {
+    expect(toastBottomAmong({ windowBottom: 740, resting: 84, toast, controls: [box({ top: 250, bottom: 700, left: 0, right: 360 })] })).toBeNull();
+  });
+  it('ignores what it does not cross sideways, and boxes a phone could not measure', () => {
+    expect(toastBottomAmong({ windowBottom: 740, resting: 84, toast: { ...toast, x: 130, width: 80 }, controls: [cells[0], cells[2]] })).toBeNull();
+    expect(toastBottomAmong({ windowBottom: 740, resting: 84, toast, controls: [{ x: Number.NaN, y: 610, width: 80, height: 93 }] })).toBeNull();
+  });
+  it('is null before the toast or the window is measured', () => {
+    expect(toastBottomAmong({ windowBottom: 740, resting: 84, toast: { ...toast, height: 0 }, controls: cells })).toBeNull();
+    expect(toastBottomAmong({ windowBottom: 0, resting: 84, toast, controls: cells })).toBeNull();
   });
 });

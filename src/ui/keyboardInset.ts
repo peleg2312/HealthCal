@@ -121,3 +121,32 @@ export function toastSpot(v: { lowest: number; highest: number; height: number; 
 export function toastReachTop(windowHeight: number, height: number): number {
   return Math.ceil(windowHeight * TOAST_REACH_FROM - height / 2);
 }
+
+/** A box as a phone measures it (`measureInWindow`): its left and top edge in the window, and its size. */
+export interface WindowBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Phones: where the screen toast rests, by the same rule as the web (`toastSpot`), from boxes a phone
+ * measures in window coordinates. The toast host sits at the app's root, so the answer is a distance from
+ * the bottom of the root (`windowBottom`, the root's bottom edge in the window), or null when the toast
+ * should rest where it always rests (`resting`, its usual distance: 12 px above the screen's chrome),
+ * because that place is clear or no clear band is in thumb reach. `controls` are the screen's own kit
+ * controls (every PressableScale and text field inside its `Screen`, measured as the toast shows).
+ */
+export function toastBottomAmong(v: { windowBottom: number; resting: number; toast: WindowBox; controls: WindowBox[] }): number | null {
+  const h = Math.round(v.toast.height);
+  const H = v.windowBottom;
+  if (!(h > 0) || !(H > 0) || !(v.toast.width > 0)) return null;
+  const lowest = H - v.resting - h;
+  const controls = v.controls
+    .filter((c) => [c.x, c.y, c.width, c.height].every(Number.isFinite))
+    .map((c) => ({ top: c.y, bottom: c.y + c.height, left: c.x, right: c.x + c.width }));
+  const top = toastSpot({ lowest, highest: toastReachTop(H, h), height: h, left: v.toast.x, right: v.toast.x + v.toast.width, controls });
+  if (top === null || top === Math.round(lowest)) return null;
+  return Math.round(H - top - h);
+}

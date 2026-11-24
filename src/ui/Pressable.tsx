@@ -5,6 +5,7 @@ import { useReducedMotion, useTheme } from '@/theme';
 
 import { ANDROID_TARGET, ariaFromState, fixedSize, isSpaceKey, pressesOnSpace, slopToReach } from './controlRules';
 import { haptic } from './haptics';
+import { passRef, useToastControl } from './toastControls';
 
 /**
  * Animated wrappers add `collapsable={false}`, a native-only hint. On web it
@@ -180,6 +181,16 @@ export function PressableScale({ style, scaleTo = 0.97, feedback = 'tap', dimDis
   const scale = scaleTo === 1 ? 1 : press.interpolate({ inputRange: [0, 1], outputRange: [scaleTo, 1] });
   const transform = dip ? [{ scale }, { translateY: press.interpolate({ inputRange: [0, 1], outputRange: [dip, 0] }) }] : [{ scale }];
   const hit = useWebHitArea(rest.hitSlop, style);
+  // On a phone the control is on its screen's list, so a toast rests clear of it (./toastControls).
+  const ownRef = useToastControl<unknown>();
+  const given = (rest as { ref?: unknown }).ref;
+  const phoneRef =
+    Platform.OS === 'web'
+      ? undefined
+      : (n: unknown) => {
+          ownRef.current = n;
+          passRef(given, n);
+        };
   const role = ((rest as { role?: string }).role ?? rest.accessibilityRole ?? 'button') as string;
   const state = expanded === undefined ? rest.accessibilityState : { ...rest.accessibilityState, expanded };
   const pressed = (e: GestureResponderEvent) => {
@@ -208,6 +219,7 @@ export function PressableScale({ style, scaleTo = 0.97, feedback = 'tap', dimDis
     <AnimatedPressable
       {...rest}
       {...web}
+      {...(phoneRef ? { ref: phoneRef } : null)}
       hitSlop={androidSlop(rest.hitSlop, style)}
       accessibilityState={state}
       disabled={disabled}

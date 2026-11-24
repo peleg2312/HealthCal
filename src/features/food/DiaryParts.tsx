@@ -62,7 +62,7 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?
     <Card testID="diary-summary" padding={18}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
         <View style={stacked ? { flex: 1, minWidth: 0, gap: 2 } : { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md }}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+          <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', alignItems: 'baseline', columnGap: 6 }}>
             <AnimatedNumber
               variant="numXL"
               color={over ? 'warningInk' : 'caloriesInk'}
@@ -308,12 +308,14 @@ export function MealCard({
   // One add per meal: an empty meal's add is its dashed slot (`meal-add-<meal>`), with no "+" cup and no "..." in its
   // header (the menu's one action for an empty meal, copying the last one, is the Repeat under the slot).
   const filled = rows.length > 0;
+  // With large text the meal's name keeps its whole word: the "..." and "+" cups go under it when both do not fit.
+  const big = useBigText();
   return (
     <Card testID={`meal-card-${meal}`} padding={0} style={{ paddingTop: filled ? 12 : 16, paddingBottom: filled ? 4 : ROW_PAD }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingLeft: ROW_PAD, paddingRight: 14 }}>
+      <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', justifyContent: 'flex-end', alignItems: 'center', gap: spacing.xs, paddingLeft: ROW_PAD, paddingRight: 14 }}>
         {/* A big total ("1,450 kcal") goes under the meal's name on a narrow phone rather than cutting it. */}
-        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10 }}>
-          <Text variant="h3" numberOfLines={1} style={{ flexShrink: 1 }}>
+        <View style={[big ? { flexGrow: 1, flexShrink: 1, flexBasis: 'auto' } : { flex: 1 }, { minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10 }]}>
+          <Text variant="h3" numberOfLines={1} style={{ flexShrink: big ? 0 : 1 }}>
             {label}
           </Text>
           {entries.length > 0 ? (
@@ -411,9 +413,11 @@ function RepeatRow({ meal, label, previous, onRepeat }: { meal: MealType; label:
   // Each name up to its first comma outside brackets: "Israeli salad (tomato, cucumber, ...)" is never cut to "Israeli salad (tomato".
   const foods = previous.entries.map((e) => foodNameHead(displayFoodName(e))).filter(Boolean);
   const total = kcal(currentKcal(previous.entries));
+  // With large text the caption has the card's width and Repeat goes under it, so no word is split.
+  const big = useBigText();
   return (
-    <View testID={`meal-repeat-row-${meal}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-      <Text variant="caption" color="textSecondary" numberOfLines={3} style={{ flex: 1, minWidth: 0 }}>
+    <View testID={`meal-repeat-row-${meal}`} style={{ flexDirection: big ? 'column' : 'row', alignItems: big ? 'flex-start' : 'center', gap: big ? spacing.sm : spacing.md }}>
+      <Text variant="caption" color="textSecondary" numberOfLines={3} style={big ? { alignSelf: 'stretch' } : { flex: 1, minWidth: 0 }}>
         {/* The day and its calories first, so a long list of foods is what the third line's ellipsis shortens, never the number. */}
         {`${when.charAt(0).toUpperCase()}${when.slice(1)}, ${total} kcal: ${foods.map(isolateRtl).join(', ')}`}
       </Text>

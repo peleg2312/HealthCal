@@ -13,6 +13,7 @@ import { PressableScale } from './Pressable';
 import { ConfirmSheet } from './Sheet';
 import { Text } from './Text';
 import { useToastDock } from './Toast';
+import { ToastScope } from './toastControls';
 
 /** Height of the docked tab bar above the home indicator (the + cup rises 14 px above it). */
 export const TAB_BAR_HEIGHT = 58;
@@ -146,6 +147,8 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
     // ScrollView then keeps the focused field in view: Android's ScrollView.onSizeChanged scrolls a focused
     // child that was visible back into view when the padding shrinks it. Web has no keyboard events:
     // useWebKeyboard below pads by what the visual viewport says the keyboard covers.
+    // On a phone every kit control drawn in this screen is on its list, so a toast rests clear of them.
+    <ToastScope.Provider value={domId}>
     <KeyboardAvoidingView
       nativeID={domId}
       testID={testID}
@@ -161,6 +164,7 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
         </View>
       )}
     </KeyboardAvoidingView>
+    </ToastScope.Provider>
   );
 }
 

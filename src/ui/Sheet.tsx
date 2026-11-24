@@ -10,6 +10,7 @@ import { Button } from './Button';
 import { ease } from './motion';
 import { Text } from './Text';
 import { ToastHost } from './Toast';
+import { ToastScope } from './toastControls';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -308,6 +309,9 @@ export function Sheet({
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - open.get()) * (travel + 24) + drag.get() }] }));
   const toastStyle = useAnimatedStyle(() => ({ opacity: open.get() }));
   return (
+    // A sheet's controls count for no screen: the sheet shows its own toast, and a closing sheet's controls
+    // must not move the screen's toast (./toastControls).
+    <ToastScope.Provider value={null}>
     <Modal
       visible={mounted}
       transparent
@@ -397,6 +401,7 @@ export function Sheet({
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
+    </ToastScope.Provider>
   );
 }
 

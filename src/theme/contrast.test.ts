@@ -138,6 +138,11 @@ describe.each(NAMES)('%s palette', (name) => {
     expect(failures(pairs(name, ['rim'], ['vesselEmpty', 'track', 'surface', 'bg'], 3))).toEqual([]);
   });
 
+  it('draws the keyboard focus ring (the level line, `rim`) at 3:1 on every surface a control sits on, the tab bar included', () => {
+    // WCAG 2.4.13 and 1.4.11: the web's one focus ring (src/ui/Pressable.tsx, `useFocusRing`) is drawn in `rim`.
+    expect(failures(pairs(name, ['rim'], ['bg', 'bgElevated', 'surface', 'surfaceAlt', 'tabBar'], 3))).toEqual([]);
+  });
+
   it("draws the coach cup's unread level line at 3:1 on its primarySoft tint over the page (the tab header)", () => {
     expect(contrast(c.rim, over(c.primarySoft, c.bg)), `${name} rim on primarySoft over bg`).toBeGreaterThanOrEqual(3);
   });

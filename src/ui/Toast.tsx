@@ -6,9 +6,10 @@ import { create } from 'zustand';
 import { withoutMarks } from '@/lib/bidi';
 import { cup, isReducedMotion, MAX_CONTENT_WIDTH, motion, useTheme, type ThemeColors } from '@/theme';
 
-import { type ControlBox, TOAST_GAP, toastBottom, toastReachTop, toastSpot } from './keyboardInset';
+import { type ControlBox, TOAST_GAP, toastBottom, toastBottomAmong, toastReachTop, toastSpot, type WindowBox } from './keyboardInset';
 import { PressableScale } from './Pressable';
 import { Text } from './Text';
+import { controlsIn } from './toastControls';
 
 /** What a toast may carry besides its message. All optional. */
 export interface ToastOptions {
@@ -223,8 +224,10 @@ const monotonicNow = () => (typeof performance !== 'undefined' && typeof perform
  * ('sheet'): a native modal covers the app's own layer, so a sheet has to show
  * the toast itself. On a screen it rests 12 px above the bottom chrome the
  * screen reported with `useToastDock` (tab bar, footer or home indicator);
- * in a browser, when a control lies there, in the lowest band clear of every
- * control with its action in thumb reach (`toastSpot`). While the on-screen keyboard is up it
+ * when a control lies there, in the lowest band clear of every control with
+ * its action in thumb reach (`toastSpot`: in a browser every control on the
+ * page, on a phone the kit's controls of the focused screen, measured in the
+ * window, ./toastControls and `toastBottomAmong`). While the on-screen keyboard is up it
  * rests 12 px above the footer that rides on the keyboard, or 12 px above the
  * keyboard when the screen has no footer, by the same measure the screen pads
  * itself with, and moves above the focused field when it would cover it and
@@ -254,6 +257,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
   const key = `${id}:${placed.cover}:${placed.dock}`;
   const [toastH, setToastH] = useState(0);
   const outer = useRef<React.ComponentRef<typeof View>>(null);
+  const toastRef = useRef<React.ComponentRef<typeof View>>(null);
   const bottomNow = useRef(0);
   const [anim] = useState(() => new Animated.Value(0));
   const [hostId] = useState(() => ++hostSeq);
@@ -362,17 +366,33 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
     keyboardUp && field && field.key === key && toastH > 0 ? { top: field.top, bottom: field.bottom, toastHeight: toastH, limit: field.hostBottom - insets.top } : null,
     TOAST_GAP,
   );
-  // Web: never over a control. Once the toast is laid out, it rests in the lowest band clear of every
-  // control on the screen (or in the sheet), its action within thumb reach (`toastSpot`); it is drawn
-  // only once that place is known, so it never shows for a frame over a button. Phones keep `resting`.
+  // Never over a control. Once the toast is laid out, it rests in the lowest band clear of every control on
+  // the screen (or, in a browser, in the sheet), its action within thumb reach (`toastSpot`); it is drawn
+  // only once that place is known, so it never shows for a frame over a button. A browser asks the page for
+  // its controls; a phone measures the kit controls of the focused screen (./toastControls,
+  // `toastBottomAmong`). A phone's sheet keeps its toast just above the sheet's top edge.
   const placeKey = `${key}:${inSheet ? 'sheet' : (scopeId ?? '')}:${winH}:${message}`;
   const [spot, setSpot] = useState<{ key: string; bottom: number | null } | null>(null);
-  const placing = Platform.OS === 'web' && shownNow && !keyboardUp;
+  const placing = shownNow && !keyboardUp && (Platform.OS === 'web' || !inSheet);
   useEffect(() => {
-    if (!placing || toastH <= 0) return;
+    if (!placing) return;
+    // A toast that is never laid out is shown where it always rests rather than kept out of sight.
+    if (toastH <= 0) {
+      const late = setTimeout(() => setSpot({ key: placeKey, bottom: null }), PLACE_LATE_MS);
+      return () => clearTimeout(late);
+    }
+    // Phones: the focused screen's kit controls, measured in the window, and the same rule as the web.
+    const placeOnPhone = async (): Promise<number | null> => {
+      if (!scopeId) return null;
+      const [host, box] = await Promise.all([measureBox(outer.current), measureRect(toastRef.current)]);
+      if (!host || !box) return null;
+      const rects = await Promise.all(controlsIn(scopeId).map((n) => measureRect(n)));
+      return toastBottomAmong({ windowBottom: host.y + host.h + bottomNow.current, resting, toast: box, controls: rects.filter((r): r is WindowBox => !!r) });
+    };
     // The place, as a bottom offset (null: where it always rests), or 'wait' while the screen it belongs to
     // is not laid out yet (a screen coming back into view after the one that raised the toast).
-    const place = (): number | null | 'wait' => {
+    const place = (): number | null | 'wait' | Promise<number | null> => {
+      if (Platform.OS !== 'web') return withTimeout(placeOnPhone(), PLACE_LATE_MS, null);
       const host = outer.current as unknown as HTMLElement | null;
       const toastEl = host?.querySelector?.('[data-testid="toast"]');
       if (!host || !toastEl || typeof window === 'undefined') return null;
@@ -401,22 +421,26 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
     };
     let tries = 0;
     let looked = false;
+    let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const run = () => {
-      const at = place();
-      if (at === 'wait' && tries++ < 12) {
-        timer = setTimeout(run, 80);
-        return;
-      }
-      setSpot({ key: placeKey, bottom: at === 'wait' ? null : at });
-      // One more look once the screen has settled (a list that was still arriving, a screen fading in).
-      if (!looked) {
-        looked = true;
-        timer = setTimeout(run, 450);
-      }
+      void Promise.resolve(place()).then((at) => {
+        if (stopped) return;
+        if (at === 'wait' && tries++ < 12) {
+          timer = setTimeout(run, 80);
+          return;
+        }
+        setSpot({ key: placeKey, bottom: at === 'wait' ? null : at });
+        // One more look once the screen has settled (a list that was still arriving, a screen fading in).
+        if (!looked) {
+          looked = true;
+          timer = setTimeout(run, 450);
+        }
+      });
     };
     const frame = requestAnimationFrame(run);
     return () => {
+      stopped = true;
       cancelAnimationFrame(frame);
       clearTimeout(timer);
     };
@@ -444,6 +468,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       {/* Only the action takes a touch: a tap on the toast's ink body goes through to what is under it (Today's
           "+ 250 ml" sits just above the resting toast at 360 x 740, and a second glass must still log). */}
       <Animated.View
+        ref={toastRef}
         testID="toast"
         pointerEvents={closingId === id ? 'none' : 'box-none'}
         accessibilityLiveRegion="polite"
@@ -538,6 +563,39 @@ function measureBox(node: Measurable | null): Promise<{ y: number; h: number } |
     } catch {
       resolve(null);
     }
+  });
+}
+
+/** A box in window coordinates with its left edge and width as well (a toast and the controls it keeps clear of). */
+function measureRect(node: unknown): Promise<WindowBox | null> {
+  return new Promise((resolve) => {
+    const m = (node as Measurable | null)?.measureInWindow;
+    if (!node || typeof m !== 'function') return resolve(null);
+    try {
+      m.call(node as Measurable, (x, y, width, height) => resolve([x, y, width, height].every(Number.isFinite) ? { x, y, width, height } : null));
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/** How long a toast may wait for its place before it shows where it always rests. */
+const PLACE_LATE_MS = 400;
+
+/** A promise's answer, or `fallback` when it has not come within `ms` (a measurement a phone never answers). */
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const t = setTimeout(() => resolve(fallback), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      () => {
+        clearTimeout(t);
+        resolve(fallback);
+      },
+    );
   });
 }
 

@@ -9,6 +9,7 @@ import { IconButton } from './Button';
 import { spokenFieldName, stepperKey, webAutoComplete } from './controlRules';
 import { FOCUS_CUP, useFocusRing } from './Pressable';
 import { Text, useLargeText } from './Text';
+import { passRef, useToastControl } from './toastControls';
 
 export interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   label?: string;
@@ -76,6 +77,16 @@ export function TextField({ label, suffix, error, hint, left, right, style, line
   const [suffixW, setSuffixW] = useState(suffix ? 8 * suffix.length : 0);
   const [rightW, setRightW] = useState(0);
   const rightRoom = right ? GAP + rightW + PAD_X : PAD_X;
+  // On a phone the field is on its screen's list, so a toast rests clear of it (./toastControls).
+  const ownRef = useToastControl<unknown>();
+  const givenRef = (rest as { ref?: unknown }).ref;
+  const phoneRef =
+    Platform.OS === 'web'
+      ? undefined
+      : (n: unknown) => {
+          ownRef.current = n;
+          passRef(givenRef, n);
+        };
   return (
     <View {...FIELD_LABEL} style={[{ gap: 6 }, style]}>
       {label ? (
@@ -101,6 +112,7 @@ export function TextField({ label, suffix, error, hint, left, right, style, line
           maxFontSizeMultiplier={phoneCapFor(scale)}
           {...rest}
           {...(web as object)}
+          {...(phoneRef ? { ref: phoneRef } : null)}
           // Its name says the unit in full: the label's short unit or the one drawn in the field ("Protein, grams").
           accessibilityLabel={spokenUnits(rest.accessibilityLabel ?? spokenFieldName(label, suffix) ?? rest.placeholder ?? '') || undefined}
           accessibilityHint={error || rest.accessibilityHint || hint}

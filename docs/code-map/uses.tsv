@@ -2705,9 +2705,11 @@ src/ui/haptics.ts	haptic	28	src/app/activity/strength.tsx	src/app/auth.tsx	src/a
 src/ui/keyboardInset.ts	ControlBox	1	src/ui/Toast.tsx
 src/ui/keyboardInset.ts	KEYBOARD_MIN	1	src/ui/keyboardInset.test.ts
 src/ui/keyboardInset.ts	TOAST_GAP	2	src/ui/Toast.tsx	src/ui/keyboardInset.test.ts
+src/ui/keyboardInset.ts	WindowBox	1	src/ui/Toast.tsx
 src/ui/keyboardInset.ts	keyboardCover	2	src/ui/Screen.tsx	src/ui/keyboardInset.test.ts
 src/ui/keyboardInset.ts	revealDelta	2	src/ui/Screen.tsx	src/ui/keyboardInset.test.ts
 src/ui/keyboardInset.ts	toastBottom	2	src/ui/Toast.tsx	src/ui/keyboardInset.test.ts
+src/ui/keyboardInset.ts	toastBottomAmong	2	src/ui/Toast.tsx	src/ui/keyboardInset.test.ts
 src/ui/keyboardInset.ts	toastReachTop	2	src/ui/Toast.tsx	src/ui/keyboardInset.test.ts
 src/ui/keyboardInset.ts	toastSpot	2	src/ui/Toast.tsx	src/ui/keyboardInset.test.ts
 src/ui/motion.tsx	AnimatedItem	1	src/app/coach.tsx
@@ -2723,6 +2725,10 @@ src/ui/motion.tsx	useReachFlash	2	src/ui/ProgressBar.tsx	src/ui/Vessel.tsx
 src/ui/textLang.ts	langParts	2	src/ui/Text.tsx	src/ui/textLang.test.ts
 src/ui/textLang.ts	scriptLang	1	src/ui/textLang.test.ts
 src/ui/textLang.ts	wholeLang	2	src/ui/Text.tsx	src/ui/textLang.test.ts
+src/ui/toastControls.ts	ToastScope	2	src/ui/Screen.tsx	src/ui/Sheet.tsx
+src/ui/toastControls.ts	controlsIn	1	src/ui/Toast.tsx
+src/ui/toastControls.ts	passRef	2	src/ui/Field.tsx	src/ui/Pressable.tsx
+src/ui/toastControls.ts	useToastControl	2	src/ui/Field.tsx	src/ui/Pressable.tsx
 src/ui/vesselLayout.ts	GoalKind	3	src/features/plan/PlanCup.tsx	src/ui/ProgressBar.tsx	src/ui/Vessel.tsx
 src/ui/vesselLayout.ts	brimOverhang	3	src/features/plan/MembershipCard.tsx	src/ui/Vessel.tsx	src/ui/vesselLayout.test.ts
 src/ui/vesselLayout.ts	fillRatio	2	src/ui/Vessel.tsx	src/ui/vesselLayout.test.ts

@@ -3514,9 +3514,11 @@ src/ui/keyboardInset.ts	REVEAL_MARGIN	const
 src/ui/keyboardInset.ts	TOAST_CLEAR	const
 src/ui/keyboardInset.ts	TOAST_GAP	const
 src/ui/keyboardInset.ts	TOAST_REACH_FROM	const
+src/ui/keyboardInset.ts	WindowBox	interface
 src/ui/keyboardInset.ts	keyboardCover	function
 src/ui/keyboardInset.ts	revealDelta	function
 src/ui/keyboardInset.ts	toastBottom	function
+src/ui/keyboardInset.ts	toastBottomAmong	function
 src/ui/keyboardInset.ts	toastReachTop	function
 src/ui/keyboardInset.ts	toastSpot	function
 src/ui/motion.tsx	AnimatedItem	component
@@ -3537,6 +3539,10 @@ src/ui/textLang.ts	LangPart	interface
 src/ui/textLang.ts	langParts	function
 src/ui/textLang.ts	scriptLang	function
 src/ui/textLang.ts	wholeLang	function
+src/ui/toastControls.ts	ToastScope	const
+src/ui/toastControls.ts	controlsIn	function
+src/ui/toastControls.ts	passRef	function
+src/ui/toastControls.ts	useToastControl	function
 src/ui/vesselLayout.ts	GoalKind	type
 src/ui/vesselLayout.ts	brimOverhang	function
 src/ui/vesselLayout.ts	fillRatio	function
