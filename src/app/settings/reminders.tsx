@@ -75,13 +75,7 @@ export default function RemindersScreen() {
         <ToggleRow
           testID="reminders-master"
           title="Reminders"
-          subtitle={
-            asking
-              ? 'Waiting for permission'
-              : r.enabled
-                ? 'On, with your live numbers'
-                : 'Off'
-          }
+          subtitle={asking ? 'Waiting for permission' : r.enabled ? 'On, with your live numbers' : 'Off'}
           value={r.enabled}
           onChange={(v) => void toggleMaster(v)}
           left={
@@ -139,7 +133,10 @@ export default function RemindersScreen() {
             {/* One row of five at every width (as chips, "4 h" wrapped alone onto a second line at 360). */}
             <Segmented
               testID="reminders-interval"
-              options={INTERVALS.map((m) => ({ value: String(m), label: intervalLabel(m) }))}
+              options={INTERVALS.map((m) => ({
+                value: String(m),
+                label: intervalLabel(m),
+              }))}
               value={String(r.water.everyMinutes)}
               onChange={(v) => setReminders({ water: { ...r.water, everyMinutes: Number(v) } })}
             />
@@ -162,12 +159,8 @@ export default function RemindersScreen() {
         {r.meals.enabled ? (
           <TimeRow testID="reminders-breakfast" title="Breakfast" value={r.meals.breakfast} hour12={hour12} onChange={(breakfast) => setReminders({ meals: { ...r.meals, breakfast } })} />
         ) : null}
-        {r.meals.enabled ? (
-          <TimeRow testID="reminders-lunch" title="Lunch" value={r.meals.lunch} hour12={hour12} onChange={(lunch) => setReminders({ meals: { ...r.meals, lunch } })} />
-        ) : null}
-        {r.meals.enabled ? (
-          <TimeRow testID="reminders-dinner" title="Dinner" value={r.meals.dinner} hour12={hour12} onChange={(dinner) => setReminders({ meals: { ...r.meals, dinner } })} />
-        ) : null}
+        {r.meals.enabled ? <TimeRow testID="reminders-lunch" title="Lunch" value={r.meals.lunch} hour12={hour12} onChange={(lunch) => setReminders({ meals: { ...r.meals, lunch } })} /> : null}
+        {r.meals.enabled ? <TimeRow testID="reminders-dinner" title="Dinner" value={r.meals.dinner} hour12={hour12} onChange={(dinner) => setReminders({ meals: { ...r.meals, dinner } })} /> : null}
       </Group>
 
       <Group title="Evening" footer="What is left today, or a note when on track.">
@@ -246,14 +239,7 @@ export default function RemindersScreen() {
       </Group>
 
       <Group title="Quiet hours" footer="Nothing is sent then. At most 6 a day, 45 min apart.">
-        <TimeRow
-          testID="reminders-quiet-start"
-          title="From"
-          subtitle="Bedtime"
-          value={r.quietStart}
-          hour12={hour12}
-          onChange={(quietStart) => setReminders({ quietStart })}
-        />
+        <TimeRow testID="reminders-quiet-start" title="From" subtitle="Bedtime" value={r.quietStart} hour12={hour12} onChange={(quietStart) => setReminders({ quietStart })} />
         <TimeRow testID="reminders-quiet-end" title="Until" subtitle="Wake up" value={r.quietEnd} hour12={hour12} onChange={(quietEnd) => setReminders({ quietEnd })} />
       </Group>
 
@@ -291,7 +277,12 @@ function Preview({ plan, now, hour12, off }: { plan: PlannedReminder[]; now: Dat
           </Text>
         ) : null}
         {plan.length === 0 ? (
-          <View style={{ alignItems: 'center', paddingVertical: spacing.md, gap: 6 }}>
+          <View
+            style={{
+              alignItems: 'center',
+              paddingVertical: spacing.md,
+              gap: 6,
+            }}>
             <MoonStar size={24} color={colors.textTertiary} />
             <Text variant="bodyStrong" align="center">
               Nothing more to send
@@ -306,7 +297,12 @@ function Preview({ plan, now, hour12, off }: { plan: PlannedReminder[]; now: Dat
               <View key={p.id} style={{ flexDirection: 'row', gap: spacing.md }}>
                 <IconTile color={kindColor[p.kind]}>{KIND_ICON[p.kind](kindColor[p.kind])}</IconTile>
                 <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      gap: spacing.sm,
+                    }}>
                     <Text variant="bodyStrong" numberOfLines={1} style={{ flexShrink: 1 }}>
                       {p.title}
                     </Text>
@@ -337,7 +333,13 @@ function DayChips({ chip }: { chip: (d: (typeof WEEKDAYS)[number]) => React.Reac
   const [room, setRoom] = useState(0);
   if (textSize <= 1) return <ChipWrap>{WEEKDAYS.map(chip)}</ChipWrap>;
   const r = scaledFontSize(13.5, textSize) / 13.5;
-  const lines = room > 0 ? balancedLines(WEEKDAYS.map((d) => 26 + (chipWidth(d.label) - 26) * r), room) : [WEEKDAYS.map((_, i) => i)];
+  const lines =
+    room > 0
+      ? balancedLines(
+          WEEKDAYS.map((d) => 26 + (chipWidth(d.label) - 26) * r),
+          room,
+        )
+      : [WEEKDAYS.map((_, i) => i)];
   return (
     <View onLayout={(e) => setRoom(Math.floor(e.nativeEvent.layout.width))} style={{ rowGap: 12 }}>
       {lines.map((line) => (

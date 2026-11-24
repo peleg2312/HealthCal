@@ -244,6 +244,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
         <PressableScale
           testID="log-activity-source"
           accessibilityLabel="Where this number comes from"
+          expanded={showSource}
           onPress={() => setShowSource((v) => !v)}
           // The row's 44 px touch height reaches into the card's bottom padding, so the card ends as close under it as under text.
           style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, marginBottom: showSource ? 0 : -spacing.sm }}>

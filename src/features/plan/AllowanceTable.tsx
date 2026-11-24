@@ -46,8 +46,22 @@ const DIGIT_W = 13;
  * room inside a cell and beside the tint close up a little so the labels keep more of the width, and
  * the rows stand further apart so two wrapped labels never read as one block.
  */
-const WIDE = { pad: 16, colGap: 8, cellGap: 8, side: 8, rowGap: 4, glyphGap: 8 } as const;
-const NARROW = { pad: 12, colGap: 4, cellGap: 6, side: 6, rowGap: 12, glyphGap: 6 } as const;
+const WIDE = {
+  pad: 16,
+  colGap: 8,
+  cellGap: 8,
+  side: 8,
+  rowGap: 4,
+  glyphGap: 8,
+} as const;
+const NARROW = {
+  pad: 12,
+  colGap: 4,
+  cellGap: 6,
+  side: 6,
+  rowGap: 12,
+  glyphGap: 6,
+} as const;
 
 const NUMBER: Record<CardRow['key'], (l: PlanLimits) => number> = {
   estimates: (l) => l.estimates,
@@ -92,7 +106,13 @@ export function AllowanceTable({ free, plus, current, testID = 'plan-compare' }:
         style={
           isPlus
             ? // Set apart by a hairline down its side; it takes the room the tint had, so nothing else moves.
-              { width: cellW + 2 * m.side, marginLeft: m.colGap, borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: 2 * m.side - 1 }
+              {
+                width: cellW + 2 * m.side,
+                marginLeft: m.colGap,
+                borderLeftWidth: 1,
+                borderLeftColor: colors.border,
+                paddingLeft: 2 * m.side - 1,
+              }
             : { width: cellW + m.colGap, paddingLeft: m.colGap }
         }>
         <View style={{ height: HEAD_H, justifyContent: 'flex-end' }}>
@@ -105,13 +125,27 @@ export function AllowanceTable({ free, plus, current, testID = 'plan-compare' }:
           </Text>
         </View>
         <View style={{ height: RULE_H, justifyContent: 'center' }}>
-          <View style={{ height: 1, backgroundColor: colors.border, marginLeft: -ruleIn, marginRight: isPlus ? 0 : -m.colGap }} />
+          <View
+            style={{
+              height: 1,
+              backgroundColor: colors.border,
+              marginLeft: -ruleIn,
+              marginRight: isPlus ? 0 : -m.colGap,
+            }}
+          />
         </View>
         <View style={{ gap: m.rowGap }}>
           {rows.map((r, i) => {
             const n = NUMBER[r.key](limits);
             return (
-              <View key={r.key} style={{ height: rowH(i), flexDirection: 'row', alignItems: 'center', gap: m.cellGap }}>
+              <View
+                key={r.key}
+                style={{
+                  height: rowH(i),
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: m.cellGap,
+                }}>
                 <PlanCup
                   size="row"
                   level={plan === 'free' ? shareOfPlus(n, NUMBER[r.key](plus)) : 1}
@@ -145,7 +179,16 @@ export function AllowanceTable({ free, plus, current, testID = 'plan-compare' }:
               testID={plan === 'free' ? 'plan-free-card' : 'plan-plus-card'}
               accessible
               accessibilityLabel={cardLabel(title, limits, mine)}
-              style={{ gap: 12, ...(plan === 'plus' ? { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: m.pad } : null) }}>
+              style={{
+                gap: 12,
+                ...(plan === 'plus'
+                  ? {
+                      borderTopWidth: 1,
+                      borderTopColor: colors.border,
+                      paddingTop: m.pad,
+                    }
+                  : null),
+              }}>
               <View>
                 <Text variant="h3">{title}</Text>
                 {mine ? (
@@ -157,7 +200,13 @@ export function AllowanceTable({ free, plus, current, testID = 'plan-compare' }:
               {rows.map((r, i) => {
                 const n = NUMBER[r.key](limits);
                 return (
-                  <View key={r.key} style={{ flexDirection: 'row', alignItems: 'center', gap: m.cellGap }}>
+                  <View
+                    key={r.key}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: m.cellGap,
+                    }}>
                     <PlanCup size="row" level={plan === 'free' ? shareOfPlus(n, NUMBER[r.key](plus)) : 1} index={(plan === 'free' ? 0 : rows.length) + i} memoryKey={`plan-${plan}-${r.key}`} />
                     <Text variant="numM" tabular>
                       {n}
@@ -191,7 +240,13 @@ export function AllowanceTable({ free, plus, current, testID = 'plan-compare' }:
           {rows.map((r, i) => (
             <View key={r.key} style={{ minHeight: rowH(i), justifyContent: 'center' }}>
               {/* Measured apart from the row's minimum, so the row can shrink again when the label does. */}
-              <View onLayout={onRow(i)} style={{ flexDirection: 'row', alignItems: 'center', gap: m.glyphGap }}>
+              <View
+                onLayout={onRow(i)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: m.glyphGap,
+                }}>
                 <AiGlyph name={r.key === 'estimates' ? 'estimate' : 'coach'} size={20} color={colors.text} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text variant="label" color="text">

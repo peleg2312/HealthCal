@@ -13,19 +13,7 @@ import { ageFromBirthDate, today } from '@/lib/dates';
 import { effectiveFrom, exerciseRuleOf, ruleFieldsOnSave } from '@/lib/exerciseBudget';
 import { ACTIVITY_LABELS, macroTargets, maxWeeklyRateKg } from '@/lib/energy';
 import { baseWaterGoalMl } from '@/lib/hydration';
-import {
-  cmToFtIn,
-  formatNumber,
-  formatVolume,
-  formatWeight,
-  ftInToCm,
-  volumeToMl,
-  volumeUnit,
-  volumeValue,
-  weightToKg,
-  weightUnit,
-  weightValue,
-} from '@/lib/units';
+import { cmToFtIn, formatNumber, formatVolume, formatWeight, ftInToCm, volumeToMl, volumeUnit, volumeValue, weightToKg, weightUnit, weightValue } from '@/lib/units';
 import { useStore } from '@/store';
 import { useToday } from '@/store/clock';
 import { computeEnergyModel, useLive, useProfile } from '@/store/selectors';
@@ -53,11 +41,7 @@ const PRESETS: Record<Exclude<MacroMode, 'auto' | 'custom'>, { label: string; sp
 function modeOf(split: MacroSplit | undefined): MacroMode {
   if (!split) return 'auto';
   for (const [k, p] of Object.entries(PRESETS)) {
-    if (
-      Math.abs(p.split.protein - split.protein) < 0.005 &&
-      Math.abs(p.split.carbs - split.carbs) < 0.005 &&
-      Math.abs(p.split.fat - split.fat) < 0.005
-    ) {
+    if (Math.abs(p.split.protein - split.protein) < 0.005 && Math.abs(p.split.carbs - split.carbs) < 0.005 && Math.abs(p.split.fat - split.fat) < 0.005) {
       return k as MacroMode;
     }
   }
@@ -107,9 +91,7 @@ function GoalsForm() {
   const scrolledToSection = useRef(false);
 
   // A plan saved as lose or gain with no pace (an older maintain plan switched over) gets the default pace, so Save fixes it.
-  const [draft, setDraft] = useState<Profile>(() =>
-    saved.goal !== 'maintain' && !(saved.weeklyRateKg > 0) ? { ...saved, weeklyRateKg: rateForGoal(saved.goal, 0, saved.weightKg) } : saved,
-  );
+  const [draft, setDraft] = useState<Profile>(() => (saved.goal !== 'maintain' && !(saved.weeklyRateKg > 0) ? { ...saved, weeklyRateKg: rateForGoal(saved.goal, 0, saved.weightKg) } : saved));
   const patch = (p: Partial<Profile>) => setDraft((d) => ({ ...d, ...p }));
 
   // Text-backed inputs that need validation before they reach the draft.
@@ -133,8 +115,7 @@ function GoalsForm() {
   const heightMessage = heightError(draft.heightCm, u);
   const heightValid = heightMessage === null;
   const bodyFatValid = draft.bodyFatPct === undefined || (draft.bodyFatPct >= 3 && draft.bodyFatPct <= 60);
-  const caloriesValid =
-    !manualCalories || (!!draft.calorieTargetOverride && draft.calorieTargetOverride >= 800 && draft.calorieTargetOverride <= 6000);
+  const caloriesValid = !manualCalories || (!!draft.calorieTargetOverride && draft.calorieTargetOverride >= 800 && draft.calorieTargetOverride <= 6000);
   const waterValid = !manualWater || (!!draft.waterGoalMlOverride && draft.waterGoalMlOverride >= 500 && draft.waterGoalMlOverride <= 8000);
   const targetMessage = targetWeightError(draft.goal, draft.weightKg, draft.targetWeightKg, u);
   const targetValid = targetMessage === null;
@@ -168,14 +149,7 @@ function GoalsForm() {
   const planLine =
     draft.goal === 'maintain'
       ? null
-      : planGoalLine(
-          effective.weightKg,
-          effective.targetWeightKg,
-          model.target.impliedWeeklyKg,
-          u,
-          todayNoon,
-          model.target.limitedByFloor || model.target.source === 'override',
-        );
+      : planGoalLine(effective.weightKg, effective.targetWeightKg, model.target.impliedWeeklyKg, u, todayNoon, model.target.limitedByFloor || model.target.source === 'override');
   const maxRate = maxWeeklyRateKg(draft.goal, draft.weightKg);
   const floor = model.target.floor;
 
@@ -200,7 +174,15 @@ function GoalsForm() {
     // An event handler, so the clock is read here. The rule fields come from the saved profile, never the
     // draft (ruleFieldsOnSave): an unchanged rule keeps the saved history as it is now.
     const day = today();
-    next = { ...next, ...ruleFieldsOnSave(saved, exerciseRuleOf(effective), day, activities.some((a) => a.date === day)) };
+    next = {
+      ...next,
+      ...ruleFieldsOnSave(
+        saved,
+        exerciseRuleOf(effective),
+        day,
+        activities.some((a) => a.date === day),
+      ),
+    };
     setProfile(next);
     // The choice was on screen, so the hint that points here has done its job on this device.
     if (effective.eatBackExercise) markSpreadHintDone();
@@ -253,7 +235,12 @@ function GoalsForm() {
         <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
           <MacroBar protein={macros.proteinG * 4} carbs={macros.carbsG * 4} fat={macros.fatG * 9} />
           {/* From 130% text the four figures go two a line, so no figure is cut short. */}
-          <View style={{ flexDirection: 'row', flexWrap: textSize >= 1.3 ? 'wrap' : 'nowrap', gap: spacing.sm }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: textSize >= 1.3 ? 'wrap' : 'nowrap',
+              gap: spacing.sm,
+            }}>
             <PreviewStat label="Protein" value={`${macros.proteinG} g`} color={colors.protein} half={textSize >= 1.3} />
             <PreviewStat label="Carbs" value={`${macros.carbsG} g`} color={colors.carbs} half={textSize >= 1.3} />
             <PreviewStat label="Fat" value={`${macros.fatG} g`} color={colors.fat} half={textSize >= 1.3} />
@@ -271,8 +258,7 @@ function GoalsForm() {
           <Text variant="label" color="text" style={{ marginTop: spacing.md }}>
             {!targetValid
               ? 'Enter a goal weight to see when this plan reaches it.'
-              : (planLine ??
-                (effective.targetWeightKg ? 'At this calorie target the weight would not move toward your goal.' : 'Add a goal weight to see when this plan reaches it.'))}
+              : (planLine ?? (effective.targetWeightKg ? 'At this calorie target the weight would not move toward your goal.' : 'Add a goal weight to see when this plan reaches it.'))}
           </Text>
         ) : null}
         {/* Where the target is set, said plainly: an estimate, not medical advice, and who checks with a doctor first. */}
@@ -484,11 +470,7 @@ function GoalsForm() {
               This is below {formatNumber(floor)} kcal, the lowest HealthCal recommends without medical supervision.
             </Text>
           ) : null}
-          <Hint>
-            {manualCalories
-              ? 'Use this if a dietitian or coach gave you a number.'
-              : 'Follows your weight as it changes.'}
-          </Hint>
+          <Hint>{manualCalories ? 'Use this if a dietitian or coach gave you a number.' : 'Follows your weight as it changes.'}</Hint>
         </View>
       </Group>
 
@@ -505,7 +487,11 @@ function GoalsForm() {
           {macroMode === 'custom' ? (
             <>
               {/* At 150% text and more a third of the row is too narrow for "30 %": the three fields stack. */}
-              <View style={{ flexDirection: bigText ? 'column' : 'row', gap: spacing.sm }}>
+              <View
+                style={{
+                  flexDirection: bigText ? 'column' : 'row',
+                  gap: spacing.sm,
+                }}>
                 <NumberField
                   testID="goals-pct-protein"
                   label="Protein"
@@ -584,11 +570,7 @@ function GoalsForm() {
               error={waterValid ? null : `Enter between ${formatVolume(500, u)} and ${formatVolume(8000, u)}.`}
             />
           ) : null}
-          <Hint>
-            {manualWater
-              ? 'A fixed goal; workouts no longer add to it.'
-              : `From your body weight. More on days you log exercise.`}
-          </Hint>
+          <Hint>{manualWater ? 'A fixed goal; workouts no longer add to it.' : `From your body weight. More on days you log exercise.`}</Hint>
         </View>
         {/* Absent means on. Off stops new pairs; drinks already counted stay (each can be deleted on Water). */}
         <ToggleRow
@@ -597,7 +579,11 @@ function GoalsForm() {
           subtitle="A drink logged as food also adds its volume to Water."
           value={draft.diaryDrinksInWater !== false}
           // Choosing what is saved puts back exactly what is saved (an older profile has no value: on).
-          onChange={(v) => patch({ diaryDrinksInWater: v === (saved.diaryDrinksInWater !== false) ? saved.diaryDrinksInWater : v })}
+          onChange={(v) =>
+            patch({
+              diaryDrinksInWater: v === (saved.diaryDrinksInWater !== false) ? saved.diaryDrinksInWater : v,
+            })
+          }
         />
       </Group>
 
@@ -608,15 +594,12 @@ function GoalsForm() {
           if (section !== 'exercise' || scrolledToSection.current) return;
           scrolledToSection.current = true;
           const y = e.nativeEvent.layout.y;
-          scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing.sm), animated: false });
+          scrollRef.current?.scrollTo({
+            y: Math.max(0, y - spacing.sm),
+            animated: false,
+          });
         }}>
-        <Group
-          title="How the budget works"
-          footer={
-            model.adaptive.observed === null
-              ? `Learning starts after ${model.adaptive.needs ?? 'a little more data'}.`
-              : undefined
-          }>
+        <Group title="How the budget works" footer={model.adaptive.observed === null ? `Learning starts after ${model.adaptive.needs ?? 'a little more data'}.` : undefined}>
           <ToggleRow
             testID="goals-eat-back"
             title="Add exercise to my budget"
@@ -635,12 +618,14 @@ function GoalsForm() {
                 accessibilityLabel="Workout calories"
                 value={draft.exerciseSpread ?? 'day'}
                 // Choosing what is saved puts back exactly what is saved (an older profile has no value: "Same day").
-                onChange={(v) => patch({ exerciseSpread: v === (saved.exerciseSpread ?? 'day') ? saved.exerciseSpread : v })}
+                onChange={(v) =>
+                  patch({
+                    exerciseSpread: v === (saved.exerciseSpread ?? 'day') ? saved.exerciseSpread : v,
+                  })
+                }
                 options={SPREAD_OPTIONS}
               />
-              <Hint testID="goals-exercise-note">
-                {spreadNote ? `${spreadRuleNote(draftRule)} ${spreadNote}` : spreadRuleNote(draftRule)}
-              </Hint>
+              <Hint testID="goals-exercise-note">{spreadNote ? `${spreadRuleNote(draftRule)} ${spreadNote}` : spreadRuleNote(draftRule)}</Hint>
             </View>
           ) : null}
           <ToggleRow

@@ -107,7 +107,7 @@ export function Explain({ label, children, testID, style }: { label: string; chi
         onPress={() => setOpen((v) => !v)}
         feedback="select"
         accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
+        expanded={open}
         accessibilityLabel={label}
         style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 }}>
         <Info size={16} color={colors.textSecondary} strokeWidth={1.9} />

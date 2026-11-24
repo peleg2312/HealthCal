@@ -101,7 +101,8 @@ export function SessionRow({
       {adds.figure}
       <Text variant="unit">{' kcal'}</Text>
       <Text variant="label" color="textSecondary">
-        {historyFigureWords(short)}
+        {/* At large text the words may take their own line under the figure, never splitting a word. */}
+        {scale > 1.15 ? ` ${short}` : historyFigureWords(short)}
       </Text>
     </Text>
   );

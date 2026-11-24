@@ -113,7 +113,15 @@ function StatusOnly({ phase, signedIn, loading }: { phase: CheckoutPhase; signed
   if (phase === 'waiting' || (phase !== 'late' && signedIn && loading)) {
     const waiting = phase === 'waiting';
     return (
-      <View testID={waiting ? 'plan-waiting' : 'plan-status'} accessibilityLiveRegion="polite" style={{ alignItems: 'center', gap: spacing.lg, paddingTop: spacing.xl + 28, paddingHorizontal: spacing.md }}>
+      <View
+        testID={waiting ? 'plan-waiting' : 'plan-status'}
+        accessibilityLiveRegion="polite"
+        style={{
+          alignItems: 'center',
+          gap: spacing.lg,
+          paddingTop: spacing.xl + 28,
+          paddingHorizontal: spacing.md,
+        }}>
         <PourWait size="tile" />
         <Text variant="body" color="textSecondary" align="center">
           {waiting ? WAITING_LINE : LOADING_LINE}
@@ -164,7 +172,15 @@ function Choose({ view, header }: { view: PlanView; header: React.ReactNode }) {
   let linksInFooter = false;
   if (phase === 'waiting') {
     footer = (
-      <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center', minHeight: 50 }} testID="plan-waiting" accessibilityLiveRegion="polite">
+      <View
+        style={{
+          flexDirection: 'row',
+          gap: spacing.md,
+          alignItems: 'center',
+          minHeight: 50,
+        }}
+        testID="plan-waiting"
+        accessibilityLiveRegion="polite">
         <PourWait size="inline" />
         <Text variant="body" color="textSecondary" style={{ flex: 1 }}>
           {WAITING_LINE}

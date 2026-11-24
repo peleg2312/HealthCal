@@ -1,11 +1,11 @@
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Platform, Text as RNText, TextInput, View, type LayoutChangeEvent, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { cup, fonts, motion, useReducedMotion, useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
-import { cssBezier, FadeUp, MiniCup, parseNumber, PressableScale, ProgressBar, Text } from '@/ui';
+import { cssBezier, FadeUp, FOCUS_CUP, MiniCup, parseNumber, PressableScale, ProgressBar, Text, useFocusRing } from '@/ui';
 
 import { inHand, nextEmptyField } from './fieldChain';
 import { convertUnits, type Draft } from './model';
@@ -15,17 +15,7 @@ import { convertUnits, type Draft } from './model';
  * reveals). The kit's `FadeUp` under an older name, so it is instant under
  * reduced motion and runs off the JS thread.
  */
-export function FadeIn({
-  delay = 0,
-  distance = 12,
-  children,
-  style,
-}: {
-  delay?: number;
-  distance?: number;
-  children: React.ReactNode;
-  style?: StyleProp<ViewStyle>;
-}) {
+export function FadeIn({ delay = 0, distance = 12, children, style }: { delay?: number; distance?: number; children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   return (
     <FadeUp delay={delay} distance={distance} duration={300} style={style}>
       {children}
@@ -55,7 +45,10 @@ export function StepSlide({ direction, disabled, children }: { direction: 1 | -1
   return (
     <Animated.View
       style={{
-        animationName: { from: { opacity: 0, transform: [{ translateX: direction * 20 }] }, to: { opacity: 1, transform: [{ translateX: 0 }] } },
+        animationName: {
+          from: { opacity: 0, transform: [{ translateX: direction * 20 }] },
+          to: { opacity: 1, transform: [{ translateX: 0 }] },
+        },
         animationDuration: motion.duration.slide,
         animationTimingFunction: cssBezier(motion.easing.enter),
         animationFillMode: 'backwards',
@@ -137,7 +130,19 @@ export function ChoiceCard({
         margin: selected ? 0 : 1,
         overflow: 'hidden',
       }}>
-      {selected ? <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 3, backgroundColor: colors.rim }} /> : null}
+      {selected ? (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 0,
+            height: 3,
+            backgroundColor: colors.rim,
+          }}
+        />
+      ) : null}
       {icon ? <View style={{ minWidth: 30, alignItems: 'center' }}>{icon}</View> : null}
       <View style={compact ? { flexShrink: 1, minWidth: 0 } : { flex: 1, minWidth: 0, gap: 2 }}>
         <Text variant={compact || lg ? 'h3' : 'title'} align={compact ? 'center' : undefined}>
@@ -179,7 +184,16 @@ export function GoalCup({ goal, index = 0 }: { goal: 'lose' | 'maintain' | 'gain
       {was !== null ? (
         <View
           pointerEvents="none"
-          style={{ position: 'absolute', left: 4, right: 4, top: Math.round((1 - was) * h) - 1, height: 0, borderTopWidth: 1.5, borderStyle: 'dashed', borderColor: colors.vesselEdge }}
+          style={{
+            position: 'absolute',
+            left: 4,
+            right: 4,
+            top: Math.round((1 - was) * h) - 1,
+            height: 0,
+            borderTopWidth: 1.5,
+            borderStyle: 'dashed',
+            borderColor: colors.vesselEdge,
+          }}
         />
       ) : null}
     </View>
@@ -222,26 +236,64 @@ export function Note({
         ...cup(radius.tile, 5),
         backgroundColor: card ? colors.surface : colors.surfaceAlt,
         // On the card surface the note is outlined like a card; the amber lip, when there is one, is its top edge.
-        ...(card ? { borderWidth: 1, borderTopWidth: tone === 'warning' ? 0 : 1, borderColor: colors.border } : null),
+        ...(card
+          ? {
+              borderWidth: 1,
+              borderTopWidth: tone === 'warning' ? 0 : 1,
+              borderColor: colors.border,
+            }
+          : null),
         overflow: 'hidden',
       }}>
-      {tone === 'warning' ? <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 3, backgroundColor: colors.warning }} /> : null}
+      {tone === 'warning' ? (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 0,
+            height: 3,
+            backgroundColor: colors.warning,
+          }}
+        />
+      ) : null}
       {icon ? <View style={{ paddingTop: 1 }}>{icon}</View> : null}
       <View style={{ flex: 1, minWidth: 0, gap: 4 }}>{children}</View>
     </View>
   );
 }
 
+/**
+ * A field in error, said to assistive technology as the kit's fields say it (D6-F23): on the web
+ * `aria-invalid` and `aria-describedby` pointing at the words under the field; natively the words are
+ * a live region read as they appear.
+ */
+function invalidAria(invalid: boolean, describedBy: string | undefined): object {
+  if (Platform.OS !== 'web' || !invalid) return {};
+  return {
+    'aria-invalid': true,
+    ...(describedBy ? { 'aria-describedby': describedBy } : null),
+  };
+}
+
 /** A field's unit as a screen reader says it: "Target weight, kilograms", never "kg". */
-const SPOKEN_UNIT: Record<string, string> = { kg: 'kilograms', lb: 'pounds', cm: 'centimetres', in: 'inches', ft: 'feet', '%': 'percent' };
+const SPOKEN_UNIT: Record<string, string> = {
+  kg: 'kilograms',
+  lb: 'pounds',
+  cm: 'centimetres',
+  in: 'inches',
+  ft: 'feet',
+  '%': 'percent',
+};
 export function unitSpoken(unit: string): string {
   return SPOKEN_UNIT[unit] ?? unit;
 }
 
-export function ErrorText({ children, testID }: { children?: string | null; testID?: string }) {
+export function ErrorText({ children, testID, nativeID }: { children?: string | null; testID?: string; nativeID?: string }) {
   if (!children) return null;
   return (
-    <Text variant="caption" color="danger" testID={testID} accessibilityLiveRegion="polite">
+    <Text variant="caption" color="danger" testID={testID} nativeID={nativeID} accessibilityLiveRegion="polite">
       {children}
     </Text>
   );
@@ -269,8 +321,16 @@ export function StepProgress({ index, total }: { index: number; total: number })
 export function UnitsToggle({ draft, set, idPrefix = 'onb-units' }: { draft: Draft; set: (patch: Partial<Draft>) => void; idPrefix?: string }) {
   const { colors, radius } = useTheme();
   const opts: { value: UnitSystem; label: string; a11y: string }[] = [
-    { value: 'metric', label: 'kg · cm', a11y: 'Metric units: kilograms and centimetres' },
-    { value: 'imperial', label: 'lb · ft', a11y: 'Imperial units: pounds, feet and inches' },
+    {
+      value: 'metric',
+      label: 'kg · cm',
+      a11y: 'Metric units: kilograms and centimetres',
+    },
+    {
+      value: 'imperial',
+      label: 'lb · ft',
+      a11y: 'Imperial units: pounds, feet and inches',
+    },
   ];
   return (
     <View accessibilityRole="radiogroup" accessibilityLabel="Units" style={{ flexDirection: 'row', gap: 4 }}>
@@ -299,7 +359,13 @@ export function UnitsToggle({ draft, set, idPrefix = 'onb-units' }: { draft: Dra
               borderColor: active ? colors.text : colors.borderStrong,
               backgroundColor: active ? colors.text : 'transparent',
             }}>
-            <Text variant="label" color={active ? 'bg' : 'text'} style={{ fontSize: 13.5, fontFamily: active ? fonts.bold : fonts.semibold }}>
+            <Text
+              variant="label"
+              color={active ? 'bg' : 'text'}
+              style={{
+                fontSize: 13.5,
+                fontFamily: active ? fonts.bold : fonts.semibold,
+              }}>
               {o.label}
             </Text>
           </PressableScale>
@@ -324,7 +390,13 @@ export function WhyWeAsk({ children, testID, title = 'Why we ask' }: { children:
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
         accessibilityLabel={title}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', minHeight: 32 }}>
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+          alignSelf: 'flex-start',
+          minHeight: 32,
+        }}>
         <Text variant="label" color="textSecondary">
           {title}
         </Text>
@@ -355,7 +427,11 @@ const FIELD_LABEL = Platform.OS === 'web' ? ({ role: 'label' } as object) : null
  * and the input's centre must match the sizer's to the fraction or the digits move by a hair.
  */
 function drawnWidth(e: LayoutChangeEvent): number {
-  const target = (e.nativeEvent as unknown as { target?: { getBoundingClientRect?: () => { width: number } } }).target;
+  const target = (
+    e.nativeEvent as unknown as {
+      target?: { getBoundingClientRect?: () => { width: number } };
+    }
+  ).target;
   const w = Platform.OS === 'web' && typeof target?.getBoundingClientRect === 'function' ? target.getBoundingClientRect().width : NaN;
   return Number.isFinite(w) && w > 0 ? w : e.nativeEvent.layout.width;
 }
@@ -460,11 +536,14 @@ export function BigNumberField({
   size = 'lg',
   placeholder,
   inputRef,
+  errorId,
   ...rest
 }: Omit<TextInputProps, 'value' | 'onChange' | 'style'> & {
   label: string;
   value: number | null;
   onChange: (n: number | null) => void;
+  /** The nativeID of an error said under a row of fields (a boolean `error`), so the input is tied to it. */
+  errorId?: string;
   /** The input itself, for a step that moves the focus from field to field (`useFieldChain`). */
   inputRef?: React.Ref<InputHandle>;
   unit?: string;
@@ -476,6 +555,10 @@ export function BigNumberField({
   size?: 'lg' | 'md';
 }) {
   const { colors, radius, spacing } = useTheme();
+  useFocusRing();
+  const ownErrorId = `onb-error-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+  const ownError = typeof error === 'string' && error.trim() ? error : null;
+  const errorAria = invalidAria(!!error, ownError ? ownErrorId : errorId);
   const [text, setText] = useState(fieldFormat(value, decimals));
   const [lastValue, setLastValue] = useState(value);
   const [focused, setFocused] = useState(false);
@@ -487,7 +570,13 @@ export function BigNumberField({
   }
   const fontSize = size === 'lg' ? 32 : 24;
   const lineHeight = size === 'lg' ? 38 : 30;
-  const type = { fontFamily: fonts.numBold, fontSize, lineHeight, letterSpacing: -0.5, fontVariant: ['tabular-nums' as const] };
+  const type = {
+    fontFamily: fonts.numBold,
+    fontSize,
+    lineHeight,
+    letterSpacing: -0.5,
+    fontVariant: ['tabular-nums' as const],
+  };
   const padX = spacing.sm;
   return (
     <View {...FIELD_LABEL} style={[{ gap: 6 }, style]}>
@@ -495,6 +584,7 @@ export function BigNumberField({
         {label}
       </Text>
       <View
+        {...FOCUS_CUP}
         style={{
           flexDirection: 'row',
           alignItems: 'flex-end',
@@ -538,6 +628,7 @@ export function BigNumberField({
           placeholderTextColor={colors.textTertiary}
           selectionColor={colors.primary}
           {...rest}
+          {...errorAria}
           accessibilityLabel={rest.accessibilityLabel ?? (unit ? `${label}, ${unitSpoken(unit)}` : label)}
           value={text}
           onFocus={(e) => {
@@ -574,7 +665,7 @@ export function BigNumberField({
           ]}
         />
       </View>
-      {typeof error === 'string' && error.trim() ? <ErrorText>{error}</ErrorText> : null}
+      {ownError ? <ErrorText nativeID={ownErrorId}>{ownError}</ErrorText> : null}
     </View>
   );
 }
@@ -589,8 +680,14 @@ export function BigTextField({
   error,
   testID,
   ...rest
-}: Omit<TextInputProps, 'style'> & { label: string; error?: string | null; testID: string }) {
+}: Omit<TextInputProps, 'style'> & {
+  label: string;
+  error?: string | null;
+  testID: string;
+}) {
   const { colors, radius } = useTheme();
+  useFocusRing();
+  const errorId = `onb-error-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const [focused, setFocused] = useState(false);
   // A long answer (a double-barrelled name) steps the type down so it still fits a 320 px phone
   // whole; the field keeps its height.
@@ -602,6 +699,7 @@ export function BigTextField({
         {label}
       </Text>
       <View
+        {...FOCUS_CUP}
         style={{
           minHeight: 64,
           justifyContent: 'center',
@@ -615,6 +713,7 @@ export function BigTextField({
           placeholderTextColor={colors.textTertiary}
           selectionColor={colors.primary}
           {...rest}
+          {...invalidAria(!!error, error ? errorId : undefined)}
           accessibilityLabel={rest.accessibilityLabel ?? label}
           onFocus={(e) => {
             setFocused(true);
@@ -626,13 +725,22 @@ export function BigTextField({
           }}
           style={[
             // 64 less the 1.5 px edges: the input is the whole inside of the cup.
-            { color: colors.text, fontFamily: fonts.display, fontSize, lineHeight: 30, paddingVertical: 12, paddingHorizontal: 16, minHeight: 61, letterSpacing: -0.3 },
+            {
+              color: colors.text,
+              fontFamily: fonts.display,
+              fontSize,
+              lineHeight: 30,
+              paddingVertical: 12,
+              paddingHorizontal: 16,
+              minHeight: 61,
+              letterSpacing: -0.3,
+            },
             Platform.OS === 'android' ? { textAlignVertical: 'center' as const } : null,
             { outlineStyle: 'none' } as object,
           ]}
         />
       </View>
-      <ErrorText>{error}</ErrorText>
+      <ErrorText nativeID={errorId}>{error}</ErrorText>
     </View>
   );
 }

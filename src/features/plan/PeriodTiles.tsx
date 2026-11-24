@@ -21,7 +21,7 @@ import { View, type LayoutChangeEvent } from 'react-native';
 
 import { NBSP } from '@/lib/text';
 
-import { cup, useTheme } from '@/theme';
+import { cup, useTextSize, useTheme } from '@/theme';
 import { CupKey, FadeUp, motion, PressableScale, Text } from '@/ui';
 
 import type { PlanOffer, PlanPeriod } from './view';
@@ -35,13 +35,15 @@ export function PeriodTiles({ offers, value, onChange }: { offers: PlanOffer[]; 
   const { spacing } = useTheme();
   const [rowW, setRowW] = useState(0);
   const [amountW, setAmountW] = useState<Partial<Record<PlanPeriod, number>>>({});
+  // From 150% text the tiles' words ("About $2.50 a month") no longer fit half the row: they stack too.
+  const largeText = useTextSize() >= 1.5;
   const list = (['month', 'year'] as const).map((p) => offers.find((o) => o.period === p)).filter((o): o is PlanOffer => !!o);
   if (!list.length) return null;
   const single = list.length === 1;
   // Room for an amount in a tile beside the other; the widest amount decides for both.
   const room = (rowW - spacing.sm) / 2 - 2 * (PAD + EDGE);
   const widest = Math.max(0, ...list.map((o) => amountW[o.period] ?? 0));
-  const stack = !single && rowW > 0 && widest > room;
+  const stack = !single && ((rowW > 0 && widest > room) || largeText);
   const onRow = (e: LayoutChangeEvent) => {
     const w = Math.round(e.nativeEvent.layout.width);
     if (w !== rowW) setRowW(w);

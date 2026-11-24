@@ -7,7 +7,7 @@ import { displayFoodName } from '@/features/food/displayName';
 import { isolateRtl } from '@/lib/bidi';
 import { cup, fonts, useTheme } from '@/theme';
 import type { Food } from '@/types';
-import { Badge, CupKey, IconButton, parseNumber, PressableScale, Text } from '@/ui';
+import { Badge, CupKey, FOCUS_CUP, IconButton, parseNumber, PressableScale, Text } from '@/ui';
 
 import { confidenceLevel, estimateGrams, gramStep, shownRowName, type ReviewRow } from './estimate';
 import { itemFromFood } from './localMatch';
@@ -52,6 +52,8 @@ export function ItemRow({
     <View testID={id} style={{ paddingVertical: spacing.sm, gap: spacing.sm }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
         {row.kind === 'fat' ? <CupKey color={colors.fat} /> : null}
+        {/* The input's own cup (FOCUS_CUP): a keyboard's focus ring goes round it, never round the bare input. */}
+        <View {...FOCUS_CUP} style={{ flex: 1, minWidth: 0, height: 44, justifyContent: 'center' }}>
         <TextInput
           testID={`${id}-name`}
           value={name}
@@ -66,6 +68,7 @@ export function ItemRow({
             { outlineStyle: 'none' } as object,
           ]}
         />
+        </View>
         {unsure && !row.food ? <Badge label="Unsure" color={colors.warning} /> : null}
         {/* A row's delete is the trash can, as in the diary, Water and Train; an X only closes. */}
         <IconButton testID={`${id}-remove`} accessibilityLabel={`Remove ${name}`} size={32} tone="clear" onPress={onRemove}>
@@ -239,7 +242,8 @@ function GramsInput({ value, onChange, label, testID }: { value: number; onChang
     if (parseNumber(text) !== value) setText(String(value));
   }
   return (
-    <View style={{ width: 72, height: 44 }}>
+    // The grams field's cup is the input's own edge; FOCUS_CUP on its box draws the keyboard's focus ring round it.
+    <View {...FOCUS_CUP} style={{ width: 72, height: 44, ...cup(radius.buttonSm, 5) }}>
       <TextInput
         testID={testID}
         value={text}

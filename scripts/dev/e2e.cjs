@@ -596,7 +596,10 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     JSON.stringify({ w1, e1: e1 && { meal: e1.meal, via: e1.via, kcal: e1.nutrients.kcal } }).slice(0, 240),
   );
   const addedToast = await text('toast');
-  check('drinks: the toast says what was added and where', addedToast.includes(`Milk, 129 kcal, added to ${mealWord} and 250 ml to Water`), addedToast);
+  // With the day's new water total the toast names the drink and where it went, held to two lines at 320 px
+  // ("Milk added to lunch and Water · 1.48 of 3.3 L", planDrink in src/features/drinks/rules.ts); the
+  // calories and the amount are on the tile just tapped.
+  check('drinks: the toast says what was added and where', new RegExp(`^Milk added to ${mealWord} and Water · [\\d.]+ of [\\d.]+ L`).test(addedToast), addedToast);
   await tap('toast-action');
   s = await stored();
   check('drinks: Undo removes both', !!s.water[w1.id]?.deleted && !!s.foodEntries[e1.id]?.deleted);
@@ -1099,8 +1102,8 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   // ------------------------------------------- the toast with the keyboard up (src/ui/Toast.tsx, toastBottom in src/ui/keyboardInset.ts)
   // With the faked keyboard open, a toast must rest 12 px above the footer that rides on the keyboard (food search),
   // or above the keyboard itself where there is no footer (Water's "Other amount"), wholly in what can be seen, and
-  // its Undo must work. With the keyboard down it is where it always was: 85 px from the bottom on food search
-  // (the footer, 73, and 12), the number recorded before this change at 360, 320 and 390 px.
+  // its Undo must work. With the keyboard down it rests 12 px above food search's pinned footer (the running count
+  // and Done over the best match's Add), as on every screen with a footer.
   const KB = 320;
   const toastBox = () => page.evaluate(() => {
     const vis = (sel) => [...document.querySelectorAll(sel)].find((e) => e.getBoundingClientRect().height > 0);
@@ -1144,7 +1147,9 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   await page.locator('[data-testid^="result-"][data-testid$="-add"]').first().click();
   await page.waitForTimeout(400);
   tb = await toastBox();
-  check('keyboard down, food search: the toast is where it was before, 85 px from the bottom (footer 73 + 12)', !!tb && Math.round(tb.inner - tb.bottom) === 85 && Math.round(tb.inner - tb.footerTop) === 73, tb ? `${Math.round(tb.inner - tb.bottom)} px from the bottom, footer ${Math.round(tb.inner - tb.footerTop)} px` : 'no toast');
+  // Search's footer now holds the running count and Done over the best match's Add (about 131 px once a food is
+  // added), so the toast is judged against the footer it rests on, whatever its height: 12 px above it.
+  check('keyboard down, food search: the toast rests 12 px above the pinned footer', !!tb && tb.footerTop != null && Math.round(tb.footerTop - tb.bottom) === 12 && Math.abs(tb.footerBottom - tb.inner) <= 1, tb ? `${Math.round(tb.inner - tb.bottom)} px from the bottom, footer ${tb.footerTop == null ? '-' : Math.round(tb.inner - tb.footerTop)} px` : 'no toast');
   for (const e of newIn(await stored(), before, 'foodEntries')) await page.evaluate((id) => window.__healthcal.getState().remove('foodEntries', id), e.id);
 
   await page.goto(`${BASE}/water`, { waitUntil: 'networkidle' });
@@ -1343,8 +1348,9 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
       }, tab);
       const xs = order === 'missing' ? [] : order.split(' ').slice(0, 3).map((t) => t.split(':'));
       check(
-        `coach: ${tab}'s header has Coach, Friends and the profile tile, 36 px cups 4 px apart, in a 68 px header`,
-        xs.length === 3 && xs.every(([, wh]) => wh === '36x36') && Number(xs[1][0]) - Number(xs[0][0]) === 40 && Number(xs[2][0]) - Number(xs[1][0]) === 40 && / h68$/.test(order),
+        // 8 px apart, so each cup's 44 px touch area (HEADER_SLOP, 4 px past it each side) meets its neighbour's.
+        `coach: ${tab}'s header has Coach, Friends and the profile tile, 36 px cups 8 px apart, in a 68 px header`,
+        xs.length === 3 && xs.every(([, wh]) => wh === '36x36') && Number(xs[1][0]) - Number(xs[0][0]) === 44 && Number(xs[2][0]) - Number(xs[1][0]) === 44 && / h68$/.test(order),
         order,
       );
       check(`coach: ${tab}'s Coach cup is labelled "Coach"`, (await cp.getByTestId(`${tab}-coach-open`).first().getAttribute('aria-label')) === 'Coach');
@@ -1366,13 +1372,20 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     if (!coachAction) {
       check('coach: a coach card with no action of its own still offers "Ask the coach" on its own', (await cp.getByTestId('today-coach-ask').count()) === 1);
     } else if (await cp.getByTestId('today-coach-ask').count()) {
+      // Beside the action when the two fit on one row (12 px apart); a long action ("Repeat yesterday's dinner",
+      // about 212 px at 360) puts it on the row under, at the card's left edge, never over or cut.
       const row = await cp.evaluate(() => {
         const a = document.querySelector('[data-testid="today-coach-ask"]').getBoundingClientRect();
         const card = document.querySelector('[data-testid="today-coach"]');
         const other = [...card.querySelectorAll('[data-testid^="today-coach-"]')].find((e) => e.getAttribute('data-testid') !== 'today-coach-ask').getBoundingClientRect();
-        return { same: Math.abs(a.top - other.top) < 1 };
+        const inner = card.getBoundingClientRect();
+        const pad = parseFloat(getComputedStyle(card).paddingLeft) + parseFloat(getComputedStyle(card).paddingRight) + 2;
+        const fits = other.width + 12 + a.width <= inner.width - pad + 0.5;
+        const same = Math.abs(a.top - other.top) < 1;
+        const under = a.top >= other.bottom + 4 && Math.abs(a.left - other.left) < 1;
+        return { fits, same, under, action: Math.round(other.width), ask: Math.round(a.width), room: Math.round(inner.width - pad) };
       });
-      check('coach: Today\'s "Ask the coach" sits in the same row as the coach card\'s action at 360 px', row.same, JSON.stringify(row));
+      check('coach: Today\'s "Ask the coach" sits beside the coach card\'s action when both fit, else directly under it', row.fits ? row.same : row.under, JSON.stringify(row));
       await ctap('today-coach-ask');
       check('coach: Today\'s "Ask the coach" opens the coach', await onCoach(), cp.url());
       await ctap('header-close');
@@ -1609,7 +1622,9 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
       const { id, updatedAt, ...rest } = from;
       return s.upsert('foodEntries', { ...rest, date: day, meal: 'lunch' }).id;
     }, today);
-    const entryRows = '^entry-(?!delete-|in-water-)';
+    // The entry rows, and a deleted row's Restore row (RestoreRow: `entry-restore-<id>-row` around its button
+    // `entry-restore-<id>`, so the button alone is left out: it lies inside its row).
+    const entryRows = '^entry-(?!delete-|in-water-|restore-)|^entry-restore-.+-row$';
     const diaryStep = async (what) => {
       await lp.waitForTimeout(SETTLE);
       const cards = await rowBoxes('[data-testid^="meal-card-"]', '^meal-card-');

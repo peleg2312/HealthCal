@@ -131,7 +131,7 @@ export function FileNotes({ notes }: { notes: FileNote[] }) {
         </View>
       ))}
       {many ? (
-        <PressableScale testID="import-notes-more" accessibilityLabel={open ? 'Show fewer files' : `Show all ${withNotes.length} files with notes`} onPress={() => setOpen((o) => !o)} style={{ minHeight: 44, justifyContent: 'center' }}>
+        <PressableScale testID="import-notes-more" accessibilityLabel={open ? 'Show fewer files' : `Show all ${withNotes.length} files with notes`} expanded={open} onPress={() => setOpen((o) => !o)} style={{ minHeight: 44, justifyContent: 'center' }}>
           <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
             {open ? 'Show fewer' : `Show all ${withNotes.length} files with notes`}
           </Text>

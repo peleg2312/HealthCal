@@ -47,16 +47,19 @@ export default function AccountScreen() {
   // The line under the title says how this account signs in.
   const subtitle = session ? signInMethodLine(session.user.identities) : demo ? signInMethodLine([{ provider: 'google' }]) : 'Not signed in';
   return (
-    <Screen header={<Header title="Account and sync" subtitle={subtitle} />}>
-      {session || demo ? <SignedIn email={session?.user.email ?? (demo ? demoEmail() : 'Signed in')} /> : <SignedOut />}
-    </Screen>
+    <Screen header={<Header title="Account and sync" subtitle={subtitle} />}>{session || demo ? <SignedIn email={session?.user.email ?? (demo ? demoEmail() : 'Signed in')} /> : <SignedOut />}</Screen>
   );
 }
 
 function Benefit({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
   const { spacing } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
+    <View
+      style={{
+        flexDirection: 'row',
+        gap: spacing.md,
+        alignItems: 'flex-start',
+      }}>
       {icon}
       <View style={{ flex: 1 }}>
         <Text variant="bodyStrong">{title}</Text>
@@ -73,13 +76,20 @@ function SignedOut() {
   const sessionLost = useAuth((s) => s.sessionLost);
   const pending = useStore(pendingChanges);
   // The same Google way in as welcome and sign-in: on a phone it ends with a session and the sign-in screen's gate takes over.
-  const google = useGoogleSignIn({ onSignedIn: () => !returnScreenOpen() && router.push('/auth?mode=google' as never) });
+  const google = useGoogleSignIn({
+    onSignedIn: () => !returnScreenOpen() && router.push('/auth?mode=google' as never),
+  });
   const accounts = isBackendConfigured || authDemo() !== null;
   if (sessionLost && isBackendConfigured) {
     return (
       <>
         <Card testID="account-session-lost">
-          <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: spacing.md,
+              alignItems: 'center',
+            }}>
             <IconTile color={colors.warningInk} keep>
               <CloudOff size={20} color={colors.warningInk} />
             </IconTile>
@@ -91,15 +101,10 @@ function SignedOut() {
             </View>
           </View>
           <Text variant="body" color="textSecondary" style={{ marginTop: spacing.md }}>
-            Your entries are safe on this device{pending > 0 ? `, including ${pending} change${pending === 1 ? '' : 's'} not uploaded yet` : ''}, but nothing new is
-            being backed up. Sign in again to resume sync.
+            Your entries are safe on this device
+            {pending > 0 ? `, including ${pending} change${pending === 1 ? '' : 's'} not uploaded yet` : ''}, but nothing new is being backed up. Sign in again to resume sync.
           </Text>
-          <Button
-            testID="account-sign-in-again"
-            title="Sign in again"
-            style={{ marginTop: spacing.md }}
-            onPress={() => router.push('/auth?mode=signin' as never)}
-          />
+          <Button testID="account-sign-in-again" title="Sign in again" style={{ marginTop: spacing.md }} onPress={() => router.push('/auth?mode=signin' as never)} />
         </Card>
       </>
     );
@@ -107,7 +112,12 @@ function SignedOut() {
   return (
     <>
       <Card>
-        <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: spacing.md,
+            alignItems: 'center',
+          }}>
           <IconTile color={colors.warningInk} keep>
             <Smartphone size={20} color={colors.warningInk} />
           </IconTile>
@@ -125,11 +135,7 @@ function SignedOut() {
           What a free account adds
         </Text>
         <View style={{ gap: spacing.lg }}>
-          <Benefit
-            icon={<Cloud size={20} color={colors.textSecondary} strokeWidth={1.9} />}
-            title="Backup"
-            text="A lost or replaced phone does not take your history with it."
-          />
+          <Benefit icon={<Cloud size={20} color={colors.textSecondary} strokeWidth={1.9} />} title="Backup" text="A lost or replaced phone does not take your history with it." />
           <Benefit
             icon={<RefreshCw size={20} color={colors.textSecondary} strokeWidth={1.9} />}
             title="Sync across devices"
@@ -199,7 +205,10 @@ function SignedIn({ email }: { email: string }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState<'signout' | 'delete' | null>(null);
   /** Ending the plan did not work, so the account was kept: why, and whether "Delete anyway" is offered. */
-  const [deleteBlocked, setDeleteBlocked] = useState<{ message: string; offerForce: boolean } | null>(null);
+  const [deleteBlocked, setDeleteBlocked] = useState<{
+    message: string;
+    offerForce: boolean;
+  } | null>(null);
   const [passwordBusy, setPasswordBusy] = useState(false);
   const user = useAuth((s) => s.session?.user ?? null);
   const plan = usePlan();
@@ -267,7 +276,12 @@ function SignedIn({ email }: { email: string }) {
     <>
       <Card testID="account-card">
         {/* Who: your tile and your address. A long address wraps at its @ and dots rather than losing its end. */}
-        <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: spacing.md,
+            alignItems: 'center',
+          }}>
           <InitialsAvatar name={name} size={48} />
           <Text variant="body" numberOfLines={3} testID="account-email" accessibilityLabel={email} style={{ flex: 1, minWidth: 0, fontFamily: fonts.semibold }}>
             {breakableEmail(email)}
@@ -281,8 +295,19 @@ function SignedIn({ email }: { email: string }) {
           The key is filled ink only when nothing waits and the last sync succeeded, an ink outline while
           changes wait or a sync runs, and amber only when sync is paused or the device is offline.
         */}
-        <View style={{ flexDirection: stacked ? 'column' : 'row', alignItems: stacked ? 'stretch' : 'center', gap: spacing.md }}>
-          <View style={{ flex: stacked ? undefined : 1, minWidth: 0, flexDirection: 'row', gap: spacing.sm }}>
+        <View
+          style={{
+            flexDirection: stacked ? 'column' : 'row',
+            alignItems: stacked ? 'stretch' : 'center',
+            gap: spacing.md,
+          }}>
+          <View
+            style={{
+              flex: stacked ? undefined : 1,
+              minWidth: 0,
+              flexDirection: 'row',
+              gap: spacing.sm,
+            }}>
             {/* The key sits on the first line of the status (a 17 px caption line). */}
             <View style={{ height: 17, justifyContent: 'center' }}>
               <CupKey size={KEY} variant={mark === 'waiting' ? 'outline' : 'filled'} color={mark === 'stopped' ? colors.warning : colors.success} />
@@ -433,7 +458,12 @@ function SignedIn({ email }: { email: string }) {
           }>
           <View style={{ gap: spacing.md }}>
             <Card tone="alt" padding={14} testID="account-delete-plan">
-              <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  gap: spacing.md,
+                  alignItems: 'flex-start',
+                }}>
                 <View style={{ height: 21, justifyContent: 'center' }}>
                   <PlanGlyph size={20} color={colors.text} />
                 </View>
@@ -465,9 +495,7 @@ function SignedIn({ email }: { email: string }) {
         footer={
           <View style={{ gap: 10 }}>
             <Button testID="account-delete-retry" title="Try again" onPress={() => void doDelete()} />
-            {deleteBlocked?.offerForce ? (
-              <Button testID="account-delete-anyway" title={DELETE_ANYWAY_LABEL} variant="danger" onPress={() => void doDelete(true)} />
-            ) : null}
+            {deleteBlocked?.offerForce ? <Button testID="account-delete-anyway" title={DELETE_ANYWAY_LABEL} variant="danger" onPress={() => void doDelete(true)} /> : null}
             <Button testID="account-delete-keep" title="Keep the account" variant="ghost" onPress={() => setDeleteBlocked(null)} />
           </View>
         }>

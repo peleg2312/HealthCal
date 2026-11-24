@@ -27,8 +27,17 @@ export function Group({ title, footer, radiogroup, children }: { title?: string;
       <Card
         padding={0}
         // A single choice keeps 4 px above its first row and below its last, so a chosen tile there stays clear of the card's edge.
-        style={{ paddingHorizontal: spacing.lg, ...(radiogroup ? { paddingVertical: spacing.xs } : null) }}
-        {...(radiogroup ? { accessibilityRole: 'radiogroup' as const, role: 'radiogroup' as const, accessibilityLabel: title } : null)}>
+        style={{
+          paddingHorizontal: spacing.lg,
+          ...(radiogroup ? { paddingVertical: spacing.xs } : null),
+        }}
+        {...(radiogroup
+          ? {
+              accessibilityRole: 'radiogroup' as const,
+              role: 'radiogroup' as const,
+              accessibilityLabel: title,
+            }
+          : null)}>
         {items.map((child, i) => (
           <React.Fragment key={i}>
             {i > 0 ? chosen(child) || chosen(items[i - 1]) ? <View style={{ height: 1 }} /> : <Divider /> : null}
@@ -65,10 +74,28 @@ export function IconTile({ color, keep, children }: { color?: string; keep?: boo
   const { colors } = useTheme();
   // A status colour (warning, danger) carries meaning, so it stays; any other colour gives way to the neutral icon.
   const own = keep || (!!color && (color === colors.warning || color === colors.danger));
-  const child = React.isValidElement<{ color?: string; size?: number; strokeWidth?: number }>(children)
-    ? React.cloneElement(children, { ...(own ? null : { color: colors.textSecondary }), size: 20, strokeWidth: 1.9 })
+  const child = React.isValidElement<{
+    color?: string;
+    size?: number;
+    strokeWidth?: number;
+  }>(children)
+    ? React.cloneElement(children, {
+        ...(own ? null : { color: colors.textSecondary }),
+        size: 20,
+        strokeWidth: 1.9,
+      })
     : children;
-  return <View style={{ width: 24, height: 36, alignItems: 'center', justifyContent: 'center' }}>{child}</View>;
+  return (
+    <View
+      style={{
+        width: 24,
+        height: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+      {child}
+    </View>
+  );
 }
 
 /**
@@ -78,19 +105,7 @@ export function IconTile({ color, keep, children }: { color?: string; keep?: boo
  * empty checkbox. Announced as a radio button with its checked state; put the rows in a `Group`
  * with `radiogroup`, which leaves out the hairlines beside the chosen tile.
  */
-export function OptionRow({
-  title,
-  subtitle,
-  selected,
-  onPress,
-  testID,
-}: {
-  title: string;
-  subtitle?: string;
-  selected: boolean;
-  onPress: () => void;
-  testID?: string;
-}) {
+export function OptionRow({ title, subtitle, selected, onPress, testID }: { title: string; subtitle?: string; selected: boolean; onPress: () => void; testID?: string }) {
   const { colors, radius, spacing } = useTheme();
   return (
     <PressableScale
@@ -117,7 +132,19 @@ export function OptionRow({
         overflow: 'hidden',
       }}>
       {/* The level line across the chosen tile's top, the mark of every selected thing in the app. It takes no room. */}
-      {selected ? <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: colors.rim }} /> : null}
+      {selected ? (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 3,
+            backgroundColor: colors.rim,
+          }}
+        />
+      ) : null}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text variant="bodyStrong" numberOfLines={1}>
           {title}
@@ -187,13 +214,16 @@ export function TimeSheet({
   const set = (n: number) => setMinutes(((n % 1440) + 1440) % 1440);
   const hourLabel = hour12 ? String(h % 12 === 0 ? 12 : h % 12) : String(h).padStart(2, '0');
   return (
-    <Sheet
-      visible={visible}
-      onClose={onClose}
-      title={title}
-      footer={<Button title="Set time" testID="time-save" onPress={() => onSave(formatHHmm(minutes))} />}>
+    <Sheet visible={visible} onClose={onClose} title={title} footer={<Button title="Set time" testID="time-save" onPress={() => onSave(formatHHmm(minutes))} />}>
       {/* With the AM/PM switch the row needs 12 px gaps to stay inside the sheet's padding on a 320 px phone. */}
-      <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: hour12 ? spacing.md : spacing.lg, paddingVertical: spacing.sm }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: hour12 ? spacing.md : spacing.lg,
+          paddingVertical: spacing.sm,
+        }}>
         <Spinner label="hour" format={hourLabel} onChange={(d) => set(minutes + d * 60)} />
         <Text variant="numXL" color="textTertiary" style={{ marginBottom: 24 }}>
           :
@@ -204,12 +234,25 @@ export function TimeSheet({
             accessibilityLabel={h < 12 ? 'Switch to PM' : 'Switch to AM'}
             testID="time-ampm"
             onPress={() => set(minutes + (h < 12 ? 720 : -720))}
-            style={{ marginBottom: 24, paddingHorizontal: 14, height: 44, ...cup(radius.buttonSm, 5), borderWidth: 1.5, borderColor: colors.borderStrong, justifyContent: 'center' }}>
+            style={{
+              marginBottom: 24,
+              paddingHorizontal: 14,
+              height: 44,
+              ...cup(radius.buttonSm, 5),
+              borderWidth: 1.5,
+              borderColor: colors.borderStrong,
+              justifyContent: 'center',
+            }}>
             <Text variant="title">{h < 12 ? 'AM' : 'PM'}</Text>
           </PressableScale>
         ) : null}
       </View>
-      <View style={{ flexDirection: 'row', gap: spacing.sm, justifyContent: 'center' }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          gap: spacing.sm,
+          justifyContent: 'center',
+        }}>
         {QUICK_MINUTES.map((q) => (
           <Chip key={q} label={`:${String(q).padStart(2, '0')}`} selected={m === q} onPress={() => set(h * 60 + q)} style={{ minWidth: 56, justifyContent: 'center' }} />
         ))}
@@ -239,14 +282,7 @@ export function TimeRow({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <ListRow
-        title={title}
-        subtitle={subtitle}
-        value={formatClock(value, hour12)}
-        onPress={disabled ? undefined : () => setOpen(true)}
-        chevron={!disabled}
-        testID={testID}
-      />
+      <ListRow title={title} subtitle={subtitle} value={formatClock(value, hour12)} onPress={disabled ? undefined : () => setOpen(true)} chevron={!disabled} testID={testID} />
       <TimeSheet
         visible={open}
         title={title}
@@ -278,7 +314,14 @@ export function InitialsAvatar({ name, size = 64 }: { name: string; size?: numbe
     <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={{ width: size, height: size, ...cupFor(size), backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+      style={{
+        width: size,
+        height: size,
+        ...cupFor(size),
+        backgroundColor: colors.surfaceAlt,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
       <Text variant="h2" color="text" style={{ fontSize: size * 0.38, lineHeight: size * 0.48 }}>
         {initials}
       </Text>

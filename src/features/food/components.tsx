@@ -22,14 +22,14 @@ import { kcal, sourceInfo, withSourceWord } from './helpers';
 
 /** The source's mark plus its name, on a faint tint (the detail page). */
 export function SourceBadge({ source, style }: { source: FoodSource; style?: StyleProp<ViewStyle> }) {
-  const { colors } = useTheme();
+  const { colors, radius } = useTheme();
   const info = sourceInfo(source);
   return (
     <View
       testID="food-source-badge"
       accessibilityLabel={`Data source: ${info.label}`}
       style={[
-        { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, height: 26, borderRadius: 4, backgroundColor: colors.surfaceAlt, alignSelf: 'flex-start' },
+        { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, height: 26, borderRadius: radius.chip, backgroundColor: colors.surfaceAlt, alignSelf: 'flex-start' },
         style,
       ]}>
       <SourceMark source={source} color={colors.textSecondary} size={9} />

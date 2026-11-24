@@ -48,7 +48,16 @@ const ADJUST_SAID_BY_CARD: readonly ReviewKind[] = ['cal'];
 /** What the week picture needs of one day. */
 function weekDay(d: DaySummary): WeekDayIn {
   const f = dayFacts(d);
-  return { date: d.date, kcal: d.eaten.kcal, budget: d.budget, target: d.target, foodLogged: f.foodLogged, complete: f.complete, approx: f.approx, workout: d.activities.length > 0 };
+  return {
+    date: d.date,
+    kcal: d.eaten.kcal,
+    budget: d.budget,
+    target: d.target,
+    foodLogged: f.foodLogged,
+    complete: f.complete,
+    approx: f.approx,
+    workout: d.activities.length > 0,
+  };
 }
 
 /**
@@ -105,7 +114,16 @@ export default function MorningScreen() {
   const title = morningTitle(greeting(now), profile.name, width);
   const sleepHours: Record<ISODate, number> = {};
   for (const s of sleepAll) sleepHours[s.date] = s.hours;
-  const personal = personalLine({ today, onboardedDay, streak, days: recent.map((d) => dayFacts(d)), sleepHours }, title.nameShown ? null : (profile.name ?? null));
+  const personal = personalLine(
+    {
+      today,
+      onboardedDay,
+      streak,
+      days: recent.map((d) => dayFacts(d)),
+      sleepHours,
+    },
+    title.nameShown ? null : (profile.name ?? null),
+  );
 
   const { quote, ready: quoteReady } = useDayQuote(today, quoteTheme(y, lastNight ? lastNight.hours : null), params.quote);
 
@@ -114,7 +132,14 @@ export default function MorningScreen() {
   const fromSetup = (range: { from: ISODate; to: ISODate } | null) =>
     range && firstWeek && onboardedDay && range.from < onboardedDay ? (onboardedDay > range.to ? null : { from: onboardedDay, to: range.to }) : range;
   // Yesterday's card shows its figures on any day with something logged: the lists then leave those numbers to it.
-  const review = { y, weekBefore: minutesIn(activities, fromSetup(weekBeforeYesterday(today))), lastNight, units: profile.units, firstWeek, figuresOnCard: !nothing };
+  const review = {
+    y,
+    weekBefore: minutesIn(activities, fromSetup(weekBeforeYesterday(today))),
+    lastNight,
+    units: profile.units,
+    firstWeek,
+    figuresOnCard: !nothing,
+  };
   const well = wentWell(review);
   const adjust = toAdjust(review);
   const note = reviewNote(y);
@@ -130,9 +155,20 @@ export default function MorningScreen() {
     firstAdjust: adjust[0]?.kind ?? null,
     units: profile.units,
   });
-  const todayTargets = { budget: todayDay.budget, proteinG: todayDay.macros.proteinG };
+  const todayTargets = {
+    budget: todayDay.budget,
+    proteinG: todayDay.macros.proteinG,
+  };
   const targets = targetsLine(todayTargets);
-  const coach = coachMessage({ today, y, well, adjust, plan, targets: todayTargets, firstWeekDay: firstWeek ? dayN : 0 });
+  const coach = coachMessage({
+    today,
+    y,
+    well,
+    adjust,
+    plan,
+    targets: todayTargets,
+    firstWeekDay: firstWeek ? dayN : 0,
+  });
 
   // Each fact is said once: the lists and the plan leave out what the coach already names, and what
   // yesterday's card already says in its sentence (the budget, protein and water reached, calories
@@ -141,7 +177,13 @@ export default function MorningScreen() {
   const adjustShown = adjust.filter((a) => a.kind !== coach.improveKind && !ADJUST_SAID_BY_CARD.includes(a.kind));
   const planShown = plan.filter((p) => p.kind !== coach.todayFrom);
 
-  const week = weekCells({ days: recent.slice(-7).map(weekDay), todayDay: weekDay(todayDay), setupDay: onboardedDay, yesterday, today });
+  const week = weekCells({
+    days: recent.slice(-7).map(weekDay),
+    todayDay: weekDay(todayDay),
+    setupDay: onboardedDay,
+    yesterday,
+    today,
+  });
   const kcalShown = week.show && !!week.yesterday?.foodLogged;
 
   const meal = mealForTime(now);
@@ -157,9 +199,21 @@ export default function MorningScreen() {
         </Text>
       ) : null}
       {/* At 150% text and more the two buttons stack, each the footer's width, so neither name is cut short. */}
-      <View style={{ flexDirection: bigText ? 'column' : 'row', gap: bigText ? spacing.sm : spacing.md }}>
+      <View
+        style={{
+          flexDirection: bigText ? 'column' : 'row',
+          gap: bigText ? spacing.sm : spacing.md,
+        }}>
         {/* "Today" always lands on Today, also when the page was opened from Profile; the X goes back to where it was opened. */}
-        <Button testID="morning-today" title="Today" accessibilityLabel="Go to Today" variant="secondary" full={false} onPress={() => router.dismissTo('/' as never)} style={bigText ? { paddingHorizontal: spacing.md } : { flex: 1, paddingHorizontal: spacing.md }} />
+        <Button
+          testID="morning-today"
+          title="Today"
+          accessibilityLabel="Go to Today"
+          variant="secondary"
+          full={false}
+          onPress={() => router.dismissTo('/' as never)}
+          style={bigText ? { paddingHorizontal: spacing.md } : { flex: 1, paddingHorizontal: spacing.md }}
+        />
         <Button
           testID="morning-log"
           title={logMealTitle(meal)}

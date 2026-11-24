@@ -41,7 +41,11 @@ export const LOOK_HINTS: Record<ThemeLook, string> = {
   java: 'Coffee brown, butter and cerulean',
 };
 
-const FALLBACK: Record<ThemeLook, 'light' | 'dark'> = { butter: 'light', honey: 'light', java: 'dark' };
+const FALLBACK: Record<ThemeLook, 'light' | 'dark'> = {
+  butter: 'light',
+  honey: 'light',
+  java: 'dark',
+};
 
 /** True for a look this version knows ('butter', 'honey', 'java'); false for anything else, including a later version's look. */
 export function isThemeLook(x: unknown): x is ThemeLook {
@@ -108,7 +112,10 @@ export function themeChoiceOf(settings: Pick<Settings, 'theme' | 'look'>): Theme
 }
 
 /** What a pick writes, in one `setSettings`: a look with its fallback, or a preference with `look` removed. */
-export type ThemePatch = { theme: ThemePreference; look: ThemeLook | undefined };
+export type ThemePatch = {
+  theme: ThemePreference;
+  look: ThemeLook | undefined;
+};
 
 /**
  * The settings patch for a pick: `useStore.getState().setSettings(themeChoicePatch(choice))`.

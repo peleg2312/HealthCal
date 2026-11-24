@@ -17,8 +17,28 @@ import { weekLabel } from './weekLabel';
  * large column is wide enough for the number (`bigColAlone`).
  */
 const SIZES = {
-  wide: { bigCol: 76, bigColAlone: 118, bigW: 56, bigH: 96, todayCol: 54, todayW: 40, todayH: 64, smallW: 16, smallH: 64 },
-  narrow: { bigCol: 66, bigColAlone: 100, bigW: 48, bigH: 88, todayCol: 46, todayW: 34, todayH: 58, smallW: 14, smallH: 56 },
+  wide: {
+    bigCol: 76,
+    bigColAlone: 118,
+    bigW: 56,
+    bigH: 96,
+    todayCol: 54,
+    todayW: 40,
+    todayH: 64,
+    smallW: 16,
+    smallH: 64,
+  },
+  narrow: {
+    bigCol: 66,
+    bigColAlone: 100,
+    bigW: 48,
+    bigH: 88,
+    todayCol: 46,
+    todayW: 34,
+    todayH: 58,
+    smallW: 14,
+    smallH: 56,
+  },
 } as const;
 
 /** The number ticks up from this share of its value, so a frame caught at load never reads "0 kcal". */
@@ -95,7 +115,19 @@ export function WeekCups({ cells, testID }: { cells: WeekCells; testID?: string 
     c.over ? (
       <View style={{ width: s.smallW, height: s.smallH }}>
         {cup({ ...c, kcal: c.budget }, s.smallW, s.smallH, index, 2.5)}
-        <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: -2, height: 4, borderTopLeftRadius: 1, borderTopRightRadius: 1, backgroundColor: colors.warning }} />
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: -2,
+            height: 4,
+            borderTopLeftRadius: 1,
+            borderTopRightRadius: 1,
+            backgroundColor: colors.warning,
+          }}
+        />
       </View>
     ) : (
       cup(c, s.smallW, s.smallH, index, 2.5)
@@ -106,54 +138,80 @@ export function WeekCups({ cells, testID }: { cells: WeekCells; testID?: string 
   const numVariant = shown(Math.round(y.kcal)).length >= 6 ? 'numM' : 'numL';
 
   const week = (
-      <View accessible accessibilityLabel={weekLabel(cells)} style={r > 1 ? { flexGrow: 1 } : undefined}>
-        {/* Yesterday's number, centred over the large cup; a wider one reaches left over the small cups. */}
-        <View style={{ flexDirection: 'row', justifyContent: n === 0 ? 'center' : 'flex-end', marginBottom: spacing.sm }}>
-          <View style={{ minWidth: bigCol, alignItems: 'center' }}>
-            {y.foodLogged ? (
-              <AnimatedNumber variant={numVariant} color="caloriesInk" numberOfLines={1} value={Math.round(y.kcal)} from={Math.round(y.kcal * TICK_FROM)} delay={n * motion.duration.stagger} memoryKey={`morning-yday-${y.date}`} format={shown}>
-                <Text variant="unit" color="textSecondary">
-                  {' kcal'}
-                </Text>
-              </AnimatedNumber>
-            ) : (
-              <Text variant="caption" color="textSecondary" numberOfLines={1}>
-                Not logged
+    <View accessible accessibilityLabel={weekLabel(cells)} style={r > 1 ? { flexGrow: 1 } : undefined}>
+      {/* Yesterday's number, centred over the large cup; a wider one reaches left over the small cups. */}
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: n === 0 ? 'center' : 'flex-end',
+          marginBottom: spacing.sm,
+        }}>
+        <View style={{ minWidth: bigCol, alignItems: 'center' }}>
+          {y.foodLogged ? (
+            <AnimatedNumber
+              variant={numVariant}
+              color="caloriesInk"
+              numberOfLines={1}
+              value={Math.round(y.kcal)}
+              from={Math.round(y.kcal * TICK_FROM)}
+              delay={n * motion.duration.stagger}
+              memoryKey={`morning-yday-${y.date}`}
+              format={shown}>
+              <Text variant="unit" color="textSecondary">
+                {' kcal'}
               </Text>
-            )}
+            </AnimatedNumber>
+          ) : (
+            <Text variant="caption" color="textSecondary" numberOfLines={1}>
+              Not logged
+            </Text>
+          )}
+        </View>
+        <View style={{ width: cols.todayCol }} />
+      </View>
+
+      {/* The cups: every one stands on the same line; the slots under them are the same height. */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'flex-end',
+          justifyContent: n === 0 ? 'center' : 'flex-start',
+        }}>
+        {before.map((c, i) => (
+          <View key={c.date} testID={`morning-week-day-${c.date}`} style={{ flex: 1, minWidth: cols.smallMin, alignItems: 'center' }}>
+            {smallCup(c, i)}
+            <Text variant="label" color="textSecondary" numberOfLines={1} style={{ height: cols.labelH, marginTop: spacing.xs }}>
+              {weekdayShort(c.date).charAt(0)}
+            </Text>
+            {mark(c)}
           </View>
-          <View style={{ width: cols.todayCol }} />
+        ))}
+
+        <View testID="morning-week-yesterday" style={{ width: bigCol, alignItems: 'center' }}>
+          {cup(y, s.bigW, s.bigH, n, 3)}
+          <Text
+            variant="caption"
+            color="text"
+            numberOfLines={1}
+            style={{
+              height: cols.labelH,
+              marginTop: spacing.xs,
+              fontFamily: fonts.bold,
+            }}>
+            Yesterday
+          </Text>
+          {mark(y)}
         </View>
 
-        {/* The cups: every one stands on the same line; the slots under them are the same height. */}
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: n === 0 ? 'center' : 'flex-start' }}>
-          {before.map((c, i) => (
-            <View key={c.date} testID={`morning-week-day-${c.date}`} style={{ flex: 1, minWidth: cols.smallMin, alignItems: 'center' }}>
-              {smallCup(c, i)}
-              <Text variant="label" color="textSecondary" numberOfLines={1} style={{ height: cols.labelH, marginTop: spacing.xs }}>
-                {weekdayShort(c.date).charAt(0)}
-              </Text>
-              {mark(c)}
-            </View>
-          ))}
-
-          <View testID="morning-week-yesterday" style={{ width: bigCol, alignItems: 'center' }}>
-            {cup(y, s.bigW, s.bigH, n, 3)}
-            <Text variant="caption" color="text" numberOfLines={1} style={{ height: cols.labelH, marginTop: spacing.xs, fontFamily: fonts.bold }}>
-              Yesterday
-            </Text>
-            {mark(y)}
-          </View>
-
-          <View testID="morning-week-today" style={{ width: cols.todayCol, alignItems: 'center' }}>
-            {cup(t, s.todayW, s.todayH, n + 1, 2.5)}
-            <Text variant="label" color="textSecondary" numberOfLines={1} style={{ height: cols.labelH, marginTop: spacing.xs }}>
-              Today
-            </Text>
-            {mark(t)}
-          </View>
+        <View testID="morning-week-today" style={{ width: cols.todayCol, alignItems: 'center' }}>
+          {cup(t, s.todayW, s.todayH, n + 1, 2.5)}
+          <Text variant="label" color="textSecondary" numberOfLines={1} style={{ height: cols.labelH, marginTop: spacing.xs }}>
+            Today
+          </Text>
+          {mark(t)}
         </View>
       </View>
+    </View>
   );
 
   return (
@@ -172,7 +230,13 @@ export function WeekCups({ cells, testID }: { cells: WeekCells; testID?: string 
       )}
 
       {anyWorkout ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.sm,
+            marginTop: spacing.xs,
+          }}>
           <CupKey color={colors.exercise} size={8} />
           <Text variant="caption" color="textSecondary">
             A workout that day

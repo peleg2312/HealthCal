@@ -53,12 +53,21 @@ const HERO_PAD = 8;
 function fitHero(room: number, narrow: boolean, wide: boolean) {
   // Too short even for the small cup with its promises: a shorter cup with its labels only (the
   // promises are in its spoken label), so the first view ends above the footer.
-  if (room < NEED_SMALL) return { height: Math.round(Math.max(NEED_TINY, room)), small: true, tiny: true };
+  if (room < NEED_SMALL)
+    return {
+      height: Math.round(Math.max(NEED_TINY, room)),
+      small: true,
+      tiny: true,
+    };
   const small = narrow || room < NEED;
   const need = small ? NEED_SMALL : NEED;
   // Up to 40 px of air around the cup, once there is room to spare.
   const air = Math.max(0, Math.min(40, room - NEED));
-  return { height: Math.round(Math.min(wide ? 380 : 340, Math.max(need, room - air))), small, tiny: false };
+  return {
+    height: Math.round(Math.min(wide ? 380 : 340, Math.max(need, room - air))),
+    small,
+    tiny: false,
+  };
 }
 
 /**
@@ -151,7 +160,15 @@ function HeroCup({ height, narrow, small, tiny }: { height: number; narrow: bool
         {tiny ? null : (
           <View style={{ gap: small ? spacing.sm : spacing.md }}>
             {PROMISES.map((p, i) => (
-              <FadeUp key={p.key} delay={POUR_DELAY + ARRIVAL_POUR / 2} index={i * 2} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <FadeUp
+                key={p.key}
+                delay={POUR_DELAY + ARRIVAL_POUR / 2}
+                index={i * 2}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: spacing.sm,
+                }}>
                 <p.Icon size={18} color={colors.text} strokeWidth={1.9} />
                 <Text variant={small ? 'label' : 'bodyStrong'} style={{ flex: 1 }}>
                   {p.title}
@@ -166,8 +183,7 @@ function HeroCup({ height, narrow, small, tiny }: { height: number; narrow: bool
 }
 
 /** The example day's spoken label: the cup and its figures are one element. */
-const HERO_LABEL =
-  'An example day: a budget of 2,160 kilocalories including about 290 added by workouts, 1,219 eaten, 941 left. Honest numbers. Fast logging. Free to log, no ads.';
+const HERO_LABEL = 'An example day: a budget of 2,160 kilocalories including about 290 added by workouts, 1,219 eaten, 941 left. Honest numbers. Fast logging. Free to log, no ads.';
 
 /**
  * The hero at 130% text and more. The labels beside the cup are placed at the levels they describe, and
@@ -178,7 +194,12 @@ function LargeTextHero() {
   const { colors, spacing } = useTheme();
   return (
     <View accessible accessibilityLabel={HERO_LABEL} style={{ gap: spacing.lg }}>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.lg }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'flex-end',
+          gap: spacing.lg,
+        }}>
         <Vessel value={EATEN} max={BUDGET} headroom={BURNED} color={colors.calories} width={64} height={160} duration={ARRIVAL_POUR} delay={POUR_DELAY} memoryKey="welcome-cup" />
         <View style={{ flex: 1, minWidth: 0, gap: spacing.sm }}>
           <Text variant="label" color="textSecondary">
@@ -206,7 +227,13 @@ function LargeTextHero() {
       </View>
       <View style={{ gap: spacing.md }}>
         {PROMISES.map((p) => (
-          <View key={p.key} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <View
+            key={p.key}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.sm,
+            }}>
             <p.Icon size={18} color={colors.text} strokeWidth={1.9} />
             <Text variant="bodyStrong" style={{ flex: 1 }}>
               {p.title}
@@ -222,7 +249,10 @@ export default function Welcome() {
   const { colors, spacing } = useTheme();
   const onboarded = useStore((s) => !!s.profile?.onboardedAt);
   const [importing, setImporting] = useState(false);
-  const [importNote, setImportNote] = useState<{ tone: 'neutral' | 'warning'; text: string } | null>(null);
+  const [importNote, setImportNote] = useState<{
+    tone: 'neutral' | 'warning';
+    text: string;
+  } | null>(null);
   // On a phone the Google flow ends with a session: the sign-in screen's waiting view then hands over to the sign-in gate.
   // (On Android the app's own link may already have opened that screen.) On the web the page leaves for Google.
   // (A test build's `?authDemo=declined` draws the note of a sign-in that was not completed, as a picture.)
@@ -274,7 +304,11 @@ export default function Welcome() {
     setImporting(false);
     if (!r.ok) {
       // The hosted preview's frame cannot open files at all: say that alone, not that a file failed.
-      if (!r.canceled) setImportNote({ tone: 'warning', text: r.message === VIEWER_BLOCKED.files ? r.message : `That file could not be restored. ${r.message}` });
+      if (!r.canceled)
+        setImportNote({
+          tone: 'warning',
+          text: r.message === VIEWER_BLOCKED.files ? r.message : `That file could not be restored. ${r.message}`,
+        });
       return;
     }
     // A backup with a finished plan opens straight onto Today.
@@ -297,8 +331,18 @@ export default function Welcome() {
       testID="welcome-screen"
       // The screen runs its own entrance: the cup first, then the headline, then the actions.
       enter={false}
-      scrollProps={{ ref: scroll, onContentSizeChange: () => (noteWords ? scroll.current?.scrollToEnd({ animated: !reduce }) : undefined) } as ScrollViewProps}
-      contentStyle={{ flexGrow: 1, gap: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.lg }}
+      scrollProps={
+        {
+          ref: scroll,
+          onContentSizeChange: () => (noteWords ? scroll.current?.scrollToEnd({ animated: !reduce }) : undefined),
+        } as ScrollViewProps
+      }
+      contentStyle={{
+        flexGrow: 1,
+        gap: spacing.xl,
+        paddingTop: spacing.lg,
+        paddingBottom: spacing.lg,
+      }}
       footer={
         ready ? (
           <FadeUp delay={actionsAt} style={{ gap: spacing.sm }}>
@@ -309,7 +353,12 @@ export default function Welcome() {
               Two full-width ways in at most, then one quiet row: the hero keeps its room. With accounts the
               row holds "Sign in" beside the restore; the two stack, Sign in first, if large text makes one wrap.
             */}
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: spacing.sm,
+              }}>
               {accounts ? (
                 <Button
                   title={WELCOME_SIGN_IN}
@@ -331,7 +380,11 @@ export default function Welcome() {
                 loading={importing}
                 // Under 340 px the row has no room for the mark beside the words.
                 icon={accounts && window.width < 340 ? undefined : <FileUp size={16} color={colors.primaryInk} />}
-                style={{ flexGrow: 1, flexBasis: accounts ? 148 : '100%', minWidth: 148 }}
+                style={{
+                  flexGrow: 1,
+                  flexBasis: accounts ? 148 : '100%',
+                  minWidth: 148,
+                }}
                 onPress={() => void restore()}
               />
             </View>
@@ -339,7 +392,12 @@ export default function Welcome() {
         ) : undefined
       }>
       <View style={{ gap: spacing.xl }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.sm,
+          }}>
           <CupMark size={24} />
           <Text variant="h3" testID="welcome-wordmark">
             HealthCal
@@ -361,8 +419,18 @@ export default function Welcome() {
       {/* The hero's place: everything between the words and the actions. A little more air under the cup than over it. */}
       <View
         testID="welcome-hero"
-        onLayout={(e) => setRoom({ height: Math.round(e.nativeEvent.layout.height), final: ready })}
-        style={{ flex: 1, minHeight: OVERLINE + NEED_TINY + HERO_PAD, justifyContent: 'center', paddingBottom: HERO_PAD }}>
+        onLayout={(e) =>
+          setRoom({
+            height: Math.round(e.nativeEvent.layout.height),
+            final: ready,
+          })
+        }
+        style={{
+          flex: 1,
+          minHeight: OVERLINE + NEED_TINY + HERO_PAD,
+          justifyContent: 'center',
+          paddingBottom: HERO_PAD,
+        }}>
         {largeText ? (
           <View style={{ gap: spacing.md }}>
             <Text variant="overline">An example day</Text>

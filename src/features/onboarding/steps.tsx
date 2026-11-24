@@ -80,9 +80,21 @@ export function BasicsStep({ draft, set, errors, submit }: StepProps) {
 export function GoalStep({ draft, set, errors, advance }: StepProps) {
   const { spacing } = useTheme();
   const options: { value: GoalType; title: string; hint: string }[] = [
-    { value: 'lose', title: 'Lose weight', hint: 'A steady calorie deficit, protein kept high' },
-    { value: 'maintain', title: 'Maintain', hint: 'Eat to match what you burn' },
-    { value: 'gain', title: 'Gain muscle', hint: 'A small surplus to support training' },
+    {
+      value: 'lose',
+      title: 'Lose weight',
+      hint: 'A steady calorie deficit, protein kept high',
+    },
+    {
+      value: 'maintain',
+      title: 'Maintain',
+      hint: 'Eat to match what you burn',
+    },
+    {
+      value: 'gain',
+      title: 'Gain muscle',
+      hint: 'A small surplus to support training',
+    },
   ];
   const name = draft.name.trim();
   return (
@@ -137,9 +149,8 @@ export function SexStep({ draft, set, errors, advance }: StepProps) {
         <ErrorText>{errors.sex}</ErrorText>
       </Group>
       <WhyWeAsk testID="onb-sex-why">
-        Resting metabolism differs between female and male bodies, so the standard equations (Mifflin-St Jeor, or Katch-McArdle when you know your body fat)
-        have a female and a male form. The answer also sets your starting water goal and the lowest calorie target HealthCal suggests. You can change it later
-        in Goals.
+        Resting metabolism differs between female and male bodies, so the standard equations (Mifflin-St Jeor, or Katch-McArdle when you know your body fat) have a female and a male form. The answer
+        also sets your starting water goal and the lowest calorie target HealthCal suggests. You can change it later in Goals.
       </WhyWeAsk>
     </Group>
   );
@@ -171,6 +182,7 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
       value={draft.dobDay}
       onChange={(dobDay) => set({ dobDay })}
       error={!!errors.dob}
+      errorId="onb-dob-error-words"
       {...field(monthFirst ? 1 : 0)}
     />
   );
@@ -187,6 +199,7 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
       value={draft.dobMonth}
       onChange={(dobMonth) => set({ dobMonth })}
       error={!!errors.dob}
+      errorId="onb-dob-error-words"
       {...field(monthFirst ? 0 : 1)}
     />
   );
@@ -203,6 +216,7 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
       value={draft.dobYear}
       onChange={(dobYear) => set({ dobYear })}
       error={!!errors.dob}
+      errorId="onb-dob-error-words"
       {...field(2)}
     />
   );
@@ -212,7 +226,9 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
       <Group gap={spacing.sm}>
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>{draft.units === 'imperial' ? [month, day, year] : [day, month, year]}</View>
         {errors.dob ? (
-          <ErrorText testID="onb-dob-error">{errors.dob}</ErrorText>
+          <ErrorText testID="onb-dob-error" nativeID="onb-dob-error-words">
+            {errors.dob}
+          </ErrorText>
         ) : iso && age !== null ? (
           <Text variant="label" color="textSecondary" testID="onb-dob-summary">
             {`${Number(iso.slice(8))} ${MONTHS[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)} · ${age} years old`}
@@ -259,6 +275,7 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
               value={draft.heightFt}
               onChange={(heightFt) => set({ heightFt })}
               error={!!errors.height}
+              errorId="onb-height-error-words"
               {...field(0)}
             />
             <BigNumberField
@@ -272,6 +289,7 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
               value={draft.heightIn}
               onChange={(heightIn) => set({ heightIn })}
               error={!!errors.height}
+              errorId="onb-height-error-words"
               {...field(1)}
             />
             <BigNumberField
@@ -285,6 +303,7 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
               value={draft.weight}
               onChange={(weight) => set({ weight })}
               error={!!errors.weight}
+              errorId="onb-weight-error-words"
               {...field(2)}
             />
           </View>
@@ -301,6 +320,7 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
               value={draft.heightCm}
               onChange={(heightCm) => set({ heightCm })}
               error={!!errors.height}
+              errorId="onb-height-error-words"
               {...field(0)}
             />
             <BigNumberField
@@ -315,12 +335,17 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
               value={draft.weight}
               onChange={(weight) => set({ weight })}
               error={!!errors.weight}
+              errorId="onb-weight-error-words"
               {...field(1)}
             />
           </View>
         )}
-        <ErrorText testID="onb-height-error">{heightError}</ErrorText>
-        <ErrorText testID="onb-weight-error">{weightError}</ErrorText>
+        <ErrorText testID="onb-height-error" nativeID="onb-height-error-words">
+          {heightError}
+        </ErrorText>
+        <ErrorText testID="onb-weight-error" nativeID="onb-weight-error-words">
+          {weightError}
+        </ErrorText>
       </Group>
       <Text variant="caption" color="textSecondary">
         Your weight is saved on this device as your first weigh-in.
@@ -341,10 +366,30 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
   // A mode that needs typing, picked here: its first field takes the focus, which also brings it into view.
   const [picked, setPicked] = useState(false);
   const mark = (Icon: typeof Ruler) => <Icon size={22} color={colors.text} strokeWidth={1.9} />;
-  const modes: { value: BodyFatMode; title: string; hint: string; icon: React.ReactNode }[] = [
-    { value: 'unknown', title: "I don't know", hint: 'Most people skip this', icon: mark(CircleHelp) },
-    { value: 'direct', title: 'I know my body fat %', hint: 'From a smart scale or a scan', icon: mark(Target) },
-    { value: 'tape', title: 'Measure with a tape', hint: 'Neck and waist, about two minutes', icon: mark(Ruler) },
+  const modes: {
+    value: BodyFatMode;
+    title: string;
+    hint: string;
+    icon: React.ReactNode;
+  }[] = [
+    {
+      value: 'unknown',
+      title: "I don't know",
+      hint: 'Most people skip this',
+      icon: mark(CircleHelp),
+    },
+    {
+      value: 'direct',
+      title: 'I know my body fat %',
+      hint: 'From a smart scale or a scan',
+      icon: mark(Target),
+    },
+    {
+      value: 'tape',
+      title: 'Measure with a tape',
+      hint: 'Neck and waist, about two minutes',
+      icon: mark(Ruler),
+    },
   ];
   return (
     <Group gap={spacing.xl}>
@@ -408,6 +453,7 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
               value={draft.neck}
               onChange={(neck) => set({ neck })}
               error={!!errors.neck}
+              errorId="onb-tape-error-words"
               {...tape(0)}
             />
             <BigNumberField
@@ -421,6 +467,7 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
               value={draft.waist}
               onChange={(waist) => set({ waist })}
               error={!!errors.waist}
+              errorId="onb-tape-error-words"
               {...tape(1)}
             />
             {draft.sex === 'female' ? (
@@ -435,12 +482,19 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
                 value={draft.hip}
                 onChange={(hip) => set({ hip })}
                 error={!!errors.hip}
+                errorId="onb-tape-error-words"
                 {...tape(2)}
               />
             ) : null}
           </View>
-          <ErrorText>{errors.neck ?? errors.waist ?? errors.hip ?? errors.tape}</ErrorText>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm }} testID="onb-bf-estimate">
+          <ErrorText nativeID="onb-tape-error-words">{errors.neck ?? errors.waist ?? errors.hip ?? errors.tape}</ErrorText>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'baseline',
+              gap: spacing.sm,
+            }}
+            testID="onb-bf-estimate">
             <Text variant="label" color="textSecondary" style={{ flex: 1 }}>
               Estimated body fat
             </Text>
@@ -458,8 +512,8 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
         </Card>
       ) : null}
       <WhyWeAsk testID="onb-bf-why">
-        With body fat, HealthCal works out resting metabolism from your lean mass (the Katch-McArdle equation) instead of from weight, height and age
-        (Mifflin-St Jeor). The tape estimate uses the US Navy method.
+        With body fat, HealthCal works out resting metabolism from your lean mass (the Katch-McArdle equation) instead of from weight, height and age (Mifflin-St Jeor). The tape estimate uses the US
+        Navy method.
       </WhyWeAsk>
     </Group>
   );
@@ -468,7 +522,13 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
 // ---------------------------------------------------------------- activity
 
 /** How full a normal day's movement is: each level is a small cup in the exercise colour, filled a step higher. */
-const ACTIVITY_LEVEL: Record<ActivityLevel, number> = { sedentary: 0.2, light: 0.4, moderate: 0.6, active: 0.8, athlete: 1 };
+const ACTIVITY_LEVEL: Record<ActivityLevel, number> = {
+  sedentary: 0.2,
+  light: 0.4,
+  moderate: 0.6,
+  active: 0.8,
+  athlete: 1,
+};
 
 export function ActivityStep({ draft, set, errors, advance }: StepProps) {
   const { colors, spacing } = useTheme();
@@ -533,10 +593,7 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
 
   return (
     <Group gap={spacing.xl}>
-      <StepTitle
-        title={goal === 'lose' ? 'Where are you heading?' : 'Set your pace'}
-        subtitle={goal === 'lose' ? 'A pace you can keep. Slower is easier.' : 'A small surplus limits fat gain.'}
-      />
+      <StepTitle title={goal === 'lose' ? 'Where are you heading?' : 'Set your pace'} subtitle={goal === 'lose' ? 'A pace you can keep. Slower is easier.' : 'A small surplus limits fat gain.'} />
       <View style={{ gap: 6 }}>
         <BigNumberField
           label={goal === 'lose' ? 'Target weight' : 'Target weight (optional)'}
@@ -564,19 +621,17 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
           </Text>
         </View>
         <View style={{ alignItems: 'center' }} testID="onb-pace">
-          <Stepper
-            label="weekly pace"
-            value={rateDisplay}
-            step={step}
-            min={minDisplay}
-            max={maxDisplay}
-            format={(v) => fmtRate(v)}
-            onChange={(v) => set({ weeklyRateKg: imp ? lbToKg(v) : v })}
-          />
+          <Stepper label="weekly pace" value={rateDisplay} step={step} min={minDisplay} max={maxDisplay} format={(v) => fmtRate(v)} onChange={(v) => set({ weeklyRateKg: imp ? lbToKg(v) : v })} />
         </View>
         <PaceMeter value={rateDisplay / maxDisplay} />
         <Divider />
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs }} testID="onb-pace-delta">
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'baseline',
+            gap: spacing.xs,
+          }}
+          testID="onb-pace-delta">
           <Text variant="numM">{`${delta < 0 ? '−' : '+'}${formatNumber(Math.abs(Math.round(delta / 10) * 10))}`}</Text>
           <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
             {`kcal a day ${word}${plan ? `, from about ${formatNumber(Math.round(plan.tdee / 10) * 10)} kcal burned` : ''}`}
@@ -599,8 +654,22 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
         </Note>
       ) : null}
       {showTargetSummary ? (
-        <Card tone="alt" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }} testID="onb-target-summary">
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <Card
+          tone="alt"
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.lg,
+          }}
+          testID="onb-target-summary">
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'flex-end',
+              gap: spacing.sm,
+            }}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants">
             <WeightCup label={fmtW(draft.weight!)} level={goal === 'lose' ? 0.8 : 0.55} />
             <View style={{ paddingBottom: 26 }}>
               <ArrowRight size={16} color={colors.textSecondary} strokeWidth={2.2} />
@@ -657,7 +726,11 @@ function PaceMeter({ value }: { value: number }) {
 
 // ----------------------------------------------------------------- routine
 
-const NUDGES: { key: Exclude<NudgeKind, 'checkin'>; title: string; icon: React.ReactNode }[] = [
+const NUDGES: {
+  key: Exclude<NudgeKind, 'checkin'>;
+  title: string;
+  icon: React.ReactNode;
+}[] = [
   { key: 'water', title: 'Water', icon: <Droplets size={20} /> },
   { key: 'meals', title: 'Meals', icon: <Utensils size={20} /> },
   { key: 'weighIn', title: 'Weigh-in', icon: <Scale size={20} /> },
@@ -671,7 +744,18 @@ export function RoutineStep({ draft, set, errors }: StepProps) {
   const hour12 = prefers12h(draft.units);
   const plan = buildPlan(draft, now);
   const setRoutine = (patch: Partial<Routine>) => set({ routine: { ...r, ...patch } });
-  const examples = plan ? nudgeExamples(r, { targetKcal: plan.target.target, waterMl: plan.waterMl, macros: plan.macros }, draft.units, hour12) : null;
+  const examples = plan
+    ? nudgeExamples(
+        r,
+        {
+          targetKcal: plan.target.target,
+          waterMl: plan.waterMl,
+          macros: plan.macros,
+        },
+        draft.units,
+        hour12,
+      )
+    : null;
   const whenFor = (key: NudgeKind): string => {
     if (key === 'weighIn') return `Mon and Thu, ${formatClock(WEIGH_IN_TIME, hour12)}`;
     if (key === 'water') return 'Every 2 hours while awake';
@@ -713,7 +797,13 @@ export function RoutineStep({ draft, set, errors }: StepProps) {
           accessibilityRole="button"
           accessibilityState={{ expanded: open }}
           accessibilityLabel={`Adjust times and the evening check-in. Awake ${formatClock(r.wake, hour12)} to ${formatClock(r.bed, hour12)}, meals ${formatClock(r.breakfast, hour12)}, ${formatClock(r.lunch, hour12)} and ${formatClock(r.dinner, hour12)}, check-in ${r.nudges.checkin ? whenFor('checkin') : 'off'}`}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 48, paddingHorizontal: spacing.xs }}>
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.md,
+            minHeight: 48,
+            paddingHorizontal: spacing.xs,
+          }}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text variant="title">Adjust times</Text>
             <Text variant="caption" color="textSecondary" tabular>

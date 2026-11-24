@@ -25,7 +25,9 @@ export function tieEnd(text: string, words = 3): string {
 
 /** A date inside a sentence stays on one line: "Nov 29, 2026" never breaks after the comma, nor "Dec 5" after the month. For the screen only. */
 export function tieDates(text: string): string {
-  return text.replace(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?:, (\d{4}))?/g, (_m, mon: string, day: string, year?: string) => (year ? `${mon}\u00A0${day},\u00A0${year}` : `${mon}\u00A0${day}`));
+  return text.replace(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?:, (\d{4}))?/g, (_m, mon: string, day: string, year?: string) =>
+    year ? `${mon}\u00A0${day},\u00A0${year}` : `${mon}\u00A0${day}`,
+  );
 }
 
 // ------------------------------------------------------------------ dates
@@ -47,8 +49,29 @@ export function fullDate(iso: string): string {
 // ------------------------------------------------------------------ money
 
 /** Digits after the point, by ISO 4217. */
-const MINOR: Record<string, number> = { JPY: 0, KRW: 0, VND: 0, CLP: 0, ISK: 0, HUF: 2, KWD: 3, BHD: 3, JOD: 3, OMR: 3, TND: 3 };
-const SYMBOL: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', ILS: '₪', JPY: '¥', CAD: 'CA$', AUD: 'A$', INR: '₹' };
+const MINOR: Record<string, number> = {
+  JPY: 0,
+  KRW: 0,
+  VND: 0,
+  CLP: 0,
+  ISK: 0,
+  HUF: 2,
+  KWD: 3,
+  BHD: 3,
+  JOD: 3,
+  OMR: 3,
+  TND: 3,
+};
+const SYMBOL: Record<string, string> = {
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  ILS: '₪',
+  JPY: '¥',
+  CAD: 'CA$',
+  AUD: 'A$',
+  INR: '₹',
+};
 
 /** An amount in minor units as people read it: "$29.99", "€4", "₪14.90", "CHF 4.50". */
 export function formatMoney(amount: number, currency: string): string {
@@ -221,8 +244,16 @@ export interface CardRow {
 export function cardRows(l: PlanLimits): CardRow[] {
   return [
     { key: 'estimates', label: 'AI estimates', value: `${l.estimates} a day` },
-    { key: 'questions', label: 'Coach questions', value: `${l.questions} a day` },
-    { key: 'memory', label: 'Coach memory', value: `${l.memoryPairs} ${l.memoryPairs === 1 ? 'exchange' : 'exchanges'}` },
+    {
+      key: 'questions',
+      label: 'Coach questions',
+      value: `${l.questions} a day`,
+    },
+    {
+      key: 'memory',
+      label: 'Coach memory',
+      value: `${l.memoryPairs} ${l.memoryPairs === 1 ? 'exchange' : 'exchanges'}`,
+    },
   ];
 }
 
@@ -233,7 +264,9 @@ export function rowUnit(key: CardRow['key']): string {
 
 /** What a card reads to a screen reader, once. */
 export function cardLabel(title: string, l: PlanLimits, current: boolean): string {
-  const rows = cardRows(l).map((r) => `${r.label}: ${r.value}`).join(', ');
+  const rows = cardRows(l)
+    .map((r) => `${r.label}: ${r.value}`)
+    .join(', ');
   return `${title}${current ? ', your plan' : ''}. ${rows}.`;
 }
 
@@ -404,7 +437,8 @@ export const RELEASED_LINE =
   'Your account is deleted. The subscription may still be open at the payment company: open the receipt email from your purchase and cancel there, so no further payment is taken.';
 
 /** The server refused the delete itself because a plan is still held (ruling R5). */
-export const PLAN_ACTIVE_LINE = 'This account still holds a plan, so it was not deleted. Try again, or choose Delete anyway: the plan is then released here and has to be cancelled at the payment company too.';
+export const PLAN_ACTIVE_LINE =
+  'This account still holds a plan, so it was not deleted. Try again, or choose Delete anyway: the plan is then released here and has to be cancelled at the payment company too.';
 
 // ------------------------------------------------------------------ add a password (R20)
 

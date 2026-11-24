@@ -18,7 +18,10 @@ import type { Scene } from './scene';
  * share of a day starts where the first left off, and turning calorie numbers
  * on for a day card never turns them on for a week card.
  */
-const remembered: Record<'day' | 'week', ShareChoices> = { day: DEFAULT_SHARE_CHOICES, week: DEFAULT_SHARE_CHOICES };
+const remembered: Record<'day' | 'week', ShareChoices> = {
+  day: DEFAULT_SHARE_CHOICES,
+  week: DEFAULT_SHARE_CHOICES,
+};
 function remember(kind: 'day' | 'week', next: ShareChoices) {
   remembered[kind] = next;
 }
@@ -115,7 +118,10 @@ export function ShareSheet({
   useEffect(() => {
     if (!visible) return;
     let live = true;
-    canShareImage().then((ok) => live && setCanShare(ok), () => live && setCanShare(false));
+    canShareImage().then(
+      (ok) => live && setCanShare(ok),
+      () => live && setCanShare(false),
+    );
     return () => {
       live = false;
     };
@@ -146,7 +152,13 @@ export function ShareSheet({
     if (busy) return;
     setBusy(what);
     try {
-      const req = { scene: p.scene, fileName: p.fileName, title: p.title, text: p.summary, target };
+      const req = {
+        scene: p.scene,
+        fileName: p.fileName,
+        title: p.title,
+        text: p.summary,
+        target,
+      };
       const result: ExportResult = what === 'share' ? await shareCard(req) : await saveCard(req);
       if (result === 'saved') {
         haptic.success();
@@ -169,10 +181,9 @@ export function ShareSheet({
       style={{ flex: 1 }}
     />
   ) : null;
-  const saveButton =
-    SAVE_AVAILABLE ? (
-      <Button title="Save image" variant={canShare ? 'secondary' : 'primary'} onPress={() => run('save')} loading={busy === 'save'} testID="share-save" style={{ flex: 1 }} />
-    ) : null;
+  const saveButton = SAVE_AVAILABLE ? (
+    <Button title="Save image" variant={canShare ? 'secondary' : 'primary'} onPress={() => run('save')} loading={busy === 'save'} testID="share-save" style={{ flex: 1 }} />
+  ) : null;
 
   return (
     <Sheet
@@ -183,7 +194,11 @@ export function ShareSheet({
         <View style={{ flexDirection: 'row', gap: spacing.md }}>
           {saveButton}
           {shareButton}
-          {!saveButton && !shareButton ? <Text variant="caption" color="textSecondary">Sharing is not available on this device.</Text> : null}
+          {!saveButton && !shareButton ? (
+            <Text variant="caption" color="textSecondary">
+              Sharing is not available on this device.
+            </Text>
+          ) : null}
         </View>
       }>
       <View testID={testID} style={{ gap: spacing.lg }}>
@@ -192,7 +207,13 @@ export function ShareSheet({
           accessible
           accessibilityRole="image"
           accessibilityLabel={spokenUnits(`Card preview. ${p.summary}`)}
-          style={{ alignSelf: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 6, overflow: 'hidden' }}>
+          style={{
+            alignSelf: 'center',
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: 6,
+            overflow: 'hidden',
+          }}>
           <CardArt scene={p.scene} width={previewW} />
         </View>
         <View style={{ gap: spacing.sm }} onLayout={(e) => setChoicesH(Math.ceil(e.nativeEvent.layout.height))}>

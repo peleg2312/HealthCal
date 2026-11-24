@@ -126,7 +126,7 @@ export function EnergyCard({ model, useAdaptiveSetting }: { model: EnergyModel; 
         testID="progress-energy-how"
         onPress={() => setOpen((o) => !o)}
         accessibilityLabel="Where this number comes from"
-        accessibilityState={{ expanded: open }}
+        expanded={open}
         style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, borderTopWidth: 1, borderTopColor: colors.border, marginBottom: -spacing.sm }}>
         <Text variant="label">Where this number comes from</Text>
         {open ? <ChevronUp size={18} color={colors.textSecondary} /> : <ChevronDown size={18} color={colors.textSecondary} />}

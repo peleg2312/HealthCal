@@ -34,9 +34,27 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
   const units = p.units;
   const t = plan.target;
   const macros = [
-    { key: 'protein', label: 'Protein', grams: plan.macros.proteinG, share: plan.macros.split.protein, color: colors.protein },
-    { key: 'carbs', label: 'Carbs', grams: plan.macros.carbsG, share: plan.macros.split.carbs, color: colors.carbs },
-    { key: 'fat', label: 'Fat', grams: plan.macros.fatG, share: plan.macros.split.fat, color: colors.fat },
+    {
+      key: 'protein',
+      label: 'Protein',
+      grams: plan.macros.proteinG,
+      share: plan.macros.split.protein,
+      color: colors.protein,
+    },
+    {
+      key: 'carbs',
+      label: 'Carbs',
+      grams: plan.macros.carbsG,
+      share: plan.macros.split.carbs,
+      color: colors.carbs,
+    },
+    {
+      key: 'fat',
+      label: 'Fat',
+      grams: plan.macros.fatG,
+      share: plan.macros.split.fat,
+      color: colors.fat,
+    },
   ];
   const water = formatVolume(plan.waterMl, units);
   const wi = water.indexOf(' ');
@@ -102,7 +120,12 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
           <Text variant="overline" color="textSecondary">
             Your daily target
           </Text>
-          <BudgetVessel target={t.target} tdee={plan.tdee} goal={p.goal} note={`${budgetNote}Each workout you log adds its calories above resting on top, shared over 7 days: the striped space at the top of your cup on Today.`} />
+          <BudgetVessel
+            target={t.target}
+            tdee={plan.tdee}
+            goal={p.goal}
+            note={`${budgetNote}Each workout you log adds its calories above resting on top, shared over 7 days: the striped space at the top of your cup on Today.`}
+          />
           {/* Where the target is set, said plainly: an estimate, not medical advice, and who checks with a doctor first. */}
           <Text variant="caption" color="textSecondary" testID="plan-care-note">
             {TARGET_CARE_NOTE}
@@ -116,7 +139,9 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
             style={{ gap: spacing.md }}
             testID="plan-projection"
             accessible
-            accessibilityLabel={spokenUnits(`The road to ${formatWeight(projection.targetKg, units)}: ${range}, around ${looseDate(projection.date, now)} at about ${pace} a week. A projection, not a promise.`)}>
+            accessibilityLabel={spokenUnits(
+              `The road to ${formatWeight(projection.targetKg, units)}: ${range}, around ${looseDate(projection.date, now)} at about ${pace} a week. A projection, not a promise.`,
+            )}>
             <View style={{ gap: spacing.xs }}>
               <Text variant="h3">{`The road to ${formatWeight(projection.targetKg, units)}`}</Text>
               <Text variant="caption" color="textSecondary" testID="plan-date">
@@ -138,7 +163,16 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
           <MacroBar protein={plan.macros.split.protein} carbs={plan.macros.split.carbs} fat={plan.macros.split.fat} height={10} />
           <View style={{ flexDirection: 'row' }}>
             {macros.map((m, i) => (
-              <View key={m.key} style={{ flex: 1, minWidth: 0, gap: 2, paddingLeft: i ? spacing.md : 0, borderLeftWidth: i ? 1 : 0, borderLeftColor: colors.border }}>
+              <View
+                key={m.key}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  gap: 2,
+                  paddingLeft: i ? spacing.md : 0,
+                  borderLeftWidth: i ? 1 : 0,
+                  borderLeftColor: colors.border,
+                }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <CupKey color={m.color} />
                   <Text variant="label" color="textSecondary" numberOfLines={1}>
@@ -164,7 +198,14 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
                 Water
               </Text>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', columnGap: spacing.md, flexWrap: 'wrap' }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'baseline',
+                justifyContent: 'space-between',
+                columnGap: spacing.md,
+                flexWrap: 'wrap',
+              }}>
               {/* The number and its unit never part; on a small phone the note drops under them. */}
               <Text variant="numL" testID="plan-water" numberOfLines={1} style={{ flexShrink: 0 }}>
                 {waterNum}
@@ -188,7 +229,12 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
             accessibilityRole="button"
             accessibilityState={{ expanded: showMath }}
             accessibilityLabel="See how we worked it out"
-            style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56 }}>
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.md,
+              minHeight: 56,
+            }}>
             <Text variant="title" style={{ flex: 1 }}>
               See how we worked it out
             </Text>
@@ -228,7 +274,13 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
       </FadeUp>
 
       {/* Always in view, not folded away with the working: these numbers are where the plan starts. */}
-      <FadeUp delay={landed + (projection ? 260 : 140)} style={{ flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.xs }}>
+      <FadeUp
+        delay={landed + (projection ? 260 : 140)}
+        style={{
+          flexDirection: 'row',
+          gap: spacing.sm,
+          paddingHorizontal: spacing.xs,
+        }}>
         <Info size={16} color={colors.textSecondary} strokeWidth={1.9} />
         <Text variant="caption" color="textSecondary" style={{ flex: 1 }} testID="plan-estimates-note">
           Starting estimates: they adapt to what you really burn as you log. Change any number in Goals.
@@ -253,7 +305,13 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
 function MathRow({ label, detail, value, testID }: { label: string; detail: string; value: string; testID?: string }) {
   const { spacing } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }} testID={testID}>
+    <View
+      style={{
+        flexDirection: 'row',
+        gap: spacing.md,
+        alignItems: 'flex-start',
+      }}
+      testID={testID}>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text variant="bodyStrong">{label}</Text>
         <Text variant="caption" color="textSecondary">
@@ -294,7 +352,18 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
   const burnLabel = (
     <View style={{ flexDirection: 'row', gap: 6 }}>
       {/* The key for the dashed mark in the cup. */}
-      {burnInside ? <View style={{ width: 12, height: 0, marginTop: 10, borderTopWidth: 1.5, borderStyle: 'dashed', borderColor: colors.text }} /> : null}
+      {burnInside ? (
+        <View
+          style={{
+            width: 12,
+            height: 0,
+            marginTop: 10,
+            borderTopWidth: 1.5,
+            borderStyle: 'dashed',
+            borderColor: colors.text,
+          }}
+        />
+      ) : null}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text variant="numM" style={{ fontSize: 18, lineHeight: 22 }}>
           {`~${formatNumber(burn)}`}
@@ -327,7 +396,16 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
       // What you burn, as a dashed mark across the cup at its level (the key beside the label matches it).
       <View
         pointerEvents="none"
-        style={{ position: 'absolute', left: 5, width: w - 10, top: Math.round(levelY(burn, top, h - 1.5)), height: 0, borderTopWidth: 1.5, borderStyle: 'dashed', borderColor: colors.text }}
+        style={{
+          position: 'absolute',
+          left: 5,
+          width: w - 10,
+          top: Math.round(levelY(burn, top, h - 1.5)),
+          height: 0,
+          borderTopWidth: 1.5,
+          borderStyle: 'dashed',
+          borderColor: colors.text,
+        }}
       />
     ) : null;
   if (largeText) {
@@ -339,7 +417,12 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
           <AnimatedNumber variant="numXL" color="caloriesInk" testID="plan-kcal" value={target} from={0} duration={ARRIVAL_POUR} delay={POUR_DELAY} format={(n) => formatNumber(Math.round(n))} />
           <Text variant="unit">kcal a day</Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.lg }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+            gap: spacing.lg,
+          }}>
           <View>
             <Vessel value={target} max={top} color={colors.calories} width={64} height={150} duration={ARRIVAL_POUR} delay={POUR_DELAY} testID="plan-vessel" />
             {burnMark(64, 150)}
@@ -369,7 +452,17 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
         labelSpacing={10}
         accessibilityLabel={spoken}
         labels={[
-          ...(showBurn ? [{ key: 'burn', at: burn, height: 40, tick: burnInside ? undefined : colors.vesselEdge, content: burnLabel }] : []),
+          ...(showBurn
+            ? [
+                {
+                  key: 'burn',
+                  at: burn,
+                  height: 40,
+                  tick: burnInside ? undefined : colors.vesselEdge,
+                  content: burnLabel,
+                },
+              ]
+            : []),
           ...(showBurn && goal !== 'maintain'
             ? [
                 {

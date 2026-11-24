@@ -5,7 +5,10 @@ import { cup, fonts, LOOK_HINTS, paletteFor, radius, THEME_CHOICES, THEME_LABELS
 import { PressableScale, Text } from '@/ui';
 
 /** The name on each tile. "Match my phone" is too long for a tile a quarter of a 320 px phone wide, so it is "System" here. */
-const TILE_LABELS: Record<ThemeChoice, string> = { ...THEME_LABELS, system: 'System' };
+const TILE_LABELS: Record<ThemeChoice, string> = {
+  ...THEME_LABELS,
+  system: 'System',
+};
 
 /** One line about each choice: under Appearance for the selected one, and in each tile's screen-reader label. */
 export const THEME_HINTS: Record<ThemeChoice, string> = {
@@ -53,7 +56,19 @@ function Mini({ c, half }: { c: ThemeColors; half?: 'left' | 'right' }) {
         borderBottomLeftRadius: half === 'right' ? 0 : 10,
         borderBottomRightRadius: half === 'left' ? 0 : 10,
       }}>
-      <View style={{ backgroundColor: c.surface, ...cup(9, 3), paddingHorizontal: 5, paddingVertical: 5, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 5, borderWidth: 1, borderColor: c.border }}>
+      <View
+        style={{
+          backgroundColor: c.surface,
+          ...cup(9, 3),
+          paddingHorizontal: 5,
+          paddingVertical: 5,
+          flexDirection: 'row',
+          alignItems: 'flex-end',
+          justifyContent: 'center',
+          gap: 5,
+          borderWidth: 1,
+          borderColor: c.border,
+        }}>
         {/* The vessel: open top, sides and base in vesselEdge, empty above the calorie fill, a rim on the fill. */}
         <View
           style={{
@@ -74,12 +89,47 @@ function Mini({ c, half }: { c: ThemeColors; half?: 'left' | 'right' }) {
         </View>
         {half ? null : (
           <View style={{ flex: 1, minWidth: 0, gap: 5, paddingBottom: 2 }}>
-            <View style={{ height: 4, width: '70%', borderRadius: 1, backgroundColor: c.text }} />
-            <View style={{ height: 4, borderRadius: 1, backgroundColor: c.track, justifyContent: 'center' }}>
-              <View style={{ width: '55%', height: 4, borderRadius: 1, backgroundColor: c.water }} />
-              <View style={{ position: 'absolute', left: '55%', width: 2, height: 8, backgroundColor: c.rim }} />
+            <View
+              style={{
+                height: 4,
+                width: '70%',
+                borderRadius: 1,
+                backgroundColor: c.text,
+              }}
+            />
+            <View
+              style={{
+                height: 4,
+                borderRadius: 1,
+                backgroundColor: c.track,
+                justifyContent: 'center',
+              }}>
+              <View
+                style={{
+                  width: '55%',
+                  height: 4,
+                  borderRadius: 1,
+                  backgroundColor: c.water,
+                }}
+              />
+              <View
+                style={{
+                  position: 'absolute',
+                  left: '55%',
+                  width: 2,
+                  height: 8,
+                  backgroundColor: c.rim,
+                }}
+              />
             </View>
-            <View style={{ height: 6, width: 14, ...cup(3, 1), backgroundColor: c.primary }} />
+            <View
+              style={{
+                height: 6,
+                width: 14,
+                ...cup(3, 1),
+                backgroundColor: c.primary,
+              }}
+            />
           </View>
         )}
       </View>
@@ -115,7 +165,12 @@ export function ThemeSwatches({ value, onChange }: { value: ThemeChoice; onChang
                 accessibilityLabel={`${TILE_LABELS[choice]}. ${THEME_HINTS[choice]}`}
                 feedback="select"
                 onPress={() => onChange(choice)}
-                style={{ flex: 1, minWidth: 0, alignItems: 'center', gap: spacing.xs }}>
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  alignItems: 'center',
+                  gap: spacing.xs,
+                }}>
                 <View
                   style={{
                     width: '100%',
@@ -140,7 +195,11 @@ export function ThemeSwatches({ value, onChange }: { value: ThemeChoice; onChang
                   variant="label"
                   color={selected ? 'text' : 'textSecondary'}
                   numberOfLines={1}
-                  style={{ maxWidth: '100%', fontFamily: selected ? fonts.bold : fonts.semibold, ...(narrow ? { fontSize: 13 } : null) }}>
+                  style={{
+                    maxWidth: '100%',
+                    fontFamily: selected ? fonts.bold : fonts.semibold,
+                    ...(narrow ? { fontSize: 13 } : null),
+                  }}>
                   {TILE_LABELS[choice]}
                 </Text>
               </PressableScale>

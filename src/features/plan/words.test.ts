@@ -10,19 +10,65 @@ import type { PlanOffer } from './view';
 import * as W from './words';
 
 const R19 = /\b(upgrade|unlock|premium|run out|ran out|don't miss|do not miss|limited time|free users|last chance|hurry|only \d+ left|ends in|countdown)\b/i;
-const MORNING =
-  /\b(bad|fail|failed|failure|cheat|cheated|should|guilty|lazy|great|amazing|well done|keep it up|too much|missed your|goal missed|over budget|make up|only|unfortunately|oops|sorry)\b/i;
+const MORNING = /\b(bad|fail|failed|failure|cheat|cheated|should|guilty|lazy|great|amazing|well done|keep it up|too much|missed your|goal missed|over budget|make up|only|unfortunately|oops|sorry)\b/i;
 
 const offers: PlanOffer[] = [
-  { id: 'm', plan: 'plus', period: 'month', amount: 399, currency: 'USD', taxIncluded: false },
-  { id: 'y', plan: 'plus', period: 'year', amount: 2999, currency: 'USD', taxIncluded: null },
-  { id: 'e', plan: 'plus', period: 'year', amount: 3499, currency: 'EUR', taxIncluded: true },
-  { id: 'i', plan: 'plus', period: 'month', amount: 1490, currency: 'ILS', taxIncluded: true },
+  {
+    id: 'm',
+    plan: 'plus',
+    period: 'month',
+    amount: 399,
+    currency: 'USD',
+    taxIncluded: false,
+  },
+  {
+    id: 'y',
+    plan: 'plus',
+    period: 'year',
+    amount: 2999,
+    currency: 'USD',
+    taxIncluded: null,
+  },
+  {
+    id: 'e',
+    plan: 'plus',
+    period: 'year',
+    amount: 3499,
+    currency: 'EUR',
+    taxIncluded: true,
+  },
+  {
+    id: 'i',
+    plan: 'plus',
+    period: 'month',
+    amount: 1490,
+    currency: 'ILS',
+    taxIncluded: true,
+  },
 ];
 const CODES = [
-  'already_subscribed', 'plans_off', 'not_configured', 'provider_failed', 'offline', 'timeout', 'rate_limited', 'checkout_limit', 'too_many', 'offer_unknown',
-  'return_url_invalid', 'nothing_to_manage', 'cancel_elsewhere', 'unauthorized', 'signed_out', 'unconfirmed', 'no_backend', 'cancelled',
-  'store_failed', 'internal', 'bad_answer', 'unknown_action',
+  'already_subscribed',
+  'plans_off',
+  'not_configured',
+  'provider_failed',
+  'offline',
+  'timeout',
+  'rate_limited',
+  'checkout_limit',
+  'too_many',
+  'offer_unknown',
+  'return_url_invalid',
+  'nothing_to_manage',
+  'cancel_elsewhere',
+  'unauthorized',
+  'signed_out',
+  'unconfirmed',
+  'no_backend',
+  'cancelled',
+  'store_failed',
+  'internal',
+  'bad_answer',
+  'unknown_action',
 ];
 
 function all(): Set<string> {
@@ -51,7 +97,13 @@ function all(): Set<string> {
     add(W.eachDayUntil(v.periodEnd));
     if (v.startedAt) add(W.withdrawSub(v.startedAt));
     add(W.freeAiLine(v.planLimits.free));
-    add(W.savingAndTax(v.offers.find((o) => o.period === 'month'), v.offers.find((o) => o.period === 'year'), { taxIncluded: false }));
+    add(
+      W.savingAndTax(
+        v.offers.find((o) => o.period === 'month'),
+        v.offers.find((o) => o.period === 'year'),
+        { taxIncluded: false },
+      ),
+    );
   }
   for (const o of offers) {
     add(W.priceLine(o));
@@ -74,12 +126,46 @@ function all(): Set<string> {
   }
   for (const s of ['paddle', 'polar', 'stripe', 'test', 'app_store', 'play_store', 'promotional'] as const) add(W.sourceLine(s));
   for (const s of [
-    W.PLAN_INTRO, W.SELLER_LINE, W.NOTHING_TO_CHOOSE, W.SIGNED_OUT_LINE, W.LOADING_LINE, W.WAITING_LINE, W.LATE_LINE, W.CHECKOUT_CLOSED,
-    W.MANAGE_LABEL, W.CANCEL_LABEL, W.WITHDRAW_LABEL, W.TERMS_LABEL, W.PRIVACY_LABEL, W.DELETE_PLAN_LINE, W.DELETE_ANYWAY_LABEL,
-    W.RELEASED_LINE, W.PLAN_ACTIVE_LINE, W.ADD_PASSWORD_LABEL, W.ADD_PASSWORD_HINT, W.addPasswordSent('a@b.co'),
-    W.notBuyableHere('channel'), W.notBuyableHere('frame'),
-    W.PLAN_INTRO_LEAD, W.PLAN_INTRO_MORE, W.YOUR_PLAN_TAG, W.STAYS_FREE_TITLE, W.STAYS_FREE_IF_CANCEL, W.STAYS_FREE_AFTER_END, ...W.STAYS_FREE_ROWS, W.STAYS_FREE_NOTE,
-    W.EACH_DAY_TITLE, W.PAST_DUE_HEAD, W.CANCEL_SUB, W.BOTH_LEAD, W.SIGNED_OUT_TITLE, W.SIGNED_OUT_BODY, W.SIGN_IN_ACTION, W.OFF_TITLE, W.LATE_TITLE, W.LATE_MORE,
+    W.PLAN_INTRO,
+    W.SELLER_LINE,
+    W.NOTHING_TO_CHOOSE,
+    W.SIGNED_OUT_LINE,
+    W.LOADING_LINE,
+    W.WAITING_LINE,
+    W.LATE_LINE,
+    W.CHECKOUT_CLOSED,
+    W.MANAGE_LABEL,
+    W.CANCEL_LABEL,
+    W.WITHDRAW_LABEL,
+    W.TERMS_LABEL,
+    W.PRIVACY_LABEL,
+    W.DELETE_PLAN_LINE,
+    W.DELETE_ANYWAY_LABEL,
+    W.RELEASED_LINE,
+    W.PLAN_ACTIVE_LINE,
+    W.ADD_PASSWORD_LABEL,
+    W.ADD_PASSWORD_HINT,
+    W.addPasswordSent('a@b.co'),
+    W.notBuyableHere('channel'),
+    W.notBuyableHere('frame'),
+    W.PLAN_INTRO_LEAD,
+    W.PLAN_INTRO_MORE,
+    W.YOUR_PLAN_TAG,
+    W.STAYS_FREE_TITLE,
+    W.STAYS_FREE_IF_CANCEL,
+    W.STAYS_FREE_AFTER_END,
+    ...W.STAYS_FREE_ROWS,
+    W.STAYS_FREE_NOTE,
+    W.EACH_DAY_TITLE,
+    W.PAST_DUE_HEAD,
+    W.CANCEL_SUB,
+    W.BOTH_LEAD,
+    W.SIGNED_OUT_TITLE,
+    W.SIGNED_OUT_BODY,
+    W.SIGN_IN_ACTION,
+    W.OFF_TITLE,
+    W.LATE_TITLE,
+    W.LATE_MORE,
   ])
     add(s);
   return out;
@@ -164,20 +250,28 @@ describe('money', () => {
 
 describe('rows and dates', () => {
   it('reads the plan in one line', () => {
-    const base = { plan: 'plus' as const, state: 'active' as const, periodEnd: '2027-12-23T12:00:00Z', cancelAtPeriodEnd: false, paymentGraceUntil: null };
+    const base = {
+      plan: 'plus' as const,
+      state: 'active' as const,
+      periodEnd: '2027-12-23T12:00:00Z',
+      cancelAtPeriodEnd: false,
+      paymentGraceUntil: null,
+    };
     expect(W.planRowLine({ ...base, plan: 'free', state: 'none' })).toBe('Free');
     expect(W.planRowLine(base)).toBe('Plus until Dec 23');
     expect(W.planRowLine({ ...base, state: 'canceling', cancelAtPeriodEnd: true })).toBe('Plus, ends Dec 23');
-    expect(W.planRowLine({ ...base, state: 'past_due', paymentGraceUntil: '2027-12-30T12:00:00Z' })).toBe('Plus, payment due by Dec 30');
+    expect(
+      W.planRowLine({
+        ...base,
+        state: 'past_due',
+        paymentGraceUntil: '2027-12-30T12:00:00Z',
+      }),
+    ).toBe('Plus, payment due by Dec 30');
     expect(W.plusOnToast('2027-12-23T12:00:00Z')).toBe('Plus is on until Dec 23, 2027.');
     expect(W.graceLine('2027-01-31T12:00:00Z')).toBe('Your earlier allowance stays until Jan 31.');
   });
   it('gives the three rows as figures with units', () => {
-    expect(W.cardRows({ estimates: 5, questions: 5, memoryPairs: 3 }).map((r) => `${r.label}: ${r.value}`)).toEqual([
-      'AI estimates: 5 a day',
-      'Coach questions: 5 a day',
-      'Coach memory: 3 exchanges',
-    ]);
+    expect(W.cardRows({ estimates: 5, questions: 5, memoryPairs: 3 }).map((r) => `${r.label}: ${r.value}`)).toEqual(['AI estimates: 5 a day', 'Coach questions: 5 a day', 'Coach memory: 3 exchanges']);
     expect(W.cardRows({ estimates: 40, questions: 30, memoryPairs: 1 })[2].value).toBe('1 exchange');
     expect(W.cardRows({ estimates: 5, questions: 5, memoryPairs: 3 }).map((r) => W.rowUnit(r.key))).toEqual(['a day', 'a day', 'earlier exchanges']);
   });

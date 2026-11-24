@@ -108,7 +108,7 @@ function Guide() {
       <PressableScale
         testID="import-guide-toggle"
         accessibilityLabel="How to get your files from Garmin Connect"
-        accessibilityState={{ expanded: open }}
+        expanded={open}
         onPress={() => setOpen((o) => !o)}
         scaleTo={0.99}
         style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingHorizontal: spacing.lg }}>

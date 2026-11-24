@@ -36,9 +36,21 @@ import { Avatar, Button, goBack, haptic, Header, IconButton, PressableScale, Scr
 type Mode = 'signin' | 'signup' | 'forgot';
 
 const COPY: Record<Mode, { title: string; subtitle: string; submit: string }> = {
-  signin: { title: 'Welcome back', subtitle: 'Your plan and logs come back on this device.', submit: 'Sign in' },
-  signup: { title: 'Create your account', subtitle: 'Free. It backs up and syncs your data.', submit: 'Create account' },
-  forgot: { title: 'Reset your password', subtitle: "We'll email you a link to choose a new one.", submit: 'Send reset link' },
+  signin: {
+    title: 'Welcome back',
+    subtitle: 'Your plan and logs come back on this device.',
+    submit: 'Sign in',
+  },
+  signup: {
+    title: 'Create your account',
+    subtitle: 'Free. It backs up and syncs your data.',
+    submit: 'Create account',
+  },
+  forgot: {
+    title: 'Reset your password',
+    subtitle: "We'll email you a link to choose a new one.",
+    submit: 'Send reset link',
+  },
 };
 
 /**
@@ -56,7 +68,12 @@ function fromEmailOf(params: Record<string, string | string[] | undefined>): Fro
 }
 
 export default function Auth() {
-  const params = useLocalSearchParams<{ mode?: string; code?: string; error_code?: string; error_description?: string }>();
+  const params = useLocalSearchParams<{
+    mode?: string;
+    code?: string;
+    error_code?: string;
+    error_description?: string;
+  }>();
   const [fromEmail] = useState<FromEmail>(() => fromEmailOf(params));
   const initial: Mode = params.mode === 'signup' ? 'signup' : params.mode === 'forgot' ? 'forgot' : 'signin';
   // Someone already signed in has nothing to do here.
@@ -97,7 +114,10 @@ function AuthForm({ initial, fromEmail, googleError = null }: { initial: Mode; f
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<{ email?: string | null; password?: string | null }>({});
+  const [fieldErrors, setFieldErrors] = useState<{
+    email?: string | null;
+    password?: string | null;
+  }>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
@@ -110,7 +130,10 @@ function AuthForm({ initial, fromEmail, googleError = null }: { initial: Mode; f
   // The links' touch area reaches LINK_REACH px under their words, so the block counts as that much taller: a link in the first view is 44 px to touch.
   const termsPush = foldPush(termsTop, termsHeight + LINK_REACH, fold);
   // On a phone the Google flow ends here with a session; on the web the page leaves for Google and comes back to /auth?mode=google.
-  const google = useGoogleSignIn({ onSignedIn: () => setSignedIn(true), initialError: googleError });
+  const google = useGoogleSignIn({
+    onSignedIn: () => setSignedIn(true),
+    initialError: googleError,
+  });
   // Opened from the confirmation email in the browser that asked for it: the backend client signs in by itself.
   const signedInByLink = useAuth((s) => !!s.session) && !!fromEmail && !signedIn && done === null;
 
@@ -118,9 +141,16 @@ function AuthForm({ initial, fromEmail, googleError = null }: { initial: Mode; f
   const arrival = mode === 'signin' && fromEmail ? fromEmail : null;
   const copy =
     arrival === 'confirmed'
-      ? { ...COPY.signin, title: 'Email confirmed', subtitle: 'Sign in to finish. Your plan then syncs here.' }
+      ? {
+          ...COPY.signin,
+          title: 'Email confirmed',
+          subtitle: 'Sign in to finish. Your plan then syncs here.',
+        }
       : arrival === 'failed'
-        ? { ...COPY.signin, subtitle: 'That link no longer works. Sign in, or sign up again for a new one.' }
+        ? {
+            ...COPY.signin,
+            subtitle: 'That link no longer works. Sign in, or sign up again for a new one.',
+          }
         : COPY[mode];
 
   const switchMode = (m: Mode) => {
@@ -194,7 +224,9 @@ function AuthForm({ initial, fromEmail, googleError = null }: { initial: Mode; f
       testID="auth-screen"
       header={<Header title={copy.title} subtitle="Account and sync" onBack={() => (mode === 'forgot' && initial !== 'forgot' ? switchMode('signin') : goBack('/welcome'))} />}
       contentStyle={{ gap: spacing.xl }}
-      scrollProps={{ onLayout: (e) => setFold(Math.round(e.nativeEvent.layout.height)) }}
+      scrollProps={{
+        onLayout: (e) => setFold(Math.round(e.nativeEvent.layout.height)),
+      }}
       footer={<Button title={copy.submit} testID="auth-submit" onPress={submit} loading={busy} />}>
       {/* The title is the header's; what the form is for is the line under it here. */}
       <FadeIn key={mode}>
@@ -291,7 +323,11 @@ function AuthForm({ initial, fromEmail, googleError = null }: { initial: Mode; f
                     accessibilityRole="button"
                     onPress={() => switchMode('forgot')}
                     testID="auth-forgot"
-                    style={{ alignSelf: 'flex-end', paddingVertical: spacing.sm, textDecorationLine: 'underline' }}>
+                    style={{
+                      alignSelf: 'flex-end',
+                      paddingVertical: spacing.sm,
+                      textDecorationLine: 'underline',
+                    }}>
                     Forgot password?
                   </Text>
                 ) : null}
@@ -333,7 +369,12 @@ function AuthForm({ initial, fromEmail, googleError = null }: { initial: Mode; f
                 <Text variant="caption" color="textSecondary" align="center" testID="auth-terms-line">
                   {AUTH_TERMS_LINE}
                 </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
                   <LegalLink label={AUTH_TERMS_LABEL} to="/legal/terms" testID="auth-terms" />
                   <Text variant="caption" color="textSecondary" style={{ marginHorizontal: spacing.md }} accessibilityElementsHidden importantForAccessibility="no">
                     ·
@@ -409,7 +450,13 @@ function FormError({ message, testID }: { message: string | null; testID: string
   const { colors, spacing } = useTheme();
   if (!message) return null;
   return (
-    <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }} testID={testID}>
+    <View
+      style={{
+        flexDirection: 'row',
+        gap: spacing.sm,
+        alignItems: 'flex-start',
+      }}
+      testID={testID}>
       <View style={{ paddingTop: 1 }}>
         <TriangleAlert size={16} color={colors.danger} strokeWidth={2.2} />
       </View>
@@ -472,7 +519,11 @@ function GoogleWaiting() {
     <Screen
       testID="auth-google-waiting"
       header={<Header title={GOOGLE_WAITING.title} subtitle={GOOGLE_WAITING.subtitle} onBack={() => goBack('/welcome')} />}
-      contentStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}>
+      contentStyle={{
+        flexGrow: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}>
       <WaitLines title={GOOGLE_WAITING.lead} body={GOOGLE_WAITING.body} cupTestID="auth-google-waiting-cup" />
     </Screen>
   );
@@ -484,7 +535,11 @@ function ResetChecking() {
     <Screen
       testID="auth-reset-checking"
       header={<Header title="New password" subtitle="Password reset" onBack={() => goBack('/welcome')} />}
-      contentStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}>
+      contentStyle={{
+        flexGrow: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}>
       <WaitLines title={RESET_CHECKING.title} body={RESET_CHECKING.body} cupTestID="auth-reset-checking-cup" />
     </Screen>
   );
@@ -507,7 +562,10 @@ function ResetPassword() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [show, setShow] = useState(false);
-  const [errors, setErrors] = useState<{ password?: string | null; confirm?: string | null }>({});
+  const [errors, setErrors] = useState<{
+    password?: string | null;
+    confirm?: string | null;
+  }>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [doneReset, setDoneReset] = useState(false);
@@ -527,7 +585,11 @@ function ResetPassword() {
       <Screen
         testID="auth-reset-expired"
         header={<Header title="Link no longer works" subtitle="Password reset" onBack={() => goBack('/welcome')} />}
-        contentStyle={{ flexGrow: 1, justifyContent: 'center', gap: spacing.xxl }}
+        contentStyle={{
+          flexGrow: 1,
+          justifyContent: 'center',
+          gap: spacing.xxl,
+        }}
         footer={
           <View style={{ gap: spacing.sm }}>
             <Button title="Send a new link" testID="auth-reset-resend" onPress={() => router.replace('/auth?mode=forgot')} />

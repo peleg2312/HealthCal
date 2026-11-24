@@ -21,6 +21,7 @@ import { fonts, useTheme } from '@/theme';
 import type { ISODate, MealType } from '@/types';
 import { Button, CupKey, Divider, EmptyState, IconButton, ProgressBar, SectionTitle, Sheet, Text } from '@/ui';
 
+import { LARGE_TEXT, useTextGrowth } from './textGrowth';
 import { fitCandidates, rankFits, type Fit } from './fits';
 import { IDEAS_TITLE, PLATE_NOTE, ideaRow, mealIdeas, overLine, type MealIdea, type MealIdeas } from './ideas';
 
@@ -77,7 +78,10 @@ export function FitsSheet({
   proteinLeft: number;
 }) {
   const { colors, spacing } = useTheme();
-  const narrow = useWindowDimensions().width < 360;
+  // No room for a numbers column beside a row's name: a narrow phone, or large text (130% and up), where the numbers
+  // lead the line under the name instead and the emoji keeps its own width.
+  const large = useTextGrowth() > LARGE_TEXT;
+  const narrow = useWindowDimensions().width < 360 || large;
   const todayDate = useToday();
   const entries = useLive('foodEntries');
   const savedMeals = useLive('savedMeals');
@@ -205,7 +209,7 @@ export function FitsSheet({
               <React.Fragment key={idea.key}>
                 {i > 0 ? <Divider inset={34} /> : null}
                 <View testID={`fits-idea-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 60, paddingVertical: 8 }}>
-                  <Text style={{ fontSize: 17, lineHeight: 22, width: 22, textAlign: 'center', opacity: dim ? 0.6 : 1 }}>{idea.emoji || '🍽️'}</Text>
+                  <Text style={{ fontSize: 17, lineHeight: 22, width: large ? undefined : 22, minWidth: 22, textAlign: 'center', opacity: dim ? 0.6 : 1 }}>{idea.emoji || '🍽️'}</Text>
                   <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                     <Text variant="bodyStrong" color={dim ? 'textSecondary' : 'text'} numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
                       {idea.name}
@@ -285,7 +289,7 @@ export function FitsSheet({
                 {i > 0 ? <Divider inset={34} /> : null}
                 <View testID={`fits-row-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 60, paddingVertical: 8 }}>
                   {/* Emoji are content marks only: 17 px, no tile. */}
-                  <Text style={{ fontSize: 17, lineHeight: 22, width: 22, textAlign: 'center', opacity: dim ? 0.6 : 1 }}>{f.food.emoji || '🍽️'}</Text>
+                  <Text style={{ fontSize: 17, lineHeight: 22, width: large ? undefined : 22, minWidth: 22, textAlign: 'center', opacity: dim ? 0.6 : 1 }}>{f.food.emoji || '🍽️'}</Text>
                   <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                     <Text variant="bodyStrong" color={dim ? 'textSecondary' : 'text'} numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
                       {isolateRtl(displayFoodName(f.food))}

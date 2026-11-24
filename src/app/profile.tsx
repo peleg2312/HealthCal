@@ -1,24 +1,5 @@
 import { router } from 'expo-router';
-import {
-  Bell,
-  Cloud,
-  CloudOff,
-  Database,
-  History,
-  Info,
-  Moon,
-  PartyPopper,
-  RefreshCw,
-  Ruler,
-  Smartphone,
-  Sunrise,
-  SunMoon,
-  Target,
-  Timer,
-  Users,
-  Vibrate,
-  Weight,
-} from 'lucide-react-native';
+import { Bell, Cloud, CloudOff, Database, History, Info, Moon, PartyPopper, RefreshCw, Ruler, Smartphone, Sunrise, SunMoon, Target, Timer, Users, Vibrate, Weight } from 'lucide-react-native';
 import React from 'react';
 import { Platform, useWindowDimensions, View } from 'react-native';
 
@@ -47,7 +28,11 @@ import { themeChoiceOf, themeChoicePatch, useTextSize, useTheme } from '@/theme'
 import type { UnitSystem } from '@/types';
 import { Card, CupKey, EmptyState, Header, ListRow, Screen, Segmented, Text, ToggleRow } from '@/ui';
 
-const GOAL_LABEL = { lose: 'Lose weight', maintain: 'Maintain weight', gain: 'Gain weight' } as const;
+const GOAL_LABEL = {
+  lose: 'Lose weight',
+  maintain: 'Maintain weight',
+  gain: 'Gain weight',
+} as const;
 
 export default function ProfileScreen() {
   const profile = useStore((s) => s.profile);
@@ -83,21 +68,12 @@ function ProfileHub() {
   const u = profile.units;
 
   const currentKg = weights.latest?.kg ?? profile.weightKg;
-  const goalLine =
-    profile.goal === 'maintain' || !profile.targetWeightKg
-      ? GOAL_LABEL[profile.goal]
-      : `Goal ${formatWeight(profile.targetWeightKg, u)}`;
+  const goalLine = profile.goal === 'maintain' || !profile.targetWeightKg ? GOAL_LABEL[profile.goal] : `Goal ${formatWeight(profile.targetWeightKg, u)}`;
 
   const r = settings.reminders;
   const { plan, now } = usePlannedReminders();
   const leftToday = plan.filter((p) => toISODate(p.at) === toISODate(now)).length;
-  const remindersSubtitle = r.enabled
-    ? leftToday === 0
-      ? 'On, nothing more today'
-      : `On, ${leftToday} more today`
-    : remindersSupported
-      ? 'Off'
-      : 'Arrive in the phone app';
+  const remindersSubtitle = r.enabled ? (leftToday === 0 ? 'On, nothing more today' : `On, ${leftToday} more today`) : remindersSupported ? 'Off' : 'Arrive in the phone app';
 
   // The daily target is in the card above; the row says what else is inside.
   const paceText =
@@ -106,7 +82,12 @@ function ProfileHub() {
   return (
     <Screen header={<Header title="Profile" subtitle="Settings and goals" />}>
       <Card>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.lg,
+          }}>
           <InitialsAvatar name={profile.name} />
           <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
             {/* A long name wraps to a second line (at its hyphen, say) rather than lose its end. */}
@@ -215,7 +196,12 @@ function ProfileHub() {
 
       <Group title="App">
         <View style={{ paddingVertical: spacing.md, gap: spacing.sm }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.md,
+            }}>
             <IconTile color={colors.primary}>
               <Weight size={20} color={colors.primary} />
             </IconTile>
@@ -237,7 +223,12 @@ function ProfileHub() {
           />
         </View>
         <View style={{ paddingVertical: spacing.md, gap: spacing.sm }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.md,
+            }}>
             <IconTile color={colors.sleep}>
               <SunMoon size={20} color={colors.sleep} />
             </IconTile>
@@ -345,7 +336,13 @@ function HeaderStat({ label, value, color, divider, stacked }: { label: string; 
   const unit = numeric ? value.slice(i + 1) : '';
   const size = narrow ? { fontSize: numeric ? 17 : 15, lineHeight: 21 } : numeric ? undefined : { fontSize: 17 };
   const key = (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, ...(stacked ? { flex: 1, minWidth: 0 } : null) }}>
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        ...(stacked ? { flex: 1, minWidth: 0 } : null),
+      }}>
       {color ? <CupKey color={color} /> : null}
       <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
         {label}
@@ -376,7 +373,14 @@ function HeaderStat({ label, value, color, divider, stacked }: { label: string; 
     );
   }
   return (
-    <View style={{ flex: 1, minWidth: 0, paddingLeft: divider ? (narrow ? spacing.sm : spacing.md) : 0, borderLeftWidth: divider ? 1 : 0, borderLeftColor: colors.border }}>
+    <View
+      style={{
+        flex: 1,
+        minWidth: 0,
+        paddingLeft: divider ? (narrow ? spacing.sm : spacing.md) : 0,
+        borderLeftWidth: divider ? 1 : 0,
+        borderLeftColor: colors.border,
+      }}>
       {key}
       {figure}
     </View>

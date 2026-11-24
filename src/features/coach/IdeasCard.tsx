@@ -3,7 +3,9 @@ import React from 'react';
 import { View } from 'react-native';
 
 import { ideaRow, PLATE_NOTE, overLine, type MealIdeas } from '@/features/today/ideas';
+import { LARGE_TEXT, useTextGrowth } from '@/features/today/textGrowth';
 import { isolateRtl } from '@/lib/bidi';
+import { spokenUnits } from '@/lib/spokenUnits';
 import { formatNumber } from '@/lib/units';
 import { useTheme } from '@/theme';
 import type { MealType } from '@/types';
@@ -34,6 +36,8 @@ export function IdeasCard({
   onFits: () => void;
 }) {
   const { colors, spacing } = useTheme();
+  // Large text (130% and up): the emoji keeps its own width rather than run into the name.
+  const large = useTextGrowth() > LARGE_TEXT;
   const body =
     ideas.state === 'over' ? (
       <Text variant="body">{overLine(ideas.overBy, true)}</Text>
@@ -47,12 +51,12 @@ export function IdeasCard({
             <React.Fragment key={idea.key}>
               {i > 0 ? <Divider /> : null}
               <View testID={`coach-idea-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: spacing.sm }}>
-                {idea.emoji ? <Text style={{ fontSize: 17, lineHeight: 22, width: 22, textAlign: 'center' }}>{idea.emoji}</Text> : null}
+                {idea.emoji ? <Text style={{ fontSize: 17, lineHeight: 22, width: large ? undefined : 22, minWidth: 22, textAlign: 'center' }}>{idea.emoji}</Text> : null}
                 <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                   <Text variant="bodyStrong" numberOfLines={1}>
                     {isolateRtl(idea.name)}
                   </Text>
-                  <Text variant="caption" color="textSecondary">
+                  <Text variant="caption" color="textSecondary" accessibilityLabel={spokenUnits(`${formatNumber(Math.round(idea.kcal))} kcal · P ${Math.round(idea.protein)} g`)}>
                     {`${formatNumber(Math.round(idea.kcal))} kcal · P ${Math.round(idea.protein)} g`}
                   </Text>
                   {row.kind === 'dim' ? (
