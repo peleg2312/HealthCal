@@ -101,7 +101,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
           <Text variant="overline" color="textSecondary">
             Your daily target
           </Text>
-          <BudgetVessel target={t.target} tdee={plan.tdee} goal={p.goal} note={`${budgetNote}Each workout you log adds its calories on top, shared over 7 days, as hatched headroom.`} />
+          <BudgetVessel target={t.target} tdee={plan.tdee} goal={p.goal} note={`${budgetNote}Each workout you log adds its calories above resting on top, shared over 7 days: the striped space at the top of your cup on Today.`} />
           {/* Where the target is set, said plainly: an estimate, not medical advice, and who checks with a doctor first. */}
           <Text variant="caption" color="textSecondary" testID="plan-care-note">
             {TARGET_CARE_NOTE}
@@ -206,7 +206,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
                       ? 'None planned: your burn is already at the recommended minimum'
                       : t.limitedByFloor
                         ? `Held at the ${formatNumber(plan.floor)} kcal minimum`
-                        : `For ${formatWeight(p.weeklyRateKg, units, 2)} a week (${units === 'imperial' ? '3,500 kcal per lb' : '7,700 kcal per kg'})`
+                        : `For ${formatWeight(p.weeklyRateKg, units, 1)} a week (${units === 'imperial' ? '3,500 kcal per lb' : '7,700 kcal per kg'})`
                   }
                   value={`${t.dailyDelta < 0 ? '−' : '+'}${kcal(Math.abs(t.dailyDelta))}`}
                 />
@@ -295,7 +295,7 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
       {burnInside ? <View style={{ width: 12, height: 0, marginTop: 10, borderTopWidth: 1.5, borderStyle: 'dashed', borderColor: colors.text }} /> : null}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text variant="numM" style={{ fontSize: 18, lineHeight: 22 }}>
-          {formatNumber(burn)}
+          {`~${formatNumber(burn)}`}
           <Text variant="unit"> kcal</Text>
         </Text>
         <Text variant="caption" color="textSecondary">

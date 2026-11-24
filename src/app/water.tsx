@@ -478,7 +478,14 @@ function WaterScreen() {
           })}
         />
       </View>
-      <Note icon={<Info size={14} color={colors.textSecondary} />}>{factorLine(beverage)}</Note>
+      <Note
+        icon={
+          <View aria-hidden>
+            <Info size={14} color={colors.textSecondary} />
+          </View>
+        }>
+        {factorLine(beverage)}
+      </Note>
 
       <SectionTitle title={isToday ? 'Today’s log' : `Log for ${dayName}`} />
       <Card padding={rows.length ? spacing.md : spacing.lg} testID="water-log">
@@ -575,7 +582,9 @@ function WaterScreen() {
         <Button
           testID="section-today-s-log-action"
           title={showAllLog ? 'Show less' : `Show all ${allEntries.length}`}
-          accessibilityLabel={showAllLog ? 'Show fewer drinks' : `Show all ${allEntries.length} drinks`}
+          // The visible words first; the open state is the button's own (aria-expanded on the web).
+          accessibilityLabel={showAllLog ? 'Show less' : `Show all ${allEntries.length} drinks`}
+          expanded={showAllLog}
           variant="ghost"
           size="sm"
           full={false}
@@ -590,8 +599,9 @@ function WaterScreen() {
         <Text variant="caption" color="textSecondary">
           {week.some((d) => d.waterMl > 0) ? `Goal met on ${daysMet} of 7 days.` : 'Bars fill in as you log drinks.'} Dashed line: the goal.
         </Text>
-        <View accessible accessibilityRole="image" accessibilityLabel={waterChartLabel(week.map((d) => ({ date: d.date, ml: d.waterMl, goalMl: d.waterGoalMl })), todayDate, units)}>
         <BarChart
+          // One image for a screen reader: the summary, then every day's amount (chartWords).
+          accessibilityLabel={waterChartLabel(week.map((d) => ({ date: d.date, ml: d.waterMl, goalMl: d.waterGoalMl })), todayDate, units)}
           data={bars}
           color={colors.water}
           goal={volumeValue(goal, units)}
@@ -601,7 +611,6 @@ function WaterScreen() {
           // Printed exactly as the hero prints the same amount ("1.23 L", "41"), with no unit for fl oz or ml.
           formatValue={(n) => formatVolume(volumeToMl(n, units), units).replace(/ (fl oz|ml)$/, '')}
         />
-        </View>
       </Card>
 
       <SectionTitle title="Where your goal comes from" />

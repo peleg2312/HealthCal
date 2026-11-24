@@ -89,10 +89,11 @@ export function calorieView(c: Pick<ImportCandidate, 'workout' | 'entry' | 'stat
   const net = Math.round(c.entry.kcalNet);
   if (c.entry.measured) {
     return {
-      added: `+${formatNumber(net)}`,
+      // The burn is measured; the part above resting is still an estimate, so it carries "~" (one name: "added").
+      added: `~${formatNumber(net)}`,
       estimate: false,
       detail: `${formatNumber(gross ?? c.entry.kcalGross)} by watch`,
-      spoken: `${formatNumber(gross ?? c.entry.kcalGross)} kcal measured by the watch, ${formatNumber(net)} kcal added above resting`,
+      spoken: `${formatNumber(gross ?? c.entry.kcalGross)} kcal burned, measured by the watch, about ${formatNumber(net)} kcal added`,
     };
   }
   const [lo, hi] = kcalRange(net);

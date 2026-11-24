@@ -129,7 +129,7 @@ export const QUALITY_LABELS: Record<SleepQuality, string> = {
   2: 'Fair',
   3: 'Okay',
   4: 'Good',
-  5: 'Great',
+  5: 'Very good',
 };
 
 /**

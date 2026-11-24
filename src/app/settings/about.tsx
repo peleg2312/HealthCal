@@ -17,6 +17,7 @@ import { View } from 'react-native';
 import { AiConsentAbout } from '@/features/ai/AiConsentAbout';
 import { AiGlyph } from '@/features/ai/mark';
 import { CoachConsentAbout } from '@/features/coach/CoachConsentAbout';
+import { CAPTION_READING_MAX, READING_MAX } from '@/features/legal/reading';
 import { usePlan } from '@/features/plan/cache';
 import { PlanRow } from '@/features/plan/PlanRow';
 import { planVisible } from '@/features/plan/view';
@@ -59,9 +60,10 @@ function Section({
           {title}
         </Text>
       </View>
-      <View style={{ gap: spacing.sm }}>{children}</View>
+      {/* Reading text keeps to about 70 characters a line at the 560 px cap (rubric D9-07). */}
+      <View style={{ gap: spacing.sm, maxWidth: READING_MAX }}>{children}</View>
       {source ? (
-        <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.md }}>
+        <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.md, maxWidth: CAPTION_READING_MAX }}>
           Source: {source}
         </Text>
       ) : null}
@@ -121,7 +123,7 @@ export default function AboutScreen() {
 
   return (
     <Screen header={<Header title="About HealthCal" subtitle="How your numbers are calculated" />}>
-      <Text variant="body" color="textSecondary">
+      <Text variant="body" color="textSecondary" style={{ maxWidth: READING_MAX }}>
         Every number in HealthCal comes from a published method. Here is each one in plain language, with where it comes from. All of them are
         estimates: bodies differ, and the app says so rather than showing false precision.
       </Text>
@@ -245,7 +247,7 @@ export default function AboutScreen() {
           with what you ate: expenditure = average intake − rate of change (kg a day) × 7,700. Logged workouts are then taken out, because each one is
           already added to the budget, on its own day or shared over seven days, so eating back exercise calories is never counted twice. It needs at least 10 fully logged days (800 kcal or more), 5 weigh-ins and two weeks between the first
           and last. The result is blended with the equation, trusting your data more as it grows (up to 85%), and kept within 65% to 145% of the
-          equation so a few missed logs cannot produce an extreme target.
+          equation so a few days without logs cannot produce an extreme target.
         </P>
       </Section>
 

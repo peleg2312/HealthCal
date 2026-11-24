@@ -114,7 +114,7 @@ describe('cases A to G', () => {
   });
   it('D: nothing notable, no line', () => expect(personalLine(D, null)).toBeNull());
   it('E: no food yesterday, the forgiving streak is still on', () => {
-    expect(personalLine(E, null)).toBe('Your 8-day logging streak is still on; one missed day does not end it.');
+    expect(personalLine(E, null)).toBe('Your 8-day logging streak is still on; one day without a log does not end it.');
   });
   it('F: day 2 of the first week', () => expect(personalLine(F, null)).toBe('Day 2 of your first week.'));
   it('G: a 412-day streak and a 22-character name; protein over the band is no record', () => {
@@ -134,7 +134,7 @@ describe('the rules in order', () => {
   it('P2: a milestone only with food yesterday', () => {
     expect(personalLine({ ...A, streak: 14 }, null)).toBe('Your logging streak reaches 14 days.');
     expect(personalLine({ ...A, streak: 400 }, null)).toBe('Your logging streak reaches 400 days.');
-    expect(personalLine({ ...E, streak: 14 }, null)).toBe('Your 14-day logging streak is still on; one missed day does not end it.');
+    expect(personalLine({ ...E, streak: 14 }, null)).toBe('Your 14-day logging streak is still on; one day without a log does not end it.');
     expect([7, 14, 21, 30, 50, 75, 100, 200, 365, 1000].every(isStreakMilestone)).toBe(true);
     expect([0, 1, 12, 99, 101, 412].some(isStreakMilestone)).toBe(false);
   });

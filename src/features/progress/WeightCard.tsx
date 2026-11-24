@@ -10,6 +10,7 @@ import { useTheme } from '@/theme';
 import type { Profile } from '@/types';
 import { Button, LineChart, Text } from '@/ui';
 
+import { chartLabel, evenly } from './chartWords';
 import { trendGoalLabel, weeklyRateText } from './goalDate';
 import { BigStat, go, Note, SectionCard, StatStrip } from './parts';
 
@@ -72,6 +73,10 @@ export function WeightCard({ series, start, end, profile, usual }: { series: Wei
         )}
       </View>
       <LineChart
+        accessibilityLabel={chartLabel(
+          `Weight trend from ${formatShortDate(pts[0].date)} to ${formatShortDate(pts[pts.length - 1].date)}: ${v(pts[0].trend).toFixed(1)} ${unit} to ${v(pts[pts.length - 1].trend).toFixed(1)} ${unit}, ${dots.length} weigh-ins`,
+          evenly(pts, 12).map((t) => `${formatShortDate(t.date)} ${v(t.trend).toFixed(1)} ${unit}`),
+        )}
         line={line}
         dots={dots}
         color={colors.weight}

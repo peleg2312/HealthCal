@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-import Animated, { FadeIn, Keyframe, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { FadeIn, Keyframe, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
 import { motion, useReducedMotion } from '@/theme';
 import { ease } from '@/ui';
 
 const { duration: D, distance: X } = motion;
+/** How long a removed row takes to fold its height away once it has faded (D1-05: the space closes, never snaps). */
+export const ROW_FOLD_MS = D.enter;
 
 // On the web a row only fades in, with Reanimated's own FadeIn: a custom Keyframe entrance is pinned with
 // position: absolute by Reanimated's web tidy-up afterwards and leaves the layout (see `rowEnter` in src/ui/motion.tsx).
@@ -22,14 +24,14 @@ const rowEnter =
 
 /**
  * Rows of a log (the diary, the water log), removed in two steps: the row fades out where it is, then
- * leaves the list, and the rows below close the space in one step with the card around them, instead
- * of sliding over a row that is still fading (the kit's `AnimatedItem` does both at once, which on web
- * draws the next row over the leaving one). No row glides: a row gliding inside a card that has
- * already shrunk is drawn past the card's bottom edge, over the gap and the next card.
+ * folds its own height to nothing (clipped while it folds), so the rows below and the card around them
+ * close the space together, frame by frame, instead of jumping up in one step (D1-05). Nothing slides
+ * over a row that is still fading (the kit's `AnimatedItem` does both at once, which on web draws the
+ * next row over the leaving one), and nothing is drawn past the card's edge: the card shrinks with the fold.
  *
- * Returns the current items with the ones just removed still in place, marked
- * `leaving`, for `motion.duration.rowExit` ms. Under reduced motion a removed
- * row goes at once. An item that comes back while it fades (Undo) simply stays.
+ * Returns the current items with the ones just removed still in place, marked `leaving`, for
+ * `motion.duration.rowExit` + `ROW_FOLD_MS` ms. Under reduced motion a removed row goes at once.
+ * An item that comes back while it fades or folds (Undo) simply stays.
  */
 export function useLeavingRows<T extends { id: string }>(items: T[]): { item: T; leaving: boolean }[] {
   const reduce = useReducedMotion();
@@ -46,7 +48,7 @@ export function useLeavingRows<T extends { id: string }>(items: T[]): { item: T;
   }
   useEffect(() => {
     if (!leaving.length) return;
-    const timer = setTimeout(() => setLeaving([]), D.rowExit);
+    const timer = setTimeout(() => setLeaving([]), D.rowExit + ROW_FOLD_MS);
     return () => clearTimeout(timer);
   }, [leaving]);
 
@@ -56,18 +58,32 @@ export function useLeavingRows<T extends { id: string }>(items: T[]): { item: T;
 }
 
 /**
- * One log row: it fades and slides in when added (not when the list
- * mounts: wrap the list in the kit's `AnimatedList`) and fades out in place while
- * `leaving`; when rows around it come or go it moves in one step with its card.
- * Only opacity and transforms animate; reduced motion makes every change instant.
+ * One log row: it fades and slides in when added (not when the list mounts: wrap the list in the kit's
+ * `AnimatedList`); while `leaving` it fades out in place and then folds its height to 0 over `ROW_FOLD_MS`,
+ * clipped, so what is below it moves up with the fold. The fold is the one height animation in the app,
+ * kept to a row that is leaving; reduced motion makes every change instant.
  */
 export function FadeRow({ children, leaving, testID }: { children: React.ReactNode; leaving: boolean; testID?: string }) {
   const reduce = useReducedMotion();
   const fade = useSharedValue(1);
+  // 1 whole, 0 folded away; the row's height as last laid out while whole.
+  const fold = useSharedValue(1);
+  const height = useSharedValue(0);
   useEffect(() => {
-    fade.set(leaving && !reduce ? withTiming(0, { duration: D.rowExit, easing: ease.exit }) : 1);
-  }, [leaving, reduce, fade]);
+    if (leaving && !reduce) {
+      fade.set(withTiming(0, { duration: D.rowExit, easing: ease.exit }));
+      fold.set(withDelay(D.rowExit, withTiming(0, { duration: ROW_FOLD_MS, easing: ease.move })));
+    } else {
+      fade.set(1);
+      fold.set(1);
+    }
+  }, [leaving, reduce, fade, fold]);
   const style = useAnimatedStyle(() => ({ opacity: fade.get(), transform: [{ scale: 0.98 + 0.02 * fade.get() }] }));
+  const folding = useAnimatedStyle(() => {
+    const f = fold.get();
+    const on = f < 1 && height.get() > 0;
+    return { height: on ? height.get() * f : 'auto', overflow: on ? 'hidden' : 'visible' };
+  });
   return (
     <Animated.View
       testID={testID}
@@ -75,8 +91,14 @@ export function FadeRow({ children, leaving, testID }: { children: React.ReactNo
       accessibilityElementsHidden={leaving}
       importantForAccessibility={leaving ? 'no-hide-descendants' : 'auto'}
       entering={reduce ? undefined : rowEnter}>
-      {/* The leaving fade on a view of its own: on the web the entrance animates the outer view's opacity. */}
-      <Animated.View style={style}>{children}</Animated.View>
+      {/* The fold and the leaving fade on views of their own: on the web the entrance animates the outer view's opacity. */}
+      <Animated.View
+        style={folding}
+        onLayout={(e) => {
+          if (!leaving) height.set(e.nativeEvent.layout.height);
+        }}>
+        <Animated.View style={style}>{children}</Animated.View>
+      </Animated.View>
     </Animated.View>
   );
 }

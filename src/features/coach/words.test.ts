@@ -74,7 +74,7 @@ describe('the coach’s words', () => {
     expect(W.ideaAddLabel('Tuesday’s dinner', 'dinner')).toBe('Add Tuesday’s dinner to dinner');
     expect(W.ideaAddLabel('Yogurt bowl', 'snack')).toBe('Add Yogurt bowl to snacks');
     expect(W.countLine(460)).toBe('460 / 500');
-    expect(W.REFER_LINE).toBe('If you are in danger now, call your local emergency number. findahelpline.com lists free lines in every country.');
+    expect(W.REFER_LINE).toBe('If you are at risk of harm now, call your local emergency number. findahelpline.com lists free lines in every country.');
     // The limit: today's words with plans off (or from an older server), the plan-aware ones with plans on.
     expect(W.NOTICE.daily_limit.text).toBe('30 questions today. They reset at midnight UTC.');
     const free = { limit: 5, plan: 'free' as const, cost: 1, resetsAt: null, graceUntil: null, shared: false };

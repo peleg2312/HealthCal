@@ -66,7 +66,7 @@ export function choiceWords(choice: BringInChoice, s: BringInState): ChoiceWords
   const waiting = waitingLine(s);
   if (!s.enabled) {
     const title = s.store ? 'Sync automatically' : 'Automatic sync';
-    const line = s.store ? `Workouts from ${storeName(s.store)}, by themselves` : syncReach('web', false).header;
+    const line = s.store ? `Workouts from ${storeName(s.store)}, by themselves` : syncReach('web', false).profile;
     return { title, line, flag: false };
   }
   if (waiting) return { title: 'Workout sync', line: waiting, flag: true };

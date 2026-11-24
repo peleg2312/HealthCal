@@ -15,7 +15,7 @@ import { Redirect, router, Stack, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
-import { AppState, Platform, Pressable, Text as RNText, View } from 'react-native';
+import { Appearance, AppState, Platform, Pressable, Text as RNText, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -34,7 +34,7 @@ import { startAutoSync, syncNow } from '@/services/sync';
 import { useStore } from '@/store';
 import { startDaySnapshots } from '@/store/daySnapshot';
 import { startPersistence, useHydration, wipePersisted } from '@/store/persistence';
-import { ThemeProvider, useReducedMotion, useTheme } from '@/theme';
+import { cup, lightColors, paletteFor, radius, resolveThemeName, ThemeProvider, useReducedMotion, useTheme, type ThemeColors } from '@/theme';
 import { ToastHost } from '@/ui';
 // Read once at the start, before the router draws a screen or changes the address (the morning page's start facts).
 import '@/features/morning/launch';
@@ -43,19 +43,35 @@ import '@/features/layout/leftToRight';
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 /**
+ * The colours of the screens drawn outside the theme (saved data that could not be read, a screen that
+ * threw): the look the stored settings name, read without React, else Light. Static palettes from the
+ * tokens, never hand-written colours.
+ */
+function fallbackColors(): ThemeColors {
+  try {
+    const settings = useStore.getState().settings;
+    return paletteFor(resolveThemeName(settings.theme, Appearance.getColorScheme(), false, settings.look));
+  } catch {
+    return lightColors;
+  }
+}
+
+/**
  * Shown when the last save did not reach the device, so the user knows before
  * more is lost. It floats above the tab bar, clear of the status bar and the
  * home indicator, instead of sitting at the very top under the notch.
  */
 function StorageWarning() {
   const failed = useHydration((h) => h.saveFailed);
-  const { colors, radius } = useTheme();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   if (!failed) return null;
   return (
     <View pointerEvents="none" style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 100, alignItems: 'center' }}>
-      <View accessibilityRole="alert" style={{ maxWidth: 520, backgroundColor: colors.warning, borderRadius: radius.md, paddingHorizontal: 16, paddingVertical: 12 }}>
-        <RNText style={{ color: '#201400', fontSize: 13, fontWeight: '600', textAlign: 'center' }}>
+      <View
+        accessibilityRole="alert"
+        style={{ maxWidth: 520, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderTopWidth: 3, borderTopColor: colors.warning, ...cup(radius.button), paddingHorizontal: 16, paddingVertical: 12 }}>
+        <RNText style={{ color: colors.text, fontSize: 13, fontWeight: '600', textAlign: 'center' }}>
           Changes are not being saved on this device (storage may be full). Export a backup from Profile, Your data.
         </RNText>
       </View>
@@ -65,26 +81,27 @@ function StorageWarning() {
 
 /** Saved data could not be read. Never leave a blank screen: offer a retry and a clean start. */
 function LoadFailed() {
+  const colors = fallbackColors();
   return (
-    <View style={{ flex: 1, backgroundColor: '#F4EEE5', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
       <RNText style={{ fontSize: 40 }}>🗄️</RNText>
-      <RNText style={{ color: '#211913', fontSize: 20, fontWeight: '700', textAlign: 'center' }}>Could not load your saved data</RNText>
-      <RNText style={{ color: '#5C5046', fontSize: 15, textAlign: 'center' }}>
+      <RNText style={{ color: colors.text, fontSize: 20, fontWeight: '700', textAlign: 'center' }}>Could not load your saved data</RNText>
+      <RNText style={{ color: colors.textSecondary, fontSize: 15, textAlign: 'center' }}>
         Try again first. Starting fresh clears what is saved on this device; anything backed up to your account comes back when you sign in.
       </RNText>
       <Pressable
         testID="load-retry"
         accessibilityRole="button"
         onPress={() => void startPersistence()}
-        style={{ marginTop: 12, backgroundColor: '#BF4420', paddingHorizontal: 28, height: 50, borderTopLeftRadius: 6, borderTopRightRadius: 6, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, alignItems: 'center', justifyContent: 'center' }}>
-        <RNText style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '700' }}>Try again</RNText>
+        style={{ marginTop: 12, backgroundColor: colors.primary, paddingHorizontal: 28, height: 50, ...cup(radius.button), alignItems: 'center', justifyContent: 'center' }}>
+        <RNText style={{ color: colors.onPrimary, fontSize: 16, fontWeight: '700' }}>Try again</RNText>
       </Pressable>
       <Pressable
         testID="load-start-fresh"
         accessibilityRole="button"
         onPress={() => void wipePersisted().then(() => startPersistence())}
         style={{ paddingHorizontal: 28, height: 50, alignItems: 'center', justifyContent: 'center' }}>
-        <RNText style={{ color: '#5C5046', fontSize: 15, fontWeight: '600' }}>Start fresh on this device</RNText>
+        <RNText style={{ color: colors.textSecondary, fontSize: 15, fontWeight: '600' }}>Start fresh on this device</RNText>
       </Pressable>
     </View>
   );
@@ -162,12 +179,13 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   useEffect(() => {
     console.error('[HealthCal] screen error:', detail, where);
   }, [detail, where]);
+  const colors = fallbackColors();
   return (
-    <View style={{ flex: 1, backgroundColor: '#F4EEE5', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 }}>
       <RNText style={{ fontSize: 40 }}>🛠️</RNText>
-      <RNText style={{ color: '#211913', fontSize: 20, fontWeight: '700', textAlign: 'center' }}>Something went wrong on this screen</RNText>
-      <RNText style={{ color: '#5C5046', fontSize: 15, textAlign: 'center' }}>Your data is safe on this device. Try again, and if it keeps happening, restart the app.</RNText>
-      <RNText testID="error-detail" selectable style={{ color: '#73665A', fontSize: 12, textAlign: 'center' }}>
+      <RNText style={{ color: colors.text, fontSize: 20, fontWeight: '700', textAlign: 'center' }}>Something went wrong on this screen</RNText>
+      <RNText style={{ color: colors.textSecondary, fontSize: 15, textAlign: 'center' }}>Your data is safe on this device. Try again, and if it keeps happening, restart the app.</RNText>
+      <RNText testID="error-detail" selectable style={{ color: colors.textSecondary, fontSize: 12, textAlign: 'center' }}>
         {detail}
         {where ? `\n${where}` : ''}
       </RNText>
@@ -175,8 +193,8 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
         testID="error-retry"
         accessibilityRole="button"
         onPress={retry}
-        style={{ marginTop: 12, backgroundColor: '#BF4420', paddingHorizontal: 28, height: 50, borderTopLeftRadius: 6, borderTopRightRadius: 6, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, alignItems: 'center', justifyContent: 'center' }}>
-        <RNText style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '700' }}>Try again</RNText>
+        style={{ marginTop: 12, backgroundColor: colors.primary, paddingHorizontal: 28, height: 50, ...cup(radius.button), alignItems: 'center', justifyContent: 'center' }}>
+        <RNText style={{ color: colors.onPrimary, fontSize: 16, fontWeight: '700' }}>Try again</RNText>
       </Pressable>
     </View>
   );

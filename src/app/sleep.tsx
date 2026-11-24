@@ -183,9 +183,14 @@ function SleepScreen() {
                 label="Night to night"
               />
             </View>
-            <View accessible accessibilityRole="image" accessibilityLabel={sleepChartLabel(summary.series, todayDate)}>
-              <BarChart data={bars} color={colors.sleep} band={{ from: SLEEP_RANGE[0], to: SLEEP_RANGE[1] }} height={160} formatValue={(n) => `${n.toFixed(1)}`} />
-            </View>
+            <BarChart
+              accessibilityLabel={sleepChartLabel(summary.series, todayDate)}
+              data={bars}
+              color={colors.sleep}
+              band={{ from: SLEEP_RANGE[0], to: SLEEP_RANGE[1] }}
+              height={160}
+              formatValue={(n) => `${n.toFixed(1)}`}
+            />
             <Text variant="caption" color="textSecondary" testID="sleep-chart-note">
               {[
                 'Shaded: 7 to 9 h.',
@@ -223,7 +228,9 @@ function SleepScreen() {
             <Button
               testID="section-sleep-history-action"
               title={showAll ? 'Show less' : `Show all ${allNights.length}`}
-              accessibilityLabel={showAll ? 'Show fewer nights' : `Show all ${allNights.length} nights`}
+              // The visible words first; the open state is the button's own (aria-expanded on the web).
+              accessibilityLabel={showAll ? 'Show less' : `Show all ${allNights.length} nights`}
+              expanded={showAll}
               variant="ghost"
               size="sm"
               full={false}

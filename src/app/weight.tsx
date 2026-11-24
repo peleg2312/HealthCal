@@ -133,8 +133,8 @@ function WeightScreen() {
               ) : null}
             </View>
             <Segmented testID="weight-range" options={RANGES} value={range} onChange={setRange} />
-            <View accessible accessibilityRole="image" accessibilityLabel={weightChartLabel(series.trend, range, end, units, target)}>
             <LineChart
+              accessibilityLabel={weightChartLabel(series.trend, range, end, units, target)}
               line={chart.line}
               dots={chart.dots}
               color={colors.weight}
@@ -143,7 +143,6 @@ function WeightScreen() {
               xLabels={chart.labels}
               formatY={(n) => (Number.isInteger(n) ? String(n) : n.toFixed(1))}
             />
-            </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg }}>
               <Legend swatch={<View style={{ width: 16, height: 2, borderRadius: 1, backgroundColor: colors.weight }} />} label="Trend" />
               <Legend swatch={<CupKey color={colors.textTertiary} size={7} />} label="Weigh-ins" />
@@ -243,7 +242,9 @@ function WeightScreen() {
             <Button
               testID="section-history-action"
               title={showAll ? 'Show less' : `Show all ${history.length}`}
-              accessibilityLabel={showAll ? 'Show fewer weigh-ins' : `Show all ${history.length} weigh-ins`}
+              // The visible words first; the open state is the button's own (aria-expanded on the web).
+              accessibilityLabel={showAll ? 'Show less' : `Show all ${history.length} weigh-ins`}
+              expanded={showAll}
               variant="ghost"
               size="sm"
               full={false}

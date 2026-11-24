@@ -71,7 +71,7 @@ export function Text({ variant = 'body', color, align, tabular, style, children,
   const name = color ?? (SECONDARY_BY_DEFAULT[variant] ? 'textSecondary' : 'text');
   const resolved = (colors as unknown as Record<string, string>)[name] ?? name;
   const styles: StyleProp<TextStyle> = [typography[variant] as TextStyle, { color: resolved }, align && { textAlign: align }, tabular && { fontVariant: ['tabular-nums'] }, style];
-  const drawn = scale === 1 && !boldText ? styles : scaleTextStyle(StyleSheet.flatten(styles), scale, boldText);
+  const drawn = scale === 1 && !boldText ? styles : scaleTextStyle(StyleSheet.flatten(styles) ?? {}, scale, boldText);
   // A whole name that starts with a Hebrew or Arabic letter stays at the left edge (@/lib/bidi).
   const content = keepNumbers(typeof children === 'string' ? leftToRightStart(children) : children, variant === 'unit');
   // A Hebrew or Arabic name is marked with its language (./textLang.ts): the whole Text when it is only

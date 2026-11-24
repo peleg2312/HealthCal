@@ -36,7 +36,7 @@ export function EarlyState({
       id: 'insights',
       color: colors.primary,
       title: 'Insights and calorie trends',
-      detail: `Personal insights, calorie bars and macro averages. Unlocks after ${MIN_INSIGHT_DAYS} fully logged days.`,
+      detail: `Personal insights, calorie bars and protein, carb and fat averages. Opens after ${MIN_INSIGHT_DAYS} fully logged days.`,
       have: completeDays,
       need: MIN_INSIGHT_DAYS,
     },
@@ -44,7 +44,7 @@ export function EarlyState({
       id: 'recap',
       color: colors.carbs,
       title: 'Weekly recap',
-      detail: 'Your week in numbers, best day, one win and one focus. Unlocks after 3 logged days in a week.',
+      detail: 'Your week in numbers, best day, one win and one focus. Opens after 3 logged days in a week.',
       have: loggedThisWeek,
       need: 3,
     },
@@ -70,7 +70,7 @@ export function EarlyState({
       <View style={{ gap: spacing.xs }}>
         <Text variant="h3">Your progress is getting started</Text>
         <Text variant="body" color="textSecondary" style={{ fontSize: 14, lineHeight: 20 }}>
-          Everything here is built from your own logs. This is what will appear, and what unlocks each part.
+          Everything here is built from your own logs. This is what will appear, and what opens each part.
         </Text>
       </View>
       {items.map((it) => {

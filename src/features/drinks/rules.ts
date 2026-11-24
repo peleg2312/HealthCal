@@ -505,7 +505,11 @@ export function planDrink(input: PlanDrinkInput): DrinkPlan {
     kcal,
     meal,
     // "Milk, 129 kcal, added to lunch and 250 ml to Water"; on a day with a date, "..., added to breakfast, Wed Nov 11, and ...".
-    toast: withWaterTotal(`${cap(noun(kind, choices.id))}, ${k}, added to ${where}${where.includes(',') ? ', and' : ' and'} ${vol} to Water`, !!after?.reaches, after?.total),
+    // With the day's new water total the toast is held to two lines at 320 px: the drink, where it went and the total
+    // ("Milk added to lunch and Water · 1.48 of 3.3 L"); the calories and the amount are on the tile just tapped.
+    toast: after?.total
+      ? withWaterTotal(`${cap(noun(kind, choices.id))} added to ${where}${where.includes(',') ? ', and' : ' and'} Water`, !!after.reaches, after.total)
+      : withWaterTotal(`${cap(noun(kind, choices.id))}, ${k}, added to ${where}${where.includes(',') ? ', and' : ' and'} ${vol} to Water`, !!after?.reaches, after?.total),
     line: custom ? `${vol} ${isolateRtl(name)}: ${k}, to ${where}` : `${shown}: ${k} per ${vol}, to ${where}`,
     tile: k,
     label: `Add ${vol} of ${name}, ${k} to ${where}`,

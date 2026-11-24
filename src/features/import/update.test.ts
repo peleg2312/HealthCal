@@ -49,7 +49,7 @@ describe('G2: a richer reading of an imported workout', () => {
     // Not counted among duplicates; counted as an update.
     expect(filterRows(rows, 'duplicates')).toEqual([]);
     expect(countRows(rows)).toMatchObject({ updates: 1, selected: 1, locked: 0, duplicates: 0 });
-    expect(calorieView(rows[0])).toMatchObject({ added: '+314', estimate: false, detail: '384 by watch' });
+    expect(calorieView(rows[0])).toMatchObject({ added: '~314', estimate: false, detail: '384 by watch' });
   });
 
   it('replaces the numbers and keeps the record’s id, day and the person’s note', () => {

@@ -307,7 +307,7 @@ export default function ScanScreen() {
 /** Frame with corner marks and a hint, drawn over the camera. */
 function Viewfinder() {
   const { colors, radius } = useTheme();
-  const corner = { position: 'absolute' as const, width: 28, height: 28, borderColor: '#FFFFFF' };
+  const corner = { position: 'absolute' as const, width: 28, height: 28, borderColor: colors.cameraInk };
   return (
     <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
       <View style={{ width: '78%', aspectRatio: 1.7 }}>
@@ -317,8 +317,8 @@ function Viewfinder() {
         <View style={[corner, { right: 0, bottom: 0, borderRightWidth: 4, borderBottomWidth: 4 }]} />
       </View>
       <View style={{ position: 'absolute', bottom: 20, paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.chip, backgroundColor: colors.overlay }}>
-        {/* Fixed white on a dark scrim: the camera image is not themed. */}
-        <Text variant="label" color="#FFFFFF">
+        {/* White on a dark scrim in every look (`cameraInk`): the camera image is not themed. */}
+        <Text variant="label" color="cameraInk">
           Line the barcode up inside the frame
         </Text>
       </View>

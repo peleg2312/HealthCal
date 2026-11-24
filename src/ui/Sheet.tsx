@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Modal, PanResponder, type PanResponderInstance, Platform, Pressable, ScrollView, useWindowDimensions, View, type ViewStyle } from 'react-native';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, KeyboardAvoidingView, Modal, PanResponder, type PanResponderInstance, Platform, Pressable, ScrollView, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -31,6 +31,95 @@ export function sheetOnScreen(): boolean {
   return openSheets > 0;
 }
 
+let sheetSeq = 0;
+/** The mark a sheet puts on the browser history entry it adds while it is open (web). */
+const SHEET_ENTRY = '__healthcalSheet';
+type HistoryState = Record<string, unknown> | null | undefined;
+const historyState = (): HistoryState => (typeof window !== 'undefined' ? (window.history.state as HistoryState) : null);
+/** Sheets whose history entry is theirs and still wanted (web). */
+const openEntries = new Set<number>();
+/** The current history entry is one a sheet added and no longer wants: it is closed, or closing. */
+function onLeftEntry(): boolean {
+  const t = historyState()?.[SHEET_ENTRY];
+  return typeof t === 'number' && !openEntries.has(t);
+}
+let historyPatched = false;
+/**
+ * Web, once: the router's own history moves step over an entry a closed sheet left on top. A screen the
+ * sheet opened takes that entry's place (pushState becomes replaceState), and a step back from it counts
+ * the entry too (go(-1) becomes go(-2)). Without this, a sheet closed in the same tap that navigates (a
+ * row that opens a screen, Delete that goes back) leaves the address and the screen out of step, because
+ * the sheet's own clean-up (one history.back()) cannot run before the router's move.
+ */
+function patchHistory() {
+  if (historyPatched || typeof window === 'undefined') return;
+  historyPatched = true;
+  const h = window.history;
+  const push = h.pushState.bind(h);
+  const go = h.go.bind(h);
+  h.pushState = (state: unknown, unused: string, url?: string | URL | null) => {
+    const ours = !!state && typeof state === 'object' && SHEET_ENTRY in (state as object);
+    if (!ours && onLeftEntry()) return h.replaceState(state, unused, url);
+    return push(state, unused, url);
+  };
+  h.go = (delta?: number) => go(delta && delta < 0 && onLeftEntry() ? delta - 1 : delta);
+}
+
+/**
+ * Web: the browser's back closes an open sheet first, as Android's back does (Modal's onRequestClose).
+ * Opening, the sheet adds a history entry for the same address (keeping the router's own id in it, so the
+ * router reads the entry under it as the same screen); back takes that entry off and the sheet asks to close
+ * through `close` (which may ask first, or refuse: the entry then comes back). A sheet closed any other way
+ * takes its entry off again with one history.back(), unless a navigation has already used it (see
+ * `patchHistory`). Layout effects, so the entry is let go in the same commit as the close, before the
+ * router moves the browser.
+ */
+function useBackCloses(visible: boolean, close: () => void, stillOpen: () => boolean) {
+  const latest = useRef({ close, stillOpen });
+  useEffect(() => {
+    latest.current = { close, stillOpen };
+  });
+  useLayoutEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined' || !visible) return;
+    patchHistory();
+    const token = ++sheetSeq;
+    const push = () => {
+      const base = historyState();
+      openEntries.add(token);
+      window.history.pushState({ ...(base && typeof base === 'object' ? base : {}), [SHEET_ENTRY]: token }, '');
+    };
+    push();
+    let popped = false;
+    let again: ReturnType<typeof setTimeout> | undefined;
+    const onPop = () => {
+      const at = historyState()?.[SHEET_ENTRY];
+      // Still on this sheet's entry, or on a sheet opened over it.
+      if (typeof at === 'number' && at >= token) return;
+      if (popped) return;
+      popped = true;
+      openEntries.delete(token);
+      latest.current.close();
+      // A sheet that did not close (it asks first, or refuses) gets its entry back.
+      clearTimeout(again);
+      again = setTimeout(() => {
+        if (!latest.current.stillOpen()) return;
+        popped = false;
+        push();
+      }, 60);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      clearTimeout(again);
+      openEntries.delete(token);
+      if (popped) return;
+      setTimeout(() => {
+        if (historyState()?.[SHEET_ENTRY] === token) window.history.back();
+      }, 0);
+    };
+  }, [visible]);
+}
+
 /** Pure rule for the end of a drag: close, or settle back. Exported for the tests. */
 export function sheetDragCloses(dy: number, vy: number, sheetHeight: number): boolean {
   if (dy <= 0) return false;
@@ -60,14 +149,42 @@ export function Sheet({
   title,
   children,
   footer,
+  accessibilityLabel,
+  unsaved,
 }: {
   visible: boolean;
   onClose: () => void;
   title?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  /** The dialog's name for a screen reader when the sheet has no title (with a title, the title names it). */
+  accessibilityLabel?: string;
+  /**
+   * Set while the sheet holds something typed and not saved: a question such as "Discard this weigh-in?".
+   * Closing it by the backdrop, a drag, Escape, the back button or the screen reader's escape then asks
+   * first, in the sheet, with "Discard" and "Keep editing". The sheet's own buttons close it as they do.
+   */
+  unsaved?: string | false | null;
 }) {
   const { colors, radius, spacing } = useTheme();
+  // Asking whether to drop what was typed (see `unsaved`).
+  const [asking, setAsking] = useState(false);
+  if (asking && (!visible || !unsaved)) setAsking(false);
+  // Every close that is not one of the sheet's own buttons comes here.
+  const requestClose = () => {
+    if (asking) return setAsking(false);
+    if (unsaved) {
+      AccessibilityInfo.announceForAccessibility(unsaved);
+      return setAsking(true);
+    }
+    onClose();
+  };
+  const [titleId] = useState(() => `sheet-title-${++sheetSeq}`);
+  const latestOpen = useRef(visible);
+  useEffect(() => {
+    latestOpen.current = visible;
+  });
+  useBackCloses(visible, requestClose, () => latestOpen.current);
   const insets = useSafeAreaInsets();
   const reduce = useReducedMotion();
   const { height: winH } = useWindowDimensions();
@@ -130,9 +247,9 @@ export function Sheet({
     }
   }, [visible, drag]);
   // The latest props for the drag handlers, which are made once, after the first render.
-  const latest = useRef({ onClose, visible, reduce, travel });
+  const latest = useRef({ onClose: requestClose, visible, reduce, travel });
   useEffect(() => {
-    latest.current = { onClose, visible, reduce, travel };
+    latest.current = { onClose: requestClose, visible, reduce, travel };
   });
   const [pan, setPan] = useState<PanResponderInstance | null>(null);
   useEffect(() => {
@@ -170,7 +287,14 @@ export function Sheet({
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - open.get()) * (travel + 24) + drag.get() }] }));
   const toastStyle = useAnimatedStyle(() => ({ opacity: open.get() }));
   return (
-    <Modal visible={mounted} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+    <Modal
+      visible={mounted}
+      transparent
+      animationType="none"
+      onRequestClose={requestClose}
+      statusBarTranslucent
+      // Web: the dialog is named by its title (or the label given), as a screen reader expects of a dialog.
+      {...((title ? { 'aria-labelledby': titleId } : accessibilityLabel ? { 'aria-label': accessibilityLabel } : {}) as object)}>
       <KeyboardAvoidingView
         pointerEvents={visible ? 'auto' : 'none'}
         behavior={Platform.OS === 'web' ? undefined : 'padding'}
@@ -178,19 +302,19 @@ export function Sheet({
         <AnimatedPressable
           accessibilityLabel="Close sheet"
           testID="sheet-backdrop"
-          onPress={onClose}
+          onPress={requestClose}
           style={[{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: colors.overlay }, backdropStyle]}
         />
         {/* A native modal covers the app's own toast layer, so the sheet shows toasts itself, just above its top edge.
             It fades with the sheet: closing, the toast leaves with it (then rises again over the screen's tab bar
             or footer) instead of hanging in mid-air while the sheet slides away. */}
-        <Animated.View pointerEvents="box-none" style={toastStyle}>
+        <Animated.View pointerEvents="box-none" style={[{ zIndex: 2 }, toastStyle]}>
           <ToastHost placement="sheet" />
         </Animated.View>
         <Animated.View
           testID="sheet"
           // VoiceOver's escape gesture (two-finger scrub) closes it, as the backdrop does.
-          onAccessibilityEscape={onClose}
+          onAccessibilityEscape={requestClose}
           onLayout={(e) => {
             setSheetH(Math.round(e.nativeEvent.layout.height));
             setMeasured(true);
@@ -219,7 +343,7 @@ export function Sheet({
               <View testID="sheet-handle" style={{ width: 36, height: 4, borderRadius: 1, backgroundColor: colors.borderStrong }} />
             </View>
             {title ? (
-              <Text variant="h2" style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.md }}>
+              <Text variant="h2" nativeID={titleId} style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.md }}>
                 {title}
               </Text>
             ) : null}
@@ -227,7 +351,28 @@ export function Sheet({
           <ScrollView testID="sheet-body" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.md }}>
             {children}
           </ScrollView>
-          {footer ? <View testID="sheet-footer" style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.sm }}>{footer}</View> : null}
+          {asking && unsaved ? (
+            // Asked in the sheet itself, in place of its footer: one sheet on screen at a time.
+            <View testID="sheet-discard" style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.sm, gap: 10 }}>
+              <Text variant="bodyStrong" testID="sheet-discard-title" accessibilityLiveRegion="polite">
+                {unsaved}
+              </Text>
+              <Button
+                testID="sheet-discard-yes"
+                title="Discard"
+                variant="danger"
+                onPress={() => {
+                  setAsking(false);
+                  onClose();
+                }}
+              />
+              <Button testID="sheet-discard-keep" title="Keep editing" variant="secondary" onPress={() => setAsking(false)} />
+            </View>
+          ) : footer ? (
+            <View testID="sheet-footer" style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.sm }}>
+              {footer}
+            </View>
+          ) : null}
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>

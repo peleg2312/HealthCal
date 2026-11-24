@@ -384,7 +384,8 @@ export function DayRingStrip({
               key={b}
               testID={`${testIDPrefix}-week-pick-${b}`}
               title={weekTitle(b)}
-              subtitle={captionFor(b)}
+              // The week's caption without its lead ("That week: "), which the title already says.
+              subtitle={sentenceCase(captionFor(b).replace(/^(Week so far|That week): /, ''))}
               value={b === back ? 'Shown' : undefined}
               accessibilityRole="radio"
               accessibilityState={{ checked: b === back }}
@@ -399,6 +400,8 @@ export function DayRingStrip({
     </View>
   );
 }
+
+const sentenceCase = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 /** Whole weeks from the week holding `date` back to the week holding `today` (negative for a later week, down to -ahead). */
 function weeksBetween(date: ISODate, today: ISODate, ahead = 0): number {

@@ -80,3 +80,44 @@ export function revealDelta(field: { top: number; bottom: number }, view: { top:
   if (above < 0) return Math.round(above);
   return 0;
 }
+
+/** A control's box in window coordinates (y grows down). */
+export interface ControlBox {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
+/** A toast's action must have its centre in the lower 60% of the window: one hand reaches it (thumb reach). */
+export const TOAST_REACH_FROM = 0.4;
+/** Room kept between a resting toast and any control above or below it. */
+export const TOAST_CLEAR = 4;
+
+/**
+ * The lowest place a toast can rest without lying over a control: the top of the toast, in window
+ * coordinates, or null when no place in the range is clear.
+ *
+ *   lowest     the lowest top allowed (a screen: 12 px above its chrome; a sheet: 12 px above the window's
+ *              bottom inset). Tried first, so a toast that is clear where it always rested stays there.
+ *   highest    the highest top allowed: the action's centre stays in the lower 60% of the window
+ *              (`toastReachTop`), and a caller may pass a higher floor of its own.
+ *   height     the toast's height; left and right its sides (only controls it would cross sideways count).
+ *   controls   every control on the screen or in the sheet; each is kept `clear` px away.
+ *
+ * The answer is the lowest clear top, so the toast stays as close to the thumb and the chrome as it can.
+ */
+export function toastSpot(v: { lowest: number; highest: number; height: number; left: number; right: number; controls: ControlBox[]; clear?: number }): number | null {
+  const clear = v.clear ?? TOAST_CLEAR;
+  if (!(v.height > 0) || !(v.lowest >= v.highest)) return null;
+  const blocks = v.controls.filter((c) => c.right - c.left >= 2 && c.bottom - c.top >= 2 && c.left < v.right && c.right > v.left).map((c) => ({ top: c.top - clear, bottom: c.bottom + clear }));
+  const free = (top: number) => blocks.every((b) => !(top < b.bottom && top + v.height > b.top));
+  const tries = [v.lowest, ...blocks.map((b) => b.top - v.height)].filter((t) => t <= v.lowest && t >= v.highest).sort((a, b) => b - a);
+  for (const t of tries) if (free(t)) return Math.round(t);
+  return null;
+}
+
+/** The highest top a toast of this height may have in a window this tall, with its action in thumb reach. */
+export function toastReachTop(windowHeight: number, height: number): number {
+  return Math.ceil(windowHeight * TOAST_REACH_FROM - height / 2);
+}

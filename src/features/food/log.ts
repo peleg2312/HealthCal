@@ -14,7 +14,7 @@ import { live } from '@/store/selectors';
 import type { Food, FoodEntry, ISODate, MealType, Nutrients, SavedMeal, SavedMealItem, Serving, UnitSystem, WaterEntry } from '@/types';
 import { haptic, toast } from '@/ui';
 
-import { foodAddedToast, mealOnDay, quickAddedToast } from './addedTo';
+import { entryUpdatedToast, foodAddedToast, mealOnDay, quickAddedToast } from './addedTo';
 import { bandSpread, buildEntry, planSavedMeal } from './build';
 import { displayFoodName } from './displayName';
 import { addedAndSavedToast } from './saveWords';
@@ -109,7 +109,8 @@ export function logFood(input: LogFoodInput): FoodEntry {
     }
     haptic.success();
     // Undo puts the entry back exactly as it was (amount, meal and day), and a drink's water record with it.
-    toast('Entry updated', before ? { label: 'Undo', onPress: () => undoEdit(before, waterBefore) } : undefined);
+    const moved = !!before && (before.meal !== entry.meal || before.date !== entry.date);
+    toast(entryUpdatedToast(displayFoodName(entry), moved, where(entry.meal, entry.date)), before ? { label: 'Undo', onPress: () => undoEdit(before, waterBefore) } : undefined);
     return entry;
   }
   const built = buildEntry({ ...input, ...lastEstimate(input.food) });

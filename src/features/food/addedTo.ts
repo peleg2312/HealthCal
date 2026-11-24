@@ -74,6 +74,14 @@ export function foodAddedToast(name: string, where: string): string {
   return `${toastFoodName(name)} added to ${where}`;
 }
 
+/**
+ * An edit of an entry, saved: "Israeli salad moved to lunch", "Banana moved to yesterday's lunch" when its meal or
+ * day changed, else "Israeli salad updated in lunch" (its amount or numbers). `where` is `mealOnDay` after the edit.
+ */
+export function entryUpdatedToast(name: string, moved: boolean, where: string): string {
+  return `${toastFoodName(name)} ${moved ? 'moved to' : 'updated in'} ${where}`;
+}
+
 /** A quick add: its name when one was typed ("Birthday cake added to snacks"), else its calories ("320 kcal added to lunch"). */
 export function quickAddedToast(name: string, kcal: number, where: string): string {
   return name.trim() ? foodAddedToast(name, where) : `${formatNumber(Math.round(kcal))} kcal added to ${where}`;

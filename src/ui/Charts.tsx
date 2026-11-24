@@ -17,6 +17,28 @@ function useWidth(): [number, (e: LayoutChangeEvent) => void] {
 
 let seq = 0;
 
+/** Every word and number a chart draws (axis labels, a highlighted value): 12 px, the caption floor. */
+const CHART_TEXT = 12;
+
+/**
+ * A chart with `accessibilityLabel` is one accessible image with that name (its summary and its values
+ * per point, written by the screen), and what it draws inside, the axis and value labels included, is
+ * hidden from assistive technology. Without one, a chart is exposed as before.
+ */
+function chartA11y(label: string | undefined) {
+  return label ? { accessible: true, accessibilityRole: 'image' as const, accessibilityLabel: label } : {};
+}
+
+/** Hides a labelled chart's drawing from assistive technology (it has said what it shows in its name). */
+function ChartInside({ hidden, children }: { hidden: boolean; children: React.ReactNode }) {
+  if (!hidden) return <>{children}</>;
+  return (
+    <View aria-hidden importantForAccessibility="no-hide-descendants" accessibilityElementsHidden pointerEvents="box-none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
+      {children}
+    </View>
+  );
+}
+
 /** Room either side of a pouring column, so a value label wider than its slot is not clipped. */
 const COL_PAD = 24;
 
@@ -138,6 +160,7 @@ export function BarChart({
   marks,
   maxValue,
   testID,
+  accessibilityLabel,
 }: {
   data: BarDatum[];
   color: string;
@@ -159,6 +182,8 @@ export function BarChart({
   /** Fixed top of the scale (e.g. 7 for days a week); taller bars and lines still widen it. */
   maxValue?: number;
   testID?: string;
+  /** The chart's name for assistive technology: its summary and its values per bar, with units. See `chartA11y`. */
+  accessibilityLabel?: string;
 }) {
   const { colors, chartFill } = useTheme();
   const [width, onLayout] = useWidth();
@@ -260,7 +285,7 @@ export function BarChart({
           />
         ) : null}
         {active === null && highlightIndex === i && v > 0 ? (
-          <SvgText x={x + barW / 2} y={Math.max(11, base - h - 6)} fontSize={11} fontFamily={fonts.numBold} fill={colors.text} textAnchor="middle">
+          <SvgText x={x + barW / 2} y={Math.max(11, base - h - 6)} fontSize={CHART_TEXT} fontFamily={fonts.numBold} fill={colors.text} textAnchor="middle">
             {formatValue ? formatValue(d.value) : Math.round(d.value)}
           </SvgText>
         ) : null}
@@ -274,7 +299,8 @@ export function BarChart({
   const perColumn = data.length <= 14;
   const stagger = Math.min(motion.duration.stagger, 360 / Math.max(1, data.length));
   return (
-    <View onLayout={onLayout} style={{ height }} testID={testID}>
+    <View onLayout={onLayout} style={{ height }} testID={testID} {...chartA11y(accessibilityLabel)}>
+      <ChartInside hidden={!!accessibilityLabel}>
       {width > 0 ? (
         <>
           {band && band.to > band.from ? (
@@ -310,7 +336,7 @@ export function BarChart({
                 key={`l-${i}`}
                 x={i * slot + slot / 2}
                 y={height - 5}
-                fontSize={10.5}
+                fontSize={CHART_TEXT}
                 fontFamily={hi === i ? fonts.bold : fonts.semibold}
                 fill={hi === i ? colors.text : colors.textSecondary}
                 textAnchor="middle">
@@ -324,6 +350,7 @@ export function BarChart({
       {active !== null && data[active] ? (
         <ScrubPill text={data[active].detail ?? `${data[active].label} · ${fmt(data[active].value)}`} x={active * slot + slot / 2} width={width} />
       ) : null}
+      </ChartInside>
     </View>
   );
 }
@@ -349,9 +376,11 @@ function toPath(points: { px: number; py: number }[], smooth: boolean): string {
 }
 
 /**
- * Line chart: a 2 px line in the data colour over a flat 10% tint (never a
- * gradient), optional faint raw points, a dashed borderStrong goal line and a
- * rim dot on the latest value. Used for the weight trend.
+ * Line chart: a 2 px line in the data colour, optional faint raw points, a
+ * dashed borderStrong goal line and a rim dot on the latest value. Used for the
+ * weight trend. A flat 10% tint (never a gradient) fills under the line only
+ * when the axis holds zero, and then only down to zero: an area on an axis that
+ * starts above zero would draw an amount by an area it does not have.
  */
 export function LineChart({
   line,
@@ -364,6 +393,7 @@ export function LineChart({
   formatY,
   xLabels,
   formatPoint,
+  accessibilityLabel,
 }: {
   line: LinePoint[];
   /** Raw measurements drawn as faint dots behind the line. */
@@ -379,6 +409,8 @@ export function LineChart({
   band?: ChartBand;
   /** When set, press and drag scrubs along the line and shows this text for the point. */
   formatPoint?: (p: LinePoint) => string;
+  /** The chart's name for assistive technology: its summary and its values per point, with units. See `chartA11y`. */
+  accessibilityLabel?: string;
 }) {
   const { colors } = useTheme();
   const [width, onLayout] = useWidth();
@@ -388,7 +420,7 @@ export function LineChart({
   const padR = 10;
   const padT = 12;
   const padB = xLabels ? 22 : 8;
-  if (all.length === 0) return <View style={{ height }} onLayout={onLayout} />;
+  if (all.length === 0) return <View style={{ height }} onLayout={onLayout} {...chartA11y(accessibilityLabel)} />;
   let minY = Math.min(...all.map((p) => p.y), goal ?? Infinity, band?.from ?? Infinity);
   let maxY = Math.max(...all.map((p) => p.y), goal ?? -Infinity, band?.to ?? -Infinity);
   const span = Math.max(maxY - minY, 1);
@@ -402,7 +434,9 @@ export function LineChart({
   const sy = (v: number) => padT + h - ((v - minY) / (maxY - minY)) * h;
   const pts = line.map((p) => ({ px: sx(p.x), py: sy(p.y) }));
   const path = toPath(pts, true);
-  const area = pts.length > 1 ? `${path} L ${pts[pts.length - 1].px} ${padT + h} L ${pts[0].px} ${padT + h} Z` : '';
+  // The tint fills down to zero, and only on an axis that holds zero (never to the floor of a 74-80 kg axis).
+  const zeroY = minY <= 0 && maxY >= 0 ? sy(0) : null;
+  const area = pts.length > 1 && zeroY !== null ? `${path} L ${pts[pts.length - 1].px} ${zeroY} L ${pts[0].px} ${zeroY} Z` : '';
   // Round grid values (steps of 1, 2 or 5 times a power of ten) read better than even fractions of the range.
   const ticks = niceTicks(minY, maxY, yLabels);
   const nearest = (e: GestureResponderEvent) => {
@@ -432,7 +466,8 @@ export function LineChart({
       : {};
   const ap = active !== null ? pts[active] : null;
   return (
-    <View onLayout={onLayout} style={{ height }}>
+    <View onLayout={onLayout} style={{ height }} {...chartA11y(accessibilityLabel)}>
+      <ChartInside hidden={!!accessibilityLabel}>
       {width > 0 ? (
         <Svg width={width} height={height}>
           {band && band.to > band.from ? (
@@ -441,7 +476,7 @@ export function LineChart({
           {ticks.map((t, i) => (
             <React.Fragment key={i}>
               <Line x1={padL} x2={width - padR} y1={sy(t)} y2={sy(t)} stroke={colors.border} strokeWidth={1} />
-              <SvgText x={padL - 8} y={sy(t) + 3} fontSize={10.5} fontFamily={fonts.medium} fill={colors.textSecondary} textAnchor="end">
+              <SvgText x={padL - 8} y={sy(t) + 4} fontSize={CHART_TEXT} fontFamily={fonts.medium} fill={colors.textSecondary} textAnchor="end">
                 {formatY ? formatY(t) : String(Math.round(t * 10) / 10)}
               </SvgText>
             </React.Fragment>
@@ -454,7 +489,7 @@ export function LineChart({
               key={`${label}-${i}`}
               x={padL + (arr.length === 1 ? w / 2 : (i / (arr.length - 1)) * w)}
               y={height - 5}
-              fontSize={10.5}
+              fontSize={CHART_TEXT}
               fontFamily={fonts.medium}
               fill={colors.textSecondary}
               textAnchor={i === 0 ? 'start' : i === arr.length - 1 ? 'end' : 'middle'}>
@@ -484,23 +519,30 @@ export function LineChart({
       ) : null}
       {formatPoint ? <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, cursor: 'crosshair', userSelect: 'none' } as object} {...responder} /> : null}
       {ap && formatPoint && active !== null ? <ScrubPill text={formatPoint(line[active])} x={ap.px} width={width} /> : null}
+      </ChartInside>
     </View>
   );
 }
 
-/** Tiny inline trend line with no axes. */
-export function Sparkline({ values, color, width = 72, height = 28 }: { values: number[]; color: string; width?: number; height?: number }) {
+/** Tiny inline trend line with no axes. With `accessibilityLabel` it is one image with that name; without, it is drawn as before. */
+export function Sparkline({ values, color, width = 72, height = 28, accessibilityLabel }: { values: number[]; color: string; width?: number; height?: number; accessibilityLabel?: string }) {
   const { colors } = useTheme();
-  if (values.length < 2) return <View style={{ width, height }} />;
+  if (values.length < 2) return <View style={{ width, height }} {...chartA11y(accessibilityLabel)} />;
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = max - min || 1;
   const pts = values.map((v, i) => ({ px: 2 + (i / (values.length - 1)) * (width - 4), py: 2 + (height - 4) - ((v - min) / span) * (height - 4) }));
-  return (
+  const line = (
     <Svg width={width} height={height}>
       <Path d={toPath(pts, true)} stroke={color} strokeWidth={1.75} fill="none" strokeLinecap="round" />
       <Circle cx={pts[pts.length - 1].px} cy={pts[pts.length - 1].py} r={2.5} fill={colors.rim} />
     </Svg>
+  );
+  if (!accessibilityLabel) return line;
+  return (
+    <View style={{ width, height }} {...chartA11y(accessibilityLabel)}>
+      <ChartInside hidden>{line}</ChartInside>
+    </View>
   );
 }
 

@@ -20,7 +20,7 @@ export interface StreakMoment {
   streak: number;
   /** Whether today is logged (the streak cup is full). */
   filled: boolean;
-  /** "12 days. A missed day will not break it." after the day's first entry extended the streak; null otherwise. */
+  /** "12 days. A day without a log will not break it." after the day's first entry extended the streak; null otherwise. */
   line: string | null;
   /** A 7, 30 or 100 day milestone to show now (once on this device, only with Celebrations on). */
   milestone: StreakMilestone | null;

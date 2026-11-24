@@ -287,7 +287,8 @@ export function Header({
       {/* minWidth 0 lets a long title shorten with an ellipsis inside the side padding instead of running past it. */}
       <View style={{ flex: 1, minWidth: 0 }}>
         {title ? (
-          <Text variant="h3" numberOfLines={1}>
+          // The screen's one level-1 heading (D6-02); section titles are level 2.
+          <Text variant="h3" numberOfLines={1} accessibilityRole="header" {...({ 'aria-level': 1 } as object)}>
             {title}
           </Text>
         ) : null}
@@ -315,7 +316,7 @@ export function SectionTitle({ title, action, onAction, testID }: { title: strin
         justifyContent: 'space-between',
         marginTop: 4,
       }}>
-      <Text variant="h3" style={{ flexShrink: 1 }}>
+      <Text variant="h3" accessibilityRole="header" {...({ 'aria-level': 2 } as object)} style={{ flexShrink: 1 }}>
         {title}
       </Text>
       {action && onAction ? (

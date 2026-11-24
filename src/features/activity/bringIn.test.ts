@@ -32,7 +32,7 @@ describe('Bring in workouts', () => {
     expect(choiceWords('sync', off)).toMatchObject({ title: 'Sync automatically', line: 'Workouts from Health Connect, by themselves' });
     expect(choiceWords('sync', { ...off, store: 'apple-health' }).line).toBe('Workouts from Apple Health, by themselves');
     expect(choiceWords('sync', { ...off, store: 'apple-health', enabled: true }).line).toBe('On, from Apple Health');
-    expect(choiceWords('sync', web)).toMatchObject({ title: 'Automatic sync', line: 'Automatic, in the phone apps' });
+    expect(choiceWords('sync', web)).toMatchObject({ title: 'Automatic sync', line: 'In the iPhone and Android apps' });
     expect(choiceWords('import', web).title).toBe('Import workouts');
     // Steps are shown, never counted: the line says so.
     expect(choiceWords('steps', web).line).toBe('Shown on Train, never added to your budget');

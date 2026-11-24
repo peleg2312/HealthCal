@@ -8,7 +8,7 @@ import { followEntry, pairEditBlocked, undoEdit } from '@/features/drinks/pair';
 import { DRINKS_NOT_COPIED, DRINKS_NOT_SAVED } from '@/features/drinks/rules';
 import { isWaterDrinkEntry } from '@/features/drinks/via';
 import { isolateRtl } from '@/lib/bidi';
-import { addDays } from '@/lib/dates';
+import { addDays, today } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
 import { MEAL_LABEL } from '@/lib/nutrition';
 import { useStore } from '@/store';
@@ -16,6 +16,8 @@ import { live } from '@/store/selectors';
 import type { CustomFood, FoodEntry, ISODate, MealType, Nutrients, SavedMeal, SavedMealItem } from '@/types';
 import { haptic, toast } from '@/ui';
 
+import { entryUpdatedToast, mealOnDay } from './addedTo';
+import { displayFoodName } from './displayName';
 import { dayPhrase } from './helpers';
 
 import { addItems, deleteEntry, toSavedMealItem } from './log';
@@ -223,6 +225,7 @@ export function updateEntryDirect(
   // or one logged in the diary (its volume recomputed from the entry).
   const waterBefore = entry.deleted ? null : followEntry(entry, next);
   haptic.success();
-  toast('Entry updated', { label: 'Undo', onPress: () => undoEdit(entry, waterBefore) });
+  const moved = entry.meal !== next.meal || entry.date !== next.date;
+  toast(entryUpdatedToast(displayFoodName(next), moved, mealOnDay(next.meal, next.date, today())), { label: 'Undo', onPress: () => undoEdit(entry, waterBefore) });
   return next;
 }

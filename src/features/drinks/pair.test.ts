@@ -190,7 +190,7 @@ describe('changing the amount or day in the diary', () => {
     logFood({ food: e0.food ?? builtinFood('b_milk_2pct')!, serving: { label: e0.servingLabel, grams: e0.grams }, quantity: 1.5, meal: e0.meal, date: e0.date, entryId: e0.id });
     expect(S().water[water.id].ml).toBe(375);
     expect(S().foodEntries[entry!.id].via).toBe('water');
-    expect(last().message).toBe('Entry updated');
+    expect(last().message).toMatch(/ updated in [a-z]/);
     undo();
     const { updatedAt: _a, ...e1 } = S().foodEntries[entry!.id];
     const { updatedAt: _b, ...e0rest } = e0;
@@ -529,7 +529,7 @@ describe('a drink logged in the diary: edits, deletes and Undo through the real 
     const w0 = W(water.id);
     const tomorrow = addDays(TODAY, 1);
     logFood({ food: energy(), serving: { label: e0.servingLabel, grams: e0.grams }, quantity: 1, meal: 'lunch', date: tomorrow, entryId: entry.id });
-    expect(last().message).toBe('Entry updated');
+    expect(last().message).toMatch(/ moved to tomorrow's lunch$/);
     expect(E(entry.id).date).toBe(tomorrow);
     expect(W(water.id)).toMatchObject({ date: tomorrow, ml: 500, deleted: false });
     undo();

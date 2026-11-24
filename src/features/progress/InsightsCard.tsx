@@ -35,8 +35,10 @@ export function InsightsCard({ insights, rangeDays }: { insights: Insight[]; ran
         <PressableScale
           testID="progress-insights-toggle"
           onPress={() => setOpen((o) => !o)}
-          accessibilityLabel={open ? 'Show only the top insight' : `Show all ${insights.length} insights`}
+          accessibilityLabel={open ? 'Show fewer insights' : `Show all ${insights.length} insights`}
           accessibilityState={{ expanded: open }}
+          // react-native-web reads the aria prop, not accessibilityState.
+          {...({ 'aria-expanded': open } as object)}
           style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, borderTopWidth: 1, borderTopColor: colors.border, marginBottom: -spacing.sm }}>
           <Text variant="label">{open ? 'Show fewer' : `All ${insights.length} insights`}</Text>
           {open ? <ChevronUp size={18} color={colors.textSecondary} /> : <ChevronDown size={18} color={colors.textSecondary} />}
@@ -62,7 +64,7 @@ function InsightRow({ insight }: { insight: Insight }) {
   const Chevron = open ? ChevronUp : ChevronDown;
   return (
     <View testID={`insight-${insight.id}`} style={{ flexDirection: 'row', gap: spacing.md }}>
-      <View style={{ width: 20, alignItems: 'center', paddingTop: 1 }}>
+      <View aria-hidden style={{ width: 20, alignItems: 'center', paddingTop: 1 }}>
         <tone.Icon size={19} color={tone.color} strokeWidth={1.9} />
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>

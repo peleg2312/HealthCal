@@ -1,5 +1,4 @@
 import { Image } from 'expo-image';
-import { Check } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
@@ -17,9 +16,10 @@ import { analysingLabel, analysingNote, analysingSteps, slowAfterMs } from './wo
  * - The photo stays on screen and "fills up": a level line rises over it from the bottom, the part
  *   above the line veiled, the part under it clear, and starts again (`PourVeil`). In text mode the
  *   words stay on screen instead.
- * - Three steps that are true (./words.ts): the input is ready (done: the phone knows it), the AI is
- *   estimating (now: the AI's cup pours beside it, `AiMark working`), and nothing is added until the
- *   person checks it (next).
+ * - Three steps that are true (./words.ts): the input is ready (done: the phone knows it; a small
+ *   filled ink cup, never a check, which in this app means only a day on budget), the AI is estimating
+ *   (now: the AI's cup pours beside it, `AiMark working`), and nothing is added until the person checks
+ *   it (next: the same cup in outline).
  * - One note: how long it usually takes, and after 10 s (20 s for the careful check) that it is
  *   still working.
  *
@@ -62,7 +62,8 @@ export function AnalysingView({ photoUri, aspect, description, precise }: { phot
         <Card padding={spacing.lg} testID="ai-analysing-steps">
           {/* One element for a screen reader: what is done, what is happening, what comes next. */}
           <View accessible accessibilityLabel={analysingLabel(photo, precise)} style={{ gap: spacing.md }}>
-            <Step testID="ai-step-input" mark={<Check size={16} strokeWidth={2.2} color={colors.success} />} text={steps.input} />
+            {/* Done is the filled ink cup (as the sync row's "nothing waits"), next the outline: the check is kept for "on budget". */}
+            <Step testID="ai-step-input" mark={<CupKey color={colors.text} size={10} />} text={steps.input} />
             {/* The cup stands on the words' line, as it does beside a coach answer; its drop hangs above it. */}
             <Step testID="ai-step-estimate" mark={<AiMark size="row" working style={{ marginTop: -aiMarkHeadroom('row') }} />} text={steps.estimate} now />
             <Step testID="ai-step-review" mark={<CupKey variant="outline" color={colors.textTertiary} size={10} />} text={steps.review} />

@@ -56,7 +56,7 @@ module.exports = [
   { id: 'quick-sheet-empty', route: '/', data: 'empty', taps: ['tab-add'], sheet: true, note: 'the + sheet with no history: no usual foods, no repeat' },
   { id: 'quick-sheet-imperial', route: '/', imperial: true, taps: ['tab-add'], sheet: true, note: 'the + sheet water glasses in fl oz' },
   { id: 'quick-sheet-past', route: '/', taps: [`today-day-${isoDay(-1)}`, 'tab-add'], sheet: true, note: 'the + sheet titled for a past day' },
-  { id: 'quick-sheet-logged', route: '/', taps: ['tab-add', '^quick-usual-', { wait: 300 }], sheet: true, note: 'a usual food added: its tick, and the toast above the sheet' },
+  { id: 'quick-sheet-logged', route: '/', taps: ['tab-add', '^quick-usual-', { wait: 900 }], waitFor: 'toast-action', note: 'a usual food added from the + sheet: the sheet closes after its tick and the toast with Undo rests over Today' },
 
   // ---------------------------------------------------------------- Diary
   { id: 'diary-past', route: '/diary?date={day}', day: -1, note: 'yesterday' },
@@ -130,7 +130,7 @@ module.exports = [
   // ---------------------------------------------------------------- One water toast (waterAddedToast with the day's total)
   { id: 'water-tile-toast', route: '/water', taps: ['water-add-1'], waitFor: 'toast-action', note: 'a glass on the Water screen: "250 ml added to Water · <total> of <goal>", as on Today' },
   { id: 'water-tile-toast-drink', route: '/water', now: todayAt(13, 30), taps: ['water-beverage-milk', 'water-add-1'], waitFor: 'toast-action', note: 'a milk on the Water screen: its calories, then the same total' },
-  { id: 'quick-sheet-water-toast', route: '/', taps: ['tab-add', 'quick-water-250'], sheet: true, waitFor: 'toast-action', note: "the + sheet's glass: the same toast with the day's total, above the sheet" },
+  { id: 'quick-sheet-water-toast', route: '/', taps: ['tab-add', 'quick-water-250', { wait: 900 }], waitFor: 'toast-action', note: "the + sheet's glass: the sheet closes and the same toast with the day's total rests over Today" },
 
   // ---------------------------------------------------------------- Detail
   { id: 'detail-new', route: '/food/search', taps: ['search-tab-recent', 'recent-0'], waitFor: 'food-detail-screen', note: 'a new food' },

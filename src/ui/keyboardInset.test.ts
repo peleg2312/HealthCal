@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { KEYBOARD_MIN, keyboardCover, revealDelta, TOAST_GAP, toastBottom } from './keyboardInset';
+import { KEYBOARD_MIN, keyboardCover, revealDelta, TOAST_GAP, toastBottom, toastReachTop, toastSpot } from './keyboardInset';
 
 describe('keyboardCover', () => {
   it('is what the keyboard takes from the bottom of the page', () => {
@@ -79,5 +79,42 @@ describe('toastBottom', () => {
     it('is never read with the keyboard down', () => {
       expect(toastBottom({ dock: 0, ridesKeyboard: false, cover: 0 }, { bottom: 0, top: 50, toastHeight: 44, limit: 800 })).toBe(12);
     });
+  });
+});
+
+describe('toastSpot', () => {
+  // Today at 360 x 740: the toast (309 x 44) would rest at top 612, over the three water-card cells.
+  const cells = [
+    { top: 610, bottom: 703, left: 37, right: 116 },
+    { top: 610, bottom: 703, left: 141, right: 204 },
+    { top: 610, bottom: 703, left: 229, right: 323 },
+  ];
+  const waterRow = [
+    { top: 519, bottom: 563, left: 37, right: 181 },
+    { top: 519, bottom: 555, left: 233, right: 323 },
+  ];
+  const ideas = [{ top: 368, bottom: 398, left: 139, right: 265 }];
+  const base = { lowest: 612, highest: toastReachTop(740, 44), height: 44, left: 25, right: 334 };
+  it('keeps the usual place when nothing is under it', () => {
+    expect(toastSpot({ ...base, controls: [{ top: 100, bottom: 140, left: 25, right: 334 }] })).toBe(612);
+  });
+  it('rises to the lowest band clear of every control, never over one', () => {
+    const top = toastSpot({ ...base, controls: [...cells, ...waterRow, ...ideas] });
+    expect(top).toBe(519 - 4 - 44);
+    for (const c of [...cells, ...waterRow, ...ideas]) expect(top! + 44 <= c.top - 4 || top! >= c.bottom + 4).toBe(true);
+  });
+  it('ignores controls it does not cross sideways', () => {
+    expect(toastSpot({ ...base, left: 130, right: 210, controls: [cells[0], cells[2]] })).toBe(612);
+  });
+  it('keeps the action in thumb reach: no clear band in the lower 60% is null', () => {
+    const wall = [{ top: 250, bottom: 700, left: 0, right: 360 }];
+    expect(toastSpot({ ...base, controls: wall })).toBeNull();
+    expect(toastReachTop(740, 44)).toBe(274);
+  });
+  it('never goes lower than its lowest place', () => {
+    expect(toastSpot({ ...base, controls: [{ top: 560, bottom: 600, left: 0, right: 360 }] })).toBe(612);
+  });
+  it('is null for a toast not measured yet', () => {
+    expect(toastSpot({ ...base, height: 0, controls: [] })).toBeNull();
   });
 });

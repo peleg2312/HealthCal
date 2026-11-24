@@ -149,7 +149,7 @@ describe('edits follow the entry (rewriteEntry, setEntryAmount, updateEntryDirec
     const id = waterIdFromEntry(entry.id);
     tick();
     logFood({ food: energy, serving: serving(energy, '1 can (16 fl oz)'), quantity: 1, meal: 'dinner', date: YESTERDAY, entryId: entry.id });
-    expect(lastToast().message).toBe('Entry updated');
+    expect(lastToast().message).toMatch(/ moved to yesterday's dinner$/);
     expect(S().water[id]).toMatchObject({ ml: 473, date: YESTERDAY, deleted: false });
     tick();
     undo();

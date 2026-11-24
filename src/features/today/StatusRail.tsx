@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { waterAddedToast } from '@/features/food/addedTo';
+import { useOneTap } from '@/features/food/oneTap';
 import { startOfWeek, today } from '@/lib/dates';
 import { guidelineMinutes } from '@/lib/exercise';
 import { effectiveMl } from '@/lib/hydration';
@@ -101,6 +102,8 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
   const cheers = isToday ? recentCheerCount(friendsStatus, friends, now.getTime()) : 0;
   // Haptics only for the screen in front: the tab stays mounted while water is added elsewhere.
   const focused = useIsFocused();
+  // One tap, one glass: a quick second tap on "+ 250 ml" (within ONE_TAP_GUARD_MS) does not log a second one.
+  const oneTap = useOneTap();
 
   // One calm line when a goal to reach is crossed on screen; it belongs to the day it was said for.
   const [note, setNote] = useState<{ date: ISODate; text: string } | null>(null);
@@ -165,7 +168,7 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
             size="sm"
             full={false}
             icon={<Plus size={18} color={quiet ? colors.text : colors.water} strokeWidth={2.2} />}
-            onPress={() => addWater(day.date, glass, units, day.waterGoalMl)}
+            onPress={oneTap(() => addWater(day.date, glass, units, day.waterGoalMl))}
           />
         </View>
         <ProgressBar
@@ -267,7 +270,9 @@ function KeyLabel({ color, label }: { color: string; label: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
       <CupKey color={color} size={10} style={{ marginTop: 4 }} />
-      <Text variant="label" color="textSecondary" numberOfLines={1} style={{ fontSize: 13, lineHeight: 17, flexShrink: 1 }}>
+      {/* One line at every width by its words and the cells' shares (never clipped): under a reader's own text
+          spacing it wraps rather than lose its end. */}
+      <Text variant="label" color="textSecondary" style={{ fontSize: 13, lineHeight: 17, flexShrink: 1 }}>
         {label}
       </Text>
     </View>

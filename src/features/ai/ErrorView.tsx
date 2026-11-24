@@ -17,7 +17,7 @@ const TITLE: Record<ScreenErrorCode, string> = {
   daily_limit: "You've used today's AI estimates",
   not_food: 'No food found',
   declined: 'This one could not be estimated',
-  truncated: 'Too much on one plate',
+  truncated: 'Many items on one plate',
   rate_limited: 'The service is busy',
   unauthorized: 'Sign in again',
   not_configured: 'Analysis is not set up',

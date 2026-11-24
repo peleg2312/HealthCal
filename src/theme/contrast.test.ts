@@ -142,6 +142,22 @@ describe.each(NAMES)('%s palette', (name) => {
     expect(contrast(c.rim, over(c.primarySoft, c.bg)), `${name} rim on primarySoft over bg`).toBeGreaterThanOrEqual(3);
   });
 
+  it("draws a text field's outline at 3:1 against the field's fill and the page and card around it", () => {
+    // WCAG 1.4.11: a field's complete border is what identifies it. The field is filled with the card colour.
+    expect(failures(pairs(name, ['fieldEdge'], ['surface', 'bg', 'bgElevated'], 3))).toEqual([]);
+  });
+
+  it('keeps the progress track a neutral step off the card, with the water bar 3:1 on it', () => {
+    // An empty track reads as empty, never as a pale fill (Butter's cerulean track did, at 1.84:1).
+    const step = contrast(c.track, c.surface);
+    expect(step, `${name} track on surface`).toBeLessThanOrEqual(1.3);
+    expect(contrast(c.water, c.track), `${name} water on track`).toBeGreaterThanOrEqual(3);
+  });
+
+  it('draws marks over the camera picture in white in every look', () => {
+    expect(c.cameraInk).toBe('#FFFFFF');
+  });
+
   it('draws the cup outline at 3:1 on the page and on a card', () => {
     expect(failures(pairs(name, ['vesselEdge'], ['bg', 'surface', 'vesselEmpty'], 3))).toEqual([]);
   });

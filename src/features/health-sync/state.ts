@@ -340,7 +340,7 @@ export function errorText(error: SyncError, store: string): string {
     case 'unsupported':
       return `${store} is not available on this device.`;
     case 'not-entitled':
-      return `${store} is not available in this install of HealthCal. Apple lets only a copy signed with HealthKit access read it.`;
+      return `${store} is not available in this install of HealthCal. Apple lets only a copy signed with access to Apple Health read it.`;
     case 'unavailable':
       return `${store} did not answer. It may be updating; try again in a moment.`;
     case 'timeout':

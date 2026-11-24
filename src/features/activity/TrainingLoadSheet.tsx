@@ -6,6 +6,8 @@ import { CHART_CAPTION, HOW_COUNTED, type TrainingOverview } from '@/lib/trainin
 import { useTheme } from '@/theme';
 import { BarChart, Button, Sheet, Text } from '@/ui';
 
+import { barsLabel } from '@/features/progress/chartWords';
+
 import { WHO_WEEKLY_MINUTES } from './build';
 import { nextChange, readFit } from './sheetFit';
 import { ZoneScale } from './ZoneScale';
@@ -94,6 +96,8 @@ function OverviewBody({ overview: o, visible, onClose }: { overview: TrainingOve
             pour): the inset keeps those boxes inside the sheet's side padding. */}
         <View style={{ paddingHorizontal: 24 }}>
           <BarChart
+            // One image for a screen reader: what the bars show, then each block's own words.
+            accessibilityLabel={barsLabel(`Active minutes by week, the 150 to 300 minute range shaded. ${CHART_CAPTION}`, o.blocks.map((b) => b.detail ?? `${b.label}: ${b.minutes} min`))}
             testID="train-load-chart"
             data={o.blocks.map((b) => ({ label: b.label, value: b.minutes, detail: b.detail }))}
             color={colors.exercise}

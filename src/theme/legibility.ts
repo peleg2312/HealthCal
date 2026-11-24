@@ -12,8 +12,8 @@
  *   ./contrastMore.ts), with `forced-color-adjust: none` on the page so the browser keeps them: the person's
  *   colours, and every fill still drawn.
  *
- * An automated browser can ask for a setting the web has no query for: `window.__healthcalLegibility =
- * { boldText: true }` (or `moreContrast`, `forcedColors`) before the app loads.
+ * An automated browser can ask for a setting the web has no query for, before the app loads (a state's
+ * `flags`): `window.__healthcalBoldText = true`, and likewise `__healthcalMoreContrast`.
  */
 import { useSyncExternalStore } from 'react';
 import { AccessibilityInfo, Platform } from 'react-native';
@@ -26,7 +26,8 @@ export interface Legibility {
 
 declare global {
   interface Window {
-    __healthcalLegibility?: Partial<Legibility>;
+    __healthcalBoldText?: boolean;
+    __healthcalMoreContrast?: boolean;
   }
 }
 
@@ -43,17 +44,17 @@ function set(patch: Partial<Legibility>) {
   for (const l of listeners) l();
 }
 
-function forced(): Partial<Legibility> {
+/** What a test asked for with a window flag (only ever turns a setting on). */
+function asked(): Partial<Legibility> {
   if (typeof window === 'undefined') return {};
-  const f = window.__healthcalLegibility;
-  return f && typeof f === 'object' ? f : {};
+  return { ...(window.__healthcalBoldText === true ? { boldText: true } : null), ...(window.__healthcalMoreContrast === true ? { moreContrast: true } : null) };
 }
 
 function startWeb() {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
   const more = window.matchMedia('(prefers-contrast: more)');
   const colors = window.matchMedia('(forced-colors: active)');
-  const read = () => set({ moreContrast: more.matches, forcedColors: colors.matches, ...forced() });
+  const read = () => set({ moreContrast: more.matches, forcedColors: colors.matches, ...asked() });
   read();
   more.addEventListener?.('change', read);
   colors.addEventListener?.('change', read);

@@ -189,6 +189,8 @@ export function RangeSwitch({ value, onChange }: { value: RangeDays; onChange: (
                 scaleTo={0.99}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: active, checked: active }}
+                // react-native-web reads the aria prop, not accessibilityState.
+                {...({ 'aria-checked': active } as object)}
                 accessibilityLabel={`Last ${r} days`}
                 style={{
                   flexDirection: 'row',
@@ -242,6 +244,8 @@ export function SegmentSwitch<T extends string>({
             scaleTo={0.98}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
+            // react-native-web reads the aria prop, not accessibilityState.
+            {...({ 'aria-selected': active } as object)}
             accessibilityLabel={o.label}
             style={{ flex: 1, minWidth: 0, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: narrow ? 1 : 4 }}>
             <Text variant="label" color={active ? 'text' : 'textSecondary'} numberOfLines={1} style={{ fontSize: narrow ? 13 : 14.5, lineHeight: 20, fontFamily: active ? fonts.bold : fonts.semibold }}>
@@ -283,8 +287,11 @@ export function TrendLegend({ period }: { period: string }) {
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: 2 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-        <Triangle size={8} color={colors.textTertiary} fill={colors.textTertiary} />
-        <View style={{ transform: [{ rotate: '180deg' }] }}>
+        {/* The marks themselves are decorative here: the words beside them say what they mean. */}
+        <View aria-hidden>
+          <Triangle size={8} color={colors.textTertiary} fill={colors.textTertiary} />
+        </View>
+        <View aria-hidden style={{ transform: [{ rotate: '180deg' }] }}>
           <Triangle size={8} color={colors.textTertiary} fill={colors.textTertiary} />
         </View>
         <Text variant="caption" color="textTertiary">

@@ -5,7 +5,22 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { AI_TILE_HINT, ANALYSING, analysingLabel, analysingNote, analysingSteps, DESCRIPTION_MAX, prefilledDescription, searchAiTile, slowAfterMs } from './words';
+import {
+  AI_TILE_HINT,
+  alternativesLabel,
+  ANALYSING,
+  analysingLabel,
+  analysingNote,
+  analysingSteps,
+  DESCRIPTION_MAX,
+  estimateReadyLine,
+  itemNameLabel,
+  prefilledDescription,
+  searchAiTile,
+  slowAfterMs,
+  spokenMacros,
+  swapChipLabel,
+} from './words';
 
 const BANNED =
   /\b(bad|fail|failed|failure|cheat|cheated|should|guilty|lazy|great|amazing|well done|keep it up|too much|missed your|goal missed|over budget|make up|only|unfortunately|oops|sorry)\b/i;
@@ -75,5 +90,40 @@ describe("food search's AI tile", () => {
     expect(prefilledDescription(undefined)).toBe('');
     expect(prefilledDescription(42)).toBe('');
     expect(prefilledDescription('y'.repeat(900))).toHaveLength(DESCRIPTION_MAX);
+  });
+});
+
+describe('the review, spoken', () => {
+  const lines = () => [
+    estimateReadyLine({ kcal: 507.4, range: [390, 620], items: 4, sample: false }),
+    estimateReadyLine({ kcal: 90, range: [90, 90], items: 1, sample: false }),
+    estimateReadyLine({ kcal: 507, range: [390, 620], items: 4, sample: true }),
+    spokenMacros(46.6, 0, 5.2),
+    itemNameLabel(2),
+    alternativesLabel(3, 'White rice, cooked'),
+    swapChipLabel('White rice, cooked', 190),
+  ];
+
+  it('says the arrival as an estimate with its range and the items to check, units in full', () => {
+    expect(estimateReadyLine({ kcal: 507.4, range: [390, 620], items: 4, sample: false })).toBe('Estimate ready: about 507 kilocalories, likely 390 to 620, 4 items to check.');
+    expect(estimateReadyLine({ kcal: 90, range: [90, 90], items: 1, sample: false })).toBe('Estimate ready: about 90 kilocalories, 1 item to check.');
+    expect(estimateReadyLine({ kcal: 507, range: [390, 620], items: 4, sample: true })).toBe('Sample result, not your meal: about 507 kilocalories, likely 390 to 620, 4 items.');
+  });
+
+  it('speaks no abbreviation: no kcal, no lone g, no macro letter', () => {
+    expect(lines().filter((s) => /\bkcal\b|\b\d+ ?g\b|\b[PCF] \d/.test(s))).toEqual([]);
+    expect(spokenMacros(46.6, 0, 1)).toBe('Protein 47 grams, carbs 0 grams, fat 1 gram');
+  });
+
+  it('names each row apart, with the visible words first (label in name)', () => {
+    expect(itemNameLabel(1)).not.toBe(itemNameLabel(2));
+    expect(itemNameLabel(1).startsWith('Item name')).toBe(true);
+    expect(alternativesLabel(3, ' White rice ')).toBe('Could also be, 3 foods for White rice');
+    expect(alternativesLabel(1, '')).toBe('Could also be, 1 food');
+    expect(swapChipLabel('White rice, cooked', 190.4)).toBe('White rice, cooked, 190 kilocalories');
+  });
+
+  it('pass the banned lists, with no exclamation mark, in sentence case', () => {
+    expect(lines().filter((s) => BANNED.test(s) || PLAN.test(s) || s.includes('!') || !/^[A-Z]/.test(s))).toEqual([]);
   });
 });

@@ -15,7 +15,7 @@ export interface ButtonProps {
    * soft: primarySoft fill with primaryInk text (a done state such as "Cheered").
    */
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'soft';
-  /** lg 48, md 44, sm 36 visible (a 44 px touch target through hitSlop, on web too). */
+  /** lg 48, md 44, sm 36 visible (a 44 px touch target through hitSlop, on web too; 48 dp on Android, see PressableScale). */
   size?: 'sm' | 'md' | 'lg';
   icon?: React.ReactNode;
   iconRight?: React.ReactNode;
@@ -28,9 +28,14 @@ export interface ButtonProps {
   style?: StyleProp<ViewStyle>;
   testID?: string;
   accessibilityLabel?: string;
+  /**
+   * For a button that opens or closes more of a list ("Show all"): true while it is open. Sets the
+   * expanded state (`aria-expanded` on the web). Leave it out on every other button.
+   */
+  expanded?: boolean;
 }
 
-export function Button({ title, onPress, variant = 'primary', size = 'lg', icon, iconRight, loading, disabled, full = true, tint, style, testID, accessibilityLabel }: ButtonProps) {
+export function Button({ title, onPress, variant = 'primary', size = 'lg', icon, iconRight, loading, disabled, full = true, tint, style, testID, accessibilityLabel, expanded }: ButtonProps) {
   const { colors, radius } = useTheme();
   const sm = size === 'sm';
   const height = size === 'lg' ? 48 : size === 'md' ? 44 : 36;
@@ -52,6 +57,7 @@ export function Button({ title, onPress, variant = 'primary', size = 'lg', icon,
       disabled={disabled || loading}
       feedback={variant === 'primary' ? 'press' : 'tap'}
       accessibilityLabel={accessibilityLabel ?? title}
+      expanded={expanded}
       hitSlop={sm ? 4 : undefined}
       style={[
         {
@@ -88,7 +94,7 @@ export function Button({ title, onPress, variant = 'primary', size = 'lg', icon,
  * Square icon button, 44 by default, with cup corners. `surface` has a 1 px
  * border; `alt` is a surfaceAlt tile; `primary` is solid; `clear` has nothing
  * behind the icon. Small sizes keep a 44 px touch target through hitSlop, on
- * web as well (see `PressableScale`).
+ * web as well, and 48 dp on Android (see `PressableScale`).
  */
 export function IconButton({
   children,
@@ -100,6 +106,7 @@ export function IconButton({
   testID,
   disabled,
   hitSlop,
+  expanded,
 }: {
   children: React.ReactNode;
   onPress?: () => void;
@@ -111,6 +118,8 @@ export function IconButton({
   disabled?: boolean;
   /** The touch area past the cup's edge, when it must differ from the default (44 px in all). The tab header's cups pass theirs. */
   hitSlop?: { top: number; bottom: number; left: number; right: number };
+  /** For a cup that opens or closes something: the expanded state (`aria-expanded` on the web). */
+  expanded?: boolean;
 }) {
   const { colors } = useTheme();
   const bg = tone === 'primary' ? colors.primary : tone === 'alt' ? colors.surfaceAlt : tone === 'surface' ? colors.surface : 'transparent';
@@ -120,6 +129,7 @@ export function IconButton({
       onPress={onPress}
       disabled={disabled}
       scaleTo={0.92}
+      expanded={expanded}
       hitSlop={hitSlop ?? Math.max(0, Math.ceil((44 - size) / 2))}
       accessibilityLabel={accessibilityLabel}
       style={[

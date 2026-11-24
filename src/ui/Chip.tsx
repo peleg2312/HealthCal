@@ -1,9 +1,10 @@
 import { ChevronDown } from 'lucide-react-native';
 import React from 'react';
-import { ScrollView, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, ScrollView, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { fonts, useTheme } from '@/theme';
 
+import { rovingIndex } from './controlRules';
 import { PressableScale } from './Pressable';
 import { Text } from './Text';
 
@@ -91,6 +92,14 @@ export function ChipWrap({ children, style }: { children: React.ReactNode; style
  * An underline tab row: a 1 px border baseline, inactive labels in
  * textSecondary, the selected label in text with a 3 px rim bar under it
  * (inset 18% each side). No sliding pill and no filled track.
+ *
+ * Two kinds, drawn the same. By default it is tabs (a `tablist` of `tab`s, the
+ * chosen one selected), for switching what a screen shows. With
+ * `role="radiogroup"` it is one choice of a form (a `radiogroup` of `radio`s,
+ * the chosen one checked), named by `accessibilityLabel` (the field's label,
+ * "Goal"). Either way it is one tab stop: on the web the arrow keys move the
+ * choice and focus along the row (Home and End to its ends), and Space or Enter
+ * picks the focused one.
  */
 export function Segmented<T extends string>({
   options,
@@ -98,6 +107,8 @@ export function Segmented<T extends string>({
   onChange,
   style,
   testID,
+  role = 'tablist',
+  accessibilityLabel,
 }: {
   options: { value: T; label: string }[];
   value: T;
@@ -105,11 +116,22 @@ export function Segmented<T extends string>({
   style?: StyleProp<ViewStyle>;
   /** Each option gets `${testID}-${value}`. */
   testID?: string;
+  /** 'tablist' (default) switches views; 'radiogroup' is a choice in a form, read as radios. */
+  role?: 'tablist' | 'radiogroup';
+  /** The group's name: with 'radiogroup', the field's label ("Goal", "Sex"). */
+  accessibilityLabel?: string;
 }) {
   const { colors } = useTheme();
+  const radio = role === 'radiogroup';
+  const current = options.findIndex((o) => o.value === value);
+  const web = Platform.OS === 'web';
   return (
-    <View accessibilityRole="tablist" style={[{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border }, style]}>
-      {options.map((o) => {
+    <View
+      accessibilityRole={radio ? 'radiogroup' : 'tablist'}
+      {...(web ? { role } : null)}
+      accessibilityLabel={accessibilityLabel}
+      style={[{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border }, style]}>
+      {options.map((o, i) => {
         const active = o.value === value;
         return (
           <PressableScale
@@ -118,10 +140,24 @@ export function Segmented<T extends string>({
             onPress={() => onChange(o.value)}
             feedback="select"
             scaleTo={0.98}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: active }}
-            aria-selected={active}
+            accessibilityRole={radio ? 'radio' : 'tab'}
+            accessibilityState={radio ? { checked: active } : { selected: active }}
+            {...(radio ? { 'aria-checked': active } : { 'aria-selected': active })}
             accessibilityLabel={o.label}
+            {...(web
+              ? {
+                  // One tab stop for the row: the chosen option, else the first.
+                  tabIndex: (current < 0 ? i === 0 : active) ? 0 : -1,
+                  onKeyDown: (e: { key: string; currentTarget: unknown; preventDefault: () => void }) => {
+                    const next = rovingIndex(e.key, i, options.length);
+                    if (next === null) return;
+                    e.preventDefault();
+                    const row = (e.currentTarget as HTMLElement | null)?.parentElement;
+                    (row?.children[next] as HTMLElement | undefined)?.focus();
+                    if (options[next].value !== value) onChange(options[next].value);
+                  },
+                }
+              : null)}
             style={{ flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
             <Text variant="label" color={active ? 'text' : 'textSecondary'} numberOfLines={1} style={{ fontSize: 14.5, lineHeight: 20, fontFamily: active ? fonts.bold : fonts.semibold }}>
               {o.label}
@@ -142,10 +178,10 @@ function Underline() {
 
 /**
  * A small status label: a cup-key square in the colour, then the text.
- * Corners 4, a faint tint of the colour behind it. Text stays a text token.
+ * A label's equal corners (`radius.chip`, 6), a faint tint of the colour behind it. Text stays a text token.
  */
 export function Badge({ label, color, style }: { label: string; color?: string; style?: StyleProp<ViewStyle> }) {
-  const { colors } = useTheme();
+  const { colors, radius } = useTheme();
   const c = color ?? colors.primary;
   const tintable = /^#[0-9a-fA-F]{6}$/.test(c);
   return (
@@ -156,7 +192,7 @@ export function Badge({ label, color, style }: { label: string; color?: string; 
           gap: 5,
           paddingHorizontal: 7,
           height: 22,
-          borderRadius: 4,
+          borderRadius: radius.chip,
           backgroundColor: tintable ? `${c}1F` : colors.surfaceAlt,
           alignItems: 'center',
           justifyContent: 'center',

@@ -8,6 +8,7 @@ import { useTheme, withOpacity } from '@/theme';
 import { BarChart, Card, Text } from '@/ui';
 
 import { buildBars, daysVerdict } from './calorieBars';
+import { barsLabel } from './chartWords';
 import { LegendDot } from './parts';
 
 /**
@@ -34,7 +35,11 @@ export function CaloriesADay({ days, summary, today, onOpen }: { days: InsightDa
     <Card
       testID="progress-calories-a-day"
       onPress={onOpen}
-      accessibilityLabel={`Calories a day, average ${formatNumber(Math.round(c.avgKcal))} kcal against an average budget of ${formatNumber(Math.round(c.avgBudget))}. ${verdict.line}.${verdict.note ? ` ${verdict.note}.` : ''} Open nutrition`}
+      // The summary first, then every bar's value (its day or week, kcal against its budget), then where it leads.
+      accessibilityLabel={`${barsLabel(
+        `${weekly ? 'Calories a day, by week' : 'Calories a day'}, average ${formatNumber(Math.round(c.avgKcal))} kcal against an average budget of ${formatNumber(Math.round(c.avgBudget))} kcal. ${verdict.line}.${verdict.note ? ` ${verdict.note}.` : ''} ${weekly ? 'Week by week' : 'Day by day'}`,
+        data.map((d) => d.detail),
+      )} Open nutrition`}
       style={{ gap: spacing.md }}>
       <View style={{ gap: 2 }}>
         {/* The average is the Calories tile's number just below, so it is said once there (and read out here). */}

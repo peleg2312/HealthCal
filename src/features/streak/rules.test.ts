@@ -39,7 +39,7 @@ describe('milestones', () => {
 
 describe('copy and pacing', () => {
   it('says the streak forgives', () => {
-    expect(streakLine(12)).toBe('12 days. A missed day will not break it.');
+    expect(streakLine(12)).toBe('12 days. A day without a log will not break it.');
   });
   it('keeps a long row to about 25 steps', () => {
     expect(pourIndex(3, 7)).toBe(3);

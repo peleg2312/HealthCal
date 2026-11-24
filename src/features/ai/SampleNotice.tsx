@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { FlaskConical, Info } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { cup, useTheme } from '@/theme';
 import { Button, IconButton, Text } from '@/ui';
@@ -19,7 +19,9 @@ type Reason = Extract<AiAvailability, { live: false }>['reason'];
 export function SampleNotice({ reason, variant }: { reason: Reason; variant: 'before' | 'result' }) {
   const { colors, radius, spacing } = useTheme();
   const [open, setOpen] = useState(false);
-  const title = variant === 'result' ? 'Sample result, not your meal' : 'Sample mode';
+  // Under 360 px the result's title takes its short form, so it stays one line and the review's first item keeps its room.
+  const narrow = useWindowDimensions().width < 360;
+  const title = variant === 'result' ? (narrow ? 'Sample, not your meal' : 'Sample result, not your meal') : 'Sample mode';
   const what = variant === 'result' ? 'Shows how reviewing works.' : 'You will see a fixed example.';
   const why = reason === 'signed_out' ? 'Sign in to have your own meals estimated.' : 'A real estimate needs this copy of HealthCal to be connected to a server.';
   return (

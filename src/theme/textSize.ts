@@ -8,7 +8,8 @@
  * here the phone may scale the kit's type up to 2x (`MAX_TEXT_GROWTH`), at 200% here not at all.
  *
  * The stored size is read before the first screen on the web (localStorage, synchronously) and at the
- * start on a phone. A browser test sets `window.__healthcalTextSize = 2` before loading (a state's `flags`).
+ * start on a phone. A browser test sets `window.__healthcalTextSize = true` (200%) or a number before
+ * loading (a state's `flags`).
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
@@ -27,7 +28,7 @@ export const TEXT_SIZE_KEY = 'healthcal.textSize';
 
 declare global {
   interface Window {
-    __healthcalTextSize?: number;
+    __healthcalTextSize?: number | boolean;
   }
 }
 
@@ -82,7 +83,9 @@ export function scaleTextStyle(style: TextStyle, scale: number, bold: boolean): 
 
 function initial(): TextSize {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return 1;
-  if (typeof window.__healthcalTextSize === 'number') return normaliseTextSize(window.__healthcalTextSize);
+  const asked = window.__healthcalTextSize;
+  if (asked === true) return 2;
+  if (typeof asked === 'number') return normaliseTextSize(asked);
   try {
     return normaliseTextSize(window.localStorage?.getItem(TEXT_SIZE_KEY));
   } catch {

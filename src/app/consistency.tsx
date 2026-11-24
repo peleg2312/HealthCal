@@ -52,8 +52,9 @@ function cellLabel(cell: CalendarCell): string {
  * budget, in the calorie colour (the recap's rule: the lighter fill is a
  * partly logged day, hatching is today, amber at the top a day above its
  * budget). Below it, a check for a fully logged day on budget (90 to 100% of
- * it, `budgetMark`; never under an amber day) and cup keys
- * for the water goal and a workout. Today's date is an ink box.
+ * it, `budgetMark`; never under an amber day), a cup key for the water goal
+ * and a small dumbbell for a workout (a shape of its own, so the two marks are
+ * told apart without their colours). Today's date is an ink box.
  * The month pours in a diagonal wave from the top left (`index`), and each
  * day remembers its level for the session, so reopening the page or coming
  * back to a month does not pour again.
@@ -80,6 +81,8 @@ function DayCell({ cell, index }: { cell: CalendarCell | null; index: number }) 
           {cell.day}
         </Text>
       </View>
+      {/* The cup and the marks are the cell's picture; its name (cellLabel) says all of it. */}
+      <View aria-hidden>
       <MiniCup
         progress={cell.logged ? cell.ratio : 0}
         color={cell.partial ? withOpacity(colors.calories, PARTIAL) : colors.calories}
@@ -90,7 +93,9 @@ function DayCell({ cell, index }: { cell: CalendarCell | null; index: number }) 
         width={22}
         height={26}
       />
+      </View>
       <View
+        aria-hidden
         style={{
           flexDirection: 'row',
           alignItems: 'center',
@@ -99,7 +104,7 @@ function DayCell({ cell, index }: { cell: CalendarCell | null; index: number }) 
         }}>
         {cell.onBudget ? <Check size={9} color={colors.success} strokeWidth={3.2} /> : null}
         {cell.waterMet ? <CupKey color={colors.water} size={6} /> : null}
-        {cell.trained ? <CupKey color={colors.exercise} size={6} /> : null}
+        {cell.trained ? <Dumbbell size={9} color={colors.exercise} strokeWidth={2.6} /> : null}
       </View>
     </View>
   );
@@ -108,7 +113,7 @@ function DayCell({ cell, index }: { cell: CalendarCell | null; index: number }) 
 function Legend({ swatch, label }: { swatch: React.ReactNode; label: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-      {swatch}
+      <View aria-hidden>{swatch}</View>
       <Text variant="caption" color="textSecondary">
         {label}
       </Text>
@@ -165,7 +170,7 @@ export default function ConsistencyScreen() {
   return (
     <Screen header={<Header title="Consistency" subtitle="Days you logged" />} testID="consistency-screen">
       <Card style={{ gap: spacing.md }} testID="consistency-summary">
-        <View accessible role="group" accessibilityLabel={`Current streak ${streak} ${word(streak, 'day')}${longestIsCurrent ? ', your longest yet' : ''}. A missed day does not break it; two in a row do.`}>
+        <View accessible role="group" accessibilityLabel={`Current streak ${streak} ${word(streak, 'day')}${longestIsCurrent ? ', your longest yet' : ''}. A day without a log does not break it; two in a row do.`}>
           <Text variant="overline">Current streak</Text>
           <View
             style={{
@@ -181,7 +186,7 @@ export default function ConsistencyScreen() {
             </Text>
           </View>
           <Text variant="title" style={{ marginTop: spacing.xs }}>
-            {streak ? (longestIsCurrent ? 'Your longest yet. A missed day will not break it.' : 'A missed day will not break it; two in a row will.') : 'Log food today to start a streak.'}
+            {streak ? (longestIsCurrent ? 'Your longest yet. A day without a log will not break it.' : 'A day without a log will not break it; two in a row will.') : 'Log food today to start a streak.'}
           </Text>
         </View>
         <View
@@ -268,7 +273,7 @@ export default function ConsistencyScreen() {
           <Legend swatch={<CupKey color={colors.warning} />} label="Above budget" />
           {rows.some((r) => r.some((c) => c?.partial)) ? <Legend swatch={<CupKey color={withOpacity(colors.calories, PARTIAL)} />} label="Partly logged" /> : null}
           <Legend swatch={<CupKey color={colors.water} size={7} />} label="Water goal met" />
-          <Legend swatch={<CupKey color={colors.exercise} size={7} />} label="Workout" />
+          <Legend swatch={<Dumbbell size={12} color={colors.exercise} strokeWidth={2.4} />} label="Workout" />
         </View>
       </Card>
 
@@ -317,7 +322,7 @@ export default function ConsistencyScreen() {
                   alignItems: 'center',
                   gap: spacing.md,
                 }}>
-                {kindIcon[k]}
+                <View aria-hidden>{kindIcon[k]}</View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text variant="bodyStrong">
                     {RHYTHM_COPY[k].title} {target} {word(target, 'day')} a week
@@ -327,14 +332,11 @@ export default function ConsistencyScreen() {
                   </Text>
                 </View>
               </View>
-              {/* One label for the eight bars: each week and its count, for a screen reader. */}
-              <View
-                accessible
-                accessibilityRole="image"
+              {/* One label for the eight bars: each week and its count, for a screen reader (the chart is one image). */}
+              <BarChart
                 accessibilityLabel={`${RHYTHM_COPY[k].title}, target ${target} ${word(target, 'day')} a week. ${weeks
                   .map((w) => `${w.partial ? 'This week so far' : `Week of ${formatShortDate(w.weekStart)}`}: ${w.count} ${word(w.count, 'day')}${w.met ? ', on target' : ''}`)
-                  .join('. ')}.`}>
-                <BarChart
+                  .join('. ')}.`}
                   testID={`consistency-rhythm-${k}-chart`}
                   data={weeks.map((w, i) => ({
                     // Eight labels share a row as narrow as 30 px a bar: the month only where it changes ("Sep 21, 28, Oct 5").
@@ -356,7 +358,6 @@ export default function ConsistencyScreen() {
                   height={110}
                   scrub
                 />
-              </View>
             </View>
           );
         })}
@@ -387,7 +388,7 @@ export default function ConsistencyScreen() {
                 gap: narrow ? spacing.sm : spacing.md,
               }}
               testID={`consistency-target-${k}`}>
-              {kindIcon[k]}
+              <View aria-hidden>{kindIcon[k]}</View>
               <Text variant="bodyStrong" style={{ flex: 1 }}>
                 {RHYTHM_COPY[k].title}
               </Text>

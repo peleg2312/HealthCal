@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { CalendarPlus, Copy, MoreHorizontal, Plus, Repeat2, Save, Trash2 } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { SourceMark, sourceMarkTop } from '@/features/ai/mark';
@@ -14,7 +14,7 @@ import type { DaySummary } from '@/store/selectors';
 import { favoriteRecordId, useStore } from '@/store';
 import { cup, fonts, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType, WaterEntry } from '@/types';
-import { AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, Hatch, IconButton, ListRow, PressableScale, ProgressBar, Sheet, Text, Trough } from '@/ui';
+import { AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, Hatch, IconButton, ListRow, PressableScale, ProgressBar, RestoreRow, Sheet, Text, Trough } from '@/ui';
 
 import { clearEntries, copyEntries } from './actions';
 import { foodNameHead } from './addedTo';
@@ -27,6 +27,7 @@ import { deleteEntry } from './log';
 import { useSaveMealStep } from './SaveMealSheet';
 import { SAVE_HINT_NOT_NOW, SAVE_HINT_NOT_NOW_A11Y, saveHintA11y, saveHintLabel } from './saveWords';
 import { currentKcal } from './usuals';
+import { removedToday } from './restore';
 import { FadeRow, useLeavingRows } from './rowMotion';
 
 /**
@@ -284,8 +285,13 @@ export function MealCard({
   const { colors, spacing, radius } = useTheme();
   const total = entriesTotal(entries).kcal;
   const add = () => router.push(href('/food/search', { meal, date }) as never);
-  // A removed row fades where it is before the rows below glide up into its place.
+  // A removed row fades where it is, then folds away while the rows below close the space.
   const rows = useLeavingRows(entries);
+  // The second way back after a delete: what was removed from this meal today, each with Restore.
+  const allEntries = useStore((s) => s.foodEntries);
+  const todayDate = useToday();
+  const removed = useMemo(() => removedToday(allEntries, date, meal, todayDate), [allEntries, date, meal, todayDate]);
+  const mealWord = label.toLowerCase();
   // One add per meal: an empty meal's add is its dashed slot (`meal-add-<meal>`), with no "+" cup and no "..." in its
   // header (the menu's one action for an empty meal, copying the last one, is the Repeat under the slot).
   const filled = rows.length > 0;
@@ -326,6 +332,21 @@ export function MealCard({
         </AnimatedList>
       </View>
       {hint && rows.length > 0 ? <SaveHintRow meal={meal} onSave={hint.onSave} onClose={hint.onClose} /> : null}
+      {removed.length ? (
+        <View testID={`meal-removed-${meal}`}>
+          {filled ? <Divider inset={ROW_PAD} /> : null}
+          <View style={{ paddingLeft: ROW_PAD, paddingRight: 8, paddingTop: filled ? 2 : 8, paddingBottom: filled ? 6 : 0 }}>
+            {removed.map((e) => (
+              <RestoreRow
+                key={e.id}
+                testID={`entry-restore-${e.id}`}
+                label={`${isolateRtl(foodNameHead(displayFoodName(e)))} removed from ${mealWord}`}
+                onRestore={() => useStore.getState().restore('foodEntries', e.id)}
+              />
+            ))}
+          </View>
+        </View>
+      ) : null}
       {filled ? null : (
         <View style={{ marginTop: spacing.md, gap: spacing.md, paddingHorizontal: ROW_PAD }}>
           <PressableScale

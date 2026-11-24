@@ -206,7 +206,8 @@ function GoalsForm() {
     goBack('/profile');
   };
 
-  const rateStep = u === 'imperial' ? weightToKg(0.1, 'imperial') : 0.05;
+  // One decimal for a weight (0.1 kg or 0.1 lb a step), so the pace never shows a false second decimal.
+  const rateStep = u === 'imperial' ? weightToKg(0.1, 'imperial') : 0.1;
   const { ft, inch } = cmToFtIn(draft.heightCm);
 
   return (
@@ -235,8 +236,8 @@ function GoalsForm() {
           {model.target.source === 'override'
             ? `Set by you. You burn about ${formatNumber(Math.round(model.tdee))} kcal a day.`
             : Math.abs(model.target.dailyDelta) <= 5
-              ? `Matched to the ${formatNumber(Math.round(model.tdee))} kcal you burn a day.`
-              : `${formatNumber(Math.round(Math.abs(model.target.dailyDelta)))} kcal ${model.target.dailyDelta < 0 ? 'below' : 'above'} the ${formatNumber(Math.round(model.tdee))} kcal you burn a day.`}
+              ? `Matched to what you burn a day, about ${formatNumber(Math.round(model.tdee))} kcal.`
+              : `${formatNumber(Math.round(Math.abs(model.target.dailyDelta)))} kcal ${model.target.dailyDelta < 0 ? 'below' : 'above'} what you burn a day, about ${formatNumber(Math.round(model.tdee))} kcal.`}
         </Text>
         {model.target.belowFloor && draft.goal === 'lose' && model.target.source !== 'override' ? (
           <Text variant="caption" color="warningInk" style={{ marginTop: 4 }}>
@@ -281,6 +282,8 @@ function GoalsForm() {
         <View style={{ paddingVertical: spacing.md, gap: spacing.md }}>
           <Segmented<GoalType>
             testID="goals-goal"
+            role="radiogroup"
+            accessibilityLabel="Goal"
             value={draft.goal}
             onChange={(goal) =>
               patch({
@@ -317,12 +320,12 @@ function GoalsForm() {
                     step={rateStep}
                     min={rateStep}
                     max={maxRate}
-                    format={(n) => formatWeight(n, u, 2)}
+                    format={(n) => formatWeight(n, u, 1)}
                     onChange={(weeklyRateKg) => patch({ weeklyRateKg })}
                   />
                 </View>
                 <Hint>
-                  Safe maximum {formatWeight(maxRate, u, 2)} a week ({draft.goal === 'lose' ? '1%' : '0.5%'} of body weight)
+                  Safe maximum {formatWeight(maxRate, u, 1)} a week ({draft.goal === 'lose' ? '1%' : '0.5%'} of body weight)
                 </Hint>
               </View>
             </>
@@ -349,6 +352,8 @@ function GoalsForm() {
         <View style={{ paddingVertical: spacing.md, gap: spacing.md }}>
           <Segmented<Sex>
             testID="goals-sex"
+            role="radiogroup"
+            accessibilityLabel="Sex for the estimate"
             value={draft.sex}
             onChange={(sex) => patch({ sex })}
             options={[
@@ -448,6 +453,8 @@ function GoalsForm() {
         <View style={{ paddingVertical: spacing.md, gap: spacing.md }}>
           <Segmented
             testID="goals-calories-mode"
+            role="radiogroup"
+            accessibilityLabel="Calorie target"
             value={manualCalories ? 'manual' : 'auto'}
             onChange={(v) => {
               setManualCalories(v === 'manual');
@@ -542,6 +549,8 @@ function GoalsForm() {
         <View style={{ paddingVertical: spacing.md, gap: spacing.md }}>
           <Segmented
             testID="goals-water-mode"
+            role="radiogroup"
+            accessibilityLabel="Water goal"
             value={manualWater ? 'manual' : 'auto'}
             onChange={(v) => {
               setManualWater(v === 'manual');
@@ -550,9 +559,10 @@ function GoalsForm() {
                   waterGoalMlOverride: baseWaterGoalMl(draft.weightKg, draft.sex),
                 });
             }}
+            // Named apart from the calorie target's "Automatic" and "Set my own", so no two choices on the page share a name.
             options={[
-              { value: 'auto', label: 'Automatic' },
-              { value: 'manual', label: 'Set my own' },
+              { value: 'auto', label: 'By weight' },
+              { value: 'manual', label: 'Fixed' },
             ]}
           />
           {manualWater ? (
@@ -617,6 +627,8 @@ function GoalsForm() {
               </Text>
               <Segmented<ExerciseSpread>
                 testID="goals-exercise-spread"
+                role="radiogroup"
+                accessibilityLabel="Workout calories"
                 value={draft.exerciseSpread ?? 'day'}
                 // Choosing what is saved puts back exactly what is saved (an older profile has no value: "Same day").
                 onChange={(v) => patch({ exerciseSpread: v === (saved.exerciseSpread ?? 'day') ? saved.exerciseSpread : v })}
@@ -632,7 +644,7 @@ function GoalsForm() {
             title="Learn from my data"
             subtitle={
               model.adaptive.observed !== null
-                ? `Your logs and weigh-ins suggest you use ${formatNumber(model.adaptive.observed)} kcal a day.`
+                ? `Your logs and weigh-ins suggest you burn about ${formatNumber(model.adaptive.observed)} kcal a day. ${draft.useAdaptiveTdee ? 'Your target blends this with the formula.' : 'On, your target blends this with the formula.'}`
                 : 'Compares what you log with your weight trend.'
             }
             value={draft.useAdaptiveTdee}

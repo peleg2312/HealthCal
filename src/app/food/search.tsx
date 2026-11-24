@@ -57,7 +57,7 @@ export default function FoodSearchScreen() {
     rememberSearchTab(t);
   };
   const [amountEntryId, setAmountEntryId] = useState<string | null>(null);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
   const [logging, setLogging] = useState<SavedMeal | null>(null);
   const [onlineResult, setOnlineResult] = useState<{ query: string; items: Food[]; failed: boolean; unavailable: boolean }>({ query: '', items: [], failed: false, unavailable: false });
   // Entries that already existed when the screen opened. Compared by id, not by time: a clock
@@ -184,7 +184,9 @@ export default function FoodSearchScreen() {
         food={food}
         subtitle={e ? portionLabel(e.servingLabel, e.quantity) : portionLabel(p.serving.label, p.quantity)}
         kcalValue={e ? e.nutrients.kcal : portionKcal(food, p)}
-        onPress={() => open(food)}
+        // A food added on this visit opens its entry (Edit entry), so changing or moving what was just logged is
+        // the row, the meal and done; any other row opens a new food detail.
+        onPress={() => (e ? router.push(href('/food/detail', { entryId: e.id, meal: e.meal, date: e.date }) as never) : open(food))}
         onQuickAdd={() => quickAdd(food)}
         // Press and hold stars it (or unstars it), with a toast and Undo; the row does not open. The empty
         // Favourites tab's tip about it is then learnt (./holdHint).
@@ -284,7 +286,7 @@ export default function FoodSearchScreen() {
           <AnimatedNumber variant="title" value={addedKcal} format={kcal} duration={motion.duration.pourSmall} />
           {' kcal'}
         </Text>
-        <Button testID="search-done" title="Done" size="md" full={false} onPress={() => (router.canGoBack() ? router.back() : router.replace(href('/diary', { date }) as never))} />
+        <Button testID="search-done" title="Close search" size="md" full={false} onPress={() => (router.canGoBack() ? router.back() : router.replace(href('/diary', { date }) as never))} />
       </View>
     ) : null;
   const footer =

@@ -684,12 +684,14 @@ export default function PhotoScreen() {
                   )}
                   <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                     <Text variant="h3" numberOfLines={2} testID="ai-dish">
-                      {/* The notice above already says it is a sample. */}
                       {result.dish}
                     </Text>
-                    <Text variant="caption" color="textSecondary">
-                      {isDemo ? 'Example data' : `AI estimate · ${CONFIDENCE_WORDS[conf]}${precisePass ? ' · checked carefully' : ''}`}
-                    </Text>
+                    {/* The notice above already says it is a sample, so the sample's dish has no second line. */}
+                    {isDemo ? null : (
+                      <Text variant="caption" color="textSecondary">
+                        {`AI estimate · ${CONFIDENCE_WORDS[conf]}${precisePass ? ' · checked carefully' : ''}`}
+                      </Text>
+                    )}
                   </View>
                 </View>
                 <View>

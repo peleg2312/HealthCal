@@ -368,6 +368,16 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
     logFood({ food, serving, quantity, meal, date, entryId: entry?.id });
     goBack(href('/diary', { date }));
   };
+  // Moving an entry is one tap (D3-08: diary, the row, the meal = 3 from Today): in Edit entry, another meal
+  // picked while nothing else has changed saves at once and goes back, with the save's toast and Undo. With
+  // the amount or the day changed too, the meal is only chosen, and Save writes everything together.
+  const pickMeal = (m: MealType) => {
+    setMeal(m);
+    const untouched = !!entry && m !== entry.meal && date === entry.date && quantity === entry.quantity && serving.label === entry.servingLabel;
+    if (!untouched || !(totalGrams > 0) || gramsInvalid || !!paired.problem) return;
+    logFood({ food, serving, quantity, meal: m, date, entryId: entry.id });
+    goBack(href('/diary', { date }));
+  };
 
   return (
     <Screen
@@ -429,7 +439,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
 
       <Card style={{ gap: spacing.md }}>
         <Text variant="h3">Meal and day</Text>
-        <MealPicker value={meal} onChange={setMeal} testIDPrefix="detail-meal" />
+        <MealPicker value={meal} onChange={pickMeal} testIDPrefix="detail-meal" />
         <DayStepper value={date} onChange={setDate} testIDPrefix="detail-day" />
         {paired.problem?.field === 'day' ? <PairProblem text={paired.problem.text} /> : null}
       </Card>

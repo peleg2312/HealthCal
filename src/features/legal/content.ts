@@ -107,7 +107,7 @@ export const TERMS: LegalDocument = {
       heading: 'Not medical advice',
       paragraphs: [
         'HealthCal is a tracking tool, not a medical device, and nothing in it is medical advice. Its calorie and nutrient figures, calorie burn and AI estimates are estimates for healthy adults. They are shown with a range or a plain label because they can be off.',
-        'If you are pregnant or breastfeeding, or have diabetes, kidney disease, an eating disorder or another medical condition, talk to a doctor or registered dietitian before changing how you eat or train. If you are in danger now, call your local emergency number.',
+        'If you are pregnant or breastfeeding, or have diabetes, kidney disease, an eating disorder or another medical condition, talk to a doctor or registered dietitian before changing how you eat or train. If you are at risk of harm now, call your local emergency number.',
         'AI answers and estimates can be wrong. Check them before you rely on them.',
       ],
     },

@@ -60,7 +60,9 @@ function Tile({ t, index, week }: { t: RecapTile; index: number; week: string })
         borderColor: colors.border,
       }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-        <CupKey color={color} size={10} />
+        <View aria-hidden>
+          <CupKey color={color} size={10} />
+        </View>
         <Text variant="label" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1 }}>
           {t.label}
         </Text>
@@ -113,7 +115,10 @@ function Row({ icon, label, text, testID }: { icon: React.ReactNode; label: stri
         gap: spacing.md,
         alignItems: 'flex-start',
       }}>
-      <View style={{ width: 20, paddingTop: 1 }}>{icon}</View>
+      {/* Decorative: the overline beside it says what the row is. */}
+      <View aria-hidden style={{ width: 20, paddingTop: 1 }}>
+        {icon}
+      </View>
       <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
         <Text variant="overline">{label}</Text>
         <Text variant="body">{text}</Text>

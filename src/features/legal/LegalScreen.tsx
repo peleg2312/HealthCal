@@ -10,6 +10,7 @@ import { Button, Card, Divider, Header, ListRow, PressableScale, Screen, Text } 
 
 import { contactLine, jumpLabel, LEGAL_DOCUMENTS, updatedLine, type LegalDocument } from './content';
 import { jumpLines, jumpWidth } from './jumpLines';
+import { READING_MAX } from './reading';
 
 /** The screen's own words (the pages' words are ./content.ts). */
 const IN_SHORT = 'In short';
@@ -154,7 +155,8 @@ export function LegalScreen({ doc }: { doc: LegalDocument }) {
       </View>
 
       {/* The full text: one reading column, a line between sections. */}
-      <View onLayout={(e) => (columnY.current = e.nativeEvent.layout.y)} style={{ marginTop: spacing.sm }}>
+      {/* At most READING_MAX wide, so a line keeps to about 70 characters on a tablet or desktop window too. */}
+      <View onLayout={(e) => (columnY.current = e.nativeEvent.layout.y)} style={{ marginTop: spacing.sm, maxWidth: READING_MAX }}>
         <Text variant="body">{doc.intro}</Text>
         {sections.map((s) => (
           <React.Fragment key={s.id}>

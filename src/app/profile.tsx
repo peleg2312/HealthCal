@@ -98,7 +98,7 @@ function ProfileHub() {
 
   // The daily target is in the card above; the row says what else is inside.
   const paceText =
-    profile.goal === 'maintain' ? 'Pace, macros and water' : `${profile.goal === 'lose' ? 'Lose' : 'Gain'} ${formatWeight(profile.weeklyRateKg, u, 2)} a week, macros, water`;
+    profile.goal === 'maintain' ? 'Pace, protein, carbs, fat, water' : `${profile.goal === 'lose' ? 'Lose' : 'Gain'} ${formatWeight(profile.weeklyRateKg, u, 1)} a week, protein, carbs, fat, water`;
 
   return (
     <Screen header={<Header title="Profile" subtitle="Settings and goals" />}>

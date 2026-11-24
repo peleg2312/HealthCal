@@ -178,7 +178,7 @@ function MealPick() {
           {added > 0 ? `${added} added just now` : 'Tap a food to add it'}
         </Text>
       </View>
-      <Button testID="meal-pick-done" title="Done" size="md" full={false} onPress={() => goBack('/food/meal-edit')} />
+      <Button testID="meal-pick-done" title="Back to the meal" size="md" full={false} onPress={() => goBack('/food/meal-edit')} />
     </View>
   );
 

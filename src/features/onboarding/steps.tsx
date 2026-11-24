@@ -45,7 +45,7 @@ export function BasicsStep({ draft, set, errors, submit }: StepProps) {
   const { spacing } = useTheme();
   return (
     <Group gap={spacing.xl}>
-      <StepTitle title="What should we call you?" subtitle="About a minute. Change any answer later." />
+      <StepTitle title="What do we call you?" subtitle="About a minute. Change any answer later." />
       <BigTextField
         label="First name (optional)"
         testID="onb-name-input"

@@ -68,3 +68,15 @@ describe('pourLandsAt', () => {
     }
   });
 });
+
+describe('routine motion stays within 600 ms', () => {
+  it("a big cup's pour and its rim's settle together, a chart's line and every routine step", async () => {
+    const { motion } = await import('./motion');
+    const d = motion.duration;
+    expect(d.pour + d.settle).toBeLessThanOrEqual(600);
+    expect(d.pourSmall + d.settle).toBeLessThanOrEqual(600);
+    for (const k of ['pour', 'pourSmall', 'settle', 'enter', 'row', 'rowExit', 'sheetIn', 'sheetOut', 'fade', 'draw', 'slide'] as const) {
+      expect(d[k], k).toBeLessThanOrEqual(600);
+    }
+  });
+});

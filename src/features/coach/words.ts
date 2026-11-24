@@ -97,7 +97,7 @@ export const DAY_YESTERDAY = 'Yesterday';
 /** The follow-up chip after the first AI answer while the week is not shared (ruling L6). */
 export const FOLLOW_SHARE = 'Let the coach see my week';
 
-export const REFER_LINE = 'If you are in danger now, call your local emergency number. findahelpline.com lists free lines in every country.';
+export const REFER_LINE = 'If you are at risk of harm now, call your local emergency number. findahelpline.com lists free lines in every country.';
 
 export const TRY_AGAIN = 'Try again';
 export const SIGN_IN = 'Sign in';

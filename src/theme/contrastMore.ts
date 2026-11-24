@@ -3,7 +3,7 @@
  * contrastMore.test.ts for all six looks.
  *
  * `moreContrastColors`: the same look, with every secondary ink pulled toward the text colour until it
- * reaches its mark: secondary text, accent and status inks 7:1 on the page, the card and the soft surface
+ * reaches its mark (secondary and tertiary text a third further still): secondary text, accent and status inks 7:1 on the page, the card and the soft surface
  * (WCAG's enhanced level), the tertiary text 4.5:1 there too (also on the soft surface, where it is not
  * allowed in the plain looks), card hairlines 3:1 and every outline (fields, cups, strong borders) 4.5:1.
  * Data fills keep their colours (they are already 3:1 on the card), and bar tints are drawn at least at 70%.
@@ -47,8 +47,10 @@ export function moreContrastColors(c: ThemeColors): ThemeColors {
   const edge = ink('vesselEdge', 4.5, pages);
   return {
     ...c,
-    textSecondary: ink('textSecondary', 7),
-    textTertiary: ink('textTertiary', 4.5),
+    // Secondary words always move a third of the way further toward the text, so a look whose secondary
+    // text is already 7:1 (Dark, Java) still shows the setting.
+    textSecondary: mix(ink('textSecondary', 7), c.text, 1 / 3),
+    textTertiary: mix(ink('textTertiary', 4.5), c.text, 1 / 3),
     primaryInk: ink('primaryInk', 7),
     caloriesInk: ink('caloriesInk', 7, pages),
     warningInk: ink('warningInk', 7),
@@ -119,7 +121,8 @@ export function forcedColorsPalette(s: SystemColors, base: ThemeColors): ThemeCo
     headroom: fill,
     vesselEdge: ink,
     caloriesInk: ink,
-    cameraInk: base.cameraInk,
+    // On the overlay (CanvasText): the page colour reads on it in a light or a dark system theme.
+    cameraInk: page,
     heroStart: page,
     heroEnd: page,
     ringEnd: fill,

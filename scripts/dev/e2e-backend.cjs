@@ -622,7 +622,7 @@ async function device(browser, seedJson) {
     const answerWords = (await K.text('coach-answer')).split('\n').map((l) => l.trim()).filter((l) => l && !/^Report(ed)?$/.test(l)).join('\n');
     check('coach: an answer cut short by the length cap shows what arrived with "…"', answerWords.endsWith('…'), JSON.stringify(answerWords.slice(-60)));
     await askIt(K, 'refer me please');
-    check('coach: a referral shows the fixed line under the answer', (await K.text('coach-refer')) === 'If you are in danger now, call your local emergency number. findahelpline.com lists free lines in every country.');
+    check('coach: a referral shows the fixed line under the answer', (await K.text('coach-refer')) === 'If you are at risk of harm now, call your local emergency number. findahelpline.com lists free lines in every country.');
     await askIt(K, 'busy now?');
     const before = (await reqs()).length;
     const busyOk = /busy right now/.test(await K.text('coach-notice')) && (await K.has('coach-retry'));

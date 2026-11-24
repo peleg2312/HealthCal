@@ -21,12 +21,12 @@ describe('greetingTitle', () => {
 describe("Today's title beside three header cups (shorten)", () => {
   const GREETINGS = ['Good morning', 'Good afternoon', 'Good evening', 'Good night'];
   // TabHeader's tabTitleRoom and tabTitleSize (kept here: the header's file loads React Native).
-  const tabTitleRoom = (width: number) => Math.min(width, 560) - 2 * 20 - 12 - (3 * 36 + 2 * 4);
+  const tabTitleRoom = (width: number) => Math.min(width, 560) - 2 * 20 - 12 - (3 * 36 + 2 * 8);
   const tabTitleSize = (width: number) => (width < 360 ? 22 : 26);
   const at = (width: number, g: string, name: string) => greetingTitle(g, name, tabTitleRoom(width), tabTitleSize(width), true);
 
-  it('has room 222, 192 and 152 at 390, 360 and 320 (three 36 px cups, 4 px apart)', () => {
-    expect([390, 360, 320].map(tabTitleRoom)).toEqual([222, 192, 152]);
+  it('has room 214, 184 and 144 at 390, 360 and 320 (three 36 px cups, 8 px apart)', () => {
+    expect([390, 360, 320].map(tabTitleRoom)).toEqual([214, 184, 144]);
   });
 
   it('shortens the greeting to its time of day, and leaves Good night alone', () => {
@@ -44,7 +44,8 @@ describe("Today's title beside three header cups (shorten)", () => {
     expect(at(360, 'Good morning', 'Alex')).toBe('Morning, Alex');
     expect(at(360, 'Good evening', 'Dana')).toBe('Evening, Dana');
     expect(at(360, 'Good afternoon', 'Al')).toBe('Afternoon, Al');
-    expect(at(360, 'Good afternoon', 'Alex')).toBe('Afternoon, Alex');
+    // 'Afternoon, Alex' needs Today's 24 px step at 360 since the cups are 8 px apart (todayTitle below).
+    expect(at(360, 'Good afternoon', 'Alex')).toBe('Afternoon');
   });
 
   it('never returns a line wider than the room, at every width, greeting and name', () => {
@@ -66,7 +67,7 @@ describe("Today's title beside three header cups (shorten)", () => {
 
 describe("Today's title with the step (todayTitle)", () => {
   const GREETINGS = ['Good morning', 'Good afternoon', 'Good evening', 'Good night'];
-  const room = (width: number) => Math.min(width, 560) - 2 * 20 - 12 - (3 * 36 + 2 * 4);
+  const room = (width: number) => Math.min(width, 560) - 2 * 20 - 12 - (3 * 36 + 2 * 8);
   const size = (width: number) => (width < 360 ? 22 : 26);
   const at = (width: number, g: string, name: string) => todayTitle(g, name, room(width), size(width));
 
@@ -79,7 +80,7 @@ describe("Today's title with the step (todayTitle)", () => {
       }
     }
     expect(at(360, 'Good night', 'Alex')).toEqual({ text: 'Good night, Alex', size: 24 });
-    expect(at(360, 'Good afternoon', 'Alex')).toEqual({ text: 'Afternoon, Alex', size: 26 });
+    expect(at(360, 'Good afternoon', 'Alex')).toEqual({ text: 'Afternoon, Alex', size: 24 });
   });
 
   it('never steps at 320 (22 px stays) and never returns a line wider than the room', () => {
@@ -115,7 +116,7 @@ describe("Today's title with the step (todayTitle)", () => {
           ],
           [
             "Evening, Alex @26",
-            "Evening, Christina @26",
+            "Evening, Christina @24",
           ],
           [
             "Good night, Alex @26",
@@ -128,7 +129,7 @@ describe("Today's title with the step (todayTitle)", () => {
             "Good morning @26",
           ],
           [
-            "Afternoon, Alex @26",
+            "Afternoon, Alex @24",
             "Afternoon @26",
           ],
           [
@@ -143,7 +144,7 @@ describe("Today's title with the step (todayTitle)", () => {
         [
           [
             "Morning, Alex @22",
-            "Good morning @22",
+            "Morning @22",
           ],
           [
             "Afternoon @22",
@@ -151,7 +152,7 @@ describe("Today's title with the step (todayTitle)", () => {
           ],
           [
             "Evening, Alex @22",
-            "Good evening @22",
+            "Evening @22",
           ],
           [
             "Good night @22",

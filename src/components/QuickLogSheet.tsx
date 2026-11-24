@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { Activity, Check, Droplets, Plus, Repeat2, Scale, ScanBarcode, Search, type LucideIcon } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView, useWindowDimensions, View } from 'react-native';
 
 import { AiGlyph, SourceMark, sourceMarkTop, type AiGlyphName } from '@/features/ai/mark';
@@ -13,7 +13,7 @@ import { approxKcalSpoken, favoriteFoodTile, isEstimateFood, quickRowTitle, save
 import { lastPortions, matchServing, portionFor, portionKcal, portionLabel, servingText, sourceInfo } from '@/features/food/helpers';
 import { formatPortion, mealServings, planSavedMeal } from '@/features/food/build';
 import { logFood, logItems, logSavedMeal } from '@/features/food/log';
-import { useOneTap } from '@/features/food/oneTap';
+import { ONE_TAP_GUARD_MS, useOneTap } from '@/features/food/oneTap';
 import { loadSearchTab } from '@/features/food/searchTab';
 import { addWater } from '@/features/today/StatusRail';
 import { quickLogDate, quickLogPastDate, useViewedDay } from '@/features/today/viewedDay';
@@ -104,10 +104,23 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
     .sort((a, b) => a - b)
     .slice(1, 3);
 
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const close = () => {
+    clearTimeout(closeTimer.current);
     setDone([]);
     onClose();
   };
+  // One tap, one log, then the sheet steps aside: a food or meal tile and either glass log at once, show their
+  // tick for the guard's length and close, so the toast with Undo rests on the screen below, near the thumb and
+  // clear of the sheet's controls. Every one-tap control shares one guard, and a press inside that window (the
+  // second tap of a double tap) is ignored, so it never logs twice nor reaches the screen under the closing sheet.
+  const oneTap = useOneTap();
+  const logThenClose = (log: () => void) =>
+    oneTap(() => {
+      log();
+      clearTimeout(closeTimer.current);
+      closeTimer.current = setTimeout(close, ONE_TAP_GUARD_MS);
+    });
   const go = (href: string) => {
     close();
     // Read at the moment of the tap, never from a render that may be hours old.
@@ -147,11 +160,11 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
       favourite={favourite}
       mealName={mealName}
       done={done.includes(key)}
-      onPress={() => {
+      onPress={logThenClose(() => {
         // A recipe logs one serving as a single line; a plain meal logs its items.
         logSavedMeal(m, mealForTime(), quickLogDate());
         mark(key);
-      }}
+      })}
     />
   );
   const showRepeat = !!prev && !alreadyLogged;
@@ -159,8 +172,6 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   // A usual tile's source, for its mark and its spoken name: an entry that carries a range is an estimate
   // (it logs again as one); a favourite food's is the food's own.
   const entrySource = (e: FoodEntry): FoodSource => (e.kcalRange ? 'ai' : e.source);
-  // One tap, one glass: a quick second press on either glass (within ONE_TAP_GUARD_MS) logs nothing.
-  const oneTap = useOneTap();
 
   const quickRow = showUsual ? (
     <View style={{ gap: spacing.sm }} testID="quick-usual">
@@ -190,10 +201,10 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
               disabled={isDone}
               // Added, not unavailable: the success edge and the check say so, so the tile is not dimmed.
               dimDisabled={false}
-              onPress={() => {
+              onPress={logThenClose(() => {
                 logFavoriteFood(f, quickLogDate());
                 mark(key);
-              }}
+              })}
               // The source in words (principle 3): the mark alone says nothing to a screen reader.
               accessibilityLabel={isDone ? `${displayFoodName(f)} added` : `${label}. ${sourceInfo(src).label}`}
               style={[tile, { width: 136, padding: spacing.md, gap: 4, borderColor: isDone ? colors.success : colors.border }]}>
@@ -220,10 +231,10 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
               feedback="none"
               disabled={isDone}
               dimDisabled={false}
-              onPress={() => {
+              onPress={logThenClose(() => {
                 logUsual(u, quickLogDate());
                 mark(u.key);
-              }}
+              })}
               accessibilityLabel={isDone ? `${displayFoodName(u.last)} added` : `Add ${displayFoodName(u.last)}, ${usualLabel(u)}, ${sourceInfo(src).label}, to ${mealName}`}
               style={[tile, { width: 136, padding: spacing.md, gap: 4, borderColor: isDone ? colors.success : colors.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -286,7 +297,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
             testID={`quick-water-${ml}`}
             feedback="none"
             hitSlop={4}
-            onPress={oneTap(() => {
+            onPress={logThenClose(() => {
               // With the day's goal, so the toast names the new total as Today's glass does ("250 ml added to Water · 1.48 of 3.3 L").
               const day = quickLogPastDate();
               addWater(day, ml, profile.units, computeDayFromStore(useStore.getState(), day)?.waterGoalMl);

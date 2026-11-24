@@ -10,6 +10,7 @@ import { BarChart, IconButton, Sheet, Text } from '@/ui';
 
 import { buildBars, daysVerdict } from './calorieBars';
 import { changeDirection } from './change';
+import { barsLabel } from './chartWords';
 import { BigStat, LegendDot, SectionCard, StatStrip, TrendLegend } from './parts';
 
 export function CaloriesCard({
@@ -73,6 +74,7 @@ export function CaloriesCard({
             </IconButton>
           </View>
           <BarChart
+            accessibilityLabel={barsLabel(`Calories ${weekly ? 'by week' : 'by day'}, average ${formatNumber(Math.round(c.avgKcal))} kcal against an average budget of ${formatNumber(Math.round(c.avgBudget))} kcal. ${verdict.line}`, data.map((d) => d.detail))}
             testID="progress-calories-chart"
             data={data}
             color={colors.calories}

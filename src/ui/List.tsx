@@ -99,10 +99,11 @@ const KNOB_INSET = (SWITCH_H - KNOB) / 2;
 /**
  * The Pour switch, drawn the same on iOS, Android and web (no platform pill):
  * a small cup lying across (40 x 24, corners 4 4 8 8) with a square-ish knob
- * (16 x 16, corners 3 3 5 5). Off is an empty cup: a 1.5 px borderStrong edge
- * and a textTertiary knob on the left. On is a full one: the primary fill and
+ * (16 x 16, corners 3 3 5 5). Off is an empty cup: a 1.5 px vesselEdge edge (the cup
+ * outline, 3:1 on the page and the card) and a textTertiary knob on the left. On is a full one: the primary fill and
  * an onPrimary knob on the right. The knob slides (a transform), or jumps
- * under reduced motion. The touch target is 44 x 44.
+ * under reduced motion. The touch target is 44 x 44 (48 dp on Android). On the web
+ * Space flips it as well as a tap and Enter (`PressableScale`, role switch).
  */
 export function Toggle({
   value,
@@ -149,7 +150,7 @@ export function Toggle({
         justifyContent: 'center',
         backgroundColor: value ? colors.primary : 'transparent',
         borderWidth: 1.5,
-        borderColor: value ? colors.primary : colors.borderStrong,
+        borderColor: value ? colors.primary : colors.vesselEdge,
       }}>
       <Animated.View
         style={{

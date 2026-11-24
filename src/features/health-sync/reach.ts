@@ -44,7 +44,8 @@ export function syncReach(os: string, hasStore: boolean, appleReady: boolean = A
   if (appleReady) {
     return {
       profile: 'In the iPhone and Android apps',
-      header: 'Automatic, in the phone apps',
+      // The screen's short line says where you are; the heading under it says where sync works (no word twice).
+      header: 'Not available here',
       heading: 'Automatic on iPhone and Android',
       // "iPhone" means a copy with the HealthKit entitlement: AltStore and Sideloadly leave it out, and Impactor or xtool may keep
       // it (not yet tried; docs/health-sync.md, "Installing on an iPhone with a free Apple ID"), so the body says "may".
@@ -56,7 +57,7 @@ export function syncReach(os: string, hasStore: boolean, appleReady: boolean = A
   // since the binding; kept so turning the flag off stays one change, and reach.test.ts still checks them.
   return {
     profile: os === 'ios' ? 'Not in the iPhone app yet' : 'In the Android app',
-    header: 'Automatic, in the Android app',
+    header: 'Not available here',
     heading: 'Automatic on Android',
     body: 'There, workouts from Garmin Connect and other apps arrive by themselves through Health Connect, with your watch’s calories.',
     here,

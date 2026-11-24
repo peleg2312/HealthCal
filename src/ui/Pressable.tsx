@@ -92,6 +92,8 @@ function ensureFocusRule() {
         `:focus-visible:not([tabindex="-1"]){${ring};outline-offset:2px!important}`,
         `[data-focus-ring="inside"]:focus-visible{outline-offset:-2px!important}`,
         `[data-focus-cup]:has(>input:focus,>textarea:focus){${ring};outline-offset:0!important}`,
+        // A browser without :has() rings the cup whenever focus is inside it.
+        `@supports not selector(:has(a)){[data-focus-cup]:focus-within{${ring};outline-offset:0!important}}`,
         `[data-focus-cup]>input:focus-visible,[data-focus-cup]>textarea:focus-visible{outline:none!important}`,
       ].join(''),
     ),
@@ -128,7 +130,7 @@ function androidSlop(hitSlop: PressableProps['hitSlop'], style: StyleProp<ViewSt
   return slopToReach(hitSlop as Insets | number | null | undefined, fixedSize(flat), ANDROID_TARGET) as PressableProps['hitSlop'];
 }
 
-export interface PressableScaleProps extends Omit<PressableProps, 'style' | 'children'> {
+export interface PressableScaleProps extends Omit<PressableProps, 'style' | 'children' | 'onKeyDown'> {
   style?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
   /** Scale while pressed. 1 disables the effect. */
@@ -144,12 +146,6 @@ export interface PressableScaleProps extends Omit<PressableProps, 'style' | 'chi
   focusRing?: 'outside' | 'inside';
   /** Web only: a key handler (react-native-web forwards it to the element). */
   onKeyDown?: (e: { key: string; repeat?: boolean; target: unknown; currentTarget: unknown; defaultPrevented?: boolean; preventDefault: () => void }) => void;
-  /** Web only: the element's tab stop (roving focus in a tab row or a radio group). */
-  tabIndex?: 0 | -1;
-  'aria-selected'?: boolean;
-  'aria-checked'?: boolean | 'mixed';
-  'aria-pressed'?: boolean;
-  'aria-expanded'?: boolean;
 }
 
 /**

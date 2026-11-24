@@ -61,8 +61,8 @@ export function ConsistencyCard({ consistency, weekDays, today }: { consistency:
       </View>
       <Note>
         {streak === 0
-          ? 'Log a meal today to start a streak. A single missed day never breaks it; only two in a row do.'
-          : 'A single missed day never breaks your streak, however often it happens; only two missed days in a row do.'}
+          ? 'Log a meal today to start a streak. A single day without a log never breaks it; two in a row do.'
+          : 'A single day without a log never breaks your streak, however often it happens; two such days in a row do.'}
       </Note>
     </SectionCard>
   );

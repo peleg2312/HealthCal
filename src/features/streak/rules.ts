@@ -46,16 +46,16 @@ export function dueMilestone(state: StreakState, today: ISODate, shown: readonly
   return shown.includes(milestoneKey(m, today)) ? null : m;
 }
 
-/** The one line under the streak when it grows: "12 days. A missed day will not break it." */
+/** The one line under the streak when it grows: "12 days. A day without a log will not break it." */
 export function streakLine(streak: number): string {
-  return `${streak} days. A missed day will not break it.`;
+  return `${streak} days. A day without a log will not break it.`;
 }
 
 /** The words of a milestone moment. Neutral, no exclamation marks. */
 export function milestoneCopy(m: StreakMilestone): { title: string; line: string } {
   switch (m) {
     case 7:
-      return { title: 'A week of logging', line: 'Seven days in a row. A missed day here and there will not break it.' };
+      return { title: 'A week of logging', line: 'Seven days in a row. A day without a log here and there will not break it.' };
     case 30:
       return { title: 'A month of logging', line: 'Thirty days. Logged every day but one is still a streak here.' };
     case 100:

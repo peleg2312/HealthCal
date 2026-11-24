@@ -63,15 +63,16 @@ export function reviewView(item: ReviewItem, todayDate: ISODate, units: UnitSyst
   if (item.entry) {
     const net = Math.round(item.entry.kcalNet);
     if (item.entry.measured) {
-      added = `+${formatNumber(net)}`;
+      // The burn is measured; the part above resting is still an estimate, so it carries "~" (one name: "added").
+      added = `~${formatNumber(net)}`;
       detail = `${formatNumber(Math.round(item.entry.kcalGross))} in total`;
-      said = `${formatNumber(net)} kilocalories above resting, measured`;
+      said = `about ${formatNumber(net)} kilocalories added, from a measured burn`;
     } else {
       const [lo, hi] = kcalRange(net);
       added = `~${formatNumber(net)}`;
       estimate = true;
       detail = `est. ${formatNumber(lo)}–${formatNumber(hi)}`;
-      said = `about ${formatNumber(net)} kilocalories above resting, an estimate between ${formatNumber(lo)} and ${formatNumber(hi)}`;
+      said = `about ${formatNumber(net)} kilocalories added, an estimate between ${formatNumber(lo)} and ${formatNumber(hi)}`;
     }
   } else {
     const active = w.activeKcal && w.activeKcal > 0 ? Math.round(w.activeKcal) : null;

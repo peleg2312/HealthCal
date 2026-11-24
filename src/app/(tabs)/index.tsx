@@ -6,6 +6,7 @@ import { useWindowDimensions, View } from 'react-native';
 import { hasFoodLogged } from '@/features/drinks/via';
 import { ShareDayButton } from '@/features/share';
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
+import { useOneTap } from '@/features/food/oneTap';
 import { currentKcal } from '@/features/food/usuals';
 import { useRecapReady } from '@/features/progress/recapReady';
 import { coachTip, rhythmFromReminders, type ClosedDay } from '@/features/today/coach';
@@ -100,17 +101,17 @@ export default function TodayScreen() {
       {/* Water and the other pillars directly under the calorie card, so the one-tap glass is in the first
           view at 360 x 740 on every day, day one included. */}
       <StatusRail day={day} isToday={isToday} quiet={firstDay} />
-      {/* The coach's one line and its one action, under the two cards whose numbers it talks about; early in
-          the week "Your week is ready" takes its place. Day one has neither: the invite in the card is the one thing to do. */}
-      {!isToday || firstDay ? null : recap.announce ? (
-        <RecapReadyCard />
-      ) : (
+      {/* Early in the week "Your week is ready" first, then the coach's one line with its one action and "Ask the
+          coach", under the two cards whose numbers it talks about, so the coach is always in reach of the thumb on
+          Today, not only at the header's top. Day one has neither: the invite in the card is the one thing to do. */}
+      {isToday && !firstDay && recap.announce ? <RecapReadyCard /> : null}
+      {isToday && !firstDay ? (
         <CoachLine
           day={day}
           yesterday={yesterday.entries.length ? { eaten: yesterday.eaten.kcal, budget: yesterday.budget } : null}
           onFits={() => setFits({ proteinFirst: true })}
         />
-      )}
+      ) : null}
 
       <MealsSection day={day} />
 
@@ -135,6 +136,8 @@ export default function TodayScreen() {
 const VESSEL_H = 150;
 /** Day one: a shorter, empty cup, so the first-log invite under it and the water row under the card stay in the first view at 360 x 740. */
 const VESSEL_H_FIRST = 120;
+/** Day one under 360 px: shorter still, so the water row and its glass are in the first view at 320 x 640. */
+const VESSEL_H_FIRST_NARROW = 100;
 /**
  * Under 360 px only (320 x 640): a tighter card, so the water row and its "+ 250 ml" are in the first
  * view there and the toast a glass raises (two lines at that width) rests under the button, not on it.
@@ -186,7 +189,7 @@ function EnergyCard({
   const emptyTop = inBand ? budget : budget - headroom;
   const numSize = narrow ? (left.length >= 5 ? 40 : 44) : left.length >= 5 ? 50 : 60;
   const unitWord = over ? 'above' : isToday ? 'left' : 'under';
-  const height = firstDay ? VESSEL_H_FIRST : narrow ? VESSEL_H_NARROW : VESSEL_H;
+  const height = firstDay ? (narrow ? VESSEL_H_FIRST_NARROW : VESSEL_H_FIRST) : narrow ? VESSEL_H_NARROW : VESSEL_H;
   const labelSpacing = narrow ? NARROW.labelSpacing : 8;
   // The label boxes: 22 px round the 17 px numbers (20 on a narrow phone), the big number as tall as it is drawn
   // on a narrow phone (its line height) and at least 44 otherwise.
@@ -216,7 +219,8 @@ function EnergyCard({
       height: lineH,
       tick: colors.exercise,
       content: (
-        <Text variant="numM" numberOfLines={1} style={{ fontSize: 17, lineHeight: lineH }}>
+        // Never clipped (no numberOfLines): under a reader's own text spacing the label wraps rather than lose its end.
+        <Text variant="numM" style={{ fontSize: 17, lineHeight: lineH }}>
           {`~${formatNumber(headroom)}`}
           <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
             {'  added'}
@@ -234,7 +238,6 @@ function EnergyCard({
       content: (
         <Text
           variant="numM"
-          numberOfLines={1}
           style={{ fontSize: 17, lineHeight: lineH }}
           testID="today-not-added"
           accessibilityLabel={`Workouts: about ${formatNumber(notAdded)} kilocalories, not added to the budget`}>
@@ -310,7 +313,7 @@ function EnergyCard({
           // Text only: it never takes a tap meant for the big number above it. The budget is said here, once, as the
           // diary's summary says it ("1,219 eaten of 2,160"); the whole sum (target plus exercise) is read out.
           <View pointerEvents="none" accessible accessibilityLabel={`${formatNumber(eaten)} kilocalories eaten. ${budgetLabel}`}>
-            <AnimatedNumber variant="numM" numberOfLines={1} value={eaten} format={(n) => formatNumber(Math.round(n))} style={{ fontSize: 17, lineHeight: lineH }} testID="today-eaten">
+            <AnimatedNumber variant="numM" value={eaten} format={(n) => formatNumber(Math.round(n))} style={{ fontSize: 17, lineHeight: lineH }} testID="today-eaten">
               <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
                 {'  eaten of '}
               </Text>
@@ -392,8 +395,8 @@ function EnergyCard({
         </View>
       )}
       {firstDay ? (
-        <View style={{ marginTop: 18 }}>
-          <FirstLogInvite meal={meal} date={day.date} budget={day.budget} />
+        <View style={{ marginTop: narrow ? 12 : 18 }}>
+          <FirstLogInvite meal={meal} date={day.date} budget={day.budget} narrow={narrow} />
         </View>
       ) : null}
     </Card>
@@ -446,6 +449,8 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
   const quick = tip.quick;
   const prev = quick?.kind === 'repeat' ? findPreviousMeal(entries, day.date, quick.meal, 7) : null;
   const glass = defaultGlass(presets);
+  // One tap, one glass: a quick second tap on "Add 250 ml" does not log a second one.
+  const oneTap = useOneTap();
 
   const small = { size: 'sm' as const, variant: 'secondary' as const, full: false, style: { alignSelf: 'flex-start' as const } };
   let button: React.ReactNode = null;
@@ -458,7 +463,7 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
         icon={<Plus size={18} color={colors.water} strokeWidth={2.2} />}
         title={`Add ${formatVolume(glass, profile.units)}`}
         accessibilityLabel={`Add ${formatVolume(glass, profile.units)} of water`}
-        onPress={() => addWater(day.date, glass, profile.units, day.waterGoalMl)}
+        onPress={oneTap(() => addWater(day.date, glass, profile.units, day.waterGoalMl))}
       />
     );
   } else if (quick?.kind === 'repeat' && prev) {
@@ -494,24 +499,23 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
         <Text variant="bodyStrong">{/[.!?]$/.test(tip.title) ? tip.title : `${tip.title}.`}</Text>
         <Text variant="body" color="textSecondary">{` ${tip.body}`}</Text>
       </Text>
-      {button ? (
-        // The worded way into the coach, in the tip's own row and voice: beside the tip's action, so the
-        // card is no taller at 360 and 390 px (at 320 it may wrap under). A tip with no action adds nothing.
-        // The ghost has no fill or edge, so it is drawn without side padding and kept 12 px from the action:
-        // "Repeat yesterday's breakfast" and "Ask the coach" then share one row at 360 px.
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.sm }}>
-          {button}
-          <Button
-            size="sm"
-            variant="ghost"
-            full={false}
-            testID="today-coach-ask"
-            title="Ask the coach"
-            onPress={() => router.push('/coach' as never)}
-            style={{ paddingHorizontal: 0 }}
-          />
-        </View>
-      ) : null}
+      {/* The worded way into the coach, in the tip's own row and voice, always there: beside the tip's action (at 320
+          it may wrap under), or on its own when the tip has none. It is the coach's way in within reach of the
+          thumb on Today; the header's Coach cup is at the top. The ghost has no fill or edge, so it is drawn without
+          side padding and kept 12 px from the action: "Repeat yesterday's breakfast" and "Ask the coach" then share
+          one row at 360 px. */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.sm }}>
+        {button}
+        <Button
+          size="sm"
+          variant="ghost"
+          full={false}
+          testID="today-coach-ask"
+          title="Ask the coach"
+          onPress={() => router.push('/coach' as never)}
+          style={{ paddingHorizontal: 0 }}
+        />
+      </View>
     </Card>
   );
 }
@@ -525,7 +529,9 @@ function MealsSection({ day }: { day: DaySummary }) {
   return (
     <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-        <Text variant="h3">Meals</Text>
+        <Text variant="h3" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>
+          Meals
+        </Text>
         <PressableScale
           testID="section-meals-action"
           onPress={() => router.push(`/diary?date=${day.date}` as never)}

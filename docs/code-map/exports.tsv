@@ -121,6 +121,7 @@ src/features/activity/history.ts	META_CHAR_PX	const
 src/features/activity/history.ts	MIN_NAME_ROOM	const
 src/features/activity/history.ts	NAME_CHAR_PX	const
 src/features/activity/history.ts	WEEKS_PER_PAGE	const
+src/features/activity/history.ts	deleteSessionLabel	function
 src/features/activity/history.ts	historyDaySpoken	function
 src/features/activity/history.ts	historyDayWord	function
 src/features/activity/history.ts	historyFigureBeside	function
@@ -290,12 +291,14 @@ src/features/ai/limit.ts	EstimateLimitWords	interface
 src/features/ai/limit.ts	LimitInfo	interface
 src/features/ai/limit.ts	carefulUses	function
 src/features/ai/limit.ts	estimateLimitWords	function
+src/features/ai/limit.ts	estimatesLeft	function
 src/features/ai/limit.ts	graceLine	function
 src/features/ai/limit.ts	limitInfoFrom	function
 src/features/ai/limit.ts	localClock	function
 src/features/ai/limit.ts	moreAfter	function
 src/features/ai/limit.ts	plusLimitOf	function
 src/features/ai/limit.ts	plusLink	function
+src/features/ai/limit.ts	retryCostLine	function
 src/features/ai/localMatch.ts	emojiLike	function
 src/features/ai/localMatch.ts	foodToItem	function
 src/features/ai/localMatch.ts	itemFromFood	function
@@ -357,12 +360,17 @@ src/features/ai/weight.ts	weightSentence	function
 src/features/ai/words.ts	AI_TILE_HINT	const
 src/features/ai/words.ts	ANALYSING	const
 src/features/ai/words.ts	DESCRIPTION_MAX	const
+src/features/ai/words.ts	alternativesLabel	function
 src/features/ai/words.ts	analysingLabel	function
 src/features/ai/words.ts	analysingNote	function
 src/features/ai/words.ts	analysingSteps	function
+src/features/ai/words.ts	estimateReadyLine	function
+src/features/ai/words.ts	itemNameLabel	function
 src/features/ai/words.ts	prefilledDescription	function
 src/features/ai/words.ts	searchAiTile	function
 src/features/ai/words.ts	slowAfterMs	function
+src/features/ai/words.ts	spokenMacros	function
+src/features/ai/words.ts	swapChipLabel	function
 src/features/auth/GoogleButton.tsx	GOOGLE_BUTTON_HEIGHT	const
 src/features/auth/GoogleButton.tsx	GoogleButton	component
 src/features/auth/GoogleButton.tsx	GoogleMark	component
@@ -866,6 +874,7 @@ src/features/food/actions.ts	saveMeal	function
 src/features/food/actions.ts	storeSavedMeal	function
 src/features/food/actions.ts	updateEntryDirect	function
 src/features/food/addedTo.ts	TOAST_NAME_MAX	const
+src/features/food/addedTo.ts	entryUpdatedToast	function
 src/features/food/addedTo.ts	foodAddedToast	function
 src/features/food/addedTo.ts	foodNameHead	function
 src/features/food/addedTo.ts	mealOnDay	function
@@ -1002,7 +1011,13 @@ src/features/food/mealDraft.ts	setDraftName	function
 src/features/food/mealDraft.ts	setDraftServings	function
 src/features/food/mealDraft.ts	updateDraftItem	function
 src/features/food/mealDraft.ts	useMealDraft	const
+src/features/food/oneTap.ts	ONE_TAP_GUARD_MS	const
+src/features/food/oneTap.ts	tooSoon	function
+src/features/food/oneTap.ts	useOneTap	function
+src/features/food/restore.ts	RESTORE_MAX	const
+src/features/food/restore.ts	removedToday	function
 src/features/food/rowMotion.tsx	FadeRow	component
+src/features/food/rowMotion.tsx	ROW_FOLD_MS	const
 src/features/food/rowMotion.tsx	useLeavingRows	function
 src/features/food/saveHint.ts	SAVE_HINT_KEY	const
 src/features/food/saveHint.ts	SAVE_MIN_FOODS	const
@@ -1770,6 +1785,14 @@ src/features/import/zipBuilder.ts	BuildOptions	interface
 src/features/import/zipBuilder.ts	buildZip	function
 src/features/import/zipBuilder.ts	crc32	function
 src/features/import/zipBuilder.ts	utf8	const
+src/features/layout/RouteTitle.tsx	RouteTitle	component
+src/features/layout/routeTitle.ts	APP_TITLE	const
+src/features/layout/routeTitle.ts	NOT_FOUND_TITLE	const
+src/features/layout/routeTitle.ts	documentTitle	function
+src/features/layout/routeTitle.ts	hasRouteTitle	function
+src/features/layout/routeTitle.ts	pageTitle	function
+src/features/layout/routeTitle.ts	routeKey	function
+src/features/legal/LegalLinksLine.tsx	LegalLinksLine	component
 src/features/legal/LegalScreen.tsx	LegalScreen	component
 src/features/legal/content.ts	CONTACT_EMAIL	const
 src/features/legal/content.ts	LEGAL_DOCUMENTS	const
@@ -1784,6 +1807,8 @@ src/features/legal/content.ts	jumpLabel	const
 src/features/legal/content.ts	updatedLine	function
 src/features/legal/jumpLines.ts	jumpLines	function
 src/features/legal/jumpLines.ts	jumpWidth	const
+src/features/legal/reading.ts	CAPTION_READING_MAX	const
+src/features/legal/reading.ts	READING_MAX	const
 src/features/morning/MoveRow.tsx	MoveRow	component
 src/features/morning/PlanCard.tsx	PlanCard	component
 src/features/morning/QuoteBlock.tsx	QuoteBlock	component
@@ -1954,11 +1979,6 @@ src/features/onboarding/ProjectionChart.tsx	ProjectionChart	component
 src/features/onboarding/SignInGate.tsx	RestoreFailed	component
 src/features/onboarding/SignInGate.tsx	Restoring	component
 src/features/onboarding/SignInGate.tsx	SignInGate	component
-src/features/onboarding/ThemeStep.tsx	SETUP_THEME_CHOICES	const
-src/features/onboarding/ThemeStep.tsx	ThemeStep	component
-src/features/onboarding/ThemeStep.tsx	commitThemeChoice	function
-src/features/onboarding/ThemeStep.tsx	preselectedTheme	function
-src/features/onboarding/ThemeStep.tsx	useMatchPhone	const
 src/features/onboarding/afterSignIn.ts	currentSignInOutcome	function
 src/features/onboarding/afterSignIn.ts	destinationAfterSignIn	function
 src/features/onboarding/afterSignIn.ts	waitForRestore	function
@@ -2277,6 +2297,15 @@ src/features/progress/change.ts	CHANGE_RULES	const
 src/features/progress/change.ts	ChangeKind	type
 src/features/progress/change.ts	changeDirection	function
 src/features/progress/change.ts	changeWords	function
+src/features/progress/chartWords.ts	amount	function
+src/features/progress/chartWords.ts	barsLabel	function
+src/features/progress/chartWords.ts	chartLabel	function
+src/features/progress/chartWords.ts	evenly	function
+src/features/progress/chartWords.ts	pointDay	function
+src/features/progress/chartWords.ts	sleepChartLabel	function
+src/features/progress/chartWords.ts	spokenUnits	function
+src/features/progress/chartWords.ts	waterChartLabel	function
+src/features/progress/chartWords.ts	weightChartLabel	function
 src/features/progress/consistency.ts	CalendarCell	interface
 src/features/progress/consistency.ts	CalendarDayInput	interface
 src/features/progress/consistency.ts	DEFAULT_RHYTHM	const
@@ -2334,11 +2363,13 @@ src/features/progress/useProgressData.ts	useProgressData	function
 src/features/progress/useRecap.ts	useRecap	function
 src/features/settings/ThemeSwatches.tsx	THEME_HINTS	const
 src/features/settings/ThemeSwatches.tsx	ThemeSwatches	component
+src/features/settings/birthDate.ts	BIRTH_AUTOCOMPLETE	const
 src/features/settings/birthDate.ts	BIRTH_INCOMPLETE	const
 src/features/settings/birthDate.ts	BirthParts	interface
 src/features/settings/birthDate.ts	birthDateWords	function
 src/features/settings/birthDate.ts	birthIso	function
 src/features/settings/birthDate.ts	birthParts	function
+src/features/settings/careNote.ts	TARGET_CARE_NOTE	const
 src/features/settings/components.tsx	Group	component
 src/features/settings/components.tsx	Hint	component
 src/features/settings/components.tsx	IconTile	component
@@ -2500,6 +2531,9 @@ src/features/streak/store.ts	useStreakMoments	const
 src/features/streak/useStreakMoment.ts	MILESTONE_LEAD_MS	const
 src/features/streak/useStreakMoment.ts	StreakMoment	interface
 src/features/streak/useStreakMoment.ts	useStreakMoment	function
+src/features/textSize/TextSizeRow.tsx	TEXT_SIZE_WORDS	const
+src/features/textSize/TextSizeRow.tsx	TextSizeRow	component
+src/features/textSize/TextSizeRow.tsx	textSizeSpoken	function
 src/features/today/DayRingStrip.tsx	CAPTION_ROW_H	const
 src/features/today/DayRingStrip.tsx	DayRingStrip	component
 src/features/today/DayRingStrip.tsx	STRIP_WEEKS	const
@@ -3189,14 +3223,38 @@ src/theme/contrast.ts	deltaE	function
 src/theme/contrast.ts	luminance	function
 src/theme/contrast.ts	over	function
 src/theme/contrast.ts	parseHex	function
+src/theme/contrastMore.ts	SystemColors	interface
+src/theme/contrastMore.ts	cssRgbToHex	function
+src/theme/contrastMore.ts	forcedColorsPalette	function
+src/theme/contrastMore.ts	mix	function
+src/theme/contrastMore.ts	moreContrastChartFill	function
+src/theme/contrastMore.ts	moreContrastColors	function
+src/theme/contrastMore.ts	readSystemColors	function
+src/theme/contrastMore.ts	strengthen	function
 src/theme/index.tsx	*	re-export-all	src/theme/resolve.ts
 src/theme/index.tsx	*	re-export-all	src/theme/tokens.ts
+src/theme/index.tsx	Legibility	re-export	src/theme/legibility.ts:Legibility
+src/theme/index.tsx	MAX_TEXT_GROWTH	re-export	src/theme/textSize.ts:MAX_TEXT_GROWTH
+src/theme/index.tsx	TEXT_SIZES	re-export	src/theme/textSize.ts:TEXT_SIZES
+src/theme/index.tsx	TEXT_SIZE_KEY	re-export	src/theme/textSize.ts:TEXT_SIZE_KEY
+src/theme/index.tsx	TextSize	re-export	src/theme/textSize.ts:TextSize
 src/theme/index.tsx	Theme	interface
 src/theme/index.tsx	ThemeProvider	component
 src/theme/index.tsx	isReducedMotion	re-export	src/theme/motion.ts:isReducedMotion
+src/theme/index.tsx	legibility	re-export	src/theme/legibility.ts:legibility
 src/theme/index.tsx	motion	re-export	src/theme/motion.ts:motion
+src/theme/index.tsx	phoneCapFor	re-export	src/theme/textSize.ts:phoneCapFor
+src/theme/index.tsx	scaleTextStyle	re-export	src/theme/textSize.ts:scaleTextStyle
+src/theme/index.tsx	setTextSize	re-export	src/theme/textSize.ts:setTextSize
+src/theme/index.tsx	textSize	re-export	src/theme/textSize.ts:textSize
+src/theme/index.tsx	textSizeLabel	re-export	src/theme/textSize.ts:textSizeLabel
+src/theme/index.tsx	useLegibility	re-export	src/theme/legibility.ts:useLegibility
 src/theme/index.tsx	useReducedMotion	re-export	src/theme/motion.ts:useReducedMotion
+src/theme/index.tsx	useTextSize	re-export	src/theme/textSize.ts:useTextSize
 src/theme/index.tsx	useTheme	function
+src/theme/legibility.ts	Legibility	interface
+src/theme/legibility.ts	legibility	function
+src/theme/legibility.ts	useLegibility	function
 src/theme/motion.ts	distance	const
 src/theme/motion.ts	duration	const
 src/theme/motion.ts	easing	const
@@ -3223,6 +3281,18 @@ src/theme/resolve.ts	themeChoiceOf	function
 src/theme/resolve.ts	themeChoicePatch	function
 src/theme/resolve.ts	themeNameFor	function
 src/theme/resolve.ts	themeNameOfChoice	function
+src/theme/textSize.ts	MAX_TEXT_GROWTH	const
+src/theme/textSize.ts	TEXT_SIZES	const
+src/theme/textSize.ts	TEXT_SIZE_KEY	const
+src/theme/textSize.ts	TextSize	type
+src/theme/textSize.ts	bolder	function
+src/theme/textSize.ts	normaliseTextSize	function
+src/theme/textSize.ts	phoneCapFor	function
+src/theme/textSize.ts	scaleTextStyle	function
+src/theme/textSize.ts	setTextSize	function
+src/theme/textSize.ts	textSize	function
+src/theme/textSize.ts	textSizeLabel	function
+src/theme/textSize.ts	useTextSize	function
 src/theme/tokens.ts	CupCorners	interface
 src/theme/tokens.ts	MAX_CONTENT_WIDTH	const
 src/theme/tokens.ts	PALETTES	const
@@ -3325,9 +3395,12 @@ src/ui/List.tsx	ListRow	component
 src/ui/List.tsx	Stat	component
 src/ui/List.tsx	Toggle	component
 src/ui/List.tsx	ToggleRow	component
+src/ui/Pressable.tsx	FOCUS_CUP	const
 src/ui/Pressable.tsx	PressableScale	component
 src/ui/Pressable.tsx	PressableScaleProps	interface
+src/ui/Pressable.tsx	useFocusRing	function
 src/ui/ProgressBar.tsx	ProgressBar	component
+src/ui/RestoreRow.tsx	RestoreRow	component
 src/ui/Screen.tsx	Header	component
 src/ui/Screen.tsx	Screen	component
 src/ui/Screen.tsx	ScreenProps	interface
@@ -3344,6 +3417,11 @@ src/ui/Text.tsx	MAX_FONT_SCALE	const
 src/ui/Text.tsx	Text	component
 src/ui/Text.tsx	TextProps	interface
 src/ui/Toast.tsx	TOAST_ACTION_GUARD_MS	const
+src/ui/Toast.tsx	TOAST_ACTION_MS	const
+src/ui/Toast.tsx	TOAST_MS	const
+src/ui/Toast.tsx	TOAST_READER_MS	const
+src/ui/Toast.tsx	TOAST_RESUME_MS	const
+src/ui/Toast.tsx	TOAST_WEB_ACTION_MS	const
 src/ui/Toast.tsx	ToastHost	component
 src/ui/Toast.tsx	ToastOptions	interface
 src/ui/Toast.tsx	toast	function
@@ -3354,6 +3432,17 @@ src/ui/Vessel.tsx	Trough	component
 src/ui/Vessel.tsx	Vessel	component
 src/ui/Vessel.tsx	VesselLabel	interface
 src/ui/Vessel.tsx	VesselProps	interface
+src/ui/controlRules.ts	ANDROID_TARGET	const
+src/ui/controlRules.ts	SlopInsets	type
+src/ui/controlRules.ts	StateIn	interface
+src/ui/controlRules.ts	ariaFromState	function
+src/ui/controlRules.ts	fixedSize	function
+src/ui/controlRules.ts	isSpaceKey	function
+src/ui/controlRules.ts	pressesOnSpace	function
+src/ui/controlRules.ts	rovingIndex	function
+src/ui/controlRules.ts	slopToReach	function
+src/ui/controlRules.ts	stepperKey	function
+src/ui/controlRules.ts	webAutoComplete	function
 src/ui/haptics.ts	haptic	const
 src/ui/index.ts	*	re-export-all	src/ui/Button.tsx
 src/ui/index.ts	*	re-export-all	src/ui/Card.tsx
@@ -3363,6 +3452,7 @@ src/ui/index.ts	*	re-export-all	src/ui/Field.tsx
 src/ui/index.ts	*	re-export-all	src/ui/List.tsx
 src/ui/index.ts	*	re-export-all	src/ui/Pressable.tsx
 src/ui/index.ts	*	re-export-all	src/ui/ProgressBar.tsx
+src/ui/index.ts	*	re-export-all	src/ui/RestoreRow.tsx
 src/ui/index.ts	*	re-export-all	src/ui/Screen.tsx
 src/ui/index.ts	*	re-export-all	src/ui/Sheet.tsx
 src/ui/index.ts	*	re-export-all	src/ui/Text.tsx
@@ -3393,12 +3483,17 @@ src/ui/index.ts	useFadeAfter	re-export	src/ui/motion.tsx:useFadeAfter
 src/ui/index.ts	usePour	re-export	src/ui/motion.tsx:usePour
 src/ui/index.ts	useReachFlash	re-export	src/ui/motion.tsx:useReachFlash
 src/ui/index.ts	useReducedMotion	re-export	src/theme/motion.ts:useReducedMotion
+src/ui/keyboardInset.ts	ControlBox	interface
 src/ui/keyboardInset.ts	KEYBOARD_MIN	const
 src/ui/keyboardInset.ts	REVEAL_MARGIN	const
+src/ui/keyboardInset.ts	TOAST_CLEAR	const
 src/ui/keyboardInset.ts	TOAST_GAP	const
+src/ui/keyboardInset.ts	TOAST_REACH_FROM	const
 src/ui/keyboardInset.ts	keyboardCover	function
 src/ui/keyboardInset.ts	revealDelta	function
 src/ui/keyboardInset.ts	toastBottom	function
+src/ui/keyboardInset.ts	toastReachTop	function
+src/ui/keyboardInset.ts	toastSpot	function
 src/ui/motion.tsx	AnimatedItem	component
 src/ui/motion.tsx	AnimatedList	component
 src/ui/motion.tsx	AnimatedNumber	component
@@ -3413,6 +3508,10 @@ src/ui/motion.tsx	ease	const
 src/ui/motion.tsx	useFadeAfter	function
 src/ui/motion.tsx	usePour	function
 src/ui/motion.tsx	useReachFlash	function
+src/ui/textLang.ts	LangPart	interface
+src/ui/textLang.ts	langParts	function
+src/ui/textLang.ts	scriptLang	function
+src/ui/textLang.ts	wholeLang	function
 src/ui/vesselLayout.ts	GoalKind	type
 src/ui/vesselLayout.ts	brimOverhang	function
 src/ui/vesselLayout.ts	fillRatio	function

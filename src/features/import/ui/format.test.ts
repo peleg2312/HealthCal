@@ -60,7 +60,7 @@ describe('import screen formatting', () => {
   });
 
   it('shows the watch figure and the net part that is added', () => {
-    expect(calorieView(row())).toMatchObject({ added: '+560', estimate: false, detail: '658 by watch' });
+    expect(calorieView(row())).toMatchObject({ added: '~560', estimate: false, detail: '658 by watch' });
   });
 
   it('labels an estimate with its range', () => {

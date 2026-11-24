@@ -7,6 +7,7 @@ import { macroPercents } from '@/lib/nutrition';
 import { useTheme } from '@/theme';
 import { BarChart, CupKey, MacroBar, ProgressBar, Text, type BarDatum } from '@/ui';
 
+import { barsLabel } from './chartWords';
 import { LegendDot, Note, SectionCard } from './parts';
 
 export function MacrosCard({ summary, days, today }: { summary: PeriodSummary; days: InsightDay[]; today: string }) {
@@ -79,7 +80,17 @@ export function MacrosCard({ summary, days, today }: { summary: PeriodSummary; d
         <Text variant="label" color="textSecondary">
           {recent.length >= 14 ? 'Last 14 days, calories by macro' : 'Calories by macro, day by day'}
         </Text>
-        <BarChart testID="progress-macros-chart" data={bars} color={colors.protein} height={130} scrub />
+        <BarChart
+          accessibilityLabel={barsLabel(
+            recent.length >= 14 ? 'Calories by macro, last 14 days' : 'Calories by macro, day by day',
+            bars.map((b) => b.detail?.replace(/P (\d+) C (\d+) F (\d+) g/, 'protein $1 g, carbs $2 g, fat $3 g')),
+          )}
+          testID="progress-macros-chart"
+          data={bars}
+          color={colors.protein}
+          height={130}
+          scrub
+        />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.lg, rowGap: spacing.xs }}>
           <LegendDot color={colors.protein} label="Protein" />
           <LegendDot color={colors.carbs} label="Carbs" />

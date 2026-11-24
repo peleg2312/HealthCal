@@ -122,7 +122,7 @@ export function personalBody(i: PersonalInput): string | null {
   if (water >= MIN_RUN) return `water goal reached ${water} days in a row`;
 
   // P7: no food yesterday, and the forgiving streak is still on.
-  if (!foodYesterday && i.streak >= MIN_RUN) return `your ${formatNumber(i.streak)}-day logging streak is still on; one missed day does not end it`;
+  if (!foodYesterday && i.streak >= MIN_RUN) return `your ${formatNumber(i.streak)}-day logging streak is still on; one day without a log does not end it`;
 
   // P8: the streak.
   if (foodYesterday && i.streak >= MIN_RUN) return `${formatNumber(i.streak)} days in your logging streak`;

@@ -250,7 +250,8 @@ describe('planDrink', () => {
     expect(water).toEqual({ total: '1.48 of 3.3 L', reaches: false });
     expect(plain(planDrink(base({ kind: 'water', drink: null, after: water })).toast)).toBe('250 ml added to Water · 1.48 of 3.3 L');
     // A drink with calories: the same ending after its words.
-    expect(plain(planDrink(base({ after: water })).toast)).toBe('Milk, 129 kcal, added to lunch and 250 ml to Water · 1.48 of 3.3 L');
+    // Held to two lines at 320 px: the calories and the amount are on the tile just tapped.
+    expect(plain(planDrink(base({ after: water })).toast)).toBe('Milk added to lunch and Water · 1.48 of 3.3 L');
     expect(plain(planDrink(base({ kind: 'juice', drink: sel('juice_orange'), waterOnly: true, after: water })).toast)).toBe('250 ml of juice added to Water only · 1.48 of 3.3 L');
     // The glass that reaches the goal says so once.
     const reach = waterAfter(3100, 3300, 250, 'water', 'metric');

@@ -36,9 +36,9 @@ describe('sync screen wording', () => {
     const hand = handLogged('running', 45, '2026-11-13', '2026-11-13T09:00:00');
     const item = planSync({ workouts: [workout({ start: '2026-11-13T06:00:00Z', minutes: 45, activeKcal: 480, totalKcal: 552, distanceM: 8200 })], existing: [hand], ctx: CTX }).review[0];
     const v = reviewView(item, '2026-11-14', 'metric', false);
-    expect(v).toMatchObject({ title: 'Running', emoji: '🏃', source: 'From Garmin Connect', added: '+483', estimate: false, detail: '552 in total' });
+    expect(v).toMatchObject({ title: 'Running', emoji: '🏃', source: 'From Garmin Connect', added: '~483', estimate: false, detail: '552 in total' });
     expect(plain(v.meta)).toBe('Yesterday · 07:00 · 45 min · 8.2 km');
-    expect(v.spoken).toBe('Running, Yesterday · 07:00 · 45 min · 8.2 km, From Garmin Connect, 483 kilocalories above resting, measured');
+    expect(v.spoken).toBe('Running, Yesterday · 07:00 · 45 min · 8.2 km, From Garmin Connect, about 483 kilocalories added, from a measured burn');
     expect(plain(reviewView(item, '2026-11-14', 'imperial', true).meta)).toBe('Yesterday · 7:00 AM · 45 min · 5.1 mi');
   });
 

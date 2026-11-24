@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { BUILTIN_FOODS } from '@/data/foods';
 
-import { TOAST_NAME_MAX, foodAddedToast, foodNameHead, mealOnDay, quickAddedToast, toastFoodName, waterAddedToast, withWaterTotal } from './addedTo';
+import { TOAST_NAME_MAX, entryUpdatedToast, foodAddedToast, foodNameHead, mealOnDay, quickAddedToast, toastFoodName, waterAddedToast, withWaterTotal } from './addedTo';
 import { displayFoodName } from './displayName';
 
 /** A comma between an open bracket and its close: "Israeli salad (tomato, cucumber, ...)". */
@@ -129,6 +129,14 @@ describe('the log toast names what was added first', () => {
     expect(plain(withWaterTotal(drink, true, '3.3 of 3.3 L'))).toBe(`${drink} · 3.3 of 3.3 L, goal reached`);
     expect(withWaterTotal(drink, true)).toBe(`${drink}. Goal reached`);
     expect(withWaterTotal(drink, false)).toBe(drink);
+  });
+});
+
+describe('an edit saved', () => {
+  it('names the food and where it now is: moved when its meal or day changed, else updated in its meal', () => {
+    expect(entryUpdatedToast('Israeli salad', true, 'lunch')).toBe('Israeli salad moved to lunch');
+    expect(entryUpdatedToast('Banana', true, "yesterday's lunch")).toBe("Banana moved to yesterday's lunch");
+    expect(entryUpdatedToast('Israeli salad', false, 'lunch')).toBe('Israeli salad updated in lunch');
   });
 });
 
