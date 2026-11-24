@@ -22,7 +22,7 @@ import { useStore } from '@/store';
 import type { Food, FoodEntry, Profile, SavedMeal, SavedMealItem, WaterEntry } from '@/types';
 
 import { clearEntries, copyEntries, copyPreviousMeal, updateEntryDirect } from './actions';
-import { deleteEntry, logAndSaveMeal, logDrink, logFood, logItems, logSavedMeal, removeDrink, setEntryAmount, toSavedMealItem } from './log';
+import { deleteEntry, logAndSaveMeal, logDrink, logFood, logItems, logQuickAdd, logSavedMeal, removeDrink, setEntryAmount, toSavedMealItem } from './log';
 import { planDrink, selectFood } from '@/features/drinks/rules';
 
 const S = () => useStore.getState();
@@ -62,12 +62,12 @@ const logCan = (over: Partial<{ quantity: number; date: string; meal: FoodEntry[
   logFood({ food: energy, serving: can, quantity: over.quantity ?? 1, meal: over.meal ?? 'lunch', date: over.date ?? TODAY });
 
 describe('logFood, a new entry', () => {
-  it('a drink: the entry and its water in one act, one toast that says both', () => {
+  it('a drink: the entry and its water in one act, one toast that names the drink and says both', () => {
     const entry = logCan();
     const water = S().water[waterIdFromEntry(entry.id)];
     expect(water).toMatchObject({ fromEntryId: entry.id, ml: 500, date: TODAY, beverage: 'other', loggedAt: entry.loggedAt, deleted: false });
     expect(water.updatedAt).toBe(entry.updatedAt);
-    expect(lastToast().message).toBe('Added to lunch and 500 ml to Water');
+    expect(lastToast().message).toBe('Energy drink added to lunch, 500 ml to Water');
   });
 
   it('Undo of the log takes both back', () => {
@@ -77,24 +77,38 @@ describe('logFood, a new entry', () => {
     expect(S().water[waterIdFromEntry(entry.id)].deleted).toBe(true);
   });
 
-  it('a food that is not a drink writes no water and the toast is unchanged', () => {
+  it('a food that is not a drink writes no water, and the toast names the food first', () => {
     const banana = food('b_banana');
     logFood({ food: banana, serving: banana.servings[0], quantity: 1, meal: 'breakfast', date: TODAY });
     expect(liveWater()).toHaveLength(0);
-    expect(lastToast().message).toBe('Added to breakfast');
+    expect(lastToast().message).toBe('Banana added to breakfast');
   });
 
   it('the switch off: no water, the toast as before', () => {
     setProfile({ diaryDrinksInWater: false });
     logCan();
     expect(liveWater()).toHaveLength(0);
-    expect(lastToast().message).toBe('Added to lunch');
+    expect(lastToast().message).toBe('Energy drink added to lunch');
   });
 
-  it('imperial units, another day: ", and 17 fl oz to Water"', () => {
+  it('imperial units, another day: ", 17 fl oz to Water"', () => {
     setProfile({ units: 'imperial' });
     logCan({ date: YESTERDAY, meal: 'breakfast' });
-    expect(lastToast().message).toBe("Added to yesterday's breakfast and 17 fl oz to Water");
+    expect(lastToast().message).toBe("Energy drink added to yesterday's breakfast, 17 fl oz to Water");
+  });
+
+  it('a bundled name is said as drawn and short: "Oats added to breakfast", never its capitals', () => {
+    const oats = BUILTIN_FOODS.find((f) => /DRY/.test(f.name))!;
+    logFood({ food: oats, serving: oats.servings[0], quantity: 1, meal: 'breakfast', date: TODAY });
+    expect(lastToast().message).toBe(`${oats.name.split(',')[0]} added to breakfast`);
+    expect(lastToast().message).not.toMatch(/\b[A-Z]{2,}\b/);
+  });
+
+  it('a quick add names itself, or its calories when it has no name', () => {
+    logQuickAdd({ name: 'Birthday cake', nutrients: { kcal: 420, protein: 5, carbs: 50, fat: 20 }, meal: 'snack', date: TODAY });
+    expect(lastToast().message).toBe('Birthday cake added to snacks');
+    logQuickAdd({ name: '  ', nutrients: { kcal: 1320, protein: 0, carbs: 0, fat: 0 }, meal: 'lunch', date: YESTERDAY });
+    expect(lastToast().message).toBe("1,320 kcal added to yesterday's lunch");
   });
 
   it('a future day: the water sits on that day', () => {

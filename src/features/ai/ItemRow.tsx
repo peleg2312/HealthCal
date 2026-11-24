@@ -3,13 +3,13 @@ import React, { useState } from 'react';
 import { TextInput, View } from 'react-native';
 
 import { SourceTag } from '@/features/food/components';
+import { displayFoodName } from '@/features/food/displayName';
 import { isolateRtl } from '@/lib/bidi';
-import { formatMacro } from '@/lib/nutrition';
 import { cup, fonts, useTheme } from '@/theme';
 import type { Food } from '@/types';
 import { Badge, CupKey, IconButton, parseNumber, PressableScale, Text } from '@/ui';
 
-import { confidenceLevel, gramStep, type ReviewRow } from './estimate';
+import { confidenceLevel, estimateGrams, gramStep, shownRowName, type ReviewRow } from './estimate';
 import { itemFromFood } from './localMatch';
 
 /** One editable line of the estimate: name, grams, live calories and macros, remove. */
@@ -43,6 +43,8 @@ export function ItemRow({
   const step = gramStep(item.grams);
   const unsure = row.kind === 'detected' && confidenceLevel(item.confidence) === 'low';
   const id = `ai-item-${index}`;
+  // A matched row shows its food's name without the reference list's capitals; typing replaces it as before.
+  const name = shownRowName(row);
 
   return (
     <View testID={id} style={{ paddingVertical: spacing.md, gap: spacing.sm }}>
@@ -50,7 +52,7 @@ export function ItemRow({
         {row.kind === 'fat' ? <CupKey color={colors.fat} /> : null}
         <TextInput
           testID={`${id}-name`}
-          value={item.name}
+          value={name}
           onChangeText={onRename}
           accessibilityLabel="Item name"
           selectionColor={colors.primary}
@@ -62,7 +64,7 @@ export function ItemRow({
           ]}
         />
         {unsure && !row.food ? <Badge label="Unsure" color={colors.warning} /> : null}
-        <IconButton testID={`${id}-remove`} accessibilityLabel={`Remove ${item.name}`} size={32} tone="clear" onPress={onRemove}>
+        <IconButton testID={`${id}-remove`} accessibilityLabel={`Remove ${name}`} size={32} tone="clear" onPress={onRemove}>
           <X size={18} color={colors.textSecondary} strokeWidth={1.9} />
         </IconButton>
       </View>
@@ -70,15 +72,15 @@ export function ItemRow({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <IconButton
             testID={`${id}-minus`}
-            accessibilityLabel={`Less ${item.name}, minus ${step} grams`}
+            accessibilityLabel={`Less ${name}, minus ${step} grams`}
             size={36}
             tone="surface"
             disabled={item.grams <= step}
             onPress={() => onGrams(Math.max(step, item.grams - step))}>
             <Minus size={16} color={colors.text} />
           </IconButton>
-          <GramsInput testID={`${id}-grams`} value={item.grams} onChange={onGrams} label={item.name} />
-          <IconButton testID={`${id}-plus`} accessibilityLabel={`More ${item.name}, plus ${step} grams`} size={36} tone="surface" onPress={() => onGrams(item.grams + step)}>
+          <GramsInput testID={`${id}-grams`} value={item.grams} onChange={onGrams} label={name} />
+          <IconButton testID={`${id}-plus`} accessibilityLabel={`More ${name}, plus ${step} grams`} size={36} tone="surface" onPress={() => onGrams(item.grams + step)}>
             <Plus size={16} color={colors.text} />
           </IconButton>
         </View>
@@ -92,7 +94,8 @@ export function ItemRow({
       {/* The source on the left, the macros on the right; on a narrow phone the macros wrap under the source rather than run over the stepper. */}
       <View testID={`${id}-source`} style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: spacing.sm, rowGap: 4 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1 }}>
-          <SourceTag source={row.food ? row.food.source : 'ai'} plain={sample} />
+          {/* The sample is not the AI: its unmatched rows say "Sample" beside the plain key, never "AI estimate". */}
+          <SourceTag source={row.food ? row.food.source : 'ai'} plain={sample} label={sample && !row.food ? 'Sample' : undefined} />
           {row.food && row.estimate ? (
             <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
               · portion still estimated
@@ -135,7 +138,7 @@ export function ItemRow({
                 <SwapChip
                   key={food.id}
                   testID={`${id}-swap-${i}`}
-                  name={food.name}
+                  name={displayFoodName(food)}
                   kcal={kcal}
                   selected={selected}
                   onPress={() => (selected ? onUnswap?.() : onSwap(food))}
@@ -188,6 +191,7 @@ function SwapChip({ name, kcal, selected, onPress, testID }: { name: string; kca
   );
 }
 
+/** One macro of an estimated row, in whole grams ("P 47", never "P 46.5": the estimate is not that precise). */
 function Macro({ letter, value, color }: { letter: string; value: number; color: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
@@ -196,7 +200,7 @@ function Macro({ letter, value, color }: { letter: string; value: number; color:
         {letter}
       </Text>
       <Text variant="caption" color="textSecondary" tabular>
-        {formatMacro(value)}
+        {estimateGrams(value)}
       </Text>
     </View>
   );

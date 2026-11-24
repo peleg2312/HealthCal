@@ -165,7 +165,7 @@ describe('planDrink', () => {
     expect(p.entry!.grams).toBeCloseTo(257.8, 1);
     expect(Math.round(p.entry!.nutrients.kcal)).toBe(129);
     expect(p.kcal).toBe(129);
-    expect(p.toast).toBe('Added 250 ml of milk, 129 kcal to lunch');
+    expect(p.toast).toBe('Milk, 129 kcal, added to lunch and 250 ml to Water');
     expect(p.line).toBe('Semi-skimmed milk: 129 kcal per 250 ml, to lunch');
     expect(p.tile).toBe('129 kcal');
     expect(p.label).toBe('Add 250 ml of semi-skimmed milk, 129 kcal to lunch');
@@ -173,11 +173,11 @@ describe('planDrink', () => {
 
   it('names the day when it is not today', () => {
     const y = planDrink(base({ date: addDays(TODAY, -1) }));
-    expect(y.toast).toBe("Added 250 ml of milk, 129 kcal to yesterday's lunch");
+    expect(y.toast).toBe("Milk, 129 kcal, added to yesterday's lunch and 250 ml to Water");
     expect(y.line).toBe("Semi-skimmed milk: 129 kcal per 250 ml, to yesterday's lunch");
     expect(y.entry!.date).toBe('2026-11-17');
     const week = planDrink(base({ date: '2026-11-11', now: at(8, 5) }));
-    expect(week.toast).toBe('Added 250 ml of milk, 129 kcal to breakfast, Wed Nov 11');
+    expect(week.toast).toBe('Milk, 129 kcal, added to breakfast, Wed Nov 11, and 250 ml to Water');
     expect(week.water.date).toBe('2026-11-11');
   });
 
@@ -190,7 +190,7 @@ describe('planDrink', () => {
     expect(p.entry).toBeNull();
     expect(p.kcal).toBe(0);
     expect(p.water).toEqual({ date: TODAY, ml: 250, beverage: 'coffee', loggedAt: at(13, 10).toISOString(), drink: 'coffee_black' });
-    expect(p.toast).toBe('Added 250 ml of coffee');
+    expect(p.toast).toBe('250 ml of coffee added to Water');
     expect(p.label).toBe('Add 250 ml of coffee');
     expect(p.line).toBe('Black coffee: no calories added');
     expect(p.tile).toBeNull();
@@ -198,11 +198,12 @@ describe('planDrink', () => {
 
   it('plain water is exactly the record and toast of the screen before drinks had choices', () => {
     const p = planDrink(base({ kind: 'water', drink: null, ml: 249.6 }));
-    // The old screen: upsert('water', { date, ml: Math.round(ml), beverage, loggedAt: nowISO() }) and toast `Added ${vol}`.
+    // The old screen: upsert('water', { date, ml: Math.round(ml), beverage, loggedAt: nowISO() }); the toast is a glass on Today's.
     expect(p.water).toEqual({ date: TODAY, ml: 250, beverage: 'water', loggedAt: at(13, 10).toISOString() });
     expect('drink' in p.water).toBe(false);
     expect(p.entry).toBeNull();
-    expect(p.toast).toBe('Added 250 ml');
+    expect(p.toast).toBe('250 ml added to Water');
+    expect(planDrink(base({ kind: 'water', drink: null, date: addDays(TODAY, -1) })).toast).toBe('250 ml added to Water for yesterday');
     expect(p.line).toBe('');
     expect(p.tile).toBeNull();
     // A selection passed for Water is ignored.
@@ -213,7 +214,7 @@ describe('planDrink', () => {
     const p = planDrink(base({ kind: 'other', drink: { id: 'kcal', food: null }, ml: 330, kcal: 140 }));
     expect(p.water).toMatchObject({ beverage: 'other', drink: 'kcal', ml: 330 });
     expect(p.entry).toMatchObject({ name: 'Other drink', emoji: '🫗', source: 'quick', servingLabel: '330 ml', quantity: 1, grams: 0, nutrients: { kcal: 140, protein: 0, carbs: 0, fat: 0 }, via: 'water', meal: 'lunch' });
-    expect(p.toast).toBe('Added 330 ml of other drink, 140 kcal to lunch');
+    expect(p.toast).toBe('Other drink, 140 kcal, added to lunch and 330 ml to Water');
     expect(planDrink(base({ kind: 'other', drink: { id: 'kcal', food: null }, kcal: 0 })).entry).toBeNull();
   });
 
@@ -221,14 +222,14 @@ describe('planDrink', () => {
     const p = planDrink(base({ kind: 'juice', drink: sel('juice_orange'), waterOnly: true }));
     expect(p.entry).toBeNull();
     expect(p.water.drink).toBe('juice_orange');
-    expect(p.toast).toBe('Added 250 ml of juice, for water only');
+    expect(p.toast).toBe('250 ml of juice added to Water only');
     expect(p.tile).toBe('No calories');
     // On a no-calorie choice the chip changes nothing.
-    expect(planDrink(base({ kind: 'tea', drink: sel('tea_plain'), waterOnly: true })).toast).toBe('Added 250 ml of tea');
+    expect(planDrink(base({ kind: 'tea', drink: sel('tea_plain'), waterOnly: true })).toast).toBe('250 ml of tea added to Water');
   });
 
   it('a soft drink under Other and a picked food', () => {
-    expect(planDrink(base({ kind: 'other', drink: sel('soft_regular'), ml: 330 })).toast).toBe('Added 330 ml of soft drink, 145 kcal to lunch');
+    expect(planDrink(base({ kind: 'other', drink: sel('soft_regular'), ml: 330 })).toast).toBe('Soft drink, 145 kcal, added to lunch and 330 ml to Water');
     const p = planDrink(base({ kind: 'juice', drink: selectFood(B('b_grape_juice')) }));
     expect(p.water.drink).toBe('food');
     expect(p.entry!.foodId).toBe('b_grape_juice');
@@ -237,7 +238,7 @@ describe('planDrink', () => {
 
   it('imperial glasses', () => {
     const p = planDrink(base({ ml: 237, units: 'imperial' }));
-    expect(p.toast).toBe('Added 8 fl oz of milk, 122 kcal to lunch');
+    expect(p.toast).toBe('Milk, 122 kcal, added to lunch and 8 fl oz to Water');
     expect(p.entry!.servingLabel).toBe('8 fl oz');
   });
 });

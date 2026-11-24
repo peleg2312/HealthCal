@@ -6,6 +6,7 @@ import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 import { AiGlyph } from '@/features/ai/mark';
 import { AmountEditor } from '@/features/food/AmountEditor';
 import { FoodRow, MealPicker } from '@/features/food/components';
+import { displayFoodName } from '@/features/food/displayName';
 import { setFoodDraft } from '@/features/food/draft';
 import { amountLabel, href, kcal, lastPortions, matchServing, parseDate, parseMeal, portionFor, portionKcal, portionLabel, stepAmount } from '@/features/food/helpers';
 import { deleteEntry, logFood, setEntryAmount } from '@/features/food/log';
@@ -196,12 +197,13 @@ export default function FoodSearchScreen() {
     );
   };
 
+  // One compact row of four (a short word under each icon, the full name for a screen reader), so the list starts higher.
   const escapes = (
     <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-      <ActionTile testID="search-scan" icon={<ScanBarcode size={20} color={colors.text} strokeWidth={1.9} />} label="Scan barcode" onPress={() => go('/food/scan')} />
-      <ActionTile testID="search-photo" icon={<AiGlyph name="photo" size={20} color={colors.text} />} label="Photo or describe" onPress={() => go('/food/photo', { mode: 'photo' })} />
-      <ActionTile testID="search-quick" icon={<Zap size={20} color={colors.text} strokeWidth={1.9} />} label="Quick add" onPress={() => go('/food/quick')} />
-      <ActionTile testID="search-create" icon={<PenLine size={20} color={colors.text} strokeWidth={1.9} />} label="Create food" onPress={() => go('/food/custom', q ? { name: q } : {})} />
+      <ActionTile testID="search-scan" icon={<ScanBarcode size={18} color={colors.text} strokeWidth={1.9} />} label="Barcode" a11y="Scan barcode" onPress={() => go('/food/scan')} />
+      <ActionTile testID="search-photo" icon={<AiGlyph name="photo" size={18} color={colors.text} />} label="Photo" a11y="Photo or describe" onPress={() => go('/food/photo', { mode: 'photo' })} />
+      <ActionTile testID="search-quick" icon={<Zap size={18} color={colors.text} strokeWidth={1.9} />} label="Quick add" a11y="Quick add" onPress={() => go('/food/quick')} />
+      <ActionTile testID="search-create" icon={<PenLine size={18} color={colors.text} strokeWidth={1.9} />} label="Create" a11y="Create food" onPress={() => go('/food/custom', q ? { name: q } : {})} />
     </View>
   );
 
@@ -309,7 +311,7 @@ export default function FoodSearchScreen() {
                         return row(
                           f,
                           `favorite-${i}`,
-                          <FavoriteStar testID={`favorite-${i}-favorite`} on={on} label={favoriteLabel(f.name, on)} onPress={() => toggleFoodFavorite(f)} style={{ marginRight: 4 }} />,
+                          <FavoriteStar testID={`favorite-${i}-favorite`} on={on} label={favoriteLabel(displayFoodName(f), on)} onPress={() => toggleFoodFavorite(f)} style={{ marginRight: 4 }} />,
                         );
                       })}
                     </List>
@@ -330,7 +332,7 @@ export default function FoodSearchScreen() {
                       `mine-${i}`,
                       <IconButton
                         testID={`mine-${i}-edit`}
-                        accessibilityLabel={`Edit ${f.name}`}
+                        accessibilityLabel={`Edit ${displayFoodName(f)}`}
                         tone="clear"
                         size={40}
                         onPress={() => go('/food/custom', { id: f.id })}>
@@ -422,7 +424,7 @@ export default function FoodSearchScreen() {
       <Sheet
         visible={!!amountEntry}
         onClose={() => setAmountEntryId(null)}
-        title={amountEntry ? isolateRtl(amountEntry.name) : undefined}
+        title={amountEntry ? isolateRtl(displayFoodName(amountEntry)) : undefined}
         footer={
           amountEntry ? (
             <View style={{ flexDirection: 'row', gap: spacing.md }}>
@@ -478,30 +480,32 @@ function Hint({ title, message }: { title: string; message: string; icon?: React
   return <EmptyState title={title} message={message} />;
 }
 
-function ActionTile({ icon, label, onPress, testID }: { icon: React.ReactNode; label: string; onPress: () => void; testID: string }) {
-  const { colors, radius, spacing } = useTheme();
+/** A compact action tile: the icon over one short word, 52 px tall; `a11y` is its full name ("Scan barcode"). */
+function ActionTile({ icon, label, a11y, onPress, testID }: { icon: React.ReactNode; label: string; a11y: string; onPress: () => void; testID: string }) {
+  const { colors, radius } = useTheme();
   return (
     <PressableScale
       testID={testID}
       onPress={onPress}
       scaleTo={0.96}
-      accessibilityLabel={label}
+      accessibilityRole="button"
+      accessibilityLabel={a11y}
       style={{
         flex: 1,
-        minHeight: 72,
+        minHeight: 52,
         ...cup(radius.tile, 5),
         backgroundColor: colors.surface,
         borderWidth: 1,
         borderColor: colors.border,
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 6,
-        paddingVertical: spacing.sm,
-        // Narrow side padding, so "barcode" and "describe" fit whole in a quarter of a 320 px screen.
-        paddingHorizontal: spacing.xs,
+        gap: 3,
+        paddingVertical: 7,
+        // Narrow side padding, so "Quick add" fits whole in a quarter of a 320 px screen.
+        paddingHorizontal: 2,
       }}>
       {icon}
-      <Text variant="label" align="center" numberOfLines={2} style={{ fontSize: 12.5, lineHeight: 16 }}>
+      <Text variant="label" align="center" numberOfLines={1} style={{ fontSize: 12.5, lineHeight: 16 }}>
         {label}
       </Text>
     </PressableScale>

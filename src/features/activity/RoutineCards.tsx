@@ -1,4 +1,4 @@
-import { Play, Repeat, X } from 'lucide-react-native';
+import { Play, Repeat, Trash2 } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
@@ -68,7 +68,7 @@ function RoutineCard({ template, id, onStart, testID }: { template: RoutineTempl
         </View>
         {id ? (
           <IconButton accessibilityLabel={`Remove routine ${template.name}`} testID={`${testID}-remove`} tone="clear" size={44} onPress={remove}>
-            <X size={18} color={colors.textSecondary} strokeWidth={1.9} />
+            <Trash2 size={18} color={colors.textSecondary} strokeWidth={1.9} />
           </IconButton>
         ) : null}
       </View>

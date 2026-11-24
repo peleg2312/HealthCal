@@ -192,6 +192,22 @@ export function sourceInfo(source: FoodSource, food?: Pick<Food, 'fdcId' | 'ilCo
   }
 }
 
+/**
+ * The word a list row ends with for its source (principle 3, ruled for loop 0): the sources worth a
+ * second look are named ("Community", "Your food", "AI estimate", "Quick add"); bundled reference data
+ * has none, its filled key on the row is its mark. The word stays in the row's screen-reader label
+ * (`sourceInfo(...).label`) and on the food detail's badge.
+ */
+export function rowSourceWord(source: FoodSource): string | null {
+  return source === 'builtin' || source === 'usda' ? null : sourceInfo(source).short;
+}
+
+/** A row's caption with its source's word at the end ("1 cup · 257 kcal · Community"), kept on one line; reference data adds nothing. */
+export function withSourceWord(line: string, source: FoodSource): string {
+  const word = rowSourceWord(source);
+  return word ? `${line} · ${word.replace(/ /g, ' ')}` : line;
+}
+
 // --------------------------------------------------------- last portion
 
 export interface Portion {

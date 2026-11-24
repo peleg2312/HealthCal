@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { BookmarkPlus, Check, Clock, Pause, Play, Plus, Search, Trash2, Trophy, X } from 'lucide-react-native';
+import { BookmarkPlus, Check, Clock, Pause, Play, Plus, Search, Trash2, Trophy } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
@@ -663,7 +663,9 @@ function ExerciseCard({
   const narrow = useWindowDimensions().width < 360;
   const gap = narrow ? 6 : spacing.sm;
   const setCol = narrow ? 26 : 28;
-  const removeSize = narrow ? 28 : 32;
+  // A set's delete is the trash can every row delete is (Trash2 18 px in a 44 px clear cup). Under 360 px the clear
+  // cup is drawn 28 px wide (the same look, still 44 px to touch through hitSlop) so the reps field keeps "10" whole.
+  const removeSize = narrow ? 28 : 44;
   return (
     <View testID={slug} style={{ backgroundColor: colors.surface, ...cup(radius.card), borderWidth: 1, borderColor: colors.border, padding: narrow ? 16 : 18, gap: spacing.sm }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
@@ -766,7 +768,7 @@ function ExerciseCard({
               tone="clear"
               size={removeSize}
               onPress={() => update((d) => edits.removeSet(d, ex.key, s.key))}>
-              <X size={16} color={colors.textSecondary} strokeWidth={1.9} />
+              <Trash2 size={18} color={colors.textSecondary} strokeWidth={1.9} />
             </IconButton>
           </View>
         );

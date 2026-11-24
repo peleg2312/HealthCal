@@ -7,6 +7,7 @@ import type { AiFoodItem, Food } from '@/types';
 import { Divider, ListRow, Text, TextField } from '@/ui';
 
 import { RowEmoji } from '@/features/food/components';
+import { displayFoodName } from '@/features/food/displayName';
 
 import { foodToItem, matchFoods } from './localMatch';
 import { AiGlyph } from './mark';
@@ -61,7 +62,7 @@ export function AddMissingItem({
                 <ListRow
                   testID={`ai-add-match-${i}`}
                   left={<RowEmoji emoji={food.emoji} />}
-                  title={food.name}
+                  title={displayFoodName(food)}
                   subtitle={`${item.grams} g · ${item.kcal} kcal · ${food.source === 'custom' ? 'your food' : 'reference data'}`}
                   onPress={() => add(item, food)}
                   right={<Plus size={20} color={colors.text} strokeWidth={2.2} />}

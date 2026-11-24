@@ -66,14 +66,15 @@ export function WeekCups({ cells, testID }: { cells: WeekCells; testID?: string 
     />
   );
 
-  // A small cup above its budget is drawn full with a thin amber lip inside its own width, so a
-  // week with a few such days reads as a row of cups, not of markers; yesterday keeps the kit's
-  // wider lip and leads. The lip shows once the cup has poured (or at once under reduced motion).
+  // A small cup above its budget is drawn full with an amber lip 2 px past each wall and 4 px tall:
+  // its shape, not only its colour, tells it from a full cup's level line (a lip inside the walls was
+  // the calorie fill's colour and nothing else); yesterday keeps the kit's wider lip and leads.
+  // The lip shows once the cup has poured (or at once under reduced motion).
   const smallCup = (c: WeekCell, index: number) =>
     c.over ? (
       <View style={{ width: s.smallW, height: s.smallH }}>
         {cup({ ...c, kcal: c.budget }, s.smallW, s.smallH, index, 2.5)}
-        <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: -1.5, height: 3, backgroundColor: colors.warning }} />
+        <View pointerEvents="none" style={{ position: 'absolute', left: -2, right: -2, top: -2.5, height: 4, borderRadius: 1.5, backgroundColor: colors.warning }} />
       </View>
     ) : (
       cup(c, s.smallW, s.smallH, index, 2.5)

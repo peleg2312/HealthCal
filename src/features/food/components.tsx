@@ -11,7 +11,8 @@ import { cup, fonts, useTheme } from '@/theme';
 import type { Food, FoodSource, ISODate, MealType } from '@/types';
 import { CupKey, IconButton, PressableScale, Text } from '@/ui';
 
-import { kcal, sourceInfo } from './helpers';
+import { displayFoodName } from './displayName';
+import { kcal, sourceInfo, withSourceWord } from './helpers';
 
 // How a data source is marked lives with the mark itself (`SourceMark`, `@/features/ai/mark`): a filled cup
 // key for reference data, an outline for community or your own numbers, the small AI mark for an AI estimate.
@@ -36,15 +37,18 @@ export function SourceBadge({ source, style }: { source: FoodSource; style?: Sty
   );
 }
 
-/** The source's mark and its short name for list captions: present but quiet. `plain`: the kit's key even for an AI estimate (the sample result, which is not the AI). */
-export function SourceTag({ source, plain = false }: { source: FoodSource; plain?: boolean }) {
+/**
+ * The source's mark and its short name for list captions: present but quiet. `plain`: the kit's key even for
+ * an AI estimate, and `label` the word instead of the source's (the sample result, which is not the AI: "Sample").
+ */
+export function SourceTag({ source, plain = false, label }: { source: FoodSource; plain?: boolean; label?: string }) {
   const { colors } = useTheme();
   const info = sourceInfo(source);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 0 }}>
       <SourceMark source={source} plain={plain} color={colors.textSecondary} size={8} />
       <Text variant="caption" color="textSecondary" numberOfLines={1}>
-        {info.short}
+        {label ?? info.short}
       </Text>
     </View>
   );
@@ -218,6 +222,8 @@ export function FoodRow({
   }, [added]);
   // On a narrow phone the stepper (about 130 px) would leave the name a few words: it goes under the row instead.
   const stack = !!amount && width < 360;
+  // Drawn without the reference list's capitals ("Oats, rolled, dry (uncooked)"); stored and searched as it is.
+  const name = displayFoodName(food);
   return (
     <View style={stack ? { paddingBottom: spacing.sm } : { flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
       <PressableScale
@@ -233,13 +239,14 @@ export function FoodRow({
             }
           : null)}
         scaleTo={0.985}
-        accessibilityLabel={`${food.name}${matched ? `, ${matched}` : ''}, ${Math.round(kcalValue)} kilocalories. Open details`}
+        // The source is said in words here for every source (the caption names only those worth a second look).
+        accessibilityLabel={`${name}${matched ? `, ${matched}` : ''}, ${Math.round(kcalValue)} kilocalories, ${sourceInfo(food.source).label}. Open details`}
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>
         <RowEmoji emoji={food.emoji} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           {/* Up to three lines, as in the diary: a long name ("Israeli salad (tomato, cucumber, onion, ...)") is read, not cut. */}
           <Text variant="bodyStrong" numberOfLines={3} style={{ fontFamily: fonts.semibold }}>
-            {isolateRtl(food.name)}
+            {isolateRtl(name)}
           </Text>
           {/* The name the query found, on one line in the name's column (a title and its one line under it). */}
           {matched ? (
@@ -247,16 +254,16 @@ export function FoodRow({
               {isolateRtl(matched)}
             </Text>
           ) : null}
-          {/* The source's mark leads the line and its word ends it, so a long portion or brand wraps
-              to a second line instead of cutting the calories, and the mark never floats. */}
+          {/* The source's mark leads the line and its word ends it (none for reference data, whose filled key
+              is enough), so a long portion or brand wraps to a second line instead of cutting the calories. */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
             <SourceMark source={food.source} color={colors.textSecondary} size={8} style={{ marginTop: sourceMarkTop(food.source) }} />
             <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1 }}>
               {/* Once added, the live kcal leads. */}
-              {amount ? `${kcal(kcalValue)} kcal · ` : food.brand ? `${isolateRtl(food.brand)} · ` : ''}
-              {subtitle}
-              {amount ? '' : ` · ${kcal(kcalValue)} kcal`}
-              {` · ${sourceInfo(food.source).short}`}
+              {withSourceWord(
+                `${amount ? `${kcal(kcalValue)} kcal · ` : food.brand ? `${isolateRtl(food.brand)} · ` : ''}${subtitle}${amount ? '' : ` · ${kcal(kcalValue)} kcal`}`,
+                food.source,
+              )}
             </Text>
           </View>
         </View>
@@ -264,12 +271,12 @@ export function FoodRow({
       {trailing}
       {amount ? (
         <View style={stack ? { alignSelf: 'flex-end' } : undefined}>
-          <AmountStepper amount={guarded ?? amount} name={food.name} testID={testID} />
+          <AmountStepper amount={guarded ?? amount} name={name} testID={testID} />
         </View>
       ) : onQuickAdd ? (
         <IconButton
           testID={testID ? `${testID}-add` : undefined}
-          accessibilityLabel={`Add ${food.name}`}
+          accessibilityLabel={`Add ${name}`}
           tone={added ? 'primary' : 'surface'}
           size={44}
           onPress={() => {

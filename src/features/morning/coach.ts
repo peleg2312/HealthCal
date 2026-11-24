@@ -138,7 +138,7 @@ export const GOOD_STRONG: readonly ((p: string) => string)[] = [
 /** A fully logged day with one good thing beside a next step. */
 export const GOOD_MIXED: readonly ((p: string) => string)[] = [
   (p) => `${cap(p)}: keep that going.`,
-  (p) => `${cap(p)}: a part of yesterday worth keeping.`,
+  (p) => `${cap(p)} yesterday: worth doing again.`,
   (p) => `${cap(p)}: that one is yours to keep.`,
 ];
 /** A fully logged day whose one good thing is the logging itself: the habit, named as such. */

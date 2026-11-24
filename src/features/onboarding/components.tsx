@@ -256,7 +256,7 @@ export function StepProgress({ index, total }: { index: number; total: number })
 }
 
 /**
- * Units as two small label chips ("kg · cm" / "lb · ft"), for the corner of a
+ * Units as two small label chips ("kg · cm" / "lb · ft", drawn as the kit's Chip), for the corner of a
  * step. The answer is preselected from the phone's region, so this is a
  * correction, not a question. Switching re-expresses anything already typed.
  */
@@ -282,16 +282,18 @@ export function UnitsToggle({ draft, set, idPrefix = 'onb-units' }: { draft: Dra
             accessibilityState={{ checked: active, selected: active }}
             aria-checked={active}
             accessibilityLabel={o.a11y}
+            // The kit's Chip look, the one look of a selected single choice in the app: selected is an ink chip
+            // (text fill, bg text), the other a 1 px borderStrong edge.
             style={{
-              height: 34,
-              paddingHorizontal: 10,
+              height: 32,
+              paddingHorizontal: 12,
               justifyContent: 'center',
               borderRadius: radius.chip,
-              borderWidth: active ? 1.5 : 1,
-              borderColor: active ? colors.text : colors.border,
-              backgroundColor: active ? colors.surface : 'transparent',
+              borderWidth: 1,
+              borderColor: active ? colors.text : colors.borderStrong,
+              backgroundColor: active ? colors.text : 'transparent',
             }}>
-            <Text variant="label" color={active ? 'text' : 'textSecondary'} style={{ fontFamily: active ? fonts.bold : fonts.semibold }}>
+            <Text variant="label" color={active ? 'bg' : 'text'} style={{ fontSize: 13.5, fontFamily: active ? fonts.bold : fonts.semibold }}>
               {o.label}
             </Text>
           </PressableScale>

@@ -8,7 +8,7 @@ import { formatNumber } from '@/lib/units';
 import type { Food, FoodEntry } from '@/types';
 
 import { buildEntry } from './build';
-import { amountLabel, amountTotal, formatQty, labelAmount, lastPortions, matchServing, portionFor, portionKcal, portionLabel, servingText, sourceInfo, stepAmount, toPer100, valuesUpdated, labelGrams } from './helpers';
+import { amountLabel, amountTotal, formatQty, labelAmount, lastPortions, matchServing, portionFor, portionKcal, portionLabel, rowSourceWord, servingText, sourceInfo, stepAmount, toPer100, valuesUpdated, labelGrams, withSourceWord } from './helpers';
 import { resolveUsuals, usualFoods, usualLabel } from './usuals';
 
 describe('stepAmount', () => {
@@ -162,6 +162,17 @@ describe('sourceInfo for a bundled food', () => {
     expect(sourceInfo('builtin').explain).toBe('From the bundled reference database (USDA-based values).');
     expect(sourceInfo('builtin', { ilCode: plain }).label).toBe('Reference data');
     expect(sourceInfo('builtin', { ilCode: plain }).short).toBe('Reference');
+  });
+  it('ends a list row with the word of every source but reference data, which keeps only its mark', () => {
+    expect(withSourceWord('1 cup · 257 kcal', 'builtin')).toBe('1 cup · 257 kcal');
+    expect(withSourceWord('1 cup · 257 kcal', 'usda')).toBe('1 cup · 257 kcal');
+    expect(rowSourceWord('builtin')).toBeNull();
+    expect(withSourceWord('1 bar · 210 kcal', 'openfoodfacts')).toBe('1 bar · 210 kcal · Community');
+    expect(withSourceWord('1 slice · 90 kcal', 'custom')).toBe('1 slice · 90 kcal · Your\u00A0food');
+    expect(withSourceWord('150 g · 248 kcal', 'ai')).toBe('150 g · 248 kcal · AI\u00A0estimate');
+    expect(withSourceWord('1 serving', 'quick')).toBe('1 serving · Quick\u00A0add');
+    // The word stays in the screen reader's label and on the detail's badge.
+    expect(sourceInfo('builtin').label).toBe('Reference data');
   });
   it('agrees with the bundled list: every food names at most one record', () => {
     for (const f of BUILTIN_FOODS) expect(f.fdcId !== undefined && f.ilCode !== undefined).toBe(false);

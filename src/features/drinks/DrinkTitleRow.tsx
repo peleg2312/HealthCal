@@ -1,17 +1,17 @@
 /**
  * The Water screen's "Add a drink" title row: the title (the kit's SectionTitle h3 and its 4 px top
  * margin), then on the right a small bordered "Search" button (`water-search`, "Search drinks": it opens
- * the drink sheet with an empty search, whichever kind is showing), 12 px, and the underlined "Edit
- * sizes" (`section-add-a-drink-action`, as SectionTitle draws it). The same form at 320, 360 and 390 px,
- * and the same layout height as SectionTitle (24 px), so "Edit sizes" and everything under it stay put.
- * Built here because SectionTitle takes one action only.
+ * the drink sheet with an empty search, whichever kind is showing), then "Edit sizes" as the kit's small
+ * ghost button (`section-add-a-drink-action`, the testID SectionTitle gave it; it opens the glass sizes
+ * sheet). The same form at 320, 360 and 390 px, and the same layout height as SectionTitle (24 px), so
+ * everything under it stays put. Built here because SectionTitle takes one action only.
  */
 import { Search } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
 import { useTheme } from '@/theme';
-import { PressableScale, Text } from '@/ui';
+import { Button, PressableScale, Text } from '@/ui';
 
 export function DrinkTitleRow({ onSearch, onEditSizes }: { onSearch: () => void; onEditSizes: () => void }) {
   const { colors, radius } = useTheme();
@@ -45,18 +45,17 @@ export function DrinkTitleRow({ onSearch, onEditSizes }: { onSearch: () => void;
           Search
         </Text>
       </PressableScale>
-      {/* As SectionTitle draws its action: an underlined text link with a full-height touch target. */}
-      <PressableScale
+      {/* The kit's small ghost button (36 visible, 44 to the finger); the -6 margins lay it out 24 px tall, the h3's line. */}
+      <Button
         testID="section-add-a-drink-action"
-        accessibilityRole="button"
+        title="Edit sizes"
         accessibilityLabel="Edit sizes"
+        variant="ghost"
+        size="sm"
+        full={false}
         onPress={onEditSizes}
-        hitSlop={{ top: 8, bottom: 8, left: 0, right: 8 }}
-        style={{ minHeight: 44, justifyContent: 'center', paddingLeft: 12, marginVertical: -10 }}>
-        <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
-          Edit sizes
-        </Text>
-      </PressableScale>
+        style={{ marginVertical: -6, marginLeft: 4, paddingHorizontal: 8 }}
+      />
     </View>
   );
 }

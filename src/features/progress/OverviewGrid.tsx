@@ -1,11 +1,12 @@
 import React from 'react';
 
-import { compareText, confidenceWord, hoursText, kcalText, rateText, WEEKLY_ACTIVE_MINUTES, type PeriodSummary } from '@/lib/insights';
+import { compareText, hoursText, kcalText, WEEKLY_ACTIVE_MINUTES, type PeriodSummary } from '@/lib/insights';
 import { formatNumber, formatVolume, formatWeight, weightUnit, weightValue } from '@/lib/units';
 import { useTheme } from '@/theme';
 import type { TrendPoint } from '@/lib/trend';
 import { Card } from '@/ui';
 
+import { weeklyRateText } from './goalDate';
 import { ProgressTile } from './ProgressTile';
 import type { ProgressData } from './useProgressData';
 
@@ -71,7 +72,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         color={colors.weight}
         value={d.series.trendKg !== null ? weightValue(d.series.trendKg, units).toFixed(1) : null}
         unit={weightUnit(units)}
-        caption={rate !== null ? `${rate > 0 ? '+' : rate < 0 ? '−' : ''}${rateText(rate, units)} a week` : 'Rate after a week of weigh-ins'}
+        caption={rate !== null ? weeklyRateText(rate, units) : 'Rate after a week of weigh-ins'}
         compare={compareText(trendNow, trendPrev, { period, format: (n) => formatWeight(n, units), same: 0.05, more: 'higher', less: 'lower' })}
         onPress={() => onOpen('body')}
       />
@@ -92,13 +93,22 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         testID="progress-tile-expenditure"
         index={3}
         borderTop
-        title="Expenditure"
+        title="You burn"
         color={colors.calories}
         keyVariant="outline"
         value={formatNumber(Math.round(d.model.tdee))}
         unit="kcal"
-        caption={adaptive ? `a day · confidence ${confidenceWord(d.model.adaptive.confidence)}` : 'a day · formula estimate'}
-        compare={adaptive ? `Formula alone says ${kcalText(d.model.formulaTdee)}` : d.model.adaptive.needs ? `Your data estimate needs ${d.model.adaptive.needs}` : null}
+        caption={adaptive ? 'a day, from your logs and weigh-ins' : 'a day, from your body and activity'}
+        // Plain words here; how the number is worked out is under "Where this number comes from" on Body.
+        compare={
+          adaptive
+            ? d.model.adaptive.confidence >= 0.75
+              ? 'A settled estimate, before workouts'
+              : 'An estimate that firms up as you log'
+            : d.model.adaptive.needs
+              ? `Learns from your logs after ${d.model.adaptive.needs}`
+              : 'An estimate, before workouts'
+        }
         onPress={() => onOpen('body')}
       />
       <ProgressTile

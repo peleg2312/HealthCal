@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { mealOnDay } from '@/features/food/addedTo';
+import { displayFoodName } from '@/features/food/displayName';
 import { approxKcal, approxKcalSpoken, hasEstimate } from '@/features/food/favoriteWords';
 import { amountTotal, lastPortions, servingText } from '@/features/food/helpers';
 import { logFood, logItems } from '@/features/food/log';
@@ -220,7 +221,8 @@ export function FitsSheet({
                       </View>
                     ) : null}
                     <Text variant="caption" color="textSecondary" numberOfLines={2} testID={`fits-idea-foods-${i}`}>
-                      {idea.foods.map(isolateRtl).join(' · ')}
+                      {/* The foods drawn without the reference list's capitals (`idea.foods` are the items' stored names). */}
+                      {idea.items.map((it) => isolateRtl(displayFoodName(it))).join(' · ')}
                     </Text>
                     {dim ? (
                       <Text variant="caption" color="textSecondary" testID={`fits-idea-more-${i}`} style={{ marginTop: 2 }}>
@@ -241,7 +243,7 @@ export function FitsSheet({
                     accessibilityLabel={
                       row.kind === 'added'
                         ? `${idea.name} added`
-                        : `Add ${idea.name}: ${idea.foods.join('; ')}, ${approxKcalSpoken(idea.kcal, hasEstimate(idea.items))}, to ${mealName}${dim ? `. ${row.caption}` : ''}`
+                        : `Add ${idea.name}: ${idea.items.map(displayFoodName).join('; ')}, ${approxKcalSpoken(idea.kcal, hasEstimate(idea.items))}, to ${mealName}${dim ? `. ${row.caption}` : ''}`
                     }
                     tone={row.kind === 'added' ? 'primary' : 'surface'}
                     size={44}
@@ -285,7 +287,7 @@ export function FitsSheet({
                   <Text style={{ fontSize: 17, lineHeight: 22, width: 22, textAlign: 'center', opacity: dim ? 0.6 : 1 }}>{f.food.emoji || '🍽️'}</Text>
                   <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                     <Text variant="bodyStrong" color={dim ? 'textSecondary' : 'text'} numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
-                      {isolateRtl(f.food.name)}
+                      {isolateRtl(displayFoodName(f.food))}
                     </Text>
                     {/* A narrow phone has no room for a numbers column: they lead the line under the name. */}
                     {narrow ? <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 8 }}>{numbers(f.kcal, f.protein, 15)}</View> : null}
@@ -301,7 +303,7 @@ export function FitsSheet({
                   {narrow ? null : <View style={{ alignItems: 'flex-end' }}>{numbers(f.kcal, f.protein, 17)}</View>}
                   <IconButton
                     testID={`fits-add-${i}`}
-                    accessibilityLabel={row.kind === 'added' ? `${f.food.name} added` : `Add ${f.food.name}, ${portionLabel(f)}, ${Math.round(f.kcal)} kilocalories, to ${mealName}`}
+                    accessibilityLabel={row.kind === 'added' ? `${displayFoodName(f.food)} added` : `Add ${displayFoodName(f.food)}, ${portionLabel(f)}, ${Math.round(f.kcal)} kilocalories, to ${mealName}`}
                     tone={row.kind === 'added' ? 'primary' : 'surface'}
                     size={44}
                     disabled={row.kind === 'added'}

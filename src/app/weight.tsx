@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Plus } from 'lucide-react-native';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
@@ -7,6 +7,7 @@ import { clockTime } from '@/features/import/ui/format';
 import { resolveDateParam } from '@/features/trackers/dateParam';
 import { diffDays, formatDayLabel, formatShortDate } from '@/lib/dates';
 import { isPlausibleBodyFat, projectedGoalDate } from '@/lib/energy';
+import { trendMonthParts, weeklyRateText } from '@/features/progress/goalDate';
 import { formatWeight, weightToKg, weightUnit, weightValue } from '@/lib/units';
 import { applyWeighInToTargets, deleteWeightRecord, saveWeightRecord } from '@/features/trackers/actions';
 import { DayStepper, Explain, ExplainText, Figure, RequireProfile } from '@/features/trackers/components';
@@ -50,8 +51,6 @@ function fixedWeight(kg: number, units: UnitSystem): string {
   return `${weightValue(kg, units).toFixed(1)} ${weightUnit(units)}`;
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 function WeightScreen() {
   const { colors, spacing } = useTheme();
   const profile = useProfile();
@@ -79,7 +78,9 @@ function WeightScreen() {
   const stats = empty ? null : weightStats(series.trend, series.startKg ?? 0, series.weeklyRateKg, profile.targetWeightKg);
   const chart = weightChartData(series.trend, range, end, (kg) => weightValue(kg, units));
   const target = profile.targetWeightKg;
-  const projected = stats && target && stats.weeklyKg !== null ? projectedGoalDate(stats.trendKg, target, stats.weeklyKg) : null;
+  // The trend's date, from today's date (never the clock in a render), said as a month: the plan's date is in Goals.
+  const projected = stats && target && stats.weeklyKg !== null ? projectedGoalDate(stats.trendKg, target, stats.weeklyKg, new Date(`${end}T12:00:00`)) : null;
+  const projectedParts = projected ? trendMonthParts(projected) : null;
   const latest = series.latest;
 
   // The newest weigh-in came from a health store and the targets do not use it yet: one tap applies it (a sync never does).
@@ -91,7 +92,7 @@ function WeightScreen() {
   const footer = <Button testID="weight-log" title="Log weigh-in" icon={<Plus size={20} color={colors.onPrimary} />} onPress={() => setSheetDate(end)} />;
 
   return (
-    <Screen header={<Header title="Weight" subtitle={target ? `Target ${formatWeight(target, units)}` : 'Trend and weigh-ins'} />} footer={footer} backdrop={colors.weight} testID="weight-screen">
+    <Screen header={<Header title="Weight" subtitle={target ? `Goal ${formatWeight(target, units)}` : 'Trend and weigh-ins'} />} footer={footer} backdrop={colors.weight} testID="weight-screen">
       {empty || !stats ? (
         <Card>
           <EmptyState
@@ -144,7 +145,7 @@ function WeightScreen() {
               <Legend swatch={<View style={{ width: 16, height: 2, borderRadius: 1, backgroundColor: colors.weight }} />} label="Trend" />
               <Legend swatch={<CupKey color={colors.textTertiary} size={7} />} label="Weigh-ins" />
               {target ? (
-                <Legend swatch={<View style={{ width: 16, borderTopWidth: 2, borderStyle: 'dashed', borderColor: colors.borderStrong }} />} label="Target" />
+                <Legend swatch={<View style={{ width: 16, borderTopWidth: 2, borderStyle: 'dashed', borderColor: colors.borderStrong }} />} label="Goal" />
               ) : null}
             </View>
             <Explain label="Why the trend differs from the scale" testID="weight-trend-help" style={{ marginTop: -spacing.xs, marginBottom: -spacing.sm }}>
@@ -176,14 +177,14 @@ function WeightScreen() {
             <View style={{ flexDirection: 'row', gap: spacing.md }}>
               <Figure
                 testID="weight-rate"
-                value={stats.weeklyKg === null ? '–' : signed(stats.weeklyKg, units, units === 'imperial' ? 1 : 2)}
-                unit={stats.weeklyKg === null ? undefined : `${unit}/week`}
+                value={stats.weeklyKg === null ? '–' : weeklyRateText(stats.weeklyKg, units).replace(` ${unit} a week`, '')}
+                unit={stats.weeklyKg === null ? undefined : `${unit} a week`}
                 label={
                   stats.weeklyKg !== null
-                    ? 'Per week, last 3 weeks'
+                    ? 'Trend, last 3 weeks'
                     : latest && diffDays(latest.date, end) > 10
-                      ? 'Per week (weigh in to update)'
-                      : 'Per week (needs more weigh-ins)'
+                      ? 'A week (weigh in to update)'
+                      : 'A week (needs more weigh-ins)'
                 }
               />
               <Figure value={signed(stats.totalChangeKg, units)} unit={unit} label={`Since ${formatShortDate(series.entries[0].date)}`} />
@@ -193,18 +194,18 @@ function WeightScreen() {
               <Figure
                 value={stats.toTargetKg === null ? '–' : Math.abs(weightValue(stats.toTargetKg, units)) < 0.05 ? '0' : Math.abs(weightValue(stats.toTargetKg, units)).toFixed(1)}
                 unit={stats.toTargetKg === null ? undefined : unit}
-                label={stats.toTargetKg === null ? 'No target set' : stats.toTargetKg < 0 ? 'Above target' : stats.toTargetKg > 0 ? 'Below target' : 'At target'}
+                label={stats.toTargetKg === null ? 'No goal set' : stats.toTargetKg < 0 ? 'Above goal' : stats.toTargetKg > 0 ? 'Below goal' : 'At goal'}
               />
               <Figure
                 testID="weight-projected"
-                value={projected ? `${MONTHS[projected.getMonth()]} ${projected.getDate()}` : '–'}
-                unit={projected && String(projected.getFullYear()) !== end.slice(0, 4) ? String(projected.getFullYear()) : undefined}
-                label={projected ? 'Projected at this rate' : target ? 'No projection at this rate' : 'Set a target to project'}
+                value={projectedParts ? projectedParts.month : '–'}
+                unit={projectedParts ? projectedParts.year : undefined}
+                label={projected && target ? 'Goal, at your current trend' : target ? 'Not toward your goal at this trend' : 'Set a goal weight to see a date'}
               />
             </View>
           </Card>
 
-          <SectionTitle title="History" action={history.length > 14 ? (showAll ? 'Show less' : `Show all ${history.length}`) : undefined} onAction={() => setShowAll((v) => !v)} />
+          <SectionTitle title="History" />
           <Card padding={spacing.md}>
             {shown.map((e, i) => {
               const prev = history[history.indexOf(e) + 1];
@@ -234,6 +235,20 @@ function WeightScreen() {
               );
             })}
           </Card>
+          {/* More than 14 weigh-ins: the rest open under the list, where it ends (the testID is the one SectionTitle gave it). */}
+          {history.length > 14 ? (
+            <Button
+              testID="section-history-action"
+              title={showAll ? 'Show less' : `Show all ${history.length}`}
+              accessibilityLabel={showAll ? 'Show fewer weigh-ins' : `Show all ${history.length} weigh-ins`}
+              variant="ghost"
+              size="sm"
+              full={false}
+              icon={showAll ? <ChevronUp size={16} color={colors.primaryInk} strokeWidth={2.2} /> : <ChevronDown size={16} color={colors.primaryInk} strokeWidth={2.2} />}
+              onPress={() => setShowAll((v) => !v)}
+              style={{ alignSelf: 'center', marginTop: -spacing.xs }}
+            />
+          ) : null}
         </>
       )}
 

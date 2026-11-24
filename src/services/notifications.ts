@@ -19,6 +19,7 @@ import { AndroidImportance } from 'expo-notifications';
 import { router } from 'expo-router';
 import { Platform } from 'react-native';
 
+import { waterAddedToast } from '@/features/food/addedTo';
 import { logItems } from '@/features/food/log';
 import { planFromStore } from '@/features/settings/planFromStore';
 import { mealRepeat, parseReminderAction, snoozeTime, type PlannedReminder, type ReminderCategory } from '@/features/settings/reminderPlanner';
@@ -67,9 +68,11 @@ const handled = new Set<string>();
 function addWaterFromReminder(ml: number) {
   const s = useStore.getState();
   const units = s.profile?.units ?? 'metric';
-  const entry = s.upsert('water', { date: today(), ml, beverage: 'water', loggedAt: nowISO() });
+  const day = today();
+  const entry = s.upsert('water', { date: day, ml, beverage: 'water', loggedAt: nowISO() });
   haptic.success();
-  toast(`Added ${formatVolume(ml, units)} of water`, { label: 'Undo', onPress: () => useStore.getState().remove('water', entry.id) });
+  // Worded as a glass on Today is: "250 ml added to Water".
+  toast(waterAddedToast(formatVolume(ml, units), day, day), { label: 'Undo', onPress: () => useStore.getState().remove('water', entry.id) });
 }
 
 function repeatMealFromReminder(meal: 'breakfast' | 'lunch' | 'dinner', date: string) {

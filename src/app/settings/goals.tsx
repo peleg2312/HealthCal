@@ -3,13 +3,14 @@ import React, { useRef, useState } from 'react';
 import { View, type ScrollView, type ScrollViewProps } from 'react-native';
 
 import { Group, Hint, OptionRow } from '@/features/settings/components';
-import { formatMonthDayYear } from '@/features/settings/format';
+import { planGoalLine } from '@/features/progress/goalDate';
 import { spreadChangeNote, spreadRuleNote } from '@/features/settings/spreadWords';
+import { BIRTH_INCOMPLETE, birthDateWords, birthIso, birthParts, type BirthParts } from '@/features/settings/birthDate';
 import { birthDateError, customSplitError, heightError, rateForGoal, targetWeightError } from '@/features/settings/goalsValidation';
 import { markSpreadHintDone } from '@/features/activity/spreadHint';
 import { ageFromBirthDate, today } from '@/lib/dates';
 import { effectiveFrom, exerciseRuleOf, ruleFieldsOnSave } from '@/lib/exerciseBudget';
-import { ACTIVITY_LABELS, macroTargets, maxWeeklyRateKg, projectedGoalDate } from '@/lib/energy';
+import { ACTIVITY_LABELS, macroTargets, maxWeeklyRateKg } from '@/lib/energy';
 import { baseWaterGoalMl } from '@/lib/hydration';
 import {
   cmToFtIn,
@@ -29,7 +30,7 @@ import { useToday } from '@/store/clock';
 import { computeEnergyModel, useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ActivityLevel, ExerciseSpread, GoalType, MacroSplit, Profile, Sex } from '@/types';
-import { Button, Card, Chip, ChipWrap, CupKey, goBack, Header, MacroBar, NumberField, Screen, Segmented, Stepper, Text, TextField, ToggleRow, toast } from '@/ui';
+import { Button, Card, Chip, ChipWrap, CupKey, goBack, Header, MacroBar, NumberField, Screen, Segmented, Stepper, Text, ToggleRow, toast } from '@/ui';
 
 type MacroMode = 'auto' | 'balanced' | 'protein' | 'lowcarb' | 'custom';
 
@@ -79,7 +80,7 @@ export default function GoalsScreen() {
   const profile = useStore((s) => s.profile);
   if (!profile?.onboardedAt) {
     return (
-      <Screen header={<Header title="Goals and targets" subtitle="Budget, macros and water" />}>
+      <Screen header={<Header title="Goals and targets" subtitle="Calories, macros and water" />}>
         <Text color="textSecondary">Finish setting up your profile first.</Text>
         <Button title="Get started" onPress={() => router.replace('/welcome')} />
       </Screen>
@@ -109,7 +110,7 @@ function GoalsForm() {
   const patch = (p: Partial<Profile>) => setDraft((d) => ({ ...d, ...p }));
 
   // Text-backed inputs that need validation before they reach the draft.
-  const [birthText, setBirthText] = useState(saved.birthDate);
+  const [birth, setBirth] = useState<BirthParts>(() => birthParts(saved.birthDate));
   const [macroMode, setMacroMode] = useState<MacroMode>(modeOf(saved.macroSplitOverride));
   const initialCustom = saved.macroSplitOverride ?? PRESETS.balanced.split;
   const [custom, setCustom] = useState({
@@ -120,8 +121,10 @@ function GoalsForm() {
   const [manualCalories, setManualCalories] = useState(!!saved.calorieTargetOverride);
   const [manualWater, setManualWater] = useState(!!saved.waterGoalMlOverride);
 
-  const birthError = birthDateError(birthText);
-  const birthValid = birthError === null;
+  const birthText = birthIso(birth);
+  const todayNoon = new Date(`${todayDate}T12:00:00`);
+  const birthError = birthText === null ? BIRTH_INCOMPLETE : birthDateError(birthText, todayNoon);
+  const birthValid = birthError === null && birthText !== null;
   const splitError = customSplitError(custom);
   const macroValid = macroMode !== 'custom' || splitError === null;
   const heightMessage = heightError(draft.heightCm, u);
@@ -140,7 +143,7 @@ function GoalsForm() {
     exerciseRuleHistory: saved.exerciseRuleHistory,
     // With adding off the spread control is hidden, so a choice made there before turning it off is not kept.
     exerciseSpread: draft.eatBackExercise ? draft.exerciseSpread : saved.exerciseSpread,
-    birthDate: birthValid ? birthText : saved.birthDate,
+    birthDate: birthValid && birthText ? birthText : saved.birthDate,
     calorieTargetOverride: manualCalories ? draft.calorieTargetOverride : undefined,
     waterGoalMlOverride: manualWater ? draft.waterGoalMlOverride : undefined,
     macroSplitOverride:
@@ -158,7 +161,18 @@ function GoalsForm() {
   const model = computeEnergyModel(effective, food, weights, todayDate, activities);
   const macros = macroTargets(effective, model.target.target);
   const water = effective.waterGoalMlOverride ?? baseWaterGoalMl(effective.weightKg, effective.sex);
-  const projected = draft.goal === 'maintain' ? null : projectedGoalDate(effective.weightKg, effective.targetWeightKg, model.target.impliedWeeklyKg);
+  // The plan's date, as the plan reveal says it (a range at the plan's pace); Weight and Progress give the trend's month.
+  const planLine =
+    draft.goal === 'maintain'
+      ? null
+      : planGoalLine(
+          effective.weightKg,
+          effective.targetWeightKg,
+          model.target.impliedWeeklyKg,
+          u,
+          todayNoon,
+          model.target.limitedByFloor || model.target.source === 'override',
+        );
   const maxRate = maxWeeklyRateKg(draft.goal, draft.weightKg);
   const floor = model.target.floor;
 
@@ -197,11 +211,12 @@ function GoalsForm() {
   return (
     <Screen
       scrollProps={{ ref: scrollRef } as ScrollViewProps}
-      header={<Header title="Goals and targets" subtitle="Budget, macros and water" />}
+      header={<Header title="Goals and targets" subtitle="Calories, macros and water" />}
       footer={<Button testID="goals-save" title={dirty ? 'Save plan' : 'No changes'} disabled={!valid || !dirty} onPress={save} />}>
       {/* Live preview */}
       <Card testID="goals-preview">
-        <Text variant="overline">Your plan</Text>
+        {/* The daily number before workouts is the target everywhere; a day's budget is it plus that day's workouts. */}
+        <Text variant="overline">Your daily target</Text>
         <View
           style={{
             flexDirection: 'row',
@@ -241,20 +256,18 @@ function GoalsForm() {
           </View>
           <Text variant="caption" color="textSecondary" testID="goals-preview-note">
             {draftRule === 'week'
-              ? 'On a day without recent workouts. Each workout raises its own day and the next six by a seventh of its calories.'
+              ? 'On a day without recent workouts. Each workout adds a seventh of its calories to the budget of its own day and the next six.'
               : effective.eatBackExercise
-                ? 'On a day without workouts. A logged workout raises that day.'
+                ? 'On a day without workouts. A logged workout adds its calories to that day’s budget.'
                 : 'On a day without workouts. A workout raises that day’s water.'}
           </Text>
         </View>
         {draft.goal !== 'maintain' ? (
           <Text variant="label" color="text" style={{ marginTop: spacing.md }}>
-            {projected
-              ? // The pace is the stepper's below, unless the calorie minimum slows it.
-                `Reaching ${formatWeight(effective.targetWeightKg ?? 0, u)} around ${formatMonthDayYear(projected)}${model.target.limitedByFloor || model.target.source === 'override' ? `, at ${formatWeight(Math.abs(model.target.impliedWeeklyKg), u, 2)} a week` : ''}.`
-              : effective.targetWeightKg
-                ? 'At this target the weight would not move toward your goal.'
-                : 'Add a target weight to see a projected date.'}
+            {!targetValid
+              ? 'Enter a goal weight to see when this plan reaches it.'
+              : (planLine ??
+                (effective.targetWeightKg ? 'At this calorie target the weight would not move toward your goal.' : 'Add a goal weight to see when this plan reaches it.'))}
           </Text>
         ) : null}
       </Card>
@@ -276,7 +289,7 @@ function GoalsForm() {
             <>
               <NumberField
                 testID="goals-target-weight"
-                label="Target weight"
+                label="Goal weight"
                 suffix={weightUnit(u)}
                 value={draft.targetWeightKg ? Math.round(weightValue(draft.targetWeightKg, u) * 10) / 10 : null}
                 onChange={(v) => patch({ targetWeightKg: v ? weightToKg(v, u) : undefined })}
@@ -309,12 +322,12 @@ function GoalsForm() {
               </View>
             </>
           ) : (
-            <Hint>Your budget matches what you burn, so weight stays steady.</Hint>
+            <Hint>Your target matches what you burn, so weight stays steady.</Hint>
           )}
         </View>
       </Group>
 
-      <Group title="Everyday activity" footer="Outside workouts, which are added on top.">
+      <Group title="Everyday activity" footer="Outside workouts, which are added on top." radiogroup>
         {(Object.keys(ACTIVITY_LABELS) as ActivityLevel[]).map((level) => (
           <OptionRow
             key={level}
@@ -383,17 +396,36 @@ function GoalsForm() {
               error={heightMessage}
             />
           )}
-          <TextField
-            testID="goals-birth-date"
-            label="Birth date"
-            placeholder="YYYY-MM-DD"
-            value={birthText}
-            onChangeText={setBirthText}
-            autoCapitalize="none"
-            inputMode="numeric"
-            error={birthError}
-            hint={birthValid ? `${ageFromBirthDate(birthText)} years old` : undefined}
-          />
+          {/* Day, month and year as onboarding asks them (month first in imperial), said back as "May 12, 1994". */}
+          <View style={{ gap: spacing.xs }} testID="goals-birth-date">
+            <Text variant="label" color="textSecondary">
+              Birth date
+            </Text>
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              {(u === 'imperial' ? (['month', 'day', 'year'] as const) : (['day', 'month', 'year'] as const)).map((part) => (
+                <NumberField
+                  key={part}
+                  testID={`goals-birth-${part}`}
+                  accessibilityLabel={`Birth ${part}`}
+                  placeholder={part === 'day' ? 'DD' : part === 'month' ? 'MM' : 'YYYY'}
+                  decimals={0}
+                  maxLength={part === 'year' ? 4 : 2}
+                  style={{ flex: part === 'year' ? 1.45 : 1 }}
+                  value={birth[part]}
+                  onChange={(v) => setBirth((b) => ({ ...b, [part]: v }))}
+                />
+              ))}
+            </View>
+            {birthValid && birthText ? (
+              <Text variant="caption" color="textSecondary" testID="goals-birth-summary">
+                {`${birthDateWords(birthText)} · ${ageFromBirthDate(birthText, todayNoon)} years old`}
+              </Text>
+            ) : (
+              <Text variant="caption" color="danger" testID="goals-birth-error">
+                {birthError}
+              </Text>
+            )}
+          </View>
           <NumberField
             testID="goals-body-fat"
             label="Body fat (optional)"

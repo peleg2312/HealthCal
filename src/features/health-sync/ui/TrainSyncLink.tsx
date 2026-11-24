@@ -1,14 +1,16 @@
 import { router } from 'expo-router';
+import { RefreshCw } from 'lucide-react-native';
 import React from 'react';
 
 import { useTheme } from '@/theme';
-import { CupKey, PressableScale, Text } from '@/ui';
+import { Button, CupKey } from '@/ui';
 
 import { useHealthSync } from '../store';
 import { healthAdapter, useSyncOnFocus } from '../sync';
 
 /**
- * Train's way into automatic sync, beside the Garmin file import: "Sync
+ * Train's way into automatic sync, beside the Garmin file import and drawn as it is (the kit's small
+ * ghost button with an icon; the amber key in the icon's place while something waits): "Sync
  * automatically" while it is off, "Workout sync" once it is on, and a small
  * count ("Sync, 2 to look at") when workouts wait in "Needs a look". Mounting it is also what makes
  * Train sync when the tab is opened. Where there is no health store (the
@@ -31,17 +33,15 @@ export function TrainSyncLink() {
         ? 'Workout sync: the last sync did not finish'
         : 'Workout sync';
   return (
-    <PressableScale
+    <Button
       testID="train-health-sync"
+      title={label}
       accessibilityLabel={spoken}
-      accessibilityRole="link"
+      variant="ghost"
+      size="sm"
+      full={false}
+      icon={waiting || attention ? <CupKey color={colors.warning} size={8} /> : <RefreshCw size={16} color={colors.primaryInk} strokeWidth={2.2} />}
       onPress={() => router.push('/settings/health-sync' as never)}
-      hitSlop={6}
-      style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-      {waiting || attention ? <CupKey color={colors.warning} size={8} /> : null}
-      <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }} testID="train-health-sync-label">
-        {label}
-      </Text>
-    </PressableScale>
+    />
   );
 }

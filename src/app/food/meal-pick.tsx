@@ -5,6 +5,7 @@ import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 
 import { BUILTIN_FOODS } from '@/data/foods';
 import { savedItemFromFood, setItemAmount } from '@/features/food/build';
+import { displayFoodName } from '@/features/food/displayName';
 import { FoodRow } from '@/features/food/components';
 import { toggleFoodFavorite } from '@/features/food/favoriteActions';
 import { favoriteActionLabel } from '@/features/food/favoriteWords';
@@ -97,7 +98,7 @@ function MealPick() {
   const removeRow = (r: DraftRow) => {
     const undo = removeDraftItem(r.key);
     haptic.tap();
-    toast(`Removed ${isolateRtl(r.item.name)}`, { label: 'Undo', onPress: undo });
+    toast(`Removed ${isolateRtl(displayFoodName(r.item))}`, { label: 'Undo', onPress: undo });
   };
 
   const row = (food: Food, testID: string, matched?: string) => {

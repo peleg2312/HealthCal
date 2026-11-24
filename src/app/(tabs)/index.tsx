@@ -97,7 +97,10 @@ export default function TodayScreen() {
         onFits={() => setFits({ proteinFirst: false })}
         share={<ShareDayButton date={date} />}
       />
-      {/* The coach's one line and its one action, under the card whose numbers it talks about; early in
+      {/* Water and the other pillars directly under the calorie card, so the one-tap glass is in the first
+          view at 360 x 740 on every day, day one included. */}
+      <StatusRail day={day} isToday={isToday} quiet={firstDay} />
+      {/* The coach's one line and its one action, under the two cards whose numbers it talks about; early in
           the week "Your week is ready" takes its place. Day one has neither: the invite in the card is the one thing to do. */}
       {!isToday || firstDay ? null : recap.announce ? (
         <RecapReadyCard />
@@ -108,7 +111,6 @@ export default function TodayScreen() {
           onFits={() => setFits({ proteinFirst: true })}
         />
       )}
-      <StatusRail day={day} isToday={isToday} quiet={firstDay} />
 
       <MealsSection day={day} />
 
@@ -131,8 +133,8 @@ export default function TodayScreen() {
 
 /** Tall enough for the cup's three labels with 8 px between them at any value; the macros sit under the cup, not beside it. */
 const VESSEL_H = 150;
-/** Day one: a shorter, empty cup, so the first-log invite under it stays in the first screen. */
-const VESSEL_H_FIRST = 150;
+/** Day one: a shorter, empty cup, so the first-log invite under it and the water row under the card stay in the first view at 360 x 740. */
+const VESSEL_H_FIRST = 120;
 
 function EnergyCard({
   day,
@@ -336,26 +338,32 @@ function EnergyCard({
         <View style={{ marginTop: 18 }}>
           <FirstLogInvite meal={meal} date={day.date} budget={day.budget} />
         </View>
-      ) : null}
+      ) : (
+        // Day one ends with the invite: no budget line and no share for a day with nothing in it yet.
+        <BudgetFooter day={day} budgetLabel={budgetLabel} notAdded={notAdded} share={share} />
+      )}
+    </Card>
+  );
+}
+
+/** The card's last row: the budget in one short line (the whole sum is read out) and the day's share button. */
+function BudgetFooter({ day, budgetLabel, notAdded, share }: { day: DaySummary; budgetLabel: string; notAdded: number; share: React.ReactNode }) {
+  const { colors, spacing } = useTheme();
+  return (
+    <>
       <View style={{ height: 1, backgroundColor: colors.border, marginTop: 16, marginBottom: 8 }} />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
         {/* One short line: the hatching and its label already say what exercise added; the whole sum is read out.
             When exercise is not added to the budget, a second short line says what was burned and left out. */}
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text variant="caption" color="textSecondary" testID="today-budget" accessibilityLabel={budgetLabel}>
-            {firstDay ? (
-              'Log the first thing and the cup starts to fill.'
-            ) : (
-              <>
-                {'Budget '}
-                <Text variant="numM" style={{ fontSize: 14, lineHeight: 17 }}>
-                  {formatNumber(day.budget)}
-                </Text>
-                {' kcal'}
-              </>
-            )}
+            {'Budget '}
+            <Text variant="numM" style={{ fontSize: 14, lineHeight: 17 }}>
+              {formatNumber(day.budget)}
+            </Text>
+            {' kcal'}
           </Text>
-          {notAdded > 0 && !firstDay ? (
+          {notAdded > 0 ? (
             <Text variant="caption" color="textSecondary" testID="today-not-added">
               {`${formatNumber(notAdded)} kcal burned, not added`}
             </Text>
@@ -363,7 +371,7 @@ function EnergyCard({
         </View>
         {share}
       </View>
-    </Card>
+    </>
   );
 }
 

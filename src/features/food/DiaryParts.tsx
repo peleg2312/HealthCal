@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { CalendarPlus, Copy, MoreHorizontal, Plus, Repeat2, Save, Trash2, X } from 'lucide-react-native';
+import { CalendarPlus, Copy, MoreHorizontal, Plus, Repeat2, Save, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
@@ -18,9 +18,10 @@ import { AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, Ha
 
 import { clearEntries, copyEntries } from './actions';
 import { DayStepper, KcalTrail, MealPicker, RowEmoji } from './components';
+import { displayFoodName } from './displayName';
 import { toggleFoodFavorite } from './favoriteActions';
 import { FAVOURITE_ACTION, favoriteActionLabel } from './favoriteWords';
-import { dayPhrase, href, kcal, portionLabel, sourceInfo } from './helpers';
+import { dayPhrase, href, kcal, portionLabel, sourceInfo, withSourceWord } from './helpers';
 import { deleteEntry } from './log';
 import { useSaveMealStep } from './SaveMealSheet';
 import { SAVE_HINT_NOT_NOW, SAVE_HINT_NOT_NOW_A11Y, saveHintA11y, saveHintLabel } from './saveWords';
@@ -32,8 +33,11 @@ import { FadeRow, useLeavingRows } from './rowMotion';
  * (eaten poured in from the left, exercise headroom hatched at the right end),
  * then the three macros with their level ticks.
  */
-/** The day's numbers at the top of the diary. `share` (the day's share button) sits at the top right, beside the big number. */
-export function DaySummaryCard({ day, share }: { day: DaySummary; share?: React.ReactNode }) {
+/**
+ * The day's numbers at the top of the diary. `share` (the day's share button) sits at the top right, beside the big
+ * number; `action` (on a day with nothing logged, "Copy yesterday") is the card's last row, under a divider.
+ */
+export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?: React.ReactNode; action?: React.ReactNode }) {
   const { colors, spacing } = useTheme();
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
@@ -123,9 +127,18 @@ export function DaySummaryCard({ day, share }: { day: DaySummary; share?: React.
           </View>
         ))}
       </View>
+      {action ? (
+        <>
+          <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
+          {action}
+        </>
+      ) : null}
     </Card>
   );
 }
+
+/** On a day with nothing logged, the first meal's slot says what the search it opens offers (one line at 320 px). */
+export const EMPTY_DAY_NOTE = 'Search, scan or snap a photo';
 
 const ROW_PAD = 18;
 /** Where the text column starts in a meal card: the padding, the 24 px emoji column and the gap. */
@@ -147,12 +160,16 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
   const food = entry.food;
   const starred = useStore((s) => (food ? !!s.favorites[favoriteRecordId(food.id)] && !s.favorites[favoriteRecordId(food.id)].deleted : false));
   const favoriteAction = food ? favoriteActionLabel(starred) : null;
+  // The name as it is drawn (a bundled food's capitals in lower case); the store, the search and the export keep it as written.
+  const name = displayFoodName(entry);
   const portion =
     entry.grams > 0 && !volume && entry.servingLabel !== `${Math.round(entry.grams)} g` && !/^\d+(\.\d+)?\s*g$/.test(entry.servingLabel.trim())
       ? `${portionLabel(entry.servingLabel, entry.quantity)} · ${Math.round(entry.grams)} g`
       : portionLabel(entry.servingLabel, entry.quantity);
+  // Reference data has no word on the row (its filled key is its mark); the others are named. The label reads every source.
+  const caption = withSourceWord(inWater ? `${portion} · ${ALSO_IN_WATER}` : portion, ai ? 'ai' : entry.source);
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: ROW_PAD, paddingRight: 4 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: ROW_PAD }}>
       <PressableScale
         testID={`entry-${entry.id}`}
         onPress={() => router.push(href('/food/detail', { entryId: entry.id, meal: entry.meal, date: entry.date }) as never)}
@@ -162,21 +179,21 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
         onLongPress={food ? () => toggleFoodFavorite(food) : holdNothing}
         accessibilityActions={favoriteAction ? [{ name: FAVOURITE_ACTION.name, label: favoriteAction }] : undefined}
         onAccessibilityAction={food ? (e) => e.nativeEvent.actionName === FAVOURITE_ACTION.name && toggleFoodFavorite(food) : undefined}
-        accessibilityLabel={`${entry.name}, ${ai ? 'about ' : ''}${Math.round(entry.nutrients.kcal)} kilocalories${inWater ? ', also counted in Water' : ''}. Edit`}
+        accessibilityLabel={`${name}, ${ai ? 'about ' : ''}${Math.round(entry.nutrients.kcal)} kilocalories${inWater ? ', also counted in Water' : ''}. Edit`}
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: 11 }}>
         <RowEmoji emoji={entry.emoji} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text variant="bodyStrong" numberOfLines={3} style={{ fontFamily: fonts.semibold }}>
-            {isolateRtl(entry.name)}
+            {isolateRtl(name)}
           </Text>
           {/* On a narrow phone the calories move to the end of the portion line, so the name has the row's width. */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
-            {/* The source's mark leads the line and its word ends it, so a portion that wraps never leaves the mark floating. */}
+            {/* The source's mark leads the line and its word (none for reference data) ends it, so a portion that wraps never leaves the mark floating. */}
             <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: 6 }} accessible accessibilityLabel={`${withoutMarks(portion)}${inWater ? `, ${ALSO_IN_WATER}` : ''}, ${source.label}`}>
               <SourceMark source={ai ? 'ai' : entry.source} color={colors.textSecondary} size={8} style={{ marginTop: sourceMarkTop(ai ? 'ai' : entry.source) }} />
-              {/* The mark "also in Water" may take one more line (on a 320 px phone "1 can (8.4 fl oz) · 250 g · also in Water · Reference" needs three), so the word Water is never cut. */}
+              {/* The mark "also in Water" may take one more line (on a 320 px phone "1 can (8.4 fl oz) · 250 g · also in Water · Your food" needs three), so the word Water is never cut. */}
               <Text testID={inWater ? `entry-in-water-${entry.id}` : undefined} variant="caption" color="textSecondary" numberOfLines={inWater ? 3 : 2} style={{ flexShrink: 1 }}>
-                {`${portion}${inWater ? ` · ${ALSO_IN_WATER}` : ''} · ${source.short}`}
+                {caption}
               </Text>
             </View>
             {narrow ? <KcalTrail value={entry.nutrients.kcal} range={entry.kcalRange} /> : null}
@@ -184,8 +201,9 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
         </View>
         {narrow ? null : <KcalTrail value={entry.nutrients.kcal} range={entry.kcalRange} />}
       </PressableScale>
-      <IconButton testID={`entry-delete-${entry.id}`} accessibilityLabel={`Delete ${entry.name}`} tone="clear" size={36} onPress={() => deleteEntry(entry)}>
-        <X size={16} color={colors.textSecondary} strokeWidth={1.9} />
+      {/* Delete on a list row is the trash can everywhere (Water, Train, Saved meals); an X only closes or dismisses. */}
+      <IconButton testID={`entry-delete-${entry.id}`} accessibilityLabel={`Delete ${name}`} tone="clear" size={44} onPress={() => deleteEntry(entry)}>
+        <Trash2 size={18} color={colors.textSecondary} strokeWidth={1.9} />
       </IconButton>
     </View>
   );
@@ -194,7 +212,7 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
 /**
  * The diary's one-time hint, a sibling row under the meal's last entry with its own divider: "Save lunch
  * as a meal" (a tap opens the save sheet) and a quiet "Not now" at the end (hides it for good on this
- * device), a text action rather than an X, so it is never taken for the entries' delete X above it.
+ * device), a text action rather than an icon, so it is never taken for the entries' delete above it.
  */
 function SaveHintRow({ meal, onSave, onClose }: { meal: MealType; onSave(): void; onClose(): void }) {
   const { colors, spacing } = useTheme();
@@ -248,6 +266,7 @@ export function MealCard({
   onMenu,
   onRepeat,
   hint,
+  slotNote,
 }: {
   meal: MealType;
   label: string;
@@ -261,14 +280,19 @@ export function MealCard({
   onRepeat: () => void;
   /** The one-time "Save lunch as a meal" line under the last row (./saveHint.ts): on one card at most. */
   hint?: { onSave(): void; onClose(): void } | null;
+  /** A second line in the empty meal's slot: on a day with nothing logged, the first card says what the search offers. */
+  slotNote?: string | null;
 }) {
   const { colors, spacing, radius } = useTheme();
   const total = entriesTotal(entries).kcal;
   const add = () => router.push(href('/food/search', { meal, date }) as never);
   // A removed row fades where it is before the rows below glide up into its place.
   const rows = useLeavingRows(entries);
+  // One add per meal: an empty meal's add is its dashed slot (`meal-add-<meal>`), with no "+" cup and no "..." in its
+  // header (the menu's one action for an empty meal, copying the last one, is the Repeat under the slot).
+  const filled = rows.length > 0;
   return (
-    <Card testID={`meal-card-${meal}`} padding={0} style={{ paddingTop: 12, paddingBottom: rows.length ? 4 : previous ? 6 : ROW_PAD }}>
+    <Card testID={`meal-card-${meal}`} padding={0} style={{ paddingTop: filled ? 12 : 16, paddingBottom: filled ? 4 : ROW_PAD }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingLeft: ROW_PAD, paddingRight: 14 }}>
         {/* A big total ("1,450 kcal") goes under the meal's name on a narrow phone rather than cutting it. */}
         <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10 }}>
@@ -281,12 +305,16 @@ export function MealCard({
             </AnimatedNumber>
           ) : null}
         </View>
-        <IconButton testID={`meal-menu-${meal}`} accessibilityLabel={`${label} options`} tone="clear" size={44} onPress={onMenu}>
-          <MoreHorizontal size={20} color={colors.textSecondary} strokeWidth={1.9} />
-        </IconButton>
-        <IconButton testID={`meal-add-${meal}`} accessibilityLabel={`Add food to ${label.toLowerCase()}`} tone="surface" size={44} onPress={add} style={{ borderColor: colors.borderStrong }}>
-          <Plus size={20} color={colors.text} strokeWidth={2.2} />
-        </IconButton>
+        {filled ? (
+          <>
+            <IconButton testID={`meal-menu-${meal}`} accessibilityLabel={`${label} options`} tone="clear" size={44} onPress={onMenu}>
+              <MoreHorizontal size={20} color={colors.textSecondary} strokeWidth={1.9} />
+            </IconButton>
+            <IconButton testID={`meal-add-${meal}`} accessibilityLabel={`Add food to ${label.toLowerCase()}`} tone="surface" size={44} onPress={add} style={{ borderColor: colors.borderStrong }}>
+              <Plus size={20} color={colors.text} strokeWidth={2.2} />
+            </IconButton>
+          </>
+        ) : null}
       </View>
       {/* Always mounted (keyed by the day), so a meal's first row slides in too; Undo brings a row back the same way. */}
       <View style={{ marginTop: rows.length ? 6 : 0 }}>
@@ -300,52 +328,72 @@ export function MealCard({
         </AnimatedList>
       </View>
       {hint && rows.length > 0 ? <SaveHintRow meal={meal} onSave={hint.onSave} onClose={hint.onClose} /> : null}
-      {rows.length > 0 ? null : (
-        <View style={{ marginTop: spacing.sm, gap: spacing.xs, paddingHorizontal: ROW_PAD }}>
+      {filled ? null : (
+        <View style={{ marginTop: spacing.md, gap: spacing.md, paddingHorizontal: ROW_PAD }}>
           <PressableScale
-            testID={`meal-empty-${meal}`}
+            testID={`meal-add-${meal}`}
             onPress={add}
             scaleTo={0.985}
-            accessibilityLabel={`Log ${label.toLowerCase()}`}
+            accessibilityLabel={`Add food to ${label.toLowerCase()}`}
             style={{
               minHeight: 48,
+              paddingVertical: slotNote ? 10 : 0,
+              paddingHorizontal: spacing.md,
               ...cup(radius.buttonSm, 5),
               borderWidth: 1.5,
               borderTopWidth: 0,
               borderStyle: 'dashed',
               borderColor: colors.borderStrong,
-              flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 8,
+              gap: 2,
             }}>
-            <Plus size={16} color={colors.textSecondary} strokeWidth={2.2} />
-            <Text variant="label" color="textSecondary">
-              Log {label.toLowerCase()}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Plus size={16} color={colors.textSecondary} strokeWidth={2.2} />
+              <Text variant="label" color="textSecondary">
+                Log {label.toLowerCase()}
+              </Text>
+            </View>
+            {slotNote ? (
+              <Text variant="caption" color="textSecondary" testID={`meal-add-${meal}-note`} style={{ textAlign: 'center' }}>
+                {slotNote}
+              </Text>
+            ) : null}
           </PressableScale>
-          {previous ? (
-            <PressableScale
-              testID={`meal-repeat-${meal}`}
-              onPress={onRepeat}
-              scaleTo={0.985}
-              accessibilityLabel={`Repeat ${label.toLowerCase()} from ${formatDayLabel(previous.date)}`}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}>
-              {/* A fixed box, so a two-line label never squeezes the icon. */}
-              <View style={{ width: 16, height: 16 }}>
-                <Repeat2 size={16} color={colors.text} strokeWidth={2.2} />
-              </View>
-              <Text variant="label" color="text" style={{ flexShrink: 1, textDecorationLine: 'underline' }} numberOfLines={3}>
-                Repeat {dayPhrase(previous.date)}: {previous.entries.map((e) => isolateRtl(e.name.split(',')[0])).join(', ')}
-              </Text>
-              <Text variant="caption" color="textSecondary" tabular numberOfLines={1} style={{ marginLeft: 'auto', flexShrink: 0 }}>
-                {kcal(currentKcal(previous.entries))} kcal
-              </Text>
-            </PressableScale>
-          ) : null}
+          {previous ? <RepeatRow meal={meal} label={label} previous={previous} onRepeat={onRepeat} /> : null}
         </View>
       )}
     </Card>
+  );
+}
+
+/**
+ * Under an empty meal's slot: what the last time held ("Yesterday, 744 kcal: Israeli salad, Pasta, Chicken breast")
+ * and the kit's small Repeat button beside it, the same control as on Today's meal rows.
+ */
+function RepeatRow({ meal, label, previous, onRepeat }: { meal: MealType; label: string; previous: PreviousMeal; onRepeat(): void }) {
+  const { colors, spacing } = useTheme();
+  const when = dayPhrase(previous.date);
+  const foods = previous.entries.map((e) => displayFoodName(e).split(',')[0].trim()).filter(Boolean);
+  const total = kcal(currentKcal(previous.entries));
+  return (
+    <View testID={`meal-repeat-row-${meal}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+      <Text variant="caption" color="textSecondary" numberOfLines={3} style={{ flex: 1, minWidth: 0 }}>
+        {/* The day and its calories first, so a long list of foods is what the third line's ellipsis shortens, never the number. */}
+        {`${when.charAt(0).toUpperCase()}${when.slice(1)}, ${total} kcal: ${foods.map(isolateRtl).join(', ')}`}
+      </Text>
+      <Button
+        testID={`meal-repeat-${meal}`}
+        title="Repeat"
+        accessibilityLabel={`Repeat ${label.toLowerCase()} from ${when}: ${foods.join(', ')}, ${total} kilocalories`}
+        variant="secondary"
+        size="sm"
+        full={false}
+        icon={<Repeat2 size={16} color={colors.text} strokeWidth={2.2} />}
+        onPress={onRepeat}
+        style={{ paddingHorizontal: 10, alignSelf: 'center' }}
+      />
+    </View>
   );
 }
 

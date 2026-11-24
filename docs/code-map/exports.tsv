@@ -98,6 +98,9 @@ src/features/activity/components.tsx	DateStepper	component
 src/features/activity/components.tsx	QuickStartTiles	component
 src/features/activity/components.tsx	SessionRow	component
 src/features/activity/components.tsx	sessionSubtitle	function
+src/features/activity/effortWords.ts	Effort	type
+src/features/activity/effortWords.ts	effortOf	function
+src/features/activity/effortWords.ts	effortSpan	function
 src/features/activity/exercises.ts	ALL_EXERCISES	const
 src/features/activity/exercises.ts	EXERCISE_GROUPS	const
 src/features/activity/exercises.ts	ExerciseGroup	interface
@@ -229,6 +232,7 @@ src/features/ai/estimate.ts	aiFoodDefinition	function
 src/features/ai/estimate.ts	applyAddedFat	function
 src/features/ai/estimate.ts	calorieRange	function
 src/features/ai/estimate.ts	confidenceLevel	function
+src/features/ai/estimate.ts	estimateGrams	function
 src/features/ai/estimate.ts	formatKcalRange	function
 src/features/ai/estimate.ts	gramStep	function
 src/features/ai/estimate.ts	itemRange	function
@@ -242,6 +246,7 @@ src/features/ai/estimate.ts	rowWiden	function
 src/features/ai/estimate.ts	rowsFromResult	function
 src/features/ai/estimate.ts	rowsToLogItems	function
 src/features/ai/estimate.ts	setRowGrams	function
+src/features/ai/estimate.ts	shownRowName	function
 src/features/ai/estimate.ts	swapRow	function
 src/features/ai/estimate.ts	totals	function
 src/features/ai/estimate.ts	unswapRow	function
@@ -795,6 +800,7 @@ src/features/drinks/via.ts	waterIdFromEntry	function
 src/features/food/AmountEditor.tsx	AmountEditor	component
 src/features/food/AmountEditor.tsx	AmountValue	interface
 src/features/food/DiaryParts.tsx	DaySummaryCard	component
+src/features/food/DiaryParts.tsx	EMPTY_DAY_NOTE	const
 src/features/food/DiaryParts.tsx	MealCard	component
 src/features/food/DiaryParts.tsx	MealMenuSheet	component
 src/features/food/DiaryParts.tsx	PreviousMeal	interface
@@ -824,7 +830,12 @@ src/features/food/actions.ts	renameSavedMeal	function
 src/features/food/actions.ts	saveMeal	function
 src/features/food/actions.ts	storeSavedMeal	function
 src/features/food/actions.ts	updateEntryDirect	function
+src/features/food/addedTo.ts	TOAST_NAME_MAX	const
+src/features/food/addedTo.ts	foodAddedToast	function
 src/features/food/addedTo.ts	mealOnDay	function
+src/features/food/addedTo.ts	quickAddedToast	function
+src/features/food/addedTo.ts	toastFoodName	function
+src/features/food/addedTo.ts	waterAddedToast	function
 src/features/food/build.ts	BuildEntryInput	interface
 src/features/food/build.ts	SavedMealPlan	interface
 src/features/food/build.ts	UNKNOWN_AI_CONFIDENCE	const
@@ -852,6 +863,8 @@ src/features/food/components.tsx	RowAmount	interface
 src/features/food/components.tsx	RowEmoji	component
 src/features/food/components.tsx	SourceBadge	component
 src/features/food/components.tsx	SourceTag	component
+src/features/food/displayName.ts	KEEP_CAPS	const
+src/features/food/displayName.ts	displayFoodName	function
 src/features/food/draft.ts	setFoodDraft	function
 src/features/food/draft.ts	useFoodDraft	const
 src/features/food/drinkDefault.ts	drinkByDefault	function
@@ -907,11 +920,13 @@ src/features/food/helpers.ts	portionFor	function
 src/features/food/helpers.ts	portionKcal	function
 src/features/food/helpers.ts	portionLabel	function
 src/features/food/helpers.ts	referenceExplain	function
+src/features/food/helpers.ts	rowSourceWord	function
 src/features/food/helpers.ts	servingText	function
 src/features/food/helpers.ts	sourceInfo	function
 src/features/food/helpers.ts	stepAmount	function
 src/features/food/helpers.ts	toPer100	function
 src/features/food/helpers.ts	valuesUpdated	function
+src/features/food/helpers.ts	withSourceWord	function
 src/features/food/itemLine.ts	itemLine	function
 src/features/food/itemLine.ts	itemStepText	function
 src/features/food/log.ts	LogFoodInput	interface
@@ -2224,6 +2239,12 @@ src/features/progress/consistency.ts	monthTally	function
 src/features/progress/consistency.ts	rhythmWeeks	function
 src/features/progress/consistency.ts	shiftMonth	function
 src/features/progress/consistency.ts	weeksOnRhythm	function
+src/features/progress/goalDate.ts	planGoalLine	function
+src/features/progress/goalDate.ts	trendGoalLabel	function
+src/features/progress/goalDate.ts	trendGoalLine	function
+src/features/progress/goalDate.ts	trendMonth	function
+src/features/progress/goalDate.ts	trendMonthParts	function
+src/features/progress/goalDate.ts	weeklyRateText	function
 src/features/progress/parts.tsx	BigStat	component
 src/features/progress/parts.tsx	Hairline	component
 src/features/progress/parts.tsx	LegendDot	component
@@ -2253,6 +2274,11 @@ src/features/progress/useProgressData.ts	useProgressData	function
 src/features/progress/useRecap.ts	useRecap	function
 src/features/settings/ThemeSwatches.tsx	THEME_HINTS	const
 src/features/settings/ThemeSwatches.tsx	ThemeSwatches	component
+src/features/settings/birthDate.ts	BIRTH_INCOMPLETE	const
+src/features/settings/birthDate.ts	BirthParts	interface
+src/features/settings/birthDate.ts	birthDateWords	function
+src/features/settings/birthDate.ts	birthIso	function
+src/features/settings/birthDate.ts	birthParts	function
 src/features/settings/components.tsx	Group	component
 src/features/settings/components.tsx	Hint	component
 src/features/settings/components.tsx	IconTile	component

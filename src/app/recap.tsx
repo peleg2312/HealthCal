@@ -212,7 +212,7 @@ export default function RecapScreen() {
           <PressableScale
             testID="recap-plan"
             onPress={() => go('/settings/goals')}
-            accessibilityLabel={`Your plan: ${formatNumber(d.plan.before)} kcal on ${formatShortDate(d.week)}, ${formatNumber(d.plan.after)} kcal ${d.plan.afterDate === d.today ? 'today' : `from ${formatShortDate(d.plan.afterDate)}`}. ${d.plan.reason} Daily budget before exercise${d.exerciseRule === 'day' ? '; logged workouts add their own calories on the day' : d.exerciseRule === 'week' ? '; each logged workout adds a seventh of its calories to 7 days' : d.exerciseRule === 'mixed' ? '; logged workouts add their calories by the rule each day had, on the day or shared over 7 days' : ''}. Open goals.`}
+            accessibilityLabel={`Your daily target: ${formatNumber(d.plan.before)} kcal on ${formatShortDate(d.week)}, ${formatNumber(d.plan.after)} kcal ${d.plan.afterDate === d.today ? 'today' : `from ${formatShortDate(d.plan.afterDate)}`}. ${d.plan.reason} The target is before workouts${d.exerciseRule === 'day' ? '; logged workouts add their own calories on the day' : d.exerciseRule === 'week' ? '; each logged workout adds a seventh of its calories to 7 days' : d.exerciseRule === 'mixed' ? '; logged workouts add their calories by the rule each day had, on the day or shared over 7 days' : ''}. Open goals.`}
             scaleTo={0.985}>
             <Card style={{ gap: spacing.sm }}>
               <View
@@ -222,7 +222,7 @@ export default function RecapScreen() {
                   gap: spacing.md,
                 }}>
                 <Text variant="h3" style={{ flex: 1 }}>
-                  Your plan this week
+                  Your daily target
                 </Text>
                 <ChevronRight size={18} color={colors.textSecondary} strokeWidth={1.9} />
               </View>

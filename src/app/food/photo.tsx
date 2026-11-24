@@ -19,6 +19,7 @@ import {
   calorieRange,
   CONFIDENCE_WORDS,
   confidenceLevel,
+  estimateGrams,
   formatKcalRange,
   makeRow,
   overallConfidence,
@@ -28,6 +29,7 @@ import {
   rowsToLogItems,
   rowWiden,
   setRowGrams,
+  shownRowName,
   swapRow,
   totals,
   unswapRow,
@@ -50,7 +52,7 @@ import { BUILTIN_FOODS } from '@/data/foods';
 import { isolateRtl } from '@/lib/bidi';
 import { today } from '@/lib/dates';
 import { newId } from '@/lib/id';
-import { formatMacro, mealForTime, MEALS } from '@/lib/nutrition';
+import { mealForTime, MEALS } from '@/lib/nutrition';
 import { useAuth } from '@/services/auth';
 import { analyzeFood, PhotoError, pickPhoto, prepareImage, takePendingPhoto, type PickedPhoto, type PreparedImage } from '@/services/aiFood';
 import { isBackendConfigured } from '@/services/supabase';
@@ -359,7 +361,7 @@ export default function PhotoScreen() {
     const fatBefore = fat;
     if (r.kind === 'fat') setFat('none');
     setRows((rs) => rs.filter((x) => x.key !== r.key));
-    toast(`Removed ${isolateRtl(r.item.name.trim()) || 'item'}`, {
+    toast(`Removed ${isolateRtl(shownRowName(r).trim()) || 'item'}`, {
       label: 'Undo',
       onPress: () => {
         if (r.kind === 'fat') {
@@ -451,7 +453,8 @@ export default function PhotoScreen() {
 
   return (
     <Screen
-      header={<Header title={title} subtitle="AI estimate" close onBack={() => goBack(`/diary?date=${date}`)} />}
+      // The sample is not the AI: its header says so ("Sample"), as its rows do; the flask stays its mark.
+      header={<Header title={title} subtitle={isDemo ? 'Sample' : 'AI estimate'} close onBack={() => goBack(`/diary?date=${date}`)} />}
       footer={footer}
       scrollProps={{ ref: scrollRef } as ScrollViewProps}>
       {step === 'capture' ? (
@@ -596,7 +599,7 @@ export default function PhotoScreen() {
                   from={countFrom}
                   arrival={arrival.at}
                   range={`${formatKcalRange(range, word)} kcal`}
-                  items={rows.filter((r) => r.kind !== 'fat').map((r) => ({ key: r.key, item: r.item }))}
+                  items={rows.filter((r) => r.kind !== 'fat').map((r) => ({ key: r.key, item: { ...r.item, name: shownRowName(r) } }))}
                   onItemPress={showRow}
                 />
                 <Card style={{ gap: spacing.md }}>
@@ -883,6 +886,7 @@ export default function PhotoScreen() {
   }
 }
 
+/** One macro of the estimate's total, in whole grams ("53 g", never "52.9 g": principle 2). */
 function MacroStat({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <View style={{ flex: 1, gap: 2 }}>
@@ -891,7 +895,7 @@ function MacroStat({ label, value, color }: { label: string; value: number; colo
         <Text variant="label">{label}</Text>
       </View>
       <Text variant="numM" tabular style={{ fontSize: 17, lineHeight: 22 }}>
-        {formatMacro(value)}
+        {estimateGrams(value)}
         <Text variant="unit">{' g'}</Text>
       </Text>
     </View>

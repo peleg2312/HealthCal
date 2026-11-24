@@ -1,11 +1,11 @@
 import { router, useIsFocused, useLocalSearchParams, useNavigation } from 'expo-router';
-import { Copy, Search } from 'lucide-react-native';
+import { Copy } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { type ScrollView, type ScrollViewProps, View } from 'react-native';
 
 import { copyPreviousDay, copyPreviousMeal, findPreviousDay, findPreviousMeal } from '@/features/food/actions';
-import { DaySummaryCard, MealCard, MealMenuSheet } from '@/features/food/DiaryParts';
-import { dayPhrase, href, kcal, param, parseDate } from '@/features/food/helpers';
+import { DaySummaryCard, EMPTY_DAY_NOTE, MealCard, MealMenuSheet } from '@/features/food/DiaryParts';
+import { dayPhrase, kcal, param, parseDate } from '@/features/food/helpers';
 import { markSaveHintDone, saveHintAllowed, saveHintMeal, useSaveHintDone } from '@/features/food/saveHint';
 import { SaveMealSheet } from '@/features/food/SaveMealSheet';
 import { currentKcal } from '@/features/food/usuals';
@@ -16,12 +16,12 @@ import { useBackToToday } from '@/features/today/useBackToToday';
 import { useDaySwipe } from '@/features/today/useDaySwipe';
 import { useReportViewedDay } from '@/features/today/viewedDay';
 import { addDays, today } from '@/lib/dates';
-import { MEALS, mealForTime } from '@/lib/nutrition';
+import { MEALS } from '@/lib/nutrition';
 import { useToday } from '@/store/clock';
 import { useDay, useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ISODate, MealType } from '@/types';
-import { Button, Card, Screen, Text } from '@/ui';
+import { Button, Screen } from '@/ui';
 
 /** How far ahead the diary goes: a week, to plan meals (the strip then shows next week as well). */
 const PLAN_AHEAD_DAYS = 7;
@@ -83,7 +83,6 @@ export default function DiaryScreen() {
   const previousDay = useMemo(() => findPreviousDay(allEntries, date), [allEntries, date]);
 
   const [menuMeal, setMenuMeal] = useState<MealType | null>(null);
-  const isToday = date === t;
   const empty = day.entries.length === 0;
 
   // The one-time "Save lunch as a meal" hint (src/features/food/saveHint.ts): on one card at most,
@@ -111,39 +110,29 @@ export default function DiaryScreen() {
       {/* The one date control, the same as Today's: the header's overline names the day, the strip picks one. */}
       <DayRingStrip today={t} selected={date} onSelect={setDate} testIDPrefix="diary" latest={latest} jumpTestID="diary-today" />
 
-      <DaySummaryCard day={day} share={date <= t ? <ShareDayButton date={date} testID="diary-share" /> : null} />
-
-      {empty ? (
-        <Card testID="diary-empty" tone="alt">
-          <Text variant="h3">{date > t ? 'Nothing planned yet' : 'Nothing logged for this day'}</Text>
-          <Text variant="body" color="textSecondary" style={{ marginTop: 4 }}>
-            {previousDay
-              ? `Ate the same as ${dayPhrase(previousDay.date)}? Copy it in one tap, then adjust.`
-              : 'Search for a food, scan a barcode or snap a photo to start.'}
-          </Text>
-          <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
-            {previousDay ? (
-              <Button
-                testID="diary-copy-yesterday"
-                size="md"
-                icon={<Copy size={18} color={colors.onPrimary} />}
-                title={`Copy ${dayPhrase(previousDay.date)} · ${kcal(currentKcal(previousDay.entries))} kcal`}
-                onPress={() => copyPreviousDay(date)}
-              />
-            ) : null}
+      {/* A day with nothing logged has no panel of its own: each meal's dashed slot is its add (the first one says what
+          the search offers), and the whole of the last logged day can be copied from the summary card's last row. */}
+      <DaySummaryCard
+        day={day}
+        share={date <= t ? <ShareDayButton date={date} testID="diary-share" /> : null}
+        action={
+          empty && previousDay ? (
             <Button
-              testID="diary-search"
-              size="md"
-              variant={previousDay ? 'secondary' : 'primary'}
-              icon={<Search size={18} color={previousDay ? colors.text : colors.onPrimary} />}
-              title="Search foods"
-              onPress={() => router.push(href('/food/search', { meal: isToday ? mealForTime() : 'breakfast', date }) as never)}
+              testID="diary-copy-yesterday"
+              size="sm"
+              variant="secondary"
+              full={false}
+              icon={<Copy size={16} color={colors.text} strokeWidth={2.2} />}
+              title={`Copy ${dayPhrase(previousDay.date)} · ${kcal(currentKcal(previousDay.entries))} kcal`}
+              accessibilityLabel={`Copy everything from ${dayPhrase(previousDay.date)} to this day, ${kcal(currentKcal(previousDay.entries))} kilocalories`}
+              onPress={() => copyPreviousDay(date)}
+              style={{ paddingHorizontal: 10 }}
             />
-          </View>
-        </Card>
-      ) : null}
+          ) : null
+        }
+      />
 
-      {MEALS.map((m) => (
+      {MEALS.map((m, i) => (
         <View
           key={m.id}
           onLayout={(e) => {
@@ -160,6 +149,7 @@ export default function DiaryScreen() {
             onMenu={() => setMenuMeal(m.id)}
             onRepeat={() => copyPreviousMeal(date, m.id)}
             hint={hintMeal === m.id ? { onSave: () => openSave(m.id), onClose: markSaveHintDone } : null}
+            slotNote={empty && i === 0 ? EMPTY_DAY_NOTE : null}
           />
         </View>
       ))}

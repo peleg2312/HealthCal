@@ -31,11 +31,16 @@ module.exports = [
   // Train: the overview's sheet (with how the guideline counts minutes), behind the week card's last line, which is one button.
   { id: 'train-guideline-sheet', route: '/train', taps: ['train-load-info'], sheet: true, note: 'how minutes count toward the guideline' },
   { id: 'train-guideline-sheet-stress', route: '/train', data: 'stress', taps: ['train-load-info'], sheet: true, note: 'the same sheet over the long-content week' },
-  // Today with "Your week is ready" hidden, so the coach line shows under the calorie card (the demo week is otherwise Monday to Wednesday).
-  { id: 'today-coach', route: '/', taps: ['today-recap-dismiss', { wait: 400 }], note: 'the coach line, its one action and "Ask the coach" beside it' },
+  // Today with "Your week is ready" hidden, so the coach line shows under the water card (the demo week is otherwise Monday to
+  // Wednesday). A reload then clears the "Check-in hidden" toast, so the capture is the line itself.
+  { id: 'today-coach', route: '/', taps: ['today-recap-dismiss', { wait: 400 }, { reload: true }], waitFor: 'today-coach', note: 'the coach line, its one action and "Ask the coach" beside it' },
   // The one-time word on where the coach went (src/features/coach/movedToast.ts), which an automated browser sees only when it asks.
   { id: 'today-coach-moved', route: '/', flags: { __healthcalCoachMoved: true }, waitFor: 'toast', note: 'the one-time toast: "The coach is now at the top of every tab."' },
-  { id: 'today-coach-stress', route: '/', data: 'stress', taps: ['today-recap-dismiss', { wait: 400 }], note: 'the coach line with long content' },
+  { id: 'today-coach-stress', route: '/', data: 'stress', taps: ['today-recap-dismiss', { wait: 400 }, { reload: true }], waitFor: 'today-coach', note: 'the coach line with long content' },
+  // The diary on a day with nothing logged after a day with food: no panel, the summary card's "Copy today" row,
+  // each meal's dashed slot as its one add (the first says what the search offers) and Repeat beside last time's foods.
+  { id: 'diary-empty-day-history', route: '/diary?date={day}', day: 1, waitFor: 'diary-copy-yesterday', note: 'tomorrow, empty: "Copy today", the slots and the Repeat buttons' },
+  { id: 'diary-empty-day-history-stress', route: '/diary?date={day}', day: 1, data: 'stress', waitFor: 'diary-copy-yesterday', note: 'the same with long food names in the Repeat lines' },
   ...pick('start'),
   ...pick('food'),
   ...pick('move'),

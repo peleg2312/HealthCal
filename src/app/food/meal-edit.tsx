@@ -5,6 +5,7 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { storeSavedMeal } from '@/features/food/actions';
 import { itemsRange, mealServings } from '@/features/food/build';
+import { displayFoodName } from '@/features/food/displayName';
 import { href, kcal, param } from '@/features/food/helpers';
 import { RowEmoji } from '@/features/food/components';
 import { closeMealDraft, openMealDraft, removeDraftItem, setDraftName, setDraftServings, updateDraftItem, useMealDraft } from '@/features/food/mealDraft';
@@ -64,7 +65,7 @@ function MealEdit() {
     const row = rows.find((r) => r.key === key);
     const undo = removeDraftItem(key);
     haptic.tap();
-    if (row) toast(`Removed ${isolateRtl(row.item.name)}`, { label: 'Undo', onPress: undo });
+    if (row) toast(`Removed ${isolateRtl(displayFoodName(row.item))}`, { label: 'Undo', onPress: undo });
   };
 
   return (
@@ -167,19 +168,19 @@ function MealEdit() {
                   testID={`meal-edit-item-${i}`}
                   scaleTo={0.985}
                   onPress={() => setEditing(r.key)}
-                  accessibilityLabel={`${r.item.name}, ${withoutMarks(itemLine(r.item))}. Change amount`}
+                  accessibilityLabel={`${displayFoodName(r.item)}, ${withoutMarks(itemLine(r.item))}. Change amount`}
                   style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>
                   <RowEmoji emoji={r.item.emoji} />
                   <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                     <Text variant="bodyStrong" numberOfLines={3} style={{ fontFamily: fonts.semibold }}>
-                      {isolateRtl(r.item.name)}
+                      {isolateRtl(displayFoodName(r.item))}
                     </Text>
                     <Text variant="caption" color="textSecondary" numberOfLines={2} tabular>
                       {itemLine(r.item)}
                     </Text>
                   </View>
                 </PressableScale>
-                <IconButton testID={`meal-edit-item-${i}-remove`} accessibilityLabel={`Remove ${r.item.name}`} tone="clear" size={44} onPress={() => remove(r.key)}>
+                <IconButton testID={`meal-edit-item-${i}-remove`} accessibilityLabel={`Remove ${displayFoodName(r.item)}`} tone="clear" size={44} onPress={() => remove(r.key)}>
                   <X size={16} color={colors.textSecondary} strokeWidth={1.9} />
                 </IconButton>
               </View>

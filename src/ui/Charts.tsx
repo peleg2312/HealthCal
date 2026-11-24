@@ -110,7 +110,10 @@ function hatchLines(x: number, top: number, w: number, h: number, color: string,
  * `chartFill`: 42% on the light papers, 70% in dark so a bar keeps its colour
  * instead of turning brown) with a solid 2.5 px rim (the day's level) on top,
  * so a row of bars reads as a skyline of level lines. The part above the
- * dashed `goal` line is amber; with `goalKind="reach"` nothing turns amber and
+ * dashed `goal` line is amber, and that bar's level line (on its top) is
+ * heavier and wider than the bar, so a day over its line is told without its
+ * colour (also a stacked bar whose top segment is the amber, as Progress
+ * draws its calorie bars); with `goalKind="reach"` nothing turns amber and
  * a bar at or past the goal wears the brim line instead (its rim 1 to 2 px
  * wider each side and 1 px heavier), so the days that met the goal can be
  * counted at a glance. The `openIndex` bar (today, not finished) is
@@ -200,9 +203,15 @@ export function BarChart({
     // Bars dim only while scrubbing, to point at the one under the finger.
     const on = active === null || active === i;
     const over = goalKind === 'limit' && !!g && v > g;
+    // A bar above its own line: the kit's amber part (`over`), or stacked segments whose top one is drawn
+    // in the amber (Progress's calorie bars, `solidBar`): amber means over and nothing else.
+    const top = d.segments?.[d.segments.length - 1];
+    const overTop = over || (goalKind === 'limit' && (d.segments?.length ?? 0) > 1 && !!top && top.value > 0 && top.color === colors.warning);
     // A day that met a goal meant to be reached wears the brim line: its rim a little wider than the bar and 1 px heavier.
     const reached = goalKind === 'reach' && !!g && v >= g;
-    const brim = reached ? (barW >= 10 ? 2 : 1) : 0;
+    // Over, the level line on top of the bar is heavier and wider than the bar too, so a day above its line
+    // is told without its colour (the amber is close to some fills, and to no one at all without colour).
+    const brim = reached || overTop ? (barW >= 10 ? 2 : 1) : 0;
     const fillTo = over ? y(g) : base - h;
     const r = Math.min(3, barW / 3);
     const c = d.color ?? color;
@@ -237,7 +246,7 @@ export function BarChart({
               ? <Path d={cupPath(x, fillTo, barW, base, r)} fill={c} opacity={chartFill} />
               : null}
         {h > 0 && over ? <Rect x={x} y={base - h} width={barW} height={Math.max(0, fillTo - (base - h))} fill={colors.warning} /> : null}
-        {h > 0 ? <Rect x={x - brim} y={(over ? fillTo : base - h) - (reached ? 1.75 : 1.25)} width={barW + 2 * brim} height={reached ? 3.5 : 2.5} fill={colors.rim} /> : null}
+        {h > 0 ? <Rect x={x - brim} y={base - h - (brim ? 1.75 : 1.25)} width={barW + 2 * brim} height={brim ? 3.5 : 2.5} fill={colors.rim} /> : null}
         {marks?.[i] ? (
           <Path
             d={`M ${x + barW / 2 - 4} ${base - h - 9} l 3 3 l 5 -6`}

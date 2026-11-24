@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Dumbbell, Plus, Timer } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, Dumbbell, FileUp, Plus, Timer } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
@@ -23,7 +23,7 @@ import { useStore } from '@/store';
 import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ActivityEntry } from '@/types';
-import { Button, Card, Chip, ConfirmSheet, EmptyState, PressableScale, Screen, SectionTitle, Text } from '@/ui';
+import { Button, Card, Chip, ConfirmSheet, EmptyState, Screen, SectionTitle, Text } from '@/ui';
 
 const DAYS_PER_PAGE = 14;
 
@@ -114,17 +114,18 @@ export default function TrainScreen() {
           A strength workout is in progress with {draft!.exercises.length} {draft!.exercises.length === 1 ? 'exercise' : 'exercises'}.
         </Text>
       ) : null}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.lg, marginTop: -spacing.sm }}>
-        <PressableScale
+      {/* The other ways in, as the kit's small ghost buttons in one row (wrapping on a narrow phone). */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.sm, rowGap: spacing.xs, marginTop: -spacing.xs }}>
+        <Button
           testID="train-import-garmin"
+          title="Import workouts"
           accessibilityLabel="Import workouts from a Garmin file or a Health export"
+          variant="ghost"
+          size="sm"
+          full={false}
+          icon={<FileUp size={16} color={colors.primaryInk} strokeWidth={2.2} />}
           onPress={() => router.push('/activity/import')}
-          hitSlop={6}
-          style={{ minHeight: 44, justifyContent: 'center' }}>
-          <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
-            Import workouts
-          </Text>
-        </PressableScale>
+        />
         <TrainSyncLink />
       </View>
 
@@ -135,7 +136,22 @@ export default function TrainScreen() {
         </>
       ) : null}
 
-      <SectionTitle title="Quick start" action="All activities" onAction={() => router.push('/activity/pick')} />
+      {/* The section title with its way to every activity, a small ghost button (the testID SectionTitle gave it). */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+        <Text variant="h3" style={{ flexShrink: 1 }}>
+          Quick start
+        </Text>
+        <Button
+          testID="section-quick-start-action"
+          title="All activities"
+          variant="ghost"
+          size="sm"
+          full={false}
+          iconRight={<ChevronRight size={16} color={colors.primaryInk} strokeWidth={2.2} />}
+          onPress={() => router.push('/activity/pick')}
+          style={{ marginVertical: -6, paddingRight: 6 }}
+        />
+      </View>
       <QuickStartTiles items={quick} onPick={(id) => router.push(`/activity/log?activityId=${id}`)} />
 
       <SectionTitle title="History" />
@@ -178,11 +194,16 @@ export default function TrainScreen() {
             );
           })}
           {history.length > visibleGroups.length ? (
-            <PressableScale onPress={() => setPages((p) => p + 1)} accessibilityLabel="Show earlier sessions" testID="train-show-more" style={{ alignItems: 'center', paddingVertical: spacing.md }}>
-              <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
-                Show earlier sessions
-              </Text>
-            </PressableScale>
+            <Button
+              testID="train-show-more"
+              title="Show earlier sessions"
+              variant="ghost"
+              size="sm"
+              full={false}
+              icon={<ChevronDown size={16} color={colors.primaryInk} strokeWidth={2.2} />}
+              onPress={() => setPages((p) => p + 1)}
+              style={{ alignSelf: 'center' }}
+            />
           ) : null}
         </View>
       )}

@@ -591,6 +591,8 @@ function hydrationInsight({ summary: s, days, today, units }: InsightContext): I
   const w = s.water;
   if (!w || w.daysTracked < 3) return null;
   const rate = w.daysAtGoal / w.daysTracked;
+  // The title says the count in neutral words (what was reached, never what was missed); the body adds the amounts.
+  const reached = `Water goal reached on ${w.daysAtGoal} of ${w.daysTracked} ${w.daysTracked === 1 ? 'day' : 'days'}`;
   const head = `You reached your water goal on ${w.daysAtGoal} of ${w.daysTracked} days`;
   if (rate < 0.5) {
     const gap = Math.max(0, w.avgGoalMl - w.avgMl);
@@ -604,8 +606,8 @@ function hydrationInsight({ summary: s, days, today, units }: InsightContext): I
     return {
       id: 'water-low',
       tone: 'attention',
-      title: 'Water goal missed on most days',
-      body: `${head}, averaging ${formatVolume(w.avgMl, units)} against ${formatVolume(w.avgGoalMl, units)}${patternText}. ${glasses === 1 ? `One more ${glassText(units)} glass` : `${glasses} more ${glassText(units)} glasses`}${when} would close the gap.`,
+      title: reached,
+      body: `You averaged ${formatVolume(w.avgMl, units)} a day against ${formatVolume(w.avgGoalMl, units)}${patternText}. ${glasses === 1 ? `One more ${glassText(units)} glass` : `${glasses} more ${glassText(units)} glasses`}${when} would close the gap.`,
       action: { label: 'Log water', route: '/water' },
       score: 42 + (1 - rate) * 20,
     };
@@ -622,8 +624,8 @@ function hydrationInsight({ summary: s, days, today, units }: InsightContext): I
   return {
     id: 'water-mixed',
     tone: 'neutral',
-    title: 'Water goal on some days',
-    body: `${head}, averaging ${formatVolume(w.avgMl, units)} against ${formatVolume(w.avgGoalMl, units)}. A glass with each meal would make it most days.`,
+    title: reached,
+    body: `You averaged ${formatVolume(w.avgMl, units)} a day against ${formatVolume(w.avgGoalMl, units)}. A glass with each meal would make it most days.`,
     action: { label: 'Log water', route: '/water' },
     score: 24,
   };
@@ -718,7 +720,7 @@ function paceInsight(ctx: InsightContext): Insight | null {
   const r = (kg: number) => rateText(kg, units);
   const movement = rate < -0.02 ? `falling ${r(rate)} a week` : rate > 0.02 ? `rising ${r(rate)} a week` : 'holding flat';
   const adjust = (kgPerWeek: number) => `${kcalText(round10((Math.abs(kgPerWeek) * KCAL_PER_KG) / 7))}`;
-  const adaptiveNote = energy.usingAdaptive ? ' Your budget already updates from these numbers as the estimate learns.' : '';
+  const adaptiveNote = energy.usingAdaptive ? ' Your target already updates from these numbers as the estimate learns.' : '';
 
   if (goal === 'maintain') {
     if (Math.abs(rate) <= 0.15) {
@@ -859,8 +861,8 @@ function adaptiveInsight({ energy }: InsightContext): Insight | null {
     return {
       id: 'adaptive-pending',
       tone: 'neutral',
-      title: 'Personal expenditure estimate in progress',
-      body: `Your own expenditure estimate needs ${a.needs ?? 'a little more data'}. Until then targets use the formula estimate of ${kcalText(formula)} a day.`,
+      title: 'Learning what you burn',
+      body: `Working out what you burn from your own logs needs ${a.needs ?? 'a little more data'}. Until then targets use the estimate from your body, ${kcalText(formula)} a day.`,
       action: needsWeight ? { label: 'Log weight', route: '/weight' } : { label: 'Open diary', route: '/diary' },
       score: 26,
     };
@@ -872,8 +874,8 @@ function adaptiveInsight({ energy }: InsightContext): Insight | null {
     return {
       id: 'adaptive-available',
       tone: 'neutral',
-      title: 'Your measured expenditure is ready',
-      body: `Your intake and weigh-ins put your expenditure, before logged exercise, at ${kcalText(a.observed)} a day, ${rel} the formula's ${kcalText(formula)}. Turn on the adaptive estimate in goals to base your targets on it.`,
+      title: 'What you burn, from your logs',
+      body: `Your food and weigh-ins show you burn about ${kcalText(a.observed)} a day before logged workouts, ${rel} the ${kcalText(formula)} estimated from your body. Turn on "Learn from my data" in Goals to base your targets on it.`,
       action: { label: 'Review goals', route: '/settings/goals' },
       score: 45,
     };
@@ -881,8 +883,8 @@ function adaptiveInsight({ energy }: InsightContext): Insight | null {
   return {
     id: 'adaptive-active',
     tone: 'positive',
-    title: 'Your expenditure, measured',
-    body: `Your intake and weigh-ins put your expenditure, before logged exercise, at ${kcalText(a.observed)} a day, ${rel} the formula's ${kcalText(formula)}. At ${confidenceWord(a.confidence)} confidence (${pct}%) it now sets your targets, from a blended ${kcalText(energy.tdee)} maintenance.`,
+    title: 'What you burn, from your logs',
+    body: `Your food and weigh-ins show you burn about ${kcalText(a.observed)} a day before logged workouts, ${rel} the ${kcalText(formula)} estimated from your body. At ${confidenceWord(a.confidence)} confidence (${pct}%) your targets now use a blend of the two, ${kcalText(energy.tdee)} a day.`,
     score: Math.abs(diff) >= 150 ? 42 : 27,
   };
 }
@@ -1221,15 +1223,15 @@ export function planChangeText(
   after: { target: number; tdee: number; usingAdaptive: boolean },
 ): string {
   const diff = Math.round(after.target - before.target);
-  if (Math.abs(diff) < 20) return 'Same budget as last week.';
+  if (Math.abs(diff) < 20) return 'Same target as last week.';
   const dir = diff > 0 ? 'up' : 'down';
   if (after.usingAdaptive && !before.usingAdaptive) {
-    return `Your budget now follows your measured expenditure, ${kcalText(after.tdee)} a day outside logged workouts, so it moved ${dir} ${kcalText(Math.abs(diff))}.`;
+    return `Your target now follows what your logs show you burn, ${kcalText(after.tdee)} a day outside logged workouts, so it moved ${dir} ${kcalText(Math.abs(diff))}.`;
   }
   if (after.usingAdaptive && Math.abs(after.tdee - before.tdee) >= 20) {
-    return `Your measured expenditure, outside logged workouts, is now ${kcalText(after.tdee)} a day against ${kcalText(before.tdee)}, so the budget moved ${dir} ${kcalText(Math.abs(diff))}.`;
+    return `Your logs now show you burn ${kcalText(after.tdee)} a day outside logged workouts, against ${kcalText(before.tdee)}, so the target moved ${dir} ${kcalText(Math.abs(diff))}.`;
   }
-  return `Your budget moved ${dir} ${kcalText(Math.abs(diff))} after a change to your goal, weight or activity settings.`;
+  return `Your target moved ${dir} ${kcalText(Math.abs(diff))} after a change to your goal, weight or activity settings.`;
 }
 
 // ------------------------------------------------------- period comparison

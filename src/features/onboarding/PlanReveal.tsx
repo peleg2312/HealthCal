@@ -58,7 +58,8 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
   const title = projection
     ? `${nameInTitle ? `${name}, you` : 'You'} could reach ${formatWeight(projection.targetKg, units).replace(/ /g, '\u00A0')}`
     : `${nameInTitle ? `${name}, here's` : "Here's"} your day`;
-  const pace = formatWeight(Math.abs(t.impliedWeeklyKg), units, 2);
+  // The chosen pace as chosen (its steps are 0.05 kg); a pace the calorie minimum sets is a rate, said with one decimal.
+  const pace = formatWeight(Math.abs(t.impliedWeeklyKg), units, t.limitedByFloor ? 1 : 2);
   // Beside the foot of the cup: what the cup cannot show. The pace is on the road card when there is a road, and a matched budget has none.
   const budgetNote = projection || Math.abs(t.dailyDelta) < 5 ? '' : `About ${pace} a week. `;
   // The rest arrives as the pour lands, one piece after another.
@@ -89,7 +90,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
         </View>
         {projection ? (
           <Text variant="body" color="textSecondary">
-            {t.limitedByFloor ? 'An estimate at this budget.' : 'An estimate at the pace you chose.'}
+            {t.limitedByFloor ? 'An estimate at this target.' : 'An estimate at the pace you chose.'}
           </Text>
         ) : null}
       </FadeUp>
@@ -97,7 +98,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
       <FadeUp delay={60}>
         <Card padding={spacing.xl} style={{ gap: spacing.lg }} testID="plan-calories">
           <Text variant="overline" color="textSecondary">
-            Your daily budget
+            Your daily target
           </Text>
           <BudgetVessel target={t.target} tdee={plan.tdee} goal={p.goal} note={`${budgetNote}Each workout you log adds its calories on top, shared over 7 days, as hatched headroom.`} />
         </Card>
@@ -114,7 +115,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
               <Text variant="h3">{`The road to ${formatWeight(projection.targetKg, units)}`}</Text>
               <Text variant="caption" color="textSecondary" testID="plan-date">
                 {/* The dates are the title's; this line says what the line and the band are. */}
-                {`About ${pace} a week, ${t.limitedByFloor ? 'the pace this budget gives' : 'the pace you chose'}. The band is a little faster or slower.`}
+                {`About ${pace} a week, ${t.limitedByFloor ? 'the pace this target gives' : 'the pace you chose'}. The band is a little faster or slower.`}
               </Text>
             </View>
             {/* The road draws once its card has arrived. */}
@@ -315,7 +316,7 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
         // 10 px between labels keeps 8 px between their letters at every plan (keeping weight puts
         // "Matches your burn" right under the number; gaining puts the surplus over the burn).
         labelSpacing={10}
-        accessibilityLabel={`Daily budget ${formatNumber(target)} kcal${showBurn ? `, against about ${formatNumber(burn)} kcal you burn` : ', matched to what you burn'}`}
+        accessibilityLabel={`Daily target ${formatNumber(target)} kcal${showBurn ? `, against about ${formatNumber(burn)} kcal you burn` : ', matched to what you burn'}`}
         labels={[
           ...(showBurn ? [{ key: 'burn', at: burn, height: 40, tick: burnInside ? undefined : colors.vesselEdge, content: burnLabel }] : []),
           ...(showBurn && goal !== 'maintain'

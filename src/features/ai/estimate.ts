@@ -5,6 +5,8 @@
  */
 import type { AiFoodItem, AiFoodResult, Food, SavedMealItem } from '@/types';
 
+import { displayFoodName } from '@/features/food/displayName';
+
 import { itemFromFood } from './localMatch';
 
 export type AiTotals = Pick<AiFoodItem, 'kcal' | 'protein' | 'carbs' | 'fat' | 'fiber'>;
@@ -154,6 +156,20 @@ export interface ReviewRow {
   food?: Food;
   /** The model's own estimate, kept so a swap can be undone. */
   estimate?: AiFoodItem;
+}
+
+/**
+ * The name a review row draws: a row matched or swapped to a food, and not renamed since, shows that food's
+ * name as drawn (`displayFoodName`: "White rice, long-grain, cooked"); any other row its own name. Display
+ * only: a matched row is logged with its food's stored name (`rowsToLogItems`).
+ */
+export function shownRowName(row: Pick<ReviewRow, 'item' | 'food'>): string {
+  return row.food && row.item.name === row.food.name ? displayFoodName(row.food) : row.item.name;
+}
+
+/** An estimate's grams are drawn whole: the AI's tenths are not that precise (principle 2). */
+export function estimateGrams(g: number): string {
+  return String(Math.round(g));
 }
 
 let seq = 0;

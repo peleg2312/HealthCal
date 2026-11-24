@@ -51,7 +51,7 @@
  *   entry that its own act did not remove.
  */
 import { BUILTIN_FOODS } from '@/data/foods';
-import { mealOnDay } from '@/features/food/addedTo';
+import { mealOnDay, waterAddedToast } from '@/features/food/addedTo';
 import { buildEntry } from '@/features/food/build';
 import { QUICK_KCAL_LIMIT, sourceInfo } from '@/features/food/helpers';
 import { isolateRtl } from '@/lib/bidi';
@@ -405,8 +405,8 @@ export interface DrinkPlan {
 /**
  * The whole log of one drink as data: the screen shows `line`, `tile` and `label` before the tap
  * and `logDrink` writes `water` and `entry` and shows `toast` after it. Plain water (and a
- * no-calorie choice) gives the record and words the water screen always wrote; a no-calorie choice
- * only adds `drink` to the record.
+ * no-calorie choice) gives the record the water screen always wrote, and the toast of a glass on
+ * Today ("250 ml added to Water"); a no-calorie choice only adds `drink` to the record.
  */
 export function planDrink(input: PlanDrinkInput): DrinkPlan {
   const { kind, drink, date, now, today, units } = input;
@@ -420,12 +420,14 @@ export function planDrink(input: PlanDrinkInput): DrinkPlan {
 
   const choices = kind === 'water' ? null : drink;
   const water: DrinkWater = { date, ml, beverage: kind, loggedAt, ...(choices ? { drink: choices.id } : null) };
+  // The toasts are worded as a glass on Today is (`waterAddedToast`): "250 ml added to Water", "250 ml of tea
+  // added to Water for yesterday"; with calories the drink is named first, as a food's toast is.
   const plain = (line: string): DrinkPlan => ({
     water,
     entry: null,
     kcal: 0,
     meal,
-    toast: kind === 'water' ? `Added ${vol}` : `Added ${vol} of ${kindLower}`,
+    toast: waterAddedToast(kind === 'water' ? vol : `${vol} of ${kindLower}`, date, today),
     line,
     tile: null,
     label: `Add ${vol} of ${kindLower}`,
@@ -467,7 +469,8 @@ export function planDrink(input: PlanDrinkInput): DrinkPlan {
       entry: null,
       kcal: 0,
       meal,
-      toast: `Added ${vol} of ${noun(kind, choices.id)}, for water only`,
+      // "250 ml of juice added to Water only": the same drink is already in the diary with its calories.
+      toast: waterAddedToast(`${vol} of ${noun(kind, choices.id)}`, date, today).replace(' added to Water', ' added to Water only'),
       line: `${shown}: for water only, no calories added`,
       tile: 'No calories',
       label: `Add ${vol} of ${name}, for water only`,
@@ -481,7 +484,8 @@ export function planDrink(input: PlanDrinkInput): DrinkPlan {
     entry,
     kcal,
     meal,
-    toast: `Added ${vol} of ${noun(kind, choices.id)}, ${k} to ${where}`,
+    // "Milk, 129 kcal, added to lunch and 250 ml to Water"; on a day with a date, "..., added to breakfast, Wed Nov 11, and ...".
+    toast: `${cap(noun(kind, choices.id))}, ${k}, added to ${where}${where.includes(',') ? ', and' : ' and'} ${vol} to Water`,
     line: custom ? `${vol} ${isolateRtl(name)}: ${k}, to ${where}` : `${shown}: ${k} per ${vol}, to ${where}`,
     tile: k,
     label: `Add ${vol} of ${name}, ${k} to ${where}`,

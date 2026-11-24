@@ -55,15 +55,15 @@ export function EnergyCard({ model, useAdaptiveSetting }: { model: EnergyModel; 
   const pct = Math.round(a.confidence * 100);
   const word = confidenceWord(a.confidence);
   const delta = Math.round(model.target.dailyDelta);
-  // Expenditure has one key everywhere: the calorie colour, outlined because it is an estimate (as on the
+  // What you burn has one key everywhere: the calorie colour, outlined because it is an estimate (as on the
   // overview tile). The exercise colour would say this card is about workouts; it is mostly resting burn.
   const accent = colors.calories;
 
   return (
     <SectionCard
       testID="progress-energy"
-      title="Energy expenditure"
-      subtitle="Calories you burn in a typical day"
+      title="Calories you burn"
+      subtitle="In a typical day, before workouts"
       color={accent}
       keyVariant="outline"
       link="/settings/goals"
@@ -71,16 +71,16 @@ export function EnergyCard({ model, useAdaptiveSetting }: { model: EnergyModel; 
       <View style={{ flexDirection: 'row' }}>
         <Column
           first
-          title="Formula estimate"
+          title="From your body"
           value={formatNumber(Math.round(model.formulaTdee))}
-          caption={`${model.bmrMethod === 'katch-mcardle' ? 'Lean-mass' : 'Mifflin-St Jeor'} BMR × activity`}
+          caption="Height, weight, age and everyday activity"
           active={!model.usingAdaptive}
           color={accent}
         />
         <Column
-          title="From your data"
+          title="From your logs"
           value={ready ? formatNumber(a.observed!) : null}
-          caption={ready ? `Last ${a.windowDays} days of intake and weight` : 'Needs a few weeks of logs'}
+          caption={ready ? `Your food and weigh-ins, last ${a.windowDays} days` : 'Needs a few weeks of logs'}
           active={model.usingAdaptive}
           color={accent}
         />
@@ -98,16 +98,16 @@ export function EnergyCard({ model, useAdaptiveSetting }: { model: EnergyModel; 
           <Text variant="caption" color="textSecondary">
             Based on {a.loggedDays} fully logged days and {a.weighIns} weigh-ins in the last {a.windowDays} days.{' '}
             {model.usingAdaptive
-              ? `Your targets use ${kcalText(model.tdee)}, a blend that gives your data ${pct}% of the weight and the formula the rest. ${a.confidence >= 0.85 ? 'That is the most weight it ever gets, so a few missed logs cannot swing your targets.' : 'More complete days and weigh-ins raise the confidence.'}`
+              ? `Your targets use ${kcalText(model.tdee)}, a blend that gives your logs ${pct}% of the weight and the body estimate the rest. ${a.confidence >= 0.85 ? 'That is the most weight it ever gets, so a few unlogged days cannot swing your targets.' : 'More complete days and weigh-ins raise the confidence.'}`
               : useAdaptiveSetting
                 ? ''
-                : 'The adaptive estimate is turned off in your goals, so targets use the formula.'}
+                : '"Learn from my data" is off in Goals, so your targets use the body estimate.'}
           </Text>
         </View>
       ) : (
         <View style={{ gap: spacing.sm }} testID="progress-energy-needs">
           <Text variant="body" color="textSecondary" style={{ fontSize: 14, lineHeight: 20 }}>
-            Still needed: <Text variant="bodyStrong" style={{ fontSize: 14 }}>{a.needs}</Text>. Until then your targets use the formula estimate.
+            Still needed: <Text variant="bodyStrong" style={{ fontSize: 14 }}>{a.needs}</Text>. Until then your targets use the estimate from your body.
           </Text>
           <NeedRow label="Fully logged days" have={a.loggedDays} need={NEED_DAYS} color={colors.calories} />
           <NeedRow label="Weigh-ins" have={a.weighIns} need={NEED_WEIGH_INS} color={colors.weight} />
@@ -115,7 +115,7 @@ export function EnergyCard({ model, useAdaptiveSetting }: { model: EnergyModel; 
       )}
 
       <Text variant="caption" color="textSecondary">
-        Daily budget {kcalText(model.target.target)}: maintenance {kcalText(model.tdee)}{' '}
+        Daily target {kcalText(model.target.target)}: the {kcalText(model.tdee)} you burn{' '}
         {delta < -5 ? `minus ${formatNumber(-delta)} kcal for your goal` : delta > 5 ? `plus ${formatNumber(delta)} kcal for your goal` : 'with no deficit'}
         {model.target.limitedByFloor ? ', held at the minimum safe intake' : ''}.
       </Text>
@@ -125,27 +125,28 @@ export function EnergyCard({ model, useAdaptiveSetting }: { model: EnergyModel; 
       <PressableScale
         testID="progress-energy-how"
         onPress={() => setOpen((o) => !o)}
-        accessibilityLabel="How this works"
+        accessibilityLabel="Where this number comes from"
         accessibilityState={{ expanded: open }}
         style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, borderTopWidth: 1, borderTopColor: colors.border, marginBottom: -spacing.sm }}>
-        <Text variant="label">How this works</Text>
+        <Text variant="label">Where this number comes from</Text>
         {open ? <ChevronUp size={18} color={colors.textSecondary} /> : <ChevronDown size={18} color={colors.textSecondary} />}
       </PressableScale>
       {open ? (
         <View style={{ gap: spacing.sm }} testID="progress-energy-explainer">
           <Text variant="caption" color="textSecondary">
-            The formula estimate starts from your resting burn (from height, weight, age and sex, or lean mass when you know your body fat) and scales it for
-            how active your days are. It is a population average and can be off by 10% or more for any one person.
+            The estimate from your body starts from your resting burn (the Mifflin-St Jeor equation from height, weight, age and sex, or Katch-McArdle from
+            lean mass when you know your body fat) and scales it for how active your days are outside workouts. It is a population average and can be off by
+            10% or more for any one person.
           </Text>
           <Text variant="caption" color="textSecondary">
-            Your data estimate works backwards from what actually happened: if you ate an average of 2,200 kcal a day and your weight held steady, you
+            The estimate from your logs works backwards from what actually happened: if you ate an average of 2,200 kcal a day and your weight held steady, you
             burn about 2,200. Weight change is read from a straight line fitted through your weigh-ins of the last {a.windowDays} days, so one high or low
             reading barely moves it, and each kilo of change is counted as about 7,700 kcal. Calories from logged exercise are taken out of the estimate,
             because your budget adds those separately.
           </Text>
           <Text variant="caption" color="textSecondary">
             It needs at least {NEED_DAYS} fully logged days and {NEED_WEIGH_INS} weigh-ins spread over two weeks. Confidence rises with more of both, and the
-            estimate is blended with the formula until it is well supported. As everywhere in the app, a day counts as fully logged at 800 kcal or more and at least half its reference; here the reference is the formula estimate, since this is what sets the budget. Other days are left out.
+            estimate is blended with the body estimate until it is well supported. As everywhere in the app, a day counts as fully logged at 800 kcal or more and at least half its reference; here the reference is the body estimate, since this is what sets the target. Other days are left out.
           </Text>
           <WatchEstimateNote model={model} />
         </View>

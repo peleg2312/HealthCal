@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { Moon, Plus } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Moon, Plus } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
@@ -200,12 +200,7 @@ function SleepScreen() {
             </Explain>
           </Card>
 
-          <SectionTitle
-            title="History"
-            testID="sleep-history"
-            action={allNights.length > 14 ? (showAll ? 'Show less' : `Show all ${allNights.length}`) : undefined}
-            onAction={() => setShowAll((v) => !v)}
-          />
+          <SectionTitle title="History" testID="sleep-history" />
           <Card padding={spacing.md}>
             {history.map((e, i) => (
               <React.Fragment key={e.id}>
@@ -220,6 +215,20 @@ function SleepScreen() {
               </React.Fragment>
             ))}
           </Card>
+          {/* More than 14 nights: the rest open under the list, where it ends (the testID is the one SectionTitle gave it). */}
+          {allNights.length > 14 ? (
+            <Button
+              testID="section-sleep-history-action"
+              title={showAll ? 'Show less' : `Show all ${allNights.length}`}
+              accessibilityLabel={showAll ? 'Show fewer nights' : `Show all ${allNights.length} nights`}
+              variant="ghost"
+              size="sm"
+              full={false}
+              icon={showAll ? <ChevronUp size={16} color={colors.primaryInk} strokeWidth={2.2} /> : <ChevronDown size={16} color={colors.primaryInk} strokeWidth={2.2} />}
+              onPress={() => setShowAll((v) => !v)}
+              style={{ alignSelf: 'center', marginTop: -spacing.xs }}
+            />
+          ) : null}
         </>
       )}
 

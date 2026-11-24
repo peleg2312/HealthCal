@@ -96,7 +96,7 @@ function ProfileHub() {
       ? 'Off'
       : 'Arrive in the phone app';
 
-  // The budget is in the card above; the row says what else is inside.
+  // The daily target is in the card above; the row says what else is inside.
   const paceText =
     profile.goal === 'maintain' ? 'Pace, macros and water' : `${profile.goal === 'lose' ? 'Lose' : 'Gain'} ${formatWeight(profile.weeklyRateKg, u, 2)} a week, macros, water`;
 
@@ -117,9 +117,10 @@ function ProfileHub() {
         </View>
         <View style={{ flexDirection: 'row', marginTop: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border }}>
           <HeaderStat label="Weight" value={formatWeight(currentKg, u)} color={colors.weight} />
-          {/* Keeping weight has no target; the line under the name already says so. */}
-          {profile.goal === 'maintain' || !profile.targetWeightKg ? null : <HeaderStat divider label="Target" value={goalLine.replace('Goal ', '')} />}
-          <HeaderStat divider label={narrow ? 'Budget' : 'Daily budget'} value={`${formatNumber(model.target.target)} kcal`} color={colors.calories} />
+          {/* Keeping weight has no goal weight; the line under the name already says so. */}
+          {profile.goal === 'maintain' || !profile.targetWeightKg ? null : <HeaderStat divider label="Goal" value={goalLine.replace('Goal ', '')} />}
+          {/* The daily number before workouts is the target everywhere; "budget" is the target plus workouts (Today). */}
+          <HeaderStat divider label={narrow ? 'Target' : 'Daily target'} value={`${formatNumber(model.target.target)} kcal`} color={colors.calories} />
         </View>
       </Card>
 

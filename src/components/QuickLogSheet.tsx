@@ -7,6 +7,7 @@ import { AiGlyph, type AiGlyphName } from '@/features/ai/mark';
 import { AI_TILE_HINT } from '@/features/ai/words';
 import { hasFoodLogged } from '@/features/drinks/via';
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
+import { displayFoodName } from '@/features/food/displayName';
 import { favoriteMeals, quickLogMeal } from '@/features/food/favorites';
 import { approxKcalSpoken, favoriteFoodTile, isEstimateFood, quickRowTitle, savedTileCaption } from '@/features/food/favoriteWords';
 import { lastPortions, matchServing, portionFor, portionKcal, portionLabel, servingText } from '@/features/food/helpers';
@@ -169,7 +170,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
               const p = portionFor(f, lastMap);
               // An AI food, or one last logged as an estimate, never shows an exact number: "150 g, ~248 kcal".
               const { caption, label } = favoriteFoodTile({
-                name: f.name,
+                name: displayFoodName(f),
                 portion: portionLabel(p.serving.label, p.quantity),
                 kcal: portionKcal(f, p),
                 estimate: isEstimateFood(f, lastMap.get(f.id)),
@@ -181,18 +182,20 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                   testID={`quick-fav-food-${i}`}
                   feedback="none"
                   disabled={isDone}
+                  // Added, not unavailable: the success edge and the check say so, so the tile is not dimmed.
+                  dimDisabled={false}
                   onPress={() => {
                     logFavoriteFood(f, quickLogDate());
                     mark(key);
                   }}
-                  accessibilityLabel={isDone ? `${f.name} added` : label}
+                  accessibilityLabel={isDone ? `${displayFoodName(f)} added` : label}
                   style={[tile, { width: 136, padding: spacing.md, gap: 4, borderColor: isDone ? colors.success : colors.border }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Text style={{ fontSize: 17, lineHeight: 24 }}>{f.emoji || '🍽️'}</Text>
                     <AddMark done={isDone} />
                   </View>
                   <Text variant="label" numberOfLines={2}>
-                    {isolateRtl(f.name)}
+                    {isolateRtl(displayFoodName(f))}
                   </Text>
                   <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ marginTop: 'auto' }} testID={`quick-fav-food-${i}-caption`}>
                     {caption}
@@ -208,11 +211,12 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                   testID={`quick-usual-${u.key}`}
                   feedback="none"
                   disabled={isDone}
+                  dimDisabled={false}
                   onPress={() => {
                     logUsual(u, quickLogDate());
                     mark(u.key);
                   }}
-                  accessibilityLabel={isDone ? `${u.last.name} added` : `Add ${u.last.name}, ${usualLabel(u)}, to ${mealName}`}
+                  accessibilityLabel={isDone ? `${displayFoodName(u.last)} added` : `Add ${displayFoodName(u.last)}, ${usualLabel(u)}, to ${mealName}`}
                   style={[tile, { width: 136, padding: spacing.md, gap: 4, borderColor: isDone ? colors.success : colors.border }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Text style={{ fontSize: 17, lineHeight: 24 }}>{u.last.emoji || '🍽️'}</Text>
@@ -221,7 +225,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                   {/* Two lines, so a name like "Greek yogurt, plain, 2%" reads whole. The name never grows with the row
                       (a taller neighbour would show the line after its ellipsis); the caption sits at the foot instead. */}
                   <Text variant="label" numberOfLines={2}>
-                    {isolateRtl(u.last.name)}
+                    {isolateRtl(displayFoodName(u.last))}
                   </Text>
                   <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ marginTop: 'auto' }}>
                     {/* The serving label drawn isolated when it is written in Hebrew (display only). */}
@@ -341,12 +345,14 @@ function RepeatRow({ label, entries, done, onPress }: { label: string; entries: 
   const { colors, radius, spacing } = useTheme();
   // What the tap stores: a bundled food at today's values for its grams (currentKcal, the rule copyEntries logs by).
   const kcal = currentKcal(entries);
-  const names = entries.map((e) => isolateRtl(e.name)).join(', ');
+  const names = entries.map((e) => isolateRtl(displayFoodName(e))).join(', ');
   return (
     <PressableScale
       testID="quick-repeat"
       feedback="none"
       disabled={done}
+      // Added, not unavailable: the success edge and the check say so, so the row is not dimmed.
+      dimDisabled={false}
       onPress={onPress}
       accessibilityLabel={done ? `${label}, added` : `${label}, ${Math.round(kcal)} kilocalories`}
       style={{
@@ -387,6 +393,7 @@ function MealTile({ meal, testID, favourite, mealName, done, onPress }: { meal: 
       testID={testID}
       feedback="none"
       disabled={done}
+      dimDisabled={false}
       onPress={onPress}
       accessibilityLabel={
         done ? `${meal.name} added` : `Add ${favourite ? 'favourite' : 'saved'} meal ${meal.name}, ${approxKcalSpoken(plan.kcal, estimate)}, to ${mealName}`

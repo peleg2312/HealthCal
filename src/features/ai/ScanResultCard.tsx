@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Animated, Platform, useWindowDimensions, View } from 'react-native';
 
 import { SourceTag } from '@/features/food/components';
+import { displayFoodName } from '@/features/food/displayName';
 import { dayPhrase, formatQty, kcal, lastPortions, portionFor, servingText } from '@/features/food/helpers';
 import { isolateRtl } from '@/lib/bidi';
 import { MEAL_LABEL, scaleNutrients, servingsFor } from '@/lib/nutrition';
@@ -74,7 +75,7 @@ export function ScanResultCard({
       <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text variant="title" numberOfLines={2} testID="scan-result-name">
-            {isolateRtl(food.name)}
+            {isolateRtl(displayFoodName(food))}
           </Text>
           {food.brand ? (
             <Text variant="caption" color="textSecondary" numberOfLines={1}>

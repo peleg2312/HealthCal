@@ -14,8 +14,9 @@ import { live } from '@/store/selectors';
 import type { Food, FoodEntry, ISODate, MealType, Nutrients, SavedMeal, SavedMealItem, Serving, UnitSystem, WaterEntry } from '@/types';
 import { haptic, toast } from '@/ui';
 
-import { mealOnDay } from './addedTo';
+import { foodAddedToast, mealOnDay, quickAddedToast } from './addedTo';
 import { bandSpread, buildEntry, planSavedMeal } from './build';
+import { displayFoodName } from './displayName';
 import { addedAndSavedToast } from './saveWords';
 import { currentValues } from './usuals';
 
@@ -117,7 +118,8 @@ export function logFood(input: LogFoodInput): FoodEntry {
   const [{ entry, water }] = store.upsertEntriesWithWater([{ entry: built, water: diaryDrink(built, store.profile) }]);
   const recentsBefore = store.recentFoods;
   store.rememberFood(input.food);
-  announce(withWater(`Added to ${where(input.meal, input.date)}`, water?.ml, unitsNow()), [entry.id], () => {
+  // The toast names what was added, then where: "Banana added to breakfast" ("…, 500 ml to Water" for a drink).
+  announce(withWater(foodAddedToast(displayFoodName(entry), where(input.meal, input.date)), water?.ml, unitsNow()), [entry.id], () => {
     useStore.setState((s) => ({ recentFoods: [...recentsAfterUndo(s.recentFoods, recentsBefore, input.food.id)] }));
   });
   return entry;
@@ -160,7 +162,8 @@ export function logQuickAdd(input: { name: string; nutrients: Nutrients; meal: M
     nutrients: input.nutrients,
     loggedAt: nowISO(),
   });
-  announce(`Added to ${where(input.meal, input.date)}`, [entry.id]);
+  // Its name when one was typed, else its calories: "320 kcal added to lunch".
+  announce(quickAddedToast(input.name, input.nutrients.kcal, where(input.meal, input.date)), [entry.id]);
   return entry;
 }
 

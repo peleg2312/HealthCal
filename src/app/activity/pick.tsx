@@ -5,6 +5,7 @@ import { FlatList, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ACTIVITIES, ACTIVITY_BY_ID, ACTIVITY_CATEGORIES, POPULAR_ACTIVITY_IDS, searchActivities } from '@/data/activities';
+import { effortSpan } from '@/features/activity/effortWords';
 import { formatDayLabel, today } from '@/lib/dates';
 import { useStore } from '@/store';
 import { cup, useTheme } from '@/theme';
@@ -12,12 +13,6 @@ import type { ActivityCategory, ActivityDef } from '@/types';
 import { Chip, ChipRow, Divider, EmptyState, Header, ListRow, PressableScale, Screen, SectionTitle, Sheet, Text, TextField } from '@/ui';
 
 const CATEGORY_LABEL = Object.fromEntries(ACTIVITY_CATEGORIES.map((c) => [c.id, c.label])) as Record<ActivityCategory, string>;
-
-function metRange(a: ActivityDef): string {
-  const lo = a.met.light;
-  const hi = a.met.vigorous;
-  return lo === hi ? `${lo} MET` : `${lo}–${hi} MET`;
-}
 
 function ActivitySeparator() {
   return <Divider inset={36} />;
@@ -155,7 +150,7 @@ export default function PickActivityScreen() {
           <ListRow
             testID={`activity-${a.id}`}
             title={a.name}
-            subtitle={`${CATEGORY_LABEL[a.category]} · ${metRange(a)}${a.tracksDistance ? ' · distance' : ''}`}
+            subtitle={`${CATEGORY_LABEL[a.category]} · ${effortSpan(a.met.light, a.met.vigorous)}${a.tracksDistance ? ' · distance' : ''}`}
             left={<View style={{ width: 24, alignItems: 'center' }}><Text style={{ fontSize: 17, lineHeight: 24 }}>{a.emoji}</Text></View>}
             onPress={() => choose(a)}
           />

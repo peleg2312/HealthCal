@@ -6,6 +6,7 @@ import { useWindowDimensions, View } from 'react-native';
 import { deleteSavedMeal } from '@/features/food/actions';
 import { formatPortion, itemsRange, mealServings } from '@/features/food/build';
 import { DayStepper, MealPicker, RowEmoji } from '@/features/food/components';
+import { displayFoodName } from '@/features/food/displayName';
 import { FavoriteStar } from '@/features/food/FavoriteStar';
 import { toggleMealFavorite } from '@/features/food/favoriteActions';
 import { isFavoriteMeal, mealToSave } from '@/features/food/favorites';
@@ -96,7 +97,7 @@ export default function SavedMealsScreen() {
                     <RowEmoji emoji={it.emoji} />
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text variant="body" numberOfLines={2}>
-                        {isolateRtl(it.name)}
+                        {isolateRtl(displayFoodName(it))}
                       </Text>
                       <ItemCaption item={it} testID={`saved-meal-item-${i}-${j}`} />
                     </View>
@@ -119,8 +120,8 @@ export default function SavedMealsScreen() {
                 <IconButton testID={`saved-meal-edit-${i}`} accessibilityLabel={`Edit ${m.name}`} tone="clear" onPress={() => build(m.id)}>
                   <PenLine size={18} color={colors.textSecondary} />
                 </IconButton>
-                <IconButton testID={`saved-meal-delete-${i}`} accessibilityLabel={`Delete ${m.name}`} tone="clear" onPress={() => deleteSavedMeal(m)}>
-                  <Trash2 size={18} color={colors.textSecondary} />
+                <IconButton testID={`saved-meal-delete-${i}`} accessibilityLabel={`Delete ${m.name}`} tone="clear" size={44} onPress={() => deleteSavedMeal(m)}>
+                  <Trash2 size={18} color={colors.textSecondary} strokeWidth={1.9} />
                 </IconButton>
               </View>
             </Card>

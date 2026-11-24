@@ -9,6 +9,7 @@ import { updateEntryDirect } from '@/features/food/actions';
 import { AmountEditor } from '@/features/food/AmountEditor';
 import { UNKNOWN_AI_CONFIDENCE, bandSpread, estimateRange, scaleRange, spreadRange } from '@/features/food/build';
 import { DayStepper, KcalValue, MacroStat, MealPicker, SourceBadge } from '@/features/food/components';
+import { displayFoodName } from '@/features/food/displayName';
 import { useFoodDraft } from '@/features/food/draft';
 import { FavoriteStar } from '@/features/food/FavoriteStar';
 import { toggleFoodFavorite } from '@/features/food/favoriteActions';
@@ -166,7 +167,8 @@ function ImpactLine({ date, kcalValue, replacing }: { date: ISODate; kcalValue: 
   );
 }
 
-function NutritionFacts({ portion, per100g, showPer100 }: { portion: Nutrients; per100g?: Nutrients; showPer100: boolean }) {
+/** `whole`: an estimate (an AI food, or an entry with a range) gives its grams whole, never a false tenth ("47 g", not "46.5 g"). */
+function NutritionFacts({ portion, per100g, showPer100, whole = false }: { portion: Nutrients; per100g?: Nutrients; showPer100: boolean; whole?: boolean }) {
   const { spacing } = useTheme();
   const rows: [string, keyof Nutrients, string, boolean?][] = [
     ['Calories', 'kcal', 'kcal'],
@@ -179,7 +181,7 @@ function NutritionFacts({ portion, per100g, showPer100 }: { portion: Nutrients; 
     ['Sodium', 'sodium', 'mg'],
   ];
   const fmt = (v: number | undefined, unit: string) =>
-    v === undefined ? '–' : unit === 'kcal' || unit === 'mg' ? `${kcal(v)} ${unit}` : `${formatMacro(v)} ${unit}`;
+    v === undefined ? '–' : unit === 'kcal' || unit === 'mg' ? `${kcal(v)} ${unit}` : `${whole ? Math.round(v) : formatMacro(v)} ${unit}`;
   return (
     <Card testID="detail-facts">
       <View style={{ flexDirection: 'row', paddingBottom: spacing.sm }}>
@@ -386,7 +388,8 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
         </View>
       }>
       <Hero
-        name={food.name}
+        // Drawn without the reference list's capitals; stored as it is.
+        name={displayFoodName(food)}
         brand={food.brand}
         source={food.source}
         explain={info.explain}
@@ -411,7 +414,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
         {paired.problem?.field === 'day' ? <PairProblem text={paired.problem.text} /> : null}
       </Card>
 
-      <NutritionFacts portion={n} per100g={food.per100g} showPer100 />
+      <NutritionFacts portion={n} per100g={food.per100g} showPer100 whole={!!range} />
     </Screen>
   );
 }

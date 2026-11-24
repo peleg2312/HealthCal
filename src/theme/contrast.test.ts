@@ -311,6 +311,21 @@ describe.each(STRICT)('%s, held to the full rule', (name) => {
   });
 });
 
+/**
+ * Dark is not held to the full rule (its level line cannot be 3:1 on its pastel fills, above), but its
+ * over mark is: the amber over part of a calorie bar and the amber lip of a calorie cup sit right on the
+ * persimmon calorie fill, so they keep further apart than the 20 the owner's palettes keep, and the
+ * over part of a bar drawn at Dark's chart opacity stays apart from the calorie bar beside it.
+ */
+describe('dark, the over mark', () => {
+  const c = darkColors;
+  it('stands apart from the calorie fill: at least 25 (CIEDE2000), solid and at the chart opacity', () => {
+    expect(deltaE(c.warning, c.calories), 'dark warning vs calories').toBeGreaterThanOrEqual(25);
+    const o = chartFillOpacity.dark;
+    expect(deltaE(over(c.warning, c.surface, o), over(c.calories, c.surface, o)), 'dark warning vs calories as bars').toBeGreaterThanOrEqual(22);
+  });
+});
+
 describe("Google's sign-in button", () => {
   // Its colours are Google's (tokens.ts, GOOGLE_LIGHT and GOOGLE_DARK), chosen by the paper's darkness, never by a branch in code.
   it("uses Google's Light button on the light papers and its Dark button on Dark and Java", () => {

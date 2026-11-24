@@ -3,7 +3,8 @@ import { Plus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { startOfWeek } from '@/lib/dates';
+import { waterAddedToast } from '@/features/food/addedTo';
+import { startOfWeek, today } from '@/lib/dates';
 import { guidelineMinutes } from '@/lib/exercise';
 import { nowISO } from '@/lib/id';
 import { WEEKLY_ACTIVE_MINUTES } from '@/lib/insights';
@@ -51,8 +52,9 @@ export function addWater(date: ISODate, ml: number, units: 'metric' | 'imperial'
   const entry = useStore.getState().upsert('water', { date, ml, beverage: 'water', loggedAt: nowISO() });
   haptic.tap();
   const reaches = goalMl !== undefined && crossesGoal(before, ml, goalMl);
+  // "250 ml added to Water", in the order of the food toasts ("Banana added to breakfast").
   const show = () =>
-    toast(reaches ? `Added ${formatVolume(ml, units)}. Water goal reached` : `Added ${formatVolume(ml, units)} of water`, {
+    toast(waterAddedToast(formatVolume(ml, units), date, today(), reaches), {
       label: 'Undo',
       tint: 'water',
       onPress: () => useStore.getState().remove('water', entry.id),

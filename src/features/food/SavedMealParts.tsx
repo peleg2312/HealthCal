@@ -17,7 +17,8 @@ import { Button, Chip, ChipWrap, NumberField, PressableScale, Sheet, Stepper, Te
 import { AmountEditor } from './AmountEditor';
 import { RowEmoji } from './components';
 import { formatPortion, mealServings, planSavedMeal, setItemAmount } from './build';
-import { dayPhrase, kcal, matchServing, sourceInfo } from './helpers';
+import { displayFoodName } from './displayName';
+import { dayPhrase, kcal, matchServing, sourceInfo, withSourceWord } from './helpers';
 import { itemLine, itemStepText } from './itemLine';
 import { logSavedMeal } from './log';
 import { currentValues } from './usuals';
@@ -33,7 +34,8 @@ export function itemSource(it: Pick<SavedMealItem, 'source' | 'kcalRange'>): Sav
 
 /**
  * One saved line's caption: its source's mark leading and its word ending the line, as on a food row
- * ("1 bowl · ~473 kcal · AI estimate"), so a long portion wraps instead of cutting the calories.
+ * ("1 bowl · ~473 kcal · AI estimate"), so a long portion wraps instead of cutting the calories. Reference
+ * data ends with no word (`withSourceWord`): its filled key is its mark.
  */
 export function ItemCaption({ item, testID }: { item: SavedMealItem; testID?: string }) {
   const { colors } = useTheme();
@@ -43,7 +45,7 @@ export function ItemCaption({ item, testID }: { item: SavedMealItem; testID?: st
       <SourceMark source={source} color={colors.textSecondary} size={8} style={{ marginTop: sourceMarkTop(source) }} />
       <Text variant="caption" color="textSecondary" numberOfLines={2} tabular style={{ flexShrink: 1 }} testID={testID}>
         {/* The source's word stays on one line ("AI estimate", "Your food"). */}
-        {`${itemLine(item)} · ${sourceInfo(source).short.replace(/ /g, '\u00A0')}`}
+        {withSourceWord(itemLine(item), source)}
       </Text>
     </View>
   );
@@ -139,7 +141,7 @@ export function LogSavedMealSheet({ meal, mealType, date, onClose }: { meal: Sav
               feedback="select"
               accessibilityRole="checkbox"
               accessibilityState={{ checked: on }}
-              accessibilityLabel={`${it.name}, ${withoutMarks(itemLine(it))}, ${sourceInfo(itemSource(it)).label}`}
+              accessibilityLabel={`${displayFoodName(it)}, ${withoutMarks(itemLine(it))}, ${sourceInfo(itemSource(it)).label}`}
               onPress={() => setInclude((cur) => meal.items.map((_, j) => (j === i ? !(cur[j] ?? true) : (cur[j] ?? true))))}
               style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 48, paddingVertical: 4 }}>
               <View
@@ -158,7 +160,7 @@ export function LogSavedMealSheet({ meal, mealType, date, onClose }: { meal: Sav
               <RowEmoji emoji={it.emoji} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text variant="body" numberOfLines={2} color={on ? 'text' : 'textTertiary'}>
-                  {isolateRtl(it.name)}
+                  {isolateRtl(displayFoodName(it))}
                 </Text>
                 <ItemCaption item={it} />
               </View>
@@ -195,7 +197,7 @@ export function ItemAmountSheet({
     <Sheet
       visible
       onClose={onClose}
-      title={isolateRtl(item.name)}
+      title={isolateRtl(displayFoodName(item))}
       footer={
         <View style={{ flexDirection: 'row', gap: spacing.md }}>
           <Button testID="meal-item-remove" variant="secondary" full={false} title="Remove" onPress={onRemove} />

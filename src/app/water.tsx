@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Check, GlassWater, Info, Trash2 } from 'lucide-react-native';
+import { Check, ChevronDown, ChevronUp, GlassWater, Info, Trash2 } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
@@ -40,11 +40,9 @@ import {
   CupKey,
   Divider,
   EmptyState,
-  FadeUp,
   haptic,
   Header,
   IconButton,
-  MiniCup,
   NumberField,
   PressableScale,
   Screen,
@@ -77,6 +75,17 @@ function factorLine(beverage: Beverage): string {
   const full = BEVERAGES.filter((b) => HYDRATION_FACTOR[b] >= 1).map((b) => BEVERAGE_LABELS[b].label.toLowerCase().replace(/drink$/, 'drinks'));
   const list = `${full.slice(0, -1).join(', ')} and ${full[full.length - 1]}`;
   return `${list[0].toUpperCase()}${list.slice(1)} count in full.`;
+}
+
+/**
+ * What follows "Goal reached for today." under the cup, in one line with it: the extra drunk and, for
+ * today, that more is a bonus ("430 ml past it, anything more is a bonus."). Null when there is nothing to add.
+ */
+function reachedNote(extra: string | null, isToday: boolean): string | null {
+  const parts = [extra ? `${extra} past it` : null, isToday ? 'anything more is a bonus' : null].filter(Boolean) as string[];
+  if (!parts.length) return null;
+  const line = parts.join(', ');
+  return `${line[0].toUpperCase()}${line.slice(1)}.`;
 }
 
 /**
@@ -116,7 +125,6 @@ function WaterScreen() {
   const [beverage, setBeverage] = useState<Beverage>('water');
   const [custom, setCustom] = useState<number | null>(null);
   const [editing, setEditing] = useState(false);
-  const [celebrate, setCelebrate] = useState(false);
   const [showAllLog, setShowAllLog] = useState(false);
   // "Water only" (the same drink already in the diary): off by default, off again after each log and on any change.
   const [waterOnly, setWaterOnly] = useState(false);
@@ -209,11 +217,10 @@ function WaterScreen() {
     setWaterOnly(false);
   };
 
-  // The level crossed the goal while the screen is open: the vessel settles and flashes its brim,
-  // and this adds the haptic and, with Celebrations on, one calm card under the cup.
+  // The level crossed the goal while the screen is open: the vessel settles and flashes its brim
+  // (with Celebrations on), and this adds the haptic; the line under the cup already says it.
   const onReached = () => {
     haptic.success();
-    if (settings.celebrations) setCelebrate(true);
   };
 
 
@@ -222,6 +229,7 @@ function WaterScreen() {
   // A removed drink fades where it is before the rows below glide up into its place.
   const rows = useLeavingRows(entries);
   const extraParts = splitUnit(formatVolume(Math.max(0, shownMl(consumed, units) - shownMl(goal, units)), units));
+  const note = reachedNote(extraParts.value === '0' ? null : `${extraParts.value} ${extraParts.unit}`, isToday);
 
   const baseMl = baseWaterGoalMl(profile.weightKg, profile.sex);
   const exerciseMl = exerciseWaterMl(day.activities);
@@ -304,36 +312,39 @@ function WaterScreen() {
           ]}
         />
 
-        {/* The goal is the cup's top label; under the cup only what is left (or the extra), said once. */}
-        <View style={{ gap: 2 }}>
-          {reached ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {/* The goal is the cup's top label; under the cup only what is left, or, once the goal is reached, one
+            line that says so with the extra (the brim line on the cup carries the moment: no second cup or check). */}
+        {reached ? (
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+            <View style={{ paddingTop: 2 }}>
               <Check size={18} color={colors.text} strokeWidth={2.2} />
-              <Text testID="water-goal-reached" variant="bodyStrong">
-                {isToday ? 'Goal reached for today' : `Goal reached on ${dayName}`}
-              </Text>
             </View>
-          ) : (
+            <Text testID="water-goal-reached" variant="bodyStrong" style={{ flex: 1, minWidth: 0 }}>
+              {isToday ? 'Goal reached for today.' : `Goal reached on ${dayName}.`}
+              {note ? (
+                <Text testID="water-glasses" variant="body" color="textSecondary">
+                  {` ${note}`}
+                </Text>
+              ) : null}
+            </Text>
+          </View>
+        ) : (
+          <View style={{ gap: 2 }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
               <AnimatedNumber testID="water-left" variant="numL" value={left} format={(ml) => volumeNumber(ml, left, units, leftLitreDecimals(left))} accessibilityLabel={`${formatVolume(left, units)} left to drink`} />
               <Text variant="unit" style={{ fontSize: 15 }}>
                 {`${volumeUnitFor(left, units)} left to drink`}
               </Text>
             </View>
-          )}
-          {reached && extraParts.value === '0' ? null : (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} testID="water-glasses">
               <CupKey color={colors.water} />
               <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
-                {reached ? `${extraParts.value} ${extraParts.unit} past the goal` : `About ${glassesLeft(left, glassMl)} × ${formatVolume(glassMl, units)} to go`}
+                {`About ${glassesLeft(left, glassMl)} × ${formatVolume(glassMl, units)} to go`}
               </Text>
             </View>
-          )}
-        </View>
+          </View>
+        )}
       </Card>
-
-      {/* A one-off acknowledgement; it leaves if intake drops back under the goal. */}
-      {celebrate && reached ? <Celebration isToday={isToday} onDone={() => setCelebrate(false)} /> : null}
 
       <DrinkTitleRow onSearch={() => openPick('', null)} onEditSizes={() => setEditing(true)} />
       <DrinkKindRow kind={beverage} onChoose={chooseKind} reveal={reveal} />
@@ -412,11 +423,7 @@ function WaterScreen() {
       </View>
       <Note icon={<Info size={14} color={colors.textSecondary} />}>{factorLine(beverage)}</Note>
 
-      <SectionTitle
-        title={isToday ? 'Today’s log' : `Log for ${dayName}`}
-        action={allEntries.length > 6 ? (showAllLog ? 'Show less' : `Show all ${allEntries.length}`) : undefined}
-        onAction={() => setShowAllLog((v) => !v)}
-      />
+      <SectionTitle title={isToday ? 'Today’s log' : `Log for ${dayName}`} />
       <Card padding={rows.length ? spacing.md : spacing.lg}>
         {rows.length === 0 ? (
           <EmptyState
@@ -495,6 +502,20 @@ function WaterScreen() {
           </AnimatedList>
         )}
       </Card>
+      {/* More than six drinks: the rest open under the list, where it ends (the testID is the one SectionTitle gave it). */}
+      {allEntries.length > 6 ? (
+        <Button
+          testID="section-today-s-log-action"
+          title={showAllLog ? 'Show less' : `Show all ${allEntries.length}`}
+          accessibilityLabel={showAllLog ? 'Show fewer drinks' : `Show all ${allEntries.length} drinks`}
+          variant="ghost"
+          size="sm"
+          full={false}
+          icon={showAllLog ? <ChevronUp size={16} color={colors.primaryInk} strokeWidth={2.2} /> : <ChevronDown size={16} color={colors.primaryInk} strokeWidth={2.2} />}
+          onPress={() => setShowAllLog((v) => !v)}
+          style={{ alignSelf: 'center', marginTop: -spacing.xs }}
+        />
+      ) : null}
 
       <SectionTitle title={isToday ? 'Last 7 days' : `7 days to ${dayTitle(date)}`} />
       <Card style={{ gap: spacing.md }}>
@@ -576,31 +597,6 @@ function GoalLine({ label, hint, value, strong }: { label: string; hint?: string
         {value}
       </Text>
     </View>
-  );
-}
-
-/**
- * The goal reached, said once under the cup: no spring, no bounce. It fades up
- * with the kit's FadeUp (instant under reduced motion) and is only shown with
- * Celebrations on in Profile. The vessel's brim line and flash carry the moment.
- */
-function Celebration({ isToday, onDone }: { isToday: boolean; onDone: () => void }) {
-  const { colors, spacing } = useTheme();
-  return (
-    <FadeUp>
-      <Card testID="water-celebration" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-        <MiniCup progress={1} goalKind="reach" animate={false} color={colors.water} />
-        <View style={{ flex: 1 }}>
-          <Text variant="title">Anything more is a bonus</Text>
-          <Text variant="caption" color="textSecondary">
-            {isToday ? 'The goal is met for today. Drink to thirst from here.' : 'The goal was met for the day.'}
-          </Text>
-        </View>
-        <IconButton testID="water-celebration-dismiss" accessibilityLabel="Dismiss" tone="clear" size={44} onPress={onDone}>
-          <Check size={18} color={colors.textSecondary} />
-        </IconButton>
-      </Card>
-    </FadeUp>
   );
 }
 

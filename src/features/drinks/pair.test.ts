@@ -55,7 +55,7 @@ describe('logging a drink', () => {
     expect(liveWater()).toHaveLength(1);
     expect(liveEntries()).toHaveLength(1);
     expect(kcalOn(TODAY)).toBe(129);
-    expect(last().message).toMatch(/^Added 250 ml of milk, 129 kcal to (breakfast|lunch|dinner|snacks)$/);
+    expect(last().message).toMatch(/^Milk, 129 kcal, added to (breakfast|lunch|dinner|snacks) and 250 ml to Water$/);
     expect(last().opts?.tint).toBe('water');
   });
 
@@ -95,7 +95,7 @@ describe('logging a drink', () => {
     const strip = ({ id: _i, updatedAt: _u, ...rest }: WaterEntry) => rest;
     expect(strip(water)).toEqual(strip(old));
     expect(Object.keys(water).sort()).toEqual(Object.keys(old).sort());
-    expect(toasts[0]).toMatchObject({ message: 'Added 250 ml', opts: { label: 'Undo', tint: 'water' } });
+    expect(toasts[0]).toMatchObject({ message: '250 ml added to Water', opts: { label: 'Undo', tint: 'water' } });
     expect(Object.keys(S().foodEntries)).toHaveLength(0);
     expect(typeof nowISO()).toBe('string');
   });

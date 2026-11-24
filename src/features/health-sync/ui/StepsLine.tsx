@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Footprints } from 'lucide-react-native';
+import { ChevronRight, Footprints } from 'lucide-react-native';
 import React from 'react';
 import { Platform, useWindowDimensions, View } from 'react-native';
 
@@ -20,8 +20,8 @@ import { useHealthSync } from '../store';
  * ("From your Health export, Nov 16"). A synced day wins over the file's.
  * Steps are shown only: never added to the calorie budget (steps.ts says why).
  *
- * With no steps at all, on web and on an iPhone with sync off, one quiet link
- * leads to the import instead; on Android, and on an iPhone with sync on,
+ * With no steps at all, on web and on an iPhone with sync off, one quiet row
+ * with a chevron (as the card's "About your usual" row) leads to the import instead; on Android, and on an iPhone with sync on,
  * where sync reads them, nothing is drawn.
  */
 export function StepsLine({ dates, today }: { dates: ISODate[]; today: ISODate }) {
@@ -37,15 +37,16 @@ export function StepsLine({ dates, today }: { dates: ISODate[]; today: ISODate }
     return (
       <PressableScale
         testID="train-steps-import"
-        accessibilityRole="link"
+        accessibilityRole="button"
         accessibilityLabel="Add your daily steps from the Health app’s export"
         onPress={() => router.push('/activity/import')}
         hitSlop={6}
         style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md, minHeight: 44 }}>
         <Footprints size={18} color={colors.textSecondary} strokeWidth={1.9} />
-        <Text variant="caption" color="textSecondary" style={{ flex: 1, minWidth: 0, textDecorationLine: 'underline' }}>
+        <Text variant="caption" color="text" style={{ flex: 1, minWidth: 0 }}>
           Add steps from your Health export
         </Text>
+        <ChevronRight size={18} color={colors.textSecondary} strokeWidth={1.9} />
       </PressableScale>
     );
   }

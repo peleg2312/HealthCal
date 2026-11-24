@@ -76,8 +76,8 @@ function picks(entries: Parameters<typeof usualFoods>[0], meal: MealType, today:
 /**
  * Day one of Today: one obvious first action. The meal for the time of day
  * with its share of the budget, a full-width button that opens food search for
- * it, and three foods that log in one tap (with Undo). The macro bars come back
- * after the first entry.
+ * it, and three foods that log in one tap (with Undo). The macro bars and the
+ * budget line come back after the first entry.
  */
 export function FirstLogInvite({ meal, date, budget }: { meal: MealType; date: ISODate; budget: number }) {
   const { colors, spacing } = useTheme();
@@ -96,23 +96,20 @@ export function FirstLogInvite({ meal, date, budget }: { meal: MealType; date: I
         onPress={() => router.push(`/food/search?meal=${meal}&date=${date}` as never)}
       />
       {options.length ? (
-        <View style={{ gap: spacing.sm }}>
-          <Text variant="caption" color="textSecondary">
-            Or add one in a tap
-          </Text>
-          {/* 12 px between rows: each 32 px chip keeps its whole 44 px touch area, never shared with the chip below. */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.sm, rowGap: spacing.md }}>
-            {options.map((p) => (
-              <Chip
-                key={p.key}
-                testID={`today-first-${p.key}`}
-                label={`${isolateRtl(p.label)} · ${formatNumber(Math.round(p.kcal))} kcal`}
-                accessibilityLabel={`${p.label} · ${formatNumber(Math.round(p.kcal))} kcal`}
-                icon={<Plus size={14} color={colors.text} strokeWidth={2.2} />}
-                onPress={() => logFood({ food: p.food, serving: p.serving, quantity: p.quantity, meal, date })}
-              />
-            ))}
-          </View>
+        // The chips follow the button with no line of their own: each one's "+" says a tap adds it, and the toast
+        // names what was added, with Undo. 12 px between rows: each 32 px chip keeps its whole 44 px touch area,
+        // never shared with the chip below. Kept this short so the water row under the card is in the first view.
+        <View testID="today-first-chips" style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.sm, rowGap: spacing.md }}>
+          {options.map((p) => (
+            <Chip
+              key={p.key}
+              testID={`today-first-${p.key}`}
+              label={`${isolateRtl(p.label)} · ${formatNumber(Math.round(p.kcal))} kcal`}
+              accessibilityLabel={`Add ${p.label}, ${formatNumber(Math.round(p.kcal))} kcal, to ${label.toLowerCase()}`}
+              icon={<Plus size={14} color={colors.text} strokeWidth={2.2} />}
+              onPress={() => logFood({ food: p.food, serving: p.serving, quantity: p.quantity, meal, date })}
+            />
+          ))}
         </View>
       ) : null}
     </View>

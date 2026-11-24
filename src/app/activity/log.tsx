@@ -319,16 +319,22 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
                     key={i}
                     testID={`intensity-${i}`}
                     feedback="select"
-                    accessibilityState={{ selected: active }}
+                    // One choice of three: a radio, drawn as the plan's period tiles are (the outline and the level line across the top).
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: active, selected: active }}
+                    aria-checked={active}
                     accessibilityLabel={`${INTENSITY_LABELS[i].title} effort`}
                     onPress={() => setIntensity(i)}
                     style={{
+                      overflow: 'hidden',
                       ...(tight ? { flexDirection: 'row', alignItems: 'center', minHeight: 56, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.md } : { flex: 1, minHeight: 104, padding: spacing.md, gap: spacing.xs }),
                       ...cup(radius.tile, 5),
                       backgroundColor: colors.surface,
                       borderWidth: active ? 2 : 1,
                       borderColor: active ? colors.text : colors.border,
                     }}>
+                    {/* The mark of every selected thing in the app: the level line across the chosen tile's top. It takes no room. */}
+                    {active ? <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: colors.rim }} /> : null}
                     {tight ? (
                       <>
                         <View style={{ flex: 1, minWidth: 0 }}>

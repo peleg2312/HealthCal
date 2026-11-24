@@ -556,7 +556,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     JSON.stringify({ w1, e1: e1 && { meal: e1.meal, via: e1.via, kcal: e1.nutrients.kcal } }).slice(0, 240),
   );
   const addedToast = await text('toast');
-  check('drinks: the toast says what was added and where', addedToast.includes(`Added 250 ml of milk, 129 kcal to ${mealWord}`), addedToast);
+  check('drinks: the toast says what was added and where', addedToast.includes(`Milk, 129 kcal, added to ${mealWord} and 250 ml to Water`), addedToast);
   await tap('toast-action');
   s = await stored();
   check('drinks: Undo removes both', !!s.water[w1.id]?.deleted && !!s.foodEntries[e1.id]?.deleted);
@@ -792,7 +792,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   // The toast's first line is its message (the action follows it).
   const toastLine = async () => (await text('toast')).split('\n')[0].trim();
   const logToast = await toastLine();
-  check('diary drinks: the toast says both', !!dw && logToast === `Added to lunch and ${dw.ml} ml to Water`, logToast);
+  check('diary drinks: the toast names the drink and says both', !!dw && logToast === `Energy drink added to lunch, ${dw.ml} ml to Water`, logToast);
   await tap('toast-action');
   s = await stored();
   check('diary drinks: Undo of the log takes the entry and its water', !!de && !!s.foodEntries[de.id]?.deleted && !!s.water[dw.id]?.deleted);
@@ -887,7 +887,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   await tap('result-0-add');
   s = await stored();
   const offToast = await toastLine();
-  check('diary drinks: with the switch off, no water and the toast as before', newIn(s, before, 'foodEntries').length === 1 && newIn(s, before, 'water').length === 0 && offToast === 'Added to dinner', offToast);
+  check('diary drinks: with the switch off, no water and the toast as before', newIn(s, before, 'foodEntries').length === 1 && newIn(s, before, 'water').length === 0 && offToast === 'Energy drink added to dinner', offToast);
   await page.goto(`${BASE}/settings/goals`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1200);
   await tap('goals-diary-drinks');

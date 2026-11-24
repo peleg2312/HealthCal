@@ -67,7 +67,7 @@ module.exports = [
   { id: 'diary-zero-day', route: '/diary?date={day}', day: -3, data: 'stress', note: 'a logged 0 kcal day' },
   { id: 'diary-imperial', route: '/diary', imperial: true, note: 'the diary in imperial units' },
   { id: 'diary-menu', route: '/diary', taps: ['meal-menu-breakfast'], sheet: true, note: 'a meal menu with items' },
-  { id: 'diary-menu-empty-meal', route: '/diary', taps: ['meal-menu-dinner'], sheet: true, note: 'a meal menu for a meal not logged yet' },
+  { id: 'diary-empty-meal', route: '/diary', waitFor: 'meal-repeat-dinner', note: 'an empty meal: its dashed slot is its one add, no "+" or "..." in its header, Repeat beside last time\'s foods' },
   { id: 'diary-copy-to', route: '/diary', taps: ['meal-menu-breakfast', 'meal-menu-copy-to'], sheet: true, note: 'copy a meal to another day' },
   { id: 'diary-save-meal', route: '/diary', data: 'stress', taps: ['meal-menu-lunch', 'meal-menu-save'], sheet: true, note: 'save the 12-item lunch as a meal: the name offered is "My lunch" (the foods run over 40 characters)' },
   // The one-time "Save lunch as a meal" hint (src/features/food/saveHint.ts). An automated browser sees it
@@ -125,9 +125,10 @@ module.exports = [
     id: 'detail-ai',
     route: '/food/photo?mode=text&meal=breakfast',
     data: 'empty',
-    taps: [{ type: 'ai-description', text: 'Chicken, rice and salad' }, 'ai-analyse', { wait: 2600 }, 'ai-add-to-diary', { wait: 1200 }, '^entry-'],
+    // The wait lets the "4 items added" toast from the review leave first (4.5 s), so the capture is the entry alone.
+    taps: [{ type: 'ai-description', text: 'Chicken, rice and salad' }, 'ai-analyse', { wait: 2600 }, 'ai-add-to-diary', { wait: 1200 }, '^entry-', { wait: 4000 }],
     waitFor: 'food-detail-screen',
-    note: 'an AI estimate in the diary, opened: its range',
+    note: 'an AI estimate in the diary, opened: its range, its macros in whole grams',
   },
 
   // ---------------------------------------------------------------- Scan, photo, quick, custom
@@ -311,8 +312,9 @@ module.exports = [
   // the own food and the online product as logged. The clock is at lunch; each state reloads first.
   { id: 'quick-sheet-repeat-old', route: '/', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }, 'tab-add'], sheet: true, waitFor: 'quick-repeat', note: 'the + sheet: "Repeat yesterday\'s lunch, 1,170 kcal" and the saved meal tile at today\'s values' },
   { id: 'quick-sheet-repeat-old-done', route: '/', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }, 'tab-add', 'quick-repeat', { wait: 300 }], sheet: true, note: 'Repeat tapped: its tick and the toast' },
-  { id: 'diary-repeat-old', route: '/diary', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }], waitFor: 'meal-repeat-lunch', note: 'the diary\'s lunch card: "Repeat yesterday: ... 1,170 kcal"' },
-  { id: 'diary-menu-old', route: '/diary', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }, 'meal-menu-lunch'], sheet: true, waitFor: 'meal-menu-copy-previous', note: 'the lunch menu: "Copy from yesterday, 5 items, 1,170 kcal"' },
+  { id: 'diary-repeat-old', route: '/diary', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }], waitFor: 'meal-repeat-lunch', note: 'the diary\'s lunch card: "Yesterday, 1,170 kcal: ..." and Repeat' },
+  // An empty meal has no menu (its copy of the last same meal is the Repeat under the slot), so the copy is tapped there.
+  { id: 'diary-repeat-old-done', route: '/diary', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }, 'meal-repeat-lunch'], waitFor: 'meal-total-lunch', note: 'Repeat tapped on the empty lunch: yesterday\'s five foods at today\'s values, 1,170 kcal' },
   { id: 'diary-copy-to-old', route: '/diary?date={day}', day: -1, values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }, 'meal-menu-lunch'], sheet: true, waitFor: 'meal-menu-copy-to', note: 'yesterday\'s lunch menu: "Copy to another day, 5 items, 1,170 kcal" while the card says 1,137' },
   { id: 'meals-old', route: '/food/meals', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }], waitFor: 'saved-meal-card-0', note: 'Saved meals: "Lunch plate" at today\'s values (744 kcal), its lines "80 g" and "2 x 30 g"' },
   { id: 'meals-log-sheet-old', route: '/food/meals', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }, 'saved-meal-log-0'], sheet: true, note: 'logging "Lunch plate": each line and the button at today\'s values' },
@@ -330,7 +332,7 @@ module.exports = [
   { id: 'detail-diary-drink', route: '/diary', values: { diaryWater: 1 }, now: todayAt(14, 0), taps: ['entry-00000000-0000-4000-8000-00000000d004'], waitFor: 'detail-drink-note', note: 'editing a drink logged in the diary: "Also counted in Water as 500 ml. It changes with this entry and is removed with it."' },
   { id: 'detail-diary-drink-imperial', route: '/diary', imperial: true, values: { diaryWater: 1 }, now: todayAt(14, 0), taps: ['entry-00000000-0000-4000-8000-00000000d004'], waitFor: 'detail-drink-note', note: 'the same in fl oz' },
   { id: 'detail-diary-drink-amount', route: '/diary', values: { diaryWater: 1 }, now: todayAt(14, 0), taps: ['entry-00000000-0000-4000-8000-00000000d004', 'detail-serving-0'], waitFor: 'detail-drink-note', note: 'editing it with the first serving (the 250 ml can) chosen on screen: the note names that volume, before Save' },
-  { id: 'toast-diary-drink-imperial', route: '/food/search?meal=lunch', imperial: true, type: { 'food-search-input': 'monster' }, taps: [{ wait: 1200 }, 'result-0-add'], waitFor: 'toast-action', note: 'an energy drink added with its +: "Added to lunch and 8.4 fl oz to Water" (320 px is the narrow case)' },
+  { id: 'toast-diary-drink-imperial', route: '/food/search?meal=lunch', imperial: true, type: { 'food-search-input': 'monster' }, taps: [{ wait: 1200 }, 'result-0-add'], waitFor: 'toast-action', note: 'an energy drink added with its +: "Energy drink added to lunch, 8.4 fl oz to Water" (320 px is the narrow case)' },
   // Copied from the meal menu so the diary stays on today, whose entries have the seed's fixed ids (a copy's own rows are new on every load).
   { id: 'toast-diary-copy', route: '/diary', values: { diaryWater: 1 }, now: todayAt(14, 0), taps: ['meal-menu-lunch', 'meal-menu-copy-to', 'copy-to-confirm'], waitFor: 'toast-action', note: "today's lunch (with the can of energy drink) copied to tomorrow: the copy's toast names the water" },
   { id: 'custom-drink-on', route: '/food/custom', type: { 'custom-name': 'Cold brew', 'custom-serving-label': '1 bottle (330 ml)', 'custom-serving-grams': '330' }, waitFor: 'custom-drink', note: 'an own food whose serving names ml: "This is a drink" on by itself' },

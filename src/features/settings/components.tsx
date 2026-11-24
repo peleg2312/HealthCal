@@ -1,4 +1,4 @@
-import { Check, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
@@ -6,8 +6,11 @@ import { formatClock, formatHHmm, parseHHmm } from '@/lib/dates';
 import { cup, cupFor, useTheme } from '@/theme';
 import { Button, Card, Chip, Divider, IconButton, ListRow, PressableScale, Sheet, Text } from '@/ui';
 
-/** A titled card of rows separated by hairlines. */
-export function Group({ title, footer, children }: { title?: string; footer?: string; children: React.ReactNode }) {
+/**
+ * A titled card of rows separated by hairlines. `radiogroup` marks a card of `OptionRow`s as one
+ * single choice, named by its title, so a screen reader says "one of five" rather than five switches.
+ */
+export function Group({ title, footer, radiogroup, children }: { title?: string; footer?: string; radiogroup?: boolean; children: React.ReactNode }) {
   const { spacing } = useTheme();
   const items = React.Children.toArray(children).filter(Boolean);
   return (
@@ -17,7 +20,10 @@ export function Group({ title, footer, children }: { title?: string; footer?: st
           {title}
         </Text>
       ) : null}
-      <Card padding={0} style={{ paddingHorizontal: spacing.lg }}>
+      <Card
+        padding={0}
+        style={{ paddingHorizontal: spacing.lg }}
+        {...(radiogroup ? { accessibilityRole: 'radiogroup' as const, role: 'radiogroup' as const, accessibilityLabel: title } : null)}>
         {items.map((child, i) => (
           <React.Fragment key={i}>
             {i > 0 ? <Divider /> : null}
@@ -51,8 +57,9 @@ export function IconTile({ color, keep, children }: { color?: string; keep?: boo
 }
 
 /**
- * Single-choice list row with a check mark. Announced as a radio button with
- * its checked state, so screen readers say which option is in effect.
+ * Single-choice list row, drawn as a radio in the Pour way: an outlined cup, and when chosen a
+ * filled cup inside it (never a check in a filled box, which reads as a checkbox). Announced as a
+ * radio button with its checked state; put the rows in a `Group` with `radiogroup`.
  */
 export function OptionRow({
   title,
@@ -89,19 +96,19 @@ export function OptionRow({
           </Text>
         ) : null}
       </View>
-      {/* A small cup: an ink cup with a check when chosen, an empty outline otherwise. */}
+      {/* The radio: an outlined cup, with a filled ink cup inside when chosen. The outline is ink when chosen. */}
       <View
         style={{
           width: 24,
           height: 24,
           ...cupFor(24),
-          borderWidth: selected ? 0 : 1.5,
-          borderColor: colors.borderStrong,
-          backgroundColor: selected ? colors.text : 'transparent',
+          borderWidth: selected ? 2 : 1.5,
+          borderColor: selected ? colors.text : colors.borderStrong,
+          backgroundColor: 'transparent',
           alignItems: 'center',
           justifyContent: 'center',
         }}>
-        {selected ? <Check size={15} color={colors.bg} strokeWidth={3} /> : null}
+        {selected ? <View style={{ width: 12, height: 12, ...cup(4, 2), backgroundColor: colors.text }} /> : null}
       </View>
     </PressableScale>
   );

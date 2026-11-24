@@ -303,7 +303,8 @@ describe('patterns are computed, not asserted', () => {
     expect(hydrationPattern(even, TODAY)).toBeNull();
     const out = generateInsights(ctx(dropping));
     const w = find(out, 'water-low')!;
-    expect(w.body).toContain('You reached your water goal on 0 of 6 days');
+    expect(w.title).toBe('Water goal reached on 0 of 6 days');
+    expect(w.body).toContain('You averaged');
     expect(w.body).toContain('afternoons are where intake drops');
     expect(w.body).toContain('in the afternoon');
   });
@@ -329,7 +330,7 @@ describe('adaptive estimate insight', () => {
     const adaptive: AdaptiveTdee = { tdee: 2480, observed: 2600, confidence: 0.62, loggedDays: 24, weighIns: 18, windowDays: 28, needs: null };
     const out = generateInsights(ctx(days, { energy: { formulaTdee: 2300, adaptive, usingAdaptive: true, useAdaptiveSetting: true, tdee: 2480 } }));
     const a = find(out, 'adaptive-active')!;
-    expect(a.body).toContain('2,600 kcal a day, 300 kcal above the formula');
+    expect(a.body).toContain('2,600 kcal a day before logged workouts, 300 kcal above the 2,300 kcal estimated from your body');
     expect(a.body).toContain('good confidence (62%)');
   });
 });
@@ -518,10 +519,10 @@ describe('weekly check-in tiles', () => {
 });
 
 describe('planChangeText', () => {
-  it('explains a budget that follows the measured expenditure', () => {
-    expect(planChangeText({ target: 2000, tdee: 2500, usingAdaptive: true }, { target: 2010, tdee: 2510, usingAdaptive: true })).toBe('Same budget as last week.');
+  it('explains a target that follows what the logs show you burn', () => {
+    expect(planChangeText({ target: 2000, tdee: 2500, usingAdaptive: true }, { target: 2010, tdee: 2510, usingAdaptive: true })).toBe('Same target as last week.');
     expect(planChangeText({ target: 2000, tdee: 2500, usingAdaptive: true }, { target: 1940, tdee: 2440, usingAdaptive: true })).toBe(
-      'Your measured expenditure, outside logged workouts, is now 2,440 kcal a day against 2,500 kcal, so the budget moved down 60 kcal.',
+      'Your logs now show you burn 2,440 kcal a day outside logged workouts, against 2,500 kcal, so the target moved down 60 kcal.',
     );
     expect(planChangeText({ target: 2000, tdee: 2500, usingAdaptive: false }, { target: 1800, tdee: 2500, usingAdaptive: false })).toContain('change to your goal');
   });
@@ -606,5 +607,36 @@ describe('baselines', () => {
     expect(direction(5, 10, 1)).toBe('down');
     expect(direction(5.5, 5, 1)).toBe('same');
     expect(direction(5, null, 1)).toBeNull();
+  });
+});
+
+describe('insight titles are neutral (principle 4)', () => {
+  // The morning page's banned list (src/features/morning/words.test.ts), plus "missed": a title says what was
+  // reached or what the numbers are, never what was missed.
+  const BANNED =
+    /\b(bad|fail|failed|failure|cheat|cheated|should|guilty|lazy|great|amazing|well done|keep it up|too much|missed your|goal missed|over budget|make up|only|unfortunately|oops|sorry|missed)\b/i;
+
+  it('no title from a grid of periods holds a banned word or an exclamation mark', () => {
+    const titles = new Set<string>();
+    const kcals = [0, 900, 1500, 1900, 2000, 2150, 2400, 3000];
+    const waters = [0, 800, 1600, 2500, 3200];
+    const minutes = [0, 20, 60];
+    const goals = ['lose', 'maintain', 'gain'] as const;
+    const rates = [null, -1.2, -0.4, -0.1, 0, 0.1, 0.4, 1.2];
+    for (const kcal of kcals)
+      for (const ml of waters)
+        for (const min of minutes) {
+          const days = run(14, (d, i) => day(d, { kcal: i % 7 >= 5 ? kcal + 300 : kcal, protein: kcal / 20, fiber: kcal / 100, water: [{ ml: ml * (i % 3 ? 1 : 0.4), hour: i % 2 ? 9 : 19 }], minutes: min }));
+          const sleep = days.map((d, i) => ({ date: d.date, hours: [5, 6.5, 8, 10][i % 4], quality: 3 }));
+          for (const goal of goals)
+            for (const rate of rates)
+              for (const out of [
+                generateInsights(ctx(days, { goal, currentWeeklyRateKg: rate, weighInsTotal: 20, lastWeighIn: TODAY, sleep, streak: 12 })),
+                generateInsights(ctx(days.slice(-4), { goal, currentWeeklyRateKg: rate, weighInsTotal: 2 })),
+              ])
+                for (const i of out) titles.add(i.title);
+        }
+    expect(titles.size).toBeGreaterThan(15);
+    expect([...titles].filter((t) => BANNED.test(t) || t.includes('!'))).toEqual([]);
   });
 });

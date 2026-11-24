@@ -1,15 +1,16 @@
 import React from 'react';
 import { View } from 'react-native';
 
-import { addDays, diffDays, formatShortDate, toISODate } from '@/lib/dates';
+import { addDays, diffDays, formatShortDate } from '@/lib/dates';
 import { projectedGoalDate } from '@/lib/energy';
-import { rateText, STALE_WEIGH_IN_DAYS, type UsualRange } from '@/lib/insights';
+import { STALE_WEIGH_IN_DAYS, type UsualRange } from '@/lib/insights';
 import { weightUnit, weightValue } from '@/lib/units';
 import type { WeightSeries } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { Profile } from '@/types';
 import { Button, LineChart, Text } from '@/ui';
 
+import { trendGoalLabel, weeklyRateText } from './goalDate';
 import { BigStat, go, Note, SectionCard, StatStrip } from './parts';
 
 export function WeightCard({ series, start, end, profile, usual }: { series: WeightSeries; start: string; end: string; profile: Profile; usual?: UsualRange | null }) {
@@ -45,7 +46,8 @@ export function WeightCard({ series, start, end, profile, usual }: { series: Wei
   // An old rate is history, not the current pace: hide it rather than present it as current.
   const rate = stale ? null : series.weeklyRateKg;
   const target = profile.targetWeightKg;
-  const eta = rate !== null && target ? projectedGoalDate(series.trendKg, target, rate) : null;
+  // The trend's date (Goals has the plan's), from the day shown rather than the clock, said as a month.
+  const eta = rate !== null && target ? projectedGoalDate(series.trendKg, target, rate, new Date(`${end}T12:00:00`)) : null;
   const sign = (kg: number) => (kg < -0.005 ? '−' : kg > 0.005 ? '+' : '');
 
   return (
@@ -62,7 +64,7 @@ export function WeightCard({ series, start, end, profile, usual }: { series: Wei
             Last weigh-in {diffDays(lastDate, end)} days ago.{'\n'}Weigh in to update your pace.
           </Text>
         ) : rate !== null ? (
-          <BigStat value={`${sign(rate)}${rateText(rate, units).replace(` ${unit}`, '')}`} unit={`${unit} / wk`} label="Last 3 weeks" align="right" />
+          <BigStat value={weeklyRateText(rate, units).replace(` ${unit} a week`, '')} unit={`${unit} a week`} label="Last 3 weeks" align="right" />
         ) : (
           <Text variant="caption" color="textSecondary" align="right" style={{ flexShrink: 1, marginBottom: 2 }}>
             Weekly rate appears after{'\n'}a week of weigh-ins
@@ -84,7 +86,7 @@ export function WeightCard({ series, start, end, profile, usual }: { series: Wei
           { label: outOfRange ? `Trend change, ${span}` : 'Trend change in range', value: `${sign(change)}${Math.abs(v(change)).toFixed(1)}`, unit },
           { label: 'Weigh-ins in range', value: outOfRange ? '0' : `${dots.length}` },
           target
-            ? { label: eta ? `Goal, around ${formatShortDate(toISODate(eta))}` : 'Goal weight', value: v(target).toFixed(1), unit }
+            ? { label: eta ? trendGoalLabel(eta) : 'Goal weight', value: v(target).toFixed(1), unit }
             : { label: 'Latest weigh-in', value: v(series.latest!.kg).toFixed(1), unit },
         ]}
       />

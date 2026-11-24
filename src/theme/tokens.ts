@@ -109,8 +109,10 @@ export const darkColors: ThemeColors = {
   sleep: '#B9A3F5',
   weight: '#B7C3C6',
   success: '#F6EEE3',
-  warning: '#F5B83D',
-  warningInk: '#F5B83D',
+  // A clear amber, yellower than the persimmon calorie fill it sits on (27.8 apart, CIEDE2000; it was
+  // 22.4 at #F5B83D and read as the same orange on a bar), and still 18 from the carbs' yellow-green.
+  warning: '#FFC400',
+  warningInk: '#FFC400',
   danger: '#FA5863',
   overlay: '#070606B8',
   track: '#2A2927',

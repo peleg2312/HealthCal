@@ -177,7 +177,8 @@ const water = [
   { id: 'water-empty', route: '/water', data: 'empty', note: 'nothing drunk yet' },
   { id: 'water-past-day', route: '/water?date={day}', day: -2, note: 'two days ago' },
   ...['tea', 'coffee', 'juice', 'milk', 'sports', 'other'].map((b) => ({ id: `water-${b}`, route: '/water', taps: [`water-beverage-${b}`], note: `${b} selected: the tiles' labels` })),
-  { id: 'water-reached', route: '/water', taps: ['water-add-3', 'water-add-3', 'water-add-3', 'water-add-3', 'water-add-3'], waitFor: 'water-goal-reached', note: 'the goal reached on screen: the calm card and the toast' },
+  { id: 'water-reached', route: '/water', taps: ['water-add-3', 'water-add-3', 'water-add-3', 'water-add-3', 'water-add-3'], waitFor: 'water-goal-reached', note: 'the goal reached on screen: one line under the cup (with the extra) and the toast' },
+  { id: 'water-reached-past-day', route: '/water?date={day}', day: -1, taps: ['water-add-3', 'water-add-3', 'water-add-3', 'water-add-3', 'water-add-3', 'water-add-3'], waitFor: 'water-goal-reached', note: "yesterday's goal reached: the line names the day, no bonus words" },
   { id: 'water-custom', route: '/water', imperial: true, type: { 'water-custom-input': '24' }, note: 'another amount typed in fl oz' },
   { id: 'water-sizes-sheet', route: '/water', taps: ['section-add-a-drink-action'], sheet: true, note: 'edit the glass sizes' },
   { id: 'water-sizes-imperial', route: '/water', imperial: true, taps: ['section-add-a-drink-action'], sheet: true, note: 'edit the glass sizes in fl oz' },
@@ -291,6 +292,7 @@ const sleep = [
   { id: 'sleep-sheet-row', route: '/sleep', taps: ['sleep-row-3'], sheet: true, note: 'an earlier night opened' },
   { id: 'sleep-help-open', route: '/sleep', taps: ['sleep-help'], waitFor: 'sleep-help-body', note: 'why 7 to 9 hours, open' },
   { id: 'sleep-past-day', route: '/sleep?date={day}', day: -4, note: 'four nights ago' },
+  { id: 'sleep-history-all', route: '/sleep', taps: ['section-sleep-history-action'], note: 'every night: "Show less" under the list' },
   // A night without a rating (what a synced night is until the person rates it). The demo's ratings are 2 to 5,
   // so tapping "Poor" twice selects it and clears it again whatever last night had; saving leaves it unrated.
   { id: 'sleep-unrated', route: '/sleep', taps: ['sleep-log', 'sleep-quality-1', 'sleep-quality-1', 'sleep-save', { wait: 4500 }], waitFor: 'sleep-last-night', note: 'last night saved without a rating' },
