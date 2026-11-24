@@ -62,14 +62,15 @@ export function IdeasCard({
                   ) : null}
                 </View>
                 {row.kind === 'added' ? (
-                  <View style={{ minWidth: 36, minHeight: 36, alignItems: 'center', justifyContent: 'center' }}>
+                  <View style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
                     <Text variant="caption" color="textSecondary" testID={`coach-idea-added-${i}`}>
                       {IDEA_ADDED}
                     </Text>
                   </View>
                 ) : (
-                  <IconButton testID={`coach-idea-add-${i}`} accessibilityLabel={ideaAddLabel(idea.name, meal)} size={36} tone="alt" onPress={() => onAdd(i)}>
-                    <Plus size={18} color={colors.text} strokeWidth={2.2} />
+                  // The same outlined "+" cup as a food row's in search and a saved meal's: it adds at once, with Undo.
+                  <IconButton testID={`coach-idea-add-${i}`} accessibilityLabel={ideaAddLabel(idea.name, meal)} size={44} tone="surface" onPress={() => onAdd(i)}>
+                    <Plus size={20} color={colors.text} strokeWidth={2.2} />
                   </IconButton>
                 )}
               </View>

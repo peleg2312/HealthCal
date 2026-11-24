@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { BURN_UNIT, budgetAdds, burnCaption, burnSource } from './logWords';
+import { BURN_UNIT, budgetAdds, budgetAddsShort, burnCaption, burnSource, NEXT_DAY_HINT } from './logWords';
 
 describe("the run log's two numbers", () => {
   it('labels the burn as burned, with its source and range', () => {
@@ -19,5 +19,17 @@ describe("the run log's two numbers", () => {
   });
   it('never uses the words of the other number', () => {
     for (const rule of ['day', 'week', 'off'] as const) expect(budgetAdds(rule, 100).words).not.toMatch(/burn/);
+  });
+  it("gives Train's history rows the same words, shorter", () => {
+    expect(budgetAddsShort('day')).toBe('added');
+    expect(budgetAddsShort('week')).toBe('added over 7 days');
+    expect(budgetAddsShort('off')).toBe('not added');
+    for (const rule of ['day', 'week', 'off'] as const) {
+      expect(budgetAdds(rule, 290).words.replace(' to your budget', '').replace('above resting, ', '')).toBe(budgetAddsShort(rule));
+    }
+  });
+  it("says why the run log's date stops at today, in plain words", () => {
+    expect(NEXT_DAY_HINT).toBe('Workouts are logged once done');
+    expect(NEXT_DAY_HINT).not.toMatch(/!|can't|cannot|should/);
   });
 });

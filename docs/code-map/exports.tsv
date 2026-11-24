@@ -113,17 +113,26 @@ src/features/activity/exercises.ts	ALL_EXERCISES	const
 src/features/activity/exercises.ts	EXERCISE_GROUPS	const
 src/features/activity/exercises.ts	ExerciseGroup	interface
 src/features/activity/exercises.ts	searchExercises	function
+src/features/activity/history.ts	FIGURE_CHAR_PX	const
+src/features/activity/history.ts	FIGURE_GAP	const
+src/features/activity/history.ts	FIGURE_WORDS_CHAR_PX	const
 src/features/activity/history.ts	HistoryWeek	interface
 src/features/activity/history.ts	META_CHAR_PX	const
+src/features/activity/history.ts	MIN_NAME_ROOM	const
+src/features/activity/history.ts	NAME_CHAR_PX	const
 src/features/activity/history.ts	WEEKS_PER_PAGE	const
 src/features/activity/history.ts	historyDaySpoken	function
 src/features/activity/history.ts	historyDayWord	function
+src/features/activity/history.ts	historyFigureBeside	function
+src/features/activity/history.ts	historyFigureWords	function
 src/features/activity/history.ts	historyMetaLines	function
 src/features/activity/history.ts	historyWeekLabel	function
 src/features/activity/history.ts	historyWeekTitle	function
 src/features/activity/history.ts	historyWeeks	function
 src/features/activity/logWords.ts	BURN_UNIT	const
+src/features/activity/logWords.ts	NEXT_DAY_HINT	const
 src/features/activity/logWords.ts	budgetAdds	function
+src/features/activity/logWords.ts	budgetAddsShort	function
 src/features/activity/logWords.ts	burnCaption	function
 src/features/activity/logWords.ts	burnSource	function
 src/features/activity/routines.ts	Routine	re-export	src/types/index.ts:Routine

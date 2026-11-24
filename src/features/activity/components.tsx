@@ -4,13 +4,16 @@ import { PixelRatio, Platform, useWindowDimensions, View } from 'react-native';
 
 import { DayStepper } from '@/features/food/components';
 import { useToday } from '@/store/clock';
+import { useLive, useProfile } from '@/store/selectors';
 import { INTENSITY_LABELS, kcalRange } from '@/lib/exercise';
+import { dayRuleFor, type ExerciseRule } from '@/lib/exerciseBudget';
 import { formatDistance, formatNumber } from '@/lib/units';
 import { cup, fonts, useTheme } from '@/theme';
-import type { ActivityEntry, UnitSystem } from '@/types';
+import type { ActivityEntry, ISODate, UnitSystem } from '@/types';
 import { CupKey, IconButton, MAX_FONT_SCALE, PressableScale, Text } from '@/ui';
 
-import { historyMetaLines } from './history';
+import { historyFigureBeside, historyFigureWords, historyMetaLines } from './history';
+import { budgetAdds, budgetAddsShort, NEXT_DAY_HINT } from './logWords';
 
 /**
  * The day of a workout: the app's one date control (`DayStepper`, `@/features/food/components`), the same look
@@ -19,7 +22,7 @@ import { historyMetaLines } from './history';
  */
 export function DateStepper({ date, onChange, testID = 'date' }: { date: string; onChange: (d: string) => void; testID?: string }) {
   const todayDate = useToday();
-  return <DayStepper value={date} onChange={onChange} testIDPrefix={testID} latest={todayDate} />;
+  return <DayStepper value={date} onChange={onChange} testIDPrefix={testID} latest={todayDate} nextHint={NEXT_DAY_HINT} />;
 }
 
 /** A workout's details as parts of its line: "75 min", "Moderate" (or its exercises and sets), "3.9 km". */
@@ -38,12 +41,22 @@ export function sessionParts(e: ActivityEntry, units: UnitSystem): string[] {
 /** Room for a history row's line: the screen's content width less the card's row (18 + emoji 24 + 12, trash 44 + 4). */
 const ROW_CHROME = 18 + 24 + 12 + 44 + 4;
 
+/** The budget rule of a workout's day, as that day's summary reads it (`dayRuleFor`): on the day, over 7 days or off. */
+function useDayRule(date: ISODate): ExerciseRule {
+  const profile = useProfile();
+  const days = useLive('days');
+  return dayRuleFor(profile, new Map(days.map((d) => [d.date, d])))(date);
+}
+
 /**
- * One workout as a row, as the diary draws a food: the name with the calories beside it, and under both, across
+ * One workout as a row, as the diary draws a food: the name with its figure beside it, and under both, across
  * the row, its line ("Today · 75 min · Moderate", `historyMetaLines`: one line at 360, at most two balanced
  * lines at 320, never a word alone). `day` (Train's history, where a week's card holds its rows) leads that
- * line and is spoken in the label. An estimate carries "~"; its range and "net" are in the label and on the
- * session's own screen ("likely 390–585 kcal"), and the week card above names the figures net.
+ * line and is spoken in the label. The figure is the net number the workout adds, with the run log's words for
+ * its day's rule (`budgetAddsShort`: "+290 kcal added", "+290 kcal added over 7 days", "290 kcal not added"),
+ * so it never reads as the run log's larger burn. Where the name and the figure do not fit side by side
+ * (`historyFigureBeside`), the figure takes a line of its own under the name. An estimate's range is in the
+ * label and on the session's own screen ("likely 390–585 kcal").
  */
 export function SessionRow({
   entry,
@@ -66,16 +79,28 @@ export function SessionRow({
   const range = measured ? null : kcalRange(entry.kcalNet);
   const parts = sessionParts(entry, units);
   const scale = Platform.OS === 'web' ? 1 : Math.min(PixelRatio.getFontScale(), MAX_FONT_SCALE);
-  const meta = historyMetaLines(day ? [day.word, ...parts] : parts, Math.min(width, 560) - 40 - ROW_CHROME, scale);
+  const room = Math.min(width, 560) - 40 - ROW_CHROME;
+  const meta = historyMetaLines(day ? [day.word, ...parts] : parts, room, scale);
+  const rule = useDayRule(entry.date);
+  const adds = budgetAdds(rule, entry.kcalNet);
+  const short = budgetAddsShort(rule);
+  const beside = historyFigureBeside(entry.name, adds.figure, short, room, scale);
   const spoken = [
     `Edit ${entry.name}`,
     ...(day ? [day.spoken] : []),
     ...parts,
     ...(garmin ? ['imported from Garmin'] : []),
-    measured
-      ? `${formatNumber(entry.kcalNet)} kilocalories net, measured`
-      : `about ${formatNumber(entry.kcalNet)} kilocalories net, likely ${formatNumber(range![0])} to ${formatNumber(range![1])}`,
+    measured ? `${adds.spoken}, measured` : `${adds.spoken}, an estimate, likely ${formatNumber(range![0])} to ${formatNumber(range![1])}`,
   ].join(', ');
+  const figure = (
+    <Text variant="numM" testID={`session-kcal-${entry.id}`} style={{ fontSize: 17, lineHeight: 22, flexShrink: beside ? 0 : 1 }}>
+      {adds.figure}
+      <Text variant="unit">{' kcal'}</Text>
+      <Text variant="label" color="textSecondary">
+        {historyFigureWords(short)}
+      </Text>
+    </Text>
+  );
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 18, paddingRight: 4 }}>
       <PressableScale
@@ -93,12 +118,9 @@ export function SessionRow({
             <Text variant="bodyStrong" numberOfLines={2} style={{ flex: 1, minWidth: 0, fontFamily: fonts.semibold }}>
               {entry.name}
             </Text>
-            <Text variant="numM" testID={`session-kcal-${entry.id}`} style={{ fontSize: 17, lineHeight: 22, flexShrink: 0 }}>
-              {measured ? '' : '~'}
-              {formatNumber(entry.kcalNet)}
-              <Text variant="unit">{' kcal'}</Text>
-            </Text>
+            {beside ? figure : null}
           </View>
+          {beside ? null : figure}
           <Text variant="caption" color="textSecondary" testID={`session-meta-${entry.id}`}>
             {meta.text}
           </Text>

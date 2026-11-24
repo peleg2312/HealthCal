@@ -120,7 +120,8 @@ export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: 
  * today. It never goes past `latest`: by default the diary's week ahead (food can be planned), today for a
  * workout. testIDs: `<prefix>-prev`, `<prefix>-today` (the middle), `<prefix>-label` (its words), `<prefix>-next`.
  */
-export function DayStepper({ value, onChange, testIDPrefix = 'day', latest }: { value: ISODate; onChange: (d: ISODate) => void; testIDPrefix?: string; latest?: ISODate }) {
+/** `nextHint`: why the next arrow is greyed when it is (a workout cannot be logged before it is done), read with it. */
+export function DayStepper({ value, onChange, testIDPrefix = 'day', latest, nextHint }: { value: ISODate; onChange: (d: ISODate) => void; testIDPrefix?: string; latest?: ISODate; nextHint?: string }) {
   const { colors, radius } = useTheme();
   const todayDate = useToday();
   const isToday = value === todayDate;
@@ -144,7 +145,7 @@ export function DayStepper({ value, onChange, testIDPrefix = 'day', latest }: { 
       </PressableScale>
       <IconButton
         testID={`${testIDPrefix}-next`}
-        accessibilityLabel="Next day"
+        accessibilityLabel={!forward && nextHint ? `Next day. ${nextHint}` : 'Next day'}
         tone="clear"
         size={44}
         disabled={!forward}

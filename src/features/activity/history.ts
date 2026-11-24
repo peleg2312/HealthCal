@@ -98,3 +98,51 @@ export function historyMetaLines(parts: readonly string[], roomPx: number, scale
   const k = best!.k;
   return { text: `${line(parts.slice(0, k))}\n${line(parts.slice(k))}`, lines: 2 };
 }
+
+/**
+ * Where a history row's figure goes ("+290 kcal added", the words from `budgetAddsShort`): beside the name, where
+ * the diary sets a food's calories, when both fit there (the name may take two lines, breaking at its spaces and
+ * hyphens, never inside a word); else on a line of its own under the name. Widths are estimates, as for the line
+ * under it, times the phone's text size: the 15 px semibold name (7 to 8.5 px a character measured), the 17 px
+ * Bricolage figure (about 10 a character) and the 13 px words after it (about 6).
+ */
+export const NAME_CHAR_PX = 8.5;
+export const FIGURE_CHAR_PX = 10.5;
+export const FIGURE_WORDS_CHAR_PX = 6.3;
+/** The gap between the name and the figure beside it. */
+export const FIGURE_GAP = 12;
+/**
+ * The least room a figure leaves beside it for a name (about "Volleyball" at the phone's text size). Under it the
+ * figure goes under the name on every row alike ("290 kcal not added" at 360, everything at 320), so the rows of
+ * one card differ only for a name with a very long word.
+ */
+export const MIN_NAME_ROOM = 88;
+
+export function historyFigureBeside(name: string, figure: string, words: string, roomPx: number, scale = 1): boolean {
+  const figureWide = (figure.length * FIGURE_CHAR_PX + ` kcal ${words}`.length * FIGURE_WORDS_CHAR_PX) * scale;
+  const nameRoom = roomPx - FIGURE_GAP - figureWide;
+  if (nameRoom < MIN_NAME_ROOM * scale) return false;
+  // The name's words wrapped greedily into lines that wide (a hyphen is a place to break, as on a phone).
+  let lines = 1;
+  let used = 0;
+  for (const word of name.replace(/-/g, '- ').split(/\s+/).filter(Boolean)) {
+    const wide = word.length * NAME_CHAR_PX * scale;
+    if (wide > nameRoom) return false;
+    const next = used ? used + NAME_CHAR_PX * scale + wide : wide;
+    if (next <= nameRoom) used = next;
+    else {
+      lines += 1;
+      used = wide;
+    }
+  }
+  return lines <= 2;
+}
+
+/**
+ * The figure's words as drawn after "kcal", held to it and to each other with no-break spaces but one, before
+ * "over 7 days": under the name the figure is one line at 360 and, where it is not, breaks only there
+ * ("+290 kcal added" / "over 7 days"), so no word is left alone.
+ */
+export function historyFigureWords(words: string): string {
+  return ` ${words.replace(/ /g, ' ').replace(' over', ' over')}`;
+}

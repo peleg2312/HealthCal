@@ -30,6 +30,7 @@ import { diaryWaterCaption, diaryWaterOpenLabel, waterDeleteLabel } from '@/feat
 import { drinkMeal, entryFor, noticeLine, pickedFood, planDrink, rememberedChoice, sameDrinkFoodIds, sameDrinkInDiary, selectChoice, selectFood, waterAfter, waterFromEntry, waterOnlyOffered, waterRowCaption, waterRowTitle, type WaterAfter } from '@/features/drinks/rules';
 import { leftLitreDecimals, shownMl, volumeNumber, volumeUnitFor, waterLeftMl } from '@/features/today/volume';
 import { useTheme } from '@/theme';
+import { pourLandsAt } from '@/theme/motion';
 import type { Beverage, Food, WaterEntry } from '@/types';
 import {
   AnimatedList,
@@ -49,7 +50,9 @@ import {
   SectionTitle,
   Sheet,
   Text,
+  motion,
   toast,
+  useReducedMotion,
   Vessel,
 } from '@/ui';
 
@@ -75,6 +78,21 @@ function factorLine(beverage: Beverage): string {
   const full = BEVERAGES.filter((b) => HYDRATION_FACTOR[b] >= 1).map((b) => BEVERAGE_LABELS[b].label.toLowerCase().replace(/drink$/, 'drinks'));
   const list = `${full.slice(0, -1).join(', ')} and ${full[full.length - 1]}`;
   return `${list[0].toUpperCase()}${list.slice(1)} count in full.`;
+}
+
+/**
+ * When "Goal reached" follows a glass that crosses the goal on screen, in ms after it: as the pour lands (when
+ * the cup draws its brim line and flashes, `pourLandsAt` of the level's change), or, when the count of the
+ * goal's share (`water-percent`, the pour's length and curve) does not read 100% by then, as it first does.
+ * `from` and `to` are the day's share of the goal before and after (1 is the goal).
+ */
+function reachedWordsAfter(from: number, to: number): number {
+  const lands = pourLandsAt(Math.min(1, to) - Math.min(1, from));
+  // The share of its tick at which the count first reads 100% (it rounds, so at 99.5%).
+  const share = to > from ? (0.995 - from) / (to - from) : 1;
+  // `pourLandsAt(0.05 / (1 - s))` is the moment of the pour's curve that reaches s, for s from 0.75 to 0.99.
+  const counts = share <= 0.75 ? 0 : share >= 0.99 ? 1 : pourLandsAt(0.05 / (1 - share));
+  return Math.round(motion.duration.pour * Math.max(lands, counts));
 }
 
 /**
@@ -149,6 +167,25 @@ function WaterScreen() {
   const left = waterLeftMl(consumed, goal, units);
   const reached = goal > 0 && consumed >= goal;
   const progress = goal > 0 ? consumed / goal : 0;
+  // The goal crossed with the screen open: the line under the cup keeps "left to drink" while the count runs
+  // and says "Goal reached" when the pour lands, with the cup's brim line, or later if the count does not read
+  // 100% by then (`reachedWordsAfter`), so the words never come before the number. Under reduced motion, and
+  // on a screen that opens on a met goal, it says so at once.
+  const reduce = useReducedMotion();
+  const [seen, setSeen] = useState({ date, reached, left, progress });
+  // While the count runs after the crossing: the ml left before it and when the words come; else null.
+  const [landing, setLanding] = useState<{ left: number; after: number } | null>(null);
+  if (seen.date !== date || seen.reached !== reached || seen.left !== left || seen.progress !== progress) {
+    setSeen({ date, reached, left, progress });
+    const crossed = seen.date === date && !seen.reached && reached && !reduce;
+    setLanding(crossed ? { left: seen.left, after: reachedWordsAfter(seen.progress, progress) } : reached ? landing : null);
+  }
+  useEffect(() => {
+    if (!landing) return;
+    const timer = setTimeout(() => setLanding(null), landing.after);
+    return () => clearTimeout(timer);
+  }, [landing]);
+  const reachedShown = reached && !landing;
   const glassMl = settings.waterPresets.includes(250) ? 250 : (settings.waterPresets[1] ?? settings.waterPresets[0] ?? 250);
 
   // What the next tap logs for the kind: the choice remembered on this device, else the kind's default (Water: none).
@@ -224,7 +261,7 @@ function WaterScreen() {
   };
 
   // The level crossed the goal while the screen is open: the vessel settles and flashes its brim
-  // (with Celebrations on), and this adds the haptic; the line under the cup already says it.
+  // (with Celebrations on), and this adds the haptic; the line under the cup says it as the count lands.
   const onReached = () => {
     haptic.success();
   };
@@ -320,7 +357,7 @@ function WaterScreen() {
 
         {/* The goal is the cup's top label; under the cup only what is left, or, once the goal is reached, one
             line that says so with the extra (the brim line on the cup carries the moment: no second cup or check). */}
-        {reached ? (
+        {reachedShown ? (
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
             <View style={{ paddingTop: 2 }}>
               <Check size={18} color={colors.text} strokeWidth={2.2} />
@@ -345,7 +382,7 @@ function WaterScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} testID="water-glasses">
               <CupKey color={colors.water} />
               <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
-                {`About ${glassesLeft(left, glassMl)} × ${formatVolume(glassMl, units)} to go`}
+                {`About ${glassesLeft(landing?.left ?? left, glassMl)} × ${formatVolume(glassMl, units)} to go`}
               </Text>
             </View>
           </View>

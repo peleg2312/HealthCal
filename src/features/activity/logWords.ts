@@ -3,7 +3,8 @@
  * ("~487 kcal burned", the whole burn, resting included) and what reaches the budget, which is only the part
  * above resting and only by the budget rule of the session's day (`exercisePlaced`, `@/lib/exerciseBudget`):
  * "+423 kcal added to your budget" on the day, "+423 kcal added to your budget over 7 days" spread over a week,
- * "423 kcal above resting, not added" when adding is off. Pure.
+ * "423 kcal above resting, not added" when adding is off. Train's history rows say the same, shorter
+ * (`budgetAddsShort`: "+423 kcal added"). Pure.
  */
 import type { ExerciseRule } from '@/lib/exerciseBudget';
 import { formatNumber } from '@/lib/units';
@@ -28,3 +29,17 @@ export function budgetAdds(rule: ExerciseRule, net: number): { figure: string; w
   const words = rule === 'week' ? 'added to your budget over 7 days' : 'added to your budget';
   return { figure: `+${n}`, words, spoken: `${n} kilocalories ${words}` };
 }
+
+/**
+ * The same words cut to a history row's few, after "+290 kcal": `budgetAdds` less "to your budget" and
+ * "above resting" ("added", "added over 7 days", "not added"), so the row and the run log never disagree.
+ */
+export function budgetAddsShort(rule: ExerciseRule): string {
+  return rule === 'off' ? 'not added' : rule === 'week' ? 'added over 7 days' : 'added';
+}
+
+/**
+ * What the run log's greyed next-day arrow says to a screen reader: the date stops at today because a burn is
+ * logged once it happened (food can be planned a week ahead; a workout cannot).
+ */
+export const NEXT_DAY_HINT = 'Workouts are logged once done';

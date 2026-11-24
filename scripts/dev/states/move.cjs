@@ -62,6 +62,8 @@ const train = [
   { id: 'train-load-sheet-past', route: '/train?week={day}', day: -14, taps: ['train-guideline-help'], sheet: true, note: 'a past week: the old line, its info cup opens the same sheet' },
   { id: 'train-load-sheet-stress', route: '/train', data: 'stress', taps: ['train-load-info'], sheet: true, note: 'the sheet over the long-content weeks (a big step up, 1,340 minutes)' },
   { id: 'train-history-more', route: '/train', data: 'stress', taps: ['train-show-more'], note: 'History with earlier sessions shown' },
+  { id: 'train-history-week', route: '/train', values: { spread: 1 }, waitFor: 'train-history', note: 'History on "Over 7 days": each figure under its name, "+290 kcal added over 7 days"' },
+  { id: 'train-history-off', route: '/train', values: { eatBack: 0 }, waitFor: 'train-history', note: 'History with adding off: "290 kcal not added" under every name alike' },
   // "Bring in workouts": one row under Log activity and Workout, and its sheet of choices (each keeps its own testID).
   { id: 'train-bring-sheet', route: '/train', taps: ['train-bring-in'], waitFor: 'train-import-garmin', sheet: true, note: 'the browser: Import workouts, Add steps from your Health export, then Automatic sync' },
   { id: 'train-bring-iphone', route: '/train', health: IPHONE_ON, taps: [toastGone], waitFor: 'train-bring-in', note: 'iPhone with sync on and a workout to look at: the row says so with the amber key' },

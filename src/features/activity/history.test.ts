@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ActivityEntry } from '@/types';
 
-import { historyDaySpoken, historyDayWord, historyMetaLines, historyWeekLabel, historyWeeks, historyWeekTitle } from './history';
+import { historyDaySpoken, historyDayWord, historyFigureBeside, historyFigureWords, historyMetaLines, historyWeekLabel, historyWeeks, historyWeekTitle } from './history';
 
 // Tuesday, Nov 24 2026: its week starts on Monday, Nov 23.
 const TODAY = '2026-11-24';
@@ -81,5 +81,33 @@ describe("a history row's line", () => {
   it('grows with the phone\'s text size', () => {
     expect(historyMetaLines(['Today', '75 min', 'Moderate'], at360, 1.3).lines).toBe(1);
     expect(historyMetaLines(['Yesterday', '75 min', 'Moderate'], at320, 1.3).lines).toBe(2);
+  });
+});
+
+describe("a history row's figure", () => {
+  const at360 = 218;
+  const at320 = 178;
+  it('sits beside the name at 360 on "Same day", the name taking two lines at most and no word cut', () => {
+    for (const name of ['Volleyball', 'Running', 'Basketball', 'Swimming', 'Strength training', 'Yoga']) {
+      expect(historyFigureBeside(name, '+290', 'added', at360)).toBe(true);
+    }
+  });
+  it('takes a line of its own where the two do not fit: a long word, a long name, 320 px, larger text', () => {
+    expect(historyFigureBeside('Stand-up paddleboarding', '+290', 'added', at360)).toBe(false);
+    expect(historyFigureBeside('Cross-country skiing on a long trail', '+290', 'added', at360)).toBe(false);
+    expect(historyFigureBeside('Volleyball', '+290', 'added', at320)).toBe(false);
+    expect(historyFigureBeside('Volleyball', '+290', 'added', at360, 1.3)).toBe(false);
+    // "Over 7 days" leaves no room beside a name, and "not added" too little for every row of a card alike:
+    // a short name goes under too, so one card's rows never differ by the length of a name.
+    expect(historyFigureBeside('Volleyball', '+290', 'added over 7 days', at360)).toBe(false);
+    expect(historyFigureBeside('Running', '290', 'not added', at360)).toBe(false);
+    expect(historyFigureBeside('Yoga', '+290', 'added', at320)).toBe(false);
+    // A wider phone has the room.
+    expect(historyFigureBeside('Volleyball', '290', 'not added', 393 - 40 - 102)).toBe(true);
+  });
+  it('holds its words together, breaking only before "over 7 days"', () => {
+    expect(historyFigureWords('added')).toBe('\u00A0added');
+    expect(historyFigureWords('not added')).toBe('\u00A0not\u00A0added');
+    expect(historyFigureWords('added over 7 days')).toBe('\u00A0added over\u00A07\u00A0days');
   });
 });
