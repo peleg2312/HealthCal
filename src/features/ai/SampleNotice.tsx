@@ -28,10 +28,13 @@ export function SampleNotice({ reason, variant }: { reason: Reason; variant: 'be
     <View
       testID={`ai-sample-notice-${variant}`}
       accessibilityRole="alert"
+      // A neutral note: the card surface inside the card's 1 px line all round, never amber (amber means only a value
+      // above its limit, or something held up that waits on the person: a sample is neither). The flask and the
+      // title say what it is.
       style={{
-        backgroundColor: colors.surfaceAlt,
-        borderLeftWidth: 3,
-        borderColor: colors.warning,
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.border,
         ...cup(radius.card),
         paddingLeft: spacing.lg,
         paddingRight: spacing.xs,

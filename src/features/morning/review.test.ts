@@ -89,14 +89,14 @@ describe('cases A to G', () => {
     expect(wentWell(C)).toEqual([]);
     expect(toAdjust(C)).toEqual([]);
     expect(reviewNote(C.y)).toBe(NOTE_PART_LOGGED);
-    expect(NOTE_PART_LOGGED).toBe('With part of the day logged, its totals are not compared with your targets.');
+    expect(NOTE_PART_LOGGED).toBe('With part of the day logged, its totals are not compared with your budget and goals.');
   });
 
   it('D: only water', () => {
     expect(wentWell(D)).toEqual([]);
     expect(toAdjust(D)).toEqual([]);
     expect(reviewNote(D.y)).toBe(NOTE_NO_FOOD);
-    expect(NOTE_NO_FOOD).toBe("With no food logged, the day's totals are not compared with your targets.");
+    expect(NOTE_NO_FOOD).toBe("With no food logged, the day's totals are not compared with your budget and goals.");
   });
 
   it('E: nothing logged has no lists and no note', () => {

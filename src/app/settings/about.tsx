@@ -193,11 +193,11 @@ export default function AboutScreen() {
         <P>
           Protein is set per kg of body weight: 2.0 g when losing (to protect muscle), 1.6 g when maintaining and 1.8 g when gaining. For people
           with a higher body mass index (above 27.5) the weight at a BMI of 25 is used, and with a known body fat percentage lean mass is used, so
-          targets do not overshoot. Protein stays between 15% and 40% of calories.
+          the protein goal does not overshoot. Protein stays between 15% and 40% of calories.
         </P>
         <P>
           Fat is about 28% of calories and never below 0.6 g per kg. Carbohydrates fill the rest, with at least 50 g. Fibre is 14 g per 1,000 kcal.
-          You can pick a preset or your own split in Goals and targets.
+          You can pick a preset or your own split in Goals.
         </P>
       </Section>
 
@@ -280,8 +280,8 @@ export default function AboutScreen() {
       <Section icon={(c) => <Lock size={20} color={c} />} color={colors.success} title="Privacy" testID="about-privacy">
         <P>
           Your data stays on this device unless you create an account. With an account it is stored in your private space on HealthCal&apos;s
-          server so it can sync, and no other account can read it. No ads, no tracking, no selling of data. You can export everything or delete
-          it at any time.
+          server so it can sync, and no other account can read it; friends, if you turn them on, see your workouts and streak. No ads, no
+          tracking, no selling of data. You can export everything you log or delete it at any time.
         </P>
         <P>
           A meal photo or description leaves this device only when you ask for an AI estimate, and a question to the coach only when you send it;

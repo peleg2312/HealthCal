@@ -308,7 +308,7 @@ function invalidAria(invalid: boolean, describedBy: string | undefined): object 
   };
 }
 
-/** A field's unit as a screen reader says it: "Target weight, kilograms", never "kg". */
+/** A field's unit as a screen reader says it: "Goal weight, kilograms", never "kg". */
 const SPOKEN_UNIT: Record<string, string> = {
   kg: 'kilograms',
   lb: 'pounds',

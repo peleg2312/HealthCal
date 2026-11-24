@@ -36,9 +36,14 @@ export interface StepProps {
   hold: () => void;
 }
 
-const Group = ({ children, gap }: { children: React.ReactNode; gap?: number }) => {
+/** A column of the step's parts. `radiogroup` names a list of choice tiles as one single choice (its radios' group), by the question. */
+const Group = ({ children, gap, radiogroup }: { children: React.ReactNode; gap?: number; radiogroup?: string }) => {
   const { spacing } = useTheme();
-  return <View style={{ gap: gap ?? spacing.md }}>{children}</View>;
+  return (
+    <View style={{ gap: gap ?? spacing.md }} {...(radiogroup ? { accessibilityRole: 'radiogroup' as const, role: 'radiogroup' as const, accessibilityLabel: radiogroup } : null)}>
+      {children}
+    </View>
+  );
 };
 
 // ------------------------------------------------------------------ basics
@@ -104,7 +109,7 @@ export function GoalStep({ draft, set, errors, advance }: StepProps) {
   return (
     <Group gap={spacing.xl}>
       <StepTitle title={name ? `What's your goal, ${name}?` : "What's your goal?"} subtitle="It sets your calorie target and protein." />
-      <Group gap={spacing.sm}>
+      <Group gap={spacing.sm} radiogroup="Your goal">
         {options.map((o, i) => (
           <ChoiceCard
             key={o.value}
@@ -135,7 +140,7 @@ export function SexStep({ draft, set, errors, advance }: StepProps) {
   return (
     <Group gap={spacing.xl}>
       <StepTitle title="Which sex should the estimate use?" subtitle="The one closest to your body." />
-      <Group gap={spacing.sm}>
+      <Group gap={spacing.sm} radiogroup="Sex for the estimate">
         <View style={{ flexDirection: large ? 'column' : 'row', gap: spacing.sm }}>
           {(['female', 'male'] as const).map((s) => (
             <View key={s} style={large ? null : { flex: 1 }}>
@@ -400,7 +405,7 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
   return (
     <Group gap={spacing.xl}>
       <StepTitle title="Body fat" subtitle="Optional. Helps for lean or muscular bodies." />
-      <Group gap={spacing.sm}>
+      <Group gap={spacing.sm} radiogroup="Body fat">
         {modes.map((m) => (
           <ChoiceCard
             key={m.value}
@@ -542,7 +547,7 @@ export function ActivityStep({ draft, set, errors, advance }: StepProps) {
   return (
     <Group gap={spacing.xl}>
       <StepTitle title="A normal day, without workouts" subtitle="Your job, chores and getting around." />
-      <Group gap={spacing.sm}>
+      <Group gap={spacing.sm} radiogroup="A normal day, without workouts">
         {levels.map((l, i) => (
           <ChoiceCard
             key={l}

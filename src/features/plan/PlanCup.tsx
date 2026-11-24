@@ -10,8 +10,10 @@
  * - `row` (24 x 30, a `MiniCup`): a cell of the comparison table, and the used-up cup at the estimate's limit.
  * - `small` (16 x 20): beside the coach's limit notice.
  *
- * `goalKind` is 'reach' for what Plus gives (full is the whole allowance) and 'limit' where the cup
- * shows an allowance that is used up (full, never amber, no brim line: nothing was reached). A full
+ * `goalKind` is 'reach' only on the membership card's hero cup, whose brim flash marks Plus arriving, and
+ * 'limit' wherever the cup shows an allowance: the comparison table's cups (a Plus cup is full, the whole
+ * allowance) and the cup of an allowance that is used up (full, never amber, no brim line: nothing was
+ * reached). A full
  * limit cup stands a hair under its open top (`fullLevel`), so its whole level line shows across the
  * top of the fill, inside the walls, as the kit draws any cup with room above its level; at exactly
  * the top the kit's open cup clips half the line away and the cup reads as a flat block.

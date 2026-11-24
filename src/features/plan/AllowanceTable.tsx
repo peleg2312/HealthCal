@@ -2,8 +2,9 @@
  * The comparison card of the plan screen: what each plan gives a day, as cups. One card, three
  * columns: the row labels (each with the AI family's glyph, ruling D1), the Free column and the Plus
  * column. A Free cup is poured to its share of Plus (5 of 40 estimates fills an eighth), so the
- * difference is seen before it is read; every Plus cup is brim-full and wears the brim line, the
- * kit's mark for "the whole of it". The column of the plan the person holds says "Your plan".
+ * difference is seen before it is read; every Plus cup is full, with its ordinary level line inside its
+ * walls (a 'limit' cup at `fullLevel`, ./PlanCup.tsx), never the brim line, which means a goal reached:
+ * nothing is reached here. The column of the plan the person holds says "Your plan".
  *
  * Every cup stands on the card itself: the Plus column is set apart by a hairline down its side and
  * its own head, not by a tint, because on a tint (surfaceAlt) the cups' outline and fill fall under
@@ -149,6 +150,8 @@ export function AllowanceTable({ free, plus, current, testID = 'plan-compare' }:
                 <PlanCup
                   size="row"
                   level={plan === 'free' ? shareOfPlus(n, NUMBER[r.key](plus)) : 1}
+                  // An allowance, not a goal: a full cup keeps its level line inside the walls, never the brim line.
+                  goalKind="limit"
                   // Free cups pour first, then Plus: left to right, top down.
                   index={(plan === 'free' ? 0 : rows.length) + i}
                   memoryKey={`plan-${plan}-${r.key}`}
@@ -207,7 +210,7 @@ export function AllowanceTable({ free, plus, current, testID = 'plan-compare' }:
                       alignItems: 'center',
                       gap: m.cellGap,
                     }}>
-                    <PlanCup size="row" level={plan === 'free' ? shareOfPlus(n, NUMBER[r.key](plus)) : 1} index={(plan === 'free' ? 0 : rows.length) + i} memoryKey={`plan-${plan}-${r.key}`} />
+                    <PlanCup size="row" level={plan === 'free' ? shareOfPlus(n, NUMBER[r.key](plus)) : 1} goalKind="limit" index={(plan === 'free' ? 0 : rows.length) + i} memoryKey={`plan-${plan}-${r.key}`} />
                     <Text variant="numM" tabular>
                       {n}
                     </Text>

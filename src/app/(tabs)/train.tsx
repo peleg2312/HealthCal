@@ -1,7 +1,7 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ChevronDown, ChevronRight, Dumbbell, Plus, Timer } from 'lucide-react-native';
 import React, { useCallback, useMemo, useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { TabHeader } from '@/components/TabHeader';
 import { ACTIVITY_BY_ID, POPULAR_ACTIVITY_IDS } from '@/data/activities';
@@ -25,6 +25,8 @@ import { useLive, useProfile } from '@/store/selectors';
 import { useTextGrowth, useTheme } from '@/theme';
 import type { ActivityEntry } from '@/types';
 import { Button, Card, Chip, ConfirmSheet, EmptyState, RestoreRow, Screen, SectionTitle, Text } from '@/ui';
+
+const web = Platform.OS === 'web';
 
 export default function TrainScreen() {
   const { colors, spacing } = useTheme();
@@ -192,19 +194,22 @@ export default function TrainScreen() {
                     .map((part, i) => (/^\d/.test(part) ? `${i ? ' ' : ''}${part}` : <Text key={i} variant="unit">{` ${part}`}</Text>))}
                 </Text>
               </View>
-              {w.entries.map((e, i) => (
-                <View key={e.id}>
-                  {i > 0 ? <View style={{ height: 1, backgroundColor: colors.border, marginLeft: 18 + 24 + 12 }} /> : null}
-                  <SessionRow
-                    entry={e}
-                    units={profile.units}
-                    day={{ word: historyDayWord(e.date, t), spoken: historyDaySpoken(e.date, t) }}
-                    onPress={() => openSession(e)}
-                    onDelete={() => removeSession(e)}
-                  />
-                  <SyncedFromLine entry={e} />
-                </View>
-              ))}
+              {/* The week's workouts are a list on the web (a ul of li), so a screen reader says how many and where it is. */}
+              <View {...(web ? { role: 'list' } : null)}>
+                {w.entries.map((e, i) => (
+                  <View key={e.id} {...(web ? { role: 'listitem' } : null)}>
+                    {i > 0 ? <View style={{ height: 1, backgroundColor: colors.border, marginLeft: 18 + 24 + 12 }} /> : null}
+                    <SessionRow
+                      entry={e}
+                      units={profile.units}
+                      day={{ word: historyDayWord(e.date, t), spoken: historyDaySpoken(e.date, t) }}
+                      onPress={() => openSession(e)}
+                      onDelete={() => removeSession(e)}
+                    />
+                    <SyncedFromLine entry={e} />
+                  </View>
+                ))}
+              </View>
             </Card>
           ))}
           {history.length > visibleWeeks.length ? (

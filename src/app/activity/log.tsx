@@ -273,7 +273,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
 
       {/* Duration */}
       <View style={{ gap: spacing.sm }}>
-        <Text variant="title">Duration</Text>
+        <Text variant="title" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>Duration</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
           <IconButton accessibilityLabel="5 minutes less" testID="duration-minus" size={48} tone="surface" style={{ borderColor: colors.borderStrong }} onPress={() => setDuration(Math.max(1, minutes - 5))} disabled={minutes <= 1}>
             <Minus size={20} color={colors.text} />
@@ -310,7 +310,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
 
       {/* Intensity */}
       <View style={{ gap: spacing.sm }}>
-        <Text variant="title">Effort</Text>
+        <Text variant="title" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>Effort</Text>
         {singleMet ? (
           <Card tone="alt" padding={spacing.md} testID="intensity-single">
             <Text variant="body" color="textSecondary">
@@ -320,7 +320,12 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
         ) : (
           <>
             {/* Three tiles side by side, or three rows when a hint's word would not fit a tile (see `tight`). */}
-            <View style={{ flexDirection: tight ? 'column' : 'row', gap: spacing.sm }}>
+            {/* One choice of a form: the three radios are one group, named by the field's title. */}
+            <View
+              accessibilityRole="radiogroup"
+              {...({ role: 'radiogroup' } as object)}
+              accessibilityLabel="Effort"
+              style={{ flexDirection: tight ? 'column' : 'row', gap: spacing.sm }}>
               {INTENSITIES.map((i) => {
                 const active = intensity === i;
                 const hint = hints[INTENSITIES.indexOf(i)];
@@ -394,7 +399,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
 
       {/* Date */}
       <View style={{ gap: spacing.sm }}>
-        <Text variant="title">Day</Text>
+        <Text variant="title" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>Day</Text>
         <DateStepper date={date} onChange={setDate} testID="log-date" />
       </View>
 

@@ -329,7 +329,8 @@ export function MealCard({
       <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', justifyContent: 'flex-end', alignItems: 'center', gap: spacing.xs, paddingLeft: ROW_PAD, paddingRight: 14 }}>
         {/* A big total ("1,450 kcal") goes under the meal's name on a narrow phone rather than cutting it. */}
         <View style={[big ? { flexGrow: 1, flexShrink: 1, flexBasis: 'auto' } : { flex: 1 }, { minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10 }]}>
-          <Text variant="h3" numberOfLines={1} style={{ flexShrink: big ? 0 : 1 }}>
+          {/* The meal's name is a heading at level 2, as a SectionTitle is (WCAG 1.3.1): the diary reads Breakfast, Lunch, ... by heading. */}
+          <Text variant="h3" numberOfLines={1} accessibilityRole="header" {...({ 'aria-level': 2 } as object)} style={{ flexShrink: big ? 0 : 1 }}>
             {label}
           </Text>
           {entries.length > 0 ? (

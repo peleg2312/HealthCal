@@ -221,8 +221,8 @@ export function toAdjust(i: ReviewInput): ReviewItem[] {
   return items.slice(0, i.firstWeek ? MAX_ADJUST_FIRST_WEEK : MAX_ADJUST);
 }
 
-export const NOTE_PART_LOGGED = 'With part of the day logged, its totals are not compared with your targets.';
-export const NOTE_NO_FOOD = "With no food logged, the day's totals are not compared with your targets.";
+export const NOTE_PART_LOGGED = 'With part of the day logged, its totals are not compared with your budget and goals.';
+export const NOTE_NO_FOOD = "With no food logged, the day's totals are not compared with your budget and goals.";
 
 /** The caption under yesterday's card when the day is not judged on food and water, else null. */
 export function reviewNote(y: DayFacts): string | null {

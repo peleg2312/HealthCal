@@ -114,18 +114,18 @@ function goodPhrase(item: ReviewItem, y: DayFacts): string {
     case 'budget':
       return 'a day within budget';
     case 'protein':
-      return 'protein on target';
+      return 'protein at its goal';
     case 'water':
-      return 'water on target';
+      return 'water at its goal';
     default:
       return 'the whole day logged';
   }
 }
 
-/** One or two went-well items as one phrase: "your workout and a full night's sleep", "protein and water on target". */
+/** One or two went-well items as one phrase: "your workout and a full night's sleep", "protein and water at their goals". */
 export function goodList(items: readonly ReviewItem[], y: DayFacts): string {
   const kinds = items.map((i) => i.kind);
-  if (kinds.length === 2 && kinds[0] === 'protein' && kinds[1] === 'water') return 'protein and water on target';
+  if (kinds.length === 2 && kinds[0] === 'protein' && kinds[1] === 'water') return 'protein and water at their goals';
   return items.map((i) => goodPhrase(i, y)).join(' and ');
 }
 
@@ -180,8 +180,8 @@ export const OPEN_FIRST_WEEK: readonly string[] = ['Small steps count in a first
 export const IMPROVE: Readonly<Record<'cal' | 'sleep' | 'water' | 'protein' | 'log', readonly string[]>> = {
   cal: ['A fresh budget today; plan the next meal from it.', 'Today brings a fresh budget.', 'Today is a new budget, one meal at a time.'],
   sleep: [
-    `Next step: an earlier night tonight, ${GOOD_NIGHT_H} h is the target.`,
-    `Tonight, give sleep more room: ${GOOD_NIGHT_H} h is the target.`,
+    `Next step: an earlier night tonight, ${GOOD_NIGHT_H} h is the goal.`,
+    `Tonight, give sleep more room: ${GOOD_NIGHT_H} h is the goal.`,
     `An earlier night is the next step, toward ${GOOD_NIGHT_H} h.`,
   ],
   water: ['Next step: a glass with each meal today.', 'Water next: keep a glass in reach today.', 'A glass with every meal is the next step.'],

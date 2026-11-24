@@ -30,6 +30,12 @@ export interface ThemeColors {
   primarySoft: string;
   /** The primary as text where `primary` itself is under 4.5:1: on primarySoft (the soft button), bg and surfaceAlt. A shade darker in light and Blossom. */
   primaryInk: string;
+  /**
+   * The ink of a borderless control: a ghost button's label and its icon. Its own colour, at least 15 apart
+   * (CIEDE2000) from `caloriesInk` in every look, so a control is never drawn in the colour of a calorie figure
+   * (in Dark the accent and the calorie ink are one persimmon). 4.5:1 on bg, bgElevated, surface and surfaceAlt.
+   */
+  actionInk: string;
   /** Semantic data colours, identical meaning in every theme. Fills and key marks only, never text. */
   calories: string;
   protein: string;
@@ -71,6 +77,18 @@ export interface ThemeColors {
   cameraInk: string;
   /** Calorie colour for text and large numbers (the calorie fill is too light to read in light and Blossom). */
   caloriesInk: string;
+  /**
+   * The calorie colour as a solid bar in a chart (the kit's `BarChart` draws a solid segment in `calories` with
+   * it): 3:1 on the card in every look. It equals `calories` everywhere but Blossom, whose tickle-pink cup fill
+   * is 2.4:1 on the card; there the bar is a deeper pink.
+   */
+  caloriesBar: string;
+  /**
+   * A dashed line that carries meaning: a chart's goal line and the dashed slot of an empty meal. 3:1 on the
+   * page and the card (bg, bgElevated, surface) in every look. `borderStrong` stays the hairline for dashes
+   * that only divide.
+   */
+  dashEdge: string;
   /** @deprecated No gradients in Pour. Equals `surface`; kept so old callers do not break. */
   heroStart: string;
   /** @deprecated No gradients in Pour. Equals `surface`. */
@@ -108,6 +126,8 @@ export const darkColors: ThemeColors = {
   onPrimary: '#1F120A',
   primarySoft: '#FF946624',
   primaryInk: '#FF9466',
+  // A pale rose-peach: the persimmon is also the calorie ink here, so a control needs a colour of its own (16 apart).
+  actionInk: '#F0BAB4',
   calories: '#FF9466',
   protein: '#F28BB8',
   carbs: '#C9D45A',
@@ -133,6 +153,8 @@ export const darkColors: ThemeColors = {
   fieldEdge: '#726D67',
   cameraInk: '#FFFFFF',
   caloriesInk: '#FF9466',
+  caloriesBar: '#FF9466',
+  dashEdge: '#726D67',
   heroStart: '#1F1E1C',
   heroEnd: '#1F1E1C',
   ringEnd: '#FF9466',
@@ -149,12 +171,14 @@ export const lightColors: ThemeColors = {
   border: '#E2D8CA',
   borderStrong: '#B9AB99',
   text: '#211913',
-  textSecondary: '#5C5046',
+  // 7:1 on the page, the card and the soft surface (WCAG's enhanced level for reading text).
+  textSecondary: '#54483F',
   textTertiary: '#73665A',
   primary: '#BF4420',
   onPrimary: '#FFFFFF',
   primarySoft: '#BF44201A',
   primaryInk: '#AD3C1C',
+  actionInk: '#782A18',
   calories: '#E2683F',
   protein: '#B43872',
   carbs: '#5E9B1F',
@@ -178,6 +202,8 @@ export const lightColors: ThemeColors = {
   fieldEdge: '#8E8273',
   cameraInk: '#FFFFFF',
   caloriesInk: '#BF4420',
+  caloriesBar: '#E2683F',
+  dashEdge: '#8E8273',
   heroStart: '#FFFCF8',
   heroEnd: '#FFFCF8',
   ringEnd: '#E2683F',
@@ -206,12 +232,13 @@ export const blossomColors: ThemeColors = {
   border: '#F2D3DC',
   borderStrong: '#D99AB2',
   text: '#3B1427',
-  textSecondary: '#6E3D54',
+  textSecondary: '#68384F',
   textTertiary: '#8A5670',
   primary: blossom.raspberry,
   onPrimary: '#FFFFFF',
   primarySoft: blossom.blush,
   primaryInk: '#AE2E64',
+  actionInk: '#781266',
   calories: blossom.ticklePink,
   protein: '#8A2F72',
   carbs: '#5E9B1F',
@@ -235,6 +262,9 @@ export const blossomColors: ThemeColors = {
   fieldEdge: '#B2788F',
   cameraInk: '#FFFFFF',
   caloriesInk: '#B42F66',
+  // 3.0:1 on the card, where the tickle-pink is 2.4:1: a calorie bar is drawn without the outline a cup has.
+  caloriesBar: '#E46A9E',
+  dashEdge: '#B2788F',
   heroStart: '#FFFDFA',
   heroEnd: '#FFFDFA',
   ringEnd: blossom.ticklePink,
@@ -271,12 +301,14 @@ export const butterColors: ThemeColors = {
   border: '#E4DAB0',
   borderStrong: '#B9A27F',
   text: ownerPalette.javaBrown,
-  textSecondary: ownerPalette.pottingSoil,
+  // Potting Soil a step darker: 7:1 on the cerulean soft surface and tab bar as on the butter paper.
+  textSecondary: '#3E2722',
   textTertiary: '#5E4339',
   primary: ownerPalette.sceptreRed,
   onPrimary: ownerPalette.transparentYellow,
   primarySoft: '#A5BCD666',
   primaryInk: ownerPalette.sceptreRed,
+  actionInk: ownerPalette.sceptreRed,
   calories: '#C4475E',
   protein: '#9A5CAA',
   carbs: '#5E8A2A',
@@ -302,6 +334,8 @@ export const butterColors: ThemeColors = {
   fieldEdge: '#958166',
   cameraInk: '#FFFFFF',
   caloriesInk: '#93263D',
+  caloriesBar: '#C4475E',
+  dashEdge: '#958166',
   heroStart: '#FCF9E6',
   heroEnd: '#FCF9E6',
   ringEnd: '#C4475E',
@@ -322,6 +356,7 @@ export const honeyColors: ThemeColors = {
   // Its own burnt-amber ink: Butter's would sit 7.9 from the honey number ink, so "over" would not change colour.
   warningInk: '#703406',
   caloriesInk: '#7A5512',
+  caloriesBar: '#B48820',
   ringEnd: '#B48820',
 };
 
@@ -348,6 +383,7 @@ export const javaColors: ThemeColors = {
   onPrimary: ownerPalette.javaBrown,
   primarySoft: '#A5BCD62E',
   primaryInk: ownerPalette.ceruleanBlue,
+  actionInk: ownerPalette.ceruleanBlue,
   calories: '#CC4F66',
   protein: '#A664B6',
   carbs: '#6A9438',
@@ -371,6 +407,8 @@ export const javaColors: ThemeColors = {
   fieldEdge: '#8A6D5C',
   cameraInk: '#FFFFFF',
   caloriesInk: '#F27A90',
+  caloriesBar: '#CC4F66',
+  dashEdge: '#8A6D5C',
   heroStart: '#31221D',
   heroEnd: '#31221D',
   ringEnd: '#CC4F66',

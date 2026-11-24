@@ -18,9 +18,11 @@
 
 /**
  * The day these texts last changed (YYYY-MM-DD). 2026-11-24: each page gained its short layer (`summary`),
- * and on the privacy page it stands where the "In short" section was drawn. No fact changed and the
- * sections are word for word as they were. A section's `jump` label is navigation, not text of the page:
- * adding or changing one does not move the date.
+ * and on the privacy page it stands where the "In short" section was drawn. The same day the privacy
+ * page's short layer gained its friends line (what a friend sees, from the Friends section), its export
+ * line says the coach chat stays on the phone (as the coach section does), and the profile is said to hold
+ * the goal weight and the calorie target. A section's `jump` label is navigation, not text of the page: adding or
+ * changing one does not move the date.
  */
 export const LEGAL_UPDATED = '2026-11-24';
 
@@ -212,9 +214,10 @@ export const PRIVACY: LegalDocument = {
   summary: [
     { id: 'device', text: 'Without an account, everything you log stays on this device.' },
     { id: 'account', text: 'With an account, it is kept in your private space so it can back up and sync. No other account can read it.' },
+    { id: 'friends', text: 'Friends are off until you turn them on; then a friend sees your workouts and streak, never your food or weight.' },
     { id: 'ads', text: 'No ads, no tracking, no analytics and no selling of data.' },
     { id: 'ai', text: 'The AI gets what you give it once you agree; the coach adds your last few questions and answers and, if shared, a week summary.' },
-    { id: 'yours', text: 'You can export everything or delete it at any time.' },
+    { id: 'yours', text: 'You can export everything you log or delete it at any time; the coach chat stays on this phone.' },
   ],
   intro: 'HealthCal is built to keep your data on your phone. This page says what leaves it, when, where it goes and what is kept, for the app on Android, iPhone and the web.',
   sections: [
@@ -222,8 +225,8 @@ export const PRIVACY: LegalDocument = {
       id: 'short',
       heading: 'In short',
       paragraphs: [
-        'Everything you log stays on this device unless you create an account. With an account it is kept in your private space on HealthCal’s server so it can back up and sync, and no other account can read it.',
-        'No ads, no tracking, no analytics and no selling of data. You can export everything or delete it at any time.',
+        'Everything you log stays on this device unless you create an account. With an account it is kept in your private space on HealthCal’s server so it can back up and sync, and no other account can read it. Friends, if you turn them on, see your workouts and streak.',
+        'No ads, no tracking, no analytics and no selling of data. You can export everything you log or delete it at any time.',
       ],
     },
     {
@@ -239,7 +242,7 @@ export const PRIVACY: LegalDocument = {
       id: 'account',
       heading: 'With an account',
       paragraphs: [
-        'An account is free and optional. It holds your email address and a password, or a sign-in with Google. What you log is copied to your private space on HealthCal’s server so it can back up and sync between your devices: your profile (name, date of birth, sex, height, weight and targets), your diary, own foods, saved meals and favourites, water, workouts, weights, body measurements, sleep, fasting, goals and settings.',
+        'An account is free and optional. It holds your email address and a password, or a sign-in with Google. What you log is copied to your private space on HealthCal’s server so it can back up and sync between your devices: your profile (name, date of birth, sex, height, weight, goal weight and calorie target), your diary, own foods, saved meals and favourites, water, workouts, weights, body measurements, sleep, fasting, goals and settings.',
         'Each account can read and change its own data and nothing else. The server checks this on every request. The server reads your date of birth for one thing: the age rule of the AI coach.',
         'If you sign in with Google, Google tells HealthCal’s sign-in service your email address and the name and picture on your Google account. HealthCal uses the email address to know your account. The sign-in service keeps the name and picture with your account, and they are deleted with it; the app does not show or use them.',
       ],

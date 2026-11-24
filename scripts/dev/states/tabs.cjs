@@ -61,10 +61,11 @@ module.exports = [
   { id: 'train-guideline-sheet-stress', route: '/train', data: 'stress', taps: ['train-load-info'], sheet: true, note: 'the same sheet over the long-content week' },
   // Today with "Your week is ready" hidden, so the coach line shows under the water card (the demo week is otherwise Monday to
   // Wednesday). A reload then clears the "Check-in hidden" toast, so the capture is the line itself.
-  { id: 'today-coach', route: '/', taps: ['today-recap-dismiss', { wait: 400 }, { reload: true }], waitFor: 'today-coach', note: 'the coach line, its one action and "Ask the coach" beside it' },
+  { id: 'today-coach', route: '/', taps: ['today-recap-dismiss', { wait: 400 }, { reload: true }], waitFor: 'today-coach', note: 'the coach line and its one action' },
+  { id: 'today-ask-coach', route: '/', values: { eaten: 1.1 }, waitFor: 'today-coach-ask', note: 'over the budget: no "Ideas that fit", so "Ask the coach" stands beside the share at 360 and wider, and on its own row at 320' },
   // The one-time word on where the coach went (src/features/coach/movedToast.ts), which an automated browser sees only when it asks.
   { id: 'today-coach-moved', route: '/', flags: { __healthcalCoachMoved: true }, waitFor: 'toast', note: 'the one-time toast: "The coach is now at the top of every tab."' },
-  { id: 'today-coach-stress', route: '/', data: 'stress', taps: ['today-recap-dismiss', { wait: 400 }, { reload: true }], waitFor: 'today-coach', note: 'the coach line with long content' },
+  { id: 'today-coach-stress', route: '/', data: 'stress', taps: ['today-recap-dismiss', { wait: 400 }, { reload: true }], waitFor: 'today-coach', note: 'the coach line and its one action, with long content' },
   // The diary on a day with nothing logged after a day with food: no panel, the summary card's "Copy today" row,
   // each meal's dashed slot as its one add (the first says what the search offers) and Repeat beside last time's foods.
   { id: 'diary-empty-day-history', route: '/diary?date={day}', day: 1, waitFor: 'diary-copy-yesterday', note: 'tomorrow, empty: "Copy today", the slots and the Repeat buttons' },

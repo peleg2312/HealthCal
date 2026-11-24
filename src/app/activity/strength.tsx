@@ -390,7 +390,7 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
 
       {draft.exercises.length === 0 && templates.length > 0 ? (
         <View style={{ gap: spacing.md }}>
-          <Text variant="title">Start from a routine</Text>
+          <Text variant="title" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>Start from a routine</Text>
           <RoutineCards onStart={(t) => update((d) => draftFromRoutine(t, d))} testID="strength-routines" />
         </View>
       ) : null}
@@ -434,7 +434,7 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
       ) : null}
 
       <View style={{ gap: spacing.sm }}>
-        <Text variant="title">Day</Text>
+        <Text variant="title" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>Day</Text>
         <DateStepper date={draft.date} onChange={(d) => update((x) => ({ ...x, date: d }))} testID="strength-date" />
       </View>
       <TextField
@@ -563,7 +563,7 @@ function FinishSummaryView({ summary }: { summary: FinishSummary }) {
       </Card>
       {summary.records.length ? (
         <View style={{ gap: spacing.sm }} testID="strength-summary-records">
-          <Text variant="title">Personal records</Text>
+          <Text variant="title" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>Personal records</Text>
           <Card padding={spacing.md} style={{ paddingVertical: spacing.xs }}>
             {summary.records.map((r, i) => (
               <View
@@ -683,7 +683,7 @@ function ExerciseCard({
     <View testID={slug} style={{ backgroundColor: colors.surface, ...cup(radius.card), borderWidth: 1, borderColor: colors.border, padding: narrow ? 16 : 18, gap: spacing.sm }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text variant="h3" numberOfLines={2}>
+          <Text variant="h3" numberOfLines={2} accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>
             {ex.name}
           </Text>
           <Text variant="caption" color="textSecondary" numberOfLines={2} testID={`${slug}-previous`}>

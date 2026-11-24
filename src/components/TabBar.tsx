@@ -137,7 +137,6 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
   const plus = (
     <PressableScale
       testID="tab-add"
-      feedback="press"
       scaleTo={0.94}
       dip={motion.distance.dip}
       accessibilityLabel="Log something"

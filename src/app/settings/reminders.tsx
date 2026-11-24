@@ -132,6 +132,9 @@ export default function RemindersScreen() {
             {/* One row of five at every width (as chips, "4 h" wrapped alone onto a second line at 360). */}
             <Segmented
               testID="reminders-interval"
+              // One choice of the reminder's form, read as radios (no panel under it, so never tabs).
+              role="radiogroup"
+              accessibilityLabel="Water reminder, every"
               options={INTERVALS.map((m) => ({
                 value: String(m),
                 label: intervalLabel(m),

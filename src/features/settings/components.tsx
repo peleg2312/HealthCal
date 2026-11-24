@@ -8,8 +8,9 @@ import { cup, cupFor, useTheme } from '@/theme';
 import { Button, Card, Chip, CupKey, Divider, IconButton, ListRow, PressableScale, Sheet, Text } from '@/ui';
 
 /**
- * A titled card of rows separated by hairlines. `radiogroup` marks a card of `OptionRow`s as one
- * single choice, named by its title, so a screen reader says "one of five" rather than five switches.
+ * A titled card of rows separated by hairlines. Its title is a level-2 heading. `radiogroup` marks a card
+ * of `OptionRow`s as one single choice, named by its title, so a screen reader says "one of five" rather
+ * than five switches.
  */
 export function Group({ title, footer, radiogroup, children }: { title?: string; footer?: string; radiogroup?: boolean; children: React.ReactNode }) {
   const { spacing } = useTheme();
@@ -20,7 +21,8 @@ export function Group({ title, footer, radiogroup, children }: { title?: string;
   return (
     <View style={{ gap: spacing.sm }}>
       {title ? (
-        <Text variant="overline" color="textSecondary" style={{ paddingHorizontal: spacing.xs }}>
+        // Drawn as a section title, so it is one: a level-2 heading under the screen's title, as SectionTitle is.
+        <Text variant="overline" color="textSecondary" accessibilityRole="header" {...({ 'aria-level': 2 } as object)} style={{ paddingHorizontal: spacing.xs }}>
           {overlineWords(title)}
         </Text>
       ) : null}

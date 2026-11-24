@@ -132,7 +132,7 @@ function OverviewBody({ overview: o, visible, onClose }: { overview: TrainingOve
       </View>
       {/* The fine print, after the action: 8 px more than the body's gap sets it apart as its own part. */}
       <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
-        <Text variant="overline" accessibilityRole="header" testID="train-load-how">
+        <Text variant="overline" accessibilityRole="header" {...({ 'aria-level': 2 } as object)} testID="train-load-how">
           {HOW_COUNTED.replace(/ (\S+)$/, '\u00A0$1')}
         </Text>
         {/* Reading text: held to the reading column's width on a wide window (`CAPTION_READING_MAX`). */}

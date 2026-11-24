@@ -10,6 +10,7 @@ import { MEALS } from '@/lib/nutrition';
 import { cup, fonts, useLargeText, useTheme } from '@/theme';
 import type { Food, ISODate, MealType } from '@/types';
 import { CupKey, IconButton, PressableScale, Text } from '@/ui';
+import { rovingIndex } from '@/ui/controlRules';
 
 import { displayFoodName } from './displayName';
 import { canStepForward, entryDayLabel, entryDaySpoken, foodLatestDay } from './entryDay';
@@ -94,9 +95,15 @@ export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: 
   const narrow = useWindowDimensions().width < 340;
   // With large text the four take two lines of two, so no word reaches past the screen (never smaller text).
   const big = useLargeText();
+  const web = Platform.OS === 'web';
   return (
-    <View accessibilityRole="tablist" style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', borderBottomWidth: 1, borderBottomColor: colors.border }}>
-      {MEALS.map((m) => {
+    // One choice of a form, read as radios (drawn as underline tabs, as the kit's Segmented with `role="radiogroup"`):
+    // the meal is a field, not a view switch, so it is a radiogroup named "Meal", never tabs with no panel.
+    <View
+      accessibilityRole="radiogroup"
+      accessibilityLabel="Meal"
+      style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', borderBottomWidth: 1, borderBottomColor: colors.border }}>
+      {MEALS.map((m, i) => {
         const active = m.id === value;
         return (
           <PressableScale
@@ -105,11 +112,25 @@ export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: 
             feedback="select"
             scaleTo={0.98}
             onPress={() => onChange(m.id)}
-            accessibilityRole="tab"
+            accessibilityRole="radio"
             accessibilityLabel={m.label}
-            accessibilityState={{ selected: active }}
+            accessibilityState={{ checked: active }}
             // react-native-web reads the aria prop, not accessibilityState.
-            aria-selected={active}
+            aria-checked={active}
+            {...(web
+              ? {
+                  // One tab stop for the group, the chosen meal; the arrow keys move the choice (WAI-ARIA radio group).
+                  tabIndex: active ? 0 : -1,
+                  onKeyDown: (e: { key: string; currentTarget: unknown; preventDefault: () => void }) => {
+                    const next = rovingIndex(e.key, i, MEALS.length);
+                    if (next === null) return;
+                    e.preventDefault();
+                    const row = (e.currentTarget as HTMLElement | null)?.parentElement;
+                    (row?.children[next] as HTMLElement | undefined)?.focus();
+                    if (MEALS[next].id !== value) onChange(MEALS[next].id);
+                  },
+                }
+              : null)}
             // On the web a cell never shrinks below its word, so wider letter spacing (WCAG 1.4.12) widens
             // "Breakfast" at its neighbours' expense instead of cutting it; natively the word stays one line.
             style={[big ? { width: '50%', minHeight: 44, alignItems: 'center', justifyContent: 'center' } : [{ flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: narrow ? 0 : 2 }, WEB_CELL]]}>

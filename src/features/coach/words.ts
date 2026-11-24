@@ -206,7 +206,7 @@ export const COACH_FACTS: readonly { title: string; body: string }[] = [
 
 export const SHARE_LABEL = 'Share my week with the coach';
 export const SHARE_HINT =
-  'A short summary written on this phone: calories, training, sleep, the weight trend, and protein and water as shares of the targets. Never your name, email, body weight, age, notes or food names.';
+  'A short summary written on this phone: calories, training, sleep, the weight trend, and protein and water as shares of their goals. Never your name, email, body weight, age, notes or food names.';
 export const SEE_WHAT_IS_SENT = 'See what is sent';
 export const HIDE_WHAT_IS_SENT = 'Hide what is sent';
 export const NOTE_EMPTY = 'Nothing to share yet: log some food, a workout or a night of sleep first.';

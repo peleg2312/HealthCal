@@ -105,8 +105,19 @@ export function quickAddedToast(name: string, kcal: number, where: string): stri
  */
 export function waterAddedToast(volume: string, date: ISODate, today: ISODate, reaches = false, total?: string): string {
   const day = date === today ? '' : date === addDays(today, -1) ? ' for yesterday' : ` for ${weekdayShort(date)} ${formatShortDate(date)}`;
-  return withWaterTotal(`${volume} added to Water${day}`, reaches, total);
+  const full = withWaterTotal(`${volume} added to Water${day}`, reaches, total);
+  if (!total || full.length <= WATER_TOAST_LINE) return full;
+  // Longer than the line that fits beside Undo at 360 px (fluid ounces: "12 fl oz added to Water · 53 of 112 fl oz"):
+  // the same facts without "added", when that keeps it to one line ("12 fl oz to Water · 53 of 112 fl oz").
+  const brief = withWaterTotal(`${volume} to Water${day}`, reaches, total);
+  return brief.length <= WATER_TOAST_LINE ? brief : full;
 }
+
+/**
+ * The longest water toast, in characters, that keeps to one line beside its Undo on a 360 px phone: the metric
+ * glass, "250 ml added to Water · 1.48 of 3.3 L" (37).
+ */
+export const WATER_TOAST_LINE = 37;
 
 /**
  * The water toast in fewer words, for large text (the kit toast's `short`): "250 ml added, 1.48 of 3.3 L", so

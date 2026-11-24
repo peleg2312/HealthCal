@@ -70,11 +70,11 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
   const name = p.name;
   // A long name goes to the overline, so the headline stays three or four lines on a small phone.
   const nameInTitle = name.length > 0 && name.length <= 12;
-  // The overline keeps the name only while it fits one line (about 8.6 px a capital at 11.5 px with its
-  // letter spacing), so no word of it is left alone on a second line ("… YOUR PLAN IS" / "READY").
+  // The overline keeps the name only while it fits one line (about 9 px a capital at the overline's 12 px with
+  // its letter spacing), so no word of it is left alone on a second line ("… YOUR PLAN IS" / "READY").
   const withName = `${name}, your plan is ready`;
-  const overline = name && !nameInTitle && withName.length * 8.6 <= Math.min(winW, 560) - 40 ? withName : 'Your plan is ready';
-  // The goal and its dates lead; without a road to draw (maintaining, or no target weight) the day itself does.
+  const overline = name && !nameInTitle && withName.length * 9.0 <= Math.min(winW, 560) - 40 ? withName : 'Your plan is ready';
+  // The goal and its dates lead; without a road to draw (maintaining, or no goal weight) the day itself does.
   // A no-break space keeps the weight and its unit on one line.
   const title = projection
     ? `${nameInTitle ? `${name}, you` : 'You'} could reach ${weightText(projection.targetKg, units).replace(/ /g, '\u00A0')}`

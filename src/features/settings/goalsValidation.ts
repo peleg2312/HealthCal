@@ -1,5 +1,5 @@
 /**
- * Validation for the Goals and targets screen. Pure, so the same rules as
+ * Validation for the Goals screen. Pure, so the same rules as
  * onboarding can be tested without rendering the form.
  */
 import { defaultRateKg, LIMITS } from '@/features/onboarding/model';

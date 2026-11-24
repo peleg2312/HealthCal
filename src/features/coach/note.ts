@@ -78,7 +78,7 @@ function rateWords(kgPerWeek: number, imperial: boolean): string {
   return imperial ? `${oneDecimal(kgPerWeek / KG_PER_LB)} lb` : `${oneDecimal(kgPerWeek)} kg`;
 }
 
-/** "70%": a share of a target, rounded to 5%. */
+/** "70%": a share of a goal, rounded to 5%. */
 function share(part: number, whole: number): string {
   return `${formatNumber(Math.round((part / whole) * 20) * 5)}%`;
 }
@@ -135,9 +135,9 @@ export function coachNote(state: NoteState, today: ISODate, os: string = Platfor
     const avg = (f: (d: (typeof logged)[number]) => number) => Math.round(logged.reduce((s, d) => s + f(d), 0) / logged.length);
     const kcal = formatNumber(avg((d) => d.eaten.kcal));
     const daysWord = `logged on ${plural(logged.length, 'day', 'days')}`;
-    // Protein only as a share of its target: the target is the body weight times a fixed factor.
+    // Protein only as a share of its goal: the goal is the body weight times a fixed factor.
     const proteinTarget = logged.reduce((s, d) => s + d.macros.proteinG, 0);
-    const protein = proteinTarget > 0 ? `; protein at about ${share(logged.reduce((s, d) => s + d.eaten.protein, 0), proteinTarget)} of its target on average` : '';
+    const protein = proteinTarget > 0 ? `; protein at about ${share(logged.reduce((s, d) => s + d.eaten.protein, 0), proteinTarget)} of its goal on average` : '';
     lines.push(
       targets
         ? `Food, the 7 days before today: ${daysWord}; on those days about ${kcal} kcal a day against an average budget of ${formatNumber(avg((d) => d.budget))} kcal${protein}.`

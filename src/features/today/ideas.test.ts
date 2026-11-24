@@ -286,9 +286,9 @@ describe('ideaAddedToast: the toast names what was added, first', () => {
     expect(ideaFoodsPhrase([item('Banana, raw')])).toBe('Banana');
     expect(ideaFoodsPhrase([item('Chicken breast, roasted'), item('Rice, white, cooked')])).toBe('Chicken breast and rice');
     expect(ideaFoodsPhrase([item('Pasta, cooked'), item('Salmon, cooked'), item('Greek yogurt, plain')])).toBe('Pasta, salmon and Greek yogurt');
-    expect(ideaFoodsPhrase([item('Eggs'), item('Toast'), item('Coca-Cola', 'off'), item('Butter')])).toBe('Eggs, toast and 2 more');
+    expect(ideaFoodsPhrase([item('Eggs'), item('Toast'), item('Coca-Cola', 'openfoodfacts'), item('Butter')])).toBe('Eggs, toast and 2 more');
     expect(ideaFoodsPhrase([item('Rice, white'), item('Rice, brown')])).toBe('Rice');
-    expect(ideaFoodsPhrase([item('Oats, rolled, DRY (uncooked)'), item('Coca-Cola', 'off')])).toBe('Oats and Coca-Cola');
+    expect(ideaFoodsPhrase([item('Oats, rolled, DRY (uncooked)'), item('Coca-Cola', 'openfoodfacts')])).toBe('Oats and Coca-Cola');
   });
   it('falls back to the idea name when no food has a name', () => {
     expect(ideaAddedToast({ kind: 'past', name: "Tuesday's dinner", items: [] }, 'dinner')).toBe("Tuesday's dinner added to dinner");

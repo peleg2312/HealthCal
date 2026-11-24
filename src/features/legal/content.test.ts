@@ -173,6 +173,16 @@ describe('both documents', () => {
           ['account', /Each account can read and change its own data and nothing else/],
         ],
       },
+      friends: {
+        // Friends are opt-in, and what they see is a training summary: never food or weight.
+        says: [/Friends are off until you turn them on/, /a friend sees your workouts and streak/, /never your food or weight/],
+        held: [
+          ['short', /Friends, if you turn them on, see your workouts and streak/],
+          ['friends', /off until you turn them on/],
+          ['friends', /A friend sees your display name, your active minutes, sessions and streak, and your recent workouts/],
+          ['friends', /Friends never see your calories, weight, food/],
+        ],
+      },
       ads: {
         says: [/No ads, no tracking, no analytics and no selling of data/],
         held: [['short', /No ads, no tracking, no analytics and no selling of data/]],
@@ -189,11 +199,12 @@ describe('both documents', () => {
         ],
       },
       yours: {
-        says: [/export everything or delete it at any time/],
+        says: [/export everything you log or delete it at any time/, /the coach chat stays on this phone/],
         held: [
-          ['short', /export everything or delete it at any time/],
+          ['short', /export everything you log or delete it at any time/],
           ['export', /exports everything you logged as a file you keep/],
           ['export', /removes your account and everything stored with it/],
+          ['coach', /The chat itself is kept on this phone and is not in the export/],
         ],
       },
     },

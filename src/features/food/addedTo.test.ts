@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { BUILTIN_FOODS } from '@/data/foods';
 
-import { TOAST_NAME_MAX, entryUpdatedToast, foodAddedToast, foodNameHead, mealOnDay, quickAddedToast, toastFoodName, waterAddedShort, waterAddedToast, withWaterTotal } from './addedTo';
+import { TOAST_NAME_MAX, entryUpdatedToast, foodAddedToast, foodNameHead, mealOnDay, quickAddedToast, toastFoodName, waterAddedShort, waterAddedToast, WATER_TOAST_LINE, withWaterTotal } from './addedTo';
 import { displayFoodName } from './displayName';
 
 /** A comma between an open bracket and its close: "Israeli salad (tomato, cucumber, ...)". */
@@ -121,6 +121,14 @@ describe('the log toast names what was added first', () => {
     expect(waterAddedToast('250 ml', today, today, false, '1.48 of 3.3 L')).toContain('1.48\u00A0of\u00A03.3\u00A0L');
     expect(plain(waterAddedToast('250 ml', today, today, true, '3.3 of 3.3 L'))).toBe('250 ml added to Water · 3.3 of 3.3 L, goal reached');
     expect(plain(waterAddedToast('8.5 fl oz', '2026-11-15', today, false, '41 of 112 fl oz'))).toBe('8.5 fl oz added to Water for yesterday · 41 of 112 fl oz');
+  });
+  it('a glass in fluid ounces keeps to one line at 360 px: the same facts without "added" when that fits', () => {
+    const plain = (s: string) => s.replace(/\u00A0/g, ' ');
+    expect(plain(waterAddedToast('12 fl oz', today, today, false, '53 of 112 fl oz'))).toBe('12 fl oz to Water · 53 of 112 fl oz');
+    expect(plain(waterAddedToast('8.5 fl oz', today, today, false, '41 of 112 fl oz'))).toBe('8.5 fl oz to Water · 41 of 112 fl oz');
+    expect(waterAddedToast('12 fl oz', today, today, false, '53 of 112 fl oz').length).toBeLessThanOrEqual(WATER_TOAST_LINE);
+    // Never shorter than the facts: when even the brief line is long (a reached goal), the whole sentence stays.
+    expect(plain(waterAddedToast('12 fl oz', today, today, true, '112 of 112 fl oz'))).toBe('12 fl oz added to Water · 112 of 112 fl oz, goal reached');
   });
   it('a glass in fewer words for large text: the amount, the day when it is not today, the total held on one line', () => {
     const plain = (s: string) => s.replace(/\u00A0/g, ' ');

@@ -8,7 +8,7 @@ import { FriendsEntry } from '@/features/friends/FriendsEntry';
 import { formatShortDate, fromISODate } from '@/lib/dates';
 import { useProfile } from '@/store/selectors';
 import { cupFor, MAX_CONTENT_WIDTH, spacing as SPACING, useLargeText, useTheme } from '@/theme';
-import { PressableScale, Text } from '@/ui';
+import { ANDROID_TOUCH, PressableScale, Text } from '@/ui';
 
 export type TabName = 'today' | 'diary' | 'train' | 'progress';
 
@@ -18,12 +18,13 @@ const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
  * The header's three cups (Coach, Friends, profile): 36 px visible, 8 px apart, each 44 x 44 px to
  * touch (4 px past the cup on every side). At 44 px from centre to centre the touch areas meet and never
  * overlap, so a tap between two cups goes to the nearer one and every cup keeps the full 44 px target.
- * On Android the kit grows a fixed-size control's area to 48 dp (`androidSlop` in @/ui's Pressable), so
- * there the cups are 12 apart: at 48 from centre to centre those areas meet without overlapping too
- * (the title's room, `tabTitleRoom`, is 8 px less there).
+ * On Android, and in a browser on an Android phone used by touch (`ANDROID_TOUCH`), the kit grows a
+ * fixed-size control's area to 48 (`androidSlop` in @/ui's Pressable), so there the cups are 12 apart: at
+ * 48 from centre to centre those areas meet without overlapping too (the title's room, `tabTitleRoom`, is
+ * 8 px less there).
  */
 export const HEADER_CUP = 36;
-const CUP_GAP = Platform.OS === 'android' ? 12 : 8;
+const CUP_GAP = ANDROID_TOUCH ? 12 : 8;
 export const HEADER_SLOP = { top: 4, bottom: 4, left: CUP_GAP / 2, right: CUP_GAP / 2 };
 /** The title's line box: the same 32 px at every width, so the header's text block is 52 px and starts 8 px down on every tab and width. */
 const TITLE_LINE = 32;

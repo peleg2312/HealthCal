@@ -384,7 +384,7 @@ export default function HealthSyncScreen() {
           <Group
             title="Weight"
             footer={`One a day: the first weigh-in of the day, with body fat when the same app measured it. ${
-              profile?.useAdaptiveTdee === true ? 'They feed your weight trend and the burn estimate your targets use.' : 'They feed your weight trend.'
+              profile?.useAdaptiveTdee === true ? 'They feed your weight trend and the burn estimate your calorie target uses.' : 'They feed your weight trend.'
             } One you enter or change yourself is never replaced, and one you delete is not added again.`}>
             <ListRow
               testID="health-sync-weight"

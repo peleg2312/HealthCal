@@ -10,7 +10,7 @@ import { copyEntries, findPreviousMeal } from '@/features/food/actions';
 import { displayFoodName } from '@/features/food/displayName';
 import { favoriteMeals, quickLogMeal } from '@/features/food/favorites';
 import { approxKcalSpoken, favoriteFoodTile, isEstimateFood, quickRowTitle, savedTileCaption } from '@/features/food/favoriteWords';
-import { lastPortions, matchServing, portionFor, portionKcal, portionLabel, servingText, sourceInfo } from '@/features/food/helpers';
+import { lastPortions, matchServing, portionFor, portionKcal, portionLabel, servingText, sourceInfo, sourceKindOf, type SourceKind } from '@/features/food/helpers';
 import { formatPortion, mealServings, planSavedMeal } from '@/features/food/build';
 import { logFood, logItems, logSavedMeal } from '@/features/food/log';
 import { ONE_TAP_GUARD_MS, tooSoon } from '@/features/food/oneTap';
@@ -26,7 +26,7 @@ import { useStore } from '@/store';
 import { useNow, useToday } from '@/store/clock';
 import { computeDayFromStore, live, useLive, useProfile } from '@/store/selectors';
 import { cup, useLargeText, useTheme } from '@/theme';
-import type { Food, FoodEntry, FoodSource, ISODate, SavedMeal } from '@/types';
+import type { Food, FoodEntry, ISODate, SavedMeal } from '@/types';
 import { Button, CupKey, PressableScale, Sheet, Text } from '@/ui';
 import { spokenUnits } from '@/lib/spokenUnits';
 
@@ -55,6 +55,8 @@ function oneTapThenClose(log: () => void, close: () => void) {
 }
 
 /** A food or meal tile's width in the row of likely next logs; wider with large text, so a word fits a line. */
+/** Under this window height the + sheet pins nothing: its footer (about 380 px) would leave the ways in no room. */
+const SHORT_WINDOW = 600;
 const TILE_W = 136;
 const TILE_W_BIG = 216;
 
@@ -122,12 +124,16 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
     void loadSearchTab();
   }, []);
   // Under 360 px a half tile has no room for the icon beside its name ("Snap a" / "meal"): the icon goes above it.
-  const narrow = useWindowDimensions().width < 360;
+  const { width: winW, height: winH } = useWindowDimensions();
+  const narrow = winW < 360;
   // Large text (Profile's text size, or the phone's): the food tiles grow wider, every way in is a whole row,
   // and nothing is pinned (the likely next log leads the body instead), so no word is split and nothing is cut
   // by the bottom of the screen.
   const big = useLargeText();
   const tileW = big ? TILE_W_BIG : TILE_W;
+  // A window too short for the pinned footer and some body (a phone held sideways, a browser zoomed to 400%):
+  // nothing is pinned, as with large text, so every way in scrolls into reach (WCAG 1.4.10).
+  const unpinned = big || winH < SHORT_WINDOW;
   const glasses = [...presets]
     .filter((p) => p > 0)
     .sort((a, b) => a - b)
@@ -195,8 +201,9 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   const showRepeat = !!prev && !alreadyLogged;
 
   // A usual tile's source, for its mark and its spoken name: an entry that carries a range is an estimate
-  // (it logs again as one); a favourite food's is the food's own.
-  const entrySource = (e: FoodEntry): FoodSource => (e.kcalRange ? 'ai' : e.source);
+  // (it logs again as one); a favourite food's is the food's own. A bundled food with no record is "Typical
+  // values" (`sourceKindOf`), never reference data.
+  const entrySource = (e: FoodEntry): SourceKind => (e.kcalRange ? 'ai' : sourceKindOf(e));
 
   const usualTile = (u: UsualFood) => {
     const isDone = done.includes(u.key);
@@ -243,7 +250,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
           const key = `fav-food:${f.id}`;
           const isDone = done.includes(key);
           const p = portionFor(f, lastMap);
-          const src = f.source;
+          const src = sourceKindOf(f);
           // An AI food, or one last logged as an estimate, never shows an exact number: "150 g, ~248 kcal".
           const { caption, label } = favoriteFoodTile({
             name: displayFoodName(f),
@@ -377,7 +384,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
       // every width, whatever rows show; the other ways to log scroll above them under the title.
       // With large text the three would fill the screen: they lead the scrolling body instead, still first in view.
       footer={
-        big ? undefined : (
+        unpinned ? undefined : (
           <View testID="quick-pinned" style={{ gap: spacing.md, marginHorizontal: -spacing.xl, paddingHorizontal: spacing.xl, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border }}>
             {searchRow}
             {repeatRow}
@@ -386,7 +393,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
           </View>
         )
       }>
-      {big ? (
+      {unpinned ? (
         <View testID="quick-pinned" style={{ gap: spacing.md }}>
           {searchRow}
           {repeatRow}
@@ -451,7 +458,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
 }
 
 /** A food tile's foot: the source's mark leading its caption, as on the diary's rows. */
-function TileCaption({ source, testID, children }: { source: FoodSource; testID?: string; children: React.ReactNode }) {
+function TileCaption({ source, testID, children }: { source: SourceKind; testID?: string; children: React.ReactNode }) {
   const { colors } = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 'auto' }}>

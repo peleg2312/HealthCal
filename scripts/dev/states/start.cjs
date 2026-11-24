@@ -109,6 +109,8 @@ const settings = [
   { id: 'profile-stress', route: '/profile', data: 'stress', note: 'profile with a 22-character name' },
   { id: 'profile-imperial', route: '/profile', imperial: true, note: 'profile in imperial (the units caption is longer)' },
   { id: 'goals-imperial', route: '/settings/goals', imperial: true, note: 'goals in lb and ft in' },
+  // Under 360 px only: the compact preview's "Details" exists there alone, so run this one with --widths=320.
+  { id: 'goals-preview-details-320', route: '/settings/goals', taps: ['goals-preview-more'], waitFor: 'goals-care-note', note: 'Goals at 320 (--widths=320): the compact preview opened with Details, its note, plan line and care note' },
   { id: 'goals-stress', route: '/settings/goals', data: 'stress', note: 'goals at 142.6 kg' },
   { id: 'goals-macro-custom', route: '/settings/goals', taps: ['goals-macro-custom'], waitFor: 'goals-pct-total', note: 'custom macro split fields' },
   { id: 'goals-exercise-week', route: '/settings/goals', taps: ['goals-exercise-spread-week'], waitFor: 'goals-exercise-note', note: 'workout calories switched from "Same day" to "Over 7 days": the note says when it starts' },

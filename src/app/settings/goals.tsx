@@ -70,7 +70,7 @@ export default function GoalsScreen() {
   const profile = useStore((s) => s.profile);
   if (!profile?.onboardedAt) {
     return (
-      <Screen header={<Header title="Goals and targets" subtitle="Calories, macros and water" />}>
+      <Screen header={<Header title="Goals" subtitle="Calorie target, macros and water" />}>
         <Text color="textSecondary">Finish setting up your profile first.</Text>
         <Button title="Get started" onPress={() => router.replace('/welcome')} />
       </Screen>
@@ -216,7 +216,7 @@ function GoalsForm() {
   return (
     <Screen
       scrollProps={{ ref: scrollRef } as ScrollViewProps}
-      header={<Header title="Goals and targets" subtitle="Calories, macros and water" />}
+      header={<Header title="Goals" subtitle="Calorie target, macros and water" />}
       footer={<Button testID="goals-save" title={dirty ? 'Save plan' : 'No changes'} disabled={!valid || !dirty} onPress={save} />}>
       {/* Live preview */}
       <Card testID="goals-preview">

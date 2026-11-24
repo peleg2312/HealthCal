@@ -58,7 +58,7 @@ const PAGES: Record<string, string | ((params: Params) => string)> = {
   '/sleep': 'Sleep',
   '/fasting': 'Fasting',
   '/profile': 'Profile',
-  '/settings/goals': 'Goals and targets',
+  '/settings/goals': 'Goals',
   '/settings/reminders': 'Reminders',
   '/settings/account': 'Account and sync',
   '/settings/data': 'Your data',

@@ -205,7 +205,7 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
       <Card style={{ gap: spacing.md }}>
         <Text variant="h3">Serving</Text>
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <TextField testID="custom-serving-label" label="Name" placeholder="1 bar" value={servingLabel} onChangeText={setServingLabel} maxLength={40} style={{ flex: 1.3 }} />
+          <TextField testID="custom-serving-label" label="Serving name" placeholder="1 bar" value={servingLabel} onChangeText={setServingLabel} maxLength={40} style={{ flex: 1.3 }} />
           <NumberField
             testID="custom-serving-grams"
             label="Size"

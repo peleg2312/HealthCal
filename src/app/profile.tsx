@@ -42,7 +42,7 @@ export default function ProfileScreen() {
       <Screen header={<Header title="Profile" subtitle="Settings and goals" />}>
         <EmptyState
           title="No profile yet"
-          message="Set up your goals first. Your profile, targets and reminders live here afterwards."
+          message="Set up your goals first. Your profile, goals and reminders live here afterwards."
           action="Get started"
           onAction={() => router.replace('/welcome')}
         />
@@ -136,7 +136,7 @@ function ProfileHub() {
       <Group title="Goals and reminders">
         <ListRow
           testID="profile-goals"
-          title="Goals and targets"
+          title="Goals"
           subtitle={paceText}
           left={
             <IconTile color={colors.calories}>
@@ -184,7 +184,7 @@ function ProfileHub() {
         <ListRow
           testID="profile-fasting"
           title="Fasting"
-          subtitle={`${settings.fastingTargetHours} h target`}
+          subtitle={`${settings.fastingTargetHours} h goal`}
           left={
             <IconTile color={colors.exercise}>
               <Timer size={20} color={colors.exercise} />
@@ -215,6 +215,9 @@ function ProfileHub() {
           </View>
           <Segmented<UnitSystem>
             testID="profile-units"
+            // One choice of a setting, read as radios (no panel under it, so never tabs).
+            role="radiogroup"
+            accessibilityLabel="Units"
             value={u}
             onChange={(units) => setProfile({ units })}
             options={[

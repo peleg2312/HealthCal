@@ -71,6 +71,23 @@ function loggedLabel(e: WaterEntry): string {
   return toISODate(new Date(e.loggedAt)) === e.date ? clockTime(e.loggedAt) : 'Added later';
 }
 
+/**
+ * Rows that would be named alike (five 500 ml glasses logged in one minute) are told apart by their place among
+ * them, newest first: " (2 of 5)" after the time; nothing for a row whose name is its own (WCAG 2.4.6).
+ */
+function apartSuffixes(keys: string[]): string[] {
+  const total = new Map<string, number>();
+  for (const k of keys) total.set(k, (total.get(k) ?? 0) + 1);
+  const seen = new Map<string, number>();
+  return keys.map((k) => {
+    const n = total.get(k) ?? 1;
+    if (n < 2) return '';
+    const at = (seen.get(k) ?? 0) + 1;
+    seen.set(k, at);
+    return ` (${at} of ${n})`;
+  });
+}
+
 /** One line on how the chosen drink counts, built from the factors so it never drifts from the maths. */
 function factorLine(beverage: Beverage): string {
   const factor = HYDRATION_FACTOR[beverage];
@@ -99,14 +116,11 @@ function reachedWordsAfter(from: number, to: number): number {
 }
 
 /**
- * What follows "Goal reached for today." under the cup, in one line with it: the extra drunk and, for
- * today, that more is a bonus ("430 ml past it, anything more is a bonus."). Null when there is nothing to add.
+ * What follows "Goal reached for today." under the cup, in one line with it: the extra drunk, as a plain fact
+ * ("430 ml past it."), never a word that presents drinking more as better. Null when there is nothing to add.
  */
-function reachedNote(extra: string | null, isToday: boolean): string | null {
-  const parts = [extra ? `${extra} past it` : null, isToday ? 'anything more is a bonus' : null].filter(Boolean) as string[];
-  if (!parts.length) return null;
-  const line = parts.join(', ');
-  return `${line[0].toUpperCase()}${line.slice(1)}.`;
+function reachedNote(extra: string | null): string | null {
+  return extra ? `${extra} past it.` : null;
 }
 
 /**
@@ -279,6 +293,7 @@ function WaterScreen() {
     setRemovedIds((cur) => [e.id, ...cur.filter((id) => id !== e.id)]);
   };
   const removed = removedIds.map((id) => waterRecords[id]).filter((w): w is WaterEntry => !!w && !!w.deleted && w.date === date);
+  const removedApart = apartSuffixes(removed.map((w) => `${waterRowTitle(w, units)}|${loggedLabel(w)}`));
 
   const chooseKind = (b: Beverage) => {
     setBeverage(b);
@@ -331,8 +346,10 @@ function WaterScreen() {
   const entries = showAllLog ? allEntries : allEntries.slice(0, 6);
   // A removed drink fades where it is before the rows below glide up into its place.
   const rows = useLeavingRows(entries);
+  // Each row's time as its delete names it, with its place among rows that would otherwise read the same.
+  const rowApart = apartSuffixes(rows.map(({ item: e }) => `${e.ml}|${loggedLabel(e)}|${e.fromEntryId ?? ''}`));
   const extraParts = splitUnit(formatVolume(Math.max(0, shownMl(consumed, units) - shownMl(goal, units)), units));
-  const note = reachedNote(extraParts.value === '0' ? null : `${extraParts.value} ${extraParts.unit}`, isToday);
+  const note = reachedNote(extraParts.value === '0' ? null : `${extraParts.value} ${extraParts.unit}`);
 
   const baseMl = baseWaterGoalMl(profile.weightKg, profile.sex);
   const exerciseMl = exerciseWaterMl(day.activities);
@@ -630,7 +647,7 @@ function WaterScreen() {
                   )}
                   <IconButton
                     testID={`water-delete-${i}`}
-                    accessibilityLabel={spokenUnits(waterDeleteLabel(e, loggedLabel(e), units, fromDiary ? partner : null))}
+                    accessibilityLabel={spokenUnits(waterDeleteLabel(e, `${loggedLabel(e)}${rowApart[i] ?? ''}`, units, fromDiary ? partner : null))}
                     tone="clear"
                     size={44}
                     onPress={() => removeRow(e)}>
@@ -648,7 +665,7 @@ function WaterScreen() {
             <Divider inset={rows.length ? 36 : 0} />
             <RestoreRow
               testID={`water-restore-${i}`}
-              label={`${waterRowTitle(w, units)}, ${loggedLabel(w)}, removed from Water`}
+              label={`${waterRowTitle(w, units)}, ${loggedLabel(w)}${removedApart[i] ?? ''}, removed from Water`}
               onRestore={() => useStore.getState().restore('water', w.id)}
             />
           </React.Fragment>
@@ -685,8 +702,8 @@ function WaterScreen() {
           goalKind="reach"
           highlightIndex={bars.length - 1}
           openIndex={isToday ? bars.length - 1 : undefined}
-          // Printed exactly as the hero prints the same amount ("1.23 L", "41"), with no unit for fl oz or ml.
-          formatValue={(n) => formatVolume(volumeToMl(n, units), units).replace(/ (fl oz|ml)$/, '')}
+          // Printed exactly as the hero prints the same amount, with its unit ("1.23 L", "41 fl oz", "850 ml").
+          formatValue={(n) => formatVolume(volumeToMl(n, units), units)}
         />
       </Card>
 

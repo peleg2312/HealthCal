@@ -498,7 +498,7 @@ export function planDrink(input: PlanDrinkInput): DrinkPlan {
       kcal: 0,
       meal,
       // "250 ml of juice added to Water only": the same drink is already in the diary with its calories.
-      toast: waterAddedToast(`${vol} of ${noun(kind, choices.id)}`, date, today, after?.reaches, after?.total).replace(' added to Water', ' added to Water only'),
+      toast: waterAddedToast(`${vol} of ${noun(kind, choices.id)}`, date, today, after?.reaches, after?.total).replace(/ (?:added )?to Water\b/, ' added to Water only'),
       line: `${shown}: for water only, no calories added`,
       tile: 'No calories',
       label: `Add ${vol} of ${name}, for water only`,

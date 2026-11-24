@@ -1,7 +1,7 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ChevronRight, PenLine, Plus, Pointer, ScanBarcode, Search, Utensils, X, Zap } from 'lucide-react-native';
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, type TextInput, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Platform, type TextInput, useWindowDimensions, View } from 'react-native';
 
 import { AiGlyph } from '@/features/ai/mark';
 import { searchAiTile } from '@/features/ai/words';
@@ -10,7 +10,7 @@ import { foodNameHead } from '@/features/food/addedTo';
 import { FoodRow, MealPicker } from '@/features/food/components';
 import { displayFoodName } from '@/features/food/displayName';
 import { setFoodDraft } from '@/features/food/draft';
-import { amountLabel, href, kcal, lastPortions, matchServing, parseDate, parseMeal, portionFor, portionKcal, portionLabel, sourceInfo, stepAmount } from '@/features/food/helpers';
+import { amountLabel, href, kcal, lastPortions, matchServing, parseDate, parseMeal, portionFor, portionKcal, portionLabel, sourceInfo, sourceKindOf, stepAmount } from '@/features/food/helpers';
 import { deleteEntry, logFood, logSavedMeal, setEntryAmount } from '@/features/food/log';
 import { useOneTap } from '@/features/food/oneTap';
 import { FavoriteStar } from '@/features/food/FavoriteStar';
@@ -280,7 +280,7 @@ export default function FoodSearchScreen() {
         name={foodNameHead(displayFoodName(top))}
         kcalValue={topAdded ? topAdded.nutrients.kcal : portionKcal(top, topPortion)}
         added={!!topAdded}
-        spoken={spokenUnits(`Add ${displayFoodName(top)}, ${portionLabel(topPortion.serving.label, topPortion.quantity)}, ${kcal(portionKcal(top, topPortion))} kilocalories, ${sourceInfo(top.source).label}, to ${MEAL_LABEL[meal].toLowerCase()}`)}
+        spoken={spokenUnits(`Add ${displayFoodName(top)}, ${portionLabel(topPortion.serving.label, topPortion.quantity)}, ${kcal(portionKcal(top, topPortion))} kilocalories, ${sourceInfo(sourceKindOf(top)).label}, to ${MEAL_LABEL[meal].toLowerCase()}`)}
         onPress={oneTap(() => quickAdd(top))}
       />
     ) : null;
@@ -575,12 +575,14 @@ export default function FoodSearchScreen() {
   );
 }
 
+/** Search's rows as a list on the web (`role="list"`, each row a `listitem`), so a screen reader says how many there are. */
 function List({ children, testID }: { children: React.ReactNode; testID?: string }) {
   const items = React.Children.toArray(children);
+  const web = Platform.OS === 'web';
   return (
-    <View testID={testID}>
+    <View testID={testID} {...(web ? { role: 'list' as const } : null)}>
       {items.map((c, i) => (
-        <View key={i}>
+        <View key={i} {...(web ? { role: 'listitem' as const } : null)}>
           {i > 0 ? <Divider inset={36} /> : null}
           {c}
         </View>

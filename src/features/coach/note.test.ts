@@ -131,11 +131,11 @@ describe('the note from a worked store', () => {
     expect(lines[0]).toBe('Goal: lose weight, about 0.4 kg a week.');
   });
 
-  it('food over the 7 days before today, against the budget, protein as a share of its target; and today so far', () => {
+  it('food over the 7 days before today, against the budget, protein as a share of its goal; and today so far', () => {
     // 500 g eaten over 5 days against 5 x the target (147 g at this profile): 68%, said as 70%.
     expect(macroTargets(PROFILE, 2000).proteinG).toBe(147);
     expect(lines[1]).toBe(
-      'Food, the 7 days before today: logged on 5 days; on those days about 1,900 kcal a day against an average budget of 2,000 kcal; protein at about 70% of its target on average.',
+      'Food, the 7 days before today: logged on 5 days; on those days about 1,900 kcal a day against an average budget of 2,000 kcal; protein at about 70% of its goal on average.',
     );
     expect(lines[2]).toBe('Today so far: 1,250 kcal eaten, 750 kcal left in the budget.');
   });
@@ -261,7 +261,7 @@ describe('the iPhone rule', () => {
       expect(ios.text).not.toMatch(/budget|target|goal|%/);
       expect(ios.text).toContain('Food, the 7 days before today: logged on 5 days; on those days about 1,900 kcal a day.');
       const android = coachNote(state, TODAY, 'android');
-      expect(android.text).toMatch(/against an average budget of [\d,]+ kcal; protein at about \d+% of its target on average\./);
+      expect(android.text).toMatch(/against an average budget of [\d,]+ kcal; protein at about \d+% of its goal on average\./);
       expect(android.text).toMatch(/water at about \d+% of its goal on average/);
     });
   }
@@ -294,7 +294,7 @@ describe('the body weight cannot be worked out from the note', () => {
       const state = worked({ profile, weights: [weigh(d(21), kg), weigh(d(14), kg), weigh(d(7), kg), weigh(d(0), kg)] });
       for (const os of ['android', 'web', 'ios']) {
         const t = coachNote(state, TODAY, os).text;
-        expect(t).toMatch(/protein at about \d+% of its target/);
+        expect(t).toMatch(/protein at about \d+% of its goal/);
         expect(t).toMatch(/water at about \d+% of its goal/);
         const numbers = (t.match(/\d[\d,]*(?:\.\d+)?/g) ?? []).map((n) => Number(n.replace(/,/g, '')));
         for (const n of numbers) for (const f of FACTORS) expect(Math.abs(n / f - kg), `${n} / ${f}`).toBeGreaterThanOrEqual(2);

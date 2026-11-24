@@ -87,6 +87,8 @@ export function FadeRow({ children, leaving, testID }: { children: React.ReactNo
   return (
     <Animated.View
       testID={testID}
+      // A row of a list (the diary's meal rows, Water's log): `listitem` on the web, inside the kit's `AnimatedList`.
+      {...(Platform.OS === 'web' ? { role: 'listitem' as const } : null)}
       pointerEvents={leaving ? 'none' : 'auto'}
       accessibilityElementsHidden={leaving}
       importantForAccessibility={leaving ? 'no-hide-descendants' : 'auto'}
