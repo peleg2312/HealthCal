@@ -198,6 +198,7 @@ export function Badge({ label, color, style }: { label: string; color?: string; 
   const { colors, radius } = useTheme();
   const c = color ?? colors.primary;
   const tintable = /^#[0-9a-fA-F]{6}$/.test(c);
+  const large = useLargeText();
   return (
     <View
       style={[
@@ -205,7 +206,8 @@ export function Badge({ label, color, style }: { label: string; color?: string; 
           flexDirection: 'row',
           gap: 5,
           paddingHorizontal: 7,
-          height: 22,
+          // At large text it grows with its label (22 at least) rather than clip it.
+          ...(large ? { minHeight: 22, paddingVertical: 2 } : { height: 22 }),
           borderRadius: radius.chip,
           backgroundColor: tintable ? `${c}1F` : colors.surfaceAlt,
           alignItems: 'center',
