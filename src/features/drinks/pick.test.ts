@@ -251,7 +251,7 @@ describe('sheetList with an empty query', () => {
     const l = sheetList(base({ yours }));
     expect(kinds(l.items).slice(0, 4)).toEqual(['water-pick-yours', 'row:yours', 'row:yours', 'water-pick-all']);
     const [mocha, monster] = rows(l.items);
-    expect(mocha).toMatchObject({ testID: 'water-pick-yours-b_mocha', key: 'yours-b_mocha', divider: false, detail: '188 kcal per 250 ml · Reference' });
+    expect(mocha).toMatchObject({ testID: 'water-pick-yours-b_mocha', key: 'yours-b_mocha', divider: false, detail: '188 kcal per 250 ml · Typical' });
     expect(monster.testID).toBe('water-pick-yours-off_5060896623368');
     expect(monster.detail).toBe('500 ml · 90 kcal per 250 ml · Community');
     // The same mocha is still under "All drinks", with its own key and testID.

@@ -18,9 +18,10 @@ import { TrainingLoadSheet } from './TrainingLoadSheet';
 const VESSEL_H = 168;
 /**
  * Under 360 px the cup is shorter (as Today's calorie cup is), so the card leaves Log activity and Workout in the
- * first view at 320 x 640; its three labels (20, 40 and 44 px) still fit beside it at every level.
+ * first view at 320 x 640, clear of the tab bar's +; its three labels (20, 40 and 44 px, 2 px apart) still fit
+ * beside it at every level.
  */
-const VESSEL_H_NARROW = 116;
+const VESSEL_H_NARROW = 108;
 
 /**
  * Train's week: active minutes (the guideline's, `guidelineMinutes`) poured into a cup whose brim is the

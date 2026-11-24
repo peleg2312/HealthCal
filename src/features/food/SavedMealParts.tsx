@@ -3,7 +3,6 @@
  * Saved meals tab and the meal builder: the "log this meal" sheet and the
  * amount sheet for one line of a meal being built.
  */
-import { Check } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
@@ -12,7 +11,7 @@ import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { MEAL_LABEL } from '@/lib/nutrition';
 import { cup, useTheme } from '@/theme';
 import type { ISODate, MealType, SavedMeal, SavedMealItem } from '@/types';
-import { Button, Chip, ChipWrap, NumberField, PressableScale, Sheet, Stepper, Text } from '@/ui';
+import { Button, Chip, ChipWrap, CupKey, NumberField, PressableScale, Sheet, Stepper, Text } from '@/ui';
 import { spokenUnits } from '@/lib/spokenUnits';
 
 import { AmountEditor } from './AmountEditor';
@@ -154,11 +153,12 @@ export function LogSavedMealSheet({ meal, mealType, date, onClose }: { meal: Sav
                   ...cup(7, 3),
                   borderWidth: 1.5,
                   borderColor: on ? colors.text : colors.borderStrong,
-                  backgroundColor: on ? colors.text : 'transparent',
+                  backgroundColor: 'transparent',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}>
-                {on ? <Check size={16} color={colors.bg} strokeWidth={3} /> : null}
+                {/* Chosen is the app's done mark, a small filled ink cup; the check means only a day on budget. */}
+                {on ? <CupKey color={colors.text} size={12} /> : null}
               </View>
               <RowEmoji emoji={it.emoji} />
               <View style={{ flex: 1, minWidth: 0 }}>

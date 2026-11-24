@@ -8,7 +8,7 @@ import { formatNumber } from '@/lib/units';
 import type { Food, FoodEntry } from '@/types';
 
 import { buildEntry } from './build';
-import { amountLabel, amountTotal, formatQty, quickKcalError, quickKcalValue, labelAmount, lastPortions, matchServing, portionFor, portionKcal, portionLabel, rowSourceWord, servingText, sourceInfo, stepAmount, toPer100, valuesUpdated, labelGrams, withSourceWord } from './helpers';
+import { amountLabel, amountTotal, formatQty, quickKcalError, quickKcalValue, sourceKindOf, labelAmount, lastPortions, matchServing, portionFor, portionKcal, portionLabel, rowSourceWord, servingText, sourceInfo, stepAmount, toPer100, valuesUpdated, labelGrams, withSourceWord } from './helpers';
 import { resolveUsuals, usualFoods, usualLabel } from './usuals';
 
 describe('stepAmount', () => {
@@ -417,5 +417,25 @@ describe('quick add: the calories field says why it cannot add (WCAG 3.3.1)', ()
     expect(quickKcalError('-50')).toBe("Calories can't be negative. To take some off, change or delete an entry.");
     expect(quickKcalValue('-50')).toBeNull();
     expect(quickKcalValue('abc')).toBeNull();
+  });
+});
+
+describe('a bundled food with no record reads as typical values, never as reference data (principle 3)', () => {
+  it('the 20 unverified bundled foods: their own word, label and an estimate\'s key; the verified ones stay reference', () => {
+    const typical = BUILTIN_FOODS.filter((f) => !f.verified);
+    expect(typical).toHaveLength(20);
+    for (const f of typical) {
+      expect(sourceKindOf(f)).toBe('typical');
+      expect(sourceInfo(f.source, f).label).toBe('Typical values');
+      expect(withSourceWord('1 cup', sourceKindOf(f))).toBe('1 cup · Typical');
+    }
+    for (const f of BUILTIN_FOODS.filter((x) => x.verified)) {
+      expect(sourceKindOf(f)).toBe('builtin');
+      expect(sourceInfo(f.source, f).label).toBe('Reference data');
+    }
+    // An entry or saved line carries the flag it was logged with, or its food's.
+    expect(sourceKindOf({ source: 'builtin', verified: false })).toBe('typical');
+    expect(sourceKindOf({ source: 'builtin', verified: true, food: typical[0] })).toBe('typical');
+    expect(sourceKindOf({ source: 'custom', verified: false })).toBe('custom');
   });
 });

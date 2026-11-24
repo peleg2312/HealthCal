@@ -322,7 +322,7 @@ function WeighInSheet({
   // noted what had the focus before ("Log weigh-in", or the row tapped), so closing it by Escape or the
   // backdrop gives the focus back there instead of to the page: an autoFocus would focus the field
   // first, and the sheet would note the field. Natively the field keeps its autoFocus.
-  const weightRef = useRef<TextInput>(null);
+  const weightRef = useRef<React.ComponentRef<typeof TextInput>>(null);
   const open = date !== null;
   useEffect(() => {
     if (open && Platform.OS === 'web') weightRef.current?.focus();
