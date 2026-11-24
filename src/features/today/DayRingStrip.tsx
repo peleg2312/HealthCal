@@ -22,6 +22,8 @@ export const CAPTION_ROW_H = 36;
 const ARROWS_MIN_W = 400;
 /** The week-picker cup: 32 px visible, 44 px to touch, 12 px from what is before it so the two touch areas never overlap. */
 const PICK_CUP = 32;
+/** The chosen day's level line under its date. */
+const SELECTED_MARK_W = 18;
 
 /** A mouse or trackpad on web: where the week arrows show. Everywhere else the week-picker cup does the same with a tap. */
 function subscribePointer(cb: () => void) {
@@ -54,7 +56,9 @@ function stripBleed(windowW: number, gutter: number): number {
  * over, a dashed outline for a day still to come), so the strip doubles as a
  * chart. A day before the profile was made is a small dot, not an empty cup:
  * it was not missed. The cups pour left to right, and a past day does not pour
- * again when the strip remounts. The selected day's date is an ink box.
+ * again when the strip remounts. Today's date is outlined; the selected day's date
+ * wears the level line under it (the active tab's mark), never an ink fill that would
+ * outweigh the day's numbers.
  *
  * It is the one date control at the top of Today and the diary: the strip (tap a
  * day; swipe it for other weeks), and one row under it, CAPTION_ROW_H tall, with
@@ -308,16 +312,24 @@ export function DayRingStrip({
                           ...cup(9, 4),
                           alignItems: 'center',
                           justifyContent: 'center',
-                          backgroundColor: isSelected ? colors.text : 'transparent',
-                          borderWidth: isToday && !isSelected ? 1.5 : 0,
+                          borderWidth: isToday ? 1.5 : 0,
                           borderColor: colors.text,
                         }}>
                         <Text
                           variant="numM"
-                          color={isSelected ? 'bg' : locked || future ? 'textTertiary' : 'text'}
-                          style={{ fontSize: 14, lineHeight: 20, letterSpacing: 0 }}>
+                          color={isSelected ? 'text' : locked || future ? 'textTertiary' : 'text'}
+                          style={{ fontSize: 14, lineHeight: 20, letterSpacing: 0, fontFamily: isSelected ? fonts.displayBold ?? undefined : undefined }}>
                           {fromISODate(d).getDate()}
                         </Text>
+                        {/* The day shown wears the level line under its date, as the active tab and the chosen segment do:
+                            quiet enough that the day's calories, not the date, lead the screen, and still plainly chosen. */}
+                        {isSelected ? (
+                          <View
+                            pointerEvents="none"
+                            testID={`${testIDPrefix}-day-${d}-mark`}
+                            style={{ position: 'absolute', bottom: isToday ? 1 : 0, alignSelf: 'center', width: SELECTED_MARK_W, height: 3, borderRadius: 1, backgroundColor: colors.rim }}
+                          />
+                        ) : null}
                       </View>
                     </PressableScale>
                   );

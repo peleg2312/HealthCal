@@ -36,7 +36,7 @@ export function RestoreRow({ label, onRestore, testID }: { label: string; onRest
         size="sm"
         full={false}
         accessibilityLabel={`Restore, ${withoutMarks(label)}`}
-        icon={<RotateCcw size={16} color={colors.primaryInk} strokeWidth={2.2} />}
+        icon={<RotateCcw size={18} color={colors.primaryInk} strokeWidth={2.2} />}
         onPress={onRestore}
       />
     </View>

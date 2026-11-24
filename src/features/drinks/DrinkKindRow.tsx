@@ -6,14 +6,20 @@
  * When the kind changes from code (a drink picked in the sheet, or a recent chip, moved the screen to
  * its kind), the screen raises `reveal` and the row scrolls just enough for the selected chip to be
  * wholly in view, so the person sees where the drink went. A kind tapped by the person never moves the
- * row (the chip is already where the finger is).
+ * row (the chip is already where the finger is). A chip reached with the keyboard (Tab) is scrolled
+ * wholly into view the same way, so the focused chip is never left mostly outside the row.
+ *
+ * The kinds are a quiet choice above the glasses, which are the screen's main action: the chosen kind
+ * is marked by a 2 px ink outline and its label's weight (`KindChip`), never a solid ink fill that would
+ * outweigh the glasses.
  */
 import React, { useEffect, useRef } from 'react';
 import { ScrollView, View } from 'react-native';
 
 import { BEVERAGE_LABELS } from '@/lib/hydration';
+import { useTheme } from '@/theme';
 import type { Beverage } from '@/types';
-import { Chip, isReducedMotion } from '@/ui';
+import { isReducedMotion, PressableScale, Text, useGrownText } from '@/ui';
 
 const BEVERAGES = Object.keys(BEVERAGE_LABELS) as Beverage[];
 /** The row's side padding (the screen's gutter): a chip scrolled into view keeps it. */
@@ -24,9 +30,9 @@ export function DrinkKindRow({ kind, onChoose, reveal }: { kind: Beverage; onCho
   const boxes = useRef<Partial<Record<Beverage, { x: number; w: number }>>>({});
   const view = useRef({ w: 0, x: 0 });
 
-  useEffect(() => {
-    if (reveal === 0) return;
-    const box = boxes.current[kind];
+  // Scrolls the row just enough for the kind's chip to be wholly in view, keeping the row's side padding.
+  const bringIntoView = (b: Beverage) => {
+    const box = boxes.current[b];
     const { w, x } = view.current;
     if (!box || !w || !scroller.current) return;
     let to: number | null = null;
@@ -35,6 +41,11 @@ export function DrinkKindRow({ kind, onChoose, reveal }: { kind: Beverage; onCho
     if (to === null) return;
     scroller.current.scrollTo({ x: to, y: 0, animated: !isReducedMotion() });
     view.current.x = to;
+  };
+
+  useEffect(() => {
+    if (reveal === 0) return;
+    bringIntoView(kind);
     // Only a pick raises `reveal`; the kind it set is read with it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reveal]);
@@ -60,9 +71,45 @@ export function DrinkKindRow({ kind, onChoose, reveal }: { kind: Beverage; onCho
           onLayout={(e) => {
             boxes.current[b] = { x: e.nativeEvent.layout.x, w: e.nativeEvent.layout.width };
           }}>
-          <Chip testID={`water-beverage-${b}`} label={BEVERAGE_LABELS[b].label} selected={kind === b} onPress={() => onChoose(b)} />
+          <KindChip testID={`water-beverage-${b}`} label={BEVERAGE_LABELS[b].label} selected={kind === b} onPress={() => onChoose(b)} onFocus={() => bringIntoView(b)} />
         </View>
       ))}
     </ScrollView>
+  );
+}
+
+/**
+ * One kind: the kit Chip's size, corners and touch area (32 px, 44 to touch), its chosen state drawn quietly as a
+ * 2 px ink outline with its label in the heavier weight (the same width either way: the padding gives back the
+ * outline's extra pixel), so the selection stays legible without a solid fill. Selected is `aria-pressed`, as the
+ * kit Chip's.
+ */
+function KindChip({ label, selected, onPress, onFocus, testID }: { label: string; selected: boolean; onPress: () => void; onFocus: () => void; testID: string }) {
+  const { colors, radius } = useTheme();
+  const large = useGrownText();
+  return (
+    <PressableScale
+      testID={testID}
+      onPress={onPress}
+      onFocus={onFocus}
+      feedback="select"
+      hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+      accessibilityState={{ selected }}
+      aria-pressed={selected}
+      accessibilityLabel={label}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        ...(large ? { minHeight: 32, paddingVertical: 3, maxWidth: '100%' as const } : { height: 32 }),
+        paddingHorizontal: selected ? 11 : 12,
+        borderRadius: radius.chip,
+        backgroundColor: 'transparent',
+        borderWidth: selected ? 2 : 1,
+        borderColor: selected ? colors.text : colors.borderStrong,
+      }}>
+      <Text variant={selected ? 'bodyStrong' : 'label'} color="text" numberOfLines={large ? undefined : 1} style={{ fontSize: 13.5, lineHeight: 18, flexShrink: 1 }}>
+        {label}
+      </Text>
+    </PressableScale>
   );
 }

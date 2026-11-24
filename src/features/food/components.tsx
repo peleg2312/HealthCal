@@ -1,20 +1,20 @@
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react-native';
+import { CalendarDays, ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Platform, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { SourceMark, sourceMarkTop } from '@/features/ai/mark';
 import { useToday } from '@/store/clock';
-import { isolateRtl } from '@/lib/bidi';
+import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { addDays } from '@/lib/dates';
 import { MEALS } from '@/lib/nutrition';
 import { cup, fonts, useLargeText, useTheme } from '@/theme';
 import type { Food, FoodSource, ISODate, MealType } from '@/types';
 import { CupKey, IconButton, PressableScale, Text } from '@/ui';
-import { spokenUnits } from '@/lib/spokenUnits';
 
 import { displayFoodName } from './displayName';
 import { canStepForward, entryDayLabel, entryDaySpoken, foodLatestDay } from './entryDay';
 import { kcal, sourceInfo, withSourceWord } from './helpers';
+import { useLangName } from './langName';
 
 // How a data source is marked lives with the mark itself (`SourceMark`, `@/features/ai/mark`): a filled cup
 // key for reference data, an outline for community or your own numbers, the small AI mark for an AI estimate.
@@ -254,6 +254,11 @@ export function FoodRow({
   const stack = !!amount && width < 360;
   // Drawn without the reference list's capitals ("Oats, rolled, dry (uncooked)"); stored and searched as it is.
   const name = displayFoodName(food);
+  // The row's name says what it shows, in its order, as the diary's row does: the name (and the name the query
+  // found), the brand, the portion, the calories and the source in words ("Whey protein shake, 1 scoop,
+  // 114 kilocalories, Reference data. Open details"); a name in Hebrew or Arabic is spoken in its own language.
+  const brand = food.brand && !amount ? `${food.brand}, ` : '';
+  const lang = useLangName(`${name}${matched ? `, ${matched}` : ''}, ${brand}${withoutMarks(subtitle)}, ${Math.round(kcalValue)} kilocalories, ${sourceInfo(food.source).label}. Open details`);
   return (
     <View style={stack ? { paddingBottom: spacing.sm } : { flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
       <PressableScale
@@ -270,8 +275,10 @@ export function FoodRow({
           : null)}
         scaleTo={0.985}
         // The source is said in words here for every source (the caption names only those worth a second look).
-        accessibilityLabel={spokenUnits(`${name}${matched ? `, ${matched}` : ''}, ${Math.round(kcalValue)} kilocalories, ${sourceInfo(food.source).label}. Open details`)}
+        accessibilityLabel={lang.label}
+        {...lang.props}
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>
+        {lang.hidden}
         <RowEmoji emoji={food.emoji} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           {/* Up to three lines, as in the diary: a long name ("Israeli salad (tomato, cucumber, onion, ...)") is read, not cut. */}
@@ -307,14 +314,15 @@ export function FoodRow({
         <IconButton
           testID={testID ? `${testID}-add` : undefined}
           accessibilityLabel={`Add ${name}`}
-          tone={added ? 'primary' : 'surface'}
+          tone="surface"
           size={44}
           onPress={() => {
             setAddedAt(Date.now());
             setAdded(true);
             onQuickAdd();
           }}>
-          {added ? <Check size={20} color={colors.onPrimary} strokeWidth={2.2} /> : <Plus size={20} color={colors.text} strokeWidth={2.2} />}
+          {/* Added: the done mark, the small filled ink cup (never a check, which means only a day on budget). */}
+          {added ? <CupKey color={colors.text} size={12} /> : <Plus size={20} color={colors.text} strokeWidth={2.2} />}
         </IconButton>
       ) : null}
     </View>
@@ -323,6 +331,7 @@ export function FoodRow({
 
 function AmountStepper({ amount, name, testID }: { amount: RowAmount; name: string; testID?: string }) {
   const { colors, radius } = useTheme();
+  const lang = useLangName(`${name}, ${withoutMarks(amount.label)}. Change amount`);
   return (
     <View
       testID={testID ? `${testID}-stepper` : undefined}
@@ -334,8 +343,10 @@ function AmountStepper({ amount, name, testID }: { amount: RowAmount; name: stri
         testID={testID ? `${testID}-amount` : undefined}
         onPress={amount.onOpen}
         feedback="select"
-        accessibilityLabel={spokenUnits(`${name}, ${amount.label}. Change amount`)}
+        accessibilityLabel={lang.label}
+        {...lang.props}
         style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
+        {lang.hidden}
         <Text variant="numM" tabular numberOfLines={1} style={{ fontSize: 14.5, lineHeight: 18 }}>
           {amount.label}
         </Text>

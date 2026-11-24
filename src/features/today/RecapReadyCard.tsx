@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { CalendarCheck, X } from 'lucide-react-native';
+import { Calendar, X } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
@@ -53,7 +53,8 @@ export function RecapReadyCard() {
       <ListRow
         testID="today-recap-open"
         title="Your week is ready"
-        left={<CalendarCheck size={20} color={colors.text} strokeWidth={1.9} />}
+        // A plain calendar: the check means only a day on budget.
+        left={<Calendar size={20} color={colors.text} strokeWidth={1.9} />}
         chevron
         accessibilityHint={`${range}. ${line}. Opens the weekly check-in`}
         onPress={() => router.push(`/recap?week=${recap.week}` as never)}

@@ -542,7 +542,7 @@ describe('planChangeText', () => {
   it('explains a target that follows what the logs show you burn', () => {
     expect(planChangeText({ target: 2000, tdee: 2500, usingAdaptive: true }, { target: 2010, tdee: 2510, usingAdaptive: true })).toBe('Same target as last week.');
     expect(planChangeText({ target: 2000, tdee: 2500, usingAdaptive: true }, { target: 1940, tdee: 2440, usingAdaptive: true })).toBe(
-      'Your logs now show you burn 2,440 kcal a day outside logged workouts, against 2,500 kcal, so the target moved down 60 kcal.',
+      'Your logs now show you burn about 2,440 kcal a day outside logged workouts, down from about 2,500 kcal, so the target moved down 60 kcal.',
     );
     expect(planChangeText({ target: 2000, tdee: 2500, usingAdaptive: false }, { target: 1800, tdee: 2500, usingAdaptive: false })).toContain('change to your goal');
   });

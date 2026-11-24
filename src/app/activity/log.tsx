@@ -6,7 +6,7 @@ import { useWindowDimensions, View } from 'react-native';
 import { ACTIVITY_BY_ID, MET_SOURCES } from '@/data/activities';
 import { basisFromEntry, formatPace, localiseSpeedText, paceModeFor, sessionPreview, sessionWaterMl } from '@/features/activity/build';
 import { DateStepper } from '@/features/activity/components';
-import { BURN_UNIT, budgetAdds, burnCaption, burnSource } from '@/features/activity/logWords';
+import { BURN_UNIT, budgetAdds, burnCaption, burnSource, sourceWords } from '@/features/activity/logWords';
 import { SpreadHint } from '@/features/activity/SpreadHint';
 import { syncedFrom } from '@/features/health-sync/origins';
 import { HeartRateLine } from '@/features/health-sync/ui/HeartRateLine';
@@ -132,13 +132,16 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
     leaveFlow();
   };
 
-  const lead = isMeasured ? `${Device} measured ${formatNumber(preview.gross)} kcal in total` : `About ${formatNumber(preview.gross)} kcal`;
-  const sentence =
-    rule === 'week'
-      ? `${lead}, of which ${formatNumber(preview.net)} is above what your day already includes; about ${formatNumber(dailyShare(preview.net))} a day is added to ${dayWord} budget and each of the next six days.`
-      : rule === 'day'
-        ? `${lead}, of which ${formatNumber(preview.net)} is above what your day already includes; ${formatNumber(preview.net)} is added to ${dayWord} budget.`
-        : `${lead}, of which ${formatNumber(preview.net)} is above what your day already includes. Your budget stays the same, because adding exercise calories back is turned off in your goals.`;
+  // How the two figures above come about, in words that never say either figure again (./logWords).
+  const source = sourceWords({
+    measuredBy: isMeasured ? device : null,
+    formula: isMeasured ? null : { met, weight: formatWeight(round(basis.weightKg, 1), 'metric'), minutes },
+    restingDay: Math.round(tdee),
+    restingShare,
+    rule,
+    dayShare: dailyShare(preview.net),
+    dayWord,
+  });
   // Said before saving: the edit replaces the device's figure with an estimate.
   const replaceNote =
     preview.kind === 'estimate' && preview.replacesMeasured && entry
@@ -256,25 +259,15 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
         {showSource ? (
           <View style={{ gap: spacing.sm, marginTop: -spacing.xs }} testID="log-activity-source-body">
             <Text variant="caption" color="textSecondary" testID="log-activity-sentence">
-              {sentence}
+              {`${source.how} ${source.resting}`}
             </Text>
-            {isMeasured ? (
-              <Text variant="caption" color="textSecondary">
-                {formatNumber(preview.gross)} kcal is the total {device} measured for this session, resting included. Your day already assumes{' '}
-                {formatNumber(Math.round(tdee))} kcal for resting and daily life, {formatNumber(restingShare)} kcal of it in these minutes, so {formatNumber(preview.net)} kcal is
-                extra. Changing the activity, the effort or the duration replaces the measured figure with an estimate.
+            <Text variant="caption" color="textSecondary">
+              {source.note}
+            </Text>
+            {isMeasured ? null : (
+              <Text variant="caption" color="textTertiary">
+                Source: {MET_SOURCES[activity.id] ?? 'Compendium of Physical Activities.'}
               </Text>
-            ) : (
-              <>
-                <Text variant="caption" color="textSecondary">
-                  {met} MET × 3.5 ml O₂ per kg per minute × {formatWeight(round(basis.weightKg, 1), 'metric')} × {minutes} min ÷ 200 = {formatNumber(preview.gross)} kcal in total.
-                  Your day already assumes {formatNumber(Math.round(tdee))} kcal for resting and daily life, {formatNumber(restingShare)} kcal of it in these minutes, so{' '}
-                  {formatNumber(preview.net)} kcal is extra. MET values describe an average adult, so the range allows about 20% either way.
-                </Text>
-                <Text variant="caption" color="textTertiary">
-                  Source: {MET_SOURCES[activity.id] ?? 'Compendium of Physical Activities.'}
-                </Text>
-              </>
             )}
           </View>
         ) : null}

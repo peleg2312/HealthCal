@@ -10,7 +10,7 @@ import { formatVolume, formatWeight, volumeToMl, volumeUnit, volumeValue } from 
 import { useNow, useToday } from '@/store/clock';
 import { DEFAULT_SETTINGS, useStore } from '@/store';
 import { computeDayFromStore, useDay, useDays, useLive, useProfile } from '@/store/selectors';
-import { Note, RequireProfile, splitUnit, Tile } from '@/features/trackers/components';
+import { Note, RequireProfile, splitUnit } from '@/features/trackers/components';
 import { dayTitle, resolveDateParam } from '@/features/trackers/dateParam';
 import { keepOrConvert, MAX_PRESET_ML, MIN_PRESET_ML, normalizePresets } from '@/features/trackers/helpers';
 import { FadeRow, useLeavingRows } from '@/features/food/rowMotion';
@@ -31,7 +31,7 @@ import { loadDrinkMemory, rememberDrinkChoice, useDrinkMemory } from '@/features
 import { diaryWaterCaption, diaryWaterOpenLabel, waterDeleteLabel } from '@/features/drinks/diary';
 import { drinkMeal, entryFor, noticeLine, pickedFood, planDrink, rememberedChoice, sameDrinkFoodIds, sameDrinkInDiary, selectChoice, selectFood, waterAfter, waterFromEntry, waterOnlyOffered, waterRowCaption, waterRowTitle, type WaterAfter } from '@/features/drinks/rules';
 import { leftLitreDecimals, shownMl, volumeNumber, volumeUnitFor, waterLeftMl } from '@/features/today/volume';
-import { useLargeText, useTheme } from '@/theme';
+import { cup, useLargeText, useTheme } from '@/theme';
 import { pourLandsAt } from '@/theme/motion';
 import type { Beverage, Food, WaterEntry } from '@/types';
 import { spokenUnits } from '@/lib/spokenUnits';
@@ -41,7 +41,6 @@ import {
   BarChart,
   Button,
   Card,
-  CupKey,
   Divider,
   EmptyState,
   haptic,
@@ -130,6 +129,46 @@ function tileRows(count: number, screenW: number, minTile = 72): number[][] {
     out.push(row);
   }
   return out;
+}
+
+/**
+ * A glass to add, the screen's main action: the water key's colour on its edge (as the kit Button's `tint`) and on
+ * its glass, and its amount in the figures' face, so the glasses lead the screen and the kind chips above them stay
+ * quiet. The tile's own words first in its name ("150 ml, Small"), then what the tap does.
+ */
+function GlassTile({ title, subtitle, icon, onPress, testID, accessibilityLabel }: { title: string; subtitle?: string; icon: React.ReactNode; onPress: () => void; testID: string; accessibilityLabel: string }) {
+  const { colors, radius } = useTheme();
+  return (
+    <PressableScale
+      testID={testID}
+      onPress={onPress}
+      feedback="press"
+      scaleTo={0.94}
+      accessibilityLabel={accessibilityLabel}
+      style={{
+        flex: 1,
+        minWidth: 72,
+        minHeight: 84,
+        ...cup(radius.tile, 5),
+        backgroundColor: colors.surface,
+        borderWidth: 2,
+        borderColor: colors.water,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+        paddingVertical: 10,
+      }}>
+      {icon}
+      <Text variant="numM" tabular numberOfLines={1} style={{ fontSize: 17, lineHeight: 22 }}>
+        {title}
+      </Text>
+      {subtitle ? (
+        <Text variant="caption" color="textSecondary" numberOfLines={1}>
+          {subtitle}
+        </Text>
+      ) : null}
+    </PressableScale>
+  );
 }
 
 function WaterScreen() {
@@ -417,19 +456,21 @@ function WaterScreen() {
             ) : null}
           </Text>
         ) : (
-          <View style={{ gap: 2 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
-              <AnimatedNumber testID="water-left" variant="numL" value={left} format={(ml) => volumeNumber(ml, left, units, leftLitreDecimals(left))} accessibilityLabel={spokenUnits(`${formatVolume(left, units)} left to drink`)} />
-              <Text variant="unit" style={{ fontSize: 15 }}>
-                {`${volumeUnitFor(left, units)} left to drink`}
+          // What is left, said once: the figure and, in the same line, about how many glasses that is.
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', columnGap: 6, flexWrap: 'wrap' }}>
+            <AnimatedNumber
+              testID="water-left"
+              variant="numL"
+              value={left}
+              format={(ml) => volumeNumber(ml, left, units, leftLitreDecimals(left))}
+              accessibilityLabel={spokenUnits(`${formatVolume(left, units)} left to drink, about ${glassesLeft(landing?.left ?? left, glassMl)} × ${formatVolume(glassMl, units)}`)}
+            />
+            <Text variant="unit" style={{ fontSize: 15, flexShrink: 1 }}>
+              {`${volumeUnitFor(left, units)} left, `}
+              <Text testID="water-glasses" variant="unit" style={{ fontSize: 15 }}>
+                {`about ${glassesLeft(landing?.left ?? left, glassMl)} × ${formatVolume(glassMl, units)}`}
               </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} testID="water-glasses">
-              <CupKey color={colors.water} />
-              <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
-                {`About ${glassesLeft(landing?.left ?? left, glassMl)} × ${formatVolume(glassMl, units)} to go`}
-              </Text>
-            </View>
+            </Text>
           </View>
         )}
       </Card>
@@ -465,14 +506,14 @@ function WaterScreen() {
               const title = formatVolume(ml, units);
               const subtitle = tilePlan.tile ?? (i === 0 ? 'Small' : undefined);
               return (
-                <Tile
+                <GlassTile
                   key={`${ml}-${i}`}
                   testID={`water-add-${i}`}
                   // The tile's own words first ("150 ml, Small"), then what the tap does.
                   accessibilityLabel={spokenUnits(`${title}${subtitle ? `, ${subtitle}` : ''}. ${tilePlan.label}`)}
                   title={title}
                   subtitle={subtitle}
-                  icon={<GlassWater size={Math.min(26, 16 + i * 3)} color={colors.water} strokeWidth={1.9} />}
+                  icon={<GlassWater size={Math.min(26, 16 + i * 3)} color={colors.water} strokeWidth={2.2} />}
                   onPress={glassTap(() => add(ml))}
                 />
               );
@@ -482,15 +523,16 @@ function WaterScreen() {
       </View>
       {/* With large text the field keeps at least 200 px and Add goes under it when both do not fit one line. */}
       <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', gap: spacing.sm, alignItems: 'flex-end' }}>
+        {/* A visible label that lasts (WCAG 3.3.2), with the unit as its suffix: its spoken name is the kit's
+            ("Other amount, millilitres"), and an empty field shows no placeholder that could pass for a value. */}
         <NumberField
           testID="water-custom-input"
           style={big ? { flexGrow: 1, flexBasis: 200 } : { flex: 1 }}
-          placeholder={big ? 'Amount' : 'Other amount'}
+          label="Other amount"
           suffix={volumeUnit(units)}
           decimals={0}
           value={custom}
           onChange={setCustom}
-          accessibilityLabel={`Other amount in ${volumeUnit(units)}`}
         />
         <Button
           testID="water-custom-add"

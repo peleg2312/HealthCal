@@ -10,7 +10,6 @@ import { displayFoodName } from '@/features/food/displayName';
 import { FavoriteStar } from '@/features/food/FavoriteStar';
 import { toggleMealFavorite } from '@/features/food/favoriteActions';
 import { isFavoriteMeal, mealToSave } from '@/features/food/favorites';
-import { favoriteLabel } from '@/features/food/favoriteWords';
 import { href, kcal, parseDate, parseMeal } from '@/features/food/helpers';
 import { ItemCaption, LogSavedMealSheet } from '@/features/food/SavedMealParts';
 import { SaveCurrentMealRow, useVisitOrder } from '@/features/food/SavedMealRow';
@@ -87,7 +86,7 @@ export default function SavedMealsScreen() {
                       : `${approx}${kcal(n.kcal)} kcal · P ${Math.round(n.protein)} g · C ${Math.round(n.carbs)} g · F ${Math.round(n.fat)} g`}
                   </Text>
                 </View>
-                <FavoriteStar testID={`saved-meal-favorite-${i}`} on={on} label={favoriteLabel(m.name, on)} onPress={() => toggleMealFavorite(m)} style={{ marginTop: -6, marginRight: -6 }} />
+                <FavoriteStar testID={`saved-meal-favorite-${i}`} on={on} name={m.name} onPress={() => toggleMealFavorite(m)} style={{ marginTop: -6, marginRight: -6 }} />
               </View>
               <MacroBar protein={n.protein * 4} carbs={n.carbs * 4} fat={n.fat * 9} height={6} />
               {/* Each item's amount goes under its name, as in the diary, so neither squeezes the other into a few letters. */}
@@ -110,7 +109,8 @@ export default function SavedMealsScreen() {
                   testID={`saved-meal-log-${i}`}
                   // At 320 px "Log to breakfast" does not fit beside edit and delete: the meal is chosen just above, so "Log" says it.
                   title={narrow ? 'Log' : `Log to ${MEAL_LABEL[meal].toLowerCase()}`}
-                  accessibilityLabel={`Log ${m.name} to ${MEAL_LABEL[meal].toLowerCase()}`}
+                  // The name starts with the visible words (WCAG 2.5.3), the meal it logs after them.
+                  accessibilityLabel={`Log to ${MEAL_LABEL[meal].toLowerCase()}, ${m.name}`}
                   size="md"
                   variant="secondary"
                   full={false}

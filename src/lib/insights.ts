@@ -1289,11 +1289,12 @@ export function planChangeText(
   const diff = Math.round(after.target - before.target);
   if (Math.abs(diff) < 20) return 'Same target as last week.';
   const dir = diff > 0 ? 'up' : 'down';
+  // What you burn is an estimate, said with "about" wherever it is a figure (principle 2).
   if (after.usingAdaptive && !before.usingAdaptive) {
-    return `Your target now follows what your logs show you burn, ${kcalText(after.tdee)} a day outside logged workouts, so it moved ${dir} ${kcalText(Math.abs(diff))}.`;
+    return `Your target now follows what your logs show you burn, about ${kcalText(after.tdee)} a day outside logged workouts, so it moved ${dir} ${kcalText(Math.abs(diff))}.`;
   }
   if (after.usingAdaptive && Math.abs(after.tdee - before.tdee) >= 20) {
-    return `Your logs now show you burn ${kcalText(after.tdee)} a day outside logged workouts, against ${kcalText(before.tdee)}, so the target moved ${dir} ${kcalText(Math.abs(diff))}.`;
+    return `Your logs now show you burn about ${kcalText(after.tdee)} a day outside logged workouts, ${after.tdee > before.tdee ? 'up' : 'down'} from about ${kcalText(before.tdee)}, so the target moved ${dir} ${kcalText(Math.abs(diff))}.`;
   }
   return `Your target moved ${dir} ${kcalText(Math.abs(diff))} after a change to your goal, weight or activity settings.`;
 }

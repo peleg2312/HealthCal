@@ -60,7 +60,7 @@ export function EarlyState({
       id: 'adaptive',
       color: colors.exercise,
       title: 'What you burn, from your logs',
-      detail: adaptiveNeeds ? `Calories you really burn, worked out from your logs. Still needs ${adaptiveNeeds}.` : 'Ready.',
+      detail: adaptiveNeeds ? `What you burn in a day, worked out from your logs. Still needs ${adaptiveNeeds}.` : 'Ready.',
       have: adaptiveDays,
       need: 10,
     },

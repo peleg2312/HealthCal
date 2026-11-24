@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { ArrowDown, ArrowRight, ArrowUp, CalendarCheck, ChevronRight, Info, Star, Target } from 'lucide-react-native';
+import { ArrowDown, ArrowRight, ArrowUp, Award, Calendar, ChevronRight, Info, Target } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
@@ -13,6 +13,7 @@ import { RecapCups } from '@/features/progress/RecapCups';
 import { recapDayCups, recapDaysVerdict } from '@/features/progress/recapDays';
 import { useRecapReady } from '@/features/progress/recapReady';
 import { useRecap } from '@/features/progress/useRecap';
+import { winTile } from '@/features/progress/recapWin';
 import { ShareWeekButton } from '@/features/share';
 import { useLargeText, useTheme } from '@/theme';
 import { AnimatedNumber, Card, CupKey, Divider, EmptyState, FadeUp, Header, IconButton, PressableScale, Screen, Sheet, Text } from '@/ui';
@@ -29,8 +30,12 @@ function deltaText(t: RecapTile): string {
 /** Each tile's measure for the honest-arrow rule (`change.ts`): an arrow only for a change worth calling, else the sideways one. */
 const TILE_KIND: Record<RecapTile['id'], ChangeKind> = { calories: 'kcal', protein: 'protein', activity: 'minutes', water: 'days' };
 
-/** One cell of the week's numbers: the four share a card, divided by hairlines. */
-function Tile({ t, index, week }: { t: RecapTile; index: number; week: string }) {
+/**
+ * One cell of the week's numbers: the four share a card, divided by hairlines. The tile the win of the
+ * week restates (`won`) keeps only its label and its change against the week before: the win card
+ * above already says its figures, and a figure is said once on a screen. Its spoken label stays whole.
+ */
+function Tile({ t, index, week, won = false }: { t: RecapTile; index: number; week: string; won?: boolean }) {
   const { colors, spacing } = useTheme();
   // At 320 px a tile is about 108 px wide: the number steps down so it and its unit are never cut.
   const narrow = useWindowDimensions().width < 360;
@@ -70,7 +75,7 @@ function Tile({ t, index, week }: { t: RecapTile; index: number; week: string })
           {t.label}
         </Text>
       </View>
-      {t.value === null ? (
+      {won ? null : t.value === null ? (
         <Text variant="numL" color="textTertiary">
           –
         </Text>
@@ -87,9 +92,11 @@ function Tile({ t, index, week }: { t: RecapTile; index: number; week: string })
           <Text variant="unit">{` ${t.unit}`}</Text>
         </AnimatedNumber>
       )}
-      <Text variant="caption" color="textSecondary" numberOfLines={oneColumn ? 4 : 2}>
-        {t.context}
-      </Text>
+      {won ? null : (
+        <Text variant="caption" color="textSecondary" numberOfLines={oneColumn ? 4 : 2}>
+          {t.context}
+        </Text>
+      )}
       {deltaText(t) ? (
         <View
           style={{
@@ -151,15 +158,18 @@ export default function RecapScreen() {
     if (r && ready.ready && ready.week === d.week) ready.markSeen();
   }, [r, ready, d.week]);
 
-  const title = r?.label === 'This week' ? 'This week so far' : r?.label === 'Last week' ? 'Your week' : 'Weekly check\u2011in';
+  // One name for the screen in every state (Progress's card and the page title say the same); which week
+  // it shows is the short line under it.
+  const title = 'Weekly check\u2011in';
   const range = weekRangeLabel(d.week, addDays(d.week, 6));
+  const won = r ? winTile(r.win) : null;
 
   return (
     <Screen
       header={
         <Header
           title={title}
-          subtitle={r ? `${r.label === 'Week' ? 'Week of' : `${r.label} ·`} ${weekRangeLabel(r.weekStart, r.weekEnd)}` : range}
+          subtitle={r ? `${r.label === 'Week' ? 'Week of' : r.label === 'This week' ? 'This week so far ·' : `${r.label} ·`} ${weekRangeLabel(r.weekStart, r.weekEnd)}` : range}
           right={r ? <ShareWeekButton recap={r} /> : undefined}
         />
       }
@@ -187,7 +197,7 @@ export default function RecapScreen() {
           <FadeUp index={1}>
             <Card padding={0} style={{ flexDirection: 'row', flexWrap: 'wrap' }} testID="recap-tiles">
               {d.tiles.map((t, i) => (
-                <Tile key={t.id} t={t} index={i} week={d.week} />
+                <Tile key={t.id} t={t} index={i} week={d.week} won={t.id === won} />
               ))}
             </Card>
           </FadeUp>
@@ -218,7 +228,8 @@ export default function RecapScreen() {
               <>
                 <Row
                   testID="recap-best-day"
-                  icon={<Star size={19} color={colors.text} strokeWidth={1.9} />}
+                  // A ribbon, never a star (a star is only a favourite) and never a check (only a day on budget).
+                  icon={<Award size={19} color={colors.text} strokeWidth={1.9} />}
                   label={`Best day · ${formatDayLabel(r.bestDay.date)}`}
                   text={r.bestDay.detail}
                 />
@@ -303,14 +314,16 @@ export default function RecapScreen() {
               key={w}
               testID={`recap-week-${w}`}
               onPress={() => go(`/recap?week=${w}`)}
-              accessibilityLabel={`Open the check-in for the week of ${formatShortDate(w)}`}
+              // The visible words first (WCAG 2.5.3), then what the row does.
+              accessibilityLabel={`${weekRangeLabel(w, addDays(w, 6))}, open the check-in`}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: spacing.md,
                 minHeight: 44,
               }}>
-              <CalendarCheck size={18} color={colors.textSecondary} strokeWidth={1.9} />
+              {/* A plain calendar: a check means only a day on budget. */}
+              <Calendar size={18} color={colors.textSecondary} strokeWidth={1.9} />
               <Text variant="body" style={{ flex: 1 }}>
                 {weekRangeLabel(w, addDays(w, 6))}
               </Text>

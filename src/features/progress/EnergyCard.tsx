@@ -9,19 +9,26 @@ import type { EnergyModel } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import { Badge, PressableScale, ProgressBar, Text } from '@/ui';
 
+import { spokenUnits } from './chartWords';
 import { SectionCard } from './parts';
 
 /** Minimums from src/lib/trend.ts, shown as progress toward the first estimate. */
 const NEED_DAYS = 10;
 const NEED_WEIGH_INS = 5;
 
-/** One estimate; the two share the card, split by a hairline. The one that sets targets carries a badge. */
+/**
+ * One estimate; the two share the card, split by a hairline. The one that sets targets carries a badge.
+ * What you burn is an estimate: its figure wears "~", and its spoken name says "about".
+ */
 function Column({ title, value, caption, active, color, first }: { title: string; value: string | null; caption: string; active: boolean; color: string; first?: boolean }) {
   const { colors, spacing } = useTheme();
   // At 320 px a column is about 110 px wide: the number steps down so it and its unit stay whole.
   const narrow = useWindowDimensions().width < 360;
   return (
     <View
+      accessible
+      role="group"
+      accessibilityLabel={spokenUnits(`${title}: ${value ? `about ${value} kcal` : 'not yet'}. ${caption}.${active ? ' Sets your targets.' : ''}`)}
       style={{
         flex: 1,
         minWidth: 0,
@@ -35,7 +42,7 @@ function Column({ title, value, caption, active, color, first }: { title: string
         {title}
       </Text>
       <Text variant="numL" color={value ? 'text' : 'textTertiary'} style={value ? (narrow ? { fontSize: 24, lineHeight: 28 } : undefined) : { fontSize: 22 }}>
-        {value ?? 'Not yet'}
+        {value ? `~${value}` : 'Not yet'}
         {value ? <Text variant="unit"> kcal</Text> : null}
       </Text>
       <Text variant="caption" color="textSecondary">
@@ -98,7 +105,7 @@ export function EnergyCard({ model, useAdaptiveSetting }: { model: EnergyModel; 
           <Text variant="caption" color="textSecondary">
             Based on {a.loggedDays} fully logged days and {a.weighIns} weigh-ins in the last {a.windowDays} days.{' '}
             {model.usingAdaptive
-              ? `Your targets use ${kcalText(model.tdee)}, a blend that gives your logs ${pct}% of the weight and the body estimate the rest. ${a.confidence >= 0.85 ? 'That is the most weight it ever gets, so a few unlogged days cannot swing your targets.' : 'More complete days and weigh-ins raise the confidence.'}`
+              ? `Your targets use about ${kcalText(model.tdee)} a day, a blend that gives your logs ${pct}% of the weight and the body estimate the rest. ${a.confidence >= 0.85 ? 'That is the most weight it ever gets, so a few unlogged days cannot swing your targets.' : 'More complete days and weigh-ins raise the confidence.'}`
               : useAdaptiveSetting
                 ? ''
                 : '"Learn from my data" is off in Goals, so your targets use the body estimate.'}
@@ -115,7 +122,7 @@ export function EnergyCard({ model, useAdaptiveSetting }: { model: EnergyModel; 
       )}
 
       <Text variant="caption" color="textSecondary">
-        Daily target {kcalText(model.target.target)}: the {kcalText(model.tdee)} you burn{' '}
+        Daily target {kcalText(model.target.target)}: what you burn, about {kcalText(model.tdee)},{' '}
         {delta < -5 ? `minus ${formatNumber(-delta)} kcal for your goal` : delta > 5 ? `plus ${formatNumber(delta)} kcal for your goal` : 'with no deficit'}
         {model.target.limitedByFloor ? ', held at the minimum safe intake' : ''}.
       </Text>

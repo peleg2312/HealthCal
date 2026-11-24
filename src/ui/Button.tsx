@@ -6,6 +6,35 @@ import { cup, cupFor, fonts, useTheme } from '@/theme';
 import { PressableScale } from './Pressable';
 import { Text, useGrownText } from './Text';
 
+/**
+ * The icon a kit button draws, one size per button size and stroke 2.2 (the rule for an icon on a button), so no
+ * caller picks its own: 18 px on a small or medium Button, 20 on a large one. The caller's `size` and
+ * `strokeWidth` are replaced; its colour is kept.
+ */
+export const BUTTON_ICON = { sm: 18, md: 18, lg: 20 } as const;
+/** The stroke of an icon on a button (on a clear `IconButton`, which draws no cup, it is a bare mark: `BARE_ICON`). */
+export const BUTTON_STROKE = 2.2;
+/** A clear `IconButton` draws no cup, so its icon is a bare mark, as the trash can is: 18 px at lucide's 1.9. */
+export const BARE_ICON = { size: 18, strokeWidth: 1.9 } as const;
+
+/** An `IconButton`'s icon size by its cup: 18 up to 36 px, 20 up to 47, 22 from 48. */
+export function iconButtonGlyph(size: number, tone: 'surface' | 'alt' | 'primary' | 'clear'): { size: number; strokeWidth: number } {
+  if (tone === 'clear') return BARE_ICON;
+  return { size: size <= 36 ? 18 : size < 48 ? 20 : 22, strokeWidth: BUTTON_STROKE };
+}
+
+/**
+ * Sizes and strokes an icon given to a kit button: a lucide icon or the app's own line glyph (`AiGlyph`), told by the
+ * `size` or `strokeWidth` it was given. Anything else (a host element, text, a mark that takes neither) is drawn
+ * as given.
+ */
+function kitIcon(node: React.ReactNode, glyph: { size: number; strokeWidth: number }): React.ReactNode {
+  if (!React.isValidElement(node) || typeof node.type === 'string') return node;
+  const props = node.props as Record<string, unknown>;
+  if (!('size' in props) && !('strokeWidth' in props)) return node;
+  return React.cloneElement(node as React.ReactElement<{ size?: number; strokeWidth?: number }>, glyph);
+}
+
 export interface ButtonProps {
   title: string;
   onPress?: () => void;
@@ -17,6 +46,7 @@ export interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'soft';
   /** lg 48, md 44, sm 36 visible (a 44 px touch target through hitSlop, on web too; 48 dp on Android, see PressableScale). */
   size?: 'sm' | 'md' | 'lg';
+  /** A lucide icon (or `AiGlyph`), drawn at the button's own icon size and stroke (`BUTTON_ICON`, `BUTTON_STROKE`). */
   icon?: React.ReactNode;
   iconRight?: React.ReactNode;
   loading?: boolean;
@@ -56,12 +86,12 @@ export function Button({ title, onPress, variant = 'primary', size = 'lg', icon,
             colors.primaryInk
           : colors.text;
   const edge = variant === 'secondary' ? (tint ?? colors.borderStrong) : variant === 'danger' ? colors.danger : 'transparent';
+  const glyph = { size: BUTTON_ICON[size], strokeWidth: BUTTON_STROKE };
   return (
     <PressableScale
       testID={testID}
       onPress={onPress}
       disabled={disabled || loading}
-      feedback={variant === 'primary' ? 'press' : 'tap'}
       accessibilityLabel={accessibilityLabel ?? title}
       expanded={expanded}
       hitSlop={sm ? 4 : undefined}
@@ -85,7 +115,7 @@ export function Button({ title, onPress, variant = 'primary', size = 'lg', icon,
         <ActivityIndicator color={fg} />
       ) : (
         <>
-          {icon ? <View>{icon}</View> : null}
+          {icon ? <View>{kitIcon(icon, glyph)}</View> : null}
           <Text
             variant="title"
             color={fg}
@@ -93,7 +123,7 @@ export function Button({ title, onPress, variant = 'primary', size = 'lg', icon,
             style={[sm ? { fontSize: 14, lineHeight: 18, fontFamily: fonts.bold } : null, large ? { flexShrink: 1, textAlign: 'center' } : null]}>
             {title}
           </Text>
-          {iconRight ? <View>{iconRight}</View> : null}
+          {iconRight ? <View>{kitIcon(iconRight, glyph)}</View> : null}
         </>
       )}
     </PressableScale>
@@ -105,6 +135,10 @@ export function Button({ title, onPress, variant = 'primary', size = 'lg', icon,
  * border; `alt` is a surfaceAlt tile; `primary` is solid; `clear` has nothing
  * behind the icon. Small sizes keep a 44 px touch target through hitSlop, on
  * web as well, and 48 dp on Android (see `PressableScale`).
+ *
+ * The icon it is given (a lucide icon or `AiGlyph`) is drawn at the cup's one size and stroke
+ * (`iconButtonGlyph`): 18 px in a cup up to 36, 20 up to 47, 22 from 48, at stroke 2.2; in a clear
+ * one, which draws no cup, a bare mark of 18 px at 1.9 (the trash can). Its colour is the caller's.
  */
 export function IconButton({
   children,
@@ -155,7 +189,7 @@ export function IconButton({
         },
         style,
       ]}>
-      {children}
+      {React.Children.map(children, (c) => kitIcon(c, iconButtonGlyph(size, tone)))}
     </PressableScale>
   );
 }

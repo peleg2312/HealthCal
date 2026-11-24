@@ -25,7 +25,8 @@ import { formatPortion, itemsRange, mealServings } from './build';
 import { FavoriteStar } from './FavoriteStar';
 import { toggleMealFavorite } from './favoriteActions';
 import { favoriteMeals, inVisitOrder, isFavoriteMeal, orderSavedMeals } from './favorites';
-import { approxKcalSpoken, favoriteActionLabel, favoriteLabel, FAVOURITE_ACTION, logMealLabel, saveRowDay, savedRowCaption } from './favoriteWords';
+import { approxKcalSpoken, favoriteActionLabel, FAVOURITE_ACTION, logMealLabel, saveRowDay, savedRowCaption } from './favoriteWords';
+import { useLangName } from './langName';
 import { SaveMealSheet } from './SaveMealSheet';
 import { itemCount, saveHintLabel } from './saveWords';
 import { currentValues } from './usuals';
@@ -64,6 +65,8 @@ export function SavedMealRow({ meal, testID, onReview, onLog, onHold }: { meal: 
   const { count, total, estimate } = rowFigures(meal);
   const caption = savedRowCaption({ items: meal.items.length, servings: count, servingsText: formatPortion(count), kcal: total, estimate });
   const star = () => toggleMealFavorite(meal);
+  // A meal named in Hebrew or Arabic is spoken in its own language (./langName).
+  const lang = useLangName(`${meal.name}, ${meal.items.length} items, ${approxKcalSpoken(total, estimate)}${on ? ', favourite' : ''}. Choose servings and items before logging`);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
       <PressableScale
@@ -74,12 +77,14 @@ export function SavedMealRow({ meal, testID, onReview, onLog, onHold }: { meal: 
           star();
         }}
         scaleTo={0.985}
-        accessibilityLabel={spokenUnits(`${meal.name}, ${meal.items.length} items, ${approxKcalSpoken(total, estimate)}${on ? ', favourite' : ''}. Choose servings and items before logging`)}
+        accessibilityLabel={lang.label}
+        {...lang.props}
         accessibilityActions={[{ name: FAVOURITE_ACTION.name, label: favoriteActionLabel(on) }]}
         onAccessibilityAction={(e) => {
           if (e.nativeEvent.actionName === FAVOURITE_ACTION.name) star();
         }}
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>
+        {lang.hidden}
         <View style={{ width: 24, alignItems: 'center' }}>
           <Utensils size={19} color={colors.textSecondary} strokeWidth={1.9} />
         </View>
@@ -94,7 +99,7 @@ export function SavedMealRow({ meal, testID, onReview, onLog, onHold }: { meal: 
         </View>
       </PressableScale>
       {/* 12 px to the "+": the star's touch area reaches 4 px past its edge, so neither takes the other's taps. */}
-      <FavoriteStar testID={`${testID}-favorite`} on={on} label={favoriteLabel(meal.name, on)} onPress={star} style={{ marginRight: 4 }} />
+      <FavoriteStar testID={`${testID}-favorite`} on={on} name={meal.name} onPress={star} style={{ marginRight: 4 }} />
       {/* The same "+" cup as a food row's, and it does the same: it adds at once, with one toast and Undo. */}
       <IconButton testID={`${testID}-log`} accessibilityLabel={count > 1 ? `Log one serving of ${meal.name}` : logMealLabel(meal.name)} tone="surface" size={44} onPress={onLog}>
         <Plus size={20} color={colors.text} strokeWidth={2.2} />

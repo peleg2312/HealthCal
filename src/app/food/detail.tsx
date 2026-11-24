@@ -13,7 +13,6 @@ import { displayFoodName } from '@/features/food/displayName';
 import { useFoodDraft } from '@/features/food/draft';
 import { FavoriteStar } from '@/features/food/FavoriteStar';
 import { toggleFoodFavorite } from '@/features/food/favoriteActions';
-import { favoriteActionLabel } from '@/features/food/favoriteWords';
 import { dayPhrase, href, portionLabel, kcal, labelAmount, lastPortions, matchServing, param, parseDate, parseMeal, portionFor, sourceInfo, valuesUpdated } from '@/features/food/helpers';
 import { deleteEntry, logFood } from '@/features/food/log';
 import { RequireProfile } from '@/features/food/RequireProfile';
@@ -395,7 +394,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
           subtitle={`${MEAL_LABEL[meal]} · ${dayPhrase(date).replace(/^./, (c) => c.toUpperCase())}`}
           right={
             // Outline when off, filled primaryInk when on (never the amber of "over"); a toast with Undo.
-            <FavoriteStar testID="detail-favorite" size={44} tone="surface" offColor="text" on={isFav} label={favoriteActionLabel(isFav)} onPress={() => toggleFoodFavorite(food)} />
+            <FavoriteStar testID="detail-favorite" size={44} tone="surface" offColor="text" on={isFav} name={displayFoodName(food)} onPress={() => toggleFoodFavorite(food)} />
           }
         />
       }

@@ -357,10 +357,12 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
         <Divider />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
           <Metric label="Volume" value={formatNumber(round(weightValue(volume, units)))} unit={weightUnit(units)} testID="strength-volume" />
+          {/* Plain words, not "1RM": the heaviest single lift the sets point to, an estimate (Epley), so "~". */}
           <Metric
-            label="Best est. 1RM"
-            value={best ? formatLiftWeight(best.kg, units) : '–'}
+            label="Best one-rep max"
+            value={best ? `~${formatLiftWeight(best.kg, units)}` : '–'}
             unit={best ? weightUnit(units) : undefined}
+            spoken={`Best one-rep max, estimated: ${best ? `about ${formatLiftWeight(best.kg, units)} ${weightUnit(units)}` : 'none yet'}`}
             testID="strength-e1rm"
           />
           <Metric label="Sets done" value={`${doneSets}/${totalSets}`} />
@@ -574,7 +576,8 @@ function FinishSummaryView({ summary }: { summary: FinishSummary }) {
                     {r.exercise}
                   </Text>
                   <Text variant="caption" color="textSecondary">
-                    {r.kind === 'e1rm' ? 'Best est. 1RM' : 'Heaviest set'} {formatLiftWeight(r.valueKg, units)} {weightUnit(units)}, up {formatLiftWeight(r.valueKg - r.previousKg, units)} {weightUnit(units)}
+                    {r.kind === 'e1rm' ? 'Best one-rep max ~' : 'Heaviest set '}
+                    {formatLiftWeight(r.valueKg, units)} {weightUnit(units)}, up {formatLiftWeight(r.valueKg - r.previousKg, units)} {weightUnit(units)}
                   </Text>
                 </View>
               </View>
@@ -627,7 +630,7 @@ function TimerText({ text, color }: { text: string; color: 'text' | 'textSeconda
   );
 }
 
-function Metric({ label, value, unit, testID }: { label: string; value: string; unit?: string; testID?: string }) {
+function Metric({ label, value, unit, testID, spoken }: { label: string; value: string; unit?: string; testID?: string; spoken?: string }) {
   // Three metrics share a row: under 360 px the number steps down a size and the label may take two lines.
   const narrow = useWindowDimensions().width < 360;
   // Above 115% text a metric is at least 120 px wide and its row wraps (two, then one), so no label is cut.
@@ -636,8 +639,8 @@ function Metric({ label, value, unit, testID }: { label: string; value: string; 
     <View
       style={{ flex: 1, minWidth: big ? 120 : 0 }}
       accessible
-      // Said in full: "Best estimated one-rep max: 80 kilograms".
-      accessibilityLabel={spokenUnits(`${label.replace('Best est. 1RM', 'Best estimated one-rep max')}: ${value === '–' ? 'none yet' : `${value}${unit ? ` ${unit}` : ''}`}`)}>
+      // Said in full: "Volume: 2,450 kilograms", "Best one-rep max, estimated: about 80 kilograms".
+      accessibilityLabel={spokenUnits(spoken ?? `${label}: ${value === '–' ? 'none yet' : `${value}${unit ? ` ${unit}` : ''}`}`)}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 3 }}>
         <Text variant="numM" tabular testID={testID} style={narrow ? { fontSize: 17, lineHeight: 21 } : undefined}>
           {value}

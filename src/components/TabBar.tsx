@@ -20,9 +20,11 @@ const ICON_TOP = 9;
 /** With large text: the + cup's own width (its 56 px cup and 2 px either side), and the row's side padding. */
 const PLUS_W_LARGE = 60;
 const PAD_LARGE = 4;
-/** With large text, a tab's side padding, and a label letter's width at the designed size (Hanken Grotesk bold at 11.5 px). */
+/** The tab labels' size: 12 px, the caption floor. */
+const LABEL_SIZE = 12;
+/** With large text, a tab's side padding, and a label letter's width at the designed size (Hanken Grotesk bold at 12 px). */
 const TAB_PAD_LARGE = 3;
-const LABEL_LETTER = 5.8;
+const LABEL_LETTER = 6.05;
 /** The band the + cup has over the four tabs when they cannot hold their labels whole beside it (the cup still rises 14 px above it). */
 const PLUS_BAND = 40;
 
@@ -125,7 +127,7 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
           variant="caption"
           color={focused ? 'text' : 'textTertiary'}
           numberOfLines={1}
-          style={[{ fontSize: 11.5, lineHeight: LABEL_LINE, fontFamily: focused ? fonts.bold : fonts.semibold }, large ? { maxWidth: '100%' } : null]}>
+          style={[{ fontSize: LABEL_SIZE, lineHeight: LABEL_LINE, fontFamily: focused ? fonts.bold : fonts.semibold }, large ? { maxWidth: '100%' } : null]}>
           {label}
         </Text>
       </PressableScale>

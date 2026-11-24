@@ -7,6 +7,7 @@ import { fonts, useTheme } from '@/theme';
 import { rovingIndex } from './controlRules';
 import { PressableScale } from './Pressable';
 import { Text, useGrownText } from './Text';
+import { Hatch } from './Vessel';
 
 /**
  * A label you can tap: 32 visible (a 44 px touch target through hitSlop, on
@@ -68,7 +69,8 @@ export function Chip({
       <Text variant="label" color={fg} numberOfLines={large ? undefined : 1} style={{ fontSize: 13.5, flexShrink: 1 }}>
         {label}
       </Text>
-      {dropdown ? <ChevronDown size={16} color={fg} strokeWidth={2.2} /> : null}
+      {/* An icon on a control: 18 px at stroke 2.2, as on a small Button. */}
+      {dropdown ? <ChevronDown size={18} color={fg} strokeWidth={2.2} /> : null}
     </PressableScale>
   );
 }
@@ -227,9 +229,13 @@ export function Badge({ label, color, style }: { label: string; color?: string; 
 /**
  * The legend key: a tiny cup (corners 1.5 on top, 4 at the base). `variant`
  * marks a food's data source: filled for reference, outlined for community,
- * dashed for an AI estimate.
+ * dashed for an AI estimate. `hatched` is the key of exercise headroom (pass
+ * `colors.headroom`): the same cup outlined in 1 px with the cup's hatching
+ * inside, as the hatched part of a cup is drawn.
  */
-export function CupKey({ color, size = 9, variant = 'filled', style }: { color: string; size?: number; variant?: 'filled' | 'outline' | 'dashed'; style?: StyleProp<ViewStyle> }) {
+export function CupKey({ color, size = 9, variant = 'filled', style }: { color: string; size?: number; variant?: 'filled' | 'outline' | 'dashed' | 'hatched'; style?: StyleProp<ViewStyle> }) {
+  const hatched = variant === 'hatched';
+  const edge = variant === 'filled' ? 0 : hatched ? 1 : 1.5;
   return (
     <View
       style={[
@@ -241,12 +247,14 @@ export function CupKey({ color, size = 9, variant = 'filled', style }: { color: 
           borderBottomLeftRadius: Math.min(4, size / 2),
           borderBottomRightRadius: Math.min(4, size / 2),
           backgroundColor: variant === 'filled' ? color : 'transparent',
-          borderWidth: variant === 'filled' ? 0 : 1.5,
+          borderWidth: edge,
           borderColor: color,
           borderStyle: variant === 'dashed' ? 'dashed' : 'solid',
+          overflow: hatched ? 'hidden' : undefined,
         },
         style,
-      ]}
-    />
+      ]}>
+      {hatched ? <Hatch width={size - 2 * edge} height={size - 2 * edge} color={color} step={3.5} opacity={1} /> : null}
+    </View>
   );
 }

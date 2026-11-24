@@ -115,12 +115,13 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         title="You burn"
         color={colors.calories}
         keyVariant="outline"
-        value={formatNumber(Math.round(d.model.tdee))}
+        // An estimate: "~" before the figure ("about" aloud), said so in its one line and by the outlined key;
+        // how it is worked out is under "Where this number comes from" on Body.
+        value={`~${formatNumber(Math.round(d.model.tdee))}`}
         unit="kcal"
-        // An estimate, said so in its one line (and by the outlined key); how it is worked out is under
-        // "Where this number comes from" on Body.
         caption="a day, an estimate"
         captionShort="an estimate"
+        spoken={`about ${formatNumber(Math.round(d.model.tdee))} kcal a day, an estimate`}
         compare={
           adaptive
             ? d.model.adaptive.confidence >= 0.75
