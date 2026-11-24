@@ -37,7 +37,7 @@ import { useNow, useToday } from '@/store/clock';
 import { useConsistency, useDay, useLive, useProfile, type DaySummary } from '@/store/selectors';
 import { motion, useLargeText, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
-import { AnimatedNumber, Button, Card, Chip, CupKey, Hatch, IconButton, levelY, placeLabels, PressableScale, ProgressBar, Screen, Text, Vessel, type VesselLabel } from '@/ui';
+import { AnimatedNumber, Button, Card, Chip, CupKey, IconButton, levelY, placeLabels, PressableScale, ProgressBar, Screen, Text, Vessel, type VesselLabel } from '@/ui';
 
 
 export default function TodayScreen() {
@@ -422,9 +422,7 @@ function EnergyCard({
           <View style={{ flex: 1, minWidth: 0, gap: spacing.md }}>
             {headroom > 0 ? (
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
-                <View style={{ width: 11, height: 11, marginTop: 8, overflow: 'hidden', borderWidth: 1, borderColor: colors.headroom, borderRadius: 2 }}>
-                  <Hatch width={11} height={11} color={colors.headroom} step={4} opacity={1} />
-                </View>
+                <CupKey color={colors.headroom} variant="hatched" size={11} style={{ marginTop: 8 }} />
                 <Text variant="numM" style={{ flexShrink: 1, fontSize: 17, lineHeight: 22 }}>
                   {`~${formatNumber(headroom)}`}
                   <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>

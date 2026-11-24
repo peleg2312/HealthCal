@@ -21,7 +21,7 @@ import { useStore } from '@/store';
 import { useDay, useLive, useProfile } from '@/store/selectors';
 import { cup, LARGE_TEXT, useTextGrowth, useTheme } from '@/theme';
 import type { Intensity } from '@/types';
-import { Button, Card, Chip, CupKey, EmptyState, Hatch, Header, IconButton, NumberField, PressableScale, Screen, Text, TextField } from '@/ui';
+import { Button, Card, Chip, CupKey, EmptyState, Header, IconButton, NumberField, PressableScale, Screen, Text, TextField } from '@/ui';
 
 const INTENSITIES: Intensity[] = ['light', 'moderate', 'vigorous'];
 const PRESETS = [15, 30, 45, 60, 90];
@@ -200,9 +200,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
           style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, ...cup(radius.tile, 5), backgroundColor: colors.surfaceAlt, paddingHorizontal: spacing.md, paddingVertical: 10 }}>
           {rule !== 'off' ? (
             // Level with the figure's line, also when the words have moved under it.
-            <View style={{ width: 11, height: 11, marginTop: 7, overflow: 'hidden', borderWidth: 1, borderColor: colors.headroom, borderRadius: 2 }}>
-              <Hatch width={11} height={11} color={colors.headroom} step={4} opacity={1} />
-            </View>
+            <CupKey color={colors.headroom} variant="hatched" style={{ marginTop: 8 }} />
           ) : null}
           {/* The words move under the figure, whole, when the two do not fit on one line. */}
           <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6 }}>

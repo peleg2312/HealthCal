@@ -14,7 +14,7 @@ import type { DaySummary } from '@/store/selectors';
 import { favoriteRecordId, useStore } from '@/store';
 import { cup, fonts, useLargeText, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType, WaterEntry } from '@/types';
-import { AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, Hatch, IconButton, ListRow, PressableScale, ProgressBar, RestoreRow, Sheet, Text, Trough } from '@/ui';
+import { AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, IconButton, ListRow, PressableScale, ProgressBar, RestoreRow, Sheet, Text, Trough } from '@/ui';
 import { spokenUnits } from '@/lib/spokenUnits';
 
 import { clearEntries, copyEntries } from './actions';
@@ -107,11 +107,7 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?
             </Text>
             {headroom > 0 || notAdded ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
-                {headroom > 0 ? (
-                  <View style={{ width: 11, height: 11, overflow: 'hidden', borderWidth: 1, borderColor: colors.headroom, borderRadius: 2 }}>
-                    <Hatch width={11} height={11} color={colors.headroom} step={4} opacity={1} />
-                  </View>
-                ) : null}
+                {headroom > 0 ? <CupKey color={colors.headroom} variant="hatched" /> : null}
                 <Text variant="caption" color="textSecondary" tabular numberOfLines={2} style={{ flexShrink: 1 }} testID="diary-exercise">
                   {headroom > 0 ? addedLine : `~${kcal(day.exerciseNet)} kcal not added`}
                 </Text>
