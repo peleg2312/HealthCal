@@ -2,12 +2,13 @@ import { Minus, Plus } from 'lucide-react-native';
 import React, { useId, useState } from 'react';
 import { Platform, TextInput, View, type AccessibilityActionEvent, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 
-import { cup, fonts, useTheme } from '@/theme';
+import { cup, fonts, phoneCapFor, useTextSize, useTheme } from '@/theme';
+import { scaledFontSize } from '@/theme/textSize';
 
 import { IconButton } from './Button';
 import { stepperKey, webAutoComplete } from './controlRules';
 import { FOCUS_CUP, useFocusRing } from './Pressable';
-import { MAX_FONT_SCALE, Text } from './Text';
+import { Text } from './Text';
 
 export interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   label?: string;
@@ -41,8 +42,8 @@ const GAP = 10;
  * Screen web app, Android Chrome and the apps). `right` is the one part that keeps its own
  * touches (a button beside the text), so it sits after the input.
  *
- * The cup's edge is `vesselEdge`, the cup outline that is at least 3:1 on bg, bgElevated and
- * surface in every look (WCAG 1.4.11; `borderStrong` is not). Focused, it is the level line (`rim`),
+ * The cup's edge is `fieldEdge`, at least 3:1 on the field's own fill, the page and bgElevated in
+ * every look (WCAG 1.4.11; `borderStrong` is not). Focused, it is the level line (`rim`),
  * and on the web the kit's focus ring lies right against it (`FOCUS_CUP`). An error is said in
  * words under the cup and tied to the input (`aria-invalid` and `aria-describedby` on the web, the
  * hint natively); a hint is tied the same way. `autoComplete` takes React Native's names and gives
@@ -52,6 +53,9 @@ export function TextField({ label, suffix, error, hint, left, right, style, line
   const { colors, radius } = useTheme();
   const [focused, setFocused] = useState(false);
   useFocusRing();
+  const scale = useTextSize();
+  const fontSize = scaledFontSize(16, scale);
+  const lineHeight = Math.round((22 * fontSize) / 16);
   const noteId = `field-note-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const note = error || hint ? noteId : undefined;
   const given = rest as { 'aria-describedby'?: string };
@@ -86,12 +90,12 @@ export function TextField({ label, suffix, error, hint, left, right, style, line
           backgroundColor: colors.surface,
           borderWidth: 1.5,
           // Focus is the level line: a rim-coloured edge. At rest the cup outline, 3:1 on the page and the field.
-          borderColor: error ? colors.danger : focused ? colors.rim : colors.vesselEdge,
+          borderColor: error ? colors.danger : focused ? colors.rim : colors.fieldEdge,
         }}>
         <TextInput
           placeholderTextColor={colors.textTertiary}
           selectionColor={colors.primary}
-          maxFontSizeMultiplier={MAX_FONT_SCALE}
+          maxFontSizeMultiplier={phoneCapFor(scale)}
           {...rest}
           {...(web as object)}
           accessibilityLabel={rest.accessibilityLabel ?? label ?? rest.placeholder}
@@ -111,14 +115,15 @@ export function TextField({ label, suffix, error, hint, left, right, style, line
               alignSelf: 'stretch',
               color: colors.text,
               fontFamily: fonts.medium,
-              fontSize: 16,
+              // 16 px at the app's text size (twice at 200%), as every Text is drawn.
+              fontSize,
               paddingVertical: 12,
               paddingLeft: PAD_X + (left ? leftW + GAP : 0),
               // The unit sits over this padding, then the right-hand control after the input.
               paddingRight: (suffix ? suffixW + GAP : 0) + (right ? GAP : PAD_X),
             },
             // 16 px text sets 22 px lines (web and native alike); the 12 px padding goes above and below.
-            rest.multiline && lines ? { minHeight: lines * 22 + 24, textAlignVertical: 'top' as const } : null,
+            rest.multiline && lines ? { minHeight: lines * lineHeight + 24, textAlignVertical: 'top' as const } : null,
             // Removes the default focus outline on web; the border shows focus instead.
             { outlineStyle: 'none' } as object,
           ]}

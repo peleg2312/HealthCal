@@ -366,18 +366,21 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
   const placing = Platform.OS === 'web' && shownNow && !keyboardUp;
   useEffect(() => {
     if (!placing || toastH <= 0) return;
-    const frame = requestAnimationFrame(() => {
+    // The place, as a bottom offset (null: where it always rests), or 'wait' while the screen it belongs to
+    // is not laid out yet (a screen coming back into view after the one that raised the toast).
+    const place = (): number | null | 'wait' => {
       const host = outer.current as unknown as HTMLElement | null;
       const toastEl = host?.querySelector?.('[data-testid="toast"]');
-      if (!host || !toastEl || typeof window === 'undefined') return setSpot({ key: placeKey, bottom: null });
+      if (!host || !toastEl || typeof window === 'undefined') return null;
       const H = window.innerHeight;
       const r = toastEl.getBoundingClientRect();
       const h = Math.round(r.height);
       if (!inSheet) {
         const scope = last?.scope ? document.getElementById(last.scope) : null;
-        if (!scope) return setSpot({ key: placeKey, bottom: null });
+        const box = scope?.getBoundingClientRect();
+        if (!scope || !box || box.height < 1 || box.width < 1) return 'wait';
         const top = toastSpot({ lowest: H - resting - h, highest: toastReachTop(H, h), height: h, left: r.left, right: r.right, controls: controlBoxes(scope, host) });
-        return setSpot({ key: placeKey, bottom: top === null ? null : H - top - h });
+        return top === null ? null : H - top - h;
       }
       // In a sheet: just above its top edge while that is within thumb reach; else the lowest clear band in it.
       let sheet: Element | null = null;
@@ -385,15 +388,34 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
         const found = a.querySelectorAll('[data-testid="sheet"]');
         sheet = found.length ? found[found.length - 1] : null;
       }
-      if (!sheet) return setSpot({ key: placeKey, bottom: null });
+      if (!sheet) return null;
       const sheetTop = sheet.getBoundingClientRect().top;
-      const flowTop = sheetTop - TOAST_GAP - h;
-      if (flowTop >= toastReachTop(H, h)) return setSpot({ key: placeKey, bottom: null });
+      if (sheetTop - TOAST_GAP - h >= toastReachTop(H, h)) return null;
       const top = toastSpot({ lowest: H - Math.max(insets.bottom, TOAST_GAP) - h, highest: Math.max(toastReachTop(H, h), sheetTop), height: h, left: r.left, right: r.right, controls: controlBoxes(sheet, host) });
       // Measured from the sheet's top edge, where this host sits in the layout.
-      setSpot({ key: placeKey, bottom: top === null ? null : Math.round(sheetTop - (top + h)) });
-    });
-    return () => cancelAnimationFrame(frame);
+      return top === null ? null : Math.round(sheetTop - (top + h));
+    };
+    let tries = 0;
+    let looked = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const run = () => {
+      const at = place();
+      if (at === 'wait' && tries++ < 12) {
+        timer = setTimeout(run, 80);
+        return;
+      }
+      setSpot({ key: placeKey, bottom: at === 'wait' ? null : at });
+      // One more look once the screen has settled (a list that was still arriving, a screen fading in).
+      if (!looked) {
+        looked = true;
+        timer = setTimeout(run, 450);
+      }
+    };
+    const frame = requestAnimationFrame(run);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+    };
   }, [placing, placeKey, toastH, resting, inSheet, last?.scope, insets.bottom]);
   const spotNow = spot && spot.key === placeKey ? spot : null;
   const hidden = placing && !spotNow;

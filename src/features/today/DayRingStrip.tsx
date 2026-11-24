@@ -2,6 +2,7 @@ import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import React, { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Platform, ScrollView, useWindowDimensions, View, type AccessibilityActionEvent, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, type StyleProp, type ViewStyle } from 'react-native';
 
+import { spokenUnits } from '@/features/progress/chartWords';
 import { diffDays, formatDayLabel, formatShortDate, fromISODate, startOfWeek } from '@/lib/dates';
 import { useDays } from '@/store/selectors';
 import { cup, fonts, MAX_CONTENT_WIDTH, useTheme } from '@/theme';
@@ -285,7 +286,7 @@ export function DayRingStrip({
                       accessibilityActions={weekActions}
                       onAccessibilityAction={onWeekAction}
                       // Starts with the words drawn on it ("M 23"), then the day in full: label in name.
-                      accessibilityLabel={`${LETTERS[i]} ${fromISODate(d).getDate()}, ${formatDayLabel(d)}${kcal}`}
+                      accessibilityLabel={`${LETTERS[i]} ${fromISODate(d).getDate()}, ${spokenUnits(`${formatDayLabel(d)}${kcal}`)}`}
                       // A future day is drawn dashed; fading it as well would make its date unreadable.
                       dimDisabled={false}
                       style={{ flex: 1, minHeight: 44, alignItems: 'center', gap: 6, paddingBottom: 2 }}>
