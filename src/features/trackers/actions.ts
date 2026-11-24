@@ -8,13 +8,12 @@
  */
 import { rememberDeletedNight, rememberDeletedWeighIn } from '@/features/health-sync/deletions';
 import { formatDuration } from '@/lib/dates';
-import { formatWeight } from '@/lib/units';
 import { live } from '@/store/selectors';
 import { useStore } from '@/store';
 import type { FastingSession, ISODate, Profile, SleepEntry, SleepQuality, WeightEntry } from '@/types';
 import { haptic, toast } from '@/ui';
 
-import { fastProgress, findByDate, isMostRecentDate, nightAfterEdit, ownLatestBodyFat, profileAfterDelete, weighInAfterEdit } from './helpers';
+import { fastProgress, findByDate, isMostRecentDate, nightAfterEdit, ownLatestBodyFat, profileAfterDelete, weighInAfterEdit, weightText } from './helpers';
 import { isSyncedWeighIn, sameFat } from './weighInSource';
 
 type WeightPatch = Partial<Omit<WeightEntry, 'id' | 'updatedAt' | 'deleted' | 'date'>>;
@@ -95,7 +94,8 @@ export function applyWeighInToTargets(entry: Pick<WeightEntry, 'kg' | 'bodyFatPc
   haptic.success();
   // Name the body fat too when the tap changed it, so the toast says everything the tap set.
   const fat = typeof entry.bodyFatPct === 'number' && !sameFat(entry.bodyFatPct, s.profile.bodyFatPct) ? ` and ${entry.bodyFatPct.toFixed(1)}% body fat` : '';
-  toast(`Targets now use ${formatWeight(entry.kg, s.profile.units)}${fat}`, {
+  // One decimal, as the weigh-in it names is shown ("Targets now use 82.0 kg").
+  toast(`Targets now use ${weightText(entry.kg, s.profile.units)}${fat}`, {
     label: 'Undo',
     tint: 'weight',
     onPress: () => {
