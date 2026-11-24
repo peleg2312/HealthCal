@@ -6,8 +6,8 @@ import { spokenUnits } from '@/lib/spokenUnits';
 import { cup, fonts, phoneCapFor, scaledFontSize, useTextSize, useTheme } from '@/theme';
 
 import { IconButton } from './Button';
-import { spokenFieldName, stepperKey, webAutoComplete } from './controlRules';
-import { FOCUS_CUP, useFocusRing } from './Pressable';
+import { ANDROID_TARGET, spokenFieldName, stepperKey, webAutoComplete } from './controlRules';
+import { ANDROID_TOUCH, FOCUS_CUP, useFocusRing } from './Pressable';
 import { Text, useGrownText } from './Text';
 import { passRef, useToastControl } from './toastControls';
 
@@ -288,8 +288,9 @@ export function Stepper({
         <Minus size={18} color={colors.text} />
       </IconButton>
       {/* Label corners, so the web's focus ring round the value is a label's shape. 44 tall, as the cups beside it,
-          so the value is a 44 x 44 target at least (it is 52 or 72 wide); the number stays centred, drawn as before. */}
-      <View {...(adjustable as object)} style={{ borderRadius: radius.chip, minHeight: 44, justifyContent: 'center' }}>
+          so the value is a 44 x 44 target at least (it is 52 or 72 wide), and 48 where Android asks for it (reaching 2 px
+          past the row each way, so nothing moves); the number stays centred, drawn as before. */}
+      <View {...(adjustable as object)} style={{ borderRadius: radius.chip, justifyContent: 'center', ...(ANDROID_TOUCH ? { minHeight: ANDROID_TARGET, marginVertical: (44 - ANDROID_TARGET) / 2 } : { minHeight: 44 }) }}>
         <Text variant="numL" align="center" style={compact ? { minWidth: 52, fontSize: 22, lineHeight: 28 } : { minWidth: 72, fontSize: 26, lineHeight: 30 }}>
           {shown}
         </Text>
