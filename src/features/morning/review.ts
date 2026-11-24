@@ -16,6 +16,10 @@
  *   shows only when the budget item does not (one calorie mark, never two).
  * - Sleep is the night dated today (the person woke up today): 7 h or more went well, under 6 h
  *   is listed to adjust, in between neither.
+ * - Each figure is said once on the page (rubric D2-04): when yesterday's card shows its figures
+ *   (`figuresOnCard`), an item whose number the card already shows (sleep, water, protein, a
+ *   workout's minutes) names the fact in words only ("A full night's sleep", "Water below its
+ *   goal"); the numbers stay on the card. Without the card's figures the items keep them.
  */
 import { originName } from '@/features/health-sync/origins';
 import { SLEEP_RANGE, formatHours } from '@/features/trackers/helpers';
@@ -73,6 +77,12 @@ export interface ReviewInput {
   units: UnitSystem;
   /** Day 1 to 7 since setup: at most one item to adjust. */
   firstWeek: boolean;
+  /**
+   * True when yesterday's card shows its four figures (eaten, protein, water, last night's sleep)
+   * and the movement row, as the morning page does on any day with something logged: the items
+   * then leave those numbers to the card. Absent or false: every item carries its numbers.
+   */
+  figuresOnCard?: boolean;
 }
 
 /** The weekly activity guideline, minutes. */
@@ -100,7 +110,7 @@ export function activeMinutes(n: number): string {
   return `${round(n)} active ${n === 1 ? 'minute' : 'minutes'}`;
 }
 
-function moveText(y: DayFacts, weekBefore: number): string {
+function moveText(y: DayFacts, weekBefore: number, figuresOnCard: boolean): string {
   const m = Math.round(y.guidelineMin);
   const before = Math.round(weekBefore);
   if (m > 0 && before >= WEEKLY_GUIDELINE_MIN) {
@@ -111,6 +121,8 @@ function moveText(y: DayFacts, weekBefore: number): string {
     return `Weekly ${WEEKLY_GUIDELINE_MIN} active minutes reached: ${round(before + m)} min`;
   }
   if (m > 0) return `${activeMinutes(m)} toward the weekly ${WEEKLY_GUIDELINE_MIN}`;
+  // The movement row on the card already says the session and its minutes.
+  if (figuresOnCard) return y.activities.length === 1 ? `${y.activities[0].name.trim()} logged` : 'Every session logged';
   if (y.activities.length === 1) {
     const a = y.activities[0];
     return `${a.name.trim()}, ${round(a.durationMin)} min`;
@@ -124,13 +136,15 @@ export const LOGGED_TEXT = 'The whole day is logged';
 /** Up to three things that went well yesterday, the ones the sentence does not already say first. */
 export function wentWell(i: ReviewInput): ReviewItem[] {
   const { y, lastNight, units } = i;
+  const onCard = !!i.figuresOnCard;
   const items: ReviewItem[] = [];
 
-  if (y.activities.length > 0) items.push({ kind: 'move', text: moveText(y, i.weekBefore), color: 'exercise', mark: 'filled' });
+  if (y.activities.length > 0) items.push({ kind: 'move', text: moveText(y, i.weekBefore, onCard), color: 'exercise', mark: 'filled' });
 
   if (lastNight && lastNight.hours >= GOOD_NIGHT_H) {
     const from = lastNight.source === 'health' && lastNight.origin ? `, from ${originName(lastNight.origin)}` : '';
-    items.push({ kind: 'sleep', text: `${formatHours(lastNight.hours)} of sleep last night${from}`, color: 'sleep', mark: 'filled' });
+    const text = onCard ? `A full night's sleep${from}` : `${formatHours(lastNight.hours)} of sleep last night${from}`;
+    items.push({ kind: 'sleep', text, color: 'sleep', mark: 'filled' });
   }
 
   const withinBudget = y.complete && y.budget > 0 && y.kcal >= y.budget * BUDGET_PRAISE_FROM - 1e-9 && y.kcal <= y.budget;
@@ -161,6 +175,7 @@ export function wentWell(i: ReviewInput): ReviewItem[] {
  */
 export function toAdjust(i: ReviewInput): ReviewItem[] {
   const { y, lastNight, units } = i;
+  const onCard = !!i.figuresOnCard;
   const items: ReviewItem[] = [];
 
   if (y.overBand) {
@@ -175,7 +190,8 @@ export function toAdjust(i: ReviewInput): ReviewItem[] {
   }
 
   if (lastNight && lastNight.hours < SHORT_NIGHT_H) {
-    items.push({ kind: 'sleep', text: `Sleep last night: ${formatHours(lastNight.hours)} of ${GOOD_NIGHT_H} h`, color: 'sleep', mark: 'outline' });
+    const text = onCard ? "A short night's sleep" : `Sleep last night: ${formatHours(lastNight.hours)} of ${GOOD_NIGHT_H} h`;
+    items.push({ kind: 'sleep', text, color: 'sleep', mark: 'outline' });
   }
 
   // Food and water are judged only on a complete day; ranked by the share still missing, water first on a tie.
@@ -183,12 +199,18 @@ export function toAdjust(i: ReviewInput): ReviewItem[] {
   const waterMl = trackedWaterMl(y);
   if (y.complete && y.waterGoalMl > 0 && waterMl < y.waterGoalMl) {
     const w = waterFigures(waterMl, y.waterGoalMl, units);
-    const text = waterMl <= 0 ? `No water logged, goal ${w.goal}` : `Water stopped at ${w.value} of ${w.goal}`;
+    const text = onCard
+      ? waterMl <= 0
+        ? 'No water logged'
+        : 'Water below its goal'
+      : waterMl <= 0
+        ? `No water logged, goal ${w.goal}`
+        : `Water stopped at ${w.value} of ${w.goal}`;
     ranked.push({ item: { kind: 'water', text, color: 'water', mark: 'outline' }, missing: 1 - Math.max(0, waterMl) / y.waterGoalMl, order: 0 });
   }
   if (y.complete && y.proteinG > 0 && y.protein < y.proteinG * PROTEIN_ADJUST_SHARE - 1e-9) {
     ranked.push({
-      item: { kind: 'protein', text: `Protein at ${round(y.protein)} of ${round(y.proteinG)} g`, color: 'protein', mark: 'outline' },
+      item: { kind: 'protein', text: onCard ? 'Protein below its goal' : `Protein at ${round(y.protein)} of ${round(y.proteinG)} g`, color: 'protein', mark: 'outline' },
       missing: 1 - Math.max(0, y.protein) / y.proteinG,
       order: 1,
     });

@@ -372,7 +372,7 @@ function EnergyCard({
                 testID="today-ideas"
                 label="Ideas that fit"
                 accessibilityLabel="Ideas that fit: meals and foods for what is left"
-                icon={<CookingPot size={18} color={colors.text} strokeWidth={1.9} />}
+                icon={<CookingPot size={18} color={colors.text} strokeWidth={2.2} />}
                 onPress={onFits}
               />
             ) : (
@@ -455,7 +455,7 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
         {...small}
         testID="today-coach-water"
         tint={colors.water}
-        icon={<Plus size={16} color={colors.water} strokeWidth={2.6} />}
+        icon={<Plus size={18} color={colors.water} strokeWidth={2.2} />}
         title={`Add ${formatVolume(glass, profile.units)}`}
         accessibilityLabel={`Add ${formatVolume(glass, profile.units)} of water`}
         onPress={() => addWater(day.date, glass, profile.units, day.waterGoalMl)}
@@ -470,7 +470,7 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
       <Button
         {...small}
         testID="today-coach-repeat"
-        icon={<Repeat2 size={16} color={colors.text} strokeWidth={2.2} />}
+        icon={<Repeat2 size={18} color={colors.text} strokeWidth={2.2} />}
         title={`Repeat ${when}'s ${meal}`}
         accessibilityLabel={`Repeat ${when}'s ${meal}, ${formatNumber(kcal)} kilocalories`}
         onPress={() => copyEntries(prev.entries, day.date, quick.meal, `Copied ${meal} from ${when}`)}
@@ -597,7 +597,7 @@ function RepeatButton({ meal, date, prev }: { meal: MealType; date: ISODate; pre
       variant="secondary"
       size="sm"
       full={false}
-      icon={<Repeat2 size={16} color={colors.text} strokeWidth={2.2} />}
+      icon={<Repeat2 size={18} color={colors.text} strokeWidth={2.2} />}
       onPress={() => copyEntries(prev.entries, date, meal, `Copied ${label} from ${when}`)}
       style={{ paddingHorizontal: 10, alignSelf: 'center' }}
     />

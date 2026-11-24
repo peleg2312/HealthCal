@@ -6,6 +6,7 @@ import { formatDayLabel, formatDuration, weekdayShort } from '@/lib/dates';
 import { OVERVIEW_ABOUT, type TrainingOverview } from '@/lib/trainingLoad';
 import { formatNumber } from '@/lib/units';
 import { cup, fonts, useTheme } from '@/theme';
+import { useProfile } from '@/store/selectors';
 import type { ISODate } from '@/types';
 import { Card, CupKey, IconButton, levelY, MiniCup, PressableScale, Text, Vessel, type VesselLabel } from '@/ui';
 
@@ -55,6 +56,11 @@ export function WeekCard({
   // The overview of the last 7 days: one line on the card, the whole of it (with how minutes count) behind the info cup.
   const [help, setHelp] = useState(false);
   const load = current && overview.state && overview.position && overview.title ? { position: overview.position, title: overview.title } : null;
+  // The week's workout calories in the run log's words (`budgetAdds`): "added", or "not added" while adding is off,
+  // always "~": the part above resting is an estimate.
+  const notAdding = useProfile().eatBackExercise === false;
+  const addedWord = notAdding ? 'Not added' : 'Added';
+  const addedSpoken = `This week's workouts: about ${formatNumber(week.kcalNet)} kilocalories ${notAdding ? 'not added to your budget' : 'added to your budget'}, an estimate`;
 
   const labels: VesselLabel[] = [
     {
@@ -122,7 +128,7 @@ export function WeekCard({
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: spacing.sm, marginTop: spacing.lg }}>
         <Mini label="Sessions" value={String(week.sessions)} />
         <Mini label="Total time" value={week.totalMinutes > 0 ? formatDuration(week.totalMinutes) : '0 min'} testID="train-total-time" />
-        <Mini label="Net, est." value={formatNumber(week.kcalNet)} unit="kcal" color={colors.exercise} />
+        <Mini label={addedWord} value={`~${formatNumber(week.kcalNet)}`} unit="kcal" color={colors.exercise} spoken={addedSpoken} />
       </View>
       {extra}
 
@@ -202,11 +208,11 @@ export function WeekCard({
   );
 }
 
-function Mini({ label, value, unit, color, testID }: { label: string; value: string; unit?: string; color?: string; testID?: string }) {
+function Mini({ label, value, unit, color, testID, spoken }: { label: string; value: string; unit?: string; color?: string; testID?: string; spoken?: string }) {
   return (
     // No shrinking below the number's own width (its spaces do not break): each total is as wide as its number,
     // at least 64 px, and the row wraps instead of cutting one ("20 h 40 min" is wider than a third of the card).
-    <View style={{ flexGrow: 1, flexBasis: 'auto', minWidth: 64 }} testID={testID}>
+    <View style={{ flexGrow: 1, flexBasis: 'auto', minWidth: 64 }} testID={testID} accessible={!!spoken} accessibilityLabel={spoken}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         {color ? <CupKey color={color} /> : null}
         <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>

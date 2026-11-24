@@ -83,18 +83,19 @@ const plainMove = (a: MoveActivity[], kcal: number) => moveLine(a, kcal).replace
 
 describe('moveLine', () => {
   it('one activity: its mark, name, minutes and calories', () => {
-    expect(plainMove([run], 384)).toBe('🏃 Running, 42 min · about 380 kcal');
-    expect(plainMove([{ ...run, emoji: '' }], 384)).toBe('Running, 42 min · about 380 kcal');
+    expect(plainMove([run], 384)).toBe('🏃 Running, 42 min · about 380 kcal added');
+    expect(plainMove([{ ...run, emoji: '' }], 384)).toBe('Running, 42 min · about 380 kcal added');
+    expect(moveLine([run], 384, false).replace(/\u00A0/g, ' ')).toBe('🏃 Running, 42 min · about 380 kcal not added');
   });
 
   it('several: the count and the total minutes', () => {
-    expect(plainMove([run, swim, ride], 612)).toBe('3 sessions, 95 min · about 610 kcal');
+    expect(plainMove([run, swim, ride], 612)).toBe('3 sessions, 95 min · about 610 kcal added');
   });
 
   it('a narrow line breaks after the dot, never between "about" and its figure', () => {
-    expect(moveLine([run], 290)).toBe('🏃 Running, 42 min\u00A0· about\u00A0290 kcal');
-    expect(moveLine([run, swim], 2088)).toBe('2 sessions, 72 min\u00A0· about\u00A02,090 kcal');
-    expect(moveLine([swim], 437)).toBe('🏊 Swimming, 30 min\u00A0· 437 kcal measured');
+    expect(moveLine([run], 290)).toBe('🏃 Running, 42 min\u00A0· about\u00A0290 kcal added');
+    expect(moveLine([run, swim], 2088)).toBe('2 sessions, 72 min\u00A0· about\u00A02,090 kcal added');
+    expect(moveLine([swim], 437)).toBe('🏊 Swimming, 30 min\u00A0· about\u00A0437 kcal added');
   });
 
   it('none', () => {
@@ -102,19 +103,20 @@ describe('moveLine', () => {
     expect(NO_WORKOUT).toBe('No workout logged');
   });
 
-  it('all measured is exact and says so; any estimate makes it about, to the nearest 10', () => {
-    expect(plainMove([swim, ride], 437)).toBe('2 sessions, 53 min · 437 kcal measured');
-    expect(plainMove([swim], 1234)).toBe('🏊 Swimming, 30 min · 1,234 kcal measured');
-    expect(plainMove([swim, run], 437)).toBe('2 sessions, 72 min · about 440 kcal');
-    expect(plainMove([run], 1234)).toBe('🏃 Running, 42 min · about 1,230 kcal');
-    expect(plainMove([run], 385)).toBe('🏃 Running, 42 min · about 390 kcal');
+  it('always about (the part above resting is an estimate); all measured keeps its figure, any estimate rounds to 10', () => {
+    expect(plainMove([swim, ride], 437)).toBe('2 sessions, 53 min · about 437 kcal added');
+    expect(plainMove([swim], 1234)).toBe('🏊 Swimming, 30 min · about 1,234 kcal added');
+    expect(plainMove([swim, run], 437)).toBe('2 sessions, 72 min · about 440 kcal added');
+    expect(plainMove([run], 1234)).toBe('🏃 Running, 42 min · about 1,230 kcal added');
+    expect(plainMove([run], 385)).toBe('🏃 Running, 42 min · about 390 kcal added');
   });
 });
 
 describe('moveAccessibilityLabel', () => {
   it('reads the activity, the net calories, the steps and where it leads', () => {
-    expect(moveAccessibilityLabel([run], 384, 9210)).toBe('Running, 42 minutes, about 380 kilocalories above resting. 9,210 steps. Opens Train');
-    expect(moveAccessibilityLabel([swim, ride], 437, 0)).toBe('2 sessions, 53 minutes, 437 kilocalories above resting, measured. Opens Train');
+    expect(moveAccessibilityLabel([run], 384, 9210)).toBe('Running, 42 minutes, about 380 kilocalories added to the budget. 9,210 steps. Opens Train');
+    expect(moveAccessibilityLabel([swim, ride], 437, 0)).toBe('2 sessions, 53 minutes, about 437 kilocalories added to the budget, from a measured burn. Opens Train');
+    expect(moveAccessibilityLabel([run], 384, null, undefined, false)).toBe('Running, 42 minutes, about 380 kilocalories not added to the budget. Opens Train');
     expect(moveAccessibilityLabel([], 0, null)).toBe('No workout logged. Opens Train');
     expect(moveAccessibilityLabel([], 0, 4120, 'From your Health export, Nov 16')).toBe('No workout logged. 4,120 steps. From your Health export, Nov 16. Opens Train');
   });

@@ -31,5 +31,13 @@ export function birthDateWords(iso: ISODate): string {
   return `${formatShortDate(iso)}, ${Number(iso.slice(0, 4))}`;
 }
 
+/**
+ * The input purpose of each field (WCAG 1.3.5): the HTML tokens. React Native passes them to the
+ * browser as they are and turns them into the phone's own names (Android's birthdate-day, iOS's
+ * birthdateDay), so the one value serves every platform. Its TextInput type lists only the phone
+ * names, so the screens cast it.
+ */
+export const BIRTH_AUTOCOMPLETE = { day: 'bday-day', month: 'bday-month', year: 'bday-year' } as const;
+
 /** Said when a field is still empty. */
 export const BIRTH_INCOMPLETE = 'Enter the day, month and year.';

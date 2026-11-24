@@ -61,23 +61,27 @@ export const NO_WORKOUT = 'No workout logged';
 const round10 = (n: number) => Math.round(n / 10) * 10;
 
 /** Device-measured calories are shown as measured; any estimate in the mix makes the total "about", to the nearest 10. */
-function kcalPart(activities: MoveActivity[], exerciseNet: number): string {
+function kcalPart(activities: MoveActivity[], exerciseNet: number, added: boolean): string {
   const measured = activities.every((a) => a.measured === true);
-  // "about" stays with its number, so a narrow line breaks after the "·", never between the hedge and the figure.
-  return measured ? `${formatNumber(Math.round(exerciseNet))} kcal measured` : `about${NBSP}${formatNumber(round10(exerciseNet))} kcal`;
+  // The run log's words for the part above resting (`budgetAdds`): "added", or "not added" while adding was off,
+  // always "about" (a device measures the burn; the part above resting is still an estimate). "about" stays with
+  // its number, so a narrow line breaks after the "·", never between the hedge and the figure.
+  const n = measured ? formatNumber(Math.round(exerciseNet)) : formatNumber(round10(exerciseNet));
+  return `about${NBSP}${n} kcal ${added ? 'added' : 'not added'}`;
 }
 
 /** The minutes and the "·" after them stay on one line: a break falls after the dot, before the calories. */
 const SEP = `${NBSP}· `;
 
 /**
- * Yesterday's movement in one line: "🏃 Running, 42 min · about 380 kcal",
- * "3 sessions, 95 min · about 610 kcal", or NO_WORKOUT. `exerciseNet` is the day's net
- * exercise calories (DaySummary.exerciseNet: above resting, never gross).
+ * Yesterday's movement in one line: "🏃 Running, 42 min · about 380 kcal added",
+ * "3 sessions, 95 min · about 610 kcal added", or NO_WORKOUT. `exerciseNet` is the day's net
+ * exercise calories (DaySummary.exerciseNet: above resting, never gross); `added` is false when that day
+ * did not add workouts to its budget (`DaySummary.exerciseRule` 'off').
  */
-export function moveLine(activities: MoveActivity[], exerciseNet: number): string {
+export function moveLine(activities: MoveActivity[], exerciseNet: number, added = true): string {
   if (activities.length === 0) return NO_WORKOUT;
-  const kcal = kcalPart(activities, exerciseNet);
+  const kcal = kcalPart(activities, exerciseNet, added);
   if (activities.length === 1) {
     const a = activities[0];
     const label = [a.emoji.trim(), a.name.trim()].filter(Boolean).join(' ');
@@ -89,17 +93,18 @@ export function moveLine(activities: MoveActivity[], exerciseNet: number): strin
 
 /**
  * What a screen reader says for the movement row, for example "Running, 42 minutes, about
- * 380 kilocalories above resting. 9,210 steps. Opens Train". `stepsNote` is added after the
+ * 380 kilocalories added to the budget. 9,210 steps. Opens Train". `stepsNote` is added after the
  * steps when they came from a Health export file (fileStepsNote).
  */
-export function moveAccessibilityLabel(activities: MoveActivity[], exerciseNet: number, steps: number | null | undefined, stepsNote?: string): string {
+export function moveAccessibilityLabel(activities: MoveActivity[], exerciseNet: number, steps: number | null | undefined, stepsNote?: string, added = true): string {
   const parts: string[] = [];
   if (activities.length === 0) parts.push(`${NO_WORKOUT}.`);
   else {
     const measured = activities.every((a) => a.measured === true);
+    const where = added ? 'added to the budget' : 'not added to the budget';
     const kcal = measured
-      ? `${formatNumber(Math.round(exerciseNet))} kilocalories above resting, measured`
-      : `about ${formatNumber(round10(exerciseNet))} kilocalories above resting`;
+      ? `about ${formatNumber(Math.round(exerciseNet))} kilocalories ${where}, from a measured burn`
+      : `about ${formatNumber(round10(exerciseNet))} kilocalories ${where}`;
     const what =
       activities.length === 1
         ? `${activities[0].name.trim()}, ${Math.round(activities[0].durationMin)} minutes`

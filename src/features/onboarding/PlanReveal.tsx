@@ -1,7 +1,8 @@
-import { ChevronDown, ChevronLeft, ChevronUp, Sparkles } from 'lucide-react-native';
+import { ChevronDown, ChevronLeft, ChevronUp, Info } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import { TARGET_CARE_NOTE } from '@/features/settings/careNote';
 import { formatNumber, formatVolume, formatWeight, round } from '@/lib/units';
 import { useTheme } from '@/theme';
 import { AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, haptic, levelY, MacroBar, PressableScale, Text, useReducedMotion, Vessel } from '@/ui';
@@ -101,6 +102,10 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
             Your daily target
           </Text>
           <BudgetVessel target={t.target} tdee={plan.tdee} goal={p.goal} note={`${budgetNote}Each workout you log adds its calories on top, shared over 7 days, as hatched headroom.`} />
+          {/* Where the target is set, said plainly: an estimate, not medical advice, and who checks with a doctor first. */}
+          <Text variant="caption" color="textSecondary" testID="plan-care-note">
+            {TARGET_CARE_NOTE}
+          </Text>
         </Card>
       </FadeUp>
 
@@ -223,7 +228,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
 
       {/* Always in view, not folded away with the working: these numbers are where the plan starts. */}
       <FadeUp delay={landed + (projection ? 260 : 140)} style={{ flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.xs }}>
-        <Sparkles size={16} color={colors.textSecondary} strokeWidth={1.9} />
+        <Info size={16} color={colors.textSecondary} strokeWidth={1.9} />
         <Text variant="caption" color="textSecondary" style={{ flex: 1 }} testID="plan-estimates-note">
           Starting estimates: they adapt to what you really burn as you log. Change any number in Goals.
         </Text>

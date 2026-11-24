@@ -65,3 +65,43 @@ export function prefilledDescription(raw: unknown): string {
   const v = Array.isArray(raw) ? raw[0] : raw;
   return typeof v === 'string' ? v.trim().slice(0, DESCRIPTION_MAX) : '';
 }
+
+// ------------------------------------------------------------ the review, spoken
+
+/**
+ * The line a screen reader hears when an estimate arrives (photo.tsx writes it into a polite live region
+ * on the web, and announces it natively), without moving focus: what arrived, its total as an estimate
+ * with its range, and how many items to check. Units in full (kilocalories), never "kcal".
+ */
+export function estimateReadyLine({ kcal, range, items, sample }: { kcal: number; range: [number, number]; items: number; sample: boolean }): string {
+  const total = Math.round(kcal);
+  const band = range[1] > range[0] ? `, likely ${Math.round(range[0])} to ${Math.round(range[1])}` : '';
+  const count = `${items} ${items === 1 ? 'item' : 'items'}`;
+  if (sample) return `Sample result, not your meal: about ${total} kilocalories${band}, ${count}.`;
+  return `Estimate ready: about ${total} kilocalories${band}, ${count} to check.`;
+}
+
+/** One item's macros as a screen reader hears them, in whole grams: "Protein 47 grams, carbs 0 grams, fat 5 grams" (the row shows "P 47 C 0 F 5"). */
+export function spokenMacros(protein: number, carbs: number, fat: number): string {
+  const g = (n: number) => {
+    const r = Math.round(n);
+    return `${r} ${r === 1 ? 'gram' : 'grams'}`;
+  };
+  return `Protein ${g(protein)}, carbs ${g(carbs)}, fat ${g(fat)}`;
+}
+
+/** The name field of the review's item n (from 1): one name per row, starting with the field's own words. */
+export function itemNameLabel(n: number): string {
+  return `Item name ${n}`;
+}
+
+/** "Could also be (3)" under a row, named with its visible words first and the item it belongs to: "Could also be, 3 foods for White rice". */
+export function alternativesLabel(count: number, name: string): string {
+  const item = name.trim();
+  return `Could also be, ${count} ${count === 1 ? 'food' : 'foods'}${item ? ` for ${item}` : ''}`;
+}
+
+/** A food it could be, as a swap chip names it: "White rice, cooked, 190 kilocalories". */
+export function swapChipLabel(name: string, kcal: number): string {
+  return `${name}, ${Math.round(kcal)} kilocalories`;
+}

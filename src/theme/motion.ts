@@ -22,14 +22,17 @@
 import { useSyncExternalStore } from 'react';
 import { AccessibilityInfo, Platform } from 'react-native';
 
-/** Durations in ms. */
+/**
+ * Durations in ms. Routine motion stays within 600 ms (Material 3's range for it): a big cup's pour plus
+ * its rim's settle is 450 + 150, and a chart's line draws in 600. Only an indeterminate wait loops longer.
+ */
 export const duration = {
-  /** A big vessel's pour (the hero cup on Today, the plan reveal). */
-  pour: 620,
+  /** A big vessel's pour (the hero cup on Today, the plan reveal). With `settle`, at most 600 ms. */
+  pour: 450,
   /** Small cups, progress bars, troughs and chart columns. */
   pourSmall: 360,
   /** The rim's overshoot and rest after a pour, added at the end of the pour. */
-  settle: 260,
+  settle: 150,
   /** Delay between neighbours in a row of cups or chart columns. */
   stagger: 40,
   /** A screen's content fading up. */
@@ -44,7 +47,7 @@ export const duration = {
   /** Small state changes: a lip or hatch fading in, a toast. */
   fade: 160,
   /** A line chart drawing left to right. */
-  draw: 700,
+  draw: 600,
   /** The active-tab mark sliding between tabs. */
   slide: 220,
 } as const;

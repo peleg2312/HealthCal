@@ -112,7 +112,8 @@ export default function MorningScreen() {
   // streak tag do: history from before setup would read "150 active minutes reached" beside "Day 2".
   const fromSetup = (range: { from: ISODate; to: ISODate } | null) =>
     range && firstWeek && onboardedDay && range.from < onboardedDay ? (onboardedDay > range.to ? null : { from: onboardedDay, to: range.to }) : range;
-  const review = { y, weekBefore: minutesIn(activities, fromSetup(weekBeforeYesterday(today))), lastNight, units: profile.units, firstWeek };
+  // Yesterday's card shows its figures on any day with something logged: the lists then leave those numbers to it.
+  const review = { y, weekBefore: minutesIn(activities, fromSetup(weekBeforeYesterday(today))), lastNight, units: profile.units, firstWeek, figuresOnCard: !nothing };
   const well = wentWell(review);
   const adjust = toAdjust(review);
   const note = reviewNote(y);
@@ -235,7 +236,7 @@ export default function MorningScreen() {
               <View style={{ marginVertical: spacing.md }}>
                 <Divider />
               </View>
-              <MoveRow activities={day.activities} exerciseNet={day.exerciseNet} steps={steps} stepsNote={stepsNote} />
+              <MoveRow activities={day.activities} exerciseNet={day.exerciseNet} steps={steps} stepsNote={stepsNote} added={day.exerciseRule !== 'off'} />
             </>
           )}
         </Card>

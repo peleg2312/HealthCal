@@ -1,4 +1,4 @@
-import { BellOff, BellRing, Droplets, Footprints, MoonStar, Scale, Sparkles, Utensils } from 'lucide-react-native';
+import { BellOff, BellRing, Droplets, Footprints, MoonStar, Scale, Sunset, Utensils } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Linking, Platform, View } from 'react-native';
 
@@ -168,7 +168,7 @@ export default function RemindersScreen() {
         ) : null}
       </Group>
 
-      <Group title="Daily check-in" footer="What is left today, or a note when on track.">
+      <Group title="Evening" footer="What is left today, or a note when on track.">
         <ToggleRow
           testID="reminders-checkin"
           title="Evening check-in"
@@ -176,7 +176,7 @@ export default function RemindersScreen() {
           onChange={(enabled) => setReminders({ dailySummary: { ...r.dailySummary, enabled } })}
           left={
             <IconTile color={colors.primary}>
-              <Sparkles size={20} color={colors.primary} />
+              <Sunset size={20} color={colors.primary} />
             </IconTile>
           }
         />
@@ -263,7 +263,7 @@ export default function RemindersScreen() {
 const KIND_ICON: Record<ReminderKind, (c: string) => React.ReactNode> = {
   water: (c) => <Droplets size={18} color={c} />,
   meal: (c) => <Utensils size={18} color={c} />,
-  checkin: (c) => <Sparkles size={18} color={c} />,
+  checkin: (c) => <Sunset size={18} color={c} />,
   weighin: (c) => <Scale size={18} color={c} />,
   movement: (c) => <Footprints size={18} color={c} />,
 };

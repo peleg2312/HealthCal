@@ -974,7 +974,7 @@ async function device(browser, seedJson) {
     check('plans: an account signs up for the plans run', await signUp(P, pEmail), P.page.url());
     check('plans off: nothing about a plan on Profile, Account or About', await nothingAboutPlans(P));
     await estimate(P, 'daily limit check');
-    check('plans off: the estimate’s limit keeps today’s words and offers no plan', (await textOf(P, 'ai-error-daily_limit')).includes("You've used today's analyses") && !(await P.has('ai-limit-plans')), (await textOf(P, 'ai-error-daily_limit')).slice(0, 120));
+    check('plans off: the estimate’s limit keeps today’s words and offers no plan', (await textOf(P, 'ai-error-daily_limit')).includes("You've used today's AI estimates") && !(await P.has('ai-limit-plans')), (await textOf(P, 'ai-error-daily_limit')).slice(0, 120));
     await P.go('/coach');
     await ask(P, 'daily limit please');
     check('plans off: the coach’s limit keeps today’s words and offers no plan', (await textOf(P, 'coach-notice')) === '30 questions today. They reset at midnight UTC.' && !(await P.has('coach-limit-plans')), await textOf(P, 'coach-notice'));

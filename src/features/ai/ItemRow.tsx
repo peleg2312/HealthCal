@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronUp, Minus, Plus, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { Platform, TextInput, View } from 'react-native';
 
 import { SourceTag } from '@/features/food/components';
 import { displayFoodName } from '@/features/food/displayName';
@@ -11,6 +11,7 @@ import { Badge, CupKey, IconButton, parseNumber, PressableScale, Text } from '@/
 
 import { confidenceLevel, estimateGrams, gramStep, shownRowName, type ReviewRow } from './estimate';
 import { itemFromFood } from './localMatch';
+import { alternativesLabel, itemNameLabel, spokenMacros, swapChipLabel } from './words';
 
 /** One editable line of the estimate: name, grams, live calories and macros, remove. */
 export function ItemRow({
@@ -47,19 +48,21 @@ export function ItemRow({
   const name = shownRowName(row);
 
   return (
-    <View testID={id} style={{ paddingVertical: spacing.md, gap: spacing.sm }}>
+    // Every field and button in the row is 44 px tall to touch; the row keeps 8 px above and below them.
+    <View testID={id} style={{ paddingVertical: spacing.sm, gap: spacing.sm }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
         {row.kind === 'fat' ? <CupKey color={colors.fat} /> : null}
         <TextInput
           testID={`${id}-name`}
           value={name}
           onChangeText={onRename}
-          accessibilityLabel="Item name"
+          // One name per row (the rows are told apart out of context), starting with the field's own words.
+          accessibilityLabel={itemNameLabel(index + 1)}
           selectionColor={colors.primary}
           placeholder="Item name"
           placeholderTextColor={colors.textTertiary}
           style={[
-            { flex: 1, minWidth: 0, color: colors.text, fontFamily: fonts.semibold, fontSize: 15, paddingVertical: 6 },
+            { flex: 1, minWidth: 0, height: 44, color: colors.text, fontFamily: fonts.semibold, fontSize: 15, paddingVertical: 0 },
             { outlineStyle: 'none' } as object,
           ]}
         />
@@ -69,19 +72,19 @@ export function ItemRow({
           <Trash2 size={18} color={colors.textSecondary} strokeWidth={1.9} />
         </IconButton>
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
           <IconButton
             testID={`${id}-minus`}
             accessibilityLabel={`Less ${name}, minus ${step} grams`}
-            size={36}
+            size={44}
             tone="surface"
             disabled={item.grams <= step}
             onPress={() => onGrams(Math.max(step, item.grams - step))}>
             <Minus size={16} color={colors.text} />
           </IconButton>
           <GramsInput testID={`${id}-grams`} value={item.grams} onChange={onGrams} label={name} />
-          <IconButton testID={`${id}-plus`} accessibilityLabel={`More ${name}, plus ${step} grams`} size={36} tone="surface" onPress={() => onGrams(item.grams + step)}>
+          <IconButton testID={`${id}-plus`} accessibilityLabel={`More ${name}, plus ${step} grams`} size={44} tone="surface" onPress={() => onGrams(item.grams + step)}>
             <Plus size={16} color={colors.text} />
           </IconButton>
         </View>
@@ -103,10 +106,16 @@ export function ItemRow({
             </Text>
           ) : null}
         </View>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Macro letter="P" value={item.protein} color={colors.protein} />
-          <Macro letter="C" value={item.carbs} color={colors.carbs} />
-          <Macro letter="F" value={item.fat} color={colors.fat} />
+        {/* Drawn as "P 47 C 0 F 5", heard in full ("Protein 47 grams, ..."): natively as the group's label, on the web as hidden words beside the hidden letters. */}
+        <View
+          style={{ flexDirection: 'row', gap: 8 }}
+          {...(Platform.OS === 'web' ? {} : { accessible: true, accessibilityLabel: spokenMacros(item.protein, item.carbs, item.fat) })}>
+          <View style={{ flexDirection: 'row', gap: 8 }} {...(Platform.OS === 'web' ? ({ 'aria-hidden': true } as object) : {})}>
+            <Macro letter="P" value={item.protein} color={colors.protein} />
+            <Macro letter="C" value={item.carbs} color={colors.carbs} />
+            <Macro letter="F" value={item.fat} color={colors.fat} />
+          </View>
+          {Platform.OS === 'web' ? <Text style={SPOKEN_ONLY}>{spokenMacros(item.protein, item.carbs, item.fat)}</Text> : null}
         </View>
       </View>
       {onSwap && !row.food && matches.length > 0 ? (
@@ -116,8 +125,11 @@ export function ItemRow({
           feedback="select"
           accessibilityRole="button"
           accessibilityState={{ expanded: showAlt }}
-          accessibilityLabel={`${showAlt ? 'Hide' : 'Show'} ${matches.length} foods from the food list it could be`}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', minHeight: 44, marginVertical: -8 }}>
+          // react-native-web does not map accessibilityState.expanded: the disclosure says it itself.
+          {...({ 'aria-expanded': showAlt } as object)}
+          accessibilityLabel={alternativesLabel(matches.length, name)}
+          // 44 px tall to touch, drawn in its 20 px line: the area reaches 12 px over the caption above and the row's own padding below.
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', minHeight: 44, marginVertical: -12 }}>
           <Text variant="label" color="text">
             {`Could also be (${matches.length})`}
           </Text>
@@ -172,7 +184,8 @@ function SwapChip({ name, kcal, selected, onPress, testID }: { name: string; kca
       feedback="select"
       hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
       accessibilityState={{ selected }}
-      accessibilityLabel={`${name}, ${kcal} kcal`}
+      {...({ 'aria-pressed': selected } as object)}
+      accessibilityLabel={swapChipLabel(name, kcal)}
       style={{
         maxWidth: '100%',
         minHeight: 32,
@@ -192,7 +205,7 @@ function SwapChip({ name, kcal, selected, onPress, testID }: { name: string; kca
   );
 }
 
-/** One macro of an estimated row, in whole grams ("P 47", never "P 46.5": the estimate is not that precise). */
+/** One macro of an estimated row, in whole grams with its unit ("P 47 g", never "P 46.5": the estimate is not that precise). */
 function Macro({ letter, value, color }: { letter: string; value: number; color: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
@@ -201,13 +214,21 @@ function Macro({ letter, value, color }: { letter: string; value: number; color:
         {letter}
       </Text>
       <Text variant="caption" color="textSecondary" tabular>
-        {estimateGrams(value)}
+        {`${estimateGrams(value)} g`}
       </Text>
     </View>
   );
 }
 
-/** Small grams field that keeps the raw text while typing and commits valid numbers. */
+/** Hide from sight, keep for screen readers (the web's spoken form of a line drawn in short). */
+const SPOKEN_ONLY = { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 } as const;
+
+/**
+ * Small grams field that keeps the raw text while typing and commits valid numbers. The input is the
+ * whole 72 x 44 cup (its side room is its own padding, and the "g" is drawn over that padding without
+ * taking touches, as the kit's fields do), so a tap anywhere on the cup edits the grams and never
+ * lands on the minus or plus beside it.
+ */
 function GramsInput({ value, onChange, label, testID }: { value: number; onChange: (g: number) => void; label: string; testID: string }) {
   const { colors, radius } = useTheme();
   const [text, setText] = useState(String(value));
@@ -218,18 +239,7 @@ function GramsInput({ value, onChange, label, testID }: { value: number; onChang
     if (parseNumber(text) !== value) setText(String(value));
   }
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        height: 36,
-        minWidth: 72,
-        paddingHorizontal: 10,
-        ...cup(radius.buttonSm, 5),
-        borderWidth: 1.5,
-        borderColor: focused ? colors.rim : colors.borderStrong,
-        backgroundColor: colors.surface,
-      }}>
+    <View style={{ width: 72, height: 44 }}>
       <TextInput
         testID={testID}
         value={text}
@@ -252,13 +262,30 @@ function GramsInput({ value, onChange, label, testID }: { value: number; onChang
           }
         }}
         style={[
-          { width: 40, color: colors.text, fontFamily: fonts.bold, fontSize: 15, textAlign: 'right', paddingVertical: 0, fontVariant: ['tabular-nums'] },
+          {
+            width: 72,
+            height: 44,
+            ...cup(radius.buttonSm, 5),
+            borderWidth: 1.5,
+            borderColor: focused ? colors.rim : colors.borderStrong,
+            backgroundColor: colors.surface,
+            color: colors.text,
+            fontFamily: fonts.bold,
+            fontSize: 15,
+            textAlign: 'right',
+            paddingVertical: 0,
+            paddingLeft: 8,
+            paddingRight: 22,
+            fontVariant: ['tabular-nums'],
+          },
           { outlineStyle: 'none' } as object,
         ]}
       />
-      <Text variant="caption" color="textSecondary" style={{ marginLeft: 3 }}>
-        g
-      </Text>
+      <View pointerEvents="none" style={{ position: 'absolute', right: 10, top: 0, bottom: 0, justifyContent: 'center' }}>
+        <Text variant="caption" color="textSecondary">
+          g
+        </Text>
+      </View>
     </View>
   );
 }

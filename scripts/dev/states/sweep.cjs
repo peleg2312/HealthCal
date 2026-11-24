@@ -43,7 +43,7 @@ const today = [
   { id: 'sweep-today-protein-low', route: '/', values: { eaten: 0.6, exercise: 290, protein: 0.05 }, note: 'Today, 60% eaten with almost no protein' },
   { id: 'sweep-today-protein-over', route: '/', values: { eaten: 0.6, exercise: 290, protein: 1.3 }, note: 'Today, 60% eaten, protein 30% past its target' },
   ...WATER.map(([water, pct]) => ({ id: `sweep-today-water-${pct}`, route: '/', values: { eaten: 0.6, exercise: 290, water }, note: `Today with ${pct}% of the water goal` })),
-  // Workout calories over 7 days (values.spread): the cup's label reads "from workouts".
+  // Workout calories over 7 days (values.spread): the cup's label reads "~N added".
   { id: 'sweep-today-week-ex-0', route: '/', values: { spread: 1, exercise: 0, eaten: 0.6 }, note: 'Over 7 days, no workout today: the headroom is all shares carried from the last six days' },
   { id: 'sweep-today-week-ex-290', route: '/', values: { spread: 1, exercise: 290, eaten: 0.6 }, note: 'Over 7 days, a 290 kcal workout today: its first share plus the carried ones' },
   { id: 'sweep-today-week-ex-900-over', route: '/', values: { spread: 1, exercise: 900, eaten: 1.3 }, note: 'Over 7 days, 900 kcal today and 30% over the budget' },
@@ -56,7 +56,7 @@ const diary = [
     id: `sweep-diary-eaten-${pct}-ex-${exercise}`, route: '/diary', values: { eaten, exercise },
     note: `the diary's summary at ${pct}% eaten, ${exercise} kcal of exercise`,
   }))),
-  { id: 'sweep-diary-week', route: '/diary', values: { spread: 1, exercise: 290, eaten: 0.6 }, note: 'the diary\'s summary over 7 days: "+N from workouts, over 7 days"' },
+  { id: 'sweep-diary-week', route: '/diary', values: { spread: 1, exercise: 290, eaten: 0.6 }, note: 'the diary\'s summary over 7 days: "~N kcal added over 7 days"' },
 ];
 
 // ------------------------------------------------------------------ trackers

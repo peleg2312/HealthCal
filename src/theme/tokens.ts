@@ -61,6 +61,14 @@ export interface ThemeColors {
   headroom: string;
   /** Outline of vessel sides and base (never the top: vessels are open). At least 3:1 on bg and surface: with an empty inside, the outline is what draws the cup. */
   vesselEdge: string;
+  /**
+   * The outline of a text field (TextField, NumberField, the search field): at least 3:1 against the field's
+   * own fill (the card colour) and against the page and the card around it, so the field can be found
+   * without its label (WCAG 1.4.11). `borderStrong` is a hairline for dividers and dashes, under 3:1.
+   */
+  fieldEdge: string;
+  /** Marks and words drawn over the live camera picture (the barcode frame's corners, its hint): the picture is the same in every look, so this is white in all of them. */
+  cameraInk: string;
   /** Calorie colour for text and large numbers (the calorie fill is too light to read in light and Blossom). */
   caloriesInk: string;
   /** @deprecated No gradients in Pour. Equals `surface`; kept so old callers do not break. */
@@ -122,6 +130,8 @@ export const darkColors: ThemeColors = {
   rim: '#F6EEE3',
   headroom: '#4FCDA3',
   vesselEdge: '#75706A',
+  fieldEdge: '#726D67',
+  cameraInk: '#FFFFFF',
   caloriesInk: '#FF9466',
   heroStart: '#1F1E1C',
   heroEnd: '#1F1E1C',
@@ -165,6 +175,8 @@ export const lightColors: ThemeColors = {
   rim: '#211913',
   headroom: '#14876C',
   vesselEdge: '#948572',
+  fieldEdge: '#8E8273',
+  cameraInk: '#FFFFFF',
   caloriesInk: '#BF4420',
   heroStart: '#FFFCF8',
   heroEnd: '#FFFCF8',
@@ -220,6 +232,8 @@ export const blossomColors: ThemeColors = {
   rim: blossom.raspberry,
   headroom: '#13876F',
   vesselEdge: '#BC7290',
+  fieldEdge: '#B2788F',
+  cameraInk: '#FFFFFF',
   caloriesInk: '#B42F66',
   heroStart: '#FFFDFA',
   heroEnd: '#FFFDFA',
@@ -244,7 +258,7 @@ export const ownerPalette = {
 /**
  * Butter: butter paper (Transparent Yellow), Java Brown ink, Potting Soil as the second voice,
  * Sceptre Red as the brand colour and the level line, Cerulean as the soft surface (tab bar, soft
- * cards, progress tracks). The calorie fill is a deep raspberry lifted from Sceptre Red. Every data
+ * cards); progress tracks are a neutral step of the butter paper, so an empty track never reads as a pale blue fill. The calorie fill is a deep raspberry lifted from Sceptre Red. Every data
  * fill and the amber sit between luminance 0.158 and 0.28, so the Sceptre Red line is 3:1 on each
  * and each is 3:1 on the butter card: the guide's full rule, with no exception.
  */
@@ -276,13 +290,17 @@ export const butterColors: ThemeColors = {
   warningInk: '#6E3F00',
   danger: '#8F1F0E',
   overlay: '#000000A6',
-  track: ownerPalette.ceruleanBlue,
+  // A neutral step of the butter paper (1.2:1 on the card, as the other looks' tracks): an empty track
+  // reads as empty, and the water bar on it stays 3:1. Cerulean read as a pale blue fill (D1-F2).
+  track: '#ECE5C2',
   vesselEmpty: '#FCF9E6',
   tabBar: ownerPalette.ceruleanBlue,
   shadow: '#000000',
   rim: ownerPalette.sceptreRed,
   headroom: '#24877A',
   vesselEdge: ownerPalette.pottingSoil,
+  fieldEdge: '#958166',
+  cameraInk: '#FFFFFF',
   caloriesInk: '#93263D',
   heroStart: '#FCF9E6',
   heroEnd: '#FCF9E6',
@@ -350,6 +368,8 @@ export const javaColors: ThemeColors = {
   rim: ownerPalette.transparentYellow,
   headroom: '#3A9682',
   vesselEdge: '#A08672',
+  fieldEdge: '#8A6D5C',
+  cameraInk: '#FFFFFF',
   caloriesInk: '#F27A90',
   heroStart: '#31221D',
   heroEnd: '#31221D',

@@ -19,6 +19,7 @@ import { refreshPlan, usePlan, usePlanStore } from '@/features/plan/cache';
 import { checkoutBlockedHere, checkoutShown } from '@/features/plan/channel';
 import { openManage, startCheckout, useCheckout, waitAfterCheckout, type CheckoutPhase } from '@/features/plan/checkout';
 import { MembershipCard, useArrival } from '@/features/plan/MembershipCard';
+import { LegalLinksLine } from '@/features/legal/LegalLinksLine';
 import { PeriodTiles } from '@/features/plan/PeriodTiles';
 import { StaysFree } from '@/features/plan/StaysFree';
 import { canManageHere, canWithdraw, holdsPlus, isEnding, offerFor, planVisible, type PlanPeriod, type PlanView } from '@/features/plan/view';
@@ -159,6 +160,7 @@ function Choose({ view, header }: { view: PlanView; header: React.ReactNode }) {
   const saving = offer ? savingAndTax(offerFor(view, 'month'), offerFor(view, 'year'), offer) : null;
 
   let footer: React.ReactNode = null;
+  let linksInFooter = false;
   if (phase === 'waiting') {
     footer = (
       <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center', minHeight: 50 }} testID="plan-waiting" accessibilityLiveRegion="polite">
@@ -175,6 +177,7 @@ function Choose({ view, header }: { view: PlanView; header: React.ReactNode }) {
       </Text>
     );
   } else if (offer && view.canCheckout) {
+    linksInFooter = true;
     footer = (
       // The renewal sentence is the legal one and is never shortened; a narrow phone only closes the gap.
       <View style={{ gap: width < 360 ? spacing.sm : spacing.md }}>
@@ -187,6 +190,8 @@ function Choose({ view, header }: { view: PlanView; header: React.ReactNode }) {
         <Text variant="caption" color="textSecondary" testID="plan-renewal-line">
           {renewalLine(offer)}
         </Text>
+        {/* Terms and Privacy pinned beside Subscribe, so they are seen with the price at every width (rubric D11-04). */}
+        <LegalLinksLine termsLabel={TERMS_LABEL} privacyLabel={PRIVACY_LABEL} termsTestID="plan-terms" privacyTestID="plan-privacy" />
         <Button
           testID="plan-subscribe"
           title={subscribeLabel(offer, subscribeLabelRoom(width))}
@@ -224,8 +229,8 @@ function Choose({ view, header }: { view: PlanView; header: React.ReactNode }) {
               {saving}
             </Text>
           ) : null}
-          {/* The two links a careful buyer looks for, right under the prices; the seller line stays last. */}
-          <LegalLinks />
+          {/* The two links a careful buyer looks for: in the pinned footer beside Subscribe when it is there, else right under the prices. */}
+          {linksInFooter ? null : <LegalLinks />}
         </View>
       ) : (
         <LegalLinks />

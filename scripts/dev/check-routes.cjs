@@ -8,6 +8,10 @@
  *   node scripts/dev/check-routes.cjs [--url=http://localhost:8081] [--only=none|empty|demo|stress]
  *
  * Add a route here when you add one to src/app.
+ *
+ * It also reads each page's document title once the route has settled: every page must be named
+ * "<page> · HealthCal" (WCAG 2.4.2; src/features/layout/routeTitle.ts), and two different addresses where the
+ * routes ended never share one within a mode. `--titles` prints the title of every route it opened.
  */
 const { chromium } = require('playwright');
 
@@ -41,6 +45,8 @@ const OPEN_WITHOUT_PROFILE = ['/welcome', '/auth', '/onboarding', '/friends/add'
   const problems = [];
   let opened = 0;
   for (const mode of modes) {
+    // Title -> the address where a route ended with it, per mode: two addresses never share a title.
+    const titled = new Map();
     for (const route of ROUTES) {
       const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
       if (mode.seed) {
@@ -69,6 +75,13 @@ const OPEN_WITHOUT_PROFILE = ['/welcome', '/auth', '/onboarding', '/friends/add'
       const end = new URL(page.url()).pathname;
       const start = route.split('?')[0];
       const reasons = [];
+      // The title is set a frame after the screen draws: give it up to 3 s to name the page.
+      await page.waitForFunction(() => / · HealthCal$/.test(document.title), null, { timeout: 3000 }).catch(() => {});
+      const title = await page.title().catch(() => '');
+      if (flags.titles) console.log(`title [${mode.key}] ${route} -> ${end}: ${title}`);
+      if (!/^\S.* · HealthCal$/.test(title)) reasons.push(`page title "${title}" does not name the page`);
+      else if (titled.has(title) && titled.get(title) !== end) reasons.push(`page title "${title}" is also ${titled.get(title)}'s`);
+      else titled.set(title, end);
       if (crashed) reasons.push('error screen');
       if (errors.length) reasons.push(`page error: ${errors[0]}`);
       if (mode.key === 'none' && !OPEN_WITHOUT_PROFILE.includes(start) && end !== '/welcome') reasons.push(`stayed on ${end} without a profile`);

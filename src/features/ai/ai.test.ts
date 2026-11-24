@@ -160,7 +160,7 @@ describe('request building', () => {
 
 describe('error mapping', () => {
   const cases: [number, unknown, string, boolean][] = [
-    [429, { error: 'daily_limit', message: "You have used today's 40 AI analyses.", remaining: 0 }, 'daily_limit', false],
+    [429, { error: 'daily_limit', message: "You have used today's 40 AI estimates.", remaining: 0 }, 'daily_limit', false],
     [422, { error: 'not_food', message: 'That looks like a cat.' }, 'not_food', false],
     [422, { error: 'declined', message: 'x' }, 'declined', false],
     [422, { error: 'truncated', message: 'The meal was too complex.' }, 'truncated', false],
@@ -186,9 +186,9 @@ describe('error mapping', () => {
     expect(e.message.length).toBeGreaterThan(10);
   });
   it('an unconfirmed email (403 unauthorized) says to confirm it, never that the session expired', () => {
-    const e = errorFromResponse(403, { error: 'unauthorized', message: 'Confirm your email address to use food analysis.' });
+    const e = errorFromResponse(403, { error: 'unauthorized', message: 'Confirm your email address to use AI estimates.' });
     expect(e.code).toBe('unauthorized');
-    expect(e.message).toBe('Confirm your email address to use food analysis.');
+    expect(e.message).toBe('Confirm your email address to use AI estimates.');
     expect(e.message).not.toMatch(/expired/);
     expect(errorFromResponse(401, { error: 'unauthorized', message: 'x' }).message).toMatch(/expired/);
   });

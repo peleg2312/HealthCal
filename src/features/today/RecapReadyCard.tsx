@@ -60,7 +60,7 @@ export function RecapReadyCard() {
         style={{ flex: 1, minWidth: 0, minHeight: 48, paddingVertical: 2 }}
       />
       <IconButton testID="today-recap-dismiss" accessibilityLabel="Hide this week's check-in" tone="clear" size={44} onPress={dismiss}>
-        <X size={18} color={colors.textSecondary} />
+        <X size={18} color={colors.textSecondary} strokeWidth={1.9} />
       </IconButton>
     </View>
   );

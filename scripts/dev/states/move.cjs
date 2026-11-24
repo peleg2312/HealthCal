@@ -62,7 +62,7 @@ const train = [
   { id: 'train-load-sheet-past', route: '/train?week={day}', day: -14, taps: ['train-guideline-help'], sheet: true, note: 'a past week: the old line, its info cup opens the same sheet' },
   { id: 'train-load-sheet-stress', route: '/train', data: 'stress', taps: ['train-load-info'], sheet: true, note: 'the sheet over the long-content weeks (a big step up, 1,340 minutes)' },
   { id: 'train-history-more', route: '/train', data: 'stress', taps: ['train-show-more'], note: 'History with earlier sessions shown' },
-  { id: 'train-history-week', route: '/train', values: { spread: 1 }, waitFor: 'train-history', note: 'History on "Over 7 days": each figure under its name, "+290 kcal added over 7 days"' },
+  { id: 'train-history-week', route: '/train', values: { spread: 1 }, waitFor: 'train-history', note: 'History on "Over 7 days": each figure under its name, "~290 kcal added over 7 days"' },
   { id: 'train-history-off', route: '/train', values: { eatBack: 0 }, waitFor: 'train-history', note: 'History with adding off: "290 kcal not added" under every name alike' },
   // "Bring in workouts": one row under Log activity and Workout, and its sheet of choices (each keeps its own testID).
   { id: 'train-bring-sheet', route: '/train', taps: ['train-bring-in'], waitFor: 'train-import-garmin', sheet: true, note: 'the browser: Import workouts, Add steps from your Health export, then Automatic sync' },
@@ -98,7 +98,7 @@ const log = [
   { id: 'log-source-open', route: '/activity/log?activityId=running', taps: ['log-activity-source'], waitFor: 'log-activity-source-body', note: 'where the number comes from, open' },
   { id: 'log-too-long', route: '/activity/log?activityId=walking', type: { 'duration-input': '2000' }, note: 'duration longer than a day: the field error' },
   { id: 'log-past-day', route: '/activity/log?activityId=yoga&date={day}', day: -2, note: 'logging for two days ago' },
-  { id: 'log-off', route: '/activity/log?activityId=running', values: { eatBack: 0 }, waitFor: 'log-activity-adds', note: 'adding exercise off: "423 kcal above resting, not added to your budget", no hatched key' },
+  { id: 'log-off', route: '/activity/log?activityId=running', values: { eatBack: 0 }, waitFor: 'log-activity-adds', note: 'adding exercise off: "~423 kcal not added to your budget", no hatched key' },
   { id: 'log-day-at-today', route: '/activity/log?activityId=running', taps: ['log-date-prev', 'log-date-next'], waitFor: 'log-date-label', note: 'the one date control: back a day and forward again; next stops at today (a workout is logged once it happened)' },
   { id: 'log-day-yesterday', route: '/activity/log?activityId=running', taps: ['log-date-prev'], waitFor: 'log-date-label', note: 'the run log on yesterday: "Yesterday" in the same control as food detail' },
   { id: 'log-edit', route: '/train', taps: ['^session-volleyball'], waitFor: 'log-activity-delete', note: 'editing a saved session' },

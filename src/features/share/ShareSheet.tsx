@@ -1,4 +1,4 @@
-import { Check, Share2 } from 'lucide-react-native';
+import { Share2 } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Platform, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,13 +26,14 @@ function remember(kind: 'day' | 'week', next: ShareChoices) {
 const OPEN_GRACE_MS = 450;
 
 /**
- * One choice of what the card carries: a label you can tap, ink when on. It is
+ * One choice of what the card carries: a label you can tap, an ink fill when on and an outline when
+ * off, as the kit's chips are. No check mark: in this app the check means only "on budget". It is
  * a checkbox to assistive technology (aria-checked on web), so a screen-reader
  * user hears whether calorie numbers or food names will be on the image.
  */
 function ChoiceChip({ label, short, on, onPress, testID }: { label: string; short?: string; on: boolean; onPress: () => void; testID: string }) {
   const { colors, radius } = useTheme();
-  // Half the sheet at 320 px is 136: too narrow for "Calorie numbers" with its check, so it shows its short name.
+  // Half the sheet at 320 px is 136: too narrow for "Calorie numbers", so it shows its short name.
   const narrow = useWindowDimensions().width < 360;
   return (
     <PressableScale
@@ -58,7 +59,6 @@ function ChoiceChip({ label, short, on, onPress, testID }: { label: string; shor
         borderWidth: 1,
         borderColor: on ? colors.text : colors.borderStrong,
       }}>
-      {on ? <Check size={14} color={colors.bg} strokeWidth={2.4} /> : null}
       <Text variant="label" color={on ? 'bg' : 'text'} numberOfLines={1} style={{ fontSize: narrow ? 13 : 13.5, flexShrink: 1 }}>
         {narrow && short ? short : label}
       </Text>

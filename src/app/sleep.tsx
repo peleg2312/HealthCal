@@ -8,6 +8,7 @@ import { deleteSleep, saveSleep } from '@/features/trackers/actions';
 import { dayTitle, resolveDateParam } from '@/features/trackers/dateParam';
 import { DayStepper, Explain, ExplainText, Figure, RequireProfile } from '@/features/trackers/components';
 import { findByDate, formatHours, QUALITY_LABELS, SLEEP_RANGE, sleepSummary } from '@/features/trackers/helpers';
+import { sleepChartLabel } from '@/features/progress/chartWords';
 import { sleepFromLine, stagesLine } from '@/features/trackers/sleepSource';
 import { useToday } from '@/store/clock';
 import { useLive } from '@/store/selectors';
@@ -182,7 +183,9 @@ function SleepScreen() {
                 label="Night to night"
               />
             </View>
-            <BarChart data={bars} color={colors.sleep} band={{ from: SLEEP_RANGE[0], to: SLEEP_RANGE[1] }} height={160} formatValue={(n) => `${n.toFixed(1)}`} />
+            <View accessible accessibilityRole="image" accessibilityLabel={sleepChartLabel(summary.series, todayDate)}>
+              <BarChart data={bars} color={colors.sleep} band={{ from: SLEEP_RANGE[0], to: SLEEP_RANGE[1] }} height={160} formatValue={(n) => `${n.toFixed(1)}`} />
+            </View>
             <Text variant="caption" color="textSecondary" testID="sleep-chart-note">
               {[
                 'Shaded: 7 to 9 h.',

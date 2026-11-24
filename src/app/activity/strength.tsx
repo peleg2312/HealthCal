@@ -7,6 +7,7 @@ import { ACTIVITY_BY_ID } from '@/data/activities';
 import { basisFromEntry, estimateSession } from '@/features/activity/build';
 import { DateStepper } from '@/features/activity/components';
 import { EXERCISE_GROUPS, searchExercises } from '@/features/activity/exercises';
+import { budgetAdds } from '@/features/activity/logWords';
 import { RoutineCards, useRoutineTemplates } from '@/features/activity/RoutineCards';
 import { formatLiftWeight, formatPreviousSets } from '@/features/activity/strengthFormat';
 import { addRoutine, draftFromRoutine, routineExercises } from '@/features/activity/routines';
@@ -33,7 +34,7 @@ import { INTENSITY_LABELS, estimateOneRepMax, findStrengthRecords, kcalRange, st
 import { formatNumber, round, weightToKg, weightUnit, weightValue } from '@/lib/units';
 import { cancelTimerAlert, scheduleTimerAlert } from '@/services/notifications';
 import { useStore } from '@/store';
-import { useLive, useProfile } from '@/store/selectors';
+import { useDay, useLive, useProfile } from '@/store/selectors';
 import { cup, cupFor, useTheme } from '@/theme';
 import type { ActivityEntry, Intensity, StrengthSet, UnitSystem } from '@/types';
 import {
@@ -126,6 +127,8 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
   const profile = useProfile();
   const activities = useLive('activities');
   const units = profile.units;
+  // What reaches the budget, in the run log's words, by the rule of the workout's day (`budgetAdds`).
+  const addsRule = useDay(draft.date).exerciseRule;
   const update = (fn: (d: StrengthDraft) => StrengthDraft) => useStrengthDrafts.getState().update(draftKey, fn);
 
   const [now, setNow] = useState(() => Date.now());
@@ -363,7 +366,7 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
         </View>
         <Text variant="caption" color="textSecondary" testID="strength-kcal">
           {minutes > 0
-            ? `About ${formatNumber(est.net)} kcal above resting, likely ${formatNumber(kcalRange(est.net)[0])}–${formatNumber(kcalRange(est.net)[1])}`
+            ? `~${formatNumber(est.net)} kcal ${budgetAdds(addsRule, est.net).words}, likely ${formatNumber(kcalRange(est.net)[0])}–${formatNumber(kcalRange(est.net)[1])}`
             : running
               ? 'Calories show after the first minute.'
               : 'Start the timer or set a duration to estimate calories.'}
@@ -445,7 +448,7 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
       <ConfirmSheet
         visible={confirmLong}
         title={`Save a ${formatDuration(minutes)} workout?`}
-        message={`The timer has been running for ${formatDuration(minutes)}, which would count as about ${formatNumber(est.net)} kcal above resting. If it was left running, set the real duration instead.`}
+        message={`The timer has been running for ${formatDuration(minutes)}, which would be logged as about ${formatNumber(est.net)} kcal ${budgetAdds(addsRule, est.net).words}. If it was left running, set the real duration instead.`}
         confirmLabel={`Save ${formatDuration(minutes)}`}
         cancelLabel="Set the duration"
         onConfirm={() => finish(true)}
@@ -528,6 +531,7 @@ function FinishSummaryView({ summary }: { summary: FinishSummary }) {
   // Undo on the "logged" toast removes the session while this summary is open.
   const undone = useStore((s) => s.activities[e.id]?.deleted !== false);
   const [lo, hi] = kcalRange(e.kcalNet);
+  const addsWords = budgetAdds(useDay(e.date).exerciseRule, e.kcalNet).words;
   return (
     <Screen
       // The back cup leaves the finished workout the way Done does (the editor behind it is closed).
@@ -552,7 +556,7 @@ function FinishSummaryView({ summary }: { summary: FinishSummary }) {
         <Text variant="body" color="textSecondary" testID="strength-summary-kcal">
           {undone
             ? 'You undid this workout, so it is not in your log.'
-            : `About ${formatNumber(Math.round(e.kcalNet))} kcal above resting (likely ${formatNumber(lo)}–${formatNumber(hi)}).`}
+            : `About ${formatNumber(Math.round(e.kcalNet))} kcal ${addsWords} (likely ${formatNumber(lo)}–${formatNumber(hi)}).`}
         </Text>
       </Card>
       {summary.records.length ? (

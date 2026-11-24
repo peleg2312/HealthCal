@@ -259,3 +259,32 @@ describe('a day whose only water came with drinks from the diary', () => {
     expect(texts(toAdjust(input({ y: facts({ waterMl: 473, hasWater: true }) })))).toEqual(['Water stopped at 0.5 of 3.3 L']);
   });
 });
+
+describe('each figure said once: the card shows its numbers, so the lists name the fact in words', () => {
+  const card = { figuresOnCard: true } as const;
+  const digits = /\d/;
+
+  it('A and B on the page: sleep, water, protein and a session without their numbers', () => {
+    expect(texts(wentWell({ ...A, ...card }))).toEqual(['75 active minutes toward the weekly 150', "A full night's sleep, from Garmin Connect", "Within the day's budget: 2,095 of 2,190 kcal"]);
+    expect(texts(toAdjust({ ...B, ...card }))).toEqual(['Calories at 2,510 of 2,190 kcal', "A short night's sleep", 'Water below its goal']);
+    expect(texts(toAdjust({ ...B, lastNight: null, ...card }))).toEqual(['Calories at 2,510 of 2,190 kcal', 'Water below its goal', 'Protein below its goal']);
+    expect(texts(toAdjust(input({ y: facts({ waterMl: 0 }), ...card })))).toEqual(['No water logged']);
+  });
+
+  it('a session that adds no active minutes is named, its minutes left to the movement row', () => {
+    const yoga = { name: 'Yoga', emoji: '🧘', durationMin: 40 };
+    const walk = { name: 'Walk', emoji: '🚶', durationMin: 30 };
+    expect(texts(wentWell(input({ y: facts({ activities: [yoga], guidelineMin: 0 }), ...card })))[0]).toBe('Yoga logged');
+    expect(texts(wentWell(input({ y: facts({ activities: [yoga, walk], guidelineMin: 0 }), ...card })))[0]).toBe('Every session logged');
+  });
+
+  it('no item the card already counts carries a digit', () => {
+    const kinds = new Set(['sleep', 'water', 'protein']);
+    for (const c of [A, B, F, G, { ...B, lastNight: null }]) {
+      for (const item of [...wentWell({ ...c, ...card }), ...toAdjust({ ...c, ...card })]) {
+        if (kinds.has(item.kind) && item.kind !== 'water') expect(item.text).not.toMatch(digits);
+        if (item.kind === 'water' && toAdjust({ ...c, ...card }).includes(item)) expect(item.text).not.toMatch(digits);
+      }
+    }
+  });
+});

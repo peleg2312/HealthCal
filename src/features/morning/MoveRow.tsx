@@ -9,13 +9,13 @@ import { leaveMorningTo } from './leave';
 import { moveAccessibilityLabel, moveLine, type MoveActivity } from './line';
 
 /**
- * Yesterday's movement in one row under the shelf: "🏃 Running, 42 min · about 380 kcal", or
+ * Yesterday's movement in one row under the shelf: "🏃 Running, 42 min · about 380 kcal added", or
  * "No workout logged" in secondary text, and the day's steps on the right when there are any.
  * Steps are shown only, never added to anything. The row opens Train.
  */
-export function MoveRow({ activities, exerciseNet, steps, stepsNote }: { activities: MoveActivity[]; exerciseNet: number; steps: number | null; stepsNote?: string }) {
+export function MoveRow({ activities, exerciseNet, steps, stepsNote, added = true }: { activities: MoveActivity[]; exerciseNet: number; steps: number | null; stepsNote?: string; added?: boolean }) {
   const { colors, spacing, typography } = useTheme();
-  const line = moveLine(activities, exerciseNet);
+  const line = moveLine(activities, exerciseNet, added);
   // One activity with an emoji: the emoji is the content mark, drawn at 17 px.
   const emoji = activities.length === 1 ? activities[0].emoji.trim() : '';
   const rest = emoji && line.startsWith(`${emoji} `) ? line.slice(emoji.length + 1) : line;
@@ -33,7 +33,7 @@ export function MoveRow({ activities, exerciseNet, steps, stepsNote }: { activit
     <PressableScale
       testID="morning-move"
       accessibilityRole="link"
-      accessibilityLabel={moveAccessibilityLabel(activities, exerciseNet, steps, stepsNote)}
+      accessibilityLabel={moveAccessibilityLabel(activities, exerciseNet, steps, stepsNote, added)}
       scaleTo={0.98}
       onPress={() => leaveMorningTo('/train')}
       style={{ minHeight: 44, flexDirection: 'row', alignItems: below && stepsFigure ? 'flex-start' : 'center', gap: spacing.sm }}>

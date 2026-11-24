@@ -853,7 +853,7 @@ const api = http.createServer(async (req, res) => {
   // -------------------------------------------------------- edge functions
   if (await billingFunction(route, req, url, body, req.rawBody || '', uid, res)) return;
   if (route === 'POST /functions/v1/analyze-food') {
-    if (!uid) return send(res, 401, { error: 'unauthorized', message: 'Sign in to analyse food.' });
+    if (!uid) return send(res, 401, { error: 'unauthorized', message: 'Sign in to use AI estimates.' });
     // As on the real function: a careful analysis uses five units of the daily allowance, and the
     // allowance is the plan's (plans.ts `limitsFor`: 40 for everyone while plans are off, else 5 free and 40 Plus).
     const cost = body.precise === true ? 5 : 1;
@@ -861,9 +861,9 @@ const api = http.createServer(async (req, res) => {
     const lim = limitsOfUser(uid);
     const LIMIT = lim.estimates;
     state.aiRequests.push({ user: uid, hasImage: typeof body.image === 'string' && body.image.length > 0, imageChars: (body.image || '').length, mediaType: body.mediaType ?? null, text: body.text ?? null, precise: body.precise === true });
-    if (/shared limit/i.test(body.text || '')) return send(res, 429, { error: 'daily_limit', message: 'Food analysis has reached its shared limit for today. Search or scan instead, and try again tomorrow.', remaining: 0, shared: true, ...limitFields(lim, 'estimates', cost) });
+    if (/shared limit/i.test(body.text || '')) return send(res, 429, { error: 'daily_limit', message: 'AI estimates have reached their shared limit for today. Search or scan instead, and try again tomorrow.', remaining: 0, shared: true, ...limitFields(lim, 'estimates', cost) });
     if (/daily limit/i.test(body.text || '') || used > LIMIT) {
-      const message = lim.plansOn ? "You have used today's AI analyses. They reset at midnight UTC." : `You have used today's ${LIMIT} AI analyses. They reset at midnight UTC.`;
+      const message = lim.plansOn ? "You have used today's AI estimates. They reset at midnight UTC." : `You have used today's ${LIMIT} AI estimates. They reset at midnight UTC.`;
       return send(res, 429, { error: 'daily_limit', message, remaining: 0, ...limitFields(lim, 'estimates', cost) });
     }
     if (!body.image && !body.text) return send(res, 400, { error: 'bad_request', message: 'Send a photo, a description, or both.' });

@@ -7,6 +7,7 @@ import { clockTime } from '@/features/import/ui/format';
 import { resolveDateParam } from '@/features/trackers/dateParam';
 import { diffDays, formatDayLabel, formatShortDate } from '@/lib/dates';
 import { isPlausibleBodyFat, projectedGoalDate } from '@/lib/energy';
+import { weightChartLabel } from '@/features/progress/chartWords';
 import { trendMonthParts, weeklyRateText } from '@/features/progress/goalDate';
 import { formatWeight, weightToKg, weightUnit, weightValue } from '@/lib/units';
 import { applyWeighInToTargets, deleteWeightRecord, saveWeightRecord } from '@/features/trackers/actions';
@@ -132,6 +133,7 @@ function WeightScreen() {
               ) : null}
             </View>
             <Segmented testID="weight-range" options={RANGES} value={range} onChange={setRange} />
+            <View accessible accessibilityRole="image" accessibilityLabel={weightChartLabel(series.trend, range, end, units, target)}>
             <LineChart
               line={chart.line}
               dots={chart.dots}
@@ -141,6 +143,7 @@ function WeightScreen() {
               xLabels={chart.labels}
               formatY={(n) => (Number.isInteger(n) ? String(n) : n.toFixed(1))}
             />
+            </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg }}>
               <Legend swatch={<View style={{ width: 16, height: 2, borderRadius: 1, backgroundColor: colors.weight }} />} label="Trend" />
               <Legend swatch={<CupKey color={colors.textTertiary} size={7} />} label="Weigh-ins" />

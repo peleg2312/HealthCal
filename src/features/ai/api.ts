@@ -53,22 +53,22 @@ export class AiError extends Error {
 }
 
 const COPY: Record<AiErrorCode, { message: string; retryable: boolean }> = {
-  daily_limit: { message: "You have used today's AI analyses. They reset at midnight UTC.", retryable: false },
+  daily_limit: { message: "You have used today's AI estimates. They reset at midnight UTC.", retryable: false },
   not_food: { message: 'No food was recognised. Try a clearer photo or describe the meal.', retryable: false },
-  declined: { message: 'This photo could not be analysed. Try a different one or describe the meal instead.', retryable: false },
-  truncated: { message: 'The meal was too complex to analyse in one go. Try a closer photo of fewer items, or describe it.', retryable: false },
-  rate_limited: { message: 'The analysis service is busy. Try again in a moment.', retryable: true },
-  unauthorized: { message: 'Your session has expired. Sign in again to analyse food.', retryable: false },
-  not_configured: { message: 'Food analysis is not set up on the server yet.', retryable: false },
+  declined: { message: 'The AI could not estimate this photo. Try a different one or describe the meal instead.', retryable: false },
+  truncated: { message: 'The meal was too complex to estimate in one go. Try a closer photo of fewer items, or describe it.', retryable: false },
+  rate_limited: { message: 'The AI estimate service is busy. Try again in a moment.', retryable: true },
+  unauthorized: { message: 'Your session has expired. Sign in again to use AI estimates.', retryable: false },
+  not_configured: { message: 'AI estimates are not set up on the server yet.', retryable: false },
   bad_request: { message: 'That image could not be read. Try another photo.', retryable: false },
-  upstream: { message: 'The analysis service is unavailable right now. Try again in a moment.', retryable: true },
+  upstream: { message: 'The AI estimate service is unavailable right now. Try again in a moment.', retryable: true },
   network: { message: 'No connection. Check your internet and try again.', retryable: true },
-  timeout: { message: 'The analysis took too long. It usually works on a second try.', retryable: true },
-  unknown: { message: 'Something went wrong analysing that. Try again.', retryable: true },
+  timeout: { message: 'The estimate took too long. It usually works on a second try.', retryable: true },
+  unknown: { message: 'Something went wrong with that estimate. Try again.', retryable: true },
 };
 
 /** The 403 of an account whose email address is not confirmed yet. */
-export const UNCONFIRMED_MESSAGE = 'Confirm your email address to use food analysis.';
+export const UNCONFIRMED_MESSAGE = 'Confirm your email address to use AI estimates.';
 
 /** Server codes whose own message is more specific than ours and safe to show. */
 const SERVER_MESSAGE_WINS = new Set<AiErrorCode>(['daily_limit', 'not_food', 'bad_request', 'truncated']);

@@ -1,16 +1,18 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { PenLine, Pointer, ScanBarcode, Search, Utensils, X, Zap } from 'lucide-react-native';
+import { Check, ChevronRight, PenLine, Plus, Pointer, ScanBarcode, Search, Utensils, X, Zap } from 'lucide-react-native';
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, type TextInput, useWindowDimensions, View } from 'react-native';
 
 import { AiGlyph } from '@/features/ai/mark';
 import { searchAiTile } from '@/features/ai/words';
 import { AmountEditor } from '@/features/food/AmountEditor';
+import { foodNameHead } from '@/features/food/addedTo';
 import { FoodRow, MealPicker } from '@/features/food/components';
 import { displayFoodName } from '@/features/food/displayName';
 import { setFoodDraft } from '@/features/food/draft';
-import { amountLabel, href, kcal, lastPortions, matchServing, parseDate, parseMeal, portionFor, portionKcal, portionLabel, stepAmount } from '@/features/food/helpers';
+import { amountLabel, href, kcal, lastPortions, matchServing, parseDate, parseMeal, portionFor, portionKcal, portionLabel, sourceInfo, stepAmount } from '@/features/food/helpers';
 import { deleteEntry, logFood, logSavedMeal, setEntryAmount } from '@/features/food/log';
+import { useOneTap } from '@/features/food/oneTap';
 import { FavoriteStar } from '@/features/food/FavoriteStar';
 import { toggleFoodFavorite } from '@/features/food/favoriteActions';
 import { favoriteFoodsInVisit, isFavoriteMeal, mealToSave } from '@/features/food/favorites';
@@ -55,6 +57,7 @@ export default function FoodSearchScreen() {
     rememberSearchTab(t);
   };
   const [amountEntryId, setAmountEntryId] = useState<string | null>(null);
+  const inputRef = useRef<TextInput>(null);
   const [logging, setLogging] = useState<SavedMeal | null>(null);
   const [onlineResult, setOnlineResult] = useState<{ query: string; items: Food[]; failed: boolean; unavailable: boolean }>({ query: '', items: [], failed: false, unavailable: false });
   // Entries that already existed when the screen opened. Compared by id, not by time: a clock
@@ -232,6 +235,7 @@ export default function FoodSearchScreen() {
       {/* The day and what is left of its budget: one short line, so the list starts higher (logging speed). */}
       <Header title={`Add to ${MEAL_LABEL[meal].toLowerCase()}`} subtitle={`${formatDayLabel(date)} · ${kcal(Math.abs(left))} kcal ${left < 0 ? 'above budget' : 'left'}`} close />
       <TextField
+        ref={inputRef}
         testID="food-search-input"
         placeholder={narrow ? 'Search foods and brands' : 'Search foods, brands, your foods'}
         value={query}
@@ -253,8 +257,26 @@ export default function FoodSearchScreen() {
     </View>
   );
 
-  // Only once something is added: the running count and Done. The budget is in the header's short line.
-  const footer =
+  // The best match's Add, pinned at the foot while words are typed: the same one tap as the first row's "+",
+  // in thumb reach and riding on the keyboard (Screen keeps its footer above it). Once that food is added it
+  // stays in place as a tick, so a quick second tap neither logs it twice nor lands on Done above it.
+  const top = q && local.length > 0 && localQ === q ? local[0].food : null;
+  const oneTap = useOneTap();
+  const topAdded = top ? addedByFood.get(top.id) : undefined;
+  const topPortion = top ? portionFor(top, lastMap) : null;
+  const topBar =
+    top && topPortion ? (
+      <BestMatchAdd
+        name={foodNameHead(displayFoodName(top))}
+        kcalValue={topAdded ? topAdded.nutrients.kcal : portionKcal(top, topPortion)}
+        added={!!topAdded}
+        spoken={`Add ${displayFoodName(top)}, ${portionLabel(topPortion.serving.label, topPortion.quantity)}, ${kcal(portionKcal(top, topPortion))} kilocalories, ${sourceInfo(top.source).label}, to ${MEAL_LABEL[meal].toLowerCase()}`}
+        onPress={oneTap(() => quickAdd(top))}
+      />
+    ) : null;
+  // Once something is added: the running count and Done, above the best match's Add (so that one never moves).
+  // The budget is in the header's short line.
+  const countRow =
     added.length > 0 ? (
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 44 }}>
         <Text variant="title" testID="search-added-count" tabular style={{ flex: 1 }}>
@@ -263,6 +285,13 @@ export default function FoodSearchScreen() {
           {' kcal'}
         </Text>
         <Button testID="search-done" title="Done" size="md" full={false} onPress={() => (router.canGoBack() ? router.back() : router.replace(href('/diary', { date }) as never))} />
+      </View>
+    ) : null;
+  const footer =
+    countRow || topBar ? (
+      <View style={{ gap: spacing.sm }}>
+        {countRow}
+        {topBar}
       </View>
     ) : undefined;
 
@@ -365,6 +394,20 @@ export default function FoodSearchScreen() {
                   </View>
                 ) : null}
                 <Hint title={FAVOURITES_EMPTY.title} message={holdHint ? FAVOURITES_EMPTY_WITH_HINT : FAVOURITES_EMPTY.message} />
+                {/* The action that fills it: the foods to star, one tap away (usual for this meal, else recent), or,
+                    with nothing logged yet, the search field to find one. */}
+                <View style={{ alignItems: 'center' }}>
+                  <Button
+                    testID="search-fav-empty-show"
+                    variant="ghost"
+                    size="sm"
+                    full={false}
+                    title={usuals.length ? 'Show your usual foods' : recents.length ? 'Show your recent foods' : 'Find a food to star'}
+                    iconRight={usuals.length || recents.length ? <ChevronRight size={16} color={colors.text} strokeWidth={2.2} /> : undefined}
+                    icon={usuals.length || recents.length ? undefined : <Search size={16} color={colors.text} strokeWidth={2.2} />}
+                    onPress={() => (usuals.length ? setTab('usual') : recents.length ? setTab('recent') : inputRef.current?.focus())}
+                  />
+                </View>
               </View>
             )
           ) : null}
@@ -428,6 +471,18 @@ export default function FoodSearchScreen() {
               <Text variant="body" color="textSecondary">
                 Try fewer words, check the online products below, or add it another way.
               </Text>
+              {/* The one way that takes the words as typed leads, named as the AI and wearing its glyph, apart from
+                  the four look-alike tiles further down. */}
+              <Button
+                testID="search-no-local-ai"
+                variant="secondary"
+                size="md"
+                title={narrow ? 'Get an AI estimate' : 'Describe it for an AI estimate'}
+                accessibilityLabel={aiTile.a11y}
+                icon={<AiGlyph name="describe" size={20} color={colors.text} />}
+                onPress={() => go('/food/photo', aiTile.params)}
+                style={{ marginTop: spacing.sm }}
+              />
             </View>
           ) : null}
 
@@ -553,8 +608,48 @@ function ActionTile({ icon, label, a11y, onPress, testID }: { icon: React.ReactN
         paddingHorizontal: 2,
       }}>
       {icon}
-      <Text variant="label" align="center" numberOfLines={1} style={{ fontSize: 12.5, lineHeight: 16 }}>
+      {/* Two lines at most: one word per line under wider text spacing (WCAG 1.4.12), never cut ("Quick add"). */}
+      <Text variant="label" align="center" numberOfLines={2} style={{ fontSize: 12.5, lineHeight: 16 }}>
         {label}
+      </Text>
+    </PressableScale>
+  );
+}
+
+/**
+ * The best match's one-tap Add at the foot of search (`search-add-top`): a plus, the food's name and what one
+ * tap adds; once added, a tick in the same place that takes no press (the row above has the amount).
+ */
+function BestMatchAdd({ name, kcalValue, added, spoken, onPress }: { name: string; kcalValue: number; added: boolean; spoken: string; onPress: () => void }) {
+  const { colors, radius, spacing } = useTheme();
+  return (
+    <PressableScale
+      testID="search-add-top"
+      onPress={onPress}
+      disabled={added}
+      dimDisabled={false}
+      feedback="none"
+      scaleTo={0.98}
+      accessibilityRole="button"
+      accessibilityLabel={added ? `${name} added` : spoken}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.md,
+        minHeight: 50,
+        paddingHorizontal: 14,
+        ...cup(radius.button),
+        backgroundColor: colors.surface,
+        borderWidth: 1.5,
+        borderColor: added ? colors.success : colors.borderStrong,
+      }}>
+      {added ? <Check size={20} color={colors.success} strokeWidth={2.4} /> : <Plus size={20} color={colors.text} strokeWidth={2.2} />}
+      <Text variant="bodyStrong" numberOfLines={1} style={{ flex: 1, minWidth: 0 }}>
+        {added ? `${isolateRtl(name)} added` : `Add ${isolateRtl(name)}`}
+      </Text>
+      <Text variant="numM" style={{ fontSize: 17, lineHeight: 22 }}>
+        {kcal(kcalValue)}
+        <Text variant="unit">{' kcal'}</Text>
       </Text>
     </PressableScale>
   );

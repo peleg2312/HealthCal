@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Check, ChevronDown, ChevronUp, GlassWater, Info, Trash2 } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, GlassWater, Info, Trash2 } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
@@ -17,6 +17,8 @@ import { FadeRow, useLeavingRows } from '@/features/food/rowMotion';
 import { mealOnDay } from '@/features/food/addedTo';
 import { href } from '@/features/food/helpers';
 import { logDrink, removeDrink } from '@/features/food/log';
+import { useOneTap } from '@/features/food/oneTap';
+import { waterChartLabel } from '@/features/progress/chartWords';
 import { customFoodIndex, resolveFood } from '@/features/food/usuals';
 import { ENTERED, type DrinkChoice } from '@/features/drinks/choices';
 import { DrinkChoices } from '@/features/drinks/DrinkChoices';
@@ -46,6 +48,7 @@ import {
   IconButton,
   NumberField,
   PressableScale,
+  RestoreRow,
   Screen,
   SectionTitle,
   Sheet,
@@ -144,6 +147,9 @@ function WaterScreen() {
   const [custom, setCustom] = useState<number | null>(null);
   const [editing, setEditing] = useState(false);
   const [showAllLog, setShowAllLog] = useState(false);
+  // Drinks removed on this visit: each keeps a Restore row in the log (the second way back after the toast's Undo)
+  // until it is restored or the screen is left.
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
   // "Water only" (the same drink already in the diary): off by default, off again after each log and on any change.
   const [waterOnly, setWaterOnly] = useState(false);
   // The drink sheet, open with its first search ("juice" for Other juice), and the kind whose chip opened
@@ -219,6 +225,14 @@ function WaterScreen() {
     logDrink(planDrink({ kind: beverage, drink: selected, ml, date, now: new Date(), today: today(), units, waterOnly: waterOnlyOn, amount, after: after(ml, beverage) }));
     setWaterOnly(false);
   };
+  // One tap, one glass: a quick second tap on a glass (or on Add) within the guard does nothing.
+  const glassTap = useOneTap();
+  const addTap = useOneTap();
+  const removeRow = (e: WaterEntry) => {
+    removeDrink(e);
+    setRemovedIds((cur) => [e.id, ...cur.filter((id) => id !== e.id)]);
+  };
+  const removed = removedIds.map((id) => waterRecords[id]).filter((w): w is WaterEntry => !!w && !!w.deleted && w.date === date);
 
   const chooseKind = (b: Beverage) => {
     setBeverage(b);
@@ -296,7 +310,8 @@ function WaterScreen() {
           memoryKey={`water-${date}`}
           color={colors.water}
           width={narrow ? 76 : 96}
-          height={220}
+          // Under 360 px the cup is shorter, so all four glasses stay in the first view at 320 x 640.
+          height={narrow ? 168 : 220}
           labelGap={narrow ? 14 : 18}
           // Labels that meet at some level keep 8 px between them, at every value.
           labelSpacing={8}
@@ -356,21 +371,17 @@ function WaterScreen() {
         />
 
         {/* The goal is the cup's top label; under the cup only what is left, or, once the goal is reached, one
-            line that says so with the extra (the brim line on the cup carries the moment: no second cup or check). */}
+            line of plain text that says so with the extra (the brim line on the cup carries the moment: no second
+            cup and no check, which means only a day on budget). */}
         {reachedShown ? (
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-            <View style={{ paddingTop: 2 }}>
-              <Check size={18} color={colors.text} strokeWidth={2.2} />
-            </View>
-            <Text testID="water-goal-reached" variant="bodyStrong" style={{ flex: 1, minWidth: 0 }}>
-              {isToday ? 'Goal reached for today.' : `Goal reached on ${dayName}.`}
-              {note ? (
-                <Text testID="water-glasses" variant="body" color="textSecondary">
-                  {` ${note}`}
-                </Text>
-              ) : null}
-            </Text>
-          </View>
+          <Text testID="water-goal-reached" variant="bodyStrong">
+            {isToday ? 'Goal reached for today.' : `Goal reached on ${dayName}.`}
+            {note ? (
+              <Text testID="water-glasses" variant="body" color="textSecondary">
+                {` ${note}`}
+              </Text>
+            ) : null}
+          </Text>
         ) : (
           <View style={{ gap: 2 }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
@@ -417,15 +428,18 @@ function WaterScreen() {
               if (i < 0) return <View key={`pad-${r}-${i}`} style={{ flex: 1 }} />;
               const ml = settings.waterPresets[i];
               const tilePlan = shownPlan(ml, 'glass');
+              const title = formatVolume(ml, units);
+              const subtitle = tilePlan.tile ?? (i === 0 ? 'Small' : undefined);
               return (
                 <Tile
                   key={`${ml}-${i}`}
                   testID={`water-add-${i}`}
-                  accessibilityLabel={tilePlan.label}
-                  title={formatVolume(ml, units)}
-                  subtitle={tilePlan.tile ?? (i === 0 ? 'Small' : undefined)}
+                  // The tile's own words first ("150 ml, Small"), then what the tap does.
+                  accessibilityLabel={`${title}${subtitle ? `, ${subtitle}` : ''}. ${tilePlan.label}`}
+                  title={title}
+                  subtitle={subtitle}
                   icon={<GlassWater size={Math.min(26, 16 + i * 3)} color={colors.water} strokeWidth={1.9} />}
-                  onPress={() => add(ml)}
+                  onPress={glassTap(() => add(ml))}
                 />
               );
             })}
@@ -452,7 +466,7 @@ function WaterScreen() {
           // As tall as the field beside it (50), so the two read as one row.
           style={{ height: 50 }}
           disabled={!(custom && custom > 0)}
-          onPress={() => {
+          onPress={addTap(() => {
             if (!custom) return;
             const ml = volumeToMl(custom, units);
             if (ml > 5000) {
@@ -461,13 +475,13 @@ function WaterScreen() {
             }
             add(ml, 'custom');
             setCustom(null);
-          }}
+          })}
         />
       </View>
       <Note icon={<Info size={14} color={colors.textSecondary} />}>{factorLine(beverage)}</Note>
 
       <SectionTitle title={isToday ? 'Today’s log' : `Log for ${dayName}`} />
-      <Card padding={rows.length ? spacing.md : spacing.lg}>
+      <Card padding={rows.length ? spacing.md : spacing.lg} testID="water-log">
         {rows.length === 0 ? (
           <EmptyState
             emoji="💧"
@@ -535,7 +549,7 @@ function WaterScreen() {
                     accessibilityLabel={waterDeleteLabel(e, loggedLabel(e), units, fromDiary ? partner : null)}
                     tone="clear"
                     size={44}
-                    onPress={() => removeDrink(e)}>
+                    onPress={() => removeRow(e)}>
                     <Trash2 size={18} color={colors.textSecondary} strokeWidth={1.9} />
                   </IconButton>
                 </View>
@@ -544,6 +558,17 @@ function WaterScreen() {
           })}
           </AnimatedList>
         )}
+        {/* Drinks removed on this visit, each with Restore: the way back that does not leave with the toast. */}
+        {removed.map((w, i) => (
+          <React.Fragment key={`removed-${w.id}`}>
+            <Divider inset={rows.length ? 36 : 0} />
+            <RestoreRow
+              testID={`water-restore-${i}`}
+              label={`${waterRowTitle(w, units)}, ${loggedLabel(w)}, removed from Water`}
+              onRestore={() => useStore.getState().restore('water', w.id)}
+            />
+          </React.Fragment>
+        ))}
       </Card>
       {/* More than six drinks: the rest open under the list, where it ends (the testID is the one SectionTitle gave it). */}
       {allEntries.length > 6 ? (
@@ -565,6 +590,7 @@ function WaterScreen() {
         <Text variant="caption" color="textSecondary">
           {week.some((d) => d.waterMl > 0) ? `Goal met on ${daysMet} of 7 days.` : 'Bars fill in as you log drinks.'} Dashed line: the goal.
         </Text>
+        <View accessible accessibilityRole="image" accessibilityLabel={waterChartLabel(week.map((d) => ({ date: d.date, ml: d.waterMl, goalMl: d.waterGoalMl })), todayDate, units)}>
         <BarChart
           data={bars}
           color={colors.water}
@@ -575,6 +601,7 @@ function WaterScreen() {
           // Printed exactly as the hero prints the same amount ("1.23 L", "41"), with no unit for fl oz or ml.
           formatValue={(n) => formatVolume(volumeToMl(n, units), units).replace(/ (fl oz|ml)$/, '')}
         />
+        </View>
       </Card>
 
       <SectionTitle title="Where your goal comes from" />

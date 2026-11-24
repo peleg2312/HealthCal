@@ -10,7 +10,7 @@
  * a second tap on the check (nothing seemed to happen) cannot restart the app.
  */
 import Constants from 'expo-constants';
-import { Brain } from 'lucide-react-native';
+import { Info } from 'lucide-react-native';
 import React, { useEffect, useRef } from 'react';
 import { AccessibilityInfo, Platform, View } from 'react-native';
 
@@ -56,7 +56,7 @@ export function AboutVersion() {
 
   return (
     <View style={{ alignItems: 'center', gap: 4, paddingVertical: spacing.md }}>
-      <Brain size={18} color={colors.textTertiary} />
+      <Info size={18} color={colors.textTertiary} />
       <Text variant="caption" color="textTertiary" testID="about-version">
         HealthCal {version}
       </Text>

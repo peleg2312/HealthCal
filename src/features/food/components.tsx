@@ -1,6 +1,6 @@
 import { CalendarDays, Check, ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { SourceMark, sourceMarkTop } from '@/features/ai/mark';
 import { useToday } from '@/store/clock';
@@ -82,6 +82,9 @@ export function KcalTrail({ value, range, approx, testID }: { value: number; ran
   );
 }
 
+/** A flex cell's floor on the web: its content's width (react-native-web sets 0). Yoga has no 'auto' minimum. */
+const WEB_CELL = (Platform.OS === 'web' ? { minWidth: 'auto' } : null) as ViewStyle | null;
+
 /** Meal selector as an underline tab row with stable test ids (`meal-breakfast`, ...). */
 export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: MealType; onChange: (m: MealType) => void; testIDPrefix?: string }) {
   const { colors } = useTheme();
@@ -101,8 +104,12 @@ export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: 
             accessibilityRole="tab"
             accessibilityLabel={m.label}
             accessibilityState={{ selected: active }}
-            style={{ flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: narrow ? 0 : 2 }}>
-            <Text variant="label" color={active ? 'text' : 'textSecondary'} numberOfLines={1} style={{ fontSize: narrow ? 13 : 14.5, lineHeight: 20, fontFamily: active ? fonts.bold : fonts.semibold }}>
+            // react-native-web reads the aria prop, not accessibilityState.
+            aria-selected={active}
+            // On the web a cell never shrinks below its word, so wider letter spacing (WCAG 1.4.12) widens
+            // "Breakfast" at its neighbours' expense instead of cutting it; natively the word stays one line.
+            style={[{ flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: narrow ? 0 : 2 }, WEB_CELL]}>
+            <Text variant="label" color={active ? 'text' : 'textSecondary'} numberOfLines={Platform.OS === 'web' ? undefined : 1} style={{ fontSize: narrow ? 13 : 14.5, lineHeight: 20, fontFamily: active ? fonts.bold : fonts.semibold }}>
               {m.label}
             </Text>
             {active ? <View pointerEvents="none" style={{ position: 'absolute', left: '18%', right: '18%', bottom: -2, height: 3, borderRadius: 1, backgroundColor: colors.rim }} /> : null}

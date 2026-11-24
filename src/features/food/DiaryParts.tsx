@@ -51,13 +51,8 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?
   // hatched headroom at the right end. Read from the day's rule, never from budget minus target.
   const headroom = Math.max(0, day.exerciseAdded);
   const notAdded = day.exerciseRule === 'off' && day.exerciseNet > 0;
-  // The old words only when all of it is this day's own burn added on the day.
-  const addedLine =
-    day.exerciseRule === 'day' && day.exerciseCarry === 0
-      ? `+${kcal(headroom)} from exercise`
-      : day.exerciseRule === 'week'
-        ? `+${kcal(headroom)} from workouts, over 7 days`
-        : `+${kcal(headroom)} from workouts`;
+  // The run log's words for what workouts add (`budgetAdds`, @/features/activity/logWords), always "~": an estimate.
+  const addedLine = day.exerciseRule === 'week' ? `~${kcal(headroom)} kcal added over 7 days` : `~${kcal(headroom)} kcal added`;
   return (
     <Card testID="diary-summary" padding={18}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
@@ -99,7 +94,7 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?
               </View>
             ) : null}
             <Text variant="caption" color="textSecondary" tabular numberOfLines={2} style={{ flexShrink: 1 }} testID="diary-exercise">
-              {headroom > 0 ? addedLine : `${kcal(day.exerciseNet)} kcal burned, not added`}
+              {headroom > 0 ? addedLine : `~${kcal(day.exerciseNet)} kcal not added`}
             </Text>
           </View>
         ) : null}

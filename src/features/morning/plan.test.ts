@@ -125,8 +125,8 @@ describe('edges', () => {
 
 describe('helpers', () => {
   it('targetsLine: budget and protein, budget alone, nothing without a budget', () => {
-    expect(targetsLine({ budget: 2190, proteinG: 152 })).toBe("Today's targets: 2,190 kcal and 152 g of protein.");
-    expect(targetsLine({ budget: 1980.4, proteinG: 0 })).toBe("Today's target: 1,980 kcal.");
+    expect(targetsLine({ budget: 2190, proteinG: 152 })).toBe("Today's budget: 2,190 kcal and 152 g of protein.");
+    expect(targetsLine({ budget: 1980.4, proteinG: 0 })).toBe("Today's budget: 1,980 kcal.");
     expect(targetsLine({ budget: 0, proteinG: 152 })).toBeNull();
   });
 

@@ -441,13 +441,13 @@ export async function analyzeFood(client: Anthropic, input: AnalyzeInput, option
       // What an earlier request of this analysis used is still billed: every failure after it carries that.
       const spent = usage.inputTokens + usage.outputTokens > 0 ? { ...usage } : undefined;
       if (error instanceof Anthropic.RateLimitError) {
-        throw new AnalyzeError('rate_limited', 'The analysis service is busy. Try again in a moment.', 429, spent);
+        throw new AnalyzeError('rate_limited', 'The AI estimate service is busy. Try again in a moment.', 429, spent);
       }
       if (error instanceof Anthropic.BadRequestError && !spent) {
         throw new AnalyzeError('bad_request', 'That image could not be read. Try another photo.', 400);
       }
       if (error instanceof Anthropic.APIError || spent) {
-        throw new AnalyzeError('upstream', 'The analysis service is unavailable right now.', 502, spent);
+        throw new AnalyzeError('upstream', 'The AI estimate service is unavailable right now.', 502, spent);
       }
       throw error;
     }
@@ -455,10 +455,10 @@ export async function analyzeFood(client: Anthropic, input: AnalyzeInput, option
     usage.outputTokens += response.usage.output_tokens;
     servedBy = response.model;
     if (response.stop_reason === 'refusal') {
-      throw new AnalyzeError('declined', 'This photo could not be analysed. Try a different one or describe the meal instead.', 422, { ...usage });
+      throw new AnalyzeError('declined', 'The AI could not estimate this photo. Try a different one or describe the meal instead.', 422, { ...usage });
     }
     if (response.stop_reason === 'max_tokens') {
-      throw new AnalyzeError('truncated', 'The meal was too complex to analyse in one go. Try a closer photo of fewer items.', 422, { ...usage });
+      throw new AnalyzeError('truncated', 'The meal was too complex to estimate in one go. Try a closer photo of fewer items.', 422, { ...usage });
     }
     // Thinking blocks can come first, so find the text block by type rather than position.
     let text = '';
@@ -471,7 +471,7 @@ export async function analyzeFood(client: Anthropic, input: AnalyzeInput, option
   // The lines did not keep their form (about one answer in twenty-five): ask once more, this time
   // held to the schema, unless the first try already used most of the time the app will wait.
   if (!parsed && first !== 'json' && Date.now() - started < budgetMs / 2) parsed = parseAnswer(await ask('json', true), true);
-  if (!parsed) throw new AnalyzeError('upstream', 'The analysis came back in an unexpected format. Try again.', 502, { ...usage });
+  if (!parsed) throw new AnalyzeError('upstream', 'The estimate came back in an unexpected format. Try again.', 502, { ...usage });
 
   const items = sanitizeItems(parsed.items);
   const str = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);

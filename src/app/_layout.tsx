@@ -25,6 +25,7 @@ import { startCoach } from '@/features/coach/history';
 import { startPlan } from '@/features/plan/start';
 import { usePendingInvite } from '@/features/friends/usePendingInvite';
 import { startHealthSync } from '@/features/health-sync/sync';
+import { RouteTitle } from '@/features/layout/RouteTitle';
 import { startUpdates, useReportScreen } from '@/features/updates/updates';
 import { handleAuthLink, initAuth } from '@/services/auth';
 import { refreshReminders } from '@/services/notifications';
@@ -118,7 +119,13 @@ function Navigation() {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar style={dark ? 'light' : 'dark'} />
       <Stack
-        screenLayout={({ children, route }) => <ProfileGate name={route.name}>{children}</ProfileGate>}
+        screenLayout={({ children, route }) => (
+          <>
+            {/* The browser tab names the page shown ("Water · HealthCal"); web only (src/features/layout/routeTitle.ts). */}
+            {Platform.OS === 'web' ? <RouteTitle /> : null}
+            <ProfileGate name={route.name}>{children}</ProfileGate>
+          </>
+        )}
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.bg },

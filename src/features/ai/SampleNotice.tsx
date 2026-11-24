@@ -21,7 +21,7 @@ export function SampleNotice({ reason, variant }: { reason: Reason; variant: 'be
   const [open, setOpen] = useState(false);
   const title = variant === 'result' ? 'Sample result, not your meal' : 'Sample mode';
   const what = variant === 'result' ? 'Shows how reviewing works.' : 'You will see a fixed example.';
-  const why = reason === 'signed_out' ? 'Sign in to have your own meals analysed.' : 'Real analysis needs this copy of HealthCal to be connected to a server.';
+  const why = reason === 'signed_out' ? 'Sign in to have your own meals estimated.' : 'A real estimate needs this copy of HealthCal to be connected to a server.';
   return (
     <View
       testID={`ai-sample-notice-${variant}`}

@@ -14,9 +14,9 @@ import type { LimitInfo } from './limit';
 export type ScreenErrorCode = AiErrorCode | 'camera_denied' | 'unreadable';
 
 const TITLE: Record<ScreenErrorCode, string> = {
-  daily_limit: "You've used today's analyses",
+  daily_limit: "You've used today's AI estimates",
   not_food: 'No food found',
-  declined: 'This one could not be analysed',
+  declined: 'This one could not be estimated',
   truncated: 'Too much on one plate',
   rate_limited: 'The service is busy',
   unauthorized: 'Sign in again',

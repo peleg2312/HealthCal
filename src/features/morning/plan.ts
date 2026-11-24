@@ -166,16 +166,17 @@ export interface TodayTargets {
 
 /**
  * The plain line under "For today" (testID morning-targets), named as targets so it is never read
- * as what was eaten: "Today's targets: 2,190 kcal and 152 g of protein.", "Today's target:
- * 1,980 kcal." without a protein target, null without a budget.
+ * as what was eaten: "Today's budget: 2,190 kcal and 152 g of protein.", "Today's budget:
+ * 1,980 kcal." without a protein target, null without a budget (the budget, never "target": the target is the
+ * number before workouts).
  */
 export function targetsLine(t: TodayTargets): string | null {
   const budget = Math.round(t.budget);
   if (!(budget > 0)) return null;
   const protein = Math.round(t.proteinG);
   return protein > 0
-    ? `Today's targets: ${formatNumber(budget)} kcal and ${formatNumber(protein)} g of protein.`
-    : `Today's target: ${formatNumber(budget)} kcal.`;
+    ? `Today's budget: ${formatNumber(budget)} kcal and ${formatNumber(protein)} g of protein.`
+    : `Today's budget: ${formatNumber(budget)} kcal.`;
 }
 
 /** The week's first day and today, for gathering weekMinutes: activities with from <= date <= to. */

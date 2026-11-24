@@ -1,7 +1,8 @@
 import { ArrowRight, BellRing, ChevronDown, ChevronUp, CircleHelp, Droplets, Ruler, Scale, Target, TriangleAlert, Utensils } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { useWindowDimensions, View, type TextInputProps } from 'react-native';
 
+import { BIRTH_AUTOCOMPLETE } from '@/features/settings/birthDate';
 import { Group as SettingsGroup, IconTile, prefers12h, TimeRow } from '@/features/settings/components';
 import { ageFromBirthDate, formatClock } from '@/lib/dates';
 import { ACTIVITY_LABELS, calorieFloor, KCAL_PER_KG, maxWeeklyRateKg } from '@/lib/energy';
@@ -164,6 +165,7 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
       label="Day"
       placeholder="DD"
       testID="onb-dob-day"
+      autoComplete={BIRTH_AUTOCOMPLETE.day as TextInputProps['autoComplete']}
       decimals={0}
       maxLength={2}
       value={draft.dobDay}
@@ -179,6 +181,7 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
       label="Month"
       placeholder="MM"
       testID="onb-dob-month"
+      autoComplete={BIRTH_AUTOCOMPLETE.month as TextInputProps['autoComplete']}
       decimals={0}
       maxLength={2}
       value={draft.dobMonth}
@@ -194,6 +197,7 @@ export function AboutStep({ draft, set, errors, submit }: StepProps) {
       label="Year"
       placeholder="YYYY"
       testID="onb-dob-year"
+      autoComplete={BIRTH_AUTOCOMPLETE.year as TextInputProps['autoComplete']}
       decimals={0}
       maxLength={4}
       value={draft.dobYear}

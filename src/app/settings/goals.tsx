@@ -1,11 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useRef, useState } from 'react';
-import { View, type ScrollView, type ScrollViewProps } from 'react-native';
+import { View, type ScrollView, type ScrollViewProps, type TextInputProps } from 'react-native';
 
 import { Group, Hint, OptionRow } from '@/features/settings/components';
 import { planGoalLine } from '@/features/progress/goalDate';
 import { spreadChangeNote, spreadRuleNote } from '@/features/settings/spreadWords';
-import { BIRTH_INCOMPLETE, birthDateWords, birthIso, birthParts, type BirthParts } from '@/features/settings/birthDate';
+import { BIRTH_AUTOCOMPLETE, BIRTH_INCOMPLETE, birthDateWords, birthIso, birthParts, type BirthParts } from '@/features/settings/birthDate';
+import { TARGET_CARE_NOTE } from '@/features/settings/careNote';
 import { birthDateError, customSplitError, heightError, rateForGoal, targetWeightError } from '@/features/settings/goalsValidation';
 import { markSpreadHintDone } from '@/features/activity/spreadHint';
 import { ageFromBirthDate, today } from '@/lib/dates';
@@ -270,6 +271,10 @@ function GoalsForm() {
                 (effective.targetWeightKg ? 'At this calorie target the weight would not move toward your goal.' : 'Add a goal weight to see when this plan reaches it.'))}
           </Text>
         ) : null}
+        {/* Where the target is set, said plainly: an estimate, not medical advice, and who checks with a doctor first. */}
+        <Text variant="caption" color="textSecondary" style={{ marginTop: spacing.md }} testID="goals-care-note">
+          {TARGET_CARE_NOTE}
+        </Text>
       </Card>
 
       <Group title="Goal">
@@ -407,6 +412,7 @@ function GoalsForm() {
                   key={part}
                   testID={`goals-birth-${part}`}
                   accessibilityLabel={`Birth ${part}`}
+                  autoComplete={BIRTH_AUTOCOMPLETE[part] as TextInputProps['autoComplete']}
                   placeholder={part === 'day' ? 'DD' : part === 'month' ? 'MM' : 'YYYY'}
                   decimals={0}
                   maxLength={part === 'year' ? 4 : 2}
@@ -480,7 +486,7 @@ function GoalsForm() {
         <View style={{ paddingVertical: spacing.md, gap: spacing.md }}>
           {/* The kit's chip rows: 12 px between rows, so each chip keeps a 44 px tap area the row below does not take. */}
           <ChipWrap>
-            <Chip testID="goals-macro-auto" label="Automatic" selected={macroMode === 'auto'} onPress={() => setMacroMode('auto')} />
+            <Chip testID="goals-macro-auto" label="Automatic" accessibilityLabel="Automatic macros" selected={macroMode === 'auto'} onPress={() => setMacroMode('auto')} />
             {(Object.keys(PRESETS) as (keyof typeof PRESETS)[]).map((k) => (
               <Chip key={k} testID={`goals-macro-${k}`} label={PRESETS[k].label} selected={macroMode === k} onPress={() => setMacroMode(k)} />
             ))}
@@ -638,9 +644,14 @@ function GoalsForm() {
   );
 }
 
-/** A cup key and label over the number; data colours mark, numbers stay in the text colour. */
+/**
+ * A cup key and label over the number; data colours mark, numbers stay in the text colour. The
+ * number is the leading figure and the unit is everything after it, so a two-word unit ("88 fl oz")
+ * is set whole in the unit style.
+ */
 function PreviewStat({ label, value, color }: { label: string; value: string; color: string }) {
-  const i = value.lastIndexOf(' ');
+  const lead = /^[\d.,\u2212-]+(?= )/.exec(value)?.[0];
+  const i = lead ? lead.length : -1;
   return (
     <View style={{ flex: 1, minWidth: 0 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

@@ -119,6 +119,21 @@ export function carefulUses(cost: number, dailyLimit: number): string {
 }
 
 /**
+ * The review's "Not quite right?" line: what each second try uses, so no try reads cheaper than it is.
+ * Re-estimate uses 1, or `CAREFUL_COST` once the result is a careful check (it checks carefully again); the
+ * careful check uses `CAREFUL_COST`, said here unless its own line under its button already says it.
+ */
+export function retryCostLine(precisePass: boolean, carefulSaidBelow: boolean): string {
+  if (precisePass) return `Re-estimate checks carefully again and uses ${CAREFUL_COST} of today's AI estimates.`;
+  return carefulSaidBelow ? "Re-estimate uses 1 of today's AI estimates." : `Re-estimate uses 1 of today's AI estimates, a careful check ${CAREFUL_COST}.`;
+}
+
+/** The allowance under the second tries: "3 AI estimates left today", the plan's own word for the unit. */
+export function estimatesLeft(remaining: number): string {
+  return `${remaining} AI ${remaining === 1 ? 'estimate' : 'estimates'} left today`;
+}
+
+/**
  * Plus's daily number for the plan link, from the plan the app was told about (@/features/plan):
  * its `planLimits.plus` (the server's figures, or its documented defaults), else an offer that
  * carries its limits, else the person's own limits while they hold Plus. Null when none says (the

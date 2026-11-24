@@ -12,7 +12,7 @@ import { cup, fonts, useTheme } from '@/theme';
 import type { ActivityEntry, ISODate, UnitSystem } from '@/types';
 import { CupKey, IconButton, MAX_FONT_SCALE, PressableScale, Text } from '@/ui';
 
-import { historyFigureBeside, historyFigureWords, historyMetaLines } from './history';
+import { deleteSessionLabel, historyFigureBeside, historyFigureWords, historyMetaLines } from './history';
 import { budgetAdds, budgetAddsShort, NEXT_DAY_HINT } from './logWords';
 
 /**
@@ -134,7 +134,7 @@ export function SessionRow({
           ) : null}
         </View>
       </PressableScale>
-      <IconButton accessibilityLabel={`Delete ${entry.name}`} tone="clear" testID={`delete-${entry.activityId}`} onPress={onDelete} size={44}>
+      <IconButton accessibilityLabel={deleteSessionLabel(entry)} tone="clear" testID={`delete-${entry.activityId}`} onPress={onDelete} size={44}>
         <Trash2 size={18} color={colors.textSecondary} strokeWidth={1.9} />
       </IconButton>
     </View>

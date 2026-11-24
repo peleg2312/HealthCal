@@ -86,7 +86,7 @@ export function AddMissingItem({
                   </View>
                 }
                 title={aiBusy ? 'Estimating…' : `Estimate “${q}” with AI`}
-                subtitle="Uses one of today's analyses"
+                subtitle="Uses one of today's AI estimates"
                 onPress={aiBusy ? undefined : () => void onAskAi(q).then((ok) => ok && setQuery(''))}
               />
             </>

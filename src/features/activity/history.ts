@@ -48,6 +48,15 @@ export function historyDaySpoken(date: ISODate, today: ISODate): string {
   return word === 'Today' || word === 'Yesterday' || word === 'Tomorrow' ? word.toLowerCase() : WEEKDAYS_LONG[fromISODate(date).getDay()];
 }
 
+/**
+ * A history row's trash can, named so no two cans share a name: the workout, its full date and its length
+ * ("Delete Volleyball, Tuesday, Nov 17, 60 minutes"). Never the clock: the date is the workout's own.
+ */
+export function deleteSessionLabel(entry: { name: string; date: ISODate; durationMin: number }): string {
+  const minutes = Math.round(entry.durationMin);
+  return `Delete ${entry.name}, ${WEEKDAYS_LONG[fromISODate(entry.date).getDay()]}, ${formatShortDate(entry.date)}, ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+}
+
 /** Every workout in week groups, newest week first; empty weeks are left out. */
 export function historyWeeks(activities: readonly ActivityEntry[], today: ISODate): HistoryWeek[] {
   const sorted = [...activities].sort((a, b) => b.date.localeCompare(a.date) || b.loggedAt.localeCompare(a.loggedAt));

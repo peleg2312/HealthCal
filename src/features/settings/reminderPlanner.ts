@@ -189,10 +189,12 @@ export function walkNetKcal(weightKg: number, baselineKcalPerDay: number): numbe
   return Math.round(netKcal(met, weightKg, WALK_MINUTES, baselineKcalPerDay) / 5) * 5;
 }
 
-export function movementBody(weightKg: number | undefined, baselineKcalPerDay?: number): string {
+export function movementBody(weightKg: number | undefined, baselineKcalPerDay?: number, added = true): string {
   const net = weightKg && baselineKcalPerDay ? walkNetKcal(weightKg, baselineKcalPerDay) : null;
-  if (!net) return 'No activity logged today. A short walk now still counts.';
-  return `No activity logged today. A ${WALK_MINUTES} minute walk at a moderate pace burns about ${net} kcal above resting.`;
+  // The run log's words for the part above resting (`budgetAdds`): "adds about 75 kcal to your budget", said only
+  // while the day adds workouts.
+  if (!net || !added) return 'No activity logged today. A short walk now still counts.';
+  return `No activity logged today. A ${WALK_MINUTES} minute walk at a moderate pace adds about ${net} kcal to your budget.`;
 }
 
 // ------------------------------------------------------------- actions
@@ -338,7 +340,7 @@ function candidatesForDay(input: PlannerInput, day: PlannerDay, untilMinutes: nu
   }
 
   if (r.dailySummary.enabled) {
-    add('checkin', parseHHmm(r.dailySummary.time), 'day', 'Daily check-in', checkInBody(s, input.units));
+    add('checkin', parseHHmm(r.dailySummary.time), 'day', 'Evening check-in', checkInBody(s, input.units));
   }
 
   if (r.weighIn.enabled && !day.weighed && r.weighIn.weekdays.includes(fromISODate(s.date).getDay())) {
@@ -349,7 +351,7 @@ function candidatesForDay(input: PlannerInput, day: PlannerDay, untilMinutes: nu
   }
 
   if (r.movement.enabled && s.activities.length === 0) {
-    add('movement', parseHHmm(r.movement.time), 'day', 'Movement', movementBody(input.weightKg, input.baselineKcalPerDay));
+    add('movement', parseHHmm(r.movement.time), 'day', 'Movement', movementBody(input.weightKg, input.baselineKcalPerDay, s.exerciseRule !== 'off'));
   }
 
   return out;

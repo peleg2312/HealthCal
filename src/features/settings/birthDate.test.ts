@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { birthDateWords, birthIso, birthParts } from './birthDate';
+import { BIRTH_AUTOCOMPLETE, birthDateWords, birthIso, birthParts } from './birthDate';
 
 describe('birth date in Goals', () => {
   it('splits and joins a stored date', () => {
@@ -14,5 +14,9 @@ describe('birth date in Goals', () => {
   it('says it in the app date style, never ISO', () => {
     expect(birthDateWords('1994-05-12')).toBe('May 12, 1994');
     expect(birthDateWords('2001-11-03')).toBe('Nov 3, 2001');
+  });
+
+  it('names each field’s purpose with the birthday autofill tokens', () => {
+    expect(BIRTH_AUTOCOMPLETE).toEqual({ day: 'bday-day', month: 'bday-month', year: 'bday-year' });
   });
 });

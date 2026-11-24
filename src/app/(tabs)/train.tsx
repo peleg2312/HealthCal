@@ -1,6 +1,6 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ChevronDown, ChevronRight, Dumbbell, Plus, Timer } from 'lucide-react-native';
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { TabHeader } from '@/components/TabHeader';
@@ -16,13 +16,15 @@ import { startRoutineDraft, type RoutineTemplate } from '@/features/activity/rou
 import { draftHasContent, useStrengthDrafts } from '@/features/activity/strengthDraft';
 import { StepsLine } from '@/features/health-sync/ui/StepsLine';
 import { SyncedFromLine } from '@/features/health-sync/ui/SyncedFromLine';
-import { addDays, formatDuration, formatShortDate, startOfWeek } from '@/lib/dates';
+import { isolateRtl } from '@/lib/bidi';
+import { addDays, formatDuration, formatShortDate, startOfWeek, weekdayShort } from '@/lib/dates';
 import { trainingOverview } from '@/lib/trainingLoad';
 import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
 import { useLive, useProfile } from '@/store/selectors';
 import { useTheme } from '@/theme';
-import { Button, Card, Chip, ConfirmSheet, EmptyState, Screen, SectionTitle, Text } from '@/ui';
+import type { ActivityEntry } from '@/types';
+import { Button, Card, Chip, ConfirmSheet, EmptyState, RestoreRow, Screen, SectionTitle, Text } from '@/ui';
 
 export default function TrainScreen() {
   const { colors, spacing } = useTheme();
@@ -31,6 +33,16 @@ export default function TrainScreen() {
   const recentIds = useStore((s) => s.recentActivityIds);
   const draft = useStrengthDrafts((s) => s.drafts.new);
   const [pages, setPages] = useState(1);
+  // Workouts removed while Train is in front: each keeps a Restore row above History (the second way back after
+  // the toast's Undo) until it is restored or the person leaves the tab (Train stays mounted, so focus decides).
+  const allActivities = useStore((s) => s.activities);
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
+  useFocusEffect(useCallback(() => () => setRemovedIds([]), []));
+  const removed = removedIds.map((id) => allActivities[id]).filter((a): a is ActivityEntry => !!a && !!a.deleted);
+  const removeSession = (e: ActivityEntry) => {
+    deleteActivity(e);
+    setRemovedIds((cur) => [e.id, ...cur.filter((id) => id !== e.id)]);
+  };
 
   const t = useToday();
   // ?week=YYYY-MM-DD shows that week (the import screen links to the week it added workouts to); otherwise this week.
@@ -80,12 +92,16 @@ export default function TrainScreen() {
         current={weekStart === startOfWeek(t)}
       />
 
-      {/* Side by side when both labels fit (150 px each); stacked on a narrow phone rather than cut. */}
+      {/* Side by side when both labels fit (150 px each); stacked on a narrow phone rather than cut. Both are
+          secondary, Log activity with the exercise colour on its edge: the tab bar's + is the screen's one
+          filled primary button. */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
         <Button
           testID="train-log-activity"
           title="Log activity"
-          icon={<Plus size={18} color={colors.onPrimary} />}
+          variant="secondary"
+          tint={colors.exercise}
+          icon={<Plus size={18} color={colors.text} strokeWidth={2.2} />}
           onPress={() => router.push('/activity/pick')}
           style={{ flexGrow: 1, flexBasis: 150 }}
         />
@@ -115,7 +131,7 @@ export default function TrainScreen() {
 
       {/* The section title with its way to every activity, a small ghost button (the testID SectionTitle gave it). */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-        <Text variant="h3" style={{ flexShrink: 1 }}>
+        <Text variant="h3" accessibilityRole="header" {...({ 'aria-level': 2 } as object)} style={{ flexShrink: 1 }}>
           Quick start
         </Text>
         <Button
@@ -132,6 +148,14 @@ export default function TrainScreen() {
       <QuickStartTiles items={quick} onPick={(id) => router.push(`/activity/log?activityId=${id}`)} />
 
       <SectionTitle title="History" />
+      {removed.map((e, i) => (
+        <RestoreRow
+          key={`removed-${e.id}`}
+          testID={`train-restore-${i}`}
+          label={`${isolateRtl(e.name)} on ${weekdayShort(e.date)}, ${formatShortDate(e.date)} removed`}
+          onRestore={() => useStore.getState().restore('activities', e.id)}
+        />
+      ))}
       {history.length === 0 ? (
         <Card>
           <EmptyState
@@ -149,6 +173,8 @@ export default function TrainScreen() {
               <View
                 accessible
                 accessibilityRole="header"
+                // A week under "History" (a section title, level 2): level 3, never a second h1.
+                {...({ 'aria-level': 3 } as object)}
                 accessibilityLabel={historyWeekLabel(w)}
                 style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10, paddingLeft: 18, paddingRight: 18, paddingBottom: 2 }}>
                 <Text variant="h3" numberOfLines={1} style={{ flexShrink: 1 }}>
@@ -168,7 +194,7 @@ export default function TrainScreen() {
                     units={profile.units}
                     day={{ word: historyDayWord(e.date, t), spoken: historyDaySpoken(e.date, t) }}
                     onPress={() => openSession(e)}
-                    onDelete={() => deleteActivity(e)}
+                    onDelete={() => removeSession(e)}
                   />
                   <SyncedFromLine entry={e} />
                 </View>

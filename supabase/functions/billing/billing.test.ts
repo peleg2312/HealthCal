@@ -852,8 +852,8 @@ describe('the AI functions take their limits from plans.ts, and keep their words
     const s = src('analyze-food/index.ts');
     expect(s).toMatch(/p_limit: limits\.estimates,/);
     expect(s).toMatch(/p_global_limit: limits\.estimatesGlobal,/);
-    expect(s).toContain(`message: "You have used today's AI analyses. They reset at midnight UTC.", remaining: 0, ...limitFields(limits, 'estimates', now, needed)`);
-    expect(s).toContain(`message: 'Food analysis has reached its shared limit for today. Search or scan instead, and try again tomorrow.', remaining: 0, shared: true, ...limitFields(limits, 'estimates', now, needed)`);
+    expect(s).toContain(`message: "You have used today's AI estimates. They reset at midnight UTC.", remaining: 0, ...limitFields(limits, 'estimates', now, needed)`);
+    expect(s).toContain(`message: 'AI estimates have reached their shared limit for today. Search or scan instead, and try again tomorrow.', remaining: 0, shared: true, ...limitFields(limits, 'estimates', now, needed)`);
     // R11: the units the refused call needed, taken before the count is zeroed for the refund rule.
     expect(s).toMatch(/const needed = cost;\n\s+if \(left === -1\)/);
   });

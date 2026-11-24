@@ -15,14 +15,15 @@ export type TabName = 'today' | 'diary' | 'train' | 'progress';
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 /**
- * The header's three cups (Coach, Friends, profile): 36 px visible, 4 px apart. Each is 40 px wide and
- * 44 px tall to touch: at 40 px from centre to centre a 44 px wide area would overlap its neighbour's,
- * so a tap between two cups would go to whichever was drawn last. This is the one stated exception to
- * the 44 px target (the alternative, wider gaps, takes the person's name out of Today's greeting).
+ * The header's three cups (Coach, Friends, profile): 36 px visible, 8 px apart, each 44 x 44 px to
+ * touch (4 px past the cup on every side). At 44 px from centre to centre the touch areas meet and never
+ * overlap, so a tap between two cups goes to the nearer one and every cup keeps the full 44 px target.
  */
 export const HEADER_CUP = 36;
-const CUP_GAP = 4;
+const CUP_GAP = 8;
 export const HEADER_SLOP = { top: 4, bottom: 4, left: CUP_GAP / 2, right: CUP_GAP / 2 };
+/** The title's line box: the same 32 px at every width, so the header's text block is 52 px and starts 8 px down on every tab and width. */
+const TITLE_LINE = 32;
 
 /**
  * A day as a tab overline: 'Sunday, Nov 15', or with `short` 'Sun, Nov 15' for a window under
@@ -38,7 +39,7 @@ export function tabTitleSize(width: number): number {
   return width < 360 ? 22 : 26;
 }
 
-/** The room the title has on a window this wide: the content width less the gap and the three cups (222 at 390, 192 at 360, 152 at 320). */
+/** The room the title has on a window this wide: the content width less the gap and the three cups (214 at 390, 184 at 360, 144 at 320). */
 export function tabTitleRoom(width: number): number {
   return Math.min(width, MAX_CONTENT_WIDTH) - 2 * SPACING.xl - SPACING.md - (3 * HEADER_CUP + 2 * CUP_GAP);
 }
@@ -86,7 +87,8 @@ function preloadCoach(): () => void {
  * day arrows, a range picker) goes in that screen's content, under this header.
  * `overlineShort`, when given, is used on a window under 360 px. `titleSize`, when given, draws the
  * title smaller than the tab's size (Today steps from 26 to 24 px to keep a name, `todayTitle`); the
- * line height stays the tab's, so the header is 68 px on every tab.
+ * line height stays 32 px at every width, so the header is 68 px on every tab and starts 8 px down.
+ * The title is the screen's one level-1 heading.
  */
 export function TabHeader({
   tab,
@@ -109,8 +111,7 @@ export function TabHeader({
   useCoachMovedToast();
   useEffect(preloadCoach, []);
   const width = useWindowDimensions().width;
-  const base = tabTitleSize(width);
-  const size = titleSize ?? base;
+  const size = titleSize ?? tabTitleSize(width);
   const initial = ((profile.name ?? '').trim() || 'Me').slice(0, 1).toUpperCase();
   return (
     <View testID="tab-header" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 68, paddingVertical: spacing.sm }}>
@@ -118,7 +119,14 @@ export function TabHeader({
         <Text variant="overline" numberOfLines={1}>
           {overlineShort && width < 360 ? overlineShort : overline}
         </Text>
-        <Text variant="h1" numberOfLines={1} testID={titleTestID} style={{ fontSize: size, lineHeight: base + 6, letterSpacing: -size * 0.025 }}>
+        {/* One line by its choice of words and size (todayTitle), never by clipping: under a reader's own text
+            spacing (wider letters and words) it wraps rather than lose its end. */}
+        <Text
+          variant="h1"
+          testID={titleTestID}
+          accessibilityRole="header"
+          {...({ 'aria-level': 1 } as object)}
+          style={{ fontSize: size, lineHeight: TITLE_LINE, letterSpacing: -size * 0.025 }}>
           {title}
         </Text>
       </View>
@@ -130,7 +138,8 @@ export function TabHeader({
           onPress={() => router.push('/profile')}
           accessibilityLabel="Profile and settings"
           hitSlop={HEADER_SLOP}
-          style={{ width: HEADER_CUP, height: HEADER_CUP, ...cupFor(HEADER_CUP), backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+          // Neutral, as Friends is: the card surface with its 1 px line. Only the Coach cup is accented.
+          style={{ width: HEADER_CUP, height: HEADER_CUP, ...cupFor(HEADER_CUP), backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
           <Text variant="h3">{initial}</Text>
         </PressableScale>
       </View>

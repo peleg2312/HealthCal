@@ -8,14 +8,14 @@ import { describe, expect, it } from 'vitest';
 import { coachLimitText, coachPlansLink } from '@/features/coach/words';
 
 import { errorFromResponse } from './api';
-import { carefulUses, CAREFUL_COST, estimateLimitWords, graceLine, limitInfoFrom, localClock, moreAfter, plusLimitOf, plusLink, type LimitInfo } from './limit';
+import { carefulUses, CAREFUL_COST, estimateLimitWords, estimatesLeft, graceLine, limitInfoFrom, localClock, moreAfter, plusLimitOf, plusLink, retryCostLine, type LimitInfo } from './limit';
 
 const RESETS = '2026-11-24T00:00:00.000Z';
 const at = (iso: string) => {
   const d = new Date(iso);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
-const answer = (extra: Record<string, unknown> = {}) => ({ error: 'daily_limit', message: "You have used today's AI analyses. They reset at midnight UTC.", remaining: 0, ...extra });
+const answer = (extra: Record<string, unknown> = {}) => ({ error: 'daily_limit', message: "You have used today's AI estimates. They reset at midnight UTC.", remaining: 0, ...extra });
 const info = (extra: Partial<LimitInfo> = {}): LimitInfo => ({ limit: 5, plan: 'free', cost: 1, resetsAt: RESETS, graceUntil: null, shared: false, ...extra });
 
 // The morning page's list, and ruling R19's words and marks.
@@ -47,7 +47,7 @@ describe('the plan fields of a limit answer', () => {
     const off = errorFromResponse(429, answer({ limit: 40, plan: null, plansOn: false, resetsAt: RESETS }));
     expect(off.code).toBe('daily_limit');
     expect(off.limit).toBeNull();
-    expect(off.message).toBe("You have used today's AI analyses. They reset at midnight UTC.");
+    expect(off.message).toBe("You have used today's AI estimates. They reset at midnight UTC.");
     const on = errorFromResponse(429, answer({ limit: 5, plan: 'free', plansOn: true, resetsAt: RESETS, cost: 1 }));
     expect(on.limit).toMatchObject({ limit: 5, plan: 'free' });
   });
@@ -101,6 +101,12 @@ describe('the estimate at its limit', () => {
 
   it('the careful option says what it uses on the free plan', () => {
     expect(carefulUses(CAREFUL_COST, 5)).toBe("Uses 5 of today's 5");
+    // Every second try says its true cost: re-estimate 1 (5 after a careful check), the careful check 5.
+    expect(retryCostLine(false, false)).toBe("Re-estimate uses 1 of today's AI estimates, a careful check 5.");
+    expect(retryCostLine(false, true)).toBe("Re-estimate uses 1 of today's AI estimates.");
+    expect(retryCostLine(true, false)).toBe("Re-estimate checks carefully again and uses 5 of today's AI estimates.");
+    expect(estimatesLeft(1)).toBe('1 AI estimate left today');
+    expect(estimatesLeft(3)).toBe('3 AI estimates left today');
   });
 
   it('Plus’s number comes from what the app was told, never from the app', () => {
@@ -126,7 +132,7 @@ describe('every limit line', () => {
                   const w = estimateLimitWords(i, left);
                   out.push(w.title, w.body, coachLimitText(i));
                 }
-    out.push(plusLink(40), plusLink(null), coachPlansLink(30), carefulUses(5, 5));
+    out.push(plusLink(40), plusLink(null), coachPlansLink(30), carefulUses(5, 5), retryCostLine(false, false), retryCostLine(false, true), retryCostLine(true, false), estimatesLeft(1));
     const bad = [...new Set(out)].filter((s) => BANNED.test(s) || R19.test(s) || !/^[A-Z0-9"]/.test(s));
     expect(bad).toEqual([]);
   });

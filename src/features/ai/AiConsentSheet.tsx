@@ -31,7 +31,7 @@ export const AI_CONSENT_PARTS: readonly { title: string; body: string }[] = [
   },
   {
     title: 'What happens to it',
-    body: "HealthCal's server does not store the photo or the words. It records only how many analyses you ran and how large they were, for the daily allowance. Anthropic handles what it receives under Anthropic's terms.",
+    body: "HealthCal's server does not store the photo or the words. It records only how many estimates you ran and how large they were, for the daily allowance. Anthropic handles what it receives under Anthropic's terms.",
   },
 ];
 

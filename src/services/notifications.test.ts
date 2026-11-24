@@ -266,7 +266,7 @@ describe('planReminders', () => {
     const plan = planReminders(input(now, { reminders: r, baselineKcalPerDay: 2400 }), now);
     // Same number the logger gives for Walking, moderate (3.8 MET), 20 min, 80 kg, 2,400 kcal baseline: 106.4 - 33.3 = 73 -> 75.
     expect(plan.find((x) => x.kind === 'movement')?.body).toBe(
-      'No activity logged today. A 20 minute walk at a moderate pace burns about 75 kcal above resting.',
+      'No activity logged today. A 20 minute walk at a moderate pace adds about 75 kcal to your budget.',
     );
     const logged = netKcal(ACTIVITY_BY_ID.walking.met.moderate, 80, 20, 2400);
     expect(Math.abs(walkNetKcal(80, 2400)! - logged)).toBeLessThanOrEqual(2.5);

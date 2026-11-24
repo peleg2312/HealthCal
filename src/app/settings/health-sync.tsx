@@ -462,15 +462,15 @@ export default function HealthSyncScreen() {
           </Text>
           <Text variant="caption" color="textSecondary">
             A synced workout is kept like a session you log yourself: on this phone, and in your account if you have one, so your other devices show it. It is never sent to the
-            AI food analysis, and to the AI coach only inside the summary you choose to share in the coach.{apple ? ' On iPhone, nothing from Apple Health is put into that summary.' : ''} Friends, if you share with any, see what they see for every workout: its name, length, distance and date, and your weekly minutes, sessions and
+            AI food estimate, and to the AI coach only inside the summary you choose to share in the coach.{apple ? ' On iPhone, nothing from Apple Health is put into that summary.' : ''} Friends, if you share with any, see what they see for every workout: its name, length, distance and date, and your weekly minutes, sessions and
             streak. Never its calories.
           </Text>
           <Text variant="caption" color="textSecondary">
-            Steps stay on this phone only, for the last 35 days: they are not added to your account, never sent to the AI food analysis or the AI coach, and never shown to friends.
+            Steps stay on this phone only, for the last 35 days: they are not added to your account, never sent to the AI food estimate or the AI coach, and never shown to friends.
           </Text>
           <Text variant="caption" color="textSecondary">
             A night of sleep is kept in your sleep log like one you enter yourself, with the app it came from and its stages: on this phone, and in your account if you have
-            one. It is never added to your calories, never sent to the AI food analysis, and to the AI coach only inside the summary you choose to share in the coach; it is never shown to friends.
+            one. It is never added to your calories, never sent to the AI food estimate, and to the AI coach only inside the summary you choose to share in the coach; it is never shown to friends.
           </Text>
           <Text variant="caption" color="textSecondary" testID="health-sync-privacy-more">
             Weigh-ins are kept like weigh-ins you enter, in your account when you have one. Calories burned in a day stay on this phone. Heart rate is kept on the workout.

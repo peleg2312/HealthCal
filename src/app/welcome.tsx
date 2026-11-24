@@ -74,7 +74,7 @@ function HeroCup({ height, narrow, small, tiny }: { height: number; narrow: bool
   const width = Math.round(Math.max(tiny ? 44 : 0, height * (narrow ? 0.32 : 0.4)));
   const big = tiny ? 34 : small ? 44 : 56;
   return (
-    <View accessible accessibilityLabel="An example day: a budget of 2,160 kcal including 290 burned by exercise, 1,219 eaten, 941 left. Honest numbers. Fast logging. Free to log, no ads.">
+    <View accessible accessibilityLabel="An example day: a budget of 2,160 kcal including about 290 added by workouts, 1,219 eaten, 941 left. Honest numbers. Fast logging. Free to log, no ads.">
       <Vessel
         value={EATEN}
         max={BUDGET}
@@ -96,9 +96,9 @@ function HeroCup({ height, narrow, small, tiny }: { height: number; narrow: bool
               <FadeUp delay={POURED_AT} distance={0}>
                 <Text variant="label" color="textSecondary" numberOfLines={1}>
                   <Text variant="numM" style={{ fontSize: 17 }}>
-                    +290
+                    ~290
                   </Text>
-                  {' from workouts'}
+                  {' added'}
                 </Text>
               </FadeUp>
             ),

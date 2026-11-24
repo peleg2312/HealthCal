@@ -3,16 +3,17 @@ import { Activity, Check, Droplets, Plus, Repeat2, Scale, ScanBarcode, Search, t
 import React, { useEffect, useState } from 'react';
 import { ScrollView, useWindowDimensions, View } from 'react-native';
 
-import { AiGlyph, type AiGlyphName } from '@/features/ai/mark';
+import { AiGlyph, SourceMark, sourceMarkTop, type AiGlyphName } from '@/features/ai/mark';
 import { AI_TILE_HINT } from '@/features/ai/words';
 import { hasFoodLogged } from '@/features/drinks/via';
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
 import { displayFoodName } from '@/features/food/displayName';
 import { favoriteMeals, quickLogMeal } from '@/features/food/favorites';
 import { approxKcalSpoken, favoriteFoodTile, isEstimateFood, quickRowTitle, savedTileCaption } from '@/features/food/favoriteWords';
-import { lastPortions, matchServing, portionFor, portionKcal, portionLabel, servingText } from '@/features/food/helpers';
+import { lastPortions, matchServing, portionFor, portionKcal, portionLabel, servingText, sourceInfo } from '@/features/food/helpers';
 import { formatPortion, mealServings, planSavedMeal } from '@/features/food/build';
 import { logFood, logItems, logSavedMeal } from '@/features/food/log';
+import { useOneTap } from '@/features/food/oneTap';
 import { loadSearchTab } from '@/features/food/searchTab';
 import { addWater } from '@/features/today/StatusRail';
 import { quickLogDate, quickLogPastDate, useViewedDay } from '@/features/today/viewedDay';
@@ -25,7 +26,7 @@ import { useStore } from '@/store';
 import { useNow, useToday } from '@/store/clock';
 import { computeDayFromStore, live, useLive, useProfile } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
-import type { Food, FoodEntry, ISODate, SavedMeal } from '@/types';
+import type { Food, FoodEntry, FoodSource, ISODate, SavedMeal } from '@/types';
 import { PressableScale, Sheet, Text } from '@/ui';
 
 /** Re-log a usual food in its last portion. Entries with a food definition go through logFood so recents stay fresh. */
@@ -155,109 +156,172 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   );
   const showRepeat = !!prev && !alreadyLogged;
 
-  return (
-    <Sheet visible={visible} onClose={close} title={viewed ? `Log to ${formatDayLabel(viewed)}` : 'Log something'}>
-      {showUsual ? (
-        <View style={{ gap: spacing.sm }} testID="quick-usual">
-          <Text variant="overline" color="textSecondary" testID="quick-usual-title">
-            {quickRowTitle({ meal: mealName, favourites: favMeals.length + favFoods.length > 0, usual: usual.length > 0, saved: !!savedMeal })}
-          </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -spacing.xl, flexGrow: 0 }} contentContainerStyle={{ gap: spacing.sm, paddingHorizontal: spacing.xl }}>
-            {favMeals.map((m, i) => mealTile(m, `fav-meal:${m.id}`, `quick-fav-meal-${i}`, true))}
-            {favFoods.map((f, i) => {
-              const key = `fav-food:${f.id}`;
-              const isDone = done.includes(key);
-              const p = portionFor(f, lastMap);
-              // An AI food, or one last logged as an estimate, never shows an exact number: "150 g, ~248 kcal".
-              const { caption, label } = favoriteFoodTile({
-                name: displayFoodName(f),
-                portion: portionLabel(p.serving.label, p.quantity),
-                kcal: portionKcal(f, p),
-                estimate: isEstimateFood(f, lastMap.get(f.id)),
-                meal: mealName,
-              });
-              return (
-                <PressableScale
-                  key={key}
-                  testID={`quick-fav-food-${i}`}
-                  feedback="none"
-                  disabled={isDone}
-                  // Added, not unavailable: the success edge and the check say so, so the tile is not dimmed.
-                  dimDisabled={false}
-                  onPress={() => {
-                    logFavoriteFood(f, quickLogDate());
-                    mark(key);
-                  }}
-                  accessibilityLabel={isDone ? `${displayFoodName(f)} added` : label}
-                  style={[tile, { width: 136, padding: spacing.md, gap: 4, borderColor: isDone ? colors.success : colors.border }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 17, lineHeight: 24 }}>{f.emoji || '🍽️'}</Text>
-                    <AddMark done={isDone} />
-                  </View>
-                  <Text variant="label" numberOfLines={2}>
-                    {isolateRtl(displayFoodName(f))}
-                  </Text>
-                  <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ marginTop: 'auto' }} testID={`quick-fav-food-${i}-caption`}>
-                    {caption}
-                  </Text>
-                </PressableScale>
-              );
-            })}
-            {usual.map((u) => {
-              const isDone = done.includes(u.key);
-              return (
-                <PressableScale
-                  key={u.key}
-                  testID={`quick-usual-${u.key}`}
-                  feedback="none"
-                  disabled={isDone}
-                  dimDisabled={false}
-                  onPress={() => {
-                    logUsual(u, quickLogDate());
-                    mark(u.key);
-                  }}
-                  accessibilityLabel={isDone ? `${displayFoodName(u.last)} added` : `Add ${displayFoodName(u.last)}, ${usualLabel(u)}, to ${mealName}`}
-                  style={[tile, { width: 136, padding: spacing.md, gap: 4, borderColor: isDone ? colors.success : colors.border }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 17, lineHeight: 24 }}>{u.last.emoji || '🍽️'}</Text>
-                    <AddMark done={isDone} />
-                  </View>
-                  {/* Two lines, so a name like "Greek yogurt, plain, 2%" reads whole. The name never grows with the row
-                      (a taller neighbour would show the line after its ellipsis); the caption sits at the foot instead. */}
-                  <Text variant="label" numberOfLines={2}>
-                    {isolateRtl(displayFoodName(u.last))}
-                  </Text>
-                  <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ marginTop: 'auto' }}>
-                    {/* The serving label drawn isolated when it is written in Hebrew (display only). */}
-                    {usualLabel({ ...u, last: { ...u.last, servingLabel: servingText(u.last.servingLabel) } })}
-                  </Text>
-                </PressableScale>
-              );
-            })}
-            {savedMeal ? mealTile(savedMeal, 'saved', 'quick-usual-saved', false) : null}
-          </ScrollView>
+  // A usual tile's source, for its mark and its spoken name: an entry that carries a range is an estimate
+  // (it logs again as one); a favourite food's is the food's own.
+  const entrySource = (e: FoodEntry): FoodSource => (e.kcalRange ? 'ai' : e.source);
+  // One tap, one glass: a quick second press on either glass (within ONE_TAP_GUARD_MS) logs nothing.
+  const oneTap = useOneTap();
+
+  const quickRow = showUsual ? (
+    <View style={{ gap: spacing.sm }} testID="quick-usual">
+      <Text variant="overline" color="textSecondary" testID="quick-usual-title">
+        {quickRowTitle({ meal: mealName, favourites: favMeals.length + favFoods.length > 0, usual: usual.length > 0, saved: !!savedMeal })}
+      </Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -spacing.xl, flexGrow: 0 }} contentContainerStyle={{ gap: spacing.sm, paddingHorizontal: spacing.xl }}>
+        {favMeals.map((m, i) => mealTile(m, `fav-meal:${m.id}`, `quick-fav-meal-${i}`, true))}
+        {favFoods.map((f, i) => {
+          const key = `fav-food:${f.id}`;
+          const isDone = done.includes(key);
+          const p = portionFor(f, lastMap);
+          const src = f.source;
+          // An AI food, or one last logged as an estimate, never shows an exact number: "150 g, ~248 kcal".
+          const { caption, label } = favoriteFoodTile({
+            name: displayFoodName(f),
+            portion: portionLabel(p.serving.label, p.quantity),
+            kcal: portionKcal(f, p),
+            estimate: isEstimateFood(f, lastMap.get(f.id)),
+            meal: mealName,
+          });
+          return (
+            <PressableScale
+              key={key}
+              testID={`quick-fav-food-${i}`}
+              feedback="none"
+              disabled={isDone}
+              // Added, not unavailable: the success edge and the check say so, so the tile is not dimmed.
+              dimDisabled={false}
+              onPress={() => {
+                logFavoriteFood(f, quickLogDate());
+                mark(key);
+              }}
+              // The source in words (principle 3): the mark alone says nothing to a screen reader.
+              accessibilityLabel={isDone ? `${displayFoodName(f)} added` : `${label}. ${sourceInfo(src).label}`}
+              style={[tile, { width: 136, padding: spacing.md, gap: 4, borderColor: isDone ? colors.success : colors.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 17, lineHeight: 24 }}>{f.emoji || '🍽️'}</Text>
+                <AddMark done={isDone} />
+              </View>
+              <Text variant="label" numberOfLines={2}>
+                {isolateRtl(displayFoodName(f))}
+              </Text>
+              <TileCaption source={src} testID={`quick-fav-food-${i}-caption`}>
+                {caption}
+              </TileCaption>
+            </PressableScale>
+          );
+        })}
+        {usual.map((u) => {
+          const isDone = done.includes(u.key);
+          const src = entrySource(u.last);
+          return (
+            <PressableScale
+              key={u.key}
+              testID={`quick-usual-${u.key}`}
+              feedback="none"
+              disabled={isDone}
+              dimDisabled={false}
+              onPress={() => {
+                logUsual(u, quickLogDate());
+                mark(u.key);
+              }}
+              accessibilityLabel={isDone ? `${displayFoodName(u.last)} added` : `Add ${displayFoodName(u.last)}, ${usualLabel(u)}, ${sourceInfo(src).label}, to ${mealName}`}
+              style={[tile, { width: 136, padding: spacing.md, gap: 4, borderColor: isDone ? colors.success : colors.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 17, lineHeight: 24 }}>{u.last.emoji || '🍽️'}</Text>
+                <AddMark done={isDone} />
+              </View>
+              {/* Two lines, so a name like "Greek yogurt, plain, 2%" reads whole. The name never grows with the row
+                  (a taller neighbour would show the line after its ellipsis); the caption sits at the foot instead. */}
+              <Text variant="label" numberOfLines={2}>
+                {isolateRtl(displayFoodName(u.last))}
+              </Text>
+              {/* The serving label drawn isolated when it is written in Hebrew (display only). */}
+              <TileCaption source={src}>{usualLabel({ ...u, last: { ...u.last, servingLabel: servingText(u.last.servingLabel) } })}</TileCaption>
+            </PressableScale>
+          );
+        })}
+        {savedMeal ? mealTile(savedMeal, 'saved', 'quick-usual-saved', false) : null}
+      </ScrollView>
+    </View>
+  ) : null;
+
+  const repeatRow =
+    showRepeat && prev ? (
+      <RepeatRow
+        label={`Repeat ${whenPhrase(prev.date, logDate)}'s ${mealName}`}
+        entries={prev.entries}
+        done={done.includes('repeat')}
+        onPress={() => {
+          const m = mealForTime();
+          const date = quickLogDate();
+          const p = findPreviousMeal(live(useStore.getState().foodEntries), date, m, 7);
+          if (p) copyEntries(p.entries, date, m, `Copied ${MEAL_LABEL[m].toLowerCase()} from ${whenPhrase(p.date, date)}`);
+          mark('repeat');
+        }}
+      />
+    ) : null;
+
+  // Water is a whole row: its name on the left (opens the water screen), the one-tap glasses on the right.
+  // Under 360 px it pads 12 and the glasses 8, so name and glasses stay on one line at 320 px.
+  const waterRow = (
+    <View
+      style={[tile, { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', paddingHorizontal: narrow ? 12 : 14, paddingVertical: 10, gap: narrow ? 8 : 12 }]}
+      testID="quick-water-tile">
+      <PressableScale
+        testID="quick-water"
+        onPress={() => go('/water')}
+        accessibilityLabel="Water, open hydration"
+        style={{ flexDirection: 'row', alignItems: 'center', gap: narrow ? 10 : 14, minHeight: 44, flexGrow: 1 }}>
+        <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+          <Droplets size={22} color={colors.water} strokeWidth={1.9} />
         </View>
-      ) : null}
+        <Text variant="bodyStrong">Water</Text>
+      </PressableScale>
+      {/* 12 apart: each glass's touch area reaches 6 px past its edge (4 of slop and the border), so the two
+          areas meet in the middle of the gap and neither takes the other's taps. */}
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        {glasses.map((ml) => (
+          <PressableScale
+            key={ml}
+            testID={`quick-water-${ml}`}
+            feedback="none"
+            hitSlop={4}
+            onPress={oneTap(() => {
+              // With the day's goal, so the toast names the new total as Today's glass does ("250 ml added to Water · 1.48 of 3.3 L").
+              const day = quickLogPastDate();
+              addWater(day, ml, profile.units, computeDayFromStore(useStore.getState(), day)?.waterGoalMl);
+            })}
+            accessibilityLabel={`Add ${formatVolume(ml, profile.units)} of water`}
+            style={{ minWidth: 30 + formatVolume(ml, profile.units).length * 7, paddingHorizontal: narrow ? 8 : 10, height: 36, ...cup(radius.buttonSm, 5), borderWidth: 1.5, borderColor: colors.water, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+            <Plus size={14} color={colors.water} strokeWidth={2.6} />
+            <Text variant="label" color="text" style={{ fontSize: 12.5 }} numberOfLines={1}>
+              {formatVolume(ml, profile.units)}
+            </Text>
+          </PressableScale>
+        ))}
+      </View>
+    </View>
+  );
 
-      {showRepeat && prev ? (
-        <RepeatRow
-          label={`Repeat ${whenPhrase(prev.date, logDate)}'s ${mealName}`}
-          entries={prev.entries}
-          done={done.includes('repeat')}
-          onPress={() => {
-            const m = mealForTime();
-            const date = quickLogDate();
-            const p = findPreviousMeal(live(useStore.getState().foodEntries), date, m, 7);
-            if (p) copyEntries(p.entries, date, m, `Copied ${MEAL_LABEL[m].toLowerCase()} from ${whenPhrase(p.date, date)}`);
-            mark('repeat');
-          }}
-        />
-      ) : null}
-
+  return (
+    <Sheet
+      visible={visible}
+      onClose={close}
+      title={viewed ? `Log to ${formatDayLabel(viewed)}` : 'Log something'}
+      // The likely next log is pinned at the sheet's foot, nearest the + that opened it and the thumb (principle 1):
+      // yesterday's meal, the favourite and usual tiles and Water's glasses are in the first view at every width,
+      // whatever rows show; the ways to log anything else scroll above them under the title.
+      footer={
+        <View testID="quick-pinned" style={{ gap: spacing.md, marginHorizontal: -spacing.xl, paddingHorizontal: spacing.xl, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border }}>
+          {repeatRow}
+          {quickRow}
+          {waterRow}
+        </View>
+      }>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
         {actions.map((a) => {
           // Search and Weigh in are whole rows (icon, name, hint beside); the four between are half-width tiles
-          // with the icon beside the name and the hint under both, so the sheet fits a 360 x 740 phone whole.
+          // with the icon beside the name and the hint under both.
           const wide = a.id === 'search' || a.id === 'weight';
           return (
             <PressableScale
@@ -293,7 +357,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                       {a.label}
                     </Text>
                   </View>
-                  {/* Under 360 px the icon sits above the name and the hint is read out only, so the sheet still fits. */}
+                  {/* Under 360 px the icon sits above the name and the hint is read out only. */}
                   {narrow ? null : (
                     <Text variant="caption" color="textSecondary">
                       {a.hint}
@@ -304,44 +368,21 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
             </PressableScale>
           );
         })}
-        {/* Water is a whole row too: its name on the left (opens the water screen), the one-tap glasses on the right. */}
-        <View style={[tile, { flexBasis: '100%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', paddingHorizontal: 14, paddingVertical: 10, gap: 12 }]} testID="quick-water-tile">
-          <PressableScale
-            testID="quick-water"
-            onPress={() => go('/water')}
-            accessibilityLabel="Water, open hydration"
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 44, flexGrow: 1 }}>
-            <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
-              <Droplets size={22} color={colors.water} strokeWidth={1.9} />
-            </View>
-            <Text variant="bodyStrong">Water</Text>
-          </PressableScale>
-          {/* 12 apart: each glass's touch area reaches 6 px past its edge (4 of slop and the border), so the two
-              areas meet in the middle of the gap and neither takes the other's taps. */}
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            {glasses.map((ml) => (
-              <PressableScale
-                key={ml}
-                testID={`quick-water-${ml}`}
-                feedback="none"
-                hitSlop={4}
-                onPress={() => {
-                  // With the day's goal, so the toast names the new total as Today's glass does ("250 ml added to Water · 1.48 of 3.3 L").
-                  const day = quickLogPastDate();
-                  addWater(day, ml, profile.units, computeDayFromStore(useStore.getState(), day)?.waterGoalMl);
-                }}
-                accessibilityLabel={`Add ${formatVolume(ml, profile.units)} of water`}
-                style={{ minWidth: 30 + formatVolume(ml, profile.units).length * 7, paddingHorizontal: 10, height: 36, ...cup(radius.buttonSm, 5), borderWidth: 1.5, borderColor: colors.water, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-                <Plus size={14} color={colors.water} strokeWidth={2.6} />
-                <Text variant="label" color="text" style={{ fontSize: 12.5 }} numberOfLines={1}>
-                  {formatVolume(ml, profile.units)}
-                </Text>
-              </PressableScale>
-            ))}
-          </View>
-        </View>
       </View>
     </Sheet>
+  );
+}
+
+/** A food tile's foot: the source's mark leading its caption, as on the diary's rows. */
+function TileCaption({ source, testID, children }: { source: FoodSource; testID?: string; children: React.ReactNode }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 'auto' }}>
+      <SourceMark source={source} color={colors.textSecondary} size={8} style={{ marginTop: sourceMarkTop(source) }} />
+      <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1 }} testID={testID}>
+        {children}
+      </Text>
+    </View>
   );
 }
 

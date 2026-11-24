@@ -24,7 +24,8 @@ export function StreakMark({ days, filled }: { days: number; filled: boolean }) 
     <PressableScale
       testID="today-streak"
       onPress={() => router.push('/consistency' as never)}
-      accessibilityLabel={`${days} day logging streak${filled ? '' : ', today not logged yet'}. Open the logging calendar`}
+      // Starts with the words drawn on it ("33 days"): label in name.
+      accessibilityLabel={`${days} ${days === 1 ? 'day' : 'days'} logging streak${filled ? '' : ', today not logged yet'}. Open the logging calendar`}
       hitSlop={6}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 32, paddingHorizontal: 4 }}>
       <MiniCup progress={filled ? 1 : 0} width={16} height={20} color={colors.calories} memoryKey="streak-today" index={AFTER_STRIP_MS / motion.duration.stagger} />

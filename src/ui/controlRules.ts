@@ -1,0 +1,165 @@
+/**
+ * The kit controls' platform rules, kept pure so they can be tested without a renderer:
+ * the touch area on Android, the ARIA state a role carries on the web, the keys a control
+ * answers, and the browser's names for what a field holds. No React, no React Native.
+ */
+
+/** Android's touch target (Core App Quality, Touch_Target_Size): 48 dp. Elsewhere the kit keeps 44 px. */
+export const ANDROID_TARGET = 48;
+
+export type SlopInsets = { top: number; right: number; bottom: number; left: number };
+type SlopIn = number | Partial<SlopInsets> | null | undefined;
+
+const px = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0);
+
+/**
+ * The hit slop that brings a control drawn `size` big up to a `target` touch area on each axis
+ * whose size is known, keeping any larger slop it was given. An axis with no known size (a row
+ * that stretches, a button as wide as its words) keeps what it was given. Returns the given value
+ * unchanged when nothing has to grow.
+ */
+export function slopToReach(hitSlop: SlopIn, size: { width?: number; height?: number }, target: number): SlopIn {
+  const given: SlopInsets =
+    typeof hitSlop === 'number' ? { top: px(hitSlop), right: px(hitSlop), bottom: px(hitSlop), left: px(hitSlop) } : { top: px(hitSlop?.top), right: px(hitSlop?.right), bottom: px(hitSlop?.bottom), left: px(hitSlop?.left) };
+  const out = { ...given };
+  let grew = false;
+  const grow = (dim: number | undefined, a: 'top' | 'left', b: 'bottom' | 'right') => {
+    if (typeof dim !== 'number' || !Number.isFinite(dim) || dim <= 0) return;
+    if (dim + out[a] + out[b] >= target) return;
+    const each = Math.ceil((target - dim) / 2);
+    if (out[a] < each) {
+      out[a] = each;
+      grew = true;
+    }
+    if (out[b] < each) {
+      out[b] = each;
+      grew = true;
+    }
+  };
+  grow(size.height, 'top', 'bottom');
+  grow(size.width, 'left', 'right');
+  return grew ? out : hitSlop;
+}
+
+/** A style's drawn size on each axis when it is fixed in numbers: `width`/`height`, else the `min` of each. */
+export function fixedSize(style: Record<string, unknown> | null | undefined): { width?: number; height?: number } {
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+  if (!style) return {};
+  return { width: num(style.width) ?? num(style.minWidth), height: num(style.height) ?? num(style.minHeight) };
+}
+
+/** Roles whose selected state the web reads as `aria-selected`. */
+const SELECTED_ROLES = new Set(['tab', 'option', 'row', 'gridcell', 'columnheader', 'rowheader', 'treeitem']);
+/** Roles whose state the web reads as `aria-checked`. */
+const CHECKED_ROLES = new Set(['checkbox', 'radio', 'switch', 'menuitemcheckbox', 'menuitemradio']);
+
+export interface StateIn {
+  selected?: boolean;
+  checked?: boolean | 'mixed';
+  expanded?: boolean;
+  disabled?: boolean;
+  busy?: boolean;
+}
+
+/**
+ * The ARIA attributes for a control's `accessibilityState` on the web, where react-native-web
+ * drops `accessibilityState` itself. A role reads its own state word: a tab or an option is
+ * selected, a radio, a checkbox or a switch is checked, and a button that is selected is
+ * pressed (a toggle button). `explicit` holds the aria props the control already passes, which
+ * always win.
+ */
+export function ariaFromState(role: string | undefined, state: StateIn | null | undefined, explicit: Record<string, unknown> = {}): Record<string, boolean | 'mixed'> {
+  const out: Record<string, boolean | 'mixed'> = {};
+  if (!state) return out;
+  const r = role ?? 'button';
+  const put = (key: string, v: boolean | 'mixed' | undefined) => {
+    if (v === undefined || explicit[key] !== undefined) return;
+    out[key] = v;
+  };
+  if (SELECTED_ROLES.has(r)) put('aria-selected', state.selected);
+  if (CHECKED_ROLES.has(r)) put('aria-checked', state.checked ?? (r === 'radio' ? state.selected : undefined));
+  if (r === 'button') put('aria-pressed', state.selected);
+  put('aria-expanded', state.expanded);
+  if (state.disabled) put('aria-disabled', true);
+  if (state.busy !== undefined) put('aria-busy', state.busy);
+  return out;
+}
+
+/**
+ * Roles that Space must press on the web. react-native-web presses only a button or a menu item
+ * on Space; a switch, a radio, a tab or a checkbox would let Space scroll the page instead.
+ */
+const SPACE_ROLES = new Set(['switch', 'radio', 'tab', 'checkbox', 'option', 'menuitemradio', 'menuitemcheckbox']);
+export function pressesOnSpace(role: string | undefined): boolean {
+  return !!role && SPACE_ROLES.has(role);
+}
+export function isSpaceKey(key: string): boolean {
+  return key === ' ' || key === 'Spacebar';
+}
+
+/**
+ * Where an arrow key moves in a row of tabs or radios (the WAI-ARIA tabs and radio group
+ * patterns): Left and Up to the previous one, Right and Down to the next, both wrapping; Home
+ * and End to the ends. Null for any other key.
+ */
+export function rovingIndex(key: string, index: number, count: number): number | null {
+  if (count <= 0) return null;
+  const i = index < 0 ? 0 : index;
+  if (key === 'ArrowRight' || key === 'ArrowDown') return (i + 1) % count;
+  if (key === 'ArrowLeft' || key === 'ArrowUp') return (i - 1 + count) % count;
+  if (key === 'Home') return 0;
+  if (key === 'End') return count - 1;
+  return null;
+}
+
+/**
+ * The value a stepper's key gives (the WAI-ARIA spin button pattern): Up and Right one step up,
+ * Down and Left one step down, Page Up and Page Down ten steps, Home and End the limits when
+ * they are finite. Held to the limits. Null for any other key, or a key that changes nothing.
+ */
+export function stepperKey(key: string, value: number, step: number, min: number, max: number): number | null {
+  const clamp = (n: number) => Math.min(max, Math.max(min, Math.round(n * 1000) / 1000));
+  let next: number | null = null;
+  if (key === 'ArrowUp' || key === 'ArrowRight') next = value + step;
+  else if (key === 'ArrowDown' || key === 'ArrowLeft') next = value - step;
+  else if (key === 'PageUp') next = value + step * 10;
+  else if (key === 'PageDown') next = value - step * 10;
+  else if (key === 'Home' && Number.isFinite(min)) next = min;
+  else if (key === 'End' && Number.isFinite(max)) next = max;
+  if (next === null) return null;
+  const v = clamp(next);
+  return v === value ? null : v;
+}
+
+/**
+ * React Native's `autoComplete` names as the browser's `autocomplete` tokens (WCAG 1.3.5, HTML's
+ * autofill field names), so one prop works on every platform. Names the browser already knows
+ * ('email', 'name', 'current-password', 'new-password', 'off', ...) pass through.
+ */
+const WEB_AUTOCOMPLETE: Record<string, string> = {
+  'birthdate-day': 'bday-day',
+  'birthdate-month': 'bday-month',
+  'birthdate-year': 'bday-year',
+  'birthdate-full': 'bday',
+  password: 'current-password',
+  'password-new': 'new-password',
+  'name-given': 'given-name',
+  'name-family': 'family-name',
+  'name-middle': 'additional-name',
+  'name-prefix': 'honorific-prefix',
+  'name-suffix': 'honorific-suffix',
+  'username-new': 'username',
+  'postal-address-country': 'country',
+  'postal-address-region': 'address-level1',
+  'postal-address-locality': 'address-level2',
+  'postal-address-extended-postal-code': 'postal-code',
+  'tel-device': 'tel',
+  'sms-otp': 'one-time-code',
+  'email-otp': 'one-time-code',
+  '2fa-app-otp': 'one-time-code',
+  gender: 'sex',
+};
+export function webAutoComplete(value: string | undefined): string | undefined {
+  if (!value) return value;
+  return WEB_AUTOCOMPLETE[value] ?? value;
+}

@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Plus } from 'lucide-react-native';
 import React from 'react';
-import { View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 
 import { BUILTIN_FOODS } from '@/data/foods';
 import { foodNameHead } from '@/features/food/addedTo';
@@ -80,40 +80,59 @@ function picks(entries: Parameters<typeof usualFoods>[0], meal: MealType, today:
  * Day one of Today: one obvious first action. The meal for the time of day
  * with its share of the budget, a full-width button that opens food search for
  * it, and three foods that log in one tap (with Undo). The macro bars and the
- * budget line come back after the first entry.
+ * budget line come back after the first entry. The button is the kit's secondary,
+ * not a filled primary: the tab bar's + is the screen's one filled action.
+ * `narrow` (a window under 360 px): a 44 px button and the three foods in one row
+ * that scrolls sideways, so the water row under the card is in the first view at 320 x 640.
  */
-export function FirstLogInvite({ meal, date, budget }: { meal: MealType; date: ISODate; budget: number }) {
+export function FirstLogInvite({ meal, date, budget, narrow = false }: { meal: MealType; date: ISODate; budget: number; narrow?: boolean }) {
   const { colors, spacing } = useTheme();
   const entries = useLive('foodEntries');
   const customFoods = useLive('customFoods');
   const label = MEAL_LABEL[meal];
   const share = Math.round((budget * MEAL_SHARE[meal]) / 10) * 10;
   const options = picks(entries, meal, date, customFoods);
+  const chip = (p: Pick) => (
+    <Chip
+      key={p.key}
+      testID={`today-first-${p.key}`}
+      label={`${isolateRtl(p.label)} · ${formatNumber(Math.round(p.kcal))} kcal`}
+      accessibilityLabel={`Add ${p.label}, ${formatNumber(Math.round(p.kcal))} kcal, to ${label.toLowerCase()}`}
+      icon={<Plus size={18} color={colors.text} strokeWidth={2.2} />}
+      onPress={() => logFood({ food: p.food, serving: p.serving, quantity: p.quantity, meal, date })}
+    />
+  );
   return (
     <View testID="today-first-invite" style={{ gap: spacing.md }}>
       <Text variant="overline">{`${label} · around ${formatNumber(share)} kcal`}</Text>
       <Button
         testID="today-first-log"
         title={`Log ${label.toLowerCase()}`}
-        icon={<Plus size={18} color={colors.onPrimary} strokeWidth={2.4} />}
+        variant="secondary"
+        size={narrow ? 'md' : 'lg'}
+        icon={<Plus size={18} color={colors.text} strokeWidth={2.2} />}
         onPress={() => router.push(`/food/search?meal=${meal}&date=${date}` as never)}
       />
       {options.length ? (
         // The chips follow the button with no line of their own: each one's "+" says a tap adds it, and the toast
         // names what was added, with Undo. 12 px between rows: each 32 px chip keeps its whole 44 px touch area,
         // never shared with the chip below. Kept this short so the water row under the card is in the first view.
-        <View testID="today-first-chips" style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.sm, rowGap: spacing.md }}>
-          {options.map((p) => (
-            <Chip
-              key={p.key}
-              testID={`today-first-${p.key}`}
-              label={`${isolateRtl(p.label)} · ${formatNumber(Math.round(p.kcal))} kcal`}
-              accessibilityLabel={`Add ${p.label}, ${formatNumber(Math.round(p.kcal))} kcal, to ${label.toLowerCase()}`}
-              icon={<Plus size={14} color={colors.text} strokeWidth={2.2} />}
-              onPress={() => logFood({ food: p.food, serving: p.serving, quantity: p.quantity, meal, date })}
-            />
-          ))}
-        </View>
+        // Under 360 px they are one row that scrolls sideways, reaching the card's edges, with 6 px above and
+        // below inside the scroller so each chip's 44 px touch area is not clipped.
+        narrow ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            testID="today-first-chips"
+            style={{ marginHorizontal: -12, marginVertical: -6 }}
+            contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 6, gap: spacing.sm }}>
+            {options.map((p) => chip(p))}
+          </ScrollView>
+        ) : (
+          <View testID="today-first-chips" style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.sm, rowGap: spacing.md }}>
+            {options.map((p) => chip(p))}
+          </View>
+        )
       ) : null}
     </View>
   );

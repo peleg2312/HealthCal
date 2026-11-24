@@ -164,7 +164,7 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
             tint={quiet ? undefined : colors.water}
             size="sm"
             full={false}
-            icon={<Plus size={16} color={quiet ? colors.text : colors.water} strokeWidth={2.6} />}
+            icon={<Plus size={18} color={quiet ? colors.text : colors.water} strokeWidth={2.2} />}
             onPress={() => addWater(day.date, glass, units, day.waterGoalMl)}
           />
         </View>

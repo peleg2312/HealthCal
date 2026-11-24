@@ -55,7 +55,7 @@ async function ensureChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     name: 'Reminders',
-    description: 'Water, meal and daily check-in reminders with your current numbers',
+    description: 'Water, meal and evening check-in reminders with your current numbers',
     importance: AndroidImportance.DEFAULT,
     showBadge: false,
   });

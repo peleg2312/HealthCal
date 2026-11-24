@@ -49,17 +49,17 @@ Deno.serve(async (req) => {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const notConfigured = () => json(500, { error: 'not_configured', message: 'Food analysis is not set up on the server yet.' });
+  const notConfigured = () => json(500, { error: 'not_configured', message: 'AI estimates are not set up on the server yet.' });
   if (!supabaseUrl || !serviceKey) return notConfigured();
 
   const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
   const { data: userData, error: userError } = await admin.auth.getUser(token);
-  if (userError || !userData.user) return json(401, { error: 'unauthorized', message: 'Sign in to analyse food.' });
+  if (userError || !userData.user) return json(401, { error: 'unauthorized', message: 'Sign in to use AI estimates.' });
   const user = userData.user;
   // Throwaway accounts are the cheap way to drain the allowance: require a confirmed email.
   if (user.is_anonymous || !user.email_confirmed_at) {
-    return json(403, { error: 'unauthorized', message: 'Confirm your email address to use food analysis.' });
+    return json(403, { error: 'unauthorized', message: 'Confirm your email address to use AI estimates.' });
   }
   // Only someone who may use the feature is told whether it is set up.
   if (!apiKey) return notConfigured();
@@ -104,11 +104,11 @@ Deno.serve(async (req) => {
     const needed = cost;
     if (left === -1) {
       cost = 0;
-      return json(429, { error: 'daily_limit', message: "You have used today's AI analyses. They reset at midnight UTC.", remaining: 0, ...limitFields(limits, 'estimates', now, needed) });
+      return json(429, { error: 'daily_limit', message: "You have used today's AI estimates. They reset at midnight UTC.", remaining: 0, ...limitFields(limits, 'estimates', now, needed) });
     }
     if (left === -2) {
       cost = 0;
-      return json(429, { error: 'daily_limit', message: 'Food analysis has reached its shared limit for today. Search or scan instead, and try again tomorrow.', remaining: 0, shared: true, ...limitFields(limits, 'estimates', now, needed) });
+      return json(429, { error: 'daily_limit', message: 'AI estimates have reached their shared limit for today. Search or scan instead, and try again tomorrow.', remaining: 0, shared: true, ...limitFields(limits, 'estimates', now, needed) });
     }
 
     const client = new Anthropic({ apiKey });
@@ -135,6 +135,6 @@ Deno.serve(async (req) => {
       return json(error.status, { error: error.code, message: error.message });
     }
     console.error('analyze-food failed', error);
-    return json(500, { error: 'internal', message: 'Something went wrong analysing that. Try again.' });
+    return json(500, { error: 'internal', message: 'Something went wrong with that estimate. Try again.' });
   }
 });

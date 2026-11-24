@@ -75,6 +75,8 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
         scaleTo={0.94}
         accessibilityRole="tab"
         accessibilityState={{ selected: focused }}
+        // react-native-web reads the aria prop, not accessibilityState, for the selected tab.
+        aria-selected={focused}
         accessibilityLabel={label}
         onPress={() => navigateToTab(route.key)}
         onLayout={(e) => {
@@ -145,7 +147,7 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
-              <Plus size={28} color={colors.onPrimary} strokeWidth={2.6} />
+              <Plus size={22} color={colors.onPrimary} strokeWidth={2.2} />
             </PressableScale>
           </View>
           {tabs.slice(2)}

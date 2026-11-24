@@ -172,7 +172,7 @@ export function FitsSheet({
       title="What fits"
       footer={
         fits.length || hasIdeas || over ? (
-          <Button testID="fits-search" title="Search all foods" variant="secondary" icon={<Search size={18} color={colors.text} />} onPress={search} />
+          <Button testID="fits-search" title="Search all foods" variant="secondary" icon={<Search size={18} color={colors.text} strokeWidth={2.2} />} onPress={search} />
         ) : undefined
       }>
       {over ? (
@@ -249,7 +249,7 @@ export function FitsSheet({
                     size={44}
                     disabled={row.kind === 'added'}
                     onPress={() => addIdea(idea)}>
-                    {row.kind === 'added' ? <Check size={20} color={colors.onPrimary} strokeWidth={2.6} /> : <Plus size={20} color={colors.text} strokeWidth={2.2} />}
+                    {row.kind === 'added' ? <Check size={20} color={colors.onPrimary} strokeWidth={2.2} /> : <Plus size={20} color={colors.text} strokeWidth={2.2} />}
                   </IconButton>
                 </View>
               </React.Fragment>
@@ -308,7 +308,7 @@ export function FitsSheet({
                     size={44}
                     disabled={row.kind === 'added'}
                     onPress={() => add(f)}>
-                    {row.kind === 'added' ? <Check size={20} color={colors.onPrimary} strokeWidth={2.6} /> : <Plus size={20} color={colors.text} strokeWidth={2.2} />}
+                    {row.kind === 'added' ? <Check size={20} color={colors.onPrimary} strokeWidth={2.2} /> : <Plus size={20} color={colors.text} strokeWidth={2.2} />}
                   </IconButton>
                 </View>
               </React.Fragment>

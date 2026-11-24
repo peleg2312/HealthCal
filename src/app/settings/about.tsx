@@ -255,7 +255,7 @@ export default function AboutScreen() {
         title="AI food estimates"
         source="Claude vision models by Anthropic, with server-side checks.">
         <P>
-          When you ask, a photo or description is analysed to identify the foods and estimate portions. Results are checked before you see them:
+          When you ask, the AI reads a photo or description to identify the foods and estimate portions. Results are checked before you see them:
           macros cannot weigh more than the food, and calories must agree with the macros.
         </P>
         <P>
@@ -285,7 +285,7 @@ export default function AboutScreen() {
           each only after you have agreed once on this device. A meal goes to HealthCal&apos;s server, which passes it to Anthropic, the maker of
           Claude, to estimate the food; nothing else from your diary goes with it. A question to the coach goes the same way with your last few
           questions and its answers, and with a summary of your week only while &quot;Share my week&quot; is on in the coach. HealthCal&apos;s server
-          does not store the photo or the words, only how many analyses and questions you sent and how large they were, for the daily allowance.
+          does not store the photo or the words, only how many estimates and questions you sent and how large they were, for the daily allowance.
           The coach chat is kept on this phone. Anthropic handles what it receives under Anthropic&apos;s terms.
         </P>
         <P>

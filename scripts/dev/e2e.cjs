@@ -353,7 +353,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   check('Today: calories left = target + first share of net exercise - eaten', near(left, expectedLeft, 1), `shown ${left}, expected ${expectedLeft} (budget ${expectedBudget})`);
   const energy = await text('today-energy');
   check('Today shows the budget breakdown with the exercise share', energy.replace(/,/g, '').includes(`${expectedBudget}`) && energy.replace(/,/g, '').includes(`${expectedAdded}`), energy.replace(/\n/g, ' | ').slice(0, 160));
-  check('Today: the shared workout calories read "from workouts"', energy.includes('from workouts'), energy.replace(/\n/g, ' | ').slice(0, 160));
+  check('Today: the shared workout calories read "~N added"', /~[\d,]+\s+added/.test(energy) && !/burned/.test(energy), energy.replace(/\n/g, ' | ').slice(0, 160));
   // Water goal: 33 ml/kg within 1.6-3.0 L for women, plus 550 ml per hour of moderate exercise, both rounded to 50 ml.
   const base = Math.round(Math.min(3000, Math.max(1600, 68 * 33)) / 50) * 50;
   const extra = Math.round(Math.min(0.5 * 550, 2000) / 50) * 50;

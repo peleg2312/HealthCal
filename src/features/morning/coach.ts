@@ -259,7 +259,7 @@ export const TODAY_WEIGH: readonly string[] = ["Today's first step: a weigh-in."
 export const TODAY_SLEEP: readonly string[] = ["First, add last night's sleep.", "First step: add last night's sleep.", "Add last night's sleep to complete the picture."];
 /** No plan row: today's targets, `k` the budget with its unit and `p` the protein with its unit. */
 export const TODAY_TARGETS: readonly ((k: string, p: string) => string)[] = [
-  (k, p) => `Today's targets: ${k} and ${p} of protein.`,
+  (k, p) => `Today's budget: ${k} and ${p} of protein.`,
   (k, p) => `Today: ${k} to work with and ${p} of protein to reach.`,
   (k, p) => `Aim for ${p} of protein within ${k} today.`,
 ];

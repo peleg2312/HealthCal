@@ -1,12 +1,12 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import React, { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Platform, ScrollView, useWindowDimensions, View, type AccessibilityActionEvent, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, type StyleProp, type ViewStyle } from 'react-native';
 
-import { diffDays, formatDayLabel, fromISODate, startOfWeek } from '@/lib/dates';
+import { diffDays, formatDayLabel, formatShortDate, fromISODate, startOfWeek } from '@/lib/dates';
 import { useDays } from '@/store/selectors';
 import { cup, fonts, MAX_CONTENT_WIDTH, useTheme } from '@/theme';
 import type { ISODate } from '@/types';
-import { Chip, FadeUp, IconButton, MiniCup, PressableScale, Text, useReducedMotion } from '@/ui';
+import { Chip, FadeUp, IconButton, ListRow, MiniCup, PressableScale, Sheet, Text, useReducedMotion } from '@/ui';
 
 import { DaySwipeGuard } from './useDaySwipe';
 import { dayRing, weekCaption, weekDates } from './week';
@@ -19,8 +19,10 @@ const DAY_MIN_W = 44;
 export const CAPTION_ROW_H = 36;
 /** The week arrows need this much window as well as a mouse; on a narrow window the caption keeps the room. */
 const ARROWS_MIN_W = 400;
+/** The week-picker cup: 32 px visible, 44 px to touch, 12 px from what is before it so the two touch areas never overlap. */
+const PICK_CUP = 32;
 
-/** A mouse or trackpad on web: the only place the week arrows show (a finger swipes the strip). */
+/** A mouse or trackpad on web: where the week arrows show. Everywhere else the week-picker cup does the same with a tap. */
 function subscribePointer(cb: () => void) {
   if (Platform.OS !== 'web' || typeof window === 'undefined' || !window.matchMedia) return () => {};
   const mq = window.matchMedia('(pointer: fine)');
@@ -56,10 +58,12 @@ function stripBleed(windowW: number, gutter: number): number {
  * It is the one date control at the top of Today and the diary: the strip (tap a
  * day; swipe it for other weeks), and one row under it, CAPTION_ROW_H tall, with
  * the week's caption on the left and on the right a "Back to today" chip when the
- * day shown is not today (else the `accessory`, Today's streak mark). The week
- * arrows show only with a mouse (a fine pointer on web, on a window 400 px or
- * wider); everywhere else each day offers "Previous week" and "Next week" as
- * accessibility actions. A swipe that starts on the strip pages weeks, never days.
+ * day shown is not today (else the `accessory`, Today's streak mark). Another week
+ * is always one visible tap away, never only a swipe: with a mouse on a window 400 px
+ * or wider the week arrows, everywhere else (a finger, a phone, a narrow window) the
+ * calendar cup at the row's end (`<prefix>-week-pick`), which opens "Choose a week"
+ * with every week the strip holds. Each day also offers "Previous week" and "Next
+ * week" as accessibility actions. A swipe that starts on the strip pages weeks, never days.
  */
 export function DayRingStrip({
   today,
@@ -183,10 +187,23 @@ export function DayRingStrip({
   }, [noteText, noteDelay, reduce]);
   const showNote = noteText !== null && noteShown === noteText && back === 0;
 
-  const shownWeek = weekDates(today, back)
-    .map((d) => byDate.get(d))
-    .filter((d) => d !== undefined);
-  const caption = back < 0 ? 'Next week, to plan ahead' : weekCaption(shownWeek, today, start);
+  const captionFor = (b: number) =>
+    b < 0
+      ? 'Next week, to plan ahead'
+      : weekCaption(
+          weekDates(today, b)
+            .map((d) => byDate.get(d))
+            .filter((d) => d !== undefined),
+          today,
+          start,
+        );
+  const caption = captionFor(back);
+  // "Choose a week": open while the person picks one of the strip's weeks.
+  const [picking, setPicking] = useState(false);
+  const weekTitle = (b: number) => {
+    const dates = weekDates(today, b);
+    return b === 0 ? 'This week' : b === 1 ? 'Last week' : b === -1 ? 'Next week' : `Week of ${formatShortDate(dates[0])}`;
+  };
   const narrow = windowW < 360;
   // Natively and on touch the arrows are not drawn: every day offers the same as actions.
   const weekActions = [
@@ -267,7 +284,8 @@ export function DayRingStrip({
                       aria-selected={isSelected}
                       accessibilityActions={weekActions}
                       onAccessibilityAction={onWeekAction}
-                      accessibilityLabel={`${formatDayLabel(d)}${kcal}`}
+                      // Starts with the words drawn on it ("M 23"), then the day in full: label in name.
+                      accessibilityLabel={`${LETTERS[i]} ${fromISODate(d).getDate()}, ${formatDayLabel(d)}${kcal}`}
                       // A future day is drawn dashed; fading it as well would make its date unreadable.
                       dimDisabled={false}
                       style={{ flex: 1, minHeight: 44, alignItems: 'center', gap: 6, paddingBottom: 2 }}>
@@ -340,14 +358,44 @@ export function DayRingStrip({
               tone="clear"
               disabled={back >= maxBack}
               onPress={() => page(back + 1)}>
-              <ChevronLeft size={20} color={colors.text} strokeWidth={2} />
+              <ChevronLeft size={20} color={colors.text} strokeWidth={2.2} />
             </IconButton>
             <IconButton testID={`${testIDPrefix}-week-next`} accessibilityLabel="Next week" size={32} tone="clear" disabled={back <= -ahead} onPress={() => page(back - 1)}>
-              <ChevronRight size={20} color={colors.text} strokeWidth={2} />
+              <ChevronRight size={20} color={colors.text} strokeWidth={2.2} />
             </IconButton>
           </View>
+        ) : maxBack + ahead > 0 ? (
+          // On touch and narrow windows: one cup, 12 px from the chip or streak before it, that opens every week the
+          // strip holds, so another week is a visible tap away (a swipe is never the only way).
+          <IconButton
+            testID={`${testIDPrefix}-week-pick`}
+            accessibilityLabel="Choose a week"
+            size={PICK_CUP}
+            onPress={() => setPicking(true)}
+            style={{ marginLeft: spacing.xs }}>
+            <CalendarDays size={18} color={colors.text} strokeWidth={2.2} />
+          </IconButton>
         ) : null}
       </View>
+      <Sheet visible={picking} onClose={() => setPicking(false)} title="Choose a week">
+        <View testID={`${testIDPrefix}-week-pick-sheet`} accessibilityRole="radiogroup">
+          {Array.from({ length: maxBack + 1 + ahead }, (_, i) => -ahead + i).map((b) => (
+            <ListRow
+              key={b}
+              testID={`${testIDPrefix}-week-pick-${b}`}
+              title={weekTitle(b)}
+              subtitle={captionFor(b)}
+              value={b === back ? 'Shown' : undefined}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: b === back }}
+              onPress={() => {
+                setPicking(false);
+                page(b);
+              }}
+            />
+          ))}
+        </View>
+      </Sheet>
     </View>
   );
 }
