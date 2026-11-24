@@ -110,7 +110,8 @@ function InsightRow({ insight }: { insight: Insight }) {
             <Text variant="label" color="textSecondary">
               {open ? 'Hide the numbers' : 'The numbers'}
             </Text>
-            <Chevron size={16} color={colors.textSecondary} strokeWidth={2} />
+            {/* The icon rule for a mark on a button: 18 px at 2.2. */}
+            <Chevron size={18} color={colors.textSecondary} strokeWidth={2.2} />
           </PressableScale>
         </View>
       </View>

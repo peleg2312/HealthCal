@@ -7,7 +7,7 @@ import { isPlausibleBodyFat, leanMassKg } from '@/lib/energy';
 import { formatHeight, lengthToCm, lengthUnit, lengthValue, weightToKg, weightUnit, weightValue } from '@/lib/units';
 import { saveWeightRecord } from '@/features/trackers/actions';
 import { Explain, ExplainText, Figure, RequireProfile } from '@/features/trackers/components';
-import { findByDate, hasMeasurements, keepOrConvert, NAVY_ERROR_PCT, WHTR_GUIDELINE } from '@/features/trackers/helpers';
+import { bodyFatText, findByDate, hasMeasurements, keepOrConvert, NAVY_ERROR_PCT, WHTR_GUIDELINE } from '@/features/trackers/helpers';
 import { useLive, useProfile } from '@/store/selectors';
 import { cup, useTheme, withOpacity } from '@/theme';
 import type { UnitSystem } from '@/types';
@@ -128,7 +128,7 @@ function BodyScreen() {
         ...(hipCm ? { hipCm: Math.round(hipCm * 10) / 10 } : {}),
         ...(estimate !== null && useEstimate ? { bodyFatPct: estimate } : {}),
       },
-      { message: estimate !== null && useEstimate ? `Saved, body fat set to ${estimate}%` : 'Measurements saved' },
+      { message: estimate !== null && useEstimate ? `Saved, body fat set to ${bodyFatText(estimate)}` : 'Measurements saved' },
     );
   };
 
@@ -200,12 +200,13 @@ function BodyScreen() {
         <View style={{ backgroundColor: colors.surfaceAlt, ...cup(radius.tile, 5), padding: spacing.lg, gap: 4 }}>
           {estimate !== null ? (
             <>
+              {/* A whole percent with "~" (the tape is ±3.5 points), as every body fat is shown ("~16%"). */}
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
                 <Text testID="body-estimate" variant="numL" tabular>
-                  {estimate.toFixed(1)}
+                  {`~${bodyFatText(estimate)}`}
                 </Text>
                 <Text variant="unit" style={{ fontSize: 15 }}>
-                  % body fat
+                  body fat
                 </Text>
               </View>
               <Text variant="caption" color="textSecondary">
@@ -236,20 +237,20 @@ function BodyScreen() {
         {bf !== null && lean !== null && ffmiValue !== null ? (
           <>
             <View style={{ flexDirection: 'row', gap: spacing.md }}>
-              <Figure testID="body-fat" value={bf.toFixed(1)} unit="%" label="Body fat" color="weight" />
+              <Figure testID="body-fat" value={bodyFatText(bf)} label="Body fat" color="weight" />
               <Figure value={weightValue(lean, units).toFixed(1)} unit={weightUnit(units)} label="Lean mass" />
               <Figure value={ffmiValue.toFixed(1)} label="FFMI" />
             </View>
             <Explain label="What lean mass and FFMI mean" testID="body-lean-help" style={{ marginTop: -spacing.xs, marginBottom: -spacing.sm }}>
               <ExplainText>
-                Lean mass is everything that is not fat: muscle, bone, organs and water. FFMI is lean mass for your height; most adults sit between about 15 and 22. Your calorie and
-                protein targets use lean mass when body fat is known.
+                Lean mass is everything that is not fat: muscle, bone, organs and water. FFMI is lean mass for your height; most adults sit between about 15 and 22. Your calorie
+                target and protein goal use lean mass when body fat is known.
               </ExplainText>
             </Explain>
           </>
         ) : (
           <Text variant="body" color="textSecondary">
-            Add body fat from a smart scale on the weight screen, or with the tape estimate above, to see lean mass and get more accurate targets.
+            Add body fat from a smart scale on the weight screen, or with the tape estimate above, to see lean mass and base your calorie target on it.
           </Text>
         )}
       </Card>
@@ -295,7 +296,7 @@ function BodyScreen() {
                 testID={`body-history-${i}`}
                 title={formatDayLabel(e.date)}
                 subtitle={`Waist ${len(e.waistCm, units)} · Neck ${len(e.neckCm, units)} · Hips ${len(e.hipCm, units)} ${unit}`}
-                value={isPlausibleBodyFat(e.bodyFatPct) ? `${e.bodyFatPct}%` : w1(e.kg, units)}
+                value={isPlausibleBodyFat(e.bodyFatPct) ? bodyFatText(e.bodyFatPct) : w1(e.kg, units)}
               />
             </React.Fragment>
           ))

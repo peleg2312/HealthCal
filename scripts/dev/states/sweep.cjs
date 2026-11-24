@@ -51,12 +51,13 @@ const today = [
 
 // ------------------------------------------------------------------ the diary
 const diary = [
-  ...EATEN.map(([eaten, pct]) => ({ id: `sweep-diary-eaten-${pct}-ex-290`, route: '/diary', values: { eaten, exercise: 290 }, note: `the diary's summary at ${pct}% eaten, 290 kcal of exercise` })),
+  // The summary's trough, target, workouts and macros are behind its chevron (`diary-summary-details`): each state opens it.
+  ...EATEN.map(([eaten, pct]) => ({ id: `sweep-diary-eaten-${pct}-ex-290`, route: '/diary', values: { eaten, exercise: 290 }, taps: ['diary-summary-details'], waitFor: 'diary-summary-more', note: `the diary's summary at ${pct}% eaten, 290 kcal of exercise` })),
   ...[0, 900].flatMap((exercise) => [[0.6, '60'], [1.3, '130']].map(([eaten, pct]) => ({
-    id: `sweep-diary-eaten-${pct}-ex-${exercise}`, route: '/diary', values: { eaten, exercise },
+    id: `sweep-diary-eaten-${pct}-ex-${exercise}`, route: '/diary', values: { eaten, exercise }, taps: ['diary-summary-details'], waitFor: 'diary-summary-more',
     note: `the diary's summary at ${pct}% eaten, ${exercise} kcal of exercise`,
   }))),
-  { id: 'sweep-diary-week', route: '/diary', values: { spread: 1, exercise: 290, eaten: 0.6 }, note: 'the diary\'s summary over 7 days: "~N kcal added over 7 days"' },
+  { id: 'sweep-diary-week', route: '/diary', values: { spread: 1, exercise: 290, eaten: 0.6 }, taps: ['diary-summary-details'], waitFor: 'diary-exercise', note: 'the diary\'s summary over 7 days: "~N kcal added over 7 days"' },
 ];
 
 // ------------------------------------------------------------------ trackers

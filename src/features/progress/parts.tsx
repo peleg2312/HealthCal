@@ -49,8 +49,8 @@ export function SectionCard({
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             {color ? <CupKey color={color} size={10} variant={keyVariant} /> : null}
-            {/* Two lines rather than an ellipsis at 320 px. */}
-            <Text variant="h3" style={{ flexShrink: 1 }}>
+            {/* Two lines rather than an ellipsis at 320 px. The card's title is a heading (level 2), as SectionTitle's. */}
+            <Text variant="h3" accessibilityRole="header" {...({ 'aria-level': 2 } as object)} style={{ flexShrink: 1 }}>
               {title}
             </Text>
           </View>

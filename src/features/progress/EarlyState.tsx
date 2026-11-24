@@ -68,7 +68,9 @@ export function EarlyState({
   return (
     <Card testID="progress-early" style={{ gap: spacing.lg }}>
       <View style={{ gap: spacing.xs }}>
-        <Text variant="h3">Your progress is getting started</Text>
+        <Text variant="h3" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>
+          Your progress is getting started
+        </Text>
         <Text variant="body" color="textSecondary" style={{ fontSize: 14, lineHeight: 20 }}>
           Everything here is built from your own logs. This is what will appear, and what opens each part.
         </Text>

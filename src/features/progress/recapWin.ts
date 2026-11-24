@@ -12,7 +12,7 @@ import type { RecapTile } from '@/lib/insights';
 const WIN_TILE: { id: RecapTile['id']; test: RegExp }[] = [
   // "305 active minutes in 4 sessions, past the weekly 150."
   { id: 'activity', test: /^\d[\d,]* active minutes in \d+ sessions?, past the weekly / },
-  // "Protein averaged 143 g, on your 152 g target."
+  // "Protein averaged 150 g against your 152 g goal."
   { id: 'protein', test: /^Protein averaged / },
   // "You hit your water goal on 5 of 7 days."
   { id: 'water', test: /^You hit your water goal on \d+ of \d+ days?\./ },

@@ -6,6 +6,7 @@ import Svg, { Line } from 'react-native-svg';
 import { spokenUnits } from '@/lib/spokenUnits';
 import { motion, useTheme, vesselBase } from '@/theme';
 
+import { DECORATIVE } from './decorative';
 import { useFadeAfter, usePour, useReachFlash } from './motion';
 import { brimOverhang, fillRatio, goalState, levelY, placeLabels, type GoalKind } from './vesselLayout';
 
@@ -19,7 +20,7 @@ export function Hatch({ width, height, color, step = 6, opacity = 0.75 }: { widt
     lines.push(<Line key={x} x1={x} y1={height} x2={x + height} y2={0} stroke={color} strokeWidth={1.5} />);
   }
   return (
-    <Svg width={width} height={height} style={{ position: 'absolute', left: 0, top: 0 }} opacity={opacity} pointerEvents="none">
+    <Svg width={width} height={height} style={{ position: 'absolute', left: 0, top: 0 }} opacity={opacity} pointerEvents="none" {...DECORATIVE}>
       {lines}
     </Svg>
   );
@@ -263,7 +264,7 @@ export function Vessel({
 
   return (
     <View style={[{ flexDirection: 'row', alignItems: 'flex-start', gap: labelGap }, style]} testID={testID} accessibilityLabel={accessibilityLabel && spokenUnits(accessibilityLabel)}>
-      <View style={{ width, height }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <View style={{ width, height }} {...DECORATIVE}>
         {cupView}
         {list.map((l, i) =>
           // A tick only where its label sits at the level it describes.
@@ -426,8 +427,7 @@ export function Trough({
       testID={testID}
       style={[{ height }, style]}
       onLayout={(e) => setW(Math.round(e.nativeEvent.layout.width))}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants">
+      {...DECORATIVE}>
       <View
         style={{
           position: 'absolute',

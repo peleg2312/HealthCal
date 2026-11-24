@@ -594,18 +594,26 @@ function speakIn(node: unknown, text: string) {
 const SPOKEN_ONLY = { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0, left: 0, top: 0 } as const;
 
 /**
- * The toast leaves: it fades and sinks 16 px (ease-in, `motion.duration.fade`), then is cleared, but only
- * while it is still the toast showing. A toast raised during the fade stops it and rises back from there;
- * the fade it interrupted ends then too, and must not clear it (a glass tapped in a toast's last 160 ms
- * used to log with no toast and no Undo). A fade stopped any other way (its host going away) still clears
- * its own toast. Instant under reduced motion.
+ * The toast leaves: it fades and sinks 16 px evenly over the whole of `motion.duration.fade` (160 ms), then is
+ * cleared, but only while it is still the toast showing. The fade is linear, so its last frames hold the last
+ * few percent of the toast and nothing is cut away at the end (an ease-in fade still showed 29% of the toast
+ * one frame before it was cleared), and it starts on the frame after the press, so the work the action does
+ * (an Undo's re-render) does not use up its first half. A toast raised during the fade stops it and rises back
+ * from there; the fade it interrupted ends then too, and must not clear it (a glass tapped in a toast's last
+ * 160 ms used to log with no toast and no Undo). A fade stopped any other way (its host going away) still
+ * clears its own toast. Instant under reduced motion.
  */
 function closeToast(anim: Animated.Value, id: number, hide: () => void) {
   const done = () => {
     if (useToast.getState().id === id) hide();
   };
   if (isReducedMotion()) return done();
-  Animated.timing(anim, { toValue: 0, duration: motion.duration.fade, easing: Easing.bezier(...motion.easing.exit), useNativeDriver: Platform.OS !== 'web' }).start(done);
+  const fade = () => Animated.timing(anim, { toValue: 0, duration: motion.duration.fade, easing: Easing.linear, useNativeDriver: Platform.OS !== 'web' }).start(done);
+  if (typeof requestAnimationFrame !== 'function') return fade();
+  // A toast raised before that frame (the action's own, or a quick next log) is not faded.
+  requestAnimationFrame(() => {
+    if (useToast.getState().id === id) fade();
+  });
 }
 
 /** A box in window coordinates: its top and bottom edge. */

@@ -5,7 +5,8 @@
  * `moreContrastColors`: the same look, with every secondary ink pulled toward the text colour until it
  * reaches its mark (secondary and tertiary text a third further still): secondary text, accent and status inks 7:1 on the page, the card and the soft surface
  * (WCAG's enhanced level), the tertiary text 4.5:1 there too (also on the soft surface, where it is not
- * allowed in the plain looks), card hairlines 3:1 and every outline (fields, cups, strong borders) 4.5:1.
+ * allowed in the plain looks), card hairlines 3:1 and every outline (fields, cups, strong borders, the dash
+ * that carries meaning) 4.5:1.
  * Data fills keep their colours (they are already 3:1 on the card), and bar tints are drawn at least at 70%.
  *
  * `forcedColorsPalette`: the person's own system colours (Windows contrast themes, `forced-colors: active`)
@@ -52,12 +53,14 @@ export function moreContrastColors(c: ThemeColors): ThemeColors {
     textSecondary: mix(ink('textSecondary', 7), c.text, 1 / 3),
     textTertiary: mix(ink('textTertiary', 4.5), c.text, 1 / 3),
     primaryInk: ink('primaryInk', 7),
+    actionInk: ink('actionInk', 7),
     caloriesInk: ink('caloriesInk', 7, pages),
     warningInk: ink('warningInk', 7),
     danger: ink('danger', 7),
     border: ink('border', 3, pages),
     borderStrong: ink('borderStrong', 4.5, pages),
     fieldEdge: ink('fieldEdge', 4.5, pages),
+    dashEdge: ink('dashEdge', 4.5, pages),
     vesselEdge: edge,
   };
 }
@@ -94,6 +97,7 @@ export function forcedColorsPalette(s: SystemColors, base: ThemeColors): ThemeCo
     border: ink,
     borderStrong: ink,
     fieldEdge: ink,
+    dashEdge: ink,
     text: ink,
     textSecondary: ink,
     textTertiary: ink,
@@ -101,7 +105,9 @@ export function forcedColorsPalette(s: SystemColors, base: ThemeColors): ThemeCo
     onPrimary: s.HighlightText,
     primarySoft: page,
     primaryInk: s.LinkText,
+    actionInk: s.LinkText,
     calories: fill,
+    caloriesBar: fill,
     protein: fill,
     carbs: fill,
     fat: fill,

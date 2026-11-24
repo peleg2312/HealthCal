@@ -5,6 +5,7 @@ import { Platform, ScrollView, View, type StyleProp, type ViewStyle } from 'reac
 import { fonts, useTheme } from '@/theme';
 
 import { rovingIndex } from './controlRules';
+import { DECORATIVE } from './decorative';
 import { PressableScale } from './Pressable';
 import { Text, useGrownText } from './Text';
 import { Hatch } from './Vessel';
@@ -70,7 +71,7 @@ export function Chip({
         {label}
       </Text>
       {/* An icon on a control: 18 px at stroke 2.2, as on a small Button. */}
-      {dropdown ? <ChevronDown size={18} color={fg} strokeWidth={2.2} /> : null}
+      {dropdown ? <ChevronDown size={18} color={fg} strokeWidth={2.2} {...DECORATIVE} /> : null}
     </PressableScale>
   );
 }
@@ -237,7 +238,9 @@ export function CupKey({ color, size = 9, variant = 'filled', style }: { color: 
   const hatched = variant === 'hatched';
   const edge = variant === 'filled' ? 0 : hatched ? 1 : 1.5;
   return (
+    // A key only decorates: the words beside it (or the row's spoken name) say what it stands for.
     <View
+      {...DECORATIVE}
       style={[
         {
           width: size,

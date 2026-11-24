@@ -50,7 +50,7 @@ export function MacrosCard({ summary, days, today }: { summary: PeriodSummary; d
     <SectionCard
       testID="progress-macros"
       title="Macros"
-      subtitle="Daily average against your targets"
+      subtitle="Daily average against your goals"
       color={colors.protein}>
       <View style={{ gap: spacing.md }}>
         {rows.map((r) => {

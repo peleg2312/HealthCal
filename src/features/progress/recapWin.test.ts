@@ -53,6 +53,6 @@ describe('winTile', () => {
     const weight = { ...quiet(), weight: { startTrend: 80, endTrend: 79.6, changeKg: -0.4, spanDays: 7, weeklyRateKg: -0.4, weighIns: 4 } };
     expect(winTile(recapWinFocus(weight, 'metric', 'lose').win)).toBeNull();
     // The focus sentence about activity is not a win.
-    expect(winTile('Activity: 90 of the weekly 150 active minutes; 2 brisk 30-minute walks would get you there.')).toBeNull();
+    expect(winTile('Activity: 2 brisk 30-minute walks would reach the weekly 150 active minutes.')).toBeNull();
   });
 });

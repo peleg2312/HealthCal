@@ -17,7 +17,7 @@ const NEED_DAYS = 10;
 const NEED_WEIGH_INS = 5;
 
 /**
- * One estimate; the two share the card, split by a hairline. The one that sets targets carries a badge.
+ * One estimate; the two share the card, split by a hairline. The one that sets the calorie target carries a badge.
  * What you burn is an estimate: its figure wears "~", and its spoken name says "about".
  */
 function Column({ title, value, caption, active, color, first }: { title: string; value: string | null; caption: string; active: boolean; color: string; first?: boolean }) {
@@ -28,7 +28,7 @@ function Column({ title, value, caption, active, color, first }: { title: string
     <View
       accessible
       role="group"
-      accessibilityLabel={spokenUnits(`${title}: ${value ? `about ${value} kcal` : 'not yet'}. ${caption}.${active ? ' Sets your targets.' : ''}`)}
+      accessibilityLabel={spokenUnits(`${title}: ${value ? `about ${value} kcal` : 'not yet'}. ${caption}.${active ? ' Sets your target.' : ''}`)}
       style={{
         flex: 1,
         minWidth: 0,
@@ -49,7 +49,7 @@ function Column({ title, value, caption, active, color, first }: { title: string
         {caption}
       </Text>
       {/* The badge is one line high: at 320 px the column only holds the short label. */}
-      {active ? <Badge label={narrow ? 'Sets targets' : 'Sets your targets'} color={color} style={{ marginTop: 4 }} /> : null}
+      {active ? <Badge label={narrow ? 'Sets target' : 'Sets your target'} color={color} style={{ marginTop: 4 }} /> : null}
     </View>
   );
 }
@@ -105,16 +105,16 @@ export function EnergyCard({ model, useAdaptiveSetting }: { model: EnergyModel; 
           <Text variant="caption" color="textSecondary">
             Based on {a.loggedDays} fully logged days and {a.weighIns} weigh-ins in the last {a.windowDays} days.{' '}
             {model.usingAdaptive
-              ? `Your targets use about ${kcalText(model.tdee)} a day, a blend that gives your logs ${pct}% of the weight and the body estimate the rest. ${a.confidence >= 0.85 ? 'That is the most weight it ever gets, so a few unlogged days cannot swing your targets.' : 'More complete days and weigh-ins raise the confidence.'}`
+              ? `Your target uses about ${kcalText(model.tdee)} a day, a blend that gives your logs ${pct}% of the weight and the body estimate the rest. ${a.confidence >= 0.85 ? 'That is the most weight it ever gets, so a few unlogged days cannot swing your target.' : 'More complete days and weigh-ins raise the confidence.'}`
               : useAdaptiveSetting
                 ? ''
-                : '"Learn from my data" is off in Goals, so your targets use the body estimate.'}
+                : '"Learn from my data" is off in Goals, so your target uses the body estimate.'}
           </Text>
         </View>
       ) : (
         <View style={{ gap: spacing.sm }} testID="progress-energy-needs">
           <Text variant="body" color="textSecondary" style={{ fontSize: 14, lineHeight: 20 }}>
-            Still needed: <Text variant="bodyStrong" style={{ fontSize: 14 }}>{a.needs}</Text>. Until then your targets use the estimate from your body.
+            Still needed: <Text variant="bodyStrong" style={{ fontSize: 14 }}>{a.needs}</Text>. Until then your target uses the estimate from your body.
           </Text>
           <NeedRow label="Fully logged days" have={a.loggedDays} need={NEED_DAYS} color={colors.calories} />
           <NeedRow label="Weigh-ins" have={a.weighIns} need={NEED_WEIGH_INS} color={colors.weight} />

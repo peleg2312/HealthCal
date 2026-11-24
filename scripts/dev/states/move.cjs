@@ -182,15 +182,15 @@ const strength = [
 
 // ------------------------------------------------------------------ water
 const water = [
-  { id: 'water-stress', route: '/water', data: 'stress', note: '12.5 L today, 25 drinks' },
+  { id: 'water-stress', route: '/water', data: 'stress', note: '12.5 L today, 25 drinks: "Goal reached for today. 6.8 L past it." and nothing more (never "a bonus")' },
   { id: 'water-stress-all', route: '/water', data: 'stress', taps: ['section-today-s-log-action'], note: 'every one of the 25 drinks' },
   { id: 'water-imperial', route: '/water', imperial: true, note: 'fl oz' },
   { id: 'water-stress-imperial', route: '/water', data: 'stress', imperial: true, note: '12.5 L in fl oz' },
   { id: 'water-empty', route: '/water', data: 'empty', note: 'nothing drunk yet' },
   { id: 'water-past-day', route: '/water?date={day}', day: -2, note: 'two days ago' },
   ...['tea', 'coffee', 'juice', 'milk', 'sports', 'other'].map((b) => ({ id: `water-${b}`, route: '/water', taps: [`water-beverage-${b}`], note: `${b} selected: the tiles' labels` })),
-  { id: 'water-reached', route: '/water', taps: ['water-add-3', 'water-add-3', 'water-add-3', 'water-add-3', 'water-add-3'], waitFor: 'water-goal-reached', note: 'the goal reached on screen: one line under the cup (with the extra) and the toast' },
-  { id: 'water-reached-past-day', route: '/water?date={day}', day: -1, taps: ['water-add-3', 'water-add-3', 'water-add-3', 'water-add-3', 'water-add-3', 'water-add-3'], waitFor: 'water-goal-reached', note: "yesterday's goal reached: the line names the day, no bonus words" },
+  { id: 'water-reached', route: '/water', taps: ['water-add-3', 'water-add-3', 'water-add-3', 'water-add-3', 'water-add-3'], waitFor: 'water-goal-reached', note: 'the goal reached on screen: one line under the cup, "Goal reached for today. 430 ml past it.", the extra as a plain fact (nothing that presents more as better), and the toast' },
+  { id: 'water-reached-past-day', route: '/water?date={day}', day: -1, taps: ['water-add-3', 'water-add-3', 'water-add-3', 'water-add-3', 'water-add-3', 'water-add-3'], waitFor: 'water-goal-reached', note: "yesterday's goal reached: the line names the day, and the extra as a plain fact" },
   { id: 'water-custom', route: '/water', imperial: true, type: { 'water-custom-input': '24' }, note: 'another amount typed in fl oz' },
   { id: 'water-sizes-sheet', route: '/water', taps: ['section-add-a-drink-action'], sheet: true, note: 'edit the glass sizes' },
   { id: 'water-sizes-imperial', route: '/water', imperial: true, taps: ['section-add-a-drink-action'], sheet: true, note: 'edit the glass sizes in fl oz' },

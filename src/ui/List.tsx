@@ -8,6 +8,7 @@ import { cup, cupFor, fonts, motion, phoneCapFor, scaledFontSize, useReducedMoti
 import { Button } from './Button';
 import { CupKey } from './Chip';
 import { rowStacks } from './controlRules';
+import { DECORATIVE } from './decorative';
 import { PressableScale } from './Pressable';
 import { Text, useGrownText } from './Text';
 
@@ -78,12 +79,14 @@ export function ListRow({
         </Text>
       ) : null}
       {right}
-      {showChevron ? <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.9} /> : null}
+      {showChevron ? <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.9} {...DECORATIVE} /> : null}
     </>
   );
+  // The leading mark only decorates: the row is named by its words, so a screen reader does not stop on it.
+  const mark = left ? <View {...DECORATIVE}>{left}</View> : null;
   const content = !large ? (
     <>
-      {left}
+      {mark}
       {words}
       {trailing}
     </>
@@ -91,7 +94,7 @@ export function ListRow({
     <>
       {stack ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, alignSelf: 'stretch' }}>
-          {left ? <View onLayout={(e) => setLeftW(Math.round(e.nativeEvent.layout.width))}>{left}</View> : null}
+          {left ? <View onLayout={(e) => setLeftW(Math.round(e.nativeEvent.layout.width))} {...DECORATIVE}>{left}</View> : null}
           <View style={{ flex: 1 }} />
           {hasTrail ? (
             <View onLayout={(e) => setTrailW(Math.round(e.nativeEvent.layout.width))} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexShrink: 1 }}>
@@ -100,7 +103,7 @@ export function ListRow({
           ) : null}
         </View>
       ) : (
-        left ? <View onLayout={(e) => setLeftW(Math.round(e.nativeEvent.layout.width))}>{left}</View> : null
+        left ? <View onLayout={(e) => setLeftW(Math.round(e.nativeEvent.layout.width))} {...DECORATIVE}>{left}</View> : null
       )}
       {words}
       {!stack && hasTrail ? (

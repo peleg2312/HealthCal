@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useSyncExternalStore } from 'react';
 import { Platform, Text as RNText, StyleSheet, useWindowDimensions, type StyleProp, type TextProps as RNTextProps, type TextStyle } from 'react-native';
 
 import { leftToRightStart } from '@/lib/bidi';
@@ -6,6 +6,7 @@ import { keepTogether, keepUnitWithNumber } from '@/lib/text';
 import { MAX_TEXT_GROWTH, phoneCapFor, scaleTextStyle, useLegibility, useTextSize, useTheme, type TextVariant, type ThemeColors } from '@/theme';
 
 import { langParts, wholeLang } from './textLang';
+import { subscribeTextSpacing, textSpacingSet } from './textSpacing';
 
 export type ColorName = keyof ThemeColors;
 
@@ -28,16 +29,20 @@ export const MAX_FONT_SCALE = MAX_TEXT_GROWTH;
 
 /**
  * True while text is drawn above its designed size at all: the app's own text size above 100% (Profile > App) or
- * the phone's text-size setting above its default. Kit controls that hold their label to one line at the designed
- * size (Button, Chip, Segmented, ListRow, the field's placeholder) let it wrap, grow or end with an ellipsis then,
- * so grown text is never cut; at the designed size nothing changes. Not the screens' large-text layouts: those
- * change from `LARGE_TEXT` (`useLargeText` from `@/theme`).
+ * the phone's text-size setting above its default, or on the web the reader's own text spacing (WCAG 1.4.12,
+ * ./textSpacing). Kit controls that hold their label to one line at the designed size (Button, Chip, Segmented,
+ * ListRow, the field's placeholder) let it wrap, grow or end with an ellipsis then, so grown or spaced text is
+ * never cut; at the designed size nothing changes. Not the screens' large-text layouts: those change from
+ * `LARGE_TEXT` (`useLargeText` from `@/theme`).
  */
 export function useGrownText(): boolean {
   const scale = useTextSize();
   const { fontScale } = useWindowDimensions();
-  return scale > 1 || fontScale > 1;
+  const spaced = useSyncExternalStore(subscribeTextSpacing, textSpacingSet, noSpacing);
+  return scale > 1 || fontScale > 1 || spaced;
 }
+
+const noSpacing = () => false;
 
 const SECONDARY_BY_DEFAULT: Partial<Record<TextVariant, true>> = { overline: true, unit: true };
 

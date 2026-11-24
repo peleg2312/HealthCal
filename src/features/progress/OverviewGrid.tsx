@@ -102,8 +102,9 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         color={colors.protein}
         value={protein ? `${Math.round(protein.avg)}` : null}
         unit="g"
-        caption={protein ? `a day · target ${Math.round(protein.target)} g` : 'No full days yet'}
-        captionShort={protein ? `target ${Math.round(protein.target)} g` : 'No full days yet'}
+        // "Target" is the calorie number only: protein has a goal.
+        caption={protein ? `a day · goal ${Math.round(protein.target)} g` : 'No full days yet'}
+        captionShort={protein ? `goal ${Math.round(protein.target)} g` : 'No full days yet'}
         compare={changeWords('protein', protein?.avg, p?.macros?.protein.avg, { period })}
         trend={changeDirection('protein', protein?.avg, p?.macros?.protein.avg)}
         period={period}

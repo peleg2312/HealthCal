@@ -62,7 +62,8 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?
   // The run log's words for what workouts add (`budgetAdds`, @/features/activity/logWords), always "~": an estimate.
   const addedLine = day.exerciseRule === 'week' ? `~${kcal(headroom)} kcal added over 7 days` : `~${kcal(headroom)} kcal added`;
   return (
-    <Card testID="diary-summary" padding={0} style={{ paddingHorizontal: 16, paddingVertical: 14 }}>
+    // Under 360 px the card is slimmer (6 px above and below, a 24 px figure), so at 320 x 640 Lunch's add is in the first view.
+    <Card testID="diary-summary" padding={0} style={{ paddingHorizontal: 16, paddingVertical: narrow && !big ? 6 : 14 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', alignItems: 'baseline', columnGap: 6 }}>
@@ -74,7 +75,7 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?
               value={day.remaining}
               format={(n) => kcal(Math.abs(n))}
               accessibilityLabel={`${kcal(Math.abs(day.remaining))} kilocalories ${over ? 'above the budget' : 'left'}`}
-              style={{ fontSize: narrow ? 30 : 32, lineHeight: 36, letterSpacing: -1 }}
+              style={narrow && !big ? { fontSize: 24, lineHeight: 28, letterSpacing: -0.6 } : { fontSize: narrow ? 30 : 32, lineHeight: 36, letterSpacing: -1 }}
             />
             <Text variant="unit" style={{ fontSize: 15 }}>{over ? 'kcal above' : 'kcal left'}</Text>
           </View>
@@ -199,7 +200,8 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
         // The whole row is one button whose name says what the row shows, its source in words included
         // ("Almonds, 1 oz · 28 g, 162 kilocalories, Reference data. Edit"): text inside a named button is not read.
         accessibilityLabel={spokenUnits(`${name}, ${withoutMarks(portion)}, ${ai ? 'about ' : ''}${Math.round(entry.nutrients.kcal)} kilocalories${inWater ? ', also counted in Water' : ''}, ${source.label}. Edit`)}
-        style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: 11 }}>
+        // Under 360 px the rows pad 6 instead of 11 (still 56 px at least), so the next meal's add reaches the first view.
+        style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: narrow && !big ? 6 : 11 }}>
         <RowEmoji emoji={entry.emoji} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text variant="bodyStrong" numberOfLines={3} style={{ fontFamily: fonts.semibold }}>
@@ -324,8 +326,12 @@ export function MealCard({
   const filled = rows.length > 0;
   // With large text the meal's name keeps its whole word: the "..." and "+" cups go under it when both do not fit.
   const big = useLargeText();
+  // Under 360 px a filled meal is tighter (8 px above its header, 36 px cups that still take 44 px of touch, 2 px to
+  // its rows), so at 320 x 640 the diary's first view holds Breakfast whole and Lunch's add.
+  const tight = useWindowDimensions().width < 360 && !big;
+  const cupSize = tight ? 36 : 44;
   return (
-    <Card testID={`meal-card-${meal}`} padding={0} style={{ paddingTop: filled ? 12 : 16, paddingBottom: filled ? 4 : ROW_PAD }}>
+    <Card testID={`meal-card-${meal}`} padding={0} style={{ paddingTop: filled ? (tight ? 8 : 12) : 16, paddingBottom: filled ? 4 : ROW_PAD }}>
       <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', justifyContent: 'flex-end', alignItems: 'center', gap: spacing.xs, paddingLeft: ROW_PAD, paddingRight: 14 }}>
         {/* A big total ("1,450 kcal") goes under the meal's name on a narrow phone rather than cutting it. */}
         <View style={[big ? { flexGrow: 1, flexShrink: 1, flexBasis: 'auto' } : { flex: 1 }, { minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10 }]}>
@@ -341,17 +347,17 @@ export function MealCard({
         </View>
         {filled ? (
           <>
-            <IconButton testID={`meal-menu-${meal}`} accessibilityLabel={`${label} options`} tone="clear" size={44} onPress={onMenu}>
+            <IconButton testID={`meal-menu-${meal}`} accessibilityLabel={`${label} options`} tone="clear" size={cupSize} onPress={onMenu}>
               <MoreHorizontal size={20} color={colors.textSecondary} strokeWidth={1.9} />
             </IconButton>
-            <IconButton testID={`meal-add-${meal}`} accessibilityLabel={`Add food to ${label.toLowerCase()}`} tone="surface" size={44} onPress={add} style={{ borderColor: colors.borderStrong }}>
+            <IconButton testID={`meal-add-${meal}`} accessibilityLabel={`Add food to ${label.toLowerCase()}`} tone="surface" size={cupSize} onPress={add} style={{ borderColor: colors.borderStrong }}>
               <Plus size={20} color={colors.text} strokeWidth={2.2} />
             </IconButton>
           </>
         ) : null}
       </View>
       {/* Always mounted (keyed by the day), so a meal's first row slides in too; Undo brings a row back the same way. */}
-      <View style={{ marginTop: rows.length ? 6 : 0 }}>
+      <View style={{ marginTop: rows.length ? (tight ? 2 : 6) : 0 }}>
         <AnimatedList key={date}>
           {rows.map(({ item: e, leaving }, i) => (
             <FadeRow key={e.id} leaving={leaving}>
@@ -395,7 +401,7 @@ export function MealCard({
               borderWidth: 1.5,
               borderTopWidth: 0,
               borderStyle: 'dashed',
-              borderColor: colors.borderStrong,
+              borderColor: colors.dashEdge,
               alignItems: 'center',
               justifyContent: 'center',
               gap: 2,

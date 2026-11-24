@@ -18,11 +18,11 @@ describe.each(NAMES)('%s with more contrast', (name) => {
   const rows = (k: keyof ThemeColors, on: readonly (keyof ThemeColors)[], min: number) => on.map((g) => [`${name} ${k} on ${g}`, c[k], c[g], min] as [string, string, string, number]);
 
   it('puts secondary text and the accent and status inks at 7:1, and the tertiary text at 4.5:1 on every surface', () => {
-    expect(under([...rows('text', grounds, 7), ...rows('textSecondary', grounds, 7), ...rows('primaryInk', grounds, 7), ...rows('warningInk', grounds, 7), ...rows('danger', grounds, 7), ...rows('textTertiary', grounds, 4.5), ...rows('caloriesInk', pages, 7)])).toEqual([]);
+    expect(under([...rows('text', grounds, 7), ...rows('textSecondary', grounds, 7), ...rows('primaryInk', grounds, 7), ...rows('actionInk', grounds, 7), ...rows('warningInk', grounds, 7), ...rows('danger', grounds, 7), ...rows('textTertiary', grounds, 4.5), ...rows('caloriesInk', pages, 7)])).toEqual([]);
   });
 
   it('draws card hairlines at 3:1 and every outline at 4.5:1', () => {
-    expect(under([...rows('border', pages, 3), ...rows('borderStrong', pages, 4.5), ...rows('fieldEdge', pages, 4.5), ...rows('vesselEdge', pages, 4.5)])).toEqual([]);
+    expect(under([...rows('border', pages, 3), ...rows('borderStrong', pages, 4.5), ...rows('fieldEdge', pages, 4.5), ...rows('vesselEdge', pages, 4.5), ...rows('dashEdge', pages, 4.5)])).toEqual([]);
   });
 
   it('changes something the person can see, and keeps the data colours and the level line', () => {
@@ -46,8 +46,9 @@ describe('forced colours', () => {
     for (const sys of [light, dark]) {
       const c = forcedColorsPalette(sys, PALETTES[name]);
       expect([c.bg, c.surface, c.vesselEmpty, c.track, c.tabBar]).toEqual(Array(5).fill(sys.Canvas));
-      expect([c.text, c.textSecondary, c.textTertiary, c.rim, c.vesselEdge, c.fieldEdge]).toEqual(Array(6).fill(sys.CanvasText));
-      for (const k of ['calories', 'water', 'protein', 'primary'] as const) expect(c[k], k).toBe(sys.Highlight);
+      expect([c.text, c.textSecondary, c.textTertiary, c.rim, c.vesselEdge, c.fieldEdge, c.dashEdge]).toEqual(Array(7).fill(sys.CanvasText));
+      for (const k of ['calories', 'caloriesBar', 'water', 'protein', 'primary'] as const) expect(c[k], k).toBe(sys.Highlight);
+      expect(c.actionInk).toBe(sys.LinkText);
       // The over mark differs from the fill under it and from the page.
       expect(c.warning).not.toBe(c.calories);
       expect(c.warning).not.toBe(c.bg);

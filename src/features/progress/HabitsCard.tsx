@@ -89,7 +89,9 @@ export function HabitsCard({ summary, previous, units }: { summary: PeriodSummar
   const keep = (text: string) => text.replace(/(\d) (?=[a-zA-Z])/g, '$1\u00A0');
   return (
     <Card testID="progress-habits" style={{ gap: spacing.md }}>
-      <Text variant="h3">Water, activity and sleep</Text>
+      <Text variant="h3" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>
+        Water, activity and sleep
+      </Text>
       <HabitRow
         testID="progress-habit-water"
         route="/water"

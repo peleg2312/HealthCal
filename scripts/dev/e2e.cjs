@@ -1078,6 +1078,14 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     const addLabel = (await p.getByTestId('fits-idea-add-0').first().getAttribute('aria-label')) || '';
     check('ideas: the added row shows its tick and every row stays in its place', addLabel.endsWith(' added') && (await p.getByTestId(/^fits-idea-\d+$/).count()) === rowsBefore && (await itext(p, 'fits-idea-0')) === name0, `${addLabel} | ${rowsBefore} rows`);
     await shot('ideas-added');
+    // The toast names what was added first (ideaAddedToast): a past meal by its foods, never "Added to dinner".
+    const ideaToast = (await p.getByTestId('toast').count()) ? await itext(p, 'toast') : '';
+    const firstHead = (foods0[0] || '').split(',')[0].trim().toLowerCase();
+    check(
+      'ideas: the toast names what was added, then where ("Israeli salad, pasta and chicken breast added to dinner")',
+      /added to dinner/.test(ideaToast) && !/^Added to/.test(ideaToast) && (name0.includes("'s dinner") ? ideaToast.toLowerCase().startsWith(firstHead.slice(0, 12)) : true),
+      ideaToast.split('\n')[0],
+    );
     await toastActionReady(p, 10000);
     await p.getByTestId('toast-action').first().click({ timeout: 10000 });
     await p.waitForTimeout(500);

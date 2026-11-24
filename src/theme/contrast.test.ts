@@ -96,6 +96,27 @@ describe.each(NAMES)('%s palette', (name) => {
     }
   });
 
+  it('keeps reading text at 7:1 (WCAG 1.4.6): text and textSecondary on the page, the card, the soft surface and the tab bar', () => {
+    // Notice paragraphs are textSecondary on surfaceAlt, captions and row lines on bg and surface.
+    expect(failures(pairs(name, ['text', 'textSecondary'], ['bg', 'bgElevated', 'surface', 'surfaceAlt', 'tabBar'], 7))).toEqual([]);
+  });
+
+  it("draws a borderless control in its own ink: actionInk 4.5:1 where it sits and at least 15 apart from the calorie ink", () => {
+    expect(failures(pairs(name, ['actionInk'], ['bg', 'bgElevated', 'surface', 'surfaceAlt'], 4.5))).toEqual([]);
+    expect(deltaE(c.actionInk, c.caloriesInk), `${name} actionInk vs caloriesInk`).toBeGreaterThanOrEqual(15);
+  });
+
+  it('draws a dash that carries meaning (a goal line, the empty meal slot) at 3:1 on the page and the card', () => {
+    expect(failures(pairs(name, ['dashEdge'], ['bg', 'bgElevated', 'surface'], 3))).toEqual([]);
+  });
+
+  it('draws the calorie colour as a solid bar at 3:1 on the card, and the same as the cup fill wherever that already is', () => {
+    expect(contrast(c.caloriesBar, c.surface), `${name} caloriesBar on surface`).toBeGreaterThanOrEqual(3);
+    if (contrast(c.calories, c.surface) >= 3) expect(c.caloriesBar).toBe(c.calories);
+    // The over part of a bar sits right on it: the amber stays apart, as from every data colour.
+    expect(deltaE(c.warning, c.caloriesBar), `${name} warning vs caloriesBar`).toBeGreaterThanOrEqual(15);
+  });
+
   it('keeps body text at 4.5:1 on every surface it is used on', () => {
     expect(
       failures([
@@ -179,7 +200,8 @@ describe.each(NAMES)('%s palette', (name) => {
   check(name, 'keeps every data fill at 3:1 on a card')('keeps every data fill at 3:1 on a card', () => {
     const rows = [...DATA, 'warning' as const].map((k) => ({ what: `${name} ${k} fill on surface`, ratio: contrast(c[k], c.surface), min: 3 }));
     // The one documented exception: Blossom's tickle-pink calorie fill is 2.4:1 on the card. It is
-    // the owner's colour, it is never text, and the raspberry rim and outline carry its shape.
+    // the owner's colour, it is never text, and in a cup the raspberry rim and outline carry its shape.
+    // A bar has no outline, so a calorie bar is drawn in `caloriesBar`, 3:1 on the card (tested above).
     const known = name === 'blossom' ? rows.filter((r) => r.what.includes('calories')) : [];
     expect(failures(rows.filter((r) => !known.includes(r)))).toEqual([]);
     for (const r of known) expect(r.ratio, r.what).toBeGreaterThan(2.3);
@@ -229,10 +251,16 @@ describe('the level line on a fill', () => {
     expect(failures([...DATA, 'warning' as const, 'primary' as const].map((k) => ({ what: `light rim on ${k}`, ratio: contrast(c.rim, c[k]), min: 3 })))).toEqual([]);
   });
 
-  it.each(['dark', 'blossom'] as const)('%s: the line differs from every data fill by at least 14 (CIEDE2000)', (name) => {
+  it.each(['dark', 'blossom'] as const)('%s: the line differs from every data fill and the solid calorie bar by at least 14 (CIEDE2000)', (name) => {
     const c = PALETTES[name];
-    const merged = [...DATA, 'warning' as const].map((k) => ({ k, d: deltaE(c.rim, c[k]) })).filter((r) => r.d < 14);
+    const merged = [...DATA, 'warning' as const, 'caloriesBar' as const].map((k) => ({ k, d: deltaE(c.rim, c[k]) })).filter((r) => r.d < 14);
     expect(merged.map((r) => `${name} rim and ${r.k}: ${r.d.toFixed(1)}`)).toEqual([]);
+  });
+
+  it("records that Blossom's line on the solid calorie bar stays under 3:1: the bar is 3:1 on the card instead (WCAG 1.4.11 asks for one of the two)", () => {
+    const c = blossomColors;
+    expect(contrast(c.rim, c.caloriesBar)).toBeLessThan(3);
+    expect(contrast(c.caloriesBar, c.surface)).toBeGreaterThanOrEqual(3);
   });
 
   it('records why dark and Blossom cannot reach 3:1 on a fill, so the exception is checked rather than assumed', () => {

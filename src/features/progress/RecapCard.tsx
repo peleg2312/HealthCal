@@ -19,21 +19,24 @@ export function RecapCard({ recap, earlier, unseen }: { recap: WeeklyRecap; earl
   const range = weekRangeLabel(recap.weekStart, recap.weekEnd);
   return (
     <Card testID="progress-recap" style={{ gap: spacing.sm }}>
+      {/* The title is the card's heading (level 2, as SectionTitle's), outside the control that opens the check-in:
+          a heading inside a button is not a heading to a screen reader. A no-break hyphen keeps "check-in" whole.
+          No icon before the title, so the badge fits beside it at 320 px; should it ever wrap (a much larger text
+          size), it keeps 8 px from the title. */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.sm, rowGap: spacing.sm, marginBottom: -6 }}>
+        <Text variant="h3" accessibilityRole="header" {...({ 'aria-level': 2 } as object)} style={{ flexShrink: 1 }}>
+          Weekly check{'\u2011'}in
+        </Text>
+        {unseen ? <Badge label="New" color={colors.primary} /> : null}
+      </View>
       <PressableScale
         testID="progress-recap-open"
         onPress={() => go(`/recap?week=${recap.weekStart}`)}
-        accessibilityLabel={spokenUnits(`Weekly check-in, ${recap.label}, ${range}. ${recap.win}`)}
+        // The words it shows first (WCAG 2.5.3), then where it leads.
+        accessibilityLabel={spokenUnits(`${recap.label}, ${range}. ${recap.win} Open the weekly check-in`)}
         scaleTo={0.985}
         style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 44 }}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          {/* A no-break hyphen keeps "check-in" whole. No icon before the title, so the badge fits beside it at 320 px;
-              should it ever wrap (a much larger text size), it keeps 8 px from the title. */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.sm, rowGap: spacing.sm }}>
-            <Text variant="h3" style={{ flexShrink: 1 }}>
-              Weekly check{'\u2011'}in
-            </Text>
-            {unseen ? <Badge label="New" color={colors.primary} /> : null}
-          </View>
           <Text variant="caption" color="textSecondary">
             {recap.label} · {range}
           </Text>

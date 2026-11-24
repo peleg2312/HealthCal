@@ -64,7 +64,8 @@ export function RecapCups({ cups, week }: { cups: RecapDayCup[]; week: string })
                 hitSlop={narrow ? { top: 0, bottom: 0, left: 3, right: 3 } : undefined}
                 style={{ flex: 1, minWidth: 0, alignItems: 'center' }}>
                 <View style={{ height: CHECK_H, justifyContent: 'flex-start' }}>
-                  {c.check ? <Check size={14} color={colors.success} strokeWidth={2.6} /> : null}
+                  {/* The icon rule: 18 px at 1.9, filling the row the checks sit in (CHECK_H). */}
+                  {c.check ? <Check size={18} color={colors.success} strokeWidth={1.9} /> : null}
                 </View>
                 <MiniCup
                   index={i}

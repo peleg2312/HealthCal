@@ -39,6 +39,16 @@ export function weightText(kg: number, units: UnitSystem): string {
   return `${weightValue(kg, units).toFixed(1)} ${weightUnit(units)}`;
 }
 
+/**
+ * Body fat as a person reads it, one format everywhere (Body, Weight's history and its sync line, the
+ * toasts): a whole percent with no space, "18%". A scale or a tape is not good to a tenth of a point
+ * (the tape is ±3.5), so no decimal is shown; the tape's estimate wears "~" before it. `tenths` only
+ * where two readings that differ would otherwise show the same figure side by side ("18.2%", "18.4%").
+ */
+export function bodyFatText(pct: number, tenths = false): string {
+  return tenths ? `${pct.toFixed(1)}%` : `${Math.round(pct)}%`;
+}
+
 /** '7 h 30 min', '45 min', '9 h' from hours. */
 export function formatHours(hours: number): string {
   const { value, unit } = hoursFigure(hours);

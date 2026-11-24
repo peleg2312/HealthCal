@@ -101,36 +101,37 @@ function FastingScreen() {
         <Vessel
           value={p ? p.elapsedMs / 3_600_000 : 0}
           max={activeTarget}
-          // A target to reach: at it the level line becomes the brim line, never amber.
+          // A goal to reach: at it the level line becomes the brim line, never amber. "Target" is the calorie
+          // number only, so the fast's length is its goal everywhere on this screen.
           goalKind="reach"
           color={colors.primary}
           width={narrow ? 72 : 88}
           height={210}
           labelGap={narrow ? 14 : 18}
-          // The target label and the timer keep 8 px between them at every level, near the top too.
+          // The goal label and the timer keep 8 px between them at every level, near the top too.
           labelSpacing={8}
           accessibilityLabel={active ? `Fasting for ${formatDuration(minutes(p?.elapsedMs ?? 0))} of ${activeTarget} hours` : 'Not fasting'}
           labels={[
             {
-              key: 'target',
+              key: 'goal',
               at: activeTarget,
               height: 20,
               content: (
                 <Text variant="caption" color="textSecondary" numberOfLines={1}>
-                  {`Target ${fastingLabel(activeTarget)}`}
+                  {`Goal ${fastingLabel(activeTarget)}`}
                 </Text>
               ),
             },
             {
               key: 'elapsed',
               at: p ? Math.min(p.elapsedMs, p.targetMs) / 3_600_000 : 0,
-              // The share of the target is the timer's third line, so it reads with the time and never sits
+              // The share of the goal is the timer's third line, so it reads with the time and never sits
               // at the foot of the cup right over "… to go" under it.
               height: active ? 84 : 64,
               tick: p && p.elapsedMs > 0 ? colors.rim : undefined,
               content: (
                 <View style={{ gap: 2 }}>
-                  <Text variant="overline">{active ? (p?.reached ? 'Target reached' : 'Fasting') : 'Not fasting'}</Text>
+                  <Text variant="overline">{active ? (p?.reached ? 'Goal reached' : 'Fasting') : 'Not fasting'}</Text>
                   <Text testID="fasting-elapsed" variant="numL" tabular numberOfLines={1} style={{ fontSize: narrow ? 30 : 36, lineHeight: narrow ? 34 : 40 }}>
                     {p ? formatClockDuration(p.elapsedMs) : '0:00:00'}
                   </Text>
@@ -149,7 +150,7 @@ function FastingScreen() {
           <>
             <Text testID="fasting-remaining" variant="title">
               {p.reached
-                ? `Target reached ${formatDuration(Math.max(1, minutes(p.elapsedMs - p.targetMs)))} ago`
+                ? `Goal reached ${formatDuration(Math.max(1, minutes(p.elapsedMs - p.targetMs)))} ago`
                 : `${formatDuration(Math.max(1, minutes(p.remainingMs)))} to go`}
             </Text>
             {/* One line each: side by side, "Tomorrow 03:14 PM" beside the edit button had about 60 px and was cut. */}
@@ -160,7 +161,7 @@ function FastingScreen() {
                   <Pencil size={16} color={colors.text} />
                 </IconButton>
               </View>
-              <TimeBlock label="Target time" value={relativeDayTime(p.endsAt, new Date(now))} />
+              <TimeBlock label="Goal at" value={relativeDayTime(p.endsAt, new Date(now))} />
             </View>
           </>
         ) : (
@@ -170,10 +171,13 @@ function FastingScreen() {
         )}
       </Card>
 
-      <SectionTitle title="Target" />
-      {/* One row of five at every width: as wrapping chips, "Custom" was left alone on a second line. */}
+      <SectionTitle title="Goal" />
+      {/* One row of five at every width: as wrapping chips, "Custom" was left alone on a second line. A choice in a
+          form, so a radiogroup named by its field, never tabs (there is no panel under it). */}
       <Segmented
         testID="fasting-target"
+        role="radiogroup"
+        accessibilityLabel="Fasting goal"
         options={[...FASTING_PRESETS.map((x) => ({ value: String(x.hours), label: x.label })), { value: 'custom', label: isPreset ? 'Other' : fastingLabel(activeTarget) }]}
         value={!isPreset || customOpen ? 'custom' : String(activeTarget)}
         onChange={(v) => {
@@ -237,7 +241,7 @@ function FastingScreen() {
                         {formatDuration(minutes(fp.elapsedMs))}
                       </Text>
                       <Text variant="caption" color="textSecondary" numberOfLines={2}>
-                        {relativeDayTime(new Date(s.start), new Date(now))} to {relativeDayTime(new Date(s.end!), new Date(now))} · target {fastingLabel(s.targetHours)}
+                        {relativeDayTime(new Date(s.start), new Date(now))} to {relativeDayTime(new Date(s.end!), new Date(now))} · goal {fastingLabel(s.targetHours)}
                       </Text>
                     </View>
                     <IconButton testID={`fasting-delete-${i}`} accessibilityLabel="Delete this fast" tone="clear" size={44} onPress={() => deleteFast(s)}>
@@ -253,7 +257,7 @@ function FastingScreen() {
 
       <Card tone="alt">
         <Note icon={<Info size={14} color={colors.textTertiary} />}>
-          Fasting is optional and not suitable for everyone, including during pregnancy, with diabetes or a history of disordered eating. Your calorie targets work the same with or without it.
+          Fasting is optional and not suitable for everyone, including during pregnancy, with diabetes or a history of disordered eating. Your calorie target works the same with or without it.
         </Note>
       </Card>
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, KeyboardAvoidingView, Modal, PanResponder, type PanResponderInstance, Platform, Pressable, ScrollView, useWindowDimensions, View, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, KeyboardAvoidingView, Modal, PanResponder, type PanResponderInstance, Platform, Pressable, ScrollView, type ScrollViewInstance, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -8,6 +8,7 @@ import { spokenUnits } from '@/lib/spokenUnits';
 import { MAX_CONTENT_WIDTH, motion, sheetShadow, useReducedMotion, useTheme } from '@/theme';
 
 import { Button } from './Button';
+import { keyboardCover, revealDelta } from './keyboardInset';
 import { ease } from './motion';
 import { backClosesSheet, ownBacks } from './sheetHistory';
 import { Text } from './Text';
@@ -174,6 +175,81 @@ export function sheetDragCloses(dy: number, vy: number, sheetHeight: number): bo
 }
 
 /**
+ * Phone browsers (web only): the px the on-screen keyboard covers while the sheet is open, 0 otherwise, as
+ * `Screen` reads it (`keyboardCover` in ./keyboardInset): the page's layout does not shrink for the keyboard
+ * in a phone browser, only the visual viewport does. The sheet pads its bottom by that much, so it rests on
+ * the keyboard with its footer in view, and the focused field in its body is scrolled into the part that
+ * shows, after the padding is laid out and again whenever the focus moves to another field.
+ */
+function useSheetKeyboard(open: boolean, body: React.RefObject<ScrollViewInstance | null>): number {
+  const [cover, setCover] = useState(0);
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined' || !open) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const measure = () => {
+      const next = keyboardCover({ layoutHeight: window.innerHeight, viewportHeight: vv.height, scale: vv.scale });
+      setCover(next);
+      // The browser panned the page to the field; the padding now makes room, so pan it back.
+      if (next > 0 && (window.scrollY > 0 || vv.offsetTop > 0)) window.scrollTo(0, 0);
+    };
+    measure();
+    vv.addEventListener('resize', measure);
+    vv.addEventListener('scroll', measure);
+    return () => {
+      vv.removeEventListener('resize', measure);
+      vv.removeEventListener('scroll', measure);
+      setCover(0);
+    };
+  }, [open]);
+  useEffect(() => {
+    if (!cover || typeof document === 'undefined') return;
+    const reveal = () => {
+      const node = (body.current as unknown as { getScrollableNode?: () => unknown } | null)?.getScrollableNode?.();
+      const el = document.activeElement;
+      if (!(node instanceof HTMLElement) || !(el instanceof HTMLElement) || !node.contains(el)) return;
+      if (!/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && !el.isContentEditable) return;
+      const r = el.getBoundingClientRect();
+      const v = node.getBoundingClientRect();
+      const delta = revealDelta({ top: r.top, bottom: r.bottom }, { top: v.top, bottom: Math.min(v.bottom, window.innerHeight - cover) });
+      if (delta) node.scrollTop += delta;
+    };
+    const frame = requestAnimationFrame(reveal);
+    const onFocus = () => requestAnimationFrame(reveal);
+    document.addEventListener('focusin', onFocus);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener('focusin', onFocus);
+    };
+  }, [cover, body]);
+  return cover;
+}
+
+/**
+ * Web: the control that opened the sheet gets the focus back when it closes. React Native Web's modal notes
+ * the focused element only after the sheet's content has mounted, so a field that takes the focus as the sheet
+ * opens (`autoFocus`) was noted instead of its opener, and on close the focus fell to the page. The opener is
+ * noted here while the sheet renders open, before its content mounts; once the sheet is gone, it is focused
+ * again unless the focus already went somewhere (the modal's own return, or a screen the sheet opened).
+ */
+function useOpenerFocus(visible: boolean, mounted: boolean) {
+  const opener = useRef<HTMLElement | null | undefined>(undefined);
+  if (Platform.OS === 'web' && typeof document !== 'undefined' && visible && opener.current === undefined) {
+    const el = document.activeElement;
+    opener.current = el instanceof HTMLElement && el !== document.body ? el : null;
+  }
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined' || mounted) return;
+    const el = opener.current;
+    opener.current = undefined;
+    if (!el || !document.contains(el)) return;
+    const now = document.activeElement;
+    if (now && now !== document.body && document.contains(now)) return;
+    el.focus();
+  }, [mounted]);
+}
+
+/**
  * Bottom sheet for short, focused tasks (pick a value, confirm, quick add).
  * It slides up while its backdrop fades in, and slides down with the backdrop
  * fading out when closed; reduced motion makes both instant. The sheet stays
@@ -240,6 +316,9 @@ export function Sheet({
   if (visible && !mounted) setMounted(true);
   // Reduced motion: no exit animation to wait for.
   if (!visible && mounted && reduce) setMounted(false);
+  useOpenerFocus(visible, mounted);
+  const body = useRef<ScrollViewInstance>(null);
+  const keyboard = useSheetKeyboard(visible, body);
   useEffect(() => {
     if (!mounted) return;
     openSheets += 1;
@@ -348,7 +427,8 @@ export function Sheet({
       <KeyboardAvoidingView
         pointerEvents={visible ? 'auto' : 'none'}
         behavior={Platform.OS === 'web' ? undefined : 'padding'}
-        style={{ flex: 1, justifyContent: 'flex-end' }}>
+        // Web: rests on a phone browser's keyboard (natively KeyboardAvoidingView pads for it).
+        style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboard }}>
         <AnimatedPressable
           accessibilityLabel="Close sheet"
           testID="sheet-backdrop"
@@ -398,7 +478,7 @@ export function Sheet({
               </Text>
             ) : null}
           </View>
-          <ScrollView testID="sheet-body" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.md }}>
+          <ScrollView ref={body} testID="sheet-body" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.md }}>
             {children}
           </ScrollView>
           {asking && unsaved ? (

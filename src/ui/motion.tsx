@@ -494,10 +494,20 @@ const rowLayout = LinearTransition.duration(D.row).easing(ease.move);
 export function AnimatedList({ children, animateFirst = false }: { children: React.ReactNode; /** Animate the rows present at mount too. */ animateFirst?: boolean }) {
   return (
     <LayoutAnimationConfig skipEntering={!animateFirst} skipExiting>
-      {children}
+      {/* A list for assistive technology on the web (WCAG 1.3.1), its rows `listitem`s (`AnimatedItem`, the food
+          screens' `FadeRow`); `display: contents` draws no box, so the rows lie in the parent's layout as before. */}
+      {Platform.OS === 'web' ? (
+        <View role="list" style={LIST_CONTENTS}>
+          {children}
+        </View>
+      ) : (
+        children
+      )}
     </LayoutAnimationConfig>
   );
 }
+
+const LIST_CONTENTS = { display: 'contents' } as unknown as ViewStyle;
 
 /**
  * One row of an animated list: it fades and slides in when added (on the web
@@ -505,7 +515,7 @@ export function AnimatedList({ children, animateFirst = false }: { children: Rea
  * when rows around it change (Reanimated layout animations: native UI thread,
  * CSS on web). Never give a row a custom `Keyframe` as `entering` on the web
  * (`scripts/dev/e2e.cjs`, "lists with motion on"). Give it the row's stable
- * key. Instant under reduced motion. A removed row stays in the tree for
+ * key. A `listitem` on the web, inside the list `AnimatedList` draws. Instant under reduced motion. A removed row stays in the tree for
  * ~120 ms while it fades, so tests that count rows should read the store.
  */
 export function AnimatedItem({ children, style, testID }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; testID?: string }) {
@@ -513,6 +523,8 @@ export function AnimatedItem({ children, style, testID }: { children: React.Reac
   return (
     <Animated.View
       testID={testID}
+      // A row of the kit's `AnimatedList`: `listitem` on the web.
+      {...(Platform.OS === 'web' ? { role: 'listitem' as const } : null)}
       style={style}
       entering={reduce ? undefined : rowEnter}
       exiting={reduce ? undefined : rowExit}

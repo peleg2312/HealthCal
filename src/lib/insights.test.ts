@@ -219,7 +219,7 @@ describe('insight content cites the numbers', () => {
     const out = generateInsights(ctx(base({ protein: 96, proteinTarget: 134 })));
     const p = find(out, 'protein-low')!;
     expect(p.tone).toBe('attention');
-    expect(p.body).toContain('Protein averaged 96 g, 38 g under your 134 g target.');
+    expect(p.body).toContain('Protein averaged 96 g, 38 g under your 134 g goal.');
     expect(p.body).toMatch(/Greek yogurt/);
   });
 
@@ -234,6 +234,13 @@ describe('insight content cites the numbers', () => {
     expect(c.body).toContain('You averaged 2,400 kcal on 7 fully logged days against a 2,000 kcal budget: 400 kcal a day above.');
     expect(c.body).toContain('0.4 kg a week');
     expect(c.body).not.toMatch(/fail|cheat|bad/i);
+  });
+
+  it('the calories step promises only what one snack or portion can keep', () => {
+    const step = (kcal: number) => find(generateInsights(ctx(base({ kcal, budget: 2000 }))), 'calories-above')!.step;
+    expect(step(2200)).toBe('Leaving out one snack of about 200 kcal a day would close it.');
+    expect(step(2400)).toBe('A portion about 400 kcal smaller each day would close it.');
+    expect(step(2995)).toBe('The diary shows which meals carry most of it.');
   });
 
   it('calories on budget are positive, counted by the one rule', () => {
@@ -322,10 +329,13 @@ describe('patterns are computed, not asserted', () => {
     expect(hydrationPattern(even, TODAY)).toBeNull();
     const out = generateInsights(ctx(dropping));
     const w = find(out, 'water-low')!;
-    expect(w.title).toBe('Water goal met on 0 of 6 days');
+    // The finding is the pattern, never the count Progress's Water tile already shows.
+    expect(w.title).toBe('Less water in the afternoon');
+    expect(w.title).not.toMatch(/\d+ of \d+ days/);
     expect(w.body).toContain('You averaged');
-    expect(w.body).toContain('afternoons are where intake drops');
-    expect(w.step).toContain('in the afternoon');
+    expect(w.body).toContain('from noon to 5 pm against');
+    // Said once, in the finding.
+    expect(w.step).not.toContain('afternoon');
   });
 
   it('sleep and appetite need 3+ days on each side', () => {
@@ -396,6 +406,24 @@ describe('weeklyRecap', () => {
     expect(r.label).toBe('Last week');
     expect(r.weekStart).toBe('2026-11-02');
     expect(r.focus).toContain('400 kcal above budget');
+  });
+
+  it('promises only what one snack or portion can keep (D9-F3)', () => {
+    const tue = '2026-11-10';
+    const focus = (kcal: number) =>
+      weeklyRecap({ days: Array.from({ length: 14 }, (_, i) => day(addDays(tue, i - 13), { kcal, budget: 2000 })), trend: [], sleep: [], today: tue, units: 'metric', goal: 'lose' })!.focus;
+    expect(focus(2400)).toBe('Calories averaged 400 kcal above budget; a portion about 400 kcal smaller each day would close it.');
+    // 995 kcal a day: no single portion closes it, so no such promise.
+    const big = focus(2995);
+    expect(big).toBe('Calories averaged 995 kcal above budget; the diary shows which meals carry most of it.');
+    expect(big).not.toMatch(/close|portion|snack/);
+  });
+
+  it('leaves the days on budget to the Day by day headline, never the win', () => {
+    const tue = '2026-11-10';
+    const days = Array.from({ length: 14 }, (_, i) => day(addDays(tue, i - 13), { kcal: 1950, budget: 2000 }));
+    const r = weeklyRecap({ days, trend: [], sleep: [], today: tue, units: 'metric', goal: 'lose' })!;
+    expect(r.win).not.toMatch(/on budget/);
   });
 
   it('lists earlier weeks with a recap', () => {

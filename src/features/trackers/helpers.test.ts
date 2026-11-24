@@ -5,6 +5,7 @@ import { weightTrend } from '@/lib/trend';
 import type { SleepEntry, SleepQuality } from '@/types';
 
 import {
+  bodyFatText,
   clampFastStart,
   crossedGoal,
   fastingLabel,
@@ -114,6 +115,14 @@ describe('body', () => {
     const f = 163.205 * Math.log10(inch(72) + inch(98) - inch(33)) - 97.684 * Math.log10(inch(165)) - 78.387;
     expect(navyBodyFatPct({ sex: 'female', heightCm: 165, neckCm: 33, waistCm: 72, hipCm: 98 })).toBeCloseTo(f, 1);
     expect(navyBodyFatPct({ sex: 'female', heightCm: 165, neckCm: 33, waistCm: 72 })).toBeNull();
+  });
+
+  it('shows body fat one way: a whole percent with no space', () => {
+    expect(bodyFatText(18)).toBe('18%');
+    expect(bodyFatText(18.2)).toBe('18%');
+    expect(bodyFatText(15.7)).toBe('16%');
+    // Only where two different readings would otherwise read the same.
+    expect(bodyFatText(18.2, true)).toBe('18.2%');
   });
 });
 

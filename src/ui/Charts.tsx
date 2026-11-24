@@ -166,7 +166,7 @@ export function BarChart({
   data: BarDatum[];
   color: string;
   height?: number;
-  /** Dashed budget line; the part of a bar above it is drawn in warning. */
+  /** Dashed budget line (`dashEdge`); the part of a bar above it is drawn in warning. */
   goal?: number;
   /** 'limit' (default): the part of a bar above the goal is amber, as for calories. 'reach': the goal is something to get to (water, minutes), so nothing turns amber; a bar at or past it wears the brim line. */
   goalKind?: 'limit' | 'reach';
@@ -253,10 +253,12 @@ export function BarChart({
               const top = base - acc - sh;
               acc += sh;
               if (sh <= 0) return null;
+              // A solid bar has no outline, so the calorie colour is drawn as `caloriesBar` (3:1 on the card in every look).
+              const fill = sg.color === colors.calories ? colors.caloriesBar : sg.color;
               return j === 0 ? (
-                <Path key={j} d={cupPath(x, top, barW, base, r)} fill={sg.color} />
+                <Path key={j} d={cupPath(x, top, barW, base, r)} fill={fill} />
               ) : (
-                <Rect key={j} x={x} y={top} width={barW} height={Math.max(0, sh - 1.5)} fill={sg.color} />
+                <Rect key={j} x={x} y={top} width={barW} height={Math.max(0, sh - 1.5)} fill={fill} />
               );
             })
           : h > 0 && open
@@ -331,7 +333,7 @@ export function BarChart({
             {active !== null && data[active] ? (
               <Line x1={active * slot + slot / 2} x2={active * slot + slot / 2} y1={topPad - 4} y2={base} stroke={colors.textSecondary} strokeWidth={1} />
             ) : null}
-            {goal ? <Line x1={0} x2={width} y1={y(goal)} y2={y(goal)} stroke={colors.borderStrong} strokeWidth={1.5} strokeDasharray="4 4" /> : null}
+            {goal ? <Line x1={0} x2={width} y1={y(goal)} y2={y(goal)} stroke={colors.dashEdge} strokeWidth={1.5} strokeDasharray="4 4" /> : null}
             {data.map((d, i) => (
               <SvgText
                 key={`l-${i}`}
@@ -378,7 +380,7 @@ function toPath(points: { px: number; py: number }[], smooth: boolean): string {
 
 /**
  * Line chart: a 2 px line in the data colour, optional faint raw points, a
- * dashed borderStrong goal line and a rim dot on the latest value. Used for the
+ * dashed goal line (`dashEdge`, 3:1 on the card) and a rim dot on the latest value. Used for the
  * weight trend. A flat 10% tint (never a gradient) fills under the line only
  * when the axis holds zero, and then only down to zero: an area on an axis that
  * starts above zero would draw an amount by an area it does not have.
@@ -483,7 +485,7 @@ export function LineChart({
             </React.Fragment>
           ))}
           {goal !== undefined ? (
-            <Line x1={padL} x2={width - padR} y1={sy(goal)} y2={sy(goal)} stroke={colors.borderStrong} strokeWidth={1.5} strokeDasharray="4 4" />
+            <Line x1={padL} x2={width - padR} y1={sy(goal)} y2={sy(goal)} stroke={colors.dashEdge} strokeWidth={1.5} strokeDasharray="4 4" />
           ) : null}
           {(xLabels ?? []).map((label, i, arr) => (
             <SvgText

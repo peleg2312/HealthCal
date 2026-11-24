@@ -105,9 +105,11 @@ function KindChip({ label, selected, onPress, onFocus, testID }: { label: string
         borderRadius: radius.chip,
         backgroundColor: 'transparent',
         borderWidth: selected ? 2 : 1,
-        borderColor: selected ? colors.text : colors.borderStrong,
+        // The other kinds stay quiet (a hairline and secondary words), so the glasses under them lead the screen in
+        // every look; the chosen kind is the 2 px ink outline with its words in ink.
+        borderColor: selected ? colors.text : colors.border,
       }}>
-      <Text variant="label" color="text" numberOfLines={large ? undefined : 1} style={{ fontSize: 13.5, flexShrink: 1 }}>
+      <Text variant="label" color={selected ? 'text' : 'textSecondary'} numberOfLines={large ? undefined : 1} style={{ fontSize: 13.5, flexShrink: 1 }}>
         {label}
       </Text>
     </PressableScale>

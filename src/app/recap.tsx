@@ -185,7 +185,10 @@ export default function RecapScreen() {
         <>
           {/* The win is the week's headline, held in a card so it reads as content under the header, not a second title. */}
           <Card style={{ gap: spacing.xs }} testID="recap-win-card">
-            <Text variant="overline">Win of the week</Text>
+            {/* The card's label is its heading (level 2): the win under it is what it heads. */}
+            <Text variant="overline" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>
+              Win of the week
+            </Text>
             <Text variant="h2" testID="recap-win">
               {/* The last two words share a line, so a headline never ends on one word alone ("150."). */}
               {r.win.replace(/ (\S+)$/, '\u00A0$1')}
@@ -204,7 +207,9 @@ export default function RecapScreen() {
             <Card style={{ gap: spacing.md }} testID="recap-days">
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
                 <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                  <Text variant="h3">Day by day</Text>
+                  <Text variant="h3" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>
+                    Day by day
+                  </Text>
                   {/* Plain words in the headline ("3 of 7 days on budget, 2 above"); what they count and the week's balance in the caption. */}
                   <Text variant="title" testID="recap-days-verdict">
                     {verdict.line}
@@ -275,7 +280,7 @@ export default function RecapScreen() {
                     <Text variant="unit"> kcal</Text>
                   </Text>
                 </View>
-                <ArrowRight size={18} color={colors.textSecondary} style={{ marginBottom: 6 }} />
+                <ArrowRight size={18} color={colors.textSecondary} strokeWidth={1.9} style={{ marginBottom: 6 }} />
                 <View>
                   <Text variant="caption" color="textSecondary">
                     {d.plan.afterDate === d.today ? 'Today' : formatShortDate(d.plan.afterDate)}
@@ -304,7 +309,7 @@ export default function RecapScreen() {
 
       {d.earlier.length ? (
         <Card style={{ gap: spacing.xs }} testID="recap-earlier">
-          <Text variant="h3" style={{ marginBottom: spacing.xs }}>
+          <Text variant="h3" accessibilityRole="header" {...({ 'aria-level': 2 } as object)} style={{ marginBottom: spacing.xs }}>
             Earlier weeks
           </Text>
           {d.earlier.map((w) => (
@@ -325,7 +330,7 @@ export default function RecapScreen() {
               <Text variant="body" style={{ flex: 1 }}>
                 {weekRangeLabel(w, addDays(w, 6))}
               </Text>
-              <ChevronRight size={18} color={colors.textTertiary} />
+              <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.9} />
             </PressableScale>
           ))}
         </Card>

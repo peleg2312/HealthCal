@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, View, type StyleProp, type ViewStyle } f
 
 import { cup, cupFor, fonts, useTheme } from '@/theme';
 
+import { DECORATIVE } from './decorative';
 import { PressableScale } from './Pressable';
 import { Text, useGrownText } from './Text';
 
@@ -28,11 +29,14 @@ export function iconButtonGlyph(size: number, tone: 'surface' | 'alt' | 'primary
  * `size` or `strokeWidth` it was given. Anything else (a host element, text, a mark that takes neither) is drawn
  * as given.
  */
-function kitIcon(node: React.ReactNode, glyph: { size: number; strokeWidth: number }): React.ReactNode {
+function kitIcon(node: React.ReactNode, glyph: { size: number; strokeWidth: number }, recolour?: { from: string[]; to: string }): React.ReactNode {
   if (!React.isValidElement(node) || typeof node.type === 'string') return node;
   const props = node.props as Record<string, unknown>;
   if (!('size' in props) && !('strokeWidth' in props)) return node;
-  return React.cloneElement(node as React.ReactElement<{ size?: number; strokeWidth?: number }>, glyph);
+  // A ghost button's icon drawn in the accent takes the button's own ink (`actionInk`), so icon and label match.
+  const color = recolour && typeof props.color === 'string' && recolour.from.includes(props.color) ? { color: recolour.to } : null;
+  // Hidden from assistive technology: the control is named by its words.
+  return React.cloneElement(node as React.ReactElement<{ size?: number; strokeWidth?: number; color?: string }>, { ...glyph, ...color, ...DECORATIVE });
 }
 
 export interface ButtonProps {
@@ -40,7 +44,7 @@ export interface ButtonProps {
   onPress?: () => void;
   /**
    * primary: solid primary. secondary: transparent with a 1.5 px borderStrong edge.
-   * ghost: no edge, primaryInk text. danger: danger text and edge, no fill.
+   * ghost: no edge, `actionInk` text and icon (never the calorie ink). danger: danger text and edge, no fill.
    * soft: primarySoft fill with primaryInk text (a done state such as "Cheered").
    */
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'soft';
@@ -86,12 +90,16 @@ export function Button({ title, onPress, variant = 'primary', size = 'lg', icon,
       ? colors.onPrimary
       : variant === 'danger'
         ? colors.danger
-        : variant === 'ghost' || variant === 'soft'
-          ? // Not `primary`: it is under 4.5:1 on the soft fill and on bg in light and Blossom.
-            colors.primaryInk
-          : colors.text;
+        : variant === 'ghost'
+          ? // A borderless control's own ink: never the colour of a calorie figure (in Dark the accent is the calorie ink).
+            colors.actionInk
+          : variant === 'soft'
+            ? // Not `primary`: it is under 4.5:1 on the soft fill and on bg in light and Blossom.
+              colors.primaryInk
+            : colors.text;
   const edge = variant === 'secondary' ? (tint ?? colors.borderStrong) : variant === 'danger' ? colors.danger : 'transparent';
   const glyph = { size: BUTTON_ICON[size], strokeWidth: BUTTON_STROKE };
+  const recolour = variant === 'ghost' ? { from: [colors.primary, colors.primaryInk, colors.caloriesInk], to: colors.actionInk } : undefined;
   return (
     <PressableScale
       testID={testID}
@@ -121,7 +129,7 @@ export function Button({ title, onPress, variant = 'primary', size = 'lg', icon,
         <ActivityIndicator color={fg} />
       ) : (
         <>
-          {icon ? <View>{kitIcon(icon, glyph)}</View> : null}
+          {icon ? <View {...DECORATIVE}>{kitIcon(icon, glyph, recolour)}</View> : null}
           <Text
             variant="title"
             color={fg}
@@ -129,7 +137,7 @@ export function Button({ title, onPress, variant = 'primary', size = 'lg', icon,
             style={[sm ? { fontSize: 14, lineHeight: 18, fontFamily: fonts.bold } : null, large ? { flexShrink: 1, textAlign: 'center' } : null]}>
             {title}
           </Text>
-          {iconRight ? <View>{kitIcon(iconRight, glyph)}</View> : null}
+          {iconRight ? <View {...DECORATIVE}>{kitIcon(iconRight, glyph, recolour)}</View> : null}
         </>
       )}
     </PressableScale>

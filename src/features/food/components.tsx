@@ -119,7 +119,8 @@ export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: 
             aria-checked={active}
             {...(web
               ? {
-                  // One tab stop for the group, the chosen meal; the arrow keys move the choice (WAI-ARIA radio group).
+                  // One tab stop for the group, the chosen meal. The arrow keys move the focus and Space or Enter
+                  // picks: in Edit entry a pick moves the entry at once (`pickMeal`), so an arrow never does it alone.
                   tabIndex: active ? 0 : -1,
                   onKeyDown: (e: { key: string; currentTarget: unknown; preventDefault: () => void }) => {
                     const next = rovingIndex(e.key, i, MEALS.length);
@@ -127,7 +128,6 @@ export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: 
                     e.preventDefault();
                     const row = (e.currentTarget as HTMLElement | null)?.parentElement;
                     (row?.children[next] as HTMLElement | undefined)?.focus();
-                    if (MEALS[next].id !== value) onChange(MEALS[next].id);
                   },
                 }
               : null)}

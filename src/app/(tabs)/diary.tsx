@@ -1,7 +1,7 @@
 import { router, useIsFocused, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Copy } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { type ScrollView, type ScrollViewProps, View } from 'react-native';
+import { type ScrollView, type ScrollViewProps, useWindowDimensions, View } from 'react-native';
 
 import { hasFoodLogged } from '@/features/drinks/via';
 import { copyPreviousDay, copyPreviousMeal, findPreviousDay, findPreviousMeal } from '@/features/food/actions';
@@ -21,7 +21,7 @@ import { today } from '@/lib/dates';
 import { MEALS } from '@/lib/nutrition';
 import { useToday } from '@/store/clock';
 import { useDay, useLive } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { useLargeText, useTheme } from '@/theme';
 import type { ISODate, MealType } from '@/types';
 import { Button, Screen } from '@/ui';
 
@@ -31,6 +31,10 @@ const MEAL_LOOKS = 20;
 
 export default function DiaryScreen() {
   const { colors, spacing } = useTheme();
+  // Under 360 px (at the designed text size) the diary is compact, so at 320 x 640 Lunch's add is in the first view.
+  const screenW = useWindowDimensions().width;
+  const big = useLargeText();
+  const narrow = screenW < 360 && !big;
   const params = useLocalSearchParams<{ date?: string; meal?: string }>();
   const t = useToday();
   const date = parseDate(params.date, t);
@@ -108,9 +112,12 @@ export default function DiaryScreen() {
 
   return (
     <Screen tabs testID="diary-screen" scrollProps={{ ref: scrollRef } as ScrollViewProps} header={<TabHeader tab="diary" overline={tabDay(date)} title="Food diary" />}>
-      <View testID="diary-swipe" {...swipe} style={{ gap: spacing.lg }}>
+      {/* Under 360 px the cards sit 12 apart (16 under the strip, as on Today), so at 320 x 640 Lunch's add is in the first view. */}
+      <View testID="diary-swipe" {...swipe} style={{ gap: narrow ? spacing.md : spacing.lg }}>
       {/* The one date control, the same as Today's: the header's overline names the day, the strip picks one. */}
-      <DayRingStrip today={t} selected={date} onSelect={setDate} testIDPrefix="diary" latest={latest} jumpTestID="diary-today" />
+      <View style={narrow ? { marginBottom: spacing.lg - spacing.md } : undefined}>
+        <DayRingStrip today={t} selected={date} onSelect={setDate} testIDPrefix="diary" latest={latest} jumpTestID="diary-today" />
+      </View>
 
       {/* A day with nothing logged has no panel of its own: each meal's dashed slot is its add (the first one says what
           the search offers), and the whole of the last logged day can be copied from the summary card's last row. */}

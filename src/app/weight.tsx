@@ -12,7 +12,7 @@ import { trendMonthParts, weeklyRateText } from '@/features/progress/goalDate';
 import { formatWeight, weightToKg, weightUnit, weightValue } from '@/lib/units';
 import { applyWeighInToTargets, deleteWeightRecord, saveWeightRecord } from '@/features/trackers/actions';
 import { DayStepper, Explain, ExplainText, Figure, HistoryRow, RequireProfile } from '@/features/trackers/components';
-import { findByDate, keepOrConvert, targetsBehind, weightChartData, weightStats, weightText, type WeightRange } from '@/features/trackers/helpers';
+import { bodyFatText, findByDate, keepOrConvert, targetsBehind, weightChartData, weightStats, weightText, type WeightRange } from '@/features/trackers/helpers';
 import { isSyncedWeighIn, weighInFromLine } from '@/features/trackers/weighInSource';
 import { useToday } from '@/store/clock';
 import { useProfile, useWeightSeries } from '@/store/selectors';
@@ -220,12 +220,12 @@ function WeightScreen() {
                     title={formatDayLabel(e.date)}
                     subtitle={[
                       delta !== null ? `${Math.abs(delta) < 0.05 ? '0' : `${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(1)}`} ${unit} vs previous` : null,
-                      isPlausibleBodyFat(e.bodyFatPct) ? `${e.bodyFatPct}% body fat` : null,
+                      isPlausibleBodyFat(e.bodyFatPct) ? `${bodyFatText(e.bodyFatPct)} body fat` : null,
                       weighInFromLine(e)?.replace(/^From /, 'from ') ?? null,
                     ]
                       .filter(Boolean)
                       // The change first and where it came from last: at 320 px a long line is shortened at the source, never the change.
-                      // Each part stays whole ("20.8% body fat"), so a long line breaks only between them; at large
+                      // Each part stays whole ("21% body fat"), so a long line breaks only between them; at large
                       // text a part may break between its words, never inside one.
                       .map((part) => (bigText ? (part as string) : (part as string).replace(/ /g, '\u00A0')))
                       .join(' · ') || undefined}
@@ -262,7 +262,7 @@ function WeightScreen() {
 
 /**
  * "Your targets use 84.0 kg. Your latest weigh-in, from Garmin Connect on Nov 18, is 82.4 kg."
- * With body fat: "… is 82.4 kg with 18.2% body fat."
+ * With body fat: "… is 82.4 kg with 18% body fat."
  */
 function targetsBehindText(
   behind: NonNullable<ReturnType<typeof targetsBehind>>,
@@ -270,9 +270,12 @@ function targetsBehindText(
   units: UnitSystem,
 ): string {
   const from = weighInFromLine(behind.latest)?.replace(/^From /, 'from ') ?? 'from your health app';
-  // One decimal on both sides; a profile without body fat leaves the clause out.
-  const fat = behind.bodyFatPct !== undefined ? ` with ${behind.bodyFatPct.toFixed(1)}% body fat` : '';
-  const ownFat = behind.bodyFatPct !== undefined && typeof profile.bodyFatPct === 'number' ? ` and ${profile.bodyFatPct.toFixed(1)}% body fat` : '';
+  // Body fat as everywhere, a whole percent; in tenths only when the two readings would show the same figure,
+  // so the sentence never sets "18%" against "18%". A profile without body fat leaves the clause out.
+  const own = typeof profile.bodyFatPct === 'number' ? profile.bodyFatPct : null;
+  const tenths = behind.bodyFatPct !== undefined && own !== null && Math.round(behind.bodyFatPct) === Math.round(own);
+  const fat = behind.bodyFatPct !== undefined ? ` with ${bodyFatText(behind.bodyFatPct, tenths)} body fat` : '';
+  const ownFat = behind.bodyFatPct !== undefined && own !== null ? ` and ${bodyFatText(own, tenths)} body fat` : '';
   return `Your targets use ${fixedWeight(profile.weightKg, units)}${ownFat}. Your latest weigh-in, ${from} on ${formatShortDate(behind.latest.date)}, is ${fixedWeight(behind.kg, units)}${fat}.`;
 }
 

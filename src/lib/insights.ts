@@ -443,6 +443,20 @@ const gText = (n: number) => `${Math.round(n)} g`;
 const round10 = (n: number) => Math.round(n / 10) * 10;
 const round50 = (n: number) => Math.max(50, Math.round(n / 50) * 50);
 
+/**
+ * What one smaller snack or portion would do to a daily excess, said only where it is true: a snack
+ * closes up to 250 kcal and a portion up to 500 kcal. Past that no single portion closes it, so there
+ * is no such promise (null), and the words point to where it adds up instead (Progress and the recap).
+ */
+function trimWords(diff: number): string | null {
+  if (diff <= 250) return `leaving out one snack of about ${round50(diff)} kcal a day would close it`;
+  if (diff <= 500) return `a portion about ${round50(diff)} kcal smaller each day would close it`;
+  return null;
+}
+/** Where an excess too large for one portion adds up: the diary, by meal. */
+const WHERE_IT_ADDS_UP = 'the diary shows which meals carry most of it';
+const sentence = (s: string) => `${s.charAt(0).toUpperCase()}${s.slice(1)}.`;
+
 /** Weekly weight change for copy: one decimal, two below 0.1. */
 export function rateText(kg: number, units: UnitSystem): string {
   const a = Math.abs(kg);
@@ -535,7 +549,7 @@ function caloriesInsight({ summary: s, days, today, units }: InsightContext): In
     const weekdaysOnPlan = pattern && pattern.diff >= 150 && Math.abs(pattern.weekdayAvg - c.avgBudget) <= c.avgBudget * 0.05;
     const step = weekdaysOnPlan
       ? 'Planning one weekend meal ahead would make the biggest difference.'
-      : `Trimming one ${diff <= 250 ? 'snack' : 'portion'} of about ${round50(diff)} kcal a day would bring it back.`;
+      : sentence(trimWords(diff) ?? WHERE_IT_ADDS_UP);
     return {
       id: 'calories-above',
       tone: 'attention',
@@ -577,9 +591,9 @@ function proteinInsight({ summary: s, goal }: InsightContext): Insight | null {
     return {
       id: 'protein-low',
       tone: 'attention',
-      title: 'Protein below target',
+      title: 'Protein below its goal',
       step: small ? 'A Greek yogurt or 100 g of chicken a day would close most of it.' : 'A protein source at two meals a day would close most of it.',
-      body: `Protein averaged ${gText(p.avg)}, ${gText(gap)} under your ${gText(p.target)} target. ${
+      body: `Protein averaged ${gText(p.avg)}, ${gText(gap)} under your ${gText(p.target)} goal. ${
         small
           ? 'A serving of Greek yogurt adds about 24 g, a 100 g portion of chicken about 31 g.'
           : 'For example Greek yogurt at breakfast, and chicken, fish or tofu at lunch.'
@@ -593,9 +607,9 @@ function proteinInsight({ summary: s, goal }: InsightContext): Insight | null {
     return {
       id: 'protein-on-target',
       tone: 'positive',
-      title: 'Protein on target',
+      title: 'Protein at its goal',
       step: `${gText(p.avg)} a day against ${gText(p.target)}.`,
-      body: `Protein averaged ${gText(p.avg)} against a ${gText(p.target)} target${why}.`,
+      body: `Protein averaged ${gText(p.avg)} against a ${gText(p.target)} goal${why}.`,
       score: 40,
     };
   }
@@ -619,9 +633,9 @@ function fiberInsight({ summary: s }: InsightContext): Insight | null {
     return {
       id: 'fiber-on-target',
       tone: 'positive',
-      title: 'Fibre on target',
+      title: 'Fibre at its goal',
       step: `${gText(f.avg)} a day against ${gText(f.target)}.`,
-      body: `Fibre averaged ${gText(f.avg)} against a ${gText(f.target)} target.`,
+      body: `Fibre averaged ${gText(f.avg)} against a ${gText(f.target)} goal.`,
       score: 18,
     };
   }
@@ -632,24 +646,27 @@ function hydrationInsight({ summary: s, days, today, units }: InsightContext): I
   const w = s.water;
   if (!w || w.daysTracked < 3) return null;
   const rate = w.daysAtGoal / w.daysTracked;
-  // The title says the count in neutral words (what was reached, never what was missed); the body adds the amounts.
-  const reached = `Water goal met on ${w.daysAtGoal} of ${w.daysTracked} ${w.daysTracked === 1 ? 'day' : 'days'}`;
-  const head = `You reached your water goal on ${w.daysAtGoal} of ${w.daysTracked} days`;
+  // Progress's Water tile already says the days at the goal and the litres a day, so the finding says
+  // what the tile does not: when in the day intake drops, else how far the average sits below the
+  // goal, in neutral words (never what was missed). The body adds the goal and the amounts.
+  const gap = Math.max(0, w.avgGoalMl - w.avgMl);
+  const pattern = hydrationPattern(days, today);
+  const when = pattern?.low === 'afternoon' ? ' in the afternoon' : pattern?.low === 'morning' ? ' in the morning' : pattern?.low === 'evening' ? ' in the early evening' : '';
+  const finding = pattern ? `Less water${when}` : gap > 0 ? `About ${formatVolume(round50(gap), units)} a day below the water goal` : null;
+  const against = `You averaged ${formatVolume(w.avgMl, units)} a day against a goal of ${formatVolume(w.avgGoalMl, units)}`;
   if (rate < 0.5) {
-    const gap = Math.max(0, w.avgGoalMl - w.avgMl);
-    const pattern = hydrationPattern(days, today);
     const label = (p: DayPart) => DAY_PARTS.find((x) => x.id === p)!.label;
     const patternText = pattern
-      ? `; ${pattern.low === 'morning' ? 'mornings' : pattern.low === 'afternoon' ? 'afternoons' : 'evenings'} are where intake drops, about ${formatVolume(round50(pattern.ml[pattern.low]), units)} ${label(pattern.low)} against ${formatVolume(round50(pattern.ml[pattern.high]), units)} ${label(pattern.high)}`
+      ? `; about ${formatVolume(round50(pattern.ml[pattern.low]), units)} ${label(pattern.low)} against ${formatVolume(round50(pattern.ml[pattern.high]), units)} ${label(pattern.high)}`
       : '';
     const glasses = Math.max(1, Math.ceil(gap / glassMl(units)));
-    const when = pattern?.low === 'afternoon' ? ' in the afternoon' : pattern?.low === 'morning' ? ' in the morning' : pattern?.low === 'evening' ? ' in the early evening' : '';
     return {
       id: 'water-low',
       tone: 'attention',
-      title: reached,
-      step: `${glasses === 1 ? `One more ${glassText(units)} glass` : `${glasses} more ${glassText(units)} glasses`} a day${when} would close the gap.`,
-      body: `You averaged ${formatVolume(w.avgMl, units)} a day against ${formatVolume(w.avgGoalMl, units)}${patternText}.`,
+      title: finding ?? 'Water below its goal on most days',
+      // When in the day is the finding above, so the step does not say it again.
+      step: `${glasses === 1 ? `One more ${glassText(units)} glass` : `${glasses} more ${glassText(units)} glasses`} a day would close the gap.`,
+      body: `${against}${patternText}.`,
       action: { label: 'Log water', route: '/water' },
       score: 42 + (1 - rate) * 20,
     };
@@ -659,17 +676,17 @@ function hydrationInsight({ summary: s, days, today, units }: InsightContext): I
       id: 'water-on-track',
       tone: 'positive',
       title: 'Hydration on track',
-      step: `Goal reached on ${w.daysAtGoal} of ${w.daysTracked} days.`,
-      body: `${head}, averaging ${formatVolume(w.avgMl, units)} a day.`,
+      step: 'The same routine keeps it there.',
+      body: `${against}.`,
       score: 34,
     };
   }
   return {
     id: 'water-mixed',
     tone: 'neutral',
-    title: reached,
+    title: finding ?? 'Water varies from day to day',
     step: 'A glass with each meal would make it most days.',
-    body: `You averaged ${formatVolume(w.avgMl, units)} a day against ${formatVolume(w.avgGoalMl, units)}.`,
+    body: `${against}.`,
     action: { label: 'Log water', route: '/water' },
     score: 24,
   };
@@ -1054,18 +1071,19 @@ export function recapWinFocus(s: PeriodSummary, units: UnitSystem, goal: GoalTyp
   const focuses: { score: number; text: string }[] = [];
   const c = s.calories;
   if (c && s.completeDays >= 2) {
-    const share = c.onBudget / s.completeDays;
-    if (share >= 0.6) wins.push({ score: share, text: `${c.onBudget} of ${s.completeDays} fully logged days on budget, at 90 to 100% of it.` });
+    // No win for days on budget: the check-in's "Day by day" headline counts them ("5 of 6 days on budget,
+    // 1 above"), and a figure is said once on a screen.
     if (c.avgDiff > c.avgBudget * 0.05)
       focuses.push({
         score: Math.min(1, c.avgDiff / c.avgBudget / 0.2),
-        text: `Calories averaged ${kcalText(c.avgDiff)} above budget; trimming one ${c.avgDiff <= 250 ? 'snack' : 'portion'} a day would close it.`,
+        // Only what one snack or portion can keep: past 500 kcal a day, where it adds up instead.
+        text: `Calories averaged ${kcalText(c.avgDiff)} above budget; ${trimWords(c.avgDiff) ?? WHERE_IT_ADDS_UP}.`,
       });
   }
   const p = s.macros?.protein;
   if (p && p.target > 0) {
     const ratio = p.avg / p.target;
-    if (ratio >= 0.95) wins.push({ score: 0.9, text: `Protein averaged ${gText(p.avg)}, on your ${gText(p.target)} target.` });
+    if (ratio >= 0.95) wins.push({ score: 0.9, text: `Protein averaged ${gText(p.avg)} against your ${gText(p.target)} goal.` });
     else if (p.target - p.avg >= 10)
       focuses.push({ score: Math.min(1, (1 - ratio) * 3), text: `Protein: add about ${gText(p.target - p.avg)} a day, for example one Greek yogurt or a portion of chicken.` });
   }
@@ -1073,12 +1091,17 @@ export function recapWinFocus(s: PeriodSummary, units: UnitSystem, goal: GoalTyp
   if (w && w.daysTracked >= 2) {
     const r = w.daysAtGoal / w.daysTracked;
     if (r >= 0.7) wins.push({ score: r, text: `You hit your water goal on ${w.daysAtGoal} of ${w.daysTracked} days.` });
-    else focuses.push({ score: (1 - r) * 0.8, text: `Water: goal reached on ${w.daysAtGoal} of ${w.daysTracked} days; one more ${glassText(units)} glass a day would help.` });
+    // The days at the goal are the Water tile's figure, so the focus says what the tile does not: the gap.
+    else {
+      const gap = w.avgGoalMl - w.avgMl;
+      focuses.push({ score: (1 - r) * 0.8, text: `Water: ${gap >= 50 ? `about ${formatVolume(round50(gap), units)} a day below its goal; ` : ''}one more ${glassText(units)} glass a day would help.` });
+    }
   }
   const mins = s.activity.guidelineMinutes;
   if (mins >= WEEKLY_ACTIVE_MINUTES) wins.push({ score: 0.85, text: `${mins} active minutes in ${plural(s.activity.sessions, 'session')}, past the weekly ${WEEKLY_ACTIVE_MINUTES}.` });
   else if (s.totalDays >= 5)
-    focuses.push({ score: ((WEEKLY_ACTIVE_MINUTES - mins) / WEEKLY_ACTIVE_MINUTES) * 0.7, text: `Activity: ${mins} of the weekly ${WEEKLY_ACTIVE_MINUTES} active minutes; ${plural(Math.ceil((WEEKLY_ACTIVE_MINUTES - mins) / 30), 'brisk 30-minute walk')} would get you there.` });
+    // The minutes so far are the Active minutes tile's figure: the focus names only what is left to do.
+    focuses.push({ score: ((WEEKLY_ACTIVE_MINUTES - mins) / WEEKLY_ACTIVE_MINUTES) * 0.7, text: `Activity: ${plural(Math.ceil((WEEKLY_ACTIVE_MINUTES - mins) / 30), 'brisk 30-minute walk')} would reach the weekly ${WEEKLY_ACTIVE_MINUTES} active minutes.` });
   const sl = s.sleep;
   if (sl && sl.nights >= 3) {
     if (sl.avgHours >= SLEEP_TARGET_HOURS && sl.avgHours <= SLEEP_MAX_HOURS) wins.push({ score: 0.6, text: `Sleep averaged ${hoursText(sl.avgHours)} a night.` });
@@ -1248,7 +1271,7 @@ export function recapTiles(r: Pick<WeeklyRecap, 'summary' | 'previous' | 'label'
       label: 'Protein',
       value: round(s.macros?.protein.avg),
       unit: 'g / day',
-      context: s.macros ? `target ${gText(s.macros.protein.target)}` : 'no fully logged days',
+      context: s.macros ? `goal ${gText(s.macros.protein.target)}` : 'no fully logged days',
       previous: round(p?.macros?.protein.avg),
       upIsGood: true,
     }),

@@ -13,7 +13,7 @@ import { useStore } from '@/store';
 import type { FastingSession, ISODate, Profile, SleepEntry, SleepQuality, WeightEntry } from '@/types';
 import { haptic, toast } from '@/ui';
 
-import { fastProgress, findByDate, isMostRecentDate, nightAfterEdit, ownLatestBodyFat, profileAfterDelete, weighInAfterEdit, weightText } from './helpers';
+import { bodyFatText, fastProgress, findByDate, isMostRecentDate, nightAfterEdit, ownLatestBodyFat, profileAfterDelete, weighInAfterEdit, weightText } from './helpers';
 import { isSyncedWeighIn, sameFat } from './weighInSource';
 
 type WeightPatch = Partial<Omit<WeightEntry, 'id' | 'updatedAt' | 'deleted' | 'date'>>;
@@ -93,7 +93,7 @@ export function applyWeighInToTargets(entry: Pick<WeightEntry, 'kg' | 'bodyFatPc
   s.setProfile({ weightKg: entry.kg, ...(typeof entry.bodyFatPct === 'number' ? { bodyFatPct: entry.bodyFatPct } : {}) });
   haptic.success();
   // Name the body fat too when the tap changed it, so the toast says everything the tap set.
-  const fat = typeof entry.bodyFatPct === 'number' && !sameFat(entry.bodyFatPct, s.profile.bodyFatPct) ? ` and ${entry.bodyFatPct.toFixed(1)}% body fat` : '';
+  const fat = typeof entry.bodyFatPct === 'number' && !sameFat(entry.bodyFatPct, s.profile.bodyFatPct) ? ` and ${bodyFatText(entry.bodyFatPct)} body fat` : '';
   // One decimal, as the weigh-in it names is shown ("Targets now use 82.0 kg").
   toast(`Targets now use ${weightText(entry.kg, s.profile.units)}${fat}`, {
     label: 'Undo',
@@ -142,7 +142,8 @@ export function deleteSleep(entry: SleepEntry) {
 }
 
 export function startFast(targetHours: number, startISO: string = new Date().toISOString()): FastingSession {
-  haptic.press();
+  // A fast starting is a record saved: `success`, the one meaning of that haptic.
+  haptic.success();
   return useStore.getState().upsert('fasting', { start: startISO, targetHours });
 }
 
