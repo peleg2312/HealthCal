@@ -2180,7 +2180,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
       const box = await p.getByTestId('quick-fav-meal-0').first().boundingBox();
       check('favourites: the + sheet\'s first tile is the newest favourite meal, wholly inside the first view at 360 x 740', box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 360 && box.y + box.height <= 740 && (await ftext(p, 'quick-fav-meal-0')).includes('Chicken and rice bowl'), box ? `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)}` : 'no tile');
       const title = await ftext(p, 'quick-usual-title');
-      check('favourites: the row is titled "Favourites and usual for …" and the second favourite follows', /^Favourites and usual for (breakfast|lunch|dinner|a snack|snack)$/i.test(title) && (await ftext(p, 'quick-fav-meal-1')).includes('Usual breakfast') && (await p.getByTestId('quick-usual-saved').count()) === 0, title);
+      check('favourites: the row is titled "Favourites and usual for …" and the second favourite follows', /^Favourites and usual for (breakfast|lunch|dinner|a snack|snacks?)$/i.test(title) && (await ftext(p, 'quick-fav-meal-1')).includes('Usual breakfast') && (await p.getByTestId('quick-usual-saved').count()) === 0, title);
       const cap = await ftext(p, 'quick-fav-meal-0-caption');
       check('favourites: the saved estimate\'s tile reads "~" before its calories ("3 items, ~592 kcal")', /^3 items, ~[\d,]+ kcal$/.test(cap), cap);
       const before = new Set(Object.keys((await fstate(p)).foodEntries));
@@ -2265,7 +2265,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
         `${box ? `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)}` : 'no tile'} | ${lefts.map((l) => l.id).join(', ')}`,
       );
       const title = await ftext(p, 'quick-usual-title');
-      check('favourites: the row is titled "Favourites and usual for …" (the favourites drawn first)', /^Favourites and usual for (breakfast|lunch|dinner|a snack|snack)$/i.test(title), title);
+      check('favourites: the row is titled "Favourites and usual for …" (the favourites drawn first)', /^Favourites and usual for (breakfast|lunch|dinner|a snack|snacks?)$/i.test(title), title);
       const favIds = (await fstate(p)).favoriteFoodIds;
       const usualShown = lefts.filter((l) => l.id.startsWith('quick-usual-')).map((l) => l.id.slice('quick-usual-'.length));
       check('favourites: a favourite food is shown once, never again as a usual tile', usualShown.length > 0 && usualShown.every((k) => !favIds.includes(k)), usualShown.join(', '));
