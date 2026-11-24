@@ -12,8 +12,8 @@ import { COACH_OPEN_LABEL, COACH_OPEN_NEW } from './words';
 /** The glyph's size in the cup, and the unread line's width. */
 const GLYPH = 20;
 const UNREAD_W = 12;
-/** The bubble's tail ends at 20 of the glyph's 24 grid, its stroke half of 1.9: the line starts 2 px under that. */
-const unreadTop = (size: number) => Math.round((size - GLYPH) / 2 + (20 * GLYPH) / 24 + (1.9 * GLYPH) / 48 + 2);
+/** The bubble's tail ends at 20 of the glyph's 24 grid, its stroke half of 1.9: the line starts 3 px under that (28 in a 36 px cup). */
+const unreadTop = (size: number) => Math.round((size - GLYPH) / 2 + (20 * GLYPH) / 24 + (1.9 * GLYPH) / 48 + 3);
 
 /**
  * The way into the coach: the first of the three cups on every tab header (Coach, Friends,
@@ -38,7 +38,7 @@ export function CoachEntry({ testID, size = 44, hitSlop }: { testID: string; siz
       {unread ? (
         // A level line poured into the cup under the bubble, taking no touches, so the whole cup stays the button.
         // The bubble holds the AI's drop, so there is no room inside it; drawn across the cup's top it cut the
-        // outline and read as a broken icon. It lies 2 px under the bubble's tail, centred, inside the cup's walls.
+        // outline and read as a broken icon. It lies 3 px under the bubble's tail, centred, inside the cup's walls.
         <View
           pointerEvents="none"
           testID={`${testID}-unread`}
