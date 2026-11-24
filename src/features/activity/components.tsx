@@ -53,7 +53,7 @@ function useDayRule(date: ISODate): ExerciseRule {
  * the row, its line ("Today · 75 min · Moderate", `historyMetaLines`: one line at 360, at most two balanced
  * lines at 320, never a word alone). `day` (Train's history, where a week's card holds its rows) leads that
  * line and is spoken in the label. The figure is the net number the workout adds, with the run log's words for
- * its day's rule (`budgetAddsShort`: "+290 kcal added", "+290 kcal added over 7 days", "290 kcal not added"),
+ * its day's rule (`budgetAddsShort`: "~290 kcal added", "~290 kcal added over 7 days", "~290 kcal not added"),
  * so it never reads as the run log's larger burn. Where the name and the figure do not fit side by side
  * (`historyFigureBeside`), the figure takes a line of its own under the name. An estimate's range is in the
  * label and on the session's own screen ("likely 390–585 kcal").
@@ -90,7 +90,7 @@ export function SessionRow({
     ...(day ? [day.spoken] : []),
     ...parts,
     ...(garmin ? ['imported from Garmin'] : []),
-    measured ? `${adds.spoken}, measured` : `${adds.spoken}, an estimate, likely ${formatNumber(range![0])} to ${formatNumber(range![1])}`,
+    measured ? `${adds.spoken}, from a measured burn` : `${adds.spoken}, an estimate, likely ${formatNumber(range![0])} to ${formatNumber(range![1])}`,
   ].join(', ');
   const figure = (
     <Text variant="numM" testID={`session-kcal-${entry.id}`} style={{ fontSize: 17, lineHeight: 22, flexShrink: beside ? 0 : 1 }}>
