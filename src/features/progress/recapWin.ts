@@ -1,7 +1,7 @@
 /**
  * Which of the check-in's four tiles the win of the week restates, so the screen says each figure
  * once: the win card states it ("305 active minutes in 4 sessions, past the weekly 150."), and the
- * tile it restates keeps only its label and its change against the week before.
+ * tile it restates keeps its label, "In the win above" and its change against the week before.
  *
  * The win is one sentence from `recapWinFocus` (`@/lib/insights`); its templates that restate a
  * tile are matched here and proved against that function in `recapWin.test.ts`, so a reworded

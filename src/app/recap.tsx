@@ -32,8 +32,8 @@ const TILE_KIND: Record<RecapTile['id'], ChangeKind> = { calories: 'kcal', prote
 
 /**
  * One cell of the week's numbers: the four share a card, divided by hairlines. The tile the win of the
- * week restates (`won`) keeps only its label and its change against the week before: the win card
- * above already says its figures, and a figure is said once on a screen. Its spoken label stays whole.
+ * week restates (`won`) keeps its label, "In the win above" and its change against the week before: the
+ * win card already says its figures, and a figure is said once on a screen. Its spoken label stays whole.
  */
 function Tile({ t, index, week, won = false }: { t: RecapTile; index: number; week: string; won?: boolean }) {
   const { colors, spacing } = useTheme();
@@ -92,11 +92,9 @@ function Tile({ t, index, week, won = false }: { t: RecapTile; index: number; we
           <Text variant="unit">{` ${t.unit}`}</Text>
         </AnimatedNumber>
       )}
-      {won ? null : (
-        <Text variant="caption" color="textSecondary" numberOfLines={oneColumn ? 4 : 2}>
-          {t.context}
-        </Text>
-      )}
+      <Text variant="caption" color="textSecondary" numberOfLines={oneColumn ? 4 : 2} testID={won ? `recap-tile-${t.id}-won` : undefined}>
+        {won ? 'In the win above' : t.context}
+      </Text>
       {deltaText(t) ? (
         <View
           style={{
