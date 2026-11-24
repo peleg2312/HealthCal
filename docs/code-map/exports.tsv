@@ -66,6 +66,7 @@ src/data/foods.ts	NATIONAL_LABELS	const
 src/data/foods.ts	NATIONAL_RECIPES	const
 src/data/searchNames.ts	SEARCH_NAMES	const
 src/data/searchNames.ts	SearchNames	interface
+src/features/activity/BringIn.tsx	BringIn	component
 src/features/activity/LoadMark.tsx	LoadMark	component
 src/features/activity/RoutineCards.tsx	RoutineCards	component
 src/features/activity/RoutineCards.tsx	useRoutineTemplates	function
@@ -74,6 +75,13 @@ src/features/activity/TrainingLoadSheet.tsx	TrainingLoadSheet	component
 src/features/activity/WeekCard.tsx	WeekCard	component
 src/features/activity/ZoneScale.tsx	ZoneScale	component
 src/features/activity/ZoneScale.tsx	ZoneTrack	component
+src/features/activity/bringIn.ts	BRING_IN_TITLE	const
+src/features/activity/bringIn.ts	BringInChoice	type
+src/features/activity/bringIn.ts	BringInState	interface
+src/features/activity/bringIn.ts	ChoiceWords	interface
+src/features/activity/bringIn.ts	bringInChoices	function
+src/features/activity/bringIn.ts	bringInLine	function
+src/features/activity/bringIn.ts	choiceWords	function
 src/features/activity/build.ts	BuildActivityInput	interface
 src/features/activity/build.ts	BuiltActivity	type
 src/features/activity/build.ts	MODERATE_MET	re-export	src/lib/exercise.ts:MODERATE_MET
@@ -326,9 +334,12 @@ src/features/ai/weight.ts	weightProblem	function
 src/features/ai/weight.ts	weightSentence	function
 src/features/ai/words.ts	AI_TILE_HINT	const
 src/features/ai/words.ts	ANALYSING	const
+src/features/ai/words.ts	DESCRIPTION_MAX	const
 src/features/ai/words.ts	analysingLabel	function
 src/features/ai/words.ts	analysingNote	function
 src/features/ai/words.ts	analysingSteps	function
+src/features/ai/words.ts	prefilledDescription	function
+src/features/ai/words.ts	searchAiTile	function
 src/features/ai/words.ts	slowAfterMs	function
 src/features/auth/GoogleButton.tsx	GOOGLE_BUTTON_HEIGHT	const
 src/features/auth/GoogleButton.tsx	GoogleButton	component
@@ -883,6 +894,7 @@ src/features/food/favoriteWords.ts	favoriteLabel	function
 src/features/food/favoriteWords.ts	favoriteToast	function
 src/features/food/favoriteWords.ts	hasEstimate	function
 src/features/food/favoriteWords.ts	isEstimateFood	function
+src/features/food/favoriteWords.ts	logMealLabel	function
 src/features/food/favoriteWords.ts	quickRowTitle	function
 src/features/food/favoriteWords.ts	saveRowDay	function
 src/features/food/favoriteWords.ts	savedRowCaption	function
@@ -1425,7 +1437,6 @@ src/features/health-sync/ui/HeartRateLine.tsx	HeartRateLine	component
 src/features/health-sync/ui/ReviewCard.tsx	ReviewCard	component
 src/features/health-sync/ui/StepsLine.tsx	StepsLine	component
 src/features/health-sync/ui/SyncedFromLine.tsx	SyncedFromLine	component
-src/features/health-sync/ui/TrainSyncLink.tsx	TrainSyncLink	component
 src/features/health-sync/ui/WatchEstimate.tsx	WatchEstimate	component
 src/features/health-sync/ui/WatchEstimate.tsx	WatchEstimateNote	component
 src/features/health-sync/ui/WatchEstimate.tsx	useWatchEstimate	function
@@ -1964,6 +1975,7 @@ src/features/onboarding/projection.ts	Projection	interface
 src/features/onboarding/projection.ts	Waypoint	interface
 src/features/onboarding/projection.ts	looseDate	function
 src/features/onboarding/projection.ts	projectTo	function
+src/features/onboarding/projection.ts	rangeShort	function
 src/features/onboarding/projection.ts	rangeText	function
 src/features/onboarding/projection.ts	shortDate	function
 src/features/onboarding/routine.ts	CHECKIN_TIME	const
@@ -2532,6 +2544,7 @@ src/features/today/volume.ts	shownMl	function
 src/features/today/volume.ts	volumeNumber	function
 src/features/today/volume.ts	volumeUnitFor	function
 src/features/today/volume.ts	waterLeftMl	function
+src/features/today/volume.ts	waterOfGoal	function
 src/features/today/week.ts	DayRing	interface
 src/features/today/week.ts	DayRingState	type
 src/features/today/week.ts	dayRing	function

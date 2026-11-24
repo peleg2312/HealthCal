@@ -67,3 +67,14 @@ export function volumeUnitFor(ml: number, units: UnitSystem): string {
 export function crossesGoal(beforeMl: number, ml: number, goalMl: number): boolean {
   return goalMl > 0 && ml > 0 && beforeMl < goalMl && beforeMl + ml >= goalMl;
 }
+
+/**
+ * The day's water against its goal as Today's water row prints it: "1.48 of 3.3 L", the unit said
+ * once when both amounts share it, else "250 ml of 2.55 L"; "40 of 112 fl oz" in imperial.
+ */
+export function waterOfGoal(ml: number, goalMl: number, units: UnitSystem): string {
+  const amount = formatVolume(Math.max(0, ml), units);
+  const goal = formatVolume(Math.max(0, goalMl), units);
+  const [n, unit] = [amount.slice(0, amount.indexOf(' ')), amount.slice(amount.indexOf(' ') + 1)];
+  return goal.endsWith(` ${unit}`) ? `${n} of ${goal}` : `${amount} of ${goal}`;
+}

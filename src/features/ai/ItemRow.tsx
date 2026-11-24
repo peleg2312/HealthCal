@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Minus, Plus, X } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Minus, Plus, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { TextInput, View } from 'react-native';
 
@@ -64,8 +64,9 @@ export function ItemRow({
           ]}
         />
         {unsure && !row.food ? <Badge label="Unsure" color={colors.warning} /> : null}
+        {/* A row's delete is the trash can, as in the diary, Water and Train; an X only closes. */}
         <IconButton testID={`${id}-remove`} accessibilityLabel={`Remove ${name}`} size={32} tone="clear" onPress={onRemove}>
-          <X size={18} color={colors.textSecondary} strokeWidth={1.9} />
+          <Trash2 size={18} color={colors.textSecondary} strokeWidth={1.9} />
         </IconButton>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>

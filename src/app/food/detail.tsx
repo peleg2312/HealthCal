@@ -167,21 +167,39 @@ function ImpactLine({ date, kcalValue, replacing }: { date: ISODate; kcalValue: 
   );
 }
 
-/** `whole`: an estimate (an AI food, or an entry with a range) gives its grams whole, never a false tenth ("47 g", not "46.5 g"). */
-function NutritionFacts({ portion, per100g, showPer100, whole = false }: { portion: Nutrients; per100g?: Nutrients; showPer100: boolean; whole?: boolean }) {
+/**
+ * `whole`: an estimate (an AI food, or an entry with a range) gives its grams whole, never a false tenth ("47 g", not "46.5 g").
+ * Protein, carbohydrates and fat are whole grams in both columns, as the stats above them show them ("8 g" in both
+ * places, never "8 g" and "7.9 g"); the lines under them (fibre, sugar, saturated fat), which no stat shows, keep one decimal.
+ */
+function NutritionFacts({
+  portion,
+  per100g,
+  showPer100,
+  whole = false,
+  asStats = true,
+}: {
+  portion: Nutrients;
+  per100g?: Nutrients;
+  showPer100: boolean;
+  whole?: boolean;
+  /** False under the quick add's own number fields, which show a macro as typed ("7.9"): the facts then say it the same way. */
+  asStats?: boolean;
+}) {
   const { spacing } = useTheme();
-  const rows: [string, keyof Nutrients, string, boolean?][] = [
-    ['Calories', 'kcal', 'kcal'],
-    ['Protein', 'protein', 'g'],
-    ['Carbohydrates', 'carbs', 'g'],
-    ['Fibre', 'fiber', 'g', true],
-    ['Sugar', 'sugar', 'g', true],
-    ['Fat', 'fat', 'g'],
-    ['Saturated fat', 'satFat', 'g', true],
-    ['Sodium', 'sodium', 'mg'],
+  // [label, key, unit, a line under a macro, whole grams as the macro stats show them]
+  const rows: [string, keyof Nutrients, string, boolean, boolean][] = [
+    ['Calories', 'kcal', 'kcal', false, true],
+    ['Protein', 'protein', 'g', false, true],
+    ['Carbohydrates', 'carbs', 'g', false, true],
+    ['Fibre', 'fiber', 'g', true, false],
+    ['Sugar', 'sugar', 'g', true, false],
+    ['Fat', 'fat', 'g', false, true],
+    ['Saturated fat', 'satFat', 'g', true, false],
+    ['Sodium', 'sodium', 'mg', false, true],
   ];
-  const fmt = (v: number | undefined, unit: string) =>
-    v === undefined ? '–' : unit === 'kcal' || unit === 'mg' ? `${kcal(v)} ${unit}` : `${whole ? Math.round(v) : formatMacro(v)} ${unit}`;
+  const fmt = (v: number | undefined, unit: string, round: boolean) =>
+    v === undefined ? '–' : unit === 'kcal' || unit === 'mg' ? `${kcal(v)} ${unit}` : `${whole || (round && asStats) ? Math.round(v) : formatMacro(v)} ${unit}`;
   return (
     <Card testID="detail-facts">
       <View style={{ flexDirection: 'row', paddingBottom: spacing.sm }}>
@@ -199,7 +217,7 @@ function NutritionFacts({ portion, per100g, showPer100, whole = false }: { porti
       </View>
       {rows
         .filter(([, key]) => portion[key] !== undefined || per100g?.[key] !== undefined)
-        .map(([label, key, unit, sub]) => (
+        .map(([label, key, unit, sub, round]) => (
           <View key={key}>
             <Divider />
             <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 36 }}>
@@ -207,11 +225,11 @@ function NutritionFacts({ portion, per100g, showPer100, whole = false }: { porti
                 {label}
               </Text>
               <Text variant="body" tabular style={{ width: 84, textAlign: 'right' }}>
-                {fmt(portion[key], unit)}
+                {fmt(portion[key], unit, round)}
               </Text>
               {showPer100 ? (
                 <Text variant="body" color="textSecondary" tabular style={{ width: 76, textAlign: 'right' }}>
-                  {fmt(per100g?.[key], unit)}
+                  {fmt(per100g?.[key], unit, round)}
                 </Text>
               ) : null}
             </View>
@@ -500,7 +518,7 @@ function ManualEditor({ entry }: { entry: FoodEntry }) {
         {paired.problem?.field === 'day' ? <PairProblem text={paired.problem.text} /> : null}
       </Card>
       {entry.nutrients.fiber !== undefined || entry.nutrients.sodium !== undefined ? (
-        <NutritionFacts portion={{ ...entry.nutrients, ...n }} showPer100={false} />
+        <NutritionFacts portion={{ ...entry.nutrients, ...n }} showPer100={false} asStats={false} />
       ) : null}
     </Screen>
   );

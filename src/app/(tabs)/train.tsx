@@ -1,10 +1,11 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronDown, ChevronRight, Dumbbell, FileUp, Plus, Timer } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, Dumbbell, Plus, Timer } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { TabHeader } from '@/components/TabHeader';
 import { ACTIVITY_BY_ID, POPULAR_ACTIVITY_IDS } from '@/data/activities';
+import { BringIn } from '@/features/activity/BringIn';
 import { QuickStartTiles, SessionRow } from '@/features/activity/components';
 import { summariseWeek } from '@/features/activity/build';
 import { deleteActivity, openSession } from '@/features/activity/session';
@@ -14,7 +15,6 @@ import { startRoutineDraft, type RoutineTemplate } from '@/features/activity/rou
 import { draftHasContent, useStrengthDrafts } from '@/features/activity/strengthDraft';
 import { StepsLine } from '@/features/health-sync/ui/StepsLine';
 import { SyncedFromLine } from '@/features/health-sync/ui/SyncedFromLine';
-import { TrainSyncLink } from '@/features/health-sync/ui/TrainSyncLink';
 import { addDays, formatDayLabel, formatDuration, formatShortDate, startOfWeek } from '@/lib/dates';
 import { trainingOverview } from '@/lib/trainingLoad';
 import { formatNumber } from '@/lib/units';
@@ -114,20 +114,8 @@ export default function TrainScreen() {
           A strength workout is in progress with {draft!.exercises.length} {draft!.exercises.length === 1 ? 'exercise' : 'exercises'}.
         </Text>
       ) : null}
-      {/* The other ways in, as the kit's small ghost buttons in one row (wrapping on a narrow phone). */}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.sm, rowGap: spacing.xs, marginTop: -spacing.xs }}>
-        <Button
-          testID="train-import-garmin"
-          title="Import workouts"
-          accessibilityLabel="Import workouts from a Garmin file or a Health export"
-          variant="ghost"
-          size="sm"
-          full={false}
-          icon={<FileUp size={16} color={colors.primaryInk} strokeWidth={2.2} />}
-          onPress={() => router.push('/activity/import')}
-        />
-        <TrainSyncLink />
-      </View>
+      {/* Every other way in (automatic sync, a file, steps from the Health export) as one row with a sheet. */}
+      <BringIn today={t} />
 
       {routines.length > 0 ? (
         <>

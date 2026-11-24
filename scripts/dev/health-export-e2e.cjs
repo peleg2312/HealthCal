@@ -178,18 +178,31 @@ const tap = async (page, id) => {
     process.exit(errors.length || failures.length ? 1 : 0);
   }
 
-  // Train before: no steps, and on the web a quiet line that leads to the import.
+  /**
+   * Train's "Bring in workouts" row opens its sheet; with no steps on the web the sheet offers
+   * "Add steps from your Health export" (`train-steps-import`). The sheet is closed again (Escape).
+   */
+  async function trainOffersStepsImport() {
+    await tap(page, 'train-bring-in');
+    const shown = await page.getByTestId('train-steps-import').waitFor({ state: 'visible', timeout: 5_000 }).then(() => true, () => false);
+    await page.keyboard.press('Escape');
+    await page.getByTestId('train-bring-sheet').waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {});
+    return shown;
+  }
+
+  // Train before: no steps, and on the web its "Bring in workouts" sheet leads to the import.
   await page.goto(`${base}/train`);
   await page.getByTestId('train-screen').waitFor({ timeout: 30_000 });
-  check(await page.getByTestId('train-steps-import').isVisible(), 'Train without steps offers "Add steps from your Health export"');
+  check(await trainOffersStepsImport(), 'Train without steps offers "Add steps from your Health export" in its "Bring in workouts" sheet');
 
   const fileSteps = () => page.evaluate(() => JSON.parse(localStorage.getItem('healthcal-health-sync') || 'null')?.state?.fileSteps ?? null);
   const activityCount = async () => Object.values((await state(page)).activities).filter((a) => !a.deleted).length;
   const liveNights = async () => Object.values((await state(page)).sleep).filter((n) => !n.deleted);
   const nightsPart = `sleep for ${expected.nights.length} nights`;
-  /** From Train, open the import the way a person does, and pick `file`. */
+  /** From Train, open the import the way a person does ("Bring in workouts", then the steps row), and pick `file`. */
   async function pickFromTrain(file) {
     await page.goto(`${base}/train`);
+    await tap(page, 'train-bring-in');
     await tap(page, 'train-steps-import');
     await page.getByTestId('import-apple-guide').waitFor({ timeout: 30_000 });
     const chooser = page.waitForEvent('filechooser');
@@ -211,7 +224,7 @@ const tap = async (page, id) => {
   await page.getByTestId('train-screen').waitFor({ timeout: 30_000 });
   await page.waitForTimeout(500);
   check((await fileSteps()) === null && (await activityCount()) === startCount && (await liveNights()).length === 0, 'X on the review saved nothing: no steps, no nights, no workouts');
-  check(await page.getByTestId('train-steps-import').isVisible(), 'Train still offers the import after X');
+  check(await trainOffersStepsImport(), 'Train still offers the import after X');
 
   // Only the steps and sleep (every workout unticked), then Undo: they go again.
   await pickFromTrain(zip);
@@ -248,6 +261,7 @@ const tap = async (page, id) => {
   await tap(page, 'header-close');
   await page.getByTestId('train-screen').waitFor({ timeout: 30_000 });
   await page.waitForTimeout(800);
+  await tap(page, 'train-bring-in');
   await tap(page, 'train-steps-import');
   await page.getByTestId('import-apple-guide').waitFor({ timeout: 30_000 });
   // Long enough for the closed read to have finished, had it gone on.
@@ -264,7 +278,7 @@ const tap = async (page, id) => {
   await page.getByTestId('train-screen').waitFor({ timeout: 30_000 });
   await page.waitForTimeout(15_000);
   check((await fileSteps()) === null && (await activityCount()) === startCount, 'back during the read: nothing saved, Train shows no steps from it');
-  check(await page.getByTestId('train-steps-import').isVisible({ timeout: 5_000 }).catch(() => false), 'Train still offers the import after back');
+  check(await trainOffersStepsImport().catch(() => false), 'Train still offers the import after back');
 
   // A real-size export's review: no filter chip alone on a line under three or more.
   await pickFromTrain(big);

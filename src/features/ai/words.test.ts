@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { AI_TILE_HINT, ANALYSING, analysingLabel, analysingNote, analysingSteps, slowAfterMs } from './words';
+import { AI_TILE_HINT, ANALYSING, analysingLabel, analysingNote, analysingSteps, DESCRIPTION_MAX, prefilledDescription, searchAiTile, slowAfterMs } from './words';
 
 const BANNED =
   /\b(bad|fail|failed|failure|cheat|cheated|should|guilty|lazy|great|amazing|well done|keep it up|too much|missed your|goal missed|over budget|make up|only|unfortunately|oops|sorry)\b/i;
@@ -13,6 +13,7 @@ const PLAN = /\b(upgrade|unlock|premium|run out|last chance)\b/i;
 
 function all(): string[] {
   const out: string[] = [...Object.values(ANALYSING), ...Object.values(AI_TILE_HINT)];
+  for (const q of ['', 'lentil stew']) out.push(searchAiTile(q).label, searchAiTile(q).a11y);
   for (const photo of [true, false])
     for (const precise of [true, false]) {
       out.push(...Object.values(analysingSteps(photo, precise)), analysingLabel(photo, precise));
@@ -47,5 +48,30 @@ describe('the words of the wait', () => {
     expect(analysingNote(false, false)).toBe('Usually a few seconds.');
     expect(analysingNote(true, false)).toBe('The careful check can take up to half a minute.');
     expect(analysingNote(true, true)).toBe(analysingNote(false, true));
+  });
+});
+
+describe("food search's AI tile", () => {
+  it('with nothing typed names the AI and both inputs, and opens on Photo', () => {
+    expect(searchAiTile('')).toEqual({ label: 'AI', a11y: 'AI estimate from a photo or a description', glyph: 'photo', params: { mode: 'photo' } });
+    expect(searchAiTile('   ').label).toBe('AI');
+  });
+
+  it('with words typed is Describe and carries them, trimmed, to the describe field', () => {
+    expect(searchAiTile('  lentil stew with toast ')).toEqual({
+      label: 'Describe',
+      a11y: 'Describe lentil stew with toast for an AI estimate',
+      glyph: 'describe',
+      params: { mode: 'text', words: 'lentil stew with toast' },
+    });
+    expect(searchAiTile('x'.repeat(600)).params.words).toHaveLength(DESCRIPTION_MAX);
+  });
+
+  it('the photo screen reads the words once, as a string, never more than the field takes', () => {
+    expect(prefilledDescription(' grandma soup ')).toBe('grandma soup');
+    expect(prefilledDescription(['first', 'second'])).toBe('first');
+    expect(prefilledDescription(undefined)).toBe('');
+    expect(prefilledDescription(42)).toBe('');
+    expect(prefilledDescription('y'.repeat(900))).toHaveLength(DESCRIPTION_MAX);
   });
 });

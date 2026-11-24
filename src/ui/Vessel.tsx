@@ -98,7 +98,9 @@ export interface VesselProps {
  *
  * What happens at the goal depends on `goalKind`:
  * - 'limit' (a budget, the default): past `max` the fill stays at the top and
- *   an amber lip sits across it. Amber means over, with neutral words.
+ *   an amber cap sits across it at the cup's own width, never past its walls:
+ *   a line wider than the cup is the brim, which means a goal reached. Amber
+ *   means over, with neutral words.
  * - 'reach' (water, activity minutes, protein): at or past `max` the cup is
  *   brim-full and the level line becomes the brim line. It lies across the
  *   open top, wider than the cup (3 to 6 px past each side) and 1 to 2 px
@@ -223,7 +225,8 @@ export function Vessel({
           <Animated.View style={[{ position: 'absolute', left: 0, right: 0, top: -rimWidth / 2, height: rimWidth, backgroundColor: colors.rim }, rimStyle]} />
         </Animated.View>
       </View>
-      {over ? <Animated.View style={[{ position: 'absolute', left: -3, right: -3, top: -4, height: 5, borderRadius: 2, backgroundColor: colors.warning }, lipStyle]} /> : null}
+      {/* The over cap lies across the open top at the cup's own width: only the brim line reaches past the walls. */}
+      {over ? <Animated.View style={[{ position: 'absolute', left: 0, right: 0, top: -2.5, height: 5, borderTopLeftRadius: 1, borderTopRightRadius: 1, backgroundColor: colors.warning }, lipStyle]} /> : null}
       {reached ? (
         <>
           {/* One flash in the data colour behind the brim line, at the crossing only. */}
@@ -456,7 +459,8 @@ export function Trough({
           {reached ? <Animated.View style={[{ position: 'absolute', left: -2, top: -3, bottom: -3, width: 4, borderRadius: 1, backgroundColor: colors.rim }, brimStyle]} /> : null}
         </Animated.View>
       ) : null}
-      {over ? <Animated.View style={[{ position: 'absolute', right: -4, top: -3, bottom: -3, width: 5, borderRadius: 2, backgroundColor: colors.warning }, lipStyle]} /> : null}
+      {/* The over cap closes the end within the trough's own height: only the brim tick reaches past its walls. */}
+      {over ? <Animated.View style={[{ position: 'absolute', right: -2.5, top: 0, bottom: 0, width: 5, backgroundColor: colors.warning }, lipStyle]} /> : null}
     </View>
   );
 }

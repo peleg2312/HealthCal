@@ -12,6 +12,7 @@ import {
   favoriteFoodTile,
   hasEstimate,
   isEstimateFood,
+  logMealLabel,
   quickRowTitle,
   saveRowDay,
   savedRowCaption,
@@ -32,6 +33,8 @@ describe('favourite words', () => {
     expect(favoriteLabel('Usual breakfast', true)).toBe('Remove Usual breakfast from favourites');
     expect(favoriteActionLabel(false)).toBe('Add to favourites');
     expect(favoriteActionLabel(true)).toBe('Remove from favourites');
+    // A saved-meal row's "+" names the meal it logs.
+    expect(logMealLabel('Usual breakfast')).toBe('Log Usual breakfast');
   });
   it("the + sheet's overline names favourites only when one is in the row, and never 'usual' without usual foods", () => {
     expect(quickRowTitle({ meal: 'lunch', favourites: false, usual: true, saved: true })).toBe('Usual for lunch');

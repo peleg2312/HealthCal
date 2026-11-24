@@ -1,11 +1,10 @@
-import { router } from 'expo-router';
-import { ChevronRight, Footprints } from 'lucide-react-native';
+import { Footprints } from 'lucide-react-native';
 import React from 'react';
-import { Platform, useWindowDimensions, View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { useTheme } from '@/theme';
 import type { ISODate } from '@/types';
-import { PressableScale, Text } from '@/ui';
+import { Text } from '@/ui';
 
 import { fileStepsNote, shownSteps, stepsLine, stepsWeek } from '../steps';
 import { useHealthSync } from '../store';
@@ -20,9 +19,9 @@ import { useHealthSync } from '../store';
  * ("From your Health export, Nov 16"). A synced day wins over the file's.
  * Steps are shown only: never added to the calorie budget (steps.ts says why).
  *
- * With no steps at all, on web and on an iPhone with sync off, one quiet row
- * with a chevron (as the card's "About your usual" row) leads to the import instead; on Android, and on an iPhone with sync on,
- * where sync reads them, nothing is drawn.
+ * With no steps this week nothing is drawn: on web and on an iPhone with sync
+ * off, the way to add them is a choice in Train's "Bring in workouts" sheet
+ * (`train-steps-import`, `@/features/activity/BringIn`).
  */
 export function StepsLine({ dates, today }: { dates: ISODate[]; today: ISODate }) {
   const { colors, spacing } = useTheme();
@@ -32,24 +31,7 @@ export function StepsLine({ dates, today }: { dates: ISODate[]; today: ISODate }
   const file = useHealthSync((s) => s.fileSteps);
   const shown = shownSteps(enabled ? synced : null, file, today);
   const week = stepsWeek(shown.days, dates, today);
-  if (!week) {
-    if (Platform.OS === 'android' || enabled || Object.keys(shown.days).length) return null;
-    return (
-      <PressableScale
-        testID="train-steps-import"
-        accessibilityRole="button"
-        accessibilityLabel="Add your daily steps from the Health app’s export"
-        onPress={() => router.push('/activity/import')}
-        hitSlop={6}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md, minHeight: 44 }}>
-        <Footprints size={18} color={colors.textSecondary} strokeWidth={1.9} />
-        <Text variant="caption" color="text" style={{ flex: 1, minWidth: 0 }}>
-          Add steps from your Health export
-        </Text>
-        <ChevronRight size={18} color={colors.textSecondary} strokeWidth={1.9} />
-      </PressableScale>
-    );
-  }
+  if (!week) return null;
   const line = stepsLine(week);
   // Under 360 px the long form wraps and leaves "week" alone; the card is the week's, so it goes.
   const text = width < 360 ? stepsLine(week, true) : line;

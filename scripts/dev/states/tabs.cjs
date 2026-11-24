@@ -26,8 +26,26 @@ const header = [
   { id: 'tabs-header-progress-early', route: '/progress', data: 'empty', now: at(15), waitFor: 'progress-coach-open', note: 'Progress before there is enough data: the "Trends and insights" overline' },
 ];
 
+// A local calendar day n days from today, as the week strip's testIDs name it.
+function isoDay(n) {
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Today's one-tap glass: its toast rests over the water row at 360 x 740, so it names the new total
+// (`waterAddedToast` with `waterOfGoal`) and keeps to two lines at 320.
+const water = [
+  { id: 'today-water-toast', route: '/', taps: ['^today-water-', { wait: 300 }], waitFor: 'toast', note: 'a glass on Today: "250 ml added to Water · 1.48 of 3.3 L" over the water row' },
+  { id: 'today-water-toast-reached', route: '/', values: { water: 0.95 }, taps: ['^today-water-', { wait: 300 }], waitFor: 'toast', note: 'the glass that reaches the goal: the total and "goal reached"' },
+  { id: 'today-water-toast-imperial', route: '/', imperial: true, taps: ['^today-water-', { wait: 300 }], waitFor: 'toast', note: 'the same in fl oz' },
+  { id: 'today-water-toast-past', route: '/', taps: [`today-day-${isoDay(-1)}`, '^today-water-', { wait: 300 }], waitFor: 'toast', note: 'a glass on yesterday, picked on the strip: the day and the total, two lines at 320 (on a Monday the strip shows only today)' },
+];
+
 module.exports = [
   ...header,
+  ...water,
   // Train: the overview's sheet (with how the guideline counts minutes), behind the week card's last line, which is one button.
   { id: 'train-guideline-sheet', route: '/train', taps: ['train-load-info'], sheet: true, note: 'how minutes count toward the guideline' },
   { id: 'train-guideline-sheet-stress', route: '/train', data: 'stress', taps: ['train-load-info'], sheet: true, note: 'the same sheet over the long-content week' },

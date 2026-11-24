@@ -7,7 +7,7 @@ import { useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
 import { DrawReveal, Text } from '@/ui';
 
-import { shortDate, type Projection } from './projection';
+import { rangeShort, shortDate, type Projection } from './projection';
 
 const PLOT_H = 148;
 const PAD_TOP = 28;
@@ -20,11 +20,16 @@ const PAD_X = 10;
  * level line (rim) as today's mark, square waypoint marks and the goal as a
  * small square-shouldered cup with the level line across it. The road draws
  * itself left to right once (the kit's DrawReveal); axis and labels are
- * there at once. Every label stays a text colour.
+ * there at once. Every label stays a text colour. Under the band's end the
+ * goal is labelled with the title's months ("Late Jan to mid Mar",
+ * `rangeShort`), never a day, since the title gives the goal as a range.
  */
-export function ProjectionChart({ projection: p, units, delay = 0 }: { projection: Projection; units: UnitSystem; delay?: number }) {
+export function ProjectionChart({ projection: p, units, delay = 0, now }: { projection: Projection; units: UnitSystem; delay?: number; now?: Date }) {
   const { colors, spacing } = useTheme();
   const [width, setWidth] = useState(0);
+  const when = rangeShort(p, now);
+  // The goal's months, right-aligned under the band's end; measured once drawn (about 7 px a character before that).
+  const [whenW, setWhenW] = useState(0);
 
   const w = Math.max(0, width - PAD_X * 2);
   const h = PLOT_H - PAD_TOP - PAD_BOTTOM;
@@ -38,13 +43,15 @@ export function ProjectionChart({ projection: p, units, delay = 0 }: { projectio
   const band = [start, { x: x(p.fastWeeks), y: end.y }, { x: x(p.slowWeeks), y: end.y }].map((pt) => `${pt.x},${pt.y}`).join(' ');
   const axisY = PLOT_H - 2;
   const labelW = 64;
-  // Each waypoint's date and weight keep clear of the next label; on a narrow phone only the
-  // halfway one is labelled (its dot and the others' stay on the line).
+  // Each waypoint's date and weight keep clear of the next label and of the goal's months; on a narrow
+  // phone only the halfway one is labelled (its dot and the others' stay on the line).
   const minLabelGap = 58;
+  const whenLeft = width - PAD_X - (whenW || when.length * 7);
+  const clearOfWhen = (at: number) => at + labelW / 2 <= whenLeft;
   const xs = p.waypoints.map((wp) => x(wp.weeks));
-  const roomy = xs.every((at, i) => (i === 0 ? true : at - xs[i - 1] >= minLabelGap)) && end.x - xs[xs.length - 1] >= minLabelGap;
+  const roomy = xs.every((at, i) => (i === 0 ? true : at - xs[i - 1] >= minLabelGap)) && clearOfWhen(xs[xs.length - 1]);
   const middle = p.waypoints[Math.floor(p.waypoints.length / 2)];
-  const labelled = new Set<number>(roomy ? p.waypoints.map((wp) => wp.share) : middle && end.x - x(middle.weeks) >= minLabelGap ? [middle.share] : []);
+  const labelled = new Set<number>(roomy ? p.waypoints.map((wp) => wp.share) : middle && clearOfWhen(x(middle.weeks)) ? [middle.share] : []);
   // The goal cup: square shoulders on top, a round base, 12 px wide.
   const gw = 12;
   const gh = 11;
@@ -105,9 +112,14 @@ export function ProjectionChart({ projection: p, units, delay = 0 }: { projectio
                 </Text>
               </View>
             ))}
-            <View style={{ position: 'absolute', left: Math.min(end.x - labelW / 2, width - labelW), width: labelW, alignItems: 'center' }}>
-              <Text variant="label" color="text" tabular>
-                {shortDate(p.date)}
+            <View style={{ position: 'absolute', right: PAD_X, maxWidth: width - 2 * PAD_X, alignItems: 'flex-end' }}>
+              <Text
+                variant="label"
+                color="text"
+                testID="plan-chart-when"
+                onLayout={(e) => setWhenW(Math.ceil(e.nativeEvent.layout.width))}
+                style={{ textAlign: 'right' }}>
+                {when}
               </Text>
             </View>
           </>

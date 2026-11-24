@@ -404,7 +404,7 @@ function relativeTo(date: ISODate, from: ISODate): string {
 }
 
 /**
- * The coach's line under the calorie card: one sentence pair in at most two lines ("Had dinner
+ * The coach's line under the water card, in a card of its own: one sentence pair in at most two lines ("Had dinner
  * yet? It is not in today's log.") and its one action as a small button directly under it
  * (a glass of water, repeat a meal, see what fits, or where the tip points). No chevron, no chips:
  * one thing to read, one thing to tap, with "Ask the coach" (`today-coach-ask`) beside it as a ghost button.
@@ -463,7 +463,8 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
   }
 
   return (
-    <View testID="today-coach" style={{ gap: spacing.sm, marginVertical: spacing.xs }}>
+    // A card line like the cards around it, not a loose paragraph between them: the tip and its action in one quiet card.
+    <Card testID="today-coach" style={{ gap: spacing.md }}>
       <Text variant="body" accessibilityLabel={`${tip.title}. ${tip.body}`}>
         <Text variant="bodyStrong">{/[.!?]$/.test(tip.title) ? tip.title : `${tip.title}.`}</Text>
         <Text variant="body" color="textSecondary">{` ${tip.body}`}</Text>
@@ -486,7 +487,7 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
           />
         </View>
       ) : null}
-    </View>
+    </Card>
   );
 }
 

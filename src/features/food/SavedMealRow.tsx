@@ -1,11 +1,11 @@
 /**
  * The saved-meal row of food search (the Saved meals tab and the Favourites tab): the kind mark, the name
- * and its caption (an estimate's calories with "~"), a star and "Log", side by side (never one pressable
- * inside another). The body opens the saved meals screen; a long press, or the named accessibility action,
+ * and its caption (an estimate's calories with "~"), a star and the "+" cup (as on a food row; it opens the
+ * log sheet), side by side (never one pressable inside another). The body opens the saved meals screen; a long press, or the named accessibility action,
  * stars it as the star does. Also here: the "Save lunch as a meal" row (R5) and the order fixed per visit.
  */
 import { useFocusEffect } from 'expo-router';
-import { ChevronRight, Save, Utensils } from 'lucide-react-native';
+import { ChevronRight, Plus, Save, Utensils } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { View } from 'react-native';
 
@@ -16,13 +16,13 @@ import { useStore } from '@/store';
 import { live } from '@/store/selectors';
 import { cup, fonts, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType, SavedMeal } from '@/types';
-import { Button, PressableScale, Text } from '@/ui';
+import { IconButton, PressableScale, Text } from '@/ui';
 
 import { formatPortion, itemsRange, mealServings } from './build';
 import { FavoriteStar } from './FavoriteStar';
 import { toggleMealFavorite } from './favoriteActions';
 import { favoriteMeals, inVisitOrder, isFavoriteMeal, orderSavedMeals } from './favorites';
-import { approxKcalSpoken, favoriteActionLabel, favoriteLabel, FAVOURITE_ACTION, saveRowDay, savedRowCaption } from './favoriteWords';
+import { approxKcalSpoken, favoriteActionLabel, favoriteLabel, FAVOURITE_ACTION, logMealLabel, saveRowDay, savedRowCaption } from './favoriteWords';
 import { SaveMealSheet } from './SaveMealSheet';
 import { itemCount, saveHintLabel } from './saveWords';
 import { currentValues } from './usuals';
@@ -83,9 +83,12 @@ export function SavedMealRow({ meal, testID, onOpen, onLog }: { meal: SavedMeal;
           </Text>
         </View>
       </PressableScale>
-      {/* 12 px to Log: the star's touch area reaches 4 px past its edge and Log's 6 (its slop and border), so neither takes the other's taps. */}
+      {/* 12 px to the "+": the star's touch area reaches 4 px past its edge, so neither takes the other's taps. */}
       <FavoriteStar testID={`${testID}-favorite`} on={on} label={favoriteLabel(meal.name, on)} onPress={star} style={{ marginRight: 4 }} />
-      <Button testID={`${testID}-log`} title="Log" size="sm" variant="secondary" full={false} style={{ alignSelf: 'center' }} onPress={onLog} />
+      {/* The same "+" cup as a food row's, so one list has one add control; it opens the log sheet (servings, meal). */}
+      <IconButton testID={`${testID}-log`} accessibilityLabel={logMealLabel(meal.name)} tone="surface" size={44} onPress={onLog}>
+        <Plus size={20} color={colors.text} strokeWidth={2.2} />
+      </IconButton>
     </View>
   );
 }

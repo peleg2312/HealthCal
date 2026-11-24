@@ -59,11 +59,12 @@ export function projectTo(startKg: number, targetKg: number | undefined, weeklyK
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+const partOf = (d: Date) => (d.getDate() <= 10 ? 'early' : d.getDate() <= 20 ? 'mid' : 'late');
+
 /** "early March", "mid April 2028": a date as loosely as a projection deserves. */
 export function looseDate(d: Date, now: Date = new Date()): string {
-  const part = d.getDate() <= 10 ? 'early' : d.getDate() <= 20 ? 'mid' : 'late';
   const year = d.getFullYear() !== now.getFullYear() ? ` ${d.getFullYear()}` : '';
-  return `${part} ${MONTHS[d.getMonth()]}${year}`;
+  return `${partOf(d)} ${MONTHS[d.getMonth()]}${year}`;
 }
 
 /** "between early March and mid April", or one phrase when both ends land in the same part of a month. */
@@ -81,3 +82,20 @@ export function shortDate(d: Date): string {
   return `${SHORT[d.getMonth()]} ${d.getDate()}`;
 }
 
+/**
+ * "Late Jan to mid Mar": the title's range (`rangeText`) in short months, for the chart's goal label,
+ * so the chart never pins the goal to a day the title does not claim. The year is the title's to say;
+ * it is added here only when both ends would otherwise read the same ("Mid Mar 2027 to mid Mar 2028").
+ */
+export function rangeShort(p: Projection, now: Date = new Date()): string {
+  const short = (d: Date, year: boolean) => `${partOf(d)} ${SHORT[d.getMonth()]}${year ? ` ${d.getFullYear()}` : ''}`;
+  const a = short(p.fastDate, false);
+  const b = short(p.slowDate, false);
+  const text =
+    a !== b
+      ? `${a} to ${b}`
+      : p.fastDate.getFullYear() === p.slowDate.getFullYear() || rangeText(p, now).startsWith('around')
+        ? `around ${b}`
+        : `${short(p.fastDate, true)} to ${short(p.slowDate, true)}`;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}

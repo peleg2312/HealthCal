@@ -3,6 +3,7 @@ import { Copy } from 'lucide-react-native';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { type ScrollView, type ScrollViewProps, View } from 'react-native';
 
+import { hasFoodLogged } from '@/features/drinks/via';
 import { copyPreviousDay, copyPreviousMeal, findPreviousDay, findPreviousMeal } from '@/features/food/actions';
 import { DaySummaryCard, EMPTY_DAY_NOTE, MealCard, MealMenuSheet } from '@/features/food/DiaryParts';
 import { dayPhrase, kcal, param, parseDate } from '@/features/food/helpers';
@@ -114,7 +115,8 @@ export default function DiaryScreen() {
           the search offers), and the whole of the last logged day can be copied from the summary card's last row. */}
       <DaySummaryCard
         day={day}
-        share={date <= t ? <ShareDayButton date={date} testID="diary-share" /> : null}
+        // Nothing to share on a day with no food logged (drinks logged on Water do not count), as on Today's day one.
+        share={date <= t && hasFoodLogged(day.entries) ? <ShareDayButton date={date} testID="diary-share" /> : null}
         action={
           empty && previousDay ? (
             <Button

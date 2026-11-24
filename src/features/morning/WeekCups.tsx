@@ -32,7 +32,7 @@ const MARK_SLOT = 12;
  * The week in cups, the picture at the top of the morning page: a small cup for each drawn day
  * before yesterday (up to six, never before setup), yesterday as the large cup with its number over
  * it, and today at the end, poured with what is logged so far. Every cup is calories against that
- * day's own budget (a limit: hatched exercise headroom, the amber lip when above it, a thin one
+ * day's own budget (a limit: hatched exercise headroom, the amber lip when above it, a heavier cap
  * inside the cup's width on the small cups, pale while partly logged). A workout that day is a small exercise key under the day's letter.
  *
  * Only draws: which days and how each reads come from weekCells (pure, tested). The cups are not
@@ -66,15 +66,15 @@ export function WeekCups({ cells, testID }: { cells: WeekCells; testID?: string 
     />
   );
 
-  // A small cup above its budget is drawn full with an amber lip 2 px past each wall and 4 px tall:
-  // its shape, not only its colour, tells it from a full cup's level line (a lip inside the walls was
-  // the calorie fill's colour and nothing else); yesterday keeps the kit's wider lip and leads.
-  // The lip shows once the cup has poured (or at once under reduced motion).
+  // A small cup above its budget is drawn full with an amber cap 4 px tall across its own width:
+  // heavier than a full cup's 2.5 px level line, so its weight, not only its colour, tells it apart,
+  // and never past the walls (a line wider than its cup is the brim, which means a goal reached).
+  // Yesterday keeps the kit's lip and leads. The cap is drawn at once, over the cup as it pours.
   const smallCup = (c: WeekCell, index: number) =>
     c.over ? (
       <View style={{ width: s.smallW, height: s.smallH }}>
         {cup({ ...c, kcal: c.budget }, s.smallW, s.smallH, index, 2.5)}
-        <View pointerEvents="none" style={{ position: 'absolute', left: -2, right: -2, top: -2.5, height: 4, borderRadius: 1.5, backgroundColor: colors.warning }} />
+        <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: -2, height: 4, borderTopLeftRadius: 1, borderTopRightRadius: 1, backgroundColor: colors.warning }} />
       </View>
     ) : (
       cup(c, s.smallW, s.smallH, index, 2.5)

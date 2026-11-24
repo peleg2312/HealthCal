@@ -32,6 +32,8 @@ const todayAt = (h, m) => {
 };
 /** On Water: search, pick the drink with this id, log a 250 ml glass of it, and wait for the toasts to go. */
 const pickAndLog = (query, id) => ['water-search', { type: 'water-pick-search', text: query }, { wait: 900 }, `water-pick-${id}`, toastGone, 'water-add-1', toastGone];
+// An iPhone with sync on: workouts from the watch and Garmin Connect, one of them to look at (health.cjs's own state).
+const IPHONE_ON = require('./health.cjs').find((s) => s.id === 'health-sync-iphone-on').health;
 const CSV = 'scripts/dev/states/files/garmin-activities.csv';
 const GPX = 'scripts/dev/states/files/morning-run.gpx';
 
@@ -60,6 +62,10 @@ const train = [
   { id: 'train-load-sheet-past', route: '/train?week={day}', day: -14, taps: ['train-guideline-help'], sheet: true, note: 'a past week: the old line, its info cup opens the same sheet' },
   { id: 'train-load-sheet-stress', route: '/train', data: 'stress', taps: ['train-load-info'], sheet: true, note: 'the sheet over the long-content weeks (a big step up, 1,340 minutes)' },
   { id: 'train-history-more', route: '/train', data: 'stress', taps: ['train-show-more'], note: 'History with earlier sessions shown' },
+  // "Bring in workouts": one row under Log activity and Workout, and its sheet of choices (each keeps its own testID).
+  { id: 'train-bring-sheet', route: '/train', taps: ['train-bring-in'], waitFor: 'train-import-garmin', sheet: true, note: 'the browser: Import workouts, Add steps from your Health export, then Automatic sync' },
+  { id: 'train-bring-iphone', route: '/train', health: IPHONE_ON, taps: [toastGone], waitFor: 'train-bring-in', note: 'iPhone with sync on and a workout to look at: the row says so with the amber key' },
+  { id: 'train-bring-sheet-iphone', route: '/train', health: IPHONE_ON, taps: [{ wait: 1500 }, 'train-bring-in'], waitFor: 'train-health-sync', sheet: true, note: 'its sheet: Workout sync first, with what waits, then Import workouts' },
   { id: 'train-deleted', route: '/train', taps: ['^delete-'], note: 'a session deleted: the Undo toast over the tab bar' },
 ];
 

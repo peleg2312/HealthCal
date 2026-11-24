@@ -16,6 +16,7 @@ import { BUILTIN_FOODS } from '@/data/foods';
 import { favoriteRecordId, useStore } from '@/store';
 import type { FoodEntry, SavedMeal, SavedMealItem } from '@/types';
 
+import { displayFoodName } from './displayName';
 import { isFavoriteFood, toggleFoodFavorite, toggleMealFavorite } from './favoriteActions';
 import { favoriteFoodsInVisit, favoriteMeals, inVisitOrder, isFavoriteMeal, mealToSave, orderSavedMeals, quickLogMeal, sameFoodsAsSaved, withFavorite } from './favorites';
 
@@ -231,7 +232,7 @@ describe('the star actions', () => {
     expect(toggleFoodFavorite(f)).toBe(true);
     expect(isFavoriteFood(f.id)).toBe(true);
     expect(S().favoriteFoodIds).toContain(f.id);
-    expect(lastToast().message).toBe(`Added to favourites: ${f.name}`);
+    expect(lastToast().message).toBe(`Added to favourites: ${displayFoodName(f)}`);
     tick();
     lastToast().opts!.onPress!();
     expect(isFavoriteFood(f.id)).toBe(false);
@@ -242,12 +243,23 @@ describe('the star actions', () => {
     const record = S().favorites[id];
     tick();
     expect(toggleFoodFavorite(f)).toBe(false);
-    expect(lastToast().message).toBe(`Removed from favourites: ${f.name}`);
+    expect(lastToast().message).toBe(`Removed from favourites: ${displayFoodName(f)}`);
     expect(S().favorites[id].deleted).toBe(true);
     tick();
     lastToast().opts!.onPress!();
     expect(S().favorites[id].deleted).toBe(false);
     // The same record (its food copy), restored, not a fresh star.
     expect(S().favorites[id].food).toBe(record.food);
+  });
+
+  it("toggleFoodFavorite's toast names a reference food as it is drawn, without the stored capitals", () => {
+    const oats = BUILTIN_FOODS.find((x) => /\bDRY\b/.test(x.name) && /^Oats/.test(x.name))!;
+    expect(oats).toBeTruthy();
+    toggleFoodFavorite(oats);
+    expect(lastToast().message).toBe(`Added to favourites: ${displayFoodName(oats)}`);
+    expect(lastToast().message).not.toMatch(/\bDRY\b/);
+    tick();
+    toggleFoodFavorite(oats);
+    expect(lastToast().message).toBe('Removed from favourites: Oats, rolled, dry (uncooked)');
   });
 });

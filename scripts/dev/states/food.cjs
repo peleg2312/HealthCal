@@ -99,7 +99,15 @@ module.exports = [
 
   // ---------------------------------------------------------------- Search
   { id: 'search-results', route: '/food/search', type: { 'food-search-input': 'chicken' }, taps: [{ wait: 1200 }], note: 'results for a word' },
-  { id: 'search-no-results', route: '/food/search', type: { 'food-search-input': 'zzqxv' }, taps: [{ wait: 1500 }], waitFor: 'search-no-local', note: 'nothing found' },
+  { id: 'search-no-results', route: '/food/search', type: { 'food-search-input': 'zzqxv' }, taps: [{ wait: 1500 }], waitFor: 'search-no-local', note: 'nothing found: the AI tile reads Describe' },
+  {
+    id: 'search-describe-prefilled',
+    route: '/food/search',
+    type: { 'food-search-input': 'grandmas lentil stew with crusty bread' },
+    taps: [{ wait: 1500 }, 'search-photo'],
+    waitFor: 'ai-description',
+    note: "no match, then Describe: the photo screen on Describe with the typed words in its field, nothing sent",
+  },
   { id: 'search-long-query', route: '/food/search', type: { 'food-search-input': LONG_QUERY }, taps: [{ wait: 1500 }], note: 'a long query' },
   { id: 'search-recent', route: '/food/search', taps: ['search-tab-recent'], note: 'the Recent filter' },
   { id: 'search-favorites', route: '/food/search', data: 'stress', taps: ['search-tab-favorites'], note: 'Favourites with long names' },
@@ -347,7 +355,7 @@ module.exports = [
   { id: 'meals-save-current', route: '/food/meals?meal=lunch&date={day}', day: -1, waitFor: 'save-current-meal', note: 'the permanent "Save lunch as a meal" row above the cards, with its count' },
   { id: 'meals-save-current-sheet', route: '/food/meals?meal=lunch&date={day}', day: -1, taps: ['save-current-meal'], sheet: true, waitFor: 'save-meal-name', note: 'the row opens the diary\'s save sheet' },
   { id: 'meals-log-sheet-estimate', route: '/food/meals', values: { savedEstimate: 1 }, taps: ['saved-meal-log-0'], sheet: true, waitFor: 'log-meal-range', note: 'logging the saved estimate: each line with the AI mark and "AI estimate", the range' },
-  { id: 'search-favourites-meals', route: '/food/search?meal=lunch', values: { favoriteMeal: 1 }, taps: ['search-tab-favorites'], waitFor: 'favorite-meal-0', note: 'Favourites: Meals (the starred meal with its star and Log) above Foods' },
+  { id: 'search-favourites-meals', route: '/food/search?meal=lunch', values: { favoriteMeal: 1 }, taps: ['search-tab-favorites'], waitFor: 'favorite-meal-0', note: 'Favourites: Meals (the starred meal with its star and +) above Foods' },
   { id: 'search-favourites-stress', route: '/food/search?meal=lunch', data: 'stress', values: { favoriteMeal: 1, savedEstimate: 2 }, taps: ['search-tab-favorites'], waitFor: 'favorite-meal-1', note: 'Favourites with long names: two meals (one an estimate, "~") and the foods' },
   { id: 'search-favourites-empty', route: '/food/search?meal=lunch', data: 'empty', taps: ['search-tab-favorites'], note: 'no favourites: the empty state names the star and the long press' },
   { id: 'search-meals-star', route: '/food/search?meal=lunch', taps: ['search-tab-meals', 'saved-meal-0-favorite'], waitFor: 'toast-action', note: 'Saved meals tab: a meal starred from its row; the row keeps its place' },

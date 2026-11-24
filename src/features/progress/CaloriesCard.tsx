@@ -36,6 +36,7 @@ export function CaloriesCard({
   const first = days.findIndex((d) => d.entries.length > 0);
   const shown = first > 0 ? days.slice(first) : days;
   const { data, weekly, openIndex } = buildBars(shown, today, { full: colors.calories, partial: withOpacity(colors.calories, 0.45), over: colors.warning });
+  const verdict = daysVerdict(shown, today);
   const diff = c ? Math.round(c.avgDiff) : 0;
   const diffText = !c ? '' : Math.abs(diff) < 10 ? 'Right on budget' : `${formatNumber(Math.abs(diff))} kcal ${diff > 0 ? 'over' : 'under'} budget on average`;
 
@@ -56,9 +57,16 @@ export function CaloriesCard({
             </Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginTop: -spacing.sm }}>
-            <Text variant="title" style={{ flex: 1, minWidth: 0 }} testID="progress-calories-card-verdict">
-              {daysVerdict(shown, today)}
-            </Text>
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <Text variant="title" testID="progress-calories-card-verdict">
+                {verdict.line}
+              </Text>
+              {verdict.note ? (
+                <Text variant="caption" color="textSecondary">
+                  {verdict.note}
+                </Text>
+              ) : null}
+            </View>
             <IconButton size={36} tone="clear" testID="progress-calories-help" accessibilityLabel="How to read the calorie chart" onPress={() => setHelp(true)}>
               <Info size={20} color={colors.textSecondary} strokeWidth={1.9} />
             </IconButton>

@@ -4,6 +4,7 @@ import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useSt
 import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 
 import { AiGlyph } from '@/features/ai/mark';
+import { searchAiTile } from '@/features/ai/words';
 import { AmountEditor } from '@/features/food/AmountEditor';
 import { FoodRow, MealPicker } from '@/features/food/components';
 import { displayFoodName } from '@/features/food/displayName';
@@ -198,10 +199,12 @@ export default function FoodSearchScreen() {
   };
 
   // One compact row of four (a short word under each icon, the full name for a screen reader), so the list starts higher.
+  const aiTile = searchAiTile(q);
   const escapes = (
     <View style={{ flexDirection: 'row', gap: spacing.sm }}>
       <ActionTile testID="search-scan" icon={<ScanBarcode size={18} color={colors.text} strokeWidth={1.9} />} label="Barcode" a11y="Scan barcode" onPress={() => go('/food/scan')} />
-      <ActionTile testID="search-photo" icon={<AiGlyph name="photo" size={18} color={colors.text} />} label="Photo" a11y="Photo or describe" onPress={() => go('/food/photo', { mode: 'photo' })} />
+      {/* "AI" with nothing typed (Photo and Describe are both behind it); "Describe" once words are typed, carrying them. */}
+      <ActionTile testID="search-photo" icon={<AiGlyph name={aiTile.glyph} size={18} color={colors.text} />} label={aiTile.label} a11y={aiTile.a11y} onPress={() => go('/food/photo', aiTile.params)} />
       <ActionTile testID="search-quick" icon={<Zap size={18} color={colors.text} strokeWidth={1.9} />} label="Quick add" a11y="Quick add" onPress={() => go('/food/quick')} />
       <ActionTile testID="search-create" icon={<PenLine size={18} color={colors.text} strokeWidth={1.9} />} label="Create" a11y="Create food" onPress={() => go('/food/custom', q ? { name: q } : {})} />
     </View>
@@ -304,7 +307,7 @@ export default function FoodSearchScreen() {
                         {FAVOURITE_GROUPS.foods}
                       </Text>
                     ) : null}
-                    {/* Each food carries the meals' star, 12 px before its "+" (as Log), so both groups are unstarred the same way. */}
+                    {/* Each food carries the meals' star, 12 px before its "+" (as a meal does), so both groups are unstarred and added the same way. */}
                     <List>
                       {favorites.map((f, i) => {
                         const on = favoriteIds.includes(f.id);

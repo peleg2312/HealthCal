@@ -52,9 +52,14 @@ export function quickAddedToast(name: string, kcal: number, where: string): stri
 /**
  * A glass from Today or the + sheet: "250 ml added to Water", on another day "250 ml added to Water for
  * yesterday" (or "for Sat Nov 14"); the glass that reaches the goal adds ". Goal reached". `volume` is
- * already formatted in the person's units.
+ * already formatted in the person's units. With `total` (the day's water against its goal as the water
+ * row prints it, `waterOfGoal`) the toast names the new total too, because on Today it rests over that
+ * row: "250 ml added to Water · 1.48 of 3.3 L", and "· 3.3 of 3.3 L, goal reached" for the glass that
+ * reaches the goal; the total never breaks over two lines.
  */
-export function waterAddedToast(volume: string, date: ISODate, today: ISODate, reaches = false): string {
+export function waterAddedToast(volume: string, date: ISODate, today: ISODate, reaches = false, total?: string): string {
   const day = date === today ? '' : date === addDays(today, -1) ? ' for yesterday' : ` for ${weekdayShort(date)} ${formatShortDate(date)}`;
+  // The total is held on one line (no-break spaces), so a two-line toast breaks before it, never inside "1.48 of 3.3 L".
+  if (total) return `${volume} added to Water${day} · ${total.replace(/ /g, '\u00A0')}${reaches ? ', goal reached' : ''}`;
   return `${volume} added to Water${day}${reaches ? '. Goal reached' : ''}`;
 }

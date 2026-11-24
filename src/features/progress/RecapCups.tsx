@@ -18,9 +18,9 @@ const CHECK_H = 18;
  * The week as seven cups that pour left to right when the recap opens (and not
  * again for the same week in this session). Each cup is that day's own budget:
  * the dashed line across their tops is "each day's budget", true of every cup.
- * A check sits over a fully logged day within 10% of it, amber marks a day
- * above it, a lighter fill a partly logged day and hatching today. Tap a cup
- * to read its numbers.
+ * Each cup gives one signal: a check sits over a fully logged day at 90 to
+ * 100% of it, amber marks a day above it (with no check), a lighter fill a
+ * partly logged day and hatching today. Tap a cup to read its numbers.
  */
 export function RecapCups({ cups, week }: { cups: RecapDayCup[]; week: string }) {
   const { colors, spacing } = useTheme();
@@ -49,7 +49,7 @@ export function RecapCups({ cups, week }: { cups: RecapDayCup[]; week: string })
                 accessibilityState={{ selected: active }}
                 style={{ flex: 1, minWidth: 0, alignItems: 'center' }}>
                 <View style={{ height: CHECK_H, justifyContent: 'flex-start' }}>
-                  {c.inBand ? <Check size={14} color={colors.success} strokeWidth={2.6} /> : null}
+                  {c.check ? <Check size={14} color={colors.success} strokeWidth={2.6} /> : null}
                 </View>
                 <MiniCup
                   index={i}

@@ -456,7 +456,7 @@ module.exports = [
     waitFor: 'train-steps-source',
     note: 'the same with long content and five-figure counts',
   },
-  { id: 'train-steps-empty-web', route: '/train', waitFor: 'train-steps-import', note: 'Train on the web with no steps: one quiet line that leads to the import' },
+  { id: 'train-steps-empty-web', route: '/train', taps: ['train-bring-in'], waitFor: 'train-steps-import', sheet: true, note: "Train on the web with no steps: Bring in workouts' sheet offers the steps from a Health export" },
 
   // ---------------------------------------------------------------- weight, the day's calories and heart rate (rows, Weight, Progress, a workout)
   {

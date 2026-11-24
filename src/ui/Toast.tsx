@@ -217,8 +217,11 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
           ? { alignSelf: 'stretch', alignItems: 'center', paddingHorizontal: 20, marginBottom: 12 }
           : { position: 'absolute', left: 0, right: 0, bottom, alignItems: 'center', paddingHorizontal: 20 }
       }>
+      {/* Only the action takes a touch: a tap on the toast's ink body goes through to what is under it (Today's
+          "+ 250 ml" sits just above the resting toast at 360 x 740, and a second glass must still log). */}
       <Animated.View
         testID="toast"
+        pointerEvents="box-none"
         accessibilityLiveRegion="polite"
         onLayout={inSheet ? undefined : (e) => setToastH(Math.round(e.nativeEvent.layout.height))}
         style={{
@@ -241,9 +244,11 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
           pointerEvents="none"
           style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 3, borderTopLeftRadius: radius.shoulder, borderTopRightRadius: radius.shoulder, backgroundColor: tint ? ((colors as unknown as Record<string, string>)[tint] ?? tint) : colors.primary }}
         />
-        <Text variant="label" color={colors.bg} style={{ flexShrink: 1 }} accessibilityLabel={withoutMarks(message)}>
-          {message}
-        </Text>
+        <View pointerEvents="none" style={{ flexShrink: 1 }}>
+          <Text variant="label" color={colors.bg} accessibilityLabel={withoutMarks(message)}>
+            {message}
+          </Text>
+        </View>
         {actionLabel ? (
           <PressableScale
             testID="toast-action"

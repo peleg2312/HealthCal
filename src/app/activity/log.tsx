@@ -304,7 +304,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
         {singleMet ? (
           <Card tone="alt" padding={spacing.md} testID="intensity-single">
             <Text variant="body" color="textSecondary">
-              {activity.name} has a single reference value in the Compendium ({activity.met.moderate} MET), so effort does not change this estimate.
+              {activity.name} has one reference value in the Compendium, so effort does not change this estimate.
             </Text>
           </Card>
         ) : (
@@ -327,7 +327,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
                     onPress={() => setIntensity(i)}
                     style={{
                       overflow: 'hidden',
-                      ...(tight ? { flexDirection: 'row', alignItems: 'center', minHeight: 56, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.md } : { flex: 1, minHeight: 104, padding: spacing.md, gap: spacing.xs }),
+                      ...(tight ? { flexDirection: 'row', alignItems: 'center', minHeight: 56, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.md } : { flex: 1, minHeight: 88, padding: spacing.md, gap: spacing.xs }),
                       ...cup(radius.tile, 5),
                       backgroundColor: colors.surface,
                       borderWidth: active ? 2 : 1,
@@ -343,18 +343,12 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
                             {hint}
                           </Text>
                         </View>
-                        <Text variant="caption" color={active ? 'text' : 'textSecondary'} tabular>
-                          {activity.met[i]} MET
-                        </Text>
                       </>
                     ) : (
                       <>
                         <Text variant="bodyStrong">{INTENSITY_LABELS[i].title}</Text>
                         <Text variant="caption" color="textSecondary" numberOfLines={3} style={{ flex: 1 }}>
                           {hint}
-                        </Text>
-                        <Text variant="caption" color={active ? 'text' : 'textSecondary'} tabular>
-                          {activity.met[i]} MET
                         </Text>
                       </>
                     )}
@@ -375,7 +369,6 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
           <NumberField
             testID="distance-input"
             label="Distance (optional)"
-            placeholder="0"
             value={distance}
             onChange={setDistance}
             decimals={2}

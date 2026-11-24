@@ -264,7 +264,7 @@ export default function RecapScreen() {
       <Sheet visible={help} onClose={() => setHelp(false)} title="Reading the cups">
         <View style={{ gap: spacing.md }} testID="recap-help">
           <Text variant="body">Each cup is one day, filled to how much of that day&apos;s own budget you ate. The dashed line across the tops is each day&apos;s budget, so a full cup is a day right on it.</Text>
-          <Text variant="body">A check marks a fully logged day within 10% of its budget. Amber at the top marks a day above its budget. A lighter fill is a day only partly logged (under 800 kcal or half the budget), and a hatched cup is today, still in progress.</Text>
+          <Text variant="body">A check marks a fully logged day at 90 to 100% of its budget. Amber at the top marks a day above its budget, and such a day has no check. A lighter fill is a day only partly logged (under 800 kcal or half the budget), and a hatched cup is today, still in progress.</Text>
           <Text variant="body" color="textSecondary">Budgets change with exercise and with your plan, which is why each day is measured against its own and never against the week&apos;s average.</Text>
         </View>
       </Sheet>

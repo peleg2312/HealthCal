@@ -43,3 +43,24 @@ export function analysingLabel(photo: boolean, precise: boolean): string {
 
 /** The + sheet's hints for the two AI tiles: both say that the numbers are an AI estimate, and "Describe it" says what to do. */
 export const AI_TILE_HINT = { photo: 'Photo, AI estimate', describe: 'Type it, AI estimate' } as const;
+
+/** The longest description the describe field takes (its `maxLength`), so a prefill never holds more. */
+export const DESCRIPTION_MAX = 500;
+
+/**
+ * Food search's AI tile (the row of four). With nothing typed it is the way to both inputs: "AI" under the
+ * AI's camera, opening the photo screen on Photo, with Describe one tab away; its full name says both. Once
+ * words are typed (results or none) it is "Describe" and carries them (`words`), so the person never types
+ * them twice; nothing is sent until they tap Estimate there.
+ */
+export function searchAiTile(query: string): { label: string; a11y: string; glyph: 'photo' | 'describe'; params: Record<string, string> } {
+  const words = query.trim().slice(0, DESCRIPTION_MAX);
+  if (!words) return { label: 'AI', a11y: 'AI estimate from a photo or a description', glyph: 'photo', params: { mode: 'photo' } };
+  return { label: 'Describe', a11y: `Describe ${words} for an AI estimate`, glyph: 'describe', params: { mode: 'text', words } };
+}
+
+/** The describe field's first value from the screen's `words` param (read once, when the screen opens): trimmed, at most `DESCRIPTION_MAX`. */
+export function prefilledDescription(raw: unknown): string {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  return typeof v === 'string' ? v.trim().slice(0, DESCRIPTION_MAX) : '';
+}

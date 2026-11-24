@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { looseDate, projectTo, rangeText, shortDate } from './projection';
+import { looseDate, projectTo, rangeShort, rangeText, shortDate } from './projection';
 
 const NOW = new Date(2026, 10, 13, 12);
 
@@ -36,5 +36,20 @@ describe('projection', () => {
     expect(looseDate(new Date(2026, 11, 15), NOW)).toBe('mid December');
     // Across a new year both years are named.
     expect(rangeText(projectTo(80, 76, -0.5, NOW)!, NOW)).toBe('between late December and late January 2027');
+  });
+
+  it("labels the chart's goal with the title's months, never a day", () => {
+    const p = projectTo(80, 72, -0.5, NOW)!;
+    expect(rangeText(p, NOW)).toBe('between mid February and mid April 2027');
+    expect(rangeShort(p, NOW)).toBe('Mid Feb to mid Apr');
+    expect(rangeShort(projectTo(80, 76, -0.5, NOW)!, NOW)).toBe('Late Dec to late Jan');
+    // A short road whose two ends land in the same part of a month: one phrase, as the title says it.
+    const near = { ...p, fastDate: new Date(2027, 2, 12), slowDate: new Date(2027, 2, 18) };
+    expect(rangeText(near, NOW)).toBe('around mid March 2027');
+    expect(rangeShort(near, NOW)).toBe('Around mid Mar');
+    // A road a year long whose ends share a part and a month names both years.
+    const long = { ...p, fastDate: new Date(2027, 2, 14), slowDate: new Date(2028, 2, 16) };
+    expect(rangeShort(long, NOW)).toBe('Mid Mar 2027 to mid Mar 2028');
+    expect(rangeShort(p, NOW)).not.toMatch(/\d/);
   });
 });

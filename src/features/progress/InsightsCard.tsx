@@ -4,7 +4,7 @@ import { View } from 'react-native';
 
 import type { Insight } from '@/lib/insights';
 import { useTheme } from '@/theme';
-import { Divider, PressableScale, Text } from '@/ui';
+import { Button, Divider, PressableScale, Text } from '@/ui';
 
 import { go, SectionCard } from './parts';
 
@@ -62,18 +62,18 @@ function InsightRow({ insight }: { insight: Insight }) {
           {insight.body}
         </Text>
         {insight.action ? (
-          <PressableScale
+          // A small kit ghost button (as Train's and Weight's), not an underlined text link; drawn without
+          // side padding so its words line up with the insight's text above it.
+          <Button
             testID={`insight-${insight.id}-action`}
+            title={insight.action.label}
+            variant="ghost"
+            size="sm"
+            full={false}
+            iconRight={<ChevronRight size={16} color={colors.primaryInk} strokeWidth={2.2} />}
             onPress={() => go(insight.action!.route)}
-            accessibilityLabel={insight.action.label}
-            accessibilityRole="link"
-            hitSlop={6}
-            style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', minHeight: 32, gap: 2 }}>
-            <Text variant="label" color="text" style={{ textDecorationLine: 'underline' }}>
-              {insight.action.label}
-            </Text>
-            <ChevronRight size={15} color={colors.text} strokeWidth={1.9} />
-          </PressableScale>
+            style={{ paddingHorizontal: 0, marginTop: spacing.xs }}
+          />
         ) : null}
       </View>
     </View>

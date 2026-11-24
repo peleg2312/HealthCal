@@ -23,6 +23,11 @@ export function favoriteLabel(name: string, on: boolean): string {
   return on ? `Remove ${name} from favourites` : `Add ${name} to favourites`;
 }
 
+/** A saved-meal row's "+" (search's Saved meals and Favourites): "Log Usual breakfast" (it opens the log sheet). */
+export function logMealLabel(name: string): string {
+  return `Log ${name}`;
+}
+
 /** The named accessibility action on a row that a long press stars (same words on both platforms). */
 export const FAVOURITE_ACTION = { name: 'favorite', add: 'Add to favourites', remove: 'Remove from favourites' } as const;
 

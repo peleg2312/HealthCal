@@ -4,7 +4,7 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { formatNumber, formatVolume, formatWeight, round } from '@/lib/units';
 import { useTheme } from '@/theme';
-import { AnimatedNumber, Card, CupKey, Divider, FadeUp, haptic, levelY, MacroBar, PressableScale, Text, useReducedMotion, Vessel } from '@/ui';
+import { AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, haptic, levelY, MacroBar, PressableScale, Text, useReducedMotion, Vessel } from '@/ui';
 
 import { ARRIVAL_POUR } from './components';
 import { METHOD_LABEL, type Plan } from './model';
@@ -119,7 +119,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
               </Text>
             </View>
             {/* The road draws once its card has arrived. */}
-            <ProjectionChart projection={projection} units={units} delay={landed + 160} />
+            <ProjectionChart projection={projection} units={units} delay={landed + 160} now={now} />
             <Text variant="caption" color="textSecondary">
               A projection, not a promise. It redraws from your real trend.
             </Text>
@@ -229,20 +229,17 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
         </Text>
       </FadeUp>
 
-      {/* On the page background, so an underlined text link in the text colour, not primary. */}
-      <PressableScale
+      {/* The way back, as the kit's small ghost button (as Train's and Weight's quiet actions are), centred under the notes. */}
+      <Button
         testID="onb-change-answers"
+        title="Change answers"
+        variant="ghost"
+        size="sm"
+        full={false}
+        icon={<ChevronLeft size={16} color={colors.primaryInk} strokeWidth={2.2} />}
         onPress={onChangeAnswers}
-        feedback="tap"
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel="Change answers"
-        style={{ alignSelf: 'center', minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md }}>
-        <ChevronLeft size={16} color={colors.textSecondary} strokeWidth={2.2} />
-        <Text variant="label" color="textSecondary" style={{ textDecorationLine: 'underline' }}>
-          Change answers
-        </Text>
-      </PressableScale>
+        style={{ alignSelf: 'center' }}
+      />
     </View>
   );
 }

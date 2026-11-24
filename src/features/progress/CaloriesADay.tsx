@@ -34,14 +34,20 @@ export function CaloriesADay({ days, summary, today, onOpen }: { days: InsightDa
     <Card
       testID="progress-calories-a-day"
       onPress={onOpen}
-      accessibilityLabel={`Calories a day, average ${formatNumber(Math.round(c.avgKcal))} kcal against an average budget of ${formatNumber(Math.round(c.avgBudget))}. ${verdict}. Open nutrition`}
+      accessibilityLabel={`Calories a day, average ${formatNumber(Math.round(c.avgKcal))} kcal against an average budget of ${formatNumber(Math.round(c.avgBudget))}. ${verdict.line}.${verdict.note ? ` ${verdict.note}.` : ''} Open nutrition`}
       style={{ gap: spacing.md }}>
       <View style={{ gap: 2 }}>
         {/* The average is the Calories tile's number just below, so it is said once there (and read out here). */}
         <Text variant="h3">{weekly ? 'Calories a day, by week' : 'Calories a day'}</Text>
+        {/* A short headline, and what it counts in the caption under it. */}
         <Text variant="title" testID="progress-calories-verdict">
-          {verdict}
+          {verdict.line}
         </Text>
+        {verdict.note ? (
+          <Text variant="caption" color="textSecondary" testID="progress-calories-verdict-note">
+            {verdict.note}
+          </Text>
+        ) : null}
       </View>
       <View>
         <BarChart data={bars} color={colors.calories} goal={c.avgBudget} openIndex={openIndex} height={150} testID="progress-overview-chart" />

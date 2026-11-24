@@ -53,5 +53,11 @@ describe('the log toast names what was added first', () => {
     expect(waterAddedToast('8.5 fl oz', '2026-11-15', today)).toBe('8.5 fl oz added to Water for yesterday');
     expect(waterAddedToast('250 ml', '2026-11-14', today, true)).toBe('250 ml added to Water for Sat Nov 14. Goal reached');
     expect(waterAddedToast('250 ml', today, today, true)).toBe('250 ml added to Water. Goal reached');
+    // With the day's new total, as Today's glass says it (the toast rests over Today's water row), held on one line.
+    const plain = (s: string) => s.replace(/\u00A0/g, ' ');
+    expect(plain(waterAddedToast('250 ml', today, today, false, '1.48 of 3.3 L'))).toBe('250 ml added to Water · 1.48 of 3.3 L');
+    expect(waterAddedToast('250 ml', today, today, false, '1.48 of 3.3 L')).toContain('1.48\u00A0of\u00A03.3\u00A0L');
+    expect(plain(waterAddedToast('250 ml', today, today, true, '3.3 of 3.3 L'))).toBe('250 ml added to Water · 3.3 of 3.3 L, goal reached');
+    expect(plain(waterAddedToast('8.5 fl oz', '2026-11-15', today, false, '41 of 112 fl oz'))).toBe('8.5 fl oz added to Water for yesterday · 41 of 112 fl oz');
   });
 });

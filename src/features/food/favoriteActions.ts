@@ -12,6 +12,7 @@ import { favoriteRecordId, useStore } from '@/store';
 import type { Food, SavedMeal } from '@/types';
 import { haptic, toast } from '@/ui';
 
+import { displayFoodName } from './displayName';
 import { isFavoriteMeal, withFavorite } from './favorites';
 import { favoriteToast } from './favoriteWords';
 
@@ -57,7 +58,8 @@ export function toggleFoodFavorite(food: Food): boolean {
   else s.remove('favorites', id);
   if (on) haptic.success();
   else haptic.tap();
-  toast(favoriteToast(isolateRtl(food.name), on, 'food'), {
+  // The name as it is drawn everywhere else ("Oats, rolled, dry (uncooked)"), never the stored capitals.
+  toast(favoriteToast(isolateRtl(displayFoodName(food)), on, 'food'), {
     label: 'Undo',
     onPress: () => {
       const st = useStore.getState();

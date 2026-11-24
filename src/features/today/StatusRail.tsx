@@ -6,6 +6,7 @@ import { useWindowDimensions, View } from 'react-native';
 import { waterAddedToast } from '@/features/food/addedTo';
 import { startOfWeek, today } from '@/lib/dates';
 import { guidelineMinutes } from '@/lib/exercise';
+import { effectiveMl } from '@/lib/hydration';
 import { nowISO } from '@/lib/id';
 import { WEEKLY_ACTIVE_MINUTES } from '@/lib/insights';
 import { formatNumber, formatVolume, weightUnit, weightValue } from '@/lib/units';
@@ -18,7 +19,7 @@ import type { ISODate } from '@/types';
 import { AnimatedNumber, Button, Card, CupKey, haptic, PressableScale, ProgressBar, Text, toast } from '@/ui';
 
 import { cheersLabel, recentCheerCount } from './cheers';
-import { crossesGoal, volumeNumber, volumeUnitFor } from './volume';
+import { crossesGoal, volumeNumber, volumeUnitFor, waterOfGoal } from './volume';
 import { weightCell } from './weightCell';
 
 /** "1.23 L" -> ["1.23", "L"], "84 fl oz" -> ["84", "fl oz"]. */
@@ -42,19 +43,25 @@ const REACHED_TOAST_WAIT = motion.duration.pourSmall + motion.duration.fade + mo
 
 /**
  * One glass, with Undo. Reaching the goal is marked by the bar itself (its `onReached` adds the
- * success haptic). Pass the day's goal so the glass that reaches it says so in its toast, after
- * the bar's flash.
+ * success haptic). Pass the day's goal so the toast names the day's new total against it (on Today
+ * the toast rests over the water row, so the number it covers is in the toast) and so the glass
+ * that reaches it says so, after the bar's flash.
  */
 export function addWater(date: ISODate, ml: number, units: 'metric' | 'imperial', goalMl?: number) {
-  const before = live(useStore.getState().water)
-    .filter((w) => w.date === date)
-    .reduce((sum, w) => sum + w.ml, 0);
+  // Counted as the day's total is (`useDay`: each drink by its hydration factor), so the toast's total and
+  // the glass that reaches the goal agree with the water row.
+  const before = Math.round(
+    live(useStore.getState().water)
+      .filter((w) => w.date === date)
+      .reduce((sum, w) => sum + effectiveMl(w.ml, w.beverage), 0),
+  );
   const entry = useStore.getState().upsert('water', { date, ml, beverage: 'water', loggedAt: nowISO() });
   haptic.tap();
   const reaches = goalMl !== undefined && crossesGoal(before, ml, goalMl);
-  // "250 ml added to Water", in the order of the food toasts ("Banana added to breakfast").
+  const total = goalMl !== undefined && goalMl > 0 ? waterOfGoal(before + ml, goalMl, units) : undefined;
+  // "250 ml added to Water · 1.48 of 3.3 L", in the order of the food toasts ("Banana added to breakfast").
   const show = () =>
-    toast(waterAddedToast(formatVolume(ml, units), date, today(), reaches), {
+    toast(waterAddedToast(formatVolume(ml, units), date, today(), reaches, total), {
       label: 'Undo',
       tint: 'water',
       onPress: () => useStore.getState().remove('water', entry.id),
@@ -108,13 +115,25 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
   // "1.23 of 3.3 L": the unit is said once when both amounts share it ("250 ml of 2.55 L" otherwise).
   const sameUnit = goalUnit === waterUnit;
   const dateQuery = isToday ? '' : `?date=${day.date}`;
+  // With guideline minutes this week the cell is the week's: "Activity this week" over the week's
+  // minutes, the bar toward the guideline and one short caption with the guideline and the day's
+  // own minutes ("of 150 min, 75 today"), so no line is a three-line wrap at 360 or 320 px.
+  const week = weekMinutes > 0;
+  const thisWeek = isToday ? 'this week' : 'that week';
+  const dayWord = isToday ? 'today' : 'that day';
   const activityLabel = [
-    day.activities.length ? `Activity, ${day.activeMinutes} minutes` : 'Activity, nothing logged',
-    weekMinutes > 0 ? `${weekMinutes} of ${WEEKLY_ACTIVE_MINUTES} guideline minutes ${isToday ? 'this' : 'that'} week` : '',
+    week
+      ? `Activity ${thisWeek}, ${weekMinutes} of ${WEEKLY_ACTIVE_MINUTES} guideline minutes${day.activities.length ? `. ${day.activeMinutes} minutes ${dayWord}` : ''}`
+      : day.activities.length
+        ? `Activity, ${day.activeMinutes} minutes`
+        : 'Activity, nothing logged',
     cheers ? `${cheersLabel(cheers)} from friends. Open friends` : day.activities.length ? '' : 'Log a session',
   ]
     .filter(Boolean)
     .join('. ');
+  // "Activity / this week" is two lines: every label then keeps two lines' height, as on a narrow phone,
+  // so the three values stay level.
+  const tall = narrow || week;
 
   return (
     <Card testID="today-rail" padding={0}>
@@ -163,13 +182,16 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
         <Cell
           testID="today-activity"
           narrow={narrow}
-          label="Activity"
+          tall={tall}
+          // A little wider on a narrow phone, so "that week" keeps its line at 320 px.
+          flex={narrow ? 1.1 : 1}
+          label={week ? `Activity\n${thisWeek}` : 'Activity'}
           color={colors.exercise}
           accessibilityLabel={activityLabel}
           onPress={() => router.push(cheers ? ('/friends' as never) : day.activities.length ? '/train' : (`/activity/pick?date=${day.date}` as never))}
-          value={day.activities.length ? String(day.activeMinutes) : null}
+          value={week ? formatNumber(weekMinutes) : day.activities.length ? String(day.activeMinutes) : null}
           unit="min">
-          {weekMinutes > 0 ? (
+          {week ? (
             <View style={{ marginTop: 6, gap: 5 }}>
               <ProgressBar
                 progress={weekMinutes / WEEKLY_ACTIVE_MINUTES}
@@ -177,10 +199,10 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
                 height={4}
                 goalKind="reach"
                 memoryKey={`rail-week-${weekStart}`}
-                onReached={() => reached(`${WEEKLY_ACTIVE_MINUTES} active minutes ${isToday ? 'this' : 'that'} week. That meets the weekly guideline.`)}
+                onReached={() => reached(`${WEEKLY_ACTIVE_MINUTES} active minutes ${thisWeek}. That meets the weekly guideline.`)}
               />
-              <Text variant="caption" color="textSecondary" numberOfLines={3} testID="today-activity-week">
-                {`${formatNumber(weekMinutes)} of ${WEEKLY_ACTIVE_MINUTES} min ${isToday ? 'this' : 'that'} week`}
+              <Text variant="caption" color="textSecondary" numberOfLines={2} testID="today-activity-week">
+                {`of ${WEEKLY_ACTIVE_MINUTES} min${day.activities.length ? `, ${formatNumber(day.activeMinutes)} ${dayWord}` : ''}`}
               </Text>
             </View>
           ) : null}
@@ -194,6 +216,7 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
         <Cell
           testID="today-sleep"
           narrow={narrow}
+          tall={tall}
           flex={0.8}
           label="Sleep"
           color={colors.sleep}
@@ -204,12 +227,13 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
         />
         <Hairline />
         {fast ? (
-          <FastCell start={fast.start} targetHours={fast.targetHours} narrow={narrow} />
+          <FastCell start={fast.start} targetHours={fast.targetHours} narrow={narrow} tall={tall} />
         ) : (
           <Cell
             testID="today-weight"
             narrow={narrow}
-            flex={1.2}
+            tall={tall}
+            flex={narrow ? 1.1 : 1.2}
             label={weight?.label ?? 'Weight trend'}
             color={colors.weight}
             accessibilityLabel={weight ? `${weight.label}, ${weightValue(weight.kg, units).toFixed(1)} ${weightUnit(units)}` : 'Weight, no weigh-ins. Add your weight'}
@@ -265,10 +289,13 @@ function Cell({
   unit,
   children,
   narrow,
+  tall,
   flex = 1,
 }: {
   testID: string;
   narrow?: boolean;
+  /** Every label in the row keeps two lines' height (a narrow phone, or the week's two-line label). */
+  tall?: boolean;
   flex?: number;
   label: string;
   color: string;
@@ -280,9 +307,10 @@ function Cell({
 }) {
   return (
     <PressableScale testID={testID} onPress={onPress} accessibilityLabel={accessibilityLabel} scaleTo={0.96} style={{ flex, minWidth: 0, minHeight: 44 }}>
-      <KeyLabel color={color} label={label} tall={narrow} />
+      <KeyLabel color={color} label={label} tall={tall ?? narrow} />
       {value !== null ? (
-        <Text variant="numM" numberOfLines={1} style={{ marginTop: 3 }}>
+        // A four-digit week ("1,240 min") steps down on a narrow phone, so it is never cut.
+        <Text variant="numM" numberOfLines={1} style={[{ marginTop: 3 }, narrow && value.length > 4 ? { fontSize: 17, lineHeight: 24 } : null]}>
           {value}
           <Text variant="unit">{unit ? ` ${unit}` : ''}</Text>
         </Text>
@@ -296,7 +324,7 @@ function Cell({
   );
 }
 
-function FastCell({ start, targetHours, narrow }: { start: string; targetHours: number; narrow: boolean }) {
+function FastCell({ start, targetHours, narrow, tall }: { start: string; targetHours: number; narrow: boolean; tall: boolean }) {
   const { colors } = useTheme();
   // The clock lives in state so rendering stays pure; it ticks while the fast runs.
   const [now, setNow] = useState(() => Date.now());
@@ -311,7 +339,8 @@ function FastCell({ start, targetHours, narrow }: { start: string; targetHours: 
     <Cell
       testID="today-fasting"
       narrow={narrow}
-      flex={1.2}
+      tall={tall}
+      flex={narrow ? 1.1 : 1.2}
       label={`Fast of ${targetHours} h`}
       color={colors.fat}
       accessibilityLabel={`Fasting, ${h} hours ${m} minutes of ${targetHours}`}

@@ -583,7 +583,8 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   s = await stored();
   const [w3] = newIn(s, before, 'water');
   check('drinks: Water only writes the water record alone', !!w3 && !w3.foodEntryId && newIn(s, before, 'foodEntries').length === 0, JSON.stringify(w3));
-  check('drinks: the Water only toast', (await text('toast')).includes('for water only'), await text('toast'));
+  // "250 ml of milk added to Water only" (src/features/drinks/rules.ts), whatever follows it.
+  check('drinks: the Water only toast', /\bof milk added to Water only\b/.test(await text('toast')), await text('toast'));
   check('drinks: Water only turns off after the log', !(await pressed('water-water-only')));
   await page.waitForTimeout(5000);
   // The diary marks the paired entry; a delete there removes the calories and keeps the water.
@@ -1023,7 +1024,9 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     const added = after.filter((e) => !before.includes(e.id));
     check(
       "ideas: one tap logs the idea's foods to today's dinner",
-      added.length === foods0.length && added.length >= 1 && foods0.every((f) => added.some((e) => e.name === f)),
+      // The row draws a reference food without the stored capitals (displayFoodName: "Pasta, enriched, cooked" for
+      // "Pasta, enriched, COOKED"), so the drawn and stored names are compared through that rule: case aside.
+      added.length === foods0.length && added.length >= 1 && foods0.every((f) => added.some((e) => e.name.toLowerCase() === f.toLowerCase())),
       `${added.map((e) => e.name).join(', ')} | row: ${foods0.join(', ')}`,
     );
     const addLabel = (await p.getByTestId('fits-idea-add-0').first().getAttribute('aria-label')) || '';

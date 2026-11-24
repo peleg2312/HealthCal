@@ -43,6 +43,7 @@ import { AiGlyph, AiMark } from '@/features/ai/mark';
 import { PhotoHero } from '@/features/ai/PhotoHero';
 import { SampleNotice } from '@/features/ai/SampleNotice';
 import { photoText, readWeight } from '@/features/ai/weight';
+import { DESCRIPTION_MAX, prefilledDescription } from '@/features/ai/words';
 import { SaveMealRow } from '@/features/ai/SaveMealRow';
 import { MealPicker } from '@/features/food/components';
 import { checkoutShown, PLAN_ROUTE, planVisible, refreshPlanAfterLimit, usePlan } from '@/features/plan';
@@ -86,7 +87,7 @@ const ARRIVE_STEP = 60;
 const CANCEL_AFTER_MS = 400;
 
 export default function PhotoScreen() {
-  const params = useLocalSearchParams<{ meal?: string; date?: string; mode?: string; demoError?: string; demoWait?: string; demoLive?: string }>();
+  const params = useLocalSearchParams<{ meal?: string; date?: string; mode?: string; words?: string; demoError?: string; demoWait?: string; demoLive?: string }>();
   const { colors, radius, spacing } = useTheme();
   // A 320 px phone gets the short forms of the longest labels, so none is cut.
   const narrow = useWindowDimensions().width < 360;
@@ -117,7 +118,10 @@ export default function PhotoScreen() {
   const [usedWeight, setUsedWeight] = useState<string | null>(null);
   const units = useStore((s) => s.profile?.units) ?? 'metric';
   const weight = readWeight(weightText, units);
-  const [description, setDescription] = useState('');
+  // Words typed in food search arrive as `words` (search's "Describe" tile) and fill the field once, when the
+  // screen opens; nothing is sent until Estimate. The caret starts after them, so amounts can be added at once.
+  const [description, setDescription] = useState(() => prefilledDescription(params.words));
+  const [caret, setCaret] = useState<number | null>(() => prefilledDescription(params.words).length || null);
   const [result, setResult] = useState<AiFoodResult | null>(null);
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [fat, setFat] = useState<AddedFat>('none');
@@ -546,9 +550,15 @@ export default function PhotoScreen() {
                 label="What did you eat?"
                 placeholder="e.g. Two scrambled eggs with butter, one slice of sourdough toast and a flat white"
                 value={description}
-                onChangeText={setDescription}
+                onChangeText={(t) => {
+                  setCaret(null);
+                  setDescription(t);
+                }}
+                // Placed once, after prefilled words; the person's own taps and typing move it from then on.
+                selection={caret !== null ? { start: caret, end: caret } : undefined}
+                onSelectionChange={caret !== null ? (e) => e.nativeEvent.selection.start === caret && setCaret(null) : undefined}
                 multiline
-                maxLength={500}
+                maxLength={DESCRIPTION_MAX}
                 autoFocus
                 lines={4}
                 hint="Amounts and cooking method help."

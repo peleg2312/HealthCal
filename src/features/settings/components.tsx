@@ -4,7 +4,7 @@ import { View } from 'react-native';
 
 import { formatClock, formatHHmm, parseHHmm } from '@/lib/dates';
 import { cup, cupFor, useTheme } from '@/theme';
-import { Button, Card, Chip, Divider, IconButton, ListRow, PressableScale, Sheet, Text } from '@/ui';
+import { Button, Card, Chip, CupKey, Divider, IconButton, ListRow, PressableScale, Sheet, Text } from '@/ui';
 
 /**
  * A titled card of rows separated by hairlines. `radiogroup` marks a card of `OptionRow`s as one
@@ -13,6 +13,9 @@ import { Button, Card, Chip, Divider, IconButton, ListRow, PressableScale, Sheet
 export function Group({ title, footer, radiogroup, children }: { title?: string; footer?: string; radiogroup?: boolean; children: React.ReactNode }) {
   const { spacing } = useTheme();
   const items = React.Children.toArray(children).filter(Boolean);
+  // The chosen OptionRow is drawn as its own outlined tile, so no hairline runs against its edge; a clear
+  // line of the same 1 px stands there instead, so choosing another row never moves anything.
+  const chosen = (c: React.ReactNode) => React.isValidElement<{ selected?: boolean }>(c) && c.type === OptionRow && !!c.props.selected;
   return (
     <View style={{ gap: spacing.sm }}>
       {title ? (
@@ -22,11 +25,12 @@ export function Group({ title, footer, radiogroup, children }: { title?: string;
       ) : null}
       <Card
         padding={0}
-        style={{ paddingHorizontal: spacing.lg }}
+        // A single choice keeps 4 px above its first row and below its last, so a chosen tile there stays clear of the card's edge.
+        style={{ paddingHorizontal: spacing.lg, ...(radiogroup ? { paddingVertical: spacing.xs } : null) }}
         {...(radiogroup ? { accessibilityRole: 'radiogroup' as const, role: 'radiogroup' as const, accessibilityLabel: title } : null)}>
         {items.map((child, i) => (
           <React.Fragment key={i}>
-            {i > 0 ? <Divider /> : null}
+            {i > 0 ? chosen(child) || chosen(items[i - 1]) ? <View style={{ height: 1 }} /> : <Divider /> : null}
             {child}
           </React.Fragment>
         ))}
@@ -57,9 +61,11 @@ export function IconTile({ color, keep, children }: { color?: string; keep?: boo
 }
 
 /**
- * Single-choice list row, drawn as a radio in the Pour way: an outlined cup, and when chosen a
- * filled cup inside it (never a check in a filled box, which reads as a checkbox). Announced as a
- * radio button with its checked state; put the rows in a `Group` with `radiogroup`.
+ * Single-choice list row. The chosen row is marked on itself, as every chosen tile in the app is
+ * (the effort tiles, the plan's periods): an ink outline round the row, the level line across its
+ * top and a small filled cup at its end. The other rows carry no mark at all, so nothing reads as an
+ * empty checkbox. Announced as a radio button with its checked state; put the rows in a `Group`
+ * with `radiogroup`, which leaves out the hairlines beside the chosen tile.
  */
 export function OptionRow({
   title,
@@ -74,7 +80,7 @@ export function OptionRow({
   onPress: () => void;
   testID?: string;
 }) {
-  const { colors, spacing } = useTheme();
+  const { colors, radius, spacing } = useTheme();
   return (
     <PressableScale
       testID={testID}
@@ -85,7 +91,22 @@ export function OptionRow({
       accessibilityState={{ checked: selected, selected }}
       aria-checked={selected}
       accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: spacing.sm }}>
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.md,
+        minHeight: 56,
+        paddingVertical: spacing.sm,
+        // The tile reaches 12 px into the card's side room; its padding (less the 2 px outline) keeps the words where every row's are.
+        marginHorizontal: -spacing.md,
+        paddingHorizontal: spacing.md - 2,
+        ...cup(radius.tile, 5),
+        borderWidth: 2,
+        borderColor: selected ? colors.text : 'transparent',
+        overflow: 'hidden',
+      }}>
+      {/* The level line across the chosen tile's top, the mark of every selected thing in the app. It takes no room. */}
+      {selected ? <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: colors.rim }} /> : null}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text variant="bodyStrong" numberOfLines={1}>
           {title}
@@ -96,20 +117,8 @@ export function OptionRow({
           </Text>
         ) : null}
       </View>
-      {/* The radio: an outlined cup, with a filled ink cup inside when chosen. The outline is ink when chosen. */}
-      <View
-        style={{
-          width: 24,
-          height: 24,
-          ...cupFor(24),
-          borderWidth: selected ? 2 : 1.5,
-          borderColor: selected ? colors.text : colors.borderStrong,
-          backgroundColor: 'transparent',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-        {selected ? <View style={{ width: 12, height: 12, ...cup(4, 2), backgroundColor: colors.text }} /> : null}
-      </View>
+      {/* A small filled ink cup on the chosen row only; the same room stays empty on the others, so no line rewraps on a choice. */}
+      <View style={{ width: 12, alignItems: 'center' }}>{selected ? <CupKey color={colors.text} size={12} /> : null}</View>
     </PressableScale>
   );
 }

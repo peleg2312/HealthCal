@@ -1,7 +1,8 @@
 /**
  * The recap's "Day by day" in words. One rule for the cups, the checks and
  * the verdict: every day is measured against its own budget (never the week's
- * average), and a check is a fully logged day within 10% of it.
+ * average). Each cup gives one signal: a check is a fully logged day at 90 to
+ * 100% of its budget, amber a day above it (never with a check).
  */
 import { hasFoodLogged } from '@/features/drinks/via';
 import { addDays, formatShortDate } from '@/lib/dates';
@@ -15,8 +16,10 @@ export interface RecapDayCup {
   ratio: number;
   logged: boolean;
   complete: boolean;
-  /** Fully logged and within 10% of its own budget: the check. */
+  /** Fully logged and within 10% of its own budget, either side. */
   inBand: boolean;
+  /** Fully logged, at 90 to 100% of its own budget: the check. A day above its budget never has one. */
+  check: boolean;
   /** Above its own budget (amber lip). */
   over: boolean;
   isToday: boolean;
@@ -36,17 +39,19 @@ export function recapDayCups(weekStart: ISODate, days: InsightDay[], today: ISOD
     const complete = !!d && isCompleteDay(d, today);
     const inBand = complete && inBudgetBand(kcal, budget);
     const over = logged && kcal > budget;
+    const check = inBand && !over;
     return {
       date,
       ratio,
       logged,
       complete,
       inBand,
+      check,
       over,
       isToday: date === today,
       future: date > today,
       detail: logged
-        ? `${formatShortDate(date)} · ${formatNumber(Math.round(kcal))} of ${formatNumber(Math.round(budget))} kcal, ${standing(kcal, budget, over, inBand)}${complete ? '' : date === today ? ', still in progress' : ', partly logged'}`
+        ? `${formatShortDate(date)} · ${formatNumber(Math.round(kcal))} of ${formatNumber(Math.round(budget))} kcal, ${standing(kcal, budget, over, check)}${complete ? '' : date === today ? ', still in progress' : ', partly logged'}`
         : `${formatShortDate(date)} · ${date > today ? 'still to come' : 'not logged'}`,
     };
   });
@@ -55,33 +60,36 @@ export function recapDayCups(weekStart: ISODate, days: InsightDay[], today: ISOD
 /**
  * How a day stands against its own budget, in words that agree with the cup:
  * a day above it says so and by how much (the amber lip), never a rounded
- * share that could read as on budget; a check is named only on a full day.
+ * share that could read as on budget; the check's words only on a checked day.
  */
-function standing(kcal: number, budget: number, over: boolean, inBand: boolean): string {
+function standing(kcal: number, budget: number, over: boolean, check: boolean): string {
   if (budget <= 0) return 'no budget set';
   if (over) {
     const above = Math.max(1, Math.round(kcal - budget));
-    return `${formatNumber(above)} kcal above that day’s budget${inBand ? ', within 10% of it' : ''}`;
+    return `${formatNumber(above)} kcal above that day’s budget`;
   }
   // Under the budget the share is floored, so 99.6% never reads as 100%.
   const pct = Math.floor((kcal / budget) * 100);
-  return `${pct}% of that day’s budget${inBand ? ', within 10% of it' : ''}`;
+  return `${pct}% of that day’s budget${check ? ', within 10% of it' : ''}`;
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => (n === 1 ? one : many);
 
-/** One plain line for the week's cups, true of every cup drawn. */
+/**
+ * One plain line for the week's cups, true of every cup drawn: it counts the checks and the amber
+ * tops, the two marks the cups carry ("3 of 7 full days at 90 to 100% of their budget; 2 above it").
+ */
 export function recapDaysVerdict(cups: RecapDayCup[]): string {
   const complete = cups.filter((c) => c.complete);
   if (!complete.length) return 'No fully logged days to measure yet';
-  const inBand = complete.filter((c) => c.inBand).length;
-  const over = complete.filter((c) => c.over && !c.inBand).length;
+  const checks = complete.filter((c) => c.check).length;
+  const over = complete.filter((c) => c.over).length;
   const n = complete.length;
   const lead =
-    inBand === n
+    checks === n
       ? n === 1
-        ? 'The one full day was within 10% of its budget'
-        : `All ${n} full days within 10% of their budget`
-      : `${inBand} of ${n} full ${plural(n, 'day')} within 10% of their budget`;
-  return over ? `${lead}; ${over} more than 10% above` : lead;
+        ? 'The one full day was at 90 to 100% of its budget'
+        : `All ${n} full days at 90 to 100% of their budget`
+      : `${checks} of ${n} full ${plural(n, 'day')} at 90 to 100% of their budget`;
+  return over ? `${lead}; ${over} above it` : lead;
 }
