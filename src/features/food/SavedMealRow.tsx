@@ -18,7 +18,7 @@ import { useStore } from '@/store';
 import { live } from '@/store/selectors';
 import { cup, fonts, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType, SavedMeal } from '@/types';
-import { IconButton, PressableScale, Text } from '@/ui';
+import { PressableScale, Text } from '@/ui';
 import { spokenUnits } from '@/lib/spokenUnits';
 
 import { formatPortion, itemsRange, mealServings } from './build';
@@ -26,7 +26,7 @@ import { FavoriteStar } from './FavoriteStar';
 import { toggleMealFavorite } from './favoriteActions';
 import { favoriteMeals, inVisitOrder, isFavoriteMeal, orderSavedMeals } from './favorites';
 import { approxKcalSpoken, favoriteActionLabel, FAVOURITE_ACTION, logMealLabel, saveRowDay, savedRowCaption } from './favoriteWords';
-import { useLangName } from './langName';
+import { LangIconButton, useLangName } from './langName';
 import { SaveMealSheet } from './SaveMealSheet';
 import { itemCount, saveHintLabel } from './saveWords';
 import { currentValues } from './usuals';
@@ -101,9 +101,9 @@ export function SavedMealRow({ meal, testID, onReview, onLog, onHold }: { meal: 
       {/* 12 px to the "+": the star's touch area reaches 4 px past its edge, so neither takes the other's taps. */}
       <FavoriteStar testID={`${testID}-favorite`} on={on} name={meal.name} onPress={star} style={{ marginRight: 4 }} />
       {/* The same "+" cup as a food row's, and it does the same: it adds at once, with one toast and Undo. */}
-      <IconButton testID={`${testID}-log`} accessibilityLabel={count > 1 ? `Log one serving of ${meal.name}` : logMealLabel(meal.name)} tone="surface" size={44} onPress={onLog}>
+      <LangIconButton testID={`${testID}-log`} accessibilityLabel={count > 1 ? `Log one serving of ${meal.name}` : logMealLabel(meal.name)} tone="surface" size={44} onPress={onLog}>
         <Plus size={20} color={colors.text} strokeWidth={2.2} />
-      </IconButton>
+      </LangIconButton>
     </View>
   );
 }

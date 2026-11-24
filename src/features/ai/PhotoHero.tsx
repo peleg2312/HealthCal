@@ -6,6 +6,8 @@ import { cup, useTheme } from '@/theme';
 import type { AiFoodItem } from '@/types';
 import { AnimatedNumber, Chip, Text } from '@/ui';
 
+import { itemKcalSpoken } from './words';
+
 /**
  * The meal photo as the head of the review: the photo in a cup, then the dish
  * name, the estimated total with its range, and the detected items as chips.
@@ -66,7 +68,14 @@ export function PhotoHero({
           // 12 px between the lines: a chip is 44 px tall to touch (6 px above and below its 32), and the areas of two lines meet without one taking the other's taps.
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, rowGap: 12, marginTop: 2 }}>
             {items.map(({ key, item }, i) => (
-              <Chip key={key} testID={`ai-hero-item-${i}`} label={`${shortName(item.name)} · ${item.kcal}`} onPress={() => onItemPress(key)} />
+              <Chip
+                key={key}
+                testID={`ai-hero-item-${i}`}
+                // An estimate never shows an exact number: "~248 kcal" drawn, "about 248 kilocalories" heard.
+                label={`${shortName(item.name)} · ~${Math.round(item.kcal)} kcal`}
+                accessibilityLabel={`${shortName(item.name)}, ${itemKcalSpoken(item.kcal)}`}
+                onPress={() => onItemPress(key)}
+              />
             ))}
           </View>
         ) : null}

@@ -17,8 +17,11 @@
 import { BUILTIN_FOODS } from '@/data/foods';
 import { isAlcohol } from '@/features/drinks/rules';
 import { isWaterDrinkEntry } from '@/features/drinks/via';
+import { foodNameHead, toastFoodName } from '@/features/food/addedTo';
 import { planSavedMeal, savedItemFromFood, setItemAmount } from '@/features/food/build';
+import { displayFoodName } from '@/features/food/displayName';
 import { currentValues, foodKey } from '@/features/food/usuals';
+import { isolateRtl } from '@/lib/bidi';
 import { addDays, diffDays, formatShortDate, fromISODate } from '@/lib/dates';
 import { MEAL_LABEL } from '@/lib/nutrition';
 import { formatNumber } from '@/lib/units';
@@ -303,6 +306,43 @@ export function ideaRow(kcal: number, added: boolean, left: number): IdeaRow {
   const more = Math.round(kcal) - Math.round(left);
   if (more > 0) return { kind: 'dim', caption: `${formatNumber(more)} kcal more than what is left` };
   return { kind: 'open' };
+}
+
+/** A food's name after the first in a toast's list: lower case ("rice") unless it carries another capital ("Coca-Cola") or is always written with one. */
+function laterName(name: string): string {
+  if (!/^[A-Z][a-z]/.test(name) || /[A-Z]/.test(name.slice(1))) return name;
+  return lowerFirst(name);
+}
+
+/**
+ * The foods of an idea as a toast names them, each as a toast says a food (`toastFoodName`), each once: "Chicken
+ * breast", "Chicken breast and rice", "Chicken breast, rice and 2 more".
+ */
+export function ideaFoodsPhrase(items: readonly Pick<SavedMealItem, 'name' | 'source'>[]): string {
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const it of items) {
+    const shown = displayFoodName({ name: it.name, source: it.source });
+    const key = foodNameHead(shown).toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    names.push(names.length === 0 ? toastFoodName(shown) : toastFoodName(laterName(shown)));
+  }
+  if (names.length <= 1) return names[0] ?? '';
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  if (names.length === 3) return `${names[0]}, ${names[1]} and ${names[2]}`;
+  return `${names[0]}, ${names[1]} and ${names.length - 2} more`;
+}
+
+/**
+ * The toast after an idea is logged from What fits or the coach, in the meal toast's order, naming what was added
+ * first: a saved meal or a plate by its own name ("Pasta night added to dinner", "Half of chicken, rice and salad
+ * added to lunch"); a past meal, whose name says only where it came from ("Tuesday's dinner"), by its foods
+ * ("Chicken breast and rice added to dinner"). `where` is `mealOnDay` (@/features/food/addedTo), read in the handler.
+ */
+export function ideaAddedToast(idea: Pick<MealIdea, 'kind' | 'name' | 'items'>, where: string): string {
+  const what = idea.kind === 'past' ? ideaFoodsPhrase(idea.items) : '';
+  return `${what || isolateRtl(idea.name)} added to ${where}`;
 }
 
 /** One idea as a line of text (for a reader or another screen): "Half of Tuesday's dinner: 410 kcal, 32 g protein (Chicken, Rice)". */

@@ -10,6 +10,8 @@ import type { Food, FoodEntry, ISODate, MealType, SavedMeal } from '@/types';
 import {
   IDEAS_TITLE,
   PLATE_NOTE,
+  ideaAddedToast,
+  ideaFoodsPhrase,
   ideaLine,
   ideaRow,
   mealIdeas,
@@ -266,6 +268,33 @@ describe('ideaRow: after an add, rows stay where they are', () => {
   });
 });
 
+describe('ideaAddedToast: the toast names what was added, first', () => {
+  const item = (name: string, source: Food['source'] = 'builtin') => ({ name, source });
+  it('names a past meal by its foods, never only where it went', () => {
+    const r = mealIdeas(base({ entries: chickenRice('2026-11-17') }));
+    const past = r.ideas.find((i) => i.kind === 'past')!;
+    expect(past.name).toBe("Tuesday's dinner");
+    const line = ideaAddedToast(past, 'dinner');
+    expect(line).toBe("Chicken breast and white rice added to dinner");
+    expect(line).not.toMatch(/^Added to/);
+  });
+  it('names a saved meal or a plate by its own name', () => {
+    expect(ideaAddedToast({ kind: 'saved', name: 'Pasta night', items: [] }, 'dinner')).toBe('Pasta night added to dinner');
+    expect(ideaAddedToast({ kind: 'plate', name: 'Half of chicken, rice and salad', items: [] }, "yesterday's lunch")).toBe("Half of chicken, rice and salad added to yesterday's lunch");
+  });
+  it('lists the foods each once, a toast name each, in short', () => {
+    expect(ideaFoodsPhrase([item('Banana, raw')])).toBe('Banana');
+    expect(ideaFoodsPhrase([item('Chicken breast, roasted'), item('Rice, white, cooked')])).toBe('Chicken breast and rice');
+    expect(ideaFoodsPhrase([item('Pasta, cooked'), item('Salmon, cooked'), item('Greek yogurt, plain')])).toBe('Pasta, salmon and Greek yogurt');
+    expect(ideaFoodsPhrase([item('Eggs'), item('Toast'), item('Coca-Cola', 'off'), item('Butter')])).toBe('Eggs, toast and 2 more');
+    expect(ideaFoodsPhrase([item('Rice, white'), item('Rice, brown')])).toBe('Rice');
+    expect(ideaFoodsPhrase([item('Oats, rolled, DRY (uncooked)'), item('Coca-Cola', 'off')])).toBe('Oats and Coca-Cola');
+  });
+  it('falls back to the idea name when no food has a name', () => {
+    expect(ideaAddedToast({ kind: 'past', name: "Tuesday's dinner", items: [] }, 'dinner')).toBe("Tuesday's dinner added to dinner");
+  });
+});
+
 describe('words', () => {
   it('pass the morning page banned-words list', () => {
     const src = readFileSync(path.resolve(__dirname, '../morning/words.test.ts'), 'utf8');
@@ -278,7 +307,7 @@ describe('words', () => {
       for (const meal of ['breakfast', 'lunch', 'dinner', 'snack'] as MealType[]) {
         const r = mealIdeas(base({ entries, meal, kcalLeft: left }));
         if (r.state === 'over') strings.add(overLine(r.overBy, true)).add(overLine(r.overBy, false));
-        for (const i of r.ideas) strings.add(i.name).add(ideaLine(i));
+        for (const i of r.ideas) strings.add(i.name).add(ideaLine(i)).add(ideaAddedToast(i, 'dinner'));
         for (const i of r.ideas) for (const l of [0, 100, 600]) {
           const row = ideaRow(i.kcal, false, l);
           if (row.kind === 'dim') strings.add(row.caption);

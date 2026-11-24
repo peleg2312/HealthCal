@@ -88,6 +88,7 @@ const log = [
   { id: 'log-new-running', route: '/activity/log?activityId=running', waitFor: 'log-activity-result', note: 'a new run, starting from the last one' },
   { id: 'log-week', route: '/activity/log?activityId=running', values: { spread: 1 }, waitFor: 'log-activity-result', note: 'over 7 days: "+N over 7 days" beside the burn' },
   { id: 'log-day-hint', route: '/activity/log?activityId=running', waitFor: 'log-activity-spread-hint', note: 'same day: the hint that workouts can be shared over 7 days, which opens Goals' },
+  { id: 'log-day-hint-closed', route: '/activity/log?activityId=running', taps: ['log-activity-spread-hint-close'], absent: ['log-activity-spread-hint'], note: 'the hint put away with its X: gone on this device' },
   { id: 'log-light', route: '/activity/log?activityId=volleyball', taps: ['intensity-light'], note: 'light effort selected' },
   { id: 'log-vigorous', route: '/activity/log?activityId=paddleboarding', taps: ['intensity-vigorous'], note: 'vigorous, the longest activity name' },
   { id: 'log-competitive', route: '/activity/log?activityId=volleyball', note: 'effort hints with long words ("Recreational", "Competitive"): rows, never a split word' },
@@ -150,7 +151,7 @@ const strength = [
   { id: 'strength-rest', route: '/activity/strength', taps: [...addEx('bench-press', true), ...set(0, 0, '62.5', '8'), 'ex-0-set-0-done'], waitFor: 'strength-rest', note: 'a set ticked: the rest bar over the footer button' },
   { id: 'strength-effort-light', route: '/activity/strength', taps: ['strength-effort-light', 'strength-time-edit', { type: 'strength-duration-input', text: '45' }], waitFor: 'strength-duration-input', note: 'light effort, the duration typed in' },
   { id: 'strength-duration-error', route: '/activity/strength', taps: ['strength-time-edit', { type: 'strength-duration-input', text: '2000' }], note: 'a duration longer than a day' },
-  { id: 'strength-discard-confirm', route: '/activity/strength', taps: [...addEx('bench-press', true), 'strength-discard'], sheet: true, note: 'discard this workout?' },
+  { id: 'strength-discard-confirm', route: '/activity/strength', taps: [...addEx('bench-press', true), 'strength-discard'], sheet: true, note: 'delete this workout? (a new one, nothing saved yet)' },
   { id: 'strength-save-routine', route: '/activity/strength', taps: [...workout, 'strength-save-routine'], sheet: true, note: 'save as routine, with the exercise list' },
   { id: 'strength-summary', route: '/activity/strength', taps: [...workout, 'strength-time-edit', { type: 'strength-duration-input', text: '52' }, 'strength-finish', settle, toastGone], waitFor: 'strength-summary', note: 'the summary after finishing' },
   {

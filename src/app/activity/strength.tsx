@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { BookmarkPlus, Check, Clock, Pause, Play, Plus, Search, Trash2, Trophy } from 'lucide-react-native';
+import { BookmarkPlus, Clock, Pause, Play, Plus, Search, Trash2, Trophy } from 'lucide-react-native';
 import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
@@ -285,11 +285,12 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
                   useStrengthDrafts.getState().discard(draftKey);
                   leaveFlow();
                 }}>
-                <Trash2 size={18} color={colors.danger} />
+                <Trash2 size={18} color={colors.danger} strokeWidth={1.9} />
               </IconButton>
             ) : (
-              <IconButton accessibilityLabel="Discard workout" testID="strength-discard" onPress={() => setConfirmDiscard(true)}>
-                <Trash2 size={18} color={colors.danger} />
+              // Every trash can is named "Delete …"; a new workout's asks first, since nothing of it is saved yet.
+              <IconButton accessibilityLabel="Delete workout" testID="strength-discard" onPress={() => setConfirmDiscard(true)}>
+                <Trash2 size={18} color={colors.danger} strokeWidth={1.9} />
               </IconButton>
             )
           }
@@ -301,7 +302,6 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
           <Button
             testID="strength-finish"
             title={draft.entryId ? 'Save workout' : 'Finish workout'}
-            icon={<Check size={18} color={colors.onPrimary} />}
             onPress={() => finish()}
             disabled={draft.exercises.length === 0 && minutes < 1}
           />
@@ -463,9 +463,9 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
       />
       <ConfirmSheet
         visible={confirmDiscard}
-        title="Discard this workout?"
+        title="Delete this workout?"
         message="The exercises and sets you entered will be cleared. Nothing has been saved to your log yet."
-        confirmLabel="Discard workout"
+        confirmLabel="Delete workout"
         destructive
         onConfirm={discard}
         onCancel={() => setConfirmDiscard(false)}
@@ -488,7 +488,6 @@ function RestBar({ draft, now, update }: { draft: StrengthDraft; now: number; up
     <PressableScale
       testID={testID}
       accessibilityLabel={a11y}
-      feedback="tap"
       onPress={onPress}
       style={{ minWidth: 52, height: 44, paddingHorizontal: spacing.sm, ...cup(radius.buttonSm, 5), borderWidth: 1.5, borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center' }}>
       <Text variant="label" tabular>
@@ -691,8 +690,8 @@ function ExerciseCard({
             {prevText ? `Last time, ${formatShortDate(prev!.date)}: ${prevText}` : 'First time logging this exercise'}
           </Text>
         </View>
-        <IconButton accessibilityLabel={`Remove ${ex.name}`} testID={`${slug}-remove`} tone="clear" onPress={() => update((d) => edits.removeExercise(d, ex.key))}>
-          <Trash2 size={18} color={colors.textTertiary} />
+        <IconButton accessibilityLabel={`Delete ${ex.name}`} testID={`${slug}-remove`} tone="clear" size={44} onPress={() => update((d) => edits.removeExercise(d, ex.key))}>
+          <Trash2 size={18} color={colors.textSecondary} strokeWidth={1.9} />
         </IconButton>
       </View>
 
@@ -770,14 +769,16 @@ function ExerciseCard({
                 ...cupFor(44),
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: s.done ? colors.text : 'transparent',
-                borderWidth: 1.5,
+                backgroundColor: 'transparent',
+                borderWidth: s.done ? 2 : 1.5,
                 borderColor: s.done ? colors.text : colors.borderStrong,
               }}>
-              <Check size={20} color={s.done ? colors.bg : colors.textSecondary} strokeWidth={2.4} />
+              {/* Done is the app's done mark, the small filled ink cup in an ink outline; not yet, the same cup empty.
+                  Never a check, which means only a day on budget. */}
+              <CupKey color={s.done ? colors.text : colors.textSecondary} variant={s.done ? 'filled' : 'outline'} size={14} />
             </PressableScale>
             <IconButton
-              accessibilityLabel={`Remove set ${i + 1}`}
+              accessibilityLabel={`Delete set ${i + 1}`}
               testID={`${slug}-set-${i}-remove`}
               tone="clear"
               size={removeSize}

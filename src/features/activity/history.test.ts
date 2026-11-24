@@ -26,7 +26,9 @@ describe("Train's history by week", () => {
     expect(historyDayWord('2026-11-23', TODAY)).toBe('Yesterday');
     expect(historyDayWord('2026-11-22', TODAY)).toBe('Sun');
     expect(historyDayWord('2026-11-16', TODAY)).toBe('Mon');
-    expect(historyDaySpoken('2026-11-22', TODAY)).toBe('Sunday');
+    expect(historyDaySpoken('2026-11-22', TODAY)).toBe('Sunday, Nov 22');
+    // The same weekday a week earlier is named apart.
+    expect(historyDaySpoken('2026-11-15', TODAY)).toBe('Sunday, Nov 15');
     expect(historyDaySpoken(TODAY, TODAY)).toBe('today');
     expect(historyDaySpoken('2026-11-23', TODAY)).toBe('yesterday');
   });

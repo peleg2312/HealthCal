@@ -18,7 +18,7 @@ import { toggleFoodFavorite } from '@/features/food/favoriteActions';
 import { favoriteFoodsInVisit, isFavoriteMeal, mealToSave } from '@/features/food/favorites';
 import { favoriteActionLabel, FAVOURITE_GROUPS, FAVOURITES_EMPTY } from '@/features/food/favoriteWords';
 import { FAVOURITES_EMPTY_WITH_HINT, HOLD_HINT, markHoldHintDone, useHoldHint } from '@/features/food/holdHint';
-import { useLangName } from '@/features/food/langName';
+import { LangIconButton, useLangName } from '@/features/food/langName';
 import { LogSavedMealSheet } from '@/features/food/SavedMealParts';
 import { SaveCurrentMealRow, SavedMealRow, useVisitOrder } from '@/features/food/SavedMealRow';
 import { loadSearchTab, openingTab, rememberSearchTab, SEARCH_CHIPS, usualEmpty, useSearchTab, type SearchTab } from '@/features/food/searchTab';
@@ -429,14 +429,14 @@ export default function FoodSearchScreen() {
                     row(
                       f,
                       `mine-${i}`,
-                      <IconButton
+                      <LangIconButton
                         testID={`mine-${i}-edit`}
                         accessibilityLabel={`Edit ${displayFoodName(f)}`}
                         tone="clear"
                         size={40}
                         onPress={() => go('/food/custom', { id: f.id })}>
                         <PenLine size={17} color={colors.textSecondary} />
-                      </IconButton>,
+                      </LangIconButton>,
                     ),
                   )}
                 </List>

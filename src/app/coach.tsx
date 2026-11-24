@@ -58,8 +58,7 @@ import { logItems } from '@/features/food/log';
 import { checkoutShown, PLAN_ROUTE, planVisible, usePlan } from '@/features/plan';
 import { FitsSheet } from '@/features/today/FitsSheet';
 import { greetingTitle } from '@/features/today/greetingTitle';
-import { mealIdeas, type MealIdea } from '@/features/today/ideas';
-import { isolateRtl } from '@/lib/bidi';
+import { ideaAddedToast, mealIdeas, type MealIdea } from '@/features/today/ideas';
 import { addDays, formatShortDate, greeting, today } from '@/lib/dates';
 import { mealForTime } from '@/lib/nutrition';
 import { useAuth } from '@/services/auth';
@@ -296,7 +295,7 @@ export default function CoachScreen() {
   const addIdea = (idea: MealIdea) => {
     // Always today (the coach has no other day); the toast is What fits' own wording.
     const where = mealOnDay(meal, todayDate, today());
-    const written = logItems(idea.items, meal, todayDate, idea.kind === 'past' ? `Added to ${where}` : `${isolateRtl(idea.name)} added to ${where}`);
+    const written = logItems(idea.items, meal, todayDate, ideaAddedToast(idea, where));
     if (written.length) setAdded((a) => [...a, { key: `idea:${idea.key}`, kcal: idea.kcal, ids: written.map((e) => e.id) }]);
   };
 

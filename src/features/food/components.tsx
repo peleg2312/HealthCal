@@ -14,7 +14,7 @@ import { CupKey, IconButton, PressableScale, Text } from '@/ui';
 import { displayFoodName } from './displayName';
 import { canStepForward, entryDayLabel, entryDaySpoken, foodLatestDay } from './entryDay';
 import { kcal, sourceInfo, sourceKindOf, withSourceWord, type SourceKind } from './helpers';
-import { useLangName } from './langName';
+import { LangIconButton, useLangName } from './langName';
 
 // How a data source is marked lives with the mark itself (`SourceMark`, `@/features/ai/mark`): a filled cup
 // key for reference data, an outline for community or your own numbers, the small AI mark for an AI estimate.
@@ -146,7 +146,6 @@ export function DayStepper({ value, onChange, testIDPrefix = 'day', latest, next
       <PressableScale
         testID={`${testIDPrefix}-today`}
         onPress={() => !isToday && onChange(todayDate)}
-        feedback={isToday ? 'none' : 'tap'}
         accessibilityLabel={entryDaySpoken(value, todayDate)}
         style={{ flex: 1, minWidth: 0, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, minHeight: 44 }}>
         <CalendarDays size={16} color={colors.textSecondary} strokeWidth={1.9} />
@@ -311,7 +310,7 @@ export function FoodRow({
           <AmountStepper amount={guarded ?? amount} name={name} testID={testID} />
         </View>
       ) : onQuickAdd ? (
-        <IconButton
+        <LangIconButton
           testID={testID ? `${testID}-add` : undefined}
           accessibilityLabel={`Add ${name}`}
           tone="surface"
@@ -323,7 +322,7 @@ export function FoodRow({
           }}>
           {/* Added: the done mark, the small filled ink cup (never a check, which means only a day on budget). */}
           {added ? <CupKey color={colors.text} size={12} /> : <Plus size={20} color={colors.text} strokeWidth={2.2} />}
-        </IconButton>
+        </LangIconButton>
       ) : null}
     </View>
   );
@@ -336,9 +335,9 @@ function AmountStepper({ amount, name, testID }: { amount: RowAmount; name: stri
     <View
       testID={testID ? `${testID}-stepper` : undefined}
       style={{ flexDirection: 'row', alignItems: 'center', ...cup(radius.buttonSm, 5), borderWidth: 1.5, borderColor: colors.borderStrong }}>
-      <IconButton testID={testID ? `${testID}-less` : undefined} accessibilityLabel={`Less ${name}`} tone="clear" size={44} onPress={() => amount.onStep(-1)}>
+      <LangIconButton testID={testID ? `${testID}-less` : undefined} accessibilityLabel={`Less ${name}`} tone="clear" size={44} onPress={() => amount.onStep(-1)}>
         <Minus size={18} color={colors.text} strokeWidth={2.2} />
-      </IconButton>
+      </LangIconButton>
       <PressableScale
         testID={testID ? `${testID}-amount` : undefined}
         onPress={amount.onOpen}
@@ -351,9 +350,9 @@ function AmountStepper({ amount, name, testID }: { amount: RowAmount; name: stri
           {amount.label}
         </Text>
       </PressableScale>
-      <IconButton testID={testID ? `${testID}-more` : undefined} accessibilityLabel={`More ${name}`} tone="clear" size={44} onPress={() => amount.onStep(1)}>
+      <LangIconButton testID={testID ? `${testID}-more` : undefined} accessibilityLabel={`More ${name}`} tone="clear" size={44} onPress={() => amount.onStep(1)}>
         <Plus size={18} color={colors.text} strokeWidth={2.2} />
-      </IconButton>
+      </LangIconButton>
     </View>
   );
 }

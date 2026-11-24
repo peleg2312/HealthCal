@@ -11,7 +11,7 @@ import { Platform, View } from 'react-native';
 
 import { withoutMarks } from '@/lib/bidi';
 import { spokenUnits } from '@/lib/spokenUnits';
-import { Text } from '@/ui';
+import { Button, IconButton, Text } from '@/ui';
 import { scriptLang } from '@/ui/textLang';
 
 export interface LangName {
@@ -37,4 +37,32 @@ export function useLangName(label: string): LangName {
       </View>
     ),
   };
+}
+
+/**
+ * The kit IconButton named through `useLangName` (search's "Edit" and "+" on own foods, the amount stepper's
+ * less and more, /food/meals' Edit and Delete): on the web a Hebrew or Arabic name is read from its hidden,
+ * language-marked copy (`aria-labelledby`, which wins over the plain label it also keeps).
+ */
+export function LangIconButton({ accessibilityLabel, children, ...rest }: React.ComponentProps<typeof IconButton>) {
+  const lang = useLangName(accessibilityLabel);
+  return (
+    <>
+      <IconButton {...rest} accessibilityLabel={accessibilityLabel} {...lang.props}>
+        {children}
+      </IconButton>
+      {lang.hidden}
+    </>
+  );
+}
+
+/** The kit Button named through `useLangName` (a saved meal's "Log"), as `LangIconButton`. */
+export function LangButton({ accessibilityLabel, ...rest }: React.ComponentProps<typeof Button> & { accessibilityLabel: string }) {
+  const lang = useLangName(accessibilityLabel);
+  return (
+    <>
+      <Button {...rest} accessibilityLabel={accessibilityLabel} {...lang.props} />
+      {lang.hidden}
+    </>
+  );
 }

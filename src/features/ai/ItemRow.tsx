@@ -11,7 +11,7 @@ import { Badge, CupKey, FOCUS_CUP, IconButton, parseNumber, PressableScale, Text
 
 import { confidenceLevel, estimateGrams, gramStep, shownRowName, type ReviewRow } from './estimate';
 import { itemFromFood } from './localMatch';
-import { alternativesLabel, itemNameLabel, spokenMacros, swapChipLabel } from './words';
+import { alternativesLabel, itemKcalSpoken, itemNameLabel, spokenMacros, swapChipLabel } from './words';
 
 /** One editable line of the estimate: name, grams, live calories and macros, remove. */
 export function ItemRow({
@@ -91,11 +91,17 @@ export function ItemRow({
             <Plus size={16} color={colors.text} />
           </IconButton>
         </View>
-        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'flex-end', gap: 3 }}>
-          <Text variant="numM" tabular testID={`${id}-kcal`} style={{ fontSize: 17, lineHeight: 22 }}>
-            {item.kcal}
-          </Text>
-          <Text variant="unit">kcal</Text>
+        {/* An estimate never shows an exact number: "~248 kcal" drawn, "about 248 kilocalories" heard, as the hero says its total. */}
+        <View
+          style={{ flex: 1, minWidth: 0, alignItems: 'flex-end' }}
+          {...(Platform.OS === 'web' ? {} : { accessible: true, accessibilityLabel: itemKcalSpoken(item.kcal) })}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }} {...(Platform.OS === 'web' ? ({ 'aria-hidden': true } as object) : {})}>
+            <Text variant="numM" tabular testID={`${id}-kcal`} style={{ fontSize: 17, lineHeight: 22 }}>
+              {`~${Math.round(item.kcal)}`}
+            </Text>
+            <Text variant="unit">kcal</Text>
+          </View>
+          {Platform.OS === 'web' ? <Text style={SPOKEN_ONLY}>{itemKcalSpoken(item.kcal)}</Text> : null}
         </View>
       </View>
       {/* The source on the left, the macros on the right; on a narrow phone the macros wrap under the source rather than run over the stepper. */}

@@ -1,9 +1,9 @@
-import { Check, Search } from 'lucide-react-native';
+import { Search } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { LARGE_TEXT, useTextGrowth, useTheme } from '@/theme';
-import { Divider, ListRow, Sheet, TextField } from '@/ui';
+import { CupKey, Divider, ListRow, Sheet, TextField } from '@/ui';
 
 import { deviceTimeZone, searchZones, zoneLabel } from './timeZones';
 
@@ -25,7 +25,8 @@ export function TimeZoneSheet({ visible, value, onClose, onPick }: { visible: bo
     onPick(z);
     close();
   };
-  const mark = (on: boolean) => (on ? <Check size={18} color={colors.text} strokeWidth={2.2} /> : undefined);
+  // The chosen zone wears the small filled ink cup, as a chosen row does; never a check, which means only a day on budget.
+  const mark = (on: boolean) => (on ? <CupKey color={colors.text} size={12} /> : undefined);
   return (
     <Sheet visible={visible} onClose={close} title="Time zone">
       <TextField

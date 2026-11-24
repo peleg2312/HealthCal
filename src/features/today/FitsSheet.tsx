@@ -22,7 +22,7 @@ import type { ISODate, MealType } from '@/types';
 import { Button, CupKey, Divider, EmptyState, IconButton, ProgressBar, SectionTitle, Sheet, Text } from '@/ui';
 
 import { fitCandidates, rankFits, type Fit } from './fits';
-import { IDEAS_TITLE, PLATE_NOTE, ideaRow, mealIdeas, overLine, type MealIdea, type MealIdeas } from './ideas';
+import { IDEAS_TITLE, PLATE_NOTE, ideaAddedToast, ideaRow, mealIdeas, overLine, type MealIdea, type MealIdeas } from './ideas';
 
 /** "1 cup" or "1.5 × 1 cup"; `shown` draws a serving label written in Hebrew isolated (display only, never for a screen reader). */
 function portionLabel(f: Fit, shown = false): string {
@@ -129,9 +129,9 @@ export function FitsSheet({
 
   const addIdea = (idea: MealIdea) => {
     // One Undo for the whole meal; the day in the toast is read now, in the handler.
-    // A past meal's name ends in the meal ("Yesterday's dinner"), so its toast does not say the meal twice.
+    // The toast names what was added first: a past meal ("Yesterday's dinner") by its foods (`ideaAddedToast`).
     const where = mealOnDay(meal, date, today());
-    const written = logItems(idea.items, meal, date, idea.kind === 'past' ? `Added to ${where}` : `${isolateRtl(idea.name)} added to ${where}`);
+    const written = logItems(idea.items, meal, date, ideaAddedToast(idea, where));
     if (written.length) setAdded((a) => [...a, { key: `idea:${idea.key}`, kcal: idea.kcal, ids: written.map((e) => e.id) }]);
   };
 

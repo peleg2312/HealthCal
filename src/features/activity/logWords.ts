@@ -63,7 +63,7 @@ export function sourceWords(o: {
   const how = o.measuredBy
     ? `The burn above is the total ${o.measuredBy} measured for this session, resting included.`
     : o.formula
-      ? `${o.formula.met} MET × 3.5 ml O₂ per kg per minute × ${o.formula.weight} × ${o.formula.minutes} min ÷ 200 gives the burn above.`
+      ? `${o.formula.met} MET (${o.formula.met} times your resting burn) × 3.5 ml O₂ per kg per minute × ${o.formula.weight} × ${o.formula.minutes} min ÷ 200 gives the burn above.`
       : 'The burn above is an estimate.';
   const where =
     o.rule === 'week'

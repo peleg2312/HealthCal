@@ -282,15 +282,16 @@ export function deleteEntry(entry: FoodEntry): void {
 /**
  * Log a drink from the water screen as planned by `planDrink` (@/features/drinks/rules): the diary
  * entry first (when the drink has calories), then the water record pointing at it. No recents (a
- * drink from Water never enters them), haptic.tap, one toast tinted 'water' whose Undo removes both
+ * drink from Water never enters them), haptic.success, one toast tinted 'water' whose Undo removes both
  * (the store's cascade). Plain water writes exactly the record and toast the water screen always did.
  */
 export function logDrink(plan: DrinkPlan): { water: WaterEntry; entry: FoodEntry | null } {
   const store = useStore.getState();
   const entry = plan.entry ? store.upsert('foodEntries', plan.entry) : null;
   const water = store.upsert('water', entry ? { ...plan.water, foodEntryId: entry.id } : plan.water);
-  // Crossing the goal is marked by the vessel itself (its onReached adds the success haptic).
-  haptic.tap();
+  // A drink logged is "logged", as Today's glass is (haptic.success; tap means a delete). Crossing the goal is
+  // marked by the vessel itself (its brim line, and its onReached on the Water screen).
+  haptic.success();
   toast(plan.toast, { label: 'Undo', tint: 'water', onPress: () => useStore.getState().remove('water', water.id) });
   return { water, entry };
 }

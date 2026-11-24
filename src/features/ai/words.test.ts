@@ -14,6 +14,7 @@ import {
   analysingSteps,
   DESCRIPTION_MAX,
   estimateReadyLine,
+  itemKcalSpoken,
   itemNameLabel,
   prefilledDescription,
   searchAiTile,
@@ -121,6 +122,10 @@ describe('the review, spoken', () => {
     expect(alternativesLabel(3, ' White rice ')).toBe('Could also be, 3 foods for White rice');
     expect(alternativesLabel(1, '')).toBe('Could also be, 1 food');
     expect(swapChipLabel('White rice, cooked', 190.4)).toBe('White rice, cooked, 190 kilocalories');
+  });
+
+  it('says an item\'s calories as an estimate, units in full', () => {
+    expect(itemKcalSpoken(248.4)).toBe('about 248 kilocalories');
   });
 
   it('pass the banned lists, with no exclamation mark, in sentence case', () => {

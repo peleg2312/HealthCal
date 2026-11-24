@@ -92,7 +92,7 @@ export const HONEST_PHONE =
 export const HONEST_COMPARE = 'This compares your minutes with your own recent weeks. It is a description, not a measure of injury risk.';
 export const HONEST_WHO = "WHO's guideline for adults is 150 to 300 minutes a week; more than 300 can bring extra benefit.";
 export const HONEST_COUNTING =
-  'Active minutes are the minutes that count toward the 150 minutes a week guideline: hard minutes (6 MET or more) count double, and light sessions (under 3 MET) are not counted.';
+  'Active minutes are the minutes that count toward the 150 minutes a week guideline. Hard minutes, at 6 MET or more (6 times your resting burn), count double, and light sessions, under 3 MET, are not counted.';
 /** Under the sheet's chart of the five 7-day blocks. */
 export const CHART_CAPTION = 'Each bar is 7 days, weeks back. The band is 150 to 300.';
 /** The heading over the honest sentences, which close the sheet under its one action. */

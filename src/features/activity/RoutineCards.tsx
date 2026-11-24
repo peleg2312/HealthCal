@@ -68,7 +68,7 @@ function RoutineCard({ template, id, onStart, testID }: { template: RoutineTempl
           </Text>
         </View>
         {id ? (
-          <IconButton accessibilityLabel={`Remove routine ${template.name}`} testID={`${testID}-remove`} tone="clear" size={44} onPress={remove}>
+          <IconButton accessibilityLabel={`Delete routine ${template.name}`} testID={`${testID}-remove`} tone="clear" size={44} onPress={remove}>
             <Trash2 size={18} color={colors.textSecondary} strokeWidth={1.9} />
           </IconButton>
         ) : null}
@@ -76,7 +76,6 @@ function RoutineCard({ template, id, onStart, testID }: { template: RoutineTempl
       <PressableScale
         testID={`${testID}-start`}
         accessibilityLabel={`Start ${title}`}
-        feedback="press"
         onPress={onStart}
         style={{
           height: 44,

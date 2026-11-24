@@ -1,4 +1,4 @@
-import { Check, ChevronDown } from 'lucide-react-native';
+import { ChevronDown } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
@@ -165,7 +165,11 @@ export function WorkoutRow({
   );
 }
 
-/** A small cup-cornered tick box. Locked rows show a dashed edge; an imported one carries a faint tick. */
+/**
+ * A small cup-cornered tick box. Ticked, it holds the app's done mark, the small filled ink cup in an ink outline;
+ * never a check, which means only a day on budget. Locked rows show a dashed edge; an imported one carries the
+ * same cup, faint.
+ */
 function TickBox({ checked, locked, imported }: { checked: boolean; locked: boolean; imported: boolean }) {
   const { colors } = useTheme();
   return (
@@ -180,11 +184,11 @@ function TickBox({ checked, locked, imported }: { checked: boolean; locked: bool
         borderWidth: 1.5,
         borderStyle: locked ? 'dashed' : 'solid',
         borderColor: checked ? colors.text : colors.borderStrong,
-        backgroundColor: checked ? colors.text : 'transparent',
+        backgroundColor: 'transparent',
         alignItems: 'center',
         justifyContent: 'center',
       }}>
-      {checked ? <Check size={15} color={colors.bg} strokeWidth={3} /> : imported ? <Check size={14} color={colors.textTertiary} strokeWidth={2.4} /> : null}
+      {checked ? <CupKey color={colors.text} size={12} /> : imported ? <CupKey color={colors.textTertiary} size={10} /> : null}
     </View>
   );
 }

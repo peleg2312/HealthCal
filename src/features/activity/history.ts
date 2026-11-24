@@ -43,10 +43,13 @@ export function historyDayWord(date: ISODate, today: ISODate): string {
   return weekdayShort(date);
 }
 
-/** The same day, spoken in the row's label: "today", "yesterday", "Sunday". */
+/**
+ * The same day, spoken in the row's label: "today", "yesterday", else the weekday with its date ("Sunday, Nov 15"),
+ * so two rows of the same workout on the same weekday of different weeks never share a name (as `deleteSessionLabel`).
+ */
 export function historyDaySpoken(date: ISODate, today: ISODate): string {
   const word = historyDayWord(date, today);
-  return word === 'Today' || word === 'Yesterday' || word === 'Tomorrow' ? word.toLowerCase() : WEEKDAYS_LONG[fromISODate(date).getDay()];
+  return word === 'Today' || word === 'Yesterday' || word === 'Tomorrow' ? word.toLowerCase() : `${WEEKDAYS_LONG[fromISODate(date).getDay()]}, ${formatShortDate(date)}`;
 }
 
 /**

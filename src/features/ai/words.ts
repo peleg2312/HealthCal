@@ -101,6 +101,11 @@ export function alternativesLabel(count: number, name: string): string {
   return `Could also be, ${count} ${count === 1 ? 'food' : 'foods'}${item ? ` for ${item}` : ''}`;
 }
 
+/** An item's calories in the review, as heard: an estimate, so "about 248 kilocalories" (drawn "~248 kcal"). */
+export function itemKcalSpoken(kcal: number): string {
+  return `about ${Math.round(kcal)} kilocalories`;
+}
+
 /** A food it could be, as a swap chip names it: "White rice, cooked, 190 kilocalories". */
 export function swapChipLabel(name: string, kcal: number): string {
   return `${name}, ${Math.round(kcal)} kilocalories`;

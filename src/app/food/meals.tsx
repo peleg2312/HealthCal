@@ -11,6 +11,7 @@ import { FavoriteStar } from '@/features/food/FavoriteStar';
 import { toggleMealFavorite } from '@/features/food/favoriteActions';
 import { isFavoriteMeal, mealToSave } from '@/features/food/favorites';
 import { href, kcal, parseDate, parseMeal } from '@/features/food/helpers';
+import { LangButton, LangIconButton } from '@/features/food/langName';
 import { ItemCaption, LogSavedMealSheet } from '@/features/food/SavedMealParts';
 import { SaveCurrentMealRow, useVisitOrder } from '@/features/food/SavedMealRow';
 import { currentValues } from '@/features/food/usuals';
@@ -20,7 +21,7 @@ import { useToday } from '@/store/clock';
 import { useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { SavedMeal } from '@/types';
-import { Button, Card, EmptyState, Header, IconButton, MacroBar, Screen, Text } from '@/ui';
+import { Button, Card, EmptyState, Header, MacroBar, Screen, Text } from '@/ui';
 
 export default function SavedMealsScreen() {
   const { colors, spacing } = useTheme();
@@ -105,7 +106,7 @@ export default function SavedMealsScreen() {
               </View>
               {/* Log leads; changing and deleting (soft, with Undo) sit beside it, smaller. */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                <Button
+                <LangButton
                   testID={`saved-meal-log-${i}`}
                   // At 320 px "Log to breakfast" does not fit beside edit and delete: the meal is chosen just above, so "Log" says it.
                   title={narrow ? 'Log' : `Log to ${MEAL_LABEL[meal].toLowerCase()}`}
@@ -117,12 +118,12 @@ export default function SavedMealsScreen() {
                   style={{ flex: 1 }}
                   onPress={() => setLogging(m)}
                 />
-                <IconButton testID={`saved-meal-edit-${i}`} accessibilityLabel={`Edit ${m.name}`} tone="clear" onPress={() => build(m.id)}>
+                <LangIconButton testID={`saved-meal-edit-${i}`} accessibilityLabel={`Edit ${m.name}`} tone="clear" onPress={() => build(m.id)}>
                   <PenLine size={18} color={colors.textSecondary} />
-                </IconButton>
-                <IconButton testID={`saved-meal-delete-${i}`} accessibilityLabel={`Delete ${m.name}`} tone="clear" size={44} onPress={() => deleteSavedMeal(m)}>
+                </LangIconButton>
+                <LangIconButton testID={`saved-meal-delete-${i}`} accessibilityLabel={`Delete ${m.name}`} tone="clear" size={44} onPress={() => deleteSavedMeal(m)}>
                   <Trash2 size={18} color={colors.textSecondary} strokeWidth={1.9} />
-                </IconButton>
+                </LangIconButton>
               </View>
             </Card>
           );

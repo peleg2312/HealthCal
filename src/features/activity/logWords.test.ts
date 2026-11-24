@@ -48,7 +48,7 @@ describe('where the number comes from', () => {
   });
   it('explains the estimate with its formula and its margin', () => {
     const w = sourceWords({ ...base, rule: 'day' });
-    expect(w.how).toBe('9.3 MET × 3.5 ml O₂ per kg per minute × 142.6 kg × 95 min ÷ 200 gives the burn above.');
+    expect(w.how).toBe('9.3 MET (9.3 times your resting burn) × 3.5 ml O₂ per kg per minute × 142.6 kg × 95 min ÷ 200 gives the burn above.');
     expect(w.resting).toBe("Your day already assumes 2,330 kcal for resting and daily life, 154 kcal of it in these minutes. The part above that is added to today's budget.");
     expect(w.note).toBe('MET values describe an average adult, so the range allows about 20% either way.');
   });
