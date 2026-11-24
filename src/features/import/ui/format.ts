@@ -69,7 +69,7 @@ export interface CalorieView {
   added: string | null;
   /** True when the added figure is an estimate (the file had no calories). */
   estimate: boolean;
-  /** The line under it: "658 by watch", "est. 390–586", or "no calories in file". */
+  /** The line under it: "658 by watch", "likely 390–586" (the run log's word for the range), or "no calories in file". */
   detail: string;
   /** Spoken version for screen readers. */
   spoken: string;
@@ -100,7 +100,7 @@ export function calorieView(c: Pick<ImportCandidate, 'workout' | 'entry' | 'stat
   return {
     added: `~${formatNumber(net)}`,
     estimate: true,
-    detail: `est. ${formatNumber(lo)}–${formatNumber(hi)}`,
+    detail: `likely ${formatNumber(lo)}–${formatNumber(hi)}`,
     spoken: `${gross === 0 ? 'The file states 0 kilocalories. ' : ''}About ${formatNumber(net)} kilocalories added, an estimate between ${formatNumber(lo)} and ${formatNumber(hi)}`,
   };
 }

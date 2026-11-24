@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, ChevronUp, CircleCheck, Info, Lightbulb } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, ChevronUp, Info, Lightbulb, Sprout } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
@@ -55,9 +55,10 @@ export function InsightsCard({ insights, rangeDays }: { insights: Insight[]; ran
 function InsightRow({ insight }: { insight: Insight }) {
   const { colors, spacing } = useTheme();
   const [open, setOpen] = useState(false);
+  // A positive finding wears a sprout, never a check: in this app a check means only a day on budget.
   const tone =
     insight.tone === 'positive'
-      ? { color: colors.success, Icon: CircleCheck }
+      ? { color: colors.text, Icon: Sprout }
       : insight.tone === 'attention'
         ? { color: colors.warningInk, Icon: Lightbulb }
         : { color: colors.textSecondary, Icon: Info };

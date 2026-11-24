@@ -7,6 +7,7 @@ import { clockTime, dayLabel, distanceLabel, durationLabel, localDay } from '@/f
 import { plausibleOffsetMin } from '@/features/import/time';
 import { formatShortDate, toISODate } from '@/lib/dates';
 import { kcalRange } from '@/lib/exercise';
+import { spokenUnits } from '@/lib/spokenUnits';
 import { sleepFrom } from '@/features/trackers/sleepSource';
 import { formatHours } from '@/features/trackers/helpers';
 import { formatNumber, formatWeight } from '@/lib/units';
@@ -29,7 +30,7 @@ export interface ReviewView {
   added: string | null;
   /** True when that figure is the app's estimate. */
   estimate: boolean;
-  /** The line under it: "552 by watch", "est. 330–494", "No calories recorded". */
+  /** The line under it: "552 by watch", "likely 330–494" (the run log's word for the range), "No calories recorded". */
   detail: string;
   /** Everything above in one sentence, for screen readers. */
   spoken: string;
@@ -71,7 +72,7 @@ export function reviewView(item: ReviewItem, todayDate: ISODate, units: UnitSyst
       const [lo, hi] = kcalRange(net);
       added = `~${formatNumber(net)}`;
       estimate = true;
-      detail = `est. ${formatNumber(lo)}–${formatNumber(hi)}`;
+      detail = `likely ${formatNumber(lo)}–${formatNumber(hi)}`;
       said = `about ${formatNumber(net)} kilocalories added, an estimate between ${formatNumber(lo)} and ${formatNumber(hi)}`;
     }
   } else {

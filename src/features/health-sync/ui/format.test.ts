@@ -38,7 +38,7 @@ describe('sync screen wording', () => {
     const v = reviewView(item, '2026-11-14', 'metric', false);
     expect(v).toMatchObject({ title: 'Running', emoji: '🏃', source: 'From Garmin Connect', added: '~483', estimate: false, detail: '552 in total' });
     expect(plain(v.meta)).toBe('Yesterday · 07:00 · 45 min · 8.2 km');
-    expect(v.spoken).toBe('Running, Yesterday · 07:00 · 45 min · 8.2 km, From Garmin Connect, about 483 kilocalories added, from a measured burn');
+    expect(v.spoken).toBe('Running, Yesterday · 07:00 · 45 minutes · 8.2 kilometres, From Garmin Connect, about 483 kilocalories added, from a measured burn');
     expect(plain(reviewView(item, '2026-11-14', 'imperial', true).meta)).toBe('Yesterday · 7:00 AM · 45 min · 5.1 mi');
   });
 

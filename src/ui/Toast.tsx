@@ -400,6 +400,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
     let timer: ReturnType<typeof setTimeout> | undefined;
     const run = () => {
       const at = place();
+      (globalThis as Record<string, unknown>).__toastDbg = { at, scope: last?.scope, tries, inSheet, resting, key: placeKey };
       if (at === 'wait' && tries++ < 12) {
         timer = setTimeout(run, 80);
         return;

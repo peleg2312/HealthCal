@@ -31,6 +31,7 @@ import { PlanRow } from '@/features/plan/PlanRow';
 import { planVisible } from '@/features/plan/view';
 import { Group, IconTile, InitialsAvatar } from '@/features/settings/components';
 import { THEME_HINTS, ThemeSwatches } from '@/features/settings/ThemeSwatches';
+import { TextSizeRow } from '@/features/textSize/TextSizeRow';
 import { timeAgo } from '@/features/settings/format';
 import { toISODate } from '@/lib/dates';
 import { usePlannedReminders } from '@/features/settings/usePlannedReminders';
@@ -242,6 +243,7 @@ function ProfileHub() {
             <ThemeSwatches value={themeChoiceOf(settings)} onChange={(choice) => setSettings(themeChoicePatch(choice))} />
           </View>
         </View>
+        <TextSizeRow />
         <ToggleRow
           testID="profile-haptics"
           title="Haptics"

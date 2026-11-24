@@ -1965,6 +1965,7 @@ src/features/streak/rules.ts	pourIndex	2	src/features/streak/MilestoneSheet.tsx	
 src/features/streak/rules.ts	streakLine	2	src/features/streak/useStreakMoment.ts	src/features/streak/rules.test.ts
 src/features/streak/store.ts	useStreakMoments	1	src/features/streak/useStreakMoment.ts
 src/features/streak/useStreakMoment.ts	useStreakMoment	1	src/app/(tabs)/index.tsx
+src/features/textSize/TextSizeRow.tsx	TextSizeRow	1	src/app/profile.tsx
 src/features/today/DayRingStrip.tsx	DayRingStrip	2	src/app/(tabs)/diary.tsx	src/app/(tabs)/index.tsx
 src/features/today/FirstLogInvite.tsx	FirstLogInvite	1	src/app/(tabs)/index.tsx
 src/features/today/FitsSheet.tsx	FitsSheet	2	src/app/(tabs)/index.tsx	src/app/coach.tsx

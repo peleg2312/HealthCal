@@ -65,7 +65,7 @@ describe('import screen formatting', () => {
 
   it('labels an estimate with its range', () => {
     const r = row({ workout: workout({ format: 'gpx', kcal: null }), entry: { ...row().entry!, measured: undefined, kcalNet: 500 } });
-    expect(calorieView(r)).toMatchObject({ added: '~500', estimate: true, detail: 'est. 400–600' });
+    expect(calorieView(r)).toMatchObject({ added: '~500', estimate: true, detail: 'likely 400–600' });
   });
 
   it('adds nothing for a workout that is already in the app or listed twice', () => {
@@ -76,7 +76,7 @@ describe('import screen formatting', () => {
 
   it('G8: a file that states 0 kcal is not described as having no calories', () => {
     // A multisport transition with total_calories 0, shown without an activity.
-    expect(calorieView(row({ workout: workout({ kcal: 0 }), entry: null, activityId: null }))).toMatchObject({ detail: '0 kcal in file', spoken: 'The file states 0 kcal' });
+    expect(calorieView(row({ workout: workout({ kcal: 0 }), entry: null, activityId: null }))).toMatchObject({ detail: '0 kcal in file', spoken: 'The file states 0 kilocalories' });
     expect(calorieView(row({ workout: workout({ format: 'gpx', kcal: null }), entry: null, activityId: null })).detail).toBe('No calories in file');
     // With an activity it is still an estimate with its range, and says why.
     const r = row({ workout: workout({ kcal: 0 }), entry: { ...row().entry!, measured: undefined, kcalNet: 10 } });

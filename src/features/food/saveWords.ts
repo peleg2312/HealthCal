@@ -16,8 +16,9 @@ import { MAX_CONTENT_WIDTH } from '@/theme/tokens';
 import type { FoodEntry, MealType, UnitSystem } from '@/types';
 
 /**
- * The AI review's switch: log, and keep the result as one of my meals. While it is on, the name field
- * takes the words' place beside the switch, so these words are also the field's screen-reader label.
+ * The AI review's switch: log, and keep the result as one of my meals. These words name the switch only;
+ * while it is on, the name field takes the words' place beside the switch with a name of its own
+ * ("Meal name for Saved meals", `SaveMealRow`), so two controls never share one name.
  */
 export const SAVE_TOGGLE = 'Also save as a meal';
 /** The name field's placeholder, shown only while the field is empty. */
