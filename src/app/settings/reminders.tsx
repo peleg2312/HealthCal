@@ -8,8 +8,7 @@ import { usePlannedReminders } from '@/features/settings/usePlannedReminders';
 import { getReminderPermission, remindersSupported, requestReminderPermission, type ReminderPermission } from '@/services/notifications';
 import { useStore } from '@/store';
 import { balancedLines, chipWidth } from '@/features/food/chipLines';
-import { useTextSize, useTheme } from '@/theme';
-import { scaledFontSize } from '@/theme/textSize';
+import { scaledFontSize, useTextSize, useTheme } from '@/theme';
 import { Button, Card, Chip, ChipWrap, Header, Screen, Segmented, Text, ToggleRow, toast } from '@/ui';
 
 const INTERVALS = [60, 90, 120, 180, 240];

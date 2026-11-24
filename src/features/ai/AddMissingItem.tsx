@@ -2,13 +2,12 @@ import { Plus } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { useTheme } from '@/theme';
+import { useLargeText, useTheme } from '@/theme';
 import type { AiFoodItem, Food } from '@/types';
 import { Divider, ListRow, Text, TextField } from '@/ui';
 
 import { RowEmoji } from '@/features/food/components';
 import { displayFoodName } from '@/features/food/displayName';
-import { useBigText } from '@/features/food/textGrowth';
 
 import { foodToItem, matchFoods } from './localMatch';
 import { AiGlyph } from './mark';
@@ -35,7 +34,7 @@ export function AddMissingItem({
   // A 320 px phone cuts the example mid-word; it keeps the words that matter.
   const narrow = useWindowDimensions().width < 360;
   // With large text a shorter placeholder, so it is never cut mid-word in its field.
-  const big = useBigText();
+  const big = useLargeText();
   const [query, setQuery] = useState('');
   const q = query.trim();
   const matches = q.length >= 2 ? matchFoods(q, foods, 3) : [];

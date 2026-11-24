@@ -3,11 +3,10 @@ import React from 'react';
 import { View } from 'react-native';
 
 import { ideaRow, PLATE_NOTE, overLine, type MealIdeas } from '@/features/today/ideas';
-import { LARGE_TEXT, useTextGrowth } from '@/features/today/textGrowth';
 import { isolateRtl } from '@/lib/bidi';
 import { spokenUnits } from '@/lib/spokenUnits';
 import { formatNumber } from '@/lib/units';
-import { useTheme } from '@/theme';
+import { useLargeText, useTheme } from '@/theme';
 import type { MealType } from '@/types';
 import { Button, Divider, IconButton, Text } from '@/ui';
 
@@ -37,7 +36,7 @@ export function IdeasCard({
 }) {
   const { colors, spacing } = useTheme();
   // Large text (130% and up): the emoji keeps its own width rather than run into the name.
-  const large = useTextGrowth() > LARGE_TEXT;
+  const large = useLargeText();
   const body =
     ideas.state === 'over' ? (
       <Text variant="body">{overLine(ideas.overBy, true)}</Text>

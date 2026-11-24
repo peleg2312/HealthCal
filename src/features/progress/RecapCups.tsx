@@ -2,9 +2,8 @@ import { Check } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { useTextGrowth } from '@/features/activity/textGrowth';
 import { weekdayShort } from '@/lib/dates';
-import { useTheme, withOpacity } from '@/theme';
+import { useLargeText, useTheme, withOpacity } from '@/theme';
 import { MiniCup, PressableScale, Text } from '@/ui';
 
 import { spokenUnits } from './chartWords';
@@ -37,7 +36,7 @@ export function RecapCups({ cups, week }: { cups: RecapDayCup[]; week: string })
   const cupW = narrow ? CUP_W_NARROW : CUP_W;
   // Above 115% text "Mon" and "Tue" would run into each other: each day shows its first letter, as Train's week
   // does (its spoken name keeps the whole day).
-  const oneLetter = useTextGrowth() > 1.15;
+  const oneLetter = useLargeText();
   const sel = cups.find((c) => c.date === selected);
   return (
     <View style={{ gap: spacing.sm }}>

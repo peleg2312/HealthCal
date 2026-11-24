@@ -3,8 +3,7 @@ import { ScrollView, useWindowDimensions, View, type ScrollViewInstance } from '
 
 import { weekdayShort } from '@/lib/dates';
 import { formatNumber } from '@/lib/units';
-import { fonts, motion, useTextSize, useTheme, withOpacity } from '@/theme';
-import { scaledFontSize } from '@/theme/textSize';
+import { fonts, motion, scaledFontSize, useTextSize, useTheme, withOpacity } from '@/theme';
 import { AnimatedNumber, CupKey, Text, Vessel } from '@/ui';
 
 import type { WeekCell, WeekCells } from './weekCells';

@@ -6,7 +6,6 @@ import { useWindowDimensions, View } from 'react-native';
 import { ACTIVITY_BY_ID } from '@/data/activities';
 import { basisFromEntry, estimateSession } from '@/features/activity/build';
 import { DateStepper } from '@/features/activity/components';
-import { useTextGrowth } from '@/features/activity/textGrowth';
 import { EXERCISE_GROUPS, searchExercises } from '@/features/activity/exercises';
 import { budgetAdds } from '@/features/activity/logWords';
 import { RoutineCards, useRoutineTemplates } from '@/features/activity/RoutineCards';
@@ -37,7 +36,7 @@ import { formatNumber, round, weightToKg, weightUnit, weightValue } from '@/lib/
 import { cancelTimerAlert, scheduleTimerAlert } from '@/services/notifications';
 import { useStore } from '@/store';
 import { useDay, useLive, useProfile } from '@/store/selectors';
-import { cup, cupFor, useTheme } from '@/theme';
+import { cup, cupFor, useLargeText, useTheme } from '@/theme';
 import type { ActivityEntry, Intensity, StrengthSet, UnitSystem } from '@/types';
 import {
   Button,
@@ -632,7 +631,7 @@ function Metric({ label, value, unit, testID }: { label: string; value: string; 
   // Three metrics share a row: under 360 px the number steps down a size and the label may take two lines.
   const narrow = useWindowDimensions().width < 360;
   // Above 115% text a metric is at least 120 px wide and its row wraps (two, then one), so no label is cut.
-  const big = useTextGrowth() > 1.15;
+  const big = useLargeText();
   return (
     <View
       style={{ flex: 1, minWidth: big ? 120 : 0 }}
@@ -849,7 +848,7 @@ function SaveRoutineSheet({ visible, onClose, exercises }: { visible: boolean; o
 
 function ExercisePicker({ visible, onClose, onPick, recent }: { visible: boolean; onClose: () => void; onPick: (name: string) => void; recent: string[] }) {
   // At large text a placeholder longer than one word would be cut in the field.
-  const bigText = useTextGrowth() > 1.15;
+  const bigText = useLargeText();
   const { colors, spacing } = useTheme();
   const [query, setQuery] = useState('');
   const [group, setGroup] = useState<string>('all');

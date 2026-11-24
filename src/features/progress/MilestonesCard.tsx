@@ -1,10 +1,9 @@
 import React from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { useTextGrowth } from '@/features/activity/textGrowth';
 import { formatShortDate } from '@/lib/dates';
 import type { Milestone } from '@/lib/insights';
-import { useTheme } from '@/theme';
+import { LARGE_TEXT, useTextGrowth, useTheme } from '@/theme';
 import { MiniCup, Text } from '@/ui';
 
 import { spokenUnits } from './chartWords';
@@ -31,7 +30,7 @@ export function MilestonesCard({ milestones }: { milestones: Milestone[] }) {
   const { colors, spacing } = useTheme();
   // Two to a row from 360 px; one to a row below that or above 115% text, so a title is never cut or split.
   const grow = useTextGrowth();
-  const two = useWindowDimensions().width >= 360 && grow <= 1.15;
+  const two = useWindowDimensions().width >= 360 && grow <= LARGE_TEXT;
   const doneAll = milestones.filter((m) => m.achieved).sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
   const done = doneAll.slice(0, 4);
   const next = milestones
@@ -87,7 +86,7 @@ export function MilestonesCard({ milestones }: { milestones: Milestone[] }) {
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text variant="label">{m.title}</Text>
                   {/* Above 115% text the share goes under the title, so the title keeps the row's width. */}
-                  {grow > 1.15 ? (
+                  {grow > LARGE_TEXT ? (
                     <Text variant="numM" style={{ fontSize: 17, lineHeight: 22 }}>
                       {pct}
                       <Text variant="unit">%</Text>
@@ -97,7 +96,7 @@ export function MilestonesCard({ milestones }: { milestones: Milestone[] }) {
                     {m.detail}
                   </Text>
                 </View>
-                {grow > 1.15 ? null : (
+                {grow > LARGE_TEXT ? null : (
                   <Text variant="numM" style={{ fontSize: 17, lineHeight: 22 }}>
                     {pct}
                     <Text variant="unit">%</Text>

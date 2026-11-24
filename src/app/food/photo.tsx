@@ -59,10 +59,9 @@ import { analyzeFood, PhotoError, pickPhoto, prepareImage, takePendingPhoto, typ
 import { isBackendConfigured } from '@/services/supabase';
 import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
-import { cup, useTheme } from '@/theme';
+import { cup, useLargeText, useTheme } from '@/theme';
 import type { AiFoodResult, Food, MealType } from '@/types';
 import { AnimatedNumber, Button, Card, Chip, CupKey, Divider, FadeUp, goBack, haptic, Header, MacroBar, PressableScale, Screen, Segmented, Text, TextField, toast } from '@/ui';
-import { useBigText } from '@/features/food/textGrowth';
 
 type InputMode = 'photo' | 'text';
 type Step = 'capture' | 'analysing' | 'review' | 'error';
@@ -956,7 +955,7 @@ export default function PhotoScreen() {
 /** One macro of the estimate's total, in whole grams ("53 g", never "52.9 g": principle 2). */
 function MacroStat({ label, value, color }: { label: string; value: number; color: string }) {
   // Three a line; with large text the row wraps (each at least 120 wide), so "Protein" never runs into "Carbs".
-  const big = useBigText();
+  const big = useLargeText();
   return (
     <View style={[big ? { flexGrow: 1, flexBasis: 120 } : { flex: 1 }, { gap: 2 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

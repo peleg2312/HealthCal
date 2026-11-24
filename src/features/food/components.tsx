@@ -7,13 +7,12 @@ import { useToday } from '@/store/clock';
 import { isolateRtl } from '@/lib/bidi';
 import { addDays } from '@/lib/dates';
 import { MEALS } from '@/lib/nutrition';
-import { cup, fonts, useTheme } from '@/theme';
+import { cup, fonts, useLargeText, useTheme } from '@/theme';
 import type { Food, FoodSource, ISODate, MealType } from '@/types';
 import { CupKey, IconButton, PressableScale, Text } from '@/ui';
 import { spokenUnits } from '@/lib/spokenUnits';
 
 import { displayFoodName } from './displayName';
-import { useBigText } from './textGrowth';
 import { canStepForward, entryDayLabel, entryDaySpoken, foodLatestDay } from './entryDay';
 import { kcal, sourceInfo, withSourceWord } from './helpers';
 
@@ -94,7 +93,7 @@ export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: 
   // Four equal cells leave about 60 px each on a 320 px phone: 'Breakfast' fits there one size down.
   const narrow = useWindowDimensions().width < 340;
   // With large text the four take two lines of two, so no word reaches past the screen (never smaller text).
-  const big = useBigText();
+  const big = useLargeText();
   return (
     <View accessibilityRole="tablist" style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', borderBottomWidth: 1, borderBottomColor: colors.border }}>
       {MEALS.map((m) => {
@@ -351,7 +350,7 @@ function AmountStepper({ amount, name, testID }: { amount: RowAmount; name: stri
 /** Small labelled number used in macro rows: a cup key, the label, then "32 / 150 g". */
 export function MacroStat({ label, value, target, color }: { label: string; value: number; target?: number; color: string }) {
   // With large text a parent row that wraps gives each figure at least 120 px, so "Protein" is never cut.
-  const big = useBigText();
+  const big = useLargeText();
   return (
     <View style={[big ? { flexGrow: 1, flexBasis: 120 } : { flex: 1 }, { minWidth: 0, gap: 4 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

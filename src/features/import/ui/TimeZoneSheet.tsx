@@ -2,8 +2,7 @@ import { Check, Search } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { useTextGrowth } from '@/features/activity/textGrowth';
-import { useTheme } from '@/theme';
+import { LARGE_TEXT, useTextGrowth, useTheme } from '@/theme';
 import { Divider, ListRow, Sheet, TextField } from '@/ui';
 
 import { deviceTimeZone, searchZones, zoneLabel } from './timeZones';
@@ -15,7 +14,7 @@ export function TimeZoneSheet({ visible, value, onClose, onPick }: { visible: bo
   // At 320 px the field holds about 26 characters: the example cities go.
   // Narrow, or large text: the short placeholder, so it is never cut in the field.
   const grow = useTextGrowth();
-  const narrow = useWindowDimensions().width < 360 || grow > 1.15;
+  const narrow = useWindowDimensions().width < 360 || grow > LARGE_TEXT;
   const device = deviceTimeZone();
   const zones = searchZones(query).filter((z) => z !== device);
   const close = () => {

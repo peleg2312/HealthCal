@@ -13,11 +13,10 @@ import { isolateRtl } from '@/lib/bidi';
 import { MEAL_LABEL, MEAL_SHARE, scaleNutrients } from '@/lib/nutrition';
 import { formatNumber } from '@/lib/units';
 import { useLive } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { useLargeText, useTheme } from '@/theme';
 import type { Food, ISODate, MealType, Serving } from '@/types';
 import { Button, Chip, Text } from '@/ui';
 
-import { LARGE_TEXT, useTextGrowth } from './textGrowth';
 
 /** Bundled staples offered for a meal when there is no history yet: short names, a common first serving. */
 const STAPLES: Record<MealType, { id: string; label: string }[]> = {
@@ -94,7 +93,7 @@ export function FirstLogInvite({ meal, date, budget, narrow = false }: { meal: M
   const label = MEAL_LABEL[meal];
   const share = Math.round((budget * MEAL_SHARE[meal]) / 10) * 10;
   const options = picks(entries, meal, date, customFoods);
-  const large = useTextGrowth() > LARGE_TEXT;
+  const large = useLargeText();
   // The strip reaches the calorie card's edges: its padding is 12 under 360 px and 18 otherwise.
   const edge = narrow ? 12 : 18;
   const chip = (p: Pick) => (

@@ -18,12 +18,11 @@ import { StepsLine } from '@/features/health-sync/ui/StepsLine';
 import { SyncedFromLine } from '@/features/health-sync/ui/SyncedFromLine';
 import { isolateRtl } from '@/lib/bidi';
 import { addDays, formatDuration, formatShortDate, startOfWeek, weekdayShort } from '@/lib/dates';
-import { useTextGrowth } from '@/features/activity/textGrowth';
 import { trainingOverview } from '@/lib/trainingLoad';
 import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
 import { useLive, useProfile } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { useTextGrowth, useTheme } from '@/theme';
 import type { ActivityEntry } from '@/types';
 import { Button, Card, Chip, ConfirmSheet, EmptyState, RestoreRow, Screen, SectionTitle, Text } from '@/ui';
 

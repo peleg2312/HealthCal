@@ -9,13 +9,12 @@ import { useLive, useProfile } from '@/store/selectors';
 import { INTENSITY_LABELS, kcalRange } from '@/lib/exercise';
 import { dayRuleFor, type ExerciseRule } from '@/lib/exerciseBudget';
 import { formatDistance, formatNumber } from '@/lib/units';
-import { cup, fonts, useTheme } from '@/theme';
+import { cup, fonts, LARGE_TEXT, useTextGrowth, useTheme } from '@/theme';
 import type { ActivityEntry, ISODate, UnitSystem } from '@/types';
 import { CupKey, IconButton, PressableScale, Text } from '@/ui';
 
 import { deleteSessionLabel, historyFigureBeside, historyFigureWords, historyMetaLines } from './history';
 import { budgetAdds, budgetAddsShort, NEXT_DAY_HINT } from './logWords';
-import { useTextGrowth } from './textGrowth';
 
 /**
  * The day of a workout: the app's one date control (`DayStepper`, `@/features/food/components`), the same look
@@ -102,7 +101,7 @@ export function SessionRow({
       <Text variant="unit">{' kcal'}</Text>
       <Text variant="label" color="textSecondary">
         {/* At large text the words may take their own line under the figure, never splitting a word. */}
-        {scale > 1.15 ? ` ${short}` : historyFigureWords(short)}
+        {scale > LARGE_TEXT ? ` ${short}` : historyFigureWords(short)}
       </Text>
     </Text>
   );

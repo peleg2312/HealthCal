@@ -3,12 +3,11 @@ import { ChevronDown, ChevronRight, ChevronUp, Info } from 'lucide-react-native'
 import React, { useEffect, useState } from 'react';
 import { AccessibilityInfo, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { useTextGrowth } from '@/features/activity/textGrowth';
 import { DayStepper as FoodDayStepper } from '@/features/food/components';
 import { spokenUnits } from '@/lib/spokenUnits';
 import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
-import { cup, fonts, useTheme } from '@/theme';
+import { cup, fonts, useLargeText, useTextGrowth, useTheme } from '@/theme';
 import type { ISODate } from '@/types';
 import { CupKey, PressableScale, Text } from '@/ui';
 
@@ -208,7 +207,7 @@ export function Tile({
  */
 export function HistoryRow({ testID, title, subtitle, value, onPress }: { testID: string; title: string; subtitle?: string; value: string; onPress: () => void }) {
   const { colors, spacing } = useTheme();
-  const big = useTextGrowth() > 1.15;
+  const big = useLargeText();
   const said = spokenUnits([title, subtitle?.replace(/\u00A0/g, ' '), value].filter(Boolean).join(', ')).replace(/\bvs\b/g, 'against the');
   return (
     <PressableScale

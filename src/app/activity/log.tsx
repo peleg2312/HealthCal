@@ -8,7 +8,6 @@ import { basisFromEntry, formatPace, localiseSpeedText, paceModeFor, sessionPrev
 import { DateStepper } from '@/features/activity/components';
 import { BURN_UNIT, budgetAdds, burnCaption, burnSource } from '@/features/activity/logWords';
 import { SpreadHint } from '@/features/activity/SpreadHint';
-import { useTextGrowth } from '@/features/activity/textGrowth';
 import { syncedFrom } from '@/features/health-sync/origins';
 import { HeartRateLine } from '@/features/health-sync/ui/HeartRateLine';
 import { deleteActivity, leaveFlow, saveActivity } from '@/features/activity/session';
@@ -20,7 +19,7 @@ import { INTENSITY_LABELS } from '@/lib/exercise';
 import { distanceToKm, distanceUnit, distanceValue, formatNumber, formatVolume, formatWeight, round } from '@/lib/units';
 import { useStore } from '@/store';
 import { useDay, useLive, useProfile } from '@/store/selectors';
-import { cup, useTheme } from '@/theme';
+import { cup, LARGE_TEXT, useTextGrowth, useTheme } from '@/theme';
 import type { Intensity } from '@/types';
 import { Button, Card, Chip, CupKey, EmptyState, Hatch, Header, IconButton, NumberField, PressableScale, Screen, Text, TextField } from '@/ui';
 
@@ -303,7 +302,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
           </IconButton>
         </View>
         {/* One row of five; above 115% text three and two to a row, so no chip is cut or left alone. */}
-        <View style={{ flexDirection: 'row', flexWrap: grow > 1.15 ? 'wrap' : 'nowrap', gap: spacing.xs }}>
+        <View style={{ flexDirection: 'row', flexWrap: grow > LARGE_TEXT ? 'wrap' : 'nowrap', gap: spacing.xs }}>
           {PRESETS.map((p) => (
             <Chip
               key={p}
@@ -312,7 +311,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
               selected={minutes === p}
               onPress={() => setDuration(p)}
               testID={`duration-${p}`}
-              style={[grow > 1.15 ? { flexGrow: 1, flexBasis: '30%' } : { flex: 1 }, { justifyContent: 'center', paddingHorizontal: 4 }]}
+              style={[grow > LARGE_TEXT ? { flexGrow: 1, flexBasis: '30%' } : { flex: 1 }, { justifyContent: 'center', paddingHorizontal: 4 }]}
             />
           ))}
         </View>
@@ -359,7 +358,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
                       <>
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <Text variant="bodyStrong">{INTENSITY_LABELS[i].title}</Text>
-                          <Text variant="caption" color="textSecondary" numberOfLines={grow > 1.15 ? undefined : 2}>
+                          <Text variant="caption" color="textSecondary" numberOfLines={grow > LARGE_TEXT ? undefined : 2}>
                             {hint}
                           </Text>
                         </View>

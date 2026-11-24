@@ -5,10 +5,9 @@ import React, { useEffect, useState } from 'react';
 import { Animated, Easing, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { cup, fonts, MAX_CONTENT_WIDTH, motion, useReducedMotion, useTheme } from '@/theme';
+import { cup, fonts, LARGE_TEXT, MAX_CONTENT_WIDTH, motion, useReducedMotion, useTextGrowth, useTheme } from '@/theme';
 import { PressableScale, TAB_BAR_HEIGHT, Text, useToastDock } from '@/ui';
 
-import { LARGE_TEXT, useTextGrowth } from '@/features/today/textGrowth';
 
 import { QuickLogSheet } from './QuickLogSheet';
 

@@ -5,10 +5,9 @@ import { Platform, useWindowDimensions, View } from 'react-native';
 import { CoachEntry } from '@/features/coach/CoachEntry';
 import { useCoachMovedToast } from '@/features/coach/movedToast';
 import { FriendsEntry } from '@/features/friends/FriendsEntry';
-import { LARGE_TEXT, useTextGrowth } from '@/features/today/textGrowth';
 import { formatShortDate, fromISODate } from '@/lib/dates';
 import { useProfile } from '@/store/selectors';
-import { cupFor, MAX_CONTENT_WIDTH, spacing as SPACING, useTheme } from '@/theme';
+import { cupFor, MAX_CONTENT_WIDTH, spacing as SPACING, useLargeText, useTheme } from '@/theme';
 import { PressableScale, Text } from '@/ui';
 
 export type TabName = 'today' | 'diary' | 'train' | 'progress';
@@ -120,7 +119,7 @@ export function TabHeader({
   useCoachMovedToast();
   useEffect(preloadCoach, []);
   const width = useWindowDimensions().width;
-  const large = useTextGrowth() > LARGE_TEXT;
+  const large = useLargeText();
   const size = titleSize ?? tabTitleSize(width);
   const initial = ((profile.name ?? '').trim() || 'Me').slice(0, 1).toUpperCase();
   const overlineText = overlineShort && width < 360 ? overlineShort : overline;

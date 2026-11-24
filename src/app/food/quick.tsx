@@ -5,9 +5,8 @@ import { View } from 'react-native';
 import { DayStepper, MealPicker } from '@/features/food/components';
 import { QUICK_KCAL_LIMIT, href, kcal, parseDate, parseMeal } from '@/features/food/helpers';
 import { logQuickAdd } from '@/features/food/log';
-import { useBigText } from '@/features/food/textGrowth';
 import { atwaterKcal, MEAL_LABEL } from '@/lib/nutrition';
-import { useTheme } from '@/theme';
+import { useLargeText, useTheme } from '@/theme';
 import { Button, Card, CupKey, Header, NumberField, Screen, Text, TextField, goBack, useLeaveGuard } from '@/ui';
 
 export default function QuickAddScreen() {
@@ -17,7 +16,7 @@ export default function QuickAddScreen() {
   const [date, setDate] = useState(() => parseDate(params.date));
   const [name, setName] = useState('');
   // With large text a shorter placeholder, so it is never cut mid-word in its field.
-  const big = useBigText();
+  const big = useLargeText();
   const macroCell = big ? { flexGrow: 1, flexBasis: 110 } : { flex: 1 };
   const [kcalV, setKcal] = useState<number | null>(null);
   const [protein, setProtein] = useState<number | null>(null);

@@ -3,8 +3,7 @@ import { Check, Triangle } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { useTextGrowth } from '@/features/activity/textGrowth';
-import { fonts, useTheme } from '@/theme';
+import { fonts, useLargeText, useTheme } from '@/theme';
 import type { Direction } from '@/lib/insights';
 import { Card, Chip, CupKey, PressableScale, Sheet, Text } from '@/ui';
 
@@ -233,7 +232,7 @@ export function SegmentSwitch<T extends string>({
   // At 320 px four tabs get about 70 px each: the labels step down so the selected (bold) one is never cut.
   const narrow = useWindowDimensions().width < 360;
   // Above 115% text four labels no longer fit on one line: the tabs go two to a row, so none is cut.
-  const twoRows = useTextGrowth() > 1.15 && options.length > 2;
+  const twoRows = useLargeText() && options.length > 2;
   return (
     <View accessibilityRole="tablist" style={{ flexDirection: 'row', flexWrap: twoRows ? 'wrap' : 'nowrap', borderBottomWidth: 1, borderBottomColor: colors.border }}>
       {options.map((o) => {

@@ -6,10 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ACTIVITIES, ACTIVITY_BY_ID, ACTIVITY_CATEGORIES, POPULAR_ACTIVITY_IDS, searchActivities } from '@/data/activities';
 import { effortSpan } from '@/features/activity/effortWords';
-import { useTextGrowth } from '@/features/activity/textGrowth';
 import { formatDayLabel, today } from '@/lib/dates';
 import { useStore } from '@/store';
-import { cup, useTheme } from '@/theme';
+import { cup, LARGE_TEXT, useTextGrowth, useTheme } from '@/theme';
 import type { ActivityCategory, ActivityDef } from '@/types';
 import { Chip, ChipRow, Divider, EmptyState, Header, ListRow, PressableScale, Screen, SectionTitle, Sheet, Text, TextField } from '@/ui';
 
@@ -98,7 +97,7 @@ export default function PickActivityScreen() {
           <TextField
             testID="activity-search"
             // At 320 px the examples do not fit the field.
-            placeholder={grow > 1.15 ? 'Search' : width < 360 ? 'Search activities' : 'Search volleyball, yoga, rowing...'}
+            placeholder={grow > LARGE_TEXT ? 'Search' : width < 360 ? 'Search activities' : 'Search volleyball, yoga, rowing...'}
             value={query}
             onChangeText={setQuery}
             autoCorrect={false}

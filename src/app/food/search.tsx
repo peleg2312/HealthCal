@@ -8,7 +8,6 @@ import { searchAiTile } from '@/features/ai/words';
 import { AmountEditor } from '@/features/food/AmountEditor';
 import { foodNameHead } from '@/features/food/addedTo';
 import { FoodRow, MealPicker } from '@/features/food/components';
-import { useBigText } from '@/features/food/textGrowth';
 import { displayFoodName } from '@/features/food/displayName';
 import { setFoodDraft } from '@/features/food/draft';
 import { amountLabel, href, kcal, lastPortions, matchServing, parseDate, parseMeal, portionFor, portionKcal, portionLabel, sourceInfo, stepAmount } from '@/features/food/helpers';
@@ -30,7 +29,7 @@ import { searchLocal, searchOnlineWithStatus } from '@/services/foodSearch';
 import { useToday } from '@/store/clock';
 import { favoriteRecordId, useStore } from '@/store';
 import { useDay, useLive } from '@/store/selectors';
-import { cup, motion, useTheme } from '@/theme';
+import { cup, motion, useLargeText, useTheme } from '@/theme';
 import type { Food, FoodEntry, MealType, SavedMeal } from '@/types';
 import { AnimatedNumber, Button, Chip, ChipRow, Divider, EmptyState, Header, IconButton, PressableScale, Screen, Sheet, Text, TextField } from '@/ui';
 import { spokenUnits } from '@/lib/spokenUnits';
@@ -42,7 +41,7 @@ export default function FoodSearchScreen() {
   const { colors, radius, spacing } = useTheme();
   // A 320 px phone cannot fit the long hint; it keeps the words that matter.
   const narrow = useWindowDimensions().width < 360;
-  const big = useBigText();
+  const big = useLargeText();
   const params = useLocalSearchParams<{ meal?: string; date?: string }>();
   const todayDate = useToday();
   const date = parseDate(params.date, todayDate);
@@ -592,7 +591,7 @@ function Hint({ title, message }: { title: string; message: string; icon?: React
 /** A compact action tile: the icon over one short word, 52 px tall; `a11y` is its full name ("Scan barcode"). */
 function ActionTile({ icon, label, a11y, onPress, testID }: { icon: React.ReactNode; label: string; a11y: string; onPress: () => void; testID: string }) {
   const { colors, radius } = useTheme();
-  const big = useBigText();
+  const big = useLargeText();
   return (
     <PressableScale
       testID={testID}

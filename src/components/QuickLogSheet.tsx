@@ -15,7 +15,6 @@ import { formatPortion, mealServings, planSavedMeal } from '@/features/food/buil
 import { logFood, logItems, logSavedMeal } from '@/features/food/log';
 import { ONE_TAP_GUARD_MS, tooSoon } from '@/features/food/oneTap';
 import { loadSearchTab } from '@/features/food/searchTab';
-import { useBigText } from '@/features/food/textGrowth';
 import { addWater } from '@/features/today/StatusRail';
 import { quickLogDate, quickLogPastDate, useViewedDay } from '@/features/today/viewedDay';
 import { currentKcal, customFoodIndex, resolveFood, resolveUsuals, usualFoods, usualLabel, type UsualFood } from '@/features/food/usuals';
@@ -26,7 +25,7 @@ import { formatNumber, formatVolume } from '@/lib/units';
 import { useStore } from '@/store';
 import { useNow, useToday } from '@/store/clock';
 import { computeDayFromStore, live, useLive, useProfile } from '@/store/selectors';
-import { cup, useTheme } from '@/theme';
+import { cup, useLargeText, useTheme } from '@/theme';
 import type { Food, FoodEntry, FoodSource, ISODate, SavedMeal } from '@/types';
 import { PressableScale, Sheet, Text } from '@/ui';
 import { spokenUnits } from '@/lib/spokenUnits';
@@ -121,7 +120,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   // Large text (Profile's text size, or the phone's): the food tiles grow wider, every way in is a whole row,
   // and nothing is pinned (the likely next log leads the body instead), so no word is split and nothing is cut
   // by the bottom of the screen.
-  const big = useBigText();
+  const big = useLargeText();
   const tileW = big ? TILE_W_BIG : TILE_W;
   const glasses = [...presets]
     .filter((p) => p > 0)

@@ -3,7 +3,6 @@ import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
-import { useTextGrowth } from '@/features/activity/textGrowth';
 import { clockTime } from '@/features/import/ui/format';
 import { resolveDateParam } from '@/features/trackers/dateParam';
 import { diffDays, formatDayLabel, formatShortDate } from '@/lib/dates';
@@ -17,7 +16,7 @@ import { findByDate, keepOrConvert, targetsBehind, weightChartData, weightStats,
 import { isSyncedWeighIn, weighInFromLine } from '@/features/trackers/weighInSource';
 import { useToday } from '@/store/clock';
 import { useProfile, useWeightSeries } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { useLargeText, useTheme } from '@/theme';
 import type { ISODate, UnitSystem, WeightEntry } from '@/types';
 import {
   Button,
@@ -54,7 +53,7 @@ function fixedWeight(kg: number, units: UnitSystem): string {
 
 function WeightScreen() {
   const { colors, spacing } = useTheme();
-  const bigText = useTextGrowth() > 1.15;
+  const bigText = useLargeText();
   const profile = useProfile();
   const units = profile.units;
   const series = useWeightSeries();

@@ -27,7 +27,6 @@ import { AFTER_STRIP_MS, StreakMark } from '@/features/streak/StreakMark';
 import { useStreakMoment } from '@/features/streak/useStreakMoment';
 import { addWater, defaultGlass, StatusRail } from '@/features/today/StatusRail';
 import { useReportViewedDay } from '@/features/today/viewedDay';
-import { LARGE_TEXT, useTextGrowth } from '@/features/today/textGrowth';
 import { addDays, formatShortDate, greeting } from '@/lib/dates';
 import { MEALS, MEAL_LABEL, MEAL_SHARE, mealForTime } from '@/lib/nutrition';
 import { spokenUnits } from '@/lib/spokenUnits';
@@ -35,7 +34,7 @@ import { formatNumber, formatVolume } from '@/lib/units';
 import { useStore } from '@/store';
 import { useNow, useToday } from '@/store/clock';
 import { useConsistency, useDay, useLive, useProfile, type DaySummary } from '@/store/selectors';
-import { motion, useTheme } from '@/theme';
+import { motion, useLargeText, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
 import { AnimatedNumber, Button, Card, Chip, CupKey, Hatch, IconButton, levelY, placeLabels, PressableScale, ProgressBar, Screen, Text, Vessel, type VesselLabel } from '@/ui';
 
@@ -174,7 +173,7 @@ function EnergyCard({
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
   // Large text: the labels leave the cup's side column for rows (EnergyCardLarge below).
-  const large = useTextGrowth() > LARGE_TEXT;
+  const large = useLargeText();
   const over = day.remaining < 0;
   const eaten = day.eaten.kcal;
   const budget = Math.max(0, day.budget);
@@ -681,7 +680,7 @@ function MealsSection({ day }: { day: DaySummary }) {
   const all = useLive('foodEntries');
   // Large text: a meal's name and its calories wrap as two lines when both do not fit, and "Repeat" goes on a row of
   // its own under the meal, so the caption keeps the room it needs and never splits a word.
-  const large = useTextGrowth() > LARGE_TEXT;
+  const large = useLargeText();
   const open = (meal: MealType) => router.push(`/food/search?meal=${meal}&date=${day.date}`);
   return (
     <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>

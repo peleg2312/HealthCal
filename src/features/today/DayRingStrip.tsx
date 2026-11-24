@@ -5,11 +5,10 @@ import { Platform, ScrollView, useWindowDimensions, View, type AccessibilityActi
 import { spokenUnits } from '@/features/progress/chartWords';
 import { diffDays, formatDayLabel, formatShortDate, fromISODate, startOfWeek } from '@/lib/dates';
 import { useDays } from '@/store/selectors';
-import { cup, fonts, MAX_CONTENT_WIDTH, useTheme } from '@/theme';
+import { cup, fonts, MAX_CONTENT_WIDTH, useLargeText, useTheme } from '@/theme';
 import type { ISODate } from '@/types';
 import { Chip, FadeUp, IconButton, ListRow, MiniCup, PressableScale, Sheet, Text, useReducedMotion } from '@/ui';
 
-import { LARGE_TEXT, useTextGrowth } from './textGrowth';
 import { DaySwipeGuard } from './useDaySwipe';
 import { dayRing, weekCaption, weekDates } from './week';
 
@@ -207,7 +206,7 @@ export function DayRingStrip({
     return b === 0 ? 'This week' : b === 1 ? 'Last week' : b === -1 ? 'Next week' : `Week of ${formatShortDate(dates[0])}`;
   };
   const narrow = windowW < 360;
-  const large = useTextGrowth() > LARGE_TEXT;
+  const large = useLargeText();
   // Natively and on touch the arrows are not drawn: every day offers the same as actions.
   const weekActions = [
     ...(back < maxBack ? [{ name: 'previousWeek', label: 'Previous week' }] : []),

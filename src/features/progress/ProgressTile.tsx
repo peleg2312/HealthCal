@@ -1,9 +1,8 @@
 import React from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { useTextGrowth } from '@/features/activity/textGrowth';
 import type { Direction } from '@/lib/insights';
-import { useTheme } from '@/theme';
+import { useLargeText, useTheme } from '@/theme';
 import { CupKey, FadeUp, PressableScale, Text } from '@/ui';
 
 import { spokenUnits } from './chartWords';
@@ -71,7 +70,7 @@ export function ProgressTile({
   const narrow = useWindowDimensions().width < 360;
   // Above 115% text a tile takes the card's whole width (one column, a hairline between tiles), so a number
   // and its unit stay inside it and its line may take a second line.
-  const oneColumn = useTextGrowth() > 1.15;
+  const oneColumn = useLargeText();
   const line = narrow && captionShort && !oneColumn ? captionShort : caption;
   return (
     <FadeUp index={index + 1} style={{ width: oneColumn ? '100%' : '50%' }}>

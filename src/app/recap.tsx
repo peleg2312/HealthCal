@@ -6,7 +6,6 @@ import { useWindowDimensions, View } from 'react-native';
 import { addDays, formatDayLabel, formatShortDate } from '@/lib/dates';
 import { budgetBalanceText, weekRangeLabel, type RecapTile } from '@/lib/insights';
 import { formatNumber } from '@/lib/units';
-import { useTextGrowth } from '@/features/activity/textGrowth';
 import { changeDirection, changeWords, type ChangeKind } from '@/features/progress/change';
 import { spokenUnits } from '@/features/progress/chartWords';
 import { go } from '@/features/progress/parts';
@@ -15,7 +14,7 @@ import { recapDayCups, recapDaysVerdict } from '@/features/progress/recapDays';
 import { useRecapReady } from '@/features/progress/recapReady';
 import { useRecap } from '@/features/progress/useRecap';
 import { ShareWeekButton } from '@/features/share';
-import { useTheme } from '@/theme';
+import { useLargeText, useTheme } from '@/theme';
 import { AnimatedNumber, Card, CupKey, Divider, EmptyState, FadeUp, Header, IconButton, PressableScale, Screen, Sheet, Text } from '@/ui';
 
 function deltaText(t: RecapTile): string {
@@ -36,7 +35,7 @@ function Tile({ t, index, week }: { t: RecapTile; index: number; week: string })
   // At 320 px a tile is about 108 px wide: the number steps down so it and its unit are never cut.
   const narrow = useWindowDimensions().width < 360;
   // Above 115% text a tile takes the card's whole width, so a number never splits from its unit or inside itself.
-  const oneColumn = useTextGrowth() > 1.15;
+  const oneColumn = useLargeText();
   const color = {
     calories: colors.calories,
     protein: colors.protein,

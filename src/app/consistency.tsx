@@ -4,13 +4,12 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { formatDayLabel, formatShortDate, startOfWeek } from '@/lib/dates';
 import { formatNumber } from '@/lib/units';
-import { useTextGrowth } from '@/features/activity/textGrowth';
 import { RHYTHM_KINDS, monthGrid, monthLabel, monthOf, monthTally, rhythmWeeks, shiftMonth, weeksOnRhythm, type CalendarCell, type RhythmKind } from '@/features/progress/consistency';
 import { solidBar } from '@/features/progress/calorieBars';
 import { spokenUnits } from '@/features/progress/chartWords';
 import { go } from '@/features/progress/parts';
 import { setRhythmTarget, useConsistencyData } from '@/features/progress/useConsistencyData';
-import { useTheme, withOpacity } from '@/theme';
+import { useLargeText, useTheme, withOpacity } from '@/theme';
 import { AnimatedNumber, BarChart, Button, Card, CupKey, EmptyState, Header, IconButton, MiniCup, Screen, Sheet, Stepper, Text } from '@/ui';
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -126,7 +125,7 @@ function Legend({ swatch, label }: { swatch: React.ReactNode; label: string }) {
 
 export default function ConsistencyScreen() {
   const { colors, spacing } = useTheme();
-  const bigText = useTextGrowth() > 1.15;
+  const bigText = useLargeText();
   const d = useConsistencyData();
   const thisMonth = monthOf(d.today);
   const firstMonth = d.firstDate ? monthOf(d.firstDate) : thisMonth;

@@ -16,12 +16,11 @@ import { useFriends } from '@/services/friends';
 import { useStore } from '@/store';
 import { useNow } from '@/store/clock';
 import { live, useLive, useProfile, useWeightSeries, type DaySummary } from '@/store/selectors';
-import { isReducedMotion, motion, useTheme } from '@/theme';
+import { isReducedMotion, motion, useLargeText, useTheme } from '@/theme';
 import type { ISODate } from '@/types';
 import { AnimatedNumber, Button, Card, CupKey, haptic, PressableScale, ProgressBar, Text, toast } from '@/ui';
 
 import { cheersLabel, recentCheerCount } from './cheers';
-import { LARGE_TEXT, useTextGrowth } from './textGrowth';
 import { crossesGoal, volumeNumber, volumeUnitFor, waterOfGoal } from './volume';
 import { weightCell } from './weightCell';
 
@@ -86,8 +85,8 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
   // Large text (130% and up): the water row may put its glass under the amount, and the three cells stack as rows,
-  // so every label and value keeps its words whole (textGrowth).
-  const large = useTextGrowth() > LARGE_TEXT;
+  // so every label and value keeps its words whole (`useLargeText`, `@/theme`).
+  const large = useLargeText();
   const profile = useProfile();
   const units = profile.units;
   const presets = useStore((s) => s.settings.waterPresets);

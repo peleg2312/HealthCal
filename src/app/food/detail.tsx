@@ -20,10 +20,9 @@ import { RequireProfile } from '@/features/food/RequireProfile';
 import { isolateRtl } from '@/lib/bidi';
 import { MEAL_LABEL, atwaterKcal, formatMacro, scaleNutrients } from '@/lib/nutrition';
 import { useStore } from '@/store';
-import { useBigText } from '@/features/food/textGrowth';
 import { useToday } from '@/store/clock';
 import { useDay, useLive } from '@/store/selectors';
-import { cup, useTheme } from '@/theme';
+import { cup, useLargeText, useTheme } from '@/theme';
 import type { Food, FoodEntry, ISODate, MealType, Nutrients, Serving, WaterEntry } from '@/types';
 import { Button, Card, CupKey, Divider, EmptyState, Header, IconButton, MacroBar, NumberField, PressableScale, Screen, Text, TextField, goBack } from '@/ui';
 
@@ -192,7 +191,7 @@ function NutritionFacts({
   const { spacing } = useTheme();
   // With large text each row's name has a line of its own and its values share the line under it in two equal
   // columns, so a figure never runs into the next one nor parts from its unit.
-  const big = useBigText();
+  const big = useLargeText();
   const portionCol = big ? { flex: 1 } : { width: 84 };
   const per100Col = big ? { flex: 1 } : { width: 76 };
   // [label, key, unit, a line under a macro]
@@ -309,7 +308,7 @@ const VALUES_UPDATED = "This food's values were updated since you logged it. Sav
 function MacroSummary({ n, kcalNote, range, updated }: { n: Nutrients; kcalNote: string; range?: [number, number] | null; updated?: boolean }) {
   const { colors, spacing } = useTheme();
   // With large text the portion's words go under the figure on a line of their own, and the macros wrap.
-  const big = useBigText();
+  const big = useLargeText();
   return (
     <View>
       <View style={{ flexDirection: big ? 'column' : 'row', alignItems: big ? 'flex-start' : 'flex-end', justifyContent: 'space-between', gap: big ? spacing.xs : spacing.md }}>

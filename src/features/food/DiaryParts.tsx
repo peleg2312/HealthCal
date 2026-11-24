@@ -12,7 +12,7 @@ import { MEAL_LABEL, entriesTotal } from '@/lib/nutrition';
 import { useToday } from '@/store/clock';
 import type { DaySummary } from '@/store/selectors';
 import { favoriteRecordId, useStore } from '@/store';
-import { cup, fonts, useTheme } from '@/theme';
+import { cup, fonts, useLargeText, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType, WaterEntry } from '@/types';
 import { AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, Hatch, IconButton, ListRow, PressableScale, ProgressBar, RestoreRow, Sheet, Text, Trough } from '@/ui';
 import { spokenUnits } from '@/lib/spokenUnits';
@@ -30,7 +30,6 @@ import { SAVE_HINT_NOT_NOW, SAVE_HINT_NOT_NOW_A11Y, saveHintA11y, saveHintLabel 
 import { currentKcal } from './usuals';
 import { removedToday } from './restore';
 import { FadeRow, Unfold, useLeavingRows } from './rowMotion';
-import { useBigText } from './textGrowth';
 
 /**
  * The diary summary: calories left as a big number, the day as a trough
@@ -49,7 +48,7 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?
   // a digit would make the whole page jump by a line as a log or a delete ticks it past 999.
   const stacked = screenW < 480;
   // With large text the three macros wrap (each at least 120 wide), so a name or "/ 152 g" is never split.
-  const big = useBigText();
+  const big = useLargeText();
   const over = day.remaining < 0;
   const budget = Math.max(0, day.budget);
   // Calories workouts add to this day (its own and shares carried from the six days before), drawn as
@@ -153,7 +152,7 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
   // On a narrow phone the name and the portion may take two lines rather than be cut.
   const narrow = width < 360;
   // With large text the calories take a line of their own under the portion, so neither is squeezed.
-  const big = useBigText();
+  const big = useLargeText();
   // Any entry that carries a range is an estimate, whatever food it was matched to afterwards.
   const ai = !!entry.kcalRange;
   const source = sourceInfo(ai ? 'ai' : entry.source);
@@ -309,7 +308,7 @@ export function MealCard({
   // header (the menu's one action for an empty meal, copying the last one, is the Repeat under the slot).
   const filled = rows.length > 0;
   // With large text the meal's name keeps its whole word: the "..." and "+" cups go under it when both do not fit.
-  const big = useBigText();
+  const big = useLargeText();
   return (
     <Card testID={`meal-card-${meal}`} padding={0} style={{ paddingTop: filled ? 12 : 16, paddingBottom: filled ? 4 : ROW_PAD }}>
       <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', justifyContent: 'flex-end', alignItems: 'center', gap: spacing.xs, paddingLeft: ROW_PAD, paddingRight: 14 }}>
@@ -414,7 +413,7 @@ function RepeatRow({ meal, label, previous, onRepeat }: { meal: MealType; label:
   const foods = previous.entries.map((e) => foodNameHead(displayFoodName(e))).filter(Boolean);
   const total = kcal(currentKcal(previous.entries));
   // With large text the caption has the card's width and Repeat goes under it, so no word is split.
-  const big = useBigText();
+  const big = useLargeText();
   return (
     <View testID={`meal-repeat-row-${meal}`} style={{ flexDirection: big ? 'column' : 'row', alignItems: big ? 'flex-start' : 'center', gap: big ? spacing.sm : spacing.md }}>
       <Text variant="caption" color="textSecondary" numberOfLines={3} style={big ? { alignSelf: 'stretch' } : { flex: 1, minWidth: 0 }}>

@@ -18,7 +18,6 @@ import { mealOnDay } from '@/features/food/addedTo';
 import { href } from '@/features/food/helpers';
 import { logDrink, removeDrink } from '@/features/food/log';
 import { useOneTap } from '@/features/food/oneTap';
-import { useBigText } from '@/features/food/textGrowth';
 import { waterChartLabel } from '@/features/progress/chartWords';
 import { customFoodIndex, resolveFood } from '@/features/food/usuals';
 import { ENTERED, type DrinkChoice } from '@/features/drinks/choices';
@@ -32,7 +31,7 @@ import { loadDrinkMemory, rememberDrinkChoice, useDrinkMemory } from '@/features
 import { diaryWaterCaption, diaryWaterOpenLabel, waterDeleteLabel } from '@/features/drinks/diary';
 import { drinkMeal, entryFor, noticeLine, pickedFood, planDrink, rememberedChoice, sameDrinkFoodIds, sameDrinkInDiary, selectChoice, selectFood, waterAfter, waterFromEntry, waterOnlyOffered, waterRowCaption, waterRowTitle, type WaterAfter } from '@/features/drinks/rules';
 import { leftLitreDecimals, shownMl, volumeNumber, volumeUnitFor, waterLeftMl } from '@/features/today/volume';
-import { useTheme } from '@/theme';
+import { useLargeText, useTheme } from '@/theme';
 import { pourLandsAt } from '@/theme/motion';
 import type { Beverage, Food, WaterEntry } from '@/types';
 import { spokenUnits } from '@/lib/spokenUnits';
@@ -139,7 +138,7 @@ function WaterScreen() {
   const narrow = screenW < 360;
   // Large text (Profile's text size, or the phone's): the cup's words leave the cup's side for a column of
   // their own, the glasses go two a row and "Other amount" says "Amount", so nothing is cut or overlaps.
-  const big = useBigText();
+  const big = useLargeText();
   const profile = useProfile();
   const settings = useStore((s) => s.settings);
   const units = profile.units;

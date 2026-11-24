@@ -17,11 +17,10 @@ import { formatNumber } from '@/lib/units';
 import { useStore } from '@/store';
 import { useToday } from '@/store/clock';
 import { useDay, useLive } from '@/store/selectors';
-import { fonts, useTheme } from '@/theme';
+import { fonts, useLargeText, useTheme } from '@/theme';
 import type { ISODate, MealType } from '@/types';
 import { Button, CupKey, Divider, EmptyState, IconButton, ProgressBar, SectionTitle, Sheet, Text } from '@/ui';
 
-import { LARGE_TEXT, useTextGrowth } from './textGrowth';
 import { fitCandidates, rankFits, type Fit } from './fits';
 import { IDEAS_TITLE, PLATE_NOTE, ideaRow, mealIdeas, overLine, type MealIdea, type MealIdeas } from './ideas';
 
@@ -80,7 +79,7 @@ export function FitsSheet({
   const { colors, spacing } = useTheme();
   // No room for a numbers column beside a row's name: a narrow phone, or large text (130% and up), where the numbers
   // lead the line under the name instead and the emoji keeps its own width.
-  const large = useTextGrowth() > LARGE_TEXT;
+  const large = useLargeText();
   const narrow = useWindowDimensions().width < 360 || large;
   const todayDate = useToday();
   const entries = useLive('foodEntries');

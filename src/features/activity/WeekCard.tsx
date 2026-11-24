@@ -5,14 +5,13 @@ import { ScrollView, useWindowDimensions, View } from 'react-native';
 import { formatDayLabel, formatDuration, weekdayShort } from '@/lib/dates';
 import { OVERVIEW_ABOUT, type TrainingOverview } from '@/lib/trainingLoad';
 import { formatNumber } from '@/lib/units';
-import { cup, fonts, useTheme } from '@/theme';
+import { cup, fonts, LARGE_TEXT, useTextGrowth, useTheme } from '@/theme';
 import { useProfile } from '@/store/selectors';
 import type { ISODate } from '@/types';
 import { Card, CupKey, IconButton, levelY, MiniCup, PressableScale, Text, Vessel, type VesselLabel } from '@/ui';
 
 import { WHO_WEEKLY_MINUTES, type WeekSummary } from './build';
 import { LoadMark } from './LoadMark';
-import { useTextGrowth } from './textGrowth';
 import { TrainingLoadSheet } from './TrainingLoadSheet';
 
 const VESSEL_H = 168;
@@ -66,7 +65,7 @@ export function WeekCard({
   const status = reached ? 'Weekly activity guideline reached' : `${WHO_WEEKLY_MINUTES - minutes} min to the weekly guideline`;
   // Above 115% text the labels placed at their levels would run into each other (they are 20, 40 and 44 px tall).
   const grow = useTextGrowth();
-  const stacked = grow > 1.15;
+  const stacked = grow > LARGE_TEXT;
   // The week strip: a column per day, at least 22 px per 100% of text above 115%; it scrolls when seven do not fit.
   const colMin = stacked ? 22 * grow : 0;
   const scrollStrip = colMin > (Math.min(screenW, 560) - 40 - 36) / 7;
