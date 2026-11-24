@@ -960,9 +960,19 @@ function headerScan() {
     }
     return false;
   };
-  // With the app's text size raised (a state's `__healthcalTextSize` flag, src/theme/textSize.ts) reading text
-  // grows past 21 px (body is 30 px at 200%), so a title is 21 px scaled the way the app scales it: 36 px at 200%.
-  const ts = window.__healthcalTextSize === true ? 2 : Math.min(2, Math.max(1, Number(window.__healthcalTextSize) || 1));
+  // With the app's text size raised (a state's `__healthcalTextSize` flag, or the size chosen in Profile and kept
+  // under `healthcal.textSize`, src/theme/textSize.ts) reading text grows past 21 px (body is 30 px at 200%, a
+  // section title 33 px), so a title is 21 px scaled the way the app scales it: 36 px at 200%, 28.5 px at 150%.
+  const flag = window.__healthcalTextSize;
+  let asked = flag === true ? 2 : Number(flag) || 0;
+  if (!asked) {
+    try {
+      asked = Number(window.localStorage.getItem('healthcal.textSize')) || 1;
+    } catch {
+      asked = 1;
+    }
+  }
+  const ts = Math.min(2, Math.max(1, asked));
   const titleFrom = 21 + (36 - 21) * (ts - 1);
   for (const el of document.querySelectorAll('body *')) {
     // The coach's hero greeting (`coach-hello`) is the one stated exception: a greeting by name in the

@@ -346,6 +346,24 @@ const cases = [
     expect: 'second title',
   },
   {
+    name: 'at 200% app text, a section title (h3, 33 px) under the header is not a second title',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><script>window.__healthcalTextSize = true</script><div data-testid="screen-header" style="display:flex;gap:12px"><button data-testid="header-back" style="width:44px;height:44px">&lt;</button><div><div style="font-size:33px">Progress</div><div style="font-size:26px">Trends</div></div></div><div style="font-size:33px;line-height:40px">Recent</div></body>',
+    run: 'header',
+    expect: '',
+  },
+  {
+    name: 'at 150% app text, a section title (h3, 25.5 px) under the header is not a second title',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><script>window.__healthcalTextSize = 1.5</script><div data-testid="screen-header" style="display:flex;gap:12px"><button data-testid="header-back" style="width:44px;height:44px">&lt;</button><div><div style="font-size:33px">Progress</div><div style="font-size:26px">Trends</div></div></div><div style="font-size:25.5px;line-height:32px">Show the last</div></body>',
+    run: 'header',
+    expect: '',
+  },
+  {
+    name: 'at 150% app text, a 30 px title under the header is still a second title',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><script>window.__healthcalTextSize = 1.5</script><div data-testid="screen-header" style="display:flex;gap:12px"><button data-testid="header-back" style="width:44px;height:44px">&lt;</button><div><div style="font-size:33px">Progress</div><div style="font-size:26px">Trends</div></div></div><div style="font-size:30px;line-height:36px">Two things to check</div></body>',
+    run: 'header',
+    expect: 'second title',
+  },
+  {
     name: "the coach's right-aligned question bubble is not a card with uneven margins",
     html: '<body style="margin:0;font:15px/20px sans-serif"><div style="padding:0 20px;display:flex;flex-direction:column"><div data-testid="coach-question-2" style="align-self:flex-end;width:80%;height:60px;box-sizing:border-box;background:#fde;padding:10px 14px">How is my training week going, with the long run?</div></div></body>',
     run: 'gaps',
