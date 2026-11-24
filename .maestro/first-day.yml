@@ -119,6 +119,9 @@ name: First day on a phone
       id: meal-add-lunch
     direction: DOWN
     timeout: 20000
+    # On the iPhone's shorter window the slot can sit behind the tab bar, where Maestro
+    # still counts it as visible and its centre lands on the tab bar's + (run 45449549702).
+    centerElement: true
 - tapOn:
     id: meal-add-lunch
 - tapOn:
