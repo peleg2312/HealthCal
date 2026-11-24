@@ -9,6 +9,7 @@ import { MAX_CONTENT_WIDTH, motion, sheetShadow, useReducedMotion, useTheme } fr
 
 import { Button } from './Button';
 import { ease } from './motion';
+import { backClosesSheet, ownBacks } from './sheetHistory';
 import { Text } from './Text';
 import { ToastHost } from './Toast';
 import { ToastScope } from './toastControls';
@@ -53,23 +54,18 @@ let historyPatched = false;
 /** How long after opening a sheet adds its history entry (the router's own wait for a move is 100 ms). */
 const PUSH_AFTER_MS = 120;
 /**
- * Web: the history.back() calls closed sheets made to take their entries off, by when each was made, until its
- * popstate arrives. That popstate is the app's own step, never the person's Back: a sheet opened in the same tap
- * that closed another (a sheet's row that opens a confirmation) must not take it as Back and close at once. A
- * step whose popstate never came is forgotten after `OWN_BACK_MS`.
+ * Web: the history.back() calls closed sheets made to take their entries off, until each one's popstate arrives
+ * (`ownBacks` in ./sheetHistory). That popstate is the app's own step, never the person's Back: a sheet opened in
+ * the same tap that closed another (a sheet's row that opens a confirmation) must not take it as Back and close
+ * at once.
  */
-const ownBacks: number[] = [];
-const OWN_BACK_MS = 1000;
+const appBacks = ownBacks();
 /** The popstate events that were the app's own steps back (marked by the first listener, before any sheet's). */
 const ownPops = new WeakSet<Event>();
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
-function pendingOwnBack(): boolean {
-  while (ownBacks.length && now() - ownBacks[0] > OWN_BACK_MS) ownBacks.shift();
-  return ownBacks.length > 0;
-}
 /** A closed sheet takes its entry off: one history.back(), noted as the app's own. */
 function ownBack() {
-  ownBacks.push(now());
+  appBacks.made(now());
   window.history.back();
 }
 /**
@@ -84,9 +80,7 @@ function patchHistory() {
   historyPatched = true;
   // Added before any sheet's own listener, so it marks the app's own step before a sheet reads it.
   window.addEventListener('popstate', (e) => {
-    if (!pendingOwnBack()) return;
-    ownBacks.shift();
-    ownPops.add(e);
+    if (appBacks.arrived(now())) ownPops.add(e);
   });
   const h = window.history;
   const push = h.pushState.bind(h);
@@ -134,7 +128,7 @@ function useBackCloses(visible: boolean, close: () => void, stillOpen: () => boo
     // Not while another sheet's own step back is still on its way: that step would take this entry off instead.
     let pushed = false;
     let first: ReturnType<typeof setTimeout> = setTimeout(function pushWhenStill() {
-      if (pendingOwnBack()) {
+      if (appBacks.pending(now())) {
         first = setTimeout(pushWhenStill, 30);
         return;
       }
@@ -144,13 +138,9 @@ function useBackCloses(visible: boolean, close: () => void, stillOpen: () => boo
     let popped = false;
     let again: ReturnType<typeof setTimeout> | undefined;
     const onPop = (e: Event) => {
-      // The app's own step back (a sheet closed in the tap that opened this one), or any step before this
-      // sheet has its own entry, is not the person's Back for this sheet.
-      if (ownPops.has(e) || !pushed) return;
-      const at = historyState()?.[SHEET_ENTRY];
-      // Still on this sheet's entry, or on a sheet opened over it.
-      if (typeof at === 'number' && at >= token) return;
-      if (popped) return;
+      // Not the person's Back for this sheet: the app's own step back (a sheet closed in the tap that opened this
+      // one), any step before this sheet has its own entry, and a step that stays on its entry or a later sheet's.
+      if (!backClosesSheet({ own: ownPops.has(e), pushed, closing: popped, at: historyState()?.[SHEET_ENTRY], token })) return;
       popped = true;
       openEntries.delete(token);
       latest.current.close();

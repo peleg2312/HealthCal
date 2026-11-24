@@ -189,8 +189,6 @@ src/features/activity/strengthDraft.ts	restRemainingMs	function
 src/features/activity/strengthDraft.ts	useStrengthDrafts	const
 src/features/activity/strengthFormat.ts	formatLiftWeight	function
 src/features/activity/strengthFormat.ts	formatPreviousSets	function
-src/features/activity/textGrowth.ts	textGrowth	function
-src/features/activity/textGrowth.ts	useTextGrowth	function
 src/features/ai/AddMissingItem.tsx	AddMissingItem	component
 src/features/ai/AiConsentAbout.tsx	AiConsentAbout	component
 src/features/ai/AiConsentSheet.tsx	AI_CONSENT_PARTS	const
@@ -883,6 +881,7 @@ src/features/food/addedTo.ts	foodNameHead	function
 src/features/food/addedTo.ts	mealOnDay	function
 src/features/food/addedTo.ts	quickAddedToast	function
 src/features/food/addedTo.ts	toastFoodName	function
+src/features/food/addedTo.ts	waterAddedShort	function
 src/features/food/addedTo.ts	waterAddedToast	function
 src/features/food/addedTo.ts	withWaterTotal	function
 src/features/food/build.ts	BuildEntryInput	interface
@@ -1061,9 +1060,6 @@ src/features/food/searchTab.ts	rememberSearchTab	function
 src/features/food/searchTab.ts	resetSearchTabForTests	function
 src/features/food/searchTab.ts	useSearchTab	const
 src/features/food/searchTab.ts	usualEmpty	function
-src/features/food/textGrowth.ts	BIG_TEXT_FROM	const
-src/features/food/textGrowth.ts	useBigText	function
-src/features/food/textGrowth.ts	useTextGrowth	function
 src/features/food/usuals.ts	UsualFood	interface
 src/features/food/usuals.ts	UsualOptions	interface
 src/features/food/usuals.ts	atFoodValues	function
@@ -1997,6 +1993,7 @@ src/features/onboarding/components.tsx	ChoiceCard	component
 src/features/onboarding/components.tsx	CupMark	component
 src/features/onboarding/components.tsx	ErrorText	component
 src/features/onboarding/components.tsx	FadeIn	component
+src/features/onboarding/components.tsx	FieldRow	component
 src/features/onboarding/components.tsx	GoalCup	component
 src/features/onboarding/components.tsx	Note	component
 src/features/onboarding/components.tsx	StepProgress	component
@@ -2623,9 +2620,6 @@ src/features/today/plates.ts	PlateItem	interface
 src/features/today/plates.ts	platesFor	function
 src/features/today/recapLine.ts	RecapLineDay	interface
 src/features/today/recapLine.ts	recapLine	function
-src/features/today/textGrowth.ts	LARGE_TEXT	const
-src/features/today/textGrowth.ts	textGrowth	function
-src/features/today/textGrowth.ts	useTextGrowth	function
 src/features/today/useBackToToday.ts	useBackToToday	function
 src/features/today/useDaySwipe.tsx	DaySwipeGuard	component
 src/features/today/useDaySwipe.tsx	useDaySwipe	function
@@ -3249,6 +3243,7 @@ src/theme/contrastMore.ts	readSystemColors	function
 src/theme/contrastMore.ts	strengthen	function
 src/theme/index.tsx	*	re-export-all	src/theme/resolve.ts
 src/theme/index.tsx	*	re-export-all	src/theme/tokens.ts
+src/theme/index.tsx	LARGE_TEXT	re-export	src/theme/textSize.ts:LARGE_TEXT
 src/theme/index.tsx	Legibility	re-export	src/theme/legibility.ts:Legibility
 src/theme/index.tsx	MAX_TEXT_GROWTH	re-export	src/theme/textSize.ts:MAX_TEXT_GROWTH
 src/theme/index.tsx	TEXT_SIZES	re-export	src/theme/textSize.ts:TEXT_SIZES
@@ -3265,10 +3260,13 @@ src/theme/index.tsx	phoneCapFor	re-export	src/theme/textSize.ts:phoneCapFor
 src/theme/index.tsx	scaleTextStyle	re-export	src/theme/textSize.ts:scaleTextStyle
 src/theme/index.tsx	scaledFontSize	re-export	src/theme/textSize.ts:scaledFontSize
 src/theme/index.tsx	setTextSize	re-export	src/theme/textSize.ts:setTextSize
+src/theme/index.tsx	textGrowth	re-export	src/theme/textSize.ts:textGrowth
 src/theme/index.tsx	textSize	re-export	src/theme/textSize.ts:textSize
 src/theme/index.tsx	textSizeLabel	re-export	src/theme/textSize.ts:textSizeLabel
+src/theme/index.tsx	useLargeText	re-export	src/theme/textSize.ts:useLargeText
 src/theme/index.tsx	useLegibility	re-export	src/theme/legibility.ts:useLegibility
 src/theme/index.tsx	useReducedMotion	re-export	src/theme/motion.ts:useReducedMotion
+src/theme/index.tsx	useTextGrowth	re-export	src/theme/textSize.ts:useTextGrowth
 src/theme/index.tsx	useTextSize	re-export	src/theme/textSize.ts:useTextSize
 src/theme/index.tsx	useTheme	function
 src/theme/legibility.ts	Legibility	interface
@@ -3300,6 +3298,7 @@ src/theme/resolve.ts	themeChoiceOf	function
 src/theme/resolve.ts	themeChoicePatch	function
 src/theme/resolve.ts	themeNameFor	function
 src/theme/resolve.ts	themeNameOfChoice	function
+src/theme/textSize.ts	LARGE_TEXT	const
 src/theme/textSize.ts	MAX_TEXT_GROWTH	const
 src/theme/textSize.ts	TEXT_SIZES	const
 src/theme/textSize.ts	TEXT_SIZE_KEY	const
@@ -3310,8 +3309,11 @@ src/theme/textSize.ts	phoneCapFor	function
 src/theme/textSize.ts	scaleTextStyle	function
 src/theme/textSize.ts	scaledFontSize	function
 src/theme/textSize.ts	setTextSize	function
+src/theme/textSize.ts	textGrowth	function
 src/theme/textSize.ts	textSize	function
 src/theme/textSize.ts	textSizeLabel	function
+src/theme/textSize.ts	useLargeText	function
+src/theme/textSize.ts	useTextGrowth	function
 src/theme/textSize.ts	useTextSize	function
 src/theme/tokens.ts	CupCorners	interface
 src/theme/tokens.ts	MAX_CONTENT_WIDTH	const
@@ -3428,7 +3430,9 @@ src/ui/Screen.tsx	SectionTitle	component
 src/ui/Screen.tsx	TAB_BAR_HEIGHT	const
 src/ui/Screen.tsx	TAB_BAR_SPACE	const
 src/ui/Screen.tsx	goBack	function
+src/ui/Screen.tsx	setTabBarExtra	function
 src/ui/Screen.tsx	useLeaveGuard	function
+src/ui/Screen.tsx	useTabBarExtra	function
 src/ui/Sheet.tsx	ConfirmSheet	component
 src/ui/Sheet.tsx	Sheet	component
 src/ui/Sheet.tsx	sheetDragCloses	function
@@ -3537,6 +3541,10 @@ src/ui/motion.tsx	ease	const
 src/ui/motion.tsx	useFadeAfter	function
 src/ui/motion.tsx	usePour	function
 src/ui/motion.tsx	useReachFlash	function
+src/ui/sheetHistory.ts	OWN_BACK_MS	const
+src/ui/sheetHistory.ts	OwnBacks	interface
+src/ui/sheetHistory.ts	backClosesSheet	function
+src/ui/sheetHistory.ts	ownBacks	function
 src/ui/textLang.ts	LangPart	interface
 src/ui/textLang.ts	langParts	function
 src/ui/textLang.ts	scriptLang	function

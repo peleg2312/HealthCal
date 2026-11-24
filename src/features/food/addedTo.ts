@@ -101,6 +101,18 @@ export function waterAddedToast(volume: string, date: ISODate, today: ISODate, r
 }
 
 /**
+ * The water toast in fewer words, for large text (the kit toast's `short`): "250 ml added, 1.48 of 3.3 L", so
+ * at 200% on a 320 px phone it keeps to two lines and finds room clear of the glass it rose from. The spoken
+ * toast is still `waterAddedToast`.
+ */
+export function waterAddedShort(volume: string, date: ISODate, today: ISODate, reaches = false, total?: string): string {
+  const day = date === today ? '' : date === addDays(today, -1) ? ' for yesterday' : ` for ${weekdayShort(date)} ${formatShortDate(date)}`;
+  const line = `${volume} added${day}`;
+  if (total) return `${line}, ${total.replace(/ /g, '\u00A0')}${reaches ? ', goal reached' : ''}`;
+  return `${line}${reaches ? '. Goal reached' : ''}`;
+}
+
+/**
  * The end of every toast that adds water (`waterAddedToast`, and a drink with calories from the Water
  * screen: "Milk, 129 kcal, added to lunch and 250 ml to Water · 1.48 of 3.3 L"): the day's new total
  * against its goal when it is known, ", goal reached" for the glass that reaches it; without a total,

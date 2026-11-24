@@ -7,6 +7,8 @@
  *   -> the next morning: the morning page opens by itself once (greeting, quote, plan), closes onto Today, not again
  *   -> ... -> drinks -> a search for any drink on Water -> drinks logged in the diary count in Water -> an old portion after a reload: the + sheet's tile shows what its tap stores, and so does
  *      "Repeat yesterday's <meal>" (bundled foods at today's values, an own food and an online product as stored)
+ *   -> one tap that closes a sheet and opens another (Friends, its store set directly): the second stays open, the
+ *      browser's Back closes it on the same address, and no sheet leaves a history entry behind
  *   -> Appearance in Profile: Java (kept through a reload), Honey, Butter, Blossom, then back to System
  *
  * The expected numbers are recomputed here from the published formulas, not
@@ -2326,6 +2328,83 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
       check('favourites: a second tap stars it again, the row in its place', (await starLook(p, 'favorite-0-favorite')).pressed === 'true' && (await ftext(p, 'favorite-0')).includes(name) && (await ftext(p, 'search-tab-favorites')) === chipBefore);
       await ctx.close();
     }
+  }
+
+  // ------------------------------------------- one tap closes a sheet and opens another (src/ui/Sheet.tsx, src/ui/sheetHistory.ts)
+  // On the web an open sheet adds a history entry so the browser's Back closes it, and a sheet closed any other way
+  // takes its entry off with one history.back(). When one tap closes sheet A and opens sheet B, that step back is the
+  // app's own: B must stay open, the person's Back then closes B on the same address, and a sheet closed by its scrim
+  // leaves no entry behind (the next Back leaves the screen). Friends has two such pairs (a friend's sheet -> "Remove
+  // Sam?", Friends settings -> "Turn friends off?"); with no backend the friends store is set directly
+  // (window.__healthcalFriends, a test-hook build only), so nothing is sent.
+  {
+    const { buildSeed } = await import(require('url').pathToFileURL(require('path').join(__dirname, 'seed.mjs')).href);
+    const seed = buildSeed({ onboarded: true, theme: 'dark' });
+    const sctx = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, colorScheme: 'dark', reducedMotion: 'reduce' });
+    await sctx.addInitScript((value) => {
+      if (!window.sessionStorage.getItem('__seeded')) {
+        window.localStorage.setItem('healthcal-v1', value);
+        window.sessionStorage.setItem('__seeded', '1');
+      }
+    }, JSON.stringify(seed));
+    const sp = await sctx.newPage();
+    sp.on('pageerror', (e) => errors.push(e.message));
+    sp.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 200)));
+    const stap = async (id) => {
+      await sp.getByTestId(id).first().click({ timeout: 15000 });
+      await sp.waitForTimeout(350);
+    };
+    const shown = async (id) => (await sp.getByTestId(id).count()) > 0;
+    const where = () => sp.evaluate(() => location.pathname + location.search);
+    const d = new Date();
+    const week = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    await sp.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+    await sp.getByTestId('today-friends').first().waitFor({ timeout: 20000 });
+    await stap('today-friends');
+    await sp.getByTestId('friends-screen').first().waitFor({ timeout: 15000 });
+    await sp.waitForTimeout(300);
+    await sp.evaluate(
+      (wk) =>
+        window.__healthcalFriends.setState({
+          status: 'ready',
+          error: null,
+          overview: {
+            me: { code: 'ABCD2345', displayName: 'Alex', avatar: '', sharing: { workouts: true, streak: true, minutes: true }, shareKey: '0'.repeat(32) },
+            friends: [{ userId: 'friend-sam', displayName: 'Sam', avatar: '', since: null, summary: { week: wk, minutes: 95, sessions: 3, streak: 4 }, summaryUpdatedAt: null, cheered: [] }],
+            incoming: [],
+            outgoing: [],
+            cheers: [],
+          },
+        }),
+      week,
+    );
+    const card = await sp.getByTestId('friends-card-friend-sam').first().waitFor({ timeout: 10000 }).then(() => true, () => false);
+    const at = await where();
+    check('sheet pair: Friends shows a friend from the store (no backend)', card && at === '/friends', at);
+    await stap('friends-card-friend-sam');
+    const friendSheet = await shown('friends-remove');
+    await stap('friends-remove');
+    // Past the sheet's own wait before it adds its entry (120 ms) and the closing sheet's step back.
+    await sp.waitForTimeout(500);
+    const removeOpen = (await shown('confirm-yes')) && (await sp.getByText('Remove Sam?').count()) > 0;
+    check('sheet pair: one tap closes the friend sheet and opens "Remove Sam?", which stays open', friendSheet && removeOpen && !(await shown('friends-remove')), `friend sheet ${friendSheet}, question ${removeOpen}`);
+    await sp.goBack();
+    await sp.waitForTimeout(500);
+    check("sheet pair: the browser's Back then closes it, the address unchanged and the screen as it was", !(await shown('confirm-yes')) && (await where()) === at && (await shown('friends-card-friend-sam')), `${await where()}, question ${await shown('confirm-yes')}`);
+    await stap('friends-settings-open');
+    const settingsSheet = await shown('friends-leave');
+    await stap('friends-leave');
+    await sp.waitForTimeout(500);
+    const leaveOpen = (await shown('confirm-yes')) && (await sp.getByText('Turn friends off?').count()) > 0;
+    check('sheet pair: "Turn friends off" closes Friends settings and opens its question, which stays open', settingsSheet && leaveOpen && !(await shown('friends-leave')), `settings ${settingsSheet}, question ${leaveOpen}`);
+    // The scrim, above the sheet.
+    await sp.touchscreen.tap(180, 40);
+    await sp.waitForTimeout(500);
+    check('sheet pair: the scrim closes the question, the address unchanged', !(await shown('confirm-yes')) && (await where()) === at, await where());
+    await sp.goBack();
+    await sp.waitForTimeout(600);
+    check('sheet pair: no sheet left an entry behind: one Back leaves Friends for Today', (await where()) === '/' && (await shown('today-friends')), await where());
+    await sctx.close();
   }
 
   // ------------------------------------------- Appearance: the newer looks (src/theme/resolve.ts)

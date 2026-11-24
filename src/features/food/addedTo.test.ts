@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { BUILTIN_FOODS } from '@/data/foods';
 
-import { TOAST_NAME_MAX, entryUpdatedToast, foodAddedToast, foodNameHead, mealOnDay, quickAddedToast, toastFoodName, waterAddedToast, withWaterTotal } from './addedTo';
+import { TOAST_NAME_MAX, entryUpdatedToast, foodAddedToast, foodNameHead, mealOnDay, quickAddedToast, toastFoodName, waterAddedShort, waterAddedToast, withWaterTotal } from './addedTo';
 import { displayFoodName } from './displayName';
 
 /** A comma between an open bracket and its close: "Israeli salad (tomato, cucumber, ...)". */
@@ -121,6 +121,14 @@ describe('the log toast names what was added first', () => {
     expect(waterAddedToast('250 ml', today, today, false, '1.48 of 3.3 L')).toContain('1.48\u00A0of\u00A03.3\u00A0L');
     expect(plain(waterAddedToast('250 ml', today, today, true, '3.3 of 3.3 L'))).toBe('250 ml added to Water · 3.3 of 3.3 L, goal reached');
     expect(plain(waterAddedToast('8.5 fl oz', '2026-11-15', today, false, '41 of 112 fl oz'))).toBe('8.5 fl oz added to Water for yesterday · 41 of 112 fl oz');
+  });
+  it('a glass in fewer words for large text: the amount, the day when it is not today, the total held on one line', () => {
+    const plain = (s: string) => s.replace(/\u00A0/g, ' ');
+    expect(plain(waterAddedShort('250 ml', today, today, false, '1.48 of 3.3 L'))).toBe('250 ml added, 1.48 of 3.3 L');
+    expect(waterAddedShort('250 ml', today, today, false, '1.48 of 3.3 L')).toContain('1.48\u00A0of\u00A03.3\u00A0L');
+    expect(plain(waterAddedShort('250 ml', today, today, true, '3.3 of 3.3 L'))).toBe('250 ml added, 3.3 of 3.3 L, goal reached');
+    expect(waterAddedShort('8.5 fl oz', '2026-11-15', today)).toBe('8.5 fl oz added for yesterday');
+    expect(waterAddedShort('250 ml', today, today, true)).toBe('250 ml added. Goal reached');
   });
   it('one ending for every toast that adds water: the total when it is known, the goal when it is reached', () => {
     const plain = (s: string) => s.replace(/\u00A0/g, ' ');

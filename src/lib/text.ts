@@ -33,6 +33,9 @@ export function keepTogether(text: string): string {
       // A range: "59-79 kg", "129–174 lb"; and a number joined to its unit by a hyphen: "150-minute".
       .replace(/(\d)([-–])(?=\d)/g, `$1${WJ}$2${WJ}`)
       .replace(/(\d)-(?=[A-Za-z])/g, `$1${WJ}-${WJ}`)
+      // A year is not a quantity: "the 2024 Compendium" may break after the year, so a long name after it is never
+      // split inside a word when text is large (the two together are wider than a 320 px line at 200%).
+      .replace(/(^|[^\d,.])((?:19|20)\d\d)\u00A0(?=[A-Z][a-z]{3,})/g, '$1$2 ')
   );
 }
 

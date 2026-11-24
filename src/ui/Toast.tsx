@@ -5,7 +5,7 @@ import { create } from 'zustand';
 
 import { withoutMarks } from '@/lib/bidi';
 import { spokenUnits } from '@/lib/spokenUnits';
-import { cup, isReducedMotion, MAX_CONTENT_WIDTH, motion, useTheme, type ThemeColors } from '@/theme';
+import { cup, isReducedMotion, MAX_CONTENT_WIDTH, motion, useLargeText, useTheme, type ThemeColors } from '@/theme';
 
 import { type ControlBox, TOAST_CLEAR, TOAST_GAP, toastBottom, toastBottomAmong, toastReachTop, toastSpot, type WindowBox } from './keyboardInset';
 import { PressableScale } from './Pressable';
@@ -23,6 +23,12 @@ export interface ToastOptions {
    * colour value (`colors.water`). Defaults to the primary.
    */
   tint?: keyof ThemeColors | (string & {});
+  /**
+   * The same news in fewer words, drawn instead of `message` while text is large (`useLargeText`), where a
+   * toast of four lines finds no clear band beside the control it rose from (Today's glass at 320 x 640). The
+   * spoken label is still the whole `message`.
+   */
+  short?: string;
 }
 
 interface Dock {
@@ -40,6 +46,7 @@ interface ToastState {
   actionLabel?: string;
   onAction?: () => void;
   tint?: string;
+  short?: string;
   /** Open sheets that carry their own host, newest last. The newest one shows the toast. */
   sheetHosts: number[];
   /**
@@ -58,8 +65,8 @@ const useToast = create<ToastState>((set, get) => ({
   sheetHosts: [],
   docks: [],
   show: (message, options) =>
-    set({ id: get().id + 1, message, actionLabel: options?.label && options.onPress ? options.label : undefined, onAction: options?.label ? options.onPress : undefined, tint: options?.tint }),
-  hide: () => set({ message: null, actionLabel: undefined, onAction: undefined, tint: undefined }),
+    set({ id: get().id + 1, message, actionLabel: options?.label && options.onPress ? options.label : undefined, onAction: options?.label ? options.onPress : undefined, tint: options?.tint, short: options?.short }),
+  hide: () => set({ message: null, actionLabel: undefined, onAction: undefined, tint: undefined, short: undefined }),
 }));
 
 /**
@@ -241,7 +248,11 @@ const monotonicNow = () => (typeof performance !== 'undefined' && typeof perform
 export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sheet' }) {
   const { colors, radius } = useTheme();
   const insets = useSafeAreaInsets();
-  const { id, message, actionLabel, onAction, tint, hide } = useToast();
+  const { id, message, actionLabel, onAction, tint, short, hide } = useToast();
+  // Large text: the short words when the caller gave them, and the toast closer to the window's sides.
+  const large = useLargeText();
+  const drawn = large && short ? short : message;
+  const side = large ? 12 : 20;
   const sheetHosts = useToast((s) => s.sheetHosts);
   const inSheet = placement === 'sheet';
   const docks = useToast((s) => s.docks);
@@ -373,7 +384,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
   // only once that place is known, so it never shows for a frame over a button. A browser asks the page for
   // its controls; a phone measures the kit controls of the focused screen (./toastControls,
   // `toastBottomAmong`). A phone's sheet keeps its toast just above the sheet's top edge.
-  const placeKey = `${key}:${inSheet ? 'sheet' : (scopeId ?? '')}:${winH}:${message}`;
+  const placeKey = `${key}:${inSheet ? 'sheet' : (scopeId ?? '')}:${winH}:${drawn}`;
   const [spot, setSpot] = useState<{ key: string; bottom: number | null } | null>(null);
   const placing = shownNow && !keyboardUp && (Platform.OS === 'web' || !inSheet);
   useEffect(() => {
@@ -466,9 +477,9 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       style={[
         inSheet
           ? spotNow?.bottom != null
-            ? { position: 'absolute', left: 0, right: 0, bottom: spotNow.bottom, alignItems: 'center', paddingHorizontal: 20 }
-            : { alignSelf: 'stretch', alignItems: 'center', paddingHorizontal: 20, marginBottom: 12 }
-          : { position: 'absolute', left: 0, right: 0, bottom, alignItems: 'center', paddingHorizontal: 20 },
+            ? { position: 'absolute', left: 0, right: 0, bottom: spotNow.bottom, alignItems: 'center', paddingHorizontal: side }
+            : { alignSelf: 'stretch', alignItems: 'center', paddingHorizontal: side, marginBottom: 12 }
+          : { position: 'absolute', left: 0, right: 0, bottom, alignItems: 'center', paddingHorizontal: side },
         hidden ? { opacity: 0 } : null,
       ]}>
       {/* Only the action takes a touch: a tap on the toast's ink body goes through to what is under it (Today's
@@ -480,7 +491,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
         accessibilityLiveRegion="polite"
         onLayout={(e) => setToastH(Math.round(e.nativeEvent.layout.height))}
         style={{
-          maxWidth: MAX_CONTENT_WIDTH - 40,
+          maxWidth: MAX_CONTENT_WIDTH - 2 * side,
           flexDirection: 'row',
           alignItems: 'center',
           gap: 16,
@@ -501,7 +512,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
         />
         <View pointerEvents="none" style={{ flexShrink: 1 }}>
           <Text variant="label" color={colors.bg} accessibilityLabel={spokenUnits(withoutMarks(message))}>
-            {message}
+            {drawn}
           </Text>
         </View>
         {actionLabel ? (

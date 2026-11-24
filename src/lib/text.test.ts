@@ -33,3 +33,16 @@ describe('keepTogether', () => {
     expect(keepUnitWithNumber(' to add')).toBe(' to add');
   });
 });
+
+describe('a year is not a quantity', () => {
+  it('lets a long name after a year start the next line', () => {
+    expect(keepTogether('from the 2024 Compendium for easy effort')).toBe('from the 2024 Compendium for easy effort');
+    expect(keepTogether('2024 Adult Compendium')).toBe('2024 Adult Compendium');
+  });
+  it('still holds a number with its unit or a short word', () => {
+    expect(keepTogether('2024 kcal')).toBe(`2024${NBSP}kcal`);
+    expect(keepTogether('12 May 1994')).toBe(`12${NBSP}May 1994`);
+    expect(keepTogether('3 L')).toBe(`3${NBSP}L`);
+    expect(keepTogether('1,500 Calories')).toBe(`1,500${NBSP}Calories`);
+  });
+});

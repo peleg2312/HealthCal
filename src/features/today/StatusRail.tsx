@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { waterAddedToast } from '@/features/food/addedTo';
+import { waterAddedShort, waterAddedToast } from '@/features/food/addedTo';
 import { useOneTap } from '@/features/food/oneTap';
 import { startOfWeek, today } from '@/lib/dates';
 import { guidelineMinutes } from '@/lib/exercise';
@@ -66,6 +66,7 @@ export function addWater(date: ISODate, ml: number, units: 'metric' | 'imperial'
     toast(waterAddedToast(formatVolume(ml, units), date, today(), reaches, total), {
       label: 'Undo',
       tint: 'water',
+      short: waterAddedShort(formatVolume(ml, units), date, today(), reaches, total),
       onPress: () => useStore.getState().remove('water', entry.id),
     });
   if (reaches && !isReducedMotion()) setTimeout(show, REACHED_TOAST_WAIT);
