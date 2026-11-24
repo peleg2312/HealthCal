@@ -8,6 +8,7 @@ import { searchAiTile } from '@/features/ai/words';
 import { AmountEditor } from '@/features/food/AmountEditor';
 import { foodNameHead } from '@/features/food/addedTo';
 import { FoodRow, MealPicker } from '@/features/food/components';
+import { useBigText } from '@/features/food/textGrowth';
 import { displayFoodName } from '@/features/food/displayName';
 import { setFoodDraft } from '@/features/food/draft';
 import { amountLabel, href, kcal, lastPortions, matchServing, parseDate, parseMeal, portionFor, portionKcal, portionLabel, sourceInfo, stepAmount } from '@/features/food/helpers';
@@ -32,6 +33,7 @@ import { useDay, useLive } from '@/store/selectors';
 import { cup, motion, useTheme } from '@/theme';
 import type { Food, FoodEntry, MealType, SavedMeal } from '@/types';
 import { AnimatedNumber, Button, Chip, ChipRow, Divider, EmptyState, Header, IconButton, PressableScale, Screen, Sheet, Text, TextField } from '@/ui';
+import { spokenUnits } from '@/lib/spokenUnits';
 
 type Tab = SearchTab;
 type Online = { query: string; status: 'idle' | 'loading' | 'done'; items: Food[] };
@@ -40,6 +42,7 @@ export default function FoodSearchScreen() {
   const { colors, radius, spacing } = useTheme();
   // A 320 px phone cannot fit the long hint; it keeps the words that matter.
   const narrow = useWindowDimensions().width < 360;
+  const big = useBigText();
   const params = useLocalSearchParams<{ meal?: string; date?: string }>();
   const todayDate = useToday();
   const date = parseDate(params.date, todayDate);
@@ -212,8 +215,9 @@ export default function FoodSearchScreen() {
 
   // One compact row of four (a short word under each icon, the full name for a screen reader), so the list starts higher.
   const aiTile = searchAiTile(q);
+  // With large text, two tiles a line, so no word is split inside a quarter of the screen.
   const escapes = (
-    <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+    <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', gap: spacing.sm }}>
       <ActionTile testID="search-scan" icon={<ScanBarcode size={18} color={colors.text} strokeWidth={1.9} />} label="Barcode" a11y="Scan barcode" onPress={() => go('/food/scan')} />
       {/* "Estimate" under the AI's estimate cup with nothing typed (Photo and Describe are both behind it); "Describe" once words are typed, carrying them. */}
       <ActionTile testID="search-photo" icon={<AiGlyph name={aiTile.glyph} size={18} color={colors.text} />} label={aiTile.label} a11y={aiTile.a11y} onPress={() => go('/food/photo', aiTile.params)} />
@@ -239,7 +243,7 @@ export default function FoodSearchScreen() {
       <TextField
         ref={inputRef}
         testID="food-search-input"
-        placeholder={narrow ? 'Search foods and brands' : 'Search foods, brands, your foods'}
+        placeholder={big ? 'Search foods' : narrow ? 'Search foods and brands' : 'Search foods, brands, your foods'}
         value={query}
         onChangeText={setQuery}
         autoFocus
@@ -272,7 +276,7 @@ export default function FoodSearchScreen() {
         name={foodNameHead(displayFoodName(top))}
         kcalValue={topAdded ? topAdded.nutrients.kcal : portionKcal(top, topPortion)}
         added={!!topAdded}
-        spoken={`Add ${displayFoodName(top)}, ${portionLabel(topPortion.serving.label, topPortion.quantity)}, ${kcal(portionKcal(top, topPortion))} kilocalories, ${sourceInfo(top.source).label}, to ${MEAL_LABEL[meal].toLowerCase()}`}
+        spoken={spokenUnits(`Add ${displayFoodName(top)}, ${portionLabel(topPortion.serving.label, topPortion.quantity)}, ${kcal(portionKcal(top, topPortion))} kilocalories, ${sourceInfo(top.source).label}, to ${MEAL_LABEL[meal].toLowerCase()}`)}
         onPress={oneTap(() => quickAdd(top))}
       />
     ) : null;
@@ -380,7 +384,7 @@ export default function FoodSearchScreen() {
                     style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 48, paddingLeft: 14, paddingRight: 4, ...cup(radius.tile, 5), backgroundColor: colors.surfaceAlt }}>
                     <Pointer size={17} color={colors.text} strokeWidth={1.9} />
                     <Text variant="label" style={{ flex: 1, minWidth: 0 }} testID="search-fav-hint-text">
-                      {narrow ? HOLD_HINT.short : HOLD_HINT.text}
+                      {narrow || big ? HOLD_HINT.short : HOLD_HINT.text}
                     </Text>
                     <PressableScale
                       testID="search-fav-hint-close"
@@ -479,7 +483,7 @@ export default function FoodSearchScreen() {
                 testID="search-no-local-ai"
                 variant="secondary"
                 size="md"
-                title={narrow ? 'Get an AI estimate' : 'Describe it for an AI estimate'}
+                title={narrow || big ? 'Get an AI estimate' : 'Describe it for an AI estimate'}
                 accessibilityLabel={aiTile.a11y}
                 icon={<AiGlyph name="describe" size={20} color={colors.text} />}
                 onPress={() => go('/food/photo', aiTile.params)}
@@ -588,6 +592,7 @@ function Hint({ title, message }: { title: string; message: string; icon?: React
 /** A compact action tile: the icon over one short word, 52 px tall; `a11y` is its full name ("Scan barcode"). */
 function ActionTile({ icon, label, a11y, onPress, testID }: { icon: React.ReactNode; label: string; a11y: string; onPress: () => void; testID: string }) {
   const { colors, radius } = useTheme();
+  const big = useBigText();
   return (
     <PressableScale
       testID={testID}
@@ -596,7 +601,8 @@ function ActionTile({ icon, label, a11y, onPress, testID }: { icon: React.ReactN
       accessibilityRole="button"
       accessibilityLabel={a11y}
       style={{
-        flex: 1,
+        // Two a line with large text (the row wraps), four otherwise.
+        ...(big ? { flexBasis: '45%', flexGrow: 1 } : { flex: 1 }),
         minHeight: 52,
         ...cup(radius.tile, 5),
         backgroundColor: colors.surface,

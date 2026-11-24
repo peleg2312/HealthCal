@@ -18,6 +18,7 @@ import { StepsLine } from '@/features/health-sync/ui/StepsLine';
 import { SyncedFromLine } from '@/features/health-sync/ui/SyncedFromLine';
 import { isolateRtl } from '@/lib/bidi';
 import { addDays, formatDuration, formatShortDate, startOfWeek, weekdayShort } from '@/lib/dates';
+import { useTextGrowth } from '@/features/activity/textGrowth';
 import { trainingOverview } from '@/lib/trainingLoad';
 import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
@@ -28,6 +29,7 @@ import { Button, Card, Chip, ConfirmSheet, EmptyState, RestoreRow, Screen, Secti
 
 export default function TrainScreen() {
   const { colors, spacing } = useTheme();
+  const grow = useTextGrowth();
   const profile = useProfile();
   const activities = useLive('activities');
   const recentIds = useStore((s) => s.recentActivityIds);
@@ -92,7 +94,7 @@ export default function TrainScreen() {
         current={weekStart === startOfWeek(t)}
       />
 
-      {/* Side by side when both labels fit (150 px each); stacked on a narrow phone rather than cut. Both are
+      {/* Side by side when both labels fit (150 px each, more as text grows); stacked on a narrow phone or at large text rather than cut. Both are
           secondary, Log activity with the exercise colour on its edge: the tab bar's + is the screen's one
           filled primary button. */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
@@ -103,7 +105,7 @@ export default function TrainScreen() {
           tint={colors.exercise}
           icon={<Plus size={18} color={colors.text} strokeWidth={2.2} />}
           onPress={() => router.push('/activity/pick')}
-          style={{ flexGrow: 1, flexBasis: 150 }}
+          style={{ flexGrow: 1, flexBasis: 150 * grow }}
         />
         <Button
           testID="train-start-workout"
@@ -111,7 +113,7 @@ export default function TrainScreen() {
           variant="secondary"
           icon={draftActive ? <Timer size={18} color={colors.exercise} /> : <Dumbbell size={18} color={colors.text} />}
           onPress={() => router.push('/activity/strength')}
-          style={{ flexGrow: 1, flexBasis: 150 }}
+          style={{ flexGrow: 1, flexBasis: 150 * grow }}
         />
       </View>
       {draftActive ? (

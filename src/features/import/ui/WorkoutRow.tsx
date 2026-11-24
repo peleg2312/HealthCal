@@ -3,6 +3,7 @@ import React from 'react';
 import { View } from 'react-native';
 
 import { ACTIVITY_BY_ID } from '@/data/activities';
+import { spokenUnits } from '@/lib/spokenUnits';
 import { fonts, useTheme } from '@/theme';
 import type { ISODate, UnitSystem } from '@/types';
 import { Badge, CupKey, PressableScale, Text } from '@/ui';
@@ -69,7 +70,7 @@ export function WorkoutRow({
         feedback="select"
         accessibilityRole="checkbox"
         accessibilityState={{ checked: row.selected, disabled: !tickable }}
-        accessibilityLabel={`${title}, ${meta}`}
+        accessibilityLabel={spokenUnits(`${title}, ${meta}`)}
         accessibilityHint={tickable ? undefined : imported ? 'Already in HealthCal' : row.activityId ? 'Cannot be imported' : 'Choose an activity first'}
         style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: -10 }}>
         <TickBox checked={row.selected} locked={!tickable} imported={imported} />

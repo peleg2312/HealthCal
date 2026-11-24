@@ -74,9 +74,11 @@ export function activeLook(theme: unknown, look: unknown): ThemeLook | null {
  * people who had never asked for a dark app).
  *
  * `lead` is true until someone has finished setting up: they have not picked a
- * look yet, so on a light or unknown phone they see the app's own lead look,
- * Blossom, the one on the icon and in the store. The last setup question then
- * stores an explicit choice, and Profile > Appearance changes it at any time.
+ * look yet, so on a light or unknown phone the welcome screens show the app's
+ * own lead look, Blossom, the one on the icon and in the store. Set-up asks no
+ * question about the look and is drawn without the lead, as the app will be
+ * drawn once it ends: following the phone ("Match my phone"), unless a backup
+ * or a sign-in brought a choice. Profile > Appearance changes it at any time.
  *
  * `look` is `Settings.look`: a newer look, drawn while `preference` equals its fallback
  * (`activeLook`). A preference this version does not know is read as "Match my phone", so a

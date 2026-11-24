@@ -8,6 +8,7 @@ import { basisFromEntry, formatPace, localiseSpeedText, paceModeFor, sessionPrev
 import { DateStepper } from '@/features/activity/components';
 import { BURN_UNIT, budgetAdds, burnCaption, burnSource } from '@/features/activity/logWords';
 import { SpreadHint } from '@/features/activity/SpreadHint';
+import { useTextGrowth } from '@/features/activity/textGrowth';
 import { syncedFrom } from '@/features/health-sync/origins';
 import { HeartRateLine } from '@/features/health-sync/ui/HeartRateLine';
 import { deleteActivity, leaveFlow, saveActivity } from '@/features/activity/session';
@@ -100,7 +101,9 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
   const hints = INTENSITIES.map((i) => localiseSpeedText(activity.intensityHint?.[i] ?? INTENSITY_LABELS[i].hint, units));
   const tileInner = (Math.min(width, 560) - 40 - 2 * spacing.sm) / 3 - 2 * spacing.md - 4;
   const longestWord = Math.max(...hints.flatMap((h) => h.split(/[\s-]+/)).map((w) => w.length), ...INTENSITIES.map((i) => INTENSITY_LABELS[i].title.length));
-  const tight = width < 360 || longestWord * 7 > tileInner;
+  // The app's text size counts too: at 200% a hint's word is twice as wide.
+  const grow = useTextGrowth();
+  const tight = width < 360 || longestWord * 7 * grow > tileInner;
 
   const unit = distanceUnit(units);
   const mode = paceModeFor(activity);
@@ -298,7 +301,8 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
             <Plus size={20} color={colors.text} />
           </IconButton>
         </View>
-        <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+        {/* One row of five; above 115% text three and two to a row, so no chip is cut or left alone. */}
+        <View style={{ flexDirection: 'row', flexWrap: grow > 1.15 ? 'wrap' : 'nowrap', gap: spacing.xs }}>
           {PRESETS.map((p) => (
             <Chip
               key={p}
@@ -306,7 +310,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
               selected={minutes === p}
               onPress={() => setDuration(p)}
               testID={`duration-${p}`}
-              style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 4 }}
+              style={[grow > 1.15 ? { flexGrow: 1, flexBasis: '30%' } : { flex: 1 }, { justifyContent: 'center', paddingHorizontal: 4 }]}
             />
           ))}
         </View>
@@ -353,7 +357,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
                       <>
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <Text variant="bodyStrong">{INTENSITY_LABELS[i].title}</Text>
-                          <Text variant="caption" color="textSecondary" numberOfLines={2}>
+                          <Text variant="caption" color="textSecondary" numberOfLines={grow > 1.15 ? undefined : 2}>
                             {hint}
                           </Text>
                         </View>

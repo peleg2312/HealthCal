@@ -1,9 +1,10 @@
 import React from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { ScrollView, useWindowDimensions, View } from 'react-native';
 
 import { weekdayShort } from '@/lib/dates';
 import { formatNumber } from '@/lib/units';
-import { fonts, motion, useTheme, withOpacity } from '@/theme';
+import { fonts, motion, useTextSize, useTheme, withOpacity } from '@/theme';
+import { scaledFontSize } from '@/theme/textSize';
 import { AnimatedNumber, CupKey, Text, Vessel } from '@/ui';
 
 import type { WeekCell, WeekCells } from './weekCells';
@@ -29,6 +30,22 @@ const LABEL_H = 18;
 const MARK_SLOT = 12;
 
 /**
+ * With the app's text size raised the labels grow (`r`, how much a 13 px label grows): the slot under the
+ * cups grows with them, the columns widen to hold "Yesterday" and "Today" whole, each small column to hold
+ * its letter, and when the row is then wider than the card it scrolls sideways, opened at its end
+ * (yesterday and today), the card's edge cutting the first cups so the scroll shows. At 100% nothing changes.
+ */
+export function weekCupColumns(r: number, s: { bigCol: number; todayCol: number }, bigCol: number) {
+  if (r <= 1) return { labelH: LABEL_H, bigCol, todayCol: s.todayCol, smallMin: 0 };
+  return {
+    labelH: Math.ceil(LABEL_H * r),
+    bigCol: Math.max(bigCol, Math.ceil(68 * r)),
+    todayCol: Math.max(s.todayCol, Math.ceil(46 * r)),
+    smallMin: Math.ceil(18 * r),
+  };
+}
+
+/**
  * The week in cups, the picture at the top of the morning page: a small cup for each drawn day
  * before yesterday (up to six, never before setup), yesterday as the large cup with its number over
  * it, and today at the end, poured with what is logged so far. Every cup is calories against that
@@ -43,11 +60,15 @@ const MARK_SLOT = 12;
 export function WeekCups({ cells, testID }: { cells: WeekCells; testID?: string }) {
   const { colors, spacing, chartFill } = useTheme();
   const narrow = useWindowDimensions().width < 360;
+  const textSize = useTextSize();
+  const scroller = React.useRef<ScrollView>(null);
   const s = narrow ? SIZES.narrow : SIZES.wide;
   const { before, yesterday: y, today: t, anyWorkout } = cells;
   if (!y) return null;
   const n = before.length;
-  const bigCol = n === 0 ? s.bigColAlone : s.bigCol;
+  const r = textSize > 1 ? scaledFontSize(13, textSize) / 13 : 1;
+  const cols = weekCupColumns(r, s, n === 0 ? s.bigColAlone : s.bigCol);
+  const bigCol = cols.bigCol;
   const fill = (c: WeekCell) => (c.partial ? withOpacity(colors.calories, chartFill) : colors.calories);
   const mark = (c: WeekCell) => (anyWorkout ? <View style={{ height: MARK_SLOT, justifyContent: 'flex-end' }}>{c.workout ? <CupKey color={colors.exercise} size={8} /> : null}</View> : null);
 
@@ -84,9 +105,8 @@ export function WeekCups({ cells, testID }: { cells: WeekCells; testID?: string 
   // A size down at six characters ("11,480", "~2,062").
   const numVariant = shown(Math.round(y.kcal)).length >= 6 ? 'numM' : 'numL';
 
-  return (
-    <View testID={testID}>
-      <View accessible accessibilityLabel={weekLabel(cells)}>
+  const week = (
+      <View accessible accessibilityLabel={weekLabel(cells)} style={r > 1 ? { flexGrow: 1 } : undefined}>
         {/* Yesterday's number, centred over the large cup; a wider one reaches left over the small cups. */}
         <View style={{ flexDirection: 'row', justifyContent: n === 0 ? 'center' : 'flex-end', marginBottom: spacing.sm }}>
           <View style={{ minWidth: bigCol, alignItems: 'center' }}>
@@ -102,15 +122,15 @@ export function WeekCups({ cells, testID }: { cells: WeekCells; testID?: string 
               </Text>
             )}
           </View>
-          <View style={{ width: s.todayCol }} />
+          <View style={{ width: cols.todayCol }} />
         </View>
 
         {/* The cups: every one stands on the same line; the slots under them are the same height. */}
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: n === 0 ? 'center' : 'flex-start' }}>
           {before.map((c, i) => (
-            <View key={c.date} testID={`morning-week-day-${c.date}`} style={{ flex: 1, minWidth: 0, alignItems: 'center' }}>
+            <View key={c.date} testID={`morning-week-day-${c.date}`} style={{ flex: 1, minWidth: cols.smallMin, alignItems: 'center' }}>
               {smallCup(c, i)}
-              <Text variant="label" color="textSecondary" numberOfLines={1} style={{ height: LABEL_H, marginTop: spacing.xs }}>
+              <Text variant="label" color="textSecondary" numberOfLines={1} style={{ height: cols.labelH, marginTop: spacing.xs }}>
                 {weekdayShort(c.date).charAt(0)}
               </Text>
               {mark(c)}
@@ -119,21 +139,37 @@ export function WeekCups({ cells, testID }: { cells: WeekCells; testID?: string 
 
           <View testID="morning-week-yesterday" style={{ width: bigCol, alignItems: 'center' }}>
             {cup(y, s.bigW, s.bigH, n, 3)}
-            <Text variant="caption" color="text" numberOfLines={1} style={{ height: LABEL_H, marginTop: spacing.xs, fontFamily: fonts.bold }}>
+            <Text variant="caption" color="text" numberOfLines={1} style={{ height: cols.labelH, marginTop: spacing.xs, fontFamily: fonts.bold }}>
               Yesterday
             </Text>
             {mark(y)}
           </View>
 
-          <View testID="morning-week-today" style={{ width: s.todayCol, alignItems: 'center' }}>
+          <View testID="morning-week-today" style={{ width: cols.todayCol, alignItems: 'center' }}>
             {cup(t, s.todayW, s.todayH, n + 1, 2.5)}
-            <Text variant="label" color="textSecondary" numberOfLines={1} style={{ height: LABEL_H, marginTop: spacing.xs }}>
+            <Text variant="label" color="textSecondary" numberOfLines={1} style={{ height: cols.labelH, marginTop: spacing.xs }}>
               Today
             </Text>
             {mark(t)}
           </View>
         </View>
       </View>
+  );
+
+  return (
+    <View testID={testID}>
+      {r > 1 ? (
+        <ScrollView
+          ref={scroller}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ flexGrow: 1 }}
+          onContentSizeChange={() => scroller.current?.scrollToEnd({ animated: false })}>
+          {week}
+        </ScrollView>
+      ) : (
+        week
+      )}
 
       {anyWorkout ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs }}>

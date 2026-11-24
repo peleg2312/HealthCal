@@ -12,6 +12,7 @@ import { Card, CupKey, IconButton, levelY, MiniCup, PressableScale, Text, Vessel
 
 import { WHO_WEEKLY_MINUTES, type WeekSummary } from './build';
 import { LoadMark } from './LoadMark';
+import { useTextGrowth } from './textGrowth';
 import { TrainingLoadSheet } from './TrainingLoadSheet';
 
 const VESSEL_H = 168;
@@ -62,6 +63,9 @@ export function WeekCard({
   const addedWord = notAdding ? 'Not added' : 'Added';
   const addedSpoken = `This week's workouts: about ${formatNumber(week.kcalNet)} kilocalories ${notAdding ? 'not added to your budget' : 'added to your budget'}, an estimate`;
 
+  const status = reached ? 'Weekly activity guideline reached' : `${WHO_WEEKLY_MINUTES - minutes} min to the weekly guideline`;
+  // Above 115% text the labels placed at their levels would run into each other (they are 20, 40 and 44 px tall).
+  const stacked = useTextGrowth() > 1.15;
   const labels: VesselLabel[] = [
     {
       key: 'guide',
@@ -96,7 +100,7 @@ export function WeekCard({
       height: 44,
       content: (
         <Text variant="label" color="textSecondary" numberOfLines={2}>
-          {reached ? 'Weekly activity guideline reached' : `${WHO_WEEKLY_MINUTES - minutes} min to the weekly guideline`}
+          {status}
         </Text>
       ),
     },
@@ -106,23 +110,58 @@ export function WeekCard({
 
   return (
     <Card testID="train-week-card" padding={18}>
-      <View>
-        <Vessel
-          value={minutes}
-          max={max}
-          color={colors.exercise}
-          width={vesselW}
-          height={VESSEL_H}
-          labels={[...labels].sort((x, y) => y.at - x.at)}
-          labelGap={narrow ? 14 : 16}
-          accessibilityLabel={`${minutes} active minutes this week, of the ${WHO_WEEKLY_MINUTES} minutes a week guideline`}
-        />
-        {/* The guideline as a dashed level line across the open vessel. */}
-        <View
-          pointerEvents="none"
-          style={{ position: 'absolute', left: -4, width: vesselW + 8, top: guideY - 1, height: 0, borderTopWidth: 2, borderStyle: 'dashed', borderColor: colors.borderStrong }}
-        />
-      </View>
+      {stacked ? (
+        // Large text: the labels no longer fit at their levels, so they stand in a column beside the cup, in
+        // the order they are read, and wrap; the dashed line in the cup still marks the guideline.
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: narrow ? 14 : 16 }}>
+          <View>
+            <Vessel
+              value={minutes}
+              max={max}
+              color={colors.exercise}
+              width={vesselW}
+              height={VESSEL_H}
+              accessibilityLabel={`${minutes} active minutes this week, of the ${WHO_WEEKLY_MINUTES} minutes a week guideline`}
+            />
+            <View
+              pointerEvents="none"
+              style={{ position: 'absolute', left: -4, width: vesselW + 8, top: guideY - 1, height: 0, borderTopWidth: 2, borderStyle: 'dashed', borderColor: colors.borderStrong }}
+            />
+          </View>
+          <View style={{ flex: 1, minWidth: 0, gap: spacing.sm }}>
+            <Text variant="numXL" testID="train-guideline-minutes" style={{ fontSize: 40, lineHeight: 42, letterSpacing: -1.2 }}>
+              {formatNumber(minutes)}
+              <Text variant="unit" style={{ fontSize: 14 }}>
+                {' active min'}
+              </Text>
+            </Text>
+            <Text variant="label" color="textSecondary">
+              {status}
+            </Text>
+            <Text variant="caption" color="textSecondary">
+              {`Dashed line: ${WHO_WEEKLY_MINUTES} min guideline`}
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <View>
+          <Vessel
+            value={minutes}
+            max={max}
+            color={colors.exercise}
+            width={vesselW}
+            height={VESSEL_H}
+            labels={[...labels].sort((x, y) => y.at - x.at)}
+            labelGap={narrow ? 14 : 16}
+            accessibilityLabel={`${minutes} active minutes this week, of the ${WHO_WEEKLY_MINUTES} minutes a week guideline`}
+          />
+          {/* The guideline as a dashed level line across the open vessel. */}
+          <View
+            pointerEvents="none"
+            style={{ position: 'absolute', left: -4, width: vesselW + 8, top: guideY - 1, height: 0, borderTopWidth: 2, borderStyle: 'dashed', borderColor: colors.borderStrong }}
+          />
+        </View>
+      )}
 
       {/* Three totals in a row; on a phone too narrow for that the third wraps under the first two, so nothing is cut. */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: spacing.sm, marginTop: spacing.lg }}>
@@ -152,7 +191,7 @@ export function WeekCard({
               <View
                 style={{
                   minWidth: 32,
-                  height: 22,
+                  minHeight: 22,
                   paddingHorizontal: 2,
                   ...cup(9, 4),
                   alignItems: 'center',

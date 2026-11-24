@@ -15,6 +15,7 @@ import { favoriteRecordId, useStore } from '@/store';
 import { cup, fonts, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType, WaterEntry } from '@/types';
 import { AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, Hatch, IconButton, ListRow, PressableScale, ProgressBar, RestoreRow, Sheet, Text, Trough } from '@/ui';
+import { spokenUnits } from '@/lib/spokenUnits';
 
 import { clearEntries, copyEntries } from './actions';
 import { foodNameHead } from './addedTo';
@@ -178,7 +179,7 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
         onAccessibilityAction={food ? (e) => e.nativeEvent.actionName === FAVOURITE_ACTION.name && toggleFoodFavorite(food) : undefined}
         // The whole row is one button whose name says what the row shows, its source in words included
         // ("Almonds, 1 oz · 28 g, 162 kilocalories, Reference data. Edit"): text inside a named button is not read.
-        accessibilityLabel={`${name}, ${withoutMarks(portion)}, ${ai ? 'about ' : ''}${Math.round(entry.nutrients.kcal)} kilocalories${inWater ? ', also counted in Water' : ''}, ${source.label}. Edit`}
+        accessibilityLabel={spokenUnits(`${name}, ${withoutMarks(portion)}, ${ai ? 'about ' : ''}${Math.round(entry.nutrients.kcal)} kilocalories${inWater ? ', also counted in Water' : ''}, ${source.label}. Edit`)}
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: 11 }}>
         <RowEmoji emoji={entry.emoji} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>

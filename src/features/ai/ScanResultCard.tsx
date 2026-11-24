@@ -11,6 +11,7 @@ import { useDay, useLive } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
 import type { Food, ISODate, MealType, Serving } from '@/types';
 import { Button, CupKey, Chip, ChipRow, IconButton, Stepper, Text } from '@/ui';
+import { spokenUnits } from '@/lib/spokenUnits';
 
 export type ScanFoundFrom = 'custom' | 'recent' | 'diary' | 'openfoodfacts';
 
@@ -121,7 +122,7 @@ export function ScanResultCard({
             key={`${s.label}-${i}`}
             testID={`scan-serving-${i}`}
             label={servingText(s.label)}
-            accessibilityLabel={s.label}
+            accessibilityLabel={spokenUnits(s.label)}
             selected={s.label === portion.serving.label}
             onPress={() => setPortion({ serving: s, quantity: 1 })}
           />

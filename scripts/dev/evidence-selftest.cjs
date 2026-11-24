@@ -506,22 +506,29 @@ async function runCase(page, c) {
   await real.waitForTimeout(500);
   judge('real + sheet is ready', [await real.evaluate(notReady, { profile: true, sheet: true })].filter(Boolean), '');
   judge('real + sheet: clean', await real.evaluate(sheetScan), '');
-  // A screen's own row pulled out to the sheet's edge (the kit's padding itself is fixed).
-  // Whatever the second row is (a block or a button): the selector must not depend on its tag.
-  await real.addStyleTag({ content: '[data-testid="sheet-body"] > div > :nth-child(2) { margin-left: -16px !important }' });
+  // A screen's own row pulled out to the sheet's edge (the kit's padding itself is fixed). The + sheet's body
+  // holds one block (the ways to log; the likely next logs are pinned in its footer): its second tile, found by
+  // its testID so the selector depends on neither its tag nor the body's shape.
+  await real.addStyleTag({ content: '[data-testid="sheet-body"] [data-testid="quick-photo"] { margin-left: -16px !important }' });
   await real.waitForTimeout(100);
   judge('real + sheet: a row pulled 16 px into the padding', await real.evaluate(sheetScan), "from the sheet's left edge");
   await real.addStyleTag({ content: '[data-testid="sheet"] { padding-bottom: 0 !important } [data-testid="sheet-body"] > div { padding-bottom: 0 !important }' });
   await real.waitForTimeout(100);
   judge('real + sheet: no space under the last control', await real.evaluate(sheetScan), 'from the bottom of the screen');
-  // Log water from the sheet: its toast shows above the sheet, and must not be over anything.
+  // Log water from the sheet: a one-tap log closes the sheet, so its toast (Undo, 12 s in a browser) rests over
+  // the screen below. Opened again while that toast shows, the sheet takes the toast just above its top edge,
+  // and it must not be over anything there.
   await real.reload({ waitUntil: 'networkidle' });
   await real.getByTestId('tab-add').first().click({ timeout: 15000 });
   await real.waitForSelector(SHEET, { timeout: 10000 });
   const water = real.locator(`${SHEET} [aria-label*="250"]`).first();
   if (await water.count()) {
     await water.click();
+    await real.waitForSelector(SHEET, { state: 'detached', timeout: 10000 }).catch(() => {});
     await real.waitForTimeout(300);
+    await real.getByTestId('tab-add').first().click({ timeout: 15000 });
+    await real.waitForSelector(SHEET, { timeout: 10000 });
+    await real.waitForTimeout(500);
     judge('real toast from the + sheet sits clear', await real.evaluate(toastScan), '');
     await real.addStyleTag({ content: '[data-testid="toast"] { transform: translateY(420px) !important }' });
     await real.waitForTimeout(100);

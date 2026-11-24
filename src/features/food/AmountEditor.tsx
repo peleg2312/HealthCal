@@ -6,6 +6,7 @@ import { servingsFor } from '@/lib/nutrition';
 import { useTheme } from '@/theme';
 import type { Food, Serving } from '@/types';
 import { Chip, NumberField, Stepper } from '@/ui';
+import { spokenUnits } from '@/lib/spokenUnits';
 
 import { balancedLines, chipWidth } from './chipLines';
 import { formatQty, servingText } from './helpers';
@@ -83,7 +84,7 @@ export function AmountEditor({
                   key={`${s.label}-${i}`}
                   testID={`${testIDPrefix}-serving-${i}`}
                   label={s.label === '1 g' ? 'grams' : servingText(s.label)}
-                  accessibilityLabel={s.label === '1 g' ? 'grams' : s.label}
+                  accessibilityLabel={s.label === '1 g' ? 'grams' : spokenUnits(s.label)}
                   selected={s.label === serving.label}
                   onPress={() => chooseServing(s)}
                 />

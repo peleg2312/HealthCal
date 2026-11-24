@@ -325,7 +325,7 @@ export default function Welcome() {
       ) : null}
       {google.error ? (
         // On the card surface: neutral in every look (a sign-in that was not completed is not an alarm).
-        <Note tone="warning" surface="card" testID="welcome-google-error" icon={<TriangleAlert size={18} color={colors.warningInk} />}>
+        <Note tone="neutral" surface="card" testID="welcome-google-error" icon={<Info size={18} color={colors.text} />}>
           <Text variant="caption" color="textSecondary" accessibilityLiveRegion="polite">
             {google.error}
           </Text>

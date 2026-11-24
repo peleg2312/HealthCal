@@ -30,7 +30,7 @@ import { guidelineMinutes } from '@/lib/exercise';
 import { mealForTime } from '@/lib/nutrition';
 import { useNow, useToday } from '@/store/clock';
 import { useConsistency, useDay, useDays, useLive, useProfile, useWeightSeries, type DaySummary } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { useTextSize, useTheme } from '@/theme';
 import type { ActivityEntry, ISODate } from '@/types';
 import { Button, Card, Divider, FadeUp, Header, Screen, Text, goBack } from '@/ui';
 
@@ -70,6 +70,7 @@ function weekDay(d: DaySummary): WeekDayIn {
  */
 export default function MorningScreen() {
   const { colors, spacing } = useTheme();
+  const bigText = useTextSize() >= 1.5;
   const params = useLocalSearchParams<{ first?: string; quote?: string }>();
   const today = useToday();
   const yesterday = addDays(today, -1);
@@ -155,16 +156,17 @@ export default function MorningScreen() {
           This opens on your first visit each morning. Turn it off in Profile.
         </Text>
       ) : null}
-      <View style={{ flexDirection: 'row', gap: spacing.md }}>
+      {/* At 150% text and more the two buttons stack, each the footer's width, so neither name is cut short. */}
+      <View style={{ flexDirection: bigText ? 'column' : 'row', gap: bigText ? spacing.sm : spacing.md }}>
         {/* "Today" always lands on Today, also when the page was opened from Profile; the X goes back to where it was opened. */}
-        <Button testID="morning-today" title="Today" accessibilityLabel="Go to Today" variant="secondary" full={false} onPress={() => router.dismissTo('/' as never)} style={{ flex: 1, paddingHorizontal: spacing.md }} />
+        <Button testID="morning-today" title="Today" accessibilityLabel="Go to Today" variant="secondary" full={false} onPress={() => router.dismissTo('/' as never)} style={bigText ? { paddingHorizontal: spacing.md } : { flex: 1, paddingHorizontal: spacing.md }} />
         <Button
           testID="morning-log"
           title={logMealTitle(meal)}
           icon={<Plus size={20} color={colors.onPrimary} strokeWidth={2.2} />}
           full={false}
           onPress={() => router.replace(`/food/search?meal=${meal}&date=${today}` as never)}
-          style={{ flex: 2, paddingHorizontal: spacing.md }}
+          style={bigText ? { paddingHorizontal: spacing.md } : { flex: 2, paddingHorizontal: spacing.md }}
         />
       </View>
     </View>

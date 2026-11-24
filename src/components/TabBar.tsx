@@ -8,12 +8,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { cup, fonts, MAX_CONTENT_WIDTH, motion, useReducedMotion, useTheme } from '@/theme';
 import { PressableScale, TAB_BAR_HEIGHT, Text, useToastDock } from '@/ui';
 
+import { LARGE_TEXT, useTextGrowth } from '@/features/today/textGrowth';
+
 import { QuickLogSheet } from './QuickLogSheet';
 
 const ICONS = { index: House, diary: BookOpen, train: Dumbbell, progress: ChartLine } as const;
 
 /** The active tab's level line: a 28 x 3 rim bar hanging from the bar's top edge. */
 const MARK_WIDTH = 28;
+/** The label's line box at 100%, and the room over the icon. */
+const LABEL_LINE = 14;
+const ICON_TOP = 9;
+/** With large text: the + cup's own width (its 56 px cup and 2 px either side), and the row's side padding. */
+const PLUS_W_LARGE = 60;
+const PAD_LARGE = 4;
 
 /**
  * The active-tab mark: one level line that slides from tab to tab. It waits
@@ -63,10 +71,22 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
   const focused = useIsFocused();
   useToastDock(insets.bottom + TAB_BAR_HEIGHT + 14, focused);
 
+  // Large text (the app's size or the phone's, `useTextGrowth`): the bar stays TAB_BAR_HEIGHT tall, so the room
+  // over the icon gives way to the taller label, and each tab is as wide as its label needs, the room left shared
+  // out evenly, so "Today", "Diary" and "Train" keep their words whole beside "Progress". Only the longest label
+  // gives way when the row is still too narrow (320 px at 200%), with an ellipsis; its full name is the tab's
+  // accessible name. At 100% the five places are as before: four equal tabs and the + at 1.1.
+  const growth = useTextGrowth();
+  const large = growth > LARGE_TEXT;
+  const labelLine = Math.round(LABEL_LINE * growth);
+  const iconTop = large ? Math.max(2, ICON_TOP - (labelLine - LABEL_LINE)) : ICON_TOP;
+  const labels = state.routes.map((route) => descriptors[route.key].options.title ?? route.name);
+  const longest = Math.max(...labels.map((l) => l.length));
+
   const tabs = state.routes.map((route, index) => {
     const focused = state.index === index;
     const Icon = ICONS[route.name as keyof typeof ICONS] ?? Activity;
-    const label = descriptors[route.key].options.title ?? route.name;
+    const label = labels[index];
     return (
       <PressableScale
         key={route.key}
@@ -84,13 +104,16 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
           const c = x + width / 2;
           setCentres((cur) => (cur[index] === c ? cur : { ...cur, [index]: c }));
         }}
-        style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 9, gap: 3, height: TAB_BAR_HEIGHT }}>
+        style={[
+          { alignItems: 'center', justifyContent: 'flex-start', paddingTop: iconTop, gap: 3, height: TAB_BAR_HEIGHT },
+          large ? { flexGrow: 1, flexShrink: label.length === longest ? 1 : 0, flexBasis: 'auto', minWidth: 44, paddingHorizontal: 2 } : { flex: 1 },
+        ]}>
         <Icon size={22} color={focused ? colors.text : colors.textTertiary} strokeWidth={focused ? 2.2 : 1.9} />
         <Text
           variant="caption"
           color={focused ? 'text' : 'textTertiary'}
           numberOfLines={1}
-          style={{ fontSize: 11.5, lineHeight: 14, fontFamily: focused ? fonts.bold : fonts.semibold }}>
+          style={[{ fontSize: 11.5, lineHeight: LABEL_LINE, fontFamily: focused ? fonts.bold : fonts.semibold }, large ? { maxWidth: '100%' } : null]}>
           {label}
         </Text>
       </PressableScale>
@@ -112,7 +135,7 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
           borderTopColor: colors.border,
           paddingBottom: insets.bottom,
         }}>
-        <View style={{ width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', flexDirection: 'row', paddingHorizontal: 10, height: TAB_BAR_HEIGHT }}>
+        <View style={{ width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', flexDirection: 'row', paddingHorizontal: large ? PAD_LARGE : 10, height: TAB_BAR_HEIGHT }}>
           <Animated.View
             pointerEvents="none"
             testID="tab-pill"
@@ -130,7 +153,7 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
             }}
           />
           {tabs.slice(0, 2)}
-          <View style={{ flex: 1.1, alignItems: 'center' }}>
+          <View style={large ? { width: PLUS_W_LARGE, flexShrink: 0, alignItems: 'center' } : { flex: 1.1, alignItems: 'center' }}>
             <PressableScale
               testID="tab-add"
               feedback="press"

@@ -29,7 +29,7 @@ import {
 import { useStore } from '@/store';
 import { useToday } from '@/store/clock';
 import { computeEnergyModel, useLive, useProfile } from '@/store/selectors';
-import { useTheme } from '@/theme';
+import { useTextSize, useTheme } from '@/theme';
 import type { ActivityLevel, ExerciseSpread, GoalType, MacroSplit, Profile, Sex } from '@/types';
 import { Button, Card, Chip, ChipWrap, CupKey, goBack, Header, MacroBar, NumberField, Screen, Segmented, Stepper, Text, ToggleRow, toast } from '@/ui';
 
@@ -92,6 +92,7 @@ export default function GoalsScreen() {
 
 function GoalsForm() {
   const { colors, spacing } = useTheme();
+  const bigText = useTextSize() >= 1.5;
   const saved = useProfile();
   const setProfile = useStore((s) => s.setProfile);
   const food = useLive('foodEntries');
@@ -501,13 +502,14 @@ function GoalsForm() {
           </ChipWrap>
           {macroMode === 'custom' ? (
             <>
-              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              {/* At 150% text and more a third of the row is too narrow for "30 %": the three fields stack. */}
+              <View style={{ flexDirection: bigText ? 'column' : 'row', gap: spacing.sm }}>
                 <NumberField
                   testID="goals-pct-protein"
                   label="Protein"
                   suffix="%"
                   decimals={0}
-                  style={{ flex: 1 }}
+                  style={bigText ? undefined : { flex: 1 }}
                   value={custom.protein}
                   onChange={(v) => setCustom((c) => ({ ...c, protein: v ?? 0 }))}
                 />
@@ -516,7 +518,7 @@ function GoalsForm() {
                   label="Carbs"
                   suffix="%"
                   decimals={0}
-                  style={{ flex: 1 }}
+                  style={bigText ? undefined : { flex: 1 }}
                   value={custom.carbs}
                   onChange={(v) => setCustom((c) => ({ ...c, carbs: v ?? 0 }))}
                 />
@@ -525,7 +527,7 @@ function GoalsForm() {
                   label="Fat"
                   suffix="%"
                   decimals={0}
-                  style={{ flex: 1 }}
+                  style={bigText ? undefined : { flex: 1 }}
                   value={custom.fat}
                   onChange={(v) => setCustom((c) => ({ ...c, fat: v ?? 0 }))}
                 />

@@ -79,8 +79,9 @@ function InsightRow({ insight }: { insight: Insight }) {
             {insight.body}
           </Text>
         ) : null}
-        {/* The action and the numbers' toggle side by side: two buttons, never one inside the other. */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, marginTop: spacing.xs }}>
+        {/* The action and the numbers' toggle side by side: two buttons, never one inside the other. At large
+            text the toggle wraps under the action rather than run past the card. */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: spacing.md, rowGap: spacing.xs, marginTop: spacing.xs }}>
           {insight.action ? (
             // A small kit ghost button (as Train's and Weight's), not an underlined text link; drawn without
             // side padding so its words line up with the insight's text above it.

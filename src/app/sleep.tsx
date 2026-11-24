@@ -6,7 +6,7 @@ import { View } from 'react-native';
 import { formatDayLabel, fromISODate, weekdayShort } from '@/lib/dates';
 import { deleteSleep, saveSleep } from '@/features/trackers/actions';
 import { dayTitle, resolveDateParam } from '@/features/trackers/dateParam';
-import { DayStepper, Explain, ExplainText, Figure, RequireProfile } from '@/features/trackers/components';
+import { DayStepper, Explain, ExplainText, Figure, HistoryRow, RequireProfile } from '@/features/trackers/components';
 import { findByDate, formatHours, QUALITY_LABELS, SLEEP_RANGE, sleepSummary } from '@/features/trackers/helpers';
 import { sleepChartLabel } from '@/features/progress/chartWords';
 import { sleepFromLine, stagesLine } from '@/features/trackers/sleepSource';
@@ -14,7 +14,7 @@ import { useToday } from '@/store/clock';
 import { useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ISODate, SleepEntry, SleepQuality } from '@/types';
-import { BarChart, Button, Card, Chip, CupKey, Divider, EmptyState, Header, ListRow, Screen, SectionTitle, Segmented, Sheet, Stepper, Text } from '@/ui';
+import { BarChart, Button, Card, Chip, CupKey, Divider, EmptyState, Header, Screen, SectionTitle, Segmented, Sheet, Stepper, Text } from '@/ui';
 
 type Window = '7' | '30';
 const QUALITIES: SleepQuality[] = [1, 2, 3, 4, 5];
@@ -213,7 +213,7 @@ function SleepScreen() {
             {history.map((e, i) => (
               <React.Fragment key={e.id}>
                 {i > 0 ? <Divider /> : null}
-                <ListRow
+                <HistoryRow
                   testID={`sleep-row-${i}`}
                   title={formatDayLabel(e.date)}
                   subtitle={historySubtitle(e)}

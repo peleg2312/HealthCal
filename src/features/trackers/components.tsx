@@ -1,12 +1,14 @@
 import { Redirect } from 'expo-router';
-import { ChevronDown, ChevronUp, Info } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, ChevronUp, Info } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { AccessibilityInfo, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { useTextGrowth } from '@/features/activity/textGrowth';
 import { DayStepper as FoodDayStepper } from '@/features/food/components';
+import { spokenUnits } from '@/lib/spokenUnits';
 import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
-import { cup, useTheme } from '@/theme';
+import { cup, fonts, useTheme } from '@/theme';
 import type { ISODate } from '@/types';
 import { CupKey, PressableScale, Text } from '@/ui';
 
@@ -192,6 +194,49 @@ export function Tile({
           {subtitle}
         </Text>
       ) : null}
+    </PressableScale>
+  );
+}
+
+/**
+ * A history row of Weight and Sleep: the kit's `ListRow` as drawn (the day, its line, the value at the end and a
+ * chevron), with its units spoken in full ("78.8 kilograms", "6 hours 15 minutes") and, above 115% text, the value
+ * on a line of its own under the day and the line unclamped, so the day and its words keep the row's whole width
+ * and no word is split.
+ */
+export function HistoryRow({ testID, title, subtitle, value, onPress }: { testID: string; title: string; subtitle?: string; value: string; onPress: () => void }) {
+  const { colors, spacing } = useTheme();
+  const big = useTextGrowth() > 1.15;
+  const said = spokenUnits([title, subtitle?.replace(/\u00A0/g, ' '), value].filter(Boolean).join(', ')).replace(/\bvs\b/g, 'against the');
+  return (
+    <PressableScale
+      testID={testID}
+      onPress={onPress}
+      scaleTo={0.985}
+      accessibilityRole="button"
+      accessibilityLabel={said}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text variant="bodyStrong" numberOfLines={big ? undefined : 2} style={{ fontFamily: fonts.semibold }}>
+          {title}
+        </Text>
+        {big ? (
+          <Text variant="label" color="text">
+            {value}
+          </Text>
+        ) : null}
+        {subtitle ? (
+          <Text variant="caption" color="textSecondary" numberOfLines={big ? undefined : 2}>
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+      {big ? null : (
+        <Text variant="label" color="textSecondary" numberOfLines={1}>
+          {value}
+        </Text>
+      )}
+      <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.9} />
     </PressableScale>
   );
 }

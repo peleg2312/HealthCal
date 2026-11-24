@@ -21,9 +21,9 @@ import { Text } from '@/ui';
  * - `tile`: 40 x 52, alone in the middle of a waiting screen.
  * - `inline`: 16 x 20, at the start of a line of text.
  *
- * One turn of the loop is 1,120 ms: the level rises from 15% to 75% over `duration.draw` (700 ms,
- * the pour's ease-out), rests for `duration.settle` (260 ms), fades over `duration.fade` (160 ms)
- * and starts again. Only a transform and an opacity move. Under reduced motion (the app's one
+ * One turn of the loop is 910 ms: the level rises from 15% to 75% over `duration.draw` (600 ms,
+ * the pour's ease-out), rests for `duration.settle` (150 ms), fades over `duration.fade` (160 ms)
+ * and starts again (`TURN_MS` adds the three tokens, so the turn follows them). Only a transform and an opacity move. Under reduced motion (the app's one
  * switch, `useReducedMotion`) nothing loops: the cup is half full and still.
  */
 export function PourWait({

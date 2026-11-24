@@ -10,6 +10,7 @@ import { useWindowDimensions, View } from 'react-native';
 
 import type { Food, UnitSystem } from '@/types';
 import { Chip } from '@/ui';
+import { spokenUnits } from '@/lib/spokenUnits';
 
 import { recentChips } from './pick';
 
@@ -31,7 +32,7 @@ export function DrinkRecentChips({ yours, glassMl, units, onPick }: { yours: rea
       }}
       style={{ flexDirection: 'row', gap: 8, paddingVertical: 6, marginVertical: -6 }}>
       {chips.map((c) => (
-        <Chip key={c.testID} testID={c.testID} label={c.text} accessibilityLabel={c.label} style={{ maxWidth: MAX_CHIP }} onPress={() => onPick(c.food)} />
+        <Chip key={c.testID} testID={c.testID} label={c.text} accessibilityLabel={spokenUnits(c.label)} style={{ maxWidth: MAX_CHIP }} onPress={() => onPick(c.food)} />
       ))}
     </View>
   );

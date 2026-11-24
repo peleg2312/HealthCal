@@ -43,7 +43,7 @@ import { useSyncState } from '@/services/sync';
 import { useNow, useToday } from '@/store/clock';
 import { pendingChanges, useStore } from '@/store';
 import { useEnergyModel, useProfile, useWeightSeries } from '@/store/selectors';
-import { themeChoiceOf, themeChoicePatch, useTheme } from '@/theme';
+import { themeChoiceOf, themeChoicePatch, useTextSize, useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
 import { Card, CupKey, EmptyState, Header, ListRow, Screen, Segmented, Text, ToggleRow } from '@/ui';
 
@@ -70,6 +70,8 @@ function ProfileHub() {
   const { colors, spacing } = useTheme();
   // Under 360 px the three header stats have about 70 px each: one-word labels keep them on one line.
   const narrow = useWindowDimensions().width < 360;
+  // Larger text: the three figures in the card's foot stack, one row each (`HeaderStat`).
+  const stacked = useTextSize() >= 1.3;
   const profile = useProfile();
   // Shown while plans are on, or while the person holds a plan (ruling R14).
   const showPlan = planVisible(usePlan());
@@ -116,12 +118,19 @@ function ProfileHub() {
             </Text>
           </View>
         </View>
-        <View style={{ flexDirection: 'row', marginTop: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border }}>
-          <HeaderStat label="Weight" value={formatWeight(currentKg, u)} color={colors.weight} />
+        <View
+          style={{
+            flexDirection: stacked ? 'column' : 'row',
+            marginTop: spacing.lg,
+            paddingTop: stacked ? spacing.xs : spacing.md,
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+          }}>
+          <HeaderStat label="Weight" value={formatWeight(currentKg, u)} color={colors.weight} stacked={stacked} />
           {/* Keeping weight has no goal weight; the line under the name already says so. */}
-          {profile.goal === 'maintain' || !profile.targetWeightKg ? null : <HeaderStat divider label="Goal" value={goalLine.replace('Goal ', '')} />}
+          {profile.goal === 'maintain' || !profile.targetWeightKg ? null : <HeaderStat divider label="Goal" value={goalLine.replace('Goal ', '')} stacked={stacked} />}
           {/* The daily number before workouts is the target everywhere; "budget" is the target plus workouts (Today). */}
-          <HeaderStat divider label={narrow ? 'Target' : 'Daily target'} value={`${formatNumber(model.target.target)} kcal`} color={colors.calories} />
+          <HeaderStat divider label={narrow && !stacked ? 'Target' : 'Daily target'} value={`${formatNumber(model.target.target)} kcal`} color={colors.calories} stacked={stacked} />
         </View>
       </Card>
 
@@ -322,7 +331,12 @@ function ProfileHub() {
  * One stat of the header row: the number large with its unit small inside it; a cup key marks a data colour.
  * Nothing is cut: under 360 px the number steps down a size, and the label or the unit wraps to a second line.
  */
-function HeaderStat({ label, value, color, divider }: { label: string; value: string; color?: string; divider?: boolean }) {
+/**
+ * The three figures stand side by side at the designed text size. With the app's text size at 130% or
+ * more a third of the card is too narrow for "1,870 kcal", so they stack: one row each, the label on the
+ * left and the figure on the right, a hairline between them (`stacked`).
+ */
+function HeaderStat({ label, value, color, divider, stacked }: { label: string; value: string; color?: string; divider?: boolean; stacked?: boolean }) {
   const { colors, spacing } = useTheme();
   const narrow = useWindowDimensions().width < 360;
   const i = value.lastIndexOf(' ');
@@ -330,18 +344,41 @@ function HeaderStat({ label, value, color, divider }: { label: string; value: st
   const num = numeric ? value.slice(0, i) : value;
   const unit = numeric ? value.slice(i + 1) : '';
   const size = narrow ? { fontSize: numeric ? 17 : 15, lineHeight: 21 } : numeric ? undefined : { fontSize: 17 };
+  const key = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, ...(stacked ? { flex: 1, minWidth: 0 } : null) }}>
+      {color ? <CupKey color={color} /> : null}
+      <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
+        {label}
+      </Text>
+    </View>
+  );
+  const figure = (
+    <Text variant="numM" style={size} align={stacked ? 'right' : undefined}>
+      {num}
+      {unit ? <Text variant="unit">{` ${unit}`}</Text> : null}
+    </Text>
+  );
+  if (stacked) {
+    return (
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'baseline',
+          flexWrap: 'wrap',
+          columnGap: spacing.md,
+          paddingVertical: spacing.sm,
+          borderTopWidth: divider ? 1 : 0,
+          borderTopColor: colors.border,
+        }}>
+        {key}
+        {figure}
+      </View>
+    );
+  }
   return (
     <View style={{ flex: 1, minWidth: 0, paddingLeft: divider ? (narrow ? spacing.sm : spacing.md) : 0, borderLeftWidth: divider ? 1 : 0, borderLeftColor: colors.border }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        {color ? <CupKey color={color} /> : null}
-        <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
-          {label}
-        </Text>
-      </View>
-      <Text variant="numM" style={size}>
-        {num}
-        {unit ? <Text variant="unit">{` ${unit}`}</Text> : null}
-      </Text>
+      {key}
+      {figure}
     </View>
   );
 }

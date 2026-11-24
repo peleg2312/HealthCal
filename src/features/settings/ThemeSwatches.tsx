@@ -1,7 +1,7 @@
 import React from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { cup, fonts, LOOK_HINTS, paletteFor, radius, THEME_CHOICES, THEME_LABELS, themeNameOfChoice, useTheme, vesselBase, type ThemeChoice, type ThemeColors } from '@/theme';
+import { cup, fonts, LOOK_HINTS, paletteFor, radius, THEME_CHOICES, THEME_LABELS, themeNameOfChoice, useTextSize, useTheme, vesselBase, type ThemeChoice, type ThemeColors } from '@/theme';
 import { PressableScale, Text } from '@/ui';
 
 /** The name on each tile. "Match my phone" is too long for a tile a quarter of a 320 px phone wide, so it is "System" here. */
@@ -16,9 +16,20 @@ export const THEME_HINTS: Record<ThemeChoice, string> = {
   ...LOOK_HINTS,
 };
 
-/** Four tiles a row: the four first looks, then the three newer ones. */
-const ROWS: ThemeChoice[][] = [THEME_CHOICES.slice(0, 4), THEME_CHOICES.slice(4)];
-const PER_ROW = 4;
+/**
+ * Four tiles a row at the designed text size: the four first looks, then the three newer ones. With the
+ * app's text size raised the names need more room, so a row holds three (from 115%) or two (from 150%),
+ * and no name is cut short.
+ */
+export function swatchesPerRow(textSize: number): number {
+  return textSize >= 1.5 ? 2 : textSize >= 1.15 ? 3 : 4;
+}
+
+function rowsOf(perRow: number): ThemeChoice[][] {
+  const rows: ThemeChoice[][] = [];
+  for (let i = 0; i < THEME_CHOICES.length; i += perRow) rows.push(THEME_CHOICES.slice(i, i + perRow));
+  return rows;
+}
 
 /**
  * A miniature of a palette in its own Pour colours: the background, a card
@@ -78,7 +89,8 @@ function Mini({ c, half }: { c: ThemeColors; half?: 'left' | 'right' }) {
 
 /**
  * Appearance picker: one cup per choice that previews it, four a row (the seven choices take two
- * rows, the second with an empty last place so every tile has the same width). The chosen one has a
+ * rows, the second with an empty last place so every tile has the same width; fewer a row with
+ * larger text, `swatchesPerRow`). The chosen one has a
  * 2 px ink edge and its name in bold ink. The name stays inside its tile's width (a check beside
  * "Blossom" ran past the tile). The value is a `ThemeChoice`: the caller reads it with
  * `themeChoiceOf(settings)` and writes a pick with `setSettings(themeChoicePatch(choice))`.
@@ -86,9 +98,10 @@ function Mini({ c, half }: { c: ThemeColors; half?: 'left' | 'right' }) {
 export function ThemeSwatches({ value, onChange }: { value: ThemeChoice; onChange: (v: ThemeChoice) => void }) {
   const { colors, spacing } = useTheme();
   const narrow = useWindowDimensions().width < 360;
+  const perRow = swatchesPerRow(useTextSize());
   return (
     <View accessibilityRole="radiogroup" accessibilityLabel="Appearance" style={{ gap: spacing.md }}>
-      {ROWS.map((row, r) => (
+      {rowsOf(perRow).map((row, r) => (
         <View key={r} style={{ flexDirection: 'row', gap: spacing.sm }}>
           {row.map((choice) => {
             const selected = value === choice;
@@ -133,7 +146,7 @@ export function ThemeSwatches({ value, onChange }: { value: ThemeChoice; onChang
               </PressableScale>
             );
           })}
-          {Array.from({ length: PER_ROW - row.length }, (_, i) => (
+          {Array.from({ length: perRow - row.length }, (_, i) => (
             <View key={`gap-${i}`} style={{ flex: 1 }} />
           ))}
         </View>

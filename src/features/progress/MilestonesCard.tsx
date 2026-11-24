@@ -1,6 +1,7 @@
 import React from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import { useTextGrowth } from '@/features/activity/textGrowth';
 import { formatShortDate } from '@/lib/dates';
 import type { Milestone } from '@/lib/insights';
 import { useTheme } from '@/theme';
@@ -28,8 +29,9 @@ export function milestoneDomain(id: string): Domain {
  */
 export function MilestonesCard({ milestones }: { milestones: Milestone[] }) {
   const { colors, spacing } = useTheme();
-  // Two to a row from 360 px; one to a row below that, so a title is never cut.
-  const two = useWindowDimensions().width >= 360;
+  // Two to a row from 360 px; one to a row below that or above 115% text, so a title is never cut or split.
+  const grow = useTextGrowth();
+  const two = useWindowDimensions().width >= 360 && grow <= 1.15;
   const doneAll = milestones.filter((m) => m.achieved).sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
   const done = doneAll.slice(0, 4);
   const next = milestones
@@ -48,7 +50,7 @@ export function MilestonesCard({ milestones }: { milestones: Milestone[] }) {
               key={m.id}
               testID={`milestone-${m.id}`}
               accessible
-              accessibilityLabel={`Reached: ${m.title}${m.date ? `, ${formatShortDate(m.date)}` : ''}`}
+              accessibilityLabel={spokenUnits(`Reached: ${m.title}${m.date ? `, ${formatShortDate(m.date)}` : ''}`)}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',

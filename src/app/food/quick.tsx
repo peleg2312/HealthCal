@@ -5,6 +5,7 @@ import { View } from 'react-native';
 import { DayStepper, MealPicker } from '@/features/food/components';
 import { QUICK_KCAL_LIMIT, href, kcal, parseDate, parseMeal } from '@/features/food/helpers';
 import { logQuickAdd } from '@/features/food/log';
+import { useBigText } from '@/features/food/textGrowth';
 import { atwaterKcal, MEAL_LABEL } from '@/lib/nutrition';
 import { useTheme } from '@/theme';
 import { Button, Card, CupKey, Header, NumberField, Screen, Text, TextField, goBack, useLeaveGuard } from '@/ui';
@@ -15,6 +16,8 @@ export default function QuickAddScreen() {
   const [meal, setMeal] = useState(() => parseMeal(params.meal));
   const [date, setDate] = useState(() => parseDate(params.date));
   const [name, setName] = useState('');
+  // With large text a shorter placeholder, so it is never cut mid-word in its field.
+  const big = useBigText();
   const [kcalV, setKcal] = useState<number | null>(null);
   const [protein, setProtein] = useState<number | null>(null);
   const [carbs, setCarbs] = useState<number | null>(null);
@@ -54,7 +57,7 @@ export default function QuickAddScreen() {
           hint={kcalV === null && hasMacros ? `Worked out from the macros: ${kcal(implied)} kcal` : undefined}
           onSubmitEditing={save}
         />
-        <TextField testID="quick-name" label="Name (optional)" placeholder="e.g. Office birthday cake" value={name} onChangeText={setName} maxLength={80} />
+        <TextField testID="quick-name" label="Name (optional)" placeholder={big ? 'e.g. Cake' : 'e.g. Office birthday cake'} value={name} onChangeText={setName} maxLength={80} />
       </Card>
 
       <Card style={{ gap: spacing.md }}>

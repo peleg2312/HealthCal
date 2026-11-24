@@ -241,6 +241,9 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
   const inSheet = placement === 'sheet';
   const docks = useToast((s) => s.docks);
   const last = docks.length ? docks[docks.length - 1] : null;
+  // The screen whose controls the toast keeps clear of: the newest dock that names one (the tab bar's
+  // own dock, registered beside a tab screen's, names none).
+  const scopeId = [...docks].reverse().find((d) => d.scope)?.scope;
   const placed = last ? { dock: last.height, ridesKeyboard: last.rides, cover: last.cover } : { dock: insets.bottom, ridesKeyboard: false, cover: 0 };
   const keyboardUp = !inSheet && placed.cover > 0;
   // With the keyboard up: the focused field, as distances from the bottom of the host, and how
@@ -361,7 +364,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
   // Web: never over a control. Once the toast is laid out, it rests in the lowest band clear of every
   // control on the screen (or in the sheet), its action within thumb reach (`toastSpot`); it is drawn
   // only once that place is known, so it never shows for a frame over a button. Phones keep `resting`.
-  const placeKey = `${key}:${inSheet ? 'sheet' : (last?.scope ?? '')}:${winH}:${message}`;
+  const placeKey = `${key}:${inSheet ? 'sheet' : (scopeId ?? '')}:${winH}:${message}`;
   const [spot, setSpot] = useState<{ key: string; bottom: number | null } | null>(null);
   const placing = Platform.OS === 'web' && shownNow && !keyboardUp;
   useEffect(() => {
@@ -376,7 +379,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       const r = toastEl.getBoundingClientRect();
       const h = Math.round(r.height);
       if (!inSheet) {
-        const scope = last?.scope ? document.getElementById(last.scope) : null;
+        const scope = scopeId ? document.getElementById(scopeId) : null;
         const box = scope?.getBoundingClientRect();
         if (!scope || !box || box.height < 1 || box.width < 1) return 'wait';
         const top = toastSpot({ lowest: H - resting - h, highest: toastReachTop(H, h), height: h, left: r.left, right: r.right, controls: controlBoxes(scope, host) });
@@ -400,7 +403,6 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
     let timer: ReturnType<typeof setTimeout> | undefined;
     const run = () => {
       const at = place();
-      (globalThis as Record<string, unknown>).__toastDbg = { at, scope: last?.scope, tries, inSheet, resting, key: placeKey };
       if (at === 'wait' && tries++ < 12) {
         timer = setTimeout(run, 80);
         return;
@@ -417,7 +419,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       cancelAnimationFrame(frame);
       clearTimeout(timer);
     };
-  }, [placing, placeKey, toastH, resting, inSheet, last?.scope, insets.bottom]);
+  }, [placing, placeKey, toastH, resting, inSheet, scopeId, insets.bottom]);
   const spotNow = spot && spot.key === placeKey ? spot : null;
   const hidden = placing && !spotNow;
   const bottom = !inSheet && spotNow?.bottom != null ? spotNow.bottom : resting;

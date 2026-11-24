@@ -8,7 +8,6 @@ import { ShareDayButton } from '@/features/share';
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
 import { useOneTap } from '@/features/food/oneTap';
 import { currentKcal } from '@/features/food/usuals';
-import { spokenUnits } from '@/features/progress/chartWords';
 import { useRecapReady } from '@/features/progress/recapReady';
 import { coachTip, rhythmFromReminders, type ClosedDay } from '@/features/today/coach';
 import { DayRingStrip } from '@/features/today/DayRingStrip';
@@ -28,15 +27,17 @@ import { AFTER_STRIP_MS, StreakMark } from '@/features/streak/StreakMark';
 import { useStreakMoment } from '@/features/streak/useStreakMoment';
 import { addWater, defaultGlass, StatusRail } from '@/features/today/StatusRail';
 import { useReportViewedDay } from '@/features/today/viewedDay';
+import { LARGE_TEXT, useTextGrowth } from '@/features/today/textGrowth';
 import { addDays, formatShortDate, greeting } from '@/lib/dates';
 import { MEALS, MEAL_LABEL, MEAL_SHARE, mealForTime } from '@/lib/nutrition';
+import { spokenUnits } from '@/lib/spokenUnits';
 import { formatNumber, formatVolume } from '@/lib/units';
 import { useStore } from '@/store';
 import { useNow, useToday } from '@/store/clock';
 import { useConsistency, useDay, useLive, useProfile, type DaySummary } from '@/store/selectors';
 import { motion, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
-import { AnimatedNumber, Button, Card, Chip, CupKey, IconButton, levelY, placeLabels, PressableScale, ProgressBar, Screen, Text, Vessel, type VesselLabel } from '@/ui';
+import { AnimatedNumber, Button, Card, Chip, CupKey, Hatch, IconButton, levelY, placeLabels, PressableScale, ProgressBar, Screen, Text, Vessel, type VesselLabel } from '@/ui';
 
 
 export default function TodayScreen() {
@@ -172,6 +173,8 @@ function EnergyCard({
   const { colors, spacing } = useTheme();
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
+  // Large text: the labels leave the cup's side column for rows (EnergyCardLarge below).
+  const large = useTextGrowth() > LARGE_TEXT;
   const over = day.remaining < 0;
   const eaten = day.eaten.kcal;
   const budget = Math.max(0, day.budget);
@@ -348,6 +351,133 @@ function EnergyCard({
   const actionsRoom = actions ? Math.max(0, actionsTop + ACTION_H + 12 - (height + macrosTop)) : 0;
   const labelLeft = vesselW + (narrow ? 14 : 16);
 
+  if (large) {
+    // Large text (130% and up, the app's size or the phone's): the side column beside the cup has no room for its
+    // labels at the heights they describe (the eaten line alone is wider than it at 130%), so nothing here is placed
+    // by value. The number leads the card, whole; the cup's other labels are rows beside the cup, each with its key
+    // (the hatch for workouts, the calorie fill for eaten); the actions and the macros are rows under it. Every line
+    // wraps at its words.
+    const remaining = notLogged ? (
+      <PressableScale
+        testID="today-not-logged"
+        scaleTo={0.97}
+        onPress={() => router.push(`/diary?date=${day.date}` as never)}
+        accessibilityLabel={drinksOnly ? 'Only drinks logged for this day. Open the diary to add what you ate' : 'Nothing logged for this day. Open the diary to add it'}
+        style={{ alignSelf: 'flex-start', gap: 2, maxWidth: '100%' }}>
+        <Text variant="h2" testID="today-remaining">
+          {drinksOnly ? 'Drinks only' : 'Nothing logged'}
+        </Text>
+        <Text variant="label" color="primaryInk">
+          Add what you ate
+        </Text>
+      </PressableScale>
+    ) : (
+      <PressableScale
+        testID="today-remaining-open"
+        scaleTo={0.97}
+        onPress={onFits}
+        accessibilityLabel={`${left} kilocalories ${over ? 'above the budget' : unitWord}. See which of your foods fit`}
+        style={{ alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', maxWidth: '100%' }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', columnGap: 6 }}>
+          <AnimatedNumber
+            variant="numXL"
+            color={over ? 'warningInk' : 'caloriesInk'}
+            testID="today-remaining"
+            numberOfLines={1}
+            value={day.remaining}
+            format={(n) => formatNumber(Math.abs(Math.round(n)))}
+            duration={motion.duration.pour}
+            accessibilityLabel={`${left} kilocalories ${over ? 'above the budget' : unitWord}`}
+            style={{ fontSize: numSize, lineHeight: numSize - 2, letterSpacing: -numSize * 0.035 }}
+          />
+          <Text variant="unit" style={{ fontSize: 14, lineHeight: 17, marginBottom: numSize * 0.08 }}>
+            {`kcal\n${unitWord}`}
+          </Text>
+        </View>
+      </PressableScale>
+    );
+    return (
+      <Card testID="today-energy" padding={narrow ? NARROW.padding : 18}>
+        {remaining}
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: narrow ? 14 : 16, marginTop: spacing.md }}>
+          <View>
+            <Vessel value={eaten} max={budget} headroom={headroom} color={colors.calories} width={vesselW} height={height} memoryKey={`hero-${day.date}`} />
+            {firstDay && headroom === 0 ? <ReadyRim width={vesselW} /> : null}
+          </View>
+          <View style={{ flex: 1, minWidth: 0, gap: spacing.md }}>
+            {headroom > 0 ? (
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
+                <View style={{ width: 11, height: 11, marginTop: 8, overflow: 'hidden', borderWidth: 1, borderColor: colors.headroom, borderRadius: 2 }}>
+                  <Hatch width={11} height={11} color={colors.headroom} step={4} opacity={1} />
+                </View>
+                <Text variant="numM" style={{ flexShrink: 1, fontSize: 17, lineHeight: 22 }}>
+                  {`~${formatNumber(headroom)}`}
+                  <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
+                    {' added'}
+                  </Text>
+                </Text>
+              </View>
+            ) : notAdded > 0 ? (
+              <Text
+                variant="numM"
+                style={{ fontSize: 17, lineHeight: 22 }}
+                testID="today-not-added"
+                accessibilityLabel={`Workouts: about ${formatNumber(notAdded)} kilocalories, not added to the budget`}>
+                {`~${formatNumber(notAdded)}`}
+                <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
+                  {' not added'}
+                </Text>
+              </Text>
+            ) : null}
+            {actions ? (
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
+                <CupKey color={colors.calories} size={11} style={{ marginTop: 8 }} />
+                <View pointerEvents="none" accessible accessibilityLabel={`${formatNumber(eaten)} kilocalories eaten. ${budgetLabel}`} style={{ flexShrink: 1 }}>
+                  <AnimatedNumber variant="numM" value={eaten} format={(n) => formatNumber(Math.round(n))} style={{ fontSize: 17, lineHeight: 22 }} testID="today-eaten">
+                    <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
+                      {' eaten of '}
+                    </Text>
+                    <Text variant="numM" style={{ fontSize: 17, lineHeight: 22 }} testID="today-budget">
+                      {formatNumber(day.budget)}
+                    </Text>
+                  </AnimatedNumber>
+                </View>
+              </View>
+            ) : null}
+          </View>
+        </View>
+        {actions ? (
+          <View testID="today-actions" style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: spacing.md }}>
+            {ideasChip ? (
+              <Chip
+                testID="today-ideas"
+                label="Ideas that fit"
+                accessibilityLabel="Ideas that fit: meals and foods for what is left"
+                icon={<CookingPot size={18} color={colors.text} strokeWidth={2.2} />}
+                onPress={onFits}
+              />
+            ) : (
+              <View />
+            )}
+            <ShareDayButton date={day.date} size={SHARE_CUP} />
+          </View>
+        ) : null}
+        {firstDay || notLogged ? null : (
+          <View style={{ gap: spacing.md, marginTop: spacing.lg }} testID="today-macros">
+            <MacroColumn label="Protein" value={day.eaten.protein} target={day.macros.proteinG} color={colors.protein} narrow={narrow} reach stacked />
+            <MacroColumn label="Carbs" value={day.eaten.carbs} target={day.macros.carbsG} color={colors.carbs} narrow={narrow} stacked />
+            <MacroColumn label="Fat" value={day.eaten.fat} target={day.macros.fatG} color={colors.fat} narrow={narrow} stacked />
+          </View>
+        )}
+        {firstDay ? (
+          <View style={{ marginTop: narrow ? 12 : 18 }}>
+            <FirstLogInvite meal={meal} date={day.date} budget={day.budget} narrow={narrow} />
+          </View>
+        ) : null}
+      </Card>
+    );
+  }
+
   return (
     <Card testID="today-energy" padding={narrow ? NARROW.padding : 18} style={narrow ? { paddingVertical: NARROW.paddingV } : undefined}>
       <View style={actionsRoom ? { marginBottom: actionsRoom } : undefined}>
@@ -404,21 +534,43 @@ function EnergyCard({
   );
 }
 
-/** One macro as a column: its key and name, its bar, then the amount of its target. The same shape as the diary's summary card. */
-function MacroColumn({ label, value, target, color, reach, narrow }: { label: string; value: number; target: number; color: string; reach?: boolean; narrow: boolean }) {
+/**
+ * One macro as a column: its key and name, its bar, then the amount of its target. The same shape as the diary's
+ * summary card. `stacked` (large text): one full-width row each, the name and the amount on one line (the amount
+ * wraps under the name when both do not fit), the bar under them.
+ */
+function MacroColumn({ label, value, target, color, reach, narrow, stacked }: { label: string; value: number; target: number; color: string; reach?: boolean; narrow: boolean; stacked?: boolean }) {
+  const name = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <CupKey color={color} />
+      <Text variant="label" numberOfLines={stacked ? undefined : 1}>
+        {label}
+      </Text>
+    </View>
+  );
+  const bar = <ProgressBar progress={target > 0 ? value / target : 0} color={color} height={6} goalKind={reach ? 'reach' : 'limit'} />;
+  // The target may wrap under the number on a narrow phone, whole ("/ 493 g"); it is never cut.
+  const amount = (
+    <AnimatedNumber variant="numM" value={Math.round(value)} style={{ fontSize: narrow ? 15 : 17, lineHeight: narrow ? 18 : 22 }}>
+      <Text variant="caption" color="textSecondary">{` / ${Math.round(target)} g`}</Text>
+    </AnimatedNumber>
+  );
+  if (stacked) {
+    return (
+      <View style={{ gap: 8 }} accessible accessibilityLabel={`${label}, ${Math.round(value)} of ${target} grams`}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', columnGap: 12 }}>
+          {name}
+          {amount}
+        </View>
+        {bar}
+      </View>
+    );
+  }
   return (
     <View style={{ flex: 1, minWidth: 0, gap: narrow ? NARROW.macroGap : 8 }} accessible accessibilityLabel={`${label}, ${Math.round(value)} of ${target} grams`}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <CupKey color={color} />
-        <Text variant="label" numberOfLines={1}>
-          {label}
-        </Text>
-      </View>
-      <ProgressBar progress={target > 0 ? value / target : 0} color={color} height={6} goalKind={reach ? 'reach' : 'limit'} />
-      {/* The target may wrap under the number on a narrow phone, whole ("/ 493 g"); it is never cut. */}
-      <AnimatedNumber variant="numM" value={Math.round(value)} style={{ fontSize: narrow ? 15 : 17, lineHeight: narrow ? 18 : 22 }}>
-        <Text variant="caption" color="textSecondary">{` / ${Math.round(target)} g`}</Text>
-      </AnimatedNumber>
+      {name}
+      {bar}
+      {amount}
     </View>
   );
 }
@@ -453,7 +605,8 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
   // One tap, one glass: a quick second tap on "Add 250 ml" does not log a second one.
   const oneTap = useOneTap();
 
-  const small = { size: 'sm' as const, variant: 'secondary' as const, full: false, style: { alignSelf: 'flex-start' as const } };
+  // Never wider than the card (large text): a long action ("Repeat yesterday's breakfast") stays inside its edges.
+  const small = { size: 'sm' as const, variant: 'secondary' as const, full: false, style: { alignSelf: 'flex-start' as const, maxWidth: '100%' as const } };
   let button: React.ReactNode = null;
   if (quick?.kind === 'water') {
     button = (
@@ -526,6 +679,9 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
 function MealsSection({ day }: { day: DaySummary }) {
   const { colors, spacing } = useTheme();
   const all = useLive('foodEntries');
+  // Large text: a meal's name and its calories wrap as two lines when both do not fit, and "Repeat" goes on a row of
+  // its own under the meal, so the caption keeps the room it needs and never splits a word.
+  const large = useTextGrowth() > LARGE_TEXT;
   const open = (meal: MealType) => router.push(`/food/search?meal=${meal}&date=${day.date}`);
   return (
     <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
@@ -561,8 +717,8 @@ function MealsSection({ day }: { day: DaySummary }) {
                   onPress={() => (entries.length ? router.push(`/diary?date=${day.date}&meal=${m.id}` as never) : open(m.id))}
                   accessibilityLabel={spokenUnits(`${m.label}, ${entries.length ? `${line.approx ? 'about ' : ''}${Math.round(line.kcal)} kilocalories, ${line.detail}` : 'not logged yet'}`)}
                   style={{ flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm }}>
-                    <Text variant="title" style={{ flex: 1 }} numberOfLines={1}>
+                  <View style={large ? { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', columnGap: spacing.sm } : { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm }}>
+                    <Text variant="title" style={large ? undefined : { flex: 1 }} numberOfLines={large ? undefined : 1}>
                       {m.label}
                     </Text>
                     {entries.length ? (
@@ -572,7 +728,7 @@ function MealsSection({ day }: { day: DaySummary }) {
                       </Text>
                     ) : null}
                   </View>
-                  <Text variant="caption" color="textSecondary" numberOfLines={2}>
+                  <Text variant="caption" color="textSecondary" numberOfLines={large ? undefined : 2}>
                     {entries.length
                       ? line.detail
                       : prev
@@ -580,11 +736,16 @@ function MealsSection({ day }: { day: DaySummary }) {
                         : `Around ${formatNumber(Math.round((day.budget * MEAL_SHARE[m.id]) / 10) * 10)} kcal suggested`}
                   </Text>
                 </PressableScale>
-                {prev ? <RepeatButton meal={m.id} date={day.date} prev={prev} /> : null}
+                {prev && !large ? <RepeatButton meal={m.id} date={day.date} prev={prev} /> : null}
                 <IconButton testID={`today-add-${m.id}`} accessibilityLabel={`Add food to ${m.label}`} onPress={() => open(m.id)}>
                   <Plus size={20} color={colors.text} strokeWidth={2.2} />
                 </IconButton>
               </View>
+              {prev && large ? (
+                <View style={{ flexDirection: 'row', paddingLeft: spacing.lg, paddingRight: spacing.sm, paddingBottom: 10 }}>
+                  <RepeatButton meal={m.id} date={day.date} prev={prev} />
+                </View>
+              ) : null}
             </View>
           );
         })}

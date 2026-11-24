@@ -19,6 +19,7 @@ import { live } from '@/store/selectors';
 import { cup, fonts, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType, SavedMeal } from '@/types';
 import { IconButton, PressableScale, Text } from '@/ui';
+import { spokenUnits } from '@/lib/spokenUnits';
 
 import { formatPortion, itemsRange, mealServings } from './build';
 import { FavoriteStar } from './FavoriteStar';
@@ -73,7 +74,7 @@ export function SavedMealRow({ meal, testID, onReview, onLog, onHold }: { meal: 
           star();
         }}
         scaleTo={0.985}
-        accessibilityLabel={`${meal.name}, ${meal.items.length} items, ${approxKcalSpoken(total, estimate)}${on ? ', favourite' : ''}. Choose servings and items before logging`}
+        accessibilityLabel={spokenUnits(`${meal.name}, ${meal.items.length} items, ${approxKcalSpoken(total, estimate)}${on ? ', favourite' : ''}. Choose servings and items before logging`)}
         accessibilityActions={[{ name: FAVOURITE_ACTION.name, label: favoriteActionLabel(on) }]}
         onAccessibilityAction={(e) => {
           if (e.nativeEvent.actionName === FAVOURITE_ACTION.name) star();
@@ -121,7 +122,7 @@ export function SaveCurrentMealRow({ meal, date, today, entries }: { meal: MealT
         testID="save-current-meal"
         onPress={() => setOpen(true)}
         scaleTo={0.985}
-        accessibilityLabel={`${saveHintLabel(meal)}, ${caption}`}
+        accessibilityLabel={spokenUnits(`${saveHintLabel(meal)}, ${caption}`)}
         style={{
           flexDirection: 'row',
           alignItems: 'center',

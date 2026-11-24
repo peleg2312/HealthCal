@@ -3,6 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 
+import { useTextGrowth } from '@/features/activity/textGrowth';
 import { clockTime } from '@/features/import/ui/format';
 import { resolveDateParam } from '@/features/trackers/dateParam';
 import { diffDays, formatDayLabel, formatShortDate } from '@/lib/dates';
@@ -11,7 +12,7 @@ import { weightChartLabel } from '@/features/progress/chartWords';
 import { trendMonthParts, weeklyRateText } from '@/features/progress/goalDate';
 import { formatWeight, weightToKg, weightUnit, weightValue } from '@/lib/units';
 import { applyWeighInToTargets, deleteWeightRecord, saveWeightRecord } from '@/features/trackers/actions';
-import { DayStepper, Explain, ExplainText, Figure, RequireProfile } from '@/features/trackers/components';
+import { DayStepper, Explain, ExplainText, Figure, HistoryRow, RequireProfile } from '@/features/trackers/components';
 import { findByDate, keepOrConvert, targetsBehind, weightChartData, weightStats, type WeightRange } from '@/features/trackers/helpers';
 import { isSyncedWeighIn, weighInFromLine } from '@/features/trackers/weighInSource';
 import { useToday } from '@/store/clock';
@@ -26,7 +27,6 @@ import {
   EmptyState,
   Header,
   LineChart,
-  ListRow,
   NumberField,
   Screen,
   SectionTitle,
@@ -54,6 +54,7 @@ function fixedWeight(kg: number, units: UnitSystem): string {
 
 function WeightScreen() {
   const { colors, spacing } = useTheme();
+  const bigText = useTextGrowth() > 1.15;
   const profile = useProfile();
   const units = profile.units;
   const series = useWeightSeries();
@@ -217,7 +218,7 @@ function WeightScreen() {
               return (
                 <React.Fragment key={e.id}>
                   {i > 0 ? <Divider /> : null}
-                  <ListRow
+                  <HistoryRow
                     testID={`weight-row-${i}`}
                     title={formatDayLabel(e.date)}
                     subtitle={[
@@ -227,8 +228,9 @@ function WeightScreen() {
                     ]
                       .filter(Boolean)
                       // The change first and where it came from last: at 320 px a long line is shortened at the source, never the change.
-                      // Each part stays whole ("20.8% body fat"), so a long line breaks only between them.
-                      .map((part) => (part as string).replace(/ /g, '\u00A0'))
+                      // Each part stays whole ("20.8% body fat"), so a long line breaks only between them; at large
+                      // text a part may break between its words, never inside one.
+                      .map((part) => (bigText ? (part as string) : (part as string).replace(/ /g, '\u00A0')))
                       .join(' · ') || undefined}
                     value={fixedWeight(e.kg, units)}
                     onPress={() => setSheetDate(e.date)}

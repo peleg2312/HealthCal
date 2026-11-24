@@ -6,6 +6,7 @@ import { useWindowDimensions, View } from 'react-native';
 import { addDays, formatDayLabel, formatShortDate } from '@/lib/dates';
 import { budgetBalanceText, weekRangeLabel, type RecapTile } from '@/lib/insights';
 import { formatNumber } from '@/lib/units';
+import { useTextGrowth } from '@/features/activity/textGrowth';
 import { changeDirection, changeWords, type ChangeKind } from '@/features/progress/change';
 import { spokenUnits } from '@/features/progress/chartWords';
 import { go } from '@/features/progress/parts';
@@ -34,6 +35,8 @@ function Tile({ t, index, week }: { t: RecapTile; index: number; week: string })
   const { colors, spacing } = useTheme();
   // At 320 px a tile is about 108 px wide: the number steps down so it and its unit are never cut.
   const narrow = useWindowDimensions().width < 360;
+  // Above 115% text a tile takes the card's whole width, so a number never splits from its unit or inside itself.
+  const oneColumn = useTextGrowth() > 1.15;
   const color = {
     calories: colors.calories,
     protein: colors.protein,
@@ -50,14 +53,14 @@ function Tile({ t, index, week }: { t: RecapTile; index: number; week: string })
       accessible
       accessibilityLabel={spokenUnits(`${t.label}: ${t.value === null ? 'no data' : `${formatNumber(t.value)} ${t.unit}`}, ${t.context}. ${said}`)}
       style={{
-        width: '50%',
+        width: oneColumn ? '100%' : '50%',
         minWidth: 0,
         paddingHorizontal: spacing.lg,
         paddingTop: 14,
         paddingBottom: spacing.lg,
         gap: 3,
-        borderRightWidth: index % 2 === 0 ? 1 : 0,
-        borderTopWidth: index >= 2 ? 1 : 0,
+        borderRightWidth: index % 2 === 0 && !oneColumn ? 1 : 0,
+        borderTopWidth: index >= (oneColumn ? 1 : 2) ? 1 : 0,
         borderColor: colors.border,
       }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
@@ -85,7 +88,7 @@ function Tile({ t, index, week }: { t: RecapTile; index: number; week: string })
           <Text variant="unit">{` ${t.unit}`}</Text>
         </AnimatedNumber>
       )}
-      <Text variant="caption" color="textSecondary" numberOfLines={2}>
+      <Text variant="caption" color="textSecondary" numberOfLines={oneColumn ? 4 : 2}>
         {t.context}
       </Text>
       {deltaText(t) ? (
@@ -102,7 +105,7 @@ function Tile({ t, index, week }: { t: RecapTile; index: number; week: string })
               <Arrow size={12} color={colors.textSecondary} />
             </View>
           ) : null}
-          <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1 }}>
+          <Text variant="caption" color="textSecondary" numberOfLines={oneColumn ? 4 : 2} style={{ flexShrink: 1 }}>
             {deltaText(t)}
           </Text>
         </View>
@@ -126,7 +129,8 @@ function Row({ icon, label, text, testID }: { icon: React.ReactNode; label: stri
         {icon}
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-        <Text variant="overline">{label}</Text>
+        {/* The last two words held together, so a wrapped overline never leaves one alone. */}
+        <Text variant="overline">{label.replace(/ (\S+)$/, '\u00A0$1')}</Text>
         <Text variant="body">{text}</Text>
       </View>
     </View>

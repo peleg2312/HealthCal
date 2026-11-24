@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Eye, EyeOff, KeyRound, MailCheck, Smartphone, TriangleAlert } from 'lucide-react-native';
+import { Eye, EyeOff, Info, KeyRound, MailCheck, Smartphone, TriangleAlert } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Platform, View, type TextInputInstance } from 'react-native';
 
@@ -205,7 +205,7 @@ function AuthForm({ initial, fromEmail, googleError = null }: { initial: Mode; f
             <GoogleButton testID="auth-google" onPress={google.press} busy={google.busy} disabled={busy} />
             {/* Not a field error and nothing went wrong: the same neutral note welcome uses, never red, on the card surface in every look. */}
             {google.error ? (
-              <Note tone="warning" surface="card" testID="auth-google-error" icon={<TriangleAlert size={18} color={colors.warningInk} />}>
+              <Note tone="neutral" surface="card" testID="auth-google-error" icon={<Info size={18} color={colors.text} />}>
                 <Text variant="caption" color="textSecondary" accessibilityLiveRegion="polite">
                   {google.error}
                 </Text>

@@ -32,6 +32,7 @@ import { formatNumber, volumeUnit, volumeValue } from '@/lib/units';
 import { useTheme } from '@/theme';
 import type { Food, UnitSystem } from '@/types';
 import { Button, Divider, IconButton, NumberField, PressableScale, Sheet, Text, TextField } from '@/ui';
+import { spokenUnits } from '@/lib/spokenUnits';
 
 import { sheetList, type OnlineAnswer, type SheetItem } from './pick';
 import { enteredKcalError } from './rules';
@@ -240,7 +241,7 @@ function SheetLine({ item, first, onPick, onShowAll }: { item: SheetItem; first:
         onPress={onShowAll}
         scaleTo={0.985}
         accessibilityRole="button"
-        accessibilityLabel={item.label}
+        accessibilityLabel={spokenUnits(item.label)}
         style={{ minHeight: 44, justifyContent: 'center' }}>
         <Text variant="bodyStrong" color="primaryInk">
           {item.text}
@@ -255,7 +256,7 @@ function SheetLine({ item, first, onPick, onShowAll }: { item: SheetItem; first:
         testID={item.testID}
         onPress={() => onPick(item.food)}
         scaleTo={0.985}
-        accessibilityLabel={item.label}
+        accessibilityLabel={spokenUnits(item.label)}
         style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 8 }}>
         <View style={{ width: 24, alignItems: 'center' }}>
           <Text style={{ fontSize: 17, lineHeight: 24 }}>{item.food.emoji ?? '🥤'}</Text>

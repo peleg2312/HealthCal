@@ -5,6 +5,7 @@ import { Platform, useWindowDimensions, View } from 'react-native';
 import { CoachEntry } from '@/features/coach/CoachEntry';
 import { useCoachMovedToast } from '@/features/coach/movedToast';
 import { FriendsEntry } from '@/features/friends/FriendsEntry';
+import { LARGE_TEXT, useTextGrowth } from '@/features/today/textGrowth';
 import { formatShortDate, fromISODate } from '@/lib/dates';
 import { useProfile } from '@/store/selectors';
 import { cupFor, MAX_CONTENT_WIDTH, spacing as SPACING, useTheme } from '@/theme';
@@ -111,12 +112,14 @@ export function TabHeader({
   useCoachMovedToast();
   useEffect(preloadCoach, []);
   const width = useWindowDimensions().width;
+  const large = useTextGrowth() > LARGE_TEXT;
   const size = titleSize ?? tabTitleSize(width);
   const initial = ((profile.name ?? '').trim() || 'Me').slice(0, 1).toUpperCase();
   return (
     <View testID="tab-header" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 68, paddingVertical: spacing.sm }}>
       <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
-        <Text variant="overline" numberOfLines={1}>
+        {/* One line at 100%; with large text it wraps at its words rather than lose the date's end. */}
+        <Text variant="overline" numberOfLines={large ? undefined : 1}>
           {overlineShort && width < 360 ? overlineShort : overline}
         </Text>
         {/* One line by its choice of words and size (todayTitle), never by clipping: under a reader's own text

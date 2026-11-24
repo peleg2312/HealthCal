@@ -18,6 +18,7 @@ import { mealOnDay } from '@/features/food/addedTo';
 import { href } from '@/features/food/helpers';
 import { logDrink, removeDrink } from '@/features/food/log';
 import { useOneTap } from '@/features/food/oneTap';
+import { useBigText } from '@/features/food/textGrowth';
 import { waterChartLabel } from '@/features/progress/chartWords';
 import { customFoodIndex, resolveFood } from '@/features/food/usuals';
 import { ENTERED, type DrinkChoice } from '@/features/drinks/choices';
@@ -34,6 +35,7 @@ import { leftLitreDecimals, shownMl, volumeNumber, volumeUnitFor, waterLeftMl } 
 import { useTheme } from '@/theme';
 import { pourLandsAt } from '@/theme/motion';
 import type { Beverage, Food, WaterEntry } from '@/types';
+import { spokenUnits } from '@/lib/spokenUnits';
 import {
   AnimatedList,
   AnimatedNumber,
@@ -114,9 +116,12 @@ function reachedNote(extra: string | null, isToday: boolean): string | null {
  * that needs and balanced, so four glasses on a 320 px phone are two and two rather than three and
  * one stretched across the screen. A short last row is padded (-1) so every tile keeps one width.
  */
-function tileRows(count: number, screenW: number): number[][] {
+/** A glass tile's least width with large text: "500 ml" whole at 200%, two tiles a row at 320 px. */
+const BIG_TILE = 128;
+
+function tileRows(count: number, screenW: number, minTile = 72): number[][] {
   const content = Math.min(screenW, 560) - 40;
-  const fit = Math.max(1, Math.floor((content + 8) / (72 + 8)));
+  const fit = Math.max(1, Math.floor((content + 8) / (minTile + 8)));
   const rows = Math.ceil(count / fit);
   const perRow = Math.ceil(count / Math.max(1, rows));
   const out: number[][] = [];
@@ -132,6 +137,9 @@ function WaterScreen() {
   const { colors, spacing } = useTheme();
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
+  // Large text (Profile's text size, or the phone's): the cup's words leave the cup's side for a column of
+  // their own, the glasses go two a row and "Other amount" says "Amount", so nothing is cut or overlaps.
+  const big = useBigText();
   const profile = useProfile();
   const settings = useStore((s) => s.settings);
   const units = profile.units;
@@ -299,76 +307,103 @@ function WaterScreen() {
   }));
   const daysMet = week.filter((d) => d.waterMl >= d.waterGoalMl && d.waterGoalMl > 0).length;
 
+  // The cup's three words: placed at their levels beside the cup, or with large text in a column of their own.
+  const goalWords = (
+    <Text variant="caption" color="textSecondary" numberOfLines={1}>
+      {`Goal ${formatVolume(goal, units)}`}
+    </Text>
+  );
+  const percentWords = (
+    <View>
+      <AnimatedNumber
+        testID="water-percent"
+        variant="numXL"
+        value={Math.round(progress * 100)}
+        format={(n) => `${Math.round(n)}%`}
+        style={{ fontSize: narrow ? 44 : 54, lineHeight: narrow ? 46 : 56, letterSpacing: -1.6 }}
+      />
+      <Text variant="caption" color="textSecondary">
+        {isToday ? 'of today’s goal' : 'of the day’s goal'}
+      </Text>
+    </View>
+  );
+  const drunkWords = (oneLine: boolean) => (
+    <AnimatedNumber
+      variant="numM"
+      numberOfLines={oneLine ? 1 : undefined}
+      style={{ fontSize: 17, lineHeight: 22 }}
+      testID="water-consumed"
+      value={consumed}
+      format={(ml) => volumeNumber(ml, consumed, units)}
+      accessibilityLabel={spokenUnits(`${formatVolume(consumed, units)} drunk`)}>
+      <Text variant="unit">{` ${volumeUnitFor(consumed, units)}`}</Text>
+      <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
+        {'  drunk'}
+      </Text>
+    </AnimatedNumber>
+  );
+
   return (
     <Screen header={<Header title="Water" subtitle={isToday ? 'Today' : dayTitle(date)} />} backdrop={colors.water} testID="water-screen">
       <Card padding={18} style={{ gap: spacing.lg }} testID="water-hero">
-        <Vessel
-          value={consumed}
-          max={goal}
-          goalKind="reach"
-          onReached={onReached}
-          memoryKey={`water-${date}`}
-          color={colors.water}
-          width={narrow ? 76 : 96}
-          // Under 360 px the cup is shorter, so all four glasses stay in the first view at 320 x 640.
-          height={narrow ? 168 : 220}
-          labelGap={narrow ? 14 : 18}
-          // Labels that meet at some level keep 8 px between them, at every value.
-          labelSpacing={8}
-          accessibilityLabel={`${formatVolume(consumed, units)} of ${formatVolume(goal, units)}`}
-          labels={[
-            {
-              key: 'goal',
-              at: goal,
-              height: 20,
-              content: (
-                <Text variant="caption" color="textSecondary" numberOfLines={1}>
-                  {`Goal ${formatVolume(goal, units)}`}
-                </Text>
-              ),
-            },
-            {
-              key: 'percent',
-              at: (Math.min(consumed, goal) + goal) / 2,
-              height: 72,
-              content: (
-                <View>
-                  <AnimatedNumber
-                    testID="water-percent"
-                    variant="numXL"
-                    value={Math.round(progress * 100)}
-                    format={(n) => `${Math.round(n)}%`}
-                    style={{ fontSize: narrow ? 44 : 54, lineHeight: narrow ? 46 : 56, letterSpacing: -1.6 }}
-                  />
-                  <Text variant="caption" color="textSecondary">
-                    {isToday ? 'of today’s goal' : 'of the day’s goal'}
-                  </Text>
-                </View>
-              ),
-            },
-            {
-              key: 'drunk',
-              at: Math.min(consumed, goal),
-              height: 24,
-              tick: consumed > 0 ? colors.rim : undefined,
-              content: (
-                <AnimatedNumber
-                  variant="numM"
-                  numberOfLines={1}
-                  style={{ fontSize: 17, lineHeight: 22 }}
-                  testID="water-consumed"
-                  value={consumed}
-                  format={(ml) => volumeNumber(ml, consumed, units)}
-                  accessibilityLabel={`${formatVolume(consumed, units)} drunk`}>
-                  <Text variant="unit">{` ${volumeUnitFor(consumed, units)}`}</Text>
-                  <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
-                    {'  drunk'}
-                  </Text>
-                </AnimatedNumber>
-              ),
-            },
-          ]}
-        />
+        {big ? (
+          // The cup, and its three words in a column of their own beside it (under it when they need the width).
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: spacing.lg }}>
+            <Vessel
+              value={consumed}
+              max={goal}
+              goalKind="reach"
+              onReached={onReached}
+              memoryKey={`water-${date}`}
+              color={colors.water}
+              width={narrow ? 76 : 96}
+              height={narrow ? 168 : 220}
+              accessibilityLabel={spokenUnits(`${formatVolume(consumed, units)} of ${formatVolume(goal, units)}`)}
+            />
+            <View style={{ flexGrow: 1, flexBasis: 140, minWidth: 0, gap: spacing.sm }}>
+              {goalWords}
+              {percentWords}
+              {drunkWords(false)}
+            </View>
+          </View>
+        ) : (
+          <Vessel
+            value={consumed}
+            max={goal}
+            goalKind="reach"
+            onReached={onReached}
+            memoryKey={`water-${date}`}
+            color={colors.water}
+            width={narrow ? 76 : 96}
+            // Under 360 px the cup is shorter, so all four glasses stay in the first view at 320 x 640.
+            height={narrow ? 168 : 220}
+            labelGap={narrow ? 14 : 18}
+            // Labels that meet at some level keep 8 px between them, at every value.
+            labelSpacing={8}
+            accessibilityLabel={spokenUnits(`${formatVolume(consumed, units)} of ${formatVolume(goal, units)}`)}
+            labels={[
+              {
+                key: 'goal',
+                at: goal,
+                height: 20,
+                content: goalWords,
+              },
+              {
+                key: 'percent',
+                at: (Math.min(consumed, goal) + goal) / 2,
+                height: 72,
+                content: percentWords,
+              },
+              {
+                key: 'drunk',
+                at: Math.min(consumed, goal),
+                height: 24,
+                tick: consumed > 0 ? colors.rim : undefined,
+                content: drunkWords(true),
+              },
+            ]}
+          />
+        )}
 
         {/* The goal is the cup's top label; under the cup only what is left, or, once the goal is reached, one
             line of plain text that says so with the extra (the brim line on the cup carries the moment: no second
@@ -385,7 +420,7 @@ function WaterScreen() {
         ) : (
           <View style={{ gap: 2 }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
-              <AnimatedNumber testID="water-left" variant="numL" value={left} format={(ml) => volumeNumber(ml, left, units, leftLitreDecimals(left))} accessibilityLabel={`${formatVolume(left, units)} left to drink`} />
+              <AnimatedNumber testID="water-left" variant="numL" value={left} format={(ml) => volumeNumber(ml, left, units, leftLitreDecimals(left))} accessibilityLabel={spokenUnits(`${formatVolume(left, units)} left to drink`)} />
               <Text variant="unit" style={{ fontSize: 15 }}>
                 {`${volumeUnitFor(left, units)} left to drink`}
               </Text>
@@ -422,7 +457,7 @@ function WaterScreen() {
         />
       )}
       <View style={{ gap: spacing.sm }}>
-        {tileRows(settings.waterPresets.length, screenW).map((row, r) => (
+        {tileRows(settings.waterPresets.length, screenW, big ? BIG_TILE : 72).map((row, r) => (
           <View key={r} style={{ flexDirection: 'row', gap: spacing.sm }}>
             {row.map((i) => {
               if (i < 0) return <View key={`pad-${r}-${i}`} style={{ flex: 1 }} />;
@@ -435,7 +470,7 @@ function WaterScreen() {
                   key={`${ml}-${i}`}
                   testID={`water-add-${i}`}
                   // The tile's own words first ("150 ml, Small"), then what the tap does.
-                  accessibilityLabel={`${title}${subtitle ? `, ${subtitle}` : ''}. ${tilePlan.label}`}
+                  accessibilityLabel={spokenUnits(`${title}${subtitle ? `, ${subtitle}` : ''}. ${tilePlan.label}`)}
                   title={title}
                   subtitle={subtitle}
                   icon={<GlassWater size={Math.min(26, 16 + i * 3)} color={colors.water} strokeWidth={1.9} />}
@@ -450,7 +485,7 @@ function WaterScreen() {
         <NumberField
           testID="water-custom-input"
           style={{ flex: 1 }}
-          placeholder="Other amount"
+          placeholder={big ? 'Amount' : 'Other amount'}
           suffix={volumeUnit(units)}
           decimals={0}
           value={custom}
@@ -543,7 +578,7 @@ function WaterScreen() {
                     <PressableScale
                       testID={`water-entry-open-${i}`}
                       scaleTo={0.985}
-                      accessibilityLabel={fromDiary ? diaryWaterOpenLabel(title, partner) : `${title}, ${waterRowCaption(partner, e.date).replace(' · ', ', ')}. Edit in diary`}
+                      accessibilityLabel={spokenUnits(fromDiary ? diaryWaterOpenLabel(title, partner) : `${title}, ${waterRowCaption(partner, e.date).replace(' · ', ', ')}. Edit in diary`)}
                       onPress={() => router.push(href('/food/detail', { entryId: partner.id, meal: partner.meal, date: partner.date }) as never)}
                       style={{ ...rowStyle, flex: 1, minWidth: 0 }}>
                       {text}
@@ -553,7 +588,7 @@ function WaterScreen() {
                   )}
                   <IconButton
                     testID={`water-delete-${i}`}
-                    accessibilityLabel={waterDeleteLabel(e, loggedLabel(e), units, fromDiary ? partner : null)}
+                    accessibilityLabel={spokenUnits(waterDeleteLabel(e, loggedLabel(e), units, fromDiary ? partner : null))}
                     tone="clear"
                     size={44}
                     onPress={() => removeRow(e)}>
@@ -601,7 +636,7 @@ function WaterScreen() {
         </Text>
         <BarChart
           // One image for a screen reader: the summary, then every day's amount (chartWords).
-          accessibilityLabel={waterChartLabel(week.map((d) => ({ date: d.date, ml: d.waterMl, goalMl: d.waterGoalMl })), todayDate, units)}
+          accessibilityLabel={spokenUnits(waterChartLabel(week.map((d) => ({ date: d.date, ml: d.waterMl, goalMl: d.waterGoalMl })), todayDate, units))}
           data={bars}
           color={colors.water}
           goal={volumeValue(goal, units)}

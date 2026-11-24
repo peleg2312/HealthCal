@@ -2,6 +2,7 @@ import { Check } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import { useTextGrowth } from '@/features/activity/textGrowth';
 import { weekdayShort } from '@/lib/dates';
 import { useTheme, withOpacity } from '@/theme';
 import { MiniCup, PressableScale, Text } from '@/ui';
@@ -34,6 +35,9 @@ export function RecapCups({ cups, week }: { cups: RecapDayCup[]; week: string })
   const [selected, setSelected] = useState<string | null>(null);
   const narrow = useWindowDimensions().width < 360;
   const cupW = narrow ? CUP_W_NARROW : CUP_W;
+  // Above 115% text "Mon" and "Tue" would run into each other: each day shows its first letter, as Train's week
+  // does (its spoken name keeps the whole day).
+  const oneLetter = useTextGrowth() > 1.15;
   const sel = cups.find((c) => c.date === selected);
   return (
     <View style={{ gap: spacing.sm }}>
@@ -79,7 +83,7 @@ export function RecapCups({ cups, week }: { cups: RecapDayCup[]; week: string })
                     marginTop: 6,
                     minWidth: 30,
                     paddingHorizontal: 4,
-                    height: 20,
+                    minHeight: 20,
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderTopLeftRadius: 4,
@@ -89,7 +93,7 @@ export function RecapCups({ cups, week }: { cups: RecapDayCup[]; week: string })
                     backgroundColor: active ? colors.text : 'transparent',
                   }}>
                   <Text variant="label" color={active ? 'bg' : c.isToday ? 'text' : 'textSecondary'} style={{ fontSize: 12 }}>
-                    {weekdayShort(c.date)}
+                    {oneLetter ? weekdayShort(c.date).slice(0, 1) : weekdayShort(c.date)}
                   </Text>
                 </View>
               </PressableScale>

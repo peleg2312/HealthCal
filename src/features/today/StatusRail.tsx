@@ -5,12 +5,12 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { waterAddedToast } from '@/features/food/addedTo';
 import { useOneTap } from '@/features/food/oneTap';
-import { spokenUnits } from '@/features/progress/chartWords';
 import { startOfWeek, today } from '@/lib/dates';
 import { guidelineMinutes } from '@/lib/exercise';
 import { effectiveMl } from '@/lib/hydration';
 import { nowISO } from '@/lib/id';
 import { WEEKLY_ACTIVE_MINUTES } from '@/lib/insights';
+import { spokenUnits } from '@/lib/spokenUnits';
 import { formatNumber, formatVolume, weightUnit, weightValue } from '@/lib/units';
 import { useFriends } from '@/services/friends';
 import { useStore } from '@/store';
@@ -21,6 +21,7 @@ import type { ISODate } from '@/types';
 import { AnimatedNumber, Button, Card, CupKey, haptic, PressableScale, ProgressBar, Text, toast } from '@/ui';
 
 import { cheersLabel, recentCheerCount } from './cheers';
+import { LARGE_TEXT, useTextGrowth } from './textGrowth';
 import { crossesGoal, volumeNumber, volumeUnitFor, waterOfGoal } from './volume';
 import { weightCell } from './weightCell';
 
@@ -84,6 +85,9 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
   const { colors, spacing } = useTheme();
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
+  // Large text (130% and up): the water row may put its glass under the amount, and the three cells stack as rows,
+  // so every label and value keeps its words whole (textGrowth).
+  const large = useTextGrowth() > LARGE_TEXT;
   const profile = useProfile();
   const units = profile.units;
   const presets = useStore((s) => s.settings.waterPresets);
@@ -142,17 +146,17 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
       {/* 8 px over the water row on a narrow phone (14 otherwise), so the row and its "+ 250 ml" are in the first view at
           320 x 640, clear of the toast a glass raises. */}
       <View style={{ paddingTop: narrow ? 8 : 14, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+        <View style={{ flexDirection: 'row', flexWrap: large ? 'wrap' : 'nowrap', alignItems: 'center', gap: spacing.md }}>
           <PressableScale
             testID="today-water"
             onPress={() => router.push(`/water${dateQuery}` as never)}
             accessibilityLabel={spokenUnits(`Water, ${formatVolume(day.waterMl, units)} of ${goal}`)}
             scaleTo={0.98}
-            style={{ flex: 1, minWidth: 0, minHeight: 44 }}>
+            style={{ flex: 1, minWidth: large ? 150 : 0, minHeight: 44 }}>
             <KeyLabel color={colors.water} label="Water" />
             <AnimatedNumber
               variant="numM"
-              numberOfLines={1}
+              numberOfLines={large ? undefined : 1}
               style={{ marginTop: 3 }}
               value={day.waterMl}
               format={(ml) => volumeNumber(ml, day.waterMl, units)}
@@ -182,10 +186,11 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
         />
       </View>
       <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: spacing.lg }} />
-      <View style={{ flexDirection: 'row', paddingHorizontal: narrow ? spacing.md : spacing.lg, paddingTop: 12, paddingBottom: 14, gap: narrow ? 8 : 12 }}>
+      <View style={{ flexDirection: large ? 'column' : 'row', paddingHorizontal: narrow ? spacing.md : spacing.lg, paddingTop: 12, paddingBottom: 14, gap: narrow ? 8 : 12 }}>
         <Cell
           testID="today-activity"
           narrow={narrow}
+          large={large}
           flex={narrow ? ACTIVITY_FLEX_NARROW : 1}
           label="Activity"
           color={colors.exercise}
@@ -203,21 +208,22 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
                 memoryKey={`rail-week-${weekStart}`}
                 onReached={() => reached(`${WEEKLY_ACTIVE_MINUTES} active minutes ${thisWeek}. That meets the weekly guideline.`)}
               />
-              <Text variant="caption" color="textSecondary" numberOfLines={2} testID="today-activity-week">
+              <Text variant="caption" color="textSecondary" numberOfLines={large ? undefined : 2} testID="today-activity-week">
                 {`${thisWeek}${day.activities.length ? `, ${formatNumber(day.activeMinutes)} ${dayWord}` : ''}`}
               </Text>
             </View>
           ) : null}
           {cheers ? (
-            <Text variant="label" color="text" numberOfLines={1} testID="today-cheers" style={{ marginTop: 4, fontSize: 13 }}>
+            <Text variant="label" color="text" numberOfLines={large ? undefined : 1} testID="today-cheers" style={{ marginTop: 4, fontSize: 13 }}>
               {cheersLabel(cheers)}
             </Text>
           ) : null}
         </Cell>
-        <Hairline />
+        <Hairline across={large} />
         <Cell
           testID="today-sleep"
           narrow={narrow}
+          large={large}
           flex={narrow ? SLEEP_FLEX_NARROW : 0.8}
           label="Sleep"
           color={colors.sleep}
@@ -226,17 +232,18 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
           value={night ? hoursValue(night.hours) : null}
           unit="h"
         />
-        <Hairline />
+        <Hairline across={large} />
         {fast ? (
-          <FastCell start={fast.start} targetHours={fast.targetHours} narrow={narrow} />
+          <FastCell start={fast.start} targetHours={fast.targetHours} narrow={narrow} large={large} />
         ) : (
           <Cell
             testID="today-weight"
             narrow={narrow}
+            large={large}
             flex={narrow ? LAST_FLEX_NARROW : 1.2}
             label={weight?.label ?? 'Weight trend'}
             color={colors.weight}
-            accessibilityLabel={weight ? `${weight.label}, ${weightValue(weight.kg, units).toFixed(1)} ${weightUnit(units)}` : 'Weight, no weigh-ins. Add your weight'}
+            accessibilityLabel={weight ? spokenUnits(`${weight.label}, ${weightValue(weight.kg, units).toFixed(1)} ${weightUnit(units)}`) : 'Weight, no weigh-ins. Add your weight'}
             onPress={() => router.push(`/weight${dateQuery}` as never)}
             value={weight ? weightValue(weight.kg, units).toFixed(1) : null}
             unit={weightUnit(units)}
@@ -284,9 +291,10 @@ function hoursValue(h: number): string {
   return Number.isInteger(h) ? String(h) : h.toFixed(1);
 }
 
-function Hairline() {
+/** The line between two cells: upright between columns, across between stacked rows (`across`, large text). */
+function Hairline({ across = false }: { across?: boolean }) {
   const { colors } = useTheme();
-  return <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: colors.border }} />;
+  return <View style={across ? { height: 1, alignSelf: 'stretch', backgroundColor: colors.border } : { width: 1, alignSelf: 'stretch', backgroundColor: colors.border }} />;
 }
 
 function Cell({
@@ -299,10 +307,13 @@ function Cell({
   unit,
   children,
   narrow,
+  large = false,
   flex = 1,
 }: {
   testID: string;
   narrow?: boolean;
+  /** Large text: a full-width row of a stacked list, its value free to wrap at its words. */
+  large?: boolean;
   flex?: number;
   label: string;
   color: string;
@@ -313,11 +324,11 @@ function Cell({
   children?: React.ReactNode;
 }) {
   return (
-    <PressableScale testID={testID} onPress={onPress} accessibilityLabel={accessibilityLabel} scaleTo={0.96} style={{ flex, minWidth: 0, minHeight: 44 }}>
+    <PressableScale testID={testID} onPress={onPress} accessibilityLabel={accessibilityLabel} scaleTo={0.96} style={large ? { minHeight: 44 } : { flex, minWidth: 0, minHeight: 44 }}>
       <KeyLabel color={color} label={label} />
       {value !== null ? (
         // A four-digit week ("1,240 min") steps down on a narrow phone, so it is never cut.
-        <Text variant="numM" numberOfLines={1} style={[{ marginTop: 3 }, narrow && value.length > 4 ? { fontSize: 17, lineHeight: 24 } : null]}>
+        <Text variant="numM" numberOfLines={large ? undefined : 1} style={[{ marginTop: 3 }, narrow && value.length > 4 ? { fontSize: 17, lineHeight: 24 } : null]}>
           {value}
           <Text variant="unit">{unit ? ` ${unit}` : ''}</Text>
         </Text>
@@ -331,7 +342,7 @@ function Cell({
   );
 }
 
-function FastCell({ start, targetHours, narrow }: { start: string; targetHours: number; narrow: boolean }) {
+function FastCell({ start, targetHours, narrow, large }: { start: string; targetHours: number; narrow: boolean; large: boolean }) {
   const { colors } = useTheme();
   // The clock lives in state so rendering stays pure; it ticks while the fast runs.
   const [now, setNow] = useState(() => Date.now());
@@ -346,6 +357,7 @@ function FastCell({ start, targetHours, narrow }: { start: string; targetHours: 
     <Cell
       testID="today-fasting"
       narrow={narrow}
+      large={large}
       flex={narrow ? LAST_FLEX_NARROW : 1.2}
       label={`Fast of ${targetHours} h`}
       color={colors.fat}

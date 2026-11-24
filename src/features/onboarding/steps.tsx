@@ -514,14 +514,15 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
   const rateKg = rateKgOf(draft, weightKg);
   const plan = buildPlan(draft, now);
 
-  // The stepper works in the display unit.
+  // The stepper works in the display unit, as Goals' does: 0.1 kg or 0.1 lb a step and one decimal shown, so the
+  // pace never shows a false second decimal (a weight has one decimal everywhere).
   const toDisplay = (kg: number) => (imp ? kgToLb(kg) : kg);
-  const step = imp ? 0.25 : 0.05;
-  const minDisplay = step * 2;
+  const step = 0.1;
+  const minDisplay = step;
   // The safe maximum itself is always reachable, even when it is not a whole step.
-  const maxDisplay = Math.max(minDisplay, round(toDisplay(maxKg), 2));
-  const rateDisplay = Math.min(maxDisplay, Math.max(minDisplay, round(toDisplay(rateKg), 2)));
-  const fmtRate = (v: number) => `${formatNumber(v, 2).replace(/\.?0+$/, '')} ${unit}`;
+  const maxDisplay = Math.max(minDisplay, toDisplay(maxKg));
+  const rateDisplay = Math.min(maxDisplay, Math.max(minDisplay, round(toDisplay(rateKg), 1)));
+  const fmtRate = (v: number) => `${formatNumber(v, 1).replace(/\.0$/, '')} ${unit}`;
   const fmtW = (v: number) => `${formatNumber(v, 1).replace(/\.0$/, '')}`;
 
   const delta = plan ? plan.target.dailyDelta : (goal === 'lose' ? -1 : 1) * ((rateKg * KCAL_PER_KG) / 7);
@@ -559,7 +560,7 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
         <View style={{ gap: 2 }}>
           <Text variant="title">Weekly pace</Text>
           <Text variant="caption" color="textSecondary" testID="onb-pace-max">
-            {`Safe maximum ${fmtRate(round(toDisplay(maxKg), 2))} a week (${goal === 'lose' ? '1' : '0.5'}% of body weight)`}
+            {`Safe maximum ${fmtRate(toDisplay(maxKg))} a week (${goal === 'lose' ? '1' : '0.5'}% of body weight)`}
           </Text>
         </View>
         <View style={{ alignItems: 'center' }} testID="onb-pace">
@@ -593,9 +594,7 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
         <Note tone="warning" icon={<TriangleAlert size={18} color={colors.warningInk} />} testID="onb-floor-note">
           <Text variant="bodyStrong">{`Your plan stops at ${formatNumber(plan.floor)} kcal a day`}</Text>
           <Text variant="caption" color="textSecondary">
-            {`A ${formatNumber(Math.round(requestedDelta / 10) * 10)} kcal deficit would take you below ${formatNumber(plan.floor)} kcal, the lowest HealthCal recommends. Expect about ${fmtRate(
-              round(toDisplay(Math.abs(plan.target.impliedWeeklyKg)), 2),
-            )} a week instead. Logged workouts add room on top.`}
+            {`A ${formatNumber(Math.round(requestedDelta / 10) * 10)} kcal deficit would take you below ${formatNumber(plan.floor)} kcal, the lowest HealthCal recommends. Expect about ${fmtRate(toDisplay(Math.abs(plan.target.impliedWeeklyKg)))} a week instead. Logged workouts add room on top.`}
           </Text>
         </Note>
       ) : null}

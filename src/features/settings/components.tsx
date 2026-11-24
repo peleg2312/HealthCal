@@ -20,7 +20,7 @@ export function Group({ title, footer, radiogroup, children }: { title?: string;
     <View style={{ gap: spacing.sm }}>
       {title ? (
         <Text variant="overline" color="textSecondary" style={{ paddingHorizontal: spacing.xs }}>
-          {title}
+          {overlineWords(title)}
         </Text>
       ) : null}
       <Card
@@ -42,6 +42,16 @@ export function Group({ title, footer, radiogroup, children }: { title?: string;
       ) : null}
     </View>
   );
+}
+
+/**
+ * A group's overline with its last two words held together (a no-break space), so where a large text
+ * size wraps it ("How the budget works" at 200%), the last word never stands alone on its own line.
+ * Titles of one or two words are left as they are, so they can still break where they must.
+ */
+export function overlineWords(title: string): string {
+  const words = title.split(' ');
+  return words.length < 3 ? title : `${words.slice(0, -1).join(' ')}\u00A0${words[words.length - 1]}`;
 }
 
 /**

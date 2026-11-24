@@ -192,10 +192,10 @@ export function GoalCup({ goal, index = 0 }: { goal: 'lose' | 'maintain' | 'gain
  * over (never red, and no stripe down the side).
  *
  * `surface="card"` draws it on the card surface inside the card's 1 px line
- * instead: for a note that must stay neutral in every look (a Google sign-in
- * that was not completed), since a look's alt surface can be a strong colour
- * of its own (maroon in Java, blue in Butter and Honey) and would read as an
- * alarm under the amber lip.
+ * instead, for a note that must stay neutral in every look, as a look's alt
+ * surface can be a strong colour of its own (maroon in Java, blue in Butter
+ * and Honey). A Google sign-in that was not completed is such a note:
+ * `neutral`, with an ink info mark and no amber, since amber means only "above".
  */
 export function Note({
   icon,

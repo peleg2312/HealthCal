@@ -189,6 +189,8 @@ src/features/activity/strengthDraft.ts	restRemainingMs	function
 src/features/activity/strengthDraft.ts	useStrengthDrafts	const
 src/features/activity/strengthFormat.ts	formatLiftWeight	function
 src/features/activity/strengthFormat.ts	formatPreviousSets	function
+src/features/activity/textGrowth.ts	textGrowth	function
+src/features/activity/textGrowth.ts	useTextGrowth	function
 src/features/ai/AddMissingItem.tsx	AddMissingItem	component
 src/features/ai/AiConsentAbout.tsx	AiConsentAbout	component
 src/features/ai/AiConsentSheet.tsx	AI_CONSENT_PARTS	const
@@ -1059,6 +1061,9 @@ src/features/food/searchTab.ts	rememberSearchTab	function
 src/features/food/searchTab.ts	resetSearchTabForTests	function
 src/features/food/searchTab.ts	useSearchTab	const
 src/features/food/searchTab.ts	usualEmpty	function
+src/features/food/textGrowth.ts	BIG_TEXT_FROM	const
+src/features/food/textGrowth.ts	useBigText	function
+src/features/food/textGrowth.ts	useTextGrowth	function
 src/features/food/usuals.ts	UsualFood	interface
 src/features/food/usuals.ts	UsualOptions	interface
 src/features/food/usuals.ts	atFoodValues	function
@@ -1817,6 +1822,7 @@ src/features/morning/QuoteBlock.tsx	QuoteBlock	component
 src/features/morning/ReviewList.tsx	ReviewList	component
 src/features/morning/WeekBlock.tsx	WeekBlock	component
 src/features/morning/WeekCups.tsx	WeekCups	component
+src/features/morning/WeekCups.tsx	weekCupColumns	function
 src/features/morning/YesterdayFigures.tsx	FiguresDay	interface
 src/features/morning/YesterdayFigures.tsx	YesterdayFigures	component
 src/features/morning/allowed.ts	morningAllowed	function
@@ -2365,6 +2371,7 @@ src/features/progress/useProgressData.ts	useProgressData	function
 src/features/progress/useRecap.ts	useRecap	function
 src/features/settings/ThemeSwatches.tsx	THEME_HINTS	const
 src/features/settings/ThemeSwatches.tsx	ThemeSwatches	component
+src/features/settings/ThemeSwatches.tsx	swatchesPerRow	function
 src/features/settings/birthDate.ts	BIRTH_AUTOCOMPLETE	const
 src/features/settings/birthDate.ts	BIRTH_INCOMPLETE	const
 src/features/settings/birthDate.ts	BirthParts	interface
@@ -2379,6 +2386,7 @@ src/features/settings/components.tsx	InitialsAvatar	component
 src/features/settings/components.tsx	OptionRow	component
 src/features/settings/components.tsx	TimeRow	component
 src/features/settings/components.tsx	TimeSheet	component
+src/features/settings/components.tsx	overlineWords	function
 src/features/settings/components.tsx	prefers12h	function
 src/features/settings/exportFormat.ts	BACKUP_COLLECTIONS	const
 src/features/settings/exportFormat.ts	BACKUP_FORMAT	const
@@ -2614,6 +2622,9 @@ src/features/today/plates.ts	PlateItem	interface
 src/features/today/plates.ts	platesFor	function
 src/features/today/recapLine.ts	RecapLineDay	interface
 src/features/today/recapLine.ts	recapLine	function
+src/features/today/textGrowth.ts	LARGE_TEXT	const
+src/features/today/textGrowth.ts	textGrowth	function
+src/features/today/textGrowth.ts	useTextGrowth	function
 src/features/today/useBackToToday.ts	useBackToToday	function
 src/features/today/useDaySwipe.tsx	DaySwipeGuard	component
 src/features/today/useDaySwipe.tsx	useDaySwipe	function
@@ -2651,6 +2662,7 @@ src/features/trackers/components.tsx	DayStepper	component
 src/features/trackers/components.tsx	Explain	component
 src/features/trackers/components.tsx	ExplainText	component
 src/features/trackers/components.tsx	Figure	component
+src/features/trackers/components.tsx	HistoryRow	component
 src/features/trackers/components.tsx	Note	component
 src/features/trackers/components.tsx	RequireProfile	component
 src/features/trackers/components.tsx	Tile	component

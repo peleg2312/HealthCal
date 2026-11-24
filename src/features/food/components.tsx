@@ -10,8 +10,10 @@ import { MEALS } from '@/lib/nutrition';
 import { cup, fonts, useTheme } from '@/theme';
 import type { Food, FoodSource, ISODate, MealType } from '@/types';
 import { CupKey, IconButton, PressableScale, Text } from '@/ui';
+import { spokenUnits } from '@/lib/spokenUnits';
 
 import { displayFoodName } from './displayName';
+import { useBigText } from './textGrowth';
 import { canStepForward, entryDayLabel, entryDaySpoken, foodLatestDay } from './entryDay';
 import { kcal, sourceInfo, withSourceWord } from './helpers';
 
@@ -58,7 +60,8 @@ export function SourceTag({ source, plain = false, label }: { source: FoodSource
 /** A food or activity emoji as a 17 px content mark at the start of a row (no tile). */
 export function RowEmoji({ emoji }: { emoji?: string }) {
   return (
-    <View style={{ width: 24, alignItems: 'center' }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    // At least 24 wide, wider as the text size grows (the emoji is a Text), so it never spills into the gutter.
+    <View style={{ minWidth: 24, alignItems: 'center' }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <Text style={{ fontSize: 17, lineHeight: 24 }}>{emoji || '🍽️'}</Text>
     </View>
   );
@@ -90,8 +93,10 @@ export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: 
   const { colors } = useTheme();
   // Four equal cells leave about 60 px each on a 320 px phone: 'Breakfast' fits there one size down.
   const narrow = useWindowDimensions().width < 340;
+  // With large text the four take two lines of two, so no word reaches past the screen (never smaller text).
+  const big = useBigText();
   return (
-    <View accessibilityRole="tablist" style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border }}>
+    <View accessibilityRole="tablist" style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', borderBottomWidth: 1, borderBottomColor: colors.border }}>
       {MEALS.map((m) => {
         const active = m.id === value;
         return (
@@ -108,7 +113,7 @@ export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: 
             aria-selected={active}
             // On the web a cell never shrinks below its word, so wider letter spacing (WCAG 1.4.12) widens
             // "Breakfast" at its neighbours' expense instead of cutting it; natively the word stays one line.
-            style={[{ flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: narrow ? 0 : 2 }, WEB_CELL]}>
+            style={[big ? { width: '50%', minHeight: 44, alignItems: 'center', justifyContent: 'center' } : [{ flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: narrow ? 0 : 2 }, WEB_CELL]]}>
             <Text variant="label" color={active ? 'text' : 'textSecondary'} numberOfLines={Platform.OS === 'web' ? undefined : 1} style={{ fontSize: narrow ? 13 : 14.5, lineHeight: 20, fontFamily: active ? fonts.bold : fonts.semibold }}>
               {m.label}
             </Text>
@@ -266,7 +271,7 @@ export function FoodRow({
           : null)}
         scaleTo={0.985}
         // The source is said in words here for every source (the caption names only those worth a second look).
-        accessibilityLabel={`${name}${matched ? `, ${matched}` : ''}, ${Math.round(kcalValue)} kilocalories, ${sourceInfo(food.source).label}. Open details`}
+        accessibilityLabel={spokenUnits(`${name}${matched ? `, ${matched}` : ''}, ${Math.round(kcalValue)} kilocalories, ${sourceInfo(food.source).label}. Open details`)}
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>
         <RowEmoji emoji={food.emoji} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
@@ -330,7 +335,7 @@ function AmountStepper({ amount, name, testID }: { amount: RowAmount; name: stri
         testID={testID ? `${testID}-amount` : undefined}
         onPress={amount.onOpen}
         feedback="select"
-        accessibilityLabel={`${name}, ${amount.label}. Change amount`}
+        accessibilityLabel={spokenUnits(`${name}, ${amount.label}. Change amount`)}
         style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
         <Text variant="numM" tabular numberOfLines={1} style={{ fontSize: 14.5, lineHeight: 18 }}>
           {amount.label}

@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ACTIVITIES, ACTIVITY_BY_ID, ACTIVITY_CATEGORIES, POPULAR_ACTIVITY_IDS, searchActivities } from '@/data/activities';
 import { effortSpan } from '@/features/activity/effortWords';
+import { useTextGrowth } from '@/features/activity/textGrowth';
 import { formatDayLabel, today } from '@/lib/dates';
 import { useStore } from '@/store';
 import { cup, useTheme } from '@/theme';
@@ -21,6 +22,8 @@ function ActivitySeparator() {
 export default function PickActivityScreen() {
   const { colors, radius, spacing } = useTheme();
   const width = useWindowDimensions().width;
+  // At large text a placeholder longer than one word would be cut in the field.
+  const grow = useTextGrowth();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ date?: string }>();
   const date = typeof params.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : today();
@@ -95,7 +98,7 @@ export default function PickActivityScreen() {
           <TextField
             testID="activity-search"
             // At 320 px the examples do not fit the field.
-            placeholder={width < 360 ? 'Search activities' : 'Search volleyball, yoga, rowing...'}
+            placeholder={grow > 1.15 ? 'Search' : width < 360 ? 'Search activities' : 'Search volleyball, yoga, rowing...'}
             value={query}
             onChangeText={setQuery}
             autoCorrect={false}

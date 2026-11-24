@@ -15,6 +15,7 @@ import { formatPortion, mealServings, planSavedMeal } from '@/features/food/buil
 import { logFood, logItems, logSavedMeal } from '@/features/food/log';
 import { ONE_TAP_GUARD_MS, tooSoon } from '@/features/food/oneTap';
 import { loadSearchTab } from '@/features/food/searchTab';
+import { useBigText } from '@/features/food/textGrowth';
 import { addWater } from '@/features/today/StatusRail';
 import { quickLogDate, quickLogPastDate, useViewedDay } from '@/features/today/viewedDay';
 import { currentKcal, customFoodIndex, resolveFood, resolveUsuals, usualFoods, usualLabel, type UsualFood } from '@/features/food/usuals';
@@ -28,6 +29,7 @@ import { computeDayFromStore, live, useLive, useProfile } from '@/store/selector
 import { cup, useTheme } from '@/theme';
 import type { Food, FoodEntry, FoodSource, ISODate, SavedMeal } from '@/types';
 import { PressableScale, Sheet, Text } from '@/ui';
+import { spokenUnits } from '@/lib/spokenUnits';
 
 /** Re-log a usual food in its last portion. Entries with a food definition go through logFood so recents stay fresh. */
 function logUsual(u: UsualFood, date: ISODate) {
@@ -52,6 +54,10 @@ function oneTapThenClose(log: () => void, close: () => void) {
   clearTimeout(closeTimer);
   closeTimer = setTimeout(close, ONE_TAP_GUARD_MS);
 }
+
+/** A food or meal tile's width in the row of likely next logs; wider with large text, so a word fits a line. */
+const TILE_W = 136;
+const TILE_W_BIG = 216;
 
 const whenPhrase = (date: ISODate, from: ISODate) => (date === addDays(from, -1) ? 'yesterday' : formatShortDate(date));
 
@@ -112,6 +118,11 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   }, []);
   // Under 360 px a half tile has no room for the icon beside its name ("Snap a" / "meal"): the icon goes above it.
   const narrow = useWindowDimensions().width < 360;
+  // Large text (Profile's text size, or the phone's): the food tiles grow wider, every way in is a whole row,
+  // and nothing is pinned (the likely next log leads the body instead), so no word is split and nothing is cut
+  // by the bottom of the screen.
+  const big = useBigText();
+  const tileW = big ? TILE_W_BIG : TILE_W;
   const glasses = [...presets]
     .filter((p) => p > 0)
     .sort((a, b) => a - b)
@@ -163,6 +174,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
     <MealTile
       key={key}
       meal={m}
+      width={tileW}
       testID={testID}
       favourite={favourite}
       mealName={mealName}
@@ -217,8 +229,8 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                 })
               }
               // The source in words (principle 3): the mark alone says nothing to a screen reader.
-              accessibilityLabel={isDone ? `${displayFoodName(f)} added` : `${label}. ${sourceInfo(src).label}`}
-              style={[tile, { width: 136, padding: spacing.md, gap: 4, borderColor: isDone ? colors.success : colors.border }]}>
+              accessibilityLabel={spokenUnits(isDone ? `${displayFoodName(f)} added` : `${label}. ${sourceInfo(src).label}`)}
+              style={[tile, { width: tileW, padding: spacing.md, gap: 4, borderColor: isDone ? colors.success : colors.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ fontSize: 17, lineHeight: 24 }}>{f.emoji || '🍽️'}</Text>
                 <AddMark done={isDone} />
@@ -248,8 +260,8 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                   mark(u.key);
                 })
               }
-              accessibilityLabel={isDone ? `${displayFoodName(u.last)} added` : `Add ${displayFoodName(u.last)}, ${usualLabel(u)}, ${sourceInfo(src).label}, to ${mealName}`}
-              style={[tile, { width: 136, padding: spacing.md, gap: 4, borderColor: isDone ? colors.success : colors.border }]}>
+              accessibilityLabel={spokenUnits(isDone ? `${displayFoodName(u.last)} added` : `Add ${displayFoodName(u.last)}, ${usualLabel(u)}, ${sourceInfo(src).label}, to ${mealName}`)}
+              style={[tile, { width: tileW, padding: spacing.md, gap: 4, borderColor: isDone ? colors.success : colors.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ fontSize: 17, lineHeight: 24 }}>{u.last.emoji || '🍽️'}</Text>
                 <AddMark done={isDone} />
@@ -317,8 +329,8 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                 addWater(day, ml, profile.units, computeDayFromStore(useStore.getState(), day)?.waterGoalMl);
               })
             }
-            accessibilityLabel={`Add ${formatVolume(ml, profile.units)} of water`}
-            style={{ minWidth: 30 + formatVolume(ml, profile.units).length * 7, paddingHorizontal: narrow ? 8 : 10, height: 36, ...cup(radius.buttonSm, 5), borderWidth: 1.5, borderColor: colors.water, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+            accessibilityLabel={spokenUnits(`Add ${formatVolume(ml, profile.units)} of water`)}
+            style={{ minWidth: 30 + formatVolume(ml, profile.units).length * 7, paddingHorizontal: narrow ? 8 : 10, minHeight: 36, ...cup(radius.buttonSm, 5), borderWidth: 1.5, borderColor: colors.water, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
             <Plus size={14} color={colors.water} strokeWidth={2.6} />
             <Text variant="label" color="text" style={{ fontSize: 12.5 }} numberOfLines={1}>
               {formatVolume(ml, profile.units)}
@@ -337,18 +349,29 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
       // The likely next log is pinned at the sheet's foot, nearest the + that opened it and the thumb (principle 1):
       // yesterday's meal, the favourite and usual tiles and Water's glasses are in the first view at every width,
       // whatever rows show; the ways to log anything else scroll above them under the title.
+      // With large text the three would fill the screen: they lead the scrolling body instead, still first in view.
       footer={
-        <View testID="quick-pinned" style={{ gap: spacing.md, marginHorizontal: -spacing.xl, paddingHorizontal: spacing.xl, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border }}>
+        big ? undefined : (
+          <View testID="quick-pinned" style={{ gap: spacing.md, marginHorizontal: -spacing.xl, paddingHorizontal: spacing.xl, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border }}>
+            {repeatRow}
+            {quickRow}
+            {waterRow}
+          </View>
+        )
+      }>
+      {big ? (
+        <View testID="quick-pinned" style={{ gap: spacing.md }}>
           {repeatRow}
           {quickRow}
           {waterRow}
         </View>
-      }>
+      ) : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
         {actions.map((a) => {
           // Search and Weigh in are whole rows (icon, name, hint beside); the four between are half-width tiles
           // with the icon beside the name and the hint under both.
-          const wide = a.id === 'search' || a.id === 'weight';
+          // With large text every one is a whole row, so "Describe it" never runs past its tile.
+          const wide = big || a.id === 'search' || a.id === 'weight';
           return (
             <PressableScale
               key={a.id}
@@ -453,7 +476,7 @@ function RepeatRow({ label, entries, done, onPress }: { label: string; entries: 
  * A saved meal as a one-tap tile: a favourite (`quick-fav-meal-<i>`) or the meal changed last
  * (`quick-usual-saved`). A saved estimate never shows an exact number: "3 items, ~640 kcal".
  */
-function MealTile({ meal, testID, favourite, mealName, done, onPress }: { meal: SavedMeal; testID: string; favourite: boolean; mealName: string; done: boolean; onPress: () => void }) {
+function MealTile({ meal, width, testID, favourite, mealName, done, onPress }: { meal: SavedMeal; width: number; testID: string; favourite: boolean; mealName: string; done: boolean; onPress: () => void }) {
   const { colors, radius, spacing } = useTheme();
   const servings = mealServings(meal);
   const plan = planSavedMeal(meal);
@@ -470,7 +493,7 @@ function MealTile({ meal, testID, favourite, mealName, done, onPress }: { meal: 
         done ? `${meal.name} added` : `Add ${favourite ? 'favourite' : 'saved'} meal ${meal.name}, ${approxKcalSpoken(plan.kcal, estimate)}, to ${mealName}`
       }
       style={{
-        width: 136,
+        width,
         padding: spacing.md,
         gap: 4,
         backgroundColor: colors.surface,

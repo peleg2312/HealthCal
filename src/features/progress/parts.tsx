@@ -3,6 +3,7 @@ import { Check, Triangle } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import { useTextGrowth } from '@/features/activity/textGrowth';
 import { fonts, useTheme } from '@/theme';
 import type { Direction } from '@/lib/insights';
 import { Card, Chip, CupKey, PressableScale, Sheet, Text } from '@/ui';
@@ -231,8 +232,10 @@ export function SegmentSwitch<T extends string>({
   const { colors } = useTheme();
   // At 320 px four tabs get about 70 px each: the labels step down so the selected (bold) one is never cut.
   const narrow = useWindowDimensions().width < 360;
+  // Above 115% text four labels no longer fit on one line: the tabs go two to a row, so none is cut.
+  const twoRows = useTextGrowth() > 1.15 && options.length > 2;
   return (
-    <View accessibilityRole="tablist" style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border }}>
+    <View accessibilityRole="tablist" style={{ flexDirection: 'row', flexWrap: twoRows ? 'wrap' : 'nowrap', borderBottomWidth: 1, borderBottomColor: colors.border }}>
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -247,7 +250,7 @@ export function SegmentSwitch<T extends string>({
             // react-native-web reads the aria prop, not accessibilityState.
             {...({ 'aria-selected': active } as object)}
             accessibilityLabel={o.label}
-            style={{ flex: 1, minWidth: 0, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: narrow ? 1 : 4 }}>
+            style={[twoRows ? { width: '50%' } : { flex: 1 }, { minWidth: 0, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: narrow ? 1 : 4 }]}>
             <Text variant="label" color={active ? 'text' : 'textSecondary'} numberOfLines={1} style={{ fontSize: narrow ? 13 : 14.5, lineHeight: 20, fontFamily: active ? fonts.bold : fonts.semibold }}>
               {o.label}
             </Text>

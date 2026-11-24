@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Cloud, CloudOff, CreditCard, Info, KeyRound, LogOut, RefreshCw, ShieldCheck, Smartphone, Trash2, TriangleAlert } from 'lucide-react-native';
+import { Cloud, CloudOff, CreditCard, Info, KeyRound, LogOut, RefreshCw, ShieldCheck, Smartphone, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
@@ -151,7 +151,7 @@ function SignedOut() {
             {/* Never the primary: between the two, as wide and as tall as they are. */}
             {google.shown ? <GoogleButton testID="account-google" onPress={google.press} busy={google.busy} /> : null}
             {google.error ? (
-              <Note tone="warning" surface="card" testID="account-google-error" icon={<TriangleAlert size={18} color={colors.warningInk} />}>
+              <Note tone="neutral" surface="card" testID="account-google-error" icon={<Info size={18} color={colors.text} />}>
                 <Text variant="caption" color="textSecondary" accessibilityLiveRegion="polite">
                   {google.error}
                 </Text>

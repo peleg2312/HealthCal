@@ -6,6 +6,7 @@ import { useWindowDimensions, View } from 'react-native';
 import { ACTIVITY_BY_ID } from '@/data/activities';
 import { basisFromEntry, estimateSession } from '@/features/activity/build';
 import { DateStepper } from '@/features/activity/components';
+import { useTextGrowth } from '@/features/activity/textGrowth';
 import { EXERCISE_GROUPS, searchExercises } from '@/features/activity/exercises';
 import { budgetAdds } from '@/features/activity/logWords';
 import { RoutineCards, useRoutineTemplates } from '@/features/activity/RoutineCards';
@@ -840,6 +841,8 @@ function SaveRoutineSheet({ visible, onClose, exercises }: { visible: boolean; o
 }
 
 function ExercisePicker({ visible, onClose, onPick, recent }: { visible: boolean; onClose: () => void; onPick: (name: string) => void; recent: string[] }) {
+  // At large text a placeholder longer than one word would be cut in the field.
+  const bigText = useTextGrowth() > 1.15;
   const { colors, spacing } = useTheme();
   const [query, setQuery] = useState('');
   const [group, setGroup] = useState<string>('all');
@@ -864,7 +867,7 @@ function ExercisePicker({ visible, onClose, onPick, recent }: { visible: boolean
     <Sheet visible={visible} onClose={onClose} title="Add exercise">
       <TextField
         testID="exercise-search"
-        placeholder="Search bench, squat, row..."
+        placeholder={bigText ? 'Search' : 'Search bench, squat, row...'}
         value={query}
         onChangeText={setQuery}
         autoCorrect={false}

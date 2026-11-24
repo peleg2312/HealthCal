@@ -1,6 +1,7 @@
 import React from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import { useTextGrowth } from '@/features/activity/textGrowth';
 import type { Direction } from '@/lib/insights';
 import { useTheme } from '@/theme';
 import { CupKey, FadeUp, PressableScale, Text } from '@/ui';
@@ -68,9 +69,12 @@ export function ProgressTile({
   const { colors, spacing } = useTheme();
   // At 320 px a tile is about 108 px wide: the number steps down instead of being cut.
   const narrow = useWindowDimensions().width < 360;
-  const line = narrow && captionShort ? captionShort : caption;
+  // Above 115% text a tile takes the card's whole width (one column, a hairline between tiles), so a number
+  // and its unit stay inside it and its line may take a second line.
+  const oneColumn = useTextGrowth() > 1.15;
+  const line = narrow && captionShort && !oneColumn ? captionShort : caption;
   return (
-    <FadeUp index={index + 1} style={{ width: '50%' }}>
+    <FadeUp index={index + 1} style={{ width: oneColumn ? '100%' : '50%' }}>
     <PressableScale
       testID={testID}
       onPress={onPress}
@@ -82,8 +86,8 @@ export function ProgressTile({
         paddingTop: 14,
         paddingBottom: spacing.lg,
         gap: 4,
-        borderRightWidth: borderRight ? 1 : 0,
-        borderTopWidth: borderTop ? 1 : 0,
+        borderRightWidth: borderRight && !oneColumn ? 1 : 0,
+        borderTopWidth: borderTop || (oneColumn && index > 0) ? 1 : 0,
         borderColor: colors.border,
       }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
@@ -101,7 +105,7 @@ export function ProgressTile({
       </View>
       {line ? (
         // One line: what the number counts. The comparison is the triangle, and in full one tap away.
-        <Text variant="caption" color="textSecondary" numberOfLines={1}>
+        <Text variant="caption" color="textSecondary" numberOfLines={oneColumn ? 3 : 1}>
           {line}
         </Text>
       ) : null}

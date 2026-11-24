@@ -934,7 +934,8 @@ function sheetScan() {
  * "The top of a screen"). A pushed screen's header (the kit's Header) has a back cup or an X, a title and
  * one short line under it; a tab's (TabHeader) has an overline over its title. Under either, no second
  * screen title: text of 21 px or more with words in it, in the first 160 px under the header, outside a
- * card (a number with its unit, a heading inside a card or a section title at 18 px are content).
+ * card (a number with its unit, a heading inside a card or a section title at 18 px are content). At a
+ * raised app text size the 21 px grows as the app's type does (36 px at 200%), so body text is not a title.
  */
 function headerScan() {
   const out = [];
@@ -959,6 +960,10 @@ function headerScan() {
     }
     return false;
   };
+  // With the app's text size raised (a state's `__healthcalTextSize` flag, src/theme/textSize.ts) reading text
+  // grows past 21 px (body is 30 px at 200%), so a title is 21 px scaled the way the app scales it: 36 px at 200%.
+  const ts = window.__healthcalTextSize === true ? 2 : Math.min(2, Math.max(1, Number(window.__healthcalTextSize) || 1));
+  const titleFrom = 21 + (36 - 21) * (ts - 1);
   for (const el of document.querySelectorAll('body *')) {
     // The coach's hero greeting (`coach-hello`) is the one stated exception: a greeting by name in the
     // middle of an empty chat, not a screen title (AGENTS.md, "The top of a screen").
@@ -967,7 +972,7 @@ function headerScan() {
     if (!text || !/[A-Za-z]{3,}/.test(text)) continue;
     const fs = parseFloat(getComputedStyle(el).fontSize);
     const r = el.getBoundingClientRect();
-    if (fs < 21 || r.top < hb - 1 || r.top > hb + 160 || inCard(el)) continue;
+    if (fs < titleFrom || r.top < hb - 1 || r.top > hb + 160 || inCard(el)) continue;
     out.push(`a second title under the header: "${text.slice(0, 40)}" (${Math.round(fs)} px)`);
     break;
   }

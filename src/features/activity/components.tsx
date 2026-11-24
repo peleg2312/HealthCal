@@ -1,6 +1,6 @@
 import { Trash2 } from 'lucide-react-native';
 import React from 'react';
-import { PixelRatio, Platform, useWindowDimensions, View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { DayStepper } from '@/features/food/components';
 import { spokenUnits } from '@/features/progress/chartWords';
@@ -11,10 +11,11 @@ import { dayRuleFor, type ExerciseRule } from '@/lib/exerciseBudget';
 import { formatDistance, formatNumber } from '@/lib/units';
 import { cup, fonts, useTheme } from '@/theme';
 import type { ActivityEntry, ISODate, UnitSystem } from '@/types';
-import { CupKey, IconButton, MAX_FONT_SCALE, PressableScale, Text } from '@/ui';
+import { CupKey, IconButton, PressableScale, Text } from '@/ui';
 
 import { deleteSessionLabel, historyFigureBeside, historyFigureWords, historyMetaLines } from './history';
 import { budgetAdds, budgetAddsShort, NEXT_DAY_HINT } from './logWords';
+import { useTextGrowth } from './textGrowth';
 
 /**
  * The day of a workout: the app's one date control (`DayStepper`, `@/features/food/components`), the same look
@@ -79,7 +80,8 @@ export function SessionRow({
   const measured = !!entry.measured;
   const range = measured ? null : kcalRange(entry.kcalNet);
   const parts = sessionParts(entry, units);
-  const scale = Platform.OS === 'web' ? 1 : Math.min(PixelRatio.getFontScale(), MAX_FONT_SCALE);
+  // The app's text size and the phone's setting together, so at 200% the figure goes under the name.
+  const scale = useTextGrowth();
   const room = Math.min(width, 560) - 40 - ROW_CHROME;
   const meta = historyMetaLines(day ? [day.word, ...parts] : parts, room, scale);
   const rule = useDayRule(entry.date);
