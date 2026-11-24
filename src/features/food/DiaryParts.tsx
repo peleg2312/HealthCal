@@ -23,7 +23,7 @@ import { DayStepper, KcalTrail, MealPicker, RowEmoji } from './components';
 import { displayFoodName } from './displayName';
 import { toggleFoodFavorite } from './favoriteActions';
 import { FAVOURITE_ACTION, favoriteActionLabel } from './favoriteWords';
-import { dayPhrase, href, kcal, portionLabel, sourceInfo, withSourceWord } from './helpers';
+import { dayPhrase, href, kcal, portionLabel, sourceInfo, sourceKindOf, withSourceWord } from './helpers';
 import { deleteEntry } from './log';
 import { useSaveMealStep } from './SaveMealSheet';
 import { SAVE_HINT_NOT_NOW, SAVE_HINT_NOT_NOW_A11Y, saveHintA11y, saveHintLabel } from './saveWords';
@@ -172,7 +172,9 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
   const big = useLargeText();
   // Any entry that carries a range is an estimate, whatever food it was matched to afterwards.
   const ai = !!entry.kcalRange;
-  const source = sourceInfo(ai ? 'ai' : entry.source);
+  // A bundled food with no record reads "Typical" (its values are an estimate), never as reference data.
+  const kind = ai ? 'ai' : sourceKindOf(entry);
+  const source = sourceInfo(kind);
   // A volume ("250 ml", "8.5 fl oz") is the portion as it was drunk: its grams are left out.
   const volume = /(ml|fl oz)$/.test(entry.servingLabel.trim());
   // A long press stars the row's food (with a toast and Undo); a quick add has no food and no long press.
@@ -186,7 +188,7 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
       ? `${portionLabel(entry.servingLabel, entry.quantity)} · ${Math.round(entry.grams)} g`
       : portionLabel(entry.servingLabel, entry.quantity);
   // Reference data has no word on the row (its filled key is its mark); the others are named. The label reads every source.
-  const caption = withSourceWord(inWater ? `${portion} · ${ALSO_IN_WATER}` : portion, ai ? 'ai' : entry.source);
+  const caption = withSourceWord(inWater ? `${portion} · ${ALSO_IN_WATER}` : portion, kind);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: ROW_PAD }}>
       <PressableScale
@@ -211,7 +213,7 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
             {/* The source's mark leads the line and its word (none for reference data) ends it, so a portion that wraps never leaves the mark floating. */}
             <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
-              <SourceMark source={ai ? 'ai' : entry.source} color={colors.textSecondary} size={8} style={{ marginTop: sourceMarkTop(ai ? 'ai' : entry.source) }} />
+              <SourceMark source={kind} color={colors.textSecondary} size={8} style={{ marginTop: sourceMarkTop(kind) }} />
               {/* The mark "also in Water" may take one more line (on a 320 px phone "1 can (8.4 fl oz) · 250 g · also in Water · Your food" needs three), so the word Water is never cut. */}
               <Text testID={inWater ? `entry-in-water-${entry.id}` : undefined} variant="caption" color="textSecondary" numberOfLines={inWater ? 3 : 2} style={{ flexShrink: 1 }}>
                 {caption}

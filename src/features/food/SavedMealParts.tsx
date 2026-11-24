@@ -19,7 +19,7 @@ import { AmountEditor } from './AmountEditor';
 import { RowEmoji } from './components';
 import { formatPortion, mealServings, planSavedMeal, setItemAmount } from './build';
 import { displayFoodName } from './displayName';
-import { dayPhrase, kcal, matchServing, sourceInfo, withSourceWord } from './helpers';
+import { dayPhrase, kcal, matchServing, sourceInfo, sourceKindOf, withSourceWord, type SourceKind } from './helpers';
 import { itemLine, itemStepText } from './itemLine';
 import { logSavedMeal } from './log';
 import { currentValues } from './usuals';
@@ -29,8 +29,8 @@ const PORTIONS = [0.5, 1, 2];
 export { itemLine } from './itemLine';
 
 /** Where a saved line's numbers come from (principle 3): an estimate kept with its range is the AI's. */
-export function itemSource(it: Pick<SavedMealItem, 'source' | 'kcalRange'>): SavedMealItem['source'] {
-  return it.kcalRange ? 'ai' : it.source;
+export function itemSource(it: Pick<SavedMealItem, 'source' | 'kcalRange' | 'verified' | 'food'>): SourceKind {
+  return it.kcalRange ? 'ai' : sourceKindOf(it);
 }
 
 /**

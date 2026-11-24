@@ -2189,7 +2189,8 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
       await ctx.close();
     }
 
-    // 3. The + sheet: favourite meals lead, inside the first view; a saved estimate reads "~" and logs with its ranges.
+    // 3. The + sheet: the meal's first usual food leads, then the favourite meals, both inside the first view; a saved
+    // estimate reads "~" and logs with its ranges.
     {
       const { ctx, p } = await favOpen({ favoriteMeal: 1, savedEstimate: 2 });
       await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
@@ -2197,9 +2198,9 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
       await ftap(p, 'tab-add');
       await p.getByTestId('quick-fav-meal-0').first().waitFor({ timeout: 10000 });
       const box = await p.getByTestId('quick-fav-meal-0').first().boundingBox();
-      check('favourites: the + sheet\'s first tile is the newest favourite meal, wholly inside the first view at 360 x 740', box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 360 && box.y + box.height <= 740 && (await ftext(p, 'quick-fav-meal-0')).includes('Chicken and rice bowl'), box ? `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)}` : 'no tile');
+      check('favourites: the + sheet\'s newest favourite meal follows the first usual food, wholly inside the first view at 360 x 740', box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 360 && box.y + box.height <= 740 && (await ftext(p, 'quick-fav-meal-0')).includes('Chicken and rice bowl'), box ? `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)}` : 'no tile');
       const title = await ftext(p, 'quick-usual-title');
-      check('favourites: the row is titled "Favourites and usual for …" and the second favourite follows', /^Favourites and usual for (breakfast|lunch|dinner|a snack|snacks?)$/i.test(title) && (await ftext(p, 'quick-fav-meal-1')).includes('Usual breakfast') && (await p.getByTestId('quick-usual-saved').count()) === 0, title);
+      check('favourites: the row is titled "Usual for … and favourites" and the second favourite follows', /^Usual for (breakfast|lunch|dinner|a snack|snacks?) and favourites$/i.test(title) && (await ftext(p, 'quick-fav-meal-1')).includes('Usual breakfast') && (await p.getByTestId('quick-usual-saved').count()) === 0, title);
       const cap = await ftext(p, 'quick-fav-meal-0-caption');
       check('favourites: the saved estimate\'s tile reads "~" before its calories ("3 items, ~592 kcal")', /^3 items, ~[\d,]+ kcal$/.test(cap), cap);
       const before = new Set(Object.keys((await fstate(p)).foodEntries));
@@ -2263,8 +2264,8 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
       await ctx.close();
     }
 
-    // 6. The + sheet with favourite foods only (the demo stars two): they lead the row, ahead of the usual foods, inside the
-    // first view; an AI food starred reads "~" and "about" (fixer two, T2 and T3).
+    // 6. The + sheet with favourite foods only (the demo stars two): the meal's first usual food leads the row, then the
+    // favourite foods, both inside the first view; an AI food starred reads "~" and "about" (fixer two, T2 and T3).
     {
       const { ctx, p } = await favOpen();
       await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
@@ -2279,15 +2280,21 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
           .sort((a, b) => a.x - b.x),
       );
       check(
-        'favourites: with favourite foods only, the first tile of the + sheet is a favourite food, wholly inside 360 x 740',
-        !!box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 360 && box.y + box.height <= 740 && lefts[0]?.id === 'quick-fav-food-0',
+        'favourites: with favourite foods only, the + sheet leads with the first usual food and then a favourite food, both wholly inside 360 x 740',
+        !!box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 360 && box.y + box.height <= 740 && lefts[0]?.id.startsWith('quick-usual-') && lefts[0].x >= 0 && lefts[1]?.id === 'quick-fav-food-0',
         `${box ? `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)}` : 'no tile'} | ${lefts.map((l) => l.id).join(', ')}`,
       );
       const title = await ftext(p, 'quick-usual-title');
-      check('favourites: the row is titled "Favourites and usual for …" (the favourites drawn first)', /^Favourites and usual for (breakfast|lunch|dinner|a snack|snacks?)$/i.test(title), title);
+      check('favourites: the row is titled "Usual for … and favourites" (the groups in the order drawn)', /^Usual for (breakfast|lunch|dinner|a snack|snacks?) and favourites$/i.test(title), title);
       const favIds = (await fstate(p)).favoriteFoodIds;
       const usualShown = lefts.filter((l) => l.id.startsWith('quick-usual-')).map((l) => l.id.slice('quick-usual-'.length));
-      check('favourites: a favourite food is shown once, never again as a usual tile', usualShown.length > 0 && usualShown.every((k) => !favIds.includes(k)), usualShown.join(', '));
+      const favTiles = lefts.filter((l) => l.id.startsWith('quick-fav-food-')).length;
+      // The first usual food may be a favourite too: it is then the usual tile only, and the favourite tiles are the others.
+      check(
+        'favourites: a favourite food is shown once, never again as a usual tile',
+        usualShown.length > 0 && usualShown.slice(1).every((k) => !favIds.includes(k)) && favTiles === Math.min(3, favIds.filter((id) => id !== usualShown[0]).length),
+        `${usualShown.join(', ')} | ${favTiles} favourite tiles`,
+      );
       // An AI food starred (as a long press on its diary row does): its tile reads "~" and "about".
       await p.evaluate(async () => {
         const s = window.__healthcal.getState();

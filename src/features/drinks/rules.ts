@@ -53,7 +53,7 @@
 import { BUILTIN_FOODS } from '@/data/foods';
 import { mealOnDay, waterAddedToast, withWaterTotal } from '@/features/food/addedTo';
 import { buildEntry } from '@/features/food/build';
-import { QUICK_KCAL_LIMIT, sourceInfo } from '@/features/food/helpers';
+import { QUICK_KCAL_LIMIT, sourceInfo, sourceKindOf } from '@/features/food/helpers';
 import { isolateRtl } from '@/lib/bidi';
 import { formatShortDate, weekdayShort } from '@/lib/dates';
 import { BEVERAGE_LABELS, effectiveMl } from '@/lib/hydration';
@@ -341,7 +341,7 @@ export function pickCaption(food: Food, glassMl: number, units: UnitSystem): str
   const { assumed } = gramsPerMl(food);
   const per = `${formatNumber(drinkKcal(food, glassMl))} kcal per ${formatVolume(glassMl, units)}`;
   const taken = assumed && food.beverage !== true ? `, taken as ${formatNumber(drinkGrams(food, glassMl))} g` : '';
-  return `${per}${taken} · ${sourceInfo(food.source).short}`;
+  return `${per}${taken} · ${sourceInfo(sourceKindOf(food)).short}`;
 }
 
 // ---------------------------------------------------------------- calories typed in

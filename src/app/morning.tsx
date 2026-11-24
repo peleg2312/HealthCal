@@ -176,6 +176,8 @@ export default function MorningScreen() {
   const wellShown = well.filter((w) => !coach.goodKinds.includes(w.kind) && !WELL_SAID_BY_CARD.includes(w.kind));
   const adjustShown = adjust.filter((a) => a.kind !== coach.improveKind && !ADJUST_SAID_BY_CARD.includes(a.kind));
   const planShown = plan.filter((p) => p.kind !== coach.todayFrom);
+  // When the coach's step for today is today's budget, "For today" leaves its targets line out: said once.
+  const targetsShown = coach.todayFrom === 'targets' ? null : targets;
 
   const week = weekCells({
     days: recent.slice(-7).map(weekDay),
@@ -318,9 +320,9 @@ export default function MorningScreen() {
         </FadeUp>
       ) : null}
 
-      {targets || planShown.length > 0 ? (
+      {targetsShown || planShown.length > 0 ? (
         <FadeUp index={6}>
-          <PlanCard today={today} targets={targets} items={planShown} />
+          <PlanCard today={today} targets={targetsShown} items={planShown} />
         </FadeUp>
       ) : null}
     </Screen>

@@ -41,9 +41,10 @@ const PARTIAL = 0.45;
 
 /** What a day of the calendar says, in words, for a screen reader. */
 function cellLabel(cell: CalendarCell): string {
-  // Above the budget says by how much (the amber lip), never a rounded share that could read as on it.
+  // Above the budget says by how much (the amber lip), never a rounded share that could read as on it. A share
+  // is rounded as the morning page and the recap round it, so one day reads one figure everywhere.
   const above = Math.round(cell.kcal - cell.budget);
-  const share = cell.ratio > 1 ? `${formatNumber(Math.max(1, above))} kcal above the budget` : `${Math.floor(cell.ratio * 100)}% of the budget`;
+  const share = cell.ratio > 1 ? `${formatNumber(Math.max(1, above))} kcal above the budget` : `${Math.round(cell.ratio * 100)}% of the budget`;
   const food = cell.future ? 'upcoming' : !cell.logged ? 'not logged' : cell.isToday ? `${share} so far` : cell.partial ? `partly logged, ${share}` : `${share}${cell.onBudget ? ', on budget' : ''}`;
   return spokenUnits([formatDayLabel(cell.date), food, cell.waterMet ? 'water goal met' : '', cell.trained ? 'workout logged' : ''].filter(Boolean).join(', '));
 }
@@ -308,7 +309,7 @@ export default function ConsistencyScreen() {
             <Text variant="unit">{word(total.total, 'week')} on rhythm</Text>
           </View>
           <Text variant="caption" color="textSecondary">
-            Weeks that met all three targets
+            Weeks that met all three aims
           </Text>
         </View>
         {RHYTHM_KINDS.map((k) => {
@@ -333,14 +334,15 @@ export default function ConsistencyScreen() {
                     {RHYTHM_COPY[k].title} {target} {word(target, 'day')} a week
                   </Text>
                   <Text variant="caption" color="textSecondary">
-                    {closed.length ? `On target ${met} of ${closed.length} ${word(closed.length, 'week')}` : 'First week'} · {current.count} this week
+                    {/* "Target" is the calorie number only: a week's aim is "met". */}
+                    {closed.length ? `Met ${met} of ${closed.length} ${word(closed.length, 'week')}` : 'First week'} · {current.count} this week
                   </Text>
                 </View>
               </View>
               {/* One label for the eight bars: each week and its count, for a screen reader (the chart is one image). */}
               <BarChart
-                accessibilityLabel={`${RHYTHM_COPY[k].title}, target ${target} ${word(target, 'day')} a week. ${weeks
-                  .map((w) => `${w.partial ? 'This week so far' : `Week of ${formatShortDate(w.weekStart)}`}: ${w.count} ${word(w.count, 'day')}${w.met ? ', on target' : ''}`)
+                accessibilityLabel={`${RHYTHM_COPY[k].title}, aim ${target} ${word(target, 'day')} a week. ${weeks
+                  .map((w) => `${w.partial ? 'This week so far' : `Week of ${formatShortDate(w.weekStart)}`}: ${w.count} ${word(w.count, 'day')}${w.met ? ', met' : ''}`)
                   .join('. ')}.`}
                   testID={`consistency-rhythm-${k}-chart`}
                   data={weeks.map((w, i) => ({
@@ -371,8 +373,8 @@ export default function ConsistencyScreen() {
       <Sheet visible={help} onClose={() => setHelp(false)} title="Weekly rhythm">
         <View style={{ gap: spacing.md }} testID="consistency-rhythm-help-text">
           <Text variant="body">Each bar is one week, Monday to Sunday, as tall as the days you logged food, trained or weighed in.</Text>
-          <Text variant="body">The shaded zone starts at your target. A week that reached it wears the brim: its level line runs a little wider than the bar. The hatched bar is this week so far.</Text>
-          <Text variant="body">Weeks on rhythm met all three of your current targets. They are counted in total, not in a row.</Text>
+          <Text variant="body">The shaded zone starts at your aim. A week that reached it wears the brim: its level line runs a little wider than the bar. The hatched bar is this week so far.</Text>
+          <Text variant="body">Weeks on rhythm met all three of your current aims. They are counted in total, not in a row.</Text>
           <Text variant="body" color="textSecondary">
             A missed week costs nothing: it is simply not counted.
           </Text>
@@ -382,7 +384,7 @@ export default function ConsistencyScreen() {
       <Sheet visible={editing} onClose={() => setEditing(false)} title="Weekly rhythm" footer={<Button title="Done" onPress={() => setEditing(false)} testID="consistency-rhythm-done" />}>
         <View style={{ gap: spacing.lg }}>
           <Text variant="body" color="textSecondary">
-            A pace you can keep most weeks. Past weeks count against these targets too.
+            A pace you can keep most weeks. Past weeks count against these aims too.
           </Text>
           {RHYTHM_KINDS.map((k) => (
             <View

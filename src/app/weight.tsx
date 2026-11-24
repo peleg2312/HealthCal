@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronUp, Plus } from 'lucide-react-native';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Platform, View, type TextInput } from 'react-native';
 
 import { clockTime } from '@/features/import/ui/format';
 import { resolveDateParam } from '@/features/trackers/dateParam';
@@ -318,6 +318,15 @@ function WeighInSheet({
     setError(null);
   }
   const unit = weightUnit(units);
+  // The weight field takes the focus as the sheet opens. On the web it is focused after the sheet has
+  // noted what had the focus before ("Log weigh-in", or the row tapped), so closing it by Escape or the
+  // backdrop gives the focus back there instead of to the page: an autoFocus would focus the field
+  // first, and the sheet would note the field. Natively the field keeps its autoFocus.
+  const weightRef = useRef<TextInput>(null);
+  const open = date !== null;
+  useEffect(() => {
+    if (open && Platform.OS === 'web') weightRef.current?.focus();
+  }, [open]);
   // A changed value is not dropped without asking (the backdrop, a drag, Escape, back).
   const changed = date !== null && (weight !== (existing ? display(existing.kg) : display(fallbackKg)) || fat !== (existing?.bodyFatPct ?? null));
 
@@ -372,7 +381,8 @@ function WeighInSheet({
           setError(null);
         }}
         error={error?.field === 'weight' ? error.message : null}
-        autoFocus
+        ref={weightRef}
+        autoFocus={Platform.OS !== 'web'}
         selectTextOnFocus
       />
       <NumberField

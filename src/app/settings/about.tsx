@@ -99,7 +99,7 @@ function MyResting() {
   const m = useEnergyModel(useToday());
   return (
     <Yours>
-      Yours: {formatNumber(Math.round(m.bmr))} kcal at rest ({m.bmrMethod === 'katch-mcardle' ? 'lean-mass equation' : 'Mifflin-St Jeor'}), about{' '}
+      Yours: about {formatNumber(Math.round(m.bmr))} kcal at rest ({m.bmrMethod === 'katch-mcardle' ? 'lean-mass equation' : 'Mifflin-St Jeor'}), about{' '}
       {formatNumber(Math.round(m.formulaTdee))} kcal with everyday activity.
     </Yours>
   );
@@ -110,7 +110,8 @@ function MyTarget() {
   return (
     <Yours>
       Yours: {formatNumber(m.target.target)} kcal a day{m.target.source === 'override' ? ', set by you' : ''}
-      {m.usingAdaptive ? `, built on ${formatNumber(Math.round(m.tdee))} kcal of expenditure, a blend of your data and the equation` : ''}.
+      {/* What you burn is an estimate, said with "about" (one verb, "burn"). */}
+      {m.usingAdaptive ? `, built on about ${formatNumber(Math.round(m.tdee))} kcal you burn a day, a blend of your data and the equation` : ''}.
     </Yours>
   );
 }

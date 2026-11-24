@@ -13,7 +13,7 @@ import { displayFoodName } from '@/features/food/displayName';
 import { useFoodDraft } from '@/features/food/draft';
 import { FavoriteStar } from '@/features/food/FavoriteStar';
 import { toggleFoodFavorite } from '@/features/food/favoriteActions';
-import { dayPhrase, href, portionLabel, kcal, labelAmount, lastPortions, matchServing, param, parseDate, parseMeal, portionFor, sourceInfo, valuesUpdated } from '@/features/food/helpers';
+import { dayPhrase, href, portionLabel, kcal, labelAmount, lastPortions, matchServing, param, parseDate, parseMeal, portionFor, sourceInfo, sourceKindOf, valuesUpdated, type SourceKind } from '@/features/food/helpers';
 import { deleteEntry, logFood } from '@/features/food/log';
 import { RequireProfile } from '@/features/food/RequireProfile';
 import { isolateRtl } from '@/lib/bidi';
@@ -250,7 +250,7 @@ function NutritionFacts({
  * sits behind the badge (tap it), so the amount and its button stay in the first view; `note` is
  * shown always (an estimate's range is part of the honest number, not help text).
  */
-function Hero({ name, brand, source, explain, note, onEdit }: { name: string; brand?: string; source: Food['source']; explain: string; note?: string; onEdit?: () => void }) {
+function Hero({ name, brand, source, explain, note, onEdit }: { name: string; brand?: string; source: SourceKind; explain: string; note?: string; onEdit?: () => void }) {
   const { colors, spacing } = useTheme();
   const [open, setOpen] = useState(false);
   return (
@@ -427,7 +427,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
         // Drawn without the reference list's capitals; stored as it is.
         name={displayFoodName(food)}
         brand={food.brand}
-        source={food.source}
+        source={sourceKindOf(food)}
         explain={info.explain}
         onEdit={food.source === 'custom' && !food.id.startsWith('meal_') ? () => router.push(href('/food/custom', { id: food.id, meal, date }) as never) : undefined}
       />
@@ -503,7 +503,7 @@ function ManualEditor({ entry }: { entry: FoodEntry }) {
       }>
       <Hero
         name={name || entry.name}
-        source={entry.source}
+        source={sourceKindOf(entry)}
         explain={info.explain}
         note={
           rangeKept && entry.kcalRange
