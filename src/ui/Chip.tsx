@@ -6,7 +6,7 @@ import { fonts, useTheme } from '@/theme';
 
 import { rovingIndex } from './controlRules';
 import { PressableScale } from './Pressable';
-import { Text, useLargeText } from './Text';
+import { Text, useGrownText } from './Text';
 
 /**
  * A label you can tap: 32 visible (a 44 px touch target through hitSlop, on
@@ -36,7 +36,7 @@ export function Chip({
   const { colors, radius } = useTheme();
   const fg = selected ? colors.bg : colors.text;
   // Large text: the chip grows to its label's lines (32 at least) and the label wraps at its spaces, never cut.
-  const large = useLargeText();
+  const large = useGrownText();
   return (
     <PressableScale
       testID={testID}
@@ -103,7 +103,7 @@ export function ChipWrap({ children, style }: { children: React.ReactNode; style
  * choice and focus along the row (Home and End to its ends), and Space or Enter
  * picks the focused one.
  *
- * At large text (`useLargeText`) no label is cut: each segment is as wide as its label, the extra room is
+ * At large text (`useGrownText`) no label is cut: each segment is as wide as its label, the extra room is
  * shared, and segments that do not fit go on to a second row (a label wider than the whole row wraps at its
  * spaces). At the designed size the segments share the row equally on one line, as always.
  */
@@ -131,7 +131,7 @@ export function Segmented<T extends string>({
   const radio = role === 'radiogroup';
   const current = options.findIndex((o) => o.value === value);
   const web = Platform.OS === 'web';
-  const large = useLargeText();
+  const large = useGrownText();
   return (
     <View
       accessibilityRole={radio ? 'radiogroup' : 'tablist'}
@@ -198,7 +198,7 @@ export function Badge({ label, color, style }: { label: string; color?: string; 
   const { colors, radius } = useTheme();
   const c = color ?? colors.primary;
   const tintable = /^#[0-9a-fA-F]{6}$/.test(c);
-  const large = useLargeText();
+  const large = useGrownText();
   return (
     <View
       style={[

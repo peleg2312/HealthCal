@@ -4,7 +4,7 @@ import { ActivityIndicator, StyleSheet, View, type StyleProp, type ViewStyle } f
 import { cup, cupFor, fonts, useTheme } from '@/theme';
 
 import { PressableScale } from './Pressable';
-import { Text, useLargeText } from './Text';
+import { Text, useGrownText } from './Text';
 
 export interface ButtonProps {
   title: string;
@@ -42,7 +42,7 @@ export function Button({ title, onPress, variant = 'primary', size = 'lg', icon,
   // Large text (the app's size above 100% or the phone's setting): the label wraps onto more lines and the
   // button grows to hold them, never cut with an ellipsis. A height the caller set (a button beside a field)
   // becomes the least height then. At the designed size the button is exactly as before: one line, its height.
-  const large = useLargeText();
+  const large = useGrownText();
   const given = large ? StyleSheet.flatten(style) : undefined;
   const callerHeight = typeof given?.height === 'number' ? given.height : undefined;
   const bg = variant === 'primary' ? colors.primary : variant === 'soft' ? colors.primarySoft : 'transparent';

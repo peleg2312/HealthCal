@@ -9,7 +9,7 @@ import { Button } from './Button';
 import { CupKey } from './Chip';
 import { rowStacks } from './controlRules';
 import { PressableScale } from './Pressable';
-import { Text, useLargeText } from './Text';
+import { Text, useGrownText } from './Text';
 
 export function ListRow({
   title,
@@ -47,7 +47,7 @@ export function ListRow({
   // Large text: when the words beside the mark and the trailing part would have less room than their longest
   // word needs, the row stacks (`rowStacks`): the mark and the trailing part on a first line, the words under
   // them across the whole row. At the designed size the row is drawn exactly as before.
-  const large = useLargeText();
+  const large = useGrownText();
   const scale = useTextSize();
   const { fontScale } = useWindowDimensions();
   const [rowW, setRowW] = useState(0);

@@ -8,7 +8,7 @@ import { cup, fonts, phoneCapFor, scaledFontSize, useTextSize, useTheme } from '
 import { IconButton } from './Button';
 import { spokenFieldName, stepperKey, webAutoComplete } from './controlRules';
 import { FOCUS_CUP, useFocusRing } from './Pressable';
-import { Text, useLargeText } from './Text';
+import { Text, useGrownText } from './Text';
 import { passRef, useToastControl } from './toastControls';
 
 export interface TextFieldProps extends Omit<TextInputProps, 'style'> {
@@ -57,7 +57,7 @@ export function TextField({ label, suffix, error, hint, left, right, style, line
   const scale = useTextSize();
   // At large text a one-line placeholder that no longer fits ends with an ellipsis (web) instead of being
   // clipped mid-word; at the designed size it must fit the field at 320 px, so nothing hides that there.
-  const large = useLargeText();
+  const large = useGrownText();
   const fontSize = scaledFontSize(16, scale);
   const lineHeight = Math.round((22 * fontSize) / 16);
   const noteId = `field-note-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
