@@ -20,6 +20,7 @@ import { RequireProfile } from '@/features/food/RequireProfile';
 import { isolateRtl } from '@/lib/bidi';
 import { MEAL_LABEL, atwaterKcal, formatMacro, scaleNutrients } from '@/lib/nutrition';
 import { useStore } from '@/store';
+import { useBigText } from '@/features/food/textGrowth';
 import { useToday } from '@/store/clock';
 import { useDay, useLive } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
@@ -189,6 +190,11 @@ function NutritionFacts({
   asStats?: boolean;
 }) {
   const { spacing } = useTheme();
+  // With large text each row's name has a line of its own and its values share the line under it in two equal
+  // columns, so a figure never runs into the next one nor parts from its unit.
+  const big = useBigText();
+  const portionCol = big ? { flex: 1 } : { width: 84 };
+  const per100Col = big ? { flex: 1 } : { width: 76 };
   // [label, key, unit, a line under a macro]
   const rows: [string, keyof Nutrients, string, boolean][] = [
     ['Calories', 'kcal', 'kcal', false],
@@ -204,15 +210,15 @@ function NutritionFacts({
     v === undefined ? '–' : unit === 'kcal' || unit === 'mg' ? `${kcal(v)} ${unit}` : `${whole || asStats ? Math.round(v) : formatMacro(v)} ${unit}`;
   return (
     <Card testID="detail-facts">
-      <View style={{ flexDirection: 'row', paddingBottom: spacing.sm }}>
-        <Text variant="h3" style={{ flex: 1 }}>
+      <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', paddingBottom: spacing.sm, columnGap: big ? spacing.md : 0 }}>
+        <Text variant="h3" style={big ? { flexBasis: '100%', marginBottom: spacing.xs } : { flex: 1 }}>
           Nutrition facts
         </Text>
-        <Text variant="caption" color="textSecondary" style={{ width: 84, textAlign: 'right' }}>
+        <Text variant="caption" color="textSecondary" style={[portionCol, { textAlign: 'right' }]}>
           This portion
         </Text>
         {showPer100 ? (
-          <Text variant="caption" color="textSecondary" style={{ width: 76, textAlign: 'right' }}>
+          <Text variant="caption" color="textSecondary" style={[per100Col, { textAlign: 'right' }]}>
             Per 100 g
           </Text>
         ) : null}
@@ -222,15 +228,15 @@ function NutritionFacts({
         .map(([label, key, unit, sub]) => (
           <View key={key}>
             <Divider />
-            <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 36 }}>
-              <Text variant={sub ? 'body' : 'bodyStrong'} color={sub ? 'textSecondary' : 'text'} style={{ flex: 1, paddingLeft: sub ? spacing.md : 0 }}>
+            <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', alignItems: 'center', minHeight: 36, columnGap: big ? spacing.md : 0, paddingVertical: big ? spacing.xs : 0 }}>
+              <Text variant={sub ? 'body' : 'bodyStrong'} color={sub ? 'textSecondary' : 'text'} style={[big ? { flexBasis: '100%' } : { flex: 1 }, { paddingLeft: sub ? spacing.md : 0 }]}>
                 {label}
               </Text>
-              <Text variant="body" tabular style={{ width: 84, textAlign: 'right' }}>
+              <Text variant="body" tabular style={[portionCol, { textAlign: 'right' }]}>
                 {fmt(portion[key], unit)}
               </Text>
               {showPer100 ? (
-                <Text variant="body" color="textSecondary" tabular style={{ width: 76, textAlign: 'right' }}>
+                <Text variant="body" color="textSecondary" tabular style={[per100Col, { textAlign: 'right' }]}>
                   {fmt(per100g?.[key], unit)}
                 </Text>
               ) : null}
@@ -302,13 +308,15 @@ const VALUES_UPDATED = "This food's values were updated since you logged it. Sav
 /** Calories (large) with the portion beside them, the macro bar and the three macros: the top of the portion card. */
 function MacroSummary({ n, kcalNote, range, updated }: { n: Nutrients; kcalNote: string; range?: [number, number] | null; updated?: boolean }) {
   const { colors, spacing } = useTheme();
+  // With large text the portion's words go under the figure on a line of their own, and the macros wrap.
+  const big = useBigText();
   return (
     <View>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: spacing.md }}>
+      <View style={{ flexDirection: big ? 'column' : 'row', alignItems: big ? 'flex-start' : 'flex-end', justifyContent: 'space-between', gap: big ? spacing.xs : spacing.md }}>
         <View testID="detail-kcal">
           <KcalValue value={n.kcal} variant="numXL" color="caloriesInk" />
         </View>
-        <Text variant="caption" color="textSecondary" align="right" style={{ flexShrink: 1, paddingBottom: 6 }} numberOfLines={2}>
+        <Text variant="caption" color="textSecondary" align={big ? 'left' : 'right'} style={{ flexShrink: 1, paddingBottom: big ? 0 : 6 }} numberOfLines={big ? undefined : 2}>
           {kcalNote}
         </Text>
       </View>
@@ -325,7 +333,7 @@ function MacroSummary({ n, kcalNote, range, updated }: { n: Nutrients; kcalNote:
       <View style={{ marginTop: spacing.md }}>
         <MacroBar protein={n.protein * 4} carbs={n.carbs * 4} fat={n.fat * 9} />
       </View>
-      <View style={{ flexDirection: 'row', gap: spacing.lg, marginTop: spacing.md }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.lg, rowGap: spacing.sm, marginTop: spacing.md }}>
         <MacroStat label="Protein" value={n.protein} color={colors.protein} />
         <MacroStat label="Carbs" value={n.carbs} color={colors.carbs} />
         <MacroStat label="Fat" value={n.fat} color={colors.fat} />

@@ -481,10 +481,11 @@ function WaterScreen() {
           </View>
         ))}
       </View>
-      <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-end' }}>
+      {/* With large text the field keeps at least 200 px and Add goes under it when both do not fit one line. */}
+      <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', gap: spacing.sm, alignItems: 'flex-end' }}>
         <NumberField
           testID="water-custom-input"
-          style={{ flex: 1 }}
+          style={big ? { flexGrow: 1, flexBasis: 200 } : { flex: 1 }}
           placeholder={big ? 'Amount' : 'Other amount'}
           suffix={volumeUnit(units)}
           decimals={0}

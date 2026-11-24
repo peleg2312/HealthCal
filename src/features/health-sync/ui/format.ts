@@ -84,7 +84,7 @@ export function reviewView(item: ReviewItem, todayDate: ISODate, units: UnitSyst
   // "Yesterday" and "Today" are words in a sentence here; a date stays as it is written.
   const dayWord = /^(today|yesterday)$/i.test(day) ? day.toLowerCase() : day;
   const named = `${title.toLowerCase()}, ${dayWord} ${time}`.replace(/ /g, ' ');
-  return { title, emoji: activity?.emoji ?? null, meta, source, added, estimate, detail, spoken: `${title}, ${meta.replace(/ /g, ' ')}, ${source}, ${said}`, named };
+  return { title, emoji: activity?.emoji ?? null, meta, source, added, estimate, detail, spoken: spokenUnits(`${title}, ${meta.replace(/ /g, ' ')}, ${source}, ${said}`), named };
 }
 
 /**

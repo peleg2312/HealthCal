@@ -16,14 +16,15 @@
  *
  * The columns are laid out as columns (so each plan's figures are one element), and a row's height
  * is the label's own measured height, at least 56, so a label that wraps on a narrow phone or at a
- * large text size never pushes its cups out of line.
+ * large text size never pushes its cups out of line. At 130% text and more the columns would leave the
+ * labels a few letters wide, so the two plans stand one under the other instead (`largeText`).
  */
 import React, { useState } from 'react';
 import { useWindowDimensions, View, type LayoutChangeEvent } from 'react-native';
 
 import { AiGlyph } from '@/features/ai/mark';
 import { NBSP } from '@/lib/text';
-import { useTheme } from '@/theme';
+import { useTextSize, useTheme } from '@/theme';
 import { Card, Text } from '@/ui';
 
 import { shareOfPlus } from './allowance';
@@ -57,6 +58,7 @@ const NUMBER: Record<CardRow['key'], (l: PlanLimits) => number> = {
 export function AllowanceTable({ free, plus, current, testID = 'plan-compare' }: { free: PlanLimits; plus: PlanLimits; current: 'free' | 'plus'; testID?: string }) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
+  const largeText = useTextSize() >= 1.3;
   const m = width < 360 ? NARROW : WIDE;
   const rows = cardRows(free);
   // Each label cell reports its own height; the cups' cells follow it.
@@ -127,6 +129,56 @@ export function AllowanceTable({ free, plus, current, testID = 'plan-compare' }:
       </View>
     );
   };
+
+  if (largeText) {
+    // At 130% text and more three columns leave the labels a few letters wide: each plan becomes a block
+    // of its own, Free then Plus under a hairline, each row its cup, its figure and its words, which wrap.
+    return (
+      <Card padding={m.pad} testID={testID} style={{ gap: m.pad }}>
+        {(['free', 'plus'] as const).map((plan) => {
+          const limits = plan === 'free' ? free : plus;
+          const title = plan === 'free' ? FREE_CARD_TITLE : PLUS_CARD_TITLE;
+          const mine = current === plan;
+          return (
+            <View
+              key={plan}
+              testID={plan === 'free' ? 'plan-free-card' : 'plan-plus-card'}
+              accessible
+              accessibilityLabel={cardLabel(title, limits, mine)}
+              style={{ gap: 12, ...(plan === 'plus' ? { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: m.pad } : null) }}>
+              <View>
+                <Text variant="h3">{title}</Text>
+                {mine ? (
+                  <Text variant="caption" color="textSecondary">
+                    {YOUR_PLAN_TAG}
+                  </Text>
+                ) : null}
+              </View>
+              {rows.map((r, i) => {
+                const n = NUMBER[r.key](limits);
+                return (
+                  <View key={r.key} style={{ flexDirection: 'row', alignItems: 'center', gap: m.cellGap }}>
+                    <PlanCup size="row" level={plan === 'free' ? shareOfPlus(n, NUMBER[r.key](plus)) : 1} index={(plan === 'free' ? 0 : rows.length) + i} memoryKey={`plan-${plan}-${r.key}`} />
+                    <Text variant="numM" tabular>
+                      {n}
+                    </Text>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text variant="label" color="text">
+                        {r.label}
+                      </Text>
+                      <Text variant="caption" color="textSecondary">
+                        {rowUnit(r.key)}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          );
+        })}
+      </Card>
+    );
+  }
 
   return (
     <Card padding={m.pad} testID={testID} style={{ flexDirection: 'row' }}>

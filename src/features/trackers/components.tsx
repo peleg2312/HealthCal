@@ -72,8 +72,10 @@ export function Figure({
 }) {
   const { colors } = useTheme();
   const key = color ? ((colors as unknown as Record<string, string>)[color] ?? color) : undefined;
+  // The narrowest width grows with the text (the app's size and the phone's), so at 200% a figure takes its own line.
+  const grow = useTextGrowth();
   return (
-    <View style={{ ...(basis ? { flexGrow: 1, flexBasis: basis } : { flex: 1 }), minWidth: 0, alignItems: align === 'center' ? 'center' : 'flex-start' }}>
+    <View style={{ ...(basis ? { flexGrow: 1, flexBasis: basis * grow } : { flex: 1 }), minWidth: 0, alignItems: align === 'center' ? 'center' : 'flex-start' }}>
       {/* The figure itself never breaks (non-breaking spaces); on a narrow phone its unit may drop to a second line rather than be cut. */}
       <Text testID={testID} variant={size} tabular numberOfLines={2}>
         {value.replace(/ /g, '\u00A0')}

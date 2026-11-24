@@ -4,6 +4,13 @@
 //
 //   node scripts/dev/evidence.cjs --states=textsize --themes=blossom --widths=360 --out=<dir>
 const big = { __healthcalTextSize: true };
+/** The local date n days from today, as the week strip names its days (as in food.cjs). */
+function isoDay(n) {
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 module.exports = [
   { id: 'text200-today', route: '/', flags: big, note: 'Today at 200% text' },
   { id: 'text200-diary', route: '/diary', flags: big, note: 'the diary at 200% text' },
@@ -25,6 +32,9 @@ module.exports = [
   { id: 'text200-import', route: '/activity/import', flags: big, note: 'the workout import at 200% text' },
   { id: 'text200-train-load-sheet', route: '/train', taps: ['train-load-info'], sheet: true, flags: big, note: "Train's overview sheet at 200% text" },
   { id: 'text200-add-sheet', route: '/', taps: ['tab-add'], sheet: true, flags: big, note: 'the + sheet at 200% text' },
+  { id: 'text200-detail', route: '/food/search', taps: ['search-tab-recent', 'recent-0'], waitFor: 'food-detail-screen', flags: big, note: 'food detail at 200% text' },
+  { id: 'text200-photo-review', route: '/food/photo?mode=text', taps: [{ type: 'ai-description', text: 'Chicken, rice and salad' }, 'ai-analyse', { wait: 2600 }], waitFor: 'ai-add-to-diary', flags: big, note: 'the AI review (sample) at 200% text' },
+  { id: 'text200-meals', route: '/food/meals?meal=lunch', flags: big, note: 'saved meals at 200% text' },
   // Settings, set-up, accounts, the morning page, friends and legal (W2-SETTINGS). The routes as they are, then
   // states of the other lists at 200%, picked by id (`settingsAt200`, below).
   { id: 'text200-reminders', route: '/settings/reminders', flags: big, note: 'Reminders at 200% text' },
@@ -38,7 +48,18 @@ module.exports = [
   { id: 'text200-privacy', route: '/legal/privacy', flags: big, note: 'Privacy at 200% text' },
   { id: 'text200-welcome', route: '/welcome', data: 'fresh', waitFor: 'welcome-get-started', flags: big, note: 'welcome at 200% text' },
   { id: 'text200-share-sheet', route: '/', taps: ['today-share'], sheet: true, flags: big, note: "the day's share sheet at 200% text" },
+  // Today, the diary and the coach in their other states (W2-TODAY).
+  { id: 'text200-today-first', route: '/', data: 'empty', flags: big, note: 'Today on day one at 200% text' },
+  { id: 'text200-today-past', route: '/', taps: [`today-day-${isoDay(-1)}`], waitFor: 'today-jump-today', flags: big, note: 'Today on yesterday at 200% text' },
+  { id: 'text200-today-off', route: '/', values: { eatBack: 0 }, flags: big, note: 'Today with workouts not added, at 200% text' },
+  { id: 'text200-today-over', route: '/', values: { eaten: 1.15 }, flags: big, note: 'Today over the budget at 200% text' },
+  { id: 'text200-today-fits', route: '/', taps: ['today-remaining-open'], sheet: true, flags: big, note: 'What fits at 200% text' },
+  { id: 'text200-diary-empty', route: '/diary', data: 'empty', flags: big, note: 'an empty diary day at 200% text' },
+  { id: 'text200-coach', route: '/coach', flags: big, note: 'the coach at 200% text' },
+  { id: 'text200-coach-ideas', route: '/coach', values: { eaten: 0.5 }, taps: ['coach-local-ideas'], waitFor: 'coach-local-answer', flags: big, note: "the coach's ideas answer at 200% text" },
   ...settingsAt200(),
+  // Profile > App > Text size, at the designed size, then Larger five times: the page's own text grows to 200%.
+  { id: 'text-size-row-larger', route: '/profile', taps: Array(5).fill('profile-text-size-larger'), waitFor: 'profile-text-size', note: 'Text size from 100% to 200% by its own control (no flag)' },
 ];
 
 /** States of the set-up, account, morning and plan lists, again at 200% text (id prefixed with text200-). */

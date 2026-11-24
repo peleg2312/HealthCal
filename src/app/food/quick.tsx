@@ -18,6 +18,7 @@ export default function QuickAddScreen() {
   const [name, setName] = useState('');
   // With large text a shorter placeholder, so it is never cut mid-word in its field.
   const big = useBigText();
+  const macroCell = big ? { flexGrow: 1, flexBasis: 110 } : { flex: 1 };
   const [kcalV, setKcal] = useState<number | null>(null);
   const [protein, setProtein] = useState<number | null>(null);
   const [carbs, setCarbs] = useState<number | null>(null);
@@ -67,10 +68,11 @@ export default function QuickAddScreen() {
             Optional, and enough on their own.
           </Text>
         </View>
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <NumberField testID="quick-protein" label="Protein" suffix="g" value={protein} onChange={setProtein} style={{ flex: 1 }} />
-          <NumberField testID="quick-carbs" label="Carbs" suffix="g" value={carbs} onChange={setCarbs} style={{ flex: 1 }} />
-          <NumberField testID="quick-fat" label="Fat" suffix="g" value={fat} onChange={setFat} style={{ flex: 1 }} />
+        {/* With large text the three wrap (each at least 110 wide), so "Protein" is never split. */}
+        <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', gap: spacing.sm }}>
+          <NumberField testID="quick-protein" label="Protein" suffix="g" value={protein} onChange={setProtein} style={macroCell} />
+          <NumberField testID="quick-carbs" label="Carbs" suffix="g" value={carbs} onChange={setCarbs} style={macroCell} />
+          <NumberField testID="quick-fat" label="Fat" suffix="g" value={fat} onChange={setFat} style={macroCell} />
         </View>
         {mismatch ? (
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>

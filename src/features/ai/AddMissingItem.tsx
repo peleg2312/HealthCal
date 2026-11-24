@@ -8,6 +8,7 @@ import { Divider, ListRow, Text, TextField } from '@/ui';
 
 import { RowEmoji } from '@/features/food/components';
 import { displayFoodName } from '@/features/food/displayName';
+import { useBigText } from '@/features/food/textGrowth';
 
 import { foodToItem, matchFoods } from './localMatch';
 import { AiGlyph } from './mark';
@@ -33,6 +34,8 @@ export function AddMissingItem({
   const { colors, spacing } = useTheme();
   // A 320 px phone cuts the example mid-word; it keeps the words that matter.
   const narrow = useWindowDimensions().width < 360;
+  // With large text a shorter placeholder, so it is never cut mid-word in its field.
+  const big = useBigText();
   const [query, setQuery] = useState('');
   const q = query.trim();
   const matches = q.length >= 2 ? matchFoods(q, foods, 3) : [];
@@ -45,7 +48,7 @@ export function AddMissingItem({
     <View style={{ gap: spacing.sm }}>
       <TextField
         testID="ai-add-item-input"
-        placeholder={narrow ? 'Add a left-out item' : 'Add a left-out item, e.g. 1 banana'}
+        placeholder={big ? 'Add an item' : narrow ? 'Add a left-out item' : 'Add a left-out item, e.g. 1 banana'}
         value={query}
         onChangeText={setQuery}
         returnKeyType="done"

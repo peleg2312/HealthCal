@@ -334,6 +334,18 @@ const cases = [
     expect: 'second title',
   },
   {
+    name: 'at 200% app text, body text of 30 px under the header is not a second title',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><script>window.__healthcalTextSize = true</script><div data-testid="screen-header" style="display:flex;gap:12px"><button data-testid="header-back" style="width:44px;height:44px">&lt;</button><div><div style="font-size:33px">About</div><div style="font-size:26px">How it works</div></div></div><p style="font-size:30px;line-height:40px">Every number in HealthCal comes from a published formula.</p></body>',
+    run: 'header',
+    expect: '',
+  },
+  {
+    name: 'at 200% app text, a 40 px title under the header is still a second title',
+    html: '<body style="margin:0;font:15px/20px sans-serif"><script>window.__healthcalTextSize = true</script><div data-testid="screen-header" style="display:flex;gap:12px"><button data-testid="header-back" style="width:44px;height:44px">&lt;</button><div><div style="font-size:33px">About</div><div style="font-size:26px">How it works</div></div></div><div style="font-size:40px;line-height:44px">Two things to check</div></body>',
+    run: 'header',
+    expect: 'second title',
+  },
+  {
     name: "the coach's right-aligned question bubble is not a card with uneven margins",
     html: '<body style="margin:0;font:15px/20px sans-serif"><div style="padding:0 20px;display:flex;flex-direction:column"><div data-testid="coach-question-2" style="align-self:flex-end;width:80%;height:60px;box-sizing:border-box;background:#fde;padding:10px 14px">How is my training week going, with the long run?</div></div></body>',
     run: 'gaps',

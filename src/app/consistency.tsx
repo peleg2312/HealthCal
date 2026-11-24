@@ -4,6 +4,7 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { formatDayLabel, formatShortDate, startOfWeek } from '@/lib/dates';
 import { formatNumber } from '@/lib/units';
+import { useTextGrowth } from '@/features/activity/textGrowth';
 import { RHYTHM_KINDS, monthGrid, monthLabel, monthOf, monthTally, rhythmWeeks, shiftMonth, weeksOnRhythm, type CalendarCell, type RhythmKind } from '@/features/progress/consistency';
 import { solidBar } from '@/features/progress/calorieBars';
 import { spokenUnits } from '@/features/progress/chartWords';
@@ -113,9 +114,10 @@ function DayCell({ cell, index }: { cell: CalendarCell | null; index: number }) 
 
 function Legend({ swatch, label }: { swatch: React.ReactNode; label: string }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+    // Never wider than the card: at large text a key's words wrap beside its swatch.
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%' }}>
       <View aria-hidden>{swatch}</View>
-      <Text variant="caption" color="textSecondary">
+      <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
         {label}
       </Text>
     </View>
@@ -124,6 +126,7 @@ function Legend({ swatch, label }: { swatch: React.ReactNode; label: string }) {
 
 export default function ConsistencyScreen() {
   const { colors, spacing } = useTheme();
+  const bigText = useTextGrowth() > 1.15;
   const d = useConsistencyData();
   const thisMonth = monthOf(d.today);
   const firstMonth = d.firstDate ? monthOf(d.firstDate) : thisMonth;
@@ -282,10 +285,12 @@ export default function ConsistencyScreen() {
         <View
           style={{
             flexDirection: 'row',
+            flexWrap: 'wrap',
             alignItems: 'flex-start',
             gap: spacing.md,
           }}>
-          <View style={{ flex: 1, minWidth: 0 }}>
+          {/* Above 115% text the title takes the whole line and its two controls go under it. */}
+          <View style={{ flex: 1, minWidth: bigText ? '100%' : 0 }}>
             <Text variant="h3">Weekly rhythm</Text>
             <Text variant="caption" color="textSecondary">
               Days a week you aim to log, train and weigh in

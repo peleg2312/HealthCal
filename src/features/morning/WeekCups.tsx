@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, useWindowDimensions, View } from 'react-native';
+import { ScrollView, useWindowDimensions, View, type ScrollViewInstance } from 'react-native';
 
 import { weekdayShort } from '@/lib/dates';
 import { formatNumber } from '@/lib/units';
@@ -61,7 +61,7 @@ export function WeekCups({ cells, testID }: { cells: WeekCells; testID?: string 
   const { colors, spacing, chartFill } = useTheme();
   const narrow = useWindowDimensions().width < 360;
   const textSize = useTextSize();
-  const scroller = React.useRef<ScrollView>(null);
+  const scroller = React.useRef<ScrollViewInstance>(null);
   const s = narrow ? SIZES.narrow : SIZES.wide;
   const { before, yesterday: y, today: t, anyWorkout } = cells;
   if (!y) return null;

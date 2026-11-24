@@ -307,6 +307,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
             <Chip
               key={p}
               label={p === 60 ? '1 h' : `${p} min`}
+              accessibilityLabel={p === 60 ? '1 hour' : `${p} minutes`}
               selected={minutes === p}
               onPress={() => setDuration(p)}
               testID={`duration-${p}`}

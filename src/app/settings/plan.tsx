@@ -66,7 +66,7 @@ import { IconTile } from '@/features/settings/components';
 import { useAuth } from '@/services/auth';
 import { isBackendConfigured } from '@/services/supabase';
 import { useNow } from '@/store/clock';
-import { useTheme } from '@/theme';
+import { useTextSize, useTheme } from '@/theme';
 import { Button, Card, Divider, EmptyState, Header, ListRow, Screen, SectionTitle, Text, toast } from '@/ui';
 
 let returnHandled = false;
@@ -150,6 +150,7 @@ function StatusOnly({ phase, signedIn, loading }: { phase: CheckoutPhase; signed
 function Choose({ view, header }: { view: PlanView; header: React.ReactNode }) {
   const { spacing } = useTheme();
   const { width } = useWindowDimensions();
+  const textSize = useTextSize();
   const phase = useCheckout((s) => s.phase);
   const busy = useCheckout((s) => s.busy);
   // Ruling D2: the smaller charge is the one chosen when the page opens; both prices are in view.
@@ -194,7 +195,7 @@ function Choose({ view, header }: { view: PlanView; header: React.ReactNode }) {
         <LegalLinksLine termsLabel={TERMS_LABEL} privacyLabel={PRIVACY_LABEL} termsTestID="plan-terms" privacyTestID="plan-privacy" />
         <Button
           testID="plan-subscribe"
-          title={subscribeLabel(offer, subscribeLabelRoom(width))}
+          title={subscribeLabel(offer, subscribeLabelRoom(width, textSize))}
           loading={busy === 'subscribe'}
           onPress={() =>
             void startCheckout(offer).then((r) => {

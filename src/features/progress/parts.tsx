@@ -289,7 +289,8 @@ export function TrendLegend({ period }: { period: string }) {
   const { colors, spacing } = useTheme();
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: 2 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+      {/* Never wider than the card: at large text the words wrap beside their marks. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, maxWidth: '100%' }}>
         {/* The marks themselves are decorative here: the words beside them say what they mean. */}
         <View aria-hidden>
           <Triangle size={8} color={colors.textTertiary} fill={colors.textTertiary} />
@@ -297,7 +298,7 @@ export function TrendLegend({ period }: { period: string }) {
         <View aria-hidden style={{ transform: [{ rotate: '180deg' }] }}>
           <Triangle size={8} color={colors.textTertiary} fill={colors.textTertiary} />
         </View>
-        <Text variant="caption" color="textTertiary">
+        <Text variant="caption" color="textTertiary" style={{ flexShrink: 1 }}>
           against your previous {period}
         </Text>
       </View>

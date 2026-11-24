@@ -361,7 +361,7 @@ function FastCell({ start, targetHours, narrow, large }: { start: string; target
       flex={narrow ? LAST_FLEX_NARROW : 1.2}
       label={`Fast of ${targetHours} h`}
       color={colors.fat}
-      accessibilityLabel={`Fasting, ${h} hours ${m} minutes of ${targetHours}`}
+      accessibilityLabel={`Fasting, ${h} hours ${m} minutes of ${targetHours} hours`}
       onPress={() => router.push('/fasting')}
       value={`${h}:${String(m).padStart(2, '0')}`}
       unit="h"

@@ -248,10 +248,12 @@ export function WeekCard({
 }
 
 function Mini({ label, value, unit, color, testID, spoken }: { label: string; value: string; unit?: string; color?: string; testID?: string; spoken?: string }) {
+  // The narrowest a total may be grows with the text, so its label never splits inside a word.
+  const grow = useTextGrowth();
   return (
     // No shrinking below the number's own width (its spaces do not break): each total is as wide as its number,
     // at least 64 px, and the row wraps instead of cutting one ("20 h 40 min" is wider than a third of the card).
-    <View style={{ flexGrow: 1, flexBasis: 'auto', minWidth: 64 }} testID={testID} accessible={!!spoken} accessibilityLabel={spoken}>
+    <View style={{ flexGrow: 1, flexBasis: 'auto', minWidth: 64 * grow }} testID={testID} accessible={!!spoken} accessibilityLabel={spoken}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         {color ? <CupKey color={color} /> : null}
         <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>

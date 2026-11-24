@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import { CAPTION_READING_MAX } from '@/features/legal/reading';
 import { CHART_CAPTION, HOW_COUNTED, type TrainingOverview } from '@/lib/trainingLoad';
 import { useTheme } from '@/theme';
 import { BarChart, Button, Sheet, Text } from '@/ui';
@@ -132,9 +133,10 @@ function OverviewBody({ overview: o, visible, onClose }: { overview: TrainingOve
       {/* The fine print, after the action: 8 px more than the body's gap sets it apart as its own part. */}
       <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
         <Text variant="overline" accessibilityRole="header" testID="train-load-how">
-          {HOW_COUNTED}
+          {HOW_COUNTED.replace(/ (\S+)$/, '\u00A0$1')}
         </Text>
-        <View style={{ gap: spacing.sm }} testID="train-load-honest">
+        {/* Reading text: held to the reading column's width on a wide window (`CAPTION_READING_MAX`). */}
+        <View style={{ gap: spacing.sm, maxWidth: CAPTION_READING_MAX }} testID="train-load-honest">
           {o.honest.map((line, i) => (
             <Text key={i} variant="caption" color="textSecondary">
               {line}

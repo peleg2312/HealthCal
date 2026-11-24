@@ -232,6 +232,12 @@ export function Note({
   );
 }
 
+/** A field's unit as a screen reader says it: "Target weight, kilograms", never "kg". */
+const SPOKEN_UNIT: Record<string, string> = { kg: 'kilograms', lb: 'pounds', cm: 'centimetres', in: 'inches', ft: 'feet', '%': 'percent' };
+export function unitSpoken(unit: string): string {
+  return SPOKEN_UNIT[unit] ?? unit;
+}
+
 export function ErrorText({ children, testID }: { children?: string | null; testID?: string }) {
   if (!children) return null;
   return (
@@ -532,7 +538,7 @@ export function BigNumberField({
           placeholderTextColor={colors.textTertiary}
           selectionColor={colors.primary}
           {...rest}
-          accessibilityLabel={rest.accessibilityLabel ?? (unit ? `${label}, ${unit}` : label)}
+          accessibilityLabel={rest.accessibilityLabel ?? (unit ? `${label}, ${unitSpoken(unit)}` : label)}
           value={text}
           onFocus={(e) => {
             setFocused(true);

@@ -30,7 +30,7 @@ import { breakableEmail } from '@/features/settings/format';
 import { sendPasswordReset, signIn, signUp, updatePassword, useAuth, validateEmail, validatePassword } from '@/services/auth';
 import { isBackendConfigured } from '@/services/supabase';
 import { useStore } from '@/store';
-import { useTheme } from '@/theme';
+import { useTextSize, useTheme } from '@/theme';
 import { Avatar, Button, goBack, haptic, Header, IconButton, PressableScale, Screen, Text, TextField, toast } from '@/ui';
 
 type Mode = 'signin' | 'signup' | 'forgot';
@@ -81,8 +81,18 @@ function DemoView({ demo }: { demo: AuthDemo }) {
   return <AuthForm initial={demo === 'signup' ? 'signup' : 'signin'} fromEmail={null} googleError={demo === 'declined' ? googleProblemWords('declined') : null} />;
 }
 
+/**
+ * A new password's rule, "At least 8 characters", is its field's placeholder. From 150% text it no longer fits
+ * a 320 px field, so it moves into the hint under the field, whole (`passwordRule`).
+ */
+const PASSWORD_RULE = 'At least 8 characters';
+function passwordRule(largeText: boolean, hint: string): { placeholder?: string; hint: string } {
+  return largeText ? { hint: `${PASSWORD_RULE}. ${hint}` } : { placeholder: PASSWORD_RULE, hint };
+}
+
 function AuthForm({ initial, fromEmail, googleError = null }: { initial: Mode; fromEmail: FromEmail; googleError?: string | null }) {
   const { colors, spacing } = useTheme();
+  const largeText = useTextSize() >= 1.5;
   const [mode, setMode] = useState<Mode>(initial);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -251,7 +261,7 @@ function AuthForm({ initial, fromEmail, googleError = null }: { initial: Mode; f
                   {...({ ref: passwordRef } as object)}
                   label="Password"
                   testID="auth-password-input"
-                  placeholder={mode === 'signup' ? 'At least 8 characters' : 'Your password'}
+                  {...(mode === 'signup' ? passwordRule(largeText, 'A short phrase is easy to remember.') : { placeholder: 'Your password' })}
                   value={password}
                   onChangeText={(t) => {
                     setPassword(t);
@@ -266,7 +276,6 @@ function AuthForm({ initial, fromEmail, googleError = null }: { initial: Mode; f
                   onSubmitEditing={() => void submit()}
                   editable={!busy}
                   error={fieldErrors.password}
-                  hint={mode === 'signup' ? 'A short phrase is easy to remember.' : undefined}
                   right={
                     <IconButton tone="clear" size={36} accessibilityLabel={show ? 'Hide password' : 'Show password'} testID="auth-password-toggle" onPress={() => setShow((s) => !s)}>
                       {show ? <EyeOff size={20} color={colors.textSecondary} /> : <Eye size={20} color={colors.textSecondary} />}
@@ -491,6 +500,7 @@ const RECOVERY_GRACE_MS = 4000;
  */
 function ResetPassword() {
   const { colors, spacing } = useTheme();
+  const largeText = useTextSize() >= 1.5;
   const recovery = useAuth((s) => s.recovery);
   const ready = useAuth((s) => s.ready);
   const [waited, setWaited] = useState(false);
@@ -584,7 +594,7 @@ function ResetPassword() {
         <TextField
           label="New password"
           testID="auth-reset-password"
-          placeholder="At least 8 characters"
+          {...passwordRule(largeText, 'A short phrase is easy to remember.')}
           value={password}
           onChangeText={(t) => {
             setPassword(t);
@@ -599,7 +609,6 @@ function ResetPassword() {
           onSubmitEditing={() => confirmRef.current?.focus()}
           editable={!busy}
           error={errors.password}
-          hint="A short phrase is easy to remember."
           right={eye}
         />
         <TextField

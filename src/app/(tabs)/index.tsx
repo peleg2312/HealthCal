@@ -649,7 +649,7 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
   return (
     // A card line like the cards around it, not a loose paragraph between them: the tip and its action in one quiet card.
     <Card testID="today-coach" style={{ gap: spacing.md }}>
-      <Text variant="body" accessibilityLabel={`${tip.title}. ${tip.body}`}>
+      <Text variant="body" accessibilityLabel={spokenUnits(`${tip.title}. ${tip.body}`)}>
         <Text variant="bodyStrong">{/[.!?]$/.test(tip.title) ? tip.title : `${tip.title}.`}</Text>
         <Text variant="body" color="textSecondary">{` ${tip.body}`}</Text>
       </Text>

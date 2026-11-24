@@ -64,6 +64,7 @@ import { addDays, formatShortDate, greeting, today } from '@/lib/dates';
 import { mealForTime } from '@/lib/nutrition';
 import { useAuth } from '@/services/auth';
 import { isBackendConfigured } from '@/services/supabase';
+import { spokenUnits } from '@/lib/spokenUnits';
 import { useStore } from '@/store';
 import { useNow, useToday } from '@/store/clock';
 import { useDay, useLive } from '@/store/selectors';
@@ -554,7 +555,7 @@ export default function CoachScreen() {
               </Text>
               {showLine ? (
                 // The week and today on a line each, centred (one sentence for a screen reader).
-                <Text variant="body" color="textSecondary" align="center" numberOfLines={2} testID="coach-hello-line" accessibilityLabel={line} style={{ maxWidth: 320 }}>
+                <Text variant="body" color="textSecondary" align="center" numberOfLines={2} testID="coach-hello-line" accessibilityLabel={spokenUnits(line)} style={{ maxWidth: 320 }}>
                   {line.split(' · ').join('\n')}
                 </Text>
               ) : null}

@@ -32,6 +32,7 @@ import { isolateRtl } from '@/lib/bidi';
 import { formatDayLabel, formatDuration, formatShortDate, today } from '@/lib/dates';
 import { formulaTdee } from '@/lib/energy';
 import { INTENSITY_LABELS, estimateOneRepMax, findStrengthRecords, kcalRange, strengthVolumeKg, type StrengthRecord } from '@/lib/exercise';
+import { spokenUnits } from '@/lib/spokenUnits';
 import { formatNumber, round, weightToKg, weightUnit, weightValue } from '@/lib/units';
 import { cancelTimerAlert, scheduleTimerAlert } from '@/services/notifications';
 import { useStore } from '@/store';
@@ -355,7 +356,7 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
           </View>
         ) : null}
         <Divider />
-        <View style={{ flexDirection: 'row', gap: spacing.md }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
           <Metric label="Volume" value={formatNumber(round(weightValue(volume, units)))} unit={weightUnit(units)} testID="strength-volume" />
           <Metric
             label="Best est. 1RM"
@@ -546,7 +547,7 @@ function FinishSummaryView({ summary }: { summary: FinishSummary }) {
         </View>
       }>
       <Card testID="strength-summary">
-        <View style={{ flexDirection: 'row', gap: spacing.md }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
           <Metric label="Duration" value={formatDuration(e.durationMin)} testID="strength-summary-duration" />
           <Metric label="Volume" value={formatNumber(round(weightValue(summary.volumeKg, units)))} unit={weightUnit(units)} />
           <Metric label="Sets done" value={String(summary.setsDone)} />
@@ -630,15 +631,21 @@ function TimerText({ text, color }: { text: string; color: 'text' | 'textSeconda
 function Metric({ label, value, unit, testID }: { label: string; value: string; unit?: string; testID?: string }) {
   // Three metrics share a row: under 360 px the number steps down a size and the label may take two lines.
   const narrow = useWindowDimensions().width < 360;
+  // Above 115% text a metric is at least 120 px wide and its row wraps (two, then one), so no label is cut.
+  const big = useTextGrowth() > 1.15;
   return (
-    <View style={{ flex: 1, minWidth: 0 }}>
+    <View
+      style={{ flex: 1, minWidth: big ? 120 : 0 }}
+      accessible
+      // Said in full: "Best estimated one-rep max: 80 kilograms".
+      accessibilityLabel={spokenUnits(`${label.replace('Best est. 1RM', 'Best estimated one-rep max')}: ${value === '–' ? 'none yet' : `${value}${unit ? ` ${unit}` : ''}`}`)}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 3 }}>
         <Text variant="numM" tabular testID={testID} style={narrow ? { fontSize: 17, lineHeight: 21 } : undefined}>
           {value}
         </Text>
         {unit ? <Text variant="unit">{unit}</Text> : null}
       </View>
-      <Text variant="caption" color="textSecondary" numberOfLines={2}>
+      <Text variant="caption" color="textSecondary" numberOfLines={big ? undefined : 2}>
         {label}
       </Text>
     </View>

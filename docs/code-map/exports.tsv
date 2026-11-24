@@ -2005,6 +2005,7 @@ src/features/onboarding/components.tsx	StepTitle	component
 src/features/onboarding/components.tsx	UnitsToggle	component
 src/features/onboarding/components.tsx	WhyWeAsk	component
 src/features/onboarding/components.tsx	focusNextEmptyField	function
+src/features/onboarding/components.tsx	unitSpoken	function
 src/features/onboarding/components.tsx	useFieldChain	function
 src/features/onboarding/deviceUnits.ts	deviceUnits	function
 src/features/onboarding/deviceUnits.ts	deviceUnitsOnce	function

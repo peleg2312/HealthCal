@@ -4,7 +4,8 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { TARGET_CARE_NOTE } from '@/features/settings/careNote';
 import { formatNumber, formatVolume, formatWeight, round } from '@/lib/units';
-import { useTheme } from '@/theme';
+import { spokenUnits } from '@/lib/spokenUnits';
+import { useTextSize, useTheme } from '@/theme';
 import { AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, haptic, levelY, MacroBar, PressableScale, Text, useReducedMotion, Vessel } from '@/ui';
 
 import { ARRIVAL_POUR } from './components';
@@ -59,8 +60,8 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
   const title = projection
     ? `${nameInTitle ? `${name}, you` : 'You'} could reach ${formatWeight(projection.targetKg, units).replace(/ /g, '\u00A0')}`
     : `${nameInTitle ? `${name}, here's` : "Here's"} your day`;
-  // The chosen pace as chosen (its steps are 0.05 kg); a pace the calorie minimum sets is a rate, said with one decimal.
-  const pace = formatWeight(Math.abs(t.impliedWeeklyKg), units, t.limitedByFloor ? 1 : 2);
+  // The pace with one decimal, as it was chosen (its steps are 0.1 kg or 0.1 lb) and as a weight is shown everywhere.
+  const pace = formatWeight(Math.abs(t.impliedWeeklyKg), units, 1);
   // Beside the foot of the cup: what the cup cannot show. The pace is on the road card when there is a road, and a matched budget has none.
   const budgetNote = projection || Math.abs(t.dailyDelta) < 5 ? '' : `About ${pace} a week. `;
   // The rest arrives as the pour lands, one piece after another.
@@ -79,7 +80,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
           {overline}
         </Text>
         {/* One heading in two sizes: the claim, then its dates in the brand ink. A screen reader gets one sentence. */}
-        <View accessible accessibilityRole="header" accessibilityLabel={projection ? `${title} ${range}` : title} testID="plan-title">
+        <View accessible accessibilityRole="header" accessibilityLabel={spokenUnits(projection ? `${title} ${range}` : title)} testID="plan-title">
           <Text variant="h1" style={narrow ? undefined : { fontSize: 32, lineHeight: 36 }}>
             {title}
           </Text>
@@ -115,7 +116,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
             style={{ gap: spacing.md }}
             testID="plan-projection"
             accessible
-            accessibilityLabel={`The road to ${formatWeight(projection.targetKg, units)}: ${range}, around ${looseDate(projection.date, now)} at about ${pace} a week. A projection, not a promise.`}>
+            accessibilityLabel={spokenUnits(`The road to ${formatWeight(projection.targetKg, units)}: ${range}, around ${looseDate(projection.date, now)} at about ${pace} a week. A projection, not a promise.`)}>
             <View style={{ gap: spacing.xs }}>
               <Text variant="h3">{`The road to ${formatWeight(projection.targetKg, units)}`}</Text>
               <Text variant="caption" color="textSecondary" testID="plan-date">
@@ -277,7 +278,8 @@ function MathRow({ label, detail, value, testID }: { label: string; detail: stri
  * foot of the cup, under the labels.
  */
 function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: number; goal: 'lose' | 'maintain' | 'gain'; note: string }) {
-  const { colors } = useTheme();
+  const { colors, spacing } = useTheme();
+  const largeText = useTextSize() >= 1.3;
   // The burn as it is printed (to the nearest 10, like the budget), so the three numbers add up on screen.
   const burn = Math.round(tdee / 10) * 10;
   const top = Math.max(target, burn);
@@ -304,6 +306,53 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
       </View>
     </View>
   );
+  const spoken = `Daily target ${formatNumber(target)} kilocalories${showBurn ? `, against about ${formatNumber(burn)} kilocalories you burn` : ', matched to what you burn'}`;
+  const gapLabel = (
+    <Text variant="label" color="textSecondary" testID="plan-gap">
+      {`${gap > 0 ? '−' : '+'}${formatNumber(Math.abs(gap))} for your goal`}
+    </Text>
+  );
+  const matched = (
+    <Text variant="label" color="textSecondary" testID="plan-matched">
+      Matches your burn
+    </Text>
+  );
+  const budgetNote = (
+    <Text variant="caption" color="textSecondary" testID="plan-budget-note">
+      {note}
+    </Text>
+  );
+  const burnMark = (w: number, h: number) =>
+    burnInside ? (
+      // What you burn, as a dashed mark across the cup at its level (the key beside the label matches it).
+      <View
+        pointerEvents="none"
+        style={{ position: 'absolute', left: 5, width: w - 10, top: Math.round(levelY(burn, top, h - 1.5)), height: 0, borderTopWidth: 1.5, borderStyle: 'dashed', borderColor: colors.text }}
+      />
+    ) : null;
+  if (largeText) {
+    // At 130% text and more the labels no longer fit between the levels they describe: the target leads in
+    // full width, then a smaller cup with the other figures in a column beside it, then the note under both.
+    return (
+      <View style={{ gap: spacing.md }} accessible accessibilityLabel={spoken}>
+        <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+          <AnimatedNumber variant="numXL" color="caloriesInk" testID="plan-kcal" value={target} from={0} duration={ARRIVAL_POUR} delay={POUR_DELAY} format={(n) => formatNumber(Math.round(n))} />
+          <Text variant="unit">kcal a day</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.lg }}>
+          <View>
+            <Vessel value={target} max={top} color={colors.calories} width={64} height={150} duration={ARRIVAL_POUR} delay={POUR_DELAY} testID="plan-vessel" />
+            {burnMark(64, 150)}
+          </View>
+          <View style={{ flex: 1, minWidth: 0, gap: spacing.md }}>
+            {showBurn ? burnLabel : matched}
+            {showBurn && goal !== 'maintain' ? gapLabel : null}
+          </View>
+        </View>
+        {budgetNote}
+      </View>
+    );
+  }
   return (
     <View>
       <Vessel
@@ -318,7 +367,7 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
         // 10 px between labels keeps 8 px between their letters at every plan (keeping weight puts
         // "Matches your burn" right under the number; gaining puts the surplus over the burn).
         labelSpacing={10}
-        accessibilityLabel={`Daily target ${formatNumber(target)} kilocalories${showBurn ? `, against about ${formatNumber(burn)} kilocalories you burn` : ', matched to what you burn'}`}
+        accessibilityLabel={spoken}
         labels={[
           ...(showBurn ? [{ key: 'burn', at: burn, height: 40, tick: burnInside ? undefined : colors.vesselEdge, content: burnLabel }] : []),
           ...(showBurn && goal !== 'maintain'
@@ -327,11 +376,7 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
                   key: 'gap',
                   at: (target + burn) / 2,
                   height: 22,
-                  content: (
-                    <Text variant="label" color="textSecondary" testID="plan-gap">
-                      {`${gap > 0 ? '−' : '+'}${formatNumber(Math.abs(gap))} for your goal`}
-                    </Text>
-                  ),
+                  content: gapLabel,
                 },
               ]
             : []),
@@ -365,26 +410,14 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
                   key: 'match',
                   at: target * 0.98,
                   height: 22,
-                  content: (
-                    <Text variant="label" color="textSecondary" testID="plan-matched">
-                      Matches your burn
-                    </Text>
-                  ),
+                  content: matched,
                 },
               ]),
         ]}>
         {/* The room beside the foot of the cup holds the one thing the cup does not show yet. */}
-        <Text variant="caption" color="textSecondary" testID="plan-budget-note">
-          {note}
-        </Text>
+        {budgetNote}
       </Vessel>
-      {burnInside ? (
-        // What you burn, as a dashed mark across the cup at its level (the key beside the label matches it).
-        <View
-          pointerEvents="none"
-          style={{ position: 'absolute', left: 5, width: width - 10, top: Math.round(levelY(burn, top, height - 1.5)), height: 0, borderTopWidth: 1.5, borderStyle: 'dashed', borderColor: colors.text }}
-        />
-      ) : null}
+      {burnMark(width, height)}
     </View>
   );
 }

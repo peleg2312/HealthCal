@@ -222,16 +222,17 @@ const monotonicNow = () => (typeof performance !== 'undefined' && typeof perform
  * Mounted once at the app root ('screen'), and once inside every open Sheet
  * ('sheet'): a native modal covers the app's own layer, so a sheet has to show
  * the toast itself. On a screen it rests 12 px above the bottom chrome the
- * screen reported with `useToastDock` (tab bar, footer or home indicator),
- * never mid-screen on top of controls. While the on-screen keyboard is up it
+ * screen reported with `useToastDock` (tab bar, footer or home indicator);
+ * in a browser, when a control lies there, in the lowest band clear of every
+ * control with its action in thumb reach (`toastSpot`). While the on-screen keyboard is up it
  * rests 12 px above the footer that rides on the keyboard, or 12 px above the
  * keyboard when the screen has no footer, by the same measure the screen pads
  * itself with, and moves above the focused field when it would cover it and
  * there is room. The root host is outside every ScrollView, so a tap on its
  * action is never taken for a tap that dismisses the keyboard (only a
  * ScrollView does that, by its keyboardShouldPersistTaps). In a sheet it sits in the layout right
- * above the sheet's top edge, and the host underneath steps aside so there is
- * only ever one toast on screen.
+ * above the sheet's top edge (in a browser, inside the sheet in its lowest clear band when that edge is
+ * out of thumb reach), and the host underneath steps aside so there is only ever one toast on screen.
  */
 export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sheet' }) {
   const { colors, radius } = useTheme();

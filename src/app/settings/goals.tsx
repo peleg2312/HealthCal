@@ -92,7 +92,8 @@ export default function GoalsScreen() {
 
 function GoalsForm() {
   const { colors, spacing } = useTheme();
-  const bigText = useTextSize() >= 1.5;
+  const textSize = useTextSize();
+  const bigText = textSize >= 1.5;
   const saved = useProfile();
   const setProfile = useStore((s) => s.setProfile);
   const food = useLive('foodEntries');
@@ -251,11 +252,12 @@ function GoalsForm() {
         ) : null}
         <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
           <MacroBar protein={macros.proteinG * 4} carbs={macros.carbsG * 4} fat={macros.fatG * 9} />
-          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            <PreviewStat label="Protein" value={`${macros.proteinG} g`} color={colors.protein} />
-            <PreviewStat label="Carbs" value={`${macros.carbsG} g`} color={colors.carbs} />
-            <PreviewStat label="Fat" value={`${macros.fatG} g`} color={colors.fat} />
-            <PreviewStat label="Water" value={formatVolume(water, u)} color={colors.water} />
+          {/* From 130% text the four figures go two a line, so no figure is cut short. */}
+          <View style={{ flexDirection: 'row', flexWrap: textSize >= 1.3 ? 'wrap' : 'nowrap', gap: spacing.sm }}>
+            <PreviewStat label="Protein" value={`${macros.proteinG} g`} color={colors.protein} half={textSize >= 1.3} />
+            <PreviewStat label="Carbs" value={`${macros.carbsG} g`} color={colors.carbs} half={textSize >= 1.3} />
+            <PreviewStat label="Fat" value={`${macros.fatG} g`} color={colors.fat} half={textSize >= 1.3} />
+            <PreviewStat label="Water" value={formatVolume(water, u)} color={colors.water} half={textSize >= 1.3} />
           </View>
           <Text variant="caption" color="textSecondary" testID="goals-preview-note">
             {draftRule === 'week'
@@ -663,11 +665,11 @@ function GoalsForm() {
  * number is the leading figure and the unit is everything after it, so a two-word unit ("88 fl oz")
  * is set whole in the unit style.
  */
-function PreviewStat({ label, value, color }: { label: string; value: string; color: string }) {
+function PreviewStat({ label, value, color, half }: { label: string; value: string; color: string; half?: boolean }) {
   const lead = /^[\d.,\u2212-]+(?= )/.exec(value)?.[0];
   const i = lead ? lead.length : -1;
   return (
-    <View style={{ flex: 1, minWidth: 0 }}>
+    <View style={half ? { flexBasis: '40%', flexGrow: 1, minWidth: 0 } : { flex: 1, minWidth: 0 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <CupKey color={color} />
         <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ flexShrink: 1 }}>

@@ -9,6 +9,7 @@ import { cup, fonts, MAX_CONTENT_WIDTH, useTheme } from '@/theme';
 import type { ISODate } from '@/types';
 import { Chip, FadeUp, IconButton, ListRow, MiniCup, PressableScale, Sheet, Text, useReducedMotion } from '@/ui';
 
+import { LARGE_TEXT, useTextGrowth } from './textGrowth';
 import { DaySwipeGuard } from './useDaySwipe';
 import { dayRing, weekCaption, weekDates } from './week';
 
@@ -206,6 +207,7 @@ export function DayRingStrip({
     return b === 0 ? 'This week' : b === 1 ? 'Last week' : b === -1 ? 'Next week' : `Week of ${formatShortDate(dates[0])}`;
   };
   const narrow = windowW < 360;
+  const large = useTextGrowth() > LARGE_TEXT;
   // Natively and on touch the arrows are not drawn: every day offers the same as actions.
   const weekActions = [
     ...(back < maxBack ? [{ name: 'previousWeek', label: 'Previous week' }] : []),
@@ -329,17 +331,19 @@ export function DayRingStrip({
         )}
       </DaySwipeGuard>
       {/* One height on both screens: two caption lines or the chip. A note that wraps moves nothing. */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: CAPTION_ROW_H }}>
+      {/* Large text (130% and up): the caption takes the whole width and the chip, the streak and the week cup a line
+          under it, so neither squeezes the other's words. */}
+      <View style={{ flexDirection: 'row', flexWrap: large ? 'wrap' : 'nowrap', alignItems: 'center', gap: spacing.sm, minHeight: CAPTION_ROW_H }}>
         {showNote ? (
-          <FadeUp key={noteText} style={{ flex: 1 }}>
-            <Text variant="caption" color="text" numberOfLines={2} testID={note?.testID} accessibilityLiveRegion="polite">
+          <FadeUp key={noteText} style={large ? { flexBasis: '100%' } : { flex: 1 }}>
+            <Text variant="caption" color="text" numberOfLines={large ? undefined : 2} testID={note?.testID} accessibilityLiveRegion="polite">
               {noteText}
             </Text>
           </FadeUp>
         ) : (
           // Never clamped: a long week ("1,060 kcal a day over budget, 4 full days") fits two lines beside the chip
           // or the streak mark on a 320 px phone, and takes a third rather than lose its end.
-          <Text variant="caption" color="textSecondary" style={{ flex: 1 }} testID={`${testIDPrefix}-week-caption`}>
+          <Text variant="caption" color="textSecondary" style={large ? { flexBasis: '100%' } : { flex: 1 }} testID={`${testIDPrefix}-week-caption`}>
             {caption}
           </Text>
         )}

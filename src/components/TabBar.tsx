@@ -106,7 +106,7 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
         }}
         style={[
           { alignItems: 'center', justifyContent: 'flex-start', paddingTop: iconTop, gap: 3, height: TAB_BAR_HEIGHT },
-          large ? { flexGrow: 1, flexShrink: label.length === longest ? 1 : 0, flexBasis: 'auto', minWidth: 44, paddingHorizontal: 2 } : { flex: 1 },
+          large ? { flexGrow: 1, flexShrink: label.length === longest ? 1 : 0, flexBasis: 'auto', minWidth: 44, paddingHorizontal: 3 } : { flex: 1 },
         ]}>
         <Icon size={22} color={focused ? colors.text : colors.textTertiary} strokeWidth={focused ? 2.2 : 1.9} />
         <Text

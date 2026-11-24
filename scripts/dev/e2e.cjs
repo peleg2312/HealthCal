@@ -454,7 +454,9 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   // (effectiveFrom), so saving leaves today's budget exactly as it was and writes one closed period.
   await page.goto(`${BASE}/settings/goals`, { waitUntil: 'networkidle' });
   await page.getByTestId('goals-exercise-spread-week').first().waitFor({ timeout: 15000 });
-  check('Goals: a new person is on "Over 7 days"', (await page.getByTestId('goals-exercise-spread-week').first().getAttribute('aria-selected')) === 'true');
+  // The choice is a radio group now (Segmented role="radiogroup"): checked, not selected.
+  const spreadWeek = page.getByTestId('goals-exercise-spread-week').first();
+  check('Goals: a new person is on "Over 7 days"', (await spreadWeek.getAttribute('aria-checked')) === 'true' || (await spreadWeek.getAttribute('aria-selected')) === 'true');
   await tap('goals-exercise-spread-day');
   const spreadNote = await text('goals-exercise-note');
   check('Goals: the note says the change waits for tomorrow when a workout is dated today', /starts with tomorrow.s workouts/i.test(spreadNote), spreadNote);

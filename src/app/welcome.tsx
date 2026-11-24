@@ -14,7 +14,7 @@ import { pickAndImportBackup } from '@/services/export';
 import { VIEWER_BLOCKED } from '@/services/viewer';
 import { isBackendConfigured } from '@/services/supabase';
 import { useStore } from '@/store';
-import { useReducedMotion, useTheme } from '@/theme';
+import { useReducedMotion, useTextSize, useTheme } from '@/theme';
 import { AnimatedNumber, Button, FadeUp, Screen, Text, Vessel } from '@/ui';
 
 /** The cup starts pouring as the screen opens; everything else follows it. */
@@ -74,7 +74,7 @@ function HeroCup({ height, narrow, small, tiny }: { height: number; narrow: bool
   const width = Math.round(Math.max(tiny ? 44 : 0, height * (narrow ? 0.32 : 0.4)));
   const big = tiny ? 34 : small ? 44 : 56;
   return (
-    <View accessible accessibilityLabel="An example day: a budget of 2,160 kilocalories including about 290 added by workouts, 1,219 eaten, 941 left. Honest numbers. Fast logging. Free to log, no ads.">
+    <View accessible accessibilityLabel={HERO_LABEL}>
       <Vessel
         value={EATEN}
         max={BUDGET}
@@ -165,6 +165,59 @@ function HeroCup({ height, narrow, small, tiny }: { height: number; narrow: bool
   );
 }
 
+/** The example day's spoken label: the cup and its figures are one element. */
+const HERO_LABEL =
+  'An example day: a budget of 2,160 kilocalories including about 290 added by workouts, 1,219 eaten, 941 left. Honest numbers. Fast logging. Free to log, no ads.';
+
+/**
+ * The hero at 130% text and more. The labels beside the cup are placed at the levels they describe, and
+ * grown text no longer fits between those levels, so the figures stand in a column beside a cup of a fixed
+ * size (each wraps whole if it must) and the three promises follow under it. The page scrolls if it needs to.
+ */
+function LargeTextHero() {
+  const { colors, spacing } = useTheme();
+  return (
+    <View accessible accessibilityLabel={HERO_LABEL} style={{ gap: spacing.lg }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.lg }}>
+        <Vessel value={EATEN} max={BUDGET} headroom={BURNED} color={colors.calories} width={64} height={160} duration={ARRIVAL_POUR} delay={POUR_DELAY} memoryKey="welcome-cup" />
+        <View style={{ flex: 1, minWidth: 0, gap: spacing.sm }}>
+          <Text variant="label" color="textSecondary">
+            <Text variant="numM">~290</Text>
+            {' added'}
+          </Text>
+          <AnimatedNumber
+            variant="numXL"
+            color="caloriesInk"
+            value={BUDGET - EATEN}
+            from={BUDGET}
+            duration={ARRIVAL_POUR}
+            delay={POUR_DELAY}
+            memoryKey="welcome-left"
+            format={(n) => formatNumber(Math.round(n))}>
+            <Text variant="unit" style={{ letterSpacing: 0 }}>
+              {' kcal left'}
+            </Text>
+          </AnimatedNumber>
+          <Text variant="label" color="textSecondary">
+            <AnimatedNumber variant="numM" value={EATEN} from={0} duration={ARRIVAL_POUR} delay={POUR_DELAY} memoryKey="welcome-eaten" format={(n) => formatNumber(Math.round(n))} />
+            {' eaten'}
+          </Text>
+        </View>
+      </View>
+      <View style={{ gap: spacing.md }}>
+        {PROMISES.map((p) => (
+          <View key={p.key} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <p.Icon size={18} color={colors.text} strokeWidth={1.9} />
+            <Text variant="bodyStrong" style={{ flex: 1 }}>
+              {p.title}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export default function Welcome() {
   const { colors, spacing } = useTheme();
   const onboarded = useStore((s) => !!s.profile?.onboardedAt);
@@ -192,6 +245,7 @@ export default function Welcome() {
   }, [ready]);
   const window = useWindowDimensions();
   const reduce = useReducedMotion();
+  const largeText = useTextSize() >= 1.3;
   // A note that appears is seen. The notes are the last thing on the page and the pinned actions can
   // cover them on a short screen, so the page scrolls to its end when one appears or changes (at once
   // under reduced motion): then, and again when the page's height settles, since the hero gives up its
@@ -309,7 +363,12 @@ export default function Welcome() {
         testID="welcome-hero"
         onLayout={(e) => setRoom({ height: Math.round(e.nativeEvent.layout.height), final: ready })}
         style={{ flex: 1, minHeight: OVERLINE + NEED_TINY + HERO_PAD, justifyContent: 'center', paddingBottom: HERO_PAD }}>
-        {fit ? (
+        {largeText ? (
+          <View style={{ gap: spacing.md }}>
+            <Text variant="overline">An example day</Text>
+            <LargeTextHero />
+          </View>
+        ) : fit ? (
           <View style={{ gap: spacing.md }}>
             <Text variant="overline">An example day</Text>
             <HeroCup height={fit.height} narrow={narrow} small={fit.small} tiny={fit.tiny} />

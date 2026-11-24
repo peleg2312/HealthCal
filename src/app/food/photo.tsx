@@ -62,6 +62,7 @@ import { useLive } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
 import type { AiFoodResult, Food, MealType } from '@/types';
 import { AnimatedNumber, Button, Card, Chip, CupKey, Divider, FadeUp, goBack, haptic, Header, MacroBar, PressableScale, Screen, Segmented, Text, TextField, toast } from '@/ui';
+import { useBigText } from '@/features/food/textGrowth';
 
 type InputMode = 'photo' | 'text';
 type Step = 'capture' | 'analysing' | 'review' | 'error';
@@ -662,7 +663,7 @@ export default function PhotoScreen() {
                     </Text>
                   ) : null}
                   <MacroBar protein={sum.protein} carbs={sum.carbs} fat={sum.fat} />
-                  <View style={{ flexDirection: 'row' }}>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.sm }}>
                     <MacroStat label="Protein" value={sum.protein} color={colors.protein} />
                     <MacroStat label="Carbs" value={sum.carbs} color={colors.carbs} />
                     <MacroStat label="Fat" value={sum.fat} color={colors.fat} />
@@ -716,7 +717,7 @@ export default function PhotoScreen() {
                   </Text>
                 </View>
                 {narrow ? null : <MacroBar protein={sum.protein} carbs={sum.carbs} fat={sum.fat} />}
-                <View style={{ flexDirection: 'row' }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.sm }}>
                   <MacroStat label="Protein" value={sum.protein} color={colors.protein} />
                   <MacroStat label="Carbs" value={sum.carbs} color={colors.carbs} />
                   <MacroStat label="Fat" value={sum.fat} color={colors.fat} />
@@ -954,8 +955,10 @@ export default function PhotoScreen() {
 
 /** One macro of the estimate's total, in whole grams ("53 g", never "52.9 g": principle 2). */
 function MacroStat({ label, value, color }: { label: string; value: number; color: string }) {
+  // Three a line; with large text the row wraps (each at least 120 wide), so "Protein" never runs into "Carbs".
+  const big = useBigText();
   return (
-    <View style={{ flex: 1, gap: 2 }}>
+    <View style={[big ? { flexGrow: 1, flexBasis: 120 } : { flex: 1 }, { gap: 2 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <CupKey color={color} />
         <Text variant="label">{label}</Text>

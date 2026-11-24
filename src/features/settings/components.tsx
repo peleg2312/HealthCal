@@ -2,6 +2,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
+import { spokenUnits } from '@/lib/spokenUnits';
 import { formatClock, formatHHmm, parseHHmm } from '@/lib/dates';
 import { cup, cupFor, useTheme } from '@/theme';
 import { Button, Card, Chip, CupKey, Divider, IconButton, ListRow, PressableScale, Sheet, Text } from '@/ui';
@@ -100,7 +101,7 @@ export function OptionRow({
       accessibilityRole="radio"
       accessibilityState={{ checked: selected, selected }}
       aria-checked={selected}
-      accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
+      accessibilityLabel={spokenUnits(subtitle ? `${title}, ${subtitle}` : title)}
       style={{
         flexDirection: 'row',
         alignItems: 'center',

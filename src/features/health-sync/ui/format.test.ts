@@ -48,7 +48,7 @@ describe('sync screen wording', () => {
     const v = reviewView(item, '2026-11-20', 'metric', false);
     expect(v.estimate).toBe(true);
     expect(v.added).toMatch(/^~\d+$/);
-    expect(v.detail).toMatch(/^est\. \d+–\d+$/);
+    expect(v.detail).toMatch(/^likely \d+–\d+$/);
     expect(plain(v.meta)).toBe('Fri, Nov 13 · 07:00 · 45 min');
   });
 

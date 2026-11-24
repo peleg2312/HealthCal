@@ -3,8 +3,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Platform, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { spokenUnits } from '@/lib/spokenUnits';
 import { ViewerBlockedError } from '@/services/viewer';
-import { useTheme } from '@/theme';
+import { useTextSize, useTheme } from '@/theme';
 import { Button, haptic, PressableScale, Sheet, Text, toast } from '@/ui';
 
 import { canShareImage, saveCard, SAVE_AVAILABLE, shareCard, type ExportResult } from './capture';
@@ -31,10 +32,10 @@ const OPEN_GRACE_MS = 450;
  * a checkbox to assistive technology (aria-checked on web), so a screen-reader
  * user hears whether calorie numbers or food names will be on the image.
  */
-function ChoiceChip({ label, short, on, onPress, testID }: { label: string; short?: string; on: boolean; onPress: () => void; testID: string }) {
+function ChoiceChip({ label, short, on, onPress, testID, large }: { label: string; short?: string; on: boolean; onPress: () => void; testID: string; large?: boolean }) {
   const { colors, radius } = useTheme();
   // Half the sheet at 320 px is 136: too narrow for "Calorie numbers", so it shows its short name.
-  const narrow = useWindowDimensions().width < 360;
+  const narrow = useWindowDimensions().width < 360 && !large;
   return (
     <PressableScale
       testID={testID}
@@ -47,19 +48,20 @@ function ChoiceChip({ label, short, on, onPress, testID }: { label: string; shor
       accessibilityLabel={label}
       style={{
         // Two to a line, as a grid: wrapped by width, six choices left "Food names" alone on a third line.
-        flexBasis: '40%',
+        // At 150% text and more, one to a line, as tall as its words, so no name is cut short.
+        flexBasis: large ? '100%' : '40%',
         flexGrow: 1,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 5,
-        height: 32,
+        ...(large ? { minHeight: 32, paddingVertical: 4 } : { height: 32 }),
         paddingHorizontal: 10,
         borderRadius: radius.chip,
         backgroundColor: on ? colors.text : 'transparent',
         borderWidth: 1,
         borderColor: on ? colors.text : colors.borderStrong,
       }}>
-      <Text variant="label" color={on ? 'bg' : 'text'} numberOfLines={1} style={{ fontSize: narrow ? 13 : 13.5, flexShrink: 1 }}>
+      <Text variant="label" color={on ? 'bg' : 'text'} numberOfLines={large ? undefined : 1} style={{ fontSize: narrow ? 13 : 13.5, flexShrink: 1 }}>
         {narrow && short ? short : label}
       </Text>
     </PressableScale>
@@ -120,6 +122,7 @@ export function ShareSheet({
   }, [visible]);
 
   const insets = useSafeAreaInsets();
+  const large = useTextSize() >= 1.5;
   // The height of the choices and their note, measured: they wrap differently at each width.
   const [choicesH, setChoicesH] = useState(176);
   const p = plan(choices);
@@ -129,7 +132,9 @@ export function ShareSheet({
   const maxW = Math.min(winW, 560) - 2 * spacing.xl - 2;
   const chrome = 64 + 8 + 52 + Math.max(insets.bottom, spacing.lg) + spacing.md;
   const maxH = winH * 0.88 - chrome - spacing.lg - choicesH - 4;
-  const previewW = Math.max(120, Math.min(kind === 'day' ? 230 : 300, maxW, (maxH * p.scene.width) / p.scene.height));
+  // At 150% text and more the words no longer fit beside a preview sized to the sheet: the preview keeps its
+  // size and the sheet's body scrolls, clearly (the choices one to a line), rather than shrink the card to nothing.
+  const previewW = large ? Math.min(kind === 'day' ? 230 : 300, maxW) : Math.max(120, Math.min(kind === 'day' ? 230 : 300, maxW, (maxH * p.scene.width) / p.scene.height));
 
   const toggle = (k: keyof ShareChoices) => {
     const next = { ...choices, [k]: !choices[k] };
@@ -186,7 +191,7 @@ export function ShareSheet({
           testID="share-card-preview"
           accessible
           accessibilityRole="image"
-          accessibilityLabel={`Card preview. ${p.summary}`}
+          accessibilityLabel={spokenUnits(`Card preview. ${p.summary}`)}
           style={{ alignSelf: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 6, overflow: 'hidden' }}>
           <CardArt scene={p.scene} width={previewW} />
         </View>
@@ -194,7 +199,7 @@ export function ShareSheet({
           <Text variant="overline">On the card</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
             {CHOICES_FOR[kind].map((k) => (
-              <ChoiceChip key={k} label={CHOICE_LABEL[k]} short={k === 'kcal' ? 'Calories' : undefined} on={choices[k]} onPress={() => toggle(k)} testID={`share-choice-${k}`} />
+              <ChoiceChip key={k} label={CHOICE_LABEL[k]} short={k === 'kcal' ? 'Calories' : undefined} on={choices[k]} onPress={() => toggle(k)} testID={`share-choice-${k}`} large={large} />
             ))}
           </View>
           <Text variant="caption" color="textSecondary">

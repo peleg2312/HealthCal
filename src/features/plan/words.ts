@@ -101,17 +101,22 @@ export function taxNote(o: Pick<PlanOffer, 'taxIncluded'>): string | null {
 
 /**
  * The pinned button: names the price and the period. When that is longer than `maxChars` (a long price on a
- * narrow phone, "CHF 14.90 a month" at 320 px) it names the price only: the renewal sentence directly above it
- * names the period in full, so the button is never cut short with an ellipsis.
+ * narrow phone, "CHF 14.90 a month" at 320 px) it names the price only, and where even that does not fit (a large
+ * text size) it says "Subscribe": the renewal sentence directly above it names the price and the period in full,
+ * so the button is never cut short with an ellipsis.
  */
 export function subscribeLabel(o: Pick<PlanOffer, 'amount' | 'currency' | 'period'>, maxChars = Infinity): string {
   const full = `Subscribe for ${priceLine(o)}`;
-  return full.length <= maxChars ? full : `Subscribe for ${formatMoney(o.amount, o.currency)}`;
+  if (full.length <= maxChars) return full;
+  const price = `Subscribe for ${formatMoney(o.amount, o.currency)}`;
+  // At a large text size even the price may not fit: the renewal sentence directly above names it in full.
+  return price.length <= maxChars ? price : 'Subscribe';
 }
 
 /** How many characters the pinned button holds before `subscribeLabel` drops the period. */
-export function subscribeLabelRoom(windowWidth: number): number {
-  return windowWidth < 360 ? 27 : 34;
+export function subscribeLabelRoom(windowWidth: number, textSize = 1): number {
+  // The button's letters grow with the app's text size (Profile > App), so it holds fewer of them.
+  return Math.floor((windowWidth < 360 ? 27 : 34) / Math.max(1, textSize));
 }
 
 /** The full renewal sentence, directly above the button. */

@@ -7,7 +7,9 @@ import { reminderTimeLabel, waterCategory, type PlannedReminder, type ReminderKi
 import { usePlannedReminders } from '@/features/settings/usePlannedReminders';
 import { getReminderPermission, remindersSupported, requestReminderPermission, type ReminderPermission } from '@/services/notifications';
 import { useStore } from '@/store';
-import { useTheme } from '@/theme';
+import { balancedLines, chipWidth } from '@/features/food/chipLines';
+import { useTextSize, useTheme } from '@/theme';
+import { scaledFontSize } from '@/theme/textSize';
 import { Button, Card, Chip, ChipWrap, Header, Screen, Segmented, Text, ToggleRow, toast } from '@/ui';
 
 const INTERVALS = [60, 90, 120, 180, 240];
@@ -205,8 +207,8 @@ export default function RemindersScreen() {
             <Text variant="label" color="textSecondary">
               Days
             </Text>
-            <ChipWrap>
-              {WEEKDAYS.map(({ day, label }) => {
+            <DayChips
+              chip={({ day, label }) => {
                 const selected = r.weighIn.weekdays.includes(day);
                 return (
                   <Chip
@@ -220,8 +222,8 @@ export default function RemindersScreen() {
                     }}
                   />
                 );
-              })}
-            </ChipWrap>
+              }}
+            />
           </View>
         ) : null}
       </Group>
@@ -321,6 +323,26 @@ function Preview({ plan, now, hour12, off }: { plan: PlannedReminder[]; now: Dat
           </View>
         )}
       </Card>
+    </View>
+  );
+}
+
+/**
+ * The seven day chips. At the designed text size they wrap as the kit's ChipWrap does. With the app's
+ * text size raised the lines are laid out ahead (`balancedLines`, widths from the grown labels), so a
+ * wrap never leaves Sunday alone on its last line.
+ */
+function DayChips({ chip }: { chip: (d: (typeof WEEKDAYS)[number]) => React.ReactNode }) {
+  const textSize = useTextSize();
+  const [room, setRoom] = useState(0);
+  if (textSize <= 1) return <ChipWrap>{WEEKDAYS.map(chip)}</ChipWrap>;
+  const r = scaledFontSize(13.5, textSize) / 13.5;
+  const lines = room > 0 ? balancedLines(WEEKDAYS.map((d) => 26 + (chipWidth(d.label) - 26) * r), room) : [WEEKDAYS.map((_, i) => i)];
+  return (
+    <View onLayout={(e) => setRoom(Math.floor(e.nativeEvent.layout.width))} style={{ rowGap: 12 }}>
+      {lines.map((line) => (
+        <ChipWrap key={line[0]}>{line.map((i) => chip(WEEKDAYS[i]))}</ChipWrap>
+      ))}
     </View>
   );
 }

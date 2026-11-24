@@ -147,6 +147,19 @@ describe('money', () => {
     expect(W.subscribeLabel(usd, W.subscribeLabelRoom(320))).toBe('Subscribe for $3.99 a month');
     expect(W.subscribeLabel(usd, W.subscribeLabelRoom(390))).toBe('Subscribe for $3.99 a month');
   });
+
+  it('at a large app text size the button holds fewer letters: the period goes, then the price, never cut', () => {
+    const usd = { amount: 399, currency: 'USD', period: 'month' as const };
+    expect(W.subscribeLabelRoom(360, 1)).toBe(W.subscribeLabelRoom(360));
+    expect(W.subscribeLabel(usd, W.subscribeLabelRoom(390, 1.5))).toBe('Subscribe for $3.99');
+    expect(W.subscribeLabel(usd, W.subscribeLabelRoom(320, 2))).toBe('Subscribe');
+    for (const size of [1, 1.15, 1.3, 1.5, 1.75, 2]) {
+      for (const w of [320, 360, 390]) {
+        const label = W.subscribeLabel(usd, W.subscribeLabelRoom(w, size));
+        expect(label.length <= W.subscribeLabelRoom(w, size) || label === 'Subscribe').toBe(true);
+      }
+    }
+  });
 });
 
 describe('rows and dates', () => {

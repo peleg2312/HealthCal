@@ -350,8 +350,10 @@ function AmountStepper({ amount, name, testID }: { amount: RowAmount; name: stri
 
 /** Small labelled number used in macro rows: a cup key, the label, then "32 / 150 g". */
 export function MacroStat({ label, value, target, color }: { label: string; value: number; target?: number; color: string }) {
+  // With large text a parent row that wraps gives each figure at least 120 px, so "Protein" is never cut.
+  const big = useBigText();
   return (
-    <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+    <View style={[big ? { flexGrow: 1, flexBasis: 120 } : { flex: 1 }, { minWidth: 0, gap: 4 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <CupKey color={color} />
         <Text variant="label" numberOfLines={1} style={{ flexShrink: 1 }}>

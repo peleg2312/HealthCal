@@ -45,6 +45,11 @@ export function tabTitleRoom(width: number): number {
   return Math.min(width, MAX_CONTENT_WIDTH) - 2 * SPACING.xl - SPACING.md - (3 * HEADER_CUP + 2 * CUP_GAP);
 }
 
+/** A line whose last two words never part: the space between them made a no-break space. */
+function keepLastTwo(line: string): string {
+  return line.replace(/ (\S+)$/, '\u00A0$1');
+}
+
 let coachPreloaded = false;
 
 /**
@@ -115,37 +120,59 @@ export function TabHeader({
   const large = useTextGrowth() > LARGE_TEXT;
   const size = titleSize ?? tabTitleSize(width);
   const initial = ((profile.name ?? '').trim() || 'Me').slice(0, 1).toUpperCase();
+  const overlineText = overlineShort && width < 360 ? overlineShort : overline;
+  const cups = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: CUP_GAP }}>
+      <CoachEntry testID={`${tab}-coach-open`} size={HEADER_CUP} hitSlop={HEADER_SLOP} />
+      <FriendsEntry testID={`${tab}-friends`} size={HEADER_CUP} hitSlop={HEADER_SLOP} />
+      <PressableScale
+        testID={`${tab}-profile`}
+        onPress={() => router.push('/profile')}
+        accessibilityLabel="Profile and settings"
+        hitSlop={HEADER_SLOP}
+        // Neutral, as Friends is: the card surface with its 1 px line. Only the Coach cup is accented.
+        style={{ width: HEADER_CUP, height: HEADER_CUP, ...cupFor(HEADER_CUP), backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
+        <Text variant="h3">{initial}</Text>
+      </PressableScale>
+    </View>
+  );
+  // One line by its choice of words and size (todayTitle), never by clipping: under a reader's own text
+  // spacing (wider letters and words) it wraps rather than lose its end.
+  const heading = (
+    <Text
+      variant="h1"
+      testID={titleTestID}
+      accessibilityRole="header"
+      {...({ 'aria-level': 1 } as object)}
+      style={{ fontSize: size, lineHeight: TITLE_LINE, letterSpacing: -size * 0.025 }}>
+      {title}
+    </Text>
+  );
+  if (large) {
+    // Large text (130% and up): the overline shares its row with the three cups and the title has the whole width
+    // under them, so a one-word title ("Progress" at 320 px) is never split and a greeting wraps at its words. The
+    // overline wraps at its words too, its last two kept together ("TUESDAY," over "NOV 24").
+    return (
+      <View testID="tab-header" style={{ minHeight: 68, paddingVertical: spacing.sm, gap: 6 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          <Text variant="overline" style={{ flex: 1, minWidth: 0 }}>
+            {keepLastTwo(overlineText)}
+          </Text>
+          {cups}
+        </View>
+        {heading}
+      </View>
+    );
+  }
   return (
     <View testID="tab-header" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 68, paddingVertical: spacing.sm }}>
       <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
-        {/* One line at 100%; with large text it wraps at its words rather than lose the date's end. */}
-        <Text variant="overline" numberOfLines={large ? undefined : 1}>
-          {overlineShort && width < 360 ? overlineShort : overline}
+        <Text variant="overline" numberOfLines={1}>
+          {overlineText}
         </Text>
-        {/* One line by its choice of words and size (todayTitle), never by clipping: under a reader's own text
-            spacing (wider letters and words) it wraps rather than lose its end. */}
-        <Text
-          variant="h1"
-          testID={titleTestID}
-          accessibilityRole="header"
-          {...({ 'aria-level': 1 } as object)}
-          style={{ fontSize: size, lineHeight: TITLE_LINE, letterSpacing: -size * 0.025 }}>
-          {title}
-        </Text>
+        {heading}
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: CUP_GAP }}>
-        <CoachEntry testID={`${tab}-coach-open`} size={HEADER_CUP} hitSlop={HEADER_SLOP} />
-        <FriendsEntry testID={`${tab}-friends`} size={HEADER_CUP} hitSlop={HEADER_SLOP} />
-        <PressableScale
-          testID={`${tab}-profile`}
-          onPress={() => router.push('/profile')}
-          accessibilityLabel="Profile and settings"
-          hitSlop={HEADER_SLOP}
-          // Neutral, as Friends is: the card surface with its 1 px line. Only the Coach cup is accented.
-          style={{ width: HEADER_CUP, height: HEADER_CUP, ...cupFor(HEADER_CUP), backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
-          <Text variant="h3">{initial}</Text>
-        </PressableScale>
-      </View>
+      {cups}
     </View>
   );
 }

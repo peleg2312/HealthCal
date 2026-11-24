@@ -86,14 +86,23 @@ export function MilestonesCard({ milestones }: { milestones: Milestone[] }) {
                 <MiniCup progress={Math.min(0.999, m.current / m.goal)} goalKind="reach" index={done.length + i} memoryKey={`milestone-${m.id}`} color={colors[milestoneDomain(m.id)]} width={22} height={28} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text variant="label">{m.title}</Text>
+                  {/* Above 115% text the share goes under the title, so the title keeps the row's width. */}
+                  {grow > 1.15 ? (
+                    <Text variant="numM" style={{ fontSize: 17, lineHeight: 22 }}>
+                      {pct}
+                      <Text variant="unit">%</Text>
+                    </Text>
+                  ) : null}
                   <Text variant="caption" color="textSecondary">
                     {m.detail}
                   </Text>
                 </View>
-                <Text variant="numM" style={{ fontSize: 17, lineHeight: 22 }}>
-                  {pct}
-                  <Text variant="unit">%</Text>
-                </Text>
+                {grow > 1.15 ? null : (
+                  <Text variant="numM" style={{ fontSize: 17, lineHeight: 22 }}>
+                    {pct}
+                    <Text variant="unit">%</Text>
+                  </Text>
+                )}
               </View>
             );
           })}

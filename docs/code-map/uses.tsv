@@ -121,7 +121,8 @@ src/features/activity/strengthDraft.ts	restRemainingMs	2	src/app/activity/streng
 src/features/activity/strengthDraft.ts	useStrengthDrafts	3	src/app/(tabs)/train.tsx	src/app/activity/strength.tsx	src/features/activity/session.ts
 src/features/activity/strengthFormat.ts	formatLiftWeight	2	src/app/activity/strength.tsx	src/features/activity/strengthFormat.test.ts
 src/features/activity/strengthFormat.ts	formatPreviousSets	2	src/app/activity/strength.tsx	src/features/activity/strengthFormat.test.ts
-src/features/activity/textGrowth.ts	useTextGrowth	13	src/app/(tabs)/train.tsx	src/app/activity/log.tsx	src/app/activity/pick.tsx	src/app/recap.tsx	src/app/weight.tsx	src/features/activity/WeekCard.tsx	src/features/activity/components.tsx	src/features/import/ui/TimeZoneSheet.tsx	src/features/progress/MilestonesCard.tsx	src/features/progress/ProgressTile.tsx	src/features/progress/RecapCups.tsx	src/features/progress/parts.tsx	src/features/trackers/components.tsx
+src/features/activity/textGrowth.ts	textGrowth	1	src/features/activity/textGrowth.test.ts
+src/features/activity/textGrowth.ts	useTextGrowth	15	src/app/(tabs)/train.tsx	src/app/activity/log.tsx	src/app/activity/pick.tsx	src/app/activity/strength.tsx	src/app/consistency.tsx	src/app/recap.tsx	src/app/weight.tsx	src/features/activity/WeekCard.tsx	src/features/activity/components.tsx	src/features/import/ui/TimeZoneSheet.tsx	src/features/progress/MilestonesCard.tsx	src/features/progress/ProgressTile.tsx	src/features/progress/RecapCups.tsx	src/features/progress/parts.tsx	src/features/trackers/components.tsx
 src/features/ai/AddMissingItem.tsx	AddMissingItem	1	src/app/food/photo.tsx
 src/features/ai/AiConsentAbout.tsx	AiConsentAbout	1	src/app/settings/about.tsx
 src/features/ai/AiConsentSheet.tsx	AiConsentSheet	2	src/app/food/photo.tsx	src/features/ai/AiConsentAbout.tsx
@@ -708,8 +709,8 @@ src/features/food/build.ts	scaleRange	2	src/app/food/detail.tsx	src/features/foo
 src/features/food/build.ts	servingsPhrase	1	src/features/food/build.test.ts
 src/features/food/build.ts	setItemAmount	4	src/app/food/meal-pick.tsx	src/features/food/SavedMealParts.tsx	src/features/today/ideas.ts	src/features/food/build.test.ts
 src/features/food/build.ts	spreadRange	2	src/app/food/detail.tsx	src/features/food/build.test.ts
-src/features/food/chipLines.ts	balancedLines	4	src/features/coach/ReportSheet.tsx	src/features/drinks/DrinkChoices.tsx	src/features/food/AmountEditor.tsx	src/features/food/chipLines.test.ts
-src/features/food/chipLines.ts	chipWidth	5	src/features/coach/ReportSheet.tsx	src/features/drinks/DrinkChoices.tsx	src/features/drinks/pick.ts	src/features/food/AmountEditor.tsx	src/features/food/chipLines.test.ts
+src/features/food/chipLines.ts	balancedLines	5	src/app/settings/reminders.tsx	src/features/coach/ReportSheet.tsx	src/features/drinks/DrinkChoices.tsx	src/features/food/AmountEditor.tsx	src/features/food/chipLines.test.ts
+src/features/food/chipLines.ts	chipWidth	6	src/app/settings/reminders.tsx	src/features/coach/ReportSheet.tsx	src/features/drinks/DrinkChoices.tsx	src/features/drinks/pick.ts	src/features/food/AmountEditor.tsx	src/features/food/chipLines.test.ts
 src/features/food/components.tsx	DayStepper	6	src/app/food/detail.tsx	src/app/food/meals.tsx	src/app/food/quick.tsx	src/features/activity/components.tsx	src/features/food/DiaryParts.tsx	src/features/trackers/components.tsx
 src/features/food/components.tsx	FoodRow	2	src/app/food/meal-pick.tsx	src/app/food/search.tsx
 src/features/food/components.tsx	KcalTrail	1	src/features/food/DiaryParts.tsx
@@ -854,7 +855,7 @@ src/features/food/searchTab.ts	parseSearchTab	1	src/features/food/searchTab.test
 src/features/food/searchTab.ts	rememberSearchTab	1	src/app/food/search.tsx
 src/features/food/searchTab.ts	useSearchTab	1	src/app/food/search.tsx
 src/features/food/searchTab.ts	usualEmpty	2	src/app/food/search.tsx	src/features/food/searchTab.test.ts
-src/features/food/textGrowth.ts	useBigText	6	src/app/food/quick.tsx	src/app/food/search.tsx	src/app/water.tsx	src/components/QuickLogSheet.tsx	src/features/drinks/DrinkTitleRow.tsx	src/features/food/components.tsx
+src/features/food/textGrowth.ts	useBigText	9	src/app/food/detail.tsx	src/app/food/photo.tsx	src/app/food/quick.tsx	src/app/food/search.tsx	src/app/water.tsx	src/components/QuickLogSheet.tsx	src/features/ai/AddMissingItem.tsx	src/features/drinks/DrinkTitleRow.tsx	src/features/food/components.tsx
 src/features/food/usuals.ts	UsualFood	1	src/components/QuickLogSheet.tsx
 src/features/food/usuals.ts	currentKcal	6	src/app/(tabs)/diary.tsx	src/app/(tabs)/index.tsx	src/components/QuickLogSheet.tsx	src/features/food/DiaryParts.tsx	src/features/food/SaveMealSheet.tsx	src/features/food/copies.test.ts
 src/features/food/usuals.ts	currentValues	9	src/app/food/meals.tsx	src/features/food/SavedMealParts.tsx	src/features/food/SavedMealRow.tsx	src/features/food/build.ts	src/features/food/log.ts	src/features/food/mealDraft.ts	src/features/today/ideas.ts	src/features/food/copies.test.ts	src/features/today/ideas.test.ts
@@ -1409,7 +1410,7 @@ src/features/legal/content.ts	jumpLabel	2	src/features/legal/LegalScreen.tsx	src
 src/features/legal/content.ts	updatedLine	2	src/features/legal/LegalScreen.tsx	src/features/legal/content.test.ts
 src/features/legal/jumpLines.ts	jumpLines	2	src/features/legal/LegalScreen.tsx	src/features/legal/jumpLines.test.ts
 src/features/legal/jumpLines.ts	jumpWidth	2	src/features/legal/LegalScreen.tsx	src/features/legal/jumpLines.test.ts
-src/features/legal/reading.ts	CAPTION_READING_MAX	1	src/app/settings/about.tsx
+src/features/legal/reading.ts	CAPTION_READING_MAX	2	src/app/settings/about.tsx	src/features/activity/TrainingLoadSheet.tsx
 src/features/legal/reading.ts	READING_MAX	2	src/app/settings/about.tsx	src/features/legal/LegalScreen.tsx
 src/features/morning/MoveRow.tsx	MoveRow	1	src/app/morning.tsx
 src/features/morning/PlanCard.tsx	PlanCard	1	src/app/morning.tsx
@@ -2022,8 +2023,9 @@ src/features/today/plates.ts	PLATES	2	src/features/today/ideas.test.ts	src/featu
 src/features/today/plates.ts	Plate	1	src/features/today/ideas.ts
 src/features/today/plates.ts	platesFor	2	src/features/today/ideas.ts	src/features/today/plates.test.ts
 src/features/today/recapLine.ts	recapLine	3	src/features/today/RecapReadyCard.tsx	src/features/drinks/skips.test.ts	src/features/today/recapLine.test.ts
-src/features/today/textGrowth.ts	LARGE_TEXT	4	src/app/(tabs)/index.tsx	src/components/TabBar.tsx	src/components/TabHeader.tsx	src/features/today/StatusRail.tsx
-src/features/today/textGrowth.ts	useTextGrowth	4	src/app/(tabs)/index.tsx	src/components/TabBar.tsx	src/components/TabHeader.tsx	src/features/today/StatusRail.tsx
+src/features/today/textGrowth.ts	LARGE_TEXT	7	src/app/(tabs)/index.tsx	src/components/TabBar.tsx	src/components/TabHeader.tsx	src/features/today/DayRingStrip.tsx	src/features/today/FirstLogInvite.tsx	src/features/today/StatusRail.tsx	src/features/today/textGrowth.test.ts
+src/features/today/textGrowth.ts	textGrowth	1	src/features/today/textGrowth.test.ts
+src/features/today/textGrowth.ts	useTextGrowth	6	src/app/(tabs)/index.tsx	src/components/TabBar.tsx	src/components/TabHeader.tsx	src/features/today/DayRingStrip.tsx	src/features/today/FirstLogInvite.tsx	src/features/today/StatusRail.tsx
 src/features/today/useBackToToday.ts	useBackToToday	2	src/app/(tabs)/diary.tsx	src/app/(tabs)/index.tsx
 src/features/today/useDaySwipe.tsx	DaySwipeGuard	1	src/features/today/DayRingStrip.tsx
 src/features/today/useDaySwipe.tsx	useDaySwipe	1	src/app/(tabs)/diary.tsx
@@ -2322,7 +2324,7 @@ src/lib/nutrition.ts	servingsFor	4	src/features/ai/ScanResultCard.tsx	src/featur
 src/lib/nutrition.ts	sumNutrients	5	src/app/food/meal-edit.tsx	src/app/food/meals.tsx	src/features/food/SavedMealRow.tsx	src/features/food/build.ts	src/lib/nutrition.test.ts
 src/lib/sha256.ts	sha256Hex	2	src/features/friends/summary.ts	src/lib/sha256.test.ts
 src/lib/sha256.ts	utf8Bytes	1	src/lib/sha256.test.ts
-src/lib/spokenUnits.ts	spokenUnits	18	src/app/(tabs)/index.tsx	src/app/food/meal-edit.tsx	src/app/food/search.tsx	src/app/water.tsx	src/components/QuickLogSheet.tsx	src/features/ai/ScanResultCard.tsx	src/features/drinks/DrinkPickSheet.tsx	src/features/drinks/DrinkRecentChips.tsx	src/features/food/AmountEditor.tsx	src/features/food/DiaryParts.tsx	src/features/food/SavedMealParts.tsx	src/features/food/SavedMealRow.tsx	src/features/food/components.tsx	src/features/health-sync/ui/format.ts	src/features/import/ui/WorkoutRow.tsx	src/features/today/StatusRail.tsx	src/features/trackers/components.tsx	src/lib/spokenUnits.test.ts
+src/lib/spokenUnits.ts	spokenUnits	26	src/app/(tabs)/index.tsx	src/app/activity/strength.tsx	src/app/coach.tsx	src/app/food/meal-edit.tsx	src/app/food/search.tsx	src/app/water.tsx	src/components/QuickLogSheet.tsx	src/features/ai/ScanResultCard.tsx	src/features/coach/CoachBubble.tsx	src/features/coach/StarterTile.tsx	src/features/drinks/DrinkPickSheet.tsx	src/features/drinks/DrinkRecentChips.tsx	src/features/food/AmountEditor.tsx	src/features/food/DiaryParts.tsx	src/features/food/SavedMealParts.tsx	src/features/food/SavedMealRow.tsx	src/features/food/components.tsx	src/features/health-sync/ui/format.ts	src/features/import/ui/WorkoutRow.tsx	src/features/morning/ReviewList.tsx	src/features/onboarding/PlanReveal.tsx	src/features/settings/components.tsx	src/features/share/ShareSheet.tsx	src/features/today/StatusRail.tsx	src/features/trackers/components.tsx	src/lib/spokenUnits.test.ts
 src/lib/text.ts	NBSP	4	src/features/morning/line.ts	src/features/plan/AllowanceTable.tsx	src/features/plan/PeriodTiles.tsx	src/lib/text.test.ts
 src/lib/text.ts	WJ	1	src/lib/text.test.ts
 src/lib/text.ts	keepTogether	3	src/ui/Text.tsx	src/lib/bidi.test.ts	src/lib/text.test.ts
@@ -2571,10 +2573,10 @@ src/theme/textSize.ts	bolder	1	src/theme/textSize.test.ts
 src/theme/textSize.ts	normaliseTextSize	1	src/theme/textSize.test.ts
 src/theme/textSize.ts	phoneCapFor	6	src/features/activity/textGrowth.ts	src/features/food/textGrowth.ts	src/features/today/textGrowth.ts	src/ui/Field.tsx	src/ui/Text.tsx	src/theme/textSize.test.ts
 src/theme/textSize.ts	scaleTextStyle	2	src/ui/Text.tsx	src/theme/textSize.test.ts
-src/theme/textSize.ts	scaledFontSize	4	src/features/morning/WeekCups.tsx	src/features/today/textGrowth.ts	src/ui/Field.tsx	src/theme/textSize.test.ts
+src/theme/textSize.ts	scaledFontSize	5	src/app/settings/reminders.tsx	src/features/morning/WeekCups.tsx	src/features/today/textGrowth.ts	src/ui/Field.tsx	src/theme/textSize.test.ts
 src/theme/textSize.ts	setTextSize	1	src/features/textSize/TextSizeRow.tsx
 src/theme/textSize.ts	textSizeLabel	2	src/features/textSize/TextSizeRow.tsx	src/theme/textSize.test.ts
-src/theme/textSize.ts	useTextSize	11	src/app/morning.tsx	src/app/profile.tsx	src/app/settings/goals.tsx	src/features/activity/textGrowth.ts	src/features/food/textGrowth.ts	src/features/morning/WeekCups.tsx	src/features/settings/ThemeSwatches.tsx	src/features/textSize/TextSizeRow.tsx	src/features/today/textGrowth.ts	src/ui/Field.tsx	src/ui/Text.tsx
+src/theme/textSize.ts	useTextSize	18	src/app/auth.tsx	src/app/morning.tsx	src/app/profile.tsx	src/app/settings/goals.tsx	src/app/settings/plan.tsx	src/app/settings/reminders.tsx	src/app/welcome.tsx	src/features/activity/textGrowth.ts	src/features/food/textGrowth.ts	src/features/morning/WeekCups.tsx	src/features/onboarding/PlanReveal.tsx	src/features/plan/AllowanceTable.tsx	src/features/settings/ThemeSwatches.tsx	src/features/share/ShareSheet.tsx	src/features/textSize/TextSizeRow.tsx	src/features/today/textGrowth.ts	src/ui/Field.tsx	src/ui/Text.tsx
 src/theme/tokens.ts	MAX_CONTENT_WIDTH	9	src/app/settings/account.tsx	src/components/TabBar.tsx	src/components/TabHeader.tsx	src/features/food/saveWords.ts	src/features/legal/LegalScreen.tsx	src/features/today/DayRingStrip.tsx	src/ui/Screen.tsx	src/ui/Sheet.tsx	src/ui/Toast.tsx
 src/theme/tokens.ts	PALETTES	2	src/theme/contrast.test.ts	src/theme/contrastMore.test.ts
 src/theme/tokens.ts	THEME_IS_DARK	1	src/theme/contrast.test.ts

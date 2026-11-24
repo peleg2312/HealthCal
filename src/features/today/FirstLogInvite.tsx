@@ -17,6 +17,8 @@ import { useTheme } from '@/theme';
 import type { Food, ISODate, MealType, Serving } from '@/types';
 import { Button, Chip, Text } from '@/ui';
 
+import { LARGE_TEXT, useTextGrowth } from './textGrowth';
+
 /** Bundled staples offered for a meal when there is no history yet: short names, a common first serving. */
 const STAPLES: Record<MealType, { id: string; label: string }[]> = {
   breakfast: [
@@ -92,6 +94,9 @@ export function FirstLogInvite({ meal, date, budget, narrow = false }: { meal: M
   const label = MEAL_LABEL[meal];
   const share = Math.round((budget * MEAL_SHARE[meal]) / 10) * 10;
   const options = picks(entries, meal, date, customFoods);
+  const large = useTextGrowth() > LARGE_TEXT;
+  // The strip reaches the calorie card's edges: its padding is 12 under 360 px and 18 otherwise.
+  const edge = narrow ? 12 : 18;
   const chip = (p: Pick) => (
     <Chip
       key={p.key}
@@ -118,14 +123,15 @@ export function FirstLogInvite({ meal, date, budget, narrow = false }: { meal: M
         // names what was added, with Undo. 12 px between rows: each 32 px chip keeps its whole 44 px touch area,
         // never shared with the chip below. Kept this short so the water row under the card is in the first view.
         // Under 360 px they are one row that scrolls sideways, reaching the card's edges, with 6 px above and
-        // below inside the scroller so each chip's 44 px touch area is not clipped.
-        narrow ? (
+        // below inside the scroller so each chip's 44 px touch area is not clipped. With large text (130% and up) too,
+        // at every width: a chip's name and calories stay whole, and the card's edge cuts the last one to show more.
+        narrow || large ? (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             testID="today-first-chips"
-            style={{ marginHorizontal: -12, marginVertical: -6 }}
-            contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 6, gap: spacing.sm }}>
+            style={{ marginHorizontal: -edge, marginVertical: -6 }}
+            contentContainerStyle={{ paddingHorizontal: edge, paddingVertical: 6, gap: spacing.sm }}>
             {options.map((p) => chip(p))}
           </ScrollView>
         ) : (

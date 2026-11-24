@@ -6,6 +6,7 @@ import { limitInfoFrom, type LimitInfo } from '@/features/ai/limit';
 import { usedUpNow } from '@/features/plan/allowance';
 import { PlanCup } from '@/features/plan/PlanCup';
 import { startsRtl } from '@/lib/bidi';
+import { spokenUnits } from '@/lib/spokenUnits';
 import { useNow } from '@/store/clock';
 import { cup, useTheme } from '@/theme';
 import { Button, Card, CupKey, FadeUp, PressableScale, Text } from '@/ui';
@@ -98,7 +99,7 @@ export function CoachBubble({
 
   if (message.source === 'local') {
     return (
-      <Card testID={testID} onLayout={onLayout} padding={16} accessibilityLabel={live ? message.text : undefined} style={{ gap: spacing.md }}>
+      <Card testID={testID} onLayout={onLayout} padding={16} accessibilityLabel={live ? spokenUnits(message.text) : undefined} style={{ gap: spacing.md }}>
         {/* The chat's signature: the level line across the card's top. */}
         <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: colors.rim }} />
         {live ?? (
