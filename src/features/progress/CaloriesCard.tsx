@@ -39,7 +39,7 @@ export function CaloriesCard({
   const { data, weekly, openIndex } = buildBars(shown, today, { full: colors.calories, partial: withOpacity(colors.calories, 0.45), over: colors.warning });
   const verdict = daysVerdict(shown, today);
   const diff = c ? Math.round(c.avgDiff) : 0;
-  const diffText = !c ? '' : Math.abs(diff) < 10 ? 'Right on budget' : `${formatNumber(Math.abs(diff))} kcal ${diff > 0 ? 'over' : 'under'} budget on average`;
+  const diffText = !c ? '' : Math.abs(diff) < 10 ? 'At budget on average' : `${formatNumber(Math.abs(diff))} kcal ${diff > 0 ? 'above' : 'under'} budget on average`;
 
   return (
     <SectionCard

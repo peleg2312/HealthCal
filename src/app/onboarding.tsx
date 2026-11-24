@@ -1,7 +1,7 @@
 import { Redirect, router } from 'expo-router';
 import { ArrowRight, BellRing, ChevronLeft, CloudUpload } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { BackHandler, Platform, useColorScheme, View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
+import { BackHandler, Platform, View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
 
 import { FadeIn, focusNextEmptyField, StepProgress, StepSlide } from '@/features/onboarding/components';
 import { deviceUnitsOnce } from '@/features/onboarding/deviceUnits';
@@ -10,7 +10,6 @@ import { PlanReveal } from '@/features/onboarding/PlanReveal';
 import { remindersPatch } from '@/features/onboarding/routine';
 import { RestoreFailed } from '@/features/onboarding/SignInGate';
 import { AboutStep, ActivityStep, BasicsStep, BodyFatStep, BodyStep, GoalStep, RoutineStep, SexStep, TargetStep, type StepProps } from '@/features/onboarding/steps';
-import { commitThemeChoice, ThemeStep, useMatchPhone } from '@/features/onboarding/ThemeStep';
 import { today } from '@/lib/dates';
 import { nowISO } from '@/lib/id';
 import { round } from '@/lib/units';
@@ -33,7 +32,6 @@ const STEP_COMPONENTS: Record<Exclude<StepId, 'plan'>, (p: StepProps) => React.R
   activity: ActivityStep,
   target: TargetStep,
   routine: RoutineStep,
-  theme: ThemeStep,
 };
 
 /** How long a chosen tile is seen as chosen before a single-choice step moves on by itself. */
@@ -65,18 +63,15 @@ export default function Onboarding() {
 }
 
 /**
- * Until set-up ends the app shows its lead look when the stored choice is
- * "Match my phone". Once that card was tapped on the look step, the choice is
- * real, so set-up shows what the phone asks for: the preview is the real thing.
+ * Set-up asks no question about the look: the app follows the phone (or a look that came with a
+ * backup or a sign-in), and Profile > Appearance offers every look. So set-up is drawn as the app
+ * will be drawn once it ends, never in a look that changes at "Start tracking".
  */
 function ChosenLook({ children }: { children: React.ReactNode }) {
   const preference = useStore((s) => s.settings.theme);
   const look = useStore((s) => s.settings.look);
-  const matchPhone = useMatchPhone((s) => s.picked);
-  // Once set-up is finished the lead look is over, as it is for the rest of the app.
-  const onboarded = useStore((s) => !!s.profile?.onboardedAt);
   return (
-    <ThemeProvider preference={preference} look={look} lead={!matchPhone && !onboarded}>
+    <ThemeProvider preference={preference} look={look} lead={false}>
       {children}
     </ThemeProvider>
   );
@@ -89,7 +84,6 @@ function Flow({ onFinished }: { onFinished: () => void }) {
   const set = useOnboardingDraft((s) => s.set);
   const setStep = useOnboardingDraft((s) => s.setStep);
   const now = useNow();
-  const scheme = useColorScheme();
   const [showErrors, setShowErrors] = useState(false);
   const [direction, setDirection] = useState<1 | -1>(1);
   // The first step arrives with the screen's own fade-up; later ones slide.
@@ -260,8 +254,7 @@ function Flow({ onFinished }: { onFinished: () => void }) {
       router.replace('/');
       return;
     }
-    // The look that was on screen becomes the stored choice, whichever way the look step was left.
-    commitThemeChoice(scheme);
+    // No look is stored: the app keeps following the phone until the person picks one in Profile.
     store.setProfile({ ...built.profile, onboardedAt: nowISO() });
     if (d.remindersOn !== null) store.setReminders(remindersPatch(d.routine, d.remindersOn));
     // The first weigh-in starts the trend; reuse today's record if one was synced down.
@@ -279,7 +272,6 @@ function Flow({ onFinished }: { onFinished: () => void }) {
     });
     haptic.success();
     useOnboardingDraft.getState().reset();
-    useMatchPhone.setState({ picked: false });
     if (isBackendConfigured && !useAuth.getState().session) onFinished();
     else router.replace('/');
   };
@@ -323,7 +315,7 @@ function Flow({ onFinished }: { onFinished: () => void }) {
             <Button title="Not now" variant="ghost" testID="onb-reminders-skip" disabled={asking} onPress={() => void answerReminders(false)} />
           </View>
         ) : (
-          <Button title={step === 'theme' ? 'See my plan' : 'Continue'} testID="onb-next" onPress={next} />
+          <Button title="Continue" testID="onb-next" onPress={next} />
         )
       }>
       {Body ? (

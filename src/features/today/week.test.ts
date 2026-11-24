@@ -83,12 +83,12 @@ describe('weekCaption', () => {
     expect(weekCaption(week([1700, 1690, 800, null, 300]), TODAY)).toBe('Week so far: 310 kcal a day under budget, 2 full days');
   });
   it('reports over budget neutrally', () => {
-    expect(weekCaption(week([2400, 2400]), TODAY)).toBe('Week so far: 400 kcal a day over budget, 2 full days');
+    expect(weekCaption(week([2400, 2400]), TODAY)).toBe('Week so far: 400 kcal a day above budget, 2 full days');
   });
   it('says on budget only when every full day was on budget, by the one rule', () => {
     expect(weekCaption(week([1930, 1980, 2000]), TODAY)).toBe('Week so far: 3 full days on budget');
     // 2,030 and 2,010 are above their budget: the average is said instead.
-    expect(weekCaption(week([2030, 1980, 2010]), TODAY)).toBe('Week so far: 10 kcal a day over budget, 3 full days');
+    expect(weekCaption(week([2030, 1980, 2010]), TODAY)).toBe('Week so far: 10 kcal a day above budget, 3 full days');
     expect(weekCaption(week([2200, 1800]), TODAY)).toBe('Week so far: at budget on average, 2 full days');
   });
   it('says so when no complete day exists yet', () => {

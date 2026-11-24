@@ -78,5 +78,5 @@ export function weekCaption(days: InsightDay[], today: ISODate, start?: ISODate)
   if (complete.every((d) => budgetMark(d.eaten.kcal, d.budget) === 'on')) return `${lead}: ${n} on budget`;
   const rounded = Math.round(Math.abs(diff) / 10) * 10;
   if (rounded === 0 || budget <= 0) return `${lead}: at budget on average, ${n}`;
-  return `${lead}: ${formatNumber(rounded)} kcal a day ${diff < 0 ? 'under' : 'over'} budget, ${n}`;
+  return `${lead}: ${formatNumber(rounded)} kcal a day ${diff < 0 ? 'under' : 'above'} budget, ${n}`;
 }

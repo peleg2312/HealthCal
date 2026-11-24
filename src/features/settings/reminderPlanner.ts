@@ -137,7 +137,7 @@ function glassPhrase(remainingMl: number, units: UnitSystem): string {
 
 function caloriesLine(day: DaySummary): string {
   if (day.remaining >= 0) return `${kcal(day.remaining)} left`;
-  return `${kcal(day.remaining)} over today's budget`;
+  return `${kcal(day.remaining)} above today's budget`;
 }
 
 export function waterBody(day: DaySummary, units: UnitSystem): string {
@@ -148,7 +148,7 @@ export function mealBody(day: DaySummary, mealLabel: string): string {
   const left =
     day.remaining >= 0
       ? `${kcal(day.remaining)} left for today.`
-      : `Today is ${kcal(day.remaining)} over budget so far.`;
+      : `Today is ${kcal(day.remaining)} above the budget so far.`;
   return `Nothing logged for ${mealLabel.toLowerCase()} yet. ${left}`;
 }
 

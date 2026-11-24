@@ -241,7 +241,7 @@ export function DayRingStrip({
                   const locked = before || d > last;
                   const kcal =
                     summary && summary.entries.length
-                      ? `, ${Math.round(summary.eaten.kcal)} of ${summary.budget} kilocalories${ring.state === 'over' ? ', over budget' : ''}`
+                      ? `, ${Math.round(summary.eaten.kcal)} of ${summary.budget} kilocalories${ring.state === 'over' ? ', above budget' : ''}`
                       : future
                         ? ''
                         : before

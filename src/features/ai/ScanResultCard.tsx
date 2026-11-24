@@ -166,7 +166,7 @@ function Impact({ date, kcalValue, grams }: { date: ISODate; kcalValue: number; 
       }}>
       <CupKey color={over ? colors.warning : colors.calories} />
       <Text variant="caption" color="text" style={{ flex: 1 }}>
-        {over ? `Puts ${dayPhrase(date)} ${kcal(-after)} kcal over budget` : `Leaves ${kcal(after)} kcal for ${dayPhrase(date)}`}
+        {over ? `Puts ${dayPhrase(date)} ${kcal(-after)} kcal above the budget` : `Leaves ${kcal(after)} kcal for ${dayPhrase(date)}`}
       </Text>
       <Text variant="caption" color="textSecondary" tabular>
         {Math.round(grams)} g

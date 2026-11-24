@@ -46,7 +46,7 @@ export function BasicsStep({ draft, set, errors, submit }: StepProps) {
     <Group gap={spacing.xl}>
       <StepTitle title="What should we call you?" subtitle="About a minute. Change any answer later." />
       <BigTextField
-        label="First name"
+        label="First name (optional)"
         testID="onb-name-input"
         placeholder="Your first name"
         value={draft.name}

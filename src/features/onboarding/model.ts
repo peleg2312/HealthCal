@@ -64,11 +64,13 @@ export interface Draft {
 
 /**
  * The questions in order. `sex` and `about` (date of birth) are one decision
- * each; `theme` is the last question, picked while looking at the real app.
+ * each. Every question feeds the plan or the reminders; the name is optional
+ * and only greets. How the app looks is not asked: it follows the phone, and
+ * Profile > Appearance offers every look.
  */
-export type StepId = 'basics' | 'goal' | 'sex' | 'about' | 'body' | 'bodyfat' | 'activity' | 'target' | 'routine' | 'theme' | 'plan';
+export type StepId = 'basics' | 'goal' | 'sex' | 'about' | 'body' | 'bodyfat' | 'activity' | 'target' | 'routine' | 'plan';
 
-const ALL_STEPS: StepId[] = ['basics', 'goal', 'sex', 'about', 'body', 'bodyfat', 'activity', 'target', 'routine', 'theme', 'plan'];
+const ALL_STEPS: StepId[] = ['basics', 'goal', 'sex', 'about', 'body', 'bodyfat', 'activity', 'target', 'routine', 'plan'];
 
 export function stepsFor(goal: GoalType | null): StepId[] {
   return goal === 'maintain' ? ALL_STEPS.filter((s) => s !== 'target') : ALL_STEPS;
@@ -273,8 +275,8 @@ export function validateStep(step: StepId, d: Draft, now: Date = new Date()): Er
   const m = toMetric(d);
   switch (step) {
     case 'basics':
-      if (!d.name.trim()) e.name = 'Add a first name so we know what to call you.';
-      else if (d.name.trim().length > 40) e.name = 'Keep it under 40 characters.';
+      // The name is optional: the plan does not use it, and every greeting reads well without one.
+      if (d.name.trim().length > 40) e.name = 'Keep it under 40 characters.';
       break;
     case 'goal':
       if (!d.goal) e.goal = 'Choose the goal that fits best. You can change it later.';
@@ -354,7 +356,6 @@ export function validateStep(step: StepId, d: Draft, now: Date = new Date()): Er
     case 'routine':
       Object.assign(e, validateRoutine(d.routine, d.units === 'imperial'));
       break;
-    case 'theme':
     case 'plan':
       break;
   }

@@ -70,10 +70,10 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?
               numberOfLines={1}
               value={day.remaining}
               format={(n) => kcal(Math.abs(n))}
-              accessibilityLabel={`${kcal(Math.abs(day.remaining))} kilocalories ${over ? 'over' : 'left'}`}
+              accessibilityLabel={`${kcal(Math.abs(day.remaining))} kilocalories ${over ? 'above the budget' : 'left'}`}
               style={{ fontSize: narrow ? 40 : 46, lineHeight: narrow ? 44 : 50, letterSpacing: -1.4 }}
             />
-            <Text variant="unit" style={{ fontSize: 15 }}>{over ? 'kcal over' : 'kcal left'}</Text>
+            <Text variant="unit" style={{ fontSize: 15 }}>{over ? 'kcal above' : 'kcal left'}</Text>
           </View>
           <Text variant="caption" color="textSecondary" style={{ paddingBottom: stacked ? 0 : 4 }}>
             <AnimatedNumber variant="numM" style={{ fontSize: 16, lineHeight: 20 }} testID="diary-eaten" value={day.eaten.kcal} format={kcal} />
@@ -180,7 +180,9 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
         onLongPress={food ? () => toggleFoodFavorite(food) : holdNothing}
         accessibilityActions={favoriteAction ? [{ name: FAVOURITE_ACTION.name, label: favoriteAction }] : undefined}
         onAccessibilityAction={food ? (e) => e.nativeEvent.actionName === FAVOURITE_ACTION.name && toggleFoodFavorite(food) : undefined}
-        accessibilityLabel={`${name}, ${ai ? 'about ' : ''}${Math.round(entry.nutrients.kcal)} kilocalories${inWater ? ', also counted in Water' : ''}. Edit`}
+        // The whole row is one button whose name says what the row shows, its source in words included
+        // ("Almonds, 1 oz · 28 g, 162 kilocalories, Reference data. Edit"): text inside a named button is not read.
+        accessibilityLabel={`${name}, ${withoutMarks(portion)}, ${ai ? 'about ' : ''}${Math.round(entry.nutrients.kcal)} kilocalories${inWater ? ', also counted in Water' : ''}, ${source.label}. Edit`}
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: 11 }}>
         <RowEmoji emoji={entry.emoji} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
@@ -190,7 +192,7 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
           {/* On a narrow phone the calories move to the end of the portion line, so the name has the row's width. */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
             {/* The source's mark leads the line and its word (none for reference data) ends it, so a portion that wraps never leaves the mark floating. */}
-            <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: 6 }} accessible accessibilityLabel={`${withoutMarks(portion)}${inWater ? `, ${ALSO_IN_WATER}` : ''}, ${source.label}`}>
+            <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
               <SourceMark source={ai ? 'ai' : entry.source} color={colors.textSecondary} size={8} style={{ marginTop: sourceMarkTop(ai ? 'ai' : entry.source) }} />
               {/* The mark "also in Water" may take one more line (on a 320 px phone "1 can (8.4 fl oz) · 250 g · also in Water · Your food" needs three), so the word Water is never cut. */}
               <Text testID={inWater ? `entry-in-water-${entry.id}` : undefined} variant="caption" color="textSecondary" numberOfLines={inWater ? 3 : 2} style={{ flexShrink: 1 }}>

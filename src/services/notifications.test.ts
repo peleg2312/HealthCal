@@ -181,9 +181,9 @@ describe('planReminders', () => {
     const now = at(15);
     const plan = planReminders(input(now, {}, day('2026-11-11', { meals: ['breakfast', 'lunch'], eaten: 2220 })), now);
     const dinner = plan.find((r) => r.id === 'meal-dinner-2026-11-11');
-    expect(dinner?.body).toBe('Nothing logged for dinner yet. Today is 120 kcal over budget so far.');
+    expect(dinner?.body).toBe('Nothing logged for dinner yet. Today is 120 kcal above the budget so far.');
     const check = plan.find((r) => r.kind === 'checkin');
-    expect(check?.body.startsWith('120 kcal over today\'s budget')).toBe(true);
+    expect(check?.body.startsWith('120 kcal above today\'s budget')).toBe(true);
     for (const r of plan) expect(r.body).not.toMatch(/fail|cheat|bad|!/i);
   });
 

@@ -178,14 +178,14 @@ function EnergyCard({
   // Calories workouts add to this day (its own and shares carried from the six days before), drawn as
   // hatched headroom at the top of the vessel. Read from the day's rule, never from budget minus target.
   const headroom = Math.max(0, day.exerciseAdded);
-  // Today's old case: all of it is this day's own burn. Otherwise it holds carried shares, so it is "from workouts".
+  // Today's old case: all of it is this day's own workouts. Otherwise it holds carried shares (said in the spoken sum).
   const pure = day.exerciseRule === 'day' && day.exerciseCarry === 0;
   const left = formatNumber(Math.abs(day.remaining));
   // The big number sits in the empty space between the level and the base budget (or the brim).
   const inBand = eaten > budget - headroom;
   const emptyTop = inBand ? budget : budget - headroom;
   const numSize = narrow ? (left.length >= 5 ? 40 : 44) : left.length >= 5 ? 50 : 60;
-  const unitWord = over ? 'over' : isToday ? 'left' : 'under';
+  const unitWord = over ? 'above' : isToday ? 'left' : 'under';
   const height = firstDay ? VESSEL_H_FIRST : narrow ? VESSEL_H_NARROW : VESSEL_H;
   const labelSpacing = narrow ? NARROW.labelSpacing : 8;
   // The label boxes: 22 px round the 17 px numbers (20 on a narrow phone), the big number as tall as it is drawn
@@ -201,10 +201,10 @@ function EnergyCard({
     headroom <= 0
       ? `Daily budget ${formatNumber(day.budget)} kilocalories`
       : pure
-        ? `Budget ${formatNumber(day.budget)} kilocalories: ${formatNumber(day.target)} target plus ${formatNumber(headroom)} from exercise`
+        ? `Budget ${formatNumber(day.budget)} kilocalories: ${formatNumber(day.target)} target plus about ${formatNumber(headroom)} added by today's workouts`
         : day.exerciseRule === 'week'
-          ? `Budget ${formatNumber(day.budget)} kilocalories: ${formatNumber(day.target)} target plus ${formatNumber(headroom)}, a seventh of each workout in the last 7 days`
-          : `Budget ${formatNumber(day.budget)} kilocalories: ${formatNumber(day.target)} target plus ${formatNumber(headroom)} from workouts`;
+          ? `Budget ${formatNumber(day.budget)} kilocalories: ${formatNumber(day.target)} target plus about ${formatNumber(headroom)} added, a seventh of each workout in the last 7 days`
+          : `Budget ${formatNumber(day.budget)} kilocalories: ${formatNumber(day.target)} target plus about ${formatNumber(headroom)} added by workouts`;
 
   const labels: VesselLabel[] = [];
   if (headroom > 0) {
@@ -217,15 +217,15 @@ function EnergyCard({
       tick: colors.exercise,
       content: (
         <Text variant="numM" numberOfLines={1} style={{ fontSize: 17, lineHeight: lineH }}>
-          {`+${formatNumber(headroom)}`}
+          {`~${formatNumber(headroom)}`}
           <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
-            {pure ? '  burned, added' : '  from workouts'}
+            {'  added'}
           </Text>
         </Text>
       ),
     });
   } else if (notAdded > 0) {
-    // Exercise left out of the budget (Goals): said at the brim, where "+290 burned, added" would be. No tick:
+    // Exercise left out of the budget (Goals): said at the brim, where "~290 added" would be. No tick:
     // nothing is poured or hatched for it.
     labels.push({
       key: 'not-added',
@@ -237,10 +237,10 @@ function EnergyCard({
           numberOfLines={1}
           style={{ fontSize: 17, lineHeight: lineH }}
           testID="today-not-added"
-          accessibilityLabel={`${formatNumber(notAdded)} kilocalories burned in workouts, not added to the budget`}>
-          {formatNumber(notAdded)}
+          accessibilityLabel={`Workouts: about ${formatNumber(notAdded)} kilocalories, not added to the budget`}>
+          {`~${formatNumber(notAdded)}`}
           <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
-            {'  burned, not added'}
+            {'  not added'}
           </Text>
         </Text>
       ),
@@ -278,7 +278,7 @@ function EnergyCard({
           testID="today-remaining-open"
           scaleTo={0.97}
           onPress={onFits}
-          accessibilityLabel={`${left} kilocalories ${unitWord}. See which of your foods fit`}
+          accessibilityLabel={`${left} kilocalories ${over ? 'above the budget' : unitWord}. See which of your foods fit`}
           hitSlop={numH < 44 ? Math.ceil((44 - numH) / 2) : undefined}
           style={{ alignSelf: 'flex-start', minHeight: numH, justifyContent: 'center' }}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
@@ -290,7 +290,7 @@ function EnergyCard({
               value={day.remaining}
               format={(n) => formatNumber(Math.abs(Math.round(n)))}
               duration={motion.duration.pour}
-              accessibilityLabel={`${left} kilocalories ${unitWord}`}
+              accessibilityLabel={`${left} kilocalories ${over ? 'above the budget' : unitWord}`}
               style={{ fontSize: numSize, lineHeight: numSize - 2, letterSpacing: -numSize * 0.035 }}
             />
             <Text variant="unit" style={{ fontSize: 14, lineHeight: 17, marginBottom: numSize * 0.08 }}>

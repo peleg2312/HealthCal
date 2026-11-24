@@ -1277,8 +1277,8 @@ export function recapTiles(r: Pick<WeeklyRecap, 'summary' | 'previous' | 'label'
 export function budgetBalanceText(balance: number | null): string {
   if (balance === null) return 'No fully logged days to compare with the budget.';
   const b = Math.round(balance);
-  if (Math.abs(b) < 50) return 'Right on budget for the week';
-  return `${kcalText(Math.abs(b))} ${b > 0 ? 'over' : 'under'} budget for the week`;
+  if (Math.abs(b) < 50) return 'At budget for the week';
+  return `${kcalText(Math.abs(b))} ${b > 0 ? 'above' : 'under'} budget for the week`;
 }
 
 /** One line on why the daily budget changed between two weeks. */

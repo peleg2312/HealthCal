@@ -30,7 +30,7 @@ name: First day on a phone
 - tapOn:
     id: welcome-get-started
 
-# 1 of 10: name, with the keyboard up and Continue on top of it.
+# 1 of 9: name, with the keyboard up and Continue on top of it.
 - tapOn:
     id: onb-units-metric
 - tapOn:
@@ -44,7 +44,7 @@ name: First day on a phone
 - tapOn:
     id: onb-sex-female
 
-# 4 of 10: date of birth, three number fields.
+# 4 of 9: date of birth, three number fields.
 - tapOn:
     id: onb-dob-day
 - inputText: '15'
@@ -64,7 +64,7 @@ name: First day on a phone
 - tapOn:
     id: onb-next
 
-# 5 of 10: height and weight. Empty fields look empty; a tap opens the keyboard; the typed number shows.
+# 5 of 9: height and weight. Empty fields look empty; a tap opens the keyboard; the typed number shows.
 - extendedWaitUntil:
     visible:
       id: onb-height-cm
@@ -90,11 +90,9 @@ name: First day on a phone
 - takeScreenshot: 07-goal-weight-keyboard
 - tapOn:
     id: onb-next
+# The look is not a set-up question (the app follows the phone): the plan comes straight after reminders.
 - tapOn:
     id: onb-reminders-skip
-- takeScreenshot: 08-look
-- tapOn:
-    id: onb-next
 - extendedWaitUntil:
     visible:
       id: plan-reveal

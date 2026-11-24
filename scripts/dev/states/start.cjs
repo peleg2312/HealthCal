@@ -34,13 +34,13 @@ const bodyfat = (units, g) => [...body(units, g), 'onb-bf-unknown', settle];
 const activity = (units, g) => [...bodyfat(units, g), 'onb-activity-light', settle];
 const target = (units) => [...activity(units), { type: 'onb-target-input', text: units === 'imperial' ? '136' : '62' }, 'onb-next'];
 const routine = (units, g = 'lose') => (g === 'maintain' ? activity(units, g) : target(units));
-const theme = (units, g) => [...routine(units, g), 'onb-reminders-skip'];
-const plan = (units, g) => [...theme(units, g), 'onb-next'];
+// The look is not a set-up question (the app follows the phone), so the plan follows the routine step.
+const plan = (units, g) => [...routine(units, g), 'onb-reminders-skip'];
 const F = { route: '/onboarding', data: 'fresh' };
 
 const onboarding = [
   { id: 'onb-basics-long', ...F, taps: [{ type: 'onb-name-input', text: LONG }], waitFor: 'onb-name-input', note: 'first question with a 22-character name' },
-  { id: 'onb-basics-error', ...F, taps: ['onb-next'], waitFor: 'onb-name-input', note: 'Continue with no name: the field error' },
+  { id: 'onb-basics-no-name', ...F, taps: ['onb-next'], waitFor: 'onb-goal-lose', note: 'Continue with no name: the name is optional, so the goal question follows' },
   { id: 'onb-sex', ...F, taps: goal('metric'), waitFor: 'onb-sex-female', note: 'sex question with its "why we ask"' },
   { id: 'onb-about-error', ...F, taps: [...sex('metric'), { type: 'onb-dob-day', text: '31' }, { type: 'onb-dob-month', text: '2' }, { type: 'onb-dob-year', text: '1890' }, 'onb-next'], waitFor: 'onb-dob-error', note: 'date of birth with an error' },
   { id: 'onb-about-filled', ...F, taps: [...sex('imperial'), { type: 'onb-dob-day', text: '15' }, { type: 'onb-dob-month', text: '6' }, { type: 'onb-dob-year', text: '1990' }], waitFor: 'onb-dob-summary', note: 'date of birth filled, the age summary' },
@@ -64,7 +64,6 @@ const onboarding = [
   { id: 'onb-routine', ...F, taps: routine('metric'), waitFor: 'onb-routine-times', note: 'reminder cards with their example messages' },
   { id: 'onb-routine-times', ...F, taps: [...routine('imperial'), 'onb-routine-times'], waitFor: 'onb-routine-breakfast', note: 'Adjust times open, 12-hour clock' },
   { id: 'onb-routine-time-sheet', ...F, taps: [...routine('imperial'), 'onb-routine-times', 'onb-routine-bed'], sheet: true, note: 'the time picker sheet, 12-hour' },
-  { id: 'onb-theme', ...F, taps: theme('metric'), waitFor: 'onb-theme-system', note: 'the look step' },
   { id: 'onb-plan-metric', ...F, taps: plan('metric'), waitFor: 'plan-reveal', note: 'the plan reveal, losing, kg' },
   { id: 'onb-plan-imperial-math', ...F, taps: [...plan('imperial'), 'plan-math-toggle'], waitFor: 'plan-math', note: 'the plan reveal in lb with the maths open' },
   { id: 'onb-plan-maintain', ...F, taps: plan('imperial', 'maintain'), waitFor: 'plan-reveal', note: 'the plan reveal for keeping weight' },

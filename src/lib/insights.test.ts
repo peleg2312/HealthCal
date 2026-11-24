@@ -532,8 +532,8 @@ describe('weekly check-in tiles', () => {
 
   it('describes the week against budget', () => {
     expect(budgetBalanceText(-310)).toBe('310 kcal under budget for the week');
-    expect(budgetBalanceText(420)).toBe('420 kcal over budget for the week');
-    expect(budgetBalanceText(20)).toBe('Right on budget for the week');
+    expect(budgetBalanceText(420)).toBe('420 kcal above budget for the week');
+    expect(budgetBalanceText(20)).toBe('At budget for the week');
     expect(budgetBalanceText(null)).toContain('No fully logged days');
   });
 });

@@ -8,6 +8,7 @@ export { AnimatedItem, AnimatedList, AnimatedNumber, cssBezier, DrawReveal, ease
 export type { AnimatedNumberProps, Pour, PourOptions, ReachOptions } from './motion';
 export * from './Pressable';
 export * from './ProgressBar';
+export * from './RestoreRow';
 export * from './Screen';
 export * from './Sheet';
 export * from './Text';

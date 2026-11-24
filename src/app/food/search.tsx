@@ -230,7 +230,7 @@ export default function FoodSearchScreen() {
   const header = (
     <View style={{ gap: spacing.sm, paddingBottom: spacing.sm }}>
       {/* The day and what is left of its budget: one short line, so the list starts higher (logging speed). */}
-      <Header title={`Add to ${MEAL_LABEL[meal].toLowerCase()}`} subtitle={`${formatDayLabel(date)} · ${kcal(Math.abs(left))} kcal ${left < 0 ? 'over' : 'left'}`} close />
+      <Header title={`Add to ${MEAL_LABEL[meal].toLowerCase()}`} subtitle={`${formatDayLabel(date)} · ${kcal(Math.abs(left))} kcal ${left < 0 ? 'above budget' : 'left'}`} close />
       <TextField
         testID="food-search-input"
         placeholder={narrow ? 'Search foods and brands' : 'Search foods, brands, your foods'}

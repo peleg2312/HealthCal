@@ -10,11 +10,14 @@ import { ACTIVITY_BY_ID } from '@/data/activities';
 import { isolateRtl } from '@/lib/bidi';
 import { formulaTdee } from '@/lib/energy';
 import { nowISO } from '@/lib/id';
+import { formatNumber } from '@/lib/units';
 import { useStore } from '@/store';
+import { computeDayFromStore } from '@/store/selectors';
 import type { ActivityEntry, Intensity, StrengthExercise } from '@/types';
 import { haptic, toast } from '@/ui';
 
 import { buildActivityEntry, rebuildActivityEntry } from './build';
+import { budgetAddsShort } from './logWords';
 import { useStrengthDrafts } from './strengthDraft';
 
 export interface SaveActivityInput {
@@ -56,7 +59,9 @@ export function saveActivity(input: SaveActivityInput): ActivityEntry | null {
   const entry = store.upsert('activities', built);
   store.rememberActivity(activity.id);
   haptic.success();
-  toast(`${isolateRtl(entry.name)} logged, about ${Math.round(entry.kcalNet)} kcal above resting`, {
+  // The run log's words for what reaches the budget, by the rule of the workout's day ("~423 kcal added").
+  const rule = computeDayFromStore(useStore.getState(), entry.date)?.exerciseRule ?? 'day';
+  toast(`${isolateRtl(entry.name)} logged, ~${formatNumber(Math.round(entry.kcalNet))} kcal ${budgetAddsShort(rule)}`, {
     label: 'Undo',
     onPress: () => useStore.getState().remove('activities', entry.id),
   });

@@ -140,7 +140,7 @@ function Missing({ message }: { message: string }) {
   );
 }
 
-/** "Leaves 640 kcal for today" / "Puts today 120 kcal over budget". */
+/** "Leaves 640 kcal for today" / "Puts today 120 kcal above the budget". */
 function ImpactLine({ date, kcalValue, replacing }: { date: ISODate; kcalValue: number; replacing?: FoodEntry }) {
   const { colors, radius, spacing } = useTheme();
   const day = useDay(date);
@@ -161,7 +161,7 @@ function ImpactLine({ date, kcalValue, replacing }: { date: ISODate; kcalValue: 
       }}>
       <CupKey color={over ? colors.warning : colors.calories} />
       <Text variant="label" color="text" style={{ flex: 1 }}>
-        {over ? `Puts ${dayPhrase(date)} ${kcal(-after)} kcal over budget` : `Leaves ${kcal(after)} kcal for ${dayPhrase(date)}`}
+        {over ? `Puts ${dayPhrase(date)} ${kcal(-after)} kcal above the budget` : `Leaves ${kcal(after)} kcal for ${dayPhrase(date)}`}
       </Text>
     </View>
   );

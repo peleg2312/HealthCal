@@ -77,11 +77,18 @@ describe('onboarding model', () => {
     expect(buildPlan(draft({ weight: 55, target: 50, activity: 'sedentary', weeklyRateKg: 0.55 }), NOW)!.floor).toBe(1200);
   });
 
-  it('asks about the day, then the look, before the plan for every goal', () => {
-    expect(stepsFor('lose').slice(-3)).toEqual(['routine', 'theme', 'plan']);
-    expect(stepsFor('maintain').slice(-3)).toEqual(['routine', 'theme', 'plan']);
-    expect(validateStep('theme', draft(), NOW)).toEqual({});
+  it('asks about the day, then shows the plan, for every goal; the look is not a question', () => {
+    expect(stepsFor('lose').slice(-2)).toEqual(['routine', 'plan']);
+    expect(stepsFor('maintain').slice(-2)).toEqual(['routine', 'plan']);
+    expect(stepsFor('lose')).toHaveLength(10);
     expect(validateStep('routine', draft(), NOW)).toEqual({});
+  });
+
+  it('lets the name be left empty, since the plan does not use it', () => {
+    expect(validateStep('basics', draft({ name: '' }), NOW)).toEqual({});
+    expect(validateStep('basics', draft({ name: '   ' }), NOW)).toEqual({});
+    expect(validateStep('basics', draft({ name: 'x'.repeat(41) }), NOW).name).toBeTruthy();
+    expect(buildPlan(draft({ name: '' }), NOW)!.profile.name).toBe('');
   });
 
   it('keeps typed values when switching units', () => {
