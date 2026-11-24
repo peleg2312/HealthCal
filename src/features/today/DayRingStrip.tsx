@@ -317,8 +317,8 @@ export function DayRingStrip({
                         }}>
                         <Text
                           variant="numM"
-                          color={isSelected ? 'text' : locked || future ? 'textTertiary' : 'text'}
-                          style={{ fontSize: 14, lineHeight: 20, letterSpacing: 0, fontFamily: isSelected ? fonts.displayBold ?? undefined : undefined }}>
+                          color={locked || future ? 'textTertiary' : 'text'}
+                          style={{ fontSize: 14, lineHeight: 20, letterSpacing: 0 }}>
                           {fromISODate(d).getDate()}
                         </Text>
                         {/* The day shown wears the level line under its date, as the active tab and the chosen segment do:
@@ -326,7 +326,6 @@ export function DayRingStrip({
                         {isSelected ? (
                           <View
                             pointerEvents="none"
-                            testID={`${testIDPrefix}-day-${d}-mark`}
                             style={{ position: 'absolute', bottom: isToday ? 1 : 0, alignSelf: 'center', width: SELECTED_MARK_W, height: 3, borderRadius: 1, backgroundColor: colors.rim }}
                           />
                         ) : null}

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { ImportCandidate } from '../plan';
 import type { ImportedWorkout } from '../types';
 
-import { calorieView, countRows, dayLabel, distanceLabel, durationLabel, fileNotes, filterRows, innerPath, shiftDays, summarise, topFile } from './format';
+import { calorieView, countRows, dayLabel, distanceLabel, durationLabel, fileNotes, filterRows, HEALTH_EXPORT_BRINGS, HEALTH_EXPORT_SKIPS, innerPath, shiftDays, summarise, topFile } from './format';
 
 const workout = (over: Partial<ImportedWorkout> = {}): ImportedWorkout => ({
   format: 'fit',
@@ -144,5 +144,13 @@ describe('import screen formatting', () => {
     );
     expect(notes[0]).toMatchObject({ file: 'export.zip', formats: ['FIT'], workouts: 2, errors: [{ inner: 'c.fit', message: 'not fit' }] });
     expect(notes[0].warnings).toHaveLength(1);
+  });
+});
+
+describe("what a Health export brings, in the reader's own windows", () => {
+  it('names workouts, steps and sleep with their windows, and never says the sleep it keeps is skipped', () => {
+    expect(HEALTH_EXPORT_BRINGS).toBe('Workouts, daily steps for the last 35 days and sleep for the last 28 nights.');
+    expect(HEALTH_EXPORT_SKIPS).toBe('Heart rate, older steps and sleep, and the rest are skipped.');
+    expect(HEALTH_EXPORT_SKIPS).not.toMatch(/(^|, )sleep/i);
   });
 });

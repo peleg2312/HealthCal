@@ -278,6 +278,10 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
   const life = useRef<Life>({ id: 0, holds: new Set(), left: 0, deadline: 0 });
   // Whether keyboard focus is on the action (web): it goes back where it came from when the toast leaves.
   const focusOn = useRef(false);
+  // Web: the words of the toast this host announced, written into its live region (below), which is mounted
+  // before any toast shows: a region added together with its words is often not read, and the web's
+  // announceForAccessibility does nothing. Keyed by the toast, so the same words twice are read twice.
+  const [said, setSaid] = useState<{ id: number; text: string } | null>(null);
   const { height: winH } = useWindowDimensions();
 
   useEffect(() => {
@@ -299,7 +303,9 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       // drawing (`isolateRtl`) is announced raw: screen readers get no direction marks. Units are said in
       // full ("250 millilitres added to Water"); the toast drawn keeps its short units.
       const spoken = spokenUnits(withoutMarks(message));
-      AccessibilityInfo.announceForAccessibility(actionLabel ? `${spoken}. ${actionLabel} available.` : spoken);
+      const line = actionLabel ? `${spoken}. ${actionLabel} available.` : spoken;
+      if (Platform.OS === 'web') setSaid({ id, text: line });
+      else AccessibilityInfo.announceForAccessibility(line);
     }
     // Rises 16 px and fades in, ease-out, no bounce; instant under reduced motion. A toast raised while the
     // one before is fading out rises back from where that fade had got to.
@@ -469,8 +475,18 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
     bottomNow.current = bottom;
   }, [bottom]);
 
-  if (!message || !active) return null;
+  // Web: one polite live region per host, mounted while the host is (the app's root, an open sheet), holding the
+  // words of the toast it shows and nothing once that toast has gone.
+  const region =
+    Platform.OS === 'web' ? (
+      <View testID="toast-live" style={SPOKEN_ONLY} {...({ role: 'status', 'aria-live': 'polite', 'aria-atomic': true } as object)}>
+        {said && message && active && said.id === id ? <Text key={said.id}>{said.text}</Text> : null}
+      </View>
+    ) : null;
+  if (!message || !active) return region;
   return (
+    <>
+    {region}
     <View
       ref={outer}
       pointerEvents="box-none"
@@ -488,7 +504,8 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
         ref={toastRef}
         testID="toast"
         pointerEvents={closingId === id ? 'none' : 'box-none'}
-        accessibilityLiveRegion="polite"
+        // Android reads the toast as it appears; the web reads the host's live region instead (above).
+        accessibilityLiveRegion={Platform.OS === 'web' ? undefined : 'polite'}
         onLayout={(e) => setToastH(Math.round(e.nativeEvent.layout.height))}
         style={{
           maxWidth: MAX_CONTENT_WIDTH - 2 * side,
@@ -553,8 +570,12 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
         ) : null}
       </Animated.View>
     </View>
+    </>
   );
 }
+
+/** Heard, never seen: a 1 px box with nothing drawn (the browser scans skip what is fully transparent). */
+const SPOKEN_ONLY = { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0, left: 0, top: 0 } as const;
 
 /**
  * The toast leaves: it fades and sinks 16 px (ease-in, `motion.duration.fade`), then is cleared, but only

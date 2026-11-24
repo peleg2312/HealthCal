@@ -3,6 +3,8 @@
  * no storage, no clock (today's date is passed in), so it is unit-tested.
  */
 import { ACTIVITY_BY_ID } from '@/data/activities';
+import { SLEEP_DAYS } from '@/features/health-sync/sleep';
+import { STEP_DAYS } from '@/features/health-sync/steps';
 import { addDays, formatDuration, fromISODate } from '@/lib/dates';
 import { kcalRange } from '@/lib/exercise';
 import { formatDistance, formatNumber } from '@/lib/units';
@@ -13,6 +15,16 @@ import type { ImportCandidate } from '../plan';
 import type { ImportBatch } from '../read';
 import { recordedWallTime } from '../time';
 import type { ImportedWorkout } from '../types';
+
+/**
+ * What a Health export brings, as the reader keeps it (`readHealthExport`, @/features/health-sync/exportRead):
+ * every workout, the days of steps in the steps window (STEP_DAYS) and the nights in the sleep window
+ * (SLEEP_DAYS). Said from the same constants, so the start view never promises what the reader drops.
+ */
+export const HEALTH_EXPORT_BRINGS = `Workouts, daily steps for the last ${STEP_DAYS} days and sleep for the last ${SLEEP_DAYS} nights.`;
+
+/** What the reader leaves in the file, said wherever the reading is: the rest of it is never read or kept. */
+export const HEALTH_EXPORT_SKIPS = 'Heart rate, older steps and sleep, and the rest are skipped.';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

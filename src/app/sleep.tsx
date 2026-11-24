@@ -7,7 +7,7 @@ import { formatDayLabel, fromISODate, weekdayShort } from '@/lib/dates';
 import { deleteSleep, saveSleep } from '@/features/trackers/actions';
 import { dayTitle, resolveDateParam } from '@/features/trackers/dateParam';
 import { DayStepper, Explain, ExplainText, Figure, HistoryRow, RequireProfile } from '@/features/trackers/components';
-import { findByDate, formatHours, QUALITY_LABELS, SLEEP_RANGE, sleepSummary } from '@/features/trackers/helpers';
+import { findByDate, formatHours, hoursFigure, QUALITY_LABELS, SLEEP_RANGE, sleepSummary } from '@/features/trackers/helpers';
 import { sleepChartLabel } from '@/features/progress/chartWords';
 import { sleepFromLine, stagesLine } from '@/features/trackers/sleepSource';
 import { useToday } from '@/store/clock';
@@ -19,11 +19,8 @@ import { BarChart, Button, Card, Chip, CupKey, Divider, EmptyState, Header, Scre
 type Window = '7' | '30';
 const QUALITIES: SleepQuality[] = [1, 2, 3, 4, 5];
 
-/** 7.25 -> '7 h 15' + 'min', 7 -> '7' + 'h': a duration as a figure and its unit, read the way every other duration in the app is. */
-function hm(hours: number): { value: string; unit: string } {
-  const mins = Math.round(hours * 60);
-  return mins % 60 === 0 ? { value: String(mins / 60), unit: 'h' } : { value: `${Math.floor(mins / 60)} h ${mins % 60}`, unit: 'min' };
-}
+/** 7.25 -> '7 h 15' + 'min', 7 -> '7' + 'h': a duration as a figure and its unit, the way Progress and Today draw sleep too. */
+const hm = hoursFigure;
 
 function QualityDots({ quality, size = 10 }: { quality: number; size?: number }) {
   const { colors } = useTheme();

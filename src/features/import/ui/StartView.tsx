@@ -6,6 +6,8 @@ import { Platform, View } from 'react-native';
 import { fonts, useTheme } from '@/theme';
 import { Card, Divider, PressableScale, Text } from '@/ui';
 
+import { HEALTH_EXPORT_BRINGS, HEALTH_EXPORT_SKIPS } from './format';
+
 /**
  * The first state: one line on what happens, then the two kinds of file: the
  * Health app's export (how to get it, in one short paragraph) and Garmin
@@ -62,10 +64,10 @@ function AppleHealthGuide() {
         </Text>
       </View>
       <Text variant="body" color="textSecondary">
-        Workouts, daily steps and sleep. In the Health app, tap your picture, then Export All Health Data. Save it to Files, then choose export.zip here.
+        {`${HEALTH_EXPORT_BRINGS} In the Health app, tap your picture, then Export All Health Data. Save it to Files, then choose export.zip here.`}
       </Text>
       <Text variant="caption" color="textSecondary">
-        A large export takes a minute or two to read. Heart rate, sleep and the rest are skipped, and nothing leaves this device.
+        {`A large export takes a minute or two to read. ${HEALTH_EXPORT_SKIPS.slice(0, -1)}, and nothing leaves this device.`}
       </Text>
     </Card>
   );

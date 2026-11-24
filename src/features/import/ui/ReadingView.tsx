@@ -4,6 +4,8 @@ import { ActivityIndicator, View } from 'react-native';
 import { useTheme } from '@/theme';
 import { MiniCup, Text } from '@/ui';
 
+import { HEALTH_EXPORT_SKIPS } from './format';
+
 /** A sign of life while files are read: a cup filling file by file, and which file it is on. */
 export function ReadingView({ progress }: { progress: { index: number; total: number; name: string; share?: number } | null }) {
   const { colors, spacing } = useTheme();
@@ -25,7 +27,7 @@ export function ReadingView({ progress }: { progress: { index: number; total: nu
           {progress ? `${progress.name}${total > 1 ? ` · ${index + 1} of ${total}` : ''}${big ? ` · ${pct}% read` : ''}` : 'Opening…'}
         </Text>
         <Text variant="caption" color="textSecondary" align="center">
-          {big ? 'A large export takes a minute or two. Heart rate, sleep and the rest are skipped.' : 'A large archive can take a few seconds.'}
+          {big ? `A large export takes a minute or two. ${HEALTH_EXPORT_SKIPS}` : 'A large archive can take a few seconds.'}
         </Text>
       </View>
       <ActivityIndicator color={colors.textSecondary} />

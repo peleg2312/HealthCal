@@ -10,7 +10,7 @@
  * wholly into view the same way, so the focused chip is never left mostly outside the row.
  *
  * The kinds are a quiet choice above the glasses, which are the screen's main action: the chosen kind
- * is marked by a 2 px ink outline and its label's weight (`KindChip`), never a solid ink fill that would
+ * is marked by a 2 px ink outline (`KindChip`), never a solid ink fill that would
  * outweigh the glasses.
  */
 import React, { useEffect, useRef } from 'react';
@@ -79,9 +79,9 @@ export function DrinkKindRow({ kind, onChoose, reveal }: { kind: Beverage; onCho
 }
 
 /**
- * One kind: the kit Chip's size, corners and touch area (32 px, 44 to touch), its chosen state drawn quietly as a
- * 2 px ink outline with its label in the heavier weight (the same width either way: the padding gives back the
- * outline's extra pixel), so the selection stays legible without a solid fill. Selected is `aria-pressed`, as the
+ * One kind: the kit Chip's size, corners, label and touch area (32 px, 44 to touch), its chosen state drawn quietly
+ * as a 2 px ink outline (the same width either way: the padding gives back the outline's extra pixel), so the
+ * selection stays legible without a solid fill. Selected is `aria-pressed`, as the
  * kit Chip's.
  */
 function KindChip({ label, selected, onPress, onFocus, testID }: { label: string; selected: boolean; onPress: () => void; onFocus: () => void; testID: string }) {
@@ -107,7 +107,7 @@ function KindChip({ label, selected, onPress, onFocus, testID }: { label: string
         borderWidth: selected ? 2 : 1,
         borderColor: selected ? colors.text : colors.borderStrong,
       }}>
-      <Text variant={selected ? 'bodyStrong' : 'label'} color="text" numberOfLines={large ? undefined : 1} style={{ fontSize: 13.5, lineHeight: 18, flexShrink: 1 }}>
+      <Text variant="label" color="text" numberOfLines={large ? undefined : 1} style={{ fontSize: 13.5, flexShrink: 1 }}>
         {label}
       </Text>
     </PressableScale>

@@ -1,12 +1,13 @@
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { Platform, Text as RNText, TextInput, View, type LayoutChangeEvent, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, Platform, Text as RNText, TextInput, View, type LayoutChangeEvent, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { cup, fonts, motion, phoneCapFor, scaledFontSize, useLargeText, useReducedMotion, useTextSize, useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
 import { cssBezier, FadeUp, FOCUS_CUP, MiniCup, parseNumber, PressableScale, ProgressBar, Text, useFocusRing } from '@/ui';
 
+import { choiceInput, type ChoiceInput } from './choiceInput';
 import { inHand, nextEmptyField } from './fieldChain';
 import { convertUnits, type Draft } from './model';
 
@@ -58,12 +59,41 @@ export function StepSlide({ direction, disabled, children }: { direction: 1 | -1
   );
 }
 
+// The heading of the question on screen (StepTitle, or the plan's title), so the flow can move the focus to it.
+let stepHeading: unknown = null;
+
+/** Hand `ref` of a step's heading here; the flow focuses it when a new question arrives. */
+export function stepHeadingRef(node: unknown) {
+  stepHeading = node;
+}
+
+/**
+ * A new question arrived: the focus goes to its heading (WCAG 2.4.3), so a keyboard or a screen
+ * reader goes on from the question itself and never from the page's start. On the web the heading is
+ * focusable by code only (tabindex -1, which the kit's focus ring leaves alone).
+ */
+export function focusStepHeading() {
+  const node = stepHeading;
+  if (!node) return;
+  if (Platform.OS === 'web') {
+    (node as { focus?: (o?: { preventScroll?: boolean }) => void }).focus?.({ preventScroll: true });
+    return;
+  }
+  const tag = findNodeHandle(node as React.Component);
+  if (tag) AccessibilityInfo.setAccessibilityFocus(tag);
+}
+
 /** Step heading: a question and a short line on why it is asked. */
 export function StepTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   const { spacing } = useTheme();
   return (
     <View style={{ gap: spacing.sm, marginBottom: spacing.xs }}>
-      <Text variant="h1" accessibilityRole="header">
+      <Text
+        variant="h1"
+        accessibilityRole="header"
+        // The kit's Text hands unknown props to the platform's: the heading can be given focus when its question arrives.
+        {...({ ref: stepHeadingRef, tabIndex: -1 } as object)}
+        style={Platform.OS === 'web' ? ({ outlineWidth: 0 } as object) : undefined}>
         {title}
       </Text>
       {subtitle ? (
@@ -95,7 +125,8 @@ export function ChoiceCard({
   hint?: string;
   icon?: React.ReactNode;
   selected: boolean;
-  onPress: () => void;
+  /** `how`: a finger or a mouse ('pointer'), or a keyboard or assistive technology ('keys'; ./choiceInput). */
+  onPress: (how: ChoiceInput) => void;
   testID: string;
   /** Centred title only (two tiles side by side). */
   compact?: boolean;
@@ -107,7 +138,7 @@ export function ChoiceCard({
   return (
     <PressableScale
       testID={testID}
-      onPress={onPress}
+      onPress={(e) => onPress(choiceInput(e))}
       feedback="select"
       scaleTo={0.985}
       accessibilityRole="radio"

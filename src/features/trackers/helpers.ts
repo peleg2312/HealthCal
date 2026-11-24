@@ -31,11 +31,32 @@ export function formatClockDuration(ms: number): string {
 
 /** '7 h 30 min', '45 min', '9 h' from hours. */
 export function formatHours(hours: number): string {
+  const { value, unit } = hoursFigure(hours);
+  return `${value} ${unit}`;
+}
+
+/**
+ * A night's length as a figure and its small unit, the one way every screen draws sleep (Sleep, the
+ * morning page, Progress, Today): 7.25 -> '7 h 15' + 'min', 7 -> '7' + 'h', 0.75 -> '45' + 'min'.
+ * Never decimal hours ('7.3 h').
+ */
+export function hoursFigure(hours: number): { value: string; unit: string } {
   const mins = Math.round(hours * 60);
   const h = Math.floor(mins / 60);
   const m = mins % 60;
-  if (h === 0) return `${m} min`;
-  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+  if (h === 0) return { value: String(m), unit: 'min' };
+  return m === 0 ? { value: String(h), unit: 'h' } : { value: `${h} h ${m}`, unit: 'min' };
+}
+
+/** What a screen reader says for a night's length: '7 hours 15 minutes', '1 hour', '45 minutes'. */
+export function hoursSpoken(hours: number): string {
+  const mins = Math.round(hours * 60);
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  const hw = `${h} ${h === 1 ? 'hour' : 'hours'}`;
+  const mw = `${m} ${m === 1 ? 'minute' : 'minutes'}`;
+  if (h === 0) return mw;
+  return m === 0 ? hw : `${hw} ${mw}`;
 }
 
 // ------------------------------------------------------------------- water
