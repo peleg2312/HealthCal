@@ -173,6 +173,8 @@ export function FoodRow({
   testID,
   amount,
   matched,
+  onLongPress,
+  longPressLabel,
 }: {
   food: Food;
   /** The portion, already for display (`portionLabel`). */
@@ -188,6 +190,13 @@ export function FoodRow({
    * one quiet line under the name, so a person sees why the row is there. Search results only.
    */
   matched?: string;
+  /**
+   * Press and hold (500 ms): stars or unstars the food (`toggleFoodFavorite`). A long press never also
+   * opens the row. Screen readers get the same act as a named action, `longPressLabel`.
+   */
+  onLongPress?: () => void;
+  /** "Add to favourites" or "Remove from favourites" (`favoriteActionLabel`). */
+  longPressLabel?: string;
 }) {
   const { colors, spacing } = useTheme();
   const { width } = useWindowDimensions();
@@ -214,6 +223,15 @@ export function FoodRow({
       <PressableScale
         testID={testID}
         onPress={onPress}
+        onLongPress={onLongPress}
+        {...(onLongPress && longPressLabel
+          ? {
+              accessibilityActions: [{ name: 'favorite', label: longPressLabel }],
+              onAccessibilityAction: (e: { nativeEvent: { actionName: string } }) => {
+                if (e.nativeEvent.actionName === 'favorite') onLongPress();
+              },
+            }
+          : null)}
         scaleTo={0.985}
         accessibilityLabel={`${food.name}${matched ? `, ${matched}` : ''}, ${Math.round(kcalValue)} kilocalories. Open details`}
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>

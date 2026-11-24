@@ -1,18 +1,21 @@
 import { router } from 'expo-router';
 import { Activity, Check, Droplets, Plus, Repeat2, Scale, ScanBarcode, Search, type LucideIcon } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, useWindowDimensions, View } from 'react-native';
 
 import { AiGlyph, type AiGlyphName } from '@/features/ai/mark';
 import { AI_TILE_HINT } from '@/features/ai/words';
 import { hasFoodLogged } from '@/features/drinks/via';
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
-import { matchServing, servingText } from '@/features/food/helpers';
+import { favoriteMeals, quickLogMeal } from '@/features/food/favorites';
+import { approxKcalSpoken, favoriteFoodTile, isEstimateFood, quickRowTitle, savedTileCaption } from '@/features/food/favoriteWords';
+import { lastPortions, matchServing, portionFor, portionKcal, portionLabel, servingText } from '@/features/food/helpers';
 import { formatPortion, mealServings, planSavedMeal } from '@/features/food/build';
 import { logFood, logItems, logSavedMeal } from '@/features/food/log';
+import { loadSearchTab } from '@/features/food/searchTab';
 import { addWater } from '@/features/today/StatusRail';
 import { quickLogDate, quickLogPastDate, useViewedDay } from '@/features/today/viewedDay';
-import { currentKcal, customFoodIndex, resolveUsuals, usualFoods, usualLabel, type UsualFood } from '@/features/food/usuals';
+import { currentKcal, customFoodIndex, resolveFood, resolveUsuals, usualFoods, usualLabel, type UsualFood } from '@/features/food/usuals';
 import { isolateRtl } from '@/lib/bidi';
 import { addDays, formatDayLabel, formatShortDate } from '@/lib/dates';
 import { MEAL_LABEL, mealForTime } from '@/lib/nutrition';
@@ -21,7 +24,7 @@ import { useStore } from '@/store';
 import { useNow, useToday } from '@/store/clock';
 import { live, useLive, useProfile } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
-import type { FoodEntry, ISODate, SavedMeal } from '@/types';
+import type { Food, FoodEntry, ISODate, SavedMeal } from '@/types';
 import { PressableScale, Sheet, Text } from '@/ui';
 
 /** Re-log a usual food in its last portion. Entries with a food definition go through logFood so recents stay fresh. */
@@ -36,6 +39,12 @@ function logUsual(u: UsualFood, date: ISODate) {
 }
 
 const whenPhrase = (date: ISODate, from: ISODate) => (date === addDays(from, -1) ? 'yesterday' : formatShortDate(date));
+
+/** Log a favourite food in its last portion (or its default one), read at the moment of the tap. */
+function logFavoriteFood(food: Food, date: ISODate) {
+  const p = portionFor(food, lastPortions(live(useStore.getState().foodEntries)));
+  logFood({ food, serving: p.serving, quantity: p.quantity, meal: mealForTime(), date });
+}
 
 /**
  * The sheet behind the centre + button. It leads with the likely next log (the
@@ -59,14 +68,33 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
 
   // Resolved against the user's own foods as they are now: an edited food logs today's values, a deleted one is not offered.
   const customFoods = useLive('customFoods');
-  const usual = resolveUsuals(usualFoods(entries, meal, todayDate, { limit: 8 }), customFoodIndex(customFoods)).slice(0, 4);
+  const customIdx = customFoodIndex(customFoods);
+  const usualAll = resolveUsuals(usualFoods(entries, meal, todayDate, { limit: 8 }), customIdx);
   // The day the screen behind the sheet shows (a past day on Today, the diary's date), else today.
   const viewed = useViewedDay((s) => s.date);
   const logDate = viewed ?? todayDate;
   const prev = findPreviousMeal(entries, logDate, meal, 7);
   const alreadyLogged = hasFoodLogged(entries.filter((e) => e.date === logDate && e.meal === meal));
-  const savedMeal = [...saved].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] as SavedMeal | undefined;
-  const savedServings = savedMeal ? mealServings(savedMeal) : 1;
+  // Favourites lead the row (principle 1: two taps from anywhere, so a starred meal or food is in the first
+  // view): up to three favourite meals, newest star first; then up to three favourite foods, newest first;
+  // then the usual foods not already shown as a favourite; then the meal changed last when it is not
+  // already a tile.
+  const favMeals = favoriteMeals(saved).slice(0, 3);
+  const savedMeal = quickLogMeal(saved, favMeals.map((m) => m.id));
+  const favoriteIds = useStore((s) => s.favoriteFoodIds);
+  const favoriteRecords = useLive('favorites');
+  const favById = new Map(favoriteRecords.map((r) => [r.food?.id, r.food]));
+  const favFoods = favoriteIds
+    .map((id) => (favById.get(id) ? resolveFood(favById.get(id)!, customIdx) : null))
+    .filter((f): f is Food => !!f)
+    .slice(0, 3);
+  const favFoodIds = new Set(favFoods.map((f) => f.id));
+  const usual = usualAll.filter((u) => !favFoodIds.has(u.food?.id ?? u.last.foodId ?? '')).slice(0, 4);
+  const lastMap = lastPortions(entries);
+  // Started here because this sheet is mounted for the whole session: search's first frame is then on the tab chosen last.
+  useEffect(() => {
+    void loadSearchTab();
+  }, []);
   // Under 360 px a half tile has no room for the icon beside its name ("Snap a" / "meal"): the icon goes above it.
   const narrow = useWindowDimensions().width < 360;
   const glasses = [...presets]
@@ -108,17 +136,70 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
     borderColor: colors.border,
   } as const;
 
-  const showUsual = usual.length > 0 || !!savedMeal;
+  const showUsual = usual.length > 0 || !!savedMeal || favMeals.length > 0 || favFoods.length > 0;
+  const mealTile = (m: SavedMeal, key: string, testID: string, favourite: boolean) => (
+    <MealTile
+      key={key}
+      meal={m}
+      testID={testID}
+      favourite={favourite}
+      mealName={mealName}
+      done={done.includes(key)}
+      onPress={() => {
+        // A recipe logs one serving as a single line; a plain meal logs its items.
+        logSavedMeal(m, mealForTime(), quickLogDate());
+        mark(key);
+      }}
+    />
+  );
   const showRepeat = !!prev && !alreadyLogged;
 
   return (
     <Sheet visible={visible} onClose={close} title={viewed ? `Log to ${formatDayLabel(viewed)}` : 'Log something'}>
       {showUsual ? (
         <View style={{ gap: spacing.sm }} testID="quick-usual">
-          <Text variant="overline" color="textSecondary">
-            {usual.length ? `Usual for ${mealName}` : 'Saved meal'}
+          <Text variant="overline" color="textSecondary" testID="quick-usual-title">
+            {quickRowTitle({ meal: mealName, favourites: favMeals.length + favFoods.length > 0, usual: usual.length > 0, saved: !!savedMeal })}
           </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -spacing.xl, flexGrow: 0 }} contentContainerStyle={{ gap: spacing.sm, paddingHorizontal: spacing.xl }}>
+            {favMeals.map((m, i) => mealTile(m, `fav-meal:${m.id}`, `quick-fav-meal-${i}`, true))}
+            {favFoods.map((f, i) => {
+              const key = `fav-food:${f.id}`;
+              const isDone = done.includes(key);
+              const p = portionFor(f, lastMap);
+              // An AI food, or one last logged as an estimate, never shows an exact number: "150 g, ~248 kcal".
+              const { caption, label } = favoriteFoodTile({
+                name: f.name,
+                portion: portionLabel(p.serving.label, p.quantity),
+                kcal: portionKcal(f, p),
+                estimate: isEstimateFood(f, lastMap.get(f.id)),
+                meal: mealName,
+              });
+              return (
+                <PressableScale
+                  key={key}
+                  testID={`quick-fav-food-${i}`}
+                  feedback="none"
+                  disabled={isDone}
+                  onPress={() => {
+                    logFavoriteFood(f, quickLogDate());
+                    mark(key);
+                  }}
+                  accessibilityLabel={isDone ? `${f.name} added` : label}
+                  style={[tile, { width: 136, padding: spacing.md, gap: 4, borderColor: isDone ? colors.success : colors.border }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 17, lineHeight: 24 }}>{f.emoji || '🍽️'}</Text>
+                    <AddMark done={isDone} />
+                  </View>
+                  <Text variant="label" numberOfLines={2}>
+                    {isolateRtl(f.name)}
+                  </Text>
+                  <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ marginTop: 'auto' }} testID={`quick-fav-food-${i}-caption`}>
+                    {caption}
+                  </Text>
+                </PressableScale>
+              );
+            })}
             {usual.map((u) => {
               const isDone = done.includes(u.key);
               return (
@@ -149,33 +230,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                 </PressableScale>
               );
             })}
-            {savedMeal ? (
-              <PressableScale
-                key="saved"
-                testID="quick-usual-saved"
-                feedback="none"
-                disabled={done.includes('saved')}
-                onPress={() => {
-                  // A recipe logs one serving as a single line; a plain meal logs its items.
-                  logSavedMeal(savedMeal, mealForTime(), quickLogDate());
-                  mark('saved');
-                }}
-                accessibilityLabel={`Add saved meal ${savedMeal.name} to ${mealName}`}
-                style={[tile, { width: 136, padding: spacing.md, gap: 4, borderColor: done.includes('saved') ? colors.success : colors.border }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Text style={{ fontSize: 17, lineHeight: 24 }}>🍱</Text>
-                  <AddMark done={done.includes('saved')} />
-                </View>
-                <Text variant="label" numberOfLines={2}>
-                  {isolateRtl(savedMeal.name)}
-                </Text>
-                <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ marginTop: 'auto' }}>
-                  {savedServings > 1
-                    ? `1 of ${formatPortion(savedServings)} servings, ${formatNumber(planSavedMeal(savedMeal).kcal)} kcal`
-                    : `${savedMeal.items.length} ${savedMeal.items.length === 1 ? 'item' : 'items'}, ${formatNumber(planSavedMeal(savedMeal).kcal)} kcal`}
-                </Text>
-              </PressableScale>
-            ) : null}
+            {savedMeal ? mealTile(savedMeal, 'saved', 'quick-usual-saved', false) : null}
           </ScrollView>
         </View>
       ) : null}
@@ -313,6 +368,48 @@ function RepeatRow({ label, entries, done, onPress }: { label: string; entries: 
           {names}
         </Text>
       </View>
+    </PressableScale>
+  );
+}
+
+/**
+ * A saved meal as a one-tap tile: a favourite (`quick-fav-meal-<i>`) or the meal changed last
+ * (`quick-usual-saved`). A saved estimate never shows an exact number: "3 items, ~640 kcal".
+ */
+function MealTile({ meal, testID, favourite, mealName, done, onPress }: { meal: SavedMeal; testID: string; favourite: boolean; mealName: string; done: boolean; onPress: () => void }) {
+  const { colors, radius, spacing } = useTheme();
+  const servings = mealServings(meal);
+  const plan = planSavedMeal(meal);
+  const estimate = !!plan.range;
+  const caption = savedTileCaption({ items: meal.items.length, servings, servingsText: formatPortion(servings), kcal: plan.kcal, estimate });
+  return (
+    <PressableScale
+      testID={testID}
+      feedback="none"
+      disabled={done}
+      onPress={onPress}
+      accessibilityLabel={
+        done ? `${meal.name} added` : `Add ${favourite ? 'favourite' : 'saved'} meal ${meal.name}, ${approxKcalSpoken(plan.kcal, estimate)}, to ${mealName}`
+      }
+      style={{
+        width: 136,
+        padding: spacing.md,
+        gap: 4,
+        backgroundColor: colors.surface,
+        ...cup(radius.tile, 5),
+        borderWidth: 1,
+        borderColor: done ? colors.success : colors.border,
+      }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text style={{ fontSize: 17, lineHeight: 24 }}>🍱</Text>
+        <AddMark done={done} />
+      </View>
+      <Text variant="label" numberOfLines={2}>
+        {isolateRtl(meal.name)}
+      </Text>
+      <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ marginTop: 'auto' }} testID={`${testID}-caption`}>
+        {caption}
+      </Text>
     </PressableScale>
   );
 }

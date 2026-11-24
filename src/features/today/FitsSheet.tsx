@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { mealOnDay } from '@/features/food/addedTo';
+import { approxKcal, approxKcalSpoken, hasEstimate } from '@/features/food/favoriteWords';
 import { amountTotal, lastPortions, servingText } from '@/features/food/helpers';
 import { logFood, logItems } from '@/features/food/log';
 import { customFoodIndex, resolveFood, resolveUsuals, usualFoods } from '@/features/food/usuals';
@@ -129,9 +130,10 @@ export function FitsSheet({
     if (written.length) setAdded((a) => [...a, { key: `idea:${idea.key}`, kcal: idea.kcal, ids: written.map((e) => e.id) }]);
   };
 
-  const kcalFigure = (kcal: number, size: number) => (
+  // An idea whose items carry a range (a saved or past AI estimate) never shows an exact number: "~473".
+  const kcalFigure = (kcal: number, size: number, estimate = false) => (
     <Text variant="numM" style={{ fontSize: size, lineHeight: size + 5 }}>
-      {formatNumber(Math.round(kcal))}
+      {approxKcal(kcal, estimate)}
       <Text variant="unit">{' kcal'}</Text>
     </Text>
   );
@@ -211,7 +213,7 @@ export function FitsSheet({
                       // under the kcal figure in the figure's own column and the protein beside the figure, on its line.
                       <View style={{ flexDirection: 'row', alignItems: 'flex-start', flexWrap: 'wrap', columnGap: 8 }}>
                         <View>
-                          {kcalFigure(idea.kcal, 15)}
+                          {kcalFigure(idea.kcal, 15, hasEstimate(idea.items))}
                           {dim ? null : fitBar(idea, i, 4)}
                         </View>
                         <View style={{ minHeight: 20, justifyContent: 'center' }}>{proteinLine(idea.protein)}</View>
@@ -229,7 +231,7 @@ export function FitsSheet({
                   {narrow ? null : (
                     // The numbers column: the kcal figure, its bar, then the protein line.
                     <View style={{ alignItems: 'flex-end' }}>
-                      {kcalFigure(idea.kcal, 17)}
+                      {kcalFigure(idea.kcal, 17, hasEstimate(idea.items))}
                       {dim ? null : fitBar(idea, i, 8)}
                       {proteinLine(idea.protein)}
                     </View>
@@ -239,7 +241,7 @@ export function FitsSheet({
                     accessibilityLabel={
                       row.kind === 'added'
                         ? `${idea.name} added`
-                        : `Add ${idea.name}: ${idea.foods.join('; ')}, ${Math.round(idea.kcal)} kilocalories, to ${mealName}${dim ? `. ${row.caption}` : ''}`
+                        : `Add ${idea.name}: ${idea.foods.join('; ')}, ${approxKcalSpoken(idea.kcal, hasEstimate(idea.items))}, to ${mealName}${dim ? `. ${row.caption}` : ''}`
                     }
                     tone={row.kind === 'added' ? 'primary' : 'surface'}
                     size={44}

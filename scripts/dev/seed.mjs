@@ -291,6 +291,13 @@ function stressUp(state, { put, baselineTdee }) {
 //                yesterday's lunch" is offered at lunch time (entries ...c001 to ...c005; look with the clock at 12:30).
 //                Also the newest saved meal, "Lunch plate" (...c101), saved then: the old bourekas and halloumi lines
 //                with their old food copies and the own food (lead's decision L2).
+// For favourite meals and saved estimates (src/features/food/favorites.ts; applied in this order):
+//   favoriteMeal   1: stars the saved meal listed last (the oldest; equal stamps keep the order they were written in)
+//                  with `favoriteAt` now: the demo's "Usual breakfast"; with stress, the Hebrew-named meal
+//                  (ארוחת בוקר ישראלית), so the order visibly changes on Saved meals.
+//   savedEstimate  1: a saved meal from an AI estimate, "Chicken and rice bowl" (...e101: three AI lines with
+//                  `kcalRange` and `confidence`, no food, source 'ai'), the newest saved meal, so its figures read "~";
+//                  2: the same, starred a second after `favoriteMeal`'s star, so it is the + sheet's first tile.
 // For Train's training overview (src/lib/trainingLoad.ts; every workout is hand-logged, on fixed days before the seed's
 // today, so a picture does not change with the date). Each rewrites the last 28 days (today and the 27 before) of the
 // demo's workouts; 'new' removes the older ones too. The past three 7-day blocks are the same "usual" week each time:
@@ -363,7 +370,7 @@ function bundledFood(id) {
   return JSON.parse(JSON.stringify(food));
 }
 
-const VALUE_KEYS = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack', 'spread', 'lastNight', 'weighInGap', 'onboardedToday', 'name', 'drinks', 'diaryDrink', 'diaryWater', 'oldBourekas', 'load'];
+const VALUE_KEYS = ['eaten', 'protein', 'exercise', 'water', 'weekMinutes', 'fasting', 'eatBack', 'spread', 'lastNight', 'weighInGap', 'onboardedToday', 'name', 'drinks', 'diaryDrink', 'diaryWater', 'oldBourekas', 'load', 'favoriteMeal', 'savedEstimate'];
 /** Knobs that are not numbers: their type is checked on its own. */
 const VALUE_TYPES = { onboardedToday: 'boolean', name: 'string', load: 'string' };
 /** The training overview's weeks (values.load, above). */
@@ -599,6 +606,27 @@ function applyValues(state, values, { put, weightKg, baselineTdee }) {
       items: [line(bundledFood('b_bourekas_cheese'), '1 piece', 80, 1, oldPer('b_bourekas_cheese')), line(bundledFood('b_halloumi'), '1 slice', 30, 2, oldPer('b_halloumi')), line(ownThen, '1 bowl', 60, 1, ownThen.per100g)],
     });
   }
+  if (values.favoriteMeal > 0) {
+    const listed = live('savedMeals').sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    const oldest = listed[listed.length - 1];
+    if (!oldest) throw new Error('seed values: favoriteMeal needs a saved meal');
+    oldest.favoriteAt = new Date().toISOString();
+  }
+  if (values.savedEstimate > 0) {
+    const later = (ms) => new Date(Date.now() + ms).toISOString();
+    const ai = (name, emoji, servingLabel, grams, kcal, range, protein, carbs, fat, confidence) => ({
+      name, emoji, servingLabel, quantity: 1, grams, nutrients: { kcal, protein, carbs, fat }, source: 'ai', verified: false, kcalRange: range, confidence,
+    });
+    put('savedMeals', {
+      id: '00000000-0000-4000-8000-00000000e101', name: 'Chicken and rice bowl', updatedAt: later(1000),
+      items: [
+        ai('Grilled chicken', '🍗', '1 portion', 160, 264, [220, 320], 46, 0, 8, 0.7),
+        ai('White rice', '🍚', '1 cup', 160, 208, [170, 250], 4, 45, 0.5, 0.65),
+        ai('Salad with olive oil', '🥗', '1 bowl', 150, 120, [80, 170], 2, 6, 10, 0.5),
+      ],
+      ...(values.savedEstimate >= 2 ? { favoriteAt: later(2000) } : null),
+    });
+  }
   if (values.lastNight !== undefined) {
     const night = iso(daysAgo(-1));
     drop('sleep', (r) => r.date !== night);
@@ -645,7 +673,7 @@ export function seedThemeIsDark(theme) {
 
 /**
  * @param {{ days?: number, empty?: boolean, theme?: 'system'|'light'|'dark'|'blossom'|'butter'|'honey'|'java', onboarded?: boolean, units?: 'metric'|'imperial', store?: boolean, stress?: boolean,
- *   values?: { eaten?: number, protein?: number, exercise?: number, water?: number, weekMinutes?: number, fasting?: number, eatBack?: number, spread?: number, load?: 'steady' | 'lighter' | 'more' | 'jump' | 'hike' | 'daily' | 'new', lastNight?: number, weighInGap?: number, onboardedToday?: boolean, name?: string, drinks?: number, diaryDrink?: number, diaryWater?: number, oldBourekas?: number } }} opts
+ *   values?: { eaten?: number, protein?: number, exercise?: number, water?: number, weekMinutes?: number, fasting?: number, eatBack?: number, spread?: number, load?: 'steady' | 'lighter' | 'more' | 'jump' | 'hike' | 'daily' | 'new', lastNight?: number, weighInGap?: number, onboardedToday?: boolean, name?: string, drinks?: number, diaryDrink?: number, diaryWater?: number, oldBourekas?: number, favoriteMeal?: number, savedEstimate?: number } }} opts
  */
 export function buildSeed(opts = {}) {
   const { days = 35, empty = false, theme = 'dark', onboarded = true, units = 'metric', store = false, stress = false, values = null } = opts;

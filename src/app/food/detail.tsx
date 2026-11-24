@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Info, Star, Trash2 } from 'lucide-react-native';
+import { Info, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
@@ -10,6 +10,9 @@ import { AmountEditor } from '@/features/food/AmountEditor';
 import { UNKNOWN_AI_CONFIDENCE, bandSpread, estimateRange, scaleRange, spreadRange } from '@/features/food/build';
 import { DayStepper, KcalValue, MacroStat, MealPicker, SourceBadge } from '@/features/food/components';
 import { useFoodDraft } from '@/features/food/draft';
+import { FavoriteStar } from '@/features/food/FavoriteStar';
+import { toggleFoodFavorite } from '@/features/food/favoriteActions';
+import { favoriteActionLabel } from '@/features/food/favoriteWords';
 import { dayPhrase, href, portionLabel, kcal, labelAmount, lastPortions, matchServing, param, parseDate, parseMeal, portionFor, sourceInfo, valuesUpdated } from '@/features/food/helpers';
 import { deleteEntry, logFood } from '@/features/food/log';
 import { RequireProfile } from '@/features/food/RequireProfile';
@@ -352,12 +355,8 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
           title={entry ? 'Edit entry' : 'Add food'}
           subtitle={`${MEAL_LABEL[meal]} · ${dayPhrase(date).replace(/^./, (c) => c.toUpperCase())}`}
           right={
-            <IconButton
-              testID="detail-favorite"
-              accessibilityLabel={isFav ? 'Remove from favourites' : 'Add to favourites'}
-              onPress={() => useStore.getState().toggleFavoriteFood(food)}>
-              <Star size={19} color={isFav ? colors.warning : colors.text} fill={isFav ? colors.warning : 'transparent'} />
-            </IconButton>
+            // Outline when off, filled primaryInk when on (never the amber of "over"); a toast with Undo.
+            <FavoriteStar testID="detail-favorite" size={44} tone="surface" offColor="text" on={isFav} label={favoriteActionLabel(isFav)} onPress={() => toggleFoodFavorite(food)} />
           }
         />
       }

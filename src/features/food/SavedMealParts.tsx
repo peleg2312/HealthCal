@@ -7,6 +7,7 @@ import { Check } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
+import { SourceMark, sourceMarkTop } from '@/features/ai/mark';
 import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { MEAL_LABEL } from '@/lib/nutrition';
 import { cup, useTheme } from '@/theme';
@@ -16,7 +17,7 @@ import { Button, Chip, ChipWrap, NumberField, PressableScale, Sheet, Stepper, Te
 import { AmountEditor } from './AmountEditor';
 import { RowEmoji } from './components';
 import { formatPortion, mealServings, planSavedMeal, setItemAmount } from './build';
-import { dayPhrase, kcal, matchServing } from './helpers';
+import { dayPhrase, kcal, matchServing, sourceInfo } from './helpers';
 import { itemLine, itemStepText } from './itemLine';
 import { logSavedMeal } from './log';
 import { currentValues } from './usuals';
@@ -24,6 +25,29 @@ import { currentValues } from './usuals';
 const PORTIONS = [0.5, 1, 2];
 
 export { itemLine } from './itemLine';
+
+/** Where a saved line's numbers come from (principle 3): an estimate kept with its range is the AI's. */
+export function itemSource(it: Pick<SavedMealItem, 'source' | 'kcalRange'>): SavedMealItem['source'] {
+  return it.kcalRange ? 'ai' : it.source;
+}
+
+/**
+ * One saved line's caption: its source's mark leading and its word ending the line, as on a food row
+ * ("1 bowl · ~473 kcal · AI estimate"), so a long portion wraps instead of cutting the calories.
+ */
+export function ItemCaption({ item, testID }: { item: SavedMealItem; testID?: string }) {
+  const { colors } = useTheme();
+  const source = itemSource(item);
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+      <SourceMark source={source} color={colors.textSecondary} size={8} style={{ marginTop: sourceMarkTop(source) }} />
+      <Text variant="caption" color="textSecondary" numberOfLines={2} tabular style={{ flexShrink: 1 }} testID={testID}>
+        {/* The source's word stays on one line ("AI estimate", "Your food"). */}
+        {`${itemLine(item)} · ${sourceInfo(source).short.replace(/ /g, '\u00A0')}`}
+      </Text>
+    </View>
+  );
+}
 
 /**
  * Pick how much of a saved meal to log: a portion for a recipe, a checklist
@@ -115,7 +139,7 @@ export function LogSavedMealSheet({ meal, mealType, date, onClose }: { meal: Sav
               feedback="select"
               accessibilityRole="checkbox"
               accessibilityState={{ checked: on }}
-              accessibilityLabel={`${it.name}, ${withoutMarks(itemLine(it))}`}
+              accessibilityLabel={`${it.name}, ${withoutMarks(itemLine(it))}, ${sourceInfo(itemSource(it)).label}`}
               onPress={() => setInclude((cur) => meal.items.map((_, j) => (j === i ? !(cur[j] ?? true) : (cur[j] ?? true))))}
               style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 48, paddingVertical: 4 }}>
               <View
@@ -136,9 +160,7 @@ export function LogSavedMealSheet({ meal, mealType, date, onClose }: { meal: Sav
                 <Text variant="body" numberOfLines={2} color={on ? 'text' : 'textTertiary'}>
                   {isolateRtl(it.name)}
                 </Text>
-                <Text variant="caption" color="textSecondary" numberOfLines={2} tabular>
-                  {itemLine(it)}
-                </Text>
+                <ItemCaption item={it} />
               </View>
             </PressableScale>
           );

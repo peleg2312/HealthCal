@@ -19,6 +19,7 @@ import { haptic, toast } from '@/ui';
 import { dayPhrase } from './helpers';
 
 import { addItems, deleteEntry, toSavedMealItem } from './log';
+import { markSaveHintDone } from './saveHint';
 
 const sortByLogged = (a: FoodEntry, b: FoodEntry) => a.loggedAt.localeCompare(b.loggedAt);
 
@@ -127,7 +128,11 @@ export function clearEntries(entries: FoodEntry[], label: string): void {
   toast(`Cleared ${label}`, { label: 'Undo', onPress: () => ids.forEach((id) => useStore.getState().restore('foodEntries', id)) });
 }
 
-/** Save entries as a meal. Drinks from the water screen are left out; with nothing else, no meal is saved and the toast says why. */
+/**
+ * Save a diary meal's entries as a meal (the meal menu, the diary's hint, Saved meals' "Save lunch as a
+ * meal" row). Drinks from the water screen are left out; with nothing else, no meal is saved and the
+ * toast says why. The AI review saves through `logAndSaveMeal` (./log.ts) instead.
+ */
 export function saveMeal(name: string, entries: FoodEntry[]): SavedMeal | null {
   if (entries.length === 0) return null;
   const food = entries.filter((e) => !isWaterDrinkEntry(e));
@@ -136,6 +141,8 @@ export function saveMeal(name: string, entries: FoodEntry[]): SavedMeal | null {
     return null;
   }
   const meal = useStore.getState().upsert('savedMeals', { name: name.trim() || 'Saved meal', items: food.map(toSavedMealItem) });
+  // A diary meal was saved: the diary's one-time hint has done its job on this device (never an AI save).
+  markSaveHintDone();
   haptic.success();
   toast(`Saved "${isolateRtl(meal.name)}"`, { label: 'Undo', onPress: () => useStore.getState().remove('savedMeals', meal.id) });
   return meal;

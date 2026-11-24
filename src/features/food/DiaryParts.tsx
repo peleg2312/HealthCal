@@ -11,14 +11,19 @@ import { addDays, formatDayLabel } from '@/lib/dates';
 import { MEAL_LABEL, entriesTotal } from '@/lib/nutrition';
 import { useToday } from '@/store/clock';
 import type { DaySummary } from '@/store/selectors';
+import { favoriteRecordId, useStore } from '@/store';
 import { cup, fonts, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType, WaterEntry } from '@/types';
-import { AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, Hatch, IconButton, ListRow, PressableScale, ProgressBar, Sheet, Text, TextField, Trough } from '@/ui';
+import { AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, Hatch, IconButton, ListRow, PressableScale, ProgressBar, Sheet, Text, Trough } from '@/ui';
 
-import { clearEntries, copyEntries, saveMeal } from './actions';
+import { clearEntries, copyEntries } from './actions';
 import { DayStepper, KcalTrail, MealPicker, RowEmoji } from './components';
+import { toggleFoodFavorite } from './favoriteActions';
+import { FAVOURITE_ACTION, favoriteActionLabel } from './favoriteWords';
 import { dayPhrase, href, kcal, portionLabel, sourceInfo } from './helpers';
 import { deleteEntry } from './log';
+import { useSaveMealStep } from './SaveMealSheet';
+import { SAVE_HINT_NOT_NOW, SAVE_HINT_NOT_NOW_A11Y, saveHintA11y, saveHintLabel } from './saveWords';
 import { currentKcal } from './usuals';
 import { FadeRow, useLeavingRows } from './rowMotion';
 
@@ -125,6 +130,8 @@ export function DaySummaryCard({ day, share }: { day: DaySummary; share?: React.
 const ROW_PAD = 18;
 /** Where the text column starts in a meal card: the padding, the 24 px emoji column and the gap. */
 const TEXT_INSET = ROW_PAD + 24 + 12;
+/** A press and hold on a row that has nothing to star: taken, so it never ends as a tap. */
+const holdNothing = () => {};
 
 function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry | null }) {
   const { colors } = useTheme();
@@ -136,6 +143,10 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
   const source = sourceInfo(ai ? 'ai' : entry.source);
   // A volume ("250 ml", "8.5 fl oz") is the portion as it was drunk: its grams are left out.
   const volume = /(ml|fl oz)$/.test(entry.servingLabel.trim());
+  // A long press stars the row's food (with a toast and Undo); a quick add has no food and no long press.
+  const food = entry.food;
+  const starred = useStore((s) => (food ? !!s.favorites[favoriteRecordId(food.id)] && !s.favorites[favoriteRecordId(food.id)].deleted : false));
+  const favoriteAction = food ? favoriteActionLabel(starred) : null;
   const portion =
     entry.grams > 0 && !volume && entry.servingLabel !== `${Math.round(entry.grams)} g` && !/^\d+(\.\d+)?\s*g$/.test(entry.servingLabel.trim())
       ? `${portionLabel(entry.servingLabel, entry.quantity)} · ${Math.round(entry.grams)} g`
@@ -146,6 +157,11 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
         testID={`entry-${entry.id}`}
         onPress={() => router.push(href('/food/detail', { entryId: entry.id, meal: entry.meal, date: entry.date }) as never)}
         scaleTo={0.985}
+        // A row with no food (a quick add) takes the hold and does nothing: without a handler a hold
+        // ends as a tap (react-native-web and React Native alike) and would open the row unasked.
+        onLongPress={food ? () => toggleFoodFavorite(food) : holdNothing}
+        accessibilityActions={favoriteAction ? [{ name: FAVOURITE_ACTION.name, label: favoriteAction }] : undefined}
+        onAccessibilityAction={food ? (e) => e.nativeEvent.actionName === FAVOURITE_ACTION.name && toggleFoodFavorite(food) : undefined}
         accessibilityLabel={`${entry.name}, ${ai ? 'about ' : ''}${Math.round(entry.nutrients.kcal)} kilocalories${inWater ? ', also counted in Water' : ''}. Edit`}
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: 11 }}>
         <RowEmoji emoji={entry.emoji} />
@@ -175,6 +191,47 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
   );
 }
 
+/**
+ * The diary's one-time hint, a sibling row under the meal's last entry with its own divider: "Save lunch
+ * as a meal" (a tap opens the save sheet) and a quiet "Not now" at the end (hides it for good on this
+ * device), a text action rather than an X, so it is never taken for the entries' delete X above it.
+ */
+function SaveHintRow({ meal, onSave, onClose }: { meal: MealType; onSave(): void; onClose(): void }) {
+  const { colors, spacing } = useTheme();
+  return (
+    <FadeUp>
+      <Divider inset={ROW_PAD} />
+      <View testID="diary-save-hint-row" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingLeft: ROW_PAD, paddingRight: 8 }}>
+        <PressableScale
+          testID="diary-save-hint"
+          onPress={onSave}
+          scaleTo={0.985}
+          accessibilityLabel={saveHintA11y(meal)}
+          style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}>
+          {/* A fixed box, so a two-line label never squeezes the icon. */}
+          <View style={{ width: 16, height: 16 }}>
+            <Save size={16} color={colors.text} strokeWidth={2.2} />
+          </View>
+          <Text variant="label" color="text" numberOfLines={2} style={{ flexShrink: 1, textDecorationLine: 'underline' }}>
+            {saveHintLabel(meal)}
+          </Text>
+        </PressableScale>
+        <PressableScale
+          testID="diary-save-hint-close"
+          onPress={onClose}
+          scaleTo={0.97}
+          feedback="select"
+          accessibilityLabel={SAVE_HINT_NOT_NOW_A11Y}
+          style={{ minHeight: 44, minWidth: 44, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center' }}>
+          <Text variant="label" color="textSecondary">
+            {SAVE_HINT_NOT_NOW}
+          </Text>
+        </PressableScale>
+      </View>
+    </FadeUp>
+  );
+}
+
 export interface PreviousMeal {
   date: ISODate;
   entries: FoodEntry[];
@@ -190,6 +247,7 @@ export function MealCard({
   previous,
   onMenu,
   onRepeat,
+  hint,
 }: {
   meal: MealType;
   label: string;
@@ -201,6 +259,8 @@ export function MealCard({
   previous: PreviousMeal | null;
   onMenu: () => void;
   onRepeat: () => void;
+  /** The one-time "Save lunch as a meal" line under the last row (./saveHint.ts): on one card at most. */
+  hint?: { onSave(): void; onClose(): void } | null;
 }) {
   const { colors, spacing, radius } = useTheme();
   const total = entriesTotal(entries).kcal;
@@ -239,6 +299,7 @@ export function MealCard({
           ))}
         </AnimatedList>
       </View>
+      {hint && rows.length > 0 ? <SaveHintRow meal={meal} onSave={hint.onSave} onClose={hint.onClose} /> : null}
       {rows.length > 0 ? null : (
         <View style={{ marginTop: spacing.sm, gap: spacing.xs, paddingHorizontal: ROW_PAD }}>
           <PressableScale
@@ -311,7 +372,6 @@ export function MealMenuSheet({
   const [step, setStep] = useState<MenuStep>('menu');
   const [targetDate, setTargetDate] = useState<ISODate>(addDays(date, 1));
   const [targetMeal, setTargetMeal] = useState<MealType>(meal ?? 'breakfast');
-  const [name, setName] = useState('');
   const [openFor, setOpenFor] = useState<string | null>(null);
 
   // Reset the sheet each time it opens for a meal.
@@ -322,9 +382,10 @@ export function MealMenuSheet({
       setStep('menu');
       setTargetDate(date === todayDate ? addDays(date, 1) : todayDate);
       setTargetMeal(meal);
-      setName(defaultMealName(entries, meal));
     }
   }
+  // The save step is SaveMealSheet's, shown inside this sheet so the step changes in place.
+  const save = useSaveMealStep({ open: !!meal && step === 'save', meal, date, entries, onClose });
 
   if (!meal) return <Sheet visible={false} onClose={onClose}>{null}</Sheet>;
   const label = MEAL_LABEL[meal];
@@ -359,25 +420,8 @@ export function MealMenuSheet({
 
   if (step === 'save') {
     return (
-      <Sheet
-        visible
-        onClose={onClose}
-        title="Save as a meal"
-        footer={
-          <Button
-            testID="save-meal-confirm"
-            title="Save meal"
-            disabled={!name.trim()}
-            onPress={() => {
-              saveMeal(name, entries);
-              onClose();
-            }}
-          />
-        }>
-        <Text variant="body" color="textSecondary">
-          {count} · {kcal(total)} kcal. Log it again later in one tap from Saved meals.
-        </Text>
-        <TextField testID="save-meal-name" label="Name" value={name} onChangeText={setName} autoFocus maxLength={60} returnKeyType="done" />
+      <Sheet visible onClose={onClose} title={save.title} footer={save.footer}>
+        {save.body}
       </Sheet>
     );
   }
@@ -439,9 +483,3 @@ export function MealMenuSheet({
   );
 }
 
-function defaultMealName(entries: FoodEntry[], meal: MealType): string {
-  const names = entries.slice(0, 3).map((e) => e.name.split(',')[0].trim());
-  const joined = names.join(', ');
-  if (!joined) return MEAL_LABEL[meal];
-  return joined.length > 40 ? `${MEAL_LABEL[meal]} favourite` : joined;
-}

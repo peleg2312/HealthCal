@@ -272,7 +272,7 @@ The runtime version is the fixed string `expo.runtimeVersion` in `app.json`. An 
 
 The scripts under `scripts/dev` test the web build in a browser. The flows in `.maestro/` do the same on a real Android or iPhone build, driven by testID with [Maestro](https://maestro.mobile.dev), with a screenshot at each step:
 
-- `first-day.yml`: setup with the keyboard on every field, food added to lunch and opened again, the four tabs and the sync screen.
+- `first-day.yml`: setup with the keyboard on every field, food added to lunch and opened again, the four tabs and the sync screen. Since 24 November its diary picture (`13-diary-lunch`) also shows the one-time "Save lunch as a meal" line under lunch, because its two lunch foods are a meal that can be saved; that is the app's real behaviour on a phone (the line is hidden only in automated browsers).
 - `health-and-about.yml` (after first-day): Workout sync turned on, the app's explanation, the system's permission screen (Apple Health or Health Connect), the sync screen and Train's steps line, then About and its version block with "Check for updates".
 - `health-data-ios.yml` (iPhone only, best effort): types steps into the simulator's Health app, syncs, and looks for them on Train.
 - `drinks.yml` (after first-day, run with `flows=first-day,drinks`): a milk logged on the water screen with its choices and the calorie line, its row in Today's log and the diary, then the drink sheet with calories typed while the keyboard is up. Passed on the Android 15 emulator on 18 November 2026 (run 44319058732).

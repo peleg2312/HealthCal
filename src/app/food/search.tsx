@@ -1,6 +1,6 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { PenLine, ScanBarcode, Search, Star, Utensils, X, Zap } from 'lucide-react-native';
-import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { PenLine, ScanBarcode, Search, Utensils, X, Zap } from 'lucide-react-native';
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 
 import { AiGlyph } from '@/features/ai/mark';
@@ -8,22 +8,27 @@ import { AmountEditor } from '@/features/food/AmountEditor';
 import { FoodRow, MealPicker } from '@/features/food/components';
 import { setFoodDraft } from '@/features/food/draft';
 import { amountLabel, href, kcal, lastPortions, matchServing, parseDate, parseMeal, portionFor, portionKcal, portionLabel, stepAmount } from '@/features/food/helpers';
-import { formatPortion, itemsRange, mealServings } from '@/features/food/build';
 import { deleteEntry, logFood, setEntryAmount } from '@/features/food/log';
+import { FavoriteStar } from '@/features/food/FavoriteStar';
+import { toggleFoodFavorite } from '@/features/food/favoriteActions';
+import { favoriteFoodsInVisit, isFavoriteMeal, mealToSave } from '@/features/food/favorites';
+import { favoriteActionLabel, favoriteLabel, FAVOURITE_GROUPS, FAVOURITES_EMPTY } from '@/features/food/favoriteWords';
 import { LogSavedMealSheet } from '@/features/food/SavedMealParts';
-import { currentValues, resolveFood, usualFoods } from '@/features/food/usuals';
+import { SaveCurrentMealRow, SavedMealRow, useVisitOrder } from '@/features/food/SavedMealRow';
+import { loadSearchTab, openingTab, rememberSearchTab, useSearchTab, type SearchTab } from '@/features/food/searchTab';
+import { resolveFood, usualFoods } from '@/features/food/usuals';
 import { isolateRtl } from '@/lib/bidi';
 import { formatDayLabel } from '@/lib/dates';
-import { MEAL_LABEL, entriesTotal, sumNutrients } from '@/lib/nutrition';
+import { MEAL_LABEL, entriesTotal } from '@/lib/nutrition';
 import { searchLocal, searchOnlineWithStatus } from '@/services/foodSearch';
 import { useToday } from '@/store/clock';
-import { useStore } from '@/store';
+import { favoriteRecordId, useStore } from '@/store';
 import { useDay, useLive } from '@/store/selectors';
-import { cup, fonts, motion, useTheme } from '@/theme';
+import { cup, motion, useTheme } from '@/theme';
 import type { Food, FoodEntry, MealType, SavedMeal } from '@/types';
 import { AnimatedNumber, Button, Chip, ChipRow, Divider, EmptyState, Header, IconButton, PressableScale, Screen, Sheet, Text, TextField } from '@/ui';
 
-type Tab = 'usual' | 'recent' | 'favorites' | 'mine' | 'meals';
+type Tab = SearchTab;
 type Online = { query: string; status: 'idle' | 'loading' | 'done'; items: Food[] };
 
 export default function FoodSearchScreen() {
@@ -35,8 +40,17 @@ export default function FoodSearchScreen() {
   const date = parseDate(params.date, todayDate);
   const [meal, setMeal] = useState<MealType>(() => parseMeal(params.meal));
   const [query, setQuery] = useState('');
-  // null until the user picks a tab: then Usual leads when there is history for this meal.
-  const [pickedTab, setTab] = useState<Tab | null>(null);
+  // null until the user picks a tab: then the tab chosen last on this device, else Usual when there is
+  // history for this meal (`openingTab`). A tap is remembered on the device (`healthcal.searchTab`).
+  const [pickedTab, setPickedTab] = useState<Tab | null>(null);
+  const rememberedTab = useSearchTab((s) => s.tab);
+  useEffect(() => {
+    void loadSearchTab();
+  }, []);
+  const setTab = (t: Tab) => {
+    setPickedTab(t);
+    rememberSearchTab(t);
+  };
   const [amountEntryId, setAmountEntryId] = useState<string | null>(null);
   const [logging, setLogging] = useState<SavedMeal | null>(null);
   const [onlineResult, setOnlineResult] = useState<{ query: string; items: Food[]; failed: boolean; unavailable: boolean }>({ query: '', items: [], failed: false, unavailable: false });
@@ -48,7 +62,15 @@ export default function FoodSearchScreen() {
   // Declared here: the header's short line shows it.
   const left = Math.round(useDay(date).remaining);
   const favoriteIds = useStore((s) => s.favoriteFoodIds);
-  const favoriteRecords = useLive('favorites');
+  // Every favourite record, removed ones too: a food unstarred in the Favourites tab keeps its row on this visit.
+  const favoriteRecords = useStore((s) => s.favorites);
+  // The favourite foods when the screen came into view (`favoriteFoodsInVisit`).
+  const [visitFoodIds, setVisitFoodIds] = useState<string[] | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      setVisitFoodIds(useStore.getState().favoriteFoodIds);
+    }, []),
+  );
   const customFoods = useLive('customFoods');
   const savedMeals = useLive('savedMeals');
   const entries = useLive('foodEntries');
@@ -60,10 +82,16 @@ export default function FoodSearchScreen() {
     [recentFoods, customById],
   );
   const favorites = useMemo(() => {
-    // Each favourite carries its own definition; favoriteFoodIds gives the newest-first order.
-    const byId = new Map(favoriteRecords.map((r) => [r.food.id, r.food]));
-    return favoriteIds.map((id) => (byId.has(id) ? resolveFood(byId.get(id)!, customById) : null)).filter((f): f is Food => !!f);
-  }, [favoriteRecords, favoriteIds, customById]);
+    // Each favourite carries its own definition; favoriteFoodIds gives the newest-first order, and the order
+    // fixed on this visit keeps a food unstarred here listed (with its outline star) until the next visit.
+    const listed = favoriteFoodsInVisit(favoriteIds, visitFoodIds);
+    return listed
+      .map((id) => {
+        const food = favoriteRecords[favoriteRecordId(id)]?.food;
+        return food ? resolveFood(food, customById) : null;
+      })
+      .filter((f): f is Food => !!f);
+  }, [favoriteRecords, favoriteIds, visitFoodIds, customById]);
   const usuals = useMemo(
     () =>
       usualFoods(entries, meal, todayDate, { limit: 12, withFood: true })
@@ -71,8 +99,17 @@ export default function FoodSearchScreen() {
         .filter((f): f is Food => !!f),
     [entries, meal, todayDate, customById],
   );
-  // The Usual tab only exists for a meal with history: after switching to a meal without, fall back.
-  const tab: Tab = pickedTab === 'usual' && !usuals.length ? 'recent' : (pickedTab ?? (usuals.length ? 'usual' : 'recent'));
+  // Saved meals in the order fixed when the screen came into view (favourites first): a star changes only
+  // its icon until the next visit. The Favourites tab keeps a meal unstarred on this visit, so it can be starred again.
+  const { ordered, starredAtVisit } = useVisitOrder(savedMeals);
+  const favMeals = ordered.filter((m) => isFavoriteMeal(m) || starredAtVisit.has(m.id));
+  // Favourites opens from memory only while it lists something (what this visit lists, so an unstar there never
+  // moves the tab); the Usual tab only exists for a meal with history: after switching to a meal without, fall back.
+  const tab: Tab = openingTab(pickedTab, rememberedTab, { usual: usuals.length > 0, favorites: favMeals.length + favorites.length > 0 });
+  // What is starred now (a food unstarred on this visit keeps its row, not its count).
+  const favCount = favorites.filter((f) => favoriteIds.includes(f.id)).length + savedMeals.filter(isFavoriteMeal).length;
+  // "Save lunch as a meal": the meal shown on this day, while it holds two foods or more that are not a saved meal yet.
+  const toSave = mealToSave(entries, meal, date, savedMeals);
   const mine = useMemo(() => [...customFoods].sort((a, b) => a.name.localeCompare(b.name)), [customFoods]);
 
   const q = query.trim();
@@ -141,6 +178,9 @@ export default function FoodSearchScreen() {
         kcalValue={e ? e.nutrients.kcal : portionKcal(food, p)}
         onPress={() => open(food)}
         onQuickAdd={() => quickAdd(food)}
+        // Press and hold stars it (or unstars it), with a toast and Undo; the row does not open.
+        onLongPress={() => toggleFoodFavorite(food)}
+        longPressLabel={favoriteActionLabel(favoriteIds.includes(food.id))}
         trailing={trailing}
         matched={matched}
         amount={
@@ -216,7 +256,7 @@ export default function FoodSearchScreen() {
           <ChipRow>
             {usuals.length ? <Chip testID="search-tab-usual" label="Usual" selected={tab === 'usual'} onPress={() => setTab('usual')} /> : null}
             <Chip testID="search-tab-recent" label="Recent" selected={tab === 'recent'} onPress={() => setTab('recent')} />
-            <Chip testID="search-tab-favorites" label={`Favourites${favorites.length ? ` ${favorites.length}` : ''}`} selected={tab === 'favorites'} onPress={() => setTab('favorites')} />
+            <Chip testID="search-tab-favorites" label={`Favourites${favCount ? ` ${favCount}` : ''}`} selected={tab === 'favorites'} onPress={() => setTab('favorites')} />
             {/* Saved meals move ahead of My foods once there are any, so the chip shows without scrolling the row. */}
             {savedMeals.length ? meals : null}
             <Chip testID="search-tab-mine" label={`My foods${mine.length ? ` ${mine.length}` : ''}`} selected={tab === 'mine'} onPress={() => setTab('mine')} />
@@ -238,14 +278,46 @@ export default function FoodSearchScreen() {
             )
           ) : null}
           {tab === 'favorites' ? (
-            favorites.length ? (
-              <List>{favorites.map((f, i) => row(f, `favorite-${i}`))}</List>
+            favMeals.length || favorites.length ? (
+              // Meals first, then foods; the two overlines only when both are there.
+              <View style={{ gap: spacing.lg }}>
+                {favMeals.length ? (
+                  <View style={{ gap: spacing.xs }}>
+                    {favorites.length ? (
+                      <Text variant="overline" color="textSecondary" testID="search-fav-meals-label">
+                        {FAVOURITE_GROUPS.meals}
+                      </Text>
+                    ) : null}
+                    <List>
+                      {favMeals.map((m, i) => (
+                        <SavedMealRow key={m.id} meal={m} testID={`favorite-meal-${i}`} onOpen={() => go('/food/meals')} onLog={() => setLogging(m)} />
+                      ))}
+                    </List>
+                  </View>
+                ) : null}
+                {favorites.length ? (
+                  <View style={{ gap: spacing.xs }}>
+                    {favMeals.length ? (
+                      <Text variant="overline" color="textSecondary" testID="search-fav-foods-label">
+                        {FAVOURITE_GROUPS.foods}
+                      </Text>
+                    ) : null}
+                    {/* Each food carries the meals' star, 12 px before its "+" (as Log), so both groups are unstarred the same way. */}
+                    <List>
+                      {favorites.map((f, i) => {
+                        const on = favoriteIds.includes(f.id);
+                        return row(
+                          f,
+                          `favorite-${i}`,
+                          <FavoriteStar testID={`favorite-${i}-favorite`} on={on} label={favoriteLabel(f.name, on)} onPress={() => toggleFoodFavorite(f)} style={{ marginRight: 4 }} />,
+                        );
+                      })}
+                    </List>
+                  </View>
+                ) : null}
+              </View>
             ) : (
-              <Hint
-                icon={<Star size={22} color={colors.textTertiary} />}
-                title="No favourites yet"
-                message="Open any food and tap the star to keep it here."
-              />
+              <Hint title={FAVOURITES_EMPTY.title} message={FAVOURITES_EMPTY.message} />
             )
           ) : null}
           {tab === 'mine' ? (
@@ -275,47 +347,12 @@ export default function FoodSearchScreen() {
           ) : null}
           {tab === 'meals' ? (
             <>
+            {toSave ? <SaveCurrentMealRow meal={meal} date={date} today={todayDate} entries={toSave} /> : null}
             {savedMeals.length ? (
               <List>
-                {savedMeals.map((m, i) => {
-                  const count = mealServings(m);
-                  // Each line as logging the meal adds it: a bundled food at today's values (currentValues).
-                  const total = sumNutrients(m.items.map(currentValues).map((it) => it.nutrients)).kcal / count;
-                  const approx = itemsRange(m.items) ? '~' : '';
-                  return (
-                    <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                      <PressableScale
-                        testID={`saved-meal-${i}`}
-                        onPress={() => go('/food/meals')}
-                        scaleTo={0.985}
-                        accessibilityLabel={`${m.name}, ${m.items.length} items. Open saved meals`}
-                        style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>
-                        <View style={{ width: 24, alignItems: 'center' }}>
-                          <Utensils size={19} color={colors.textSecondary} strokeWidth={1.9} />
-                        </View>
-                        <View style={{ flex: 1, minWidth: 0 }}>
-                          <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
-                            {isolateRtl(m.name)}
-                          </Text>
-                          <Text variant="caption" color="textSecondary" numberOfLines={1}>
-                            {count > 1
-                              ? `${approx}${kcal(total)} kcal per serving · makes ${formatPortion(count)}`
-                              : `${m.items.length} ${m.items.length === 1 ? 'item' : 'items'} · ${approx}${kcal(total)} kcal`}
-                          </Text>
-                        </View>
-                      </PressableScale>
-                      <Button
-                        testID={`saved-meal-${i}-log`}
-                        title="Log"
-                        size="sm"
-                        variant="secondary"
-                        full={false}
-                        style={{ alignSelf: 'center' }}
-                        onPress={() => setLogging(m)}
-                      />
-                    </View>
-                  );
-                })}
+                {ordered.map((m, i) => (
+                  <SavedMealRow key={m.id} meal={m} testID={`saved-meal-${i}`} onOpen={() => go('/food/meals')} onLog={() => setLogging(m)} />
+                ))}
               </List>
             ) : (
               <Hint title="No saved meals yet" message="Build a meal you eat often, or a recipe that makes several servings. You can also save a meal from the diary's meal menu." />

@@ -4,6 +4,9 @@
  * logFood (a new entry) and logItems (and through it copies, saved meals and the reminder's Repeat);
  * every Undo is carried by the store's cascade; edits recompute the water and never create or remove it.
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Toast = { message: string; opts?: { label?: string; onPress?: () => void } };
@@ -16,10 +19,10 @@ vi.mock('@/ui', () => ({
 import { BUILTIN_FOODS } from '@/data/foods';
 import { waterIdFromEntry } from '@/features/drinks/via';
 import { useStore } from '@/store';
-import type { Food, FoodEntry, Profile, SavedMeal, WaterEntry } from '@/types';
+import type { Food, FoodEntry, Profile, SavedMeal, SavedMealItem, WaterEntry } from '@/types';
 
 import { clearEntries, copyEntries, copyPreviousMeal, updateEntryDirect } from './actions';
-import { deleteEntry, logDrink, logFood, logItems, logSavedMeal, removeDrink, setEntryAmount, toSavedMealItem } from './log';
+import { deleteEntry, logAndSaveMeal, logDrink, logFood, logItems, logSavedMeal, removeDrink, setEntryAmount, toSavedMealItem } from './log';
 import { planDrink, selectFood } from '@/features/drinks/rules';
 
 const S = () => useStore.getState();
@@ -315,5 +318,96 @@ describe('logItems and what goes through it', () => {
     const before = liveWater().length;
     copyEntries([S().foodEntries[entry!.id]], TODAY);
     expect(liveWater().length).toBe(before);
+  });
+});
+
+describe('logAndSaveMeal (the AI review with "Also save as a meal" on)', () => {
+  const aiItem = (name: string, kcal: number, extra: Partial<SavedMealItem> = {}): SavedMealItem => ({
+    name,
+    emoji: '🍗',
+    servingLabel: '1 portion (150 g)',
+    quantity: 1,
+    grams: 150,
+    nutrients: { kcal, protein: 20, carbs: 10, fat: 5 },
+    food: { id: `ai_${name}`, name, source: 'ai', verified: false, per100g: { kcal, protein: 20, carbs: 10, fat: 5 }, servings: [{ label: '1 portion (150 g)', grams: 150 }] } as Food,
+    source: 'ai',
+    verified: false,
+    ...extra,
+  });
+  const items = (): SavedMealItem[] => [
+    aiItem('Grilled chicken', 248, { kcalRange: [200, 300], confidence: 0.7 }),
+    aiItem('Rice', 205, { kcalRange: [170, 240], confidence: 0.8 }),
+    // The fat answer's row (1 tsp oil), as rowsToLogItems writes it.
+    aiItem('Added fat', 40, { kcalRange: [30, 50], confidence: 0.5 }),
+  ];
+  const liveMeals = () => Object.values(S().savedMeals).filter((m) => !m.deleted);
+
+  it('writes the entries and one saved meal whose items are exactly what was logged', () => {
+    const { entries, saved } = logAndSaveMeal(items(), 'lunch', TODAY, '  Chicken   and rice ');
+    expect(entries).toHaveLength(3);
+    expect(liveEntries()).toHaveLength(3);
+    expect(liveMeals()).toHaveLength(1);
+    expect(saved).not.toBeNull();
+    expect(saved!.name).toBe('Chicken and rice');
+    expect(saved!.items).toEqual(entries.map((e) => toSavedMealItem(stored(e))));
+    expect(saved!.items[0]).toMatchObject({ source: 'ai', kcalRange: [200, 300], confidence: 0.7 });
+    expect(saved!.items.every((it) => it.kcalRange)).toBe(true);
+  });
+
+  it('one toast that names the meal; its Undo takes back the entries and the meal', () => {
+    toasts.length = 0;
+    const { saved } = logAndSaveMeal(items(), 'lunch', TODAY, 'Chicken and rice');
+    expect(toasts).toHaveLength(1);
+    expect(lastToast().message).toBe('3 items added to lunch, saved as "Chicken and rice"');
+    expect(lastToast().opts?.label).toBe('Undo');
+    undo();
+    expect(liveEntries()).toHaveLength(0);
+    expect(S().savedMeals[saved!.id].deleted).toBe(true);
+  });
+
+  it('another day says which; an empty name becomes "Saved meal"; nothing logged saves nothing', () => {
+    logAndSaveMeal(items().slice(0, 2), 'dinner', YESTERDAY, '   ');
+    expect(lastToast().message).toBe('2 items added to yesterday\'s dinner, saved as "Saved meal"');
+    const n = toasts.length;
+    expect(logAndSaveMeal([], 'lunch', TODAY, 'X')).toEqual({ entries: [], saved: null });
+    expect(toasts.length).toBe(n);
+    expect(liveMeals()).toHaveLength(1);
+  });
+
+  it('a row swapped for a bundled drink adds its water, said once; Undo takes the water too', () => {
+    const latte = food('b_latte');
+    const drink: SavedMealItem = { name: latte.name, servingLabel: '1 g', quantity: 240, grams: 240, nutrients: { kcal: 130, protein: 8, carbs: 12, fat: 5 }, food: latte, source: 'builtin', verified: true, kcalRange: [110, 150], confidence: 0.6 };
+    logAndSaveMeal([items()[0], drink], 'breakfast', TODAY, 'Chicken and latte');
+    expect(lastToast().message).toBe('2 items added to breakfast, meal saved, 240 ml to Water');
+    expect(liveWater()).toHaveLength(1);
+    undo();
+    expect(liveWater()).toHaveLength(0);
+  });
+
+  it('logging the saved estimate again keeps it an estimate (its range on every entry)', () => {
+    const { saved } = logAndSaveMeal(items(), 'lunch', YESTERDAY, 'Chicken and rice');
+    const again = logSavedMeal(S().savedMeals[saved!.id], 'lunch', TODAY);
+    expect(again).toHaveLength(3);
+    expect(again.every((e) => Array.isArray(e.kcalRange))).toBe(true);
+    expect(lastToast().message).toBe('Chicken and rice added to lunch');
+  });
+
+  it('this file reaches no AI service, directly or through its imports: saving and logging a saved estimate use no allowance', () => {
+    const map = new Map<string, string[]>();
+    for (const line of readFileSync(resolve(__dirname, '../../../docs/code-map/imports.tsv'), 'utf8').split('\n')) {
+      const [file, ...deps] = line.split('\t');
+      if (file) map.set(file, deps.filter(Boolean));
+    }
+    expect(map.get('src/features/food/log.ts')?.length).toBeGreaterThan(0);
+    const seen = new Set<string>();
+    const todo = ['src/features/food/log.ts'];
+    while (todo.length) {
+      const f = todo.pop()!;
+      if (seen.has(f)) continue;
+      seen.add(f);
+      todo.push(...(map.get(f) ?? []));
+    }
+    expect(seen.has('src/services/aiFood.ts')).toBe(false);
+    expect(seen.has('src/features/ai/api.ts')).toBe(false);
   });
 });

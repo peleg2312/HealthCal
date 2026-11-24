@@ -202,6 +202,72 @@ async function device(browser, seedJson) {
   await A.shot('backend-ai-photo-weight');
   check('the review says the weighed total was used', (await A.has('ai-weight-used')) && (await A.page.getByText('Made with your weighed total, 418 g').count()) > 0);
 
+  // ------------------------------------- a live estimate saved as a meal, then logged again (src/features/food/log.ts)
+  // "Also save as a meal" on a live estimate logs and saves in one act; the saved meal syncs like any saved meal. Logging
+  // it again, from /food/meals and from the + sheet's tile, runs on the phone: no request reaches analyze-food, and the
+  // next estimate's allowance is exactly one below the one before (the stand-in counts every use).
+  {
+    const leftOf = async () => Number(((await A.has('ai-remaining')) ? await A.text('ai-remaining') : '').match(/^(\d+)/)?.[1] ?? NaN);
+    await A.go('/food/photo?mode=text&meal=dinner');
+    await A.fill('ai-description', 'eggs on toast for the saved meal');
+    await A.tap('ai-analyse');
+    await A.page.waitForSelector('[data-testid="ai-add-to-diary"]', { timeout: 20000 }).catch(() => {});
+    const left1 = await leftOf();
+    check('save live: the live review offers "Also save as a meal", off', (await A.has('ai-save-meal')) && (await A.page.getByTestId('ai-save-meal').first().getAttribute('aria-checked')) === 'false');
+    await A.tap('ai-save-meal');
+    const offered = await A.page.getByTestId('ai-save-meal-name').first().inputValue().catch(() => '');
+    check('save live: the name offered is the dish the AI named', offered === 'Eggs on toast', offered);
+    await A.fill('ai-save-meal-name', 'Saved live estimate');
+    await A.tap('ai-add-to-diary');
+    await A.page.waitForTimeout(1200);
+    const st = await A.state();
+    const meal = Object.values(st.savedMeals).find((m) => !m.deleted && m.name === 'Saved live estimate');
+    check(
+      'save live: one tap logged the estimate and saved it, each item an AI estimate with its range',
+      !!meal && meal.items.length >= 2 && meal.items.every((it) => it.source === 'ai' && Array.isArray(it.kcalRange)),
+      meal ? `${meal.items.length} items` : 'no saved meal',
+    );
+    const requestsBefore = (await server()).aiRequests.length;
+    const sent = [];
+    const watch = (r) => /analyze-food/.test(r.url()) && r.method() === 'POST' && sent.push(r.url());
+    A.page.on('request', watch);
+    // From /food/meals.
+    await A.go('/food/meals?meal=snack');
+    const cards = await A.page.locator('[data-testid^="saved-meal-card-"]').allInnerTexts();
+    const i = cards.findIndex((t) => t.includes('Saved live estimate'));
+    const entriesBefore = new Set(Object.keys((await A.state()).foodEntries));
+    if (i >= 0) {
+      await A.tap(`saved-meal-log-${i}`);
+      await A.tap('log-meal-confirm');
+      await A.page.waitForTimeout(800);
+    }
+    const fromMeals = Object.values((await A.state()).foodEntries).filter((e) => !e.deleted && !entriesBefore.has(e.id));
+    check('save live: logged again from /food/meals, still an estimate', i >= 0 && fromMeals.length === meal?.items.length && fromMeals.every((e) => Array.isArray(e.kcalRange)), `${fromMeals.length} entries`);
+    // From the + sheet's tile (the saved meal changed last).
+    await A.go('/');
+    await A.tap('tab-add');
+    const tile = (await A.has('quick-usual-saved')) ? await A.text('quick-usual-saved') : '';
+    const before2 = new Set(Object.keys((await A.state()).foodEntries));
+    if (tile.includes('Saved live estimate')) await A.tap('quick-usual-saved');
+    await A.page.waitForTimeout(800);
+    const fromTile = Object.values((await A.state()).foodEntries).filter((e) => !e.deleted && !before2.has(e.id));
+    check('save live: the + sheet tile names it with "~" and one tap logs it as an estimate', tile.includes('Saved live estimate') && /~\s?[\d,]+/.test(tile) && fromTile.length === meal?.items.length && fromTile.every((e) => Array.isArray(e.kcalRange)), tile.replace(/\n/g, ' | '));
+    A.page.off('request', watch);
+    check('save live: no request reached analyze-food while saving and logging the saved meal', sent.length === 0 && (await server()).aiRequests.length === requestsBefore, `${sent.length} sent, server ${(await server()).aiRequests.length - requestsBefore} new`);
+    // The next estimate is exactly one use later: the stand-in's count did not move in between.
+    await A.go('/food/photo?mode=text&meal=dinner');
+    await A.fill('ai-description', 'eggs on toast once more');
+    await A.tap('ai-analyse');
+    await A.page.waitForSelector('[data-testid="ai-add-to-diary"]', { timeout: 20000 }).catch(() => {});
+    const left2 = await leftOf();
+    check('save live: the allowance moved by the one new estimate only', Number.isFinite(left1) && left2 === left1 - 1, `${left1} then ${left2}`);
+    // The saved meal reaches the account like any saved meal.
+    await A.go('/settings/account');
+    await A.tap('account-sync-now');
+    await A.page.waitForTimeout(2500);
+    check('save live: the saved meal is backed up to the account', (await server()).records.some((r) => r.collection === 'savedMeals' && r.id === meal?.id && r.data?.name === 'Saved live estimate'));
+  }
+
   // ------------------------------------------------------------ sign out
   await B.go('/settings/account');
   await B.tap('account-sign-out');

@@ -16,6 +16,7 @@ import { haptic, toast } from '@/ui';
 
 import { mealOnDay } from './addedTo';
 import { bandSpread, buildEntry, planSavedMeal } from './build';
+import { addedAndSavedToast } from './saveWords';
 import { currentValues } from './usuals';
 
 export { buildEntry } from './build';
@@ -208,6 +209,39 @@ export function logItems(items: (SavedMealItem | FoodEntry)[], meal: MealType, d
     entries.map((e) => e.id),
   );
   return entries;
+}
+
+/**
+ * Log items and save them as one saved meal in one act (the AI review's "Also save as a meal"): one
+ * toast that names the meal ("4 items added to lunch, saved as "Chicken and rice""), one Undo that
+ * takes back the entries (and, by the store's cascade, any water a drink among them added) and the
+ * saved meal. The meal's items are the entries just written (`toSavedMealItem`), so what is saved is
+ * exactly what was logged: each AI row with its source, `kcalRange` and `confidence`, the fat answer's
+ * row and any swap or correction. Nothing is saved when nothing was logged.
+ *
+ * It runs on the phone only: it never calls the AI and uses no estimate allowance, and neither does
+ * logging the saved meal later (`logSavedMeal`). This file imports no AI service (log.test.ts reads
+ * the code map to hold that).
+ *
+ * `windowWidth` is the window's width when the person tapped (read in the screen's handler), so the
+ * toast keeps as much of the name as two lines hold on that phone (`addedAndSavedToast`).
+ */
+export function logAndSaveMeal(items: SavedMealItem[], meal: MealType, date: ISODate, name: string, windowWidth?: number): { entries: FoodEntry[]; saved: SavedMeal | null } {
+  const { entries, ml } = addItems(items, meal, date);
+  if (entries.length === 0) return { entries, saved: null };
+  const store = useStore.getState();
+  const saved = store.upsert('savedMeals', { name: name.replace(/\s+/g, ' ').trim().slice(0, 60).trim() || 'Saved meal', items: entries.map(toSavedMealItem) });
+  const ids = entries.map((e) => e.id);
+  haptic.success();
+  toast(addedAndSavedToast({ count: entries.length, where: where(meal, date), name: saved.name, ml, units: unitsNow(), width: windowWidth }), {
+    label: 'Undo',
+    onPress: () => {
+      const s = useStore.getState();
+      ids.forEach((id) => s.remove('foodEntries', id));
+      s.remove('savedMeals', saved.id);
+    },
+  });
+  return { entries, saved };
 }
 
 /**

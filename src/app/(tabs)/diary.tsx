@@ -6,6 +6,8 @@ import { type ScrollView, type ScrollViewProps, View } from 'react-native';
 import { copyPreviousDay, copyPreviousMeal, findPreviousDay, findPreviousMeal } from '@/features/food/actions';
 import { DaySummaryCard, MealCard, MealMenuSheet } from '@/features/food/DiaryParts';
 import { dayPhrase, href, kcal, param, parseDate } from '@/features/food/helpers';
+import { markSaveHintDone, saveHintAllowed, saveHintMeal, useSaveHintDone } from '@/features/food/saveHint';
+import { SaveMealSheet } from '@/features/food/SaveMealSheet';
 import { currentKcal } from '@/features/food/usuals';
 import { TabHeader, tabDay } from '@/components/TabHeader';
 import { ShareDayButton } from '@/features/share';
@@ -84,6 +86,25 @@ export default function DiaryScreen() {
   const isToday = date === t;
   const empty = day.entries.length === 0;
 
+  // The one-time "Save lunch as a meal" hint (src/features/food/saveHint.ts): on one card at most,
+  // preferring the meal the diary was opened for (`?meal=`, kept here for the day after the param is
+  // dropped), never for a meal that already is a saved meal.
+  const [askedFor, setAskedFor] = useState<{ date: ISODate; meal: MealType } | null>(null);
+  if (targetMeal && (askedFor?.date !== date || askedFor.meal !== targetMeal)) setAskedFor({ date, meal: targetMeal });
+  const savedMeals = useLive('savedMeals');
+  const hintDone = useSaveHintDone();
+  const hintMeal = saveHintMeal(
+    MEALS.map((m) => ({ meal: m.id, entries: day.byMeal[m.id] })),
+    { done: hintDone, allowed: saveHintAllowed(), saved: savedMeals, prefer: askedFor?.date === date ? askedFor.meal : null },
+  );
+  // The save sheet the hint opens; the meal it was opened for is kept while the sheet slides away.
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [saveFor, setSaveFor] = useState<MealType>('lunch');
+  const openSave = (m: MealType) => {
+    setSaveFor(m);
+    setSaveOpen(true);
+  };
+
   return (
     <Screen tabs testID="diary-screen" scrollProps={{ ref: scrollRef } as ScrollViewProps} header={<TabHeader tab="diary" overline={tabDay(date)} title="Food diary" />}>
       <View testID="diary-swipe" {...swipe} style={{ gap: spacing.lg }}>
@@ -138,6 +159,7 @@ export default function DiaryScreen() {
             previous={previousByMeal[m.id]}
             onMenu={() => setMenuMeal(m.id)}
             onRepeat={() => copyPreviousMeal(date, m.id)}
+            hint={hintMeal === m.id ? { onSave: () => openSave(m.id), onClose: markSaveHintDone } : null}
           />
         </View>
       ))}
@@ -150,6 +172,7 @@ export default function DiaryScreen() {
         onClose={() => setMenuMeal(null)}
         onRepeat={() => menuMeal && copyPreviousMeal(date, menuMeal)}
       />
+      <SaveMealSheet visible={saveOpen} meal={saveFor} date={date} entries={day.byMeal[saveFor]} onClose={() => setSaveOpen(false)} />
       </View>
     </Screen>
   );

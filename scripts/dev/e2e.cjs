@@ -1607,6 +1607,650 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     await lctx.close();
   }
 
+  // ------------------------------------------- saving meals: from the AI review and from the diary (builder one)
+  // (src/features/ai/SaveMealRow.tsx, logAndSaveMeal in src/features/food/log.ts, src/features/food/saveHint.ts,
+  // SaveMealSheet.tsx.) Each part in a fresh seeded demo context at 360 x 740, so no step leans on another's data.
+  // The review's "Also save as a meal" is off on every visit; on, its name follows the dish and the button says
+  // "Add to lunch and save"; the name field in the footer rides above the faked keyboard; one tap logs and saves
+  // exactly what was logged (ranges, confidence and source kept) with one toast that names the meal, whose Undo
+  // takes back both. The saved estimate is logged again from /food/meals as an estimate, with no request to the
+  // AI (the stand-in backend's allowance is proven unchanged in e2e-backend.cjs). The sample offers no switch.
+  // The diary's one-time hint: on one card, opens the save sheet, gone for good after a save or "Not now", never in
+  // an automated browser that did not ask. A long press on a diary row stars its food, with Undo, and never opens it.
+  {
+    const { buildSeed } = await import(require('url').pathToFileURL(require('path').join(__dirname, 'seed.mjs')).href);
+    const seed = JSON.stringify(buildSeed({ onboarded: true, theme: 'dark' }));
+    const now = new Date();
+    const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const open = async ({ hint = false } = {}) => {
+      const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, colorScheme: 'dark', reducedMotion: 'reduce' });
+      await ctx.addInitScript(
+        ([value, hint]) => {
+          if (!window.sessionStorage.getItem('__seeded')) {
+            window.localStorage.setItem('healthcal-v1', value);
+            window.sessionStorage.setItem('__seeded', '1');
+          }
+          if (hint) window.__healthcalSaveHint = true;
+          const fake = new EventTarget();
+          let kb = 0;
+          const num = (get) => ({ configurable: true, get });
+          Object.defineProperties(fake, {
+            height: num(() => window.innerHeight - kb), width: num(() => window.innerWidth), offsetTop: num(() => 0), offsetLeft: num(() => 0),
+            pageTop: num(() => window.scrollY), pageLeft: num(() => window.scrollX), scale: num(() => 1),
+          });
+          Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => fake });
+          window.__keyboard = (h) => { kb = h; fake.dispatchEvent(new Event('resize')); };
+        },
+        [seed, hint],
+      );
+      const p = await ctx.newPage();
+      const requests = [];
+      p.on('request', (r) => requests.push(r.url()));
+      p.on('pageerror', (e) => errors.push(e.message));
+      p.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 200)));
+      return { ctx, p, requests };
+    };
+    const ptext = async (p, id) => (await p.getByTestId(id).first().innerText({ timeout: 15000 })).replace(/ /g, ' ').replace(/[⁠‎⁨⁩]/g, '').trim();
+    const pstate = (p) => p.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())));
+    const liveOf = (map) => Object.values(map).filter((r) => !r.deleted);
+    const ptap = async (p, id) => {
+      await p.getByTestId(id).first().click({ timeout: 15000 });
+      await p.waitForTimeout(350);
+    };
+    const review = async (p) => {
+      await p.goto(`${BASE}/food/photo?mode=text&meal=lunch&demoLive=1`, { waitUntil: 'networkidle' });
+      await p.getByTestId('ai-description').first().fill('Chicken, rice and salad', { timeout: 20000 });
+      await ptap(p, 'ai-analyse');
+      await p.getByTestId('ai-add-to-diary').first().waitFor({ timeout: 15000 });
+      await p.waitForTimeout(300);
+    };
+    const switchOn = async (p) => (await p.getByTestId('ai-save-meal').first().getAttribute('aria-checked')) === 'true';
+    const pick = (e) => ({ name: e.name, grams: e.grams, quantity: e.quantity, servingLabel: e.servingLabel, nutrients: e.nutrients, kcalRange: e.kcalRange ?? null, confidence: e.confidence ?? null, source: e.source });
+
+    // 1. The review: off, on, the name and the button, the field above the faked keyboard, one act, its Undo.
+    {
+      const { ctx, p } = await open();
+      await review(p);
+      check('save meals: the review offers "Also save as a meal", off, with no name field', (await p.getByTestId('ai-save-meal').count()) === 1 && !(await switchOn(p)) && (await p.getByTestId('ai-save-meal-name').count()) === 0 && (await ptext(p, 'ai-add-to-diary')) === 'Add to lunch');
+      // The footer's geometry: the field and the switch, the footer, the first item's name (scrolled to the top).
+      const footerGeo = () =>
+        p.evaluate(() => {
+          const vis = (sel) => [...document.querySelectorAll(sel)].find((e) => e.getBoundingClientRect().height > 0);
+          const box = (sel) => {
+            const r = vis(sel)?.getBoundingClientRect();
+            return r ? { top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height } : null;
+          };
+          return { footer: box('[data-testid="screen-footer"]'), field: box('[data-testid="ai-save-meal-name"]'), toggle: box('[data-testid="ai-save-meal"]'), words: box('[data-testid="ai-save-meal-words"]'), item: box('[data-testid="ai-item-0-name"]'), vh: window.innerHeight };
+        });
+      const offGeo = await footerGeo();
+      // The words beside the switch take a finger's tap too (ai-save-meal-words).
+      await ptap(p, 'ai-save-meal-words');
+      const onGeo = await footerGeo();
+      const oneRow = (g) => !!g.field && !!g.toggle && !g.words && Math.abs((g.field.top + g.field.bottom) / 2 - (g.toggle.top + g.toggle.bottom) / 2) <= 2 && g.field.right < g.toggle.left;
+      check(
+        'save meals: a tap on the words turns it on; the name field and the switch share one row (field left, switch right), the footer only a field taller than the row it replaced',
+        (await switchOn(p)) && !!offGeo.words && oneRow(onGeo) && onGeo.footer.height - offGeo.footer.height <= 50 - 36 + 1,
+        `footer ${Math.round(offGeo.footer?.height)} -> ${Math.round(onGeo.footer?.height)}, field ${JSON.stringify(onGeo.field && [Math.round(onGeo.field.left), Math.round(onGeo.field.top), Math.round(onGeo.field.right)])}, switch ${JSON.stringify(onGeo.toggle && [Math.round(onGeo.toggle.left), Math.round(onGeo.toggle.top)])}`,
+      );
+      check('save meals: with it on, the first item is in view above the footer at 360 x 740', !!onGeo.item && onGeo.item.top >= 0 && onGeo.item.bottom <= onGeo.footer.top, `item ${Math.round(onGeo.item?.top)}-${Math.round(onGeo.item?.bottom)}, footer top ${Math.round(onGeo.footer.top)}`);
+      // At 320 x 640 the review's own cards (the total, the oil question with its chips on two lines) already
+      // reach below where even a button-only footer starts, so the first item is a scroll away whatever the
+      // footer does: what the switch may cost there is the same one row, no taller than at 360.
+      await p.setViewportSize({ width: 320, height: 640 });
+      await p.waitForTimeout(400);
+      const small = await footerGeo();
+      await ptap(p, 'ai-save-meal');
+      const smallOff = await footerGeo();
+      await ptap(p, 'ai-save-meal');
+      check(
+        'save meals: at 320 x 640 still one row, and the switch adds no more to the footer than at 360',
+        oneRow(small) && !!smallOff.words && small.footer.height - smallOff.footer.height <= 50 - 36 + 1 && Math.abs(small.footer.height - onGeo.footer.height) <= 1,
+        `footer ${Math.round(smallOff.footer?.height)} -> ${Math.round(small.footer?.height)} (360: ${Math.round(onGeo.footer.height)}), first item at ${Math.round(small.item?.top)}, footer top ${Math.round(small.footer?.top)}`,
+      );
+      await p.setViewportSize({ width: 360, height: 740 });
+      await p.waitForTimeout(400);
+      const dish = await ptext(p, 'ai-dish');
+      const offered = await p.getByTestId('ai-save-meal-name').first().inputValue({ timeout: 10000 }).catch(() => '');
+      check('save meals: on, the name offered is the dish and the button says "Add to lunch and save"', (await switchOn(p)) && offered === dish && (await ptext(p, 'ai-add-to-diary')) === 'Add to lunch and save', `"${offered}" / "${dish}"`);
+      // The name field sits in the footer: with the faked keyboard up, the footer rides on it and the field is in view.
+      const field = await p.getByTestId('ai-save-meal-name').first().boundingBox();
+      await p.touchscreen.tap(field.x + field.width / 2, field.y + field.height / 2);
+      await p.evaluate(() => window.__keyboard(320));
+      await p.waitForTimeout(400);
+      const kb = await p.evaluate(() => {
+        const vis = (sel) => [...document.querySelectorAll(sel)].find((e) => e.getBoundingClientRect().height > 0);
+        const f = vis('[data-testid="screen-footer"]').getBoundingClientRect();
+        const i = vis('[data-testid="ai-save-meal-name"]').getBoundingClientRect();
+        return { visible: window.visualViewport.height, footerBottom: f.bottom, fieldTop: i.top, fieldBottom: i.bottom, focused: document.activeElement?.getAttribute('data-testid') };
+      });
+      check('save meals: keyboard (faked, 320 px): the footer with the name field sits on it, the field in view', Math.abs(kb.footerBottom - kb.visible) <= 1 && kb.fieldTop >= 0 && kb.fieldBottom <= kb.visible && kb.focused === 'ai-save-meal-name', `visible ${Math.round(kb.visible)}, footer bottom ${Math.round(kb.footerBottom)}, field ${Math.round(kb.fieldTop)}-${Math.round(kb.fieldBottom)}, focus ${kb.focused}`);
+      await p.evaluate(() => window.__keyboard(0));
+      await p.getByTestId('ai-save-meal-name').first().fill('My chicken lunch');
+      // Off and on again keeps the typed name.
+      await ptap(p, 'ai-save-meal');
+      await ptap(p, 'ai-save-meal');
+      check('save meals: the switch off and on again keeps the typed name', (await p.getByTestId('ai-save-meal-name').first().inputValue()) === 'My chicken lunch');
+      const before = await pstate(p);
+      const entriesBefore = new Set(Object.keys(before.foodEntries));
+      const mealsBefore = new Set(liveOf(before.savedMeals).map((m) => m.id));
+      await ptap(p, 'ai-add-to-diary');
+      await p.waitForTimeout(600);
+      const after = await pstate(p);
+      const added = liveOf(after.foodEntries).filter((e) => !entriesBefore.has(e.id));
+      const saved = liveOf(after.savedMeals).filter((m) => !mealsBefore.has(m.id));
+      const sorted = (list) => list.map((x) => JSON.stringify(pick(x))).sort();
+      const same = saved.length === 1 && JSON.stringify(sorted(saved[0].items)) === JSON.stringify(sorted(added));
+      check('save meals: one tap logs the estimate to lunch and saves exactly that as "My chicken lunch"', added.length >= 3 && added.every((e) => e.meal === 'lunch' && e.date === todayIso && Array.isArray(e.kcalRange)) && saved.length === 1 && saved[0].name === 'My chicken lunch' && same, `${added.length} entries, ${saved.length} meal(s)`);
+      check('save meals: the saved items keep the AI source, range and confidence', saved.length === 1 && saved[0].items.every((it) => Array.isArray(it.kcalRange) && typeof it.confidence === 'number') && saved[0].items.some((it) => it.source === 'ai'));
+      const toastText = (await ptext(p, 'toast').catch(() => '')).replace(/\s*Undo$/, '');
+      check('save meals: one toast names the meal', toastText === `${added.length} items added to lunch, saved as "My chicken lunch"`, toastText);
+      await ptap(p, 'toast-action');
+      const undone = await pstate(p);
+      check('save meals: its Undo takes back the entries and the saved meal', added.every((e) => undone.foodEntries[e.id].deleted) && saved.every((m) => undone.savedMeals[m.id].deleted));
+      // A new visit: the switch is off again (never remembered).
+      await review(p);
+      check('save meals: the switch is off again on the next visit', !(await switchOn(p)));
+      await ctx.close();
+    }
+
+    // 1b. The toast always names the meal, as much of it as two lines hold at the window's width: yesterday's
+    // breakfast, no water, a 27-letter Hebrew name, at 320 px (shortened at a word with "…") and at 360 px (more of it).
+    let shown320 = 0;
+    for (const width of [320, 360]) {
+      const { ctx, p } = await open();
+      await p.setViewportSize({ width, height: 740 });
+      const y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      const ydayIso = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
+      await p.goto(`${BASE}/food/photo?mode=text&meal=breakfast&date=${ydayIso}&demoLive=1`, { waitUntil: 'networkidle' });
+      await p.getByTestId('ai-description').first().fill('Shakshuka with two eggs and bread', { timeout: 20000 });
+      await ptap(p, 'ai-analyse');
+      await p.getByTestId('ai-add-to-diary').first().waitFor({ timeout: 15000 });
+      await ptap(p, 'ai-save-meal');
+      const hebrew = 'שקשוקה של שבת בבוקר עם לחם וטחינה';
+      await p.getByTestId('ai-save-meal-name').first().fill(hebrew);
+      await ptap(p, 'ai-add-to-diary');
+      await p.getByTestId('toast').first().waitFor({ timeout: 10000 });
+      await p.waitForTimeout(300);
+      const msg = (await ptext(p, 'toast')).replace(/\s*Undo$/, '');
+      // The toast is its 13 + 11 px padding around 18 px lines (Toast.tsx): two lines are 60 px.
+      const lines = await p.evaluate(() => {
+        const t = [...document.querySelectorAll('[data-testid="toast"]')].find((e) => e.getBoundingClientRect().height > 0);
+        return t ? Math.round((t.getBoundingClientRect().height - 24) / 18) : 0;
+      });
+      const shown = (msg.match(/saved as "([^"]*)"/) || [])[1] || '';
+      const letters = shown.replace(/[^\p{L}]/gu, '');
+      check(
+        `save meals: the toast names the meal at ${width} px (yesterday's breakfast, a 27-letter Hebrew name): shortened at a word with "…", in two lines`,
+        /^\d+ items? added to yesterday's breakfast, saved as "/.test(msg) && letters.length >= 4 && hebrew.replace(/\s+/g, ' ').startsWith(shown.replace(/…$/, '')) && lines > 0 && lines <= 2,
+        `"${msg}" (${lines} lines)`,
+      );
+      if (width === 320) shown320 = letters.length;
+      else check('save meals: at 360 px the toast keeps more of the name than at 320 px', letters.length > shown320, `${shown320} then ${letters.length} letters`);
+      await ctx.close();
+    }
+
+    // 2. The saved estimate logged again from /food/meals is still an estimate, and nothing is asked of the AI.
+    {
+      const { ctx, p, requests } = await open();
+      await review(p);
+      await ptap(p, 'ai-save-meal');
+      await p.getByTestId('ai-save-meal-name').first().fill('Estimate to repeat');
+      await ptap(p, 'ai-add-to-diary');
+      await p.waitForTimeout(600);
+      await p.goto(`${BASE}/food/meals?meal=dinner`, { waitUntil: 'networkidle' });
+      await p.getByTestId('saved-meal-card-0').first().waitFor({ timeout: 15000 });
+      const cards = await p.locator('[data-testid^="saved-meal-card-"]').allInnerTexts();
+      const i = cards.findIndex((t) => t.replace(/[⁠‎⁨⁩]/g, '').includes('Estimate to repeat'));
+      check('save meals: the saved estimate is on /food/meals, its total with "~"', i >= 0 && /~\s?[\d,]+/.test(cards[i] || ''), (cards[i] || '').split('\n').slice(0, 3).join(' | '));
+      const before = new Set(Object.keys((await pstate(p)).foodEntries));
+      if (i >= 0) {
+        await ptap(p, `saved-meal-log-${i}`);
+        await ptap(p, 'log-meal-confirm');
+        await p.waitForTimeout(500);
+      }
+      const again = liveOf((await pstate(p)).foodEntries).filter((e) => !before.has(e.id));
+      check('save meals: logged again (dinner), every line is still an estimate with its range', again.length >= 3 && again.every((e) => e.meal === 'dinner' && Array.isArray(e.kcalRange)), `${again.length} entries`);
+      check('save meals: no request went to the AI while saving and logging the saved estimate', !requests.some((u) => /analyze-food/.test(u)));
+      await ctx.close();
+    }
+
+    // 3. The sample (no account) offers no switch.
+    {
+      const { ctx, p } = await open();
+      await p.goto(`${BASE}/food/photo?mode=text&meal=lunch`, { waitUntil: 'networkidle' });
+      await p.getByTestId('ai-description').first().fill('Chicken, rice and salad', { timeout: 20000 });
+      await ptap(p, 'ai-analyse');
+      await p.getByTestId('ai-add-to-diary').first().waitFor({ timeout: 15000 });
+      check('save meals: the sample offers no "Also save as a meal"', (await p.getByTestId('ai-save-meal').count()) === 0 && (await ptext(p, 'ai-add-to-diary')) === 'Add sample to lunch');
+      await ctx.close();
+    }
+
+    // 4. The diary's one-time hint.
+    {
+      const plain = await open();
+      await plain.p.goto(`${BASE}/diary`, { waitUntil: 'networkidle' });
+      await plain.p.getByTestId('meal-card-breakfast').first().waitFor({ timeout: 20000 });
+      await plain.p.waitForTimeout(800);
+      check('save hint: an automated browser that did not ask never sees it', (await plain.p.getByTestId('diary-save-hint').count()) === 0);
+      await plain.ctx.close();
+
+      const { ctx, p } = await open({ hint: true });
+      await p.goto(`${BASE}/diary`, { waitUntil: 'networkidle' });
+      const shown = await p.getByTestId('diary-save-hint').first().waitFor({ timeout: 15000 }).then(() => true, () => false);
+      const where = await p.evaluate(() => {
+        const hints = [...document.querySelectorAll('[data-testid="diary-save-hint"]')];
+        return { count: hints.length, card: hints[0]?.closest('[data-testid^="meal-card-"]')?.getAttribute('data-testid') ?? null };
+      });
+      const st = await pstate(p);
+      const meals = ['breakfast', 'lunch', 'dinner', 'snack'];
+      const want = meals.find((m) => liveOf(st.foodEntries).filter((e) => e.date === todayIso && e.meal === m && e.via !== 'water').length >= 2);
+      check('save hint: on exactly one card, the first meal with two foods', shown && where.count === 1 && where.card === `meal-card-${want}`, `${where.card} (want meal-card-${want})`);
+      check('save hint: it says "Save <meal> as a meal" and offers "Not now"', (await ptext(p, 'diary-save-hint')) === `Save ${want} as a meal` && (await ptext(p, 'diary-save-hint-close')) === 'Not now');
+      const mealsBefore = liveOf(st.savedMeals).length;
+      await ptap(p, 'diary-save-hint');
+      const name = await p.getByTestId('save-meal-name').first().inputValue({ timeout: 10000 }).catch(() => '');
+      const sheetLine = await ptext(p, 'save-meal-line').catch(() => '');
+      // The demo's first meal of two foods has three: the name offered is those foods, so they are not written again in bold.
+      const foodsShown = await p.getByTestId('save-meal-foods').count();
+      check(
+        'save hint: a tap opens the save sheet with a name offered, its line honest ("Find it any time in Saved meals."), the foods not repeated in bold over the same name',
+        name.length > 0 && /^\d+ items? · ~?[\d,]+ kcal\. Find it any time in Saved meals\.$/.test(sheetLine) && (foodsShown === 0 || (await ptext(p, 'save-meal-foods')) !== name) && (/^My /.test(name) || foodsShown === 0),
+        `"${name}" | "${sheetLine}" | bold foods line ${foodsShown}`,
+      );
+      await ptap(p, 'save-meal-confirm');
+      await p.waitForTimeout(500);
+      check('save hint: Save meal keeps it as a saved meal and the hint is gone', liveOf((await pstate(p)).savedMeals).length === mealsBefore + 1 && (await p.getByTestId('diary-save-hint').count()) === 0);
+      await p.reload({ waitUntil: 'networkidle' });
+      await p.getByTestId('meal-card-breakfast').first().waitFor({ timeout: 20000 });
+      await p.waitForTimeout(800);
+      check('save hint: still gone after a restart', (await p.getByTestId('diary-save-hint').count()) === 0);
+      await ctx.close();
+
+      const second = await open({ hint: true });
+      await second.p.goto(`${BASE}/diary`, { waitUntil: 'networkidle' });
+      await second.p.getByTestId('diary-save-hint').first().waitFor({ timeout: 15000 });
+      const savedBefore = liveOf((await pstate(second.p)).savedMeals).length;
+      await ptap(second.p, 'diary-save-hint-close');
+      const gone = (await second.p.getByTestId('diary-save-hint').count()) === 0;
+      await second.p.reload({ waitUntil: 'networkidle' });
+      await second.p.getByTestId('meal-card-breakfast').first().waitFor({ timeout: 20000 });
+      await second.p.waitForTimeout(800);
+      check('save hint: "Not now" hides it for good and saves nothing', gone && (await second.p.getByTestId('diary-save-hint').count()) === 0 && liveOf((await pstate(second.p)).savedMeals).length === savedBefore);
+      await second.ctx.close();
+    }
+
+    // 5. A long press on a diary row stars its food (a real touch held 800 ms), never opens the row; Undo.
+    {
+      const { ctx, p } = await open();
+      await p.goto(`${BASE}/diary`, { waitUntil: 'networkidle' });
+      await p.locator('[data-testid^="entry-delete-"]').first().waitFor({ timeout: 20000 });
+      // The first row whose food is not a favourite yet.
+      const st0 = await pstate(p);
+      const starred0 = new Set(liveOf(st0.favorites).map((f) => f.food.id));
+      const ids = await p.locator('[data-testid^="entry-delete-"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid').slice('entry-delete-'.length)));
+      const id = ids.find((i) => st0.foodEntries[i]?.food && !starred0.has(st0.foodEntries[i].food.id));
+      const entry = st0.foodEntries[id];
+      const row = p.getByTestId(`entry-${id}`).first();
+      await row.scrollIntoViewIfNeeded();
+      const box = await row.boundingBox();
+      const cdp = await ctx.newCDPSession(p);
+      const x = box.x + box.width / 2;
+      const y = box.y + box.height / 2;
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      await p.waitForTimeout(800);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await p.waitForTimeout(600);
+      const favs = liveOf((await pstate(p)).favorites).map((f) => f.food.id);
+      const msg = (await ptext(p, 'toast').catch(() => '')).replace(/\s*Undo$/, '');
+      const selected = await p.evaluate(() => String(window.getSelection?.() ?? ''));
+      check(
+        'long press: a diary row stars its food with a toast, stays on the diary and selects no text',
+        !!entry?.food && favs.includes(entry.food.id) && msg === `Added to favourites: ${entry.food.name}` && new URL(p.url()).pathname === '/diary' && selected === '',
+        `${msg} | ${new URL(p.url()).pathname} | selection "${selected.slice(0, 30)}"`,
+      );
+      await ptap(p, 'toast-action');
+      check('long press: Undo takes the star back', !liveOf((await pstate(p)).favorites).some((f) => f.food.id === entry?.food?.id));
+
+      // A quick add has no food: a press and hold on it does nothing at all (it never ends as a tap that opens the row).
+      const quickId = await p.evaluate((date) => {
+        const rec = window.__healthcal.getState().upsert('foodEntries', {
+          date,
+          meal: 'snack',
+          name: 'Office cake',
+          emoji: '⚡',
+          source: 'quick',
+          verified: false,
+          servingLabel: '1 serving',
+          quantity: 1,
+          grams: 0,
+          nutrients: { kcal: 320, protein: 4, carbs: 40, fat: 16 },
+          loggedAt: new Date().toISOString(),
+        });
+        return rec.id;
+      }, todayIso);
+      const quickRow = p.getByTestId(`entry-${quickId}`).first();
+      await quickRow.waitFor({ timeout: 10000 });
+      await quickRow.scrollIntoViewIfNeeded();
+      await p.waitForTimeout(300);
+      const qb = await quickRow.boundingBox();
+      const favsBefore = liveOf((await pstate(p)).favorites).length;
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: qb.x + qb.width / 2, y: qb.y + qb.height / 2 }] });
+      await p.waitForTimeout(800);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await p.waitForTimeout(800);
+      check(
+        'long press: on a quick add (no food) it does nothing: stays on the diary, opens nothing, stars nothing',
+        new URL(p.url()).pathname === '/diary' && liveOf((await pstate(p)).favorites).length === favsBefore,
+        `${new URL(p.url()).pathname}${new URL(p.url()).search}`,
+      );
+      await ctx.close();
+    }
+  }
+
+  // ------------------------------------------- favourites: foods and saved meals (builder two)
+  // (src/features/food/favorites.ts, favoriteActions.ts, FavoriteStar.tsx, SavedMealRow.tsx, searchTab.ts, QuickLogSheet.)
+  // Each part in a fresh seeded demo context at 360 x 740 (seed knobs favoriteMeal and savedEstimate), so no step leans
+  // on another's data and every card is found by its name. A meal's star on /food/meals writes `favoriteAt` and keeps
+  // every other field, its Undo takes it away again, the card keeps its place until the next visit and then leads; the
+  // star is filled primaryInk, never amber. Search's Favourites tab lists the starred meal (with its star and Log) above
+  // the foods, and logging it from there adds its items; search opens on the tab chosen last. The + sheet leads with the
+  // favourite meals inside the first view, a saved estimate reads "~", and one tap logs it with its ranges. A long press
+  // on a food row or a saved-meal row stars it with a toast and Undo and never opens it. "Save lunch as a meal" in
+  // Saved meals saves the day's lunch and then goes, because that lunch is now a saved meal.
+  {
+    // This file's folder from the command line (the lint setup does not define __dirname).
+    const here = require('path').dirname(require('path').resolve(process.argv[1]));
+    const { buildSeed } = await import(require('url').pathToFileURL(require('path').join(here, 'seed.mjs')).href);
+    const { execFileSync } = require('child_process');
+    const ink = JSON.parse(
+      execFileSync(process.execPath, ['--no-warnings', '--input-type=module', '-e', "const t = await import('./src/theme/tokens.ts'); console.log(JSON.stringify({ ink: t.paletteFor('dark').primaryInk, warning: t.paletteFor('dark').warning }))"], {
+        cwd: require('path').join(here, '..', '..'),
+      }).toString(),
+    );
+    const rgbOf = (hex) => `rgb(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ')})`;
+    const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const yesterday = ymd(new Date(Date.now() - 86400000));
+    const favOpen = async (values = {}) => {
+      const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, colorScheme: 'dark', reducedMotion: 'reduce' });
+      await ctx.addInitScript((value) => {
+        if (!window.sessionStorage.getItem('__seeded')) {
+          window.localStorage.setItem('healthcal-v1', value);
+          window.sessionStorage.setItem('__seeded', '1');
+        }
+      }, JSON.stringify(buildSeed({ onboarded: true, theme: 'dark', values })));
+      const p = await ctx.newPage();
+      p.on('pageerror', (e) => errors.push(e.message));
+      p.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 200)));
+      return { ctx, p };
+    };
+    const ftext = async (p, id) => (await p.getByTestId(id).first().innerText({ timeout: 15000 })).replace(/ /g, ' ').replace(/[⁠‎⁨⁩]/g, '').trim();
+    const fstate = (p) => p.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())));
+    const ftap = async (p, id) => {
+      await p.getByTestId(id).first().click({ timeout: 15000 });
+      await p.waitForTimeout(350);
+    };
+    const mealNamed = (s, name) => Object.values(s.savedMeals).find((m) => m.name === name);
+    // The star's own drawing: its fill as the browser paints it, and whether it is pressed.
+    const starLook = (p, id) =>
+      p.evaluate((id) => {
+        const b = [...document.querySelectorAll(`[data-testid="${id}"]`)].find((e) => e.getBoundingClientRect().width > 0);
+        const shape = b && b.querySelector('svg path, svg polygon');
+        return { pressed: b?.getAttribute('aria-pressed'), fill: shape ? getComputedStyle(shape).fill : 'none' };
+      }, id);
+    // A finger held on a row for 800 ms (a real touch, as a phone sends it), then lifted.
+    const hold = async (p, id) => {
+      const box = await p.getByTestId(id).first().boundingBox();
+      const cdp = await p.context().newCDPSession(p);
+      const x = box.x + Math.min(80, box.width / 2);
+      const y = box.y + box.height / 2;
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      await p.waitForTimeout(800);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await p.waitForTimeout(500);
+    };
+    const cardIndex = async (p, name) => {
+      const n = await p.getByTestId(/^saved-meal-card-\d+$/).count();
+      for (let i = 0; i < n; i++) if ((await ftext(p, `saved-meal-card-${i}`)).includes(name)) return i;
+      return -1;
+    };
+
+    // 1. The star on /food/meals: the field, the toast, the Undo, the colour, the card in place until the next visit.
+    {
+      const { ctx, p } = await favOpen({ savedEstimate: 1 });
+      await p.goto(`${BASE}/food/meals`, { waitUntil: 'networkidle' });
+      await p.getByTestId('saved-meal-card-0').first().waitFor({ timeout: 20000 });
+      const at = await cardIndex(p, 'Usual breakfast');
+      const before = mealNamed(await fstate(p), 'Usual breakfast');
+      await ftap(p, `saved-meal-favorite-${at}`);
+      const after = mealNamed(await fstate(p), 'Usual breakfast');
+      const { favoriteAt, updatedAt: _u1, ...restAfter } = after;
+      const { updatedAt: _u0, ...restBefore } = before;
+      check(
+        'favourites: the star on /food/meals writes an ISO favoriteAt and leaves every other field as it was',
+        typeof favoriteAt === 'string' && !Number.isNaN(Date.parse(favoriteAt)) && JSON.stringify(restAfter) === JSON.stringify(restBefore),
+        `${favoriteAt}`,
+      );
+      const toastText = await ftext(p, 'toast');
+      check('favourites: the toast puts the verb first, "Added to favourites: \\"Usual breakfast\\"", with Undo', toastText.startsWith('Added to favourites: "Usual breakfast"') && (await ftext(p, 'toast-action')) === 'Undo', toastText);
+      const look = await starLook(p, `saved-meal-favorite-${at}`);
+      check('favourites: the star is pressed and filled primaryInk (never the amber of "over")', look.pressed === 'true' && look.fill === rgbOf(ink.ink) && look.fill !== rgbOf(ink.warning), `${look.pressed}, ${look.fill} (want ${rgbOf(ink.ink)})`);
+      check('favourites: the starred card keeps its place on this visit', (await cardIndex(p, 'Usual breakfast')) === at, `index ${at}`);
+      await ftap(p, 'toast-action');
+      const undone = mealNamed(await fstate(p), 'Usual breakfast');
+      check('favourites: Undo takes the star away again (no favoriteAt at all)', !('favoriteAt' in undone) && !undone.deleted);
+      await ftap(p, `saved-meal-favorite-${at}`);
+      await p.reload({ waitUntil: 'networkidle' });
+      await p.getByTestId('saved-meal-card-0').first().waitFor({ timeout: 20000 });
+      check('favourites: on the next visit the favourite leads', (await cardIndex(p, 'Usual breakfast')) === 0, `"Chicken and rice bowl" at ${await cardIndex(p, 'Chicken and rice bowl')}`);
+      const cap = await ftext(p, `saved-meal-caption-${await cardIndex(p, 'Chicken and rice bowl')}`);
+      check('favourites: a saved estimate on /food/meals reads "~" before its calories', cap.startsWith('~'), cap);
+      await ctx.close();
+    }
+
+    // 2. Search: Favourites lists the starred meal above the foods; Log adds its items; search opens on the tab chosen last.
+    {
+      const { ctx, p } = await favOpen({ favoriteMeal: 1 });
+      await p.goto(`${BASE}/food/search?meal=lunch`, { waitUntil: 'networkidle' });
+      await p.getByTestId('search-tab-favorites').first().waitFor({ timeout: 20000 });
+      await ftap(p, 'search-tab-favorites');
+      const chip = await ftext(p, 'search-tab-favorites');
+      const mealsLabel = (await p.getByTestId('search-fav-meals-label').count()) > 0 && (await p.getByTestId('search-fav-foods-label').count()) > 0;
+      const mealBox = await p.getByTestId('favorite-meal-0').first().boundingBox();
+      const foodBox = await p.getByTestId('favorite-0').first().boundingBox();
+      check('favourites: search\'s Favourites tab counts foods and meals ("Favourites 3") and lists Meals above Foods', chip === 'Favourites 3' && mealsLabel && mealBox && foodBox && mealBox.y < foodBox.y, `${chip}`);
+      check('favourites: the meal row names the meal and carries its star (pressed) and Log', (await ftext(p, 'favorite-meal-0')).includes('Usual breakfast') && (await starLook(p, 'favorite-meal-0-favorite')).pressed === 'true' && (await p.getByTestId('favorite-meal-0-log').count()) === 1);
+      const lunchBefore = Object.values((await fstate(p)).foodEntries).filter((e) => !e.deleted && e.meal === 'lunch').length;
+      await ftap(p, 'favorite-meal-0-log');
+      await ftap(p, 'log-meal-confirm');
+      const lunchAfter = Object.values((await fstate(p)).foodEntries).filter((e) => !e.deleted && e.meal === 'lunch').length;
+      check('favourites: Log on the favourite meal adds its two items to lunch', lunchAfter - lunchBefore === 2, `${lunchAfter - lunchBefore} added`);
+      await p.goto(`${BASE}/food/search?meal=lunch`, { waitUntil: 'networkidle' });
+      await p.getByTestId('search-tab-favorites').first().waitFor({ timeout: 20000 });
+      await p.waitForTimeout(400);
+      check('favourites: search opens again on the tab chosen last on this device (Favourites)', (await p.getByTestId('favorite-meal-0').count()) === 1 && (await p.getByTestId('search-tab-favorites').first().getAttribute('aria-pressed')) === 'true');
+      // The chip of the tab search opened on is wholly in view, at 360 and at 320 (fixer two, T1).
+      const chipIn = async (w) => {
+        const b = await p.getByTestId('search-tab-favorites').first().boundingBox();
+        return { ok: !!b && b.x >= 0 && b.x + b.width <= w, at: b ? `${Math.round(b.x)}-${Math.round(b.x + b.width)}` : 'none' };
+      };
+      const at360 = await chipIn(360);
+      await p.setViewportSize({ width: 320, height: 640 });
+      await p.reload({ waitUntil: 'networkidle' });
+      await p.getByTestId('search-tab-favorites').first().waitFor({ timeout: 20000 });
+      await p.waitForTimeout(400);
+      const at320 = await chipIn(320);
+      check(
+        'favourites: opened on Favourites, its chip is wholly in view at 360 and at 320',
+        at360.ok && at320.ok && (await p.getByTestId('search-tab-favorites').first().getAttribute('aria-pressed')) === 'true',
+        `360: ${at360.at}, 320: ${at320.at}`,
+      );
+      await p.setViewportSize({ width: 360, height: 740 });
+      // Only Favourites is remembered: after a look at Saved meals, search opens on the meal's default (Usual) again.
+      await ftap(p, 'search-tab-meals');
+      await p.reload({ waitUntil: 'networkidle' });
+      await p.getByTestId('search-tab-usual').first().waitFor({ timeout: 20000 });
+      await p.waitForTimeout(400);
+      check('favourites: Saved meals chosen last does not stick: search opens on Usual again', (await p.getByTestId('search-tab-usual').first().getAttribute('aria-pressed')) === 'true' && (await p.getByTestId('search-tab-meals').first().getAttribute('aria-pressed')) !== 'true');
+      // Favourites chosen last but nothing starred any more: the default, never an empty tab.
+      await ftap(p, 'search-tab-favorites');
+      await p.evaluate(async () => {
+        const s = window.__healthcal.getState();
+        for (const [id, r] of Object.entries(s.favorites)) if (!r.deleted) s.remove('favorites', id);
+        for (const m of Object.values(s.savedMeals)) {
+          if (m.deleted || !('favoriteAt' in m)) continue;
+          const { favoriteAt: _f, ...rest } = m;
+          s.upsert('savedMeals', rest);
+        }
+        await window.__healthcal.flush?.();
+      });
+      await p.reload({ waitUntil: 'networkidle' });
+      await p.getByTestId('search-tab-usual').first().waitFor({ timeout: 20000 });
+      await p.waitForTimeout(400);
+      check('favourites: Favourites chosen last with nothing starred opens on Usual, not an empty tab', (await p.getByTestId('search-tab-usual').first().getAttribute('aria-pressed')) === 'true' && (await p.getByTestId('search-tab-favorites').first().getAttribute('aria-pressed')) !== 'true');
+      await ctx.close();
+    }
+
+    // 3. The + sheet: favourite meals lead, inside the first view; a saved estimate reads "~" and logs with its ranges.
+    {
+      const { ctx, p } = await favOpen({ favoriteMeal: 1, savedEstimate: 2 });
+      await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+      await p.getByTestId('tab-add').first().waitFor({ timeout: 20000 });
+      await ftap(p, 'tab-add');
+      await p.getByTestId('quick-fav-meal-0').first().waitFor({ timeout: 10000 });
+      const box = await p.getByTestId('quick-fav-meal-0').first().boundingBox();
+      check('favourites: the + sheet\'s first tile is the newest favourite meal, wholly inside the first view at 360 x 740', box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 360 && box.y + box.height <= 740 && (await ftext(p, 'quick-fav-meal-0')).includes('Chicken and rice bowl'), box ? `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)}` : 'no tile');
+      const title = await ftext(p, 'quick-usual-title');
+      check('favourites: the row is titled "Favourites and usual for …" and the second favourite follows', /^Favourites and usual for (breakfast|lunch|dinner|a snack|snack)$/i.test(title) && (await ftext(p, 'quick-fav-meal-1')).includes('Usual breakfast') && (await p.getByTestId('quick-usual-saved').count()) === 0, title);
+      const cap = await ftext(p, 'quick-fav-meal-0-caption');
+      check('favourites: the saved estimate\'s tile reads "~" before its calories ("3 items, ~592 kcal")', /^3 items, ~[\d,]+ kcal$/.test(cap), cap);
+      const before = new Set(Object.keys((await fstate(p)).foodEntries));
+      await ftap(p, 'quick-fav-meal-0');
+      const added = Object.values((await fstate(p)).foodEntries).filter((e) => !before.has(e.id) && !e.deleted);
+      check('favourites: one tap logs the saved estimate, each line still an estimate (its range and source kept)', added.length === 3 && added.every((e) => Array.isArray(e.kcalRange) && e.source === 'ai'), `${added.length} added`);
+      await ctx.close();
+    }
+
+    // 4. A long press stars a food (search's Recent) and a saved meal (search's Saved meals), never opening the row.
+    {
+      const { ctx, p } = await favOpen();
+      await p.goto(`${BASE}/food/search?meal=lunch`, { waitUntil: 'networkidle' });
+      await p.getByTestId('search-tab-recent').first().waitFor({ timeout: 20000 });
+      await ftap(p, 'search-tab-recent');
+      // The demo's recent foods start with oats (a favourite) and then banana (not one): hold the second row.
+      const i = 1;
+      const before = (await fstate(p)).favoriteFoodIds;
+      await hold(p, `recent-${i}`);
+      const s1 = await fstate(p);
+      const gained = s1.favoriteFoodIds.filter((id) => !before.includes(id));
+      const name = Object.values(s1.favorites).find((r) => !r.deleted && r.food?.id === gained[0])?.food?.name ?? '?';
+      const t = await ftext(p, 'toast').catch(() => '');
+      const selected = await p.evaluate(() => String(window.getSelection?.() ?? ''));
+      check('favourites: a long press on a food row stars it, with "Added to favourites: <name>" and Undo', gained.length === 1 && t.startsWith(`Added to favourites: ${name}`), `${gained.join(',')} | ${t}`);
+      check('favourites: the long press did not open the row nor select its text', new URL(p.url()).pathname === '/food/search' && (await p.getByTestId('food-detail-screen').count()) === 0 && selected.trim() === '', `${p.url()} | "${selected.slice(0, 30)}"`);
+      await ftap(p, 'toast-action');
+      check('favourites: its Undo removes the star again', !(await fstate(p)).favoriteFoodIds.includes(gained[0]));
+      await ftap(p, 'search-tab-meals');
+      await hold(p, 'saved-meal-0');
+      const meal = mealNamed(await fstate(p), 'Usual breakfast');
+      check('favourites: a long press on a saved-meal row stars the meal and stays on search', typeof meal.favoriteAt === 'string' && new URL(p.url()).pathname === '/food/search', `${meal.favoriteAt}`);
+      check('favourites: the row\'s star shows it at once, the row in its place', (await starLook(p, 'saved-meal-0-favorite')).pressed === 'true' && (await ftext(p, 'saved-meal-0')).includes('Usual breakfast'));
+      // The detail star: a toast, pressed, filled primaryInk.
+      await ftap(p, 'search-tab-recent');
+      await ftap(p, `recent-${i}`);
+      await p.getByTestId('detail-favorite').first().waitFor({ timeout: 15000 });
+      await ftap(p, 'detail-favorite');
+      const dt = await ftext(p, 'toast').catch(() => '');
+      const dl = await starLook(p, 'detail-favorite');
+      check('favourites: the detail star stars the food with a toast and is filled primaryInk', dt.startsWith(`Added to favourites: ${name}`) && dl.pressed === 'true' && dl.fill === rgbOf(ink.ink), `${dt} | ${dl.fill}`);
+      await ctx.close();
+    }
+
+    // 5. "Save lunch as a meal" in Saved meals (yesterday's lunch): the sheet saves it, then the row goes.
+    {
+      const { ctx, p } = await favOpen();
+      await p.goto(`${BASE}/food/search?meal=lunch&date=${yesterday}`, { waitUntil: 'networkidle' });
+      await p.getByTestId('search-tab-meals').first().waitFor({ timeout: 20000 });
+      await ftap(p, 'search-tab-meals');
+      const label = await ftext(p, 'save-current-meal');
+      const lunch = Object.values((await fstate(p)).foodEntries).filter((e) => !e.deleted && e.date === yesterday && e.meal === 'lunch' && e.via !== 'water');
+      check('favourites: Saved meals offers "Save lunch as a meal" with the count of yesterday\'s lunch', label.startsWith('Save lunch as a meal') && label.includes(`${lunch.length} items, yesterday`), label.replace(/\n/g, ' | '));
+      const count = Object.values((await fstate(p)).savedMeals).filter((m) => !m.deleted).length;
+      await ftap(p, 'save-current-meal');
+      await p.getByTestId('save-meal-name').first().waitFor({ timeout: 10000 });
+      await ftap(p, 'save-meal-confirm');
+      await p.waitForTimeout(400);
+      const saved = Object.values((await fstate(p)).savedMeals).filter((m) => !m.deleted);
+      check('favourites: the row\'s sheet saves the lunch as a meal, and the row goes (that lunch is a saved meal now)', saved.length === count + 1 && (await p.getByTestId('save-current-meal').count()) === 0, `${saved.length - count} saved`);
+      await ctx.close();
+    }
+
+    // 6. The + sheet with favourite foods only (the demo stars two): they lead the row, ahead of the usual foods, inside the
+    // first view; an AI food starred reads "~" and "about" (fixer two, T2 and T3).
+    {
+      const { ctx, p } = await favOpen();
+      await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+      await p.getByTestId('tab-add').first().waitFor({ timeout: 20000 });
+      await ftap(p, 'tab-add');
+      await p.getByTestId('quick-fav-food-0').first().waitFor({ timeout: 10000 });
+      const box = await p.getByTestId('quick-fav-food-0').first().boundingBox();
+      const lefts = await p.evaluate(() =>
+        [...document.querySelectorAll('[data-testid^="quick-fav-"], [data-testid^="quick-usual-"]')]
+          .filter((e) => !/-caption$/.test(e.getAttribute('data-testid')) && e.getAttribute('data-testid') !== 'quick-usual-title' && e.getBoundingClientRect().width > 100)
+          .map((e) => ({ id: e.getAttribute('data-testid'), x: Math.round(e.getBoundingClientRect().left) }))
+          .sort((a, b) => a.x - b.x),
+      );
+      check(
+        'favourites: with favourite foods only, the first tile of the + sheet is a favourite food, wholly inside 360 x 740',
+        !!box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 360 && box.y + box.height <= 740 && lefts[0]?.id === 'quick-fav-food-0',
+        `${box ? `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)}` : 'no tile'} | ${lefts.map((l) => l.id).join(', ')}`,
+      );
+      const title = await ftext(p, 'quick-usual-title');
+      check('favourites: the row is titled "Favourites and usual for …" (the favourites drawn first)', /^Favourites and usual for (breakfast|lunch|dinner|a snack|snack)$/i.test(title), title);
+      const favIds = (await fstate(p)).favoriteFoodIds;
+      const usualShown = lefts.filter((l) => l.id.startsWith('quick-usual-')).map((l) => l.id.slice('quick-usual-'.length));
+      check('favourites: a favourite food is shown once, never again as a usual tile', usualShown.length > 0 && usualShown.every((k) => !favIds.includes(k)), usualShown.join(', '));
+      // An AI food starred (as a long press on its diary row does): its tile reads "~" and "about".
+      await p.evaluate(async () => {
+        const s = window.__healthcal.getState();
+        s.toggleFavoriteFood({ id: 'ai-e2e-grilled-chicken', name: 'Grilled chicken breast', per100g: { kcal: 165, protein: 31, carbs: 0, fat: 3.6 }, servings: [{ label: '150 g', grams: 150 }], source: 'ai', verified: false, emoji: '🍗' });
+        await window.__healthcal.flush?.();
+      });
+      await p.waitForTimeout(400);
+      const cap = await ftext(p, 'quick-fav-food-0-caption');
+      const label = await p.getByTestId('quick-fav-food-0').first().getAttribute('aria-label');
+      check('favourites: a starred AI food\'s tile reads "~" before its calories and "about" in its label', /^150 g, ~248 kcal$/.test(cap) && /about 248 kilocalories/.test(label ?? ''), `${cap} | ${label}`);
+      await ctx.close();
+    }
+
+    // 7. Search's Favourites tab: each food carries the meals' star 12 px before its "+"; unstarring keeps the row (outline
+    // star) until the next visit, with "Removed from favourites: <name>" and Undo (fixer two, T6 and T7).
+    {
+      const { ctx, p } = await favOpen();
+      await p.goto(`${BASE}/food/search?meal=lunch`, { waitUntil: 'networkidle' });
+      await p.getByTestId('search-tab-favorites').first().waitFor({ timeout: 20000 });
+      await ftap(p, 'search-tab-favorites');
+      await p.getByTestId('favorite-0-favorite').first().waitFor({ timeout: 10000 });
+      const starBox = await p.getByTestId('favorite-0-favorite').first().boundingBox();
+      const addBox = await p.getByTestId('favorite-0-add').first().boundingBox();
+      const gap = starBox && addBox ? Math.round(addBox.x - (starBox.x + starBox.width)) : null;
+      const name = (await ftext(p, 'favorite-0')).split('\n').map((l) => l.trim()).find((l) => /[A-Za-z]/.test(l)) ?? '';
+      const chipBefore = await ftext(p, 'search-tab-favorites');
+      check('favourites: a favourite food row carries a pressed star 12 px before its "+"', (await starLook(p, 'favorite-0-favorite')).pressed === 'true' && gap === 12, `gap ${gap}`);
+      await ftap(p, 'favorite-0-favorite');
+      const t = await ftext(p, 'toast').catch(() => '');
+      const after = await starLook(p, 'favorite-0-favorite');
+      const chipAfter = await ftext(p, 'search-tab-favorites');
+      check(
+        'favourites: its star unstars it with "Removed from favourites: <name>"; the row stays, its star an outline, the count one less',
+        t.startsWith(`Removed from favourites: ${name}`) && after.pressed === 'false' && (await ftext(p, 'favorite-0')).includes(name) && chipAfter !== chipBefore,
+        `${t} | ${after.pressed} | ${chipBefore} -> ${chipAfter}`,
+      );
+      await ftap(p, 'favorite-0-favorite');
+      check('favourites: a second tap stars it again, the row in its place', (await starLook(p, 'favorite-0-favorite')).pressed === 'true' && (await ftext(p, 'favorite-0')).includes(name) && (await ftext(p, 'search-tab-favorites')) === chipBefore);
+      await ctx.close();
+    }
+  }
+
   // ------------------------------------------- Appearance: the newer looks (src/theme/resolve.ts)
   // A newer look is stored as `look` beside its fallback in `theme` (an older copy shows Light or Dark);
   // the four older choices write `theme` and remove `look`. The page's ground is the palette's own bg,

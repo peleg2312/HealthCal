@@ -180,6 +180,12 @@ export interface SavedMeal extends SyncedRecord {
   items: SavedMealItem[];
   /** How many servings the items make together. Logging one serving adds the total divided by this. Default 1. */
   servings?: number;
+  /**
+   * When it was starred (ISO time); absent is not a favourite. Written only through `withFavorite`
+   * (`@/features/food/favorites`). An older copy keeps it untouched: every saved-meal writer spreads the
+   * stored record (`savedMealCompat.test.ts`).
+   */
+  favoriteAt?: string;
 }
 
 // -------------------------------------------------------------- activity

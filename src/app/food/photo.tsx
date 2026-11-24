@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Camera, ChevronDown, ChevronUp, Droplet, FlaskConical, ImagePlus, Info, Lightbulb, MessageSquareText, RefreshCw } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { useWindowDimensions, View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
+import { Dimensions, useWindowDimensions, View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
 
 import { AddMissingItem } from '@/features/ai/AddMissingItem';
 import { AiConsentSheet } from '@/features/ai/AiConsentSheet';
@@ -41,9 +41,11 @@ import { AiGlyph, AiMark } from '@/features/ai/mark';
 import { PhotoHero } from '@/features/ai/PhotoHero';
 import { SampleNotice } from '@/features/ai/SampleNotice';
 import { photoText, readWeight } from '@/features/ai/weight';
+import { SaveMealRow } from '@/features/ai/SaveMealRow';
 import { MealPicker } from '@/features/food/components';
 import { checkoutShown, PLAN_ROUTE, planVisible, refreshPlanAfterLimit, usePlan } from '@/features/plan';
-import { logItems } from '@/features/food/log';
+import { logAndSaveMeal, logItems } from '@/features/food/log';
+import { aiAddTitle, aiMealName } from '@/features/food/saveWords';
 import { BUILTIN_FOODS } from '@/data/foods';
 import { isolateRtl } from '@/lib/bidi';
 import { today } from '@/lib/dates';
@@ -125,6 +127,10 @@ export default function PhotoScreen() {
   const [pendingPrecise, setPendingPrecise] = useState(false);
   const [correction, setCorrection] = useState('');
   const [highlight, setHighlight] = useState<string | null>(null);
+  // "Also save as a meal": off on every visit (not remembered, so My meals does not fill with one-off
+  // plates). The name follows the dish (null) until the person types one; both last for the screen.
+  const [saveOn, setSaveOn] = useState(false);
+  const [saveName, setSaveName] = useState<string | null>(null);
   // One arrival of an estimate: when it came and the order of the rows it brought. The review's blocks
   // and those rows enter one after another once per arrival (keyed by it), and the total counts up
   // from the low end of its range; an edit, a swap or a row added later never replays it.
@@ -337,7 +343,11 @@ export default function PhotoScreen() {
     // An estimated row wears the mark of the food in the list it names outright, so the diary reads as food.
     const items = rowsToLogItems(rows, newId, mode === 'photo', (name) => emojiLike(name, matchPool));
     if (items.length === 0) return;
-    logItems(items, meal, date);
+    // With the switch on, one act logs and saves: one toast that names the meal, one Undo for both.
+    // Never for the sample (it is example data, not the person's food nor an AI estimate).
+    // The toast keeps as much of the name as two lines hold at the window's width now.
+    if (saveOn && !isDemo) logAndSaveMeal(items, meal, date, (saveName ?? '').trim() || aiMealName(result?.dish, items), Dimensions.get('window').width);
+    else logItems(items, meal, date);
     // Estimates and matched foods show up in Recent, ready to log again.
     const store = useStore.getState();
     for (const it of items) if (it.food) store.rememberFood(it.food);
@@ -423,14 +433,19 @@ export default function PhotoScreen() {
   } else if (step === 'analysing') {
     footer = <Button testID="ai-cancel" title="Cancel" variant="secondary" onPress={cancel} />;
   } else if (step === 'review') {
+    const saving = saveOn && !isDemo;
     footer = (
-      <Button
-        testID="ai-add-to-diary"
-        // The total is the large number at the top: the button names where it goes, not the number again.
-        title={`${isDemo ? 'Add sample to' : 'Add to'} ${MEALS.find((m) => m.id === meal)?.label.toLowerCase()}`}
-        disabled={items.length === 0}
-        onPress={add}
-      />
+      <View style={{ gap: spacing.sm }}>
+        {/* The sample is example data: it is never offered as one of my meals. */}
+        {isDemo ? null : <SaveMealRow on={saveOn} onChange={setSaveOn} name={saveName ?? aiMealName(result?.dish, items)} onName={setSaveName} />}
+        <Button
+          testID="ai-add-to-diary"
+          // The total is the large number at the top: the button names where it goes, not the number again.
+          title={aiAddTitle({ sample: isDemo, save: saving, meal: MEALS.find((m) => m.id === meal)?.label ?? '' })}
+          disabled={items.length === 0}
+          onPress={add}
+        />
+      </View>
     );
   }
 

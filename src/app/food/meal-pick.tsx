@@ -6,6 +6,8 @@ import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 import { BUILTIN_FOODS } from '@/data/foods';
 import { savedItemFromFood, setItemAmount } from '@/features/food/build';
 import { FoodRow } from '@/features/food/components';
+import { toggleFoodFavorite } from '@/features/food/favoriteActions';
+import { favoriteActionLabel } from '@/features/food/favoriteWords';
 import { amountLabel, kcal, lastPortions, portionFor, portionKcal, portionLabel, stepAmount } from '@/features/food/helpers';
 import { addDraftItem, removeDraftItem, updateDraftItem, useMealDraft, type DraftRow } from '@/features/food/mealDraft';
 import { RequireProfile } from '@/features/food/RequireProfile';
@@ -110,6 +112,9 @@ function MealPick() {
         kcalValue={r ? r.item.nutrients.kcal : portionKcal(food, p)}
         onPress={() => (r ? setEditing(r.key) : add(food))}
         onQuickAdd={() => add(food)}
+        // Press and hold stars it, as in food search (a toast with Undo; the row does not open).
+        onLongPress={() => toggleFoodFavorite(food)}
+        longPressLabel={favoriteActionLabel(favoriteIds.includes(food.id))}
         matched={matched}
         amount={
           r
