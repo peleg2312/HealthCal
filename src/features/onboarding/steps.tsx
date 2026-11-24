@@ -7,13 +7,13 @@ import { Group as SettingsGroup, IconTile, prefers12h, TimeRow } from '@/feature
 import { ageFromBirthDate, formatClock } from '@/lib/dates';
 import { ACTIVITY_LABELS, calorieFloor, KCAL_PER_KG, maxWeeklyRateKg } from '@/lib/energy';
 import { formatNumber, kgToLb, lbToKg, round, weightUnit } from '@/lib/units';
-import { remindersSupported } from '@/services/notifications';
 import { useNow, useToday } from '@/store/clock';
 import { cup, useLargeText, useTheme } from '@/theme';
 import type { ActivityLevel, GoalType } from '@/types';
 import { Card, Divider, MiniCup, PressableScale, ProgressBar, Stepper, Text, ToggleRow } from '@/ui';
 
-import { BigNumberField, BigTextField, ChoiceCard, ErrorText, FieldRow, GoalCup, Note, StepTitle, UnitsToggle, useFieldChain, WhyWeAsk } from './components';
+import type { ChoiceInput } from './choiceInput';
+import { BigNumberField, BigTextField, ChoiceCard, ErrorText, FieldRow, GoalCup, Note, StepTitle, unitSpoken, UnitsToggle, useFieldChain, WhyWeAsk } from './components';
 import { birthDateOf, buildPlan, heightRangeText, rateKgOf, tapeEstimate, toMetric, weightRangeText, type BodyFatMode, type Draft, type Errors } from './model';
 import { looseDate } from './projection';
 import { nudgeExamples, WEIGH_IN_TIME, type NudgeKind, type Routine } from './routine';
@@ -27,9 +27,11 @@ export interface StepProps {
   submit: () => void;
   /**
    * Move on after a short beat, so the chosen tile is seen to be chosen. Used by
-   * single-choice answers; Back still works and typing screens keep Continue.
+   * single-choice answers, and only for a tap or a click (`how` 'pointer'): with a
+   * keyboard or a screen reader a choice is only a choice and Continue moves on.
+   * Back still works and typing screens keep Continue.
    */
-  advance: () => void;
+  advance: (how: ChoiceInput) => void;
   /** Call off a wait started by `advance`: for a tile on the same question that needs something typed. */
   hold: () => void;
 }
@@ -112,9 +114,9 @@ export function GoalStep({ draft, set, errors, advance }: StepProps) {
             icon={<GoalCup goal={o.value} index={i} />}
             size="lg"
             selected={draft.goal === o.value}
-            onPress={() => {
+            onPress={(how) => {
               set({ goal: o.value });
-              advance();
+              advance(how);
             }}
           />
         ))}
@@ -142,9 +144,9 @@ export function SexStep({ draft, set, errors, advance }: StepProps) {
                 testID={`onb-sex-${s}`}
                 title={s === 'female' ? 'Female' : 'Male'}
                 selected={draft.sex === s}
-                onPress={() => {
+                onPress={(how) => {
                   set({ sex: s });
-                  advance();
+                  advance(how);
                 }}
               />
             </View>
@@ -331,7 +333,7 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
               grow={1}
               size={width < 360 ? 'md' : 'lg'}
               label="Weight"
-              accessibilityLabel={`Current weight, ${weightUnit(draft.units)}`}
+              accessibilityLabel={`Current weight, ${unitSpoken(weightUnit(draft.units))}`}
               testID="onb-weight"
               unit={weightUnit(draft.units)}
               decimals={1}
@@ -407,10 +409,10 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
             hint={m.hint}
             icon={m.icon}
             selected={draft.bodyFatMode === m.value}
-            onPress={() => {
+            onPress={(how) => {
               set({ bodyFatMode: m.value });
               // Only the answer that needs nothing typed moves on by itself.
-              if (m.value === 'unknown') advance();
+              if (m.value === 'unknown') advance(how);
               else {
                 hold();
                 setPicked(true);
@@ -549,9 +551,9 @@ export function ActivityStep({ draft, set, errors, advance }: StepProps) {
             hint={ACTIVITY_LABELS[l].hint}
             icon={<MiniCup progress={ACTIVITY_LEVEL[l]} color={colors.exercise} width={24} height={30} index={i} memoryKey={`onb-activity-${l}`} />}
             selected={draft.activity === l}
-            onPress={() => {
+            onPress={(how) => {
               set({ activity: l });
-              advance();
+              advance(how);
             }}
           />
         ))}
@@ -586,8 +588,9 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
   // The safe maximum itself is always reachable, even when it is not a whole step.
   const maxDisplay = Math.max(minDisplay, toDisplay(maxKg));
   const rateDisplay = Math.min(maxDisplay, Math.max(minDisplay, round(toDisplay(rateKg), 1)));
-  const fmtRate = (v: number) => `${formatNumber(v, 1).replace(/\.0$/, '')} ${unit}`;
-  const fmtW = (v: number) => `${formatNumber(v, 1).replace(/\.0$/, '')}`;
+  // A weight and a pace keep their one decimal ("68.0 kg", "0.5 kg"), as every weigh-in and Goals show them (rubric D11-07).
+  const fmtRate = (v: number) => `${formatNumber(v, 1)} ${unit}`;
+  const fmtW = (v: number) => formatNumber(v, 1);
 
   const delta = plan ? plan.target.dailyDelta : (goal === 'lose' ? -1 : 1) * ((rateKg * KCAL_PER_KG) / 7);
   const requestedDelta = (rateKg * KCAL_PER_KG) / 7;
@@ -600,7 +603,8 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
       <StepTitle title={goal === 'lose' ? 'Where are you heading?' : 'Set your pace'} subtitle={goal === 'lose' ? 'A pace you can keep. Slower is easier.' : 'A small surplus limits fat gain.'} />
       <View style={{ gap: 6 }}>
         <BigNumberField
-          label={goal === 'lose' ? 'Target weight' : 'Target weight (optional)'}
+          // The goal weight is the "goal" everywhere (Goals, Weight, Profile, the plan); "target" is the calorie number.
+          label={goal === 'lose' ? 'Goal weight' : 'Goal weight (optional)'}
           testID="onb-target-input"
           unit={unit}
           decimals={1}
@@ -683,7 +687,7 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
           <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
             <Text variant="title">{date ? `Around ${looseDate(date, now)}` : 'No date yet'}</Text>
             <Text variant="caption" color="textSecondary">
-              {date ? `${fmtW(draft.weight!)} to ${fmtW(draft.target!)} ${unit} at this pace. The date moves with your real trend.` : 'At this pace the target is not reached; try a different pace.'}
+              {date ? `${fmtW(draft.weight!)} to ${fmtW(draft.target!)} ${unit} at this pace. The date moves with your real trend.` : 'At this pace the goal is not reached; try a different pace.'}
             </Text>
           </View>
         </Card>
@@ -842,11 +846,7 @@ export function RoutineStep({ draft, set, errors }: StepProps) {
         ) : null}
         {timeError ? <ErrorText testID="onb-routine-error">{errors.sleep ?? errors.meals}</ErrorText> : null}
       </View>
-      {!remindersSupported ? (
-        <Text variant="caption" color="textSecondary">
-          A browser cannot send reminders; HealthCal on your phone sends them with these choices.
-        </Text>
-      ) : null}
+      {/* In a browser, that reminders arrive in the phone app is said in the footer, beside the offer (src/app/onboarding.tsx). */}
     </Group>
   );
 }

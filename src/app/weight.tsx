@@ -12,7 +12,7 @@ import { trendMonthParts, weeklyRateText } from '@/features/progress/goalDate';
 import { formatWeight, weightToKg, weightUnit, weightValue } from '@/lib/units';
 import { applyWeighInToTargets, deleteWeightRecord, saveWeightRecord } from '@/features/trackers/actions';
 import { DayStepper, Explain, ExplainText, Figure, HistoryRow, RequireProfile } from '@/features/trackers/components';
-import { findByDate, keepOrConvert, targetsBehind, weightChartData, weightStats, type WeightRange } from '@/features/trackers/helpers';
+import { findByDate, keepOrConvert, targetsBehind, weightChartData, weightStats, weightText, type WeightRange } from '@/features/trackers/helpers';
 import { isSyncedWeighIn, weighInFromLine } from '@/features/trackers/weighInSource';
 import { useToday } from '@/store/clock';
 import { useProfile, useWeightSeries } from '@/store/selectors';
@@ -46,10 +46,8 @@ function signed(kg: number, units: UnitSystem, digits = 1): string {
   return s;
 }
 
-/** Weights always with one decimal so a column of them lines up. */
-function fixedWeight(kg: number, units: UnitSystem): string {
-  return `${weightValue(kg, units).toFixed(1)} ${weightUnit(units)}`;
-}
+/** Weights always with one decimal so a column of them lines up, the goal's included ("Goal 74.0 kg"). */
+const fixedWeight = weightText;
 
 function WeightScreen() {
   const { colors, spacing } = useTheme();
@@ -93,7 +91,7 @@ function WeightScreen() {
   const footer = <Button testID="weight-log" title="Log weigh-in" icon={<Plus size={20} color={colors.onPrimary} />} onPress={() => setSheetDate(end)} />;
 
   return (
-    <Screen header={<Header title="Weight" subtitle={target ? `Goal ${formatWeight(target, units)}` : 'Trend and weigh-ins'} />} footer={footer} backdrop={colors.weight} testID="weight-screen">
+    <Screen header={<Header title="Weight" subtitle={target ? `Goal ${fixedWeight(target, units)}` : 'Trend and weigh-ins'} />} footer={footer} backdrop={colors.weight} testID="weight-screen">
       {empty || !stats ? (
         <Card>
           <EmptyState

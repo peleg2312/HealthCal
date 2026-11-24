@@ -185,9 +185,32 @@ export function referenceExplain(food: Pick<Food, 'fdcId' | 'ilCode'>): string {
   return `${lead} An estimate from a typical label or recipe, not a measured record.`;
 }
 
+/**
+ * How a food's numbers are sourced, as every list, badge and spoken name says it: its `FoodSource`, except a bundled
+ * food that names no record (`verified: false`, the 20 foods with neither a USDA `fdcId` nor a national `ilCode`),
+ * which is 'typical': typical values from a common label or recipe, an estimate, never "Reference data".
+ */
+export type SourceKind = FoodSource | 'typical';
+
+/** The source kind of a food, an entry or a saved line (`SourceKind`): 'typical' for a bundled food with no record. */
+export function sourceKindOf(x: { source: FoodSource; verified?: boolean; food?: { source?: FoodSource; verified?: boolean } | null }): SourceKind {
+  if (x.source !== 'builtin') return x.source;
+  const verified = x.food && x.food.source === 'builtin' && typeof x.food.verified === 'boolean' ? x.food.verified : x.verified;
+  return verified === false ? 'typical' : 'builtin';
+}
+
 /** A data source's names and colour; with the food, a bundled food's `explain` names its own record (`referenceExplain`). */
-export function sourceInfo(source: FoodSource, food?: Pick<Food, 'fdcId' | 'ilCode'>): SourceInfo {
+export function sourceInfo(source: SourceKind, food?: Pick<Food, 'fdcId' | 'ilCode'> & { verified?: boolean }): SourceInfo {
+  // A bundled food passed with its record flag says what it is, wherever the caller took `source` from.
+  if (source === 'builtin' && food && food.verified === false) source = 'typical';
   switch (source) {
+    case 'typical':
+      return {
+        label: 'Typical values',
+        short: 'Typical',
+        color: 'textSecondary',
+        explain: 'From the bundled list: typical values from a common label or recipe, not a measured record. Treat them as an estimate.',
+      };
     case 'builtin':
     case 'usda':
       return {
@@ -215,16 +238,16 @@ export function sourceInfo(source: FoodSource, food?: Pick<Food, 'fdcId' | 'ilCo
 
 /**
  * The word a list row ends with for its source (principle 3, ruled for loop 0): the sources worth a
- * second look are named ("Community", "Your food", "AI estimate", "Quick add"); bundled reference data
- * has none, its filled key on the row is its mark. The word stays in the row's screen-reader label
+ * second look are named ("Typical", "Community", "Your food", "AI estimate", "Quick add"); bundled reference
+ * data has none, its filled key on the row is its mark. The word stays in the row's screen-reader label
  * (`sourceInfo(...).label`) and on the food detail's badge.
  */
-export function rowSourceWord(source: FoodSource): string | null {
+export function rowSourceWord(source: SourceKind): string | null {
   return source === 'builtin' || source === 'usda' ? null : sourceInfo(source).short;
 }
 
 /** A row's caption with its source's word at the end ("1 cup · 257 kcal · Community"), kept on one line; reference data adds nothing. */
-export function withSourceWord(line: string, source: FoodSource): string {
+export function withSourceWord(line: string, source: SourceKind): string {
   const word = rowSourceWord(source);
   return word ? `${line} · ${word.replace(/ /g, ' ')}` : line;
 }

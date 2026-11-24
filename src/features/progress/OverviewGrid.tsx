@@ -1,7 +1,8 @@
 import React from 'react';
 import { View } from 'react-native';
 
-import { hoursText, WEEKLY_ACTIVE_MINUTES, type PeriodSummary } from '@/lib/insights';
+import { WEEKLY_ACTIVE_MINUTES, type PeriodSummary } from '@/lib/insights';
+import { hoursFigure, hoursSpoken } from '@/features/trackers/helpers';
 import { formatNumber, formatVolume, weightUnit, weightValue } from '@/lib/units';
 import { useTheme } from '@/theme';
 import type { TrendPoint } from '@/lib/trend';
@@ -178,9 +179,11 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         borderTop
         title="Sleep"
         color={colors.sleep}
-        value={sl ? hoursText(sl.avgHours).replace(' h', '') : null}
-        unit="h"
+        // Hours and minutes, as Sleep, the morning page and Today draw a night ("7 h 6 min"), never decimal hours.
+        value={sl ? hoursFigure(sl.avgHours).value : null}
+        unit={sl ? hoursFigure(sl.avgHours).unit : undefined}
         caption={sl ? `a night · ${sl.nights} ${sl.nights === 1 ? 'night' : 'nights'}` : 'No sleep logged yet'}
+        spoken={sl ? `${hoursSpoken(sl.avgHours)} a night, ${sl.nights} ${sl.nights === 1 ? 'night' : 'nights'}` : undefined}
         captionShort={sl ? `a night · ${sl.nights} logged` : 'No sleep yet'}
         compare={changeWords('sleep', sl?.avgHours, p?.sleep?.avgHours, { period })}
         trend={changeDirection('sleep', sl?.avgHours, p?.sleep?.avgHours)}

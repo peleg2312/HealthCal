@@ -4,7 +4,8 @@
  */
 import { addDays, diffDays, formatShortDate, lastNDates } from '@/lib/dates';
 import type { TrendPoint } from '@/lib/trend';
-import type { ISODate, Profile, SleepEntry, SleepQuality, WeightEntry } from '@/types';
+import { weightUnit, weightValue } from '@/lib/units';
+import type { ISODate, Profile, SleepEntry, SleepQuality, UnitSystem, WeightEntry } from '@/types';
 
 import { isSyncedWeighIn, sameFat, sameKg, withoutSyncFields } from './weighInSource';
 
@@ -27,6 +28,15 @@ export function formatClockDuration(ms: number): string {
   const m = Math.floor((total % 3600) / 60);
   const s = total % 60;
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+/**
+ * A weight with its one decimal, always: "74.0 kg", "163.1 lb". Every weight a person reads (a weigh-in,
+ * the trend, a goal, a range, a change) has one decimal, so a goal of 74 never sits as "74 kg" beside
+ * "78.8 kg" (`formatWeight` drops a trailing zero).
+ */
+export function weightText(kg: number, units: UnitSystem): string {
+  return `${weightValue(kg, units).toFixed(1)} ${weightUnit(units)}`;
 }
 
 /** '7 h 30 min', '45 min', '9 h' from hours. */

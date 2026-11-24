@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Platform, TextInput, useWindowDimensions, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Platform, Text as PlainText, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { create } from 'zustand';
 
@@ -479,8 +479,8 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
   // words of the toast it shows and nothing once that toast has gone.
   const region =
     Platform.OS === 'web' ? (
-      <View testID="toast-live" style={SPOKEN_ONLY} {...({ role: 'status', 'aria-live': 'polite', 'aria-atomic': true } as object)}>
-        {said && message && active && said.id === id ? <Text key={said.id}>{said.text}</Text> : null}
+      <View testID="toast-live" pointerEvents="none" style={SPOKEN_ONLY} {...({ role: 'status', 'aria-live': 'polite', 'aria-atomic': true } as object)}>
+        {said && message && active && said.id === id ? <PlainText key={said.id}>{said.text}</PlainText> : null}
       </View>
     ) : null;
   if (!message || !active) return region;

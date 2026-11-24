@@ -12,6 +12,8 @@ import {
   findByDate,
   formatClockDuration,
   formatHours,
+  hoursFigure,
+  hoursSpoken,
   isMostRecentDate,
   MAX_START_BACK_MS,
   normalizePresets,
@@ -39,6 +41,18 @@ describe('common', () => {
     expect(formatHours(7.5)).toBe('7 h 30 min');
     expect(formatHours(9)).toBe('9 h');
     expect(formatHours(0.75)).toBe('45 min');
+  });
+
+  it('draws and says a night in hours and minutes, never decimal hours', () => {
+    expect(hoursFigure(7.8)).toEqual({ value: '7 h 48', unit: 'min' });
+    expect(hoursFigure(7.1)).toEqual({ value: '7 h 6', unit: 'min' });
+    expect(hoursFigure(8)).toEqual({ value: '8', unit: 'h' });
+    expect(hoursFigure(7.999)).toEqual({ value: '8', unit: 'h' });
+    expect(hoursFigure(0.5)).toEqual({ value: '30', unit: 'min' });
+    expect(hoursSpoken(7.8)).toBe('7 hours 48 minutes');
+    expect(hoursSpoken(1)).toBe('1 hour');
+    expect(hoursSpoken(1 + 1 / 60)).toBe('1 hour 1 minute');
+    expect(hoursSpoken(0.25)).toBe('15 minutes');
   });
 });
 

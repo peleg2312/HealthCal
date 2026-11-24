@@ -163,7 +163,7 @@ function BodyScreen() {
         />
         <ScaleLabels min={15} max={35} ticks={[18.5, 25, 30]} />
         <Text variant="body">
-          Healthy range for your height: <Text variant="bodyStrong">{`${weightValue(lo, units).toFixed(0)}–${weightValue(hi, units).toFixed(0)} ${weightUnit(units)}`}</Text>
+          Healthy range for your height: <Text variant="bodyStrong">{`${weightValue(lo, units).toFixed(1)}–${weightValue(hi, units).toFixed(1)} ${weightUnit(units)}`}</Text>
         </Text>
         <Explain label="What BMI leaves out" testID="body-bmi-help" style={{ marginTop: -spacing.xs, marginBottom: -spacing.sm }}>
           <ExplainText>BMI only compares weight with height. It cannot tell muscle from fat, so muscular people often read above the range. Waist size and body fat say more.</ExplainText>

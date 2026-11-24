@@ -40,7 +40,8 @@ describe('chart words', () => {
       .filter((p) => p.date <= '2026-10-31')
       .concat(Array.from({ length: 24 }, (_, i) => ({ date: `2026-11-${String(i + 1).padStart(2, '0')}`, kg: 79, trend: 78.8, interpolated: false })));
     const label = weightChartLabel(trend, '1m', '2026-11-24', 'metric', 74);
-    expect(label).toContain('goal 74 kilograms');
+    expect(label).toContain('goal 74.0 kilograms');
+    expect(label).toContain('weigh-ins from 78.6 kilograms to 79.0 kilograms');
     expect(label).toContain('every weigh-in is listed under History');
     expect(label.endsWith('today 78.8 kilograms.')).toBe(true);
   });

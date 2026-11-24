@@ -20,7 +20,8 @@
  * the previous 30 days"), so the dash never hides what moved. Pure: no React, no storage.
  */
 import type { Direction } from '@/lib/insights';
-import { formatNumber, formatVolume, formatWeight } from '@/lib/units';
+import { weightText } from '@/features/trackers/helpers';
+import { formatNumber, formatVolume } from '@/lib/units';
 import type { UnitSystem } from '@/types';
 
 export type ChangeKind = 'kcal' | 'protein' | 'weight' | 'waterMl' | 'share' | 'minutes' | 'sleep' | 'days';
@@ -58,7 +59,8 @@ function sizeWords(kind: ChangeKind, n: number, units: UnitSystem, total: boolea
     case 'protein':
       return `${Math.round(n)} g a day`;
     case 'weight':
-      return formatWeight(n, units);
+      // One decimal, as every weight ("Down 1.0 kg", never "Down 1 kg").
+      return weightText(n, units);
     case 'waterMl':
       return `${formatVolume(n, units)} a day`;
     case 'minutes':

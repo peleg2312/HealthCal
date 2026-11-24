@@ -553,7 +553,8 @@ export const typography: Record<TextVariant, TypeStyle> = {
   bodyStrong: { fontFamily: fonts.bold, fontSize: 15, lineHeight: 21 },
   label: { fontFamily: fonts.semibold, fontSize: 13, lineHeight: 18 },
   caption: { fontFamily: fonts.regular, fontSize: 12.5, lineHeight: 17 },
-  overline: { fontFamily: fonts.bold, fontSize: 11.5, lineHeight: 14, letterSpacing: 1.03, textTransform: 'uppercase' },
+  // 12 px, the floor for any caption (rubric D6-41); the 14 px line is kept, so every block an overline heads keeps its height.
+  overline: { fontFamily: fonts.bold, fontSize: 12, lineHeight: 14, letterSpacing: 1.03, textTransform: 'uppercase' },
   numXL: { fontFamily: fonts.extrabold, fontSize: 60, lineHeight: 58, letterSpacing: -2.1, fontVariant: ['tabular-nums'] },
   numL: { fontFamily: fonts.numBold, fontSize: 30, lineHeight: 32, letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
   numM: { fontFamily: fonts.numBold, fontSize: 20, lineHeight: 24, letterSpacing: -0.2, fontVariant: ['tabular-nums'] },

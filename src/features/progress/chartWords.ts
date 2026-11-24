@@ -7,7 +7,8 @@
  */
 import { addDays, formatShortDate, fromISODate } from '@/lib/dates';
 import type { TrendPoint } from '@/lib/trend';
-import { formatNumber, formatVolume, formatWeight } from '@/lib/units';
+import { weightText } from '@/features/trackers/helpers';
+import { formatNumber, formatVolume } from '@/lib/units';
 import type { ISODate, UnitSystem } from '@/types';
 
 const DAY_NAMES: Record<string, string> = { Sun: 'Sunday', Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday' };
@@ -93,10 +94,11 @@ export function weightChartLabel(trend: readonly TrendPoint[], range: '1m' | '3m
   const z = pts[pts.length - 1];
   const weighIns = pts.filter((p) => !p.interpolated);
   const kgs = weighIns.map((p) => p.kg);
-  const lowHigh = kgs.length ? `, ${weighIns.length} weigh-ins from ${formatWeight(Math.min(...kgs), units)} to ${formatWeight(Math.max(...kgs), units)}` : '';
-  const goal = goalKg ? `, goal ${formatWeight(goalKg, units)}` : '';
-  const summary = `Weight trend from ${formatShortDate(a.date)} to ${z.date === end ? 'today' : formatShortDate(z.date)}: ${formatWeight(a.trend, units)} to ${formatWeight(z.trend, units)}${goal}${lowHigh}. Trend by date, every weigh-in is listed under History`;
-  return chartLabel(summary, evenly(pts, 12).map((p) => `${p.date === end ? 'today' : formatShortDate(p.date)} ${formatWeight(p.trend, units)}`));
+  // Every weight with its one decimal, as the screen draws them ("79.0 kilograms", "goal 74.0 kilograms").
+  const lowHigh = kgs.length ? `, ${weighIns.length} weigh-ins from ${weightText(Math.min(...kgs), units)} to ${weightText(Math.max(...kgs), units)}` : '';
+  const goal = goalKg ? `, goal ${weightText(goalKg, units)}` : '';
+  const summary = `Weight trend from ${formatShortDate(a.date)} to ${z.date === end ? 'today' : formatShortDate(z.date)}: ${weightText(a.trend, units)} to ${weightText(z.trend, units)}${goal}${lowHigh}. Trend by date, every weigh-in is listed under History`;
+  return chartLabel(summary, evenly(pts, 12).map((p) => `${p.date === end ? 'today' : formatShortDate(p.date)} ${weightText(p.trend, units)}`));
 }
 
 /**

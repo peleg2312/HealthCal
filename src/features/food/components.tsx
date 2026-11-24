@@ -8,19 +8,19 @@ import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { addDays } from '@/lib/dates';
 import { MEALS } from '@/lib/nutrition';
 import { cup, fonts, useLargeText, useTheme } from '@/theme';
-import type { Food, FoodSource, ISODate, MealType } from '@/types';
+import type { Food, ISODate, MealType } from '@/types';
 import { CupKey, IconButton, PressableScale, Text } from '@/ui';
 
 import { displayFoodName } from './displayName';
 import { canStepForward, entryDayLabel, entryDaySpoken, foodLatestDay } from './entryDay';
-import { kcal, sourceInfo, withSourceWord } from './helpers';
+import { kcal, sourceInfo, sourceKindOf, withSourceWord, type SourceKind } from './helpers';
 import { useLangName } from './langName';
 
 // How a data source is marked lives with the mark itself (`SourceMark`, `@/features/ai/mark`): a filled cup
 // key for reference data, an outline for community or your own numbers, the small AI mark for an AI estimate.
 
 /** The source's mark plus its name, on a faint tint (the detail page). */
-export function SourceBadge({ source, style }: { source: FoodSource; style?: StyleProp<ViewStyle> }) {
+export function SourceBadge({ source, style }: { source: SourceKind; style?: StyleProp<ViewStyle> }) {
   const { colors, radius } = useTheme();
   const info = sourceInfo(source);
   return (
@@ -43,7 +43,7 @@ export function SourceBadge({ source, style }: { source: FoodSource; style?: Sty
  * The source's mark and its short name for list captions: present but quiet. `plain`: the kit's key even for
  * an AI estimate, and `label` the word instead of the source's (the sample result, which is not the AI: "Sample").
  */
-export function SourceTag({ source, plain = false, label }: { source: FoodSource; plain?: boolean; label?: string }) {
+export function SourceTag({ source, plain = false, label }: { source: SourceKind; plain?: boolean; label?: string }) {
   const { colors } = useTheme();
   const info = sourceInfo(source);
   return (
@@ -258,7 +258,7 @@ export function FoodRow({
   // found), the brand, the portion, the calories and the source in words ("Whey protein shake, 1 scoop,
   // 114 kilocalories, Reference data. Open details"); a name in Hebrew or Arabic is spoken in its own language.
   const brand = food.brand && !amount ? `${food.brand}, ` : '';
-  const lang = useLangName(`${name}${matched ? `, ${matched}` : ''}, ${brand}${withoutMarks(subtitle)}, ${Math.round(kcalValue)} kilocalories, ${sourceInfo(food.source).label}. Open details`);
+  const lang = useLangName(`${name}${matched ? `, ${matched}` : ''}, ${brand}${withoutMarks(subtitle)}, ${Math.round(kcalValue)} kilocalories, ${sourceInfo(sourceKindOf(food)).label}. Open details`);
   return (
     <View style={stack ? { paddingBottom: spacing.sm } : { flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
       <PressableScale
@@ -294,12 +294,12 @@ export function FoodRow({
           {/* The source's mark leads the line and its word ends it (none for reference data, whose filled key
               is enough), so a long portion or brand wraps to a second line instead of cutting the calories. */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
-            <SourceMark source={food.source} color={colors.textSecondary} size={8} style={{ marginTop: sourceMarkTop(food.source) }} />
+            <SourceMark source={sourceKindOf(food)} color={colors.textSecondary} size={8} style={{ marginTop: sourceMarkTop(sourceKindOf(food)) }} />
             <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1 }}>
               {/* Once added, the live kcal leads. */}
               {withSourceWord(
                 `${amount ? `${kcal(kcalValue)} kcal · ` : food.brand ? `${isolateRtl(food.brand)} · ` : ''}${subtitle}${amount ? '' : ` · ${kcal(kcalValue)} kcal`}`,
-                food.source,
+                sourceKindOf(food),
               )}
             </Text>
           </View>

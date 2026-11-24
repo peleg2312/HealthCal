@@ -58,7 +58,8 @@ export function addWater(date: ISODate, ml: number, units: 'metric' | 'imperial'
       .reduce((sum, w) => sum + effectiveMl(w.ml, w.beverage), 0),
   );
   const entry = useStore.getState().upsert('water', { date, ml, beverage: 'water', loggedAt: nowISO() });
-  haptic.tap();
+  // A glass logged is a log, like a food: the success pattern (a light tap is a removal's).
+  haptic.success();
   const reaches = goalMl !== undefined && crossesGoal(before, ml, goalMl);
   const total = goalMl !== undefined && goalMl > 0 ? waterOfGoal(before + ml, goalMl, units) : undefined;
   // "250 ml added to Water · 1.48 of 3.3 L", in the order of the food toasts ("Banana added to breakfast").

@@ -11,7 +11,8 @@
  * "a week" ("−0.2 kg a week"). Pure: no React, no storage, no clock (the day comes in).
  */
 import { projectTo, rangeText } from '@/features/onboarding/projection';
-import { formatWeight, weightValue } from '@/lib/units';
+import { weightText } from '@/features/trackers/helpers';
+import { weightValue } from '@/lib/units';
 import type { UnitSystem } from '@/types';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -41,15 +42,15 @@ export function trendGoalLabel(eta: Date): string {
   return `Goal, around ${trendMonth(eta)}`;
 }
 
-/** "74 kg around May 2027 at your current trend." */
+/** "74.0 kg around May 2027 at your current trend." A weight always has its one decimal. */
 export function trendGoalLine(targetKg: number, eta: Date, units: UnitSystem): string {
-  return `${formatWeight(targetKg, units)} around ${trendMonth(eta)} at your current trend.`;
+  return `${weightText(targetKg, units)} around ${trendMonth(eta)} at your current trend.`;
 }
 
 /**
- * The plan's date in Goals: "On this plan, 74 kg between late January and mid March 2027." With
+ * The plan's date in Goals: "On this plan, 74.0 kg between late January and mid March 2027." With
  * `paceDiffers` (the calorie minimum or a target set by hand decides the pace, not the stepper) the
- * pace is said too: "On this plan, about 0.3 kg a week: 74 kg around mid March 2027." Null when the
+ * pace is said too: "On this plan, about 0.3 kg a week: 74.0 kg around mid March 2027." Null when the
  * plan does not move toward the goal (the caller says so in its own words).
  */
 export function planGoalLine(
@@ -61,9 +62,9 @@ export function planGoalLine(
   paceDiffers = false,
 ): string | null {
   if (targetKg === undefined) return null;
-  if (Math.abs(targetKg - startKg) < 0.5) return `You are within ${units === 'imperial' ? 'a pound' : 'half a kilo'} of ${formatWeight(targetKg, units)}.`;
+  if (Math.abs(targetKg - startKg) < 0.5) return `You are within ${units === 'imperial' ? 'a pound' : 'half a kilo'} of ${weightText(targetKg, units)}.`;
   const p = projectTo(startKg, targetKg, weeklyKgSigned, now);
   if (!p) return null;
   const pace = paceDiffers ? `, about ${weeklyRateText(Math.abs(weeklyKgSigned), units).replace('+', '')}:` : ',';
-  return `On this plan${pace} ${formatWeight(targetKg, units)} ${rangeText(p, now)}.`;
+  return `On this plan${pace} ${weightText(targetKg, units)} ${rangeText(p, now)}.`;
 }

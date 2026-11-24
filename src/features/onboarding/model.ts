@@ -244,8 +244,6 @@ export function rateKgOf(d: Draft, weightKg: number): number {
 
 export type Errors = Partial<Record<string, string>>;
 
-const fmt = (n: number, digits = 0) => String(round(n, digits));
-
 /**
  * The limits as the person reads them. Imperial bounds are rounded inward
  * (up at the bottom, down at the top) so every stated bound passes validation.
@@ -347,9 +345,9 @@ export function validateStep(step: StepId, d: Draft, now: Date = new Date()): Er
       if (m.targetKg < LIMITS.weightKg[0] || m.targetKg > LIMITS.weightKg[1]) {
         e.target = `Enter a weight between ${weightRangeText(d.units)}.`;
       } else if (d.goal === 'lose' && m.targetKg >= m.weightKg - 0.2) {
-        e.target = `To lose weight, the target needs to be below your current ${fmt(d.weight ?? 0, 1)} ${unit}.`;
+        e.target = `To lose weight, the goal needs to be below your current ${(d.weight ?? 0).toFixed(1)} ${unit}.`;
       } else if (d.goal === 'gain' && m.targetKg <= m.weightKg + 0.2) {
-        e.target = `To gain, the target needs to be above your current ${fmt(d.weight ?? 0, 1)} ${unit}.`;
+        e.target = `To gain, the goal needs to be above your current ${(d.weight ?? 0).toFixed(1)} ${unit}.`;
       }
       break;
     }

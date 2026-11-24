@@ -219,7 +219,7 @@ export function Badge({ label, color, style }: { label: string; color?: string; 
         style,
       ]}>
       <CupKey color={c} size={7} />
-      <Text variant="caption" color="text" style={{ fontSize: 11.5, lineHeight: 14, fontFamily: fonts.semibold }}>
+      <Text variant="caption" color="text" style={{ fontSize: 12, lineHeight: 14, fontFamily: fonts.semibold }}>
         {label}
       </Text>
     </View>

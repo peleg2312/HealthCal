@@ -242,8 +242,9 @@ export default function CoachScreen() {
         clearCoachArrived();
         const m = useCoachHistory.getState().messages.find((x) => x.id === arrived.id);
         if (!m) return;
+        // A notice (a limit, a refusal) is the warning pattern; an answer arriving plays none, so a light tap keeps one
+        // meaning (a removal) across the app.
         if (arrived.kind === 'notice') haptic.warn();
-        else haptic.tap();
         if (m.source === 'ai') {
           setFresh(m.id);
           if (!shareChipTaken.current && !useCoachConsent.getState().share) {
@@ -482,7 +483,6 @@ export default function CoachScreen() {
             // Enter sends with a keyboard and a mouse; on a touch screen Return makes a new line, as in the apps.
             if (e.nativeEvent.key !== 'Enter' || e.nativeEvent.shiftKey || !finePointer()) return;
             e.preventDefault?.();
-            haptic.tap();
             send(draft);
           },
         }

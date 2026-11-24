@@ -13,10 +13,10 @@ import { planVisible } from '@/features/plan/view';
 import { Group, IconTile, InitialsAvatar } from '@/features/settings/components';
 import { THEME_HINTS, ThemeSwatches } from '@/features/settings/ThemeSwatches';
 import { TextSizeRow } from '@/features/textSize/TextSizeRow';
-import { timeAgo } from '@/features/settings/format';
+import { timeAgo, weightFixed } from '@/features/settings/format';
 import { toISODate } from '@/lib/dates';
 import { usePlannedReminders } from '@/features/settings/usePlannedReminders';
-import { formatNumber, formatWeight } from '@/lib/units';
+import { formatNumber } from '@/lib/units';
 import { useAuth } from '@/services/auth';
 import { remindersSupported } from '@/services/notifications';
 import { isBackendConfigured } from '@/services/supabase';
@@ -68,7 +68,7 @@ function ProfileHub() {
   const u = profile.units;
 
   const currentKg = weights.latest?.kg ?? profile.weightKg;
-  const goalLine = profile.goal === 'maintain' || !profile.targetWeightKg ? GOAL_LABEL[profile.goal] : `Goal ${formatWeight(profile.targetWeightKg, u)}`;
+  const goalLine = profile.goal === 'maintain' || !profile.targetWeightKg ? GOAL_LABEL[profile.goal] : `Goal ${weightFixed(profile.targetWeightKg, u)}`;
 
   const r = settings.reminders;
   const { plan, now } = usePlannedReminders();
@@ -77,7 +77,7 @@ function ProfileHub() {
 
   // The daily target is in the card above; the row says what else is inside.
   const paceText =
-    profile.goal === 'maintain' ? 'Pace, protein, carbs, fat, water' : `${profile.goal === 'lose' ? 'Lose' : 'Gain'} ${formatWeight(profile.weeklyRateKg, u, 1)} a week, protein, carbs, fat, water`;
+    profile.goal === 'maintain' ? 'Pace, protein, carbs, fat, water' : `${profile.goal === 'lose' ? 'Lose' : 'Gain'} ${weightFixed(profile.weeklyRateKg, u)} a week, protein, carbs, fat, water`;
 
   return (
     <Screen header={<Header title="Profile" subtitle="Settings and goals" />}>
@@ -107,7 +107,7 @@ function ProfileHub() {
             borderTopWidth: 1,
             borderTopColor: colors.border,
           }}>
-          <HeaderStat label="Weight" value={formatWeight(currentKg, u)} color={colors.weight} stacked={stacked} />
+          <HeaderStat label="Weight" value={weightFixed(currentKg, u)} color={colors.weight} stacked={stacked} />
           {/* Keeping weight has no goal weight; the line under the name already says so. */}
           {profile.goal === 'maintain' || !profile.targetWeightKg ? null : <HeaderStat divider label="Goal" value={goalLine.replace('Goal ', '')} stacked={stacked} />}
           {/* The daily number before workouts is the target everywhere; "budget" is the target plus workouts (Today). */}

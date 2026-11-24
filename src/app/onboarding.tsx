@@ -1,9 +1,10 @@
 import { Redirect, router } from 'expo-router';
 import { ArrowRight, BellRing, ChevronLeft, CloudUpload } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { BackHandler, Platform, View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
+import { AccessibilityInfo, BackHandler, Platform, View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
 
-import { FadeIn, focusNextEmptyField, StepProgress, StepSlide } from '@/features/onboarding/components';
+import type { ChoiceInput } from '@/features/onboarding/choiceInput';
+import { FadeIn, focusNextEmptyField, focusStepHeading, StepProgress, StepSlide } from '@/features/onboarding/components';
 import { deviceUnitsOnce } from '@/features/onboarding/deviceUnits';
 import { buildPlan, convertUnits, draftFromProfile, effectiveBodyFat, stepsFor, toMetric, useOnboardingDraft, validateStep, type StepId } from '@/features/onboarding/model';
 import { PlanReveal } from '@/features/onboarding/PlanReveal';
@@ -93,6 +94,27 @@ function Flow({ onFinished }: { onFinished: () => void }) {
   const beat = useRef<ReturnType<typeof setTimeout> | null>(null);
   const movedByItselfAt = useRef(0);
   const [asking, setAsking] = useState(false);
+  // A new question takes the focus to its heading once it is on screen (set by every move between questions).
+  const focusArrival = useRef(false);
+  // A screen reader on a phone presses a tile as a finger does, so whether one is on is asked here: with one, a
+  // choice never moves on by itself (on the web its activation already reads as 'keys', ./choiceInput).
+  const reader = useRef(false);
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    let live = true;
+    AccessibilityInfo.isScreenReaderEnabled()
+      .then((on) => {
+        if (live) reader.current = on;
+      })
+      .catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('screenReaderChanged', (on: boolean) => {
+      reader.current = on;
+    });
+    return () => {
+      live = false;
+      sub.remove();
+    };
+  }, []);
 
   // A finished profile can arrive from a late sync while the answers are being given:
   // that plan is the person's real one, so leave rather than replace it.
@@ -131,6 +153,18 @@ function Flow({ onFinished }: { onFinished: () => void }) {
   const index = Math.min(stepIndex, steps.length - 1);
   const step = steps[index];
   const questions = steps.length - 1;
+
+  // The question that just arrived is drawn: its heading takes the focus (WCAG 2.4.3), so a keyboard or a screen
+  // reader goes on from the new question, never from the start of the page or a control that has gone.
+  useEffect(() => {
+    if (!focusArrival.current) return;
+    focusArrival.current = false;
+    if (Platform.OS === 'web') focusStepHeading();
+    else {
+      const t = setTimeout(focusStepHeading, 300);
+      return () => clearTimeout(t);
+    }
+  }, [step]);
   const errors = showErrors ? validateStep(step, draft, now) : {};
   const plan = step === 'plan' ? buildPlan(draft, now) : null;
 
@@ -149,6 +183,7 @@ function Flow({ onFinished }: { onFinished: () => void }) {
     setDirection(to > at ? 1 : -1);
     setMoved(true);
     setShowErrors(false);
+    focusArrival.current = true;
     setStep(to);
     scrollRef.current?.scrollTo({ y: 0, animated: false });
   };
@@ -177,9 +212,14 @@ function Flow({ onFinished }: { onFinished: () => void }) {
     beat.current = null;
   };
 
-  /** A single-choice answer was tapped: let it be seen, then move on. Back, Continue and another tap all cancel the wait. */
-  const advance = () => {
+  /**
+   * A single-choice answer was tapped: let it be seen, then move on. Back, Continue and another tap all cancel the wait.
+   * Only for a finger or a mouse: chosen with a keyboard or a screen reader, the answer is only chosen and Continue
+   * moves on (WCAG 3.2.2), so nobody is taken to another question by choosing and the focus stays on the answer.
+   */
+  const advance = (how: ChoiceInput) => {
     hold();
+    if (how === 'keys' || reader.current) return;
     const from = where().id;
     beat.current = setTimeout(() => {
       beat.current = null;
@@ -210,6 +250,7 @@ function Flow({ onFinished }: { onFinished: () => void }) {
       setDirection(-1);
       setMoved(true);
       setShowErrors(false);
+      focusArrival.current = true;
       s.setStep(at - 1);
       scrollRef.current?.scrollTo({ y: 0, animated: false });
       return true;
@@ -303,8 +344,14 @@ function Flow({ onFinished }: { onFinished: () => void }) {
           <Button title="Start tracking" testID="onb-finish" onPress={finish} disabled={!plan} iconRight={<ArrowRight size={18} color={colors.onPrimary} />} />
         ) : step === 'routine' ? (
           <View style={{ gap: spacing.sm }}>
+            {/* A browser cannot send reminders: said with the offer, so the button is not read as turning them on here. */}
+            {!remindersSupported ? (
+              <Text variant="caption" color="textSecondary" testID="onb-reminders-web">
+                Reminders arrive in the phone app. A browser cannot send them; these choices are saved for your phone.
+              </Text>
+            ) : null}
             <Button
-              title="Turn on reminders"
+              title={remindersSupported ? 'Turn on reminders' : 'Turn on in the phone app'}
               variant="primary"
               testID="onb-reminders-on"
               loading={asking}
