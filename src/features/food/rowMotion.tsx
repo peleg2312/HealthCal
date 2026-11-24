@@ -102,3 +102,31 @@ export function FadeRow({ children, leaving, testID }: { children: React.ReactNo
     </Animated.View>
   );
 }
+
+/**
+ * A row that appears in a log card because of something done on screen (the Restore row after a delete):
+ * it unfolds its height from 0 while the leaving row folds (starting after `delay`, the leaving row's fade),
+ * fading in, so the card and the cards below move smoothly instead of jumping by the row's height.
+ * `animate` false (a row already there when the card mounted) and reduced motion draw it at once.
+ */
+export function Unfold({ children, animate, delay = D.rowExit }: { children: React.ReactNode; animate: boolean; delay?: number }) {
+  const reduce = useReducedMotion();
+  const run = animate && !reduce;
+  const open = useSharedValue(run ? 0 : 1);
+  const height = useSharedValue(0);
+  useEffect(() => {
+    if (run) open.set(withDelay(delay, withTiming(1, { duration: ROW_FOLD_MS, easing: ease.move })));
+    // Run once, on mount: a row that is already open stays open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const style = useAnimatedStyle(() => {
+    const v = open.get();
+    const on = v < 1;
+    return { height: on ? height.get() * v : 'auto', overflow: on ? 'hidden' : 'visible', opacity: v };
+  });
+  return (
+    <Animated.View style={style}>
+      <Animated.View onLayout={(e) => height.set(e.nativeEvent.layout.height)}>{children}</Animated.View>
+    </Animated.View>
+  );
+}

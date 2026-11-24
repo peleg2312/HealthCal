@@ -5,6 +5,7 @@ import type { Direction } from '@/lib/insights';
 import { useTheme } from '@/theme';
 import { CupKey, FadeUp, PressableScale, Text } from '@/ui';
 
+import { spokenUnits } from './chartWords';
 import { TrendMark } from './parts';
 
 /**
@@ -74,7 +75,7 @@ export function ProgressTile({
       testID={testID}
       onPress={onPress}
       scaleTo={0.98}
-      accessibilityLabel={`${title}: ${spoken ?? `${value === null ? 'no data' : `${value} ${unit ?? ''}`}${caption ? `, ${caption}` : ''}`}.${compare ? ` ${compare}.` : ''} Open details.`}
+      accessibilityLabel={spokenUnits(`${title}: ${spoken ?? `${value === null ? 'no data' : `${value} ${unit ?? ''}`}${caption ? `, ${caption}` : ''}`}.${compare ? ` ${compare}.` : ''} Open details.`)}
       style={{
         flexGrow: 1,
         paddingHorizontal: spacing.lg,

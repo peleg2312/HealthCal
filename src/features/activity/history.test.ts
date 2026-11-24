@@ -48,8 +48,8 @@ describe("Train's history by week", () => {
     ]);
     // Every workout is in exactly one week, and a week with none is left out.
     expect(weeks.reduce((n, w) => n + w.entries.length, 0)).toBe(list.length);
-    expect(historyWeekLabel(weeks[0])).toBe('This week, 3 sessions, 3 h');
-    expect(historyWeekLabel(weeks[2])).toBe('Week of Nov 2, 1 session, 40 min');
+    expect(historyWeekLabel(weeks[0])).toBe('This week, 3 sessions, 3 hours');
+    expect(historyWeekLabel(weeks[2])).toBe('Week of Nov 2, 1 session, 40 minutes');
     expect(historyWeeks([], TODAY)).toEqual([]);
   });
 });

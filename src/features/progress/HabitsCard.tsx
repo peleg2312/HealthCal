@@ -9,6 +9,7 @@ import type { UnitSystem } from '@/types';
 import { Card, CupKey, Divider, PressableScale, ProgressBar, Text } from '@/ui';
 
 import { changeDirection, changeWords } from './change';
+import { spokenUnits } from './chartWords';
 import { go, TrendLegend, TrendMark } from './parts';
 import { sleepDetail } from './sleepDetail';
 
@@ -40,7 +41,7 @@ function HabitRow({
 }) {
   const { colors, spacing } = useTheme();
   return (
-    <PressableScale testID={testID} onPress={() => go(route)} scaleTo={0.985} accessibilityLabel={`${title}: ${value ?? 'no data'} ${unit ?? ''}. ${detail}.${change ? ` ${change}.` : ''}`} style={{ gap: spacing.sm, paddingVertical: spacing.xs }}>
+    <PressableScale testID={testID} onPress={() => go(route)} scaleTo={0.985} accessibilityLabel={spokenUnits(`${title}: ${value ?? 'no data'} ${unit ?? ''}. ${detail}.${change ? ` ${change}.` : ''}`)} style={{ gap: spacing.sm, paddingVertical: spacing.xs }}>
       {/* The number shares the title's line and the detail runs the full width under both, so on a
           320 px phone the detail is not squeezed into a narrow column beside the number. */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>

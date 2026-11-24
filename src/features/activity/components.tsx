@@ -3,6 +3,7 @@ import React from 'react';
 import { PixelRatio, Platform, useWindowDimensions, View } from 'react-native';
 
 import { DayStepper } from '@/features/food/components';
+import { spokenUnits } from '@/features/progress/chartWords';
 import { useToday } from '@/store/clock';
 import { useLive, useProfile } from '@/store/selectors';
 import { INTENSITY_LABELS, kcalRange } from '@/lib/exercise';
@@ -88,7 +89,8 @@ export function SessionRow({
   const spoken = [
     `Edit ${entry.name}`,
     ...(day ? [day.spoken] : []),
-    ...parts,
+    // "75 minutes", "3.9 kilometres": units spoken in full (`spokenUnits`).
+    ...parts.map(spokenUnits),
     ...(garmin ? ['imported from Garmin'] : []),
     measured ? `${adds.spoken}, from a measured burn` : `${adds.spoken}, an estimate, likely ${formatNumber(range![0])} to ${formatNumber(range![1])}`,
   ].join(', ');

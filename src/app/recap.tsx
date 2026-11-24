@@ -7,6 +7,7 @@ import { addDays, formatDayLabel, formatShortDate } from '@/lib/dates';
 import { budgetBalanceText, weekRangeLabel, type RecapTile } from '@/lib/insights';
 import { formatNumber } from '@/lib/units';
 import { changeDirection, changeWords, type ChangeKind } from '@/features/progress/change';
+import { spokenUnits } from '@/features/progress/chartWords';
 import { go } from '@/features/progress/parts';
 import { RecapCups } from '@/features/progress/RecapCups';
 import { recapDayCups, recapDaysVerdict } from '@/features/progress/recapDays';
@@ -47,7 +48,7 @@ function Tile({ t, index, week }: { t: RecapTile; index: number; week: string })
     <View
       testID={`recap-tile-${t.id}`}
       accessible
-      accessibilityLabel={`${t.label}: ${t.value === null ? 'no data' : `${formatNumber(t.value)} ${t.unit}`}, ${t.context}. ${said}`}
+      accessibilityLabel={spokenUnits(`${t.label}: ${t.value === null ? 'no data' : `${formatNumber(t.value)} ${t.unit}`}, ${t.context}. ${said}`)}
       style={{
         width: '50%',
         minWidth: 0,
@@ -232,7 +233,7 @@ export default function RecapScreen() {
           <PressableScale
             testID="recap-plan"
             onPress={() => go('/settings/goals')}
-            accessibilityLabel={`Your daily target: ${formatNumber(d.plan.before)} kcal on ${formatShortDate(d.week)}, ${formatNumber(d.plan.after)} kcal ${d.plan.afterDate === d.today ? 'today' : `from ${formatShortDate(d.plan.afterDate)}`}. ${d.plan.reason} The target is before workouts${d.exerciseRule === 'day' ? '; logged workouts add their own calories on the day' : d.exerciseRule === 'week' ? '; each logged workout adds a seventh of its calories to 7 days' : d.exerciseRule === 'mixed' ? '; logged workouts add their calories by the rule each day had, on the day or shared over 7 days' : ''}. Open goals.`}
+            accessibilityLabel={spokenUnits(`Your daily target: ${formatNumber(d.plan.before)} kcal on ${formatShortDate(d.week)}, ${formatNumber(d.plan.after)} kcal ${d.plan.afterDate === d.today ? 'today' : `from ${formatShortDate(d.plan.afterDate)}`}. ${d.plan.reason} The target is before workouts${d.exerciseRule === 'day' ? '; logged workouts add their own calories on the day' : d.exerciseRule === 'week' ? '; each logged workout adds a seventh of its calories to 7 days' : d.exerciseRule === 'mixed' ? '; logged workouts add their calories by the rule each day had, on the day or shared over 7 days' : ''}. Open goals.`)}
             scaleTo={0.985}>
             <Card style={{ gap: spacing.sm }}>
               <View

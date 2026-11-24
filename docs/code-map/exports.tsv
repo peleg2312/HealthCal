@@ -1018,6 +1018,7 @@ src/features/food/restore.ts	RESTORE_MAX	const
 src/features/food/restore.ts	removedToday	function
 src/features/food/rowMotion.tsx	FadeRow	component
 src/features/food/rowMotion.tsx	ROW_FOLD_MS	const
+src/features/food/rowMotion.tsx	Unfold	component
 src/features/food/rowMotion.tsx	useLeavingRows	function
 src/features/food/saveHint.ts	SAVE_HINT_KEY	const
 src/features/food/saveHint.ts	SAVE_MIN_FOODS	const

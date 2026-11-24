@@ -7,6 +7,7 @@ import { weekRangeLabel, type WeeklyRecap } from '@/lib/insights';
 import { useTheme } from '@/theme';
 import { Badge, Card, Chip, PressableScale, Text } from '@/ui';
 
+import { spokenUnits } from './chartWords';
 import { go } from './parts';
 
 /**
@@ -21,7 +22,7 @@ export function RecapCard({ recap, earlier, unseen }: { recap: WeeklyRecap; earl
       <PressableScale
         testID="progress-recap-open"
         onPress={() => go(`/recap?week=${recap.weekStart}`)}
-        accessibilityLabel={`Weekly check-in, ${recap.label}, ${range}. ${recap.win}`}
+        accessibilityLabel={spokenUnits(`Weekly check-in, ${recap.label}, ${range}. ${recap.win}`)}
         scaleTo={0.985}
         style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 44 }}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>

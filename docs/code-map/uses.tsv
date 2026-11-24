@@ -817,6 +817,7 @@ src/features/food/oneTap.ts	useOneTap	4	src/app/(tabs)/index.tsx	src/app/food/se
 src/features/food/restore.ts	RESTORE_MAX	1	src/features/food/restore.test.ts
 src/features/food/restore.ts	removedToday	2	src/features/food/DiaryParts.tsx	src/features/food/restore.test.ts
 src/features/food/rowMotion.tsx	FadeRow	2	src/app/water.tsx	src/features/food/DiaryParts.tsx
+src/features/food/rowMotion.tsx	Unfold	1	src/features/food/DiaryParts.tsx
 src/features/food/rowMotion.tsx	useLeavingRows	2	src/app/water.tsx	src/features/food/DiaryParts.tsx
 src/features/food/saveHint.ts	canOfferSave	1	src/features/food/saveHint.test.ts
 src/features/food/saveHint.ts	markSaveHintDone	2	src/app/(tabs)/diary.tsx	src/features/food/actions.ts
@@ -1796,7 +1797,7 @@ src/features/progress/chartWords.ts	barsLabel	5	src/features/activity/TrainingLo
 src/features/progress/chartWords.ts	chartLabel	2	src/features/progress/WeightCard.tsx	src/features/progress/chartWords.test.ts
 src/features/progress/chartWords.ts	evenly	2	src/features/progress/WeightCard.tsx	src/features/progress/chartWords.test.ts
 src/features/progress/chartWords.ts	sleepChartLabel	2	src/app/sleep.tsx	src/features/progress/chartWords.test.ts
-src/features/progress/chartWords.ts	spokenUnits	1	src/features/progress/chartWords.test.ts
+src/features/progress/chartWords.ts	spokenUnits	10	src/app/consistency.tsx	src/app/recap.tsx	src/features/activity/components.tsx	src/features/activity/history.ts	src/features/progress/HabitsCard.tsx	src/features/progress/MilestonesCard.tsx	src/features/progress/ProgressTile.tsx	src/features/progress/RecapCard.tsx	src/features/progress/RecapCups.tsx	src/features/progress/chartWords.test.ts
 src/features/progress/chartWords.ts	waterChartLabel	2	src/app/water.tsx	src/features/progress/chartWords.test.ts
 src/features/progress/chartWords.ts	weightChartLabel	2	src/app/weight.tsx	src/features/progress/chartWords.test.ts
 src/features/progress/consistency.ts	CalendarCell	1	src/app/consistency.tsx

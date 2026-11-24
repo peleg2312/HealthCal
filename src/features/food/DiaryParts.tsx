@@ -28,7 +28,7 @@ import { useSaveMealStep } from './SaveMealSheet';
 import { SAVE_HINT_NOT_NOW, SAVE_HINT_NOT_NOW_A11Y, saveHintA11y, saveHintLabel } from './saveWords';
 import { currentKcal } from './usuals';
 import { removedToday } from './restore';
-import { FadeRow, useLeavingRows } from './rowMotion';
+import { FadeRow, Unfold, useLeavingRows } from './rowMotion';
 
 /**
  * The diary summary: calories left as a big number, the day as a trough
@@ -291,6 +291,8 @@ export function MealCard({
   const allEntries = useStore((s) => s.foodEntries);
   const todayDate = useToday();
   const removed = useMemo(() => removedToday(allEntries, date, meal, todayDate), [allEntries, date, meal, todayDate]);
+  // Rows already there when the card mounted are drawn at once; one that a delete brings unfolds with the fold.
+  const [shownAtMount] = useState(() => new Set(removed.map((e) => `${date}:${e.id}`)));
   const mealWord = label.toLowerCase();
   // One add per meal: an empty meal's add is its dashed slot (`meal-add-<meal>`), with no "+" cup and no "..." in its
   // header (the menu's one action for an empty meal, copying the last one, is the Repeat under the slot).
@@ -337,12 +339,13 @@ export function MealCard({
           {filled ? <Divider inset={ROW_PAD} /> : null}
           <View style={{ paddingLeft: ROW_PAD, paddingRight: 8, paddingTop: filled ? 2 : 8, paddingBottom: filled ? 6 : 0 }}>
             {removed.map((e) => (
-              <RestoreRow
-                key={e.id}
-                testID={`entry-restore-${e.id}`}
-                label={`${isolateRtl(foodNameHead(displayFoodName(e)))} removed from ${mealWord}`}
-                onRestore={() => useStore.getState().restore('foodEntries', e.id)}
-              />
+              <Unfold key={e.id} animate={!shownAtMount.has(`${date}:${e.id}`)}>
+                <RestoreRow
+                  testID={`entry-restore-${e.id}`}
+                  label={`${isolateRtl(foodNameHead(displayFoodName(e)))} removed from ${mealWord}`}
+                  onRestore={() => useStore.getState().restore('foodEntries', e.id)}
+                />
+              </Unfold>
             ))}
           </View>
         </View>

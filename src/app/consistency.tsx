@@ -6,6 +6,7 @@ import { formatDayLabel, formatShortDate, startOfWeek } from '@/lib/dates';
 import { formatNumber } from '@/lib/units';
 import { RHYTHM_KINDS, monthGrid, monthLabel, monthOf, monthTally, rhythmWeeks, shiftMonth, weeksOnRhythm, type CalendarCell, type RhythmKind } from '@/features/progress/consistency';
 import { solidBar } from '@/features/progress/calorieBars';
+import { spokenUnits } from '@/features/progress/chartWords';
 import { go } from '@/features/progress/parts';
 import { setRhythmTarget, useConsistencyData } from '@/features/progress/useConsistencyData';
 import { useTheme, withOpacity } from '@/theme';
@@ -44,7 +45,7 @@ function cellLabel(cell: CalendarCell): string {
   const above = Math.round(cell.kcal - cell.budget);
   const share = cell.ratio > 1 ? `${formatNumber(Math.max(1, above))} kcal above the budget` : `${Math.floor(cell.ratio * 100)}% of the budget`;
   const food = cell.future ? 'upcoming' : !cell.logged ? 'not logged' : cell.isToday ? `${share} so far` : cell.partial ? `partly logged, ${share}` : `${share}${cell.onBudget ? ', on budget' : ''}`;
-  return [formatDayLabel(cell.date), food, cell.waterMet ? 'water goal met' : '', cell.trained ? 'workout logged' : ''].filter(Boolean).join(', ');
+  return spokenUnits([formatDayLabel(cell.date), food, cell.waterMet ? 'water goal met' : '', cell.trained ? 'workout logged' : ''].filter(Boolean).join(', '));
 }
 
 /**

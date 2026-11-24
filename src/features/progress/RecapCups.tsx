@@ -6,6 +6,7 @@ import { weekdayShort } from '@/lib/dates';
 import { useTheme, withOpacity } from '@/theme';
 import { MiniCup, PressableScale, Text } from '@/ui';
 
+import { spokenUnits } from './chartWords';
 import type { RecapDayCup } from './recapDays';
 
 const CUP_W = 34;
@@ -53,7 +54,7 @@ export function RecapCups({ cups, week }: { cups: RecapDayCup[]; week: string })
                 feedback="select"
                 scaleTo={0.96}
                 accessibilityRole="button"
-                accessibilityLabel={`${weekdayShort(c.date)}, ${c.detail}`}
+                accessibilityLabel={spokenUnits(`${weekdayShort(c.date)}, ${c.detail.replace(/ · /g, ', ')}`)}
                 accessibilityState={{ selected: active }}
                 // react-native-web reads the aria prop: the day whose numbers show under the cups is pressed.
                 {...({ 'aria-pressed': active } as object)}

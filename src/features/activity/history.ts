@@ -3,6 +3,7 @@
  * newest week first, one card per week with its workouts as rows. Pure: no React, storage or clock;
  * `today` comes from the screen's clock hook.
  */
+import { spokenUnits } from '@/features/progress/chartWords';
 import { addDays, formatDuration, formatShortDate, fromISODate, startOfWeek, weekdayShort } from '@/lib/dates';
 import type { ActivityEntry, ISODate } from '@/types';
 
@@ -75,7 +76,8 @@ export function historyWeeks(activities: readonly ActivityEntry[], today: ISODat
 /** The week card's spoken head: "This week, 3 sessions, 2 h 30 min". */
 export function historyWeekLabel(week: HistoryWeek): string {
   const n = week.entries.length;
-  return `${week.title}, ${n} ${n === 1 ? 'session' : 'sessions'}, ${formatDuration(week.minutes)}`;
+  // Units spoken in full ("2 hours 30 minutes"), as every spoken name says them (`spokenUnits`).
+  return spokenUnits(`${week.title}, ${n} ${n === 1 ? 'session' : 'sessions'}, ${formatDuration(week.minutes)}`);
 }
 
 /**

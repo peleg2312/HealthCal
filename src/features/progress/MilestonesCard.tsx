@@ -6,6 +6,7 @@ import type { Milestone } from '@/lib/insights';
 import { useTheme } from '@/theme';
 import { MiniCup, Text } from '@/ui';
 
+import { spokenUnits } from './chartWords';
 import { SectionCard } from './parts';
 
 type Domain = 'calories' | 'weight' | 'water' | 'exercise';
@@ -79,7 +80,7 @@ export function MilestonesCard({ milestones }: { milestones: Milestone[] }) {
           {next.map((m, i) => {
             const pct = Math.round((m.current / m.goal) * 100);
             return (
-              <View key={m.id} testID={`milestone-${m.id}`} accessible accessibilityLabel={`${m.title}, ${pct}% of the way. ${m.detail}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+              <View key={m.id} testID={`milestone-${m.id}`} accessible accessibilityLabel={spokenUnits(`${m.title}, ${pct}% of the way. ${m.detail}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
                 <MiniCup progress={Math.min(0.999, m.current / m.goal)} goalKind="reach" index={done.length + i} memoryKey={`milestone-${m.id}`} color={colors[milestoneDomain(m.id)]} width={22} height={28} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text variant="label">{m.title}</Text>
