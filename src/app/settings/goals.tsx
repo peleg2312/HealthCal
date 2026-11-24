@@ -616,7 +616,7 @@ function GoalsForm() {
           <ToggleRow
             testID="goals-eat-back"
             title="Add exercise to my budget"
-            subtitle="Workouts add only the calories burned above resting."
+            subtitle="Workouts add only their calories above resting."
             value={draft.eatBackExercise}
             onChange={(eatBackExercise) => patch({ eatBackExercise })}
           />

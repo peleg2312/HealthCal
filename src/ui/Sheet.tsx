@@ -38,10 +38,14 @@ type HistoryState = Record<string, unknown> | null | undefined;
 const historyState = (): HistoryState => (typeof window !== 'undefined' ? (window.history.state as HistoryState) : null);
 /** Sheets whose history entry is theirs and still wanted (web). */
 const openEntries = new Set<number>();
+/** Entries of closed sheets that a router move has already stepped over or taken. */
+const usedEntries = new Set<number>();
 /** The current history entry is one a sheet added and no longer wants: it is closed, or closing. */
 function onLeftEntry(): boolean {
   const t = historyState()?.[SHEET_ENTRY];
-  return typeof t === 'number' && !openEntries.has(t);
+  const left = typeof t === 'number' && !openEntries.has(t);
+  if (left) usedEntries.add(t);
+  return left;
 }
 let historyPatched = false;
 /**
@@ -63,6 +67,13 @@ function patchHistory() {
     return push(state, unused, url);
   };
   h.go = (delta?: number) => go(delta && delta < 0 && onLeftEntry() ? delta - 1 : delta);
+  const replace = h.replaceState.bind(h);
+  // Replacing a closed sheet's entry leaves the entry under it as it was: noted, so it is not taken off.
+  h.replaceState = (state: unknown, unused: string, url?: string | URL | null) => {
+    const ours = !!state && typeof state === 'object' && SHEET_ENTRY in (state as object);
+    if (!ours) onLeftEntry();
+    return replace(state, unused, url);
+  };
 }
 
 /**
@@ -114,7 +125,8 @@ function useBackCloses(visible: boolean, close: () => void, stillOpen: () => boo
       openEntries.delete(token);
       if (popped) return;
       setTimeout(() => {
-        if (historyState()?.[SHEET_ENTRY] === token) window.history.back();
+        const used = usedEntries.delete(token);
+        if (!used && historyState()?.[SHEET_ENTRY] === token) window.history.back();
       }, 0);
     };
   }, [visible]);
