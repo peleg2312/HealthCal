@@ -18,7 +18,7 @@ import { favoriteActionLabel, favoriteLabel, FAVOURITE_GROUPS, FAVOURITES_EMPTY 
 import { FAVOURITES_EMPTY_WITH_HINT, HOLD_HINT, markHoldHintDone, useHoldHint } from '@/features/food/holdHint';
 import { LogSavedMealSheet } from '@/features/food/SavedMealParts';
 import { SaveCurrentMealRow, SavedMealRow, useVisitOrder } from '@/features/food/SavedMealRow';
-import { loadSearchTab, openingTab, rememberSearchTab, useSearchTab, type SearchTab } from '@/features/food/searchTab';
+import { loadSearchTab, openingTab, rememberSearchTab, SEARCH_CHIPS, usualEmpty, useSearchTab, type SearchTab } from '@/features/food/searchTab';
 import { resolveFood, usualFoods } from '@/features/food/usuals';
 import { isolateRtl } from '@/lib/bidi';
 import { formatDayLabel } from '@/lib/dates';
@@ -107,7 +107,7 @@ export default function FoodSearchScreen() {
   const { ordered, starredAtVisit } = useVisitOrder(savedMeals);
   const favMeals = ordered.filter((m) => isFavoriteMeal(m) || starredAtVisit.has(m.id));
   // Favourites opens from memory only while it lists something (what this visit lists, so an unstar there never
-  // moves the tab); the Usual tab only exists for a meal with history: after switching to a meal without, fall back.
+  // moves the tab); Usual opens by itself only for a meal with history (a tap opens it empty too).
   const tab: Tab = openingTab(pickedTab, rememberedTab, { usual: usuals.length > 0, favorites: favMeals.length + favorites.length > 0 });
   // What is starred now (a food unstarred on this visit keeps its row, not its count).
   const favCount = favorites.filter((f) => favoriteIds.includes(f.id)).length + savedMeals.filter(isFavoriteMeal).length;
@@ -217,7 +217,15 @@ export default function FoodSearchScreen() {
     </View>
   );
 
-  const meals = <Chip testID="search-tab-meals" label={`Saved meals${savedMeals.length ? ` ${savedMeals.length}` : ''}`} selected={tab === 'meals'} onPress={() => setTab('meals')} />;
+
+  // Each chip's words, with its count when it holds something ("Favourites 3").
+  const chipLabel: Record<Tab, string> = {
+    usual: 'Usual',
+    recent: 'Recent',
+    favorites: `Favourites${favCount ? ` ${favCount}` : ''}`,
+    mine: `My foods${mine.length ? ` ${mine.length}` : ''}`,
+    meals: `Saved meals${savedMeals.length ? ` ${savedMeals.length}` : ''}`,
+  };
 
   const header = (
     <View style={{ gap: spacing.sm, paddingBottom: spacing.sm }}>
@@ -265,22 +273,25 @@ export default function FoodSearchScreen() {
       {!q ? (
         <>
           {escapes}
+          {/* One fixed set in one fixed order on every visit (SEARCH_CHIPS): a chip with nothing behind it opens its empty state. */}
           <ChipRow>
-            {usuals.length ? <Chip testID="search-tab-usual" label="Usual" selected={tab === 'usual'} onPress={() => setTab('usual')} /> : null}
-            <Chip testID="search-tab-recent" label="Recent" selected={tab === 'recent'} onPress={() => setTab('recent')} />
-            <Chip testID="search-tab-favorites" label={`Favourites${favCount ? ` ${favCount}` : ''}`} selected={tab === 'favorites'} onPress={() => setTab('favorites')} />
-            {/* Saved meals move ahead of My foods once there are any, so the chip shows without scrolling the row. */}
-            {savedMeals.length ? meals : null}
-            <Chip testID="search-tab-mine" label={`My foods${mine.length ? ` ${mine.length}` : ''}`} selected={tab === 'mine'} onPress={() => setTab('mine')} />
-            {savedMeals.length ? null : meals}
+            {SEARCH_CHIPS.map((t) => (
+              <Chip key={t} testID={`search-tab-${t}`} label={chipLabel[t]} selected={tab === t} onPress={() => setTab(t)} />
+            ))}
           </ChipRow>
-          {tab === 'usual' && usuals.length ? (
-            <View style={{ gap: spacing.xs }}>
-              <Text variant="caption" color="textSecondary" testID="search-usual-note">
-                Most logged at {MEAL_LABEL[meal].toLowerCase()}, last 30 days
-              </Text>
-              <List>{usuals.map((f, i) => row(f, `usual-${i}`))}</List>
-            </View>
+          {tab === 'usual' ? (
+            usuals.length ? (
+              <View style={{ gap: spacing.xs }}>
+                <Text variant="caption" color="textSecondary" testID="search-usual-note">
+                  Most logged at {MEAL_LABEL[meal].toLowerCase()}, last 30 days
+                </Text>
+                <List>{usuals.map((f, i) => row(f, `usual-${i}`))}</List>
+              </View>
+            ) : (
+              <View testID="search-usual-empty">
+                <Hint {...usualEmpty(MEAL_LABEL[meal].toLowerCase())} />
+              </View>
+            )
           ) : null}
           {tab === 'recent' ? (
             recents.length ? (

@@ -31,6 +31,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import { useStore } from '@/store';
 import { motion, useReducedMotion } from '@/theme';
+import { pourLandsAt } from '@/theme/motion';
 
 import { Text, type TextProps } from './Text';
 import { reachedBefore } from './vesselLayout';
@@ -43,6 +44,7 @@ export const ease = {
   enter: Easing.bezier(...motion.easing.enter),
   exit: Easing.bezier(...motion.easing.exit),
   move: Easing.bezier(...motion.easing.move),
+  arrive: Easing.bezier(...motion.easing.arrive),
 };
 
 /**
@@ -84,13 +86,64 @@ export interface Pour {
   settle: SharedValue<number>;
   /** True when this pour is instant (reduced motion or animate=false). */
   instant: boolean;
-  /** When the pour ends, in ms from now: for things that appear "at the end of the pour". 0 when there is no pour to wait for (instant, or a remount already at its level). */
+  /**
+   * When the pour lands, in ms from now: for what appears "at the end of the pour" (the brim line and its
+   * flash, the amber cap, the hatched headroom): `pourLandsAt` of its length, when the level is within 5% of
+   * the cup of where it stops. 0 when there is no pour to wait for (instant, or a remount already at its level).
+   */
   endsIn: number;
+}
+
+const clock = () => (typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now());
+
+/** Pours waiting for the page to draw at an even pace (`whenEven`), started together. */
+const waitingPours = new Set<() => void>();
+let watchingFrames = false;
+
+/**
+ * Calls `start` once the page draws at an even pace: two frames in a row, each under 40 ms after the one
+ * before, or after 600 ms at the latest. A cup that pours as its screen mounts (Today's calorie cup when the
+ * app opens) otherwise starts while the screen's first frames are still being built: on the web the pour
+ * runs on that same thread, its clock kept running through a 120 ms frame, and its first step drawn was
+ * half its height. One watcher serves every waiting cup, so a screen's cups still start together (each
+ * keeps its own `delay`, the row's stagger). Returns the cancel.
+ */
+function whenEven(start: () => void): () => void {
+  if (typeof requestAnimationFrame !== 'function') {
+    start();
+    return () => {};
+  }
+  waitingPours.add(start);
+  if (!watchingFrames) {
+    watchingFrames = true;
+    const began = clock();
+    let last = 0;
+    let even = 0;
+    const step = () => {
+      const t = clock();
+      even = last && t - last < 40 ? even + 1 : 0;
+      last = t;
+      if (even >= 2 || t - began > 600 || waitingPours.size === 0) {
+        watchingFrames = false;
+        const all = [...waitingPours];
+        waitingPours.clear();
+        for (const go of all) go();
+        return;
+      }
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+  return () => {
+    waitingPours.delete(start);
+  };
 }
 
 /**
  * Animate a level to `to`: a pour (ease-out) then a settle of the rim. The
  * shared value is driven on the UI thread; read it in `useAnimatedStyle`.
+ * A pour that starts as the cup mounts waits for the page to draw at an even
+ * pace first (`whenEven`, a frame or two, 600 ms at most).
  *
  *   const p = usePour(ratio, { duration: motion.duration.pourSmall, delay: index * motion.duration.stagger });
  *   const style = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - p.level.get()) * h }] }));
@@ -109,7 +162,14 @@ export function usePour(to: number, { duration = D.pour, delay = 0, memoryKey, a
   const resting = mounted.atRest && mounted.target === target;
   const level = useSharedValue(initial);
   const rim = useSharedValue(0);
+  // The pour this render asks for, from the level the one before asked for: its size decides when it lands.
+  const [leg, setLeg] = useState({ from: initial, to: target });
+  if (leg.to !== target) setLeg({ from: leg.to, to: target });
+  // Whether the effect below has run yet: its first run is the mount.
+  const ran = useRef(false);
   useEffect(() => {
+    const first = !ran.current;
+    ran.current = true;
     if (memoryKey) shown.set(memoryKey, target);
     if (instant) {
       cancelAnimation(level);
@@ -120,22 +180,33 @@ export function usePour(to: number, { duration = D.pour, delay = 0, memoryKey, a
     }
     const start = level.get();
     if (Math.abs(start - target) < 1e-6) return;
-    level.set(withDelay(delay, withTiming(target, { duration, easing: ease.pour })));
-    if (settle > 0) {
-      const dir = target > start ? 1 : -1;
-      // The level line arrives a hair late: it rides a little past the level near the end, then rests.
-      rim.set(
-        withDelay(
-          delay + duration * 0.72,
+    const go = () => {
+      level.set(withDelay(delay, withTiming(target, { duration, easing: ease.pour })));
+      if (settle > 0) {
+        const dir = target > start ? 1 : -1;
+        // The level line arrives a hair late: it rides a little past the level near the end, then rests.
+        // A settle still running from the pour before (a quick second glass, the AI cup's loop) is let go
+        // first, so the line never rides the wrong way while this pour rises.
+        const at = delay + duration * 0.72;
+        const letGo = Math.min(D.fade, at);
+        rim.set(
           withSequence(
-            withTiming(dir * settle, { duration: D.settle * 0.45, easing: ease.enter }),
-            withTiming(0, { duration: D.settle * 0.55, easing: Easing.inOut(Easing.quad) }),
+            withTiming(0, { duration: letGo, easing: ease.enter }),
+            withDelay(
+              at - letGo,
+              withSequence(
+                withTiming(dir * settle, { duration: D.settle * 0.45, easing: ease.enter }),
+                withTiming(0, { duration: D.settle * 0.55, easing: Easing.inOut(Easing.quad) }),
+              ),
+            ),
           ),
-        ),
-      );
-    }
+        );
+      }
+    };
+    if (first) return whenEven(go);
+    go();
   }, [target, instant, delay, duration, memoryKey, settle, level, rim]);
-  return { level, settle: rim, instant, endsIn: instant || resting ? 0 : delay + duration };
+  return { level, settle: rim, instant, endsIn: instant || resting ? 0 : delay + duration * pourLandsAt(leg.to - leg.from) };
 }
 
 /**

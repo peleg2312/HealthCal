@@ -10,7 +10,8 @@ import { TrendMark } from './parts';
 /**
  * One cell of the overview card: a cup key and title, one large value with
  * its unit small inside it and the Nutrition card's trend mark beside it (a
- * triangle against the previous equal period, explained once under the grid),
+ * triangle against the previous equal period for a change worth calling, a
+ * dash for about the same; explained once under the grid),
  * and one caption line. The comparison in words is read out with the cell and
  * shown in full one tap away. Cells share one card and are divided by hairlines
  * (drawn by the grid). The whole cell is one pressable; it holds nothing else
@@ -24,6 +25,7 @@ export function ProgressTile({
   unit,
   caption,
   captionShort,
+  spoken,
   compare,
   trend,
   period,
@@ -44,6 +46,8 @@ export function ProgressTile({
   caption?: string;
   /** The same line for a phone under 360 px, where a cell is about 108 px wide. */
   captionShort?: string;
+  /** What a screen reader says for the number and its line, when the short caption needs more words ("218 active minutes a week, toward ..."). */
+  spoken?: string;
   /** Neutral comparison sentence, read out with the cell; null when there is nothing to compare with. */
   compare: string | null;
   /** The triangle beside the value: the shown number against the previous equal period. */
@@ -70,7 +74,7 @@ export function ProgressTile({
       testID={testID}
       onPress={onPress}
       scaleTo={0.98}
-      accessibilityLabel={`${title}: ${value === null ? 'no data' : `${value} ${unit ?? ''}`}${caption ? `, ${caption}` : ''}.${compare ? ` ${compare}.` : ''} Open details.`}
+      accessibilityLabel={`${title}: ${spoken ?? `${value === null ? 'no data' : `${value} ${unit ?? ''}`}${caption ? `, ${caption}` : ''}`}.${compare ? ` ${compare}.` : ''} Open details.`}
       style={{
         flexGrow: 1,
         paddingHorizontal: spacing.lg,

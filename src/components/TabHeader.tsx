@@ -47,9 +47,11 @@ let coachPreloaded = false;
 
 /**
  * On the web each route's code is its own file, fetched on the first visit, so the first tap on the
- * Coach cup showed a blank page while the coach's code arrived. Once a tab has settled (the
- * browser is idle, or 1.5 s), the coach's code is fetched ahead, once a run, so the first frame
- * after the tap is the coach. Natively every route is already in the bundle.
+ * Coach cup showed a blank page while the coach's code arrived, and the first visit to a tab faded
+ * the last one out, showed a blank page for about 250 ms and then faded the tab in. Once a tab has
+ * settled (the browser is idle, or 1.5 s), the coach's code and the four tabs' are fetched ahead,
+ * once a run, so the first frame after the tap is the coach, and a tab's cross-fade has a page to
+ * fade to. Natively every route is already in the bundle.
  */
 function preloadCoach(): () => void {
   if (Platform.OS !== 'web' || coachPreloaded || typeof window === 'undefined') return () => {};
@@ -60,6 +62,11 @@ function preloadCoach(): () => void {
       // Offline or a failed fetch: the tap loads it as before.
       coachPreloaded = false;
     });
+    // The tabs, so a first visit cross-fades into a drawn page; a failed fetch loads on the tap as before.
+    import('@/app/(tabs)/index').catch(() => {});
+    import('@/app/(tabs)/diary').catch(() => {});
+    import('@/app/(tabs)/train').catch(() => {});
+    import('@/app/(tabs)/progress').catch(() => {});
   };
   const idle = (window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
   if (idle) {

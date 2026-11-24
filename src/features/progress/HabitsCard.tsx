@@ -2,12 +2,13 @@ import { ChevronRight } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
-import { direction, hoursText, plural, type Direction, SLEEP_MAX_HOURS, SLEEP_TARGET_HOURS, WEEKLY_ACTIVE_MINUTES, type PeriodSummary } from '@/lib/insights';
+import { hoursText, plural, type Direction, SLEEP_MAX_HOURS, SLEEP_TARGET_HOURS, WEEKLY_ACTIVE_MINUTES, type PeriodSummary } from '@/lib/insights';
 import { formatVolume } from '@/lib/units';
 import { useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
 import { Card, CupKey, Divider, PressableScale, ProgressBar, Text } from '@/ui';
 
+import { changeDirection, changeWords } from './change';
 import { go, TrendLegend, TrendMark } from './parts';
 import { sleepDetail } from './sleepDetail';
 
@@ -21,9 +22,12 @@ function HabitRow({
   detail,
   progress,
   trend,
+  change,
   period,
 }: {
   trend?: Direction | null;
+  /** The change against the previous period in words, read out with the row. */
+  change?: string | null;
   period?: string;
   testID: string;
   route: string;
@@ -36,7 +40,7 @@ function HabitRow({
 }) {
   const { colors, spacing } = useTheme();
   return (
-    <PressableScale testID={testID} onPress={() => go(route)} scaleTo={0.985} accessibilityLabel={`${title}: ${value ?? 'no data'} ${unit ?? ''}. ${detail}`} style={{ gap: spacing.sm, paddingVertical: spacing.xs }}>
+    <PressableScale testID={testID} onPress={() => go(route)} scaleTo={0.985} accessibilityLabel={`${title}: ${value ?? 'no data'} ${unit ?? ''}. ${detail}.${change ? ` ${change}.` : ''}`} style={{ gap: spacing.sm, paddingVertical: spacing.xs }}>
       {/* The number shares the title's line and the detail runs the full width under both, so on a
           320 px phone the detail is not squeezed into a narrow column beside the number. */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
@@ -90,7 +94,8 @@ export function HabitsCard({ summary, previous, units }: { summary: PeriodSummar
         unit={`${waterUnit.join(' ')} / day`}
         detail={w ? keep(`Goal met on ${w.daysAtGoal} of ${w.daysTracked} days · goal ${formatVolume(w.avgGoalMl, units)}`) : 'No drinks logged in this range yet'}
         progress={w ? w.avgMl / w.avgGoalMl : 0}
-        trend={direction(w?.avgMl, p?.water?.avgMl, 50)}
+        trend={changeDirection('waterMl', w?.avgMl, p?.water?.avgMl)}
+        change={changeWords('waterMl', w?.avgMl, p?.water?.avgMl, { period, units })}
         period={period}
       />
       <Divider />
@@ -107,7 +112,8 @@ export function HabitsCard({ summary, previous, units }: { summary: PeriodSummar
             : 'No workouts logged in this range yet'
         }
         progress={weekly / WEEKLY_ACTIVE_MINUTES}
-        trend={p && (a.minutes || p.activity.minutes) ? direction(weekly, Math.round(p.activity.weeklyMinutes), 5) : null}
+        trend={p && (a.minutes || p.activity.minutes) ? changeDirection('minutes', weekly, Math.round(p.activity.weeklyMinutes)) : null}
+        change={p && (a.minutes || p.activity.minutes) ? changeWords('minutes', weekly, Math.round(p.activity.weeklyMinutes), { period }) : null}
         period={period}
       />
       <Divider />
@@ -120,7 +126,8 @@ export function HabitsCard({ summary, previous, units }: { summary: PeriodSummar
         unit="h / night"
         detail={s ? keep(sleepDetail(s)) : 'No sleep logged in this range yet'}
         progress={s ? Math.min(s.avgHours, SLEEP_MAX_HOURS) / SLEEP_TARGET_HOURS : 0}
-        trend={direction(s?.avgHours, p?.sleep?.avgHours, 0.1)}
+        trend={changeDirection('sleep', s?.avgHours, p?.sleep?.avgHours)}
+        change={changeWords('sleep', s?.avgHours, p?.sleep?.avgHours, { period })}
         period={period}
       />
       {p ? <TrendLegend period={period} /> : null}

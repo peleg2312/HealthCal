@@ -42,3 +42,29 @@ describe('isReducedMotion on web', () => {
     expect((await loadOnWeb({ webdriver: false, reduce: false, optIn: false })).isReducedMotion()).toBe(true);
   });
 });
+
+describe('pourLandsAt', () => {
+  it('lands a whole-cup pour at about two thirds of its length', async () => {
+    const { pourLandsAt } = await import('./motion');
+    expect(pourLandsAt(1)).toBeGreaterThan(0.6);
+    expect(pourLandsAt(1)).toBeLessThan(0.7);
+  });
+
+  it('lands a small top-up sooner, once three quarters of it has poured', async () => {
+    const { pourLandsAt } = await import('./motion');
+    // The glass that reaches the water goal: 5% of the cup.
+    expect(pourLandsAt(0.05)).toBeGreaterThan(0.3);
+    expect(pourLandsAt(0.05)).toBeLessThan(0.45);
+    expect(pourLandsAt(0.05)).toBeLessThan(pourLandsAt(0.3));
+    expect(pourLandsAt(0.3)).toBeLessThan(pourLandsAt(1));
+  });
+
+  it('is the same for a pour down, and safe for nothing or nonsense', async () => {
+    const { pourLandsAt } = await import('./motion');
+    expect(pourLandsAt(-0.5)).toBe(pourLandsAt(0.5));
+    for (const c of [0, Number.NaN, 5]) {
+      expect(pourLandsAt(c)).toBeGreaterThan(0);
+      expect(pourLandsAt(c)).toBeLessThan(1);
+    }
+  });
+});

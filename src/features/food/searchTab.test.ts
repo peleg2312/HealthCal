@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { openingTab, parseSearchTab } from './searchTab';
+import { openingTab, parseSearchTab, SEARCH_CHIPS, usualEmpty } from './searchTab';
 
 const both = { usual: true, favorites: true };
 
@@ -19,8 +19,8 @@ describe('the search tab chosen last (on this device)', () => {
     expect(openingTab('meals', null, both)).toBe('meals');
     // A tap on Favourites opens it even when it is empty (the person asked for it).
     expect(openingTab('favorites', null, { usual: true, favorites: false })).toBe('favorites');
-    // Usual needs history for this meal, remembered or tapped.
-    expect(openingTab('usual', null, { usual: false, favorites: false })).toBe('recent');
+    // A tap on Usual opens it with no history too: its empty state (the chip is always there).
+    expect(openingTab('usual', null, { usual: false, favorites: false })).toBe('usual');
   });
   it('only Favourites is opened from memory, and only while it lists a food or a meal', () => {
     expect(openingTab(null, 'favorites', both)).toBe('favorites');
@@ -34,5 +34,12 @@ describe('the search tab chosen last (on this device)', () => {
     expect(openingTab(null, 'meals', { usual: false, favorites: true })).toBe('recent');
     expect(openingTab(null, 'recent', both)).toBe('usual');
     expect(openingTab(null, 'usual', { usual: false, favorites: false })).toBe('recent');
+  });
+  it('shows one fixed set of chips in one fixed order', () => {
+    expect(SEARCH_CHIPS).toEqual(['usual', 'recent', 'favorites', 'mine', 'meals']);
+  });
+  it('says what the Usual chip will hold before there is any history', () => {
+    expect(usualEmpty('lunch')).toEqual({ title: 'Your usual foods for lunch', message: 'The foods you log most for lunch show here, each one tap to add.' });
+    expect(usualEmpty('snacks').title).toBe('Your usual foods for snacks');
   });
 });

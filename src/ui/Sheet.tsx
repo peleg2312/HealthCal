@@ -84,6 +84,20 @@ export function Sheet({
     };
   }, [mounted]);
   const [sheetH, setSheetH] = useState(0);
+  // Whether this opening's sheet has been measured. Until it has, it waits below the window and does
+  // not start its slide: a slide begun on a guess (the window's height, or the height of the last time
+  // it opened) changed its length when the measure came in and jumped about 70 px in its second frame.
+  const [measured, setMeasured] = useState(false);
+  if (!mounted && measured) setMeasured(false);
+  // A last resort, should a layout never arrive: the slide starts anyway, a little late.
+  const [waitedOut, setWaitedOut] = useState(false);
+  if (!mounted && waitedOut) setWaitedOut(false);
+  const ready = measured || waitedOut;
+  useEffect(() => {
+    if (!mounted || ready) return;
+    const timer = setTimeout(() => setWaitedOut(true), 120);
+    return () => clearTimeout(timer);
+  }, [mounted, ready]);
   // 0 hidden, 1 open.
   const open = useSharedValue(visible && reduce ? 1 : 0);
   useEffect(() => {
@@ -93,15 +107,20 @@ export function Sheet({
       open.set(visible ? 1 : 0);
       return;
     }
-    if (visible) open.set(withTiming(1, { duration: motion.duration.sheetIn, easing: ease.enter }));
-    else
+    if (visible) {
+      if (!ready) return;
+      // It moves from its first frame and slows all the way to rest (`easing.arrive`), so a tall sheet
+      // never hangs for two frames and then leaps a fifth of its height in one.
+      open.set(withTiming(1, { duration: motion.duration.sheetIn, easing: ease.arrive }));
+    } else
       open.set(
         withTiming(0, { duration: motion.duration.sheetOut, easing: ease.exit }, (finished) => {
           if (finished) scheduleOnRN(setMounted, false);
         }),
       );
-  }, [visible, mounted, reduce, open]);
-  const travel = sheetH || winH;
+  }, [visible, mounted, reduce, open, ready]);
+  // Until measured, a whole window's height (and its 24 px) below: out of sight whatever its size.
+  const travel = measured && sheetH ? sheetH : winH;
   // How far the finger has pulled the sheet down (0 at rest). Reset each time the sheet opens.
   const drag = useSharedValue(0);
   useEffect(() => {
@@ -149,6 +168,7 @@ export function Sheet({
   }, [drag]);
   const backdropStyle = useAnimatedStyle(() => ({ opacity: open.get() * (1 - Math.min(0.6, Math.max(0, drag.get()) / (travel + 24))) }));
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - open.get()) * (travel + 24) + drag.get() }] }));
+  const toastStyle = useAnimatedStyle(() => ({ opacity: open.get() }));
   return (
     <Modal visible={mounted} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <KeyboardAvoidingView
@@ -161,13 +181,20 @@ export function Sheet({
           onPress={onClose}
           style={[{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: colors.overlay }, backdropStyle]}
         />
-        {/* A native modal covers the app's own toast layer, so the sheet shows toasts itself, just above its top edge. */}
-        <ToastHost placement="sheet" />
+        {/* A native modal covers the app's own toast layer, so the sheet shows toasts itself, just above its top edge.
+            It fades with the sheet: closing, the toast leaves with it (then rises again over the screen's tab bar
+            or footer) instead of hanging in mid-air while the sheet slides away. */}
+        <Animated.View pointerEvents="box-none" style={toastStyle}>
+          <ToastHost placement="sheet" />
+        </Animated.View>
         <Animated.View
           testID="sheet"
           // VoiceOver's escape gesture (two-finger scrub) closes it, as the backdrop does.
           onAccessibilityEscape={onClose}
-          onLayout={(e) => setSheetH(Math.round(e.nativeEvent.layout.height))}
+          onLayout={(e) => {
+            setSheetH(Math.round(e.nativeEvent.layout.height));
+            setMeasured(true);
+          }}
           style={[
             {
             width: '100%',

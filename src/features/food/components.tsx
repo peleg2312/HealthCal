@@ -5,13 +5,14 @@ import { useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react
 import { SourceMark, sourceMarkTop } from '@/features/ai/mark';
 import { useToday } from '@/store/clock';
 import { isolateRtl } from '@/lib/bidi';
-import { addDays, formatDayLabel, formatLongDate, today } from '@/lib/dates';
+import { addDays } from '@/lib/dates';
 import { MEALS } from '@/lib/nutrition';
 import { cup, fonts, useTheme } from '@/theme';
 import type { Food, FoodSource, ISODate, MealType } from '@/types';
 import { CupKey, IconButton, PressableScale, Text } from '@/ui';
 
 import { displayFoodName } from './displayName';
+import { canStepForward, entryDayLabel, entryDaySpoken, foodLatestDay } from './entryDay';
 import { kcal, sourceInfo, withSourceWord } from './helpers';
 
 // How a data source is marked lives with the mark itself (`SourceMark`, `@/features/ai/mark`): a filled cup
@@ -112,10 +113,19 @@ export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: 
   );
 }
 
-/** Previous / next day with the date in the middle; tap the label to return to today. */
-export function DayStepper({ value, onChange, testIDPrefix = 'day' }: { value: ISODate; onChange: (d: ISODate) => void; testIDPrefix?: string }) {
+/**
+ * The day of an entry, the one date control (food detail, quick add, Saved meals, copying a meal, and the run
+ * and strength logs through `DateStepper` in `@/features/activity/components`): previous and next day with
+ * the day named in the middle (`entryDayLabel`: "Today", "Yesterday", "Sat, Nov 14"); a tap on it returns to
+ * today. It never goes past `latest`: by default the diary's week ahead (food can be planned), today for a
+ * workout. testIDs: `<prefix>-prev`, `<prefix>-today` (the middle), `<prefix>-label` (its words), `<prefix>-next`.
+ */
+export function DayStepper({ value, onChange, testIDPrefix = 'day', latest }: { value: ISODate; onChange: (d: ISODate) => void; testIDPrefix?: string; latest?: ISODate }) {
   const { colors, radius } = useTheme();
-  const isToday = value === useToday();
+  const todayDate = useToday();
+  const isToday = value === todayDate;
+  const last = latest ?? foodLatestDay(todayDate);
+  const forward = canStepForward(value, last);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, ...cup(radius.buttonSm, 5), borderWidth: 1.5, borderColor: colors.borderStrong }}>
       <IconButton testID={`${testIDPrefix}-prev`} accessibilityLabel="Previous day" tone="clear" size={44} onPress={() => onChange(addDays(value, -1))}>
@@ -123,14 +133,22 @@ export function DayStepper({ value, onChange, testIDPrefix = 'day' }: { value: I
       </IconButton>
       <PressableScale
         testID={`${testIDPrefix}-today`}
-        onPress={() => !isToday && onChange(today())}
+        onPress={() => !isToday && onChange(todayDate)}
         feedback={isToday ? 'none' : 'tap'}
-        accessibilityLabel={isToday ? 'Today' : `${formatLongDate(value)}, tap for today`}
-        style={{ flex: 1, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, minHeight: 44 }}>
+        accessibilityLabel={entryDaySpoken(value, todayDate)}
+        style={{ flex: 1, minWidth: 0, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, minHeight: 44 }}>
         <CalendarDays size={16} color={colors.textSecondary} strokeWidth={1.9} />
-        <Text variant="label">{formatDayLabel(value)}</Text>
+        <Text variant="label" testID={`${testIDPrefix}-label`} numberOfLines={1} style={{ flexShrink: 1 }}>
+          {entryDayLabel(value, todayDate)}
+        </Text>
       </PressableScale>
-      <IconButton testID={`${testIDPrefix}-next`} accessibilityLabel="Next day" tone="clear" size={44} onPress={() => onChange(addDays(value, 1))}>
+      <IconButton
+        testID={`${testIDPrefix}-next`}
+        accessibilityLabel="Next day"
+        tone="clear"
+        size={44}
+        disabled={!forward}
+        onPress={() => forward && onChange(addDays(value, 1))}>
         <ChevronRight size={20} color={colors.text} strokeWidth={1.9} />
       </IconButton>
     </View>

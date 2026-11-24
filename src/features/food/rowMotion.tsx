@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-import Animated, { FadeIn, Keyframe, LinearTransition, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { FadeIn, Keyframe, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { motion, useReducedMotion } from '@/theme';
 import { ease } from '@/ui';
@@ -19,13 +19,13 @@ const rowEnter =
       })
         .duration(D.row)
         .delay(D.row / 2);
-const move = LinearTransition.duration(D.row).easing(ease.move);
 
 /**
- * Rows of a log (the diary, the water log), removed in two steps: the row fades out where it is, and
- * only then leaves the list, so the rows below glide up into an empty space
- * instead of sliding over a row that is still fading (the kit's `AnimatedItem`
- * does both at once, which on web draws the next row over the leaving one).
+ * Rows of a log (the diary, the water log), removed in two steps: the row fades out where it is, then
+ * leaves the list, and the rows below close the space in one step with the card around them, instead
+ * of sliding over a row that is still fading (the kit's `AnimatedItem` does both at once, which on web
+ * draws the next row over the leaving one). No row glides: a row gliding inside a card that has
+ * already shrunk is drawn past the card's bottom edge, over the gap and the next card.
  *
  * Returns the current items with the ones just removed still in place, marked
  * `leaving`, for `motion.duration.rowExit` ms. Under reduced motion a removed
@@ -57,9 +57,9 @@ export function useLeavingRows<T extends { id: string }>(items: T[]): { item: T;
 
 /**
  * One log row: it fades and slides in when added (not when the list
- * mounts: wrap the list in the kit's `AnimatedList`), fades out in place while
- * `leaving`, and glides when rows around it come or go. Only opacity and
- * transforms animate; reduced motion makes every change instant.
+ * mounts: wrap the list in the kit's `AnimatedList`) and fades out in place while
+ * `leaving`; when rows around it come or go it moves in one step with its card.
+ * Only opacity and transforms animate; reduced motion makes every change instant.
  */
 export function FadeRow({ children, leaving, testID }: { children: React.ReactNode; leaving: boolean; testID?: string }) {
   const reduce = useReducedMotion();
@@ -74,8 +74,7 @@ export function FadeRow({ children, leaving, testID }: { children: React.ReactNo
       pointerEvents={leaving ? 'none' : 'auto'}
       accessibilityElementsHidden={leaving}
       importantForAccessibility={leaving ? 'no-hide-descendants' : 'auto'}
-      entering={reduce ? undefined : rowEnter}
-      layout={reduce ? undefined : move}>
+      entering={reduce ? undefined : rowEnter}>
       {/* The leaving fade on a view of its own: on the web the entrance animates the outer view's opacity. */}
       <Animated.View style={style}>{children}</Animated.View>
     </Animated.View>

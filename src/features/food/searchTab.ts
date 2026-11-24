@@ -25,14 +25,24 @@ export function parseSearchTab(raw: string | null | undefined): SearchTab | null
 }
 
 /**
- * The tab search opens on: the one picked on this visit; else Favourites when that was the tab chosen last
- * on this device and it lists something (`has.favorites`: a favourite food or meal); else Usual when the
- * meal has history and Recent when not. Any other remembered tab, or Favourites with nothing in it, opens
- * the default. Usual without history falls back to Recent.
+ * Search's filter chips: one fixed set in one fixed order on every visit, whatever the data. A chip with
+ * nothing behind it is still there and opens its empty state, so the row never changes under the finger.
+ */
+export const SEARCH_CHIPS: readonly SearchTab[] = TABS;
+
+/**
+ * The tab search opens on: the one picked on this visit (any of the five, an empty one shows its empty state);
+ * else Favourites when that was the tab chosen last on this device and it lists something (`has.favorites`: a
+ * favourite food or meal); else Usual when the meal has history and Recent when not. Any other remembered
+ * tab, or Favourites with nothing in it, opens the default.
  */
 export function openingTab(picked: SearchTab | null, remembered: SearchTab | null, has: { usual: boolean; favorites: boolean }): SearchTab {
-  const t = picked ?? (remembered === 'favorites' && has.favorites ? 'favorites' : has.usual ? 'usual' : 'recent');
-  return t === 'usual' && !has.usual ? 'recent' : t;
+  return picked ?? (remembered === 'favorites' && has.favorites ? 'favorites' : has.usual ? 'usual' : 'recent');
+}
+
+/** The Usual chip with no history for this meal yet: what will be there (`meal` as the tabs say it, lower case: "lunch", "snacks"). */
+export function usualEmpty(meal: string): { title: string; message: string } {
+  return { title: `Your usual foods for ${meal}`, message: `The foods you log most for ${meal} show here, each one tap to add.` };
 }
 
 interface SearchTabState {

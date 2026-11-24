@@ -151,6 +151,8 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
   const bottomNow = useRef(0);
   const [anim] = useState(() => new Animated.Value(0));
   const [hostId] = useState(() => ++hostSeq);
+  // The toast whose action was pressed: it is on its way out and takes no second press.
+  const [closingId, setClosingId] = useState(0);
 
   useEffect(() => {
     if (!inSheet) return;
@@ -172,13 +174,13 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       const spoken = withoutMarks(message);
       AccessibilityInfo.announceForAccessibility(actionLabel ? `${spoken}. ${actionLabel} available.` : spoken);
     }
-    // Rises 16 px and fades in, ease-out, no bounce; instant under reduced motion.
+    // Rises 16 px and fades in, ease-out, no bounce; instant under reduced motion. A toast raised while the
+    // one before is fading out rises back from where that fade had got to.
     if (isReducedMotion()) anim.setValue(1);
     else Animated.timing(anim, { toValue: 1, duration: motion.duration.row, easing: Easing.bezier(...motion.easing.enter), useNativeDriver: Platform.OS !== 'web' }).start();
     let cancelled = false;
     let t: ReturnType<typeof setTimeout> | undefined;
-    const close = () =>
-      isReducedMotion() ? hide() : Animated.timing(anim, { toValue: 0, duration: motion.duration.fade, easing: Easing.bezier(...motion.easing.exit), useNativeDriver: Platform.OS !== 'web' }).start(() => hide());
+    const close = () => closeToast(anim, id, hide);
     // Someone using a screen reader needs longer to reach the action.
     AccessibilityInfo.isScreenReaderEnabled()
       .catch(() => false)
@@ -237,7 +239,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
           "+ 250 ml" sits just above the resting toast at 360 x 740, and a second glass must still log). */}
       <Animated.View
         testID="toast"
-        pointerEvents="box-none"
+        pointerEvents={closingId === id ? 'none' : 'box-none'}
         accessibilityLiveRegion="polite"
         onLayout={inSheet ? undefined : (e) => setToastH(Math.round(e.nativeEvent.layout.height))}
         style={{
@@ -273,8 +275,13 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
             onPress={() => {
               // A press in the toast's first moments was meant for what it rose beside: ignored, the toast stays.
               if (monotonicNow() - shownAt < TOAST_ACTION_GUARD_MS) return;
+              if (closingId === id) return;
               onAction?.();
-              hide();
+              // A toast the action raised itself stays; otherwise this one leaves as it always does, fading and
+              // sinking (160 ms), never cut away in one frame.
+              if (useToast.getState().id !== id) return;
+              setClosingId(id);
+              closeToast(anim, id, hide);
             }}
             style={{ minHeight: 44, paddingHorizontal: 10, marginVertical: -12, marginRight: -6, justifyContent: 'center' }}>
             <Text variant="label" color={colors.bg} style={{ textDecorationLine: 'underline' }}>
@@ -285,6 +292,21 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       </Animated.View>
     </View>
   );
+}
+
+/**
+ * The toast leaves: it fades and sinks 16 px (ease-in, `motion.duration.fade`), then is cleared, but only
+ * while it is still the toast showing. A toast raised during the fade stops it and rises back from there;
+ * the fade it interrupted ends then too, and must not clear it (a glass tapped in a toast's last 160 ms
+ * used to log with no toast and no Undo). A fade stopped any other way (its host going away) still clears
+ * its own toast. Instant under reduced motion.
+ */
+function closeToast(anim: Animated.Value, id: number, hide: () => void) {
+  const done = () => {
+    if (useToast.getState().id === id) hide();
+  };
+  if (isReducedMotion()) return done();
+  Animated.timing(anim, { toValue: 0, duration: motion.duration.fade, easing: Easing.bezier(...motion.easing.exit), useNativeDriver: Platform.OS !== 'web' }).start(done);
 }
 
 /** A box in window coordinates: its top and bottom edge. */

@@ -16,7 +16,7 @@ import { TrainingLoadSheet } from './TrainingLoadSheet';
 const VESSEL_H = 168;
 
 /**
- * Train's week: guideline minutes poured into a vessel with the 150-minute
+ * Train's week: active minutes (the guideline's, `guidelineMinutes`) poured into a vessel with the 150-minute
  * guideline drawn as a dashed level line across it (reaching it is the point,
  * so there is no "over"), the week's totals, then a cup per day filled with
  * that day's minutes. Its last line is the training overview (the last 7 days against the
@@ -79,7 +79,7 @@ export function WeekCard({
             {formatNumber(minutes)}
           </Text>
           <Text variant="unit" style={{ fontSize: 14 }}>
-            min
+            active min
           </Text>
         </View>
       ),
@@ -109,7 +109,7 @@ export function WeekCard({
           height={VESSEL_H}
           labels={[...labels].sort((x, y) => y.at - x.at)}
           labelGap={narrow ? 14 : 16}
-          accessibilityLabel={`${minutes} of ${WHO_WEEKLY_MINUTES} guideline minutes this week`}
+          accessibilityLabel={`${minutes} active minutes this week, of the ${WHO_WEEKLY_MINUTES} minutes a week guideline`}
         />
         {/* The guideline as a dashed level line across the open vessel. */}
         <View

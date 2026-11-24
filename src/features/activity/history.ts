@@ -68,3 +68,33 @@ export function historyWeekLabel(week: HistoryWeek): string {
   const n = week.entries.length;
   return `${week.title}, ${n} ${n === 1 ? 'session' : 'sessions'}, ${formatDuration(week.minutes)}`;
 }
+
+/**
+ * A row's line under its name ("Today · 75 min · Moderate · 3.9 km"), laid out for the room it has: one line
+ * when it fits, else two lines broken between its parts, balanced, so a part never sits alone on a line when
+ * a split with two words on each line exists ("Sun · 45 min" / "Moderate · 3.9 km", never "…Moderate ·" /
+ * "3.9 km"). A part never breaks inside (no-break spaces: "75 min", "3.9 km" stay whole). The width is an
+ * estimate at the caption size (12.5 px Hanken Grotesk: under 6 px a character on these words; 6 errs on the
+ * side of two lines), times the phone's text size; past two lines the text wraps by itself.
+ */
+export const META_CHAR_PX = 6;
+
+const keep = (part: string) => part.replace(/ /g, ' ');
+const words = (part: string) => part.split(/\s+/).filter(Boolean).length;
+
+export function historyMetaLines(parts: readonly string[], roomPx: number, scale = 1): { text: string; lines: 1 | 2 } {
+  const width = (ps: readonly string[]) => ps.join(' · ').length * META_CHAR_PX * scale;
+  const line = (ps: readonly string[]) => ps.map(keep).join(' · ');
+  if (parts.length < 2 || width(parts) <= roomPx) return { text: line(parts), lines: 1 };
+  let best: { k: number; wide: number; full: boolean } | null = null;
+  for (let k = 1; k < parts.length; k++) {
+    const a = parts.slice(0, k);
+    const b = parts.slice(k);
+    const wide = Math.max(width(a), width(b));
+    // Two words or more on each line: no word left alone.
+    const full = a.reduce((n, p) => n + words(p), 0) >= 2 && b.reduce((n, p) => n + words(p), 0) >= 2;
+    if (!best || (full && !best.full) || (full === best.full && wide < best.wide)) best = { k, wide, full };
+  }
+  const k = best!.k;
+  return { text: `${line(parts.slice(0, k))}\n${line(parts.slice(k))}`, lines: 2 };
+}

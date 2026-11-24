@@ -6,6 +6,7 @@ import { useWindowDimensions, View } from 'react-native';
 import { ACTIVITY_BY_ID, MET_SOURCES } from '@/data/activities';
 import { basisFromEntry, formatPace, localiseSpeedText, paceModeFor, sessionPreview, sessionWaterMl } from '@/features/activity/build';
 import { DateStepper } from '@/features/activity/components';
+import { BURN_UNIT, budgetAdds, burnCaption, burnSource } from '@/features/activity/logWords';
 import { SpreadHint } from '@/features/activity/SpreadHint';
 import { syncedFrom } from '@/features/health-sync/origins';
 import { HeartRateLine } from '@/features/health-sync/ui/HeartRateLine';
@@ -20,7 +21,7 @@ import { useStore } from '@/store';
 import { useDay, useLive, useProfile } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
 import type { Intensity } from '@/types';
-import { Button, Card, Chip, CupKey, EmptyState, Header, IconButton, NumberField, PressableScale, Screen, Text, TextField } from '@/ui';
+import { Button, Card, Chip, CupKey, EmptyState, Hatch, Header, IconButton, NumberField, PressableScale, Screen, Text, TextField } from '@/ui';
 
 const INTENSITIES: Intensity[] = ['light', 'moderate', 'vigorous'];
 const PRESETS = [15, 30, 45, 60, 90];
@@ -91,6 +92,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
   const restingShare = Math.round((tdee / 1440) * minutes);
   // A workout on this date is placed by this date's rule: on the day, over 7 days, or not added.
   const rule = useDay(date).exerciseRule;
+  const adds = budgetAdds(rule, preview.net);
 
   // Effort tiles sit three in a row while every word of their hints fits a tile; a word like
   // "strokes/min" or "Recreational" would break mid-word there, so the three become rows, the hint
@@ -165,34 +167,46 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
       footer={<Button testID="log-activity-save" title={entryId ? 'Save changes' : 'Log session'} onPress={save} disabled={!canSave} />}>
       {/* Live result */}
       <Card testID="log-activity-result" style={{ gap: spacing.md }}>
-        {/* The net figure sits beside the burn; a five-digit burn on a narrow phone sends it under, never past the card. */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', columnGap: spacing.md, rowGap: spacing.sm }}>
-          <View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <CupKey color={colors.exercise} />
-              <Text variant="overline" testID="log-activity-kind">
-                {isMeasured ? `Measured by ${device}` : 'Estimated burn'}
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 5 }}>
-              <Text variant="numXL" tabular testID="log-activity-gross" style={{ fontSize: 46, lineHeight: 50, letterSpacing: -1.4 }}>
-                {isMeasured ? formatNumber(preview.gross) : `~${formatNumber(preview.gross)}`}
-              </Text>
-              <Text variant="unit" style={{ fontSize: 15 }}>
-                kcal
-              </Text>
-            </View>
-            <Text variant="caption" color="textSecondary" tabular>
-              {preview.kind === 'estimate' ? `likely ${formatNumber(preview.grossRange[0])}–${formatNumber(preview.grossRange[1])} kcal` : 'total burned, resting included'}
+        {/* Two numbers, each with its words (./logWords): what the session burned, and what of it reaches the budget. */}
+        <View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <CupKey color={colors.exercise} />
+            <Text variant="overline" testID="log-activity-kind">
+              {burnSource(isMeasured ? device : null)}
             </Text>
           </View>
-          <View style={{ alignItems: 'flex-end', ...cup(radius.tile, 5), backgroundColor: colors.surfaceAlt, paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
-            <Text variant="numM" tabular testID="log-activity-net">
-              {rule !== 'off' ? '+' : ''}
-              {formatNumber(preview.net)}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6 }}>
+            <Text variant="numXL" tabular testID="log-activity-gross" style={{ fontSize: 46, lineHeight: 50, letterSpacing: -1.4 }}>
+              {isMeasured ? formatNumber(preview.gross) : `~${formatNumber(preview.gross)}`}
             </Text>
-            <Text variant="caption" color="textSecondary" testID="log-activity-net-caption">
-              {rule === 'week' ? 'over 7 days' : rule === 'day' ? 'to budget' : 'above resting'}
+            <Text variant="unit" style={{ fontSize: 15 }}>
+              {BURN_UNIT}
+            </Text>
+          </View>
+          <Text variant="caption" color="textSecondary" tabular>
+            {burnCaption(preview.kind === 'estimate' ? preview.grossRange : null)}
+          </Text>
+        </View>
+        {/* What the budget gains: the hatched key of exercise headroom (as on the diary's summary), the figure, its words. */}
+        <View
+          testID="log-activity-adds"
+          accessible
+          accessibilityLabel={adds.spoken}
+          style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, ...cup(radius.tile, 5), backgroundColor: colors.surfaceAlt, paddingHorizontal: spacing.md, paddingVertical: 10 }}>
+          {rule !== 'off' ? (
+            // Level with the figure's line, also when the words have moved under it.
+            <View style={{ width: 11, height: 11, marginTop: 7, overflow: 'hidden', borderWidth: 1, borderColor: colors.headroom, borderRadius: 2 }}>
+              <Hatch width={11} height={11} color={colors.headroom} step={4} opacity={1} />
+            </View>
+          ) : null}
+          {/* The words move under the figure, whole, when the two do not fit on one line. */}
+          <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6 }}>
+            <Text variant="numM" tabular testID="log-activity-net">
+              {adds.figure}
+              <Text variant="unit">{' kcal'}</Text>
+            </Text>
+            <Text variant="label" color="textSecondary" testID="log-activity-net-caption">
+              {adds.words}
             </Text>
           </View>
         </View>

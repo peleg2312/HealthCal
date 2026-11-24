@@ -38,8 +38,8 @@ export const duration = {
   row: 220,
   /** Rows leaving. */
   rowExit: 160,
-  /** A sheet sliding up (the backdrop fades over the same time). */
-  sheetIn: 280,
+  /** A sheet sliding up (the backdrop fades over the same time), on `easing.arrive`. */
+  sheetIn: 300,
   sheetOut: 200,
   /** Small state changes: a lip or hatch fading in, a toast. */
   fade: 160,
@@ -63,6 +63,12 @@ export const easing = {
   exit: [0.4, 0, 1, 1] as const,
   /** Movement between two resting places (tab mark, reorder). */
   move: [0.3, 0, 0, 1] as const,
+  /**
+   * A large surface arriving (a sheet sliding up): it moves from its first frame and slows all the
+   * way to rest, the pour's own curve. `enter` starts slowly, so over a 600 px sheet it hangs for two
+   * frames and then covers a fifth of the way in one, which reads as a jump.
+   */
+  arrive: [0.22, 0.61, 0.36, 1] as const,
 };
 
 /** Distances in px. */
@@ -78,6 +84,34 @@ export const distance = {
 };
 
 export const motion = { duration, easing, distance };
+
+/** Where a cubic bezier easing (as in `easing`) reaches `y`, as a share of its length (x). */
+function easingTimeAt([x1, y1, x2, y2]: readonly number[], y: number): number {
+  const at = (a: number, b: number, u: number) => 3 * a * u * (1 - u) ** 2 + 3 * b * u * u * (1 - u) + u ** 3;
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 40; i++) {
+    const u = (lo + hi) / 2;
+    if (at(y1, y2, u) < y) lo = u;
+    else hi = u;
+  }
+  return at(x1, x2, (lo + hi) / 2);
+}
+
+/**
+ * When a pour has landed, as a share of its length: the level is within 5% of the cup's height of where it
+ * stops and at least three quarters of the way there, so what appears as the pour lands (the brim line and
+ * its one flash, the amber cap, the hatched headroom) comes with the level's arrival instead of after its
+ * last, unseen pixels. `change` is the pour's size as a share of the cup (0..1). A pour the cup's whole
+ * height lands at about 0.65 of its length, a 5% top-up (the glass that reaches the water goal) at about
+ * 0.37: at the full length, the water cup stood brim-full and still for a third of a second before its
+ * brim line came, and the moment read as two.
+ */
+export function pourLandsAt(change: number): number {
+  const c = Math.abs(Number.isFinite(change) ? change : 0);
+  const share = Math.min(0.99, Math.max(0.75, c > 0 ? 1 - 0.05 / c : 0));
+  return easingTimeAt(easing.pour, share);
+}
 
 // ------------------------------------------------------------ reduced motion
 

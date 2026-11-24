@@ -7,7 +7,8 @@
  * Plain sentences, one a line, each present only when its data exists, at most 900 characters:
  *   the goal and its weekly pace; food over the 7 days before today (days logged, average calories
  *   against the budget, protein as a share of its target) and today so far (eaten and left);
- *   training over the last 7 days from every workout on the phone (guideline minutes, sessions, the
+ *   training over the last 7 days from every workout on the phone (active minutes, the guideline's
+ *   `guidelineMinutes` under the name a person reads everywhere; sessions, the
  *   three most frequent kinds, the overview's title, days without a session); sleep, the average of
  *   the last 7 nights when there are 4 or more; the weight trend as a direction and a rate a week;
  *   water as a share of its goal on days water was tracked.
@@ -161,7 +162,7 @@ export function coachNote(state: NoteState, today: ISODate, os: string = Platfor
       .slice(0, 3)
       .map(([id, n]) => `${ACTIVITY_BY_ID[id].name.toLowerCase()} ${n}`);
     const head = last7.length
-      ? `Training, last 7 days: ${plural(o.minutes, 'guideline minute', 'guideline minutes')} in ${plural(last7.length, 'session', 'sessions')}${top.length ? ` (${top.join(', ')})` : ''}.`
+      ? `Training, last 7 days: ${plural(o.minutes, 'active minute', 'active minutes')} in ${plural(last7.length, 'session', 'sessions')}${top.length ? ` (${top.join(', ')})` : ''}.`
       : 'Training, last 7 days: no sessions.';
     const rest = o.counts.restDays === 0 ? 'A session on each day.' : `${plural(o.counts.restDays, 'day', 'days')} without a session.`;
     lines.push([head, o.title ? `Overview: ${o.title}.` : '', last7.length ? rest : ''].filter(Boolean).join(' '));

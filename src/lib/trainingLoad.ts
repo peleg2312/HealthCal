@@ -91,7 +91,8 @@ export const HONEST_PHONE =
   'From the workouts on this phone. Training you did not log, or that was not synced, is not counted, so a week can look lighter than it was.';
 export const HONEST_COMPARE = 'This compares your minutes with your own recent weeks. It is a description, not a measure of injury risk.';
 export const HONEST_WHO = "WHO's guideline for adults is 150 to 300 minutes a week; more than 300 can bring extra benefit.";
-export const HONEST_COUNTING = 'Hard minutes (6 MET or more) count double; light sessions (under 3 MET) are not counted.';
+export const HONEST_COUNTING =
+  'Active minutes are the minutes that count toward the 150 minutes a week guideline: hard minutes (6 MET or more) count double, and light sessions (under 3 MET) are not counted.';
 /** Under the sheet's chart of the five 7-day blocks. */
 export const CHART_CAPTION = 'Each bar is 7 days, weeks back. The band is 150 to 300.';
 /** The heading over the honest sentences, which close the sheet under its one action. */
@@ -256,7 +257,7 @@ export function trainingOverview(activities: readonly LoadSession[], today: ISOD
   const c = sum / 3;
   const recentAverage = first === null ? null : Math.round(c);
   const ratio = sum > 0 ? Math.round(((3 * a) / sum) * 100) / 100 : null;
-  const aWords = `${plural(Math.round(a), 'guideline minute')} in the last 7 days`;
+  const aWords = `${plural(Math.round(a), 'active minute')} in the last 7 days`;
 
   const lines: string[] = [];
   if (!state) lines.push(`${aWords}.`);

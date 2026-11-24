@@ -64,7 +64,7 @@ function localPair(): CoachMessage[] {
 describe('what a question sends', () => {
   it('the phone answer from a synced workout is real (it names the workout minutes)', () => {
     const [, a] = localPair();
-    expect(a.role === 'assistant' && 'text' in a ? a.text : '').toMatch(/146 guideline minutes/);
+    expect(a.role === 'assistant' && 'text' in a ? a.text : '').toMatch(/146 active minutes/);
   });
 
   it('never sends an answer given on the phone or its button question, in any position', () => {
@@ -79,7 +79,7 @@ describe('what a question sends', () => {
       const body = buildCoachRequest({ message: 'Next?', messages: chat, note: null, consentVersion: 1, pairs: 3 });
       const sent = JSON.stringify(body);
       expect(sent).not.toContain(LOCAL_TRAINING_QUESTION);
-      expect(sent).not.toMatch(/guideline minutes|146|From the workouts on this phone/);
+      expect(sent).not.toMatch(/active minutes|guideline minutes|146|From the workouts on this phone/);
       expect(body.history).toEqual([
         { role: 'user', text: 'How many rest days a week?' },
         { role: 'assistant', text: 'Most people do well with one or two.' },

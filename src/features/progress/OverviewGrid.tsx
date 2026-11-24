@@ -1,12 +1,13 @@
 import React from 'react';
 import { View } from 'react-native';
 
-import { compareText, direction, hoursText, kcalText, WEEKLY_ACTIVE_MINUTES, type PeriodSummary } from '@/lib/insights';
-import { formatNumber, formatVolume, formatWeight, weightUnit, weightValue } from '@/lib/units';
+import { hoursText, WEEKLY_ACTIVE_MINUTES, type PeriodSummary } from '@/lib/insights';
+import { formatNumber, formatVolume, weightUnit, weightValue } from '@/lib/units';
 import { useTheme } from '@/theme';
 import type { TrendPoint } from '@/lib/trend';
 import { Card } from '@/ui';
 
+import { changeDirection, changeWords } from './change';
 import { TrendLegend } from './parts';
 
 import { weeklyRateText } from './goalDate';
@@ -22,8 +23,10 @@ function avgTrend(trend: TrendPoint[], start: string, end: string): number | nul
 
 /**
  * Eight tiles, one number each, built from what useProgressData already returns. Each tile is its
- * number, a triangle against the previous equal period and one line of context; the comparison in
+ * number, a mark against the previous equal period and one line of context; the comparison in
  * words is read out with the tile, and every detail is one tap away (Nutrition, Body, Habits).
+ * The mark is a triangle only for a change worth calling, by each measure's own rule (`change.ts`:
+ * 100 kcal and 5% for calories, ...), else a dash; the spoken words always say the size.
  */
 export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: number; onOpen: (s: ProgressSegment) => void }) {
   const { colors, spacing } = useTheme();
@@ -71,8 +74,8 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         unit="kcal"
         caption={c ? `a day · budget ${formatNumber(Math.round(c.avgBudget))}` : 'No full days yet'}
         captionShort={c ? `budget ${formatNumber(Math.round(c.avgBudget))}` : 'No full days yet'}
-        compare={compareText(c?.avgKcal, p?.calories?.avgKcal, { period, format: (n) => kcalText(n), same: 20 })}
-        trend={direction(c?.avgKcal, p?.calories?.avgKcal, 20)}
+        compare={changeWords('kcal', c?.avgKcal, p?.calories?.avgKcal, { period })}
+        trend={changeDirection('kcal', c?.avgKcal, p?.calories?.avgKcal)}
         period={period}
         onPress={() => onOpen('nutrition')}
       />
@@ -84,8 +87,8 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         value={d.series.trendKg !== null ? weightValue(d.series.trendKg, units).toFixed(1) : null}
         unit={weightUnit(units)}
         caption={rate !== null ? weeklyRateText(rate, units) : 'Rate after a week'}
-        compare={compareText(trendNow, trendPrev, { period, format: (n) => formatWeight(n, units), same: 0.05, more: 'higher', less: 'lower' })}
-        trend={direction(trendNow, trendPrev, 0.05)}
+        compare={changeWords('weight', trendNow, trendPrev, { period, units })}
+        trend={changeDirection('weight', trendNow, trendPrev)}
         period={period}
         onPress={() => onOpen('body')}
       />
@@ -100,8 +103,8 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         unit="g"
         caption={protein ? `a day · target ${Math.round(protein.target)} g` : 'No full days yet'}
         captionShort={protein ? `target ${Math.round(protein.target)} g` : 'No full days yet'}
-        compare={compareText(protein?.avg, p?.macros?.protein.avg, { period, format: (n) => `${Math.round(n)} g`, same: 2 })}
-        trend={direction(protein?.avg, p?.macros?.protein.avg, 2)}
+        compare={changeWords('protein', protein?.avg, p?.macros?.protein.avg, { period })}
+        trend={changeDirection('protein', protein?.avg, p?.macros?.protein.avg)}
         period={period}
         onPress={() => onOpen('nutrition')}
       />
@@ -140,15 +143,9 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         unit={w ? `of ${w.daysTracked} days` : undefined}
         caption={w ? `at goal · ${formatVolume(w.avgMl, units)} a day` : 'No drinks logged yet'}
         captionShort={w ? 'at goal' : 'No drinks yet'}
-        compare={compareText(w?.avgMl, p?.water?.avgMl, {
-          period,
-          format: (n) => formatVolume(n, units),
-          same: 50,
-          more: 'more a day',
-          less: 'less a day',
-        })}
-        // The triangle compares the number shown: the share of tracked days at the goal.
-        trend={direction(waterShare(w), waterShare(p?.water ?? null), 0.05)}
+        // The mark and its words compare the number shown: the share of tracked days at the goal.
+        compare={changeWords('share', waterShare(w), waterShare(p?.water ?? null), { period, subject: 'Days at the water goal' })}
+        trend={changeDirection('share', waterShare(w), waterShare(p?.water ?? null))}
         period={period}
         onPress={() => onOpen('habits')}
       />
@@ -160,14 +157,16 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         color={colors.exercise}
         value={a.minutes ? `${weekly}` : null}
         unit="min"
-        caption={a.minutes ? `a week · guideline ${WEEKLY_ACTIVE_MINUTES}` : 'No workouts yet'}
-        captionShort={a.minutes ? `a week, of ${WEEKLY_ACTIVE_MINUTES}` : 'No workouts yet'}
+        // Active minutes: the minutes that count toward the guideline (hard ones double), said in full once, aloud.
+        caption={a.minutes ? `active a week · of ${WEEKLY_ACTIVE_MINUTES}` : 'No workouts yet'}
+        captionShort={a.minutes ? `active, of ${WEEKLY_ACTIVE_MINUTES}` : 'No workouts yet'}
+        spoken={a.minutes ? `${weekly} active minutes a week, toward the ${WEEKLY_ACTIVE_MINUTES} minutes a week guideline` : undefined}
         compare={
           a.minutes || (p && p.activity.minutes)
-            ? `${a.sessions} ${a.sessions === 1 ? 'session' : 'sessions'}. ${compareText(weekly, p ? Math.round(p.activity.weeklyMinutes) : null, { period, format: (n) => `${Math.round(n)} min a week`, same: 5 }) ?? ''}`.replace(/\. $/, '')
+            ? [`${a.sessions} ${a.sessions === 1 ? 'session' : 'sessions'}`, changeWords('minutes', weekly, p ? Math.round(p.activity.weeklyMinutes) : null, { period })].filter(Boolean).join('. ')
             : null
         }
-        trend={a.minutes || (p && p.activity.minutes) ? direction(weekly, p ? Math.round(p.activity.weeklyMinutes) : null, 5) : null}
+        trend={a.minutes || (p && p.activity.minutes) ? changeDirection('minutes', weekly, p ? Math.round(p.activity.weeklyMinutes) : null) : null}
         period={period}
         onPress={() => onOpen('habits')}
       />
@@ -182,8 +181,8 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         unit="h"
         caption={sl ? `a night · ${sl.nights} ${sl.nights === 1 ? 'night' : 'nights'}` : 'No sleep logged yet'}
         captionShort={sl ? `a night · ${sl.nights} logged` : 'No sleep yet'}
-        compare={compareText(sl?.avgHours, p?.sleep?.avgHours, { period, format: (n) => hoursText(n), same: 0.1, more: 'longer', less: 'shorter' })}
-        trend={direction(sl?.avgHours, p?.sleep?.avgHours, 0.1)}
+        compare={changeWords('sleep', sl?.avgHours, p?.sleep?.avgHours, { period })}
+        trend={changeDirection('sleep', sl?.avgHours, p?.sleep?.avgHours)}
         period={period}
         onPress={() => onOpen('habits')}
       />

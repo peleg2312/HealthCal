@@ -252,9 +252,10 @@ describe('insight content cites the numbers', () => {
     const out = generateInsights(ctx(days));
     const a = find(out, 'activity-low');
     expect(a).toBeDefined();
-    expect(a!.body).toContain('You averaged 40 guideline minutes a week');
-    expect(a!.body).toContain('110 short');
-    expect(a!.body).toContain('4 brisk 30-minute walks');
+    expect(a!.title).toBe('Under 150 active minutes a week');
+    expect(a!.body).toContain('You averaged 40 active minutes a week');
+    expect(a!.body).toContain('110 short of the 150 minutes a week guideline');
+    expect(a!.step).toBe('4 brisk 30-minute walks a week would cover it.');
   });
 
   it('sleep under 7 h suggests a specific bedtime shift', () => {
@@ -262,7 +263,7 @@ describe('insight content cites the numbers', () => {
     const sleep = days.map((d) => ({ date: d.date, hours: 6.5, quality: 3 }));
     const out = generateInsights(ctx(days, { sleep }));
     expect(find(out, 'sleep-short')?.body).toContain('Sleep averaged 6.5 h over 8 nights');
-    expect(find(out, 'sleep-short')?.body).toContain('30 minutes earlier');
+    expect(find(out, 'sleep-short')?.step).toContain('30 minutes earlier');
   });
 });
 
@@ -278,7 +279,7 @@ describe('weight pace', () => {
     expect(p.tone).toBe('attention');
     expect(p.body).toContain('falling 1.1 kg a week');
     expect(p.body).toContain('0.8 kg a week upper limit');
-    expect(p.body).toContain('770 kcal more a day'); // (1.1 - 0.4) * 7700 / 7 = 770
+    expect(p.step).toContain('770 kcal more a day'); // (1.1 - 0.4) * 7700 / 7 = 770
     expect(out[0].id).toBe('pace-too-fast');
   });
   it('slower than chosen', () => {
@@ -321,10 +322,10 @@ describe('patterns are computed, not asserted', () => {
     expect(hydrationPattern(even, TODAY)).toBeNull();
     const out = generateInsights(ctx(dropping));
     const w = find(out, 'water-low')!;
-    expect(w.title).toBe('Water goal reached on 0 of 6 days');
+    expect(w.title).toBe('Water goal met on 0 of 6 days');
     expect(w.body).toContain('You averaged');
     expect(w.body).toContain('afternoons are where intake drops');
-    expect(w.body).toContain('in the afternoon');
+    expect(w.step).toContain('in the afternoon');
   });
 
   it('sleep and appetite need 3+ days on each side', () => {
@@ -444,7 +445,7 @@ describe('computeMilestones', () => {
 
 describe('rankInsights', () => {
   it('keeps a positive insight in the top five', () => {
-    const mk = (id: string, tone: Insight['tone'], score: number): Insight => ({ id, tone, title: id, body: id, score });
+    const mk = (id: string, tone: Insight['tone'], score: number): Insight => ({ id, tone, title: id, step: id, body: id, score });
     const list = [mk('a', 'attention', 90), mk('b', 'attention', 80), mk('c', 'neutral', 70), mk('d', 'neutral', 60), mk('e', 'attention', 50), mk('f', 'neutral', 45), mk('g', 'positive', 10)];
     expect(ids(rankInsights(list))).toEqual(['a', 'b', 'c', 'd', 'g']);
   });
@@ -490,7 +491,8 @@ describe('review findings', () => {
     const dropping = run(7, (d) => day(d, { water: [{ ml: 1000, hour: 9 }, { ml: 150, hour: 14 }, { ml: 800, hour: 19 }] }));
     const w = find(generateInsights(ctx(dropping, { units: 'imperial' })), 'water-low')!;
     expect(w.body).not.toContain('ml');
-    expect(w.body).toContain('more 8 fl oz glasses');
+    expect(w.step).not.toContain('ml');
+    expect(w.step).toContain('more 8 fl oz glasses');
   });
 
   it('consistency-3: guideline minutes count vigorous double and light not at all, as Train does', () => {
@@ -634,8 +636,10 @@ describe('insight titles are neutral (principle 4)', () => {
   const BANNED =
     /\b(bad|fail|failed|failure|cheat|cheated|should|guilty|lazy|great|amazing|well done|keep it up|too much|missed your|goal missed|over budget|make up|only|unfortunately|oops|sorry|missed)\b/i;
 
-  it('no title from a grid of periods holds a banned word or an exclamation mark', () => {
+  it('no title or step from a grid of periods holds a banned word or an exclamation mark; a step is one short sentence', () => {
     const titles = new Set<string>();
+    const steps = new Set<string>();
+    const bodies: { step: string; body: string }[] = [];
     const kcals = [0, 900, 1500, 1900, 2000, 2150, 2400, 3000];
     const waters = [0, 800, 1600, 2500, 3200];
     const minutes = [0, 20, 60];
@@ -652,9 +656,18 @@ describe('insight titles are neutral (principle 4)', () => {
                 generateInsights(ctx(days, { goal, currentWeeklyRateKg: rate, weighInsTotal: 20, lastWeighIn: TODAY, sleep, streak: 12 })),
                 generateInsights(ctx(days.slice(-4), { goal, currentWeeklyRateKg: rate, weighInsTotal: 2 })),
               ])
-                for (const i of out) titles.add(i.title);
+                for (const i of out) {
+                  titles.add(i.title);
+                  steps.add(i.step);
+                  bodies.push(i);
+                }
         }
     expect(titles.size).toBeGreaterThan(15);
+    expect(steps.size).toBeGreaterThan(15);
     expect([...titles].filter((t) => BANNED.test(t) || t.includes('!'))).toEqual([]);
+    expect([...steps].filter((t) => BANNED.test(t) || t.includes('!'))).toEqual([]);
+    // Two short lines on Progress: the step is one sentence of at most 85 characters, and the numbers on tap never repeat it.
+    expect([...steps].filter((t) => t.length > 85 || /\. \S/.test(t))).toEqual([]);
+    expect(bodies.filter((i) => i.body.includes(i.step))).toEqual([]);
   });
 });

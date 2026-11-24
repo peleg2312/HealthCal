@@ -33,23 +33,23 @@ function DaySheet({ date, visible, onClose }: { date: ISODate; visible: boolean;
 }
 
 /**
- * The share button for a day (Today's header places it). It opens the share
- * sheet for that day: a portrait card of the day's cup in the current theme,
- * with the person choosing what it carries (no weight, ever; calorie numbers
- * and food names only when they add them).
+ * The share button for a day (Today's calorie card, the diary's summary, the morning page's header). It opens the
+ * share sheet for that day: a portrait card of the day's cup in the current theme, with the person choosing what it
+ * carries (no weight, ever; calorie numbers and food names only when they add them). `size` draws the cup smaller
+ * where a row is shorter (Today's action row, `SHARE_CUP`); the kit's `IconButton` keeps it 44 px to touch.
  */
-export function ShareDayButton({ date, testID = 'today-share' }: { date: string; testID?: string }): React.ReactElement | null {
+export function ShareDayButton({ date, testID = 'today-share', size = 44 }: { date: string; testID?: string; size?: number }): React.ReactElement | null {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
   // Mounted on first use only (the sheet reads a week of data), then kept so it can slide away.
   const [used, setUsed] = useState(false);
   return (
     <>
-      <IconButton testID={testID} accessibilityLabel="Share your day as an image" onPress={() => {
+      <IconButton testID={testID} size={size} accessibilityLabel="Share your day as an image" onPress={() => {
           setUsed(true);
           setOpen(true);
         }}>
-        <Share size={20} color={colors.text} strokeWidth={1.9} />
+        <Share size={size < 44 ? 18 : 20} color={colors.text} strokeWidth={1.9} />
       </IconButton>
       {used ? <DaySheet date={date as ISODate} visible={open} onClose={() => setOpen(false)} /> : null}
     </>

@@ -1254,7 +1254,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     await lp.waitForTimeout(400);
     const sheetOpen = await lp.getByTestId('train-load-sheet').first().waitFor({ timeout: 10000 }).then(() => true, () => false);
     const numbers = sheetOpen ? await ltext('train-load-numbers') : '';
-    check('training overview: the sheet opens with the last 7 days and the recent average', sheetOpen && numbers.startsWith(`${a7} guideline minutes in the last 7 days`) && numbers.includes(`recent average of ${Math.round(c)}`), numbers);
+    check('training overview: the sheet opens with the last 7 days and the recent average', sheetOpen && numbers.startsWith(`${a7} active minutes in the last 7 days`) && numbers.includes(`recent average of ${Math.round(c)}`), numbers);
     const sheetText = sheetOpen ? await ltext('train-load-sheet') : '';
     check(
       'training overview: the sheet has the three positions, the chart, the counts and the honest sentences',
@@ -1271,7 +1271,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     check('training overview: a past week keeps the old line and no overview line', oldLine === 'Hard minutes count double' && (await lp.getByTestId('train-load').count()) === 0, oldLine);
     await lp.getByTestId('train-guideline-help').first().click({ timeout: 15000 }).catch(() => {});
     await lp.waitForTimeout(400);
-    check('training overview: the old line\'s info cup opens the same sheet', (await lp.getByTestId('train-load-sheet').count()) > 0 && (await ltext('train-load-numbers')).startsWith(`${a7} guideline minutes`));
+    check('training overview: the old line\'s info cup opens the same sheet', (await lp.getByTestId('train-load-sheet').count()) > 0 && (await ltext('train-load-numbers')).startsWith(`${a7} active minutes`));
     await loadContext.close();
   }
 

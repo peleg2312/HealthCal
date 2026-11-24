@@ -274,18 +274,29 @@ export function TrendMark({ trend, period }: { trend?: Direction | null; period?
   );
 }
 
-/** One line explaining the triangles. */
+/**
+ * The marks explained once: the triangles against the previous period, and the dash for a change too
+ * small to call (`change.ts`). The dash's words go under the triangles' on a phone too narrow for both.
+ */
 export function TrendLegend({ period }: { period: string }) {
   const { colors, spacing } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-      <Triangle size={8} color={colors.textTertiary} fill={colors.textTertiary} />
-      <View style={{ transform: [{ rotate: '180deg' }] }}>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: 2 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
         <Triangle size={8} color={colors.textTertiary} fill={colors.textTertiary} />
+        <View style={{ transform: [{ rotate: '180deg' }] }}>
+          <Triangle size={8} color={colors.textTertiary} fill={colors.textTertiary} />
+        </View>
+        <Text variant="caption" color="textTertiary">
+          against your previous {period}
+        </Text>
       </View>
-      <Text variant="caption" color="textTertiary">
-        compared with your previous {period}
-      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+        <View style={{ width: 8, height: 2, borderRadius: 1, backgroundColor: colors.textTertiary }} />
+        <Text variant="caption" color="textTertiary">
+          about the same
+        </Text>
+      </View>
     </View>
   );
 }

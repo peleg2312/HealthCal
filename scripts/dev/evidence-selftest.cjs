@@ -580,7 +580,7 @@ async function runCase(page, c) {
   });
   if (moved) {
     await today.waitForTimeout(100);
-    judge('real Today at 360 px: the eaten label set 4 px under the label above it', (await today.evaluate(layoutScan, null)).tight.filter((t) => t.includes('eaten"')), '4px above "1,');
+    judge('real Today at 360 px: the eaten label set 4 px under the label above it', (await today.evaluate(layoutScan, null)).tight.filter((t) => t.includes('eaten of')), '4px above "1,');
   } else {
     judge('real Today has the eaten label (today-eaten) placed under another label in today-energy', [], 'both');
   }

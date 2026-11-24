@@ -1,14 +1,14 @@
 import { Redirect } from 'expo-router';
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Info } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Info } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { AccessibilityInfo, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { addDays, formatDayLabel, formatLongDate } from '@/lib/dates';
+import { DayStepper as FoodDayStepper } from '@/features/food/components';
 import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
 import { cup, useTheme } from '@/theme';
 import type { ISODate } from '@/types';
-import { CupKey, IconButton, PressableScale, Text } from '@/ui';
+import { CupKey, PressableScale, Text } from '@/ui';
 
 /** Renders children only once a profile exists; otherwise sends the user to the welcome flow. */
 export function RequireProfile({ children }: { children: React.ReactNode }) {
@@ -33,43 +33,14 @@ export function useReduceMotion(): boolean {
   return reduce;
 }
 
-/** Previous / next day picker that never goes past today. */
+/**
+ * The day of a weigh-in or a night: the app's one date control (`DayStepper`, `@/features/food/components`), the
+ * same look and words as food detail and the run log, stopping at today (a weight or a night is logged once it
+ * happened). testIDs `<testID>-prev`, `-today`, `-label`, `-next`.
+ */
 export function DayStepper({ date, onChange, testID }: { date: ISODate; onChange: (d: ISODate) => void; testID: string }) {
-  const { colors, radius } = useTheme();
-  const atToday = date >= useToday();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        ...cup(radius.buttonSm, 5),
-        borderWidth: 1.5,
-        borderColor: colors.borderStrong,
-        padding: 2,
-      }}>
-      <IconButton testID={`${testID}-prev`} accessibilityLabel="Previous day" tone="clear" size={44} onPress={() => onChange(addDays(date, -1))}>
-        <ChevronLeft size={20} color={colors.text} />
-      </IconButton>
-      <View style={{ flex: 1, alignItems: 'center' }}>
-        <Text testID={`${testID}-label`} variant="title">
-          {formatDayLabel(date)}
-        </Text>
-        <Text variant="caption" color="textSecondary">
-          {formatLongDate(date)}
-        </Text>
-      </View>
-      <IconButton
-        testID={`${testID}-next`}
-        accessibilityLabel="Next day"
-        tone="clear"
-        size={44}
-        disabled={atToday}
-        onPress={() => onChange(addDays(date, 1))}>
-        <ChevronRight size={20} color={colors.text} />
-      </IconButton>
-    </View>
-  );
+  const todayDate = useToday();
+  return <FoodDayStepper value={date} onChange={onChange} testIDPrefix={testID} latest={todayDate} />;
 }
 
 /**

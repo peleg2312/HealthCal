@@ -6,6 +6,7 @@ import { type ScrollView, type ScrollViewProps, View } from 'react-native';
 import { hasFoodLogged } from '@/features/drinks/via';
 import { copyPreviousDay, copyPreviousMeal, findPreviousDay, findPreviousMeal } from '@/features/food/actions';
 import { DaySummaryCard, EMPTY_DAY_NOTE, MealCard, MealMenuSheet } from '@/features/food/DiaryParts';
+import { foodLatestDay } from '@/features/food/entryDay';
 import { dayPhrase, kcal, param, parseDate } from '@/features/food/helpers';
 import { markSaveHintDone, saveHintAllowed, saveHintMeal, useSaveHintDone } from '@/features/food/saveHint';
 import { SaveMealSheet } from '@/features/food/SaveMealSheet';
@@ -16,7 +17,7 @@ import { DayRingStrip } from '@/features/today/DayRingStrip';
 import { useBackToToday } from '@/features/today/useBackToToday';
 import { useDaySwipe } from '@/features/today/useDaySwipe';
 import { useReportViewedDay } from '@/features/today/viewedDay';
-import { addDays, today } from '@/lib/dates';
+import { today } from '@/lib/dates';
 import { MEALS } from '@/lib/nutrition';
 import { useToday } from '@/store/clock';
 import { useDay, useLive } from '@/store/selectors';
@@ -24,8 +25,6 @@ import { useTheme } from '@/theme';
 import type { ISODate, MealType } from '@/types';
 import { Button, Screen } from '@/ui';
 
-/** How far ahead the diary goes: a week, to plan meals (the strip then shows next week as well). */
-const PLAN_AHEAD_DAYS = 7;
 /** How often and how many times the diary looks for the meal it was asked to show before giving up (two seconds). */
 const MEAL_LOOK_MS = 100;
 const MEAL_LOOKS = 20;
@@ -38,7 +37,9 @@ export default function DiaryScreen() {
   // The + sheet logs to the day being looked at.
   useReportViewedDay(date === t ? null : date);
   const setDate = (d: ISODate) => router.setParams({ date: d === today() ? undefined : d });
-  const latest = addDays(t, PLAN_AHEAD_DAYS);
+  // How far ahead the diary goes: a week, to plan meals (the strip then shows next week as well), the same limit
+  // as every entry's date control (`ENTRY_DAYS_AHEAD`), so the two cannot drift apart.
+  const latest = foodLatestDay(t);
   // A quick sideways flick on the page moves one day, never past today (planning ahead is a tap
   // in the strip), and says so with a toast; the strip itself pages weeks.
   const swipe = useDaySwipe({ date, onChange: setDate, latest: t });

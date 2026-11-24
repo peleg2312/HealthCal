@@ -124,7 +124,7 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
   const dayWord = isToday ? 'today' : 'that day';
   const activityLabel = [
     week
-      ? `Activity ${thisWeek}, ${weekMinutes} of ${WEEKLY_ACTIVE_MINUTES} guideline minutes${day.activities.length ? `. ${day.activeMinutes} minutes ${dayWord}` : ''}`
+      ? `Activity ${thisWeek}, ${weekMinutes} active minutes, of the ${WEEKLY_ACTIVE_MINUTES} minutes a week guideline${day.activities.length ? `. ${day.activeMinutes} minutes ${dayWord}` : ''}`
       : day.activities.length
         ? `Activity, ${day.activeMinutes} minutes`
         : 'Activity, nothing logged',
@@ -135,8 +135,9 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
 
   return (
     <Card testID="today-rail" padding={0}>
-      {/* 10 px over the water row on a narrow phone (14 otherwise), so the row and its "+ 250 ml" are in the first view at 320 x 640. */}
-      <View style={{ paddingTop: narrow ? 10 : 14, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
+      {/* 8 px over the water row on a narrow phone (14 otherwise), so the row and its "+ 250 ml" are in the first view at
+          320 x 640, clear of the toast a glass raises. */}
+      <View style={{ paddingTop: narrow ? 8 : 14, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
           <PressableScale
             testID="today-water"

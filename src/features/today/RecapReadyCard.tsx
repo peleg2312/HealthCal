@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { CalendarCheck, ChevronRight, X } from 'lucide-react-native';
+import { CalendarCheck, X } from 'lucide-react-native';
 import React from 'react';
 import { View } from 'react-native';
 
@@ -9,14 +9,16 @@ import { weekRangeLabel } from '@/lib/insights';
 import { useStore } from '@/store';
 import { useDays } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
-import { IconButton, PressableScale, Text, toast } from '@/ui';
+import { IconButton, ListRow, toast } from '@/ui';
 
 import { recapLine } from './recapLine';
 
 /**
- * "Your week is ready": announces last week's check-in early in the new week.
- * Takes the coach card's place on the days it shows. Opening the recap marks
- * it seen (the recap screen does that); the dismiss control marks it seen too.
+ * "Your week is ready": announces last week's check-in early in the new week, in the coach card's place.
+ * One slim row, not a card of its own: the kit's ListRow (its mark, the words, its chevron) in a surface
+ * tile with the cards' 1 px line, so it is no louder than the cards around it, and the hide control
+ * beside it. The week's dates and numbers are on the check-in it opens, and read out here. Opening the
+ * recap marks it seen (the recap screen does that); the hide control marks it seen too, with Undo.
  */
 export function RecapReadyCard() {
   const { colors, spacing, radius } = useTheme();
@@ -41,32 +43,22 @@ export function RecapReadyCard() {
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        gap: spacing.xs,
-        // An alt cup (surfaceAlt, no border): a note, not a stat card.
-        backgroundColor: colors.surfaceAlt,
-        ...cup(radius.card),
-        paddingVertical: spacing.md,
+        backgroundColor: colors.surface,
+        ...cup(radius.tile, 5),
+        borderWidth: 1,
+        borderColor: colors.border,
         paddingLeft: spacing.lg,
-        paddingRight: spacing.sm,
+        paddingRight: spacing.xs,
       }}>
-      <PressableScale
+      <ListRow
         testID="today-recap-open"
-        scaleTo={0.99}
+        title="Your week is ready"
+        left={<CalendarCheck size={20} color={colors.text} strokeWidth={1.9} />}
+        chevron
+        accessibilityHint={`${range}. ${line}. Opens the weekly check-in`}
         onPress={() => router.push(`/recap?week=${recap.week}` as never)}
-        accessibilityLabel={`Your week is ready, ${range}. ${line}. Open the weekly check-in`}
-        style={{ flex: 1, minWidth: 0, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-        <CalendarCheck size={22} color={colors.text} strokeWidth={1.9} />
-        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Text variant="bodyStrong" numberOfLines={1}>
-            Your week is ready
-          </Text>
-          {/* The week's dates lead the line under the title, so they are never cut at the end of the title. */}
-          <Text variant="caption" color="textSecondary" numberOfLines={2}>
-            {`${range} · ${line}`}
-          </Text>
-        </View>
-        <ChevronRight size={18} color={colors.textSecondary} />
-      </PressableScale>
+        style={{ flex: 1, minWidth: 0, minHeight: 48, paddingVertical: 2 }}
+      />
       <IconButton testID="today-recap-dismiss" accessibilityLabel="Hide this week's check-in" tone="clear" size={44} onPress={dismiss}>
         <X size={18} color={colors.textSecondary} />
       </IconButton>

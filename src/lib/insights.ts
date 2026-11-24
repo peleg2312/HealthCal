@@ -398,7 +398,14 @@ export interface Insight {
   /** Stable id, e.g. 'protein-low', usable as a React key and testID. */
   id: string;
   tone: InsightTone;
+  /** The finding, one short line. */
   title: string;
+  /**
+   * One short sentence under the finding: the one next step, or, for a finding with nothing to
+   * change, its number in a few words. Progress shows the finding and this line; the body is a tap away.
+   */
+  step: string;
+  /** The full numbers behind the finding (never the step again), shown on tap. */
   body: string;
   action?: { label: string; route: string };
   /** Higher ranks first. */
@@ -463,6 +470,7 @@ export function generateInsights(ctx: InsightContext): Insight[] {
         id: 'log-more',
         tone: 'neutral',
         title: 'Log a few more days',
+        step: `${plural(need, 'more fully logged day')} and insights start.`,
         body: `Insights start after ${MIN_INSIGHT_DAYS} fully logged days in this range. You have ${s.completeDays} so far, so ${plural(need, 'more day')} will unlock them.`,
         action: { label: 'Open diary', route: '/diary' },
         score: 100,
@@ -510,11 +518,12 @@ function caloriesInsight({ summary: s, days, today, units }: InsightContext): In
     // a little above the budget is said as above it, with the days counted by the same rule.
     const counted = `${c.onBudget} of ${n} days were on budget, at 90 to 100% of it${c.above ? `, and ${c.above} above it` : ''}`;
     return rel <= 0
-      ? { id: 'calories-on-budget', tone: 'positive', title: 'Calories on budget', body: `${base}, and ${counted}. Keep the same routine.`, score: 50 }
+      ? { id: 'calories-on-budget', tone: 'positive', title: 'Calories on budget', step: 'Keep the same routine.', body: `${base}, and ${counted}.`, score: 50 }
       : {
           id: 'calories-on-budget',
           tone: 'neutral',
           title: 'Calories just above budget',
+          step: `${kcalText(c.avgDiff)} a day above, on average.`,
           body: `${base}: ${kcalText(c.avgDiff)} a day above. ${counted.charAt(0).toUpperCase()}${counted.slice(1)}.`,
           score: 50,
         };
@@ -525,13 +534,14 @@ function caloriesInsight({ summary: s, days, today, units }: InsightContext): In
     const pattern = weekendPattern(days, today);
     const weekdaysOnPlan = pattern && pattern.diff >= 150 && Math.abs(pattern.weekdayAvg - c.avgBudget) <= c.avgBudget * 0.05;
     const step = weekdaysOnPlan
-      ? 'On weekdays you average about your budget, so planning one weekend meal ahead would make the biggest difference.'
-      : `Trimming one ${diff <= 250 ? 'snack' : 'portion'} of about ${round50(diff)} kcal a day would bring the average back to budget.`;
+      ? 'Planning one weekend meal ahead would make the biggest difference.'
+      : `Trimming one ${diff <= 250 ? 'snack' : 'portion'} of about ${round50(diff)} kcal a day would bring it back.`;
     return {
       id: 'calories-above',
       tone: 'attention',
       title: 'Calories above budget',
-      body: `${base}: ${kcalText(diff)} a day above. At that level your trend moves about ${rateText(slower, units)} a week ${slower > 0 ? 'higher' : 'lower'} than planned. ${step}`,
+      step,
+      body: `${base}: ${kcalText(diff)} a day above. At that level your trend moves about ${rateText(slower, units)} a week ${slower > 0 ? 'higher' : 'lower'} than planned.${weekdaysOnPlan ? ' On weekdays you average about your budget.' : ''}`,
       action: { label: 'Open diary', route: '/diary' },
       score: 60 + Math.min(30, rel * 200),
     };
@@ -542,7 +552,8 @@ function caloriesInsight({ summary: s, days, today, units }: InsightContext): In
       id: 'calories-well-under',
       tone: 'attention',
       title: 'Eating well under budget',
-      body: `${base}: ${kcalText(gap)} a day under. Eating this far under can sap energy and cost muscle; adding a snack of about ${round50(Math.min(gap, 400))} kcal brings you closer to plan. If some meals went unlogged, logging them keeps your estimates accurate.`,
+      step: `A snack of about ${round50(Math.min(gap, 400))} kcal a day brings you closer to plan.`,
+      body: `${base}: ${kcalText(gap)} a day under. Eating this far under can sap energy and cost muscle. If some meals went unlogged, logging them keeps your estimates accurate.`,
       action: { label: 'Open diary', route: '/diary' },
       score: 58,
     };
@@ -551,7 +562,8 @@ function caloriesInsight({ summary: s, days, today, units }: InsightContext): In
     id: 'calories-under',
     tone: 'neutral',
     title: 'A little under budget',
-    body: `${base}: ${kcalText(-c.avgDiff)} a day under, a modest gap. If you feel low on energy, a snack of about ${round50(-c.avgDiff)} kcal would close it.`,
+    step: `If energy is low, a snack of about ${round50(-c.avgDiff)} kcal would close it.`,
+    body: `${base}: ${kcalText(-c.avgDiff)} a day under, a modest gap.`,
     score: 22,
   };
 }
@@ -561,15 +573,17 @@ function proteinInsight({ summary: s, goal }: InsightContext): Insight | null {
   if (!p || p.target <= 0) return null;
   const gap = p.target - p.avg;
   if (gap >= Math.max(10, p.target * 0.1)) {
-    const step =
-      gap <= 35
-        ? 'One more serving of Greek yogurt (about 24 g) or a 100 g portion of chicken (about 31 g) a day would close most of the gap.'
-        : 'Adding a protein source to two meals a day, such as Greek yogurt at breakfast and chicken, fish or tofu at lunch, would close most of the gap.';
+    const small = gap <= 35;
     return {
       id: 'protein-low',
       tone: 'attention',
       title: 'Protein below target',
-      body: `Protein averaged ${gText(p.avg)}, ${gText(gap)} under your ${gText(p.target)} target. ${step}`,
+      step: small ? 'A Greek yogurt or 100 g of chicken a day would close most of it.' : 'A protein source at two meals a day would close most of it.',
+      body: `Protein averaged ${gText(p.avg)}, ${gText(gap)} under your ${gText(p.target)} target. ${
+        small
+          ? 'A serving of Greek yogurt adds about 24 g, a 100 g portion of chicken about 31 g.'
+          : 'For example Greek yogurt at breakfast, and chicken, fish or tofu at lunch.'
+      }`,
       action: { label: 'Find protein foods', route: '/food/search?meal=snack' },
       score: 55 + Math.min(25, (gap / p.target) * 100),
     };
@@ -580,6 +594,7 @@ function proteinInsight({ summary: s, goal }: InsightContext): Insight | null {
       id: 'protein-on-target',
       tone: 'positive',
       title: 'Protein on target',
+      step: `${gText(p.avg)} a day against ${gText(p.target)}.`,
       body: `Protein averaged ${gText(p.avg)} against a ${gText(p.target)} target${why}.`,
       score: 40,
     };
@@ -595,7 +610,8 @@ function fiberInsight({ summary: s }: InsightContext): Insight | null {
       id: 'fiber-low',
       tone: 'attention',
       title: 'Fibre is low',
-      body: `Fibre averaged ${gText(f.avg)} against ${gText(f.target)}. A cup of cooked lentils or beans (about 13 g) or a pear with a handful of almonds (about 9 g) would close much of the gap.`,
+      step: 'A cup of lentils or beans a day would close much of it.',
+      body: `Fibre averaged ${gText(f.avg)} against ${gText(f.target)}. A cup of cooked lentils or beans adds about 13 g, a pear with a handful of almonds about 9 g.`,
       score: 32 + Math.min(15, (1 - f.avg / f.target) * 30),
     };
   }
@@ -604,6 +620,7 @@ function fiberInsight({ summary: s }: InsightContext): Insight | null {
       id: 'fiber-on-target',
       tone: 'positive',
       title: 'Fibre on target',
+      step: `${gText(f.avg)} a day against ${gText(f.target)}.`,
       body: `Fibre averaged ${gText(f.avg)} against a ${gText(f.target)} target.`,
       score: 18,
     };
@@ -616,7 +633,7 @@ function hydrationInsight({ summary: s, days, today, units }: InsightContext): I
   if (!w || w.daysTracked < 3) return null;
   const rate = w.daysAtGoal / w.daysTracked;
   // The title says the count in neutral words (what was reached, never what was missed); the body adds the amounts.
-  const reached = `Water goal reached on ${w.daysAtGoal} of ${w.daysTracked} ${w.daysTracked === 1 ? 'day' : 'days'}`;
+  const reached = `Water goal met on ${w.daysAtGoal} of ${w.daysTracked} ${w.daysTracked === 1 ? 'day' : 'days'}`;
   const head = `You reached your water goal on ${w.daysAtGoal} of ${w.daysTracked} days`;
   if (rate < 0.5) {
     const gap = Math.max(0, w.avgGoalMl - w.avgMl);
@@ -631,7 +648,8 @@ function hydrationInsight({ summary: s, days, today, units }: InsightContext): I
       id: 'water-low',
       tone: 'attention',
       title: reached,
-      body: `You averaged ${formatVolume(w.avgMl, units)} a day against ${formatVolume(w.avgGoalMl, units)}${patternText}. ${glasses === 1 ? `One more ${glassText(units)} glass` : `${glasses} more ${glassText(units)} glasses`}${when} would close the gap.`,
+      step: `${glasses === 1 ? `One more ${glassText(units)} glass` : `${glasses} more ${glassText(units)} glasses`} a day${when} would close the gap.`,
+      body: `You averaged ${formatVolume(w.avgMl, units)} a day against ${formatVolume(w.avgGoalMl, units)}${patternText}.`,
       action: { label: 'Log water', route: '/water' },
       score: 42 + (1 - rate) * 20,
     };
@@ -641,6 +659,7 @@ function hydrationInsight({ summary: s, days, today, units }: InsightContext): I
       id: 'water-on-track',
       tone: 'positive',
       title: 'Hydration on track',
+      step: `Goal reached on ${w.daysAtGoal} of ${w.daysTracked} days.`,
       body: `${head}, averaging ${formatVolume(w.avgMl, units)} a day.`,
       score: 34,
     };
@@ -649,7 +668,8 @@ function hydrationInsight({ summary: s, days, today, units }: InsightContext): I
     id: 'water-mixed',
     tone: 'neutral',
     title: reached,
-    body: `You averaged ${formatVolume(w.avgMl, units)} a day against ${formatVolume(w.avgGoalMl, units)}. A glass with each meal would make it most days.`,
+    step: 'A glass with each meal would make it most days.',
+    body: `You averaged ${formatVolume(w.avgMl, units)} a day against ${formatVolume(w.avgGoalMl, units)}.`,
     action: { label: 'Log water', route: '/water' },
     score: 24,
   };
@@ -660,13 +680,14 @@ function activityInsight({ summary: s }: InsightContext): Insight | null {
   const a = s.activity;
   const weekly = Math.round(a.weeklyMinutes);
   const sessions = plural(a.sessions, 'session');
-  const light = a.minutes > 0 && a.guidelineMinutes < a.minutes ? ' Light sessions such as easy walks are logged but do not count toward it.' : '';
+  const light = a.minutes > 0 && a.guidelineMinutes < a.minutes ? ' Light sessions such as easy walks are logged but do not count.' : '';
   if (weekly >= WEEKLY_ACTIVE_MINUTES) {
     return {
       id: 'activity-on-track',
       tone: 'positive',
       title: 'Above the activity guideline',
-      body: `You averaged ${weekly} guideline minutes a week (${sessions} in this range, hard sessions count double), above the ${WEEKLY_ACTIVE_MINUTES}-minute guideline.`,
+      step: `${weekly} active minutes a week, on average.`,
+      body: `You averaged ${weekly} active minutes a week (${sessions} in this range), toward the ${WEEKLY_ACTIVE_MINUTES} minutes a week guideline. Hard minutes count double.`,
       score: 38,
     };
   }
@@ -675,8 +696,9 @@ function activityInsight({ summary: s }: InsightContext): Insight | null {
   return {
     id: 'activity-low',
     tone: 'attention',
-    title: `Under ${WEEKLY_ACTIVE_MINUTES} guideline minutes a week`,
-    body: `You averaged ${weekly} guideline minutes a week (${sessions} in this range), ${gap} short of the ${WEEKLY_ACTIVE_MINUTES}-minute guideline.${light} ${walks === 1 ? 'One brisk 30-minute walk' : `${walks} brisk 30-minute walks`} a week would cover it.`,
+    title: `Under ${WEEKLY_ACTIVE_MINUTES} active minutes a week`,
+    step: `${walks === 1 ? 'One brisk 30-minute walk' : `${walks} brisk 30-minute walks`} a week would cover it.`,
+    body: `You averaged ${weekly} active minutes a week (${sessions} in this range), ${gap} short of the ${WEEKLY_ACTIVE_MINUTES} minutes a week guideline. Hard minutes count double.${light}`,
     action: { label: 'Log activity', route: '/activity/pick' },
     score: 30 + Math.min(20, (gap / WEEKLY_ACTIVE_MINUTES) * 20),
   };
@@ -691,7 +713,8 @@ function sleepInsight({ summary: s }: InsightContext): Insight | null {
       id: 'sleep-short',
       tone: 'attention',
       title: 'Sleep under 7 hours',
-      body: `Sleep averaged ${hoursText(sl.avgHours)} over ${plural(sl.nights, 'night')}, under the 7 h most adults need. Going to bed ${mins} minutes earlier would close the gap.`,
+      step: `Going to bed ${mins} minutes earlier would close the gap.`,
+      body: `Sleep averaged ${hoursText(sl.avgHours)} over ${plural(sl.nights, 'night')}, under the 7 h most adults need.`,
       action: { label: 'Sleep log', route: '/sleep' },
       score: 33 + Math.min(20, (SLEEP_TARGET_HOURS - sl.avgHours) * 15),
     };
@@ -701,7 +724,8 @@ function sleepInsight({ summary: s }: InsightContext): Insight | null {
       id: 'sleep-long',
       tone: 'neutral',
       title: 'Sleep above 9 hours',
-      body: `Sleep averaged ${hoursText(sl.avgHours)} over ${plural(sl.nights, 'night')}, above the 7 to 9 h most adults need. Long sleep is often catch-up after short nights; if it lasts, it is worth mentioning to a doctor.`,
+      step: 'If it lasts, it is worth mentioning to a doctor.',
+      body: `Sleep averaged ${hoursText(sl.avgHours)} over ${plural(sl.nights, 'night')}, above the 7 to 9 h most adults need. Long sleep is often catch-up after short nights.`,
       action: { label: 'Sleep log', route: '/sleep' },
       score: 36,
     };
@@ -710,6 +734,7 @@ function sleepInsight({ summary: s }: InsightContext): Insight | null {
     id: 'sleep-on-track',
     tone: 'positive',
     title: 'Sleep in a healthy range',
+    step: `${hoursText(sl.avgHours)} a night over ${plural(sl.nights, 'night')}.`,
     body: `Sleep averaged ${hoursText(sl.avgHours)} over ${plural(sl.nights, 'night')}, inside the 7 to 9 h most adults need.`,
     score: 24,
   };
@@ -722,7 +747,8 @@ function sleepAppetiteInsight({ days, sleep, today }: InsightContext): Insight |
     id: 'sleep-appetite',
     tone: 'neutral',
     title: 'Short nights, bigger appetite',
-    body: `On days after less than 6.5 h of sleep you ate ${kcalText(p.diff)} more on average (${kcalText(p.shortAvgKcal)} across ${p.shortDays} days against ${kcalText(p.restAvgKcal)}). After a short night, a protein-rich breakfast helps keep hunger steady.`,
+    step: 'After a short night, a protein-rich breakfast helps keep hunger steady.',
+    body: `On days after less than 6.5 h of sleep you ate ${kcalText(p.diff)} more on average (${kcalText(p.shortAvgKcal)} across ${p.shortDays} days against ${kcalText(p.restAvgKcal)}).`,
     score: 36,
   };
 }
@@ -736,7 +762,8 @@ function paceInsight(ctx: InsightContext): Insight | null {
       id: 'pace-stale',
       tone: 'neutral',
       title: 'Weigh in to update your pace',
-      body: `Your last weigh-in was ${ago} days ago (${formatShortDate(ctx.lastWeighIn)}), so there is no current rate to compare with your plan. A few mornings this week will bring the trend up to date.`,
+      step: 'A few mornings this week will bring the trend up to date.',
+      body: `Your last weigh-in was ${ago} days ago (${formatShortDate(ctx.lastWeighIn)}), so there is no current rate to compare with your plan.`,
       action: { label: 'Log weight', route: '/weight' },
       score: 35,
     };
@@ -752,6 +779,7 @@ function paceInsight(ctx: InsightContext): Insight | null {
         id: 'pace-on-track',
         tone: 'positive',
         title: 'Weight holding steady',
+        step: `Your trend weight is ${movement}.`,
         body: `Your trend weight is ${movement}, well within normal variation for maintenance.`,
         score: 55,
       };
@@ -760,7 +788,8 @@ function paceInsight(ctx: InsightContext): Insight | null {
       id: 'pace-drift',
       tone: 'neutral',
       title: 'Trend weight drifting',
-      body: `Your trend weight is ${movement} while your goal is to maintain. ${rate > 0 ? 'Eating' : 'Adding'} about ${adjust(rate)} ${rate > 0 ? 'less' : 'more'} a day would level it out.${adaptiveNote}`,
+      step: `${rate > 0 ? 'Eating' : 'Adding'} about ${adjust(rate)} ${rate > 0 ? 'less' : 'more'} a day would level it out.`,
+      body: `Your trend weight is ${movement} while your goal is to maintain.${adaptiveNote}`,
       action: { label: 'Review goals', route: '/settings/goals' },
       score: 50,
     };
@@ -778,10 +807,11 @@ function paceInsight(ctx: InsightContext): Insight | null {
       id: 'pace-too-fast',
       tone: 'attention',
       title: goal === 'lose' ? 'Losing faster than recommended' : 'Gaining faster than planned',
+      step: `Eating about ${adjust(towards - Math.abs(chosen))} ${goal === 'lose' ? 'more' : 'less'} a day would bring you to the ${r(chosen)} pace you chose.`,
       body:
         goal === 'lose'
-          ? `Your trend weight is ${movement}, faster than the ${r(max)} a week upper limit for your weight. Losing this fast makes it harder to keep muscle; eating about ${adjust(towards - Math.abs(chosen))} more a day would bring you to the ${r(chosen)} pace you chose.`
-          : `Your trend weight is ${movement}, above the ${r(max)} a week that mostly adds muscle. Eating about ${adjust(towards - Math.abs(chosen))} less a day would bring you to the ${r(chosen)} pace you chose.`,
+          ? `Your trend weight is ${movement}, faster than the ${r(max)} a week upper limit for your weight. Losing this fast makes it harder to keep muscle.`
+          : `Your trend weight is ${movement}, above the ${r(max)} a week that mostly adds muscle.`,
       action: { label: 'Review goals', route: '/settings/goals' },
       score: 75,
     };
@@ -791,6 +821,7 @@ function paceInsight(ctx: InsightContext): Insight | null {
       id: 'pace-on-track',
       tone: 'positive',
       title: 'Right on pace',
+      step: `${r(rate)} a week, the pace you chose.`,
       body: `Your trend weight ${verb} ${r(rate)} a week, right at the ${r(chosen)} pace you chose.`,
       score: 58,
     };
@@ -800,7 +831,8 @@ function paceInsight(ctx: InsightContext): Insight | null {
       id: 'pace-ahead',
       tone: 'neutral',
       title: 'Ahead of your chosen pace',
-      body: `Your trend weight ${verb} ${r(rate)} a week, faster than the ${r(chosen)} you chose and within the ${r(max)} safe limit. If hunger or training suffer, about ${adjust(towards - Math.abs(chosen))} more a day would ease it back.`,
+      step: `If hunger or training suffer, about ${adjust(towards - Math.abs(chosen))} more a day would ease it back.`,
+      body: `Your trend weight ${verb} ${r(rate)} a week, faster than the ${r(chosen)} you chose and within the ${r(max)} safe limit.`,
       score: 44,
     };
   }
@@ -808,7 +840,8 @@ function paceInsight(ctx: InsightContext): Insight | null {
     id: 'pace-slower',
     tone: 'neutral',
     title: 'Slower than your chosen pace',
-    body: `Your trend weight is ${movement} against the ${r(chosen)} a week you chose. A daily change of about ${adjust(chosen - rate)} would close the gap; first check that drinks, oils and weekend meals are logged.${adaptiveNote}`,
+    step: 'First check that drinks, oils and weekend meals are logged.',
+    body: `Your trend weight is ${movement} against the ${r(chosen)} a week you chose. A daily change of about ${adjust(chosen - rate)} would close the gap.${adaptiveNote}`,
     action: { label: 'Review goals', route: '/settings/goals' },
     score: 48,
   };
@@ -822,15 +855,16 @@ function weekendInsight({ summary: s, days, today }: InsightContext): Insight | 
     const onBudget = Math.abs(c.avgDiff) <= c.avgBudget * 0.05;
     const under = c.avgDiff < -c.avgBudget * 0.05;
     const step = onBudget
-      ? 'Your overall average is still on budget, so this is a pattern to know about rather than something to fix.'
+      ? 'Your average is still on budget: a pattern to know, not to fix.'
       : under
-        ? 'Your overall average is under budget, so this is a pattern to know about rather than something to trim.'
+        ? 'Your average is under budget: a pattern to know, not to trim.'
         : `Setting aside about ${kcalText(round10((p.diff * 2) / 5))} on each weekday would balance the week.`;
     return {
       id: 'weekend-higher',
       tone: 'neutral',
       title: 'Weekends run higher',
-      body: `Weekends average ${kcalText(p.diff)} more than weekdays (${kcalText(p.weekendAvg)} against ${kcalText(p.weekdayAvg)}). ${step}`,
+      step,
+      body: `Weekends average ${kcalText(p.diff)} more than weekdays (${kcalText(p.weekendAvg)} against ${kcalText(p.weekdayAvg)}).${onBudget ? ' Your overall average is still on budget.' : under ? ' Your overall average is under budget.' : ''}`,
       score: onBudget || under ? 30 : 46,
     };
   }
@@ -838,7 +872,8 @@ function weekendInsight({ summary: s, days, today }: InsightContext): Insight | 
     id: 'weekday-higher',
     tone: 'neutral',
     title: 'Weekdays run higher',
-    body: `Weekdays average ${kcalText(-p.diff)} more than weekends (${kcalText(p.weekdayAvg)} against ${kcalText(p.weekendAvg)}). Workday snacks are a common source; logging them as you go shows where it adds up.`,
+    step: 'Logging workday snacks as you go shows where it adds up.',
+    body: `Weekdays average ${kcalText(-p.diff)} more than weekends (${kcalText(p.weekdayAvg)} against ${kcalText(p.weekendAvg)}). Workday snacks are a common source.`,
     score: 30,
   };
 }
@@ -853,6 +888,7 @@ function consistencyInsight({ summary: s, streak }: InsightContext): Insight | n
       id: 'logging-consistent',
       tone: 'positive',
       title: 'Consistent logging',
+      step: `Food logged on ${n} of the last ${d} days.`,
       body: `You logged food on ${n} of the last ${d} days${streak >= 3 ? `, with a current streak of ${streak} days` : ''}. That consistency is what makes these averages reliable.`,
       score: 28,
     };
@@ -862,7 +898,8 @@ function consistencyInsight({ summary: s, streak }: InsightContext): Insight | n
       id: 'logging-gaps',
       tone: 'attention',
       title: 'Gaps in logging',
-      body: `You logged food on ${n} of ${d} days. Each fully logged day sharpens your averages and expenditure estimate; on busy days, copying a previous meal takes two taps.`,
+      step: 'On busy days, copying a previous meal takes two taps.',
+      body: `You logged food on ${n} of ${d} days. Each fully logged day sharpens your averages and expenditure estimate.`,
       action: { label: 'Open diary', route: '/diary' },
       score: 40,
     };
@@ -886,6 +923,7 @@ function adaptiveInsight({ energy }: InsightContext): Insight | null {
       id: 'adaptive-pending',
       tone: 'neutral',
       title: 'Learning what you burn',
+      step: `Until then targets use ${kcalText(formula)} a day, from your body.`,
       body: `Working out what you burn from your own logs needs ${a.needs ?? 'a little more data'}. Until then targets use the estimate from your body, ${kcalText(formula)} a day.`,
       action: needsWeight ? { label: 'Log weight', route: '/weight' } : { label: 'Open diary', route: '/diary' },
       score: 26,
@@ -899,7 +937,8 @@ function adaptiveInsight({ energy }: InsightContext): Insight | null {
       id: 'adaptive-available',
       tone: 'neutral',
       title: 'What you burn, from your logs',
-      body: `Your food and weigh-ins show you burn about ${kcalText(a.observed)} a day before logged workouts, ${rel} the ${kcalText(formula)} estimated from your body. Turn on "Learn from my data" in Goals to base your targets on it.`,
+      step: 'Turn on "Learn from my data" in Goals to base your targets on it.',
+      body: `Your food and weigh-ins show you burn about ${kcalText(a.observed)} a day before logged workouts, ${rel} the ${kcalText(formula)} estimated from your body.`,
       action: { label: 'Review goals', route: '/settings/goals' },
       score: 45,
     };
@@ -908,6 +947,7 @@ function adaptiveInsight({ energy }: InsightContext): Insight | null {
     id: 'adaptive-active',
     tone: 'positive',
     title: 'What you burn, from your logs',
+    step: `Your targets now use ${kcalText(energy.tdee)} a day.`,
     body: `Your food and weigh-ins show you burn about ${kcalText(a.observed)} a day before logged workouts, ${rel} the ${kcalText(formula)} estimated from your body. At ${confidenceWord(a.confidence)} confidence (${pct}%) your targets now use a blend of the two, ${kcalText(energy.tdee)} a day.`,
     score: Math.abs(diff) >= 150 ? 42 : 27,
   };
@@ -1036,9 +1076,9 @@ export function recapWinFocus(s: PeriodSummary, units: UnitSystem, goal: GoalTyp
     else focuses.push({ score: (1 - r) * 0.8, text: `Water: goal reached on ${w.daysAtGoal} of ${w.daysTracked} days; one more ${glassText(units)} glass a day would help.` });
   }
   const mins = s.activity.guidelineMinutes;
-  if (mins >= WEEKLY_ACTIVE_MINUTES) wins.push({ score: 0.85, text: `${mins} guideline minutes across ${plural(s.activity.sessions, 'session')}, above the 150-minute guideline.` });
+  if (mins >= WEEKLY_ACTIVE_MINUTES) wins.push({ score: 0.85, text: `${mins} active minutes in ${plural(s.activity.sessions, 'session')}, past the weekly ${WEEKLY_ACTIVE_MINUTES}.` });
   else if (s.totalDays >= 5)
-    focuses.push({ score: ((WEEKLY_ACTIVE_MINUTES - mins) / WEEKLY_ACTIVE_MINUTES) * 0.7, text: `Activity: ${mins} of 150 guideline minutes; ${plural(Math.ceil((WEEKLY_ACTIVE_MINUTES - mins) / 30), 'brisk 30-minute walk')} would get you there.` });
+    focuses.push({ score: ((WEEKLY_ACTIVE_MINUTES - mins) / WEEKLY_ACTIVE_MINUTES) * 0.7, text: `Activity: ${mins} of the weekly ${WEEKLY_ACTIVE_MINUTES} active minutes; ${plural(Math.ceil((WEEKLY_ACTIVE_MINUTES - mins) / 30), 'brisk 30-minute walk')} would get you there.` });
   const sl = s.sleep;
   if (sl && sl.nights >= 3) {
     if (sl.avgHours >= SLEEP_TARGET_HOURS && sl.avgHours <= SLEEP_MAX_HOURS) wins.push({ score: 0.6, text: `Sleep averaged ${hoursText(sl.avgHours)} a night.` });
@@ -1124,8 +1164,8 @@ export function computeMilestones(input: {
   }
   out.push({
     id: 'active-week',
-    title: '150 guideline minutes in a week',
-    detail: 'The weekly guideline for adults; hard sessions count double.',
+    title: '150 active minutes in a week',
+    detail: 'The weekly guideline for adults; hard minutes count double.',
     achieved: !!activeWeek,
     date: activeWeek,
     current: Math.min(bestWeek, WEEKLY_ACTIVE_MINUTES),
@@ -1214,7 +1254,7 @@ export function recapTiles(r: Pick<WeeklyRecap, 'summary' | 'previous' | 'label'
     }),
     tile({
       id: 'activity',
-      label: 'Guideline minutes',
+      label: 'Active minutes',
       value: s.activity.guidelineMinutes,
       unit: 'min',
       context: `of ${WEEKLY_ACTIVE_MINUTES}, ${plural(s.activity.sessions, 'session')}`,

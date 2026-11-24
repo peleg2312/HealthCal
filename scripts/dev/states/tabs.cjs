@@ -34,10 +34,11 @@ function isoDay(n) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// Today's one-tap glass: its toast rests over the water row at 360 x 740, so it names the new total
-// (`waterAddedToast` with `waterOfGoal`) and keeps to two lines at 320.
+// Today's one-tap glass: the calorie card has no footer row (the budget is in its "eaten" line, Share in its action
+// row), so the toast rests under the "+ 250 ml" it answers at 360 x 740, 390 x 844 and 320 x 640, never on it (no
+// small-target finding). It names the new total (`waterAddedToast` with `waterOfGoal`) and keeps to two lines at 320.
 const water = [
-  { id: 'today-water-toast', route: '/', taps: ['^today-water-', { wait: 300 }], waitFor: 'toast', note: 'a glass on Today: "250 ml added to Water · 1.48 of 3.3 L" over the water row' },
+  { id: 'today-water-toast', route: '/', taps: ['^today-water-', { wait: 300 }], waitFor: 'toast', note: 'a glass on Today: "250 ml added to Water · 1.48 of 3.3 L" under the "+ 250 ml" just pressed' },
   { id: 'today-water-toast-reached', route: '/', values: { water: 0.95 }, taps: ['^today-water-', { wait: 300 }], waitFor: 'toast', note: 'the glass that reaches the goal: the total and "goal reached"' },
   { id: 'today-water-toast-imperial', route: '/', imperial: true, taps: ['^today-water-', { wait: 300 }], waitFor: 'toast', note: 'the same in fl oz' },
   { id: 'today-water-toast-past', route: '/', taps: [`today-day-${isoDay(-1)}`, '^today-water-', { wait: 300 }], waitFor: 'toast', note: 'a glass on yesterday, picked on the strip: the day and the total, two lines at 320 (on a Monday the strip shows only today)' },

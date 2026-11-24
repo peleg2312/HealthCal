@@ -343,8 +343,11 @@ export default function ConsistencyScreen() {
                     detail: `Week of ${formatShortDate(w.weekStart)} · ${w.count} ${word(w.count, 'day')} ${RHYTHM_COPY[k].verb}${w.partial ? ' so far' : ''}`,
                     // Finished weeks are solid in the habit's own colour; this week stays hatched.
                     ...(w.partial ? null : solidBar(w.count, 0, color, color)),
+                    // The target is a goal to reach: a week that met it wears the brim line (the kit's reached mark),
+                    // so the check keeps one meaning in the app, a day on budget.
+                    goal: target,
                   }))}
-                  marks={weeks.map((w) => w.met)}
+                  goalKind="reach"
                   openIndex={weeks.findIndex((w) => w.partial) >= 0 ? weeks.findIndex((w) => w.partial) : undefined}
                   // The target is a shaded zone, not a budget line: more days than the target is never "over".
                   band={{ from: target, to: 7, color }}
@@ -362,7 +365,7 @@ export default function ConsistencyScreen() {
       <Sheet visible={help} onClose={() => setHelp(false)} title="Weekly rhythm">
         <View style={{ gap: spacing.md }} testID="consistency-rhythm-help-text">
           <Text variant="body">Each bar is one week, Monday to Sunday, as tall as the days you logged food, trained or weighed in.</Text>
-          <Text variant="body">The shaded zone starts at your target. A check marks a week that reached it, and the hatched bar is this week so far.</Text>
+          <Text variant="body">The shaded zone starts at your target. A week that reached it wears the brim: its level line runs a little wider than the bar. The hatched bar is this week so far.</Text>
           <Text variant="body">Weeks on rhythm met all three of your current targets. They are counted in total, not in a row.</Text>
           <Text variant="body" color="textSecondary">
             A missed week costs nothing: it is simply not counted.

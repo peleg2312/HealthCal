@@ -590,7 +590,7 @@ async function device(browser, seedJson) {
       same(second, { message: q2, history: [{ role: 'user', text: q1 }, { role: 'assistant', text: firstAnswer }], consentVersion: 1 }),
       JSON.stringify(second).slice(0, 240),
     );
-    check('coach: no figure from the app went with sharing off', !/guideline|kcal|Meals that fit|training week|Ideas for/.test(JSON.stringify(r.map((x) => x.body))));
+    check('coach: no figure from the app went with sharing off', !/guideline|active minutes|kcal|Meals that fit|training week|Ideas for/.test(JSON.stringify(r.map((x) => x.body))));
 
     // Share my week: on in "What the coach sees", its text read from the preview, then sent word for word.
     await K.tap('coach-about');

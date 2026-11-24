@@ -1,55 +1,29 @@
-import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react-native';
+import { Trash2 } from 'lucide-react-native';
 import React from 'react';
-import { View } from 'react-native';
+import { PixelRatio, Platform, useWindowDimensions, View } from 'react-native';
 
+import { DayStepper } from '@/features/food/components';
 import { useToday } from '@/store/clock';
-import { addDays, formatDayLabel, formatLongDate } from '@/lib/dates';
 import { INTENSITY_LABELS, kcalRange } from '@/lib/exercise';
 import { formatDistance, formatNumber } from '@/lib/units';
 import { cup, fonts, useTheme } from '@/theme';
 import type { ActivityEntry, UnitSystem } from '@/types';
-import { CupKey, IconButton, PressableScale, Text } from '@/ui';
+import { CupKey, IconButton, MAX_FONT_SCALE, PressableScale, Text } from '@/ui';
 
-/** Day chooser: today by default, earlier days allowed, never the future. */
+import { historyMetaLines } from './history';
+
+/**
+ * The day of a workout: the app's one date control (`DayStepper`, `@/features/food/components`), the same look
+ * and words as food detail and Saved meals, stopping at today (a burn is logged once it happened). testIDs
+ * `<testID>-prev`, `-today`, `-label`, `-next`.
+ */
 export function DateStepper({ date, onChange, testID = 'date' }: { date: string; onChange: (d: string) => void; testID?: string }) {
-  const { colors, radius, spacing } = useTheme();
-  const isToday = date >= useToday();
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.md,
-        ...cup(radius.buttonSm, 5),
-        borderWidth: 1.5,
-        borderColor: colors.borderStrong,
-        padding: 4,
-      }}>
-      <IconButton accessibilityLabel="Previous day" tone="clear" testID={`${testID}-prev`} onPress={() => onChange(addDays(date, -1))} size={44}>
-        <ChevronLeft size={20} color={colors.text} />
-      </IconButton>
-      <View style={{ flex: 1, alignItems: 'center' }}>
-        <Text variant="bodyStrong" testID={`${testID}-label`}>
-          {formatDayLabel(date)}
-        </Text>
-        <Text variant="caption" color="textSecondary">
-          {formatLongDate(date)}
-        </Text>
-      </View>
-      <IconButton
-        accessibilityLabel="Next day"
-        tone="clear"
-        testID={`${testID}-next`}
-        disabled={isToday}
-        onPress={() => onChange(addDays(date, 1))}
-        size={44}>
-        <ChevronRight size={20} color={colors.text} />
-      </IconButton>
-    </View>
-  );
+  const todayDate = useToday();
+  return <DayStepper value={date} onChange={onChange} testIDPrefix={testID} latest={todayDate} />;
 }
 
-export function sessionSubtitle(e: ActivityEntry, units: UnitSystem): string {
+/** A workout's details as parts of its line: "75 min", "Moderate" (or its exercises and sets), "3.9 km". */
+export function sessionParts(e: ActivityEntry, units: UnitSystem): string[] {
   const parts = [`${e.durationMin} min`];
   if (e.exercises?.length) {
     const sets = e.exercises.reduce((s, x) => s + x.sets.length, 0);
@@ -57,15 +31,19 @@ export function sessionSubtitle(e: ActivityEntry, units: UnitSystem): string {
   } else {
     parts.push(INTENSITY_LABELS[e.intensity].title);
   }
-  // Non-breaking spaces keep each value with its unit when the line wraps, and each "·" with the value before it,
-  // so a wrapped line never starts with a separator ("Sun · 45 min · Moderate ·" / "3.9 km").
   if (e.distanceKm) parts.push(formatDistance(e.distanceKm, units));
-  return parts.map((p) => p.replace(/ /g, '\u00A0')).join('\u00A0· ');
+  return parts;
 }
 
+/** Room for a history row's line: the screen's content width less the card's row (18 + emoji 24 + 12, trash 44 + 4). */
+const ROW_CHROME = 18 + 24 + 12 + 44 + 4;
+
 /**
- * One workout as a row. `day` (Train's history, where a week's card holds its rows) leads the row's line
- * ("Sun · 45 min · Moderate") and is spoken in its label.
+ * One workout as a row, as the diary draws a food: the name with the calories beside it, and under both, across
+ * the row, its line ("Today · 75 min · Moderate", `historyMetaLines`: one line at 360, at most two balanced
+ * lines at 320, never a word alone). `day` (Train's history, where a week's card holds its rows) leads that
+ * line and is spoken in the label. An estimate carries "~"; its range and "net" are in the label and on the
+ * session's own screen ("likely 390–585 kcal"), and the week card above names the figures net.
  */
 export function SessionRow({
   entry,
@@ -81,15 +59,28 @@ export function SessionRow({
   onDelete: () => void;
 }) {
   const { colors, spacing } = useTheme();
+  const { width } = useWindowDimensions();
   const garmin = entry.source === 'garmin';
-  // A device-measured burn is shown as it is; an estimate from a MET table carries "~" and its range.
+  // A device-measured burn is shown as it is; an estimate from a MET table carries "~" and, when spoken, its range.
   const measured = !!entry.measured;
   const range = measured ? null : kcalRange(entry.kcalNet);
+  const parts = sessionParts(entry, units);
+  const scale = Platform.OS === 'web' ? 1 : Math.min(PixelRatio.getFontScale(), MAX_FONT_SCALE);
+  const meta = historyMetaLines(day ? [day.word, ...parts] : parts, Math.min(width, 560) - 40 - ROW_CHROME, scale);
+  const spoken = [
+    `Edit ${entry.name}`,
+    ...(day ? [day.spoken] : []),
+    ...parts,
+    ...(garmin ? ['imported from Garmin'] : []),
+    measured
+      ? `${formatNumber(entry.kcalNet)} kilocalories net, measured`
+      : `about ${formatNumber(entry.kcalNet)} kilocalories net, likely ${formatNumber(range![0])} to ${formatNumber(range![1])}`,
+  ].join(', ');
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 18, paddingRight: 4 }}>
       <PressableScale
         testID={`session-${entry.activityId}`}
-        accessibilityLabel={`Edit ${entry.name}${day ? `, ${day.spoken}` : ''}${garmin ? ', imported from Garmin' : ''}, ${measured ? '' : 'about '}${formatNumber(entry.kcalNet)} kilocalories`}
+        accessibilityLabel={spoken}
         onPress={onPress}
         scaleTo={0.985}
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>
@@ -97,12 +88,19 @@ export function SessionRow({
           <Text style={{ fontSize: 17, lineHeight: 24 }}>{entry.emoji}</Text>
         </View>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          {/* Two lines for a long name and as many as the details need on a narrow phone: nothing here is cut. */}
-          <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
-            {entry.name}
-          </Text>
-          <Text variant="caption" color="textSecondary">
-            {day ? `${day.word}\u00A0· ${sessionSubtitle(entry, units)}` : sessionSubtitle(entry, units)}
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.md }}>
+            {/* Two lines for a long name: nothing here is cut. */}
+            <Text variant="bodyStrong" numberOfLines={2} style={{ flex: 1, minWidth: 0, fontFamily: fonts.semibold }}>
+              {entry.name}
+            </Text>
+            <Text variant="numM" testID={`session-kcal-${entry.id}`} style={{ fontSize: 17, lineHeight: 22, flexShrink: 0 }}>
+              {measured ? '' : '~'}
+              {formatNumber(entry.kcalNet)}
+              <Text variant="unit">{' kcal'}</Text>
+            </Text>
+          </View>
+          <Text variant="caption" color="textSecondary" testID={`session-meta-${entry.id}`}>
+            {meta.text}
           </Text>
           {garmin ? (
             <View testID={`session-source-${entry.id}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
@@ -112,16 +110,6 @@ export function SessionRow({
               </Text>
             </View>
           ) : null}
-        </View>
-        <View style={{ alignItems: 'flex-end', flexShrink: 0 }}>
-          <Text variant="numM" style={{ fontSize: 17, lineHeight: 22 }}>
-            {measured ? '' : '~'}
-            {formatNumber(entry.kcalNet)}
-            <Text variant="unit">{' kcal'}</Text>
-          </Text>
-          <Text variant="caption" color="textSecondary" tabular>
-            {range ? `${formatNumber(range[0])}–${formatNumber(range[1])} net` : 'net'}
-          </Text>
         </View>
       </PressableScale>
       <IconButton accessibilityLabel={`Delete ${entry.name}`} tone="clear" testID={`delete-${entry.activityId}`} onPress={onDelete} size={44}>

@@ -6,6 +6,7 @@ import { useWindowDimensions, View } from 'react-native';
 import { addDays, formatDayLabel, formatShortDate } from '@/lib/dates';
 import { budgetBalanceText, weekRangeLabel, type RecapTile } from '@/lib/insights';
 import { formatNumber } from '@/lib/units';
+import { changeDirection, changeWords, type ChangeKind } from '@/features/progress/change';
 import { go } from '@/features/progress/parts';
 import { RecapCups } from '@/features/progress/RecapCups';
 import { recapDayCups, recapDaysVerdict } from '@/features/progress/recapDays';
@@ -24,6 +25,9 @@ function deltaText(t: RecapTile): string {
   return `${t.delta > 0 ? '+' : '−'}${n}${unit} vs the week before`;
 }
 
+/** Each tile's measure for the honest-arrow rule (`change.ts`): an arrow only for a change worth calling, else the sideways one. */
+const TILE_KIND: Record<RecapTile['id'], ChangeKind> = { calories: 'kcal', protein: 'protein', activity: 'minutes', water: 'days' };
+
 /** One cell of the week's numbers: the four share a card, divided by hairlines. */
 function Tile({ t, index, week }: { t: RecapTile; index: number; week: string }) {
   const { colors, spacing } = useTheme();
@@ -35,12 +39,15 @@ function Tile({ t, index, week }: { t: RecapTile; index: number; week: string })
     activity: colors.exercise,
     water: colors.water,
   }[t.id];
-  const Arrow = t.delta === null || t.delta === 0 ? ArrowRight : t.delta > 0 ? ArrowUp : ArrowDown;
+  const dir = t.delta === null ? null : changeDirection(TILE_KIND[t.id], t.value, t.previous);
+  const Arrow = dir === 'up' ? ArrowUp : dir === 'down' ? ArrowDown : ArrowRight;
+  // Read out with its size and whether it counts as a change ("About the same as the week before: down 17 kcal a day").
+  const said = t.delta === null ? deltaText(t) : (changeWords(TILE_KIND[t.id], t.value, t.previous, { period: 'week', than: 'the week before', total: t.id === 'activity' }) ?? deltaText(t));
   return (
     <View
       testID={`recap-tile-${t.id}`}
       accessible
-      accessibilityLabel={`${t.label}: ${t.value === null ? 'no data' : `${t.value} ${t.unit}`}, ${t.context}. ${deltaText(t)}`}
+      accessibilityLabel={`${t.label}: ${t.value === null ? 'no data' : `${formatNumber(t.value)} ${t.unit}`}, ${t.context}. ${said}`}
       style={{
         width: '50%',
         minWidth: 0,
@@ -158,7 +165,8 @@ export default function RecapScreen() {
           <Card style={{ gap: spacing.xs }} testID="recap-win-card">
             <Text variant="overline">Win of the week</Text>
             <Text variant="h2" testID="recap-win">
-              {r.win}
+              {/* The last two words share a line, so a headline never ends on one word alone ("150."). */}
+              {r.win.replace(/ (\S+)$/, '\u00A0$1')}
             </Text>
           </Card>
 

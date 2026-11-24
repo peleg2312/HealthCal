@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ActivityEntry } from '@/types';
 
-import { historyDaySpoken, historyDayWord, historyWeekLabel, historyWeeks, historyWeekTitle } from './history';
+import { historyDaySpoken, historyDayWord, historyMetaLines, historyWeekLabel, historyWeeks, historyWeekTitle } from './history';
 
 // Tuesday, Nov 24 2026: its week starts on Monday, Nov 23.
 const TODAY = '2026-11-24';
@@ -51,5 +51,35 @@ describe("Train's history by week", () => {
     expect(historyWeekLabel(weeks[0])).toBe('This week, 3 sessions, 3 h');
     expect(historyWeekLabel(weeks[2])).toBe('Week of Nov 2, 1 session, 40 min');
     expect(historyWeeks([], TODAY)).toEqual([]);
+  });
+});
+
+describe("a history row's line", () => {
+  const at360 = 218;
+  const at320 = 178;
+  it('is one line at 360 for the everyday rows', () => {
+    for (const parts of [
+      ['Today', '75 min', 'Moderate'],
+      ['Yesterday', '75 min', 'Moderate'],
+      ['Sun', '45 min', 'Moderate', '3.9 km'],
+      ['Tue', '55 min', 'Hard'],
+    ]) {
+      const r = historyMetaLines(parts, at360);
+      expect(r.lines).toBe(1);
+      expect(r.text).not.toContain('\n');
+    }
+    expect(historyMetaLines(['Today', '75 min', 'Moderate'], at360).text).toBe('Today · 75 min · Moderate');
+  });
+  it('keeps three parts on one line at 320 too', () => {
+    expect(historyMetaLines(['Yesterday', '75 min', 'Moderate'], at320).lines).toBe(1);
+  });
+  it('breaks a longer line in two balanced halves, never leaving one word alone', () => {
+    expect(historyMetaLines(['Yesterday', '45 min', 'Moderate', '3.9 km'], at320).text).toBe('Yesterday · 45 min\nModerate · 3.9 km');
+    expect(historyMetaLines(['Sun', '45 min', 'Moderate', '3.9 km'], at320).text).toBe('Sun · 45 min\nModerate · 3.9 km');
+    expect(historyMetaLines(['Yesterday', '55 min', '4 exercises', '12 sets'], at360).text).toBe('Yesterday · 55 min\n4 exercises · 12 sets');
+  });
+  it('grows with the phone\'s text size', () => {
+    expect(historyMetaLines(['Today', '75 min', 'Moderate'], at360, 1.3).lines).toBe(1);
+    expect(historyMetaLines(['Yesterday', '75 min', 'Moderate'], at320, 1.3).lines).toBe(2);
   });
 });

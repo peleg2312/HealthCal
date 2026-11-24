@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { hasFoodLogged } from '@/features/drinks/via';
+import { ShareDayButton } from '@/features/share';
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
 import { currentKcal } from '@/features/food/usuals';
 import { useRecapReady } from '@/features/progress/recapReady';
@@ -12,12 +13,12 @@ import { DayRingStrip } from '@/features/today/DayRingStrip';
 import { FitsSheet } from '@/features/today/FitsSheet';
 import { mealLine } from '@/features/today/meals';
 import { ReadyRim } from '@/features/today/ReadyRim';
+import { SHARE_CUP } from '@/features/today/ShareCup';
 import { RecapReadyCard } from '@/features/today/RecapReadyCard';
 import { FirstLogInvite } from '@/features/today/FirstLogInvite';
 import { MorningWatcher } from '@/features/morning/useMorningPage';
 import { useBackToToday } from '@/features/today/useBackToToday';
 import { startDate } from '@/features/today/week';
-import { ShareDayButton } from '@/features/share';
 import { todayTitle } from '@/features/today/greetingTitle';
 import { TabHeader, tabDay, tabTitleRoom, tabTitleSize } from '@/components/TabHeader';
 import { MilestoneSheet } from '@/features/streak/MilestoneSheet';
@@ -95,7 +96,6 @@ export default function TodayScreen() {
         firstDay={firstDay}
         meal={mealForTime(now)}
         onFits={() => setFits({ proteinFirst: false })}
-        share={<ShareDayButton date={date} />}
       />
       {/* Water and the other pillars directly under the calorie card, so the one-tap glass is in the first
           view at 360 x 740 on every day, day one included. */}
@@ -137,12 +137,20 @@ const VESSEL_H = 150;
 const VESSEL_H_FIRST = 120;
 /**
  * Under 360 px only (320 x 640): a tighter card, so the water row and its "+ 250 ml" are in the first
- * view there too. The cup is as short as its label column allows (the three labels and "Ideas that
- * fit" 6 px apart), the card's padding and inner gaps step down, and the budget row follows the macros
- * 12 px under them with no hairline; at 360 and wider nothing changes.
+ * view there and the toast a glass raises (two lines at that width) rests under the button, not on it.
+ * The cup is as tall as its label column needs at the demo's values (the three labels, 20 px boxes
+ * round 17 px numbers, and the action row, 4 px apart, which keeps their letters 8 px apart), and the
+ * card's padding and inner gaps step down; at 360 and wider nothing changes.
  */
 const VESSEL_H_NARROW = 126;
-const NARROW = { padding: 12, labelSpacing: 6, macrosTop: 12, macroGap: 5, footerTop: 12 };
+const NARROW = { padding: 12, paddingV: 10, labelSpacing: 4, labelH: 20, macrosTop: 12, macroGap: 4 };
+/**
+ * The card's action row, under the "eaten" line in the cup's label column: "Ideas that fit" (a 32 px chip) and the
+ * day's share cup, as tall as the chip, at the column's right end. The card has no footer row: the budget is said in
+ * the "eaten" line ("1,219 eaten of 2,160", as the diary's summary says it), so the water row under the card sits
+ * higher and the toast a glass raises rests clear of its "+ 250 ml".
+ */
+const ACTION_H = Math.max(32, SHARE_CUP);
 
 function EnergyCard({
   day,
@@ -150,15 +158,12 @@ function EnergyCard({
   firstDay,
   meal,
   onFits,
-  share,
 }: {
   day: DaySummary;
   isToday: boolean;
   firstDay: boolean;
   meal: MealType;
   onFits: () => void;
-  /** The day's share button, at the end of the budget line. */
-  share: React.ReactNode;
 }) {
   const { colors, spacing } = useTheme();
   const { width: screenW } = useWindowDimensions();
@@ -183,10 +188,15 @@ function EnergyCard({
   const unitWord = over ? 'over' : isToday ? 'left' : 'under';
   const height = firstDay ? VESSEL_H_FIRST : narrow ? VESSEL_H_NARROW : VESSEL_H;
   const labelSpacing = narrow ? NARROW.labelSpacing : 8;
+  // The label boxes: 22 px round the 17 px numbers (20 on a narrow phone), the big number as tall as it is drawn
+  // on a narrow phone (its line height) and at least 44 otherwise.
+  const lineH = narrow ? NARROW.labelH : 22;
+  const numH = narrow ? 42 : Math.max(44, numSize - 4);
   const macrosTop = narrow ? NARROW.macrosTop : spacing.lg;
   const vesselW = narrow ? 66 : 84;
   // Burned in activity but left out of the budget (exercise is not added in Goals).
   const notAdded = day.exerciseRule === 'off' ? Math.max(0, day.exerciseNet) : 0;
+  // The whole sum, read out with the "eaten" line that shows the budget.
   const budgetLabel =
     headroom <= 0
       ? `Daily budget ${formatNumber(day.budget)} kilocalories`
@@ -203,13 +213,34 @@ function EnergyCard({
       // Beside its hatched band: mid-band, or the very top once eaten has risen into the band,
       // so it always reads above the eaten line.
       at: inBand ? budget : budget - headroom / 2,
-      height: 22,
+      height: lineH,
       tick: colors.exercise,
       content: (
-        <Text variant="numM" numberOfLines={1} style={{ fontSize: 17, lineHeight: 22 }}>
+        <Text variant="numM" numberOfLines={1} style={{ fontSize: 17, lineHeight: lineH }}>
           {`+${formatNumber(headroom)}`}
           <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
             {pure ? '  burned, added' : '  from workouts'}
+          </Text>
+        </Text>
+      ),
+    });
+  } else if (notAdded > 0) {
+    // Exercise left out of the budget (Goals): said at the brim, where "+290 burned, added" would be. No tick:
+    // nothing is poured or hatched for it.
+    labels.push({
+      key: 'not-added',
+      at: budget,
+      height: lineH,
+      content: (
+        <Text
+          variant="numM"
+          numberOfLines={1}
+          style={{ fontSize: 17, lineHeight: lineH }}
+          testID="today-not-added"
+          accessibilityLabel={`${formatNumber(notAdded)} kilocalories burned in workouts, not added to the budget`}>
+          {formatNumber(notAdded)}
+          <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
+            {'  burned, not added'}
           </Text>
         </Text>
       ),
@@ -240,15 +271,16 @@ function EnergyCard({
     labels.push({
       key: 'left',
       at: (Math.min(eaten, budget) + emptyTop) / 2,
-      // At least 44 tall, so the number is a whole touch target even at its smallest (40 px type on a narrow phone).
-      height: Math.max(44, numSize - 4),
+      // At least 44 tall to touch: as tall as the number on a narrow phone, its touch area reaching 44 past it.
+      height: numH,
       content: (
         <PressableScale
           testID="today-remaining-open"
           scaleTo={0.97}
           onPress={onFits}
           accessibilityLabel={`${left} kilocalories ${unitWord}. See which of your foods fit`}
-          style={{ alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' }}>
+          hitSlop={numH < 44 ? Math.ceil((44 - numH) / 2) : undefined}
+          style={{ alignSelf: 'flex-start', minHeight: numH, justifyContent: 'center' }}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
             <AnimatedNumber
               variant="numXL"
@@ -272,14 +304,18 @@ function EnergyCard({
       labels.push({
         key: 'eaten',
         at: Math.min(eaten, budget),
-        height: 22,
+        height: lineH,
         tick: colors.rim,
         content: (
-          // Text only: it never takes a tap meant for the big number above it.
-          <View pointerEvents="none">
-            <AnimatedNumber variant="numM" numberOfLines={1} value={eaten} format={(n) => formatNumber(Math.round(n))} style={{ fontSize: 17, lineHeight: 22 }} testID="today-eaten">
+          // Text only: it never takes a tap meant for the big number above it. The budget is said here, once, as the
+          // diary's summary says it ("1,219 eaten of 2,160"); the whole sum (target plus exercise) is read out.
+          <View pointerEvents="none" accessible accessibilityLabel={`${formatNumber(eaten)} kilocalories eaten. ${budgetLabel}`}>
+            <AnimatedNumber variant="numM" numberOfLines={1} value={eaten} format={(n) => formatNumber(Math.round(n))} style={{ fontSize: 17, lineHeight: lineH }} testID="today-eaten">
               <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
-                {'  eaten'}
+                {'  eaten of '}
+              </Text>
+              <Text variant="numM" style={{ fontSize: 17, lineHeight: lineH }} testID="today-budget">
+                {formatNumber(day.budget)}
               </Text>
             </AnimatedNumber>
           </View>
@@ -288,9 +324,11 @@ function EnergyCard({
     }
   }
 
-  // "Ideas that fit" (opens What fits, ideas first): 8 px under the "eaten" line in the cup's label column, placed
-  // as the cup places its labels (placeLabels), so the cup, the number and every label above it stay where they are.
-  // Not over the budget (What fits then has no ideas), and only where there is an "eaten" line.
+  // The action row, 8 px under the "eaten" line in the cup's label column, placed as the cup places its labels
+  // (placeLabels), so the cup, the number and every label above it stay where they are: "Ideas that fit" (opens What
+  // fits, ideas first; not over the budget, where What fits has no ideas) and the day's share cup at the column's
+  // right end. Only where there is an "eaten" line: day one ends with its invite and a past day with nothing logged
+  // has nothing to share (as on the diary).
   const sorted = [...labels].sort((a, b) => b.at - a.at);
   const tops = placeLabels(
     sorted.map((l) => levelY(l.at, budget, height - 1.5) - l.height / 2),
@@ -299,14 +337,16 @@ function EnergyCard({
     labelSpacing,
   );
   const eatenIdx = sorted.findIndex((l) => l.key === 'eaten');
-  const ideasChip = isToday && day.remaining >= 0 && eatenIdx >= 0;
-  const chipTop = eatenIdx >= 0 ? tops[eatenIdx] + sorted[eatenIdx].height + labelSpacing : 0;
-  // Room the chip takes below the cup, keeping 12 px to the macros (16 under the cup, 12 on a narrow phone).
-  const chipRoom = ideasChip ? Math.max(0, chipTop + 32 + 12 - (height + macrosTop)) : 0;
+  const actions = eatenIdx >= 0;
+  const ideasChip = actions && isToday && day.remaining >= 0;
+  const actionsTop = actions ? tops[eatenIdx] + sorted[eatenIdx].height + labelSpacing : 0;
+  // Room the row takes below the cup, keeping 12 px to the macros (16 under the cup, 12 on a narrow phone).
+  const actionsRoom = actions ? Math.max(0, actionsTop + ACTION_H + 12 - (height + macrosTop)) : 0;
+  const labelLeft = vesselW + (narrow ? 14 : 16);
 
   return (
-    <Card testID="today-energy" padding={narrow ? NARROW.padding : 18}>
-      <View style={chipRoom ? { marginBottom: chipRoom } : undefined}>
+    <Card testID="today-energy" padding={narrow ? NARROW.padding : 18} style={narrow ? { paddingVertical: NARROW.paddingV } : undefined}>
+      <View style={actionsRoom ? { marginBottom: actionsRoom } : undefined}>
         <Vessel
           value={eaten}
           max={budget}
@@ -321,17 +361,24 @@ function EnergyCard({
         />
         {/* Day one: the empty cup's open top is a dashed level line at the budget, "ready to fill". */}
         {firstDay && headroom === 0 ? <ReadyRim width={vesselW} /> : null}
-        {/* After the cup in the tree, so the cup's label column never sits over the chip and takes its tap. */}
-        {ideasChip ? (
-          <View style={{ position: 'absolute', left: vesselW + (narrow ? 14 : 16), top: chipTop, flexDirection: 'row' }}>
+        {/* After the cup in the tree, so the cup's label column never sits over the row and takes its taps. */}
+        {actions ? (
+          <View
+            testID="today-actions"
+            style={{ position: 'absolute', left: labelLeft, right: 0, top: actionsTop, height: ACTION_H, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm }}>
             {/* A pot, not the AI mark: these ideas are worked out on the phone from the person's own meals and fixed plates. */}
-            <Chip
-              testID="today-ideas"
-              label="Ideas that fit"
-              accessibilityLabel="Ideas that fit: meals and foods for what is left"
-              icon={<CookingPot size={18} color={colors.text} strokeWidth={1.9} />}
-              onPress={onFits}
-            />
+            {ideasChip ? (
+              <Chip
+                testID="today-ideas"
+                label="Ideas that fit"
+                accessibilityLabel="Ideas that fit: meals and foods for what is left"
+                icon={<CookingPot size={18} color={colors.text} strokeWidth={1.9} />}
+                onPress={onFits}
+              />
+            ) : (
+              <View />
+            )}
+            <ShareDayButton date={day.date} size={SHARE_CUP} />
           </View>
         ) : null}
       </View>
@@ -348,40 +395,8 @@ function EnergyCard({
         <View style={{ marginTop: 18 }}>
           <FirstLogInvite meal={meal} date={day.date} budget={day.budget} />
         </View>
-      ) : (
-        // Day one ends with the invite: no budget line and no share for a day with nothing in it yet.
-        <BudgetFooter day={day} budgetLabel={budgetLabel} notAdded={notAdded} share={share} narrow={narrow} />
-      )}
+      ) : null}
     </Card>
-  );
-}
-
-/** The card's last row: the budget in one short line (the whole sum is read out) and the day's share button. */
-function BudgetFooter({ day, budgetLabel, notAdded, share, narrow }: { day: DaySummary; budgetLabel: string; notAdded: number; share: React.ReactNode; narrow: boolean }) {
-  const { colors, spacing } = useTheme();
-  return (
-    <>
-      {narrow ? <View style={{ height: NARROW.footerTop }} /> : <View style={{ height: 1, backgroundColor: colors.border, marginTop: 16, marginBottom: 8 }} />}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-        {/* One short line: the hatching and its label already say what exercise added; the whole sum is read out.
-            When exercise is not added to the budget, a second short line says what was burned and left out. */}
-        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Text variant="caption" color="textSecondary" testID="today-budget" accessibilityLabel={budgetLabel}>
-            {'Budget '}
-            <Text variant="numM" style={{ fontSize: 14, lineHeight: 17 }}>
-              {formatNumber(day.budget)}
-            </Text>
-            {' kcal'}
-          </Text>
-          {notAdded > 0 ? (
-            <Text variant="caption" color="textSecondary" testID="today-not-added">
-              {`${formatNumber(notAdded)} kcal burned, not added`}
-            </Text>
-          ) : null}
-        </View>
-        {share}
-      </View>
-    </>
   );
 }
 
@@ -397,7 +412,7 @@ function MacroColumn({ label, value, target, color, reach, narrow }: { label: st
       </View>
       <ProgressBar progress={target > 0 ? value / target : 0} color={color} height={6} goalKind={reach ? 'reach' : 'limit'} />
       {/* The target may wrap under the number on a narrow phone, whole ("/ 493 g"); it is never cut. */}
-      <AnimatedNumber variant="numM" value={Math.round(value)} style={{ fontSize: narrow ? 15 : 17, lineHeight: narrow ? 20 : 22 }}>
+      <AnimatedNumber variant="numM" value={Math.round(value)} style={{ fontSize: narrow ? 15 : 17, lineHeight: narrow ? 18 : 22 }}>
         <Text variant="caption" color="textSecondary">{` / ${Math.round(target)} g`}</Text>
       </AnimatedNumber>
     </View>

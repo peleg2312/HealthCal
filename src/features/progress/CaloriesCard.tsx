@@ -9,6 +9,7 @@ import { useTheme, withOpacity } from '@/theme';
 import { BarChart, IconButton, Sheet, Text } from '@/ui';
 
 import { buildBars, daysVerdict } from './calorieBars';
+import { changeDirection } from './change';
 import { BigStat, LegendDot, SectionCard, StatStrip, TrendLegend } from './parts';
 
 export function CaloriesCard({
@@ -96,9 +97,9 @@ export function CaloriesCard({
                 label: 'On budget',
                 value: `${c.onBudget}`,
                 unit: `of ${summary.completeDays}`,
-                trend: previous?.calories ? direction(c.onBudget / Math.max(1, summary.completeDays), previous.calories.onBudget / Math.max(1, previous.completeDays), 0.05) : null,
+                trend: previous?.calories ? changeDirection('share', c.onBudget / Math.max(1, summary.completeDays), previous.calories.onBudget / Math.max(1, previous.completeDays)) : null,
               },
-              { label: 'Average budget', value: formatNumber(Math.round(c.avgBudget)), unit: 'kcal', trend: direction(c.avgBudget, previous?.calories?.avgBudget, 20) },
+              { label: 'Average budget', value: formatNumber(Math.round(c.avgBudget)), unit: 'kcal', trend: changeDirection('kcal', c.avgBudget, previous?.calories?.avgBudget) },
               {
                 label: 'Days logged',
                 value: `${summary.loggedDaysInclToday}`,

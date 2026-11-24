@@ -105,7 +105,7 @@ src/features/activity/build.ts	summariseWeek	function
 src/features/activity/components.tsx	DateStepper	component
 src/features/activity/components.tsx	QuickStartTiles	component
 src/features/activity/components.tsx	SessionRow	component
-src/features/activity/components.tsx	sessionSubtitle	function
+src/features/activity/components.tsx	sessionParts	function
 src/features/activity/effortWords.ts	Effort	type
 src/features/activity/effortWords.ts	effortOf	function
 src/features/activity/effortWords.ts	effortSpan	function
@@ -114,12 +114,18 @@ src/features/activity/exercises.ts	EXERCISE_GROUPS	const
 src/features/activity/exercises.ts	ExerciseGroup	interface
 src/features/activity/exercises.ts	searchExercises	function
 src/features/activity/history.ts	HistoryWeek	interface
+src/features/activity/history.ts	META_CHAR_PX	const
 src/features/activity/history.ts	WEEKS_PER_PAGE	const
 src/features/activity/history.ts	historyDaySpoken	function
 src/features/activity/history.ts	historyDayWord	function
+src/features/activity/history.ts	historyMetaLines	function
 src/features/activity/history.ts	historyWeekLabel	function
 src/features/activity/history.ts	historyWeekTitle	function
 src/features/activity/history.ts	historyWeeks	function
+src/features/activity/logWords.ts	BURN_UNIT	const
+src/features/activity/logWords.ts	budgetAdds	function
+src/features/activity/logWords.ts	burnCaption	function
+src/features/activity/logWords.ts	burnSource	function
 src/features/activity/routines.ts	Routine	re-export	src/types/index.ts:Routine
 src/features/activity/routines.ts	RoutineExercise	interface
 src/features/activity/routines.ts	RoutineTemplate	interface
@@ -890,6 +896,11 @@ src/features/food/displayName.ts	displayFoodName	function
 src/features/food/draft.ts	setFoodDraft	function
 src/features/food/draft.ts	useFoodDraft	const
 src/features/food/drinkDefault.ts	drinkByDefault	function
+src/features/food/entryDay.ts	ENTRY_DAYS_AHEAD	const
+src/features/food/entryDay.ts	canStepForward	function
+src/features/food/entryDay.ts	entryDayLabel	function
+src/features/food/entryDay.ts	entryDaySpoken	function
+src/features/food/entryDay.ts	foodLatestDay	function
 src/features/food/favoriteActions.ts	isFavoriteFood	function
 src/features/food/favoriteActions.ts	toggleFoodFavorite	function
 src/features/food/favoriteActions.ts	toggleMealFavorite	function
@@ -1012,6 +1023,7 @@ src/features/food/saveWords.ts	saveSheetTitle	function
 src/features/food/saveWords.ts	savedToastBudget	function
 src/features/food/saveWords.ts	shortName	function
 src/features/food/saveWords.ts	showSaveSheetFoods	function
+src/features/food/searchTab.ts	SEARCH_CHIPS	const
 src/features/food/searchTab.ts	SEARCH_TAB_KEY	const
 src/features/food/searchTab.ts	SearchTab	type
 src/features/food/searchTab.ts	loadSearchTab	function
@@ -1020,6 +1032,7 @@ src/features/food/searchTab.ts	parseSearchTab	function
 src/features/food/searchTab.ts	rememberSearchTab	function
 src/features/food/searchTab.ts	resetSearchTabForTests	function
 src/features/food/searchTab.ts	useSearchTab	const
+src/features/food/searchTab.ts	usualEmpty	function
 src/features/food/usuals.ts	UsualFood	interface
 src/features/food/usuals.ts	UsualOptions	interface
 src/features/food/usuals.ts	atFoodValues	function
@@ -2251,6 +2264,10 @@ src/features/progress/calorieBars.ts	BarFills	interface
 src/features/progress/calorieBars.ts	buildBars	function
 src/features/progress/calorieBars.ts	daysVerdict	function
 src/features/progress/calorieBars.ts	solidBar	function
+src/features/progress/change.ts	CHANGE_RULES	const
+src/features/progress/change.ts	ChangeKind	type
+src/features/progress/change.ts	changeDirection	function
+src/features/progress/change.ts	changeWords	function
 src/features/progress/consistency.ts	CalendarCell	interface
 src/features/progress/consistency.ts	CalendarDayInput	interface
 src/features/progress/consistency.ts	DEFAULT_RHYTHM	const
@@ -2483,6 +2500,7 @@ src/features/today/FitsSheet.tsx	FitsSheet	component
 src/features/today/FitsSheet.tsx	useMealIdeas	function
 src/features/today/ReadyRim.tsx	ReadyRim	component
 src/features/today/RecapReadyCard.tsx	RecapReadyCard	component
+src/features/today/ShareCup.tsx	SHARE_CUP	const
 src/features/today/StatusRail.tsx	StatusRail	component
 src/features/today/StatusRail.tsx	addWater	function
 src/features/today/StatusRail.tsx	defaultGlass	function
@@ -3175,6 +3193,7 @@ src/theme/motion.ts	duration	const
 src/theme/motion.ts	easing	const
 src/theme/motion.ts	isReducedMotion	function
 src/theme/motion.ts	motion	const
+src/theme/motion.ts	pourLandsAt	function
 src/theme/motion.ts	useReducedMotion	function
 src/theme/resolve.ts	LOOK_HINTS	const
 src/theme/resolve.ts	THEME_CHOICES	const

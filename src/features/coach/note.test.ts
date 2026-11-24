@@ -144,7 +144,7 @@ describe('the note from a worked store', () => {
     const o = trainingOverview(Object.values(worked().activities), TODAY);
     expect(o.title).not.toBeNull();
     expect(lines[3]).toBe(
-      `Training, last 7 days: ${o.minutes} guideline minutes in 5 sessions (running 2, volleyball 2, walking 1). Overview: ${o.title}. 2 days without a session.`,
+      `Training, last 7 days: ${o.minutes} active minutes in 5 sessions (running 2, volleyball 2, walking 1). Overview: ${o.title}. 2 days without a session.`,
     );
   });
 
@@ -229,7 +229,7 @@ describe('the iPhone rule', () => {
     expect(t).not.toMatch(/protein|%/);
     expect(t).toContain('Today so far: 1,250 kcal eaten.');
     // The hand-logged volleyball is there; the synced run is not.
-    expect(t).toMatch(/Training, last 7 days: \d+ guideline minutes in 1 session \(volleyball 1\)/);
+    expect(t).toMatch(/Training, last 7 days: \d+ active minutes in 1 session \(volleyball 1\)/);
     expect(t).not.toMatch(/running/);
     expect(t).not.toMatch(/Sleep|Weight trend/);
     expect(t).toContain('Water, the 7 days before today: tracked on 3 days.');

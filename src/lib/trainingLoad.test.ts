@@ -64,7 +64,7 @@ describe("the training reader's eight worked weeks", () => {
     expect(o.title).toBeNull();
     expect(o.minutes).toBe(90);
     expect(o.lead).toBe(NEEDS_HISTORY);
-    expect(o.lines).toEqual(['90 guideline minutes in the last 7 days.']);
+    expect(o.lines).toEqual(['90 active minutes in the last 7 days.']);
     expect(o.countsLine).toBe('4 days without a session. No strength sessions.');
     expect(o.honest).toEqual([HONEST_PHONE, HONEST_WHO, HONEST_COUNTING]);
     expect(o.cardLabel).toBeNull();
@@ -83,9 +83,9 @@ describe("the training reader's eight worked weeks", () => {
     expect(o.state).toBe('lighter');
     expect(o.position).toBe('lighter');
     expect(o.title).toBe('Lighter than your recent weeks');
-    expect(o.lines).toEqual(['0 guideline minutes in the last 7 days, against your recent average of 240.', LIGHTER_NOTE]);
+    expect(o.lines).toEqual(['0 active minutes in the last 7 days, against your recent average of 240.', LIGHTER_NOTE]);
     expect(o.countsLine).toBe('7 days without a session. No strength sessions.');
-    expect(o.cardLabel).toBe('Last 7 days: Lighter than your recent weeks. 0 guideline minutes in the last 7 days, against your recent average of 240.');
+    expect(o.cardLabel).toBe('Last 7 days: Lighter than your recent weeks. 0 active minutes in the last 7 days, against your recent average of 240.');
   });
 
   it('3. one long hike on top of two usual runs: one big day, not a step up', () => {
@@ -99,7 +99,7 @@ describe("the training reader's eight worked weeks", () => {
     expect(o.state).toBe('oneBigDay');
     expect(o.position).toBe('more');
     expect(o.title).toBe('One big day');
-    expect(o.lines).toEqual(['400 guideline minutes in the last 7 days, about 4 times your recent average of 100.', '300 of them on Wednesday.', STEP_SETTLE]);
+    expect(o.lines).toEqual(['400 active minutes in the last 7 days, about 4 times your recent average of 100.', '300 of them on Wednesday.', STEP_SETTLE]);
     expect(o.counts.bigDay).toBe('2026-11-18');
   });
 
@@ -111,7 +111,7 @@ describe("the training reader's eight worked weeks", () => {
     expect(o.position).toBe('usual');
     expect(o.mostlyStrength).toBe(true);
     expect(o.counts.strengthDays).toBe(3);
-    expect(o.lines).toEqual(['360 guideline minutes in the last 7 days, close to your recent average of 360.']);
+    expect(o.lines).toEqual(['360 active minutes in the last 7 days, close to your recent average of 360.']);
     expect(o.countsLine).toBe('4 days without a session. Strength on 3 days.');
     // The WHO band sentence is replaced: lifting is not aerobic minutes.
     expect(o.honest).toEqual([HONEST_PHONE, HONEST_COMPARE, 'Strength on 3 days. WHO counts strength days apart from the 150 to 300 aerobic minutes.', HONEST_COUNTING]);
@@ -139,7 +139,7 @@ describe("the training reader's eight worked weeks", () => {
     expect(o.state).toBe('fullWeek');
     expect(o.position).toBe('more');
     expect(o.title).toBe('A full week, few easy days');
-    expect(o.lines).toEqual(['840 guideline minutes in the last 7 days, about 1.9 times your recent average of 450.', 'Hard sessions on each of the last 7 days.', STEP_EASY]);
+    expect(o.lines).toEqual(['840 active minutes in the last 7 days, about 1.9 times your recent average of 450.', 'Hard sessions on each of the last 7 days.', STEP_EASY]);
     expect(o.countsLine).toBe('A session on each of the last 7 days. No strength sessions.');
     expect(o.counts.strengthDays).toBe(0);
     expect(o.counts.hardDays).toBe(7);
@@ -153,7 +153,7 @@ describe("the training reader's eight worked weeks", () => {
     const o = trainingOverview(runs, T);
     expect(o.recentAverage).toBe(99);
     expect(o.state).toBe('usual');
-    expect(o.lines[0]).toBe('120 guideline minutes in the last 7 days, close to your recent average of 99.');
+    expect(o.lines[0]).toBe('120 active minutes in the last 7 days, close to your recent average of 99.');
   });
 
   it("8. the demo person's mix: 270 against 628 over three weeks, r = 1.29, just under the edge", () => {
@@ -175,7 +175,7 @@ describe("the training reader's eight worked weeks", () => {
     );
     expect(o.minutes).toBe(270);
     expect(o.state).toBe('usual');
-    expect(o.lines[0]).toBe('270 guideline minutes in the last 7 days, close to your recent average of 209.');
+    expect(o.lines[0]).toBe('270 active minutes in the last 7 days, close to your recent average of 209.');
   });
 });
 
@@ -197,12 +197,12 @@ describe('band edges', () => {
     const at150 = trainingOverview([...history(300), ...spread(150)], T);
     expect(at150.state).toBe('more');
     // At or under 150 there is no next step: WHO counts more as better there.
-    expect(at150.lines).toEqual(['150 guideline minutes in the last 7 days, about 1.5 times your recent average of 100.']);
+    expect(at150.lines).toEqual(['150 active minutes in the last 7 days, about 1.5 times your recent average of 100.']);
     // sum = 302, a = 151: r = 1.5 exactly and a above 150.
     const step = trainingOverview([...history(302), ...spread(151)], T);
     expect(step.state).toBe('stepUp');
     expect(step.title).toBe('A big step up');
-    expect(step.lines).toEqual(['151 guideline minutes in the last 7 days, about 1.5 times your recent average of 101.', STEP_SETTLE]);
+    expect(step.lines).toEqual(['151 active minutes in the last 7 days, about 1.5 times your recent average of 101.', STEP_SETTLE]);
     // sum = 303, a = 151: r = 1.495, under 1.5.
     expect(trainingOverview([...history(303), ...spread(151)], T).state).toBe('more');
   });
@@ -220,7 +220,7 @@ describe('band edges', () => {
     // 4 hard runs of 20 min = 160; sum 480, c = 160, r = 1.
     const four = trainingOverview([...history(480), ...[1, 2, 3, 4].map((d) => hardRun(d, 20))], T);
     expect(four.state).toBe('fullWeek');
-    expect(four.lines).toEqual(['160 guideline minutes in the last 7 days, close to your recent average of 160.', 'Hard sessions on 4 days in a row.', STEP_EASY]);
+    expect(four.lines).toEqual(['160 active minutes in the last 7 days, close to your recent average of 160.', 'Hard sessions on 4 days in a row.', STEP_EASY]);
     // 3 hard runs in a row = 120; sum 360, c = 120, r = 1.
     expect(trainingOverview([...history(360), ...[1, 2, 3].map((d) => hardRun(d, 20))], T).state).toBe('usual');
   });
@@ -296,9 +296,9 @@ describe('the strength list and the counts', () => {
   });
   it('one rest day and singular words', () => {
     const o = trainingOverview([walk(0, 1), ...[1, 2, 3, 4, 5].map((d) => walk(d, 20))], T);
-    expect(o.lines[0]).toBe('101 guideline minutes in the last 7 days.');
+    expect(o.lines[0]).toBe('101 active minutes in the last 7 days.');
     expect(o.countsLine).toBe('1 day without a session. No strength sessions.');
-    expect(trainingOverview([walk(3, 1)], T).lines[0]).toBe('1 guideline minute in the last 7 days.');
+    expect(trainingOverview([walk(3, 1)], T).lines[0]).toBe('1 active minute in the last 7 days.');
   });
   it('a light session is a session (not a rest day) but adds no minutes', () => {
     const o = trainingOverview([s(1, 'yoga', 40, 'light', 2.3)], T);
@@ -332,13 +332,13 @@ describe('the answer as text (for the chat\'s phone button)', () => {
   it('with a state', () => {
     const o = trainingOverview([...history(300), ...spread(131)], T);
     expect(overviewAnswer(o)).toBe(
-      'Last 7 days: More than your recent weeks. 131 guideline minutes in the last 7 days, about 1.3 times your recent average of 100. 4 days without a session. No strength sessions. ' +
+      'Last 7 days: More than your recent weeks. 131 active minutes in the last 7 days, about 1.3 times your recent average of 100. 4 days without a session. No strength sessions. ' +
         HONEST_PHONE,
     );
   });
   it('without enough history', () => {
     const o = trainingOverview([walk(2, 30)], T);
-    expect(overviewAnswer(o)).toBe(`${NEEDS_HISTORY} 30 guideline minutes in the last 7 days. 6 days without a session. No strength sessions. ${HONEST_PHONE}`);
+    expect(overviewAnswer(o)).toBe(`${NEEDS_HISTORY} 30 active minutes in the last 7 days. 6 days without a session. No strength sessions. ${HONEST_PHONE}`);
   });
 });
 
