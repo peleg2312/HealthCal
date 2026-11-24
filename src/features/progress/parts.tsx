@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Check, Triangle } from 'lucide-react-native';
+import { Triangle } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
@@ -203,7 +203,10 @@ export function RangeSwitch({ value, onChange }: { value: RangeDays; onChange: (
                 <Text variant="bodyStrong" style={{ flex: 1, fontFamily: active ? fonts.bold : fonts.semibold }}>
                   {r} days
                 </Text>
-                {active ? <Check size={20} color={colors.text} strokeWidth={2.2} /> : null}
+                {/* The app's mark for the chosen row (a small filled ink cup, as OptionRow's): a check means only a day on budget. */}
+                <View aria-hidden style={{ width: 20, alignItems: 'center' }}>
+                  {active ? <CupKey color={colors.text} size={12} /> : null}
+                </View>
               </PressableScale>
             );
           })}

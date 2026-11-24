@@ -5,6 +5,7 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { waterAddedShort, waterAddedToast } from '@/features/food/addedTo';
 import { useOneTap } from '@/features/food/oneTap';
+import { hoursFigure, hoursSpoken } from '@/features/trackers/helpers';
 import { startOfWeek, today } from '@/lib/dates';
 import { guidelineMinutes } from '@/lib/exercise';
 import { effectiveMl } from '@/lib/hydration';
@@ -228,10 +229,11 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
           flex={narrow ? SLEEP_FLEX_NARROW : 0.8}
           label="Sleep"
           color={colors.sleep}
-          accessibilityLabel={night ? `Sleep, ${night.hours.toFixed(1)} hours` : 'Sleep, not logged. Add a night'}
+          accessibilityLabel={night ? `Sleep, ${hoursSpoken(night.hours)}` : 'Sleep, not logged. Add a night'}
           onPress={() => router.push(`/sleep${dateQuery}` as never)}
-          value={night ? hoursValue(night.hours) : null}
-          unit="h"
+          // Hours and minutes ("7 h 48 min"), as Sleep, the morning page and Progress draw a night.
+          value={night ? hoursFigure(night.hours).value : null}
+          unit={night ? hoursFigure(night.hours).unit : 'h'}
         />
         <Hairline across={large} />
         {fast ? (
@@ -286,10 +288,6 @@ function KeyLabel({ color, label }: { color: string; label: string }) {
       </Text>
     </View>
   );
-}
-
-function hoursValue(h: number): string {
-  return Number.isInteger(h) ? String(h) : h.toFixed(1);
 }
 
 /** The line between two cells: upright between columns, across between stacked rows (`across`, large text). */

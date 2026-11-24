@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { TARGET_CARE_NOTE } from '@/features/settings/careNote';
-import { weightFixed } from '@/features/settings/format';
+import { weightText } from '@/features/trackers/helpers';
 import { formatNumber, formatVolume, round } from '@/lib/units';
 import { spokenUnits } from '@/lib/spokenUnits';
 import { useTextSize, useTheme } from '@/theme';
@@ -65,7 +65,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
   const range = projection ? rangeText(projection, now) : '';
   const methodWhy =
     plan.bmrMethod === 'katch-mcardle' && plan.leanMassKg !== null
-      ? `From your lean mass of ${weightFixed(plan.leanMassKg, units)} (body fat ${round(p.bodyFatPct ?? 0, 1)}%)`
+      ? `From your lean mass of ${weightText(plan.leanMassKg, units)} (body fat ${round(p.bodyFatPct ?? 0, 1)}%)`
       : 'From your height, weight, age and sex';
   const name = p.name;
   // A long name goes to the overline, so the headline stays three or four lines on a small phone.
@@ -77,10 +77,10 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
   // The goal and its dates lead; without a road to draw (maintaining, or no target weight) the day itself does.
   // A no-break space keeps the weight and its unit on one line.
   const title = projection
-    ? `${nameInTitle ? `${name}, you` : 'You'} could reach ${weightFixed(projection.targetKg, units).replace(/ /g, '\u00A0')}`
+    ? `${nameInTitle ? `${name}, you` : 'You'} could reach ${weightText(projection.targetKg, units).replace(/ /g, '\u00A0')}`
     : `${nameInTitle ? `${name}, here's` : "Here's"} your day`;
   // The pace with one decimal, as it was chosen (its steps are 0.1 kg or 0.1 lb) and as a weight is shown everywhere.
-  const pace = weightFixed(Math.abs(t.impliedWeeklyKg), units);
+  const pace = weightText(Math.abs(t.impliedWeeklyKg), units);
   // Beside the foot of the cup: what the cup cannot show. The pace is on the road card when there is a road, and a matched budget has none.
   const budgetNote = projection || Math.abs(t.dailyDelta) < 5 ? '' : `About ${pace} a week. `;
   // The rest arrives as the pour lands, one piece after another.
@@ -148,10 +148,10 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
             testID="plan-projection"
             accessible
             accessibilityLabel={spokenUnits(
-              `The road to ${weightFixed(projection.targetKg, units)}: ${range}, around ${looseDate(projection.date, now)} at about ${pace} a week. A projection, not a promise.`,
+              `The road to ${weightText(projection.targetKg, units)}: ${range}, around ${looseDate(projection.date, now)} at about ${pace} a week. A projection, not a promise.`,
             )}>
             <View style={{ gap: spacing.xs }}>
-              <Text variant="h3">{`The road to ${weightFixed(projection.targetKg, units)}`}</Text>
+              <Text variant="h3">{`The road to ${weightText(projection.targetKg, units)}`}</Text>
               <Text variant="caption" color="textSecondary" testID="plan-date">
                 {/* The dates are the title's; this line says what the line and the band are. */}
                 {`About ${pace} a week, ${t.limitedByFloor ? 'the pace this target gives' : 'the pace you chose'}. The band is a little faster or slower.`}
@@ -261,7 +261,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
                       ? 'None planned: your burn is already at the recommended minimum'
                       : t.limitedByFloor
                         ? `Held at the ${formatNumber(plan.floor)} kcal minimum`
-                        : `For ${weightFixed(p.weeklyRateKg, units)} a week (${units === 'imperial' ? '3,500 kcal per lb' : '7,700 kcal per kg'})`
+                        : `For ${weightText(p.weeklyRateKg, units)} a week (${units === 'imperial' ? '3,500 kcal per lb' : '7,700 kcal per kg'})`
                   }
                   value={`${t.dailyDelta < 0 ? '−' : '+'}${kcal(Math.abs(t.dailyDelta))}`}
                 />

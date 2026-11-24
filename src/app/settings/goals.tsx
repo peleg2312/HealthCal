@@ -8,7 +8,7 @@ import { planGoalLine } from '@/features/progress/goalDate';
 import { spreadChangeNote, spreadRuleNote } from '@/features/settings/spreadWords';
 import { BIRTH_AUTOCOMPLETE, BIRTH_INCOMPLETE, birthDateWords, birthIso, birthParts, type BirthParts } from '@/features/settings/birthDate';
 import { TARGET_CARE_NOTE } from '@/features/settings/careNote';
-import { weightFixed } from '@/features/settings/format';
+import { weightText } from '@/features/trackers/helpers';
 import { birthDateError, customSplitError, heightError, rateForGoal, targetWeightError } from '@/features/settings/goalsValidation';
 import { markSpreadHintDone } from '@/features/activity/spreadHint';
 import { ageFromBirthDate, today } from '@/lib/dates';
@@ -329,7 +329,7 @@ function GoalsForm() {
                 value={draft.targetWeightKg ? Math.round(weightValue(draft.targetWeightKg, u) * 10) / 10 : null}
                 onChange={(v) => patch({ targetWeightKg: v ? weightToKg(v, u) : undefined })}
                 error={targetMessage}
-                hint={`Now ${weightFixed(draft.weightKg, u)}`}
+                hint={`Now ${weightText(draft.weightKg, u)}`}
               />
               <View style={{ gap: spacing.sm }}>
                 <Text variant="label" color="textSecondary">
@@ -347,12 +347,12 @@ function GoalsForm() {
                     step={rateStep}
                     min={rateStep}
                     max={maxRate}
-                    format={(n) => weightFixed(n, u)}
+                    format={(n) => weightText(n, u)}
                     onChange={(weeklyRateKg) => patch({ weeklyRateKg })}
                   />
                 </View>
                 <Hint>
-                  Safe maximum {weightFixed(maxRate, u)} a week ({draft.goal === 'lose' ? '1%' : '0.5%'} of body weight)
+                  Safe maximum {weightText(maxRate, u)} a week ({draft.goal === 'lose' ? '1%' : '0.5%'} of body weight)
                 </Hint>
               </View>
             </>

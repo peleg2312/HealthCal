@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 import Svg, { Line, Path, Polygon, Rect } from 'react-native-svg';
 
-import { weightFixed } from '@/features/settings/format';
+import { weightText } from '@/features/trackers/helpers';
 import { useTextGrowth, useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
 import { DrawReveal, Text } from '@/ui';
@@ -94,10 +94,10 @@ export function ProjectionChart({ projection: p, units, delay = 0, now }: { proj
         {width > 0 ? (
           <>
             <Text variant="caption" color="textSecondary" tabular style={{ position: 'absolute', left: PAD_X, top: 2 }}>
-              {`${weightFixed(p.startKg, units)} today`}
+              {`${weightText(p.startKg, units)} today`}
             </Text>
             <Text variant="label" color="text" tabular style={{ position: 'absolute', right: PAD_X, top: Math.max(0, end.y - 28), textAlign: 'right' }}>
-              {`Goal ${weightFixed(p.targetKg, units)}`}
+              {`Goal ${weightText(p.targetKg, units)}`}
             </Text>
           </>
         ) : null}
@@ -111,7 +111,7 @@ export function ProjectionChart({ projection: p, units, delay = 0, now }: { proj
                   {shortDate(wp.date)}
                 </Text>
                 <Text variant="caption" color="textSecondary" tabular style={{ fontSize: 12, lineHeight: 15 }}>
-                  {weightFixed(wp.kg, units)}
+                  {weightText(wp.kg, units)}
                 </Text>
               </View>
             ))}
