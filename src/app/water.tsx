@@ -176,7 +176,7 @@ function WaterScreen() {
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
   // Large text (Profile's text size, or the phone's): the cup's words leave the cup's side for a column of
-  // their own, the glasses go two a row and "Other amount" says "Amount", so nothing is cut or overlaps.
+  // their own and the glasses go two a row, so nothing is cut or overlaps.
   const big = useLargeText();
   const profile = useProfile();
   const settings = useStore((s) => s.settings);
