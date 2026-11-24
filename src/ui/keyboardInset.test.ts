@@ -100,8 +100,8 @@ describe('toastSpot', () => {
   });
   it('rises to the lowest band clear of every control, never over one', () => {
     const top = toastSpot({ ...base, controls: [...cells, ...waterRow, ...ideas] });
-    expect(top).toBe(519 - 4 - 44);
-    for (const c of [...cells, ...waterRow, ...ideas]) expect(top! + 44 <= c.top - 4 || top! >= c.bottom + 4).toBe(true);
+    expect(top).toBe(519 - 8 - 44);
+    for (const c of [...cells, ...waterRow, ...ideas]) expect(top! + 44 <= c.top - 8 || top! >= c.bottom + 8).toBe(true);
   });
   it('ignores controls it does not cross sideways', () => {
     expect(toastSpot({ ...base, left: 130, right: 210, controls: [cells[0], cells[2]] })).toBe(612);
@@ -121,8 +121,8 @@ describe('toastSpot', () => {
     const v = { lowest: 524, highest: toastReachTop(740, 132), height: 132, left: 25, right: 334, controls: big };
     expect(toastSpot(v)).toBeNull();
     const top = toastSpot({ ...v, above: 0 })!;
-    expect(top).toBe(322 - 4 - 132);
-    for (const c of big) expect(top + 132 <= c.top - 4 || top >= c.bottom + 4).toBe(true);
+    expect(top).toBe(322 - 8 - 132);
+    for (const c of big) expect(top + 132 <= c.top - 8 || top >= c.bottom + 8).toBe(true);
     // Nothing clear even up there: null, it rests where it always rests.
     expect(toastSpot({ ...v, above: 0, controls: [...big, { top: 40, bottom: 320, left: 0, right: 360 }] })).toBeNull();
   });
@@ -149,10 +149,10 @@ describe('toastBottomAmong (phones: the same rule from measured window boxes)', 
   });
   it('rises to the lowest band clear of every control, as a distance from the bottom', () => {
     const bottom = toastBottomAmong({ windowBottom: 740, resting: 84, toast, controls: [...cells, ...waterRow] });
-    // Top 519 - 4 - 44 = 471: its bottom edge 740 - 515 = 225 px above the bottom of the window.
-    expect(bottom).toBe(740 - (519 - 4));
+    // Top 519 - 8 - 44 = 467: its bottom edge 740 - 511 = 229 px above the bottom of the window.
+    expect(bottom).toBe(740 - (519 - 8));
     const top = 740 - bottom! - 44;
-    for (const c of [...cells, ...waterRow]) expect(top + 44 <= c.y - 4 || top >= c.y + c.height + 4).toBe(true);
+    for (const c of [...cells, ...waterRow]) expect(top + 44 <= c.y - 8 || top >= c.y + c.height + 8).toBe(true);
   });
   it('keeps the action in thumb reach: with no clear band it stays where it rests', () => {
     expect(toastBottomAmong({ windowBottom: 740, resting: 84, toast, controls: [box({ top: 250, bottom: 700, left: 0, right: 360 })] })).toBeNull();
@@ -170,7 +170,7 @@ describe('toastBottomAmong (phones: the same rule from measured window boxes)', 
       { x: 33, y: 456, width: 254, height: 128 },
     ];
     expect(toastBottomAmong({ windowBottom: 640, resting: 84, toast: tall, controls })).toBeNull();
-    expect(toastBottomAmong({ windowBottom: 640, resting: 84, toast: tall, controls, above: 24 })).toBe(640 - (272 - 4));
+    expect(toastBottomAmong({ windowBottom: 640, resting: 84, toast: tall, controls, above: 24 })).toBe(640 - (272 - 8));
   });
   it('is null before the toast or the window is measured', () => {
     expect(toastBottomAmong({ windowBottom: 740, resting: 84, toast: { ...toast, height: 0 }, controls: cells })).toBeNull();

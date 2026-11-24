@@ -2705,6 +2705,7 @@ src/ui/controlRules.ts	webAutoComplete	2	src/ui/Field.tsx	src/ui/controlRules.te
 src/ui/haptics.ts	haptic	28	src/app/activity/strength.tsx	src/app/auth.tsx	src/app/body.tsx	src/app/coach.tsx	src/app/food/custom.tsx	src/app/food/meal-edit.tsx	src/app/food/meal-pick.tsx	src/app/food/photo.tsx	src/app/food/scan.tsx	src/app/onboarding.tsx	src/app/settings/health-sync.tsx	src/app/water.tsx	src/features/activity/session.ts	src/features/auth/useGoogleSignIn.ts	src/features/coach/ReportSheet.tsx	src/features/food/actions.ts	src/features/food/favoriteActions.ts	src/features/food/log.ts	src/features/import/ui/session.ts	src/features/onboarding/PlanReveal.tsx	src/features/plan/MembershipCard.tsx	src/features/share/ShareSheet.tsx	src/features/today/StatusRail.tsx	src/features/today/useDaySwipe.tsx	src/features/trackers/actions.ts	src/services/notifications.ts	src/ui/Charts.tsx	src/ui/Pressable.tsx
 src/ui/keyboardInset.ts	ControlBox	1	src/ui/Toast.tsx
 src/ui/keyboardInset.ts	KEYBOARD_MIN	1	src/ui/keyboardInset.test.ts
+src/ui/keyboardInset.ts	TOAST_CLEAR	1	src/ui/Toast.tsx
 src/ui/keyboardInset.ts	TOAST_GAP	2	src/ui/Toast.tsx	src/ui/keyboardInset.test.ts
 src/ui/keyboardInset.ts	WindowBox	1	src/ui/Toast.tsx
 src/ui/keyboardInset.ts	keyboardCover	2	src/ui/Screen.tsx	src/ui/keyboardInset.test.ts

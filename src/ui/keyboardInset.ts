@@ -91,8 +91,11 @@ export interface ControlBox {
 
 /** A toast's action must have its centre in the lower 60% of the window: one hand reaches it (thumb reach). */
 export const TOAST_REACH_FROM = 0.4;
-/** Room kept between a resting toast and any control above or below it. */
-export const TOAST_CLEAR = 4;
+/**
+ * Room kept between a resting toast and any control above or below it: 8 px, so the toast stays off the control's
+ * touch area too (a 36 px button reaches 44 with 4 px of slop each side, 48 dp on Android with 6; a 32 px chip 6 and 8).
+ */
+export const TOAST_CLEAR = 8;
 
 /**
  * The lowest place a toast can rest without lying over a control: the top of the toast, in window
