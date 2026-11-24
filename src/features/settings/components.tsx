@@ -146,7 +146,8 @@ export function OptionRow({ title, subtitle, selected, onPress, testID }: { titl
         />
       ) : null}
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text variant="bodyStrong" numberOfLines={1}>
+        {/* Two lines, as a list row's title: a long choice at a large text size wraps rather than lose its end. */}
+        <Text variant="bodyStrong" numberOfLines={2}>
           {title}
         </Text>
         {subtitle ? (

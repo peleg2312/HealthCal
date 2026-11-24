@@ -80,13 +80,10 @@ export function TextField({ label, suffix, error, hint, left, right, style, line
   // On a phone the field is on its screen's list, so a toast rests clear of it (./toastControls).
   const ownRef = useToastControl<unknown>();
   const givenRef = (rest as { ref?: unknown }).ref;
-  const phoneRef =
-    Platform.OS === 'web'
-      ? undefined
-      : (n: unknown) => {
-          ownRef.current = n;
-          passRef(givenRef, n);
-        };
+  const setRef = (n: unknown) => {
+    ownRef.current = n;
+    passRef(givenRef, n);
+  };
   return (
     <View {...FIELD_LABEL} style={[{ gap: 6 }, style]}>
       {label ? (
@@ -112,7 +109,7 @@ export function TextField({ label, suffix, error, hint, left, right, style, line
           maxFontSizeMultiplier={phoneCapFor(scale)}
           {...rest}
           {...(web as object)}
-          {...(phoneRef ? { ref: phoneRef } : null)}
+          ref={setRef as never}
           // Its name says the unit in full: the label's short unit or the one drawn in the field ("Protein, grams").
           accessibilityLabel={spokenUnits(rest.accessibilityLabel ?? spokenFieldName(label, suffix) ?? rest.placeholder ?? '') || undefined}
           accessibilityHint={error || rest.accessibilityHint || hint}

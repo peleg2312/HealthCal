@@ -332,11 +332,12 @@ function DayChips({ chip }: { chip: (d: (typeof WEEKDAYS)[number]) => React.Reac
   const textSize = useTextSize();
   const [room, setRoom] = useState(0);
   if (textSize <= 1) return <ChipWrap>{WEEKDAYS.map(chip)}</ChipWrap>;
+  // The label grows by `r`; its width a tenth more (at 200% a three-letter chip is about 76 px wide).
   const r = scaledFontSize(13.5, textSize) / 13.5;
   const lines =
     room > 0
       ? balancedLines(
-          WEEKDAYS.map((d) => 26 + (chipWidth(d.label) - 26) * r),
+          WEEKDAYS.map((d) => 26 + (chipWidth(d.label) - 26) * r * 1.1),
           room,
         )
       : [WEEKDAYS.map((_, i) => i)];

@@ -269,7 +269,8 @@ function AuthForm({ initial, fromEmail, googleError = null }: { initial: Mode; f
             <TextField
               label="Email"
               testID="auth-email-input"
-              placeholder="you@example.com"
+              // From 150% text the example no longer fits a 320 px field; the label says what goes in.
+              placeholder={largeText ? undefined : 'you@example.com'}
               value={email}
               onChangeText={(t) => {
                 setEmail(t);
@@ -293,7 +294,7 @@ function AuthForm({ initial, fromEmail, googleError = null }: { initial: Mode; f
                   {...({ ref: passwordRef } as object)}
                   label="Password"
                   testID="auth-password-input"
-                  {...(mode === 'signup' ? passwordRule(largeText, 'A short phrase is easy to remember.') : { placeholder: 'Your password' })}
+                  {...(mode === 'signup' ? passwordRule(largeText, 'A short phrase is easy to remember.') : { placeholder: largeText ? undefined : 'Your password' })}
                   value={password}
                   onChangeText={(t) => {
                     setPassword(t);

@@ -111,6 +111,21 @@ describe('toastSpot', () => {
     expect(toastSpot({ ...base, controls: wall })).toBeNull();
     expect(toastReachTop(740, 44)).toBe(274);
   });
+  it('with no clear band in thumb reach, takes the lowest clear band higher up when it may (`above`), never a control', () => {
+    // Today at 360 x 740 with text at 200%: a 132 px toast, the water card's link, its "+ 250 ml" and the activity cell.
+    const big = [
+      { top: 322, bottom: 401, left: 37, right: 323 },
+      { top: 413, bottom: 459, left: 37, right: 172 },
+      { top: 506, bottom: 634, left: 37, right: 323 },
+    ];
+    const v = { lowest: 524, highest: toastReachTop(740, 132), height: 132, left: 25, right: 334, controls: big };
+    expect(toastSpot(v)).toBeNull();
+    const top = toastSpot({ ...v, above: 0 })!;
+    expect(top).toBe(322 - 4 - 132);
+    for (const c of big) expect(top + 132 <= c.top - 4 || top >= c.bottom + 4).toBe(true);
+    // Nothing clear even up there: null, it rests where it always rests.
+    expect(toastSpot({ ...v, above: 0, controls: [...big, { top: 40, bottom: 320, left: 0, right: 360 }] })).toBeNull();
+  });
   it('never goes lower than its lowest place', () => {
     expect(toastSpot({ ...base, controls: [{ top: 560, bottom: 600, left: 0, right: 360 }] })).toBe(612);
   });
@@ -145,6 +160,17 @@ describe('toastBottomAmong (phones: the same rule from measured window boxes)', 
   it('ignores what it does not cross sideways, and boxes a phone could not measure', () => {
     expect(toastBottomAmong({ windowBottom: 740, resting: 84, toast: { ...toast, x: 130, width: 80 }, controls: [cells[0], cells[2]] })).toBeNull();
     expect(toastBottomAmong({ windowBottom: 740, resting: 84, toast, controls: [{ x: Number.NaN, y: 610, width: 80, height: 93 }] })).toBeNull();
+  });
+  it('with `above`, rises past thumb reach rather than lie over a control', () => {
+    const tall = { x: 25, y: 0, width: 309, height: 168 };
+    // 320 x 640 at 200%: the water card's link, "+ 250 ml", the activity cell; the toast rests 84 px up.
+    const controls = [
+      { x: 37, y: 272, width: 246, height: 79 },
+      { x: 37, y: 363, width: 135, height: 46 },
+      { x: 33, y: 456, width: 254, height: 128 },
+    ];
+    expect(toastBottomAmong({ windowBottom: 640, resting: 84, toast: tall, controls })).toBeNull();
+    expect(toastBottomAmong({ windowBottom: 640, resting: 84, toast: tall, controls, above: 24 })).toBe(640 - (272 - 4));
   });
   it('is null before the toast or the window is measured', () => {
     expect(toastBottomAmong({ windowBottom: 740, resting: 84, toast: { ...toast, height: 0 }, controls: cells })).toBeNull();

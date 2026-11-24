@@ -3455,6 +3455,7 @@ src/ui/Vessel.tsx	Vessel	component
 src/ui/Vessel.tsx	VesselLabel	interface
 src/ui/Vessel.tsx	VesselProps	interface
 src/ui/controlRules.ts	ANDROID_TARGET	const
+src/ui/controlRules.ts	ROW_WORD_ROOM	const
 src/ui/controlRules.ts	SlopInsets	type
 src/ui/controlRules.ts	StateIn	interface
 src/ui/controlRules.ts	ariaFromState	function
@@ -3462,6 +3463,7 @@ src/ui/controlRules.ts	fixedSize	function
 src/ui/controlRules.ts	isSpaceKey	function
 src/ui/controlRules.ts	pressesOnSpace	function
 src/ui/controlRules.ts	rovingIndex	function
+src/ui/controlRules.ts	rowStacks	function
 src/ui/controlRules.ts	slopToReach	function
 src/ui/controlRules.ts	spokenFieldName	function
 src/ui/controlRules.ts	stepperKey	function

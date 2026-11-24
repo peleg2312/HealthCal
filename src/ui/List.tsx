@@ -1,14 +1,15 @@
 import { ChevronRight } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { Animated, Easing, Platform, View, type AccessibilityRole, type AccessibilityState, type StyleProp, type ViewStyle } from 'react-native';
+import { Animated, Easing, Platform, useWindowDimensions, View, type AccessibilityRole, type AccessibilityState, type StyleProp, type ViewStyle } from 'react-native';
 
 import { spokenUnits } from '@/lib/spokenUnits';
-import { cup, cupFor, fonts, motion, useReducedMotion, useTheme } from '@/theme';
+import { cup, cupFor, fonts, motion, phoneCapFor, scaledFontSize, useReducedMotion, useTextSize, useTheme } from '@/theme';
 
 import { Button } from './Button';
 import { CupKey } from './Chip';
+import { rowStacks } from './controlRules';
 import { PressableScale } from './Pressable';
-import { Text } from './Text';
+import { Text, useLargeText } from './Text';
 
 export function ListRow({
   title,
@@ -43,30 +44,76 @@ export function ListRow({
   accessibilityLabel?: string;
 }) {
   const { colors, spacing } = useTheme();
-  const content = (
-    <>
-      {left}
-      <View style={{ flex: 1, minWidth: 0 }}>
-        {/* A long title wraps to a second line on a narrow phone rather than lose its end. */}
-        <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
-          {title}
+  // Large text: when the words beside the mark and the trailing part would have less room than their longest
+  // word needs, the row stacks (`rowStacks`): the mark and the trailing part on a first line, the words under
+  // them across the whole row. At the designed size the row is drawn exactly as before.
+  const large = useLargeText();
+  const scale = useTextSize();
+  const { fontScale } = useWindowDimensions();
+  const [rowW, setRowW] = useState(0);
+  const [leftW, setLeftW] = useState(0);
+  const [trailW, setTrailW] = useState(0);
+  const growth = (scaledFontSize(15, scale) / 15) * Math.min(Math.max(1, fontScale), phoneCapFor(scale));
+  const showChevron = chevron ?? (!!onPress && !right);
+  const hasTrail = !!value || !!right || showChevron;
+  const stack = large && rowStacks({ rowWidth: rowW, sideWidth: (left ? leftW + spacing.md : 0) + (hasTrail ? trailW + spacing.md : 0), growth });
+  const words = (
+    <View style={stack ? { alignSelf: 'stretch' } : { flex: 1, minWidth: 0 }}>
+      {/* A long title wraps to a second line on a narrow phone rather than lose its end. */}
+      <Text variant="bodyStrong" numberOfLines={large ? 3 : 2} style={{ fontFamily: fonts.semibold }}>
+        {title}
+      </Text>
+      {subtitle ? (
+        <Text variant="caption" color="textSecondary" numberOfLines={large ? 3 : 2}>
+          {subtitle}
         </Text>
-        {subtitle ? (
-          <Text variant="caption" color="textSecondary" numberOfLines={2}>
-            {subtitle}
-          </Text>
-        ) : null}
-      </View>
+      ) : null}
+    </View>
+  );
+  const trailing = (
+    <>
       {value ? (
-        <Text variant="label" color="textSecondary" numberOfLines={1}>
+        <Text variant="label" color="textSecondary" numberOfLines={1} style={large ? { flexShrink: 1 } : undefined}>
           {value}
         </Text>
       ) : null}
       {right}
-      {chevron ?? (!!onPress && !right) ? <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.9} /> : null}
+      {showChevron ? <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.9} /> : null}
     </>
   );
-  const rowStyle: ViewStyle = { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 };
+  const content = !large ? (
+    <>
+      {left}
+      {words}
+      {trailing}
+    </>
+  ) : (
+    <>
+      {stack ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, alignSelf: 'stretch' }}>
+          {left ? <View onLayout={(e) => setLeftW(Math.round(e.nativeEvent.layout.width))}>{left}</View> : null}
+          <View style={{ flex: 1 }} />
+          {hasTrail ? (
+            <View onLayout={(e) => setTrailW(Math.round(e.nativeEvent.layout.width))} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexShrink: 1 }}>
+              {trailing}
+            </View>
+          ) : null}
+        </View>
+      ) : (
+        left ? <View onLayout={(e) => setLeftW(Math.round(e.nativeEvent.layout.width))}>{left}</View> : null
+      )}
+      {words}
+      {!stack && hasTrail ? (
+        <View onLayout={(e) => setTrailW(Math.round(e.nativeEvent.layout.width))} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexShrink: 1 }}>
+          {trailing}
+        </View>
+      ) : null}
+    </>
+  );
+  const rowStyle: ViewStyle = stack
+    ? { flexDirection: 'column', alignItems: 'flex-start', gap: spacing.sm, minHeight: 56, paddingVertical: 11 }
+    : { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 };
+  const measureRow = large ? (e: { nativeEvent: { layout: { width: number } } }) => setRowW(Math.round(e.nativeEvent.layout.width)) : undefined;
   if (onPress) {
     return (
       <PressableScale
@@ -74,6 +121,7 @@ export function ListRow({
         onPress={onPress}
         scaleTo={0.985}
         style={[rowStyle, style]}
+        onLayout={measureRow}
         accessibilityRole={accessibilityRole}
         accessibilityState={accessibilityState}
         accessibilityHint={accessibilityHint}
@@ -83,7 +131,7 @@ export function ListRow({
     );
   }
   return (
-    <View testID={testID} style={[rowStyle, style]}>
+    <View testID={testID} style={[rowStyle, style]} onLayout={measureRow}>
       {content}
     </View>
   );

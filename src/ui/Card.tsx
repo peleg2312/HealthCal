@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, type StyleProp, type ViewProps, type ViewStyle } from 'react-native';
 
+import { spokenUnits } from '@/lib/spokenUnits';
 import { cup, useTheme } from '@/theme';
 
 import { PressableScale } from './Pressable';
@@ -38,7 +39,7 @@ export function Card({ onPress, padding, gradient: _gradient, tone = 'surface', 
     );
   }
   return (
-    <View {...rest} accessibilityLabel={accessibilityLabel} style={[base, style]}>
+    <View {...rest} accessibilityLabel={accessibilityLabel && spokenUnits(accessibilityLabel)} style={[base, style]}>
       {children}
     </View>
   );

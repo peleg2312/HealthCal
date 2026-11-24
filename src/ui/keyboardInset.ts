@@ -104,17 +104,26 @@ export const TOAST_CLEAR = 4;
  *              (`toastReachTop`), and a caller may pass a higher floor of its own.
  *   height     the toast's height; left and right its sides (only controls it would cross sideways count).
  *   controls   every control on the screen or in the sheet; each is kept `clear` px away.
+ *   above      optional: the highest top allowed when no band in thumb reach is clear (the top of the screen
+ *              or the window's top inset). Being over a control is worse than being out of thumb reach: a
+ *              tall toast (large text) often finds no clear band in the lower 60%, and then takes the lowest
+ *              clear band higher up rather than lie over the button just pressed.
  *
  * The answer is the lowest clear top, so the toast stays as close to the thumb and the chrome as it can.
  */
-export function toastSpot(v: { lowest: number; highest: number; height: number; left: number; right: number; controls: ControlBox[]; clear?: number }): number | null {
+export function toastSpot(v: { lowest: number; highest: number; height: number; left: number; right: number; controls: ControlBox[]; clear?: number; above?: number }): number | null {
   const clear = v.clear ?? TOAST_CLEAR;
   if (!(v.height > 0) || !(v.lowest >= v.highest)) return null;
   const blocks = v.controls.filter((c) => c.right - c.left >= 2 && c.bottom - c.top >= 2 && c.left < v.right && c.right > v.left).map((c) => ({ top: c.top - clear, bottom: c.bottom + clear }));
   const free = (top: number) => blocks.every((b) => !(top < b.bottom && top + v.height > b.top));
-  const tries = [v.lowest, ...blocks.map((b) => b.top - v.height)].filter((t) => t <= v.lowest && t >= v.highest).sort((a, b) => b - a);
-  for (const t of tries) if (free(t)) return Math.round(t);
-  return null;
+  const lowestClear = (hi: number, lo: number) => {
+    const tries = [lo, ...blocks.map((b) => b.top - v.height)].filter((t) => t <= lo && t >= hi).sort((a, b) => b - a);
+    for (const t of tries) if (free(t)) return Math.round(t);
+    return null;
+  };
+  const near = lowestClear(v.highest, v.lowest);
+  if (near !== null || typeof v.above !== 'number' || !(v.above < v.highest)) return near;
+  return lowestClear(v.above, v.highest);
 }
 
 /** The highest top a toast of this height may have in a window this tall, with its action in thumb reach. */
@@ -135,10 +144,11 @@ export interface WindowBox {
  * measures in window coordinates. The toast host sits at the app's root, so the answer is a distance from
  * the bottom of the root (`windowBottom`, the root's bottom edge in the window), or null when the toast
  * should rest where it always rests (`resting`, its usual distance: 12 px above the screen's chrome),
- * because that place is clear or no clear band is in thumb reach. `controls` are the screen's own kit
+ * because that place is clear or no clear band is in thumb reach or, with `above` (the window's top
+ * inset), anywhere below that. `controls` are the screen's own kit
  * controls (every PressableScale and text field inside its `Screen`, measured as the toast shows).
  */
-export function toastBottomAmong(v: { windowBottom: number; resting: number; toast: WindowBox; controls: WindowBox[] }): number | null {
+export function toastBottomAmong(v: { windowBottom: number; resting: number; toast: WindowBox; controls: WindowBox[]; above?: number }): number | null {
   const h = Math.round(v.toast.height);
   const H = v.windowBottom;
   if (!(h > 0) || !(H > 0) || !(v.toast.width > 0)) return null;
@@ -146,7 +156,7 @@ export function toastBottomAmong(v: { windowBottom: number; resting: number; toa
   const controls = v.controls
     .filter((c) => [c.x, c.y, c.width, c.height].every(Number.isFinite))
     .map((c) => ({ top: c.y, bottom: c.y + c.height, left: c.x, right: c.x + c.width }));
-  const top = toastSpot({ lowest, highest: toastReachTop(H, h), height: h, left: v.toast.x, right: v.toast.x + v.toast.width, controls });
+  const top = toastSpot({ lowest, highest: toastReachTop(H, h), height: h, left: v.toast.x, right: v.toast.x + v.toast.width, controls, above: v.above });
   if (top === null || top === Math.round(lowest)) return null;
   return Math.round(H - top - h);
 }

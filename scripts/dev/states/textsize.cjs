@@ -58,6 +58,8 @@ module.exports = [
   { id: 'text200-coach', route: '/coach', flags: big, note: 'the coach at 200% text' },
   { id: 'text200-coach-ideas', route: '/coach', values: { eaten: 0.5 }, taps: ['coach-local-ideas'], waitFor: 'coach-local-answer', flags: big, note: "the coach's ideas answer at 200% text" },
   ...settingsAt200(),
+  // The kit's toast at 200% (W2-KIT): a glass on Today, the toast in its place clear of the controls.
+  { id: 'text200-toast-water', route: '/', taps: ['^today-water-', { wait: 300 }], waitFor: 'toast', flags: big, note: "Today's glass and its toast at 200% text" },
   // Profile > App > Text size, at the designed size, then Larger five times: the page's own text grows to 200%.
   { id: 'text-size-row-larger', route: '/profile', taps: Array(5).fill('profile-text-size-larger'), waitFor: 'profile-text-size', note: 'Text size from 100% to 200% by its own control (no flag)' },
 ];

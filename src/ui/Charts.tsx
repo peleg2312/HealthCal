@@ -4,6 +4,7 @@ import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withDelay,
 import Svg, { Circle, ClipPath, Defs, G, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import { niceTicks } from '@/lib/chart';
+import { spokenUnits } from '@/lib/spokenUnits';
 import { cup, fonts, motion, useReducedMotion, useTheme } from '@/theme';
 
 import { haptic } from './haptics';
@@ -26,7 +27,7 @@ const CHART_TEXT = 12;
  * hidden from assistive technology. Without one, a chart is exposed as before.
  */
 function chartA11y(label: string | undefined) {
-  return label ? { accessible: true, accessibilityRole: 'image' as const, accessibilityLabel: label } : {};
+  return label ? { accessible: true, accessibilityRole: 'image' as const, accessibilityLabel: spokenUnits(label) } : {};
 }
 
 /** Hides a labelled chart's drawing from assistive technology (it has said what it shows in its name). */

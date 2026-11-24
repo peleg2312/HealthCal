@@ -198,3 +198,19 @@ export function spokenFieldName(label: string | undefined, suffix?: string): str
   const word = suffix ? FIELD_UNITS[suffix.trim()] : undefined;
   return word && !name.includes(word) ? `${name}, ${word}` : name;
 }
+
+/**
+ * The room a list row's title needs for its longest word at the designed size: a 13-letter word ("measurements",
+ * "Notifications") in the row's 15 px semibold, with a little to spare.
+ */
+export const ROW_WORD_ROOM = 120;
+
+/**
+ * Whether a `ListRow` stacks at large text: its mark and its trailing part (value, switch, chevron) on a first
+ * line and its words under them across the whole row, because beside them the words would have less room than
+ * their longest word needs at that size (a word is never split). `growth` is how much the row's text has
+ * grown (1 at the designed size, 2 at 200%); `sideWidth` is the mark, the trailing part and the gaps between.
+ */
+export function rowStacks(v: { rowWidth: number; sideWidth: number; growth: number }): boolean {
+  return v.growth > 1 && v.rowWidth > 0 && v.rowWidth - v.sideWidth < ROW_WORD_ROOM * v.growth;
+}

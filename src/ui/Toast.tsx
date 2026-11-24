@@ -4,9 +4,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { create } from 'zustand';
 
 import { withoutMarks } from '@/lib/bidi';
+import { spokenUnits } from '@/lib/spokenUnits';
 import { cup, isReducedMotion, MAX_CONTENT_WIDTH, motion, useTheme, type ThemeColors } from '@/theme';
 
-import { type ControlBox, TOAST_GAP, toastBottom, toastBottomAmong, toastReachTop, toastSpot, type WindowBox } from './keyboardInset';
+import { type ControlBox, TOAST_CLEAR, TOAST_GAP, toastBottom, toastBottomAmong, toastReachTop, toastSpot, type WindowBox } from './keyboardInset';
 import { PressableScale } from './Pressable';
 import { Text } from './Text';
 import { controlsIn } from './toastControls';
@@ -284,8 +285,9 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       announcedId = id;
       shownAt = monotonicNow();
       // Live regions are Android-only; announcing explicitly covers iOS as well. A name isolated for
-      // drawing (`isolateRtl`) is announced raw: screen readers get no direction marks.
-      const spoken = withoutMarks(message);
+      // drawing (`isolateRtl`) is announced raw: screen readers get no direction marks. Units are said in
+      // full ("250 millilitres added to Water"); the toast drawn keeps its short units.
+      const spoken = spokenUnits(withoutMarks(message));
       AccessibilityInfo.announceForAccessibility(actionLabel ? `${spoken}. ${actionLabel} available.` : spoken);
     }
     // Rises 16 px and fades in, ease-out, no bounce; instant under reduced motion. A toast raised while the
@@ -387,7 +389,8 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       const [host, box] = await Promise.all([measureBox(outer.current), measureRect(toastRef.current)]);
       if (!host || !box) return null;
       const rects = await Promise.all(controlsIn(scopeId).map((n) => measureRect(n)));
-      return toastBottomAmong({ windowBottom: host.y + host.h + bottomNow.current, resting, toast: box, controls: rects.filter((r): r is WindowBox => !!r) });
+      // With no clear band in thumb reach, any clear band below the status bar, rather than over a control.
+      return toastBottomAmong({ windowBottom: host.y + host.h + bottomNow.current, resting, toast: box, controls: rects.filter((r): r is WindowBox => !!r), above: insets.top });
     };
     // The place, as a bottom offset (null: where it always rests), or 'wait' while the screen it belongs to
     // is not laid out yet (a screen coming back into view after the one that raised the toast).
@@ -403,7 +406,10 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
         const scope = scopeId ? document.getElementById(scopeId) : null;
         const box = scope?.getBoundingClientRect();
         if (!scope || !box || box.height < 1 || box.width < 1) return 'wait';
-        const top = toastSpot({ lowest: H - resting - h, highest: toastReachTop(H, h), height: h, left: r.left, right: r.right, controls: controlBoxes(scope, host) });
+        // With no clear band in thumb reach, any clear band under the screen's header, rather than over a control.
+        const head = scope.querySelector('[data-testid="screen-header"], [data-testid="tab-header"]')?.getBoundingClientRect();
+        const above = Math.max(box.top, head ? head.bottom + TOAST_CLEAR : 0, insets.top);
+        const top = toastSpot({ lowest: H - resting - h, highest: toastReachTop(H, h), height: h, left: r.left, right: r.right, controls: controlBoxes(scope, host), above });
         return top === null ? null : H - top - h;
       }
       // In a sheet: just above its top edge while that is within thumb reach; else the lowest clear band in it.
@@ -444,7 +450,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       cancelAnimationFrame(frame);
       clearTimeout(timer);
     };
-  }, [placing, placeKey, toastH, resting, inSheet, scopeId, insets.bottom]);
+  }, [placing, placeKey, toastH, resting, inSheet, scopeId, insets.bottom, insets.top]);
   const spotNow = spot && spot.key === placeKey ? spot : null;
   const hidden = placing && !spotNow;
   const bottom = !inSheet && spotNow?.bottom != null ? spotNow.bottom : resting;
@@ -494,7 +500,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
           style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 3, borderTopLeftRadius: radius.shoulder, borderTopRightRadius: radius.shoulder, backgroundColor: tint ? ((colors as unknown as Record<string, string>)[tint] ?? tint) : colors.primary }}
         />
         <View pointerEvents="none" style={{ flexShrink: 1 }}>
-          <Text variant="label" color={colors.bg} accessibilityLabel={withoutMarks(message)}>
+          <Text variant="label" color={colors.bg} accessibilityLabel={spokenUnits(withoutMarks(message))}>
             {message}
           </Text>
         </View>

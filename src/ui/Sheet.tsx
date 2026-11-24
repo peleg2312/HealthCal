@@ -4,6 +4,7 @@ import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withTiming
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { spokenUnits } from '@/lib/spokenUnits';
 import { MAX_CONTENT_WIDTH, motion, sheetShadow, useReducedMotion, useTheme } from '@/theme';
 
 import { Button } from './Button';
@@ -319,7 +320,7 @@ export function Sheet({
       onRequestClose={requestClose}
       statusBarTranslucent
       // Web: the dialog is named by its title (or the label given), as a screen reader expects of a dialog.
-      {...((title ? { 'aria-labelledby': titleId } : accessibilityLabel ? { 'aria-label': accessibilityLabel } : {}) as object)}>
+      {...((title ? { 'aria-labelledby': titleId } : accessibilityLabel ? { 'aria-label': spokenUnits(accessibilityLabel) } : {}) as object)}>
       <KeyboardAvoidingView
         pointerEvents={visible ? 'auto' : 'none'}
         behavior={Platform.OS === 'web' ? undefined : 'padding'}

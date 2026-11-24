@@ -4,7 +4,7 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { formatNumber } from '@/lib/units';
 import { SLEEP_RANGE } from '@/features/trackers/helpers';
-import { motion, useTheme, withOpacity } from '@/theme';
+import { motion, useTextSize, useTheme, withOpacity } from '@/theme';
 import type { ISODate, UnitSystem } from '@/types';
 import { AnimatedNumber, CupKey, PressableScale, Text, Trough } from '@/ui';
 
@@ -51,6 +51,9 @@ function calorieLabel(d: FiguresDay): string {
  */
 export function YesterdayFigures({ day, sleepHours, units, kcalShown }: { day: FiguresDay; sleepHours: number | null; units: UnitSystem; kcalShown: boolean }) {
   const { colors, spacing, chartFill } = useTheme();
+  // From 130% text a figure's name and its "of 2,190 kcal" wrap rather than end in an ellipsis.
+  const textSize = useTextSize();
+  const lines = textSize >= 1.3 ? undefined : 1;
   const narrow = useWindowDimensions().width < 360;
   const numStyle = narrow ? { fontSize: 26, lineHeight: 30 } : undefined;
   const water = waterFigures(day.waterMl, day.waterGoalMl, units);
@@ -58,7 +61,8 @@ export function YesterdayFigures({ day, sleepHours, units, kcalShown }: { day: F
   const waterReached = day.waterGoalMl > 0 && day.waterMl >= day.waterGoalMl;
   const key = (id: string) => `morning-${day.date}-${id}`;
   const delay = (i: number) => 4 * motion.duration.stagger + i * motion.duration.stagger;
-  const tile = { flexBasis: '45%', flexGrow: 1, minWidth: 0, minHeight: 44 } as const;
+  // Two figures a line; from 150% text one a line, so "of 2,190 kcal" keeps its number with its unit.
+  const tile = { flexBasis: textSize >= 1.5 ? '100%' : '45%', flexGrow: 1, minWidth: 0, minHeight: 44 } as const;
   // With the calories shown over the week's large cup, a fully logged day shows its share of the budget here instead.
   const share = kcalShown && day.foodLogged && day.complete ? budgetShare(day.kcal, day.budget) : null;
   const slept = sleepHours !== null ? hoursAndMinutes(sleepHours) : null;
@@ -66,7 +70,7 @@ export function YesterdayFigures({ day, sleepHours, units, kcalShown }: { day: F
   const head = (color: string, label: string, variant: 'filled' | 'dashed' = 'filled') => (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
       <CupKey color={color} variant={variant} />
-      <Text variant="label" color="textSecondary" numberOfLines={1}>
+      <Text variant="label" color="textSecondary" numberOfLines={lines} style={{ flexShrink: 1 }}>
         {label}
       </Text>
     </View>
@@ -77,7 +81,7 @@ export function YesterdayFigures({ day, sleepHours, units, kcalShown }: { day: F
     </Text>
   );
   const caption = (text: string) => (
-    <Text variant="caption" color="textSecondary" numberOfLines={1} style={{ marginBottom: spacing.sm }}>
+    <Text variant="caption" color="textSecondary" numberOfLines={lines} style={{ marginBottom: spacing.sm }}>
       {text}
     </Text>
   );

@@ -3,6 +3,7 @@ import { View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 're
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import Svg, { Line } from 'react-native-svg';
 
+import { spokenUnits } from '@/lib/spokenUnits';
 import { motion, useTheme, vesselBase } from '@/theme';
 
 import { useFadeAfter, usePour, useReachFlash } from './motion';
@@ -239,7 +240,7 @@ export function Vessel({
 
   if (!labels?.length && !children) {
     return (
-      <View style={style} testID={testID} accessibilityLabel={accessibilityLabel} accessible={!!accessibilityLabel}>
+      <View style={style} testID={testID} accessibilityLabel={accessibilityLabel && spokenUnits(accessibilityLabel)} accessible={!!accessibilityLabel}>
         {cupView}
       </View>
     );
@@ -261,7 +262,7 @@ export function Vessel({
   };
 
   return (
-    <View style={[{ flexDirection: 'row', alignItems: 'flex-start', gap: labelGap }, style]} testID={testID} accessibilityLabel={accessibilityLabel}>
+    <View style={[{ flexDirection: 'row', alignItems: 'flex-start', gap: labelGap }, style]} testID={testID} accessibilityLabel={accessibilityLabel && spokenUnits(accessibilityLabel)}>
       <View style={{ width, height }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         {cupView}
         {list.map((l, i) =>

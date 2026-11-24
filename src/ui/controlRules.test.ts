@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ANDROID_TARGET, ariaFromState, fixedSize, pressesOnSpace, rovingIndex, slopToReach, spokenFieldName, stepperKey, webAutoComplete } from './controlRules';
+import { ANDROID_TARGET, ariaFromState, fixedSize, pressesOnSpace, rovingIndex, rowStacks, slopToReach, spokenFieldName, stepperKey, webAutoComplete } from './controlRules';
 
 describe('slopToReach (48 dp on Android)', () => {
   it('grows a 44 px cup to 48 on both axes', () => {
@@ -110,5 +110,20 @@ describe('spokenFieldName', () => {
     expect(spokenFieldName('Servings', 'servings')).toBe('Servings');
     expect(spokenFieldName('Login')).toBe('Login');
     expect(spokenFieldName(undefined, 'g')).toBeUndefined();
+  });
+});
+
+describe('rowStacks (a list row at large text)', () => {
+  it('never stacks at the designed size', () => {
+    expect(rowStacks({ rowWidth: 200, sideWidth: 150, growth: 1 })).toBe(false);
+  });
+  it("stacks when the words' room beside the mark and the switch is under the longest word's need", () => {
+    // 320 px phone at 200%: a 248 px row in its card, a 44 px tile, a 40 px switch and two 12 px gaps leave 140 px.
+    expect(rowStacks({ rowWidth: 248, sideWidth: 44 + 40 + 24, growth: 2 })).toBe(true);
+    // 390 px phone at 115%: plenty of room.
+    expect(rowStacks({ rowWidth: 318, sideWidth: 44 + 18 + 24, growth: 1.15 })).toBe(false);
+  });
+  it('waits for the row to be measured', () => {
+    expect(rowStacks({ rowWidth: 0, sideWidth: 0, growth: 2 })).toBe(false);
   });
 });

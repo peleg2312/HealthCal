@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Animated, Platform, Pressable as RNPressable, StyleSheet, type GestureResponderEvent, type Insets, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 
+import { spokenUnits } from '@/lib/spokenUnits';
 import { useReducedMotion, useTheme } from '@/theme';
 
 import { ANDROID_TARGET, ariaFromState, fixedSize, isSpaceKey, pressesOnSpace, slopToReach } from './controlRules';
@@ -184,13 +185,10 @@ export function PressableScale({ style, scaleTo = 0.97, feedback = 'tap', dimDis
   // On a phone the control is on its screen's list, so a toast rests clear of it (./toastControls).
   const ownRef = useToastControl<unknown>();
   const given = (rest as { ref?: unknown }).ref;
-  const phoneRef =
-    Platform.OS === 'web'
-      ? undefined
-      : (n: unknown) => {
-          ownRef.current = n;
-          passRef(given, n);
-        };
+  const setRef = (n: unknown) => {
+    ownRef.current = n;
+    passRef(given, n);
+  };
   const role = ((rest as { role?: string }).role ?? rest.accessibilityRole ?? 'button') as string;
   const state = expanded === undefined ? rest.accessibilityState : { ...rest.accessibilityState, expanded };
   const pressed = (e: GestureResponderEvent) => {
@@ -218,8 +216,10 @@ export function PressableScale({ style, scaleTo = 0.97, feedback = 'tap', dimDis
   return (
     <AnimatedPressable
       {...rest}
+      // Every control's name says its units in full ("Add 250 millilitres"); what is drawn keeps them short.
+      accessibilityLabel={typeof rest.accessibilityLabel === 'string' ? spokenUnits(rest.accessibilityLabel) : rest.accessibilityLabel}
       {...web}
-      {...(phoneRef ? { ref: phoneRef } : null)}
+      ref={setRef as never}
       hitSlop={androidSlop(rest.hitSlop, style)}
       accessibilityState={state}
       disabled={disabled}
