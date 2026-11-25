@@ -13,6 +13,7 @@ import { themeNameFor, type ThemeName } from '@/theme/resolve';
 import type { ISODate } from '@/types';
 
 import type { RecentGlass } from './glass';
+import type { WidgetTexts } from './layout';
 import {
   addedCaption,
   eatenLine,
@@ -24,6 +25,7 @@ import {
   rootSpoken,
   SETUP_LINE,
   SETUP_TITLE,
+  UNDO_WORD,
   undoSpoken,
   waterCaption,
   waterSpoken,
@@ -129,5 +131,19 @@ export function widgetModel(s: Store, date: ISODate, recent: RecentGlass | null 
     added,
     spoken: rootSpoken(date, kcalHeard, waterHeard),
     themes: widgetThemes(s),
+  };
+}
+
+/** The words the drawing draws for a day, as drawn (the date in capitals): what `widgetLayout` measures. */
+export function widgetTexts(f: WidgetDay): WidgetTexts {
+  return {
+    date: f.dateLine.toUpperCase(),
+    figure: f.kcal.figure,
+    word: f.kcal.word,
+    eaten: f.kcal.eatenLine,
+    water: f.water.line,
+    caption: f.added ? f.added.caption : f.water.caption,
+    glass: f.glass.label,
+    undo: f.added ? UNDO_WORD : null,
   };
 }

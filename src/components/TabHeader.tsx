@@ -144,7 +144,13 @@ export function TabHeader({
   const initial = ((profile.name ?? '').trim() || 'Me').slice(0, 1).toUpperCase();
   // The overline's short form while text is grown and the whole one, measured as drawn, is wider than its line.
   const [overlineW, setOverlineW] = useState(0);
-  const measureOverline = grown && !large && !!overlineTight;
+  const measureOverline = grown && !!overlineTight;
+  // Unseen, at its natural width as drawn (the overline's line beside the cups is `tabTitleRoom` wide in both layouts).
+  const overlineProbe = measureOverline ? (
+    <MeasureWidth onWidth={setOverlineW}>
+      <Text variant="overline">{overline}</Text>
+    </MeasureWidth>
+  ) : null;
   const overlineText = overlineShort && width < 360 ? overlineShort : measureOverline && !fitsRoom(overlineW, tabTitleRoom(width)) ? overlineTight : overline;
   const cups = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: CUP_GAP }}>
@@ -181,6 +187,7 @@ export function TabHeader({
     return (
       <View testID="tab-header" style={{ minHeight: 68, paddingVertical: spacing.sm, gap: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          {overlineProbe}
           <Text variant="overline" style={{ flex: 1, minWidth: 0 }}>
             {keepLastTwo(overlineText)}
           </Text>
@@ -193,11 +200,7 @@ export function TabHeader({
   return (
     <View testID="tab-header" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 68, paddingVertical: spacing.sm }}>
       <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
-        {measureOverline ? (
-          <MeasureWidth onWidth={setOverlineW}>
-            <Text variant="overline">{overline}</Text>
-          </MeasureWidth>
-        ) : null}
+        {overlineProbe}
         <Text variant="overline" numberOfLines={grown ? undefined : 1}>
           {grown ? keepLastTwo(overlineText) : overlineText}
         </Text>

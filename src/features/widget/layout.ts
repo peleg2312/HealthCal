@@ -1,93 +1,393 @@
 /**
- * How the widget is laid out in the size the launcher gives it (dp) at the phone's font scale. Pure,
- * tested (layout.test.ts). The widget is a picture drawn at that size, so what does not fit is left
- * out, in this order, rather than cut: the hairline between the halves, the "eaten of" line, the date
- * line. The big figure, the water figures and the glass always stay. Small text grows with the
- * phone's font size (sp); the big figure is already large and keeps its size, so the halves keep
- * their room at every scale.
+ * How the widget is laid out in the size the launcher gives it (dp) at the phone's font scale.
+ * Pure, tested (layout.test.ts). The widget is a picture of Android TextViews, so a line that does
+ * not fit is cut, not wrapped tidily: every line here is measured (`fonts.ts`: the bundled fonts'
+ * own widths and line boxes) at the size it is really drawn (`fontScale.ts`: Android's own curve;
+ * the drawing passes these dp sizes with font scaling off, so what is measured is what is drawn),
+ * and each line gets a box it fits in.
+ *
+ * Plans are tried richest first and the first that fits is drawn:
+ *
+ * 1. At the phone's font scale, with the 30 dp figure, the parts are given up in this order: the
+ *    hairline between the halves, room in the card's padding, the "eaten of" line, then the date
+ *    line. A line also goes, whole, where it is wider than its column. The figure with its "kcal
+ *    left", the water figures with their "Water" label and the glass always stay.
+ * 2. Width is found before anything else goes: "kcal left" stands on the figure's line and moves
+ *    under "kcal" only when the line is too narrow; the glass's side padding narrows, then the small
+ *    water cup goes, then the glass moves under the water figures. "213 ml of 2.9 L" is always one
+ *    line, never split from its number.
+ * 3. A short widget (one row) takes the figure down a size (27, 24, 22 dp) and a tighter frame.
+ * 4. Only where none of that fits is the text drawn one of Android's font size steps smaller, down
+ *    to the designed size (never smaller than that, unless the phone's own size is).
+ *
+ * The Undo, while a glass can be undone, sits beside the calorie half when the figure's line still
+ * fits beside it, else on a row of its own above it.
  */
-import { CUP_TOP } from './cup';
+import { CUP_TOP, cupBox } from './cup';
+import { cleanScale, scaleSteps, spToDp } from './fontScale';
+import { baselineOf, lineHeight, textWidth, wrapWords, type WidgetFont } from './fonts';
 
-/** Text sizes in sp and their line heights at the designed size. */
+/** Text sizes in sp at the designed size. The figure is in dp: it is already large and does not grow. */
 export const TYPE = {
-  date: { size: 11, line: 14 },
-  figure: { size: 30, line: 32 },
-  unit: { size: 12, line: 14 },
-  caption: { size: 12, line: 16 },
-  water: { size: 16, line: 20 },
-  button: { size: 14, line: 18 },
+  date: 11,
+  unit: 12,
+  eaten: 12,
+  water: 16,
+  caption: 12,
+  button: 14,
+  undo: 13,
+  title: 18,
+  line: 13,
 } as const;
 
-export interface WidgetLayout {
-  pad: number;
-  /** Space between the calorie half and the water row (each side of the hairline when it shows). */
-  gap: number;
-  date: boolean;
-  eaten: boolean;
-  divider: boolean;
-  /** Heights of the two halves, in dp. */
-  calH: number;
-  waterH: number;
-  /** The glass button's height. */
-  glassH: number;
-  /** The calorie cup and the water cup (the cups themselves; their SVG boxes add `cupBox`'s room). */
-  calCup: { width: number; height: number };
-  waterCup: { width: number; height: number };
-  /** The text column beside the calorie cup holds this many dp: the "eaten of" line is left out when it would not fit. */
-  textW: number;
-}
+/** The big figure's sizes in dp, the first the designed one; a short widget steps down. */
+export const FIGURE_SIZES = [30, 27, 24, 22] as const;
 
-/** About how wide `chars` characters of text `size` sp are, at `fontScale` (a sans at about 0.55 em a character). */
-export function textWidth(chars: number, size: number, fontScale = 1, em = 0.55): number {
-  return chars * size * em * fontScale;
-}
+/** Letter spacing in em: the date's overline tracking, and the figure drawn a little tighter. */
+export const DATE_TRACKING = 0.9 / 11;
+export const FIGURE_TRACKING = -0.6 / 30;
 
-const UNDO_W = 60;
+/** Fixed room in dp. */
+export const ROOM = {
+  border: 1,
+  calCup: 30,
+  waterCup: 22,
+  /** Between a cup and its words. */
+  cupGap: 10,
+  /** Between the figure and "kcal left". */
+  unitGap: 6,
+  /** Before the Undo and before the glass, beside what they sit next to. */
+  buttonGap: 8,
+  /** Between the water figures and the glass under them. */
+  underGap: 6,
+  glassBorder: 1.5,
+  undoBorder: 1,
+  undoPad: 12,
+  /** A button is its words plus this above and below, and never shorter than its least height. */
+  buttonPadV: 8,
+  glassMinH: 40,
+  undoMinH: 36,
+  /** Pixel rounding across the stacked parts. */
+  slack: 2,
+} as const;
 
 /**
- * The layout for a widget `width` x `height` dp at `fontScale`, with the "eaten of" line `eatenChars`
- * long and the Undo beside the calorie half (`undo`) or not.
+ * What is shown, richest first: the hairline goes first, then the "eaten of" line, then the date.
+ * Each is tried with the card's padding from roomy to tight (the hairline only with a roomy card).
  */
-export function widgetLayout(width: number, height: number, fontScale = 1, opts: { eatenChars?: number; undo?: boolean } = {}): WidgetLayout {
-  const f = Math.max(1, Number.isFinite(fontScale) ? fontScale : 1);
-  const w = Math.max(160, width || 0);
-  const h = Math.max(90, height || 0);
-  const glassH = Math.max(40, Math.ceil(TYPE.button.line * f + 16));
-  const waterText = Math.ceil((TYPE.water.line + TYPE.caption.line) * f);
-  const waterH = Math.max(glassH, waterText);
-  const figureH = Math.max(TYPE.figure.line, Math.ceil(2 * TYPE.unit.line * f));
-  const dateH = Math.ceil(TYPE.date.line * f) + 2;
-  const eatenH = Math.ceil(TYPE.caption.line * f) + 2;
+const TIERS = [
+  { divider: true, eaten: true, date: true, pads: [14, 12] },
+  { divider: false, eaten: true, date: true, pads: [14, 12, 10, 8] },
+  { divider: false, eaten: false, date: true, pads: [14, 12, 10, 8] },
+  { divider: false, eaten: false, date: false, pads: [14, 12, 10, 8, 6, 5] },
+] as const;
 
-  // Richest first; the first that fits is used, else the last.
-  const tiers = [
-    { date: true, eaten: true, divider: true, pad: 14, gap: 10 },
-    { date: true, eaten: true, divider: false, pad: 12, gap: 10 },
-    { date: true, eaten: false, divider: false, pad: 12, gap: 8 },
-    { date: false, eaten: false, divider: false, pad: 10, gap: 8 },
-  ];
-  const need = (t: (typeof tiers)[number]) => 2 * t.pad + (t.date ? dateH : 0) + figureH + (t.eaten ? eatenH : 0) + (t.divider ? 2 * t.gap + 1 : t.gap) + waterH;
-  const tier = tiers.find((t) => need(t) <= h) ?? tiers[tiers.length - 1];
+/**
+ * Within a tier, the card's padding and where the glass goes, in order: the glass beside the water
+ * figures in a roomy card, then under them in a roomy card, then the tighter cards.
+ */
+const ARRANGEMENTS = [
+  { pad: 14, glass: 'beside' },
+  { pad: 12, glass: 'beside' },
+  { pad: 10, glass: 'beside' },
+  { pad: 14, glass: 'under' },
+  { pad: 12, glass: 'under' },
+  { pad: 10, glass: 'under' },
+  { pad: 8, glass: 'beside' },
+  { pad: 8, glass: 'under' },
+  { pad: 6, glass: 'beside' },
+  { pad: 6, glass: 'under' },
+  { pad: 5, glass: 'beside' },
+  { pad: 5, glass: 'under' },
+] as const;
 
-  const calH = (tier.date ? dateH : 0) + figureH + (tier.eaten ? eatenH : 0);
-  const calCupW = 30;
-  const textW = w - 2 * tier.pad - calCupW - 6 - 10 - (opts.undo ? UNDO_W + 8 : 0);
-  // The "eaten of" line keeps its words whole: where it would not fit beside the cup, it is left out.
-  const eatenFits = !opts.eatenChars || textWidth(opts.eatenChars, TYPE.caption.size, f) <= textW;
-  const eaten = tier.eaten && eatenFits;
-  const calHeight = eaten === tier.eaten ? calH : calH - eatenH;
-  return {
-    pad: tier.pad,
-    gap: tier.gap,
-    date: tier.date,
-    eaten,
-    divider: tier.divider,
-    calH: calHeight,
-    waterH,
-    glassH,
-    // The cup stands in its half: its box (the cup and the room above its open top, `CUP_TOP`) is the half's height.
-    calCup: { width: calCupW, height: Math.max(24, calHeight - CUP_TOP) },
-    waterCup: { width: 22, height: Math.max(24, Math.min(36, waterH - 8)) },
-    textW,
+/** The room between the halves for a card padding: less in a tighter card. */
+export function gapFor(pad: number): number {
+  return pad >= 12 ? 10 : pad >= 10 ? 8 : pad >= 8 ? 6 : 4;
+}
+
+/** The glass's side padding, roomy then narrow. */
+const GLASS_PADS = [14, 8] as const;
+
+/** The words the widget draws for one day, as drawn. */
+export interface WidgetTexts {
+  /** "WED, NOV 25" (upper case, as drawn). */
+  date: string;
+  /** "2,239". */
+  figure: string;
+  /** "left" or "above", after "kcal". */
+  word: string;
+  /** "782 eaten of 3,020". */
+  eaten: string;
+  /** "213 ml of 2.9 L". */
+  water: string;
+  /** "Water", "Goal reached" or "250 ml added". */
+  caption: string;
+  /** "+ 250 ml". */
+  glass: string;
+  /** "Undo" while a glass can be undone, else null. */
+  undo: string | null;
+}
+
+/** One line of text with the box it is drawn in (dp): `width` is the room its words take. */
+export interface LineBox {
+  text: string;
+  font: WidgetFont;
+  /** The size it is drawn at, in dp (font scaling off). */
+  size: number;
+  /** Letter spacing in em. */
+  tracking: number;
+  width: number;
+  height: number;
+}
+
+export interface WidgetLayout {
+  /** Whether everything fits; false only where even the sparest plan at the designed size does not (below the widget's least size). */
+  fits: boolean;
+  /** The font scale the text is drawn at: the phone's, or a smaller step of Android's ladder. */
+  scale: number;
+  pad: number;
+  gap: number;
+  divider: boolean;
+  date: boolean;
+  eaten: boolean;
+  units: 'inline' | 'stacked';
+  undo: 'beside' | 'top' | null;
+  glass: 'beside' | 'under';
+  glassPad: number;
+  waterCup: boolean;
+  /** The calorie half's text column and its width. */
+  calH: number;
+  calTextW: number;
+  /** The figure's row (the figure and "kcal left", or "kcal" over "left"). */
+  figureH: number;
+  /** For stacked units: how far their column stands above the row's foot, so "left" sits on the figure's baseline. */
+  unitsDrop: number;
+  /** The Undo's own row above the calorie half (undo 'top'), else 0. */
+  topH: number;
+  /** The water figures with their label, and the whole water block (with the glass under it, when it is). */
+  waterTextH: number;
+  waterTextW: number;
+  waterH: number;
+  glassW: number;
+  glassH: number;
+  undoW: number;
+  undoH: number;
+  calCup: { width: number; height: number };
+  waterCupSize: { width: number; height: number };
+  lines: {
+    date: LineBox;
+    figure: LineBox;
+    /** "kcal left" on the figure's line. */
+    units: LineBox;
+    /** "kcal" and "left" when stacked. */
+    kcal: LineBox;
+    word: LineBox;
+    eaten: LineBox;
+    water: LineBox;
+    caption: LineBox;
+    glass: LineBox;
+    undo: LineBox | null;
   };
+  /** The height the plan takes, in dp (at most the widget's height when it fits). */
+  used: number;
+}
+
+function box(text: string, font: WidgetFont, size: number, tracking = 0): LineBox {
+  return { text, font, size, tracking, width: textWidth(text, font, size, tracking), height: lineHeight(font, size) };
+}
+
+/** The sizes in dp at `scale`, whole numbers (the drawing's size steps are whole dp). */
+function sizesAt(scale: number) {
+  const dp = (sp: number) => Math.max(1, Math.round(spToDp(sp, scale)));
+  return {
+    date: dp(TYPE.date),
+    unit: dp(TYPE.unit),
+    eaten: dp(TYPE.eaten),
+    water: dp(TYPE.water),
+    caption: dp(TYPE.caption),
+    button: dp(TYPE.button),
+    undo: dp(TYPE.undo),
+  };
+}
+
+interface Attempt {
+  width: number;
+  height: number;
+  scale: number;
+  figure: number;
+  tier: { divider: boolean; eaten: boolean; date: boolean };
+  pad: number;
+  glass: 'beside' | 'under';
+  undoAt: 'beside' | 'top' | null;
+  texts: WidgetTexts;
+  /** Measure it even where a line that must stay is too wide (the last resort below the widget's least size): it then does not fit. */
+  force?: boolean;
+}
+
+/** One plan, measured; null when a line that must stay does not fit its width (unless forced). */
+function plan(a: Attempt): WidgetLayout | null {
+  const { texts } = a;
+  const frame = { ...a.tier, pad: a.pad, gap: gapFor(a.pad) };
+  const s = sizesAt(a.scale);
+  const inner = a.width - 2 * (frame.pad + ROOM.border);
+  const calCupBox = cupBox(ROOM.calCup, 40).width;
+  const calTextFull = inner - calCupBox - ROOM.cupGap;
+
+  const date = box(texts.date, 'strong', s.date, DATE_TRACKING);
+  const figure = box(texts.figure, 'numbers', a.figure, FIGURE_TRACKING);
+  const units = box(`kcal ${texts.word}`, 'strong', s.unit);
+  const kcal = box('kcal', 'strong', s.unit);
+  const word = box(texts.word, 'strong', s.unit);
+  const eaten = box(texts.eaten, 'words', s.eaten);
+  const undoLine = texts.undo ? box(texts.undo, 'strong', s.undo) : null;
+  const undoW = undoLine ? undoLine.width + 2 * (ROOM.undoPad + ROOM.undoBorder) : 0;
+  const undoH = undoLine ? Math.max(ROOM.undoMinH, undoLine.height + 2 * ROOM.buttonPadV) : 0;
+
+  // The calorie half: the figure's line must fit its column.
+  const calTextW = calTextFull - (a.undoAt === 'beside' ? undoW + ROOM.buttonGap : 0);
+  const stackedW = Math.max(kcal.width, word.width);
+  const unitsFit: 'inline' | 'stacked' | null =
+    figure.width + ROOM.unitGap + units.width <= calTextW ? 'inline' : figure.width + ROOM.unitGap + stackedW <= calTextW ? 'stacked' : null;
+  if (!unitsFit && !a.force) return null;
+  const unitsAt = unitsFit ?? 'stacked';
+
+  const figBase = baselineOf('numbers', a.figure);
+  const figDesc = figure.height - figBase;
+  const unitBase = baselineOf('strong', s.unit);
+  const unitDesc = units.height - unitBase;
+  const unitsDrop = unitsAt === 'stacked' ? Math.max(0, figDesc - unitDesc) : 0;
+  const figureH = unitsAt === 'inline' ? Math.max(figBase, unitBase) + Math.max(figDesc, unitDesc) : Math.max(figure.height, kcal.height + word.height + unitsDrop);
+
+  // The date stands in the column (or beside the Undo on the Undo's own row), the "eaten of" line under the figure.
+  const dateFits = a.undoAt === 'top' ? date.width + ROOM.buttonGap + undoW <= calTextFull : date.width <= calTextW;
+  const showDate = frame.date && dateFits;
+  const showEaten = frame.eaten && eaten.width <= calTextW;
+  const topH = a.undoAt === 'top' ? Math.max(undoH, showDate ? date.height : 0) : 0;
+  const calH = (showDate && a.undoAt !== 'top' ? date.height : 0) + figureH + (showEaten ? eaten.height : 0);
+  const calRowH = a.undoAt === 'beside' ? Math.max(calH, undoH) : calH;
+
+  // The water figures with their label, and the glass beside or under them.
+  const water = box(texts.water, 'numbers', s.water);
+  const caption = box(texts.caption, 'words', s.caption);
+  const glass = box(texts.glass, 'strong', s.button);
+  const waterTextW = Math.max(water.width, caption.width);
+  const waterTextH = water.height + caption.height;
+  const glassH = Math.max(ROOM.glassMinH, glass.height + 2 * ROOM.buttonPadV);
+  const glassWith = (pad: number) => glass.width + 2 * (pad + ROOM.glassBorder);
+  const cupRoom = cupBox(ROOM.waterCup, 30).width + ROOM.cupGap;
+  const options =
+    a.glass === 'beside'
+      ? [
+          { cup: true, pad: GLASS_PADS[0] },
+          { cup: true, pad: GLASS_PADS[1] },
+          { cup: false, pad: GLASS_PADS[0] },
+          { cup: false, pad: GLASS_PADS[1] },
+        ].filter((o) => (o.cup ? cupRoom : 0) + waterTextW + ROOM.buttonGap + glassWith(o.pad) <= inner)
+      : [
+          { cup: true, pad: GLASS_PADS[0] },
+          { cup: false, pad: GLASS_PADS[0] },
+          { cup: false, pad: GLASS_PADS[1] },
+        ].filter((o) => (o.cup ? cupRoom : 0) + waterTextW <= inner && glassWith(o.pad) <= inner);
+  if (!options[0] && !a.force) return null;
+  const pick = options[0] ?? { cup: false, pad: GLASS_PADS[1] };
+  const waterH = a.glass === 'beside' ? Math.max(waterTextH, glassH) : waterTextH + ROOM.underGap + glassH;
+
+  const used = 2 * (frame.pad + ROOM.border) + topH + calRowH + (frame.divider ? 2 * frame.gap + 1 : frame.gap) + waterH + ROOM.slack;
+  return {
+    fits: used <= a.height && !!unitsFit && !!options[0],
+    scale: a.scale,
+    pad: frame.pad,
+    gap: frame.gap,
+    divider: frame.divider,
+    date: showDate,
+    eaten: showEaten,
+    units: unitsAt,
+    undo: texts.undo ? a.undoAt : null,
+    glass: a.glass,
+    glassPad: pick.pad,
+    waterCup: pick.cup,
+    calH,
+    calTextW,
+    figureH,
+    unitsDrop,
+    topH,
+    waterTextH,
+    waterTextW: inner - (pick.cup ? cupRoom : 0) - (a.glass === 'beside' ? ROOM.buttonGap + glassWith(pick.pad) : 0),
+    waterH,
+    glassW: glassWith(pick.pad),
+    glassH,
+    undoW,
+    undoH,
+    // The cup stands in its half: its box (the cup and the room above its open top, `CUP_TOP`) is the half's height.
+    calCup: { width: ROOM.calCup, height: Math.max(16, calH - CUP_TOP) },
+    waterCupSize: { width: ROOM.waterCup, height: Math.max(16, Math.min(36, waterTextH - CUP_TOP)) },
+    lines: { date, figure, units, kcal, word, eaten, water, caption, glass, undo: undoLine },
+    used,
+  };
+}
+
+/**
+ * The layout for a widget `width` x `height` dp at the phone's `fontScale`, for the words `texts`
+ * (their lengths decide what fits). The first plan that fits, richest first; where none fits (a size
+ * below the widget's least), the sparest plan at the smallest step, with `fits` false.
+ */
+export function widgetLayout(width: number, height: number, fontScale: number, texts: WidgetTexts): WidgetLayout {
+  const w = Math.max(1, width || 0);
+  const h = Math.max(1, height || 0);
+  const undoPlaces: ('beside' | 'top' | null)[] = texts.undo ? ['beside', 'top'] : [null];
+  const steps = scaleSteps(fontScale);
+  for (const scale of steps) {
+    for (const figure of FIGURE_SIZES) {
+      for (const tier of TIERS) {
+        for (const { pad, glass } of ARRANGEMENTS) {
+          if (!(tier.pads as readonly number[]).includes(pad)) continue;
+          for (const undoAt of undoPlaces) {
+            const p = plan({ width: w, height: h, scale, figure, tier, pad, glass, undoAt, texts });
+            if (p?.fits) return p;
+          }
+        }
+      }
+    }
+  }
+  // Below the widget's least size nothing fits: the sparest plan at the smallest step, marked as not fitting.
+  const sparest = { width: w, height: h, scale: steps[steps.length - 1] ?? cleanScale(fontScale), figure: FIGURE_SIZES[FIGURE_SIZES.length - 1], tier: TIERS[TIERS.length - 1], pad: 5 };
+  const beside = plan({ ...sparest, glass: 'beside', undoAt: texts.undo ? 'top' : null, texts });
+  return beside ?? plan({ ...sparest, glass: 'under', undoAt: texts.undo ? 'top' : null, texts, force: true })!;
+}
+
+/** The message drawing ("Set up HealthCal", "Not saved"): its title and line broken into lines, each line drawn as its own one-line text. */
+export interface MessageLayout {
+  fits: boolean;
+  scale: number;
+  pad: number;
+  textW: number;
+  title: LineBox[];
+  line: LineBox[];
+  cup: { width: number; height: number };
+}
+
+const MESSAGE_PAD = 14;
+const MESSAGE_CUP = { width: 30, height: 44 };
+const MESSAGE_CUP_GAP = 12;
+/** Between the title and the line under it. */
+const MESSAGE_GAP = 2;
+
+/** The message drawing's layout for `width` x `height` dp at `fontScale`: the largest step at which every line fits. */
+export function messageLayout(width: number, height: number, fontScale: number, title: string, line: string): MessageLayout {
+  const inner = Math.max(1, width || 0) - 2 * (MESSAGE_PAD + ROOM.border);
+  const innerH = Math.max(1, height || 0) - 2 * (MESSAGE_PAD + ROOM.border) - ROOM.slack;
+  const textW = inner - cupBox(MESSAGE_CUP.width, MESSAGE_CUP.height).width - MESSAGE_CUP_GAP;
+  let result: MessageLayout | null = null;
+  for (const scale of scaleSteps(fontScale)) {
+    const titleSize = Math.round(spToDp(TYPE.title, scale));
+    const lineSize = Math.round(spToDp(TYPE.line, scale));
+    const titles = wrapWords(title, 'numbers', titleSize, textW).map((t) => box(t, 'numbers', titleSize));
+    const lines = wrapWords(line, 'words', lineSize, textW).map((t) => box(t, 'words', lineSize));
+    const tall = titles.reduce((n, b) => n + b.height, 0) + MESSAGE_GAP + lines.reduce((n, b) => n + b.height, 0);
+    const wide = [...titles, ...lines].every((b) => b.width <= textW);
+    result = { fits: wide && tall <= innerH, scale, pad: MESSAGE_PAD, textW, title: titles, line: lines, cup: MESSAGE_CUP };
+    if (result.fits) return result;
+  }
+  return result!;
 }

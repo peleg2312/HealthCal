@@ -248,15 +248,19 @@ export function DayRingStrip({
   const large = useVeryLargeText();
   const grown = useGrownText();
   const thin = slim;
-  // With text grown, the caption row's room as measured: the row, and the chip or streak beside the caption as drawn.
+  // With text grown, the caption row's room as measured: the row, and what sits beside the caption as drawn.
   const [rowW, setRowW] = useState(0);
-  const [sideW, setSideW] = useState(0);
+  const [groupW, setGroupW] = useState(0);
   const [linkW, setLinkW] = useState(0);
   const [shortW, setShortW] = useState(0);
-  const pickW = arrows ? 2 * PICK_CUP + spacing.md + spacing.xs : maxBack + ahead > 0 ? PICK_CUP + spacing.xs : 0;
-  // The room for the link's words: the row less what sits beside them (the chip or streak, the week cup or arrows, its
-  // X and its chevron, with the gaps between), the same whichever way the row is laid out, so a choice never flips it.
-  const linkRoom = rowW ? rowW - (sideW ? sideW + spacing.sm : 0) - (pickW ? pickW + spacing.sm : 0) - (link?.hide ? PICK_CUP + spacing.sm : 0) - LINK_MARK : 0;
+  // Beside the caption: the "Back to today" chip ("Today" on a narrow phone, so the caption keeps two lines), else the
+  // accessory (Today's streak).
+  const side =
+    selected !== today ? <Chip testID={jumpTestID ?? `${testIDPrefix}-jump-today`} label={narrow ? 'Today' : 'Back to today'} selected onPress={() => onSelect(today)} /> : accessory;
+  // The room for the link's words: the row less what sits beside them (the chip or streak with the week controls, as
+  // drawn; its X and its chevron, with the gaps between), the same whichever way the row is laid out, so a choice never
+  // flips it.
+  const linkRoom = rowW ? rowW - (groupW ? groupW + spacing.sm : 0) - (link?.hide ? PICK_CUP + spacing.sm : 0) - LINK_MARK : 0;
   // "Your week is ready" or its short form: the short one under 360 px, and with text grown wherever the whole label,
   // measured as drawn, is wider than its room (`fitsRoom`), so it keeps one line.
   const linkShort = !!link?.short && (narrow || (grown && !fitsRoom(linkW, linkRoom)));
@@ -272,6 +276,36 @@ export function DayRingStrip({
     if (e.nativeEvent.actionName === 'previousWeek') page(back + 1);
     if (e.nativeEvent.actionName === 'nextWeek') page(back - 1);
   };
+
+  // The week arrows (a mouse on a wide window) or the week-picker cup, at the caption row's end.
+  const weekControls = arrows ? (
+    // 12 apart, so each 32 px arrow's 44 px touch area (6 px each side) ends where its neighbour's begins.
+    <View style={{ flexDirection: 'row', gap: spacing.md, marginLeft: spacing.xs }}>
+      <IconButton
+        testID={`${testIDPrefix}-week-prev`}
+        accessibilityLabel="Previous week"
+        size={32}
+        tone="clear"
+        disabled={back >= maxBack}
+        onPress={() => page(back + 1)}>
+        <ChevronLeft size={20} color={colors.text} strokeWidth={2.2} />
+      </IconButton>
+      <IconButton testID={`${testIDPrefix}-week-next`} accessibilityLabel="Next week" size={32} tone="clear" disabled={back <= -ahead} onPress={() => page(back - 1)}>
+        <ChevronRight size={20} color={colors.text} strokeWidth={2.2} />
+      </IconButton>
+    </View>
+  ) : maxBack + ahead > 0 ? (
+    // On touch and narrow windows: one cup, 12 px from the chip or streak before it, that opens every week the
+    // strip holds, so another week is a visible tap away (a swipe is never the only way).
+    <IconButton
+      testID={`${testIDPrefix}-week-pick`}
+      accessibilityLabel="Choose a week"
+      size={PICK_CUP}
+      onPress={() => setPicking(true)}
+      style={{ marginLeft: spacing.xs }}>
+      <CalendarDays size={18} color={colors.text} strokeWidth={2.2} />
+    </IconButton>
+  ) : null;
 
   return (
     <View style={[{ gap: spacing.xs }, style]} testID={`${testIDPrefix}-week`}>
@@ -450,48 +484,18 @@ export function DayRingStrip({
           </Text>
         )}
         {grown ? (
-          // Measured as drawn while text is grown, for the room left to the caption's link.
-          <View onLayout={(e) => setSideW(Math.ceil(e.nativeEvent.layout.width))}>
-            {selected !== today ? (
-              <Chip testID={jumpTestID ?? `${testIDPrefix}-jump-today`} label={narrow ? 'Today' : 'Back to today'} selected onPress={() => onSelect(today)} />
-            ) : (
-              accessory
-            )}
+          // With text grown the chip or streak and the week controls are one group, measured as drawn (the room left to
+          // the caption's link), that goes to a line under the caption together when the row wraps.
+          <View onLayout={(e) => setGroupW(Math.ceil(e.nativeEvent.layout.width))} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            {side}
+            {weekControls}
           </View>
-        ) : selected !== today ? (
-          // "Today" on a narrow phone, so the caption keeps two lines.
-          <Chip testID={jumpTestID ?? `${testIDPrefix}-jump-today`} label={narrow ? 'Today' : 'Back to today'} selected onPress={() => onSelect(today)} />
         ) : (
-          accessory
+          <>
+            {side}
+            {weekControls}
+          </>
         )}
-        {arrows ? (
-          // 12 apart, so each 32 px arrow's 44 px touch area (6 px each side) ends where its neighbour's begins.
-          <View style={{ flexDirection: 'row', gap: spacing.md, marginLeft: spacing.xs }}>
-            <IconButton
-              testID={`${testIDPrefix}-week-prev`}
-              accessibilityLabel="Previous week"
-              size={32}
-              tone="clear"
-              disabled={back >= maxBack}
-              onPress={() => page(back + 1)}>
-              <ChevronLeft size={20} color={colors.text} strokeWidth={2.2} />
-            </IconButton>
-            <IconButton testID={`${testIDPrefix}-week-next`} accessibilityLabel="Next week" size={32} tone="clear" disabled={back <= -ahead} onPress={() => page(back - 1)}>
-              <ChevronRight size={20} color={colors.text} strokeWidth={2.2} />
-            </IconButton>
-          </View>
-        ) : maxBack + ahead > 0 ? (
-          // On touch and narrow windows: one cup, 12 px from the chip or streak before it, that opens every week the
-          // strip holds, so another week is a visible tap away (a swipe is never the only way).
-          <IconButton
-            testID={`${testIDPrefix}-week-pick`}
-            accessibilityLabel="Choose a week"
-            size={PICK_CUP}
-            onPress={() => setPicking(true)}
-            style={{ marginLeft: spacing.xs }}>
-            <CalendarDays size={18} color={colors.text} strokeWidth={2.2} />
-          </IconButton>
-        ) : null}
       </View>
       <Sheet visible={picking} onClose={() => setPicking(false)} title="Choose a week">
         <View testID={`${testIDPrefix}-week-pick-sheet`} accessibilityRole="radiogroup">

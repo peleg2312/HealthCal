@@ -34,7 +34,7 @@ import { formatNumber } from '@/lib/units';
 import { useStore } from '@/store';
 import { useNow, useToday } from '@/store/clock';
 import { useConsistency, useDay, useDays, useLive, useProfile, type DaySummary } from '@/store/selectors';
-import { motion, useDrawnFontSize, useTheme, useVeryLargeText } from '@/theme';
+import { MAX_CONTENT_WIDTH, motion, useDrawnFontSize, useTheme, useVeryLargeText } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
 import { AnimatedNumber, Badge, Button, Card, CupKey, figure, IconButton, PressableScale, ProgressBar, Screen, Text, toast, useGrownText, Vessel, type VesselLabel } from '@/ui';
 
@@ -64,9 +64,12 @@ export default function TodayScreen() {
   const [fits, setFits] = useState<{ proteinFirst: boolean } | null>(null);
 
   const { width } = useWindowDimensions();
-  // Measured as drawn: with text grown the title steps down to keep the name on one line beside the header's cups.
+  // Measured as drawn: with text grown the title steps down to keep the name on one line beside the header's cups; with
+  // very large text the header stacks and the title has the content's whole width (`TabHeader`).
   const drawn = useDrawnFontSize();
-  const title = todayTitle(greeting(now), profile.name ?? '', tabTitleRoom(width), tabTitleSize(width), drawn);
+  const veryLarge = useVeryLargeText();
+  const titleRoom = veryLarge ? Math.min(width, MAX_CONTENT_WIDTH) - 2 * spacing.xl : tabTitleRoom(width);
+  const title = todayTitle(greeting(now), profile.name ?? '', titleRoom, tabTitleSize(width), drawn);
   const select = (d: ISODate) => setPicked(d === todayDate ? null : d);
   // The day changes only from the week strip: no page swipe here, so scrolling or reaching for a
   // row never moves Today to another day. Back in front after five minutes or more away, or on
@@ -170,6 +173,11 @@ const VESSEL_H = 124;
  */
 const VESSEL_H_NARROW = 100;
 const NARROW = { padding: 12, paddingV: 10, labelSpacing: 4, labelH: 20, macrosTop: 12, macroGap: 4 };
+/**
+ * Very large text (`VERY_LARGE_TEXT`): the cup beside the label rows under the big number, smaller than the designed one
+ * and as tall as those rows are drawn (at least `least`), so the card has no empty band beside a cup taller than its words.
+ */
+const LARGE_CUP = { width: 60, least: 72 };
 
 /**
  * The day card: the calorie cup with its labels (the big number switches between left and eaten), the three macros
@@ -198,6 +206,8 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
   // The widest macro name with its key as drawn, and the macros' row, to know whether three fit side by side.
   const [macroNameW, setMacroNameW] = useState(0);
   const [macrosW, setMacrosW] = useState(0);
+  // Very large text: the height of the rows beside the smaller cup, as drawn.
+  const [rowsH, setRowsH] = useState(0);
   const over = day.remaining < 0;
   const eaten = day.eaten.kcal;
   const budget = Math.max(0, day.budget);
@@ -418,9 +428,10 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
 
   if (large) {
     // Very large text (150% and up, the app's size or the phone's): the side column beside the cup has no room for its
-    // labels at the heights they describe (the eaten line alone would take three lines of it), so nothing here is placed by value. The number leads the card, whole; the cup's other labels are rows beside the cup, each with its key
-    // (the hatch for workouts, the calorie fill for eaten); the macros and water are rows under it. Every line
-    // wraps at its words.
+    // labels at the heights they describe (the eaten line alone would take three lines of it), so nothing here is placed
+    // by value. The number leads the card, whole; the cup's other labels are rows beside a smaller cup, as tall as they
+    // are (`LARGE_CUP`), each with its key (the hatch for workouts, the calorie fill for eaten); the macros and water are
+    // rows under it. Every line wraps at its words.
     const remaining = notLogged ? (
       <PressableScale
         testID="today-not-logged"
@@ -438,15 +449,17 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
     ) : (
       bigControl(true, { minHeight: 44, maxWidth: '100%' })
     );
+    // The cup is as tall as the rows beside it, never under its least height (an empty day's cup has no rows).
+    const largeCupH = Math.max(LARGE_CUP.least, rowsH);
     return (
       <Card testID="today-energy" padding={narrow ? NARROW.padding : 16}>
         {remaining}
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: narrow ? 14 : 16, marginTop: spacing.md }}>
           <View>
-            <Vessel value={eaten} max={budget} headroom={headroom} color={colors.calories} width={vesselW} height={height} memoryKey={`hero-${day.date}`} />
-            {firstDay && headroom === 0 ? <ReadyRim width={vesselW} /> : null}
+            <Vessel value={eaten} max={budget} headroom={headroom} color={colors.calories} width={LARGE_CUP.width} height={largeCupH} memoryKey={`hero-${day.date}`} />
+            {firstDay && headroom === 0 ? <ReadyRim width={LARGE_CUP.width} /> : null}
           </View>
-          <View style={{ flex: 1, minWidth: 0, gap: spacing.md }}>
+          <View onLayout={(e) => setRowsH(Math.ceil(e.nativeEvent.layout.height))} style={{ flex: 1, minWidth: 0, gap: spacing.md }}>
             {headroom > 0 ? (
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
                 <CupKey color={colors.headroom} variant="hatched" size={11} style={{ marginTop: 8 }} />
@@ -610,11 +623,13 @@ const sentence = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 function MealsSection({ day, nowMeal, cardRepeat }: { day: DaySummary; nowMeal: MealType | null; cardRepeat: MealType | null }) {
   const { colors, spacing } = useTheme();
   const all = useLive('foodEntries');
-  // Very large text (150% and up): a meal's name and its calories wrap as two lines when both do not fit, and "Repeat"
-  // goes on a row of its own under the meal, so the caption keeps the room it needs and never splits a word. Through the
-  // phone's common steps the rows keep their shape with larger text: the caption takes its lines rather than be cut.
+  // Very large text (150% and up): "Repeat" goes on a row of its own under the meal, so the caption keeps the room it
+  // needs and never splits a word. With text grown at all, a meal's name and its calories wrap as two lines where both do
+  // not fit (never "Lun…"), and the caption takes its lines rather than be cut; through the phone's common steps the
+  // rows keep their shape otherwise.
   const large = useVeryLargeText();
   const grown = useGrownText();
+  const wrapName = large || grown;
   const open = (meal: MealType) => router.push(`/food/search?meal=${meal}&date=${day.date}`);
   const web = Platform.OS === 'web';
   return (
@@ -665,10 +680,10 @@ function MealsSection({ day, nowMeal, cardRepeat }: { day: DaySummary; nowMeal: 
                   // What the row shows, as drawn and in its order (WCAG 2.5.3, label in name), then what it leaves out.
                   accessibilityLabel={`${m.label}${isNow ? `, ${NOW_WORDS.now}` : ''}, ${entries.length ? `${line.approx ? '~' : ''}${formatNumber(line.kcal)} kcal, ${caption}` : `${caption}, not logged yet`}`}
                   style={{ flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' }}>
-                  <View style={large ? { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', columnGap: spacing.sm } : { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm }}>
+                  <View style={wrapName ? { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', columnGap: spacing.sm } : { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm }}>
                     {/* 2 px under the name, so the caption keeps 6 px from the "Now" tag's box. */}
-                    <View style={large ? { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 2 } : { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 2 }}>
-                      <Text variant="title" style={{ flexShrink: 1 }} numberOfLines={large ? undefined : 1}>
+                    <View style={wrapName ? { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 2 } : { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 2 }}>
+                      <Text variant="title" style={{ flexShrink: 1 }} numberOfLines={wrapName ? undefined : 1}>
                         {m.label}
                       </Text>
                       {/* The meal the Now card is about: a small label, never a colour alone. */}

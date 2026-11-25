@@ -3,6 +3,9 @@ import { Activity, ChevronRight, Droplets, Plus, Repeat2, Scale, ScanBarcode, Se
 import React, { useEffect, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import { fitsRoom } from '@/features/today/fit';
+import { MeasureWidth } from '@/features/today/MeasureWidth';
+
 import { AiGlyph, SourceMark, sourceMarkTop, type AiGlyphName } from '@/features/ai/mark';
 import { hasFoodLogged } from '@/features/drinks/via';
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
@@ -26,9 +29,9 @@ import { formatNumber, formatVolume } from '@/lib/units';
 import { useStore } from '@/store';
 import { useNow, useToday } from '@/store/clock';
 import { computeDayFromStore, live, useDay, useLive, useProfile } from '@/store/selectors';
-import { cup, useLargeText, useTheme } from '@/theme';
+import { cup, useTheme, useVeryLargeText } from '@/theme';
 import type { Food, FoodEntry, ISODate, SavedMeal } from '@/types';
-import { Button, CupKey, PressableScale, Sheet, Text, toastToScreen } from '@/ui';
+import { Button, CupKey, PressableScale, Sheet, Text, toastToScreen, useGrownText } from '@/ui';
 
 /** Re-log a usual food in its last portion. Entries with a food definition go through logFood so recents stay fresh. */
 function logUsual(u: UsualFood, date: ISODate) {
@@ -141,11 +144,16 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   // Under 360 px the ways in are a quarter of 280 px: their icons are a step smaller, so a word keeps one line.
   const { width: winW } = useWindowDimensions();
   const narrow = winW < 360;
-  // Large text (Profile's text size, or the phone's): every way in is a whole row with its hint, and the likely next
-  // log leads the body, which scrolls, so no word is split and nothing is cut by the bottom of the screen. A window
-  // too short for the sheet (`SHORT_WINDOW`: a phone held sideways, a browser zoomed to 400%) is scrolled whole by
-  // the kit's sheet itself (WCAG 1.4.10).
-  const big = useLargeText();
+  // Very large text (150% and up, Profile's text size or the phone's, `VERY_LARGE_TEXT`): every way in is a whole row
+  // with its hint, and the likely next log leads the body, which scrolls, so no word is split and nothing is cut by the
+  // bottom of the screen. Through the phone's common steps the sheet keeps its shape with larger text: the four ways in
+  // stay four small tiles in a row while their words, measured as drawn, fit a tile, else two a row (`waysTwoUp`). A
+  // window too short for the sheet (`SHORT_WINDOW`: a phone held sideways, a browser zoomed to 400%) is scrolled whole
+  // by the kit's sheet itself (WCAG 1.4.10).
+  const big = useVeryLargeText();
+  const grown = useGrownText();
+  const [waysW, setWaysW] = useState(0);
+  const [wayWordW, setWayWordW] = useState(0);
   const glasses = [...presets]
     .filter((p) => p > 0)
     .sort((a, b) => a - b)
@@ -426,28 +434,70 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
     </View>
   );
 
-  // The four small ways in: an icon over one word, the AI's two with its tag. Each is a quarter of the row.
+  // The four small ways in: an icon over one word, the AI's two with its tag. Each is a quarter of the row. With text grown
+  // the AI's tag sits beside its glyph rather than in the tile's corner (a grown tag would run into the glyph), and where
+  // the longest word, measured as drawn, is wider than a quarter less its padding and edges the tiles go two a row, each
+  // its icon beside its word, so the row grows by one short line only.
+  const waysTwoUp = grown && !fitsRoom(wayWordW, waysW ? (waysW - 3 * spacing.sm) / 4 - 2 * WAY_PAD - 2 : 0);
   const waysRow = (
-    <View style={{ flexDirection: 'row', gap: spacing.sm }} testID="quick-ways">
-      {(['photo', 'describe', 'activity', 'weight'] as const).map((id) => (
-        <PressableScale
-          key={id}
-          testID={`quick-${id}`}
-          onPress={() => go(ways[id].href)}
-          // The drawn word first (label in name), then what the hint said before it was left off the screen.
-          accessibilityLabel={QUICK_WAYS[id].spoken}
-          scaleTo={0.96}
-          style={[tile, { flex: 1, minWidth: 0, minHeight: narrow ? 56 : 64, alignItems: 'center', justifyContent: 'center', gap: 4, paddingTop: narrow ? 8 : 10, paddingBottom: narrow ? 6 : 8, paddingHorizontal: 2 }]}>
-          {wayIcon(id, narrow ? 20 : 22)}
-          {/* Two lines at most: one word per line under wider text spacing (WCAG 1.4.12), never cut. */}
-          <Text variant="label" align="center" numberOfLines={2}>
-            {QUICK_WAYS[id].label}
-          </Text>
-          {/* After the word in the page's order, so the tile's text reads "Photo AI", as its name does ("Photo, AI
-              estimate"; label in name); drawn in the top corner all the same (absolute). */}
-          {ways[id].glyph ? <AiTag narrow={narrow} /> : null}
-        </PressableScale>
-      ))}
+    <View
+      onLayout={grown ? (e) => setWaysW(Math.floor(e.nativeEvent.layout.width)) : undefined}
+      style={waysTwoUp ? { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm } : { flexDirection: 'row', gap: spacing.sm }}
+      testID="quick-ways">
+      {grown ? (
+        <MeasureWidth onWidth={setWayWordW}>
+          <View style={{ alignItems: 'flex-start' }}>
+            {(['photo', 'describe', 'activity', 'weight'] as const).map((id) => (
+              <Text key={id} variant="label">
+                {QUICK_WAYS[id].label}
+              </Text>
+            ))}
+          </View>
+        </MeasureWidth>
+      ) : null}
+      {(['photo', 'describe', 'activity', 'weight'] as const).map((id) =>
+        waysTwoUp ? (
+          // Two a row: the icon, the word and the AI's tag on one line.
+          <PressableScale
+            key={id}
+            testID={`quick-${id}`}
+            onPress={() => go(ways[id].href)}
+            accessibilityLabel={QUICK_WAYS[id].spoken}
+            scaleTo={0.96}
+            style={[tile, { flexGrow: 1, flexBasis: '40%', minWidth: 0, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: 6, paddingHorizontal: spacing.sm }]}>
+            {wayIcon(id, narrow ? 20 : 22)}
+            <Text variant="label" numberOfLines={2} style={{ flexShrink: 1 }}>
+              {QUICK_WAYS[id].label}
+            </Text>
+            {ways[id].glyph ? <AiTag narrow={narrow} inline /> : null}
+          </PressableScale>
+        ) : (
+          <PressableScale
+            key={id}
+            testID={`quick-${id}`}
+            onPress={() => go(ways[id].href)}
+            // The drawn word first (label in name), then what the hint said before it was left off the screen.
+            accessibilityLabel={QUICK_WAYS[id].spoken}
+            scaleTo={0.96}
+            style={[tile, { flex: 1, minWidth: 0, minHeight: narrow ? 56 : 64, alignItems: 'center', justifyContent: 'center', gap: 4, paddingTop: narrow ? 8 : 10, paddingBottom: narrow ? 6 : 8, paddingHorizontal: WAY_PAD }]}>
+            {grown && ways[id].glyph ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                {wayIcon(id, narrow ? 20 : 22)}
+                <AiTag narrow={narrow} inline />
+              </View>
+            ) : (
+              wayIcon(id, narrow ? 20 : 22)
+            )}
+            {/* Two lines at most: one word per line under wider text spacing (WCAG 1.4.12), never cut. */}
+            <Text variant="label" align="center" numberOfLines={2}>
+              {QUICK_WAYS[id].label}
+            </Text>
+            {/* After the word in the page's order, so the tile's text reads "Photo AI", as its name does ("Photo, AI
+                estimate"; label in name); drawn in the top corner all the same (absolute). */}
+            {!grown && ways[id].glyph ? <AiTag narrow={narrow} /> : null}
+          </PressableScale>
+        ),
+      )}
     </View>
   );
 
@@ -499,6 +549,9 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   );
 }
 
+/** A way-in tile's side padding: its word has the quarter of the row less this on each side and its 1 px edges. */
+const WAY_PAD = 2;
+
 /**
  * The line under the title: the day and what is left of its budget ("Today · 941 kcal left"), in food search's
  * header words, passed as the sheet's `subtitle`. Its own component, so the day is worked out only while the sheet
@@ -517,7 +570,7 @@ function DayLine({ date, today }: { date: ISODate; today: ISODate }) {
  * The small "AI" tag at a way in's top right corner, beside the AI's glyph (the accent ink on its soft fill). Under
  * 360 px it hugs the corner, so it stays clear of the glyph in a quarter of 280 px.
  */
-function AiTag({ narrow }: { narrow: boolean }) {
+function AiTag({ narrow, inline = false }: { narrow: boolean; /** Beside the glyph or the word (text grown), not in the corner. */ inline?: boolean }) {
   const { colors, radius } = useTheme();
   return (
     <View
@@ -525,7 +578,10 @@ function AiTag({ narrow }: { narrow: boolean }) {
       importantForAccessibility="no-hide-descendants"
       accessibilityElementsHidden
       {...({ 'aria-hidden': true } as object)}
-      style={{ position: 'absolute', top: narrow ? 3 : 4, right: narrow ? 3 : 4, paddingHorizontal: narrow ? 2 : 4, paddingVertical: 1, borderRadius: radius.chip, backgroundColor: colors.primarySoft }}>
+      style={[
+        inline ? null : { position: 'absolute', top: narrow ? 3 : 4, right: narrow ? 3 : 4 },
+        { paddingHorizontal: narrow ? 2 : 4, paddingVertical: 1, borderRadius: radius.chip, backgroundColor: colors.primarySoft },
+      ]}>
       <Text variant="overline" color="primaryInk" style={{ letterSpacing: 0.4 }}>
         {AI_TAG}
       </Text>

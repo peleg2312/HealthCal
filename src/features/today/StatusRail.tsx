@@ -16,12 +16,14 @@ import { useFriends } from '@/services/friends';
 import { useStore } from '@/store';
 import { useNow } from '@/store/clock';
 import { live, useLive, useProfile, useWeightSeries, type DaySummary } from '@/store/selectors';
-import { isReducedMotion, motion, useLargeText, useTheme, useVeryLargeText } from '@/theme';
+import { isReducedMotion, motion, useTheme, useVeryLargeText } from '@/theme';
 import type { ISODate } from '@/types';
 import { AnimatedNumber, Button, Card, CupKey, haptic, PressableScale, ProgressBar, Text, toast, useGrownText } from '@/ui';
 
 import { cheersLabel, recentCheerCount } from './cheers';
+import { fitsRoom } from './fit';
 import { logPlainGlass } from './glass';
+import { MeasureWidth } from './MeasureWidth';
 import { crossesGoal, defaultGlass, volumeNumber, volumeUnitFor, waterOfGoal } from './volume';
 import { weightCell } from './weightCell';
 
@@ -173,22 +175,31 @@ export function WaterRow({ day, isToday, quiet = false }: { day: DaySummary; isT
 
 /**
  * Activity, sleep and weight (or the running fast) in one card of their own, under Meals: three cells on one row
- * (stacked rows with large text), each opening its screen. The week's activity minutes are a goal to reach: past the
+ * (stacked rows with very large text, or with text grown wherever a cell's label or value, measured as drawn, is wider
+ * than its share of the row), each opening its screen. The week's activity minutes are a goal to reach: past the
  * guideline its bar wears the brim tick, never amber, and crossing it on screen adds one calm line at the card's foot.
  */
 export function PillarsCard({ day, isToday }: { day: DaySummary; isToday: boolean }) {
   const { colors, spacing } = useTheme();
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
-  // Large text (130% and up): the three cells stack as rows, so every label and value keeps its words whole.
-  const large = useLargeText();
+  // Very large text (150% and up), or text grown where a cell's label or value, measured as drawn, is wider than its share
+  // of the row: the three cells stack as rows, so every label keeps one line and every value its words whole. At the
+  // designed size, and through the phone's common steps where they fit, the three share one row and one baseline.
+  const veryLarge = useVeryLargeText();
+  const grown = useGrownText();
+  const [rowW, setRowW] = useState(0);
+  const [needs, setNeeds] = useState<Record<string, number>>({});
+  const need = (key: string) => (w: number) => {
+    if (needs[key] !== w) setNeeds((n) => ({ ...n, [key]: w }));
+  };
   const profile = useProfile();
   const units = profile.units;
   const sleep = useLive('sleep');
   const night = sleep.find((s) => s.date === day.date);
   // Last night in hours and minutes: the minutes under the hours in the narrow cell (see the sleep cell).
   const nightHm = night ? hoursParts(night.hours) : null;
-  const nightTwoLines = !large && nightHm !== null && nightHm.h > 0 && nightHm.m > 0;
+  const nightSplit = nightHm !== null && nightHm.h > 0 && nightHm.m > 0;
   const fasting = useLive('fasting');
   const fast = isToday ? fasting.find((f) => !f.end) : undefined;
   const series = useWeightSeries();
@@ -201,6 +212,16 @@ export function PillarsCard({ day, isToday }: { day: DaySummary; isToday: boolea
   const now = useNow();
   const cheers = isToday ? recentCheerCount(friendsStatus, friends, now.getTime()) : 0;
   const { note, reached } = useReachedNote(day.date);
+  // The three cells' shares of the row (their flex), as laid out: the row less its padding, the gaps and the two hairlines.
+  const pad = narrow ? spacing.md : spacing.lg;
+  const gap = narrow ? 8 : 12;
+  const flexes = { activity: narrow ? ACTIVITY_FLEX_NARROW : 1, sleep: narrow ? SLEEP_FLEX_NARROW : 0.8, last: narrow ? LAST_FLEX_NARROW : 1.2 };
+  const flexSum = flexes.activity + flexes.sleep + flexes.last;
+  const share = (k: keyof typeof flexes) => (rowW ? ((rowW - 2 * pad - 4 * gap - 2) * flexes[k]) / flexSum : 0);
+  const measuring = grown && !veryLarge;
+  const cellsFit = (['activity', 'sleep', 'last'] as const).every((k) => fitsRoom(needs[k], share(k)));
+  const large = veryLarge || (measuring && !cellsFit);
+  const nightTwoLines = !large && nightSplit;
 
   const dateQuery = isToday ? '' : `?date=${day.date}`;
   // With guideline minutes this week the cell is the week's: "Activity" over the week's minutes, the
@@ -227,7 +248,29 @@ export function PillarsCard({ day, isToday }: { day: DaySummary; isToday: boolea
 
   return (
     <Card testID="today-rail" padding={0}>
-      <View style={{ flexDirection: large ? 'column' : 'row', paddingHorizontal: narrow ? spacing.md : spacing.lg, paddingTop: 12, paddingBottom: 14, gap: narrow ? 8 : 12 }}>
+      <View
+        onLayout={measuring ? (e) => setRowW(Math.floor(e.nativeEvent.layout.width)) : undefined}
+        style={{ flexDirection: large ? 'column' : 'row', paddingHorizontal: pad, paddingTop: 12, paddingBottom: 14, gap }}>
+        {measuring ? (
+          // Each cell's label and value at their natural widths as drawn, to know whether the three share one row.
+          <>
+            <CellProbe label="Activity" value={week ? formatNumber(weekMinutes) : String(day.activeMinutes)} unit="min" narrow={narrow} onWidth={need('activity')} />
+            <CellProbe
+              label="Sleep"
+              value={night ? (nightSplit ? String(nightHm!.h) : hoursFigure(night.hours).value) : '0'}
+              unit={night && !nightSplit ? hoursFigure(night.hours).unit : 'h'}
+              narrow={narrow}
+              onWidth={need('sleep')}
+            />
+            <CellProbe
+              label={fast ? `Fast of ${fast.targetHours} h` : (weight?.label ?? 'Weight trend')}
+              value={fast ? '00:00' : weight ? weightValue(weight.kg, units).toFixed(1) : '0'}
+              unit={fast ? 'h' : weightUnit(units)}
+              narrow={narrow}
+              onWidth={need('last')}
+            />
+          </>
+        ) : null}
         <Cell
           testID="today-activity"
           narrow={narrow}
@@ -332,6 +375,22 @@ function KeyLabel({ color, label }: { color: string; label: string }) {
         {label}
       </Text>
     </View>
+  );
+}
+
+/** A cell's label and value drawn unseen at their natural widths (the wider is reported), for `PillarsCard`'s fit. */
+function CellProbe({ label, value, unit, narrow, onWidth }: { label: string; value: string; unit: string; narrow: boolean; onWidth: (w: number) => void }) {
+  const { colors } = useTheme();
+  return (
+    <MeasureWidth onWidth={onWidth}>
+      <View style={{ alignItems: 'flex-start' }}>
+        <KeyLabel color={colors.textSecondary} label={label} />
+        <Text variant="numM" style={narrow && value.length > 4 ? { fontSize: 17, lineHeight: 24 } : null}>
+          {value}
+          <Text variant="unit">{unit ? ` ${unit}` : ''}</Text>
+        </Text>
+      </View>
+    </MeasureWidth>
   );
 }
 

@@ -21,7 +21,7 @@ import { today } from '@/lib/dates';
 import { MEALS } from '@/lib/nutrition';
 import { useToday } from '@/store/clock';
 import { useDay, useLive } from '@/store/selectors';
-import { useLargeText, useTheme } from '@/theme';
+import { useTheme, useVeryLargeText } from '@/theme';
 import type { ISODate, MealType } from '@/types';
 import { Button, Screen } from '@/ui';
 
@@ -31,9 +31,11 @@ const MEAL_LOOKS = 20;
 
 export default function DiaryScreen() {
   const { colors, spacing } = useTheme();
-  // Under 360 px (at the designed text size) the summary's cups are smaller, so at 320 x 640 Lunch's add is in the first view.
+  // Under 360 px (up to very large text) the summary's cups are smaller, so at 320 x 640 Lunch's add is in the first view.
+  // Very large text (150% and up, `VERY_LARGE_TEXT`): the cards sit 16 apart and each part takes its large layout; through
+  // the phone's common steps the diary keeps its designed shape with larger text.
   const screenW = useWindowDimensions().width;
-  const big = useLargeText();
+  const big = useVeryLargeText();
   const narrow = screenW < 360 && !big;
   const params = useLocalSearchParams<{ date?: string; meal?: string }>();
   const t = useToday();
@@ -111,12 +113,12 @@ export default function DiaryScreen() {
   };
 
   return (
-    <Screen tabs testID="diary-screen" scrollProps={{ ref: scrollRef } as ScrollViewProps} header={<TabHeader tab="diary" overline={tabDay(date)} title="Food diary" />}>
-      {/* The diary shows more of the day: the strip and the cards sit 12 apart at the designed text size (16 with large
-          text), so at 360 x 740 Breakfast and Lunch are whole in the first view, and at 320 x 640 Lunch's add is in it. */}
+    <Screen tabs testID="diary-screen" scrollProps={{ ref: scrollRef } as ScrollViewProps} header={<TabHeader tab="diary" overline={tabDay(date)} overlineTight={tabDay(date, true)} title="Food diary" />}>
+      {/* The diary shows more of the day: the strip and the cards sit 12 apart (16 with very large text), so at 360 x 740
+          Breakfast and Lunch are whole in the first view, and at 320 x 640 Lunch's add is in it. */}
       <View testID="diary-swipe" {...swipe} style={{ gap: big ? spacing.lg : spacing.md }}>
-      {/* The one date control, drawn slim (small cups; the full strip with large text, where the dates need their room):
-          the header's overline names the day, the strip picks one. */}
+      {/* The one date control, drawn slim (small cups) at every text size: the header's overline names the day, the strip
+          picks one. */}
       <DayRingStrip today={t} selected={date} onSelect={setDate} testIDPrefix="diary" latest={latest} jumpTestID="diary-today" slim />
 
       {/* A day with nothing logged has no panel of its own: each meal's dashed slot is its add (the first one says what

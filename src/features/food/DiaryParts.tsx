@@ -13,9 +13,9 @@ import { MEAL_LABEL, entriesTotal } from '@/lib/nutrition';
 import { useToday } from '@/store/clock';
 import type { DaySummary } from '@/store/selectors';
 import { favoriteRecordId, useStore } from '@/store';
-import { cup, fonts, useLargeText, useTheme } from '@/theme';
+import { cup, fonts, useTheme, useVeryLargeText } from '@/theme';
 import type { FoodEntry, ISODate, MealType, WaterEntry } from '@/types';
-import { ANDROID_TOUCH, AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, figure, IconButton, ListRow, PressableScale, ProgressBar, RestoreRow, Sheet, Text, Trough } from '@/ui';
+import { ANDROID_TOUCH, AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, figure, IconButton, ListRow, PressableScale, ProgressBar, RestoreRow, Sheet, Text, Trough, useGrownText } from '@/ui';
 import { spokenUnits } from '@/lib/spokenUnits';
 
 import { clearEntries, copyEntries } from './actions';
@@ -48,8 +48,12 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; /** Th
   const { colors, spacing } = useTheme();
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
-  // With large text the three macros wrap (each at least 120 wide), so a name or "/ 152 g" is never split.
-  const big = useLargeText();
+  // With very large text (150% and up) the card pads more and the three macros wrap (each at least 120 wide), so a name or
+  // "/ 152 g" is never split. Through the phone's common steps the card keeps its shape with larger text, and the macros
+  // stay side by side where they fit as drawn: each takes the width its words need and they wrap only where three do not
+  // fit the row (`grown`).
+  const big = useVeryLargeText();
+  const grown = useGrownText();
   const [open, setOpenState] = useState(summaryOpen);
   const setOpen = (v: boolean) => {
     summaryOpen = v;
@@ -152,7 +156,7 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; /** Th
             ) : null}
           </View>
           <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
-          <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', columnGap: narrow ? spacing.md : spacing.lg, rowGap: spacing.md }}>
+          <View style={{ flexDirection: 'row', flexWrap: big || grown ? 'wrap' : 'nowrap', columnGap: narrow ? spacing.md : spacing.lg, rowGap: spacing.md }}>
             {(
               [
                 ['Protein', day.eaten.protein, day.macros.proteinG, colors.protein, 'reach'],
@@ -160,7 +164,10 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; /** Th
                 ['Fat', day.eaten.fat, day.macros.fatG, colors.fat, 'limit'],
               ] as const
             ).map(([label, value, target, color, goalKind]) => (
-              <View key={label} style={[big ? { flexGrow: 1, flexBasis: 120 } : { flex: 1 }, { minWidth: 0, gap: 8 }]} {...figure(`${label}, ${Math.round(value)} of ${target} grams`)}>
+              <View
+                key={label}
+                style={[big ? { flexGrow: 1, flexBasis: 120 } : grown ? { flexGrow: 1, flexShrink: 1, flexBasis: 'auto' } : { flex: 1 }, { minWidth: 0, gap: 8 }]}
+                {...figure(`${label}, ${Math.round(value)} of ${target} grams`)}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <CupKey color={color} />
                   <Text variant="label" numberOfLines={1}>
@@ -213,8 +220,9 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
   const { width } = useWindowDimensions();
   // On a narrow phone the name and the portion may take two lines rather than be cut.
   const narrow = width < 360;
-  // With large text the calories take a line of their own under the portion, so neither is squeezed.
-  const big = useLargeText();
+  // With very large text (150% and up) the calories take a line of their own under the portion, so neither is squeezed.
+  // Through the phone's common steps the row keeps its shape: the name and the portion take their lines beside the calories.
+  const big = useVeryLargeText();
   // Any entry that carries a range is an estimate, whatever food it was matched to afterwards.
   const ai = !!entry.kcalRange;
   // A bundled food with no record reads "Typical" (its values are an estimate), never as reference data.
@@ -394,8 +402,9 @@ export function MealCard({
   // One add per meal: an empty meal's add is its dashed slot (`meal-add-<meal>`), with no "+" cup and no "..." in its
   // header (the menu's one action for an empty meal, copying the last one, is the Repeat under the slot).
   const filled = rows.length > 0;
-  // With large text the meal's name keeps its whole word: the "..." and "+" cups go under it when both do not fit.
-  const big = useLargeText();
+  // With very large text (150% and up) the meal's name keeps its whole word: the "..." and "+" cups go under it when both
+  // do not fit. Through the phone's common steps the header keeps its shape, its total going under the name where it must.
+  const big = useVeryLargeText();
   // At the designed text size a filled meal is tight (10 px above its header, 36 px cups that still take 44 px of touch,
   // its macros under its name, a hairline and then its rows), so at 360 x 740 Breakfast and Lunch are whole in the first
   // view and at 320 x 640 Lunch's add is in it. Each cup's touch reaches 4 px past it (the kit's hitSlop), so the two
@@ -533,8 +542,8 @@ function RepeatRow({ meal, label, previous, onRepeat }: { meal: MealType; label:
   // Each name up to its first comma outside brackets: "Israeli salad (tomato, cucumber, ...)" is never cut to "Israeli salad (tomato".
   const foods = previous.entries.map((e) => foodNameHead(displayFoodName(e))).filter(Boolean);
   const total = kcal(currentKcal(previous.entries));
-  // With large text the caption has the card's width and Repeat goes under it, so no word is split.
-  const big = useLargeText();
+  // With very large text (150% and up) the caption has the card's width and Repeat goes under it, so no word is split.
+  const big = useVeryLargeText();
   return (
     <View testID={`meal-repeat-row-${meal}`} style={{ flexDirection: big ? 'column' : 'row', alignItems: big ? 'flex-start' : 'center', gap: big ? spacing.sm : spacing.md }}>
       <Text variant="caption" color="textSecondary" numberOfLines={3} style={big ? { alignSelf: 'stretch' } : { flex: 1, minWidth: 0 }}>
