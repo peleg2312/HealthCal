@@ -1,8 +1,9 @@
 /**
  * "Share my week" (`buildCoachNote`): every line from a worked store, the never-list proved by
  * planting a name, an email, a body weight, a note, a device title, a food name, a time of day and a
- * heart rate and finding none of them in the text, the 900 cap, and the iPhone rule with and without
- * records from Apple Health, its constant held to app.json's sentence.
+ * heart rate and finding none of them in the text, the 900 cap, the iPhone rule with and without
+ * records from Apple Health, its constant held to app.json's sentence, and friends' meals, which never
+ * reach it (neither the store nor note.ts's imports hold anything from friends).
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -12,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 import { addDays } from '@/lib/dates';
 import { macroTargets } from '@/lib/energy';
 import { trainingOverview } from '@/lib/trainingLoad';
-import type { ActivityEntry, FoodEntry, Profile, SleepEntry, WaterEntry, WeightEntry } from '@/types';
+import type { ActivityEntry, FeedMeal, FoodEntry, MySharedMeal, Profile, SleepEntry, WaterEntry, WeightEntry } from '@/types';
 
 import { APPLE_HEALTH_LEFT_OUT, APPLE_HEALTH_PROMISE, buildCoachNote, coachNote, NOTE_MAX, type NoteState } from './note';
 
@@ -189,6 +190,64 @@ describe('the note from a worked store', () => {
 
   it('buildCoachNote is the text', () => {
     expect(buildCoachNote(worked(), TODAY, 'android')).toBe(note.text);
+  });
+});
+
+// The never-list's last item: friends' meals. Friends live on the server and in the friends store (`useFriends`),
+// never in the app's store, so the note cannot read them: a friend's meal in the feed and a meal the person shows
+// change nothing when they sit beside the store, and the note's code reaches no friends code at all.
+describe("friends' meals", () => {
+  const theirs: FeedMeal = {
+    kind: 'meal',
+    ref: 'a'.repeat(32),
+    day: TODAY,
+    meal: 'dinner',
+    showKcal: true,
+    items: [{ name: 'Marjoram Tahini Dressing', emoji: '🥗', portion: '2 tbsp · 30 g', source: 'custom', kcal: 777 }],
+    cheered: true,
+    userId: 'friend-1',
+    displayName: 'Ottoline Brackenbury',
+    avatar: 'OB',
+  };
+  const mine: MySharedMeal = {
+    ref: 'b'.repeat(32),
+    day: TODAY,
+    meal: 'lunch',
+    showKcal: false,
+    items: [{ name: 'Secret Pickle Soup', portion: '1 bowl', source: 'custom' }],
+    shownAt: '2026-11-23T12:40:00Z',
+    expiresAt: '2026-11-30T12:40:00Z',
+    viewers: [{ userId: 'friend-2', displayName: 'Peregrine Throckmorton', avatar: 'PT' }],
+    cheers: 3,
+  };
+
+  it('a friend’s meal and a meal shown to friends, held beside the store, change nothing and are found nowhere', () => {
+    const plain = coachNote(worked(), TODAY, 'android');
+    const withFriends = { ...worked(), friends: { feed: [theirs], myMeals: [mine], friends: [{ userId: 'friend-1', displayName: 'Ottoline Brackenbury', avatar: 'OB' }] } } as NoteState;
+    const both = coachNote(withFriends, TODAY, 'android');
+    expect(both.text).toBe(plain.text);
+    for (const planted of ['Ottoline', 'Brackenbury', 'Peregrine', 'Throckmorton', 'Marjoram', 'Tahini', 'Dressing', '777', 'friend', 'shown', 'cheer'])
+      expect(both.text.toLowerCase(), planted).not.toContain(planted.toLowerCase());
+    expect(buildCoachNote(withFriends, TODAY, 'ios')).toBe(coachNote(worked(), TODAY, 'ios').text);
+  });
+
+  it('note.ts reaches no friends code, directly or through its imports (the code map)', () => {
+    const map = new Map<string, string[]>();
+    for (const line of readFileSync(join(__dirname, '../../../docs/code-map/imports.tsv'), 'utf8').split('\n')) {
+      const [file, ...deps] = line.split('\t');
+      if (file) map.set(file, deps.filter(Boolean));
+    }
+    expect(map.get('src/features/coach/note.ts')?.length).toBeGreaterThan(0);
+    const seen = new Set<string>();
+    const todo = ['src/features/coach/note.ts'];
+    while (todo.length) {
+      const f = todo.pop()!;
+      if (seen.has(f)) continue;
+      seen.add(f);
+      todo.push(...(map.get(f) ?? []));
+    }
+    const friendsCode = [...seen].filter((f) => f.startsWith('src/features/friends/') || /^src\/services\/friends/.test(f));
+    expect(friendsCode).toEqual([]);
   });
 });
 

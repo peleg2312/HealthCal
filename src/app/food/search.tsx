@@ -12,7 +12,7 @@ import { foodNameHead } from '@/features/food/addedTo';
 import { FoodRow, MealPicker } from '@/features/food/components';
 import { displayFoodName } from '@/features/food/displayName';
 import { setFoodDraft } from '@/features/food/draft';
-import { amountLabel, href, kcal, lastPortions, matchServing, parseDate, parseMeal, portionFor, portionKcal, portionLabel, sourceInfo, sourceKindOf, stepAmount } from '@/features/food/helpers';
+import { amountLabel, href, kcal, lastPortions, matchServing, param, parseDate, parseMeal, portionFor, portionKcal, portionLabel, sourceInfo, sourceKindOf, stepAmount } from '@/features/food/helpers';
 import { deleteEntry, logFood, logSavedMeal, setEntryAmount } from '@/features/food/log';
 import { useOneTap } from '@/features/food/oneTap';
 import { FavoriteStar } from '@/features/food/FavoriteStar';
@@ -48,11 +48,19 @@ export default function FoodSearchScreen() {
   const narrow = useWindowDimensions().width < 360;
   const big = useLargeText();
   const grown = useGrownText();
-  const params = useLocalSearchParams<{ meal?: string; date?: string; tab?: string }>();
+  const params = useLocalSearchParams<{ meal?: string; date?: string; tab?: string; q?: string }>();
   const todayDate = useToday();
   const date = parseDate(params.date, todayDate);
   const [meal, setMeal] = useState<MealType>(() => parseMeal(params.meal));
-  const [query, setQuery] = useState('');
+  // `?q=` (a friend's meal's "Find" opens search with the food's name): the field's first words, read once when the
+  // screen opens and searched as if typed; never written anywhere (not remembered, not in the title). The caret starts
+  // after them, as the describe screen's words do; the person's own taps and typing move it from then on.
+  const [query, setQuery] = useState(() => (param(params.q) ?? '').trim());
+  const [caret, setCaret] = useState<number | null>(() => query.length || null);
+  const typeQuery = (text: string) => {
+    setCaret(null);
+    setQuery(text);
+  };
   // null until the user picks a tab: then the tab the address asks for (`?tab=`, the + sheet's "See all N": this visit
   // only, never remembered), else the tab chosen last on this device, else Usual when there is history for this meal
   // (`openingTab`). A tap is remembered on the device (`healthcal.searchTab`).
@@ -206,6 +214,7 @@ export default function FoodSearchScreen() {
   const focusSearchWords = () => {
     const node = inputRef.current as unknown as { focus?: () => void; select?: () => void; setSelection?: (start: number, end: number) => void } | null;
     if (!node) return;
+    setCaret(null);
     node.focus?.();
     if (typeof node.select === 'function') node.select();
     else node.setSelection?.(0, query.length);
@@ -298,7 +307,10 @@ export default function FoodSearchScreen() {
         // a reader's own text spacing included (`useGrownText`, WCAG 1.4.12), where the longer ones are cut mid-word.
         placeholder={big || grown ? 'Search foods' : narrow ? 'Search foods and brands' : 'Search foods, brands, your foods'}
         value={query}
-        onChangeText={setQuery}
+        onChangeText={typeQuery}
+        // Placed once, after the words `?q=` brought; released as soon as it is there.
+        selection={caret !== null ? { start: caret, end: caret } : undefined}
+        onSelectionChange={caret !== null ? (e) => e.nativeEvent.selection.start === caret && setCaret(null) : undefined}
         onFocus={() => {
           fieldFocus.current = { focused: true, blurredAt: 0 };
         }}
@@ -313,7 +325,7 @@ export default function FoodSearchScreen() {
         left={<Search size={18} color={colors.textTertiary} />}
         right={
           query ? (
-            <IconButton testID="food-search-clear" accessibilityLabel="Clear search" tone="clear" size={32} onPress={() => setQuery('')}>
+            <IconButton testID="food-search-clear" accessibilityLabel="Clear search" tone="clear" size={32} onPress={() => typeQuery('')}>
               <X size={16} color={colors.textSecondary} />
             </IconButton>
           ) : null

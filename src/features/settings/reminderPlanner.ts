@@ -435,17 +435,15 @@ export interface PlannerFast {
  * stored reminders, so an older copy of the app keeps the field.
  */
 export const FAST_GOAL_DEFAULT = true;
-type WithFastGoal = ReminderSettings & { fastGoal?: boolean };
 
 export function fastGoalOn(r: ReminderSettings): boolean {
-  const v = (r as WithFastGoal).fastGoal;
+  const v = r.fastGoal;
   return typeof v === 'boolean' ? v : FAST_GOAL_DEFAULT;
 }
 
 /** The `setReminders` patch that turns the fast's goal notification on or off. */
 export function fastGoalPatch(on: boolean): Partial<ReminderSettings> {
-  const patch: Partial<WithFastGoal> = { fastGoal: on };
-  return patch;
+  return { fastGoal: on };
 }
 
 /** The fast running now: the latest started of the fasts with no end (`fasts` are live records). */

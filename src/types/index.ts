@@ -390,6 +390,11 @@ export interface ReminderSettings {
   dailySummary: { enabled: boolean; time: string };
   weighIn: { enabled: boolean; time: string; weekdays: number[] };
   movement: { enabled: boolean; time: string };
+  /**
+   * The notification when a running fast reaches its goal. Absent means on (`FAST_GOAL_DEFAULT`); read only
+   * with `fastGoalOn` and written only with `fastGoalPatch` (src/features/settings/reminderPlanner.ts).
+   */
+  fastGoal?: boolean;
 }
 
 export interface Settings {

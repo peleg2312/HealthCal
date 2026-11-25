@@ -14,7 +14,7 @@ import { useStore } from '@/store';
 import { live } from '@/store/selectors';
 import type { FeedItem, ISODate, MealSettings, MealType, MySharedMeal, SharedMealItem } from '@/types';
 
-import { cleanMealSettings, cleanSharedMealItems, DEFAULT_MEAL_SETTINGS, mealCheerRef, mealItemsSignature, toFeed, toMyMeals } from './friendsWire';
+import { cleanMealSettings, cleanSharedMealItems, DEFAULT_MEAL_SETTINGS, mealCheerRef, mealItemsSignature, toFeed, toMyMeals, workoutFeedOf } from './friendsWire';
 import { isBackendConfigured, supabase } from './supabase';
 import { useSyncState } from './sync';
 
@@ -90,6 +90,12 @@ export interface FriendsOverview {
   feed?: FeedItem[];
   /** My meals showing now, newest first. Always filled by `toOverview`. */
   myMeals?: MySharedMeal[];
+  /**
+   * False while the server has no meals (20261201000000_friends_meals.sql not applied yet: its overview sends no
+   * `feed`): every meal control hides, Friends settings says meals are not here yet, the feed holds friends'
+   * workouts made on the phone, and no meal call reaches the server. Absent (a hand-built overview) reads as true.
+   */
+  mealsAvailable?: boolean;
 }
 
 /**
@@ -143,6 +149,17 @@ export function toOverview(raw: unknown): FriendsOverview {
   const o = (raw && typeof raw === 'object' ? raw : {}) as Json;
   const me = o.me && typeof o.me === 'object' ? (o.me as Json) : null;
   const person = (p: Json) => ({ userId: str(p.user_id), displayName: str(p.display_name), avatar: str(p.avatar) });
+  // A server with meals always sends a feed (an empty list at least); one without them sends no such key.
+  const mealsAvailable = Array.isArray(o.feed);
+  const friends = list(o.friends).map((f) => ({
+    ...person(f),
+    since: typeof f.since === 'string' ? f.since : null,
+    summary: cleanFriendSummary(f.summary),
+    summaryUpdatedAt: typeof f.summary_updated_at === 'string' ? f.summary_updated_at : null,
+    cheered: Array.isArray(f.cheered) ? f.cheered.filter((r): r is string => typeof r === 'string') : [],
+    shareMeals: f.share_meals !== false,
+    seeMeals: f.see_meals !== false,
+  }));
   return {
     me: me
       ? {
@@ -152,24 +169,17 @@ export function toOverview(raw: unknown): FriendsOverview {
           sharing: toSharing(me.sharing),
           shareKey: str(me.share_key),
           mealSettings: cleanMealSettings(me.meal_settings),
-          mealsAllowed: me.meals_allowed === true,
+          mealsAllowed: mealsAvailable && me.meals_allowed === true,
           audience: Array.isArray(me.audience) ? me.audience.filter((id): id is string => typeof id === 'string') : [],
         }
       : null,
-    friends: list(o.friends).map((f) => ({
-      ...person(f),
-      since: typeof f.since === 'string' ? f.since : null,
-      summary: cleanFriendSummary(f.summary),
-      summaryUpdatedAt: typeof f.summary_updated_at === 'string' ? f.summary_updated_at : null,
-      cheered: Array.isArray(f.cheered) ? f.cheered.filter((r): r is string => typeof r === 'string') : [],
-      shareMeals: f.share_meals !== false,
-      seeMeals: f.see_meals !== false,
-    })),
+    friends,
     incoming: list(o.incoming).map((r) => ({ ...person(r), createdAt: str(r.created_at) })),
     outgoing: list(o.outgoing).map((r) => ({ ...person(r), createdAt: str(r.created_at) })),
     cheers: list(o.cheers).map((c) => ({ fromUserId: str(c.from_user), displayName: str(c.display_name), avatar: str(c.avatar), ref: str(c.ref), createdAt: str(c.created_at) })),
-    feed: toFeed(o.feed),
-    myMeals: toMyMeals(o.my_meals),
+    feed: mealsAvailable ? toFeed(o.feed) : workoutFeedOf(friends),
+    myMeals: mealsAvailable ? toMyMeals(o.my_meals) : [],
+    mealsAvailable,
   };
 }
 

@@ -158,6 +158,46 @@ export function toFeed(raw: unknown): FeedItem[] {
   return out;
 }
 
+/** A friend as `toOverview` holds them, with only what `workoutFeedOf` reads. */
+export interface FeedFriend extends FriendPerson {
+  /** References this user already cheered. */
+  cheered: readonly string[];
+  summary: { workouts?: readonly { id: string; name: string; emoji: string; minutes: number; date: string; distanceKm?: number }[] };
+}
+
+/**
+ * The feed's workouts made on the phone from friends' shared weeks, for a server that sends no feed (before
+ * 20261201000000_friends_meals.sql is applied; the overview then has no `feed` key): the same items the server's
+ * feed would hold for them, in its order (the day, newest first, then the place in the friend's list, then the
+ * name and the reference), at most 100. The 7 days are the phone's own, as for the server's feed (`localFeed`).
+ */
+export function workoutFeedOf(friends: readonly FeedFriend[]): FeedWorkout[] {
+  const rows: { item: FeedWorkout; seq: number; name: string }[] = [];
+  for (const f of friends) {
+    if (!f.userId) continue;
+    (f.summary.workouts ?? []).forEach((w, i) => {
+      if (!isRef(w.id) || !isCalendarDay(w.date) || !isNumber(w.minutes) || w.minutes < 0) return;
+      const item: FeedWorkout = {
+        kind: 'workout',
+        userId: f.userId,
+        displayName: f.displayName,
+        avatar: f.avatar,
+        ref: w.id,
+        day: w.date,
+        name: w.name.trim() || 'Workout',
+        emoji: w.emoji,
+        minutes: w.minutes,
+        cheered: f.cheered.includes(w.id),
+        ...(isNumber(w.distanceKm) && w.distanceKm > 0 ? { distanceKm: w.distanceKm } : null),
+      };
+      rows.push({ item, seq: i, name: f.displayName.toLowerCase() });
+    });
+  }
+  const text = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  rows.sort((a, b) => text(b.item.day, a.item.day) || a.seq - b.seq || text(a.name, b.name) || text(a.item.ref, b.item.ref));
+  return rows.slice(0, 100).map((r) => r.item);
+}
+
 /** The user's own meals showing now (friends_overview -> my_meals), newest first. */
 export function toMyMeals(raw: unknown): MySharedMeal[] {
   if (!Array.isArray(raw)) return [];
