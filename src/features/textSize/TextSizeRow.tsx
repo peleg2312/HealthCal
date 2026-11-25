@@ -5,7 +5,7 @@
  */
 import { Minus, Plus, Type } from 'lucide-react-native';
 import React from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 
 import { IconTile } from '@/features/settings/components';
 import { setTextSize, TEXT_SIZES, textSizeLabel, useTextSize, useTheme } from '@/theme';
@@ -55,6 +55,8 @@ export function TextSizeRow() {
           accessibilityLabel={textSizeSpoken(size)}
           accessibilityLiveRegion="polite"
           aria-live="polite"
+          // On the web a name is read only on an element with a role: a status, whose changes are announced politely.
+          {...(Platform.OS === 'web' ? ({ role: 'status' } as object) : null)}
           style={{ flex: 1 }}>
           {textSizeLabel(size)}
         </Text>

@@ -571,7 +571,10 @@ export function Sheet({
         // Web: rests on a phone browser's keyboard (natively KeyboardAvoidingView pads for it).
         style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboard }}>
         <AnimatedPressable
-          accessibilityLabel="Close sheet"
+          // A tap or a click on the scrim closes the sheet. On the web it is no stop for Tab or a screen reader (it
+          // would be a nameless focusable box there): Escape and the browser's back close the sheet. Natively it is
+          // "Close sheet" to VoiceOver and TalkBack.
+          {...(Platform.OS === 'web' ? ({ focusable: false, 'aria-hidden': true } as object) : { accessibilityLabel: 'Close sheet' })}
           testID="sheet-backdrop"
           onPress={requestClose}
           style={[{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: colors.overlay }, backdropStyle]}

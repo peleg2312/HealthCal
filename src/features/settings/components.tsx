@@ -242,7 +242,8 @@ export function TimeSheet({
         <Spinner label="minute" format={String(m).padStart(2, '0')} onChange={(d) => set(h * 60 + ((m + d * 5 + 60) % 60))} />
         {hour12 ? (
           <PressableScale
-            accessibilityLabel={h < 12 ? 'Switch to PM' : 'Switch to AM'}
+            // Starts with the word it shows, then what a press does (label in name).
+            accessibilityLabel={h < 12 ? 'AM, switch to PM' : 'PM, switch to AM'}
             testID="time-ampm"
             onPress={() => set(minutes + (h < 12 ? 720 : -720))}
             style={{

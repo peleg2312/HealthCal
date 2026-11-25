@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import Svg, { Line } from 'react-native-svg';
 
@@ -264,7 +264,13 @@ export function Vessel({
   };
 
   return (
-    <View style={[{ flexDirection: 'row', alignItems: 'flex-start', gap: labelGap }, style]} testID={testID} accessibilityLabel={accessibilityLabel && spokenUnits(accessibilityLabel)}>
+    // With labels the cup is not one element (its labels can hold controls, Today's "941 kcal left"), so on the web its
+    // name is a group's, read as a reader enters it: a name on a box with no role is not read there.
+    <View
+      style={[{ flexDirection: 'row', alignItems: 'flex-start', gap: labelGap }, style]}
+      testID={testID}
+      accessibilityLabel={accessibilityLabel && spokenUnits(accessibilityLabel)}
+      {...(Platform.OS === 'web' && accessibilityLabel ? ({ role: 'group' } as const) : null)}>
       <View style={{ width, height }} {...DECORATIVE}>
         {cupView}
         {list.map((l, i) =>

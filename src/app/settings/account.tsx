@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Cloud, CloudOff, CreditCard, Info, KeyRound, LogOut, RefreshCw, Shield, Smartphone, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { authDemo, demoEmail, syncDemo } from '@/features/auth/demo';
 import { returnScreenOpen } from '@/features/auth/google';
@@ -314,7 +314,7 @@ function SignedIn({ email }: { email: string }) {
             </View>
             <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
               {/* Both lines keep their last two words together: beside the button the column is narrow, and no line ends on one word alone. */}
-              <Text variant="caption" color={sync.status === 'error' ? 'warningInk' : 'text'} testID="account-sync-status" accessibilityLiveRegion="polite" accessibilityLabel={status}>
+              <Text variant="caption" color={sync.status === 'error' ? 'warningInk' : 'text'} testID="account-sync-status" accessibilityLiveRegion="polite" accessibilityLabel={status} {...(Platform.OS === 'web' ? ({ role: 'status' } as object) : null)}>
                 {lastWordsTogether(status)}
               </Text>
               <Text variant="caption" color="textSecondary" testID="account-sync-pending" {...figure(syncPendingLine(pending))}>

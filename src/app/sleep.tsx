@@ -14,7 +14,7 @@ import { useToday } from '@/store/clock';
 import { useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ISODate, SleepEntry, SleepQuality } from '@/types';
-import { BarChart, Button, Card, Chip, CupKey, Divider, EmptyState, Header, Screen, SectionTitle, Segmented, Sheet, Stepper, Text } from '@/ui';
+import { BarChart, Button, Card, Chip, CupKey, Divider, EmptyState, figure, Header, Screen, SectionTitle, Segmented, Sheet, Stepper, Text } from '@/ui';
 
 type Window = '7' | '30';
 const QUALITIES: SleepQuality[] = [1, 2, 3, 4, 5];
@@ -25,7 +25,7 @@ const hm = hoursFigure;
 function QualityDots({ quality, size = 10 }: { quality: number; size?: number }) {
   const { colors } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', gap: 4 }} accessibilityLabel={`Quality ${quality} of 5`}>
+    <View style={{ flexDirection: 'row', gap: 4 }} {...figure(`Quality ${quality} of 5`)}>
       {QUALITIES.map((q) => (
         <CupKey key={q} size={size} color={q <= quality ? colors.sleep : colors.borderStrong} variant={q <= quality ? 'filled' : 'outline'} />
       ))}

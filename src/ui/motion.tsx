@@ -360,8 +360,13 @@ export function AnimatedNumber({ value, format, decimals = 0, duration = D.pour,
   // Mid-tick the shown number may differ from `value`; once the tick ends they agree.
   const text = fmt(reduce ? target : current);
   const label = accessibilityLabel ?? (children === undefined || typeof children === 'string' ? `${fmt(target)}${children ?? ''}` : undefined);
+  // On the web a name on an element with no role is not read (react-native-web ignores `accessible`), so a named
+  // number is an image there, as `figure()` makes every figure block; inside a control or a figure its name is the
+  // control's or the figure's, as before. A caller's own role wins.
+  const given = rest as { role?: string; accessibilityRole?: string };
+  const webRole = Platform.OS === 'web' && label && !given.role && !given.accessibilityRole ? ({ role: 'img' } as const) : null;
   return (
-    <Text tabular {...rest} accessibilityLabel={label}>
+    <Text tabular {...rest} {...webRole} accessibilityLabel={label}>
       {text}
       {children}
     </Text>

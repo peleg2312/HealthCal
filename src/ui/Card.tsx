@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, type StyleProp, type ViewProps, type ViewStyle } from 'react-native';
+import { Platform, View, type StyleProp, type ViewProps, type ViewStyle } from 'react-native';
 
 import { spokenUnits } from '@/lib/spokenUnits';
 import { cup, useTheme } from '@/theme';
@@ -38,8 +38,12 @@ export function Card({ onPress, padding, gradient: _gradient, tone = 'surface', 
       </PressableScale>
     );
   }
+  // A named card that is not one element (its content can hold controls: the coach's local answer) is a named group
+  // on the web, where a name on a box with no role is not read. A figure card (`figure()`) brings its own role.
+  const given = rest as { role?: string };
+  const webGroup = Platform.OS === 'web' && accessibilityLabel && !given.role && !rest.accessibilityRole ? ({ role: 'group' } as const) : null;
   return (
-    <View {...rest} accessibilityLabel={accessibilityLabel && spokenUnits(accessibilityLabel)} style={[base, style]}>
+    <View {...rest} {...webGroup} accessibilityLabel={accessibilityLabel && spokenUnits(accessibilityLabel)} style={[base, style]}>
       {children}
     </View>
   );
