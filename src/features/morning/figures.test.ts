@@ -48,6 +48,11 @@ describe('budgetShare and hoursAndMinutes', () => {
     expect(budgetShare(2850, 2190)).toBe(130);
     expect(budgetShare(0, 2190)).toBe(0);
     expect(budgetShare(2000, 0)).toBeNull();
+    // One share for one day on every screen: 89.6% is 89 (no on-budget mark), never 90; just above is 101.
+    expect(budgetShare(1961, 2190)).toBe(89);
+    expect(budgetShare(1971, 2190)).toBe(90);
+    expect(budgetShare(2191, 2190)).toBe(101);
+    expect(budgetShare(2190, 2190)).toBe(100);
   });
   it('sleep in hours and minutes, as the lists say it', () => {
     expect(hoursAndMinutes(7.5)).toEqual({ h: 7, m: 30 });

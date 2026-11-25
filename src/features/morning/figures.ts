@@ -6,6 +6,7 @@
  */
 import { formatNumber, mlToFlOz } from '@/lib/units';
 import type { MealType, UnitSystem } from '@/types';
+import { budgetSharePct } from '@/features/progress/budgetShare';
 
 export interface WaterFigures {
   /** The amount drunk, in the goal's unit, without the unit: "2.4", "0.8", "2.0", "88". Litres always carry one decimal, as the sleep hours do, so the numbers on the shelf read alike. */
@@ -54,8 +55,9 @@ export function logMealTitle(meal: MealType): string {
  * when the week picture already shows the calories; null without a budget.
  */
 export function budgetShare(kcal: number, budget: number): number | null {
-  if (!(budget > 0)) return null;
-  return Math.round((Math.max(0, kcal) / budget) * 100);
+  // The one share every screen says for a day (@/features/progress/budgetShare): never 90% for a day under 90%
+  // of its budget, never 100% or less for a day above it, so it always agrees with the on-budget mark.
+  return budgetSharePct(kcal, budget);
 }
 
 /** Hours of sleep as whole hours and minutes, the form used everywhere on the page ("7 h 30 min"). */

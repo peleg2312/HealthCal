@@ -2,7 +2,7 @@
  * The soft check of an amount for one entry (rubric D8-04, error prevention): an amount above what one plausible
  * entry holds is stored only on a second press of the screen's Add (or Save). The first press stores nothing: a
  * line tied to the field (an amber key, neutral words) says why it waits, the button names the amount it will
- * store, and the line is spoken without moving the focus. Any other amount asks again; an amount below the
+ * store, and the line is spoken, units in full, without moving the focus. Any other amount asks again; an amount below the
  * check, or one already stored, never asks. The hard limits are unchanged (quick add's `QUICK_KCAL_LIMIT`, the
  * grams field's 20,000 g). Pure, so the screens only place the words: quick add (src/app/food/quick.tsx) and
  * food detail (src/app/food/detail.tsx, its line drawn by `AmountEditor`).
@@ -37,13 +37,19 @@ export function quickKcalAsks(kcal: number | null): boolean {
   return kcal !== null && kcal > ENTRY_KCAL_CHECK && kcal < QUICK_KCAL_LIMIT;
 }
 
-/** The line tied to a calories field while Add (or Save, editing an entry's numbers) waits for its second press. */
-export function kcalAsk(edit: boolean): string {
-  return `More than most meals: press ${edit ? 'Save' : 'Add'} again if the number is right.`;
+/**
+ * The question under a field while its Add (or Save) waits for the second press, in Water's words for one voice
+ * across the app (`drinkAmountCheck`: "Is 2.5 L right for one drink? Tap Add again to add it."): the amount as typed,
+ * then what the second press does. Two sentences: drawn as reading text (body, textSecondary) by `AskLine`.
+ */
+function askLine(amount: string, edit: boolean): string {
+  return `Is ${amount} right for one entry? Tap ${edit ? 'Save again to save it' : 'Add again to add it'}.`;
 }
 
-/** Quick add's line (one sentence, neutral). */
-export const QUICK_KCAL_ASK = kcalAsk(false);
+/** Calories: "Is 5,000 kcal right for one entry? Tap Add again to add it." (Save, editing an entry's own numbers). */
+export function kcalAsk(kcal: number, edit: boolean): string {
+  return askLine(`${formatNumber(Math.round(kcal))} kcal`, edit);
+}
 
 /**
  * Whether calories typed into an entry's own numbers (Edit entry of a quick add or an AI estimate) ask before
@@ -92,9 +98,9 @@ export function portionAsks(food: Pick<Food, 'servings'>, grams: number, kcal: n
   return grams > portionCheckGrams(food) || kcal > ENTRY_KCAL_CHECK;
 }
 
-/** The line under the amount while Add (or Save, in Edit entry) waits for its second press. */
-export function portionAsk(edit: boolean): string {
-  return `More than most portions: press ${edit ? 'Save' : 'Add'} again if the amount is right.`;
+/** A portion: "Is 1,500 g right for one entry? Tap Add again to add it." (Save in Edit entry). */
+export function portionAsk(grams: number, edit: boolean): string {
+  return askLine(`${formatNumber(Math.round(grams))} g`, edit);
 }
 
 /** Food detail's button while it waits: the amount it will store ("Add 1,500 g to lunch", "Save 1,500 g"). */
