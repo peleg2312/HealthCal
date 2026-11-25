@@ -1,16 +1,16 @@
 import { router, useIsFocused, usePreventRemove } from 'expo-router';
 import { ChevronLeft, X } from 'lucide-react-native';
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, useWindowDimensions, View, type ScrollViewProps, type StyleProp, type ViewStyle } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, View, type ScrollViewProps, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MAX_CONTENT_WIDTH, useTheme } from '@/theme';
 
 import { IconButton } from './Button';
-import { SHORT_WINDOW } from './controlRules';
 import { keyboardCover, revealDelta, scrollGivesUp } from './keyboardInset';
 import { FadeUp } from './motion';
 import { PressableScale } from './Pressable';
+import { useShortWindow } from './shortWindow';
 import { ConfirmSheet } from './Sheet';
 import { Text } from './Text';
 import { useToastBand, useToastDock } from './Toast';
@@ -21,10 +21,6 @@ export const TAB_BAR_HEIGHT = 58;
 /** Height reserved at the bottom of tab screens for the docked tab bar, plus breathing room. */
 export const TAB_BAR_SPACE = TAB_BAR_HEIGHT + 28;
 
-/** Whether the window is too short for pinned parts (`SHORT_WINDOW` in ./controlRules), live. */
-export function useShortWindow(): boolean {
-  return useWindowDimensions().height < SHORT_WINDOW;
-}
 
 /**
  * What the tab bar adds to its height now: 0, or with large text on a window too narrow for its four labels whole
@@ -115,7 +111,8 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
   // ends 8 px above it while it shows, so nothing a person can press is under it (`useToastBand`). Nothing on
   // screen moves: the rows under the band leave the scroll area's view and are a scroll away.
   const band = useToastBand(domId);
-  const givesUp = focused ? scrollGivesUp(band, pinnedFooter ? footerH : 0) : 0;
+  // Under the scroll area lie the pinned footer and, while it is up, what the keyboard covers.
+  const givesUp = focused ? scrollGivesUp(band, (pinnedFooter ? footerH : 0) + cover) : 0;
   // Keyboard focus is never left under the tab bar (WCAG 2.4.11), which lies over the scroll area, nor with its ring
   // cut at the edge of the scroll area, under a pinned footer or at the window's bottom (2.4.12).
   useFocusClear(domId, focused, tabs && !pinnedFooter ? dock : 0);

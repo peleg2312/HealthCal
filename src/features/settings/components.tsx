@@ -2,7 +2,6 @@ import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
-import { spokenUnits } from '@/lib/spokenUnits';
 import { formatClock, formatHHmm, parseHHmm } from '@/lib/dates';
 import { cup, cupFor, useTheme } from '@/theme';
 import { Button, Card, Chip, CupKey, DECORATIVE, Divider, IconButton, ListRow, PressableScale, Sheet, Text } from '@/ui';
@@ -124,7 +123,8 @@ export function OptionRow({ title, subtitle, selected, onPress, testID }: { titl
       accessibilityRole="radio"
       accessibilityState={{ checked: selected, selected }}
       aria-checked={selected}
-      accessibilityLabel={spokenUnits(subtitle ? `${title}, ${subtitle}` : title)}
+      // Its words as drawn, units included (WCAG 2.5.3, label in name).
+      accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
       // The card clips what reaches past it, so the keyboard's ring is drawn just inside the tile's edge.
       focusRing="inside"
       style={{

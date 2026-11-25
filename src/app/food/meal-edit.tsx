@@ -16,7 +16,6 @@ import { sumNutrients } from '@/lib/nutrition';
 import { useStore } from '@/store';
 import { fonts, useTheme } from '@/theme';
 import { Button, Card, Divider, EmptyState, Header, IconButton, MacroBar, NumberField, PressableScale, Screen, Text, TextField, goBack, haptic, toast } from '@/ui';
-import { spokenUnits } from '@/lib/spokenUnits';
 
 export default function MealEditRoute() {
   return (
@@ -169,7 +168,8 @@ function MealEdit() {
                   testID={`meal-edit-item-${i}`}
                   scaleTo={0.985}
                   onPress={() => setEditing(r.key)}
-                  accessibilityLabel={spokenUnits(`${displayFoodName(r.item)}, ${withoutMarks(itemLine(r.item))}. Change amount`)}
+                  // Its words as drawn (label in name), then what a tap does.
+                  accessibilityLabel={`${displayFoodName(r.item)}, ${withoutMarks(itemLine(r.item))}. Change amount`}
                   style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 11 }}>
                   <RowEmoji emoji={r.item.emoji} />
                   <View style={{ flex: 1, minWidth: 0, gap: 2 }}>

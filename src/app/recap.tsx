@@ -15,7 +15,6 @@ import { useRecapReady } from '@/features/progress/recapReady';
 import { useRecap } from '@/features/progress/useRecap';
 import { winTile } from '@/features/progress/recapWin';
 import { ShareWeekButton } from '@/features/share';
-import { noteVariant } from '@/features/settings/noteText';
 import { useLargeText, useTheme } from '@/theme';
 import { AnimatedNumber, Card, CupKey, Divider, EmptyState, FadeUp, figure, Header, IconButton, PressableScale, Screen, Sheet, Text } from '@/ui';
 
@@ -251,7 +250,8 @@ export default function RecapScreen() {
           <PressableScale
             testID="recap-plan"
             onPress={() => go('/settings/goals')}
-            accessibilityLabel={spokenUnits(`Your daily target: ${formatNumber(d.plan.before)} kcal on ${formatShortDate(d.week)}, ${formatNumber(d.plan.after)} kcal ${d.plan.afterDate === d.today ? 'today' : `from ${formatShortDate(d.plan.afterDate)}`}. ${d.plan.reason} The target is before workouts${d.exerciseRule === 'day' ? '; logged workouts add their own calories on the day' : d.exerciseRule === 'week' ? '; each logged workout adds a seventh of its calories to 7 days' : d.exerciseRule === 'mixed' ? '; logged workouts add their calories by the rule each day had, on the day or shared over 7 days' : ''}. Open goals.`)}
+            // What the card shows, as drawn and in its order (WCAG 2.5.3, label in name), then what it leaves out.
+            accessibilityLabel={`Your daily target, ${formatShortDate(d.week)}: ${formatNumber(d.plan.before)} kcal, ${d.plan.afterDate === d.today ? 'Today' : formatShortDate(d.plan.afterDate)}: ${formatNumber(d.plan.after)} kcal. ${d.plan.reason} The target is before workouts${d.exerciseRule === 'day' ? '; logged workouts add their own calories on the day' : d.exerciseRule === 'week' ? '; each logged workout adds a seventh of its calories to 7 days' : d.exerciseRule === 'mixed' ? '; logged workouts add their calories by the rule each day had, on the day or shared over 7 days' : ''}. Open goals.`}
             scaleTo={0.985}>
             <Card style={{ gap: spacing.sm }}>
               <View
@@ -292,8 +292,9 @@ export default function RecapScreen() {
                   </Text>
                 </View>
               </View>
-              {/* Why the target moved: two sentences or more are reading text, at the body size (`noteVariant`). */}
-              <Text variant={noteVariant(d.plan.reason)} color="textSecondary" testID="recap-plan-reason">
+              {/* Why the target moved, in a sentence that runs to two or three lines: reading text, at the body size
+                  (never a caption, which is one line under a figure; `noteVariant` counts sentences and would set a long one small). */}
+              <Text variant="body" color="textSecondary" testID="recap-plan-reason">
                 {d.plan.reason}
               </Text>
             </Card>

@@ -335,9 +335,13 @@ export function diaryWaterCaption(entry: Pick<FoodEntry, 'name' | 'meal'>): stri
   return `${entry.name} · from ${MEAL_LABEL[entry.meal].toLowerCase()}`;
 }
 
-/** The Water row's open label for a drink from the diary: "473 ml drink, Energy drink, sugared, from lunch. Edit in diary" (raw name). */
-export function diaryWaterOpenLabel(title: string, entry: Pick<FoodEntry, 'name' | 'meal'>): string {
-  return `${title}, ${entry.name}, from ${MEAL_LABEL[entry.meal].toLowerCase()}. Edit in diary`;
+/**
+ * The Water row's open label for a drink from the diary: the row's words as drawn, in their order (WCAG 2.5.3, label
+ * in name: the title, its time line `when`, the caption), then what a tap does: "473 ml drink, 12:40, Energy drink,
+ * sugared, from lunch. Edit in diary" (raw name).
+ */
+export function diaryWaterOpenLabel(title: string, when: string, entry: Pick<FoodEntry, 'name' | 'meal'>): string {
+  return `${title}, ${when}, ${entry.name}, from ${MEAL_LABEL[entry.meal].toLowerCase()}. Edit in diary`;
 }
 
 /**

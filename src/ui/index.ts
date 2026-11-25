@@ -13,6 +13,7 @@ export * from './ProgressBar';
 export * from './RestoreRow';
 export * from './Screen';
 export * from './Sheet';
+export { useShortWindow } from './shortWindow';
 export * from './Text';
 export * from './Toast';
 export { haptic } from './haptics';

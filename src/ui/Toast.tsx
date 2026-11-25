@@ -51,9 +51,10 @@ interface ToastState {
   toScreen?: boolean;
   /**
    * While a toast shows on a screen with no band clear of controls: that screen (its element id) and how far up from
-   * the window's bottom its scroll area gives way (`toastBand`). Cleared with the toast.
+   * the window's bottom its scroll area gives way (`toastBand`), and the place it was made for (a keyboard that opens
+   * or closes is another place, so the band is made again). Cleared with the toast.
    */
-  band: { scope: string; fromBottom: number } | null;
+  band: { scope: string; fromBottom: number; key?: string } | null;
   /** Open sheets that carry their own host, newest last. The newest one shows the toast. */
   sheetHosts: number[];
   /**
@@ -453,9 +454,15 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
   // `toastBottomAmong`). A phone's sheet keeps its toast just above the sheet's top edge.
   const placeKey = `${key}:${inSheet ? 'sheet' : (scopeId ?? '')}:${winH}:${drawn}`;
   const [spot, setSpot] = useState<{ key: string; bottom: number | null } | null>(null);
-  const placing = shownNow && !keyboardUp && (Platform.OS === 'web' || !inSheet);
+  // With the keyboard up the toast keeps its place over the footer riding on the keyboard (or over the keyboard), and
+  // in a browser, when a control lies under that place, the screen gives way under it as with no clear band (a list
+  // of result rows over food search's footer). A phone with the keyboard up keeps the toast where it rests.
+  const placing = shownNow && (Platform.OS === 'web' || (!inSheet && !keyboardUp));
   useEffect(() => {
     if (!placing) return;
+    // A band made for another place (the keyboard has opened or closed since) is let go before this one is looked for.
+    const made = useToast.getState().band;
+    if (made && made.scope === scopeId && made.key !== placeKey) useToast.setState({ band: null });
     // A toast that is never laid out is shown where it always rests rather than kept out of sight.
     if (toastH <= 0) {
       const late = setTimeout(() => setSpot({ key: placeKey, bottom: null }), PLACE_LATE_MS);
@@ -485,6 +492,11 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
         const scope = scopeId ? document.getElementById(scopeId) : null;
         const box = scope?.getBoundingClientRect();
         if (!scope || !box || box.height < 1 || box.width < 1) return 'wait';
+        if (keyboardUp) {
+          // Only where it rests, just above the footer riding on the keyboard: clear, or the screen gives way under it.
+          const at = H - resting - h;
+          return toastSpot({ lowest: at, highest: at, height: h, left: r.left, right: r.right, controls: controlBoxes(scope, host) }) === null ? 'none' : null;
+        }
         // With no clear band in thumb reach, any clear band under the screen's header, rather than over a control.
         const head = scope.querySelector('[data-testid="screen-header"], [data-testid="tab-header"]')?.getBoundingClientRect();
         const above = Math.max(box.top, head ? head.bottom + TOAST_CLEAR : 0, insets.top);
@@ -519,7 +531,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
           // No band on the screen is clear of controls: the screen makes one where the toast rests (its scroll area
           // ends 8 px above it, `toastBand`), and the toast is drawn there once the screen has given way (two frames).
           const fromBottom = toastBand(resting, toastH);
-          useToast.setState((st) => ({ band: { scope: scopeId, fromBottom: Math.max(fromBottom, st.band?.scope === scopeId ? st.band.fromBottom : 0) } }));
+          useToast.setState((st) => ({ band: { scope: scopeId, key: placeKey, fromBottom: Math.max(fromBottom, st.band?.scope === scopeId && st.band.key === placeKey ? st.band.fromBottom : 0) } }));
           timer = setTimeout(() => {
             if (stopped) return;
             setSpot({ key: placeKey, bottom: null });
@@ -544,7 +556,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       cancelAnimationFrame(frame);
       clearTimeout(timer);
     };
-  }, [placing, placeKey, toastH, resting, inSheet, scopeId, insets.bottom, insets.top]);
+  }, [placing, placeKey, toastH, resting, inSheet, scopeId, insets.bottom, insets.top, keyboardUp]);
   const spotNow = spot && spot.key === placeKey ? spot : null;
   const hidden = placing && !spotNow;
   const bottom = !inSheet && spotNow?.bottom != null ? spotNow.bottom : resting;

@@ -169,9 +169,15 @@ src/features/activity/sheetFit.ts	chartChange	function
 src/features/activity/sheetFit.ts	nextChange	function
 src/features/activity/sheetFit.ts	readFit	function
 src/features/activity/spreadHint.ts	SPREAD_HINT_KEY	const
+src/features/activity/spreadHint.ts	SPREAD_HINT_SHOWN_KEY	const
 src/features/activity/spreadHint.ts	SPREAD_HINT_TEXT	const
 src/features/activity/spreadHint.ts	markSpreadHintDone	function
 src/features/activity/spreadHint.ts	useSpreadHint	function
+src/features/activity/spreadHintRule.ts	SPREAD_HINT_MAX	const
+src/features/activity/spreadHintRule.ts	SpreadHintState	interface
+src/features/activity/spreadHintRule.ts	parseShownCount	function
+src/features/activity/spreadHintRule.ts	spreadHintCounts	function
+src/features/activity/spreadHintRule.ts	spreadHintVisible	function
 src/features/activity/strengthDraft.ts	DEFAULT_REST_SEC	const
 src/features/activity/strengthDraft.ts	DraftExercise	interface
 src/features/activity/strengthDraft.ts	DraftSet	interface
@@ -334,6 +340,8 @@ src/features/ai/mark/index.ts	WAIT_HIGH	re-export	src/features/ai/mark/loop.ts:W
 src/features/ai/mark/index.ts	WAIT_LOOP_MS	re-export	src/features/ai/mark/loop.ts:WAIT_LOOP_MS
 src/features/ai/mark/index.ts	WAIT_LOW	re-export	src/features/ai/mark/loop.ts:WAIT_LOW
 src/features/ai/mark/index.ts	WAIT_REST	re-export	src/features/ai/mark/loop.ts:WAIT_REST
+src/features/ai/mark/index.ts	WAIT_STILL_AFTER_MS	re-export	src/features/ai/mark/loop.ts:WAIT_STILL_AFTER_MS
+src/features/ai/mark/index.ts	WAIT_TURNS	re-export	src/features/ai/mark/loop.ts:WAIT_TURNS
 src/features/ai/mark/index.ts	aiMarkFill	re-export	src/features/ai/mark/fill.ts:aiMarkFill
 src/features/ai/mark/index.ts	aiMarkHeadroom	re-export	src/features/ai/mark/AiMark.tsx:aiMarkHeadroom
 src/features/ai/mark/index.ts	coachMarkFill	re-export	src/features/ai/mark/fill.ts:coachMarkFill
@@ -346,6 +354,8 @@ src/features/ai/mark/loop.ts	WAIT_HIGH	const
 src/features/ai/mark/loop.ts	WAIT_LOOP_MS	const
 src/features/ai/mark/loop.ts	WAIT_LOW	const
 src/features/ai/mark/loop.ts	WAIT_REST	const
+src/features/ai/mark/loop.ts	WAIT_STILL_AFTER_MS	const
+src/features/ai/mark/loop.ts	WAIT_TURNS	const
 src/features/ai/mark/loop.ts	startWaitLoop	function
 src/features/ai/mark/loop.ts	waitDuration	function
 src/features/ai/weight.ts	GRAMS_PER_OZ	const
@@ -362,13 +372,17 @@ src/features/ai/weight.ts	weightSentence	function
 src/features/ai/words.ts	AI_TILE_HINT	const
 src/features/ai/words.ts	ANALYSING	const
 src/features/ai/words.ts	DESCRIPTION_MAX	const
+src/features/ai/words.ts	PhotoScreenHeld	interface
 src/features/ai/words.ts	alternativesLabel	function
 src/features/ai/words.ts	analysingLabel	function
 src/features/ai/words.ts	analysingNote	function
 src/features/ai/words.ts	analysingSteps	function
+src/features/ai/words.ts	estimateGramsSpoken	function
 src/features/ai/words.ts	estimateReadyLine	function
 src/features/ai/words.ts	itemKcalSpoken	function
 src/features/ai/words.ts	itemNameLabel	function
+src/features/ai/words.ts	macroStatSpoken	function
+src/features/ai/words.ts	photoLeaveQuestion	function
 src/features/ai/words.ts	prefilledDescription	function
 src/features/ai/words.ts	searchAiTile	function
 src/features/ai/words.ts	slowAfterMs	function
@@ -784,6 +798,9 @@ src/features/drinks/rules.ts	ALSO_IN_WATER	const
 src/features/drinks/rules.ts	BUNDLED_DRINK_IDS	const
 src/features/drinks/rules.ts	DRINKS_NOT_COPIED	const
 src/features/drinks/rules.ts	DRINKS_NOT_SAVED	const
+src/features/drinks/rules.ts	DRINK_ASK_ML	const
+src/features/drinks/rules.ts	DRINK_MAX_ML	const
+src/features/drinks/rules.ts	DrinkAmountCheck	type
 src/features/drinks/rules.ts	DrinkEntry	type
 src/features/drinks/rules.ts	DrinkMemory	type
 src/features/drinks/rules.ts	DrinkPlan	interface
@@ -798,6 +815,7 @@ src/features/drinks/rules.ts	builtinFood	function
 src/features/drinks/rules.ts	choiceA11y	function
 src/features/drinks/rules.ts	choiceFood	function
 src/features/drinks/rules.ts	detailDrinkNote	function
+src/features/drinks/rules.ts	drinkAmountCheck	function
 src/features/drinks/rules.ts	drinkGrams	function
 src/features/drinks/rules.ts	drinkKcal	function
 src/features/drinks/rules.ts	drinkMeal	function
@@ -846,11 +864,14 @@ src/features/drinks/via.ts	isWaterDrinkEntry	function
 src/features/drinks/via.ts	waterIdFromEntry	function
 src/features/food/AmountEditor.tsx	AmountEditor	component
 src/features/food/AmountEditor.tsx	AmountValue	interface
+src/features/food/AskLine.tsx	AskLine	component
+src/features/food/AskLine.tsx	askTie	function
 src/features/food/DiaryParts.tsx	DaySummaryCard	component
 src/features/food/DiaryParts.tsx	EMPTY_DAY_NOTE	const
 src/features/food/DiaryParts.tsx	MealCard	component
 src/features/food/DiaryParts.tsx	MealMenuSheet	component
 src/features/food/DiaryParts.tsx	PreviousMeal	interface
+src/features/food/DiaryParts.tsx	SUMMARY_CUP_NARROW	const
 src/features/food/FavoriteStar.tsx	FavoriteStar	component
 src/features/food/RequireProfile.tsx	RequireProfile	component
 src/features/food/SaveMealSheet.tsx	SaveMealSheet	component
@@ -1026,6 +1047,11 @@ src/features/food/mealDraft.ts	setDraftName	function
 src/features/food/mealDraft.ts	setDraftServings	function
 src/features/food/mealDraft.ts	updateDraftItem	function
 src/features/food/mealDraft.ts	useMealDraft	const
+src/features/food/mealMove.ts	EntryOnScreen	interface
+src/features/food/mealMove.ts	MEAL_PICK_CHOOSES	const
+src/features/food/mealMove.ts	MEAL_PICK_MOVES	const
+src/features/food/mealMove.ts	mealPickAdvice	function
+src/features/food/mealMove.ts	pickMovesAtOnce	function
 src/features/food/oneTap.ts	ONE_TAP_GUARD_MS	const
 src/features/food/oneTap.ts	tooSoon	function
 src/features/food/oneTap.ts	useOneTap	function
@@ -1034,7 +1060,11 @@ src/features/food/restore.ts	removedToday	function
 src/features/food/rowMotion.tsx	FadeRow	component
 src/features/food/rowMotion.tsx	ROW_FOLD_MS	const
 src/features/food/rowMotion.tsx	Unfold	component
+src/features/food/rowMotion.tsx	useComeBack	function
 src/features/food/rowMotion.tsx	useLeavingRows	function
+src/features/food/rowMotionRules.ts	LogLists	interface
+src/features/food/rowMotionRules.ts	cameBack	function
+src/features/food/rowMotionRules.ts	withReturning	function
 src/features/food/saveHint.ts	SAVE_HINT_KEY	const
 src/features/food/saveHint.ts	SAVE_MIN_FOODS	const
 src/features/food/saveHint.ts	canOfferSave	function
@@ -1047,6 +1077,7 @@ src/features/food/saveWords.ts	SAVED_TOAST_BUDGET	const
 src/features/food/saveWords.ts	SAVE_FIXED_WORDS	const
 src/features/food/saveWords.ts	SAVE_HINT_NOT_NOW	const
 src/features/food/saveWords.ts	SAVE_HINT_NOT_NOW_A11Y	const
+src/features/food/saveWords.ts	SAVE_NAME_DISCARD	const
 src/features/food/saveWords.ts	SAVE_NAME_MAX	const
 src/features/food/saveWords.ts	SAVE_NAME_PLACEHOLDER	const
 src/features/food/saveWords.ts	SAVE_TOGGLE	const
@@ -1057,6 +1088,7 @@ src/features/food/saveWords.ts	defaultMealName	function
 src/features/food/saveWords.ts	itemCount	function
 src/features/food/saveWords.ts	saveHintA11y	function
 src/features/food/saveWords.ts	saveHintLabel	function
+src/features/food/saveWords.ts	saveNameTyped	function
 src/features/food/saveWords.ts	saveSheetFoods	function
 src/features/food/saveWords.ts	saveSheetLine	function
 src/features/food/saveWords.ts	saveSheetTitle	function
@@ -1073,6 +1105,20 @@ src/features/food/searchTab.ts	rememberSearchTab	function
 src/features/food/searchTab.ts	resetSearchTabForTests	function
 src/features/food/searchTab.ts	useSearchTab	const
 src/features/food/searchTab.ts	usualEmpty	function
+src/features/food/softCheck.ts	ENTRY_KCAL_CHECK	const
+src/features/food/softCheck.ts	PORTION_CHECK_FLOOR	const
+src/features/food/softCheck.ts	PORTION_CHECK_TIMES	const
+src/features/food/softCheck.ts	editedKcalAsks	function
+src/features/food/softCheck.ts	kcalAsk	function
+src/features/food/softCheck.ts	kcalSaveTitle	function
+src/features/food/softCheck.ts	portionAsk	function
+src/features/food/softCheck.ts	portionAsks	function
+src/features/food/softCheck.ts	portionCheckGrams	function
+src/features/food/softCheck.ts	portionTitle	function
+src/features/food/softCheck.ts	pressFor	function
+src/features/food/softCheck.ts	quickAddTitle	function
+src/features/food/softCheck.ts	quickKcalAsks	function
+src/features/food/softCheck.ts	waitsFor	function
 src/features/food/usuals.ts	UsualFood	interface
 src/features/food/usuals.ts	UsualOptions	interface
 src/features/food/usuals.ts	atFoodValues	function
@@ -1836,6 +1882,9 @@ src/features/morning/WeekCups.tsx	WeekCups	component
 src/features/morning/WeekCups.tsx	weekCupColumns	function
 src/features/morning/YesterdayFigures.tsx	FiguresDay	interface
 src/features/morning/YesterdayFigures.tsx	YesterdayFigures	component
+src/features/morning/acted.ts	JUST_NOW_MS	const
+src/features/morning/acted.ts	PERSON_COLLECTIONS	const
+src/features/morning/acted.ts	wroteByPerson	function
 src/features/morning/allowed.ts	morningAllowed	function
 src/features/morning/coach.ts	CoachInput	interface
 src/features/morning/coach.ts	CoachKind	type
@@ -2298,6 +2347,9 @@ src/features/plan/words.ts	unitText	function
 src/features/plan/words.ts	withdrawLine	function
 src/features/plan/words.ts	withdrawSub	function
 src/features/plan/words.ts	yearSavingLine	function
+src/features/progress/BudgetBars.tsx	BudgetBars	component
+src/features/progress/BudgetBars.tsx	BudgetKeys	component
+src/features/progress/BudgetBars.tsx	budgetKeyWords	function
 src/features/progress/CaloriesADay.tsx	CaloriesADay	component
 src/features/progress/CaloriesCard.tsx	CaloriesCard	component
 src/features/progress/ConsistencyCard.tsx	ConsistencyCard	component
@@ -2314,7 +2366,12 @@ src/features/progress/ProgressTile.tsx	ProgressTile	component
 src/features/progress/RecapCard.tsx	RecapCard	component
 src/features/progress/RecapCups.tsx	RecapCups	component
 src/features/progress/WeightCard.tsx	WeightCard	component
+src/features/progress/budgetShare.ts	budgetSharePct	function
+src/features/progress/calorieBars.ts	BAR_GEOMETRY	const
 src/features/progress/calorieBars.ts	BarFills	interface
+src/features/progress/calorieBars.ts	BudgetTick	interface
+src/features/progress/calorieBars.ts	budgetScaleTop	function
+src/features/progress/calorieBars.ts	budgetTicks	function
 src/features/progress/calorieBars.ts	buildBars	function
 src/features/progress/calorieBars.ts	daysVerdict	function
 src/features/progress/calorieBars.ts	solidBar	function
@@ -2355,6 +2412,9 @@ src/features/progress/goalDate.ts	trendGoalLine	function
 src/features/progress/goalDate.ts	trendMonth	function
 src/features/progress/goalDate.ts	trendMonthParts	function
 src/features/progress/goalDate.ts	weeklyRateText	function
+src/features/progress/insightMark.ts	ABOVE_LIMIT_INSIGHTS	const
+src/features/progress/insightMark.ts	InsightMark	type
+src/features/progress/insightMark.ts	insightMark	function
 src/features/progress/parts.tsx	BigStat	component
 src/features/progress/parts.tsx	Hairline	component
 src/features/progress/parts.tsx	LegendDot	component
@@ -2363,7 +2423,6 @@ src/features/progress/parts.tsx	RangeSwitch	component
 src/features/progress/parts.tsx	SectionCard	component
 src/features/progress/parts.tsx	SegmentSwitch	component
 src/features/progress/parts.tsx	StatStrip	component
-src/features/progress/parts.tsx	TextLink	component
 src/features/progress/parts.tsx	TrendLegend	component
 src/features/progress/parts.tsx	TrendMark	component
 src/features/progress/parts.tsx	go	function
@@ -2442,6 +2501,8 @@ src/features/settings/goalsValidation.ts	customSplitError	function
 src/features/settings/goalsValidation.ts	heightError	function
 src/features/settings/goalsValidation.ts	rateForGoal	function
 src/features/settings/goalsValidation.ts	targetWeightError	function
+src/features/settings/noteText.ts	isReadingNote	function
+src/features/settings/noteText.ts	noteVariant	function
 src/features/settings/planFromStore.ts	planFromStore	function
 src/features/settings/reminderPlanner.ts	MAX_PER_DAY	const
 src/features/settings/reminderPlanner.ts	MIN_GAP_MINUTES	const
@@ -2660,6 +2721,7 @@ src/features/today/volume.ts	waterLeftMl	function
 src/features/today/volume.ts	waterOfGoal	function
 src/features/today/week.ts	DayRing	interface
 src/features/today/week.ts	DayRingState	type
+src/features/today/week.ts	dayCellLabel	function
 src/features/today/week.ts	dayRing	function
 src/features/today/week.ts	startDate	function
 src/features/today/week.ts	weekCaption	function
@@ -2678,12 +2740,16 @@ src/features/trackers/actions.ts	updateFast	function
 src/features/trackers/components.tsx	DayStepper	component
 src/features/trackers/components.tsx	Explain	component
 src/features/trackers/components.tsx	ExplainText	component
+src/features/trackers/components.tsx	FIGURE_INSIDE	const
 src/features/trackers/components.tsx	Figure	component
+src/features/trackers/components.tsx	HistoryItem	component
+src/features/trackers/components.tsx	HistoryList	component
 src/features/trackers/components.tsx	HistoryRow	component
 src/features/trackers/components.tsx	Note	component
 src/features/trackers/components.tsx	RequireProfile	component
 src/features/trackers/components.tsx	Tile	component
 src/features/trackers/components.tsx	splitUnit	re-export	src/features/trackers/helpers.ts:splitUnit
+src/features/trackers/components.tsx	spokenFigure	function
 src/features/trackers/components.tsx	useReduceMotion	function
 src/features/trackers/dateParam.ts	dayTitle	function
 src/features/trackers/dateParam.ts	resolveDateParam	function
@@ -3305,6 +3371,7 @@ src/theme/motion.ts	easing	const
 src/theme/motion.ts	isReducedMotion	function
 src/theme/motion.ts	motion	const
 src/theme/motion.ts	pourLandsAt	function
+src/theme/motion.ts	reachFlash	const
 src/theme/motion.ts	useReducedMotion	function
 src/theme/resolve.ts	LOOK_HINTS	const
 src/theme/resolve.ts	THEME_CHOICES	const
@@ -3483,6 +3550,8 @@ src/ui/Toast.tsx	TOAST_WEB_ACTION_MS	const
 src/ui/Toast.tsx	ToastHost	component
 src/ui/Toast.tsx	ToastOptions	interface
 src/ui/Toast.tsx	toast	function
+src/ui/Toast.tsx	toastToScreen	function
+src/ui/Toast.tsx	useToastBand	function
 src/ui/Toast.tsx	useToastDock	function
 src/ui/Vessel.tsx	Hatch	component
 src/ui/Vessel.tsx	MiniCup	component
@@ -3490,23 +3559,31 @@ src/ui/Vessel.tsx	Trough	component
 src/ui/Vessel.tsx	Vessel	component
 src/ui/Vessel.tsx	VesselLabel	interface
 src/ui/Vessel.tsx	VesselProps	interface
+src/ui/announce.ts	sayOnWeb	function
 src/ui/controlRules.ts	ANDROID_TARGET	const
+src/ui/controlRules.ts	NO_MINUS	const
 src/ui/controlRules.ts	ROW_WORD_ROOM	const
+src/ui/controlRules.ts	SHORT_WINDOW	const
 src/ui/controlRules.ts	SlopInsets	type
 src/ui/controlRules.ts	StateIn	interface
 src/ui/controlRules.ts	ariaFromState	function
 src/ui/controlRules.ts	fixedSize	function
 src/ui/controlRules.ts	isSpaceKey	function
+src/ui/controlRules.ts	numberTextProblem	function
+src/ui/controlRules.ts	numberTextValue	function
 src/ui/controlRules.ts	pressesOnSpace	function
 src/ui/controlRules.ts	rovingIndex	function
 src/ui/controlRules.ts	rowStacks	function
+src/ui/controlRules.ts	scrubKey	function
 src/ui/controlRules.ts	slopToReach	function
 src/ui/controlRules.ts	spokenFieldName	function
 src/ui/controlRules.ts	stepperKey	function
 src/ui/controlRules.ts	wantsAndroidTarget	function
 src/ui/controlRules.ts	webAutoComplete	function
 src/ui/decorative.ts	DECORATIVE	const
+src/ui/decorative.ts	FigureProps	type
 src/ui/decorative.ts	decorative	function
+src/ui/decorative.ts	figure	function
 src/ui/haptics.ts	haptic	const
 src/ui/index.ts	*	re-export-all	src/ui/Button.tsx
 src/ui/index.ts	*	re-export-all	src/ui/Card.tsx
@@ -3530,26 +3607,33 @@ src/ui/index.ts	AnimatedNumberProps	re-export	src/ui/motion.tsx:AnimatedNumberPr
 src/ui/index.ts	DECORATIVE	re-export	src/ui/decorative.ts:DECORATIVE
 src/ui/index.ts	DrawReveal	re-export	src/ui/motion.tsx:DrawReveal
 src/ui/index.ts	FadeUp	re-export	src/ui/motion.tsx:FadeUp
+src/ui/index.ts	FigureProps	re-export	src/ui/decorative.ts:FigureProps
 src/ui/index.ts	GoalKind	re-export	src/ui/vesselLayout.ts:GoalKind
+src/ui/index.ts	NO_MINUS	re-export	src/ui/controlRules.ts:NO_MINUS
 src/ui/index.ts	Pour	re-export	src/ui/motion.tsx:Pour
 src/ui/index.ts	PourOptions	re-export	src/ui/motion.tsx:PourOptions
 src/ui/index.ts	ReachOptions	re-export	src/ui/motion.tsx:ReachOptions
+src/ui/index.ts	SHORT_WINDOW	re-export	src/ui/controlRules.ts:SHORT_WINDOW
 src/ui/index.ts	brimOverhang	re-export	src/ui/vesselLayout.ts:brimOverhang
 src/ui/index.ts	cssBezier	re-export	src/ui/motion.tsx:cssBezier
 src/ui/index.ts	decorative	re-export	src/ui/decorative.ts:decorative
 src/ui/index.ts	ease	re-export	src/ui/motion.tsx:ease
+src/ui/index.ts	figure	re-export	src/ui/decorative.ts:figure
 src/ui/index.ts	fillRatio	re-export	src/ui/vesselLayout.ts:fillRatio
 src/ui/index.ts	goalState	re-export	src/ui/vesselLayout.ts:goalState
 src/ui/index.ts	haptic	re-export	src/ui/haptics.ts:haptic
 src/ui/index.ts	isReducedMotion	re-export	src/theme/motion.ts:isReducedMotion
 src/ui/index.ts	levelY	re-export	src/ui/vesselLayout.ts:levelY
 src/ui/index.ts	motion	re-export	src/theme/motion.ts:motion
+src/ui/index.ts	numberTextProblem	re-export	src/ui/controlRules.ts:numberTextProblem
+src/ui/index.ts	numberTextValue	re-export	src/ui/controlRules.ts:numberTextValue
 src/ui/index.ts	placeLabels	re-export	src/ui/vesselLayout.ts:placeLabels
 src/ui/index.ts	reachedBefore	re-export	src/ui/vesselLayout.ts:reachedBefore
 src/ui/index.ts	useFadeAfter	re-export	src/ui/motion.tsx:useFadeAfter
 src/ui/index.ts	usePour	re-export	src/ui/motion.tsx:usePour
 src/ui/index.ts	useReachFlash	re-export	src/ui/motion.tsx:useReachFlash
 src/ui/index.ts	useReducedMotion	re-export	src/theme/motion.ts:useReducedMotion
+src/ui/index.ts	useShortWindow	re-export	src/ui/shortWindow.ts:useShortWindow
 src/ui/index.ts	webAutoComplete	re-export	src/ui/controlRules.ts:webAutoComplete
 src/ui/keyboardInset.ts	ControlBox	interface
 src/ui/keyboardInset.ts	KEYBOARD_MIN	const
@@ -3560,8 +3644,11 @@ src/ui/keyboardInset.ts	TOAST_REACH_FROM	const
 src/ui/keyboardInset.ts	WindowBox	interface
 src/ui/keyboardInset.ts	keyboardCover	function
 src/ui/keyboardInset.ts	revealDelta	function
+src/ui/keyboardInset.ts	scrollGivesUp	function
+src/ui/keyboardInset.ts	toastBand	function
 src/ui/keyboardInset.ts	toastBottom	function
 src/ui/keyboardInset.ts	toastBottomAmong	function
+src/ui/keyboardInset.ts	toastPlaceAmong	function
 src/ui/keyboardInset.ts	toastReachTop	function
 src/ui/keyboardInset.ts	toastSpot	function
 src/ui/motion.tsx	AnimatedItem	component
@@ -3578,10 +3665,13 @@ src/ui/motion.tsx	ease	const
 src/ui/motion.tsx	useFadeAfter	function
 src/ui/motion.tsx	usePour	function
 src/ui/motion.tsx	useReachFlash	function
+src/ui/sheetHistory.ts	HeldWrites	interface
 src/ui/sheetHistory.ts	OWN_BACK_MS	const
 src/ui/sheetHistory.ts	OwnBacks	interface
 src/ui/sheetHistory.ts	backClosesSheet	function
+src/ui/sheetHistory.ts	heldWrites	function
 src/ui/sheetHistory.ts	ownBacks	function
+src/ui/shortWindow.ts	useShortWindow	function
 src/ui/textLang.ts	LangPart	interface
 src/ui/textLang.ts	langParts	function
 src/ui/textLang.ts	scriptLang	function

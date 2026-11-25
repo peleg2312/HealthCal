@@ -18,7 +18,7 @@ import { AmountEditor } from './AmountEditor';
 import { RowEmoji } from './components';
 import { formatPortion, mealServings, planSavedMeal, setItemAmount } from './build';
 import { displayFoodName } from './displayName';
-import { dayPhrase, kcal, matchServing, sourceInfo, sourceKindOf, withSourceWord, type SourceKind } from './helpers';
+import { dayPhrase, kcal, matchServing, rowSourceWord, sourceInfo, sourceKindOf, withSourceWord, type SourceKind } from './helpers';
 import { itemLine, itemStepText } from './itemLine';
 import { logSavedMeal } from './log';
 import { currentValues } from './usuals';
@@ -143,7 +143,9 @@ export function LogSavedMealSheet({ meal, mealType, date, onClose }: { meal: Sav
               feedback="select"
               accessibilityRole="checkbox"
               accessibilityState={{ checked: on }}
-              accessibilityLabel={spokenUnits(`${displayFoodName(it)}, ${withoutMarks(itemLine(it))}, ${sourceInfo(itemSource(it)).label}`)}
+              // Its words as drawn (label in name: the name, then the caption with its source's word), then the
+              // source in words where the caption has none for it.
+              accessibilityLabel={`${displayFoodName(it)}, ${withoutMarks(withSourceWord(itemLine(it), itemSource(it)))}${rowSourceWord(itemSource(it)) === sourceInfo(itemSource(it)).label ? '' : `, ${sourceInfo(itemSource(it)).label}`}`}
               onPress={() => setInclude((cur) => meal.items.map((_, j) => (j === i ? !(cur[j] ?? true) : (cur[j] ?? true))))}
               style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 48, paddingVertical: 4 }}>
               <View

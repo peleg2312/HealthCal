@@ -2372,7 +2372,8 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
       await p.waitForTimeout(400);
       const cap = await ftext(p, 'quick-fav-food-0-caption');
       const label = await p.getByTestId('quick-fav-food-0').first().getAttribute('aria-label');
-      check('favourites: a starred AI food\'s tile reads "~" before its calories and "about" in its label', /^150 g, ~248 kcal$/.test(cap) && /about 248 kilocalories/.test(label ?? ''), `${cap} | ${label}`);
+      // The label holds the tile's words as drawn (WCAG 2.5.3, label in name), its "~" included.
+      check('favourites: a starred AI food\'s tile reads "~" before its calories, and its label holds them as drawn', /^150 g, ~248 kcal$/.test(cap) && (label ?? '').includes('150 g, ~248 kcal'), `${cap} | ${label}`);
       await ctx.close();
     }
 

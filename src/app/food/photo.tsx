@@ -574,7 +574,6 @@ export default function PhotoScreen() {
               <TextField
                 testID="ai-photo-weight"
                 label={units === 'imperial' ? 'Weighed it? Total ounces (optional)' : 'Weighed it? Total grams (optional)'}
-                accessibilityLabel={`Weighed it? Total ${units === 'imperial' ? 'ounces' : 'grams'} of food, without the plate. Optional`}
                 value={weightText}
                 onChangeText={(t) => {
                   setWeightText(t);

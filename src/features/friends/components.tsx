@@ -140,7 +140,18 @@ export function FriendCard({ friend, today, units, onOpen, onCheer }: { friend: 
         testID={`friends-card-${slug}`}
         onPress={onOpen}
         scaleTo={0.99}
-        accessibilityLabel={`${friend.displayName}. ${hasMinutes ? `${s.minutes} active minutes ${current ? 'this week' : 'in their last shared week'}. ` : ''}${typeof s.streak === 'number' ? `${s.streak} day streak. ` : ''}Open details`}
+        // What the card shows, as drawn and in its order (WCAG 2.5.3, label in name: the mark, the name, the streak,
+        // the minutes and their line, the week's day letters), then the minutes in words and where it leads.
+        accessibilityLabel={`${[
+          personMark(friend.displayName, friend.avatar).text,
+          friend.displayName,
+          typeof s.streak === 'number' ? (s.streak === 1 ? '1 day streak' : `${s.streak} day streak`) : !sharesAnything(s) ? 'Not sharing their week right now' : '',
+          hasMinutes ? `${formatNumber(s.minutes ?? 0)} min` : '',
+          hasMinutes ? (current ? `${s.sessions ?? 0} ${s.sessions === 1 ? 'session' : 'sessions'}${narrow ? '' : ' this week'}` : s.week ? `Week of ${formatShortDate(s.week)}` : 'Last shared week') : '',
+          days ? days.map((d) => weekdayShort(d.date).slice(0, 1)).join(' ') : '',
+        ]
+          .filter(Boolean)
+          .join(', ')}. ${hasMinutes ? `${s.minutes} active minutes ${current ? 'this week' : 'in their last shared week'}. ` : ''}Open details`}
         style={{ gap: spacing.lg }}>
         {/* The minutes sit beside the name; a name too long for that line takes the row and the minutes go under it, at the right. */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.xs }}>

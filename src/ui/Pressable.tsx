@@ -5,6 +5,7 @@ import { useReducedMotion, useTheme } from '@/theme';
 
 import { ANDROID_TARGET, ariaFromState, fixedSize, isSpaceKey, pressesOnSpace, slopToReach, wantsAndroidTarget } from './controlRules';
 import { haptic } from './haptics';
+import { scheduleHitTrim, trackHitArea } from './hitTrim';
 import { passRef, useToastControl } from './toastControls';
 
 /**
@@ -204,6 +205,16 @@ export function PressableScale({ style, scaleTo = 0.97, feedback = 'none', dimDi
     ownRef.current = n;
     passRef(given, n);
   };
+  // Web: the touch area is cut where it would reach into another control's drawn box (./hitTrim), looked at again
+  // after every render, since the controls around it may have moved.
+  useEffect(() => {
+    const n = ownRef.current;
+    if (Platform.OS !== 'web' || !hit || typeof HTMLElement === 'undefined' || !(n instanceof HTMLElement)) return;
+    return trackHitArea(n);
+  }, [hit, ownRef]);
+  useEffect(() => {
+    if (Platform.OS === 'web' && hit) scheduleHitTrim();
+  });
   // Web: a named control's icons only decorate (its name says what it does), so they are hidden from assistive
   // technology, whoever drew them: a screen's own icon in a pressable row or tile as much as a kit Button's. An
   // svg that carries a name of its own keeps it. Run after every render, as the icons inside may change.

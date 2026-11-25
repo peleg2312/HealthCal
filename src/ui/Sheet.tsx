@@ -8,10 +8,10 @@ import { spokenUnits } from '@/lib/spokenUnits';
 import { MAX_CONTENT_WIDTH, motion, sheetShadow, useReducedMotion, useTheme } from '@/theme';
 
 import { Button } from './Button';
-import { SHORT_WINDOW } from './controlRules';
 import { keyboardCover, revealDelta } from './keyboardInset';
 import { ease } from './motion';
 import { backClosesSheet, heldWrites, OWN_BACK_MS, ownBacks } from './sheetHistory';
+import { useShortWindow } from './shortWindow';
 import { Text } from './Text';
 import { ToastHost } from './Toast';
 import { ToastScope } from './toastControls';
@@ -421,7 +421,7 @@ export function Sheet({
   const { height: winH } = useWindowDimensions();
   // A short window (a browser zoomed to 400%, a window held sideways) pins nothing but the handle: the title, the
   // body and the footer scroll together, so the body never has 0 px between them (WCAG 1.4.10; `SHORT_WINDOW`).
-  const short = winH < SHORT_WINDOW;
+  const short = useShortWindow();
   // Stays true through the exit animation, then the modal unmounts.
   const [mounted, setMounted] = useState(visible);
   if (visible && !mounted) setMounted(true);

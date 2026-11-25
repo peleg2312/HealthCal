@@ -426,7 +426,7 @@ describe('words', () => {
   it('the Water row for a drink from the diary: caption, open label, delete label', () => {
     const entry = { name: 'Energy drink, sugared', meal: 'lunch' as const };
     expect(diaryWaterCaption(entry)).toBe('Energy drink, sugared · from lunch');
-    expect(diaryWaterOpenLabel('473 ml drink', entry)).toBe('473 ml drink, Energy drink, sugared, from lunch. Edit in diary');
+    expect(diaryWaterOpenLabel('473 ml drink', '12:40', entry)).toBe('473 ml drink, 12:40, Energy drink, sugared, from lunch. Edit in diary');
     expect(waterDeleteLabel({ ml: 473 }, '12:40', 'metric', entry)).toBe('Delete 473 ml, 12:40. The drink stays in lunch');
     // The old label, byte for byte, for every other row.
     expect(waterDeleteLabel({ ml: 473 }, '12:40', 'metric')).toBe('Delete 473 ml, 12:40');

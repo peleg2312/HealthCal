@@ -128,7 +128,8 @@ export function ItemRow({
       </View>
       {gramsProblem ? (
         // The grams field's own words, tied to it (`aria-describedby` on the web, its hint natively), in the kit's error style.
-        <Text testID={`${id}-grams-error`} nativeID={gramsErrorId} variant="caption" color="danger" accessibilityLiveRegion="polite">
+        // 6 px under the field, as the kit's field errors sit, and 12 px above the row under it.
+        <Text testID={`${id}-grams-error`} nativeID={gramsErrorId} variant="caption" color="danger" accessibilityLiveRegion="polite" style={{ marginTop: -2, marginBottom: 4 }}>
           {gramsProblem}
         </Text>
       ) : null}

@@ -572,7 +572,7 @@ function WaterScreen() {
                   key={`${ml}-${i}`}
                   testID={`water-add-${i}`}
                   // The tile's own words first ("150 ml, Small"), then what the tap does.
-                  accessibilityLabel={spokenUnits(`${title}${subtitle ? `, ${subtitle}` : ''}. ${tilePlan.label}`)}
+                  accessibilityLabel={`${title}${subtitle ? `, ${subtitle}` : ''}. ${tilePlan.label}`}
                   title={title}
                   subtitle={subtitle}
                   icon={<GlassWater size={Math.min(26, 16 + i * 3)} color={colors.water} strokeWidth={2.2} />}
@@ -684,6 +684,7 @@ function WaterScreen() {
             const partner = linked?.entry ?? null;
             const fromDiary = linked?.origin === 'diary';
             const title = waterRowTitle(e, units);
+            const whenLine = `${loggedLabel(e)}${counts !== e.ml ? ` · counts as ${formatVolume(counts, units)}` : ''}`;
             const text = (
               <>
                 <View style={{ width: 24, alignItems: 'center' }}>
@@ -694,8 +695,7 @@ function WaterScreen() {
                     {title}
                   </Text>
                   <Text variant="caption" color="textSecondary">
-                    {loggedLabel(e)}
-                    {counts !== e.ml ? ` · counts as ${formatVolume(counts, units)}` : ''}
+                    {whenLine}
                   </Text>
                   {partner && fromDiary ? (
                     <Text testID={`water-entry-from-${i}`} variant="caption" color="textSecondary" numberOfLines={2}>
@@ -721,7 +721,8 @@ function WaterScreen() {
                     <PressableScale
                       testID={`water-entry-open-${i}`}
                       scaleTo={0.985}
-                      accessibilityLabel={spokenUnits(fromDiary ? diaryWaterOpenLabel(title, partner) : `${title}, ${waterRowCaption(partner, e.date).replace(' · ', ', ')}. Edit in diary`)}
+                      // The row's words as drawn, in their order (WCAG 2.5.3, label in name), then what a tap does.
+                      accessibilityLabel={fromDiary ? diaryWaterOpenLabel(title, whenLine, partner) : `${title}, ${whenLine}, ${waterRowCaption(partner, e.date).replace(' · ', ', ')}. Edit in diary`}
                       onPress={() => router.push(href('/food/detail', { entryId: partner.id, meal: partner.meal, date: partner.date }) as never)}
                       style={{ ...rowStyle, flex: 1, minWidth: 0 }}>
                       {text}

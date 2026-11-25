@@ -134,7 +134,8 @@ export function TabHeader({
       <PressableScale
         testID={`${tab}-profile`}
         onPress={() => router.push('/profile')}
-        accessibilityLabel="Profile and settings"
+        // The initial it shows first (label in name), then where it leads.
+        accessibilityLabel={`${initial}, profile and settings`}
         hitSlop={HEADER_SLOP}
         // Neutral, as Friends is: the card surface with its 1 px line. Only the Coach cup is accented.
         style={{ width: HEADER_CUP, height: HEADER_CUP, ...cupFor(HEADER_CUP), backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>

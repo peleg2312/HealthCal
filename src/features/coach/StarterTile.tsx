@@ -1,7 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
 
-import { spokenUnits } from '@/lib/spokenUnits';
 import { cup, useTheme } from '@/theme';
 import { CupKey, PressableScale, Text } from '@/ui';
 
@@ -31,7 +30,8 @@ export function StarterTile({
     <PressableScale
       testID={testID}
       accessibilityRole="button"
-      accessibilityLabel={spokenUnits(`${question}${/[?.!]$/.test(question) ? ' ' : '. '}${caption}`)}
+      // The question and its caption as drawn (label in name).
+      accessibilityLabel={`${question}${/[?.!]$/.test(question) ? ' ' : '. '}${caption}`}
       feedback="select"
       scaleTo={0.97}
       onPress={onPress}

@@ -59,6 +59,10 @@ export function WorkoutRow({
   const imported = row.status === 'already-imported';
   const meta = metaLine(w, todayDate, units, hour12);
   const replaceable = replaceHandLoggedPlan(row) !== null;
+  // The line under the date: what the file calls an unknown sport, else the leg and the notes.
+  const capLine = !activity
+    ? `${w.format === 'apple' ? 'Apple Health' : 'Garmin'} calls it ${garminName}${legNote ? ` · ${legNote}` : ''}`
+    : [legNote, row.entry?.notes].filter(Boolean).join(' · ');
 
   return (
     <View testID={`import-row-${id}`} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, paddingVertical: 6 }}>
@@ -81,7 +85,8 @@ export function WorkoutRow({
           testID={`import-activity-${id}`}
           onPress={() => onChoose(row.key)}
           scaleTo={0.985}
-          accessibilityLabel={activity ? `${activity.name}. Change activity` : `Choose the activity for ${garminName}`}
+          // The row's words as drawn, in their order (WCAG 2.5.3, label in name), then what a tap does.
+          accessibilityLabel={`${[title, meta, capLine, kcal.added ? `${kcal.added} kcal` : '', kcal.detail].filter(Boolean).join(', ')}. ${activity ? 'Change activity' : `Choose the activity for ${garminName}`}`}
           accessibilityHint={kcal.spoken}
           style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, minHeight: 44, paddingTop: 10 }}>
           {/* 4 px between the row's own lines, so the date line and the note never read as touching. */}
@@ -99,14 +104,9 @@ export function WorkoutRow({
             <Text variant="caption" color="textSecondary">
               {meta}
             </Text>
-            {!activity ? (
+            {capLine ? (
               <Text variant="caption" color="textSecondary" numberOfLines={2}>
-                {w.format === 'apple' ? 'Apple Health' : 'Garmin'} calls it {garminName}
-                {legNote ? ` · ${legNote}` : ''}
-              </Text>
-            ) : legNote || row.entry?.notes ? (
-              <Text variant="caption" color="textSecondary" numberOfLines={2}>
-                {[legNote, row.entry?.notes].filter(Boolean).join(' · ')}
+                {capLine}
               </Text>
             ) : null}
           </View>

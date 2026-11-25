@@ -279,7 +279,8 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
               grow={1}
               size="md"
               label="Height, ft"
-              accessibilityLabel="Height, feet"
+              // The label as drawn, then its unit in full (label in name, as `spokenFieldName`).
+              accessibilityLabel="Height, ft, feet"
               testID="onb-height-ft"
               decimals={0}
               maxLength={1}
@@ -293,7 +294,7 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
               grow={1}
               size="md"
               label="in"
-              accessibilityLabel="Height, inches"
+              accessibilityLabel="Height in inches"
               testID="onb-height-in"
               decimals={1}
               maxLength={4}
@@ -307,7 +308,7 @@ export function BodyStep({ draft, set, errors, submit }: StepProps) {
               grow={1.25}
               size="md"
               label="Weight, lb"
-              accessibilityLabel="Current weight, pounds"
+              accessibilityLabel="Weight, lb, current weight in pounds"
               testID="onb-weight"
               decimals={1}
               maxLength={5}
@@ -455,7 +456,7 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
             <BigNumberField
               grow={1}
               label={`Neck, ${lu}`}
-              accessibilityLabel={`Neck, ${imp ? 'inches' : 'centimetres'}`}
+              accessibilityLabel={`Neck, ${lu}, ${imp ? 'inches' : 'centimetres'}`}
               testID="onb-neck-input"
               autoFocus={picked}
               size="md"
@@ -470,7 +471,7 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
             <BigNumberField
               grow={1}
               label={`Waist, ${lu}`}
-              accessibilityLabel={`Waist, ${imp ? 'inches' : 'centimetres'}`}
+              accessibilityLabel={`Waist, ${lu}, ${imp ? 'inches' : 'centimetres'}`}
               testID="onb-waist-input"
               size="md"
               decimals={1}
@@ -485,7 +486,7 @@ export function BodyFatStep({ draft, set, errors, submit, advance, hold }: StepP
               <BigNumberField
                 grow={1}
                 label={`Hips, ${lu}`}
-                accessibilityLabel={`Hips, ${imp ? 'inches' : 'centimetres'}`}
+                accessibilityLabel={`Hips, ${lu}, ${imp ? 'inches' : 'centimetres'}`}
                 testID="onb-hip-input"
                 size="md"
                 decimals={1}
@@ -809,7 +810,8 @@ export function RoutineStep({ draft, set, errors }: StepProps) {
           scaleTo={0.99}
           accessibilityRole="button"
           accessibilityState={{ expanded: open }}
-          accessibilityLabel={`Adjust times and the evening check-in. Awake ${formatClock(r.wake, hour12)} to ${formatClock(r.bed, hour12)}, meals ${formatClock(r.breakfast, hour12)}, ${formatClock(r.lunch, hour12)} and ${formatClock(r.dinner, hour12)}, check-in ${r.nudges.checkin ? whenFor('checkin') : 'off'}`}
+          // Its words as drawn (label in name), then the meal times and what it opens.
+          accessibilityLabel={`Adjust times, Meals, awake ${formatClock(r.wake, hour12)} to ${formatClock(r.bed, hour12)}, check-in ${r.nudges.checkin ? whenFor('checkin') : 'off'}. Meals at ${formatClock(r.breakfast, hour12)}, ${formatClock(r.lunch, hour12)} and ${formatClock(r.dinner, hour12)}; the times and the evening check-in`}
           style={{
             flexDirection: 'row',
             alignItems: 'center',

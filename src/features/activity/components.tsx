@@ -3,7 +3,6 @@ import React from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { DayStepper } from '@/features/food/components';
-import { spokenUnits } from '@/features/progress/chartWords';
 import { useToday } from '@/store/clock';
 import { useLive, useProfile } from '@/store/selectors';
 import { INTENSITY_LABELS, kcalRange } from '@/lib/exercise';
@@ -87,14 +86,15 @@ export function SessionRow({
   const adds = budgetAdds(rule, entry.kcalNet);
   const short = budgetAddsShort(rule);
   const beside = historyFigureBeside(entry.name, adds.figure, short, room, scale);
+  // Named by what it shows, as drawn and in its order (WCAG 2.5.3, label in name: "Volleyball, ~290 kcal added,
+  // Sun · 75 min · Moderate"), then what it leaves out: the date in full where the row shows a short day (so two
+  // rows never share a name), how the figure was found and what a tap does.
   const spoken = [
-    `Edit ${entry.name}`,
-    ...(day ? [day.spoken] : []),
-    // "75 minutes", "3.9 kilometres": units spoken in full (`spokenUnits`).
-    ...parts.map(spokenUnits),
-    ...(garmin ? ['imported from Garmin'] : []),
-    measured ? `${adds.spoken}, from a measured burn` : `${adds.spoken}, an estimate, likely ${formatNumber(range![0])} to ${formatNumber(range![1])}`,
-  ].join(', ');
+    `${entry.name}, ${adds.figure} kcal ${short}, ${(day ? [day.word, ...parts] : parts).join(' · ')}${garmin ? `, ${measured ? 'Garmin · measured' : 'Garmin'}` : ''}`,
+    ...(day && day.spoken.toLowerCase() !== day.word.toLowerCase() ? [day.spoken] : []),
+    `${adds.words[0].toUpperCase()}${adds.words.slice(1)}, ${measured ? 'from a measured burn' : `an estimate, likely ${formatNumber(range![0])} to ${formatNumber(range![1])} kcal`}`,
+    'Edit',
+  ].join('. ');
   const figure = (
     <Text variant="numM" testID={`session-kcal-${entry.id}`} style={{ fontSize: 17, lineHeight: 22, flexShrink: beside ? 0 : 1 }}>
       {adds.figure}
