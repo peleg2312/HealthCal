@@ -2,7 +2,6 @@ import { ChevronRight } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Animated, Easing, Platform, useWindowDimensions, View, type AccessibilityRole, type AccessibilityState, type StyleProp, type ViewStyle } from 'react-native';
 
-import { spokenUnits } from '@/lib/spokenUnits';
 import { cup, cupFor, fonts, motion, phoneCapFor, scaledFontSize, useReducedMotion, useTextSize, useTheme } from '@/theme';
 
 import { Button } from './Button';
@@ -41,7 +40,7 @@ export function ListRow({
   accessibilityRole?: AccessibilityRole;
   accessibilityState?: AccessibilityState;
   accessibilityHint?: string;
-  /** What a screen reader says for a row you can tap. By default its title, subtitle and value, with every unit said in full. */
+  /** What a screen reader says for a row you can tap. By default its title, subtitle and value as drawn, units included (label in name). */
   accessibilityLabel?: string;
 }) {
   const { colors, spacing } = useTheme();
@@ -131,7 +130,7 @@ export function ListRow({
         accessibilityRole={accessibilityRole}
         accessibilityState={accessibilityState}
         accessibilityHint={accessibilityHint}
-        accessibilityLabel={accessibilityLabel ?? spokenUnits([title, subtitle, value].filter(Boolean).join(', '))}>
+        accessibilityLabel={accessibilityLabel ?? [title, subtitle, value].filter(Boolean).join(', ')}>
         {content}
       </PressableScale>
     );
@@ -153,6 +152,8 @@ const SWITCH_W = 40;
 const SWITCH_H = 24;
 const KNOB = 16;
 const KNOB_INSET = (SWITCH_H - KNOB) / 2;
+/** While a finger, a mouse button or a key holds the switch, its knob stretches this much towards the other side. */
+const KNOB_HELD = 5;
 
 /**
  * The Pour switch, drawn the same on iOS, Android and web (no platform pill):
@@ -160,7 +161,9 @@ const KNOB_INSET = (SWITCH_H - KNOB) / 2;
  * (16 x 16, corners 3 3 5 5). Off is an empty cup: a 1.5 px vesselEdge edge (the cup
  * outline, 3:1 on the page and the card) and a textTertiary knob on the left. On is a full one: the primary fill and
  * an onPrimary knob on the right. The knob slides (a transform), or jumps
- * under reduced motion. The touch target is 44 x 44 (48 dp on Android). On the web
+ * under reduced motion. While it is held the knob stretches 5 px towards the side it
+ * will go (its pressed state, shown at once, also under reduced motion), and lets go
+ * when the press ends. The touch target is 44 x 44 (48 dp on Android). On the web
  * Space flips it as well as a tap and Enter (`PressableScale`, role switch).
  */
 export function Toggle({
@@ -180,6 +183,9 @@ export function Toggle({
   const reduce = useReducedMotion();
   // Held in state, not a ref: the value is read while rendering. 0 off, 1 on.
   const [x] = useState(() => new Animated.Value(value ? 1 : 0));
+  // The pressed state: the knob stretches while the switch is held (a press that ends anywhere lets it go).
+  const [held, setHeld] = useState(false);
+  const knobW = KNOB + (held ? KNOB_HELD : 0);
   useEffect(() => {
     if (reduce) {
       x.setValue(value ? 1 : 0);
@@ -193,6 +199,8 @@ export function Toggle({
     <PressableScale
       testID={testID}
       onPress={() => onChange(!value)}
+      onPressIn={() => setHeld(true)}
+      onPressOut={() => setHeld(false)}
       disabled={disabled}
       feedback="select"
       scaleTo={1}
@@ -212,13 +220,14 @@ export function Toggle({
       }}>
       <Animated.View
         style={{
-          width: KNOB,
+          // Held, it is wider and keeps its outer edge where it was, so it stretches towards the middle.
+          width: knobW,
           height: KNOB,
           // The border is inside the 40 x 24 box, so the knob's inset is measured from it.
           marginLeft: KNOB_INSET - 1.5,
           ...cup(5, 3),
           backgroundColor: value ? colors.onPrimary : colors.textTertiary,
-          transform: [{ translateX: x.interpolate({ inputRange: [0, 1], outputRange: [0, SWITCH_W - KNOB - 2 * KNOB_INSET] }) }],
+          transform: [{ translateX: x.interpolate({ inputRange: [0, 1], outputRange: [0, SWITCH_W - knobW - 2 * KNOB_INSET] }) }],
         }}
       />
     </PressableScale>
@@ -240,7 +249,7 @@ export function ToggleRow({
   left?: React.ReactNode;
   testID?: string;
 }) {
-  return <ListRow title={title} subtitle={subtitle} left={left} chevron={false} right={<Toggle testID={testID} value={value} onChange={onChange} accessibilityLabel={spokenUnits(title)} />} />;
+  return <ListRow title={title} subtitle={subtitle} left={left} chevron={false} right={<Toggle testID={testID} value={value} onChange={onChange} accessibilityLabel={title} />} />;
 }
 
 /**

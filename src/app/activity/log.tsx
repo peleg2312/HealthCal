@@ -22,7 +22,7 @@ import { useStore } from '@/store';
 import { useDay, useLive, useProfile } from '@/store/selectors';
 import { cup, LARGE_TEXT, useTextGrowth, useTheme } from '@/theme';
 import type { Intensity } from '@/types';
-import { Button, Card, Chip, CupKey, decorative, EmptyState, Header, IconButton, NumberField, PressableScale, Screen, Text, TextField } from '@/ui';
+import { Button, Card, Chip, CupKey, decorative, EmptyState, figure, Header, IconButton, NumberField, PressableScale, Screen, Text, TextField } from '@/ui';
 
 const INTENSITIES: Intensity[] = ['light', 'moderate', 'vigorous'];
 const PRESETS = [15, 30, 45, 60, 90];
@@ -197,8 +197,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
         {/* What the budget gains: the hatched key of exercise headroom (as on the diary's summary), the figure, its words. */}
         <View
           testID="log-activity-adds"
-          accessible
-          accessibilityLabel={adds.spoken}
+          {...figure(adds.spoken)}
           style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, ...cup(radius.tile, 5), backgroundColor: colors.surfaceAlt, paddingHorizontal: spacing.md, paddingVertical: 10 }}>
           {rule !== 'off' ? (
             // Level with the figure's line, also when the words have moved under it.

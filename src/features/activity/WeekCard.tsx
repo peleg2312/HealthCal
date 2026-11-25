@@ -9,7 +9,7 @@ import { formatNumber } from '@/lib/units';
 import { cup, fonts, LARGE_TEXT, useTextGrowth, useTheme } from '@/theme';
 import { useProfile } from '@/store/selectors';
 import type { ISODate } from '@/types';
-import { Card, CupKey, IconButton, MiniCup, PressableScale, Text, Vessel, type VesselLabel } from '@/ui';
+import { Card, CupKey, figure, IconButton, MiniCup, PressableScale, Text, Vessel, type VesselLabel } from '@/ui';
 
 import { WHO_WEEKLY_MINUTES, type WeekSummary } from './build';
 import { weekStripLabel } from './history';
@@ -285,7 +285,7 @@ function Mini({ label, value, unit, color, testID, spoken }: { label: string; va
   return (
     // No shrinking below the number's own width (its spaces do not break): each total is as wide as its number,
     // at least 64 px, and the row wraps instead of cutting one ("20 h 40 min" is wider than a third of the card).
-    <View style={{ flexGrow: 1, flexBasis: 'auto', minWidth: 64 * grow }} testID={testID} accessible={!!spoken} accessibilityLabel={spoken}>
+    <View style={{ flexGrow: 1, flexBasis: 'auto', minWidth: 64 * grow }} testID={testID} {...figure(spoken)}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         {color ? <CupKey color={color} /> : null}
         <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>

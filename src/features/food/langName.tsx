@@ -3,8 +3,10 @@
  * Parts). An aria-label is one plain string with no language for its parts, so on the web such a control is
  * named instead from a hidden copy of its words, in which the kit `Text` marks the name with its language
  * (a span with `lang`, `@/ui/textLang`), through `aria-labelledby`. Natively, and for a label with no Hebrew
- * or Arabic letter, the plain label stands as it is. The words are the same either way: the label with its
- * units in full (`spokenUnits`) and without direction marks (`withoutMarks`).
+ * or Arabic letter, the plain label stands as it is. The words are the same either way: the label as given,
+ * without direction marks (`withoutMarks`). A control that shows words is named with them as drawn, units
+ * included (WCAG 2.5.3, label in name); a cup that shows none (`LangIconButton`) says its units in full
+ * (`spoken`, `spokenUnits`), as the kit's IconButton does.
  */
 import React, { useId } from 'react';
 import { Platform, View } from 'react-native';
@@ -23,8 +25,11 @@ export interface LangName {
   hidden: React.ReactNode;
 }
 
-/** The name of one control (`label` as it would be its accessibilityLabel). One call per control. */
-export function useLangName(label: string): LangName {
+/**
+ * The name of one control (`label` as it would be its accessibilityLabel). One call per control. `spoken`: the
+ * control shows no words (a cup), so its hidden copy says the units in full.
+ */
+export function useLangName(label: string, spoken = false): LangName {
   const id = `lang-name-${useId().replace(/[^A-Za-z0-9_-]/g, '')}`;
   if (Platform.OS !== 'web' || !scriptLang(label)) return { label, props: {}, hidden: null };
   return {
@@ -33,7 +38,7 @@ export function useLangName(label: string): LangName {
     hidden: (
       // Hidden from view and from the reading order; aria-labelledby still reads it (a referenced node counts when hidden).
       <View nativeID={id} style={{ display: 'none' }}>
-        <Text>{spokenUnits(withoutMarks(label))}</Text>
+        <Text>{spoken ? spokenUnits(withoutMarks(label)) : withoutMarks(label)}</Text>
       </View>
     ),
   };
@@ -45,7 +50,7 @@ export function useLangName(label: string): LangName {
  * language-marked copy (`aria-labelledby`, which wins over the plain label it also keeps).
  */
 export function LangIconButton({ accessibilityLabel, children, ...rest }: React.ComponentProps<typeof IconButton>) {
-  const lang = useLangName(accessibilityLabel);
+  const lang = useLangName(accessibilityLabel, true);
   return (
     <>
       <IconButton {...rest} accessibilityLabel={accessibilityLabel} {...lang.props}>

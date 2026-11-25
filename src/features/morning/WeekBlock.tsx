@@ -3,7 +3,7 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { formatNumber } from '@/lib/units';
 import { cup, fonts, useTheme } from '@/theme';
-import { FadeUp, Text } from '@/ui';
+import { FadeUp, figure, Text } from '@/ui';
 
 import type { CoachMessage } from './coach';
 import { keepLastWord } from './coachLines';
@@ -78,7 +78,7 @@ export function WeekBlock({ cells, streak, personal, coach, firstWeek }: { cells
 
       {coach.text ? (
         <FadeUp index={1} style={hasTop ? { marginTop: spacing.xl } : undefined}>
-          <View testID="morning-coach" accessible accessibilityLabel={coach.label} style={{ gap: spacing.sm }}>
+          <View testID="morning-coach" {...figure(coach.label)} style={{ gap: spacing.sm }}>
             {coach.opener ?? coach.good ? (
               <Text variant="h3" color="text" testID="morning-coach-lead" style={narrow ? LEAD_TYPE_NARROW : LEAD_TYPE}>
                 {keepLastWord((coach.opener ?? coach.good) as string)}

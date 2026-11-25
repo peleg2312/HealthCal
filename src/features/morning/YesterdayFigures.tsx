@@ -6,7 +6,7 @@ import { formatNumber } from '@/lib/units';
 import { SLEEP_RANGE } from '@/features/trackers/helpers';
 import { motion, useTextSize, useTheme, withOpacity } from '@/theme';
 import type { ISODate, UnitSystem } from '@/types';
-import { AnimatedNumber, CupKey, PressableScale, Text, Trough } from '@/ui';
+import { AnimatedNumber, CupKey, figure, PressableScale, Text, Trough } from '@/ui';
 
 import { budgetShare, hoursAndMinutes, spokenHours, waterFigures } from './figures';
 import { leaveMorningTo } from './leave';
@@ -126,14 +126,14 @@ export function YesterdayFigures({ day, sleepHours, units, kcalShown }: { day: F
         </View>
       </PressableScale>
 
-      <View testID="morning-protein" accessible accessibilityLabel={day.foodLogged ? `Protein, ${Math.round(day.protein)} of ${Math.round(day.proteinG)} grams${proteinReached ? ', goal reached' : ''}` : 'Protein, not logged'} style={tile}>
+      <View testID="morning-protein" {...figure(day.foodLogged ? `Protein, ${Math.round(day.protein)} of ${Math.round(day.proteinG)} grams${proteinReached ? ', goal reached' : ''}` : 'Protein, not logged')} style={tile}>
         {head(colors.protein, 'Protein', day.foodLogged ? 'filled' : 'dashed')}
         {day.foodLogged ? <AnimatedNumber variant="numL" style={numStyle} numberOfLines={1} value={Math.round(day.protein)} delay={delay(1)} memoryKey={key('protein')} /> : dash}
         {caption(day.foodLogged ? `of ${Math.round(day.proteinG)} g` : 'not logged')}
         <Trough value={day.foodLogged ? day.protein : 0} max={day.proteinG} goalKind="reach" color={colors.protein} height={10} delay={delay(1)} memoryKey={key('protein')} />
       </View>
 
-      <View testID="morning-water" accessible accessibilityLabel={`Water, ${water.value} of ${water.goal.replace(/\s\S.*$/, '')} ${water.spokenUnit}${waterReached ? ', goal reached' : ''}`} style={tile}>
+      <View testID="morning-water" {...figure(`Water, ${water.value} of ${water.goal.replace(/\s\S.*$/, '')} ${water.spokenUnit}${waterReached ? ', goal reached' : ''}`)} style={tile}>
         {head(colors.water, 'Water')}
         <AnimatedNumber variant="numL" style={numStyle} numberOfLines={1} value={day.waterMl} delay={delay(2)} memoryKey={key('water')} format={(n) => waterFigures(n, day.waterGoalMl, units).value} />
         {caption(`of ${water.goal}`)}
@@ -141,7 +141,7 @@ export function YesterdayFigures({ day, sleepHours, units, kcalShown }: { day: F
       </View>
 
       {sleepHours !== null ? (
-        <View testID="morning-sleep" accessible accessibilityLabel={`Sleep last night, ${spokenHours(sleepHours)}`} style={tile}>
+        <View testID="morning-sleep" {...figure(`Sleep last night, ${spokenHours(sleepHours)}`)} style={tile}>
           {head(colors.sleep, 'Sleep')}
           {/* Hours and minutes, as the lists say it ("7 h 30 min"), never a decimal. */}
           <Text variant="numL" style={numStyle} numberOfLines={1} testID="morning-sleep-value">

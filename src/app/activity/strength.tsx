@@ -42,9 +42,9 @@ import {
   Button,
   Card,
   Chip,
-  CupKey,
   ChipRow,
   ConfirmSheet,
+  CupKey,
   Divider,
   EmptyState,
   Header,
@@ -58,6 +58,7 @@ import {
   Text,
   TextField,
   Trough,
+  figure,
   goBack,
   haptic,
   toast,
@@ -637,9 +638,8 @@ function Metric({ label, value, unit, testID, spoken }: { label: string; value: 
   return (
     <View
       style={{ flex: 1, minWidth: big ? 120 : 0 }}
-      accessible
       // Said in full: "Volume: 2,450 kilograms", "Best one-rep max, estimated: about 80 kilograms".
-      accessibilityLabel={spokenUnits(spoken ?? `${label}: ${value === '–' ? 'none yet' : `${value}${unit ? ` ${unit}` : ''}`}`)}>
+      {...figure(spokenUnits(spoken ?? `${label}: ${value === '–' ? 'none yet' : `${value}${unit ? ` ${unit}` : ''}`}`))}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 3 }}>
         <Text variant="numM" tabular testID={testID} style={narrow ? { fontSize: 17, lineHeight: 21 } : undefined}>
           {value}

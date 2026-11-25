@@ -9,7 +9,7 @@ import { formatDistance, formatNumber } from '@/lib/units';
 import type { CheerReceived, Friend, FriendRequest, FriendWorkout, SocialSharing } from '@/services/friends';
 import { fonts, useTheme } from '@/theme';
 import type { ISODate, UnitSystem } from '@/types';
-import { Avatar, Button, Card, Divider, IconButton, MiniCup, PressableScale, Text, TextField, Toggle } from '@/ui';
+import { Avatar, Button, Card, Divider, figure, IconButton, MiniCup, PressableScale, Text, TextField, Toggle } from '@/ui';
 
 import { formatCode, normalizeCode } from './summary';
 import { dayLabel, friendWeek, isCurrentWeek, latestWorkout, personMark, sharesAnything, sharingSentence, type FriendDay } from './week';
@@ -56,8 +56,7 @@ export function WeekCups({ days, today }: { days: FriendDay[]; today: ISODate })
       {days.map((d) => (
         <View
           key={d.date}
-          accessible
-          accessibilityLabel={`${weekdayShort(d.date)}: ${d.future ? 'not yet' : d.minutes ? `${d.minutes} minutes` : 'no workout shared'}`}
+          {...figure(`${weekdayShort(d.date)}: ${d.future ? 'not yet' : d.minutes ? `${d.minutes} minutes` : 'no workout shared'}`)}
           style={{ flex: 1, alignItems: 'center', gap: 5 }}>
           <MiniCup progress={d.progress} over={false} future={d.future} color={colors.exercise} width={30} height={26} />
           <Text variant="caption" color={d.date === today ? 'text' : 'textSecondary'} style={d.date === today ? { fontFamily: fonts.bold } : undefined}>

@@ -6,7 +6,7 @@ import { addDays, startOfWeek, weekdayShort } from '@/lib/dates';
 import type { InsightDay } from '@/lib/insights';
 import type { Consistency } from '@/store/selectors';
 import { fonts, useTheme } from '@/theme';
-import { AnimatedNumber, MiniCup, Text } from '@/ui';
+import { AnimatedNumber, figure, MiniCup, Text } from '@/ui';
 
 import { BigStat, Note, SectionCard } from './parts';
 
@@ -29,7 +29,7 @@ export function ConsistencyCard({ consistency, weekDays, today }: { consistency:
       linkLabel="Calendar">
       <View style={{ flexDirection: 'row', gap: spacing.lg }}>
         <View style={{ flex: 1 }}>
-          <View accessible accessibilityLabel={`Current streak ${streak} ${streak === 1 ? 'day' : 'days'}`}>
+          <View {...figure(`Current streak ${streak} ${streak === 1 ? 'day' : 'days'}`)}>
             <AnimatedNumber variant="numL" value={streak} memoryKey="progress-streak">
               <Text variant="unit">{streak === 1 ? ' day' : ' days'}</Text>
             </AnimatedNumber>
@@ -42,7 +42,7 @@ export function ConsistencyCard({ consistency, weekDays, today }: { consistency:
           <BigStat value={`${thisWeek}`} unit={`of ${elapsed}`} label="Days logged this week" />
         </View>
       </View>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }} accessible accessibilityLabel={`Logged ${thisWeek} of ${elapsed} days this week`}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }} {...figure(`Logged ${thisWeek} of ${elapsed} days this week`)}>
         {week.map((d, i) => {
           const isLogged = logged.has(d);
           const future = d > today;

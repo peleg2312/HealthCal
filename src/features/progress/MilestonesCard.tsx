@@ -4,7 +4,7 @@ import { useWindowDimensions, View } from 'react-native';
 import { formatShortDate } from '@/lib/dates';
 import type { Milestone } from '@/lib/insights';
 import { LARGE_TEXT, useTextGrowth, useTheme } from '@/theme';
-import { MiniCup, Text } from '@/ui';
+import { figure, MiniCup, Text } from '@/ui';
 
 import { spokenUnits } from './chartWords';
 import { SectionCard } from './parts';
@@ -48,8 +48,7 @@ export function MilestonesCard({ milestones }: { milestones: Milestone[] }) {
             <View
               key={m.id}
               testID={`milestone-${m.id}`}
-              accessible
-              accessibilityLabel={spokenUnits(`Reached: ${m.title}${m.date ? `, ${formatShortDate(m.date)}` : ''}`)}
+              {...figure(spokenUnits(`Reached: ${m.title}${m.date ? `, ${formatShortDate(m.date)}` : ''}`))}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -81,7 +80,7 @@ export function MilestonesCard({ milestones }: { milestones: Milestone[] }) {
           {next.map((m, i) => {
             const pct = Math.round((m.current / m.goal) * 100);
             return (
-              <View key={m.id} testID={`milestone-${m.id}`} accessible accessibilityLabel={spokenUnits(`${m.title}, ${pct}% of the way. ${m.detail}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+              <View key={m.id} testID={`milestone-${m.id}`} {...figure(spokenUnits(`${m.title}, ${pct}% of the way. ${m.detail}`))} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
                 <MiniCup progress={Math.min(0.999, m.current / m.goal)} goalKind="reach" index={done.length + i} memoryKey={`milestone-${m.id}`} color={colors[milestoneDomain(m.id)]} width={22} height={28} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text variant="label">{m.title}</Text>

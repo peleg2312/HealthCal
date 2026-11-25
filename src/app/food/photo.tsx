@@ -126,6 +126,9 @@ export default function PhotoScreen() {
   const [caret, setCaret] = useState<number | null>(() => prefilledDescription(params.words).length || null);
   const [result, setResult] = useState<AiFoodResult | null>(null);
   const [rows, setRows] = useState<ReviewRow[]>([]);
+  // Rows whose grams field holds a typed minus (named under the row): Add waits until each is put right.
+  const [gramsProblems, setGramsProblems] = useState<Record<string, boolean>>({});
+  const gramsWait = rows.some((r) => gramsProblems[r.key]);
   const [fat, setFat] = useState<AddedFat>('none');
   const [remaining, setRemaining] = useState<number | null>(null);
   const plan = usePlan();
@@ -375,7 +378,7 @@ export default function PhotoScreen() {
   function add() {
     // An estimated row wears the mark of the food in the list it names outright, so the diary reads as food.
     const items = rowsToLogItems(rows, newId, mode === 'photo', (name) => emojiLike(name, matchPool));
-    if (items.length === 0) return;
+    if (items.length === 0 || gramsWait) return;
     // With the switch on, one act logs and saves: one toast that names the meal, one Undo for both.
     // Never for the sample (it is example data, not the person's food nor an AI estimate).
     // The toast keeps as much of the name as two lines hold at the window's width now.
@@ -496,7 +499,7 @@ export default function PhotoScreen() {
         testID="ai-add-to-diary"
         // The total is the large number at the top: the button names where it goes, not the number again.
         title={aiAddTitle({ sample: isDemo, save: saving, meal: MEALS.find((m) => m.id === meal)?.label ?? '' })}
-        disabled={items.length === 0}
+        disabled={items.length === 0 || gramsWait}
         onPress={add}
       />
     );
@@ -782,6 +785,7 @@ export default function PhotoScreen() {
                           onSwap={!swappable(r) ? undefined : (food) => setRows((rs) => rs.map((x) => (x.key === r.key ? swapRow(x, food) : x)))}
                           onUnswap={() => setRows((rs) => rs.map((x) => (x.key === r.key ? unswapRow(x) : x)))}
                           onGrams={(g) => setRows((rs) => rs.map((x) => (x.key === r.key ? setRowGrams(x, g) : x)))}
+                          onGramsProblem={(p) => setGramsProblems((m) => (!!m[r.key] === !!p ? m : { ...m, [r.key]: !!p }))}
                           onRename={(name) => setRows((rs) => rs.map((x) => (x.key === r.key ? renameRow(x, name) : x)))}
                           onRemove={() => removeRow(r)}
                         />

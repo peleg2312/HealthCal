@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { spokenUnits } from '@/lib/spokenUnits';
 import { cup, cupFor, fonts, useTheme } from '@/theme';
 
 import { CupKey } from './Chip';
@@ -195,7 +196,9 @@ export function IconButton({
       scaleTo={0.92}
       expanded={expanded}
       hitSlop={hitSlop ?? Math.max(0, Math.ceil((44 - size) / 2))}
-      accessibilityLabel={accessibilityLabel}
+      // A cup shows no words, so its name says its units in full ("Delete 500 millilitres, 22:56"): there is no drawn
+      // label for the name to match (a control that shows words is named as drawn, see `PressableScale`).
+      accessibilityLabel={spokenUnits(accessibilityLabel)}
       {...(labelledBy ? { 'aria-labelledby': labelledBy } : null)}
       style={[
         {

@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Info, Trash2 } from 'lucide-react-native';
+import { Info } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { AccessibilityInfo, Platform, View } from 'react-native';
 
@@ -27,7 +27,7 @@ import { useToday } from '@/store/clock';
 import { useDay, useLive } from '@/store/selectors';
 import { cup, useLargeText, useTheme } from '@/theme';
 import type { Food, FoodEntry, ISODate, MealType, Nutrients, Serving, WaterEntry } from '@/types';
-import { Button, Card, CupKey, Divider, EmptyState, Header, IconButton, MacroBar, NumberField, PressableScale, Screen, Text, TextField, goBack, haptic } from '@/ui';
+import { Button, Card, CupKey, Divider, EmptyState, Header, MacroBar, NumberField, numberTextProblem, PressableScale, Screen, Text, TextField, goBack, haptic } from '@/ui';
 
 /** Hidden from sight, kept for screen readers: the polite live region that says why Add or Save waited. */
 const SPOKEN_ONLY = { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 } as const;
@@ -385,7 +385,7 @@ function MacroSummary({ n, kcalNote, range, updated }: { n: Nutrients; kcalNote:
 }
 
 function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; entry?: FoodEntry; initialMeal: MealType; initialDate: ISODate }) {
-  const { colors, spacing } = useTheme();
+  const { spacing } = useTheme();
   const entries = useLive('foodEntries');
   const isFav = useStore((s) => s.favoriteFoodIds.includes(food.id));
   const [portion, setPortion] = useState<{ serving: Serving; quantity: number }>(() => {
@@ -453,18 +453,18 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
       footer={
         <View style={{ flexDirection: 'row', gap: spacing.md }}>
           {entry ? (
-            <IconButton
+            // The kit's danger button, its word drawn (one delete per screen; the entry comes back with the toast's Undo).
+            <Button
               testID="detail-delete"
+              title="Delete"
               accessibilityLabel="Delete entry"
-              size={48}
-              tone="clear"
-              style={{ borderWidth: 1.5, borderColor: colors.danger }}
+              variant="danger"
+              full={false}
               onPress={() => {
                 deleteEntry(entry);
                 goBack(href('/diary', { date: entry.date }));
-              }}>
-              <Trash2 size={20} color={colors.danger} strokeWidth={1.9} />
-            </IconButton>
+              }}
+            />
           ) : null}
           <Button
             testID="detail-save"
@@ -510,12 +510,16 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
 
 /** AI estimates and quick adds have no food definition: edit the numbers themselves. */
 function ManualEditor({ entry }: { entry: FoodEntry }) {
-  const { colors, spacing } = useTheme();
+  const { spacing } = useTheme();
   const [name, setName] = useState(entry.name);
   const [kcalV, setKcal] = useState<number | null>(Math.round(entry.nutrients.kcal));
   const [protein, setProtein] = useState<number | null>(entry.nutrients.protein || null);
   const [carbs, setCarbs] = useState<number | null>(entry.nutrients.carbs || null);
   const [fat, setFat] = useState<number | null>(entry.nutrients.fat || null);
+  // The macros as typed: a refused minus empties a value while its field still shows it with its words, so Save
+  // waits rather than store 0 over it (`numberTextProblem`).
+  const [macroTyped, setMacroTyped] = useState<{ protein?: string; carbs?: string; fat?: string }>({});
+  const macroProblem = ([['protein', protein], ['carbs', carbs], ['fat', fat]] as const).some(([k, v]) => v === null && !!numberTextProblem(macroTyped[k] ?? ''));
   const [meal, setMeal] = useState(entry.meal);
   const [date, setDate] = useState(entry.date);
   const paired = usePairedDrink(entry, { grams: entry.grams, date });
@@ -535,23 +539,22 @@ function ManualEditor({ entry }: { entry: FoodEntry }) {
       header={<Header title="Edit entry" subtitle={`${MEAL_LABEL[meal]} · ${dayPhrase(date).replace(/^./, (c) => c.toUpperCase())}`} />}
       footer={
         <View style={{ flexDirection: 'row', gap: spacing.md }}>
-          <IconButton
+          <Button
             testID="detail-delete"
+            title="Delete"
             accessibilityLabel="Delete entry"
-            size={48}
-            tone="clear"
-            style={{ borderWidth: 1.5, borderColor: colors.danger }}
+            variant="danger"
+            full={false}
             onPress={() => {
               deleteEntry(entry);
               goBack(href('/diary', { date: entry.date }));
-            }}>
-            <Trash2 size={20} color={colors.danger} strokeWidth={1.9} />
-          </IconButton>
+            }}
+          />
           <Button
             testID="detail-save"
             style={{ flex: 1 }}
             title={waiting && kcalV !== null ? kcalSaveTitle(kcalV) : 'Save changes'}
-            disabled={kcalV === null || kcalV < 0 || !!paired.problem}
+            disabled={kcalV === null || kcalV < 0 || macroProblem || !!paired.problem}
             onPress={() =>
               second.press(kcalAsks, kcalV ?? 0, kcalAsk(kcalV ?? 0, true), () => {
                 updateEntryDirect(entry, { name, nutrients: n, meal, date });
@@ -586,9 +589,39 @@ function ManualEditor({ entry }: { entry: FoodEntry }) {
         />
         {waiting ? <AskLine id={askId} line={kcalAsk(kcalV ?? 0, true)} testID="manual-kcal-ask" /> : null}
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <NumberField testID="manual-protein" label="Protein" suffix="g" value={protein} onChange={setProtein} style={{ flex: 1 }} />
-          <NumberField testID="manual-carbs" label="Carbs" suffix="g" value={carbs} onChange={setCarbs} style={{ flex: 1 }} />
-          <NumberField testID="manual-fat" label="Fat" suffix="g" value={fat} onChange={setFat} style={{ flex: 1 }} />
+          <NumberField
+            testID="manual-protein"
+            label="Protein"
+            suffix="g"
+            value={protein}
+            onChange={(v, t) => {
+              setProtein(v);
+              setMacroTyped((x) => ({ ...x, protein: t }));
+            }}
+            style={{ flex: 1 }}
+          />
+          <NumberField
+            testID="manual-carbs"
+            label="Carbs"
+            suffix="g"
+            value={carbs}
+            onChange={(v, t) => {
+              setCarbs(v);
+              setMacroTyped((x) => ({ ...x, carbs: t }));
+            }}
+            style={{ flex: 1 }}
+          />
+          <NumberField
+            testID="manual-fat"
+            label="Fat"
+            suffix="g"
+            value={fat}
+            onChange={(v, t) => {
+              setFat(v);
+              setMacroTyped((x) => ({ ...x, fat: t }));
+            }}
+            style={{ flex: 1 }}
+          />
         </View>
         <MacroBar protein={n.protein * 4} carbs={n.carbs * 4} fat={n.fat * 9} height={6} />
         {implied > 40 && kcalV !== null && Math.abs(implied - kcalV) > Math.max(60, kcalV * 0.25) ? (

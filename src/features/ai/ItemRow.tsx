@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronUp, Minus, Plus, Trash2 } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { Platform, TextInput, View } from 'react-native';
 
 import { SourceTag } from '@/features/food/components';
@@ -7,7 +7,7 @@ import { displayFoodName } from '@/features/food/displayName';
 import { isolateRtl } from '@/lib/bidi';
 import { cup, fonts, useTheme } from '@/theme';
 import type { Food } from '@/types';
-import { Badge, CupKey, FOCUS_CUP, IconButton, parseNumber, PressableScale, Text } from '@/ui';
+import { Badge, CupKey, FOCUS_CUP, IconButton, numberTextProblem, parseNumber, PressableScale, Text } from '@/ui';
 
 import { confidenceLevel, estimateGrams, gramStep, shownRowName, type ReviewRow } from './estimate';
 import { itemFromFood } from './localMatch';
@@ -23,6 +23,7 @@ export function ItemRow({
   matches = [],
   onSwap,
   onUnswap,
+  onGramsProblem,
   sample = false,
 }: {
   row: ReviewRow;
@@ -36,9 +37,19 @@ export function ItemRow({
   matches?: Food[];
   onSwap?: (food: Food) => void;
   onUnswap?: () => void;
+  /** What the grams field says about its own text (a typed minus, `numberTextProblem`), or null: the review's Add waits on it. */
+  onGramsProblem?: (problem: string | null) => void;
 }) {
   const { colors, spacing } = useTheme();
   const { item } = row;
+  // A typed minus is kept in the grams field and named under the row in the kit's words; the item keeps its grams
+  // and the review's Add waits until the field is put right (never adds over what the field shows).
+  const [gramsProblem, setGramsProblem] = useState<string | null>(null);
+  const gramsErrorId = `ai-grams-error-${useId().replace(/[^A-Za-z0-9_-]/g, '')}`;
+  const reportGrams = (problem: string | null) => {
+    setGramsProblem(problem);
+    onGramsProblem?.(problem);
+  };
   // The reference foods it could be stay folded under one line until asked for; a matched item shows its match.
   const [showAlt, setShowAlt] = useState(false);
   const step = gramStep(item.grams);
@@ -83,11 +94,22 @@ export function ItemRow({
             size={44}
             tone="surface"
             disabled={item.grams <= step}
-            onPress={() => onGrams(Math.max(step, item.grams - step))}>
+            onPress={() => {
+              reportGrams(null);
+              onGrams(Math.max(step, item.grams - step));
+            }}>
             <Minus size={16} color={colors.text} />
           </IconButton>
-          <GramsInput testID={`${id}-grams`} value={item.grams} onChange={onGrams} label={name} />
-          <IconButton testID={`${id}-plus`} accessibilityLabel={`More ${name}, plus ${step} grams`} size={44} tone="surface" onPress={() => onGrams(item.grams + step)}>
+          <GramsInput testID={`${id}-grams`} value={item.grams} onChange={onGrams} onProblem={reportGrams} problem={gramsProblem} errorId={gramsErrorId} label={name} />
+          <IconButton
+            testID={`${id}-plus`}
+            accessibilityLabel={`More ${name}, plus ${step} grams`}
+            size={44}
+            tone="surface"
+            onPress={() => {
+              reportGrams(null);
+              onGrams(item.grams + step);
+            }}>
             <Plus size={16} color={colors.text} />
           </IconButton>
         </View>
@@ -104,6 +126,12 @@ export function ItemRow({
           {Platform.OS === 'web' ? <Text style={SPOKEN_ONLY}>{itemKcalSpoken(item.kcal)}</Text> : null}
         </View>
       </View>
+      {gramsProblem ? (
+        // The grams field's own words, tied to it (`aria-describedby` on the web, its hint natively), in the kit's error style.
+        <Text testID={`${id}-grams-error`} nativeID={gramsErrorId} variant="caption" color="danger" accessibilityLiveRegion="polite">
+          {gramsProblem}
+        </Text>
+      ) : null}
       {/* The source on the left, the macros on the right; on a narrow phone the macros wrap under the source rather than run over the stepper. */}
       <View testID={`${id}-source`} style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: spacing.sm, rowGap: 4 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1 }}>
@@ -238,7 +266,25 @@ const SPOKEN_ONLY = { position: 'absolute', width: 1, height: 1, overflow: 'hidd
  * taking touches, as the kit's fields do), so a tap anywhere on the cup edits the grams and never
  * lands on the minus or plus beside it.
  */
-function GramsInput({ value, onChange, label, testID }: { value: number; onChange: (g: number) => void; label: string; testID: string }) {
+function GramsInput({
+  value,
+  onChange,
+  onProblem,
+  problem,
+  errorId,
+  label,
+  testID,
+}: {
+  value: number;
+  onChange: (g: number) => void;
+  /** Told what the text says about itself on every change (a typed minus: `numberTextProblem`, else null). */
+  onProblem: (problem: string | null) => void;
+  /** The words drawn under the row for this field, and their id, to tie them to the input. */
+  problem: string | null;
+  errorId: string;
+  label: string;
+  testID: string;
+}) {
   const { colors, radius } = useTheme();
   const [text, setText] = useState(String(value));
   const [last, setLast] = useState(value);
@@ -247,6 +293,11 @@ function GramsInput({ value, onChange, label, testID }: { value: number; onChang
     setLast(value);
     if (parseNumber(text) !== value) setText(String(value));
   }
+  const tie = problem
+    ? Platform.OS === 'web'
+      ? ({ 'aria-invalid': true, 'aria-describedby': errorId } as object)
+      : { accessibilityHint: problem }
+    : null;
   return (
     // The grams field's cup is the input's own edge; FOCUS_CUP on its box draws the keyboard's focus ring round it.
     <View {...FOCUS_CUP} style={{ width: 72, height: 44, ...cup(radius.buttonSm, 5) }}>
@@ -257,14 +308,18 @@ function GramsInput({ value, onChange, label, testID }: { value: number; onChang
         keyboardType="number-pad"
         selectTextOnFocus
         accessibilityLabel={`Grams of ${label}`}
+        {...tie}
         selectionColor={colors.primary}
         onFocus={() => setFocused(true)}
         onBlur={() => {
           setFocused(false);
+          // An empty or zero field goes back to the item's grams; a typed minus stays, named under the row, until put right.
+          if (numberTextProblem(text)) return;
           if (parseNumber(text) === null || (parseNumber(text) ?? 0) <= 0) setText(String(value));
         }}
         onChangeText={(t) => {
           setText(t);
+          onProblem(numberTextProblem(t));
           const n = parseNumber(t);
           if (n !== null && n > 0 && n <= 5000) {
             setLast(Math.round(n));
@@ -277,7 +332,7 @@ function GramsInput({ value, onChange, label, testID }: { value: number; onChang
             height: 44,
             ...cup(radius.buttonSm, 5),
             borderWidth: 1.5,
-            borderColor: focused ? colors.rim : colors.fieldEdge,
+            borderColor: problem ? colors.danger : focused ? colors.rim : colors.fieldEdge,
             backgroundColor: colors.surface,
             color: colors.text,
             fontFamily: fonts.bold,

@@ -10,7 +10,7 @@ import { kcalAsk, pressFor, quickAddTitle, quickKcalAsks, waitsFor } from '@/fea
 import { spokenUnits } from '@/lib/spokenUnits';
 import { atwaterKcal } from '@/lib/nutrition';
 import { useLargeText, useTheme } from '@/theme';
-import { Button, Card, CupKey, Header, NumberField, Screen, Text, TextField, goBack, haptic, useLeaveGuard } from '@/ui';
+import { Button, Card, CupKey, Header, NumberField, numberTextProblem, Screen, Text, TextField, goBack, haptic, useLeaveGuard } from '@/ui';
 
 /** Hidden from sight, kept for screen readers: the live region that says why Add waited. */
 const SPOKEN_ONLY = { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 } as const;
@@ -30,19 +30,23 @@ export default function QuickAddScreen() {
   const [protein, setProtein] = useState<number | null>(null);
   const [carbs, setCarbs] = useState<number | null>(null);
   const [fat, setFat] = useState<number | null>(null);
+  // The macros as typed: a refused minus empties a value while its field still shows it with its words, so Add
+  // waits rather than add 0 g over it (`numberTextProblem`).
+  const [macroTyped, setMacroTyped] = useState<{ protein?: string; carbs?: string; fat?: string }>({});
+  const macroProblem = ([['protein', protein], ['carbs', carbs], ['fat', fat]] as const).some(([k, v]) => v === null && !!numberTextProblem(macroTyped[k] ?? ''));
 
   const hasMacros = protein !== null || carbs !== null || fat !== null;
   const implied = Math.round(atwaterKcal({ protein: protein ?? 0, carbs: carbs ?? 0, fat: fat ?? 0 }));
   const calories = kcalV ?? (hasMacros ? implied : null);
   const mismatch = kcalV !== null && hasMacros && implied > 40 && Math.abs(implied - kcalV) > Math.max(50, kcalV * 0.2);
-  const valid = calories !== null && calories > 0 && calories < QUICK_KCAL_LIMIT && !quickKcalError(kcalText);
+  const valid = calories !== null && calories > 0 && calories < QUICK_KCAL_LIMIT && !quickKcalError(kcalText) && !macroProblem;
   // Why Add cannot add yet, in words under the calories field and tied to it (WCAG 3.3.1): what was typed, or macros
   // alone that add up to no calories or too many.
   const kcalError =
     quickKcalError(kcalText) ??
     (!kcalText.trim() && hasMacros && !(implied > 0 && implied < QUICK_KCAL_LIMIT) ? `These macros add up to ${kcal(implied)} kcal. Enter 1 to ${kcal(QUICK_KCAL_LIMIT - 1)} kcal.` : null);
   // Typed numbers or a name are not dropped without asking (the X, back, a swipe back).
-  const typed = kcalText.trim().length > 0 || hasMacros || name.trim().length > 0;
+  const typed = kcalText.trim().length > 0 || hasMacros || macroProblem || name.trim().length > 0;
   const leave = useLeaveGuard(typed ? 'Discard this quick add?' : null);
   // More than one plausible entry holds (`quickKcalAsks`) is added on a second press of Add (`pressFor`): the
   // first adds nothing, ties its question to the field and names the amount on the button. Another amount asks again.
@@ -106,9 +110,39 @@ export default function QuickAddScreen() {
         </View>
         {/* With large text the three wrap (each at least 110 wide), so "Protein" is never split. */}
         <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', gap: spacing.sm }}>
-          <NumberField testID="quick-protein" label="Protein" suffix="g" value={protein} onChange={setProtein} style={macroCell} />
-          <NumberField testID="quick-carbs" label="Carbs" suffix="g" value={carbs} onChange={setCarbs} style={macroCell} />
-          <NumberField testID="quick-fat" label="Fat" suffix="g" value={fat} onChange={setFat} style={macroCell} />
+          <NumberField
+            testID="quick-protein"
+            label="Protein"
+            suffix="g"
+            value={protein}
+            onChange={(v, t) => {
+              setProtein(v);
+              setMacroTyped((x) => ({ ...x, protein: t }));
+            }}
+            style={macroCell}
+          />
+          <NumberField
+            testID="quick-carbs"
+            label="Carbs"
+            suffix="g"
+            value={carbs}
+            onChange={(v, t) => {
+              setCarbs(v);
+              setMacroTyped((x) => ({ ...x, carbs: t }));
+            }}
+            style={macroCell}
+          />
+          <NumberField
+            testID="quick-fat"
+            label="Fat"
+            suffix="g"
+            value={fat}
+            onChange={(v, t) => {
+              setFat(v);
+              setMacroTyped((x) => ({ ...x, fat: t }));
+            }}
+            style={macroCell}
+          />
         </View>
         {mismatch ? (
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>

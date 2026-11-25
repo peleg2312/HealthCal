@@ -2,7 +2,7 @@ import React from 'react';
 import { View } from 'react-native';
 
 import { fonts, useTheme } from '@/theme';
-import { Text } from '@/ui';
+import { figure, Text } from '@/ui';
 
 import { quoteAccessibilityLabel, type Quote } from './quotes';
 import { quoteWords } from './quoteText';
@@ -24,8 +24,7 @@ export function QuoteBlock({ quote, ready }: { quote: Quote; ready: boolean }) {
   return (
     <View
       testID={ready ? 'morning-quote' : undefined}
-      accessible={ready}
-      accessibilityLabel={ready ? quoteAccessibilityLabel(quote) : undefined}
+      {...figure(ready && quoteAccessibilityLabel(quote))}
       importantForAccessibility={ready ? 'auto' : 'no-hide-descendants'}
       accessibilityElementsHidden={!ready}
       style={{ opacity: ready ? 1 : 0 }}>

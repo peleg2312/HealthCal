@@ -14,7 +14,7 @@ import { atwaterKcal, GRAM_SERVING } from '@/lib/nutrition';
 import { useStore } from '@/store';
 import { cupFor, useTheme } from '@/theme';
 import type { CustomFood, Nutrients } from '@/types';
-import { Button, Card, EmptyState, Header, IconButton, NumberField, PressableScale, Screen, Segmented, Text, TextField, ToggleRow, goBack, haptic, toast, useLeaveGuard } from '@/ui';
+import { Button, Card, EmptyState, Header, IconButton, NumberField, numberTextProblem, PressableScale, Screen, Segmented, Text, TextField, ToggleRow, goBack, haptic, toast, useLeaveGuard } from '@/ui';
 
 type Basis = 'serving' | 'per100';
 type Values = Record<keyof Nutrients, number | null>;
@@ -71,18 +71,27 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
   const [opened] = useState(form);
   const leave = useLeaveGuard(form !== opened ? (existing ? 'Discard changes to this food?' : 'Discard this food?') : null);
 
-  const set = (k: keyof Nutrients) => (v: number | null) => setValues((s) => ({ ...s, [k]: v }));
+  // What was typed in each number field: a refused minus empties its value while the field still shows it with its
+  // words, so Save waits rather than store the food without it (`numberTextProblem`).
+  const [typed, setTyped] = useState<Partial<Record<keyof Nutrients | 'servingGrams', string>>>({});
+  const set = (k: keyof Nutrients) => (v: number | null, t: string) => {
+    setValues((s) => ({ ...s, [k]: v }));
+    setTyped((x) => ({ ...x, [k]: t }));
+  };
+  const minusIn = (k: keyof Nutrients | 'servingGrams', v: number | null) => (v === null ? numberTextProblem(typed[k] ?? '') : null);
+  const minusTyped = NUTRIENT_KEYS.some((k) => !!minusIn(k, values[k])) || !!minusIn('servingGrams', servingGrams);
   const factor = basis === 'serving' ? servingGrams ?? 0 : 100;
   const per100 = (v: number | null) => (v === null ? undefined : basis === 'serving' ? toPer100(v, factor) : v);
 
   const errors = {
     name: !name.trim() ? 'Give it a name' : null,
-    kcal: values.kcal === null ? 'Calories are needed' : null,
-    grams: basis === 'serving' && !(servingGrams && servingGrams > 0) ? 'Size in grams is needed' : null,
+    // A typed minus is named in the kit's words, never replaced by "needed".
+    kcal: values.kcal === null ? (minusIn('kcal', values.kcal) ?? 'Calories are needed') : null,
+    grams: basis === 'serving' && !(servingGrams && servingGrams > 0) ? (minusIn('servingGrams', servingGrams) ?? 'Size in grams is needed') : null,
   };
   const macroSum100 = (per100(values.protein) ?? 0) + (per100(values.carbs) ?? 0) + (per100(values.fat) ?? 0);
   const impossible = factor > 0 && macroSum100 > 101 ? 'Per 100 g these macros add up to more than 100 g. Check the serving size.' : null;
-  const valid = !errors.name && !errors.kcal && !errors.grams && !impossible;
+  const valid = !errors.name && !errors.kcal && !errors.grams && !impossible && !minusTyped;
   const implied = atwaterKcal({ protein: values.protein ?? 0, carbs: values.carbs ?? 0, fat: values.fat ?? 0 });
   const mismatch = values.kcal !== null && implied > 40 && Math.abs(implied - values.kcal) > Math.max(40, values.kcal * 0.25);
 
@@ -218,7 +227,10 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
             label="Size"
             suffix="g"
             value={servingGrams}
-            onChange={setServingGrams}
+            onChange={(v, t) => {
+              setServingGrams(v);
+              setTyped((x) => ({ ...x, servingGrams: t }));
+            }}
             style={{ flex: 1 }}
             error={tried ? errors.grams : null}
           />

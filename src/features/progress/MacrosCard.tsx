@@ -10,6 +10,11 @@ import { BarChart, CupKey, MacroBar, ProgressBar, Text, type BarDatum } from '@/
 import { barsLabel } from './chartWords';
 import { LegendDot, Note, SectionCard } from './parts';
 
+/** A day's macros as the chart's detail draws them, each letter with its own gram amount: "P 171 g · C 242 g · F 61 g". */
+function macroGrams(protein: number, carbs: number, fat: number): string {
+  return `P ${Math.round(protein)} g · C ${Math.round(carbs)} g · F ${Math.round(fat)} g`;
+}
+
 export function MacrosCard({ summary, days, today }: { summary: PeriodSummary; days: InsightDay[]; today: string }) {
   const { colors, spacing } = useTheme();
   const m = summary.macros;
@@ -36,14 +41,15 @@ export function MacrosCard({ summary, days, today }: { summary: PeriodSummary; d
       label: recent.length <= 7 ? weekdayShort(d.date) : '',
       value: p * 4 + c * 4 + f * 9,
       segments: seg(p, c, f),
-      detail: ok ? `${formatShortDate(d.date)} · P ${Math.round(p)} C ${Math.round(c)} F ${Math.round(f)} g` : `${formatShortDate(d.date)} · not fully logged`,
+      // A g after each amount, so each letter is said as its macro ("protein 171 grams, carbs 242 grams, fat 61 grams").
+      detail: ok ? `${formatShortDate(d.date)} · ${macroGrams(p, c, f)}` : `${formatShortDate(d.date)} · not fully logged`,
     };
   });
   bars.push({
     label: 'Avg',
     value: m.protein.avg * 4 + m.carbs.avg * 4 + m.fat.avg * 9,
     segments: seg(m.protein.avg, m.carbs.avg, m.fat.avg),
-    detail: `Average · P ${Math.round(m.protein.avg)} C ${Math.round(m.carbs.avg)} F ${Math.round(m.fat.avg)} g`,
+    detail: `Average · ${macroGrams(m.protein.avg, m.carbs.avg, m.fat.avg)}`,
   });
   const pct = macroPercents({ kcal: 0, protein: m.protein.avg, carbs: m.carbs.avg, fat: m.fat.avg });
   return (

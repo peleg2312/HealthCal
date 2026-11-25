@@ -4,7 +4,7 @@ import { useWindowDimensions, View } from 'react-native';
 import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 
 import { cup, useTheme } from '@/theme';
-import { Card, CupKey, ease, FadeUp, Text, useReducedMotion } from '@/ui';
+import { Card, CupKey, ease, FadeUp, figure, Text, useReducedMotion } from '@/ui';
 
 import { AiMark, aiMarkHeadroom } from './mark';
 import { analysingLabel, analysingNote, analysingSteps, slowAfterMs } from './words';
@@ -61,7 +61,7 @@ export function AnalysingView({ photoUri, aspect, description, precise }: { phot
 
         <Card padding={spacing.lg} testID="ai-analysing-steps">
           {/* One element for a screen reader: what is done, what is happening, what comes next. */}
-          <View accessible accessibilityLabel={analysingLabel(photo, precise)} style={{ gap: spacing.md }}>
+          <View {...figure(analysingLabel(photo, precise))} style={{ gap: spacing.md }}>
             {/* Done is the filled ink cup (as the sync row's "nothing waits"), next the outline: the check is kept for "on budget". */}
             <Step testID="ai-step-input" mark={<CupKey color={colors.text} size={10} />} text={steps.input} />
             {/* The cup stands on the words' line, as it does beside a coach answer; its drop hangs above it. */}

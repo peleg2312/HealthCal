@@ -11,7 +11,7 @@ import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { MEAL_LABEL } from '@/lib/nutrition';
 import { cup, useTheme } from '@/theme';
 import type { ISODate, MealType, SavedMeal, SavedMealItem } from '@/types';
-import { Button, Chip, ChipWrap, CupKey, NumberField, PressableScale, Sheet, Stepper, Text } from '@/ui';
+import { Button, Chip, ChipWrap, CupKey, figure, NumberField, PressableScale, Sheet, Stepper, Text } from '@/ui';
 import { spokenUnits } from '@/lib/spokenUnits';
 
 import { AmountEditor } from './AmountEditor';
@@ -43,7 +43,7 @@ export function ItemCaption({ item, testID }: { item: SavedMealItem; testID?: st
   // The line is one element to a screen reader and names its source in words, reference data included
   // (the mark alone says nothing to it): "1.5 × 1/2 cup dry · 60 g · 227 kcal, Reference data".
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }} accessible accessibilityLabel={spokenUnits(`${withoutMarks(itemLine(item))}, ${sourceInfo(source).label}`)}>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }} {...figure(spokenUnits(`${withoutMarks(itemLine(item))}, ${sourceInfo(source).label}`))}>
       <SourceMark source={source} color={colors.textSecondary} size={8} style={{ marginTop: sourceMarkTop(source) }} />
       <Text variant="caption" color="textSecondary" numberOfLines={2} tabular style={{ flexShrink: 1 }} testID={testID}>
         {/* The source's word stays on one line ("AI estimate", "Your food"). */}

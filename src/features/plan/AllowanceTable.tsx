@@ -26,7 +26,7 @@ import { useWindowDimensions, View, type LayoutChangeEvent } from 'react-native'
 import { AiGlyph } from '@/features/ai/mark';
 import { NBSP } from '@/lib/text';
 import { useTextSize, useTheme } from '@/theme';
-import { Card, DECORATIVE, Text } from '@/ui';
+import { Card, DECORATIVE, figure, Text } from '@/ui';
 
 import { shareOfPlus } from './allowance';
 import { PlanCup } from './PlanCup';
@@ -102,8 +102,7 @@ export function AllowanceTable({ free, plus, current, testID = 'plan-compare' }:
     return (
       <View
         testID={plan === 'free' ? 'plan-free-card' : 'plan-plus-card'}
-        accessible
-        accessibilityLabel={cardLabel(title, limits, mine)}
+        {...figure(cardLabel(title, limits, mine))}
         style={
           isPlus
             ? // Set apart by a hairline down its side; it takes the room the tint had, so nothing else moves.
@@ -180,8 +179,7 @@ export function AllowanceTable({ free, plus, current, testID = 'plan-compare' }:
             <View
               key={plan}
               testID={plan === 'free' ? 'plan-free-card' : 'plan-plus-card'}
-              accessible
-              accessibilityLabel={cardLabel(title, limits, mine)}
+              {...figure(cardLabel(title, limits, mine))}
               style={{
                 gap: 12,
                 ...(plan === 'plus'

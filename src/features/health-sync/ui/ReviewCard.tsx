@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { ACTIVITY_BY_ID } from '@/data/activities';
 import { fonts, useTheme } from '@/theme';
 import type { ISODate, UnitSystem } from '@/types';
-import { Button, Card, Chip, CupKey, Text } from '@/ui';
+import { Button, Card, Chip, CupKey, figure, Text } from '@/ui';
 
 import type { ReviewItem } from '../plan';
 
@@ -46,7 +46,7 @@ export function ReviewCard({
   const likely = item.alternatives.slice(0, 3).map((id) => ACTIVITY_BY_ID[id]).filter(Boolean);
   return (
     <Card testID={`health-review-${item.id}`} padding={16} style={{ gap: spacing.md }}>
-      <View accessible accessibilityLabel={v.spoken} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
+      <View {...figure(v.spoken)} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           {/* A workout's own title can be a sentence: two lines before it shortens, the emoji on the first. */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>

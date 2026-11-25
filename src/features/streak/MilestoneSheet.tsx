@@ -2,7 +2,7 @@ import React from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { useTheme } from '@/theme';
-import { AnimatedNumber, Button, MiniCup, Sheet, Text } from '@/ui';
+import { AnimatedNumber, Button, figure, MiniCup, Sheet, Text } from '@/ui';
 
 import { milestoneCopy, pourIndex, type StreakMilestone } from './rules';
 
@@ -38,7 +38,7 @@ export function MilestoneSheet({ milestone, onClose }: { milestone: StreakMilest
               <MiniCup key={i} index={SHEET_LEAD + pourIndex(i, n)} progress={1} width={cupW} height={cupH} color={colors.calories} />
             ))}
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }} accessible accessibilityLabel={`${n} days`}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }} {...figure(`${n} days`)}>
             <AnimatedNumber variant="numXL" value={n} from={0} delay={SHEET_LEAD * 40} color="caloriesInk" />
             <Text variant="unit" style={{ fontSize: 18 }}>
               days

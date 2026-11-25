@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import { spokenUnits } from '@/lib/spokenUnits';
 import { useTheme } from '@/theme';
-import { CupKey, SectionTitle, Text } from '@/ui';
+import { CupKey, figure, SectionTitle, Text } from '@/ui';
 
 import { ADJUST_TITLE, WELL_TITLE, type ReviewItem } from './review';
 
@@ -29,7 +29,7 @@ export function ReviewList({ variant, items }: { variant: 'well' | 'adjust'; ite
           // A row can start with "about": the list shows it as a sentence.
           const text = item.text.charAt(0).toUpperCase() + item.text.slice(1);
           return (
-            <View key={item.kind} testID={`${testID}-${item.kind}`} accessible accessibilityLabel={spokenUnits(text)} style={{ flexDirection: 'row', gap: spacing.md }}>
+            <View key={item.kind} testID={`${testID}-${item.kind}`} {...figure(spokenUnits(text))} style={{ flexDirection: 'row', gap: spacing.md }}>
               {/* The key sits on the first line of the text. */}
               <View
                 style={{

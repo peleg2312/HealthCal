@@ -15,7 +15,7 @@ import { VIEWER_BLOCKED } from '@/services/viewer';
 import { isBackendConfigured } from '@/services/supabase';
 import { useStore } from '@/store';
 import { useReducedMotion, useTextSize, useTheme } from '@/theme';
-import { AnimatedNumber, Button, decorative, FadeUp, Screen, Text, Vessel } from '@/ui';
+import { AnimatedNumber, Button, decorative, FadeUp, figure, Screen, Text, Vessel } from '@/ui';
 
 /** The cup starts pouring as the screen opens; everything else follows it. */
 const POUR_DELAY = 120;
@@ -83,7 +83,7 @@ function HeroCup({ height, narrow, small, tiny }: { height: number; narrow: bool
   const width = Math.round(Math.max(tiny ? 44 : 0, height * (narrow ? 0.32 : 0.4)));
   const big = tiny ? 34 : small ? 44 : 56;
   return (
-    <View accessible accessibilityLabel={HERO_LABEL}>
+    <View {...figure(HERO_LABEL)}>
       <Vessel
         value={EATEN}
         max={BUDGET}
@@ -193,7 +193,7 @@ const HERO_LABEL = 'An example day: a budget of 2,160 kilocalories including abo
 function LargeTextHero() {
   const { colors, spacing } = useTheme();
   return (
-    <View accessible accessibilityLabel={HERO_LABEL} style={{ gap: spacing.lg }}>
+    <View {...figure(HERO_LABEL)} style={{ gap: spacing.lg }}>
       <View
         style={{
           flexDirection: 'row',

@@ -4,7 +4,7 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { useTheme } from '@/theme';
 import type { ISODate } from '@/types';
-import { DECORATIVE, Text } from '@/ui';
+import { DECORATIVE, figure, Text } from '@/ui';
 
 import { fileStepsNote, shownSteps, stepsLine, stepsWeek } from '../steps';
 import { useHealthSync } from '../store';
@@ -37,7 +37,7 @@ export function StepsLine({ dates, today }: { dates: ISODate[]; today: ISODate }
   const text = width < 360 ? stepsLine(week, true) : line;
   const fromFile = file && shown.fromFile.some((d) => dates.includes(d)) ? fileStepsNote(file.asOfDay) : null;
   return (
-    <View testID="train-steps" accessible accessibilityLabel={fromFile ? `${line}. ${fromFile}` : line} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginTop: spacing.md }}>
+    <View testID="train-steps" {...figure(fromFile ? `${line}. ${fromFile}` : line)} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginTop: spacing.md }}>
       <View style={{ paddingTop: 1 }} {...DECORATIVE}>
         <Footprints size={18} color={colors.textSecondary} strokeWidth={1.9} />
       </View>

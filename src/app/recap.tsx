@@ -16,7 +16,7 @@ import { useRecap } from '@/features/progress/useRecap';
 import { winTile } from '@/features/progress/recapWin';
 import { ShareWeekButton } from '@/features/share';
 import { useLargeText, useTheme } from '@/theme';
-import { AnimatedNumber, Card, CupKey, Divider, EmptyState, FadeUp, Header, IconButton, PressableScale, Screen, Sheet, Text } from '@/ui';
+import { AnimatedNumber, Card, CupKey, Divider, EmptyState, FadeUp, figure, Header, IconButton, PressableScale, Screen, Sheet, Text } from '@/ui';
 
 function deltaText(t: RecapTile): string {
   if (t.soFar) return 'So far, week in progress';
@@ -54,8 +54,7 @@ function Tile({ t, index, week, won = false }: { t: RecapTile; index: number; we
   return (
     <View
       testID={`recap-tile-${t.id}`}
-      accessible
-      accessibilityLabel={spokenUnits(`${t.label}: ${t.value === null ? 'no data' : `${formatNumber(t.value)} ${t.unit}`}, ${t.context}. ${said}`)}
+      {...figure(spokenUnits(`${t.label}: ${t.value === null ? 'no data' : `${formatNumber(t.value)} ${t.unit}`}, ${t.context}. ${said}`))}
       style={{
         width: oneColumn ? '100%' : '50%',
         minWidth: 0,
@@ -292,8 +291,8 @@ export default function RecapScreen() {
                   </Text>
                 </View>
               </View>
-              {/* Why the target moved, in a sentence or two: reading text, at the body size. */}
-              <Text variant="body" color="textSecondary" testID="recap-plan-reason">
+              {/* Why the target moved: two sentences or more are reading text, at the body size (`noteVariant`). */}
+              <Text variant={noteVariant(d.plan.reason)} color="textSecondary" testID="recap-plan-reason">
                 {d.plan.reason}
               </Text>
             </Card>

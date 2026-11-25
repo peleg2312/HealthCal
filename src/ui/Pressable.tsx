@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Animated, Platform, Pressable as RNPressable, StyleSheet, type GestureResponderEvent, type Insets, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 
-import { spokenUnits } from '@/lib/spokenUnits';
 import { useReducedMotion, useTheme } from '@/theme';
 
 import { ANDROID_TARGET, ariaFromState, fixedSize, isSpaceKey, pressesOnSpace, slopToReach, wantsAndroidTarget } from './controlRules';
@@ -241,8 +240,9 @@ export function PressableScale({ style, scaleTo = 0.97, feedback = 'none', dimDi
   return (
     <AnimatedPressable
       {...rest}
-      // Every control's name says its units in full ("Add 250 millilitres"); what is drawn keeps them short.
-      accessibilityLabel={typeof rest.accessibilityLabel === 'string' ? spokenUnits(rest.accessibilityLabel) : rest.accessibilityLabel}
+      // The name is used as given: a control that shows words is named with them as drawn, units included ("Add
+      // 250 ml of water" for "+ 250 ml"; WCAG 2.5.3, label in name), so a speech user can say what they see. A control
+      // that shows no words says its units in full (`IconButton` does it for its cups; `spokenUnits`).
       {...web}
       ref={setRef as never}
       hitSlop={slop}

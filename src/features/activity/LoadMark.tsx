@@ -1,6 +1,8 @@
 import React from 'react';
 import { View } from 'react-native';
 
+import { figure } from '@/ui';
+
 import { positionLabel, type LoadPosition } from '@/lib/trainingLoad';
 
 import { ZoneTrack } from './ZoneScale';
@@ -13,7 +15,7 @@ import { ZoneTrack } from './ZoneScale';
  */
 export function LoadMark({ position, testID }: { position: LoadPosition; testID?: string }) {
   return (
-    <View testID={testID} accessible accessibilityLabel={positionLabel(position)} style={{ width: 36 }}>
+    <View testID={testID} {...figure(positionLabel(position))} style={{ width: 36 }}>
       <ZoneTrack position={position} height={12} rim={2.5} animate={false} />
     </View>
   );

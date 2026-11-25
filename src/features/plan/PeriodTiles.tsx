@@ -22,7 +22,7 @@ import { View, type LayoutChangeEvent } from 'react-native';
 import { NBSP } from '@/lib/text';
 
 import { cup, useTextSize, useTheme } from '@/theme';
-import { CupKey, FadeUp, motion, PressableScale, Text } from '@/ui';
+import { CupKey, FadeUp, figure, motion, PressableScale, Text } from '@/ui';
 
 import type { PlanOffer, PlanPeriod } from './view';
 import { amountText, monthlyEquivalent, tieMoney, periodLabel, priceLine, taxNote, tileLabel, unitText } from './words';
@@ -103,8 +103,7 @@ function Tile({ offer, selected, single, onPress }: { offer: PlanOffer; selected
       {/* The amount never breaks; the unit goes under it whole when the two do not fit on one line. */}
       <View
         testID={selected ? 'plan-price' : undefined}
-        accessible={single}
-        accessibilityLabel={single ? [priceLine(offer), monthlyEquivalent(offer), taxNote(offer)].filter(Boolean).join('. ') : undefined}
+        {...figure(single && [priceLine(offer), monthlyEquivalent(offer), taxNote(offer)].filter(Boolean).join('. '))}
         style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 4 }}>
         <Text variant="numM">{amountText(offer)}</Text>
         <Text variant="unit">{unitText(offer.period)}</Text>
