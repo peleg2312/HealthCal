@@ -123,7 +123,7 @@ function SignedOut() {
           </IconTile>
           <View style={{ flex: 1 }}>
             <Text variant="title">On this device only</Text>
-            <Text variant="caption" color="textSecondary">
+            <Text variant="body" color="textSecondary">
               Everything works without an account. Your data stays on this device until you choose otherwise.
             </Text>
           </View>
@@ -335,7 +335,7 @@ function SignedIn({ email }: { email: string }) {
           />
         </View>
         {sync.rejected > 0 ? (
-          <Text variant="caption" color="warningInk" style={{ marginTop: spacing.sm, marginLeft: KEY + spacing.sm }} testID="account-sync-rejected">
+          <Text variant="body" color="warningInk" style={{ marginTop: spacing.sm, marginLeft: KEY + spacing.sm }} testID="account-sync-rejected">
             {sync.rejected === 1 ? '1 item was not accepted by the server.' : `${sync.rejected} items were not accepted by the server.`} {sync.rejected === 1 ? 'It is' : 'They are'} safe on this
             device and will be tried again. Everything else is backed up.
           </Text>

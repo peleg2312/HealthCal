@@ -6,7 +6,7 @@ import { View } from 'react-native';
 import { formatDayLabel, fromISODate, weekdayShort } from '@/lib/dates';
 import { deleteSleep, saveSleep } from '@/features/trackers/actions';
 import { dayTitle, resolveDateParam } from '@/features/trackers/dateParam';
-import { DayStepper, Explain, ExplainText, Figure, HistoryItem, HistoryList, HistoryRow, RequireProfile, spokenFigure } from '@/features/trackers/components';
+import { DayStepper, Explain, ExplainText, Figure, FIGURE_INSIDE, HistoryItem, HistoryList, HistoryRow, RequireProfile, spokenFigure } from '@/features/trackers/components';
 import { findByDate, formatHours, hoursFigure, hoursSpoken, QUALITY_LABELS, SLEEP_RANGE, sleepSummary } from '@/features/trackers/helpers';
 import { sleepChartLabel } from '@/features/progress/chartWords';
 import { sleepFromLine, stagesLine } from '@/features/trackers/sleepSource';
@@ -52,9 +52,11 @@ function SyncedNight({ night }: { night: SleepEntry }) {
       {stages ? (
         // One element, its units in full ("Deep 1 hour 10 minutes"), as the figures above it.
         <View {...spokenFigure(stages)}>
-          <Text variant="caption" color="textSecondary" testID="sleep-last-night-stages">
-            {stages}
-          </Text>
+          <View {...FIGURE_INSIDE}>
+            <Text variant="caption" color="textSecondary" testID="sleep-last-night-stages">
+              {stages}
+            </Text>
+          </View>
         </View>
       ) : null}
       <Text variant="caption" color="textSecondary">
@@ -70,7 +72,8 @@ function HoursBig({ hours, testID }: { hours: number; testID?: string }) {
   const m = mins % 60;
   return (
     // One element to a screen reader, its units in full ("7 hours 15 minutes"), never "7 h 15 min".
-    <View testID={testID} {...spokenFigure(hoursSpoken(hours))} style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+    <View testID={testID} {...spokenFigure(hoursSpoken(hours))}>
+    <View {...FIGURE_INSIDE} style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
       <Text variant="numXL" tabular>
         {h}
       </Text>
@@ -87,6 +90,7 @@ function HoursBig({ hours, testID }: { hours: number; testID?: string }) {
           </Text>
         </>
       ) : null}
+    </View>
     </View>
   );
 }

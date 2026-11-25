@@ -254,7 +254,7 @@ function Choose({ view, header }: { view: PlanView; header: React.ReactNode }) {
       )}
       <StaysFree free={view.planLimits.free} title={STAYS_FREE_TITLE} />
       {offer ? (
-        <Text variant="caption" color="textSecondary" testID="plan-seller-line">
+        <Text variant="body" color="textSecondary" testID="plan-seller-line">
           {SELLER_LINE}
         </Text>
       ) : null}

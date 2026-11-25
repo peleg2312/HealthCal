@@ -53,6 +53,9 @@ export function spokenFigure(label: string): { accessible: true; accessibilityRo
   return { accessible: true, accessibilityRole: Platform.OS === 'web' ? 'image' : 'text', accessibilityLabel: spokenUnits(label.replace(/\u00A0/g, ' ')) };
 }
 
+/** Spread on the View that holds a `spokenFigure`'s drawn words: on the web they are hidden, the name says them (natively the group already does). */
+export const FIGURE_INSIDE = (Platform.OS === 'web' ? { 'aria-hidden': true } : {}) as { 'aria-hidden'?: true };
+
 /**
  * A number with a small unit beside it and a label underneath. With `color`
  * (a theme colour name), the label carries a cup key in that colour; the
@@ -91,6 +94,7 @@ export function Figure({
     <View
       {...spokenFigure(said)}
       style={{ ...(basis ? { flexGrow: 1, flexBasis: basis * grow } : { flex: 1 }), minWidth: 0, alignItems: align === 'center' ? 'center' : 'flex-start' }}>
+      <View {...FIGURE_INSIDE} style={{ alignSelf: 'stretch', alignItems: align === 'center' ? 'center' : 'flex-start' }}>
       {/* The figure itself never breaks (non-breaking spaces); on a narrow phone its unit may drop to a second line rather than be cut. */}
       <Text testID={testID} variant={size} tabular numberOfLines={2}>
         {value.replace(/ /g, '\u00A0')}
@@ -102,6 +106,7 @@ export function Figure({
         <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1 }}>
           {label}
         </Text>
+      </View>
       </View>
     </View>
   );

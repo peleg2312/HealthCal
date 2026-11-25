@@ -17,7 +17,7 @@ import { friendsAttention, loadFriendsSeen, useFriendsSeen } from './attention';
  * size (the tab header's cups are 36 px; IconButton keeps the touch area at 44).
  */
 export function FriendsEntry({ testID, size = 44, hitSlop }: { testID: string; size?: number; hitSlop?: { top: number; bottom: number; left: number; right: number } }) {
-  const { colors } = useTheme();
+  const { colors, radius } = useTheme();
   const status = useFriends((s) => s.status);
   const overview = useFriends((s) => s.overview);
   const seenAt = useFriendsSeen((s) => s.seenAt);
@@ -38,15 +38,16 @@ export function FriendsEntry({ testID, size = 44, hitSlop }: { testID: string; s
             position: 'absolute',
             top: -5,
             right: -5,
-            minWidth: 18,
-            height: 18,
+            minWidth: 20,
+            minHeight: 20,
             paddingHorizontal: 4,
-            borderRadius: 5,
+            // A label's small equal corners, and the caption's own size (12.5 px, never under the 12 px floor).
+            borderRadius: radius.chip,
             backgroundColor: colors.primary,
             alignItems: 'center',
             justifyContent: 'center',
           }}>
-          <Text variant="caption" color="onPrimary" tabular style={{ fontSize: 11, lineHeight: 14, fontFamily: fonts.bold }}>
+          <Text variant="caption" color="onPrimary" tabular style={{ fontFamily: fonts.bold }}>
             {count > 9 ? '9+' : String(count)}
           </Text>
         </View>

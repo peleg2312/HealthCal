@@ -7,12 +7,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MAX_CONTENT_WIDTH, useTheme } from '@/theme';
 
 import { IconButton } from './Button';
-import { keyboardCover, revealDelta } from './keyboardInset';
+import { keyboardCover, revealDelta, scrollGivesUp } from './keyboardInset';
 import { FadeUp } from './motion';
 import { PressableScale } from './Pressable';
 import { ConfirmSheet } from './Sheet';
 import { Text } from './Text';
-import { useToastDock } from './Toast';
+import { useToastBand, useToastDock } from './Toast';
 import { ToastScope } from './toastControls';
 
 /** Height of the docked tab bar above the home indicator (the + cup rises 14 px above it). */
@@ -99,8 +99,14 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
   const cover = Platform.OS === 'web' ? webKeyboard : outerH > 0 && innerH > 0 ? Math.max(0, outerH - innerH) : 0;
   const dock = footer ? footerH : insets.bottom + (tabs ? TAB_BAR_HEIGHT + 14 + barExtra : 0);
   useToastDock(dock, focused, { cover, rides: !!footer }, domId);
-  // Keyboard focus is never left under the tab bar (WCAG 2.4.11): the tab bar lies over the scroll area.
-  useFocusClear(domId, focused && !!tabs && !footer, dock);
+  // A toast that found no band clear of controls on this screen rests where it always rests, and the scroll area
+  // ends 8 px above it while it shows, so nothing a person can press is under it (`useToastBand`). Nothing on
+  // screen moves: the rows under the band leave the scroll area's view and are a scroll away.
+  const band = useToastBand(domId);
+  const givesUp = focused ? scrollGivesUp(band, footer ? footerH : 0) : 0;
+  // Keyboard focus is never left under the tab bar (WCAG 2.4.11), which lies over the scroll area, nor with its ring
+  // cut at the edge of the scroll area, under a pinned footer or at the window's bottom (2.4.12).
+  useFocusClear(domId, focused, tabs && !footer ? dock : 0);
   const body = (
     <FadeUp disabled={!enter} style={{ flex: 1 }}>
       <View style={{ paddingTop: noTopInset ? 0 : insets.top }} />
@@ -110,6 +116,7 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           {...scrollProps}
+          style={[scrollProps?.style, givesUp ? { marginBottom: givesUp } : null]}
           contentContainerStyle={[
             inner,
             {
@@ -129,6 +136,7 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
               flex: 1,
               paddingBottom: (tabs ? TAB_BAR_SPACE + barExtra : 0) + (footer ? 0 : insets.bottom),
             },
+            givesUp ? { marginBottom: givesUp } : null,
             contentStyle,
           ]}>
           {children}
@@ -270,8 +278,11 @@ function useWebKeyboard(domId: string, active: boolean): number {
 
 /**
  * Web only: a control reached with the keyboard (Tab) that lies under the tab bar, which is drawn over the
- * bottom of a tab screen's scroll area, is scrolled up into the part of the screen that shows, with
- * REVEAL_MARGIN to spare. Only for keyboard focus (`:focus-visible`), so a tap never moves the page.
+ * bottom of a tab screen's scroll area (`chrome`), or at an edge of the scroll area (a pinned footer under it, the
+ * header above it), is scrolled into the part of the screen that shows with REVEAL_MARGIN to spare, so the
+ * control and its focus ring (3 px, 2 px outside it) show whole. The browser's own scroll to a focused control
+ * stops at its edge and left the ring, and up to 2 px of Goals' radios, under the footer. Only for keyboard focus
+ * (`:focus-visible`), so a tap never moves the page.
  */
 function useFocusClear(domId: string, active: boolean, chrome: number) {
   useEffect(() => {

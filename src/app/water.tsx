@@ -31,7 +31,7 @@ import { loadDrinkMemory, rememberDrinkChoice, useDrinkMemory } from '@/features
 import { diaryWaterCaption, diaryWaterOpenLabel, waterDeleteLabel } from '@/features/drinks/diary';
 import { DRINK_MAX_ML, drinkAmountCheck, drinkMeal, entryFor, noticeLine, pickedFood, planDrink, rememberedChoice, sameDrinkFoodIds, sameDrinkInDiary, selectChoice, selectFood, waterAfter, waterFromEntry, waterOnlyOffered, waterRowCaption, waterRowTitle, type WaterAfter } from '@/features/drinks/rules';
 import { leftLitreDecimals, shownMl, volumeNumber, volumeUnitFor, waterLeftMl } from '@/features/today/volume';
-import { cup, useLargeText, useTheme, withOpacity } from '@/theme';
+import { cup, useLargeText, useTheme } from '@/theme';
 import { pourLandsAt } from '@/theme/motion';
 import type { Beverage, Food, WaterEntry } from '@/types';
 import { spokenUnits } from '@/lib/spokenUnits';
@@ -136,8 +136,25 @@ const BIG_TILE = 128;
  * "500 ml" never parts from its unit, so the tile makes room for it whole (two a row at 360) rather than cut it.
  */
 const GROWN_TILE = 96;
-/** The glass tile's water fill: a flat tint of the water key over the card (its edge stays 3:1 on it in every look). */
+/**
+ * The glass tile's water fill: a flat tint of the water key over the card. On it the amount stays 11:1 or more
+ * and the caption ("Small", textSecondary) 6.9:1 or more in every look, and the water edge 3.4:1 or more.
+ */
 const GLASS_FILL = 0.14;
+
+/**
+ * `color` laid over `base` at `share`, as one solid colour (so a tint reads the same on any page under it). Theme
+ * colours that are not plain hex (the system's own under forced colours) give `base` unchanged.
+ */
+function tintOver(color: string, base: string, share: number): string {
+  const hex = /^#([0-9a-f]{6})/i;
+  const a = hex.exec(color);
+  const b = hex.exec(base);
+  if (!a || !b) return base;
+  const ch = (h: string, i: number) => parseInt(h.slice(i, i + 2), 16);
+  const mixed = [0, 2, 4].map((i) => Math.round(ch(a[1], i) * share + ch(b[1], i) * (1 - share)));
+  return `#${mixed.map((n) => n.toString(16).padStart(2, '0')).join('')}`;
+}
 
 function tileRows(count: number, screenW: number, minTile = 72): number[][] {
   const content = Math.min(screenW, 560) - 40;
@@ -175,9 +192,9 @@ function GlassTile({ title, subtitle, icon, onPress, testID, accessibilityLabel 
         minHeight: 84,
         ...cup(radius.tile, 5),
         // A soft water fill inside a 3 px water edge: the glasses are the screen's heaviest mass in every look
-        // (blurred, D2-03), above the hero's cup and figure and the kind chips. A flat tint of the whole tile, never
-        // a level: it is a button, not an amount. Its words stay 7:1 on it in every look (textSecondary 6.9:1 in Dark).
-        backgroundColor: withOpacity(colors.water, GLASS_FILL),
+        // (blurred, D2-03, mean against the hero's), above the kind chips. A flat tint of the whole tile, never a
+        // level: it is a button, not an amount. Laid on the card colour, so it reads as water on every paper.
+        backgroundColor: tintOver(colors.water, colors.surface, GLASS_FILL),
         borderWidth: 3,
         borderColor: colors.water,
         alignItems: 'center',
@@ -742,9 +759,9 @@ function WaterScreen() {
 
       <SectionTitle title={isToday ? 'Last 7 days' : `7 days to ${dayTitle(date)}`} />
       <Card style={{ gap: spacing.md }}>
-        {/* Two sentences: reading text (body), never a caption. */}
+        {/* Two sentences: reading text (body), never a caption. The key's sentence stays whole on its line. */}
         <Text variant="body" color="textSecondary">
-          {week.some((d) => d.waterMl > 0) ? `Goal met on ${daysMet} of 7 days.` : 'Bars fill in as you log drinks.'} Dashed line: the goal.
+          {week.some((d) => d.waterMl > 0) ? `Goal met on ${daysMet} of 7 days.` : 'Bars fill in as you log drinks.'} {'Dashed\u00A0line:\u00A0the\u00A0goal.'}
         </Text>
         <BarChart
           // One image for a screen reader: the summary, then every day's amount (chartWords).

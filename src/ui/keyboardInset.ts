@@ -152,6 +152,15 @@ export interface WindowBox {
  * controls (every PressableScale and text field inside its `Screen`, measured as the toast shows).
  */
 export function toastBottomAmong(v: { windowBottom: number; resting: number; toast: WindowBox; controls: WindowBox[]; above?: number }): number | null {
+  const at = toastPlaceAmong(v);
+  return at === 'none' ? null : at;
+}
+
+/**
+ * `toastBottomAmong`, telling apart the two reasons it rests where it always rests: null when that place is clear
+ * (or the toast cannot be measured), 'none' when no band at all is clear (the screen then makes one, `toastBand`).
+ */
+export function toastPlaceAmong(v: { windowBottom: number; resting: number; toast: WindowBox; controls: WindowBox[]; above?: number }): number | null | 'none' {
   const h = Math.round(v.toast.height);
   const H = v.windowBottom;
   if (!(h > 0) || !(H > 0) || !(v.toast.width > 0)) return null;
@@ -160,6 +169,25 @@ export function toastBottomAmong(v: { windowBottom: number; resting: number; toa
     .filter((c) => [c.x, c.y, c.width, c.height].every(Number.isFinite))
     .map((c) => ({ top: c.y, bottom: c.y + c.height, left: c.x, right: c.x + c.width }));
   const top = toastSpot({ lowest, highest: toastReachTop(H, h), height: h, left: v.toast.x, right: v.toast.x + v.toast.width, controls, above: v.above });
-  if (top === null || top === Math.round(lowest)) return null;
+  if (top === null) return 'none';
+  if (top === Math.round(lowest)) return null;
   return Math.round(H - top - h);
+}
+
+/**
+ * When no band anywhere on a screen is clear of controls (a list whose rows are each a control, as the diary's are:
+ * its widest gap was 33 px, under a 44 px toast with its 8 px of room each side), the screen makes one where the
+ * toast always rests: its scroll area ends `clear` px above the toast while the toast shows, so nothing a person can
+ * press lies under the toast (a tap on its body went through to the + or the trash can under it), and nothing on
+ * screen moves (the rows under the band leave the scroll area's view and are a scroll away). This is how far up from
+ * the window's bottom the band reaches.
+ */
+export function toastBand(resting: number, toastHeight: number, clear = TOAST_CLEAR): number {
+  if (!(toastHeight > 0) || !(resting >= 0)) return 0;
+  return Math.ceil(resting + toastHeight + clear);
+}
+
+/** How much a screen's scroll area gives up for that band: the band less what already lies under the scroll area (a pinned footer). */
+export function scrollGivesUp(band: number, belowScroll: number): number {
+  return band > 0 ? Math.max(0, Math.ceil(band - Math.max(0, belowScroll))) : 0;
 }

@@ -12,9 +12,10 @@
  * its own button. It draws nothing until the backend says Google is on (googleSetting.ts).
  */
 import React, { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
+import { PourWait } from '@/components/PourWait';
 import { cup, fonts, useTheme } from '@/theme';
 import { PressableScale, Text } from '@/ui';
 
@@ -70,7 +71,8 @@ export function GoogleButton({ testID, onPress, busy, disabled }: { testID: stri
         <GoogleMark size={18} />
       </View>
       {busy ? (
-        <ActivityIndicator color={colors.googleText} />
+        // The app's waiting cup (signing in is a wait that is not the AI), never a bare spinner.
+        <PourWait size="inline" label="Signing in with Google" />
       ) : (
         <Text color="googleText" numberOfLines={1} style={{ fontFamily: fonts.medium, fontSize: 14, lineHeight: 20, paddingHorizontal: 28 }}>
           {GOOGLE_LABEL}

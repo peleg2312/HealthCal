@@ -7,7 +7,7 @@ import { withoutMarks } from '@/lib/bidi';
 import { spokenUnits } from '@/lib/spokenUnits';
 import { cup, isReducedMotion, MAX_CONTENT_WIDTH, motion, useLargeText, useTheme, type ThemeColors } from '@/theme';
 
-import { type ControlBox, TOAST_CLEAR, TOAST_GAP, toastBottom, toastBottomAmong, toastReachTop, toastSpot, type WindowBox } from './keyboardInset';
+import { type ControlBox, TOAST_CLEAR, TOAST_GAP, toastBand, toastBottom, toastPlaceAmong, toastReachTop, toastSpot, type WindowBox } from './keyboardInset';
 import { PressableScale } from './Pressable';
 import { Text } from './Text';
 import { controlsIn } from './toastControls';
@@ -49,6 +49,11 @@ interface ToastState {
   short?: string;
   /** Raised inside `toastToScreen`: shown by the screen once every sheet has gone, never in a sheet. */
   toScreen?: boolean;
+  /**
+   * While a toast shows on a screen with no band clear of controls: that screen (its element id) and how far up from
+   * the window's bottom its scroll area gives way (`toastBand`). Cleared with the toast.
+   */
+  band: { scope: string; fromBottom: number } | null;
   /** Open sheets that carry their own host, newest last. The newest one shows the toast. */
   sheetHosts: number[];
   /**
@@ -66,9 +71,10 @@ const useToast = create<ToastState>((set, get) => ({
   message: null,
   sheetHosts: [],
   docks: [],
+  band: null,
   show: (message, options) =>
     set({ id: get().id + 1, message, actionLabel: options?.label && options.onPress ? options.label : undefined, onAction: options?.label ? options.onPress : undefined, tint: options?.tint, short: options?.short, toScreen: handingToScreen > 0 }),
-  hide: () => set({ message: null, actionLabel: undefined, onAction: undefined, tint: undefined, short: undefined, toScreen: undefined }),
+  hide: () => set({ message: null, actionLabel: undefined, onAction: undefined, tint: undefined, short: undefined, toScreen: undefined, band: null }),
 }));
 
 /** How deep the calls of `toastToScreen` are now (a toast raised meanwhile goes to the screen). */
@@ -123,6 +129,15 @@ export function useToastDock(height: number, active = true, keyboard?: { cover: 
     });
   }, [id, height, active, cover, rides, scope]);
   useEffect(() => () => useToast.setState((s) => ({ docks: s.docks.filter((d) => d.id !== id) })), [id]);
+}
+
+/**
+ * How far up from the window's bottom this screen's scroll area gives way while a toast shows (0: not at all). A
+ * toast that finds no band clear of controls anywhere on the screen (`toastPlaceAmong` says 'none') asks for one
+ * where it rests (`toastBand`); `Screen` ends its scroll area there, so no control is under the toast.
+ */
+export function useToastBand(scope: string): number {
+  return useToast((s) => (s.band && s.band.scope === scope ? s.band.fromBottom : 0));
 }
 
 /**
@@ -224,11 +239,31 @@ const CONTROLS = 'button,a[href],input,textarea,select,[role="button"],[role="li
 
 function controlBoxes(scope: Element, skip: Element): ControlBox[] {
   const out: ControlBox[] = [];
+  // What shows of a control: its box cut by every box above it that clips (a scroll area, a card that hides its
+  // overflow), up to the screen. A row scrolled out of the scroll area's view is not under the toast.
+  const clips = new Map<Element, DOMRect | null>();
+  const clipOf = (a: Element): DOMRect | null => {
+    if (!clips.has(a)) {
+      const cs = getComputedStyle(a);
+      clips.set(a, cs.overflowX !== 'visible' || cs.overflowY !== 'visible' ? a.getBoundingClientRect() : null);
+    }
+    return clips.get(a) ?? null;
+  };
   for (const el of Array.from(scope.querySelectorAll(CONTROLS))) {
     if (skip.contains(el) || el.getAttribute('data-testid') === 'sheet-backdrop') continue;
     const r = el.getBoundingClientRect();
     if (r.width < 2 || r.height < 2) continue;
-    out.push({ top: r.top, bottom: r.bottom, left: r.left, right: r.right });
+    let { top, bottom, left, right } = r;
+    for (let a = el.parentElement; a && a !== scope.parentElement; a = a.parentElement) {
+      const c = clipOf(a);
+      if (!c) continue;
+      top = Math.max(top, c.top);
+      bottom = Math.min(bottom, c.bottom);
+      left = Math.max(left, c.left);
+      right = Math.min(right, c.right);
+    }
+    if (bottom - top < 2 || right - left < 2) continue;
+    out.push({ top, bottom, left, right });
   }
   return out;
 }
@@ -427,17 +462,18 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       return () => clearTimeout(late);
     }
     // Phones: the focused screen's kit controls, measured in the window, and the same rule as the web.
-    const placeOnPhone = async (): Promise<number | null> => {
+    const placeOnPhone = async (): Promise<number | null | 'none'> => {
       if (!scopeId) return null;
       const [host, box] = await Promise.all([measureBox(outer.current), measureRect(toastRef.current)]);
       if (!host || !box) return null;
       const rects = await Promise.all(controlsIn(scopeId).map((n) => measureRect(n)));
       // With no clear band in thumb reach, any clear band below the status bar, rather than over a control.
-      return toastBottomAmong({ windowBottom: host.y + host.h + bottomNow.current, resting, toast: box, controls: rects.filter((r): r is WindowBox => !!r), above: insets.top });
+      return toastPlaceAmong({ windowBottom: host.y + host.h + bottomNow.current, resting, toast: box, controls: rects.filter((r): r is WindowBox => !!r), above: insets.top });
     };
-    // The place, as a bottom offset (null: where it always rests), or 'wait' while the screen it belongs to
-    // is not laid out yet (a screen coming back into view after the one that raised the toast).
-    const place = (): number | null | 'wait' | Promise<number | null> => {
+    // The place, as a bottom offset (null: where it always rests), 'none' when no band on the screen is clear (the
+    // screen then makes one), or 'wait' while the screen it belongs to is not laid out yet (a screen coming back
+    // into view after the one that raised the toast).
+    const place = (): number | null | 'none' | 'wait' | Promise<number | null | 'none'> => {
       if (Platform.OS !== 'web') return withTimeout(placeOnPhone(), PLACE_LATE_MS, null);
       const host = outer.current as unknown as HTMLElement | null;
       const toastEl = host?.querySelector?.('[data-testid="toast"]');
@@ -453,7 +489,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
         const head = scope.querySelector('[data-testid="screen-header"], [data-testid="tab-header"]')?.getBoundingClientRect();
         const above = Math.max(box.top, head ? head.bottom + TOAST_CLEAR : 0, insets.top);
         const top = toastSpot({ lowest: H - resting - h, highest: toastReachTop(H, h), height: h, left: r.left, right: r.right, controls: controlBoxes(scope, host), above });
-        return top === null ? null : H - top - h;
+        return top === null ? 'none' : H - top - h;
       }
       // In a sheet: just above its top edge while that is within thumb reach; else the lowest clear band in it.
       let sheet: Element | null = null;
@@ -479,7 +515,22 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
           timer = setTimeout(run, 80);
           return;
         }
-        setSpot({ key: placeKey, bottom: at === 'wait' ? null : at });
+        if (at === 'none' && scopeId && toastH > 0) {
+          // No band on the screen is clear of controls: the screen makes one where the toast rests (its scroll area
+          // ends 8 px above it, `toastBand`), and the toast is drawn there once the screen has given way (two frames).
+          const fromBottom = toastBand(resting, toastH);
+          useToast.setState((st) => ({ band: { scope: scopeId, fromBottom: Math.max(fromBottom, st.band?.scope === scopeId ? st.band.fromBottom : 0) } }));
+          timer = setTimeout(() => {
+            if (stopped) return;
+            setSpot({ key: placeKey, bottom: null });
+            if (!looked) {
+              looked = true;
+              timer = setTimeout(run, 450);
+            }
+          }, 34);
+          return;
+        }
+        setSpot({ key: placeKey, bottom: at === 'wait' || at === 'none' ? null : at });
         // One more look once the screen has settled (a list that was still arriving, a screen fading in).
         if (!looked) {
           looked = true;

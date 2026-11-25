@@ -1,6 +1,8 @@
 import { Copy, Flame, HandHeart, Lock, Share as ShareIcon, X } from 'lucide-react-native';
 import React from 'react';
-import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
+
+import { PourWait } from '@/components/PourWait';
 
 import { formatShortDate, weekdayShort } from '@/lib/dates';
 import { formatDistance, formatNumber } from '@/lib/units';
@@ -427,10 +429,10 @@ export function NameField({ value, onChange, testID }: { value: string; onChange
 // ------------------------------------------------------------------ states
 
 export function Loading({ label = 'Loading friends' }: { label?: string }) {
-  const { colors } = useTheme();
   return (
     <View testID="friends-loading" accessibilityLabel={label} style={{ alignItems: 'center', paddingVertical: 48, gap: 12 }}>
-      <ActivityIndicator color={colors.textSecondary} />
+      {/* The app's waiting cup (never a bare spinner), beside the words that say what is happening. */}
+      <PourWait />
       <Text variant="label" color="textSecondary">
         {label}
       </Text>

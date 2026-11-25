@@ -690,7 +690,8 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
           </View>
           <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
             <Text variant="title">{date ? `Around ${looseDate(date, now)}` : 'No date yet'}</Text>
-            <Text variant="caption" color="textSecondary">
+            {/* Two sentences with a date: reading text (body); the one-sentence line stays a caption. */}
+            <Text variant={date ? 'body' : 'caption'} color="textSecondary">
               {date ? `${fmtW(draft.weight!)} to ${fmtW(draft.target!)} ${unit} at this pace. The date moves with your real trend.` : 'At this pace the goal is not reached; try a different pace.'}
             </Text>
           </View>

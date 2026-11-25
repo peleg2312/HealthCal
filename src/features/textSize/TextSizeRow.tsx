@@ -37,7 +37,8 @@ export function TextSizeRow() {
         </IconTile>
         <View style={{ flex: 1 }}>
           <Text variant="bodyStrong">{TEXT_SIZE_WORDS.title}</Text>
-          <Text variant="caption" color="textSecondary">
+          {/* Two sentences: reading text, body in textSecondary. */}
+          <Text variant="body" color="textSecondary">
             {TEXT_SIZE_WORDS.hint}
           </Text>
         </View>

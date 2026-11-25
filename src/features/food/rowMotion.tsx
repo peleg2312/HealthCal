@@ -60,6 +60,20 @@ export function useLeavingRows<T extends { id: string }>(items: T[]): { item: T;
 }
 
 /**
+ * Runs `fn` on the next animation frame and returns the cancel. A timing set while the page is still busy drawing
+ * the change that started it (an Undo redraws the whole diary) counts from the moment it was set, so its first
+ * frames would pass unseen and it would show in one step; set on the next frame it starts as it is seen.
+ */
+function onNextFrame(fn: () => void, frames = 1): () => void {
+  let id = 0;
+  const step = (left: number) => {
+    id = requestAnimationFrame(() => (left > 1 ? step(left - 1) : fn()));
+  };
+  step(frames);
+  return () => cancelAnimationFrame(id);
+}
+
+/**
  * A log card's way back after a delete, both ways in step (the owner's ruling, D1-05): `live` the ids of the
  * list's live rows now, `removed` its Restore rows now (the items removed on this visit, not yet restored).
  * Returns `back`, the ids of rows that just came back (an Undo or a Restore), whose `FadeRow` unfolds its
@@ -126,9 +140,9 @@ export function FadeRow({ children, leaving, back = false, testID }: { children:
       fade.set(withTiming(0, { duration: D.rowExit, easing: ease.exit }));
       fold.set(withDelay(D.rowExit, withTiming(0, { duration: ROW_FOLD_MS, easing: ease.move })));
     } else if (wasLeaving.current) {
-      // Back before its fold ended: its height is known, so it opens at once.
+      // Back before its fold ended: its height is known, so it opens from the next frame (`onNextFrame`).
       wasLeaving.current = false;
-      open();
+      return onNextFrame(open);
     } else if (!opened.current) {
       // Should no layout ever come (a row that is not drawn), it is opened all the same.
       const timer = setTimeout(() => !opened.current && open(), 250);
@@ -204,7 +218,13 @@ export function Unfold({ children, animate, delay = D.rowExit, open = true }: { 
     // The mount's own run is above; from then on a change of `open` folds the row out or back in.
     if (lastOpen.current === open) return;
     lastOpen.current = open;
-    v.set(reduce ? (open ? 1 : 0) : withTiming(open ? 1 : 0, { duration: ROW_FOLD_MS, easing: ease.move }));
+    if (reduce) {
+      v.set(open ? 1 : 0);
+      return;
+    }
+    // Two frames on, as the row that came back opens on its first layout (a frame after it is drawn): in step with
+    // it, so the card around them neither dips nor jumps (`onNextFrame`).
+    return onNextFrame(() => v.set(withTiming(open ? 1 : 0, { duration: ROW_FOLD_MS, easing: ease.move })), 2);
   }, [open, reduce, v]);
   const style = useAnimatedStyle(() => {
     const k = v.get();

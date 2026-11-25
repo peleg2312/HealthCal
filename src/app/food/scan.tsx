@@ -2,7 +2,9 @@ import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'ex
 import { router, useLocalSearchParams } from 'expo-router';
 import { Camera, CloudOff, Flashlight, FlashlightOff, Keyboard, PackageSearch, PackageX, ScanBarcode } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Platform, View } from 'react-native';
+import { Linking, Platform, View } from 'react-native';
+
+import { PourWait } from '@/components/PourWait';
 
 import { checkBarcode, cleanBarcode, findLocalByBarcode, lookupCode } from '@/features/ai/barcode';
 import { ScanResultCard, type ScanFoundFrom } from '@/features/ai/ScanResultCard';
@@ -252,7 +254,8 @@ export default function ScanScreen() {
 
       {phase.kind === 'looking' ? (
         <Card testID="scan-looking" style={{ alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xxxl }}>
-          <ActivityIndicator color={colors.primary} />
+          {/* The app's waiting cup (never a bare spinner), over the words that say what is happening. */}
+          <PourWait />
           <Text variant="title">Looking up the product</Text>
           <Text variant="label" color="textSecondary" tabular>
             {phase.code}

@@ -334,18 +334,28 @@ function Hero({ name, brand, source, explain, note, onEdit }: { name: string; br
 /** Said under the calories when an entry opens at other calories than it stores (`valuesUpdated`). */
 const VALUES_UPDATED = "This food's values were updated since you logged it. Saving uses the new ones.";
 
+/** The least room the portion's words take beside the calories before they go under them: two lines of about 16 letters. */
+const NOTE_ROOM = 104;
+
 /** Calories (large) with the portion beside them, the macro bar and the three macros: the top of the portion card. */
 function MacroSummary({ n, kcalNote, range, updated }: { n: Nutrients; kcalNote: string; range?: [number, number] | null; updated?: boolean }) {
   const { colors, spacing } = useTheme();
-  // With large text the portion's words go under the figure on a line of their own, and the macros wrap.
+  // With large text the portion's words go under the figure on a line of their own, and the macros wrap. So do
+  // they when the figure leaves them less than `NOTE_ROOM` beside it (a four-figure portion at 320 px), so the
+  // words are never cut at the card's edge.
   const big = useLargeText();
+  const [rowW, setRowW] = useState(0);
+  const [figureW, setFigureW] = useState(0);
+  const stack = big || (rowW > 0 && figureW > 0 && rowW - figureW - spacing.md < NOTE_ROOM);
   return (
     <View>
-      <View style={{ flexDirection: big ? 'column' : 'row', alignItems: big ? 'flex-start' : 'flex-end', justifyContent: 'space-between', gap: big ? spacing.xs : spacing.md }}>
-        <View testID="detail-kcal">
+      <View
+        onLayout={(e) => setRowW(Math.round(e.nativeEvent.layout.width))}
+        style={{ flexDirection: stack ? 'column' : 'row', alignItems: stack ? 'flex-start' : 'flex-end', justifyContent: 'space-between', gap: stack ? spacing.xs : spacing.md }}>
+        <View testID="detail-kcal" onLayout={(e) => setFigureW(Math.round(e.nativeEvent.layout.width))}>
           <KcalValue value={n.kcal} variant="numXL" color="caloriesInk" />
         </View>
-        <Text variant="caption" color="textSecondary" align={big ? 'left' : 'right'} style={{ flexShrink: 1, paddingBottom: big ? 0 : 6 }} numberOfLines={big ? undefined : 2}>
+        <Text variant="caption" color="textSecondary" align={stack ? 'left' : 'right'} style={{ flexShrink: 1, paddingBottom: stack ? 0 : 6 }} numberOfLines={stack ? undefined : 2}>
           {kcalNote}
         </Text>
       </View>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { KEYBOARD_MIN, keyboardCover, revealDelta, TOAST_GAP, toastBottom, toastBottomAmong, toastReachTop, toastSpot } from './keyboardInset';
+import { KEYBOARD_MIN, keyboardCover, revealDelta, scrollGivesUp, TOAST_GAP, toastBand, toastBottom, toastBottomAmong, toastPlaceAmong, toastReachTop, toastSpot } from './keyboardInset';
 
 describe('keyboardCover', () => {
   it('is what the keyboard takes from the bottom of the page', () => {
@@ -175,5 +175,39 @@ describe('toastBottomAmong (phones: the same rule from measured window boxes)', 
   it('is null before the toast or the window is measured', () => {
     expect(toastBottomAmong({ windowBottom: 740, resting: 84, toast: { ...toast, height: 0 }, controls: cells })).toBeNull();
     expect(toastBottomAmong({ windowBottom: 0, resting: 84, toast, controls: cells })).toBeNull();
+  });
+});
+
+describe('when no band is clear, the screen makes one (toastPlaceAmong, toastBand, scrollGivesUp)', () => {
+  // The diary at 360 x 740 after a delete: every row is a control, the widest gap 33 px (measured with the 8 px each side).
+  const toast = { x: 35, y: 0, width: 290, height: 44 };
+  const rows = [
+    [0, 60], [68, 214], [236, 296], [329, 580], [612, 700],
+  ].map(([top, bottom]) => ({ x: 20, y: top + 8, width: 320, height: bottom - top - 16 }));
+  it("says 'none' when no band at all is clear, and null when its own place is clear", () => {
+    expect(toastPlaceAmong({ windowBottom: 740, resting: 84, toast, controls: rows, above: 24 })).toBe('none');
+    expect(toastBottomAmong({ windowBottom: 740, resting: 84, toast, controls: rows, above: 24 })).toBeNull();
+    expect(toastPlaceAmong({ windowBottom: 740, resting: 84, toast, controls: [] })).toBeNull();
+  });
+  it('the band reaches from the bottom to 8 px above the toast where it rests', () => {
+    // Rests 84 px up (12 over the tab bar), 44 tall, 8 clear: the scroll area ends 136 px above the bottom.
+    expect(toastBand(84, 44)).toBe(136);
+    expect(toastBand(84, 0)).toBe(0);
+  });
+  it('the scroll area gives up the band less what already lies under it', () => {
+    // A tab screen scrolls to the window's bottom (the tab bar lies over it): it gives up the whole band.
+    expect(scrollGivesUp(136, 0)).toBe(136);
+    // A screen with a 90 px pinned footer: the toast rests 12 over it, so the scroll area gives up 12 + 44 + 8.
+    expect(scrollGivesUp(toastBand(90 + 12, 44), 90)).toBe(64);
+    expect(scrollGivesUp(0, 90)).toBe(0);
+  });
+  it('once the scroll area has given it up, the toast rests where it always rests, clear of every control', () => {
+    const band = toastBand(84, 44);
+    const end = 740 - scrollGivesUp(band, 0);
+    // What the scroll area shows of each row: nothing below its new end.
+    const seen = rows
+      .map((r) => ({ ...r, height: Math.min(r.y + r.height, end) - r.y }))
+      .filter((r) => r.height > 0);
+    expect(toastPlaceAmong({ windowBottom: 740, resting: 84, toast, controls: seen })).toBeNull();
   });
 });

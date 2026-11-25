@@ -1,7 +1,9 @@
 import { router } from 'expo-router';
 import { Search, X } from 'lucide-react-native';
 import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
+
+import { PourWait } from '@/components/PourWait';
 
 import { BUILTIN_FOODS } from '@/data/foods';
 import { savedItemFromFood, setItemAmount } from '@/features/food/build';
@@ -218,7 +220,7 @@ function MealPick() {
                     Community data from Open Food Facts
                   </Text>
                 </View>
-                {loading ? <ActivityIndicator color={colors.textSecondary} /> : null}
+                {loading ? <PourWait size="inline" label="Searching online products" /> : null}
               </View>
               {onlineItems.length ? <List>{onlineItems.map((f, i) => row(f, `pick-online-${i}`))}</List> : null}
             </View>

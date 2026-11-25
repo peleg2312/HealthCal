@@ -443,7 +443,8 @@ function GoalsForm() {
             />
           )}
           {/* Day, month and year as onboarding asks them (month first in imperial), said back as "May 12, 1994". */}
-          <View style={{ gap: spacing.xs }} testID="goals-birth-date">
+          {/* 8 px between "Birth date" and the fields' own labels under it, so two labels never touch. */}
+          <View style={{ gap: spacing.sm }} testID="goals-birth-date">
             <Text variant="label" color="textSecondary">
               Birth date
             </Text>

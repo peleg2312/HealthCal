@@ -1,7 +1,9 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ChevronRight, PenLine, Plus, Pointer, ScanBarcode, Search, Utensils, X, Zap } from 'lucide-react-native';
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, type TextInput, useWindowDimensions, View } from 'react-native';
+import { Platform, type TextInput, useWindowDimensions, View } from 'react-native';
+
+import { PourWait } from '@/components/PourWait';
 
 import { AiGlyph } from '@/features/ai/mark';
 import { searchAiTile } from '@/features/ai/words';
@@ -508,7 +510,7 @@ export default function FoodSearchScreen() {
                     Community data from Open Food Facts
                   </Text>
                 </View>
-                {online.status === 'loading' ? <ActivityIndicator color={colors.textSecondary} /> : null}
+                {online.status === 'loading' ? <PourWait size="inline" label="Searching online products" /> : null}
               </View>
               {onlineItems.length > 0 ? (
                 <List>{onlineItems.map((f, i) => row(f, `online-${i}`))}</List>

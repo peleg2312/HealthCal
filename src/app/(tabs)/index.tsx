@@ -155,8 +155,9 @@ const NARROW = { padding: 12, paddingV: 10, labelSpacing: 4, labelH: 20, macrosT
  * day's share cup, as tall as the chip, at the column's right end; on today, "Ask the coach" (a chip with the coach's
  * glyph) on a row of its own under them, ACTION_GAP lower, so the 44 px touch areas of the two rows meet and never
  * overlap. The coach's worded way in is then in the first view's lower part at 320, 360 and 390 px. The card has no
- * footer row: the budget is said in the "eaten" line ("1,219 eaten of 2,160 kcal", as the diary's summary says it), so the
- * water row under the card sits higher and the toast a glass raises rests clear of its "+ 250 ml".
+ * footer row: the budget is said in the "eaten" line ("1,219 eaten of 2,160", as the diary's summary says it), so the
+ * water row under the card sits higher and the toast a glass raises rests clear of its "+ 250 ml". The line shares the
+ * unit of the number above it ("941 kcal left"): " kcal" needs 27 px more, and at 320 px its column has 26 to spare.
  */
 const ACTION_H = Math.max(32, SHARE_CUP);
 const ACTION_GAP = 12;
@@ -325,7 +326,8 @@ function EnergyCard({
         tick: colors.rim,
         content: (
           // Text only: it never takes a tap meant for the big number above it. The budget is said here, once, as the
-          // diary's summary says it ("1,219 eaten of 2,160 kcal"); the whole sum (target plus exercise) is read out.
+          // diary's summary says it ("1,219 eaten of 2,160", under "941 kcal left", whose unit it shares: " kcal" would not
+          // fit its column at 320 px); the whole sum (target plus exercise) is read out.
           <View pointerEvents="none" accessible accessibilityLabel={`${formatNumber(eaten)} kilocalories eaten. ${budgetLabel}`}>
             <AnimatedNumber variant="numM" value={eaten} format={(n) => formatNumber(Math.round(n))} style={{ fontSize: 17, lineHeight: lineH }} testID="today-eaten">
               <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
@@ -334,7 +336,6 @@ function EnergyCard({
               <Text variant="numM" style={{ fontSize: 17, lineHeight: lineH }} testID="today-budget">
                 {formatNumber(day.budget)}
               </Text>
-              <Text variant="unit">{' kcal'}</Text>
             </AnimatedNumber>
           </View>
         ),
@@ -465,7 +466,6 @@ function EnergyCard({
                     <Text variant="numM" style={{ fontSize: 17, lineHeight: 22 }} testID="today-budget">
                       {formatNumber(day.budget)}
                     </Text>
-                    <Text variant="unit">{' kcal'}</Text>
                   </AnimatedNumber>
                 </View>
               </View>

@@ -1,12 +1,17 @@
 import React from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 
+import { PourWait } from '@/components/PourWait';
 import { useTheme } from '@/theme';
 import { MiniCup, Text } from '@/ui';
 
 import { HEALTH_EXPORT_SKIPS } from './format';
 
-/** A sign of life while files are read: a cup filling file by file, and which file it is on. */
+/**
+ * A sign of life while files are read. A Health export, read piece by piece, fills a cup to the share read (and the
+ * line says it in numbers); files are shown by the app's waiting cup (`PourWait`, never a bare spinner) with
+ * the file it is on.
+ */
 export function ReadingView({ progress }: { progress: { index: number; total: number; name: string; share?: number } | null }) {
   const { colors, spacing } = useTheme();
   const total = progress?.total ?? 1;
@@ -18,7 +23,7 @@ export function ReadingView({ progress }: { progress: { index: number; total: nu
   const pct = big ? Math.floor(share * 100) : 0;
   return (
     <View testID="import-reading" accessibilityLiveRegion="polite" style={{ alignItems: 'center', gap: spacing.lg, paddingVertical: spacing.huge }}>
-      <MiniCup progress={level} color={colors.exercise} width={52} height={66} animate={!big} />
+      {big ? <MiniCup progress={level} color={colors.exercise} width={52} height={66} animate={false} /> : <PourWait />}
       <View style={{ alignItems: 'center', gap: spacing.xs }}>
         <Text variant="h3" align="center">
           {big ? 'Reading your Health export' : 'Reading your files'}
@@ -30,7 +35,6 @@ export function ReadingView({ progress }: { progress: { index: number; total: nu
           {big ? `A large export takes a minute or two. ${HEALTH_EXPORT_SKIPS}` : 'A large archive can take a few seconds.'}
         </Text>
       </View>
-      <ActivityIndicator color={colors.textSecondary} />
     </View>
   );
 }

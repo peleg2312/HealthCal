@@ -10,13 +10,14 @@ import { BURN_UNIT, budgetAdds, burnCaption, burnSource, sourceWords } from '@/f
 import { SpreadHint } from '@/features/activity/SpreadHint';
 import { syncedFrom } from '@/features/health-sync/origins';
 import { HeartRateLine } from '@/features/health-sync/ui/HeartRateLine';
+import { weightText } from '@/features/trackers/helpers';
 import { deleteActivity, leaveFlow, saveActivity } from '@/features/activity/session';
 import { formatDayLabel, today } from '@/lib/dates';
 import { formulaTdee } from '@/lib/energy';
 import { dailyShare } from '@/lib/exerciseBudget';
 import { exerciseWaterMl } from '@/lib/hydration';
 import { INTENSITY_LABELS } from '@/lib/exercise';
-import { distanceToKm, distanceUnit, distanceValue, formatNumber, formatVolume, formatWeight, round } from '@/lib/units';
+import { distanceToKm, distanceUnit, distanceValue, formatNumber, formatVolume, round } from '@/lib/units';
 import { useStore } from '@/store';
 import { useDay, useLive, useProfile } from '@/store/selectors';
 import { cup, LARGE_TEXT, useTextGrowth, useTheme } from '@/theme';
@@ -135,7 +136,8 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
   // How the two figures above come about, in words that never say either figure again (./logWords).
   const source = sourceWords({
     measuredBy: isMeasured ? device : null,
-    formula: isMeasured ? null : { met, weight: formatWeight(round(basis.weightKg, 1), 'metric'), minutes },
+    // The formula is per kg, so the weight it uses is in kg; on an imperial profile the chosen unit is said beside it ("142.6 kg (314.4 lb)").
+    formula: isMeasured ? null : { met, weight: units === 'imperial' ? `${weightText(basis.weightKg, 'metric')} (${weightText(basis.weightKg, 'imperial')})` : weightText(basis.weightKg, 'metric'), minutes },
     restingDay: Math.round(tdee),
     restingShare,
     rule,

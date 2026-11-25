@@ -9,7 +9,7 @@ import { IconButton, PressableScale, Text } from '@/ui';
 import { SPREAD_HINT_TEXT, markSpreadHintDone, useSpreadHint } from './spreadHint';
 
 /**
- * The "over 7 days" hint as a small caption row that opens Goals (./spreadHint says when it shows), with an X
+ * The "over 7 days" hint as a small row that opens Goals (./spreadHint says when it shows: at most three visits), with an X
  * beside it (`<testID>-close`, a 44 px clear cup) that puts it away in place, without leaving the screen.
  * The two are siblings in one row, never one pressable inside another. Place the row as a sibling of other
  * controls, never inside another pressable.
@@ -31,7 +31,8 @@ export function SpreadHint({ testID, style }: { testID: string; style?: StylePro
           router.push('/settings/goals?section=exercise');
         }}
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 }}>
-        <Text variant="caption" color="textSecondary" style={{ flex: 1, minWidth: 0 }}>
+        {/* Two sentences: reading text, body in textSecondary. */}
+        <Text variant="body" color="textSecondary" style={{ flex: 1, minWidth: 0 }}>
           {SPREAD_HINT_TEXT}
         </Text>
         <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.9} />

@@ -14,7 +14,7 @@ import type { DaySummary } from '@/store/selectors';
 import { favoriteRecordId, useStore } from '@/store';
 import { cup, fonts, useLargeText, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType, WaterEntry } from '@/types';
-import { AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, IconButton, ListRow, PressableScale, ProgressBar, RestoreRow, Sheet, Text, Trough } from '@/ui';
+import { ANDROID_TOUCH, AnimatedList, AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, IconButton, ListRow, PressableScale, ProgressBar, RestoreRow, Sheet, Text, Trough } from '@/ui';
 import { spokenUnits } from '@/lib/spokenUnits';
 
 import { clearEntries, copyEntries } from './actions';
@@ -49,7 +49,7 @@ const FIGURES = Platform.OS === 'web' ? ({ role: 'img' } as const) : null;
  * with their level ticks. `action` (on a day with nothing logged, "Copy yesterday") is the card's last row, under a
  * divider, open or not.
  */
-export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?: React.ReactNode; action?: React.ReactNode }) {
+export function DaySummaryCard({ day, share, action }: { day: DaySummary; /** The day's share cup, 44 px (`SUMMARY_CUP_NARROW` under 360 px at the designed text size). */ share?: React.ReactNode; action?: React.ReactNode }) {
   const { colors, spacing } = useTheme();
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
@@ -102,16 +102,18 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?
             {' kcal'}
           </Text>
         </View>
-        {share}
-        <IconButton
-          testID="diary-summary-details"
-          tone="clear"
-          size={44}
-          expanded={open}
-          accessibilityLabel={open ? "Hide the day's details" : "Show the day's details: the target, workouts and macros"}
-          onPress={() => setOpen(!open)}>
-          {open ? <ChevronUp size={20} color={colors.text} strokeWidth={2.2} /> : <ChevronDown size={20} color={colors.text} strokeWidth={2.2} />}
-        </IconButton>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: narrow && !big ? SUMMARY_CUP_GAP : spacing.sm }}>
+          {share}
+          <IconButton
+            testID="diary-summary-details"
+            tone="clear"
+            size={narrow && !big ? SUMMARY_CUP_NARROW : 44}
+            expanded={open}
+            accessibilityLabel={open ? "Hide the day's details" : "Show the day's details: the target, workouts and macros"}
+            onPress={() => setOpen(!open)}>
+            {open ? <ChevronUp size={20} color={colors.text} strokeWidth={2.2} /> : <ChevronDown size={20} color={colors.text} strokeWidth={2.2} />}
+          </IconButton>
+        </View>
       </View>
       {open ? (
         <View testID="diary-summary-more">
@@ -165,6 +167,15 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?
     </Card>
   );
 }
+
+/**
+ * The summary's share and chevron cups under 360 px at the designed text size: 36 px (44 to touch, 48 on Android, the
+ * kit's slop), so the figures keep the room for "1,219 eaten of 2,160 kcal" on one line (152 px; two 44 px cups left
+ * 142) and Lunch's add stays in the first view at 320 x 640. Elsewhere 44.
+ */
+export const SUMMARY_CUP_NARROW = 36;
+/** The room between the two cups at 36 px: their 44 px touch areas meet (48 on Android, 12 apart), never overlap. */
+const SUMMARY_CUP_GAP = ANDROID_TOUCH ? 12 : 8;
 
 /** On a day with nothing logged, the first meal's slot says what the search it opens offers (one line at 320 px). */
 export const EMPTY_DAY_NOTE = 'Search, scan or snap a photo';

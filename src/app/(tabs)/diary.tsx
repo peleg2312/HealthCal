@@ -5,7 +5,7 @@ import { type ScrollView, type ScrollViewProps, useWindowDimensions, View } from
 
 import { hasFoodLogged } from '@/features/drinks/via';
 import { copyPreviousDay, copyPreviousMeal, findPreviousDay, findPreviousMeal } from '@/features/food/actions';
-import { DaySummaryCard, EMPTY_DAY_NOTE, MealCard, MealMenuSheet } from '@/features/food/DiaryParts';
+import { DaySummaryCard, EMPTY_DAY_NOTE, MealCard, MealMenuSheet, SUMMARY_CUP_NARROW } from '@/features/food/DiaryParts';
 import { foodLatestDay } from '@/features/food/entryDay';
 import { dayPhrase, kcal, param, parseDate } from '@/features/food/helpers';
 import { markSaveHintDone, saveHintAllowed, saveHintMeal, useSaveHintDone } from '@/features/food/saveHint';
@@ -124,7 +124,8 @@ export default function DiaryScreen() {
       <DaySummaryCard
         day={day}
         // Nothing to share on a day with no food logged (drinks logged on Water do not count), as on Today's day one.
-        share={date <= t && hasFoodLogged(day.entries) ? <ShareDayButton date={date} testID="diary-share" /> : null}
+        // Under 360 px a 36 px cup (44 to touch), so the summary's figures keep one line with their unit.
+        share={date <= t && hasFoodLogged(day.entries) ? <ShareDayButton date={date} testID="diary-share" size={narrow ? SUMMARY_CUP_NARROW : 44} /> : null}
         action={
           empty && previousDay ? (
             <Button

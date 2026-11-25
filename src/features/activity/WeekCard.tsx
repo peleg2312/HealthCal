@@ -4,6 +4,7 @@ import { ScrollView, useWindowDimensions, View } from 'react-native';
 
 import { formatDuration, weekdayShort } from '@/lib/dates';
 import { OVERVIEW_ABOUT, type TrainingOverview } from '@/lib/trainingLoad';
+import { spokenUnits } from '@/lib/spokenUnits';
 import { formatNumber } from '@/lib/units';
 import { cup, fonts, LARGE_TEXT, useTextGrowth, useTheme } from '@/theme';
 import { useProfile } from '@/store/selectors';
@@ -72,6 +73,13 @@ export function WeekCard({
   const addedSpoken = `This week's workouts: about ${formatNumber(week.kcalNet)} kilocalories ${notAdding ? 'not added to your budget' : 'added to your budget'}, an estimate`;
 
   const status = reached ? 'Weekly activity guideline reached' : `${WHO_WEEKLY_MINUTES - minutes} min to the weekly guideline`;
+  const totalTime = week.totalMinutes > 0 ? formatDuration(week.totalMinutes) : '0 min';
+  // The cup, its labels and the three totals are one element to a screen reader, read in the order they are drawn
+  // with every unit in full ("3 hours 15 minutes", never "3 h 15 min"), as the week strip under them is.
+  const figuresLabel = spokenUnits(
+    `${formatNumber(minutes)} active minutes this week, of the ${WHO_WEEKLY_MINUTES} minutes a week guideline. ${status}. ` +
+      `${week.sessions === 1 ? '1 session' : `${formatNumber(week.sessions)} sessions`}, ${totalTime} in all. ${addedSpoken}.`,
+  );
   // Above 115% text the labels placed at their levels would run into each other (they are 20, 40 and 44 px tall).
   const grow = useTextGrowth();
   const stacked = grow > LARGE_TEXT;
@@ -133,6 +141,8 @@ export function WeekCard({
 
   return (
     <Card testID="train-week-card" padding={18}>
+      <View testID="train-week-figures" accessible accessibilityRole="image" accessibilityLabel={figuresLabel}>
+      <View aria-hidden importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
       {stacked ? (
         // Large text: the labels no longer fit at their levels, so they stand in a column beside the cup, in
         // the order they are read, and wrap; the cup's brim is the guideline.
@@ -181,8 +191,10 @@ export function WeekCard({
       {/* Three totals in a row; on a phone too narrow for that the third wraps under the first two, so nothing is cut. */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: spacing.sm, marginTop: spacing.lg }}>
         <Mini label="Sessions" value={String(week.sessions)} />
-        <Mini label="Total time" value={week.totalMinutes > 0 ? formatDuration(week.totalMinutes) : '0 min'} testID="train-total-time" />
-        <Mini label={addedWord} value={`~${formatNumber(week.kcalNet)}`} unit="kcal" color={colors.exercise} spoken={addedSpoken} />
+        <Mini label="Total time" value={totalTime} testID="train-total-time" />
+        <Mini label={addedWord} value={`~${formatNumber(week.kcalNet)}`} unit="kcal" color={colors.exercise} />
+      </View>
+      </View>
       </View>
       {extra}
 

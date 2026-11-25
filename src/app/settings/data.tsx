@@ -1,7 +1,9 @@
 import { router } from 'expo-router';
 import { Activity, Archive, Droplets, FileUp, Scale, Trash2, Utensils } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { ActivityIndicator, Platform, View } from 'react-native';
+import { Platform, View } from 'react-native';
+
+import { PourWait } from '@/components/PourWait';
 
 import { Group, IconTile } from '@/features/settings/components';
 import { applyLastBackupProfile, exportData, pickAndImportBackup, type ExportKind, type ImportResult } from '@/services/export';
@@ -79,7 +81,8 @@ export default function DataScreen() {
     router.replace('/welcome');
   };
 
-  const spinner = (k: ExportKind | 'import') => (busy === k ? <ActivityIndicator color={colors.textSecondary} /> : undefined);
+  // The app's waiting cup at the row's end while its file is made or read (never a bare spinner).
+  const spinner = (k: ExportKind | 'import') => (busy === k ? <PourWait size="inline" label={k === 'import' ? 'Reading the backup' : 'Making the file'} /> : undefined);
   const count = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
   const fileAction = Platform.OS === 'web' ? 'Download' : 'Share';
 
