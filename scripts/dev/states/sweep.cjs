@@ -64,7 +64,7 @@ const diary = [
 const water = WATER.map(([value, pct]) => ({ id: `sweep-water-${pct}`, route: '/water', values: { water: value }, note: `the water cup at ${pct}% of the goal` }));
 const train = [0, 45, 150, 300, 600].map((weekMinutes) => ({ id: `sweep-train-week-${weekMinutes}`, route: '/train', values: { weekMinutes }, note: `Train's week cup at ${weekMinutes} guideline minutes` }));
 const fasting = [[0, '0'], [0.05, '5'], [0.37, '37'], [0.85, '85'], [1, '100'], [1.3, '130']].map(([value, pct]) => ({
-  id: `sweep-fasting-${pct}`, route: '/fasting', values: { fasting: value }, waitFor: 'fasting-screen', note: value ? `the fasting cup ${pct}% of the way to the target` : 'no fast running',
+  id: `sweep-fasting-${pct}`, route: '/fasting', values: { fasting: value }, waitFor: 'fasting-screen', note: value ? `the fasting cup ${pct}% of the way to the goal` : 'no fast running',
 }));
 
 // ------------------------------------------------------------------ the share card

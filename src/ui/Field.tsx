@@ -7,6 +7,7 @@ import { cup, fonts, phoneCapFor, scaledFontSize, useTextSize, useTheme } from '
 
 import { IconButton } from './Button';
 import { ANDROID_TARGET, spokenFieldName, stepperKey, webAutoComplete } from './controlRules';
+import { DECORATIVE } from './decorative';
 import { ANDROID_TOUCH, FOCUS_CUP, useFocusRing } from './Pressable';
 import { Text, useGrownText } from './Text';
 import { passRef, useToastControl } from './toastControls';
@@ -144,7 +145,7 @@ export function TextField({ label, suffix, error, hint, left, right, style, line
         />
         {left ? (
           <View pointerEvents="none" style={{ position: 'absolute', left: PAD_X, top: 0, bottom: 0, justifyContent: 'center' }}>
-            <View onLayout={(e) => setLeftW(Math.round(e.nativeEvent.layout.width))}>{left}</View>
+            <View onLayout={(e) => setLeftW(Math.round(e.nativeEvent.layout.width))} {...DECORATIVE}>{left}</View>
           </View>
         ) : null}
         {suffix ? (

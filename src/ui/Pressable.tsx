@@ -205,6 +205,15 @@ export function PressableScale({ style, scaleTo = 0.97, feedback = 'none', dimDi
     ownRef.current = n;
     passRef(given, n);
   };
+  // Web: a named control's icons only decorate (its name says what it does), so they are hidden from assistive
+  // technology, whoever drew them: a screen's own icon in a pressable row or tile as much as a kit Button's. An
+  // svg that carries a name of its own keeps it. Run after every render, as the icons inside may change.
+  const named = typeof rest.accessibilityLabel === 'string' ? rest.accessibilityLabel.trim() !== '' : !!(rest as Record<string, unknown>)['aria-label'] || !!(rest as Record<string, unknown>)['aria-labelledby'];
+  useEffect(() => {
+    const n = ownRef.current;
+    if (Platform.OS !== 'web' || !named || typeof HTMLElement === 'undefined' || !(n instanceof HTMLElement)) return;
+    for (const svg of n.querySelectorAll('svg:not([aria-hidden]):not([aria-label]):not([aria-labelledby])')) svg.setAttribute('aria-hidden', 'true');
+  });
   const role = ((rest as { role?: string }).role ?? rest.accessibilityRole ?? 'button') as string;
   const state = expanded === undefined ? rest.accessibilityState : { ...rest.accessibilityState, expanded };
   const pressed = (e: GestureResponderEvent) => {

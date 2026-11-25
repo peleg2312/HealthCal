@@ -463,8 +463,13 @@ export function rateText(kg: number, units: UnitSystem): string {
   return formatWeight(a, units, a < 0.1 && a > 0 ? 2 : 1);
 }
 
+/** A night's length for copy, in hours and minutes to the nearest minute, never decimal hours: "7 h 45 min", "7 h", "45 min". */
 export function hoursText(h: number): string {
-  return `${(Math.round(h * 10) / 10).toFixed(1).replace(/\.0$/, '')} h`;
+  const mins = Math.round(Math.max(0, h) * 60);
+  const hh = Math.floor(mins / 60);
+  const mm = mins % 60;
+  if (hh === 0) return `${mm} min`;
+  return mm === 0 ? `${hh} h` : `${hh} h ${mm} min`;
 }
 
 export function plural(n: number, one: string, many = `${one}s`): string {
@@ -940,8 +945,8 @@ function adaptiveInsight({ energy }: InsightContext): Insight | null {
       id: 'adaptive-pending',
       tone: 'neutral',
       title: 'Learning what you burn',
-      step: `Until then targets use ${kcalText(formula)} a day, from your body.`,
-      body: `Working out what you burn from your own logs needs ${a.needs ?? 'a little more data'}. Until then targets use the estimate from your body, ${kcalText(formula)} a day.`,
+      step: `Until then targets use about ${kcalText(formula)} a day, from your body.`,
+      body: `Working out what you burn from your own logs needs ${a.needs ?? 'a little more data'}. Until then targets use the estimate from your body, about ${kcalText(formula)} a day.`,
       action: needsWeight ? { label: 'Log weight', route: '/weight' } : { label: 'Open diary', route: '/diary' },
       score: 26,
     };
@@ -955,7 +960,7 @@ function adaptiveInsight({ energy }: InsightContext): Insight | null {
       tone: 'neutral',
       title: 'What you burn, from your logs',
       step: 'Turn on "Learn from my data" in Goals to base your targets on it.',
-      body: `Your food and weigh-ins show you burn about ${kcalText(a.observed)} a day before logged workouts, ${rel} the ${kcalText(formula)} estimated from your body.`,
+      body: `Your food and weigh-ins show you burn about ${kcalText(a.observed)} a day before logged workouts, ${rel} the body's estimate of about ${kcalText(formula)}.`,
       action: { label: 'Review goals', route: '/settings/goals' },
       score: 45,
     };
@@ -964,8 +969,8 @@ function adaptiveInsight({ energy }: InsightContext): Insight | null {
     id: 'adaptive-active',
     tone: 'positive',
     title: 'What you burn, from your logs',
-    step: `Your targets now use ${kcalText(energy.tdee)} a day.`,
-    body: `Your food and weigh-ins show you burn about ${kcalText(a.observed)} a day before logged workouts, ${rel} the ${kcalText(formula)} estimated from your body. At ${confidenceWord(a.confidence)} confidence (${pct}%) your targets now use a blend of the two, ${kcalText(energy.tdee)} a day.`,
+    step: `Your targets now use about ${kcalText(energy.tdee)} a day.`,
+    body: `Your food and weigh-ins show you burn about ${kcalText(a.observed)} a day before logged workouts, ${rel} the body's estimate of about ${kcalText(formula)}. At ${confidenceWord(a.confidence)} confidence (${pct}%) your targets now use a blend of the two, about ${kcalText(energy.tdee)} a day.`,
     score: Math.abs(diff) >= 150 ? 42 : 27,
   };
 }

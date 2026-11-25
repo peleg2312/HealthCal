@@ -66,7 +66,8 @@ export function Chip({
         },
         style,
       ]}>
-      {icon}
+      {/* The chip is named by its label: its icon only decorates. */}
+      {icon ? <View {...DECORATIVE}>{icon}</View> : null}
       <Text variant="label" color={fg} numberOfLines={large ? undefined : 1} style={{ fontSize: 13.5, flexShrink: 1 }}>
         {label}
       </Text>

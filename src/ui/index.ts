@@ -3,6 +3,7 @@ export * from './Card';
 export * from './Charts';
 export * from './Chip';
 export { ANDROID_TARGET, webAutoComplete } from './controlRules';
+export { decorative, DECORATIVE } from './decorative';
 export * from './Field';
 export * from './List';
 export { AnimatedItem, AnimatedList, AnimatedNumber, cssBezier, DrawReveal, ease, FadeUp, useFadeAfter, usePour, useReachFlash } from './motion';

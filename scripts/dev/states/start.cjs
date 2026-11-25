@@ -172,7 +172,7 @@ const weeks = [
   { id: 'consistency-empty', route: '/consistency', data: 'empty', waitFor: 'consistency-screen', note: 'nothing logged yet' },
   { id: 'consistency-prev-month', route: '/consistency', taps: ['consistency-month-prev'], waitFor: 'consistency-calendar', note: 'the month before' },
   { id: 'consistency-help-sheet', route: '/consistency', taps: ['consistency-rhythm-help'], sheet: true, note: 'weekly rhythm explainer' },
-  { id: 'consistency-edit-sheet', route: '/consistency', taps: ['consistency-rhythm-edit'], sheet: true, note: 'weekly rhythm targets' },
+  { id: 'consistency-edit-sheet', route: '/consistency', taps: ['consistency-rhythm-edit'], sheet: true, note: 'weekly rhythm goals' },
 ];
 
 // ------------------------------------------------------------------ accounts (a build with a backend)

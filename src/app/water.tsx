@@ -165,7 +165,8 @@ function GlassTile({ title, subtitle, icon, onPress, testID, accessibilityLabel 
         minHeight: 84,
         ...cup(radius.tile, 5),
         backgroundColor: colors.surface,
-        borderWidth: 2,
+        // A 3 px water edge: the glasses outweigh the kind chips above them in every look (blurred, D2-03).
+        borderWidth: 3,
         borderColor: colors.water,
         alignItems: 'center',
         justifyContent: 'center',

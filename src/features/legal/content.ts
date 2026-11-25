@@ -18,13 +18,13 @@
 
 /**
  * The day these texts last changed (YYYY-MM-DD). 2026-11-24: each page gained its short layer (`summary`),
- * and on the privacy page it stands where the "In short" section was drawn. The same day the privacy
- * page's short layer gained its friends line (what a friend sees, from the Friends section), its export
- * line says the coach chat stays on the phone (as the coach section does), and the profile is said to hold
- * the goal weight and the calorie target. A section's `jump` label is navigation, not text of the page: adding or
+ * and on the privacy page it stands where the "In short" section was drawn. 2026-11-25: the privacy page's
+ * short layer gained its friends line (what a friend sees, from the Friends section), its export line says
+ * the coach chat stays on the phone (as the coach section does), and the profile is said to hold the goal
+ * weight and the calorie target. A section's `jump` label is navigation, not text of the page: adding or
  * changing one does not move the date.
  */
-export const LEGAL_UPDATED = '2026-11-24';
+export const LEGAL_UPDATED = '2026-11-25';
 
 /** The support address the pages give. Empty until the owner supplies one: never a personal address. */
 export const CONTACT_EMAIL = '';

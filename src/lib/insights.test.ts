@@ -269,7 +269,7 @@ describe('insight content cites the numbers', () => {
     const days = base({});
     const sleep = days.map((d) => ({ date: d.date, hours: 6.5, quality: 3 }));
     const out = generateInsights(ctx(days, { sleep }));
-    expect(find(out, 'sleep-short')?.body).toContain('Sleep averaged 6.5 h over 8 nights');
+    expect(find(out, 'sleep-short')?.body).toContain('Sleep averaged 6 h 30 min over 8 nights');
     expect(find(out, 'sleep-short')?.step).toContain('30 minutes earlier');
   });
 });
@@ -359,7 +359,8 @@ describe('adaptive estimate insight', () => {
     const adaptive: AdaptiveTdee = { tdee: 2480, observed: 2600, confidence: 0.62, loggedDays: 24, weighIns: 18, windowDays: 28, needs: null };
     const out = generateInsights(ctx(days, { energy: { formulaTdee: 2300, adaptive, usingAdaptive: true, useAdaptiveSetting: true, tdee: 2480 } }));
     const a = find(out, 'adaptive-active')!;
-    expect(a.body).toContain('2,600 kcal a day before logged workouts, 300 kcal above the 2,300 kcal estimated from your body');
+    expect(a.body).toContain('about 2,600 kcal a day before logged workouts, 300 kcal above the body\'s estimate of about 2,300 kcal');
+    expect(a.body).toContain('a blend of the two, about 2,480 kcal a day');
     expect(a.body).toContain('good confidence (62%)');
   });
 });

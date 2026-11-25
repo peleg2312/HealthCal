@@ -271,7 +271,7 @@ const weight = [
   require('./health.cjs').find((s) => s.id === 'weight-synced'),
   { id: 'weight-1m', route: '/weight', taps: ['weight-range-1m'], note: 'one month' },
   { id: 'weight-all', route: '/weight', taps: ['weight-range-all'], note: 'all of it' },
-  { id: 'weight-stress', route: '/weight', data: 'stress', note: '142.6 kg, target 118 kg' },
+  { id: 'weight-stress', route: '/weight', data: 'stress', note: '142.6 kg, goal 118 kg' },
   { id: 'weight-stress-imperial', route: '/weight', data: 'stress', imperial: true, note: '314 lb' },
   { id: 'weight-imperial', route: '/weight', imperial: true, note: 'lb' },
   { id: 'weight-empty', route: '/weight', data: 'empty', note: 'one weigh-in or none' },
@@ -324,7 +324,7 @@ const fasting = [
     waitFor: 'fasting-end',
     note: 'a 2 h fast reached an hour ago',
   },
-  { id: 'fasting-custom', route: '/fasting', taps: ['fasting-target-custom', { type: 'fasting-custom-input', text: '36.5' }], waitFor: 'fasting-custom-input', note: 'a custom target being typed' },
+  { id: 'fasting-custom', route: '/fasting', taps: ['fasting-target-custom', { type: 'fasting-custom-input', text: '36.5' }], waitFor: 'fasting-custom-input', note: 'a custom goal being typed' },
   { id: 'fasting-long-target', route: '/fasting', taps: ['fasting-target-custom', { type: 'fasting-custom-input', text: '72' }, 'fasting-custom-set', 'fasting-start'], waitFor: 'fasting-end', note: 'a 72 h fast running' },
   { id: 'fasting-history', route: '/fasting', taps: ['fasting-start', 'fasting-adjust', 'fasting-shift--60', 'fasting-shift--60', 'fasting-adjust-save', settle, 'fasting-end', settle, 'fasting-start', settle, 'fasting-end', settle, toastGone], waitFor: 'fasting-row-1', note: 'two finished fasts in the history' },
 ];

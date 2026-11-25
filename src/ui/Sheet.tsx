@@ -228,24 +228,51 @@ function useSheetKeyboard(open: boolean, body: React.RefObject<ScrollViewInstanc
 /**
  * Web: the control that opened the sheet gets the focus back when it closes. React Native Web's modal notes
  * the focused element only after the sheet's content has mounted, so a field that takes the focus as the sheet
- * opens (`autoFocus`) was noted instead of its opener, and on close the focus fell to the page. The opener is
- * noted here while the sheet renders open, before its content mounts; once the sheet is gone, it is focused
- * again unless the focus already went somewhere (the modal's own return, or a screen the sheet opened).
+ * opens (`autoFocus`) was noted instead of its opener, and on close the focus fell to the page. So the page's
+ * last focused control outside any dialog is kept as it is focused (`lastOutside`), and a sheet that opens
+ * notes it (or the control still focused, when nothing inside took the focus); once the sheet is gone, that
+ * control is focused again unless the focus already went somewhere (the modal's own return, or a screen the
+ * sheet opened).
  */
+let lastOutside: HTMLElement | null = null;
+const inDialog = (el: Element) => !!el.closest('[aria-modal="true"]');
+if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  document.addEventListener(
+    'focusin',
+    (e) => {
+      if (e.target instanceof HTMLElement && !inDialog(e.target)) lastOutside = e.target;
+    },
+    true,
+  );
+}
+
 function useOpenerFocus(visible: boolean, mounted: boolean) {
-  const opener = useRef<HTMLElement | null | undefined>(undefined);
-  if (Platform.OS === 'web' && typeof document !== 'undefined' && visible && opener.current === undefined) {
-    const el = document.activeElement;
-    opener.current = el instanceof HTMLElement && el !== document.body ? el : null;
-  }
+  const opener = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined' || !visible) return;
+    const now = document.activeElement;
+    opener.current = now instanceof HTMLElement && now !== document.body && !inDialog(now) ? now : lastOutside;
+  }, [visible]);
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined' || mounted) return;
     const el = opener.current;
-    opener.current = undefined;
-    if (!el || !document.contains(el)) return;
-    const now = document.activeElement;
-    if (now && now !== document.body && document.contains(now)) return;
-    el.focus();
+    opener.current = null;
+    if (!el) return;
+    // The modal's content leaves the page a frame or two after the sheet lets it go: wait for the focus to
+    // fall (to the page, or with a field that has left the page), at most about half a second.
+    let frames = 0;
+    let frame = 0;
+    const look = () => {
+      if (!document.contains(el)) return;
+      const now = document.activeElement;
+      const fell = !now || now === document.body || !document.contains(now);
+      if (fell) return el.focus();
+      // Focus went somewhere else outside a dialog (the modal's own return, a screen the sheet opened): leave it.
+      if (!inDialog(now)) return;
+      if (++frames < 30) frame = requestAnimationFrame(look);
+    };
+    look();
+    return () => cancelAnimationFrame(frame);
   }, [mounted]);
 }
 
