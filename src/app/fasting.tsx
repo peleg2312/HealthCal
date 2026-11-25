@@ -256,7 +256,8 @@ function FastingScreen() {
       </Card>
 
       <Card tone="alt">
-        <Note icon={<Info size={14} color={colors.textTertiary} />}>
+        {/* On surfaceAlt the mark is textSecondary (textTertiary never sits there), at the icon size, centred on the first line. */}
+        <Note icon={<Info size={18} color={colors.textSecondary} strokeWidth={1.9} style={{ marginTop: -2 }} />}>
           Fasting is optional and not suitable for everyone, including during pregnancy, with diabetes or a history of disordered eating. Your calorie target works the same with or without it.
         </Note>
       </Card>

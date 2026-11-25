@@ -14,7 +14,7 @@ import { rovingIndex } from '@/ui/controlRules';
 
 import { displayFoodName } from './displayName';
 import { canStepForward, entryDayLabel, entryDaySpoken, foodLatestDay } from './entryDay';
-import { kcal, sourceInfo, sourceKindOf, withSourceWord, type SourceKind } from './helpers';
+import { kcal, rowSourceWord, sourceInfo, sourceKindOf, withSourceWord, type SourceKind } from './helpers';
 import { LangIconButton, useLangName } from './langName';
 
 // How a data source is marked lives with the mark itself (`SourceMark`, `@/features/ai/mark`): a filled cup
@@ -291,11 +291,19 @@ export function FoodRow({
   const stack = !!amount && width < 360;
   // Drawn without the reference list's capitals ("Oats, rolled, dry (uncooked)"); stored and searched as it is.
   const name = displayFoodName(food);
-  // The row's name says what it shows, in its order, as the diary's row does: the name (and the name the query
-  // found), the brand, the portion, the calories and the source in words ("Whey protein shake, 1 scoop,
-  // 114 kilocalories, Reference data. Open details"); a name in Hebrew or Arabic is spoken in its own language.
-  const brand = food.brand && !amount ? `${food.brand}, ` : '';
-  const lang = useLangName(`${name}${matched ? `, ${matched}` : ''}, ${brand}${withoutMarks(subtitle)}, ${Math.round(kcalValue)} kilocalories, ${sourceInfo(sourceKindOf(food)).label}. Open details`);
+  // The source's mark leads the line and its word ends it (none for reference data, whose filled key is enough);
+  // once added, the live kcal leads.
+  const kind = sourceKindOf(food);
+  const caption = withSourceWord(
+    `${amount ? `${kcal(kcalValue)} kcal · ` : food.brand ? `${isolateRtl(food.brand)} · ` : ''}${subtitle}${amount ? '' : ` · ${kcal(kcalValue)} kcal`}`,
+    kind,
+  );
+  // The row's name says what it shows, as drawn and in its order (WCAG 2.5.3, label in name), as the diary's row
+  // does: the name (and the name the query found), the line under it, then the source in words where the line has no
+  // word for it ("Whey protein shake, 1 scoop · 114 kcal, Reference data. Open details"); a name in Hebrew or Arabic
+  // is spoken in its own language.
+  const source = sourceInfo(kind);
+  const lang = useLangName(`${name}${matched ? `, ${matched}` : ''}, ${withoutMarks(caption)}${rowSourceWord(kind) === source.label ? '' : `, ${source.label}`}. Open details`);
   return (
     <View style={stack ? { paddingBottom: spacing.sm } : { flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
       <PressableScale
@@ -331,13 +339,9 @@ export function FoodRow({
           {/* The source's mark leads the line and its word ends it (none for reference data, whose filled key
               is enough), so a long portion or brand wraps to a second line instead of cutting the calories. */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
-            <SourceMark source={sourceKindOf(food)} color={colors.textSecondary} size={8} style={{ marginTop: sourceMarkTop(sourceKindOf(food)) }} />
+            <SourceMark source={kind} color={colors.textSecondary} size={8} style={{ marginTop: sourceMarkTop(kind) }} />
             <Text variant="caption" color="textSecondary" numberOfLines={2} style={{ flexShrink: 1 }}>
-              {/* Once added, the live kcal leads. */}
-              {withSourceWord(
-                `${amount ? `${kcal(kcalValue)} kcal · ` : food.brand ? `${isolateRtl(food.brand)} · ` : ''}${subtitle}${amount ? '' : ` · ${kcal(kcalValue)} kcal`}`,
-                sourceKindOf(food),
-              )}
+              {caption}
             </Text>
           </View>
         </View>

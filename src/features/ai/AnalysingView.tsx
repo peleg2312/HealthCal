@@ -2,11 +2,12 @@ import { Image } from 'expo-image';
 import React, { useEffect, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 
 import { cup, useTheme } from '@/theme';
 import { Card, CupKey, ease, FadeUp, figure, Text, useReducedMotion } from '@/ui';
 
-import { AiMark, aiMarkHeadroom } from './mark';
+import { AiMark, aiMarkHeadroom, WAIT_STILL_AFTER_MS } from './mark';
 import { analysingLabel, analysingNote, analysingSteps, slowAfterMs } from './words';
 
 /**
@@ -105,6 +106,8 @@ const VEIL_OUT_MS = 240;
 const HOLD_MS = 160;
 /** How much of the page colour lies over the part of the photo the line has not reached. */
 const VEIL = 0.4;
+/** The turns that end within 5 s (WCAG 2.2.2): three, 4,680 ms; then the line holds still. */
+const VEIL_TURNS = Math.floor(WAIT_STILL_AFTER_MS / (RISE_MS + HOLD_MS));
 
 /**
  * The level line over the photo: a veil of the page colour with the `rim` line along its bottom edge
@@ -113,13 +116,17 @@ const VEIL = 0.4;
  * and rises to the top (1,400 ms) while the veil fades in over its first 260 ms, so the photo is
  * washed over softly, never cut to pale; near the top the line fades out (240 ms); the clear photo
  * rests 160 ms, and the line is put back at the bottom unseen. It never stops part way and never says
- * how much is done. Under reduced motion: no veil, one still line at the cup's rest level.
+ * how much is done. It moves for 5 s at most (WCAG 2.2.2): after three turns it is the still line, as the
+ * AI's cup beside the steps holds still too. Under reduced motion: no veil, one still line at the cup's rest
+ * level, from the start.
  */
 function PourVeil({ boxH }: { boxH: number }) {
   const { colors } = useTheme();
   const reduce = useReducedMotion();
   const y = useSharedValue(0);
   const opacity = useSharedValue(0);
+  // True once its turns are over: it is then the still line, as under reduced motion.
+  const [still, setStill] = useState(false);
   const band = LINE + 2 * EDGE;
   const top = -(boxH - band);
 
@@ -135,7 +142,7 @@ function PourVeil({ boxH }: { boxH: number }) {
           withTiming(top, { duration: HOLD_MS }),
           withTiming(0, { duration: 0 }),
         ),
-        -1,
+        VEIL_TURNS,
       ),
     );
     opacity.set(
@@ -146,7 +153,11 @@ function PourVeil({ boxH }: { boxH: number }) {
           withTiming(0, { duration: VEIL_OUT_MS, easing: ease.exit }),
           withTiming(0, { duration: HOLD_MS }),
         ),
-        -1,
+        VEIL_TURNS,
+        false,
+        (finished) => {
+          if (finished) scheduleOnRN(setStill, true);
+        },
       ),
     );
     return () => {
@@ -159,7 +170,7 @@ function PourVeil({ boxH }: { boxH: number }) {
 
   if (boxH <= band) return null;
   const line = { height: band, borderTopWidth: EDGE, borderBottomWidth: EDGE, borderColor: colors.surface, backgroundColor: colors.rim } as const;
-  if (reduce) {
+  if (reduce || still) {
     return <View testID="ai-analysing-level" pointerEvents="none" style={[{ position: 'absolute', left: 0, right: 0, top: Math.round(boxH * 0.45) }, line]} />;
   }
   return (

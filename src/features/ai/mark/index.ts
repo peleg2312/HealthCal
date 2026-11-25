@@ -8,4 +8,4 @@ export { AiMark, AI_MARK_BOX, aiMarkHeadroom, type AiMarkSize } from './AiMark';
 export { AiGlyph, type AiGlyphName } from './AiGlyph';
 export { SourceMark, sourceKeyVariant, sourceMarkTop } from './SourceMark';
 export { aiMarkFill, coachMarkFill, dropColor, type MarkFill, type MarkPalette } from './fill';
-export { startWaitLoop, waitDuration, WAIT_HIGH, WAIT_LOOP_MS, WAIT_LOW, WAIT_REST } from './loop';
+export { startWaitLoop, waitDuration, WAIT_HIGH, WAIT_LOOP_MS, WAIT_LOW, WAIT_REST, WAIT_STILL_AFTER_MS, WAIT_TURNS } from './loop';

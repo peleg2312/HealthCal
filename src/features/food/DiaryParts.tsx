@@ -23,7 +23,7 @@ import { DayStepper, KcalTrail, MealPicker, RowEmoji } from './components';
 import { displayFoodName } from './displayName';
 import { toggleFoodFavorite } from './favoriteActions';
 import { FAVOURITE_ACTION, favoriteActionLabel } from './favoriteWords';
-import { dayPhrase, href, kcal, portionLabel, sourceInfo, sourceKindOf, withSourceWord } from './helpers';
+import { dayPhrase, href, kcal, portionLabel, rowSourceWord, sourceInfo, sourceKindOf, withSourceWord } from './helpers';
 import { deleteEntry } from './log';
 import { useSaveMealStep } from './SaveMealSheet';
 import { SAVE_HINT_NOT_NOW, SAVE_HINT_NOT_NOW_A11Y, saveHintA11y, saveHintLabel } from './saveWords';
@@ -214,9 +214,10 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
         onLongPress={food ? () => toggleFoodFavorite(food) : holdNothing}
         accessibilityActions={favoriteAction ? [{ name: FAVOURITE_ACTION.name, label: favoriteAction }] : undefined}
         onAccessibilityAction={food ? (e) => e.nativeEvent.actionName === FAVOURITE_ACTION.name && toggleFoodFavorite(food) : undefined}
-        // The whole row is one button whose name says what the row shows, its source in words included
-        // ("Almonds, 1 oz · 28 g, 162 kilocalories, Reference data. Edit"): text inside a named button is not read.
-        accessibilityLabel={spokenUnits(`${name}, ${withoutMarks(portion)}, ${ai ? 'about ' : ''}${Math.round(entry.nutrients.kcal)} kilocalories${inWater ? ', also counted in Water' : ''}, ${source.label}. Edit`)}
+        // The whole row is one button whose name says what the row shows, as drawn and in its order (WCAG 2.5.3,
+        // label in name), then its source in words where the row has no word for it ("Almonds, 1 oz · 28 g, 162 kcal,
+        // Reference data. Edit"): text inside a named button is not read.
+        accessibilityLabel={`${withoutMarks(name)}, ${withoutMarks(caption)}, ${ai ? '~' : ''}${kcal(entry.nutrients.kcal)} kcal${entry.kcalRange ? `, ${kcal(entry.kcalRange[0])}–${kcal(entry.kcalRange[1])} kcal` : ''}${rowSourceWord(kind) === source.label ? '' : `, ${source.label}`}. Edit`}
         // Under 360 px the rows pad 6 instead of 11 (still 56 px at least), so the next meal's add reaches the first view.
         style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: narrow && !big ? 6 : 11 }}>
         <RowEmoji emoji={entry.emoji} />
