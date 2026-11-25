@@ -315,7 +315,9 @@ function row(food: Food, section: SheetRow['section'], glassMl: number, units: U
     name: isolateRtl(food.name),
     ...(m ? { matched: isolateRtl(m), matchedTestID: `water-pick-${food.id}-matched` } : null),
     detail,
-    label: `${food.name}${m ? `, ${m}` : ''}, ${pickDetail(food, glassMl, units, false)}`,
+    // The row's words as drawn (WCAG 2.5.3, label in name); a row under "Your drinks" says so, so it is never named
+    // as the same drink's row under "All drinks" is.
+    label: `${food.name}${m ? `, ${m}` : ''}, ${pickDetail(food, glassMl, units, false)}${section === 'yours' ? ', from your drinks' : ''}`,
     divider,
   };
 }

@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronUp, Minus, Plus, Trash2 } from 'lucide-react-native';
-import React, { useId, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { Platform, TextInput, View } from 'react-native';
 
 import { SourceTag } from '@/features/food/components';
@@ -50,6 +50,11 @@ export function ItemRow({
     setGramsProblem(problem);
     onGramsProblem?.(problem);
   };
+  // A row that (re)mounts shows its item's grams, so the review has nothing to wait on for it.
+  useEffect(() => {
+    onGramsProblem?.(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // The reference foods it could be stay folded under one line until asked for; a matched item shows its match.
   const [showAlt, setShowAlt] = useState(false);
   const step = gramStep(item.grams);

@@ -614,31 +614,31 @@ function WaterScreen() {
                 {'\u00A0'}
               </Text>
             )}
-          <Button
-            testID="water-custom-add"
-            title="Add"
-            size="lg"
-            variant="secondary"
-            full={false}
-            style={{ height: Math.max(50, cupH) }}
-            disabled={!(custom && custom > 0) || amountCheck?.state === 'over'}
-            onPress={addTap(() => {
-              if (!custom) return;
-              const ml = volumeToMl(custom, units);
-              const check = drinkAmountCheck(ml, units);
-              if (check.state === 'over') return;
-              // More than 2 L: asked once, under the field; the same amount pressed again is added.
-              if (check.state === 'ask' && askedMl !== ml) {
-                setAskedMl(ml);
-                haptic.warn();
-                if (Platform.OS !== 'web') AccessibilityInfo.announceForAccessibility(check.line);
-                return;
-              }
-              add(ml, 'custom');
-              setCustom(null);
-              setAskedMl(null);
-            })}
-          />
+            <Button
+              testID="water-custom-add"
+              title="Add"
+              size="lg"
+              variant="secondary"
+              full={false}
+              style={{ height: Math.max(50, cupH) }}
+              disabled={!(custom && custom > 0) || amountCheck?.state === 'over'}
+              onPress={addTap(() => {
+                if (!custom) return;
+                const ml = volumeToMl(custom, units);
+                const check = drinkAmountCheck(ml, units);
+                if (check.state === 'over') return;
+                // More than 2 L: asked once, under the field; the same amount pressed again is added.
+                if (check.state === 'ask' && askedMl !== ml) {
+                  setAskedMl(ml);
+                  haptic.warn();
+                  if (Platform.OS !== 'web') AccessibilityInfo.announceForAccessibility(check.line);
+                  return;
+                }
+                add(ml, 'custom');
+                setCustom(null);
+                setAskedMl(null);
+              })}
+            />
           </View>
         </View>
         {/* Kept mounted (a polite live region), so the question is read as it appears; empty, it takes no room. */}
