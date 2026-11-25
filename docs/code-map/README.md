@@ -67,7 +67,7 @@ with how many steps away it is). This one is worked out from the sources, in abo
   recorded as an import of every file Metro could pick for it: the plain file and each platform
   file that exists (`adapter.ts`, `adapter.android.ts`, `adapter.ios.ts`), and a name imported from
   it is used in each of them that defines it. An import that names a platform file itself
-  (`./capture.native`) is that file only. The platform files now: `src/features/health-sync/adapter.android.ts`, `src/features/health-sync/adapter.ios.ts`, `src/features/share/capture.native.ts`, `src/features/updates/platform.native.ts`, `src/features/widget/pin.android.ts`, `src/features/widget/refresh.android.ts`, `src/features/widget/register.android.ts`.
+  (`./capture.native`) is that file only. The platform files now: `src/features/health-sync/adapter.android.ts`, `src/features/health-sync/adapter.ios.ts`, `src/features/journal/files.web.ts`, `src/features/share/capture.native.ts`, `src/features/updates/platform.native.ts`, `src/features/widget/pin.android.ts`, `src/features/widget/refresh.android.ts`, `src/features/widget/register.android.ts`.
 - Packages (`react`, `expo-router`, `node:fs`, `npm:`, `jsr:`, URLs) are not in the map.
 - JSON, images and every other file that is not TypeScript are not nodes: an import of one
   (`import data from './x.json'`) adds nothing to the map. Today no source imports one.
@@ -100,8 +100,8 @@ with how many steps away it is). This one is worked out from the sources, in abo
 
 ## Counts
 
-819 files (262 of them tests), 4019 exported names (class 17, component 266, const 986, default 44, function 1963, interface 488, type 255),
-227 re-export lines, 3170 names imported somewhere, 4698 file-to-file dependencies.
+847 files (270 of them tests), 4102 exported names (class 17, component 277, const 1001, default 47, function 2007, interface 496, type 257),
+227 re-export lines, 3297 names imported somewhere, 4888 file-to-file dependencies.
 
 ## Refreshing it
 

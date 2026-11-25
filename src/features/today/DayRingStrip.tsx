@@ -9,7 +9,7 @@ import type { ISODate } from '@/types';
 import { Chip, FadeUp, IconButton, ListRow, MiniCup, PressableScale, Sheet, Text, useGrownText, useReducedMotion } from '@/ui';
 
 import { fitsRoom } from './fit';
-import { MeasureWidth } from './MeasureWidth';
+import { MeasureWidth, SizeProbe, useMeasureKey } from './MeasureWidth';
 import { DaySwipeGuard } from './useDaySwipe';
 import { dayCellLabel, dayRing, weekCaption, weekDates } from './week';
 
@@ -249,6 +249,7 @@ export function DayRingStrip({
   // its shape and grows with its text (`grown`); the slim strip stays slim at every size, its date boxes growing.
   const large = useVeryLargeText();
   const grown = useGrownText();
+  const measureKey = useMeasureKey();
   const thin = slim;
   // With text grown, the caption row's room as measured: the row, and what sits beside the caption as drawn.
   const [rowW, setRowW] = useState(0);
@@ -433,21 +434,19 @@ export function DayRingStrip({
       {/* One height on both screens: two caption lines or the chip. A note that wraps moves nothing. */}
       {/* Very large text (150% and up), or a link that does not fit beside them: the row wraps, the chip, the streak and
           the week cup going to a line under the caption where they do not fit beside it, so neither squeezes the other's words. */}
-      <View
-        // Always observed: react-native-web watches a view's layout only when it mounts with a handler.
-        onLayout={(e) => setRowW(Math.floor(e.nativeEvent.layout.width))}
-        style={{ flexDirection: 'row', flexWrap: wraps ? 'wrap' : 'nowrap', alignItems: 'center', gap: spacing.sm, minHeight: CAPTION_ROW_H }}>
+      <View style={{ flexDirection: 'row', flexWrap: wraps ? 'wrap' : 'nowrap', alignItems: 'center', gap: spacing.sm, minHeight: CAPTION_ROW_H }}>
+        {grown ? <SizeProbe key={measureKey} onSize={(w) => setRowW(Math.floor(w))} /> : null}
         {showLink && link ? (
           <View style={wraps ? { flexGrow: 1, flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm } : { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
             {grown ? (
               <>
-                <MeasureWidth onWidth={setLinkW}>
+                <MeasureWidth key={`long-${measureKey}`} onWidth={setLinkW}>
                   <Text variant="label" style={{ fontSize: 13, lineHeight: 17 }}>
                     {link.label}
                   </Text>
                 </MeasureWidth>
                 {link.short ? (
-                  <MeasureWidth onWidth={setShortW}>
+                  <MeasureWidth key={`short-${measureKey}`} onWidth={setShortW}>
                     <Text variant="label" style={{ fontSize: 13, lineHeight: 17 }}>
                       {link.short}
                     </Text>
@@ -490,7 +489,8 @@ export function DayRingStrip({
         {grown ? (
           // With text grown the chip or streak and the week controls are one group, measured as drawn (the room left to
           // the caption's link), that goes to a line under the caption together when the row wraps.
-          <View onLayout={(e) => setGroupW(Math.ceil(e.nativeEvent.layout.width))} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <SizeProbe key={measureKey} onSize={(w) => setGroupW(Math.ceil(w))} />
             {side}
             {weekControls}
           </View>

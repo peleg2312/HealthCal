@@ -23,7 +23,7 @@ import { AnimatedNumber, Button, Card, CupKey, haptic, PressableScale, ProgressB
 import { cheersLabel, recentCheerCount } from './cheers';
 import { fitsRoom } from './fit';
 import { logPlainGlass } from './glass';
-import { MeasureWidth } from './MeasureWidth';
+import { MeasureWidth, SizeProbe, useMeasureKey } from './MeasureWidth';
 import { crossesGoal, defaultGlass, volumeNumber, volumeUnitFor, waterOfGoal } from './volume';
 import { weightCell } from './weightCell';
 
@@ -190,6 +190,7 @@ export function PillarsCard({ day, isToday }: { day: DaySummary; isToday: boolea
   const grown = useGrownText();
   const [rowW, setRowW] = useState(0);
   const [needs, setNeeds] = useState<Record<string, number>>({});
+  const measureKey = useMeasureKey();
   const need = (key: string) => (w: number) => {
     if (needs[key] !== w) setNeeds((n) => ({ ...n, [key]: w }));
   };
@@ -248,13 +249,12 @@ export function PillarsCard({ day, isToday }: { day: DaySummary; isToday: boolea
 
   return (
     <Card testID="today-rail" padding={0}>
-      <View
-        // Always observed: react-native-web watches a view's layout only when it mounts with a handler.
-        onLayout={(e) => setRowW(Math.floor(e.nativeEvent.layout.width))}
-        style={{ flexDirection: large ? 'column' : 'row', paddingHorizontal: pad, paddingTop: 12, paddingBottom: 14, gap }}>
+      <View style={{ flexDirection: large ? 'column' : 'row', paddingHorizontal: pad, paddingTop: 12, paddingBottom: 14, gap }}>
         {measuring ? (
-          // Each cell's label and value at their natural widths as drawn, to know whether the three share one row.
-          <>
+          // The row's width, and each cell's label and value at their natural widths as drawn, to know whether the three
+          // share one row (measured again each time Today comes back into focus, `useMeasureKey`).
+          <React.Fragment key={measureKey}>
+            <SizeProbe onSize={(w) => setRowW(Math.floor(w))} />
             <CellProbe label="Activity" value={week ? formatNumber(weekMinutes) : String(day.activeMinutes)} unit="min" narrow={narrow} onWidth={need('activity')} />
             <CellProbe
               label="Sleep"
@@ -270,7 +270,7 @@ export function PillarsCard({ day, isToday }: { day: DaySummary; isToday: boolea
               narrow={narrow}
               onWidth={need('last')}
             />
-          </>
+          </React.Fragment>
         ) : null}
         <Cell
           testID="today-activity"

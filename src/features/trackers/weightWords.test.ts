@@ -17,9 +17,9 @@ describe('range words', () => {
     const s3 = weightRangeSummary(trend, '3m', END)!;
     expect(rangeSpanWords(s3, '3m')).toBe('last 3 months');
     const all = weightRangeSummary(trend, 'all', END)!;
-    expect(rangeSpanWords(all, 'all')).toBe('since May 10');
+    expect(rangeSpanWords(all, 'all')).toBe('since May\u00A010');
     const y = weightRangeSummary(trend, '1y', END)!;
-    expect(rangeSpanWords(y, '1y')).toBe('since May 10');
+    expect(rangeSpanWords(y, '1y')).toBe('since May\u00A010');
   });
 
   it('gives the average and lowest to highest with one decimal, in the person\'s units', () => {
@@ -29,7 +29,7 @@ describe('range words', () => {
       { date: '2026-11-25', kg: 78.5 },
     ]);
     const f = rangeFigures(weightRangeSummary(t, '1m', END)!, '1m', 'metric')!;
-    expect(f).toMatchObject({ unit: 'kg', average: '79.2', averageLabel: 'Average, since Nov 20', spread: '78.5–80.0', spreadLabel: 'Lowest to highest' });
+    expect(f).toMatchObject({ unit: 'kg', average: '79.2', averageLabel: 'Average, since Nov\u00A020', spread: '78.5–80.0', spreadLabel: 'Lowest to highest' });
     expect(f.spreadSpoken).toBe('78.5 to 80.0 kg, lowest to highest of 3 weigh-ins');
     const lb = rangeFigures(weightRangeSummary(t, '1m', END)!, '1m', 'imperial')!;
     expect(lb.unit).toBe('lb');

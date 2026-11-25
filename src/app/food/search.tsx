@@ -352,7 +352,8 @@ export default function FoodSearchScreen() {
           accessibilityLabel={`${added.length} added, ${kcal(addedKcal)} kcal. Show what was added, to undo any`}
           style={{ flex: 1, minWidth: 0, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Text variant="title" testID="search-added-count" tabular style={{ flexShrink: 1 }}>
-            {`${added.length} added · `}
+            {/* Under 360 px the count takes two lines by design ("2 added" over "325 kcal"), never broken mid-phrase. */}
+            {`${added.length} added${narrow ? '\n' : ' · '}`}
             <AnimatedNumber variant="title" value={addedKcal} format={kcal} duration={motion.duration.pourSmall} />
             {' kcal'}
           </Text>

@@ -280,6 +280,8 @@ const weight = [
   require('./health.cjs').find((s) => s.id === 'weight-synced'),
   { id: 'weight-1m', route: '/weight', taps: ['weight-range-1m'], note: 'one month' },
   { id: 'weight-all', route: '/weight', taps: ['weight-range-all'], note: 'all of it' },
+  { id: 'weight-1y', route: '/weight', taps: ['weight-range-1y'], waitFor: 'weight-range-figures', note: 'the 1Y chip: the average and lowest to highest follow the range' },
+  { id: 'weight-held', route: '/weight', taps: ['weight-chart', { key: 'ArrowLeft' }, { key: 'ArrowLeft' }], waitFor: 'weight-scale', note: "a point held with the arrow keys (as a finger holds it): the figures read yesterday's weigh-in and trend" },
   { id: 'weight-stress', route: '/weight', data: 'stress', note: '142.6 kg, goal 118 kg' },
   { id: 'weight-stress-imperial', route: '/weight', data: 'stress', imperial: true, note: '314 lb' },
   { id: 'weight-imperial', route: '/weight', imperial: true, note: 'lb' },

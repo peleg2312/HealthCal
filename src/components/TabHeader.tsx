@@ -7,7 +7,7 @@ import { useCoachMovedToast } from '@/features/coach/movedToast';
 import { FriendsEntry } from '@/features/friends/FriendsEntry';
 import { fitsRoom } from '@/features/today/fit';
 import { tabTitleFit } from '@/features/today/greetingTitle';
-import { MeasureWidth } from '@/features/today/MeasureWidth';
+import { MeasureWidth, useMeasureKey } from '@/features/today/MeasureWidth';
 import { formatShortDate, fromISODate } from '@/lib/dates';
 import { useProfile } from '@/store/selectors';
 import { cupFor, MAX_CONTENT_WIDTH, spacing as SPACING, useDrawnFontSize, useTheme, useVeryLargeText } from '@/theme';
@@ -144,10 +144,11 @@ export function TabHeader({
   const initial = ((profile.name ?? '').trim() || 'Me').slice(0, 1).toUpperCase();
   // The overline's short form while text is grown and the whole one, measured as drawn, is wider than its line.
   const [overlineW, setOverlineW] = useState(0);
+  const measureKey = useMeasureKey();
   const measureOverline = grown && !!overlineTight;
   // Unseen, at its natural width as drawn (the overline's line beside the cups is `tabTitleRoom` wide in both layouts).
   const overlineProbe = measureOverline ? (
-    <MeasureWidth onWidth={setOverlineW}>
+    <MeasureWidth key={measureKey} onWidth={setOverlineW}>
       <Text variant="overline">{overline}</Text>
     </MeasureWidth>
   ) : null;

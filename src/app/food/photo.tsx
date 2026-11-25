@@ -48,6 +48,7 @@ import { SaveMealRow } from '@/features/ai/SaveMealRow';
 import { MealPicker } from '@/features/food/components';
 import { checkoutShown, PLAN_ROUTE, planVisible, refreshPlanAfterLimit, usePlan } from '@/features/plan';
 import { logAndSaveMeal, logItems } from '@/features/food/log';
+import { keepMealPhoto } from '@/features/journal/store';
 import { aiAddTitle, aiMealName } from '@/features/food/saveWords';
 import { BUILTIN_FOODS } from '@/data/foods';
 import { isolateRtl } from '@/lib/bidi';
@@ -382,8 +383,10 @@ export default function PhotoScreen() {
     // With the switch on, one act logs and saves: one toast that names the meal, one Undo for both.
     // Never for the sample (it is example data, not the person's food nor an AI estimate).
     // The toast keeps as much of the name as two lines hold at the window's width now.
-    if (saveOn && !isDemo) logAndSaveMeal(items, meal, date, (saveName ?? '').trim() || aiMealName(result?.dish, items), Dimensions.get('window').width);
-    else logItems(items, meal, date);
+    const written = saveOn && !isDemo ? logAndSaveMeal(items, meal, date, (saveName ?? '').trim() || aiMealName(result?.dish, items), Dimensions.get('window').width).entries : logItems(items, meal, date);
+    // The photo is kept on this phone only, as the food journal's (src/features/journal), linked to the entries
+    // just written; never for the sample, which is not about the photo. It runs on after the screen closes.
+    if (mode === 'photo' && preview && !isDemo) void keepMealPhoto({ uri: preview.uri, date, meal, entryIds: written.map((e) => e.id) });
     // Estimates and matched foods show up in Recent, ready to log again.
     const store = useStore.getState();
     for (const it of items) if (it.food) store.rememberFood(it.food);

@@ -7,6 +7,7 @@ import { syncReach } from '@/features/health-sync/reach';
 import { useHealthSync } from '@/features/health-sync/store';
 import { healthAdapter, useHealthStatus } from '@/features/health-sync/sync';
 import { profileSubtitle } from '@/features/health-sync/ui/format';
+import { ProfileJournalRow } from '@/features/journal/JournalRows';
 import { usePlan } from '@/features/plan/cache';
 import { PlanRow } from '@/features/plan/PlanRow';
 import { planVisible } from '@/features/plan/view';
@@ -193,6 +194,7 @@ function ProfileHub() {
           }
           onPress={() => router.push('/fasting' as never)}
         />
+        <ProfileJournalRow />
         <HealthSyncRow />
       </Group>
 

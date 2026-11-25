@@ -1,12 +1,12 @@
 import { Undo2 } from 'lucide-react-native';
 import React from 'react';
-import { Platform, View } from 'react-native';
+import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { useStore } from '@/store';
 import { useTheme } from '@/theme';
 import type { MealType } from '@/types';
-import { Button, Divider, Sheet, Text, RestoreRow } from '@/ui';
+import { Button, Divider, RestoreRow, Sheet, Text, useGrownText } from '@/ui';
 
 import { entryRemovedToast, mealOnDay } from './addedTo';
 import { RowEmoji } from './components';
@@ -40,6 +40,8 @@ export function VisitAddsSheet({
   const live = adds.filter((a) => !a.removed);
   const total = live.reduce((sum, a) => sum + a.entry.nutrients.kcal, 0);
   const web = Platform.OS === 'web';
+  const grown = useGrownText();
+  const stack = useWindowDimensions().width < 360 || grown;
   return (
     <Sheet
       visible={visible}
@@ -47,9 +49,10 @@ export function VisitAddsSheet({
       title={VISIT_ADDS_TITLE}
       subtitle={`${live.length} added · ${kcal(total)} kcal`}
       footer={
-        <View style={{ flexDirection: 'row', gap: spacing.md }}>
-          <Button testID="search-added-back" title="Keep adding" variant="secondary" style={{ flex: 1 }} onPress={onClose} />
-          <Button testID="search-added-close" title="Close search" style={{ flex: 1 }} onPress={onCloseSearch} />
+        // Side by side from 360 px at the designed text size; stacked under it, or as soon as text grows, so neither is cut.
+        <View style={{ flexDirection: stack ? 'column' : 'row', gap: stack ? spacing.sm : spacing.md }}>
+          <Button testID="search-added-back" title="Keep adding" variant="secondary" style={stack ? undefined : { flex: 1 }} onPress={onClose} />
+          <Button testID="search-added-close" title="Close search" style={stack ? undefined : { flex: 1 }} onPress={onCloseSearch} />
         </View>
       }>
       {/* A list on the web, as search's own lists are. */}

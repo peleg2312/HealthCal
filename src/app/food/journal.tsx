@@ -21,7 +21,7 @@ import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
 import { cup, useLargeText, useTheme } from '@/theme';
 import type { FoodEntry } from '@/types';
-import { Button, ConfirmSheet, EmptyState, Header, ListRow, Note, PressableScale, Screen, SectionTitle, Sheet, Text, toast, ToggleRow } from '@/ui';
+import { Button, ConfirmSheet, EmptyState, Header, ListRow, PressableScale, Screen, SectionTitle, Sheet, Text, toast, ToggleRow } from '@/ui';
 
 /** Each day's photos are a list on the web (`role="list"`, each tile a `listitem`), as the app's other lists are. */
 const LIST = (Platform.OS === 'web' ? { role: 'list' } : null) as object | null;
@@ -115,9 +115,11 @@ export default function JournalScreen() {
       {photos === null ? null : (
         <Group title="On this phone" footer={JOURNAL_WORDS.privacyNote}>
           {available === false ? (
-            <Note tone="neutral" surface="card">
-              {JOURNAL_WORDS.webUnavailable}
-            </Note>
+            <View style={{ paddingVertical: spacing.md }}>
+              <Text testID="journal-unavailable" variant="body" color="textSecondary">
+                {JOURNAL_WORDS.webUnavailable}
+              </Text>
+            </View>
           ) : (
             <ToggleRow testID="journal-keep" title={JOURNAL_WORDS.keepTitle} subtitle={JOURNAL_WORDS.keepSubtitle} value={keep} onChange={setKeepPhotos} />
           )}

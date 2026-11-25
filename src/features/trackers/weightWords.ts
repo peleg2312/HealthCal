@@ -11,7 +11,8 @@ import { WEIGHT_RANGES, weightText, type WeightRange, type WeightRangeSummary } 
 
 /** "last 3 months", or "since Oct 21" when the range reaches back to the first weigh-in. */
 export function rangeSpanWords(summary: Pick<WeightRangeSummary, 'from' | 'sinceFirst'>, range: WeightRange): string {
-  if (summary.sinceFirst) return `since ${formatShortDate(summary.from)}`;
+  // The date's month and day stay on one line ("since Oct" / "21" never).
+  if (summary.sinceFirst) return `since ${formatShortDate(summary.from).replace(' ', '\u00A0')}`;
   return WEIGHT_RANGES.find((r) => r.value === range)?.span ?? '';
 }
 

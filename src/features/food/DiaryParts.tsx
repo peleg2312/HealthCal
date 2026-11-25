@@ -6,6 +6,7 @@ import { useWindowDimensions, View } from 'react-native';
 import { SourceMark, sourceMarkTop } from '@/features/ai/mark';
 import { ALSO_IN_WATER, waterFor } from '@/features/drinks/rules';
 import { isWaterDrinkEntry } from '@/features/drinks/via';
+import { MealMenuJournalRow } from '@/features/journal/JournalRows';
 import { figureWords, otherFigure, setCalorieFigure, useCalorieFigure } from '@/features/today/calorieFigure';
 import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { addDays, formatDayLabel } from '@/lib/dates';
@@ -681,6 +682,9 @@ export function MealMenuSheet({
               left={<CalendarPlus size={20} color={colors.text} />}
               onPress={() => setStep('copyTo')}
             />
+            <Divider inset={32} />
+            {/* The meal photo journal: photos of added AI estimates, kept on this phone only. */}
+            <MealMenuJournalRow onClose={onClose} />
             <Divider inset={32} />
             <ListRow
               testID="meal-menu-clear"

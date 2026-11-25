@@ -137,8 +137,8 @@ export function helpParagraphs(kind: Period['kind']): string[] {
   return [
     'Each cup is one day, filled to how much of that day’s own budget you ate, so a full cup is a day right on its budget. An empty cup is a day with no food logged; the days before your first log have no cup.',
     kind === 'month'
-      ? 'A check marks a fully logged day on budget: 90 to 100% of its own budget. Amber at the top marks a day above its budget, and such a day has no check. A lighter fill is a day only partly logged, and a hatched cup is today, still in progress.'
-      : 'Amber at the top marks a day above its budget. A lighter fill is a day only partly logged, and a hatched cup is today, still in progress. Each month’s own page marks its days on budget with a check.',
+      ? 'A check marks a fully logged day on budget: 90 to 100% of its own budget. Amber at the top marks a day above its budget, and such a day has no check. A lighter fill is a day partly logged, and a hatched cup is today, still in progress.'
+      : 'Amber at the top marks a day above its budget. A lighter fill is a day partly logged, and a hatched cup is today, still in progress. Each month’s own page marks its days on budget with a check.',
     'Budgets change with workouts and with your plan, which is why each day is measured against its own.',
   ];
 }

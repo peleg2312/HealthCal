@@ -152,6 +152,7 @@ function WeightScreen() {
               ) : null}
             </View>
             {/* Press and hold (or drag) on the chart, or its arrow keys on the web: the figures above read that day. */}
+            <View testID="weight-chart">
             <LineChart
               key={range}
               accessibilityLabel={weightChartLabel(series.trend, range, end, units, target)}
@@ -170,6 +171,7 @@ function WeightScreen() {
               }}
               onActiveChange={setHeld}
             />
+            </View>
             {/* The range, under the chart where the thumb is; the figures under it follow it. */}
             <RangeChips
               value={range}

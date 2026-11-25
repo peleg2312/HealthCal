@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { ArrowRightLeft, ChevronRight, Plus, Repeat2 } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { Platform, useWindowDimensions, View, type LayoutChangeEvent } from 'react-native';
+import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { hasFoodLogged } from '@/features/drinks/via';
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
@@ -11,7 +11,7 @@ import { figureWords, otherFigure, setCalorieFigure, useCalorieFigure } from '@/
 import { DayRingStrip } from '@/features/today/DayRingStrip';
 import { cupHeightFor, fitsRoom } from '@/features/today/fit';
 import { FitsSheet } from '@/features/today/FitsSheet';
-import { MeasureWidth } from '@/features/today/MeasureWidth';
+import { MeasureWidth, SizeProbe, useMeasureKey } from '@/features/today/MeasureWidth';
 import { mealLine } from '@/features/today/meals';
 import { NOW_WORDS } from '@/features/today/now';
 import { NowCard, relativeTo, useNowState } from '@/features/today/NowCard';
@@ -199,10 +199,12 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
   const drawn = useDrawnFontSize();
   // Each label's box as measured (fit only), by key; until measured, the designed box grown as its text is drawn.
   const [boxes, setBoxes] = useState<Record<string, number>>({});
-  const measureBox = (key: string) => (e: LayoutChangeEvent) => {
-    const h = Math.ceil(e.nativeEvent.layout.height);
+  const measureBox = (key: string) => (_w: number, height: number) => {
+    const h = Math.ceil(height);
     if (Math.abs((boxes[key] ?? 0) - h) >= 1) setBoxes((b) => ({ ...b, [key]: h }));
   };
+  // Every measuring part mounts again as Today comes back into focus (a size changed on Profile is measured again).
+  const measureKey = useMeasureKey();
   // The widest macro name with its key as drawn, and the macros' row, to know whether three fit side by side.
   const [macroNameW, setMacroNameW] = useState(0);
   const [macrosW, setMacrosW] = useState(0);
@@ -248,7 +250,15 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
   const lineBox = (key: string) => (fit ? (boxes[key] ?? Math.ceil((lineH * drawn(17)) / 17)) : lineH);
   const numBox = fit ? Math.max(44, boxes.left ?? Math.ceil((numH * drawn(boxSize)) / boxSize)) : numH;
   // With text grown each label's content reports its height (its box), and wraps at its words in the column.
-  const boxed = (key: string, node: React.ReactNode) => (fit ? <View onLayout={measureBox(key)}>{node}</View> : node);
+  const boxed = (key: string, node: React.ReactNode) =>
+    fit ? (
+      <View>
+        <SizeProbe key={measureKey} onSize={measureBox(key)} />
+        {node}
+      </View>
+    ) : (
+      node
+    );
   const vesselW = narrow ? 66 : 84;
   // Burned in activity but left out of the budget (exercise is not added in Goals).
   const notAdded = day.exerciseRule === 'off' ? Math.max(0, day.exerciseNet) : 0;
@@ -473,7 +483,8 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
             <Vessel value={eaten} max={budget} headroom={headroom} color={colors.calories} width={LARGE_CUP.width} height={largeCupH} memoryKey={`hero-${day.date}`} />
             {firstDay && headroom === 0 ? <ReadyRim width={LARGE_CUP.width} /> : null}
           </View>
-          <View onLayout={(e) => setRowsH(Math.ceil(e.nativeEvent.layout.height))} style={{ flex: 1, minWidth: 0, gap: spacing.md }}>
+          <View style={{ flex: 1, minWidth: 0, gap: spacing.md }}>
+            <SizeProbe key={measureKey} onSize={(_w, h) => setRowsH(Math.ceil(h))} />
             {headroom > 0 ? (
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
                 <CupKey color={colors.headroom} variant="hatched" size={11} style={{ marginTop: 8 }} />
@@ -556,13 +567,10 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
       {/* The macros sit under the cup, not in its side column: beside the cup there is room only for
           the cup's own labels, each at the height it describes, whatever the day's numbers are. */}
       {firstDay || notLogged ? null : (
-        <View
-          // Always observed: react-native-web watches a view's layout only when it mounts with a handler.
-          onLayout={(e) => setMacrosW(Math.floor(e.nativeEvent.layout.width))}
-          style={macrosStacked ? { gap: spacing.md, marginTop: macrosTop } : { flexDirection: 'row', gap: macroGap, marginTop: macrosTop }}
-          testID="today-macros">
+        <View style={macrosStacked ? { gap: spacing.md, marginTop: macrosTop } : { flexDirection: 'row', gap: macroGap, marginTop: macrosTop }} testID="today-macros">
+          {fit ? <SizeProbe key={measureKey} onSize={(w) => setMacrosW(Math.floor(w))} /> : null}
           {fit ? (
-            <MeasureWidth onWidth={setMacroNameW}>
+            <MeasureWidth key={measureKey} onWidth={setMacroNameW}>
               <View style={{ alignItems: 'flex-start' }}>
                 {['Protein', 'Carbs', 'Fat'].map((label) => (
                   <MacroName key={label} label={label} color={colors.text} />
