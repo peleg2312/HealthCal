@@ -1,6 +1,6 @@
 import { ChevronRight, Info } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { ScrollView, useWindowDimensions, View } from 'react-native';
+import { Platform, ScrollView, useWindowDimensions, View } from 'react-native';
 
 import { formatDuration, weekdayShort } from '@/lib/dates';
 import { OVERVIEW_ABOUT, type TrainingOverview } from '@/lib/trainingLoad';
@@ -254,7 +254,8 @@ export function WeekCard({
           style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, paddingVertical: spacing.xs, marginTop: spacing.xs, marginBottom: -spacing.md }}>
           <LoadMark position={load.position} />
           {/* The cup above counts Monday to Sunday; this line counts the last 7 days, and says so. */}
-          <View testID="train-load" accessibilityLabel={overview.cardLabel ?? undefined} style={{ flex: 1, minWidth: 0 }}>
+          {/* Its name is the button's too; on the web a named box carries a role (inside the button it is presentational). */}
+          <View testID="train-load" accessibilityLabel={overview.cardLabel ?? undefined} {...(Platform.OS === 'web' && overview.cardLabel ? ({ role: 'img' } as const) : null)} style={{ flex: 1, minWidth: 0 }}>
             <Text variant="caption" color="textSecondary" numberOfLines={1} testID="train-load-span">
               Last 7 days
             </Text>

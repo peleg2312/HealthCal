@@ -28,6 +28,8 @@ export function SourceBadge({ source, style }: { source: SourceKind; style?: Sty
     <View
       testID="food-source-badge"
       accessibilityLabel={`Data source: ${info.label}`}
+      // On the web a named box carries a role: an image of its words (natively the row or control around it reads it).
+      {...(Platform.OS === 'web' ? ({ role: 'img' } as const) : null)}
       style={[
         { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, height: 26, borderRadius: radius.chip, backgroundColor: colors.surfaceAlt, alignSelf: 'flex-start' },
         style,
