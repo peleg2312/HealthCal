@@ -14,6 +14,14 @@
  * zustand, fflate, ...) are left out: an update carries them. Image files named in app.json (icon,
  * splash) are hashed by path only: a new picture needs a new build to show, but cannot crash an
  * older one.
+ *
+ * Per platform: an installed Android app and an installed iPhone app are matched to updates by their
+ * own runtimeVersion (`expo.android.runtimeVersion` or `expo.ios.runtimeVersion` wins over
+ * `expo.runtimeVersion`), so each has its own surface and its own recorded pair. A package whose
+ * native code is for one platform only (an android/ folder and no ios/, apple/, cpp/ or podspec, or
+ * the reverse), its config plugin's entry in app.json and the other platform's app.json key count
+ * toward that platform alone: adding an Android-only package (the home-screen widget) changes the
+ * Android surface and leaves the iPhone's as it was.
  */
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -22,7 +30,12 @@ import { dirname, join } from 'node:path';
 export const ROOT = join(__dirname, '..', '..', '..');
 export const RECORD_FILE = join(__dirname, 'nativeSurface.json');
 
+/** The two apps an over-the-air update can reach, each with its own runtimeVersion. */
+export type NativePlatform = 'android' | 'ios';
+export const NATIVE_PLATFORMS: readonly NativePlatform[] = ['android', 'ios'];
+
 export interface NativeSurface {
+  platform: NativePlatform;
   runtimeVersion: string;
   /** Native package name -> installed version. */
   packages: Record<string, string>;
@@ -56,15 +69,71 @@ export function stable(value: unknown): string {
   return JSON.stringify(value);
 }
 
-/** Whether a package folder carries native code. */
-export function isNative(dir: string, meta?: { codegenConfig?: unknown }): boolean {
-  if (NATIVE_MARKS.some((m) => existsSync(join(dir, m)))) return true;
-  if (meta?.codegenConfig) return true;
+function hasPodspec(dir: string): boolean {
   try {
     return readdirSync(dir).some((f) => f.endsWith('.podspec'));
   } catch {
     return false;
   }
+}
+
+/** Whether a package folder carries native code. */
+export function isNative(dir: string, meta?: { codegenConfig?: unknown }): boolean {
+  if (NATIVE_MARKS.some((m) => existsSync(join(dir, m)))) return true;
+  if (meta?.codegenConfig) return true;
+  return hasPodspec(dir);
+}
+
+/** The platforms an expo-module.config.json names ("android", "ios", "apple"), or null without one. */
+function expoModulePlatforms(dir: string): string[] | null {
+  const file = join(dir, 'expo-module.config.json');
+  if (!existsSync(file)) return null;
+  try {
+    const platforms = (readJson(file) as { platforms?: unknown }).platforms;
+    return Array.isArray(platforms) ? platforms.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The platforms a native package builds into. One platform only when every sign of native code
+ * points to it: Android alone for an android/ folder with no ios/, apple/ or cpp/ folder, no
+ * podspec, no react-native.config.js, no codegenConfig and an expo-module.config.json (if any) that
+ * names Android alone; the iPhone alone for the reverse. Anything else counts for both, so a
+ * package is never left out of a platform it might reach (react-native itself, with its podspecs,
+ * ReactAndroid/ and react-native.config.js, is both).
+ */
+export function nativePlatforms(dir: string, meta?: { codegenConfig?: unknown }): NativePlatform[] {
+  const has = (m: string) => existsSync(join(dir, m));
+  const both: NativePlatform[] = ['android', 'ios'];
+  if (has('cpp') || has('react-native.config.js') || meta?.codegenConfig) return both;
+  const named = expoModulePlatforms(dir);
+  const android = has('android');
+  const apple = has('ios') || has('apple') || hasPodspec(dir);
+  if (android && !apple && (named === null || named.every((p) => p === 'android'))) return ['android'];
+  if (apple && !android && (named === null || named.every((p) => p === 'ios' || p === 'apple'))) return ['ios'];
+  return both;
+}
+
+/** The package a config plugin entry names ("expo-foo", "expo-foo/plugin", "@a/b/plugin"), or null for a local one. */
+function pluginPackage(entry: unknown): string | null {
+  const ref = Array.isArray(entry) ? entry[0] : entry;
+  if (typeof ref !== 'string' || ref.startsWith('.')) return null;
+  const parts = ref.split('/');
+  return ref.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
+}
+
+/** The app.json plugin entries that reach `platform`: an entry of a package native to the other platform only is left out. */
+function pluginsFor(root: string, plugins: unknown, platform: NativePlatform): unknown {
+  if (!Array.isArray(plugins)) return plugins;
+  return plugins.filter((entry) => {
+    const name = pluginPackage(entry);
+    const dir = name ? resolvePackage(name, root) : null;
+    if (!dir) return true;
+    const meta = readJson(join(dir, 'package.json'));
+    return !isNative(dir, meta) || nativePlatforms(dir, meta).includes(platform);
+  });
 }
 
 /** The packages a package brings in: dependencies, optional ones, and peers it does not mark optional. */
@@ -111,7 +180,13 @@ function resolvePackage(name: string, from: string): string | null {
   }
 }
 
-export function nativeSurface(root: string = ROOT): NativeSurface {
+/** The runtimeVersion an installed app of `platform` carries: its own key, else the top-level one. */
+export function runtimeVersionFor(expo: Record<string, unknown>, platform: NativePlatform): string {
+  const own = (expo[platform] as { runtimeVersion?: unknown } | undefined)?.runtimeVersion;
+  return String(own ?? expo.runtimeVersion ?? '');
+}
+
+export function nativeSurface(platform: NativePlatform, root: string = ROOT): NativeSurface {
   const pkg = readJson(join(root, 'package.json'));
   const expo = readJson(join(root, 'app.json')).expo;
   const packages: Record<string, string> = {};
@@ -124,42 +199,62 @@ export function nativeSurface(root: string = ROOT): NativeSurface {
     if (!dir || seen.has(dir)) continue;
     seen.add(dir);
     const meta = readJson(join(dir, 'package.json'));
-    if (isNative(dir, meta)) {
+    if (isNative(dir, meta) && nativePlatforms(dir, meta).includes(platform)) {
       // By name, not by folder, so how npm laid out node_modules does not matter; two copies list both versions.
       const versions = new Set((packages[name] ?? '').split(' ').filter(Boolean)).add(meta.version);
       packages[name] = [...versions].sort().join(' ');
     }
     for (const dep of brings(meta)) queue.push([dep, dir]);
   }
-  const runtimeVersion = String(expo.runtimeVersion ?? '');
-  const app = Object.fromEntries(Object.entries(expo).filter(([k]) => !(APP_KEYS_UPDATES_CARRY as readonly string[]).includes(k)));
+  const runtimeVersion = runtimeVersionFor(expo, platform);
+  // The other platform's own key never reaches this platform's build; nor do the plugins of its packages.
+  const other = platform === 'android' ? 'ios' : 'android';
+  const app = Object.fromEntries(
+    Object.entries(expo)
+      .filter(([k]) => !(APP_KEYS_UPDATES_CARRY as readonly string[]).includes(k) && k !== other)
+      .map(([k, v]) => [k, k === 'plugins' ? pluginsFor(root, v, platform) : v]),
+  );
   const surface = { runtimeVersion, packages, app, localPlugins: localPlugins(root, expo.plugins), buildConfigs: buildConfigs(root) };
-  return { runtimeVersion, packages, hash: createHash('sha256').update(stable(surface)).digest('hex').slice(0, 16) };
+  return { platform, runtimeVersion, packages, hash: createHash('sha256').update(stable(surface)).digest('hex').slice(0, 16) };
 }
 
-export function readRecorded(): Recorded | null {
-  return existsSync(RECORD_FILE) ? (readJson(RECORD_FILE) as Recorded) : null;
+/** The recorded pairs, one per platform: `{ android: { runtimeVersion, hash }, ios: { ... } }`. */
+export type RecordedPairs = Partial<Record<NativePlatform, Recorded>>;
+
+/**
+ * The pair recorded for `platform`, or null. A file in the earlier one-pair shape ({ runtimeVersion,
+ * hash }) was made by a formula that hashed both platforms together, so its hash cannot be compared
+ * with a platform's own: it counts as no record for either.
+ */
+export function readRecorded(platform: NativePlatform, file: string = RECORD_FILE): Recorded | null {
+  if (!existsSync(file)) return null;
+  const pairs = readJson(file) as RecordedPairs;
+  const pair = pairs[platform];
+  return pair && typeof pair.hash === 'string' && typeof pair.runtimeVersion === 'string' ? pair : null;
 }
+
+const APP_NAME: Record<NativePlatform, string> = { android: 'Android', ios: 'iPhone' };
 
 /** null when the recorded pair matches; otherwise what the maintainer must do. */
 export function tripwire(now: NativeSurface, recorded: Recorded | null): string | null {
   if (recorded && recorded.hash === now.hash && recorded.runtimeVersion === now.runtimeVersion) return null;
   const record = `HEALTHCAL_RECORD_NATIVE=1 npx vitest run src/features/updates/nativeSurface.test.ts`;
   const pair = JSON.stringify({ runtimeVersion: now.runtimeVersion, hash: now.hash });
+  const app = APP_NAME[now.platform];
   if (recorded && recorded.runtimeVersion === now.runtimeVersion) {
     return [
-      `The app's native surface changed (a package with native code, a native setting in app.json, a local config plugin or an .eas/build config) but runtimeVersion is still "${now.runtimeVersion}".`,
+      `The ${app} app's native surface changed (a package with native code, a native setting in app.json, a local config plugin or an .eas/build config) but its runtimeVersion is still "${now.runtimeVersion}".`,
       `An over-the-air update built now would reach phones whose installed app lacks that native code and could crash them.`,
-      `1. Raise expo.runtimeVersion in app.json (for example to "${bump(now.runtimeVersion)}").`,
-      `2. Rebuild and reinstall both apps (Android and iPhone) with the new runtime version.`,
+      `1. Raise expo.${now.platform}.runtimeVersion in app.json (for example to "${bump(now.runtimeVersion)}"), or expo.runtimeVersion when both apps changed.`,
+      `2. Rebuild and reinstall the ${app} app with the new runtime version.`,
       `3. Record the new pair: ${record}`,
       `Only then publish an update (node scripts/ops/publish-update.mjs).`,
     ].join('\n');
   }
   return [
-    `runtimeVersion is "${now.runtimeVersion}" but the recorded pair is ${recorded ? JSON.stringify(recorded) : 'missing'}.`,
-    `If both apps were rebuilt with runtimeVersion "${now.runtimeVersion}", record the new pair: ${record}`,
-    `(it writes ${pair} to src/features/updates/nativeSurface.json).`,
+    `The ${app} app's runtimeVersion is "${now.runtimeVersion}" but the recorded pair is ${recorded ? JSON.stringify(recorded) : 'missing'}.`,
+    `If the ${app} app was rebuilt with runtimeVersion "${now.runtimeVersion}", record the new pair: ${record}`,
+    `(it writes ${pair} under "${now.platform}" in src/features/updates/nativeSurface.json).`,
   ].join('\n');
 }
 
@@ -176,8 +271,8 @@ export const SAME_RUNTIME_VAR = 'HEALTHCAL_RECORD_SAME_RUNTIME';
 export function recordRefusal(now: NativeSurface, recorded: Recorded | null, sameRuntimeOverride: boolean): string | null {
   if (!recorded || recorded.runtimeVersion !== now.runtimeVersion || recorded.hash === now.hash || sameRuntimeOverride) return null;
   return [
-    `Not recording: the native surface changed but runtimeVersion is still "${now.runtimeVersion}" (recorded hash ${recorded.hash}, now ${now.hash}).`,
-    `Raise expo.runtimeVersion in app.json (for example to "${bump(now.runtimeVersion)}") and rebuild both apps, then record again.`,
+    `Not recording: the ${APP_NAME[now.platform]} app's native surface changed but its runtimeVersion is still "${now.runtimeVersion}" (recorded hash ${recorded.hash}, now ${now.hash}).`,
+    `Raise expo.${now.platform}.runtimeVersion in app.json (for example to "${bump(now.runtimeVersion)}") and rebuild the ${APP_NAME[now.platform]} app, then record again.`,
     `Only if the installed apps are known to match this surface already (the hash formula changed, nothing native did), record with ${SAME_RUNTIME_VAR}=1 as well.`,
   ].join('\n');
 }

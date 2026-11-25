@@ -278,9 +278,27 @@ async function mergeFromOtherTab(): Promise<void> {
   }
 }
 
-/** Load saved data into the store and keep saving changes from then on. Safe to call more than once. */
-export async function startPersistence(): Promise<void> {
-  if (started && useHydration.getState().status !== 'error') return;
+/** The load running now, shared by every caller until it ends. */
+let loading: Promise<void> | null = null;
+
+/**
+ * Load saved data into the store and keep saving changes from then on. Safe to call more than once,
+ * also while a load runs: every caller waits for the same load (single flight). Two loads at once
+ * (the home-screen widget's task and the root layout, when the app opens while the widget is
+ * logging a glass) would each `hydrate`, and the second would replace a record written after the
+ * first and not yet saved.
+ */
+export function startPersistence(): Promise<void> {
+  if (started && useHydration.getState().status !== 'error') return Promise.resolve();
+  if (!loading) {
+    loading = loadAndStart().finally(() => {
+      loading = null;
+    });
+  }
+  return loading;
+}
+
+async function loadAndStart(): Promise<void> {
   useHydration.setState({ status: 'loading' });
   try {
     const snapshot = await loadPersisted();

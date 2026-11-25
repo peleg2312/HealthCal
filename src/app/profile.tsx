@@ -15,6 +15,7 @@ import { THEME_HINTS, ThemeSwatches } from '@/features/settings/ThemeSwatches';
 import { TextSizeRow } from '@/features/textSize/TextSizeRow';
 import { timeAgo } from '@/features/settings/format';
 import { weightText } from '@/features/trackers/helpers';
+import { WidgetRow } from '@/features/widget/WidgetRow';
 import { toISODate } from '@/lib/dates';
 import { usePlannedReminders } from '@/features/settings/usePlannedReminders';
 import { formatNumber } from '@/lib/units';
@@ -248,6 +249,8 @@ function ProfileHub() {
           </View>
         </View>
         <TextSizeRow />
+        {/* Android only: places the home-screen widget (nothing on the web or an iPhone). */}
+        <WidgetRow />
         <ToggleRow
           testID="profile-haptics"
           title="Haptics"

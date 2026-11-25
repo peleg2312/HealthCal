@@ -24,8 +24,8 @@ import { waterAddedToast } from '@/features/food/addedTo';
 import { logItems } from '@/features/food/log';
 import { planFromStore } from '@/features/settings/planFromStore';
 import { mealRepeat, parseReminderAction, snoozeTime, type PlannedReminder, type ReminderCategory } from '@/features/settings/reminderPlanner';
+import { logPlainGlass } from '@/features/today/glass';
 import { today } from '@/lib/dates';
-import { nowISO } from '@/lib/id';
 import { formatVolume } from '@/lib/units';
 import { useStore } from '@/store';
 import { computeDayFromStore, live } from '@/store/selectors';
@@ -73,7 +73,7 @@ function addWaterFromReminder(ml: number) {
   // The day before this glass, counted as the water row counts it (each drink by its hydration factor).
   const d = computeDayFromStore(s, day);
   const after = d ? waterAfter(d.waterMl, d.waterGoalMl, ml, 'water', units) : undefined;
-  const entry = s.upsert('water', { date: day, ml, beverage: 'water', loggedAt: nowISO() });
+  const entry = logPlainGlass(day, ml);
   haptic.success();
   // Worded as a glass on Today is, with the day's new total: "250 ml added to Water · 1.48 of 3.3 L".
   toast(waterAddedToast(formatVolume(ml, units), day, day, after?.reaches, after?.total), { label: 'Undo', onPress: () => useStore.getState().remove('water', entry.id), tint: 'water' });

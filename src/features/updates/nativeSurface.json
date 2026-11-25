@@ -1,4 +1,10 @@
 {
-  "runtimeVersion": "3",
-  "hash": "54b0029602542d76"
+  "android": {
+    "runtimeVersion": "4",
+    "hash": "926645dc47ff13e5"
+  },
+  "ios": {
+    "runtimeVersion": "3",
+    "hash": "b850d21fd88b9d82"
+  }
 }

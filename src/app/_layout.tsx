@@ -27,6 +27,7 @@ import { usePendingInvite } from '@/features/friends/usePendingInvite';
 import { startHealthSync } from '@/features/health-sync/sync';
 import { RouteTitle } from '@/features/layout/RouteTitle';
 import { startUpdates, useReportScreen } from '@/features/updates/updates';
+import { startWidgetRefresh } from '@/features/widget/refresh';
 import { handleAuthLink, initAuth } from '@/services/auth';
 import { refreshReminders } from '@/services/notifications';
 import { startFriends } from '@/services/friends';
@@ -234,6 +235,8 @@ export default function RootLayout() {
     startPlan();
     startUpdates();
     const stopSnapshots = startDaySnapshots();
+    // The Android home-screen widget shows today's numbers: drawn again after a change (nothing elsewhere).
+    const stopWidget = startWidgetRefresh();
     // Reminder text carries live numbers ("620 ml left"), so it is rebuilt whenever data changes.
     void refreshReminders();
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -250,6 +253,7 @@ export default function RootLayout() {
     return () => {
       stopSync();
       stopSnapshots();
+      stopWidget();
       unsubStore();
       appState.remove();
       if (timer) clearTimeout(timer);

@@ -67,7 +67,7 @@ with how many steps away it is). This one is worked out from the sources, in abo
   recorded as an import of every file Metro could pick for it: the plain file and each platform
   file that exists (`adapter.ts`, `adapter.android.ts`, `adapter.ios.ts`), and a name imported from
   it is used in each of them that defines it. An import that names a platform file itself
-  (`./capture.native`) is that file only. The platform files now: `src/features/health-sync/adapter.android.ts`, `src/features/health-sync/adapter.ios.ts`, `src/features/share/capture.native.ts`, `src/features/updates/platform.native.ts`.
+  (`./capture.native`) is that file only. The platform files now: `src/features/health-sync/adapter.android.ts`, `src/features/health-sync/adapter.ios.ts`, `src/features/share/capture.native.ts`, `src/features/updates/platform.native.ts`, `src/features/widget/pin.android.ts`, `src/features/widget/refresh.android.ts`, `src/features/widget/register.android.ts`.
 - Packages (`react`, `expo-router`, `node:fs`, `npm:`, `jsr:`, URLs) are not in the map.
 - JSON, images and every other file that is not TypeScript are not nodes: an import of one
   (`import data from './x.json'`) adds nothing to the map. Today no source imports one.
@@ -96,12 +96,12 @@ with how many steps away it is). This one is worked out from the sources, in abo
   imports, not where it uses them, or whether it does), names reached through a computed path or a
   computed key, uses by expo-router (every file under `src/app/` is a screen), and files outside
   `src/` and `supabase/functions/` (scripts, config, and the test stand-ins in `test/stubs/`: an
-  import of one adds nothing, 1 today).
+  import of one adds nothing, 2 today).
 
 ## Counts
 
-776 files (249 of them tests), 3797 exported names (class 17, component 263, const 936, default 44, function 1829, interface 462, type 246),
-223 re-export lines, 3025 names imported somewhere, 4543 file-to-file dependencies.
+802 files (257 of them tests), 3881 exported names (class 17, component 264, const 959, default 44, function 1875, interface 471, type 251),
+223 re-export lines, 3097 names imported somewhere, 4626 file-to-file dependencies.
 
 ## Refreshing it
 

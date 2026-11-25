@@ -1,0 +1,123 @@
+# The Android home-screen widget, after first-day.yml has set the app up (no clearState: it needs the
+# profile first-day made, and first-day logs no water, so the glass below is the day's first).
+#
+# Profile > "Home screen widget" asks the launcher to place it (the launcher's own dialog, tapped by its
+# words); then, on the home screen, the glass is tapped by its spoken label with the app in the
+# background (warm), the water figures open Water with the glass in its log, the widget's Undo takes the
+# glass back, and the glass is tapped again after the app's process was killed (cold: the system's own
+# process death, `am kill`, never a force stop, which would keep the widget's taps from the app).
+#
+# Android only, best effort, as hebrew.yml: launchers differ (Pixel's places the widget at once, others
+# ask), and a launcher may use the first tap on a widget it has just placed to measure it, so a first
+# glass that does not show is tapped once more. The screenshots are the evidence: 80 the launcher's
+# dialog, 81 the widget placed, 82 the warm glass, 83 Water, 84 after Undo, 85 the cold glass. The
+# app's log (logcat, kept by the workflow) has one line per widget task: "[widget] WIDGET_CLICK
+# ADD_GLASS: glass in 812 ms (cold)".
+#
+#   GitHub (free):  Actions > Phone test > Run workflow, platform = android, flows = first-day,widget
+#   An emulator on your desk:  maestro test .maestro/first-day.yml .maestro/widget.yml
+appId: app.healthcal.mobile
+name: Home-screen widget
+---
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: today-energy
+    timeout: 120000
+# After midnight the morning page may open over Today (see health-and-about.yml).
+- tapOn:
+    id: morning-today
+    optional: true
+
+# Place the widget from Profile.
+- tapOn:
+    id: today-profile
+- scrollUntilVisible:
+    element:
+      id: profile-widget-add
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: profile-widget-add
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: 80-pin-dialog
+# The launcher's dialog: "Add to home screen" (Pixel), "Add" (One UI), "Add automatically" (older Pixel).
+- tapOn:
+    text: '(?i)(add to home screen|add automatically|add)'
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- pressKey: Home
+- extendedWaitUntil:
+    visible: 'Add 250 millilitres of water'
+    timeout: 30000
+- takeScreenshot: 81-widget-placed
+
+# Warm: the app's process is alive in the background.
+- tapOn: 'Add 250 millilitres of water'
+- extendedWaitUntil:
+    visible: 'Undo 250 millilitres of water'
+    timeout: 20000
+    optional: true
+# The launcher took the first tap to measure the widget: tap once more (a second tap on the same
+# picture never logs a second glass, so this cannot add two).
+- runFlow:
+    when:
+      notVisible: 'Undo 250 millilitres of water'
+    commands:
+      - tapOn: 'Add 250 millilitres of water'
+      - extendedWaitUntil:
+          visible: 'Undo 250 millilitres of water'
+          timeout: 20000
+- takeScreenshot: 82-widget-glass-warm
+
+# The water figures open Water, where the glass is in today's log.
+- tapOn: '(?s)Water, .*Open Water'
+- extendedWaitUntil:
+    visible:
+      id: water-screen
+    timeout: 30000
+- assertVisible:
+    id: water-entry-0
+- assertNotVisible:
+    id: water-entry-1
+- takeScreenshot: 83-water-from-widget
+- pressKey: Home
+
+# Undo on the widget takes that glass back.
+- tapOn: 'Undo 250 millilitres of water'
+- extendedWaitUntil:
+    notVisible: 'Undo 250 millilitres of water'
+    timeout: 20000
+- takeScreenshot: 84-widget-undone
+
+# Cold: the system ends the app's process; the glass starts the app's JavaScript without a screen.
+- killApp
+- tapOn: 'Add 250 millilitres of water'
+- extendedWaitUntil:
+    visible: 'Undo 250 millilitres of water'
+    timeout: 45000
+- takeScreenshot: 85-widget-glass-cold
+
+# The cold glass is in the app: one live row in today's water log (the undone one is gone).
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: today-energy
+    timeout: 120000
+- tapOn:
+    id: morning-today
+    optional: true
+- openLink: healthcal://water
+- extendedWaitUntil:
+    visible:
+      id: water-screen
+    timeout: 30000
+- assertVisible:
+    id: water-entry-0
+- assertNotVisible:
+    id: water-entry-1
+- takeScreenshot: 86-water-after-cold-glass

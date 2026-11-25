@@ -9,7 +9,6 @@ import { hoursFigure, hoursParts } from '@/features/trackers/helpers';
 import { startOfWeek, today } from '@/lib/dates';
 import { guidelineMinutes } from '@/lib/exercise';
 import { effectiveMl } from '@/lib/hydration';
-import { nowISO } from '@/lib/id';
 import { WEEKLY_ACTIVE_MINUTES } from '@/lib/insights';
 import { spokenUnits } from '@/lib/spokenUnits';
 import { formatNumber, formatVolume, weightUnit, weightValue } from '@/lib/units';
@@ -22,19 +21,14 @@ import type { ISODate } from '@/types';
 import { AnimatedNumber, Button, Card, CupKey, haptic, PressableScale, ProgressBar, Text, toast } from '@/ui';
 
 import { cheersLabel, recentCheerCount } from './cheers';
-import { crossesGoal, volumeNumber, volumeUnitFor, waterOfGoal } from './volume';
+import { logPlainGlass } from './glass';
+import { crossesGoal, defaultGlass, volumeNumber, volumeUnitFor, waterOfGoal } from './volume';
 import { weightCell } from './weightCell';
 
 /** "1.23 L" -> ["1.23", "L"], "84 fl oz" -> ["84", "fl oz"]. */
 function split(s: string): [string, string] {
   const i = s.indexOf(' ');
   return i < 0 ? [s, ''] : [s.slice(0, i), s.slice(i + 1)];
-}
-
-/** The glass size the one-tap button logs: the second smallest preset (250 ml by default). */
-export function defaultGlass(presets: number[]): number {
-  const sorted = [...presets].filter((p) => p > 0).sort((a, b) => a - b);
-  return sorted[1] ?? sorted[0] ?? 250;
 }
 
 /**
@@ -58,7 +52,7 @@ export function addWater(date: ISODate, ml: number, units: 'metric' | 'imperial'
       .filter((w) => w.date === date)
       .reduce((sum, w) => sum + effectiveMl(w.ml, w.beverage), 0),
   );
-  const entry = useStore.getState().upsert('water', { date, ml, beverage: 'water', loggedAt: nowISO() });
+  const entry = logPlainGlass(date, ml);
   // A glass logged is a log, like a food: the success pattern (a light tap is a removal's).
   haptic.success();
   const reaches = goalMl !== undefined && crossesGoal(before, ml, goalMl);

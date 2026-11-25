@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { formatVolume } from '@/lib/units';
 
-import { crossesGoal, formatWaterLeft, shownMl, volumeNumber, volumeUnitFor, waterLeftMl, waterOfGoal } from './volume';
+import { crossesGoal, defaultGlass, formatWaterLeft, shownMl, volumeNumber, volumeUnitFor, waterLeftMl, waterOfGoal } from './volume';
 
 describe('water left adds up to the goal shown', () => {
   it('metric: 1.23 L drunk and 2.07 L left make the 3.3 L goal', () => {
@@ -69,5 +69,16 @@ describe('waterOfGoal', () => {
     expect(waterOfGoal(250, 750, 'metric')).toBe('250 of 750 ml');
     expect(waterOfGoal(1225, 3300, 'imperial')).toBe('41 of 112 fl oz');
     expect(waterOfGoal(250, 3300, 'imperial')).toBe('8.5 of 112 fl oz');
+  });
+});
+
+describe('the one-tap glass', () => {
+  it('is the second smallest preset, 250 ml by default, whatever order the presets are in', () => {
+    expect(defaultGlass([150, 250, 330, 500])).toBe(250);
+    expect(defaultGlass([500, 330, 150, 250])).toBe(250);
+    expect(defaultGlass([237, 355, 473, 710])).toBe(355);
+    expect(defaultGlass([400])).toBe(400);
+    expect(defaultGlass([0, -5])).toBe(250);
+    expect(defaultGlass([])).toBe(250);
   });
 });

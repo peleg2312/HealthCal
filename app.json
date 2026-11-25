@@ -17,6 +17,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "app.healthcal.mobile",
+      "runtimeVersion": "4",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.POST_NOTIFICATIONS",
@@ -93,6 +94,31 @@
           "NSHealthShareUsageDescription": "HealthCal reads the workouts, heart rate during workouts, steps, sleep, weight, body fat and energy burned you choose from Apple Health to fill your training week, sleep log and weigh-ins. It never writes to Apple Health and never sends this data to the AI functions.",
           "NSHealthUpdateUsageDescription": false,
           "background": false
+        }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "fonts": [
+            "./node_modules/@expo-google-fonts/bricolage-grotesque/700Bold/BricolageGrotesque_700Bold.ttf",
+            "./node_modules/@expo-google-fonts/hanken-grotesk/500Medium/HankenGrotesk_500Medium.ttf",
+            "./node_modules/@expo-google-fonts/hanken-grotesk/700Bold/HankenGrotesk_700Bold.ttf"
+          ],
+          "widgets": [
+            {
+              "name": "TodayWidget",
+              "label": "HealthCal today",
+              "description": "Calories left and water, with a one-tap glass",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "widgetCategory": "home_screen|not_keyguard",
+              "previewImage": "./assets/widget-preview/today.png",
+              "updatePeriodMillis": 3600000
+            }
+          ]
         }
       ]
     ],

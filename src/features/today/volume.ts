@@ -78,3 +78,9 @@ export function waterOfGoal(ml: number, goalMl: number, units: UnitSystem): stri
   const [n, unit] = [amount.slice(0, amount.indexOf(' ')), amount.slice(amount.indexOf(' ') + 1)];
   return goal.endsWith(` ${unit}`) ? `${n} of ${goal}` : `${amount} of ${goal}`;
 }
+
+/** The glass size a one-tap glass logs (Today's water row, the home-screen widget): the second smallest preset (250 ml by default). */
+export function defaultGlass(presets: number[]): number {
+  const sorted = [...presets].filter((p) => p > 0).sort((a, b) => a - b);
+  return sorted[1] ?? sorted[0] ?? 250;
+}
