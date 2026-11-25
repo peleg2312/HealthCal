@@ -47,6 +47,8 @@ interface ToastState {
   onAction?: () => void;
   tint?: string;
   short?: string;
+  /** Raised inside `toastToScreen`: shown by the screen once every sheet has gone, never in a sheet. */
+  toScreen?: boolean;
   /** Open sheets that carry their own host, newest last. The newest one shows the toast. */
   sheetHosts: number[];
   /**
@@ -65,9 +67,27 @@ const useToast = create<ToastState>((set, get) => ({
   sheetHosts: [],
   docks: [],
   show: (message, options) =>
-    set({ id: get().id + 1, message, actionLabel: options?.label && options.onPress ? options.label : undefined, onAction: options?.label ? options.onPress : undefined, tint: options?.tint, short: options?.short }),
-  hide: () => set({ message: null, actionLabel: undefined, onAction: undefined, tint: undefined, short: undefined }),
+    set({ id: get().id + 1, message, actionLabel: options?.label && options.onPress ? options.label : undefined, onAction: options?.label ? options.onPress : undefined, tint: options?.tint, short: options?.short, toScreen: handingToScreen > 0 }),
+  hide: () => set({ message: null, actionLabel: undefined, onAction: undefined, tint: undefined, short: undefined, toScreen: undefined }),
 }));
+
+/** How deep the calls of `toastToScreen` are now (a toast raised meanwhile goes to the screen). */
+let handingToScreen = 0;
+
+/**
+ * Runs `log` and hands every toast it raises to the screen under the open sheet: no sheet shows it, and the
+ * screen shows it once every sheet has gone, once, in its own place. For a sheet that closes right after a
+ * one-tap log (the + sheet's tiles and glasses): shown by the sheet first, the toast stood above the sheet's
+ * top edge for half a second and then jumped down onto the screen as the sheet left.
+ */
+export function toastToScreen<T>(log: () => T): T {
+  handingToScreen += 1;
+  try {
+    return log();
+  } finally {
+    handingToScreen -= 1;
+  }
+}
 
 /**
  * Show a brief confirmation, optionally with an Undo action. Callable from anywhere.
@@ -248,7 +268,7 @@ const monotonicNow = () => (typeof performance !== 'undefined' && typeof perform
 export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sheet' }) {
   const { colors, radius } = useTheme();
   const insets = useSafeAreaInsets();
-  const { id, message, actionLabel, onAction, tint, short, hide } = useToast();
+  const { id, message, actionLabel, onAction, tint, short, toScreen, hide } = useToast();
   // Large text: the short words when the caller gave them, and the toast closer to the window's sides.
   const large = useLargeText();
   const drawn = large && short ? short : message;
@@ -292,7 +312,8 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
 
   const top = sheetHosts[sheetHosts.length - 1];
   // Before a new sheet host has registered itself (its first render), it already counts as the one on top.
-  const active = inSheet ? top === hostId || !sheetHosts.includes(hostId) : sheetHosts.length === 0;
+  // A toast handed to the screen (`toastToScreen`) waits for every sheet to go and is shown by the screen.
+  const active = inSheet ? !toScreen && (top === hostId || !sheetHosts.includes(hostId)) : sheetHosts.length === 0;
 
   useEffect(() => {
     if (!message || !active) return;

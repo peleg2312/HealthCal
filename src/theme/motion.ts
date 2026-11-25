@@ -86,7 +86,14 @@ export const distance = {
   dip: 2,
 };
 
-export const motion = { duration, easing, distance };
+/**
+ * The one flash when a goal is reached (the brim line flashing in the data colour, `useReachFlash` in
+ * src/ui/motion.tsx): it rises over `fade`, holds for the rim's `settle`, and goes over `fall`, all of it
+ * within the 600 ms of routine motion (it was 160 + 150 + 360 = 670 ms).
+ */
+export const reachFlash = { rise: duration.fade, hold: duration.settle, fall: 240 } as const;
+
+export const motion = { duration, easing, distance, reachFlash };
 
 /** Where a cubic bezier easing (as in `easing`) reaches `y`, as a share of its length (x). */
 function easingTimeAt([x1, y1, x2, y2]: readonly number[], y: number): number {

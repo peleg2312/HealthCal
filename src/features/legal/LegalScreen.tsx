@@ -96,7 +96,8 @@ export function LegalScreen({ doc }: { doc: LegalDocument }) {
       <Card tone="alt" testID={doc.id === 'privacy' ? 'legal-privacy-short' : `legal-${doc.id}-summary`} style={{ gap: spacing.md }}>
         {/* Under 360 px the date takes its own line, so the overline never shares one with it. */}
         <View style={narrow ? { gap: spacing.xs } : { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.md }}>
-          <Text variant="overline" accessibilityRole="header">
+          {/* Level 2 under the page's one level-1 title (the kit Header's), as a SectionTitle is (WCAG 1.3.1). */}
+          <Text variant="overline" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>
             {IN_SHORT}
           </Text>
           {updated}
@@ -168,7 +169,8 @@ export function LegalScreen({ doc }: { doc: LegalDocument }) {
                 variant="h3"
                 accessibilityRole="header"
                 // The kit's Text hands unknown props to the platform's: the heading can be given focus after a jump.
-                {...({ ref: (node: unknown) => void (headings.current[s.id] = node), tabIndex: -1 } as object)}
+                // Level 2 under the page's one level-1 title, as a SectionTitle is (WCAG 1.3.1).
+                {...({ ref: (node: unknown) => void (headings.current[s.id] = node), tabIndex: -1, 'aria-level': 2 } as object)}
                 style={Platform.OS === 'web' ? { outlineWidth: 0 } : undefined}>
                 {s.heading}
               </Text>

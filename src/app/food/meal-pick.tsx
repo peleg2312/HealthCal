@@ -19,7 +19,7 @@ import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { Food } from '@/types';
-import { Button, Divider, EmptyState, Header, IconButton, Screen, Text, TextField, goBack, haptic, toast } from '@/ui';
+import { Button, Divider, EmptyState, Header, IconButton, Screen, Text, TextField, goBack, haptic, toast, useGrownText } from '@/ui';
 
 const BUILTIN_BY_ID = new Map(BUILTIN_FOODS.map((f) => [f.id, f]));
 
@@ -39,6 +39,7 @@ function MealPick() {
   const { colors, spacing } = useTheme();
   // At 320 px the search field holds about 26 characters, as on food search.
   const narrow = useWindowDimensions().width < 360;
+  const grown = useGrownText();
   const active = useMealDraft((s) => s.active);
   const name = useMealDraft((s) => s.name);
   const rows = useMealDraft((s) => s.rows);
@@ -148,7 +149,8 @@ function MealPick() {
       <Header title={`Add to ${isolateRtl(name.trim()) || 'new meal'}`} subtitle="Foods go into the meal, not the diary" />
       <TextField
         testID="meal-pick-input"
-        placeholder={narrow ? 'Search foods and brands' : 'Search foods, brands, your foods'}
+        // Whole in its field: the short one as soon as text grows at all (`useGrownText`, a reader's text spacing included; WCAG 1.4.12).
+        placeholder={grown ? 'Search foods' : narrow ? 'Search foods and brands' : 'Search foods, brands, your foods'}
         value={query}
         onChangeText={setQuery}
         autoFocus

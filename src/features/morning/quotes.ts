@@ -6,7 +6,8 @@
  * published before 1930), found word for word on the author's own English Wikiquote page
  * (https://en.wikiquote.org/wiki/<page>) under a sourced work, never under Disputed,
  * Misattributed, Attributed or "Quotes about". The comment above each one names the page and the
- * heading it stands under (checked against the raw wikitext on 17 and 18 November 2026). Wording,
+ * heading it stands under (checked against the raw wikitext on 17 and 18 November 2026; the six
+ * that replaced quotes holding the page's banned words on 25 November 2026). Wording,
  * spelling and inner quotation marks are as printed there, with typographic quotes stored as
  * straight ASCII; a verse line break is "\n". A quote is cut only at a sentence end, never with an
  * ellipsis.
@@ -65,6 +66,8 @@ export const REST_UNDER_HOURS = 6;
  * I and XXXI are in volume I (1917), Letters XCV and CXVI in volume III (1925). His On Tranquility
  * of the Mind is in William Bell Langsdorf's translation, Tranquillity of Mind and Providence
  * (1900), also named in the page's section note. Tagore wrote Stray Birds in English himself.
+ * Owen Meredith is the pen name under which Robert Bulwer-Lytton published Lucile; his Wikiquote
+ * page is Robert_Bulwer-Lytton,_1st_Earl_of_Lytton.
  */
 export const AUTHOR_DIED: Record<string, number> = {
   'Henry David Thoreau': 1862,
@@ -82,7 +85,6 @@ export const AUTHOR_DIED: Record<string, number> = {
   'Rudyard Kipling': 1936,
   'Alfred, Lord Tennyson': 1892,
   'Thomas Carlyle': 1881,
-  'John Lubbock': 1913,
   'Percy Bysshe Shelley': 1822,
   'Samuel Johnson': 1784,
   'George Eliot': 1880,
@@ -101,7 +103,9 @@ export const AUTHOR_DIED: Record<string, number> = {
   'William Hazlitt': 1830,
   'Frances Hodgson Burnett': 1924,
   'William Henry Davies': 1940,
-  'William Ernest Henley': 1903,
+  'Owen Meredith': 1891,
+  'Virginia Woolf': 1941,
+  'L. M. Montgomery': 1942,
 };
 
 /** The 31-day cycle. Each comment: the Wikiquote page, the heading path, and the source line under the quote. */
@@ -172,9 +176,9 @@ export const QUOTE_DAYS: QuoteDay[] = [
   // 5
   {
     again:
-      // Elbert_Hubbard: Quotes > The Note Book of Elbert Hubbard (1927)
-      { id: 'hubbard-mistake', theme: 'again', author: "Elbert Hubbard", work: "The Note Book of Elbert Hubbard, 1927",
-        text: "The greatest mistake you can make in life is to be continually fearing you will make one." },
+      // Robert_Louis_Stevenson: Quotes > Virginibus Puerisque and Other Papers (1881) (An Apology for Idlers)
+      { id: 'stevenson-happy', theme: 'again', author: "Robert Louis Stevenson", work: "Virginibus Puerisque, 1881",
+        text: "There is no duty we so much underrate as the duty of being happy." },
     onward:
       // Rudyard_Kipling: Quotes > Other works (A Doctor's Work, an address at Middlesex Hospital (October 1908).)
       { id: 'kipling-enough', theme: 'onward', author: "Rudyard Kipling", work: "A Doctor's Work, 1908",
@@ -191,9 +195,9 @@ export const QUOTE_DAYS: QuoteDay[] = [
       { id: 'carlyle-noble-work', theme: 'onward', author: "Thomas Carlyle", work: "Past and Present, 1843",
         text: "Every noble work is at first impossible." },
     rest:
-      // John_Lubbock,_1st_Baron_Avebury: Quotes (The Pleasures of Life, vol. 1 (1887), ch. II: The Happiness of Duty)
-      { id: 'lubbock-best', theme: 'rest', author: "John Lubbock", work: "The Pleasures of Life, 1887",
-        text: "When we have done our best, we should wait the result in peace." },
+      // Robert_Bulwer-Lytton,_1st_Earl_of_Lytton: Quotes > Lucile (1860) (Part i, canto vi, section xxvi.)
+      { id: 'meredith-strife', theme: 'rest', author: "Owen Meredith", work: "Lucile, 1860",
+        text: "Rest is sweet after strife." },
   },
   // 7
   {
@@ -217,9 +221,9 @@ export const QUOTE_DAYS: QuoteDay[] = [
       { id: 'tennyson-strive', theme: 'onward', author: "Alfred, Lord Tennyson", work: "Ulysses, 1842",
         text: "To strive, to seek, to find, and not to yield." },
     rest:
-      // William_Ernest_Henley: Quotes > A Book of Verses (1888) ("Life and Death (Echoes)", XXXIV. "Margaritæ Sorori, I. M." (1876))
-      { id: 'henley-sleep', theme: 'rest', author: "William Ernest Henley", work: "A Book of Verses, 1888",
-        text: "Night with her train of stars\nAnd her great gift of sleep." },
+      // Virginia_Woolf: Quotes > A Room of One's Own (1929) (Ch. 1, p. 17)
+      { id: 'woolf-hurry', theme: 'rest', author: "Virginia Woolf", work: "A Room of One's Own, 1929",
+        text: "No need to hurry. No need to sparkle. No need to be anybody but oneself." },
   },
   // 9
   {
@@ -298,9 +302,9 @@ export const QUOTE_DAYS: QuoteDay[] = [
   // 15
   {
     again:
-      // James_Russell_Lowell: Quotes > Poems: Second Series (1848) ("Columbus" (1844), p. 14)
-      { id: 'lowell-endurance', theme: 'again', author: "James Russell Lowell", work: "Columbus, 1844",
-        text: "Endurance is the crowning quality,\nAnd patience all the passion of great hearts." },
+      // Lucy_Maud_Montgomery: Quotes > Rainbow Valley (1919) (Ch. 13; the second of the entry's two sentences)
+      { id: 'montgomery-chapter', theme: 'again', author: "L. M. Montgomery", work: "Rainbow Valley, 1919",
+        text: "When we imagine we have finished our story fate has a trick of turning the page and showing us yet another chapter." },
     onward:
       // Thomas_Carlyle: Quotes > Boswell's Life of Johnson (1832)
       { id: 'carlyle-seed', theme: 'onward', author: "Thomas Carlyle", work: "Boswell's Life of Johnson, 1832",
@@ -387,9 +391,9 @@ export const QUOTE_DAYS: QuoteDay[] = [
   // 22
   {
     again:
-      // Ralph_Waldo_Emerson: Quotes > The Conduct of Life (1860) (Power)
-      { id: 'emerson-speakers', theme: 'again', author: "Ralph Waldo Emerson", work: "The Conduct of Life, 1860",
-        text: "All the great speakers were bad speakers at first." },
+      // Rabindranath_Tagore: Quotes > Stray Birds (1916) (130)
+      { id: 'tagore-errors', theme: 'again', author: "Rabindranath Tagore", work: "Stray Birds, 1916",
+        text: "If you shut your door to all errors truth will be shut out." },
     onward:
       // Sydney_Smith: Quotes > Lady Holland's Memoir (1855) (Vol. I, ch. 12, p. 472)
       { id: 'sydney-today', theme: 'onward', author: "Sydney Smith", work: "A Memoir of the Reverend Sydney Smith, 1855",
@@ -431,9 +435,9 @@ export const QUOTE_DAYS: QuoteDay[] = [
   // 26
   {
     again:
-      // Ralph_Waldo_Emerson: Quotes > Society and Solitude (1870) (Success)
-      { id: 'emerson-good', theme: 'again', author: "Ralph Waldo Emerson", work: "Society and Solitude, 1870",
-        text: "Don't waste yourself in rejection, nor bark against the bad, but chant the beauty of the good." },
+      // Ralph_Waldo_Emerson: Quotes > Letters and Social Aims (1876) (Progress of Culture)
+      { id: 'emerson-amateur', theme: 'again', author: "Ralph Waldo Emerson", work: "Letters and Social Aims, 1876",
+        text: "Every artist was first an amateur." },
     onward:
       // Booker_T._Washington: Quotes (The Story of My Life and Work, vol. I (1900), ch. XV: Cuban Education and the Chicago Peac)
       { id: 'washington-lift', theme: 'onward', author: "Booker T. Washington", work: "The Story of My Life and Work, 1900",

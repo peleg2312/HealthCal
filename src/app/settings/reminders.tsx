@@ -88,7 +88,7 @@ export default function RemindersScreen() {
       {!remindersSupported ? (
         <Card tone="alt">
           <Text variant="bodyStrong">Reminders arrive in the phone app</Text>
-          <Text variant="caption" color="textSecondary" style={{ marginTop: 4 }}>
+          <Text variant="body" color="textSecondary" style={{ marginTop: 4 }}>
             A browser cannot send them. These settings are saved for your phone.
           </Text>
         </Card>
@@ -269,12 +269,13 @@ function Preview({ plan, now, hour12, off }: { plan: PlannedReminder[]; now: Dat
   };
   return (
     <View style={{ gap: spacing.sm }} testID="reminders-preview">
-      <Text variant="overline" color="textSecondary" style={{ paddingHorizontal: spacing.xs }}>
+      {/* Starts at the card's edge and is a level-2 heading, as a settings Group's title is. */}
+      <Text variant="overline" color="textSecondary" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>
         Coming up
       </Text>
       <Card>
         {off ? (
-          <Text variant="caption" color="textSecondary" style={{ marginBottom: spacing.md }}>
+          <Text variant="body" color="textSecondary" style={{ marginBottom: spacing.md }}>
             Reminders are off. With them on, you would get these.
           </Text>
         ) : null}

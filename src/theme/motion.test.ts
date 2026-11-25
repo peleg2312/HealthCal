@@ -79,4 +79,9 @@ describe('routine motion stays within 600 ms', () => {
       expect(d[k], k).toBeLessThanOrEqual(600);
     }
   });
+  it("a reached goal's one flash, from its rise to its end", async () => {
+    const { motion } = await import('./motion');
+    const f = motion.reachFlash;
+    expect(f.rise + f.hold + f.fall).toBeLessThanOrEqual(600);
+  });
 });

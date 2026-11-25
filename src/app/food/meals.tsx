@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { PenLine, Plus, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { Platform, useWindowDimensions, View, type ViewStyle } from 'react-native';
 
 import { deleteSavedMeal } from '@/features/food/actions';
 import { formatPortion, itemsRange, mealServings } from '@/features/food/build';
@@ -22,6 +22,21 @@ import { useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { SavedMeal } from '@/types';
 import { Button, Card, EmptyState, Header, MacroBar, Screen, Text } from '@/ui';
+
+/** The saved meals and each meal's foods are lists on the web (`role="list"`, each card or line a `listitem`; WCAG 1.3.1), as search's and the diary's rows are. */
+const LIST = (Platform.OS === 'web' ? { role: 'list' } : null) as object | null;
+const LIST_ITEM = (Platform.OS === 'web' ? { role: 'listitem' } : null) as object | null;
+const CONTENTS = { display: 'contents' } as unknown as ViewStyle;
+
+/** The cards' list: on the web a `list` with no box of its own (`display: contents`), so the cards keep the screen's 16 px gap; natively nothing. */
+function WebList({ children }: { children: React.ReactNode }) {
+  if (Platform.OS !== 'web') return <>{children}</>;
+  return (
+    <View testID="saved-meals-list" style={CONTENTS} {...LIST}>
+      {children}
+    </View>
+  );
+}
 
 export default function SavedMealsScreen() {
   const { colors, spacing } = useTheme();
@@ -65,7 +80,8 @@ export default function SavedMealsScreen() {
           onAction={() => build()}
         />
       ) : (
-        meals.map((m, i) => {
+        <WebList>
+        {meals.map((m, i) => {
           // Each line as logging it adds it: a bundled food at today's values (currentValues); the saved meal is not changed.
           const items = m.items.map(currentValues);
           const n = sumNutrients(items.map((it) => it.nutrients));
@@ -73,7 +89,7 @@ export default function SavedMealsScreen() {
           const approx = itemsRange(m.items) ? '~' : '';
           const on = isFavoriteMeal(m);
           return (
-            <Card key={m.id} testID={`saved-meal-card-${i}`} style={{ gap: spacing.md }}>
+            <Card key={m.id} testID={`saved-meal-card-${i}`} style={{ gap: spacing.md }} {...LIST_ITEM}>
               {/* The name and its caption, the star beside them (a sibling: the card itself takes no tap). The star's
                   negative margins keep the card's height and leave it 10 px inside the card's edge. */}
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
@@ -91,9 +107,9 @@ export default function SavedMealsScreen() {
               </View>
               <MacroBar protein={n.protein * 4} carbs={n.carbs * 4} fat={n.fat * 9} height={6} />
               {/* Each item's amount goes under its name, as in the diary, so neither squeezes the other into a few letters. */}
-              <View style={{ gap: spacing.sm }}>
+              <View style={{ gap: spacing.sm }} {...LIST}>
                 {items.map((it, j) => (
-                  <View key={j} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                  <View key={j} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }} {...LIST_ITEM}>
                     <RowEmoji emoji={it.emoji} />
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text variant="body" numberOfLines={2}>
@@ -127,7 +143,8 @@ export default function SavedMealsScreen() {
               </View>
             </Card>
           );
-        })
+        })}
+        </WebList>
       )}
 
       <LogSavedMealSheet key={logging?.id ?? 'none'} meal={logging} mealType={meal} date={date} onClose={() => setLogging(null)} />

@@ -18,6 +18,7 @@ import {
   itemKcalSpoken,
   itemNameLabel,
   macroStatSpoken,
+  photoLeaveQuestion,
   prefilledDescription,
   searchAiTile,
   slowAfterMs,
@@ -142,5 +143,36 @@ describe('the review, spoken', () => {
 
   it('pass the banned lists, with no exclamation mark, in sentence case', () => {
     expect(lines().filter((s) => BANNED.test(s) || PLAN.test(s) || s.includes('!') || !/^[A-Z]/.test(s))).toEqual([]);
+  });
+});
+
+describe('leaving the photo or describe screen', () => {
+  const none = { mode: 'text' as const, estimate: false, description: '', prefilled: '', photo: false, note: '', weight: '' };
+
+  it('asks nothing when nothing is held, nor for the words search handed over unchanged', () => {
+    expect(photoLeaveQuestion(none)).toBeNull();
+    expect(photoLeaveQuestion({ ...none, description: '   ' })).toBeNull();
+    expect(photoLeaveQuestion({ ...none, description: 'lentil stew', prefilled: 'lentil stew' })).toBeNull();
+  });
+
+  it('asks about words typed, a photo, or a live estimate', () => {
+    expect(photoLeaveQuestion({ ...none, description: 'Lentil soup with bread' })).toBe('Discard this description?');
+    expect(photoLeaveQuestion({ ...none, description: 'lentil stew, two bowls', prefilled: 'lentil stew' })).toBe('Discard this description?');
+    expect(photoLeaveQuestion({ ...none, mode: 'photo', photo: true })).toBe('Discard this photo?');
+    expect(photoLeaveQuestion({ ...none, mode: 'photo', note: 'cooked in butter' })).toBe('Discard what you typed?');
+    expect(photoLeaveQuestion({ ...none, mode: 'photo', weight: '450' })).toBe('Discard what you typed?');
+    expect(photoLeaveQuestion({ ...none, description: 'Lentil soup', estimate: true })).toBe('Discard this estimate?');
+  });
+
+  it('asks first about the tab on screen, then about what the other tab still holds', () => {
+    expect(photoLeaveQuestion({ ...none, mode: 'photo', description: 'Lentil soup', photo: true })).toBe('Discard this photo?');
+    expect(photoLeaveQuestion({ ...none, mode: 'text', description: 'Lentil soup', photo: true })).toBe('Discard this description?');
+    expect(photoLeaveQuestion({ ...none, mode: 'photo', description: 'Lentil soup' })).toBe('Discard this description?');
+    expect(photoLeaveQuestion({ ...none, mode: 'text', photo: true })).toBe('Discard this photo?');
+  });
+
+  it('pass the banned lists, in sentence case', () => {
+    const qs = ['Discard this estimate?', 'Discard this photo?', 'Discard what you typed?', 'Discard this description?'];
+    expect(qs.filter((q) => BANNED.test(q) || PLAN.test(q) || q.includes('!') || !/^[A-Z]/.test(q))).toEqual([]);
   });
 });

@@ -135,7 +135,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
             note={`${budgetNote}Each workout you log adds its calories above resting on top, shared over 7 days: the striped space at the top of your cup on Today.`}
           />
           {/* Where the target is set, said plainly: an estimate, not medical advice, and who checks with a doctor first. */}
-          <Text variant="caption" color="textSecondary" testID="plan-care-note">
+          <Text variant="body" color="textSecondary" testID="plan-care-note">
             {TARGET_CARE_NOTE}
           </Text>
         </Card>
@@ -152,14 +152,14 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
             )}>
             <View style={{ gap: spacing.xs }}>
               <Text variant="h3">{`The road to ${weightText(projection.targetKg, units)}`}</Text>
-              <Text variant="caption" color="textSecondary" testID="plan-date">
+              <Text variant="body" color="textSecondary" testID="plan-date">
                 {/* The dates are the title's; this line says what the line and the band are. */}
                 {`About ${pace} a week, ${t.limitedByFloor ? 'the pace this target gives' : 'the pace you chose'}. The band is a little faster or slower.`}
               </Text>
             </View>
             {/* The road draws once its card has arrived. */}
             <ProjectionChart projection={projection} units={units} delay={landed + 160} now={now} />
-            <Text variant="caption" color="textSecondary">
+            <Text variant="body" color="textSecondary">
               A projection, not a promise. It redraws from your real trend.
             </Text>
           </Card>
@@ -290,7 +290,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
           paddingHorizontal: spacing.xs,
         }}>
         {decorative(<Info size={16} color={colors.textSecondary} strokeWidth={1.9} />)}
-        <Text variant="caption" color="textSecondary" style={{ flex: 1 }} testID="plan-estimates-note">
+        <Text variant="body" color="textSecondary" style={{ flex: 1 }} testID="plan-estimates-note">
           Starting estimates: they adapt to what you really burn as you log. Change any number in Goals.
         </Text>
       </FadeUp>
@@ -340,8 +340,8 @@ function MathRow({ label, detail, value, testID }: { label: string; detail: stri
  * line lands on the budget, and the space left above it is the gap to what
  * you burn, labelled with what it is for. For gain the cup is the budget, and
  * what you burn is a dashed mark across it with the surplus labelled above.
- * A budget equal to the burn fills the cup and says so. `note` sits beside the
- * foot of the cup, under the labels; under 360 px it goes under the cup, full width.
+ * A budget equal to the burn fills the cup and says so. `note` (reading text, body
+ * size) goes under the cup, full width.
  */
 function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: number; goal: 'lose' | 'maintain' | 'gain'; note: string }) {
   const { colors, spacing } = useTheme();
@@ -386,7 +386,7 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
   const spoken = `Daily target ${formatNumber(target)} kilocalories${showBurn ? `, against about ${formatNumber(burn)} kilocalories you burn` : ', matched to what you burn'}`;
   const gapLabel = (
     <Text variant="label" color="textSecondary" testID="plan-gap">
-      {`${gap > 0 ? '−' : '+'}${formatNumber(Math.abs(gap))} for your goal`}
+      {`${gap > 0 ? '−' : '+'}${formatNumber(Math.abs(gap))} kcal for your goal`}
     </Text>
   );
   const matched = (
@@ -395,7 +395,7 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
     </Text>
   );
   const budgetNote = (
-    <Text variant="caption" color="textSecondary" testID="plan-budget-note">
+    <Text variant="body" color="textSecondary" testID="plan-budget-note">
       {note}
     </Text>
   );
@@ -444,10 +444,10 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
       </View>
     );
   }
-  // Under 360 px the label column is about 140 px wide: the note would wrap to seven lines there and take, from
-  // the bottom of the column, the height the labels need beside the cup (Vessel keeps its children's height), so
-  // the figures would be drawn over it. There it goes under the cup, full width.
-  const noteUnder = narrow;
+  // The note is reading text (two sentences, body size): in the label column beside the cup (about 140 to 160 px
+  // wide) it would wrap to seven lines or more and take, from the bottom of the column, the height the labels need
+  // beside the cup (Vessel keeps its children's height), so the figures would be drawn over it. It goes under the
+  // cup, full width, at every width.
   const cupWithLabels = (
     <View>
       <Vessel
@@ -518,14 +518,11 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
                   content: matched,
                 },
               ]),
-        ]}>
-        {/* The room beside the foot of the cup holds the one thing the cup does not show yet. */}
-        {noteUnder ? null : budgetNote}
-      </Vessel>
+        ]}
+      />
       {burnMark(width, height)}
     </View>
   );
-  if (!noteUnder) return cupWithLabels;
   return (
     <View style={{ gap: spacing.lg }}>
       {cupWithLabels}

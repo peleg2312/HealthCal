@@ -17,25 +17,28 @@
  * view) opens an amount and a calories field (under the quick-add screen's limit), logged at once as
  * a quick entry "Other drink" (via the screen's `onEntered`, which goes through planDrink and
  * logDrink). The pinned button is there only while those fields are open, and says what it will do
- * before the tap ("Add 140 kcal to lunch"); the sheet never opens on a disabled button.
+ * before the tap ("Add 140 kcal to lunch"); the sheet never opens on a disabled button. The amount is held to
+ * Water's "Other amount" rule (`drinkAmountCheck`): above 5 L the field says so and Add waits; above 2 L the
+ * first press asks, under the fields, and a second press adds. Typed calories or a changed amount are not
+ * dropped without asking ("Discard this drink?", the Sheet's `unsaved`).
  */
 import { ChevronDown, ChevronUp, Search, X } from 'lucide-react-native';
-import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import React, { useDeferredValue, useEffect, useId, useMemo, useState } from 'react';
+import { AccessibilityInfo, Platform, useWindowDimensions, View } from 'react-native';
 
 import { resolveFood } from '@/features/food/usuals';
 import { searchLocal, searchOnlineWithStatus } from '@/services/foodSearch';
 import { onlineSearchAvailable } from '@/services/openFoodFacts';
 import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
-import { formatNumber, volumeUnit, volumeValue } from '@/lib/units';
+import { formatNumber, volumeToMl, volumeUnit, volumeValue } from '@/lib/units';
 import { useTheme } from '@/theme';
 import type { Food, UnitSystem } from '@/types';
-import { Button, Divider, IconButton, NumberField, PressableScale, Sheet, Text, TextField } from '@/ui';
+import { Button, Divider, haptic, IconButton, NumberField, PressableScale, Sheet, Text, TextField } from '@/ui';
 import { spokenUnits } from '@/lib/spokenUnits';
 
 import { sheetList, type OnlineAnswer, type SheetItem } from './pick';
-import { enteredKcalError } from './rules';
+import { drinkAmountCheck, enteredKcalError } from './rules';
 
 export function DrinkPickSheet({
   visible,
@@ -69,6 +72,9 @@ export function DrinkPickSheet({
   const [amount, setAmount] = useState<number | null>(glassShown);
   const [kcalTyped, setKcalTyped] = useState<number | null>(null);
   const [entering, setEntering] = useState(false);
+  // The amount (ml) asked about with "Tap Add again" (`drinkAmountCheck`); another amount is asked afresh.
+  const [askedMl, setAskedMl] = useState<number | null>(null);
+  const askId = `water-pick-ask-${useId().replace(/[^A-Za-z0-9_-]/g, '')}`;
   const [showAll, setShowAll] = useState(false);
   const [online, setOnline] = useState<OnlineAnswer | null>(null);
   const [wasVisible, setWasVisible] = useState(visible);
@@ -81,6 +87,7 @@ export function DrinkPickSheet({
       setAmount(glassShown);
       setKcalTyped(null);
       setEntering(false);
+      setAskedMl(null);
     }
   }
 
@@ -116,13 +123,19 @@ export function DrinkPickSheet({
     setShowAll(false);
   };
   const kcalError = enteredKcalError(kcalTyped);
-  const canAdd = !!(amount && amount > 0 && kcalTyped && kcalTyped > 0 && !kcalError);
+  const amountMl = amount && amount > 0 ? volumeToMl(amount, units) : 0;
+  const amountCheck = amountMl > 0 ? drinkAmountCheck(amountMl, units) : null;
+  const askLine = amountCheck?.state === 'ask' && askedMl === amountMl ? amountCheck.line : null;
+  const canAdd = !!(amount && amount > 0 && kcalTyped && kcalTyped > 0 && !kcalError && amountCheck?.state !== 'over');
+  // Something typed and not added: closing by the backdrop, a drag, Escape or back asks first.
+  const unsaved = entering && (kcalTyped !== null || amount !== glassShown);
 
   return (
     <Sheet
       visible={visible}
       onClose={onClose}
       title="Choose a drink"
+      unsaved={unsaved ? 'Discard this drink?' : null}
       footer={
         entering ? (
           <Button
@@ -130,7 +143,15 @@ export function DrinkPickSheet({
             title={canAdd && kcalTyped ? `Add ${formatNumber(Math.round(kcalTyped))} kcal to ${where}` : `Add to ${where}`}
             disabled={!canAdd}
             onPress={() => {
-              if (canAdd && amount && kcalTyped) onEntered(amount, kcalTyped);
+              if (!(canAdd && amount && kcalTyped)) return;
+              // More than 2 L: asked once, under the fields; the same amount added again goes in.
+              if (amountCheck?.state === 'ask' && askedMl !== amountMl) {
+                setAskedMl(amountMl);
+                haptic.warn();
+                if (Platform.OS !== 'web') AccessibilityInfo.announceForAccessibility(amountCheck.line);
+                return;
+              }
+              onEntered(amount, kcalTyped);
             }}
           />
         ) : undefined
@@ -168,29 +189,44 @@ export function DrinkPickSheet({
           {entering ? <ChevronUp size={20} color={colors.textSecondary} strokeWidth={1.9} /> : <ChevronDown size={20} color={colors.textSecondary} strokeWidth={1.9} />}
         </PressableScale>
         {entering ? (
-          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            <NumberField
-              testID="water-pick-ml"
-              label="Amount"
-              suffix={volumeUnit(units)}
-              decimals={0}
-              value={amount}
-              onChange={setAmount}
-              style={{ flex: 1 }}
-              accessibilityLabel={`Amount in ${volumeUnit(units)}`}
-            />
-            <NumberField
-              testID="water-pick-kcal"
-              label="Calories"
-              suffix="kcal"
-              placeholder="e.g. 120"
-              decimals={0}
-              value={kcalTyped}
-              onChange={setKcalTyped}
-              error={kcalError}
-              style={{ flex: 1 }}
-              accessibilityLabel="Calories in kcal"
-            />
+          <View>
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <NumberField
+                testID="water-pick-ml"
+                label="Amount"
+                suffix={volumeUnit(units)}
+                decimals={0}
+                value={amount}
+                onChange={setAmount}
+                style={{ flex: 1 }}
+                accessibilityLabel={`Amount in ${volumeUnit(units)}`}
+                // Above 5 L: the field's own error, and Add waits. Above 2 L, once Add was pressed: the question
+                // under the fields, tied to this field.
+                error={amountCheck?.state === 'over' ? amountCheck.line : null}
+                accessibilityHint={askLine ?? undefined}
+                {...((Platform.OS === 'web' && askLine ? { 'aria-describedby': askId } : {}) as object)}
+              />
+              <NumberField
+                testID="water-pick-kcal"
+                label="Calories"
+                suffix="kcal"
+                placeholder="e.g. 120"
+                decimals={0}
+                value={kcalTyped}
+                onChange={setKcalTyped}
+                error={kcalError}
+                style={{ flex: 1 }}
+                accessibilityLabel="Calories in kcal"
+              />
+            </View>
+            {/* Kept mounted while the fields are open (a polite live region), so the question is read as it appears. */}
+            <View accessibilityLiveRegion="polite" {...(Platform.OS === 'web' ? { 'aria-live': 'polite' } : null)}>
+              {askLine ? (
+                <Text testID="water-pick-ask" nativeID={askId} variant="body" color="textSecondary" style={{ marginTop: 6 }}>
+                  {askLine}
+                </Text>
+              ) : null}
+            </View>
           </View>
         ) : null}
         <Divider />

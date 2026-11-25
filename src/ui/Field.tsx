@@ -6,7 +6,7 @@ import { spokenUnits } from '@/lib/spokenUnits';
 import { cup, fonts, phoneCapFor, scaledFontSize, useTextSize, useTheme } from '@/theme';
 
 import { IconButton } from './Button';
-import { ANDROID_TARGET, spokenFieldName, stepperKey, webAutoComplete } from './controlRules';
+import { ANDROID_TARGET, numberTextProblem, numberTextValue, spokenFieldName, stepperKey, webAutoComplete } from './controlRules';
 import { DECORATIVE } from './decorative';
 import { ANDROID_TOUCH, FOCUS_CUP, useFocusRing } from './Pressable';
 import { Text, useGrownText } from './Text';
@@ -176,41 +176,44 @@ export function TextField({ label, suffix, error, hint, left, right, style, line
 
 /** Parse user-typed numbers, accepting a comma as the decimal separator. */
 export function parseNumber(text: string): number | null {
-  const cleaned = text.replace(',', '.').replace(/[^0-9.\-]/g, '');
-  if (cleaned === '' || cleaned === '.' || cleaned === '-') return null;
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
+  return numberTextValue(text, true);
 }
 
 export interface NumberFieldProps extends Omit<TextFieldProps, 'value' | 'onChangeText' | 'onChange'> {
   value: number | null;
-  onChange: (n: number | null) => void;
+  /** The value as typed (null for nothing, or for text the field cannot take), and the text itself. */
+  onChange: (n: number | null, text: string) => void;
   decimals?: number;
-  /** Amounts, weights and nutrients are never below zero, so a minus sign is not accepted unless this is set. */
+  /**
+   * Amounts, weights and nutrients are never below zero, so unless this is set a typed minus is not taken: it stays
+   * as typed, the value is null and the field says why under itself (`numberTextProblem`), unless the caller's own
+   * `error` says it. A form whose Save would pass over an empty optional field reads `text` to wait as well.
+   */
   allowNegative?: boolean;
 }
 
-/** Numeric text field that keeps the raw text while typing so "1." is not eaten. */
-export function NumberField({ value, onChange, decimals = 1, allowNegative = false, ...rest }: NumberFieldProps) {
+/** Numeric text field that keeps the raw text while typing so "1." is not eaten, and a minus is never dropped. */
+export function NumberField({ value, onChange, decimals = 1, allowNegative = false, error, ...rest }: NumberFieldProps) {
   const format = (n: number | null) => (n === null ? '' : String(Math.round(n * 10 ** decimals) / 10 ** decimals));
   const [text, setText] = useState(format(value));
+  // The value the caller last gave: when it changes to something the text does not say, the text follows it (a
+  // value set from outside, or rounded or limited by the caller). A caller that keeps its value for what the
+  // field cannot take (a minus, an empty field) leaves the text as typed.
   const [lastValue, setLastValue] = useState(value);
   if (value !== lastValue) {
     setLastValue(value);
-    if (parseNumber(text) !== value) setText(format(value));
+    if (numberTextValue(text, allowNegative) !== value) setText(format(value));
   }
   return (
     <TextField
       keyboardType={decimals > 0 ? 'decimal-pad' : 'number-pad'}
       inputMode={decimals > 0 ? 'decimal' : 'numeric'}
       {...rest}
+      error={error || numberTextProblem(text, allowNegative)}
       value={text}
-      onChangeText={(raw) => {
-        const t = allowNegative ? raw : raw.replace(/-/g, '');
+      onChangeText={(t) => {
         setText(t);
-        const n = parseNumber(t);
-        setLastValue(n);
-        onChange(n);
+        onChange(numberTextValue(t, allowNegative), t);
       }}
     />
   );

@@ -225,6 +225,24 @@ export function Tile({
 }
 
 /**
+ * The rows of a history card (Weight, Sleep) as a list on the web, a `role="list"` holding one `listitem` per row
+ * (`HistoryItem`, its divider inside it), as Train's history and the diary's rows are: a screen reader says how many
+ * rows there are and can move by them. Natively a plain View (the rows are buttons in reading order).
+ */
+export function HistoryList({ children, testID }: { children: React.ReactNode; testID?: string }) {
+  return (
+    <View testID={testID} {...(Platform.OS === 'web' ? { role: 'list' as const } : null)}>
+      {children}
+    </View>
+  );
+}
+
+/** One row of a `HistoryList`. */
+export function HistoryItem({ children }: { children: React.ReactNode }) {
+  return <View {...(Platform.OS === 'web' ? { role: 'listitem' as const } : null)}>{children}</View>;
+}
+
+/**
  * A history row of Weight and Sleep: the kit's `ListRow` as drawn (the day, its line, the value at the end and a
  * chevron), with its units spoken in full ("78.8 kilograms", "6 hours 15 minutes") and, above 115% text, the value
  * on a line of its own under the day and the line unclamped, so the day and its words keep the row's whole width

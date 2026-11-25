@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import React, { useId, useState } from 'react';
+import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { labelMl } from '@/features/drinks/rules';
 import { servingsFor } from '@/lib/nutrition';
 import { useTheme } from '@/theme';
 import type { Food, Serving } from '@/types';
-import { Chip, NumberField, Stepper } from '@/ui';
+import { Chip, CupKey, NumberField, Stepper, Text } from '@/ui';
 import { spokenUnits } from '@/lib/spokenUnits';
 
 import { balancedLines, chipWidth } from './chipLines';
@@ -34,6 +34,7 @@ export function AmountEditor({
   onChange,
   onPendingChange,
   testIDPrefix = 'detail',
+  ask,
 }: {
   food: Food;
   value: AmountValue;
@@ -41,8 +42,15 @@ export function AmountEditor({
   /** True while the grams field holds something that is not a usable amount (empty, 0). */
   onPendingChange?: (invalid: boolean) => void;
   testIDPrefix?: string;
+  /**
+   * While the screen's Add waits for a second press (`portionAsk`, ./softCheck): the line under the amount, with
+   * the amber key (held up, waiting on the person), tied to the grams field (`aria-describedby` on the web, its
+   * hint natively). testID `<prefix>-ask`.
+   */
+  ask?: string | null;
 }) {
-  const { spacing } = useTheme();
+  const { colors, spacing } = useTheme();
+  const askId = `${testIDPrefix}-ask-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const { width } = useWindowDimensions();
   const [typed, setTyped] = useState<number | null | undefined>(undefined);
   const { serving, quantity } = value;
@@ -120,9 +128,18 @@ export function AmountEditor({
           // An amount it cannot take is said under the field and tied to it (WCAG 3.3.1); on blur the last good amount returns.
           error={typed !== undefined && typed !== null && !(typed > 0 && typed <= MAX_GRAMS) ? `Enter more than 0 g, up to ${MAX_GRAMS.toLocaleString('en-US')} g.` : null}
           accessibilityLabel="Amount in grams"
+          {...(ask ? (Platform.OS === 'web' ? ({ 'aria-describedby': askId } as object) : { accessibilityHint: ask }) : null)}
           style={{ flexGrow: 1, flexBasis: 104, maxWidth: 200 }}
         />
       </View>
+      {ask ? (
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+          <CupKey color={colors.warning} style={{ marginTop: 4 }} />
+          <Text testID={`${testIDPrefix}-ask`} nativeID={askId} variant="caption" color="text" style={{ flex: 1 }}>
+            {ask}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }

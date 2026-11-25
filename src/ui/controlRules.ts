@@ -224,3 +224,24 @@ export const ROW_WORD_ROOM = 120;
 export function rowStacks(v: { rowWidth: number; sideWidth: number; growth: number }): boolean {
   return v.growth > 1 && v.rowWidth > 0 && v.rowWidth - v.sideWidth < ROW_WORD_ROOM * v.growth;
 }
+
+/** The kit's words under a number field that takes no negative when a minus is typed into it. */
+export const NO_MINUS = 'Enter 0 or more, without a minus.';
+
+/**
+ * What a `NumberField` says under itself about its own text (null: nothing). A typed minus in a field that takes no
+ * negative is kept as typed and named, never dropped (a dropped minus turned "-100" into 100 ml stored); the field's
+ * value is then null, so nothing is stored until it is put right. A caller's own `error` is said instead when it gives one.
+ */
+export function numberTextProblem(text: string, allowNegative = false): string | null {
+  return !allowNegative && text.includes('-') ? NO_MINUS : null;
+}
+
+/** A number field's value as typed: null for nothing, for what is not a number, and for a refused minus (`numberTextProblem`). */
+export function numberTextValue(text: string, allowNegative = false): number | null {
+  if (numberTextProblem(text, allowNegative)) return null;
+  const cleaned = text.replace(',', '.').replace(/[^0-9.\-]/g, '');
+  if (cleaned === '' || cleaned === '.' || cleaned === '-') return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}

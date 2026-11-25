@@ -31,7 +31,7 @@ import { useStore } from '@/store';
 import { useEnergyModel } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
 import type { ActivityLevel } from '@/types';
-import { Button, Card, Header, Screen, Text } from '@/ui';
+import { Button, Card, Divider, Header, Screen, Text } from '@/ui';
 
 function Section({
   icon,
@@ -52,22 +52,34 @@ function Section({
   testID?: string;
 }) {
   const { spacing } = useTheme();
+  // One reading column, as the legal pages are: no card round a section, so a line at 390 px holds about
+  // 48 characters rather than 44 (rubric D9-07: 45 to 75), and at most READING_MAX wide on a wide window.
   return (
-    <Card testID={testID}>
+    <View testID={testID} style={{ maxWidth: READING_MAX }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.sm }}>
         <IconTile color={color} keep={keep}>{icon(color)}</IconTile>
-        <Text variant="h3" style={{ flex: 1 }}>
+        {/* Level 2 under the screen's one level-1 title, as a SectionTitle is. */}
+        <Text variant="h3" accessibilityRole="header" {...({ 'aria-level': 2 } as object)} style={{ flex: 1 }}>
           {title}
         </Text>
       </View>
-      {/* Reading text keeps to about 70 characters a line at the 560 px cap (rubric D9-07). */}
-      <View style={{ gap: spacing.sm, maxWidth: READING_MAX }}>{children}</View>
+      <View style={{ gap: spacing.sm }}>{children}</View>
       {source ? (
-        <Text variant="caption" color="textTertiary" style={{ marginTop: spacing.md, maxWidth: CAPTION_READING_MAX }}>
+        <Text variant="caption" color="textSecondary" style={{ marginTop: spacing.md, maxWidth: CAPTION_READING_MAX }}>
           Source: {source}
         </Text>
       ) : null}
-    </Card>
+    </View>
+  );
+}
+
+/** The line between two sections of the reading column: 24 px either side of it, with the screen's own gap. */
+function Break() {
+  const { spacing } = useTheme();
+  return (
+    <View style={{ paddingVertical: spacing.sm, maxWidth: READING_MAX }}>
+      <Divider />
+    </View>
   );
 }
 
@@ -129,6 +141,8 @@ export default function AboutScreen() {
         estimates: bodies differ, and the app says so rather than showing false precision.
       </Text>
 
+      <Break />
+
       <Section
         testID="about-resting"
         icon={(c) => <HeartPulse size={20} color={c} />}
@@ -142,10 +156,12 @@ export default function AboutScreen() {
         <P>
           If you enter a body fat percentage between 3 and 60%, the Katch-McArdle equation is used instead: 370 + 21.6 × lean mass in kg. It fits
           muscular and very lean people better. Body fat readings are noisy, so the result is kept within 15% of the Mifflin-St Jeor value: a
-          mistyped number can never swing your budget wildly.
+          mistyped number can never swing your target wildly.
         </P>
         {mine ? <MyResting /> : null}
       </Section>
+
+      <Break />
 
       <Section
         icon={(c) => <Gauge size={20} color={c} />}
@@ -168,6 +184,8 @@ export default function AboutScreen() {
         <P>Logged workouts are not part of this factor. They are added separately, so nothing is counted twice.</P>
       </Section>
 
+      <Break />
+
       <Section
         icon={(c) => <Target size={20} color={c} />}
         color={colors.calories}
@@ -185,6 +203,8 @@ export default function AboutScreen() {
         {mine ? <MyTarget /> : null}
       </Section>
 
+      <Break />
+
       <Section
         icon={(c) => <Flame size={20} color={c} />}
         color={colors.protein}
@@ -201,21 +221,26 @@ export default function AboutScreen() {
         </P>
       </Section>
 
+      <Break />
+
       <Section
         icon={(c) => <Activity size={20} color={c} />}
         color={colors.exercise}
         title="Exercise calories"
         source="2024 Adult Compendium of Physical Activities (Herrmann et al., Journal of Sport and Health Science, 2024).">
         <P>
-          Each activity has a MET value from the 2024 Compendium for easy, moderate and hard effort. Calories during a session are MET × 3.5 × body
-          weight in kg ÷ 200 per minute.
+          Each activity has a MET value (how many times your resting burn the activity takes) from the 2024 Compendium for easy, moderate and
+          hard effort. Calories during a session are MET × 3.5 × body weight in kg ÷ 200 per minute.
         </P>
         <P>
-          Your daily budget already covers what you would have burned in those minutes anyway, so only the net part, above that baseline, is added
-          back. Adding the gross number would count your resting burn twice, which is a common reason calorie apps overestimate. Real costs vary
-          by about a fifth either way, so burns are shown with a range.
+          Your daily target already covers what you would have burned at rest in those minutes, so only the part above that is added to your
+          budget: on the workout&apos;s own day, or shared over seven days, as you choose in Goals. Adding the gross number would count your resting
+          burn twice, which is a common reason calorie apps overestimate. Real costs vary by about a fifth either way, so burns are shown with a
+          range.
         </P>
       </Section>
+
+      <Break />
 
       <Section
         icon={(c) => <Droplets size={20} color={c} />}
@@ -232,6 +257,8 @@ export default function AboutScreen() {
           drinks count at 90%, juice at 95%.
         </P>
       </Section>
+
+      <Break />
 
       <Section
         icon={(c) => <Scale size={20} color={c} />}
@@ -252,6 +279,8 @@ export default function AboutScreen() {
         </P>
       </Section>
 
+      <Break />
+
       <Section
         icon={(c) => <AiGlyph name="estimate" size={20} color={c} />}
         color={colors.fat}
@@ -267,6 +296,8 @@ export default function AboutScreen() {
         </P>
       </Section>
 
+      <Break />
+
       <Section icon={(c) => <BookOpen size={20} color={c} />} color={colors.carbs} title="Where food data comes from">
         <P>
           Three sources, ranked by how much to trust them, and each food shows which one it came from. First, a bundled reference list of common
@@ -276,6 +307,8 @@ export default function AboutScreen() {
           and meals you create yourself.
         </P>
       </Section>
+
+      <Break />
 
       <Section icon={(c) => <Lock size={20} color={c} />} color={colors.success} title="Privacy" testID="about-privacy">
         <P>
@@ -309,6 +342,8 @@ export default function AboutScreen() {
       </Section>
 
       <LegalLinks />
+
+      <Break />
 
       <Section icon={(c) => <Stethoscope size={20} color={c} />} color={colors.warningInk} keep title="Not medical advice">
         <P>

@@ -440,7 +440,8 @@ export function WhyWeAsk({ children, testID, title = 'Why we ask' }: { children:
       </PressableScale>
       {open ? (
         <FadeUp>
-          <Text variant="caption" color="textSecondary">
+          {/* An explanation of two or more sentences: reading text, body in textSecondary. */}
+          <Text variant="body" color="textSecondary">
             {children}
           </Text>
         </FadeUp>

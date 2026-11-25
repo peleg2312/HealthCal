@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { ChevronRight, CookingPot, Plus, Repeat2 } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { hasFoodLogged } from '@/features/drinks/via';
 import { ShareDayButton } from '@/features/share';
@@ -37,7 +37,7 @@ import { useNow, useToday } from '@/store/clock';
 import { useConsistency, useDay, useLive, useProfile, type DaySummary } from '@/store/selectors';
 import { motion, useLargeText, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
-import { AnimatedNumber, Button, Card, Chip, CupKey, IconButton, levelY, placeLabels, PressableScale, ProgressBar, Screen, Text, Vessel, type VesselLabel } from '@/ui';
+import { AnimatedNumber, Button, Card, Chip, CupKey, IconButton, levelY, placeLabels, PressableScale, ProgressBar, Screen, Text, useGrownText, Vessel, type VesselLabel } from '@/ui';
 
 
 export default function TodayScreen() {
@@ -177,8 +177,12 @@ function EnergyCard({
   const { colors, spacing } = useTheme();
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
-  // Large text: the labels leave the cup's side column for rows (EnergyCardLarge below).
-  const large = useLargeText();
+  // Large text, or text grown at all (the app's or the phone's size above the designed one, or a reader's own text
+  // spacing, WCAG 1.4.12): the labels leave the cup's side column for rows (the `large` layout below). The column places
+  // each label at the level it describes in boxes measured at the designed size, so grown letters would run into the
+  // labels beside them; the rows wrap at their words instead. At the designed size nothing changes.
+  const grown = useGrownText();
+  const large = useLargeText() || grown;
   const over = day.remaining < 0;
   const eaten = day.eaten.kcal;
   const budget = Math.max(0, day.budget);
@@ -373,9 +377,9 @@ function EnergyCard({
   const labelLeft = vesselW + (narrow ? 14 : 16);
 
   if (large) {
-    // Large text (130% and up, the app's size or the phone's): the side column beside the cup has no room for its
-    // labels at the heights they describe (the eaten line alone is wider than it at 130%), so nothing here is placed
-    // by value. The number leads the card, whole; the cup's other labels are rows beside the cup, each with its key
+    // Large text (130% and up, the app's size or the phone's), or text grown at all: the side column beside the cup has
+    // no room for its labels at the heights they describe (the eaten line alone is wider than it at 130%, and a reader's
+    // text spacing widens every label), so nothing here is placed by value. The number leads the card, whole; the cup's other labels are rows beside the cup, each with its key
     // (the hatch for workouts, the calorie fill for eaten); the actions and the macros are rows under it. Every line
     // wraps at its words.
     const remaining = notLogged ? (
@@ -694,6 +698,7 @@ function MealsSection({ day }: { day: DaySummary }) {
   // its own under the meal, so the caption keeps the room it needs and never splits a word.
   const large = useLargeText();
   const open = (meal: MealType) => router.push(`/food/search?meal=${meal}&date=${day.date}`);
+  const web = Platform.OS === 'web';
   return (
     // 4 px over the page's 16 px gap, as SectionTitle's own top margin: 20 px from the card above to the title, as on
     // Train, Water and every other screen.
@@ -716,12 +721,15 @@ function MealsSection({ day }: { day: DaySummary }) {
         />
       </View>
       <Card testID="today-meals" padding={0} style={{ paddingVertical: 2 }}>
+        {/* The four meals are a list on the web (role="list", each meal a listitem), as the diary's meal rows are, so a
+            screen reader says how many there are and can move through them as a list. */}
+        <View {...(web ? { role: 'list' as const } : null)}>
         {MEALS.map((m, i) => {
           const entries = day.byMeal[m.id];
           const line = mealLine(entries);
           const prev = entries.length ? null : findPreviousMeal(all, day.date, m.id, 7);
           return (
-            <View key={m.id}>
+            <View key={m.id} {...(web ? { role: 'listitem' as const } : null)}>
               {i > 0 ? <View style={{ height: 1, backgroundColor: colors.border, marginLeft: spacing.lg }} /> : null}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingLeft: spacing.lg, paddingRight: spacing.sm, paddingVertical: 10 }}>
                 <PressableScale
@@ -762,6 +770,7 @@ function MealsSection({ day }: { day: DaySummary }) {
             </View>
           );
         })}
+        </View>
       </Card>
     </View>
   );

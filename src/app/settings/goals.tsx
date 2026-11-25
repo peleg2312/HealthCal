@@ -4,6 +4,7 @@ import React, { useRef, useState } from 'react';
 import { Platform, useWindowDimensions, View, type ScrollView, type ScrollViewProps, type TextInputProps } from 'react-native';
 
 import { Group, Hint, OptionRow } from '@/features/settings/components';
+import { noteVariant } from '@/features/settings/noteText';
 import { planGoalLine } from '@/features/progress/goalDate';
 import { spreadChangeNote, spreadRuleNote } from '@/features/settings/spreadWords';
 import { BIRTH_AUTOCOMPLETE, BIRTH_INCOMPLETE, birthDateWords, birthIso, birthParts, type BirthParts } from '@/features/settings/birthDate';
@@ -25,6 +26,9 @@ import { Button, Card, Chip, ChipWrap, CupKey, goBack, Header, MacroBar, NumberF
 
 /** The nativeID of the words under the three birth-date fields. */
 const BIRTH_ERROR_ID = 'goals-birth-error-words';
+
+/** The birth-date fields' visible labels, as onboarding's. */
+const BIRTH_LABEL = { day: 'Day', month: 'Month', year: 'Year' } as const;
 
 type MacroMode = 'auto' | 'balanced' | 'protein' | 'lowcarb' | 'custom';
 
@@ -209,6 +213,14 @@ function GoalsForm() {
     goBack('/profile');
   };
 
+  // How the number relates to what you burn, said once under it.
+  const why =
+    model.target.source === 'override'
+      ? `Set by you. You burn about ${formatNumber(Math.round(model.tdee))} kcal a day.`
+      : Math.abs(model.target.dailyDelta) <= 5
+        ? `Matched to what you burn a day, about ${formatNumber(Math.round(model.tdee))} kcal.`
+        : `${formatNumber(Math.round(Math.abs(model.target.dailyDelta)))} kcal ${model.target.dailyDelta < 0 ? 'below' : 'above'} what you burn a day, about ${formatNumber(Math.round(model.tdee))} kcal.`;
+
   // One decimal for a weight (0.1 kg or 0.1 lb a step), so the pace never shows a false second decimal.
   const rateStep = u === 'imperial' ? weightToKg(0.1, 'imperial') : 0.1;
   const { ft, inch } = cmToFtIn(draft.heightCm);
@@ -235,12 +247,8 @@ function GoalsForm() {
           <Text variant="unit">kcal a day</Text>
         </View>
         {/* The explanation, said once: how the number relates to what you burn. 8 px under the big number. */}
-        <Text variant="caption" color="textSecondary" style={{ marginTop: spacing.sm }} testID="goals-preview-why">
-          {model.target.source === 'override'
-            ? `Set by you. You burn about ${formatNumber(Math.round(model.tdee))} kcal a day.`
-            : Math.abs(model.target.dailyDelta) <= 5
-              ? `Matched to what you burn a day, about ${formatNumber(Math.round(model.tdee))} kcal.`
-              : `${formatNumber(Math.round(Math.abs(model.target.dailyDelta)))} kcal ${model.target.dailyDelta < 0 ? 'below' : 'above'} what you burn a day, about ${formatNumber(Math.round(model.tdee))} kcal.`}
+        <Text variant={noteVariant(why)} color="textSecondary" style={{ marginTop: spacing.sm }} testID="goals-preview-why">
+          {why}
         </Text>
         {model.target.belowFloor && draft.goal === 'lose' && model.target.source !== 'override' ? (
           <Text variant="caption" color="warningInk" style={{ marginTop: 4 }}>
@@ -266,7 +274,8 @@ function GoalsForm() {
             <PreviewStat label="Water" value={formatVolume(water, u)} color={colors.water} half={textSize >= 1.3} />
           </View>
           {notesShown ? (
-          <Text variant="caption" color="textSecondary" testID="goals-preview-note">
+          // Two sentences: reading text, body in textSecondary.
+          <Text variant="body" color="textSecondary" testID="goals-preview-note">
             {draftRule === 'week'
               ? 'On a day without recent workouts. Each workout adds a seventh of its calories to the budget of its own day and the next six.'
               : effective.eatBackExercise
@@ -284,7 +293,7 @@ function GoalsForm() {
         ) : null}
         {/* Where the target is set, said plainly: an estimate, not medical advice, and who checks with a doctor first. */}
         {notesShown ? (
-          <Text variant="caption" color="textSecondary" style={{ marginTop: spacing.md }} testID="goals-care-note">
+          <Text variant="body" color="textSecondary" style={{ marginTop: spacing.md }} testID="goals-care-note">
             {TARGET_CARE_NOTE}
           </Text>
         ) : null}
@@ -443,6 +452,8 @@ function GoalsForm() {
                 <NumberField
                   key={part}
                   testID={`goals-birth-${part}`}
+                  // A visible label that stays once the field is filled, as onboarding's (WCAG 3.3.2); the spoken name holds it.
+                  label={BIRTH_LABEL[part]}
                   accessibilityLabel={`Birth ${part}`}
                   autoComplete={BIRTH_AUTOCOMPLETE[part] as TextInputProps['autoComplete']}
                   placeholder={part === 'day' ? 'DD' : part === 'month' ? 'MM' : 'YYYY'}

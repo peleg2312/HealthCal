@@ -6,8 +6,9 @@ import type { ExerciseRule } from '@/lib/exerciseBudget';
 import { direction, type InsightDay, type PeriodSummary, type UsualRange } from '@/lib/insights';
 import { formatNumber } from '@/lib/units';
 import { useTheme, withOpacity } from '@/theme';
-import { BarChart, IconButton, Sheet, Text } from '@/ui';
+import { IconButton, Sheet, Text } from '@/ui';
 
+import { BudgetBars, BudgetKeys } from './BudgetBars';
 import { buildBars, daysVerdict } from './calorieBars';
 import { changeDirection } from './change';
 import { barsLabel } from './chartWords';
@@ -37,7 +38,7 @@ export function CaloriesCard({
   // Skip leading days from before the user started, so the chart is not half empty.
   const first = days.findIndex((d) => d.entries.length > 0);
   const shown = first > 0 ? days.slice(first) : days;
-  const { data, weekly, openIndex } = buildBars(shown, today, { full: colors.caloriesBar, partial: withOpacity(colors.calories, 0.45), over: colors.warning });
+  const { data, weekly, openIndex, budgets } = buildBars(shown, today, { full: colors.caloriesBar, partial: withOpacity(colors.calories, 0.45), over: colors.warning });
   const verdict = daysVerdict(shown, today);
   const diff = c ? Math.round(c.avgDiff) : 0;
   const diffText = !c ? '' : Math.abs(diff) < 10 ? 'At budget on average' : `${formatNumber(Math.abs(diff))} kcal ${diff > 0 ? 'above' : 'under'} budget on average`;
@@ -73,21 +74,19 @@ export function CaloriesCard({
               <Info size={20} color={colors.textSecondary} strokeWidth={1.9} />
             </IconButton>
           </View>
-          <BarChart
+          <BudgetBars
             accessibilityLabel={barsLabel(`Calories ${weekly ? 'by week' : 'by day'}, average ${formatNumber(Math.round(c.avgKcal))} kcal against an average budget of ${formatNumber(Math.round(c.avgBudget))} kcal. ${verdict.line}`, data.map((d) => d.detail))}
             testID="progress-calories-chart"
             data={data}
-            color={colors.calories}
+            budgets={budgets}
             band={usual ? { from: usual.low, to: usual.high, color: colors.textSecondary } : undefined}
-            goal={c.avgBudget}
             openIndex={openIndex}
             height={160}
             scrub
           />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.lg, rowGap: spacing.xs }}>
-            <LegendDot color={colors.dashEdge} label="Average budget" dashed />
+            <BudgetKeys weekly={weekly} />
             <LegendDot color={colors.rim} label="Day's level" level />
-            <LegendDot color={colors.warning} label={weekly ? "Above that week's budget" : "Above that day's budget"} />
             {data.some((b) => b.color) ? <LegendDot color={withOpacity(colors.calories, 0.45)} label="Partly logged" /> : null}
             {openIndex !== undefined ? <LegendDot color={colors.calories} label="Today, hatched: not finished" /> : null}
             {usual ? <LegendDot color={withOpacity(colors.textSecondary, 0.33)} label={`Your usual ${formatNumber(Math.round(usual.low))}–${formatNumber(Math.round(usual.high))} kcal`} /> : null}
@@ -114,7 +113,7 @@ export function CaloriesCard({
           <Sheet visible={help} onClose={() => setHelp(false)} title="Reading the chart">
             <View style={{ gap: spacing.md }} testID="progress-calories-help-text">
               <Text variant="body">
-                Each bar is one {weekly ? "week's average day" : 'day'}, and it is amber only above its own {weekly ? "week's" : "day's"} budget. A fully logged day is on budget at 90 to 100% of its own budget. The dashed line is the average budget, for reference.
+                Each bar is one {weekly ? "week's average day" : 'day'}, and the short dash across it is that {weekly ? "week's" : "day's"} own budget. A bar that passes its dash is above its budget, and the part above is amber. A fully logged day is on budget at 90 to 100% of its own budget.
               </Text>
               {usual ? <Text variant="body">The grey band is your usual intake: the middle half of your fully logged days in the last 4 weeks.</Text> : null}
               <Text variant="body" color="textSecondary">

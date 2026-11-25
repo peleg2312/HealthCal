@@ -7,10 +7,13 @@ import { formatClock, formatHHmm, parseHHmm } from '@/lib/dates';
 import { cup, cupFor, useTheme } from '@/theme';
 import { Button, Card, Chip, CupKey, DECORATIVE, Divider, IconButton, ListRow, PressableScale, Sheet, Text } from '@/ui';
 
+import { noteVariant } from './noteText';
+
 /**
  * A titled card of rows separated by hairlines. Its title is a level-2 heading. `radiogroup` marks a card
  * of `OptionRow`s as one single choice, named by its title, so a screen reader says "one of five" rather
- * than five switches.
+ * than five switches. The title and the footnote start at the card's own edge, as a SectionTitle does over
+ * the cards of every other screen, and the footnote is reading text in textSecondary (7:1 on the page).
  */
 export function Group({ title, footer, radiogroup, children }: { title?: string; footer?: string; radiogroup?: boolean; children: React.ReactNode }) {
   const { spacing } = useTheme();
@@ -22,7 +25,7 @@ export function Group({ title, footer, radiogroup, children }: { title?: string;
     <View style={{ gap: spacing.sm }}>
       {title ? (
         // Drawn as a section title, so it is one: a level-2 heading under the screen's title, as SectionTitle is.
-        <Text variant="overline" color="textSecondary" accessibilityRole="header" {...({ 'aria-level': 2 } as object)} style={{ paddingHorizontal: spacing.xs }}>
+        <Text variant="overline" color="textSecondary" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>
           {overlineWords(title)}
         </Text>
       ) : null}
@@ -48,7 +51,7 @@ export function Group({ title, footer, radiogroup, children }: { title?: string;
         ))}
       </Card>
       {footer ? (
-        <Text variant="caption" color="textTertiary" style={{ paddingHorizontal: spacing.xs }}>
+        <Text variant={noteVariant(footer)} color="textSecondary">
           {footer}
         </Text>
       ) : null}
@@ -122,6 +125,8 @@ export function OptionRow({ title, subtitle, selected, onPress, testID }: { titl
       accessibilityState={{ checked: selected, selected }}
       aria-checked={selected}
       accessibilityLabel={spokenUnits(subtitle ? `${title}, ${subtitle}` : title)}
+      // The card clips what reaches past it, so the keyboard's ring is drawn just inside the tile's edge.
+      focusRing="inside"
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -335,10 +340,13 @@ export function InitialsAvatar({ name, size = 64 }: { name: string; size?: numbe
   );
 }
 
-/** Small explanatory paragraph used under form controls. */
+/** Explanatory words under form controls: a caption, or body text when they run to two sentences or more (`noteVariant`). */
 export function Hint({ children, testID }: { children: React.ReactNode; testID?: string }) {
+  const words = React.Children.toArray(children)
+    .map((c) => (typeof c === 'string' || typeof c === 'number' ? String(c) : ''))
+    .join('');
   return (
-    <Text variant="caption" color="textSecondary" testID={testID}>
+    <Text variant={noteVariant(words)} color="textSecondary" testID={testID}>
       {children}
     </Text>
   );

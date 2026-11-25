@@ -5,7 +5,7 @@ import { AccessibilityInfo, Platform, View } from 'react-native';
 import { DayStepper, MealPicker } from '@/features/food/components';
 import { QUICK_KCAL_LIMIT, href, kcal, parseDate, parseMeal, quickKcalError, quickKcalValue } from '@/features/food/helpers';
 import { logQuickAdd } from '@/features/food/log';
-import { QUICK_KCAL_ASK, quickAddPress, quickAddTitle, quickAddWaiting } from '@/features/food/quickCheck';
+import { QUICK_KCAL_ASK, pressFor, quickAddTitle, quickKcalAsks, waitsFor } from '@/features/food/softCheck';
 import { atwaterKcal } from '@/lib/nutrition';
 import { useLargeText, useTheme } from '@/theme';
 import { Button, Card, CupKey, Header, NumberField, Screen, Text, TextField, goBack, haptic, useLeaveGuard } from '@/ui';
@@ -42,17 +42,18 @@ export default function QuickAddScreen() {
   // Typed numbers or a name are not dropped without asking (the X, back, a swipe back).
   const typed = kcalText.trim().length > 0 || hasMacros || name.trim().length > 0;
   const leave = useLeaveGuard(typed ? 'Discard this quick add?' : null);
-  // More than one plausible entry holds (`quickKcalAsks`) is added on a second press of Add (`quickAddPress`): the
+  // More than one plausible entry holds (`quickKcalAsks`) is added on a second press of Add (`pressFor`): the
   // first adds nothing, ties a line to the field and names the amount on the button. Another amount asks again.
   const [askedFor, setAskedFor] = useState<number | null>(null);
-  const waiting = quickAddWaiting(calories, askedFor);
+  const asks = quickKcalAsks(calories);
+  const waiting = waitsFor(asks, calories, askedFor);
   const askId = `quick-ask-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   // The web's polite live region, mounted empty, so the line is heard as it appears without moving focus.
   const [spoken, setSpoken] = useState('');
 
   const save = () => {
     if (!valid) return;
-    if (quickAddPress(calories!, askedFor) === 'ask') {
+    if (pressFor(asks, calories!, askedFor) === 'ask') {
       setAskedFor(calories);
       haptic.warn();
       if (Platform.OS !== 'web') AccessibilityInfo.announceForAccessibility(QUICK_KCAL_ASK);

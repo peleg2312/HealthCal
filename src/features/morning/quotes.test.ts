@@ -145,6 +145,8 @@ describe('the quote table', () => {
       'carlyle-blue-day', 'montgomery-evening', 'franklin-felicity', 'longfellow-past', 'seneca-begin', 'shelley-fields',
       'tagore-clouds', 'smiles-bright-side', 'longfellow-builders', 'hubbard-credo', 'seneca-burdens', 'baum-courage',
       'longfellow-perseverance', 'james-uncompleted', 'bronte-hope',
+      // The page's banned words ("great", "greatest", "bad", "should"), replaced on 25 November 2026.
+      'lubbock-best', 'henley-sleep', 'lowell-endurance', 'emerson-speakers', 'emerson-good', 'hubbard-mistake',
     ];
     for (const id of removed) expect(quoteById(id), id).toBeUndefined();
   });

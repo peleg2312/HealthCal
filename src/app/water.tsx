@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronDown, ChevronUp, GlassWater, Info, Trash2 } from 'lucide-react-native';
-import React, { useEffect, useMemo, useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import React, { useEffect, useId, useMemo, useState } from 'react';
+import { AccessibilityInfo, Platform, useWindowDimensions, View } from 'react-native';
 
 import { isolateRtl } from '@/lib/bidi';
 import { today, toISODate, weekdayShort } from '@/lib/dates';
@@ -13,7 +13,7 @@ import { computeDayFromStore, useDay, useDays, useLive, useProfile } from '@/sto
 import { Note, RequireProfile, splitUnit } from '@/features/trackers/components';
 import { dayTitle, resolveDateParam } from '@/features/trackers/dateParam';
 import { keepOrConvert, MAX_PRESET_ML, MIN_PRESET_ML, normalizePresets } from '@/features/trackers/helpers';
-import { FadeRow, useLeavingRows } from '@/features/food/rowMotion';
+import { FadeRow, Unfold, useComeBack, useLeavingRows } from '@/features/food/rowMotion';
 import { mealOnDay } from '@/features/food/addedTo';
 import { href } from '@/features/food/helpers';
 import { logDrink, removeDrink } from '@/features/food/log';
@@ -29,9 +29,9 @@ import { DrinkTitleRow } from '@/features/drinks/DrinkTitleRow';
 import { pickToast, placePick, yourDrinks } from '@/features/drinks/pick';
 import { loadDrinkMemory, rememberDrinkChoice, useDrinkMemory } from '@/features/drinks/memory';
 import { diaryWaterCaption, diaryWaterOpenLabel, waterDeleteLabel } from '@/features/drinks/diary';
-import { drinkMeal, entryFor, noticeLine, pickedFood, planDrink, rememberedChoice, sameDrinkFoodIds, sameDrinkInDiary, selectChoice, selectFood, waterAfter, waterFromEntry, waterOnlyOffered, waterRowCaption, waterRowTitle, type WaterAfter } from '@/features/drinks/rules';
+import { DRINK_MAX_ML, drinkAmountCheck, drinkMeal, entryFor, noticeLine, pickedFood, planDrink, rememberedChoice, sameDrinkFoodIds, sameDrinkInDiary, selectChoice, selectFood, waterAfter, waterFromEntry, waterOnlyOffered, waterRowCaption, waterRowTitle, type WaterAfter } from '@/features/drinks/rules';
 import { leftLitreDecimals, shownMl, volumeNumber, volumeUnitFor, waterLeftMl } from '@/features/today/volume';
-import { cup, useLargeText, useTheme } from '@/theme';
+import { cup, useLargeText, useTheme, withOpacity } from '@/theme';
 import { pourLandsAt } from '@/theme/motion';
 import type { Beverage, Food, WaterEntry } from '@/types';
 import { spokenUnits } from '@/lib/spokenUnits';
@@ -136,6 +136,8 @@ const BIG_TILE = 128;
  * "500 ml" never parts from its unit, so the tile makes room for it whole (two a row at 360) rather than cut it.
  */
 const GROWN_TILE = 96;
+/** The glass tile's water fill: a flat tint of the water key over the card (its edge stays 3:1 on it in every look). */
+const GLASS_FILL = 0.14;
 
 function tileRows(count: number, screenW: number, minTile = 72): number[][] {
   const content = Math.min(screenW, 560) - 40;
@@ -172,8 +174,10 @@ function GlassTile({ title, subtitle, icon, onPress, testID, accessibilityLabel 
         minWidth: 72,
         minHeight: 84,
         ...cup(radius.tile, 5),
-        backgroundColor: colors.surface,
-        // A 3 px water edge: the glasses outweigh the kind chips above them in every look (blurred, D2-03).
+        // A soft water fill inside a 3 px water edge: the glasses are the screen's heaviest mass in every look
+        // (blurred, D2-03), above the hero's cup and figure and the kind chips. A flat tint of the whole tile, never
+        // a level: it is a button, not an amount. Its words stay 7:1 on it in every look (textSecondary 6.9:1 in Dark).
+        backgroundColor: withOpacity(colors.water, GLASS_FILL),
         borderWidth: 3,
         borderColor: colors.water,
         alignItems: 'center',
@@ -215,6 +219,10 @@ function WaterScreen() {
   const week = useDays(7, date);
   const [beverage, setBeverage] = useState<Beverage>('water');
   const [custom, setCustom] = useState<number | null>(null);
+  // The amount (ml) the person was asked about with "Tap Add again" (`drinkAmountCheck`): a second press of Add
+  // with this same amount adds it; any other amount is asked about afresh.
+  const [askedMl, setAskedMl] = useState<number | null>(null);
+  const checkId = `water-custom-check-${useId().replace(/[^A-Za-z0-9_-]/g, '')}`;
   const [editing, setEditing] = useState(false);
   const [showAllLog, setShowAllLog] = useState(false);
   // Drinks removed on this visit: each keeps a Restore row in the log (the second way back after the toast's Undo)
@@ -281,7 +289,10 @@ function WaterScreen() {
   const customMl = custom && custom > 0 ? volumeToMl(custom, units) : 0;
   // The words before the tap, from the same plan the tap writes (clock from useNow, never read while rendering).
   const shownPlan = (ml: number, amount: 'glass' | 'custom') => planDrink({ kind: beverage, drink: selected, ml, date, now, today: todayDate, units, waterOnly: waterOnlyOn, amount });
-  const line = beverage === 'water' ? '' : customMl > 0 && customMl <= 5000 ? shownPlan(customMl, 'custom').line : shownPlan(glassMl, 'glass').line;
+  const line = beverage === 'water' ? '' : customMl > 0 && customMl <= DRINK_MAX_ML ? shownPlan(customMl, 'custom').line : shownPlan(glassMl, 'glass').line;
+  // "Other amount": refused above the limit as it is typed (Add waits), and above 2 L asked about once at Add.
+  const amountCheck = customMl > 0 ? drinkAmountCheck(customMl, units) : null;
+  const amountLine = amountCheck?.state === 'over' || (amountCheck?.state === 'ask' && askedMl === customMl) ? amountCheck.line : null;
 
   // The day's water after this glass, read from the store at the tap, so the toast names the new total as
   // every water toast does ("250 ml added to Water · 1.48 of 3.3 L").
@@ -303,7 +314,6 @@ function WaterScreen() {
     setRemovedIds((cur) => [e.id, ...cur.filter((id) => id !== e.id)]);
   };
   const removed = removedIds.map((id) => waterRecords[id]).filter((w): w is WaterEntry => !!w && !!w.deleted && w.date === date);
-  const removedApart = apartSuffixes(removed.map((w) => `${waterRowTitle(w, units)}|${loggedLabel(w)}`));
 
   const chooseKind = (b: Beverage) => {
     setBeverage(b);
@@ -336,10 +346,8 @@ function WaterScreen() {
   };
   const enterCalories = (amountShown: number, kcal: number) => {
     const ml = volumeToMl(amountShown, units);
-    if (ml > 5000) {
-      toast(`Add up to ${formatVolume(5000, units)} at a time`);
-      return;
-    }
+    // The sheet keeps its Add waiting above the limit (`drinkAmountCheck`); this only guards the write.
+    if (ml > DRINK_MAX_ML) return;
     setPickQuery(null);
     logDrink(planDrink({ kind: beverage, drink: { id: ENTERED, food: null }, ml, kcal, date, now: new Date(), today: today(), units, amount: 'custom', after: after(ml, beverage) }));
     setWaterOnly(false);
@@ -356,6 +364,12 @@ function WaterScreen() {
   const entries = showAllLog ? allEntries : allEntries.slice(0, 6);
   // A removed drink fades where it is before the rows below glide up into its place.
   const rows = useLeavingRows(entries);
+  // An Undo or a Restore: the drink that comes back unfolds in step with its Restore row folding out.
+  const { back, restores } = useComeBack(
+    entries.map((e) => e.id),
+    removed,
+  );
+  const restoresApart = apartSuffixes(restores.map(({ item: w }) => `${waterRowTitle(w, units)}|${loggedLabel(w)}`));
   // Each row's time as its delete names it, with its place among rows that would otherwise read the same.
   const rowApart = apartSuffixes(rows.map(({ item: e }) => `${e.ml}|${loggedLabel(e)}|${e.fromEntryId ?? ''}`));
   const extraParts = splitUnit(formatVolume(Math.max(0, shownMl(consumed, units) - shownMl(goal, units)), units));
@@ -548,44 +562,71 @@ function WaterScreen() {
           </View>
         ))}
       </View>
-      {/* With large text the field keeps at least 200 px and Add goes under it when both do not fit one line. */}
-      <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', gap: spacing.sm, alignItems: 'flex-end' }}>
-        {/* A visible label that lasts (WCAG 3.3.2), with the unit as its suffix: its spoken name is the kit's
-            ("Other amount, millilitres"), and an empty field shows no placeholder that could pass for a value. */}
-        <NumberField
-          testID="water-custom-input"
-          style={big ? { flexGrow: 1, flexBasis: 200 } : { flex: 1 }}
-          label="Other amount"
-          suffix={volumeUnit(units)}
-          decimals={0}
-          value={custom}
-          onChange={setCustom}
-        />
-        <Button
-          testID="water-custom-add"
-          title="Add"
-          size="lg"
-          variant="secondary"
-          full={false}
-          // As tall as the field beside it (50), so the two read as one row.
-          style={{ height: 50 }}
-          disabled={!(custom && custom > 0)}
-          onPress={addTap(() => {
-            if (!custom) return;
-            const ml = volumeToMl(custom, units);
-            if (ml > 5000) {
-              toast(`Add up to ${formatVolume(5000, units)} at a time`);
-              return;
-            }
-            add(ml, 'custom');
-            setCustom(null);
-          })}
-        />
+      <View>
+        {/* With large text the field keeps at least 200 px and Add goes under it when both do not fit one line. */}
+        <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', gap: spacing.sm, alignItems: 'flex-end' }}>
+          {/* A visible label that lasts (WCAG 3.3.2), with the unit as its suffix: its spoken name is the kit's
+              ("Other amount, millilitres"), and an empty field shows no placeholder that could pass for a value.
+              What the amount needs is said under the row, tied to the field (`aria-describedby` on the web, the
+              hint natively), so the field's box ends at its cup and Add lines up with the cup. */}
+          <NumberField
+            testID="water-custom-input"
+            style={big ? { flexGrow: 1, flexBasis: 200 } : { flex: 1 }}
+            label="Other amount"
+            suffix={volumeUnit(units)}
+            decimals={0}
+            value={custom}
+            onChange={setCustom}
+            accessibilityHint={amountLine ?? undefined}
+            {...((Platform.OS === 'web' && amountLine ? { 'aria-describedby': checkId, ...(amountCheck?.state === 'over' ? { 'aria-invalid': true } : null) } : {}) as object)}
+          />
+          <Button
+            testID="water-custom-add"
+            title="Add"
+            size="lg"
+            variant="secondary"
+            full={false}
+            // As tall as the field's cup beside it (50) and set at the row's end, so its box is the cup's: a button
+            // that does not fill the row stands at the row's start by default (the kit's), level with the label.
+            style={{ height: 50, alignSelf: 'flex-end' }}
+            disabled={!(custom && custom > 0) || amountCheck?.state === 'over'}
+            onPress={addTap(() => {
+              if (!custom) return;
+              const ml = volumeToMl(custom, units);
+              const check = drinkAmountCheck(ml, units);
+              if (check.state === 'over') return;
+              // More than 2 L: asked once, under the field; the same amount pressed again is added.
+              if (check.state === 'ask' && askedMl !== ml) {
+                setAskedMl(ml);
+                haptic.warn();
+                if (Platform.OS !== 'web') AccessibilityInfo.announceForAccessibility(check.line);
+                return;
+              }
+              add(ml, 'custom');
+              setCustom(null);
+              setAskedMl(null);
+            })}
+          />
+        </View>
+        {/* Kept mounted (a polite live region), so the question is read as it appears; empty, it takes no room. */}
+        <View accessibilityLiveRegion="polite" {...(Platform.OS === 'web' ? { 'aria-live': 'polite' } : null)}>
+          {amountLine ? (
+            <Text
+              testID="water-custom-check"
+              nativeID={checkId}
+              // Refused: a field's error words. Asked: the question, two sentences of reading text.
+              variant={amountCheck?.state === 'over' ? 'caption' : 'body'}
+              color={amountCheck?.state === 'over' ? 'danger' : 'textSecondary'}
+              style={{ marginTop: 6 }}>
+              {amountLine}
+            </Text>
+          ) : null}
+        </View>
       </View>
       <Note
         icon={
           <View aria-hidden>
-            <Info size={14} color={colors.textSecondary} />
+            <Info size={18} color={colors.textSecondary} strokeWidth={1.9} />
           </View>
         }>
         {factorLine(beverage)}
@@ -640,7 +681,7 @@ function WaterScreen() {
             );
             const rowStyle = { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: 6 } as const;
             return (
-              <FadeRow key={e.id} leaving={leaving}>
+              <FadeRow key={e.id} leaving={leaving} back={back.has(e.id)}>
                 {i > 0 ? <Divider inset={36} /> : null}
                 <View testID={`water-entry-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
                   {partner ? (
@@ -669,16 +710,17 @@ function WaterScreen() {
           })}
           </AnimatedList>
         )}
-        {/* Drinks removed on this visit, each with Restore: the way back that does not leave with the toast. */}
-        {removed.map((w, i) => (
-          <React.Fragment key={`removed-${w.id}`}>
+        {/* Drinks removed on this visit, each with Restore: the way back that does not leave with the toast. Each
+            unfolds as its drink folds away (after the drink's fade) and folds out as the drink comes back, in step. */}
+        {restores.map(({ item: w, leaving }, i) => (
+          <Unfold key={`removed-${w.id}`} animate open={!leaving}>
             <Divider inset={rows.length ? 36 : 0} />
             <RestoreRow
               testID={`water-restore-${i}`}
-              label={`${waterRowTitle(w, units)}, ${loggedLabel(w)}${removedApart[i] ?? ''}, removed from Water`}
+              label={`${waterRowTitle(w, units)}, ${loggedLabel(w)}${restoresApart[i] ?? ''}, removed from Water`}
               onRestore={() => useStore.getState().restore('water', w.id)}
             />
-          </React.Fragment>
+          </Unfold>
         ))}
       </Card>
       {/* More than six drinks: the rest open under the list, where it ends (the testID is the one SectionTitle gave it). */}
@@ -700,7 +742,8 @@ function WaterScreen() {
 
       <SectionTitle title={isToday ? 'Last 7 days' : `7 days to ${dayTitle(date)}`} />
       <Card style={{ gap: spacing.md }}>
-        <Text variant="caption" color="textSecondary">
+        {/* Two sentences: reading text (body), never a caption. */}
+        <Text variant="body" color="textSecondary">
           {week.some((d) => d.waterMl > 0) ? `Goal met on ${daysMet} of 7 days.` : 'Bars fill in as you log drinks.'} Dashed line: the goal.
         </Text>
         <BarChart
@@ -741,7 +784,8 @@ function WaterScreen() {
             />
             <Divider />
             <GoalLine label={isToday ? 'Today’s goal' : `Goal for ${dayName}`} value={formatVolume(goal, units)} strong />
-            <Text variant="caption" color="textTertiary">
+            {/* A note of two sentences is reading text: body in textSecondary, never a caption. */}
+            <Text testID="water-goal-note" variant="body" color="textSecondary">
               This counts drinks only. Food supplies roughly a fifth of the water you take in, so it is not included.
             </Text>
           </>
@@ -801,6 +845,8 @@ function PresetSheet({ visible, onClose, presets, units }: { visible: boolean; o
     }
   }
   const unit = volumeUnit(units);
+  // Sizes typed and not saved are not dropped without asking (the backdrop, a drag, Escape, back), as a weigh-in is not.
+  const changed = visible && (fields.length !== presets.length || fields.some((f, i) => f.shown !== toDisplay(presets[i])));
   const save = () => {
     // Untouched fields keep their stored ml, so an imperial save does not shift 250 ml to 237 ml.
     const ml = normalizePresets(fields.map((f) => keepOrConvert(f.shown, f.ml, toDisplay, (v) => volumeToMl(v, units))));
@@ -819,6 +865,7 @@ function PresetSheet({ visible, onClose, presets, units }: { visible: boolean; o
       visible={visible}
       onClose={onClose}
       title="Glass sizes"
+      unsaved={changed ? 'Discard these sizes?' : null}
       footer={
         <View style={{ gap: spacing.sm }}>
           {error ? (

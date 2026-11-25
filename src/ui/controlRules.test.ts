@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ANDROID_TARGET, ariaFromState, fixedSize, pressesOnSpace, rovingIndex, rowStacks, slopToReach, spokenFieldName, stepperKey, wantsAndroidTarget, webAutoComplete } from './controlRules';
+import { ANDROID_TARGET, ariaFromState, fixedSize, NO_MINUS, numberTextProblem, numberTextValue, pressesOnSpace, rovingIndex, rowStacks, slopToReach, spokenFieldName, stepperKey, wantsAndroidTarget, webAutoComplete } from './controlRules';
 
 describe('slopToReach (48 dp on Android)', () => {
   it('grows a 44 px cup to 48 on both axes', () => {
@@ -142,5 +142,29 @@ describe('rowStacks (a list row at large text)', () => {
   });
   it('waits for the row to be measured', () => {
     expect(rowStacks({ rowWidth: 0, sideWidth: 0, growth: 2 })).toBe(false);
+  });
+});
+
+describe('number fields: a typed minus is kept and named', () => {
+  it('a minus in a field that takes no negative is named, and its value is nothing', () => {
+    expect(numberTextProblem('-100')).toBe(NO_MINUS);
+    expect(numberTextProblem('-')).toBe(NO_MINUS);
+    expect(numberTextProblem('10-0')).toBe(NO_MINUS);
+    expect(numberTextValue('-100')).toBeNull();
+    expect(numberTextValue('-')).toBeNull();
+    // Never turned into a plus.
+    expect(numberTextValue('-70')).not.toBe(70);
+  });
+  it('plain numbers read as before, a comma as the decimal point', () => {
+    expect(numberTextProblem('100')).toBeNull();
+    expect(numberTextValue('100')).toBe(100);
+    expect(numberTextValue('1,5')).toBe(1.5);
+    expect(numberTextValue('1.')).toBe(1);
+    expect(numberTextValue('')).toBeNull();
+    expect(numberTextValue('.')).toBeNull();
+  });
+  it('a field that takes negatives reads the minus', () => {
+    expect(numberTextProblem('-3', true)).toBeNull();
+    expect(numberTextValue('-3', true)).toBe(-3);
   });
 });

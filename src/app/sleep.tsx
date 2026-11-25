@@ -6,7 +6,7 @@ import { View } from 'react-native';
 import { formatDayLabel, fromISODate, weekdayShort } from '@/lib/dates';
 import { deleteSleep, saveSleep } from '@/features/trackers/actions';
 import { dayTitle, resolveDateParam } from '@/features/trackers/dateParam';
-import { DayStepper, Explain, ExplainText, Figure, HistoryRow, RequireProfile, spokenFigure } from '@/features/trackers/components';
+import { DayStepper, Explain, ExplainText, Figure, HistoryItem, HistoryList, HistoryRow, RequireProfile, spokenFigure } from '@/features/trackers/components';
 import { findByDate, formatHours, hoursFigure, hoursSpoken, QUALITY_LABELS, SLEEP_RANGE, sleepSummary } from '@/features/trackers/helpers';
 import { sleepChartLabel } from '@/features/progress/chartWords';
 import { sleepFromLine, stagesLine } from '@/features/trackers/sleepSource';
@@ -125,7 +125,8 @@ function SleepScreen() {
   const chartNote = [
     'Shaded: 7 to 9 hours.',
     summary.nights < days ? `${days - summary.nights} of ${days} nights not logged.` : null,
-    summary.avgQuality !== null ? `Average quality ${QUALITY_LABELS[Math.round(summary.avgQuality) as SleepQuality].toLowerCase()}.` : null,
+    // "quality good." held together, so a wrapped note never ends on one word alone.
+    summary.avgQuality !== null ? `Average quality\u00A0${QUALITY_LABELS[Math.round(summary.avgQuality) as SleepQuality].toLowerCase().replace(/ /g, '\u00A0')}.` : null,
   ].filter((x): x is string => !!x);
 
   const footer = <Button testID="sleep-log" title={lastNight ? (isToday ? 'Log sleep' : 'Edit this night') : isToday ? 'Log last night' : 'Log this night'} icon={<Plus size={20} color={colors.onPrimary} />} onPress={() => setSheetDate(end)} />;
@@ -220,18 +221,21 @@ function SleepScreen() {
 
           <SectionTitle title="History" testID="sleep-history" />
           <Card padding={spacing.md}>
-            {history.map((e, i) => (
-              <React.Fragment key={e.id}>
-                {i > 0 ? <Divider /> : null}
-                <HistoryRow
-                  testID={`sleep-row-${i}`}
-                  title={formatDayLabel(e.date)}
-                  subtitle={historySubtitle(e)}
-                  value={formatHours(e.hours)}
-                  onPress={() => setSheetDate(e.date)}
-                />
-              </React.Fragment>
-            ))}
+            {/* A list on the web (a ul of li), each night one item with its divider. */}
+            <HistoryList testID="sleep-history-list">
+              {history.map((e, i) => (
+                <HistoryItem key={e.id}>
+                  {i > 0 ? <Divider /> : null}
+                  <HistoryRow
+                    testID={`sleep-row-${i}`}
+                    title={formatDayLabel(e.date)}
+                    subtitle={historySubtitle(e)}
+                    value={formatHours(e.hours)}
+                    onPress={() => setSheetDate(e.date)}
+                  />
+                </HistoryItem>
+              ))}
+            </HistoryList>
           </Card>
           {/* More than 14 nights: the rest open under the list, where it ends (the testID is the one SectionTitle gave it). */}
           {allNights.length > 14 ? (

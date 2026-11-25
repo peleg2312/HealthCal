@@ -80,7 +80,7 @@ export function ProgressTile({
       testID={testID}
       onPress={onPress}
       scaleTo={0.98}
-      accessibilityLabel={spokenUnits(`${title}: ${spoken ?? `${value === null ? 'no data' : `${value} ${unit ?? ''}`}${caption ? `, ${caption}` : ''}`}.${compare ? ` ${compare}.` : ''} Open details.`)}
+      accessibilityLabel={spokenUnits(`${title}: ${spoken ?? `${value === null ? 'no data' : `${value} ${unit ?? ''}`}${caption ? `, ${caption}` : ''}`}.${compare ? ` ${compare}.` : ''} Open details.`).replace(/\u00A0/g, ' ')}
       style={{
         flexGrow: 1,
         paddingHorizontal: spacing.lg,

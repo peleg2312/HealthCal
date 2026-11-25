@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Info, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { AccessibilityInfo, Platform, View } from 'react-native';
 
 import { detailWaterAdds, diaryDrink, diaryDrinkMl } from '@/features/drinks/diary';
 import { detailDrinkNote, pairEditProblem, waterFor, waterPointingAt, type PairEditProblem } from '@/features/drinks/rules';
@@ -16,6 +16,7 @@ import { toggleFoodFavorite } from '@/features/food/favoriteActions';
 import { dayPhrase, href, portionLabel, kcal, labelAmount, lastPortions, matchServing, param, parseDate, parseMeal, portionFor, sourceInfo, sourceKindOf, valuesUpdated, type SourceKind } from '@/features/food/helpers';
 import { deleteEntry, logFood } from '@/features/food/log';
 import { mealPickAdvice, pickMovesAtOnce } from '@/features/food/mealMove';
+import { editedKcalAsks, kcalAsk, kcalSaveTitle, portionAsk, portionAsks, portionTitle, pressFor, waitsFor } from '@/features/food/softCheck';
 import { RequireProfile } from '@/features/food/RequireProfile';
 import { isolateRtl } from '@/lib/bidi';
 import { MEAL_LABEL, atwaterKcal, formatMacro, scaleNutrients } from '@/lib/nutrition';
@@ -24,7 +25,36 @@ import { useToday } from '@/store/clock';
 import { useDay, useLive } from '@/store/selectors';
 import { cup, useLargeText, useTheme } from '@/theme';
 import type { Food, FoodEntry, ISODate, MealType, Nutrients, Serving, WaterEntry } from '@/types';
-import { Button, Card, CupKey, Divider, EmptyState, Header, IconButton, MacroBar, NumberField, PressableScale, Screen, Text, TextField, goBack } from '@/ui';
+import { Button, Card, CupKey, Divider, EmptyState, Header, IconButton, MacroBar, NumberField, PressableScale, Screen, Text, TextField, goBack, haptic } from '@/ui';
+
+/** Hidden from sight, kept for screen readers: the polite live region that says why Add or Save waited. */
+const SPOKEN_ONLY = { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 } as const;
+
+/**
+ * The soft check's second press (`pressFor`, @/features/food/softCheck) as a screen holds it: the amount the last
+ * press asked about, a press that stores or asks (saying why without moving the focus: announced natively, through
+ * the polite live region `spoken` on the web), and that region.
+ */
+function useSecondPress() {
+  const [askedFor, setAskedFor] = useState<number | null>(null);
+  const [spoken, setSpoken] = useState('');
+  const press = (asks: boolean, amount: number, line: string, store: () => void) => {
+    if (pressFor(asks, amount, askedFor) === 'add') return store();
+    setAskedFor(amount);
+    haptic.warn();
+    if (Platform.OS !== 'web') return AccessibilityInfo.announceForAccessibility(line);
+    // Emptied first, so the same words after a second question are still a change the region reads out.
+    setSpoken('');
+    setTimeout(() => setSpoken(line), 150);
+  };
+  const region =
+    Platform.OS === 'web' ? (
+      <Text testID="detail-announce" style={SPOKEN_ONLY} {...({ 'aria-live': 'polite', 'aria-atomic': true } as object)}>
+        {spoken}
+      </Text>
+    ) : null;
+  return { askedFor, press, region };
+}
 
 export default function FoodDetailRoute() {
   return (
@@ -371,10 +401,17 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
   // A property of the stored entry, not of the amount being chosen: it stays while the amount changes.
   const updated = valuesUpdated(food, entry);
 
-  const save = () => {
-    logFood({ food, serving, quantity, meal, date, entryId: entry?.id });
-    goBack(href('/diary', { date }));
-  };
+  // A portion above what one plausible entry holds is stored on a second press (`portionAsks`): the first stores
+  // nothing, ties a line to the grams field and names the amount on the button. Another amount asks again.
+  const second = useSecondPress();
+  const gramsKey = Math.round(totalGrams * 10) / 10;
+  const asks = portionAsks(food, totalGrams, n.kcal, entry?.grams);
+  const waiting = waitsFor(asks, gramsKey, second.askedFor);
+  const save = () =>
+    second.press(asks, gramsKey, portionAsk(!!entry), () => {
+      logFood({ food, serving, quantity, meal, date, entryId: entry?.id });
+      goBack(href('/diary', { date }));
+    });
   // Moving an entry is one tap (D3-08: diary, the row, the meal = 3 from Today): in Edit entry, another meal
   // picked while nothing else has changed saves at once and goes back, with the save's toast and Undo. With
   // the amount or the day changed too, the meal is only chosen, and Save writes everything together. The line
@@ -419,7 +456,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
           <Button
             testID="detail-save"
             style={{ flex: 1 }}
-            title={entry ? 'Save changes' : `Add to ${MEAL_LABEL[meal].toLowerCase()}`}
+            title={waiting ? portionTitle(!!entry, meal, totalGrams) : entry ? 'Save changes' : `Add to ${MEAL_LABEL[meal].toLowerCase()}`}
             disabled={!(totalGrams > 0) || gramsInvalid || !!paired.problem}
             onPress={save}
           />
@@ -438,7 +475,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
       <Card style={{ gap: spacing.lg }} testID="detail-portion">
         <MacroSummary range={range} n={n} updated={updated} kcalNote={`${portionLabel(serving.label, quantity)}${perGram || labelAmount(serving.label) !== null || (quantity === 1 && /\d\s?g\)*$/.test(serving.label)) ? '' : ` · ${Math.round(totalGrams)} g`}`} />
         <Divider />
-        <AmountEditor food={food} value={portion} onChange={setPortion} onPendingChange={setGramsInvalid} testIDPrefix="detail" />
+        <AmountEditor food={food} value={portion} onChange={setPortion} onPendingChange={setGramsInvalid} testIDPrefix="detail" ask={waiting ? portionAsk(!!entry) : null} />
       </Card>
       <DrinkNote water={paired.water} problem={paired.problem} hasAmount shown={{ food, serving, quantity }} />
       {entry ? null : <WaterAdds food={food} serving={serving} quantity={quantity} />}
@@ -453,6 +490,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
       </Card>
 
       <NutritionFacts portion={n} per100g={food.per100g} showPer100 whole={!!range} />
+      {second.region}
     </Screen>
   );
 }
@@ -472,6 +510,11 @@ function ManualEditor({ entry }: { entry: FoodEntry }) {
   const n: Nutrients = { kcal: kcalV ?? 0, protein: protein ?? 0, carbs: carbs ?? 0, fat: fat ?? 0 };
   const implied = atwaterKcal(n);
   const rangeKept = entry.kcalRange && Math.round(n.kcal) === Math.round(entry.nutrients.kcal);
+  // Calories changed to more than one plausible entry holds are saved on a second press, as quick add's are.
+  const second = useSecondPress();
+  const kcalAsks = editedKcalAsks(kcalV, entry.nutrients.kcal);
+  const waiting = waitsFor(kcalAsks, kcalV, second.askedFor);
+  const askId = `manual-kcal-ask-${entry.id}`;
 
   return (
     <Screen
@@ -494,12 +537,14 @@ function ManualEditor({ entry }: { entry: FoodEntry }) {
           <Button
             testID="detail-save"
             style={{ flex: 1 }}
-            title="Save changes"
+            title={waiting && kcalV !== null ? kcalSaveTitle(kcalV) : 'Save changes'}
             disabled={kcalV === null || kcalV < 0 || !!paired.problem}
-            onPress={() => {
-              updateEntryDirect(entry, { name, nutrients: n, meal, date });
-              goBack(href('/diary', { date }));
-            }}
+            onPress={() =>
+              second.press(kcalAsks, kcalV ?? 0, kcalAsk(true), () => {
+                updateEntryDirect(entry, { name, nutrients: n, meal, date });
+                goBack(href('/diary', { date }));
+              })
+            }
           />
         </View>
       }>
@@ -516,7 +561,25 @@ function ManualEditor({ entry }: { entry: FoodEntry }) {
       {/* The fields are the numbers: no summary above them repeating the same values. */}
       <Card style={{ gap: spacing.md }}>
         <TextField testID="manual-name" label="Name" value={name} onChangeText={setName} maxLength={80} />
-        <NumberField testID="manual-kcal" label="Calories" suffix="kcal" value={kcalV} onChange={setKcal} decimals={0} hint={entry.grams > 0 ? `About ${Math.round(entry.grams)} g` : undefined} />
+        <NumberField
+          testID="manual-kcal"
+          label="Calories"
+          suffix="kcal"
+          value={kcalV}
+          onChange={setKcal}
+          decimals={0}
+          hint={entry.grams > 0 ? `About ${Math.round(entry.grams)} g` : undefined}
+          {...(waiting ? (Platform.OS === 'web' ? ({ 'aria-describedby': askId } as object) : { accessibilityHint: kcalAsk(true) }) : null)}
+        />
+        {waiting ? (
+          // Held up and waiting on the person: the amber key, with neutral words.
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+            <CupKey color={colors.warning} style={{ marginTop: 4 }} />
+            <Text testID="manual-kcal-ask" nativeID={askId} variant="caption" color="text" style={{ flex: 1 }}>
+              {kcalAsk(true)}
+            </Text>
+          </View>
+        ) : null}
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
           <NumberField testID="manual-protein" label="Protein" suffix="g" value={protein} onChange={setProtein} style={{ flex: 1 }} />
           <NumberField testID="manual-carbs" label="Carbs" suffix="g" value={carbs} onChange={setCarbs} style={{ flex: 1 }} />
@@ -540,6 +603,7 @@ function ManualEditor({ entry }: { entry: FoodEntry }) {
       {entry.nutrients.fiber !== undefined || entry.nutrients.sodium !== undefined ? (
         <NutritionFacts portion={{ ...entry.nutrients, ...n }} showPer100={false} asStats={false} />
       ) : null}
+      {second.region}
     </Screen>
   );
 }

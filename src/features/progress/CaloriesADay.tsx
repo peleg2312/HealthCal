@@ -5,8 +5,9 @@ import { formatShortDate } from '@/lib/dates';
 import type { InsightDay, PeriodSummary } from '@/lib/insights';
 import { formatNumber } from '@/lib/units';
 import { useTheme, withOpacity } from '@/theme';
-import { BarChart, Card, PressableScale, Text } from '@/ui';
+import { Card, PressableScale, Text } from '@/ui';
 
+import { BudgetBars, BudgetKeys } from './BudgetBars';
 import { buildBars, daysVerdict } from './calorieBars';
 import { barsLabel } from './chartWords';
 import { LegendDot } from './parts';
@@ -14,9 +15,9 @@ import { LegendDot } from './parts';
 /**
  * The overview's chart (the designer's "Calories a day"), under the period overview: a row of slim
  * cups in the calorie colour, one per day (one per week past six weeks), each
- * capped by its level line. A bar is amber only above its own budget; the
- * dashed line is the average budget, a reference. Today is hatched and a
- * partly logged day is lighter. One verdict line says what the bars show.
+ * capped by its level line and set against its own budget's mark (`BudgetBars`):
+ * a bar is amber only above that mark, which it then passes through. Today is
+ * hatched and a partly logged day is lighter. One verdict line says what the bars show.
  */
 export function CaloriesADay({ days, summary, today, onOpen }: { days: InsightDay[]; summary: PeriodSummary; today: string; onOpen: () => void }) {
   const { colors, spacing } = useTheme();
@@ -25,7 +26,7 @@ export function CaloriesADay({ days, summary, today, onOpen }: { days: InsightDa
   const first = days.findIndex((d) => d.entries.length > 0);
   const shown = first > 0 ? days.slice(first) : days;
   const partial = withOpacity(colors.calories, 0.45);
-  const { data, weekly, openIndex } = buildBars(shown, today, { full: colors.caloriesBar, partial: partial, over: colors.warning });
+  const { data, weekly, openIndex, budgets } = buildBars(shown, today, { full: colors.caloriesBar, partial: partial, over: colors.warning });
   // The chart's own labels sit under every slot; the overview reads better with three: start, middle, end.
   const bars = data.map((d) => ({ ...d, label: '' }));
   const mid = shown[Math.floor((shown.length - 1) / 2)]?.date;
@@ -63,7 +64,7 @@ export function CaloriesADay({ days, summary, today, onOpen }: { days: InsightDa
           ) : null}
         </View>
         <View>
-          <BarChart data={bars} color={colors.calories} goal={c.avgBudget} openIndex={openIndex} height={150} testID="progress-overview-chart" />
+          <BudgetBars data={bars} budgets={budgets} openIndex={openIndex} height={150} testID="progress-overview-chart" />
           {shown.length > 1 ? (
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: -16 }}>
               <Text variant="caption" color="textSecondary">
@@ -81,8 +82,7 @@ export function CaloriesADay({ days, summary, today, onOpen }: { days: InsightDa
           ) : null}
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.lg, rowGap: spacing.xs }}>
-          <LegendDot color={colors.dashEdge} label="Average budget" dashed />
-          <LegendDot color={colors.warning} label={weekly ? "Above that week's budget" : "Above that day's budget"} />
+          <BudgetKeys weekly={weekly} />
           {data.some((b) => b.color) ? <LegendDot color={partial} label="Partly logged" /> : null}
         </View>
       </PressableScale>

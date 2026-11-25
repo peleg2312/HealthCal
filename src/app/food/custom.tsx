@@ -14,7 +14,7 @@ import { atwaterKcal, GRAM_SERVING } from '@/lib/nutrition';
 import { useStore } from '@/store';
 import { cupFor, useTheme } from '@/theme';
 import type { CustomFood, Nutrients } from '@/types';
-import { Button, Card, EmptyState, Header, IconButton, NumberField, PressableScale, Screen, Segmented, Text, TextField, ToggleRow, goBack, haptic, toast } from '@/ui';
+import { Button, Card, EmptyState, Header, IconButton, NumberField, PressableScale, Screen, Segmented, Text, TextField, ToggleRow, goBack, haptic, toast, useLeaveGuard } from '@/ui';
 
 type Basis = 'serving' | 'per100';
 type Values = Record<keyof Nutrients, number | null>;
@@ -65,6 +65,11 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
   // keeps no flag until it is edited and saved here.
   const [drinkChoice, setDrinkChoice] = useState<boolean | null>(existing?.beverage ?? null);
   const isDrink = drinkChoice ?? drinkByDefault(servingLabel, name);
+  // Anything typed or chosen since the form opened is asked about before the back chevron, a swipe back or the
+  // browser's back drops it (rubric D5-01, `useLeaveGuard`); the form's own Save and Delete never ask.
+  const form = JSON.stringify({ basis, name, brand, code, emoji, servingLabel, servingGrams, values, drinkChoice });
+  const [opened] = useState(form);
+  const leave = useLeaveGuard(form !== opened ? (existing ? 'Discard changes to this food?' : 'Discard this food?') : null);
 
   const set = (k: keyof Nutrients) => (v: number | null) => setValues((s) => ({ ...s, [k]: v }));
   const factor = basis === 'serving' ? servingGrams ?? 0 : 100;
@@ -125,6 +130,7 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
       beverage: isDrink,
     });
     haptic.success();
+    leave.allowLeave();
     if (existing) {
       toast('Food updated');
       // Keep a detail screen underneath in step with the new definition.
@@ -157,6 +163,7 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
               style={{ borderWidth: 1.5, borderColor: colors.danger }}
               onPress={() => {
                 deleteCustomFood(existing);
+                leave.allowLeave();
                 goBack('/food/search');
               }}>
               <Trash2 size={20} color={colors.danger} />
@@ -256,6 +263,7 @@ function CustomFoodForm({ existing, barcode, name: initialName, meal, date }: { 
           </Text>
         ) : null}
       </Card>
+      {leave.guard}
     </Screen>
   );
 }

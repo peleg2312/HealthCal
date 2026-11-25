@@ -32,7 +32,7 @@ import { favoriteRecordId, useStore } from '@/store';
 import { useDay, useLive } from '@/store/selectors';
 import { cup, motion, useLargeText, useTheme } from '@/theme';
 import type { Food, FoodEntry, MealType, SavedMeal } from '@/types';
-import { AnimatedNumber, Button, Chip, ChipRow, CupKey, decorative, Divider, EmptyState, Header, IconButton, PressableScale, Screen, Sheet, Text, TextField } from '@/ui';
+import { AnimatedNumber, Button, Chip, ChipRow, CupKey, decorative, Divider, EmptyState, Header, IconButton, PressableScale, Screen, Sheet, Text, TextField, useGrownText } from '@/ui';
 import { spokenUnits } from '@/lib/spokenUnits';
 
 type Tab = SearchTab;
@@ -43,6 +43,7 @@ export default function FoodSearchScreen() {
   // A 320 px phone cannot fit the long hint; it keeps the words that matter.
   const narrow = useWindowDimensions().width < 360;
   const big = useLargeText();
+  const grown = useGrownText();
   const params = useLocalSearchParams<{ meal?: string; date?: string }>();
   const todayDate = useToday();
   const date = parseDate(params.date, todayDate);
@@ -247,7 +248,9 @@ export default function FoodSearchScreen() {
       <TextField
         ref={inputRef}
         testID="food-search-input"
-        placeholder={big ? 'Search foods' : narrow ? 'Search foods and brands' : 'Search foods, brands, your foods'}
+        // A one-line placeholder fits its field whole: the short one with large text, and as soon as text grows at all,
+        // a reader's own text spacing included (`useGrownText`, WCAG 1.4.12), where the longer ones are cut mid-word.
+        placeholder={big || grown ? 'Search foods' : narrow ? 'Search foods and brands' : 'Search foods, brands, your foods'}
         value={query}
         onChangeText={setQuery}
         autoFocus
@@ -510,7 +513,8 @@ export default function FoodSearchScreen() {
               {onlineItems.length > 0 ? (
                 <List>{onlineItems.map((f, i) => row(f, `online-${i}`))}</List>
               ) : online.status === 'done' ? (
-                <Text variant="body" color="textTertiary" testID="search-online-empty" style={{ paddingVertical: spacing.sm }}>
+                // Reading text: textSecondary, 7:1 on every page (WCAG 1.4.6); textTertiary is for captions.
+                <Text variant="body" color="textSecondary" testID="search-online-empty" style={{ paddingVertical: spacing.sm }}>
                   {onlineResult.unavailable
                     ? 'Search them by name in the phone app.'
                     : onlineResult.failed
@@ -518,7 +522,7 @@ export default function FoodSearchScreen() {
                       : 'No online products match that search.'}
                 </Text>
               ) : (
-                <Text variant="body" color="textTertiary" style={{ paddingVertical: spacing.sm }}>
+                <Text variant="body" color="textSecondary" style={{ paddingVertical: spacing.sm }}>
                   Searching Open Food Facts…
                 </Text>
               )}

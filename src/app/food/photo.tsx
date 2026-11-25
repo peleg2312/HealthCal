@@ -43,7 +43,7 @@ import { AiGlyph, AiMark } from '@/features/ai/mark';
 import { PhotoHero } from '@/features/ai/PhotoHero';
 import { SampleNotice } from '@/features/ai/SampleNotice';
 import { photoText, readWeight } from '@/features/ai/weight';
-import { DESCRIPTION_MAX, estimateReadyLine, macroStatSpoken, prefilledDescription } from '@/features/ai/words';
+import { DESCRIPTION_MAX, estimateReadyLine, macroStatSpoken, photoLeaveQuestion, prefilledDescription } from '@/features/ai/words';
 import { SaveMealRow } from '@/features/ai/SaveMealRow';
 import { MealPicker } from '@/features/food/components';
 import { checkoutShown, PLAN_ROUTE, planVisible, refreshPlanAfterLimit, usePlan } from '@/features/plan';
@@ -61,7 +61,7 @@ import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
 import { cup, useLargeText, useTheme } from '@/theme';
 import type { AiFoodResult, Food, MealType } from '@/types';
-import { AnimatedNumber, Button, Card, Chip, CupKey, decorative, Divider, FadeUp, goBack, haptic, Header, MacroBar, PressableScale, Screen, Segmented, Text, TextField, toast } from '@/ui';
+import { AnimatedNumber, Button, Card, Chip, CupKey, decorative, Divider, FadeUp, goBack, haptic, Header, MacroBar, PressableScale, Screen, Segmented, Text, TextField, toast, useLeaveGuard } from '@/ui';
 
 type InputMode = 'photo' | 'text';
 type Step = 'capture' | 'analysing' | 'review' | 'error';
@@ -384,7 +384,7 @@ export default function PhotoScreen() {
     // Estimates and matched foods show up in Recent, ready to log again.
     const store = useStore.getState();
     for (const it of items) if (it.food) store.rememberFood(it.food);
-    goBack(`/diary?date=${date}`);
+    leaveTo(() => goBack(`/diary?date=${date}`));
   }
 
   function removeRow(r: ReviewRow) {
@@ -450,6 +450,24 @@ export default function PhotoScreen() {
   // On the free plan the careful check says what it uses (ruling R18).
   const carefulLine = plan.known && plan.plansOn && plan.plan === 'free' ? carefulUses(CAREFUL_COST, plan.limits.estimates) : null;
   const allowance = remaining !== null ? estimatesLeft(remaining) : null;
+  // What the X, back or a swipe back would drop is asked about first (rubric D5-01): a live estimate, a photo,
+  // words typed (not those search handed over, which are still in search). Nothing held, nothing asked.
+  const leave = useLeaveGuard(
+    photoLeaveQuestion({
+      mode,
+      estimate: !!result && !isDemo && rows.length > 0,
+      description,
+      prefilled: prefilledDescription(params.words),
+      photo: !!photo,
+      note,
+      weight: weightText,
+    }),
+  );
+  /** The screen's own ways out (Add, search instead, quick add instead) never ask. */
+  const leaveTo = (go: () => void) => {
+    leave.allowLeave();
+    go();
+  };
 
   // The footer's button is one element through the steps (Estimate, then Cancel, then Add), always in the
   // same place in the tree: a keyboard or screen-reader user's focus stays on it when the estimate arrives,
@@ -899,6 +917,7 @@ export default function PhotoScreen() {
           toast('Agreement withdrawn. HealthCal asks again before the next estimate.');
         }}
       />
+      {leave.guard}
     </Screen>
   );
 
@@ -917,8 +936,8 @@ export default function PhotoScreen() {
         out.push({ id: 'sign-in', label: 'Sign in', onPress: () => router.push('/auth?mode=signin' as never) });
         break;
       case 'daily_limit':
-        out.push({ id: 'search', label: 'Search food instead', onPress: () => router.replace(searchHref as never) });
-        out.push({ id: 'quick', label: 'Enter calories yourself', onPress: () => router.replace(`/food/quick?meal=${meal}&date=${date}` as never) });
+        out.push({ id: 'search', label: 'Search food instead', onPress: () => leaveTo(() => router.replace(searchHref as never)) });
+        out.push({ id: 'quick', label: 'Enter calories yourself', onPress: () => leaveTo(() => router.replace(`/food/quick?meal=${meal}&date=${date}` as never)) });
         return out;
       case 'camera_denied':
         out.push({ id: 'library', label: 'Choose from library', onPress: () => void choose('library') });
@@ -947,7 +966,7 @@ export default function PhotoScreen() {
     } else if (error.code !== 'unauthorized') {
       out.push({ id: 'edit', label: 'Edit the description', onPress: back });
     }
-    out.push({ id: 'search', label: 'Search food manually', onPress: () => router.replace(searchHref as never) });
+    out.push({ id: 'search', label: 'Search food manually', onPress: () => leaveTo(() => router.replace(searchHref as never)) });
     return out;
   }
 }

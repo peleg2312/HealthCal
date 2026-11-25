@@ -289,9 +289,10 @@ export function useReachFlash(reached: boolean, { delay = 0, instant = false, me
     flash.set(
       withDelay(
         delay,
+        // Within the 600 ms of routine motion (`motion.reachFlash`).
         withSequence(
-          withTiming(1, { duration: D.fade, easing: ease.enter }),
-          withDelay(D.settle, withTiming(0, { duration: D.pourSmall, easing: ease.exit })),
+          withTiming(1, { duration: motion.reachFlash.rise, easing: ease.enter }),
+          withDelay(motion.reachFlash.hold, withTiming(0, { duration: motion.reachFlash.fall, easing: ease.exit })),
         ),
       ),
     );

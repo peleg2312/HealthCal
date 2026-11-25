@@ -1,8 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import type { InsightDay } from '@/lib/insights';
 
-import { buildBars, daysVerdict, solidBar } from './calorieBars';
+import { BAR_GEOMETRY, budgetScaleTop, budgetTicks, buildBars, daysVerdict, solidBar } from './calorieBars';
 
 const FILLS = { full: 'FULL', partial: 'PARTIAL', over: 'AMBER' };
 
@@ -75,5 +78,49 @@ describe('calorie bars', () => {
     expect(daysVerdict([day('2026-11-10', 1850, 2000), day('2026-11-11', 2000, 2000)], '2026-11-14').line).toBe('All 2 days on budget');
     expect(daysVerdict([day('2026-11-11', 2000, 2000)], '2026-11-14')).toEqual({ line: 'The one full day on budget', note: 'On budget: a full day at 90 to 100% of its budget' });
     expect(daysVerdict([], '2026-11-14')).toEqual({ line: 'No fully logged days yet', note: null });
+  });
+
+  it('give each bar its own budget to mark, the week its average day\'s', () => {
+    expect(buildBars(days, '2026-11-14', FILLS).budgets).toEqual([2568, 1920, 2000, 2100]);
+    expect(buildBars([day('2026-11-10', 0, 0)], '2026-11-14', FILLS).budgets).toEqual([null]);
+  });
+
+  it('stand each budget mark on its own bar, on the kit\'s scale', () => {
+    const budgets = [2568, 1920, null, 2100];
+    const values = [2209, 2085, 300, 900];
+    const top = budgetScaleTop(values, budgets);
+    expect(top).toBe(2568);
+    // 4 bars over 320 px: slots of 80, bars 20 wide (the kit's most), 30 px either side; a mark reaches 4 px past each wall.
+    const ticks = budgetTicks(budgets, 320, 150, top);
+    expect(ticks.map((t) => t.index)).toEqual([0, 1, 3]);
+    expect(ticks[0]).toMatchObject({ x: 26, w: 28 });
+    expect(ticks[1].x).toBe(80 + 26);
+    // y on the kit's scale: 18 px of room on top, 112 px of chart, the top of the scale 8% over the tallest.
+    const y = (v: number) => 18 + 112 - (v / (2568 * 1.08)) * 112;
+    expect(ticks[0].y).toBeCloseTo(y(2568), 6);
+    expect(ticks[1].y).toBeCloseTo(y(1920), 6);
+    // Nov 11 (2,085 of its 1,920) passes through its mark: its top is above it on screen.
+    expect(y(2085)).toBeLessThan(ticks[1].y);
+  });
+
+  it('keep 30 marks apart, so a month of them reads as a dashed line', () => {
+    const ticks = budgetTicks(Array(30).fill(2000), 320, 150, 2000);
+    for (let i = 1; i < ticks.length; i++) expect(ticks[i].x - (ticks[i - 1].x + ticks[i - 1].w)).toBeCloseTo(2, 6);
+    // Each still reaches past its bar's walls.
+    const slot = 320 / 30;
+    const barW = Math.max(3, Math.min(20, slot * 0.5));
+    for (const t of ticks) expect(t.w).toBeGreaterThan(barW);
+  });
+
+  it('mirror the kit BarChart\'s geometry (src/ui/Charts.tsx), so a mark never drifts off its bar', () => {
+    const kit = readFileSync(join(__dirname, '../../ui/Charts.tsx'), 'utf8');
+    const { labelH, topPad, head, minBarW, maxBarW, barShare } = BAR_GEOMETRY;
+    expect(kit).toContain(`const labelH = ${labelH};`);
+    expect(kit).toContain(`const topPad = ${topPad};`);
+    expect(kit).toContain(`maxValue * ${head}`);
+    expect(kit).toContain(`const barW = Math.max(${minBarW}, Math.min(${maxBarW}, slot * ${barShare}));`);
+    expect(kit).toContain('const x = i * slot + (slot - barW) / 2;');
+    expect(kit).toContain('const y = (v: number) => topPad + chartH - (Math.min(v, max) / max) * chartH;');
+    expect(kit).toContain('const slot = data.length ? width / data.length : 0;');
   });
 });

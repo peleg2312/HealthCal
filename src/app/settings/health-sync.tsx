@@ -195,10 +195,10 @@ export default function HealthSyncScreen() {
         </Card>
         {/* What works here, with the one action under it. */}
         <View style={{ gap: spacing.sm }}>
-          <Text variant="body" color="textSecondary" style={{ paddingHorizontal: spacing.xs }}>
+          <Text variant="body" color="textSecondary">
             {reach.here}
           </Text>
-          <Text variant="body" color="textSecondary" style={{ paddingHorizontal: spacing.xs }} testID="health-sync-export-note">
+          <Text variant="body" color="textSecondary" testID="health-sync-export-note">
             The Health app’s export brings workouts and daily steps from an iPhone. It is a snapshot: import a new one whenever you like.
           </Text>
           {/* One way in: Garmin files and the Health export open the same screen. */}
@@ -231,7 +231,7 @@ export default function HealthSyncScreen() {
           writes nothing back.
         </Text>
       </Card>
-      <SpreadHint testID="health-sync-spread-hint" style={{ marginVertical: -spacing.sm, paddingHorizontal: spacing.xs }} />
+      <SpreadHint testID="health-sync-spread-hint" style={{ marginVertical: -spacing.sm }} />
 
       <Card padding={0} style={{ paddingHorizontal: spacing.lg }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 64, paddingVertical: spacing.md }}>
@@ -273,7 +273,7 @@ export default function HealthSyncScreen() {
             <Text variant="body" color="textSecondary">
               {errorText(lastError, store)}
             </Text>
-            <Text variant="caption" color="textSecondary">
+            <Text variant="body" color="textSecondary">
               Tried {timeAgo(lastError.at, now) ?? 'just now'}. Nothing in your diary was changed.
             </Text>
           </View>
@@ -298,7 +298,7 @@ export default function HealthSyncScreen() {
       {state.review.length ? (
         <View style={{ gap: spacing.sm }} testID="health-sync-review">
           <SectionTitle title={`Needs a look (${state.review.length})`} />
-          <Text variant="caption" color="textSecondary" style={{ paddingHorizontal: spacing.xs, marginTop: -spacing.xs }}>
+          <Text variant="body" color="textSecondary" style={{ marginTop: -spacing.xs }}>
             These were not added by themselves. Each waits here until you choose.
           </Text>
           {state.review.map((item) => (
@@ -341,7 +341,7 @@ export default function HealthSyncScreen() {
                 onPress={() => void syncNow()}
               />
             </View>
-            <Text variant="caption" color="textSecondary">
+            <Text variant="body" color="textSecondary">
               Runs by itself when you open HealthCal or the Train tab, at most every 15 minutes, and looks at the last 30 days of workouts.
               {state.lastResult ? ` Last change ${timeAgo(state.lastResult.at, now) ?? 'just now'}: ${changeText(state.lastResult)}.` : ''}
             </Text>
@@ -431,7 +431,7 @@ export default function HealthSyncScreen() {
             ) : (
               <View style={{ paddingVertical: spacing.md, gap: 4 }} testID="health-sync-none-found">
                 <Text variant="bodyStrong">{state.lastSyncedAt ? 'No workouts in the last 30 days' : 'Nothing read yet'}</Text>
-                <Text variant="caption" color="textSecondary">
+                <Text variant="body" color="textSecondary">
                   {apple
                     ? 'Apple Watch workouts arrive by themselves. Other apps share with Apple Health only after you switch that on in each app; in Garmin Connect, look for Apple Health in its settings. If you turned a type off when Apple asked, allow it in the Health app under Sharing, Apps, HealthCal.'
                     : `Apps share workouts with ${store} only after you switch that on in each app. In Garmin Connect, look for ${store} in its settings; workouts recorded after that appear here.`}
@@ -445,7 +445,7 @@ export default function HealthSyncScreen() {
       <Group title="Stopping">
         <View style={{ paddingVertical: spacing.md, gap: 4 }}>
           <Text variant="bodyStrong">Stop at any time with the switch</Text>
-          <Text variant="caption" color="textSecondary">
+          <Text variant="body" color="textSecondary">
             Once it is off, nothing more is read and the steps and daily calories kept on this phone are cleared. Workouts, nights and weigh-ins already added stay, in Train, the
             sleep log and Weight, where you can delete any of them; one you delete is not brought back by a later sync. To take the permission away as well,{' '}
             {apple ? 'open the Health app and turn HealthCal off under Sharing, Apps.' : `open ${store} and remove HealthCal under app permissions.`}
@@ -456,23 +456,23 @@ export default function HealthSyncScreen() {
 
       <Group title="What happens to this data">
         <View style={{ paddingVertical: spacing.md, gap: spacing.sm }} testID="health-sync-privacy">
-          <Text variant="caption" color="textSecondary">
+          <Text variant="body" color="textSecondary">
             HealthCal reads workouts and, for each, its {apple ? 'active calories' : 'active and total calories'}, distance and heart rate, your daily steps, how long you slept
             each night, your weigh-ins with body fat, and the calories you burn in a day. Nothing is written back to {store}.
           </Text>
-          <Text variant="caption" color="textSecondary">
+          <Text variant="body" color="textSecondary">
             A synced workout is kept like a session you log yourself: on this phone, and in your account if you have one, so your other devices show it. It is never sent to the
             AI food estimate, and to the AI coach only inside the summary you choose to share in the coach.{apple ? ' On iPhone, nothing from Apple Health is put into that summary.' : ''} Friends, if you share with any, see what they see for every workout: its name, length, distance and date, and your weekly minutes, sessions and
             streak. Never its calories.
           </Text>
-          <Text variant="caption" color="textSecondary">
+          <Text variant="body" color="textSecondary">
             Steps stay on this phone only, for the last 35 days: they are not added to your account, never sent to the AI food estimate or the AI coach, and never shown to friends.
           </Text>
-          <Text variant="caption" color="textSecondary">
+          <Text variant="body" color="textSecondary">
             A night of sleep is kept in your sleep log like one you enter yourself, with the app it came from and its stages: on this phone, and in your account if you have
             one. It is never added to your calories, never sent to the AI food estimate, and to the AI coach only inside the summary you choose to share in the coach; it is never shown to friends.
           </Text>
-          <Text variant="caption" color="textSecondary" testID="health-sync-privacy-more">
+          <Text variant="body" color="textSecondary" testID="health-sync-privacy-more">
             Weigh-ins are kept like weigh-ins you enter, in your account when you have one. Calories burned in a day stay on this phone. Heart rate is kept on the workout.
             Weigh-ins reach the AI coach only as a trend (a direction and a rate a week) inside the summary you choose to share in the coach; calories burned in a day and heart rate never go to the AI functions. None of it goes to friends.
           </Text>

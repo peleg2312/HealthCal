@@ -1,7 +1,9 @@
 /**
  * No shame (product principle 4): no string the morning page's own functions can return holds a
- * word from the banned list or an exclamation mark, across a generated grid of inputs. Quotes are
- * exempt (quotes.test.ts checks them by their own rules).
+ * word from the banned list or an exclamation mark, across a generated grid of inputs. The quote of
+ * the day is on the same page, so every bundled quote is held to the page's own list (AGENTS.md:
+ * "bad", "failed", "missed your", "should", "cheat", "great", in every form); quotes.test.ts checks
+ * the rest of their rules.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -12,10 +14,18 @@ import type { DayFacts } from './facts';
 import { morningLine, moveLine } from './line';
 import { personalLine } from './personal';
 import { targetsLine, todayPlan } from './plan';
+import { QUOTES } from './quotes';
 import { ADJUST_TITLE, NOTHING_CAPTION, NOTHING_LINE, PLAN_TITLE, WELL_TITLE, reviewNote, toAdjust, wentWell, type ReviewKind } from './review';
 
 const BANNED =
   /\b(bad|fail|failed|failure|cheat|cheated|should|guilty|lazy|great|amazing|well done|keep it up|too much|missed your|goal missed|over budget|make up|only|unfortunately|oops|sorry)\b/i;
+
+/**
+ * The page's own list (AGENTS.md, the morning page), every form of each word: what a quote may never
+ * say on this page. ("Only" and "well done", banned above in the page's own sentences as words that
+ * belittle or praise without a figure, are not on it: in a quote they do neither.)
+ */
+const PAGE_BANNED = /\b(bad|badly|worse|worst|fail|fails|failed|failing|failure|failures|missed your|should|cheat|cheats|cheated|cheating|great|greater|greatest|greatly|greatness)\b/i;
 
 function check(strings: Set<string>) {
   // Also "1 active minutes": one is singular.
@@ -67,6 +77,11 @@ function factsGrid(): DayFacts[] {
 }
 
 describe('no-shame words', () => {
+  it('the quote of the day: no quote holds a word from the page\'s banned list', () => {
+    const held = QUOTES.filter((q) => PAGE_BANNED.test(q.text.replace(/\n/g, ' '))).map((q) => `${q.id}: ${q.text}`);
+    expect(held).toEqual([]);
+  });
+
   it('review: went well, to improve, the note and the titles', () => {
     const seen = new Set<string>([NOTHING_LINE, NOTHING_CAPTION, WELL_TITLE, ADJUST_TITLE, PLAN_TITLE]);
     for (const y of factsGrid())

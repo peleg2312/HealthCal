@@ -8,7 +8,7 @@ import { FriendsEntry } from '@/features/friends/FriendsEntry';
 import { formatShortDate, fromISODate } from '@/lib/dates';
 import { useProfile } from '@/store/selectors';
 import { cupFor, MAX_CONTENT_WIDTH, spacing as SPACING, useLargeText, useTheme } from '@/theme';
-import { ANDROID_TOUCH, PressableScale, Text } from '@/ui';
+import { ANDROID_TOUCH, PressableScale, Text, useGrownText } from '@/ui';
 
 export type TabName = 'today' | 'diary' | 'train' | 'progress';
 
@@ -121,6 +121,9 @@ export function TabHeader({
   useEffect(preloadCoach, []);
   const width = useWindowDimensions().width;
   const large = useLargeText();
+  // Text grown at all (the app's or the phone's size, or a reader's own text spacing, WCAG 1.4.12): the overline wraps
+  // at its words rather than lose its end to an ellipsis ("WEDNESDAY, NOV …"). At the designed size it is one line.
+  const grown = useGrownText();
   const size = titleSize ?? tabTitleSize(width);
   const initial = ((profile.name ?? '').trim() || 'Me').slice(0, 1).toUpperCase();
   const overlineText = overlineShort && width < 360 ? overlineShort : overline;
@@ -170,8 +173,8 @@ export function TabHeader({
   return (
     <View testID="tab-header" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 68, paddingVertical: spacing.sm }}>
       <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
-        <Text variant="overline" numberOfLines={1}>
-          {overlineText}
+        <Text variant="overline" numberOfLines={grown ? undefined : 1}>
+          {grown ? keepLastTwo(overlineText) : overlineText}
         </Text>
         {heading}
       </View>

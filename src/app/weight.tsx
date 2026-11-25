@@ -11,7 +11,7 @@ import { weightChartLabel } from '@/features/progress/chartWords';
 import { trendMonthParts, weeklyRateText } from '@/features/progress/goalDate';
 import { formatWeight, weightToKg, weightUnit, weightValue } from '@/lib/units';
 import { applyWeighInToTargets, deleteWeightRecord, saveWeightRecord } from '@/features/trackers/actions';
-import { DayStepper, Explain, ExplainText, Figure, HistoryRow, RequireProfile } from '@/features/trackers/components';
+import { DayStepper, Explain, ExplainText, Figure, HistoryItem, HistoryList, HistoryRow, RequireProfile } from '@/features/trackers/components';
 import { bodyFatText, findByDate, keepOrConvert, targetsBehind, weightChartData, weightStats, weightText, type WeightRange } from '@/features/trackers/helpers';
 import { isSyncedWeighIn, weighInFromLine } from '@/features/trackers/weighInSource';
 import { useToday } from '@/store/clock';
@@ -148,7 +148,7 @@ function WeightScreen() {
                 <Legend swatch={<View style={{ width: 16, borderTopWidth: 2, borderStyle: 'dashed', borderColor: colors.dashEdge }} />} label="Goal" />
               ) : null}
             </View>
-            <Explain label="Why the trend differs from the scale" testID="weight-trend-help" style={{ marginTop: -spacing.xs, marginBottom: -spacing.sm }}>
+            <Explain label="Why the trend differs from the scale" labelShort="Why the trend differs" testID="weight-trend-help" style={{ marginTop: -spacing.xs, marginBottom: -spacing.sm }}>
               <ExplainText>
                 A day’s weight can swing by {units === 'imperial' ? 'two pounds' : 'a kilo'} or more with water, salt, carbs and digestion. The trend averages recent weigh-ins (most
                 weight on the last few weeks), so a single high or low reading barely moves it. Watch the trend, not the daily number.
@@ -207,13 +207,15 @@ function WeightScreen() {
 
           <SectionTitle title="History" />
           <Card padding={spacing.md}>
+            {/* A list on the web (a ul of li), each weigh-in one item with its divider. */}
+            <HistoryList testID="weight-history-list">
             {shown.map((e, i) => {
               const prev = history[history.indexOf(e) + 1];
               // From the rounded weights on screen, so the difference matches what the two rows show.
               const shown = (kg: number) => Math.round(weightValue(kg, units) * 10) / 10;
               const delta = prev ? shown(e.kg) - shown(prev.kg) : null;
               return (
-                <React.Fragment key={e.id}>
+                <HistoryItem key={e.id}>
                   {i > 0 ? <Divider /> : null}
                   <HistoryRow
                     testID={`weight-row-${i}`}
@@ -232,9 +234,10 @@ function WeightScreen() {
                     value={fixedWeight(e.kg, units)}
                     onPress={() => setSheetDate(e.date)}
                   />
-                </React.Fragment>
+                </HistoryItem>
               );
             })}
+            </HistoryList>
           </Card>
           {/* More than 14 weigh-ins: the rest open under the list, where it ends (the testID is the one SectionTitle gave it). */}
           {history.length > 14 ? (

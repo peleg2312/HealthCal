@@ -27,7 +27,7 @@ import { useNow, useToday } from '@/store/clock';
 import { computeDayFromStore, live, useLive, useProfile } from '@/store/selectors';
 import { cup, useLargeText, useTheme } from '@/theme';
 import type { Food, FoodEntry, ISODate, SavedMeal } from '@/types';
-import { Button, CupKey, PressableScale, Sheet, Text } from '@/ui';
+import { Button, CupKey, PressableScale, Sheet, Text, toastToScreen } from '@/ui';
 import { spokenUnits } from '@/lib/spokenUnits';
 
 /** Re-log a usual food in its last portion. Entries with a food definition go through logFood so recents stay fresh. */
@@ -49,7 +49,8 @@ function oneTapThenClose(log: () => void, close: () => void) {
   const now = Date.now();
   if (tooSoon(lastOneTap, now)) return;
   lastOneTap = now;
-  log();
+  // The sheet closes in a moment: its toast is shown once, by the screen below, after the sheet has gone.
+  toastToScreen(log);
   clearTimeout(closeTimer);
   closeTimer = setTimeout(close, ONE_TAP_GUARD_MS);
 }

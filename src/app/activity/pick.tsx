@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Dumbbell, Search, Timer } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
-import { FlatList, useWindowDimensions, View } from 'react-native';
+import { FlatList, Platform, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ACTIVITIES, ACTIVITY_BY_ID, ACTIVITY_CATEGORIES, POPULAR_ACTIVITY_IDS, searchActivities } from '@/data/activities';
@@ -50,14 +50,18 @@ export default function PickActivityScreen() {
     .filter(Boolean)
     .slice(0, 8);
   const showShortcuts = !searching && category === 'all';
+  const web = Platform.OS === 'web';
 
   // Train's Quick start rule (QuickStartTiles): each tile is as wide as its emoji and its whole name and
-  // the tiles wrap, so a name never breaks inside a word ("Volleyba/ll") at any width.
+  // the tiles wrap, so a name never breaks inside a word ("Volleyba/ll") at any width. On the web the tiles are a list
+  // (role="list", each tile in a listitem), as the rows under them are.
   const grid = (items: ActivityDef[], prefix: string) => (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }} testID={`${prefix}-tiles`}>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }} testID={`${prefix}-tiles`} {...(web ? { role: 'list' as const } : null)}>
       {items.map((a) => (
+        // Each line of tiles is filled edge to edge, so the block reads as a set, not a ragged cloud with a short line
+        // (or one tile) left at the end: the item grows, and the tile fills it.
+        <View key={a.id} style={{ flexGrow: 1, maxWidth: '100%' }} {...(web ? { role: 'listitem' as const } : null)}>
         <PressableScale
-          key={a.id}
           testID={`${prefix}-${a.id}`}
           accessibilityLabel={a.name}
           onPress={() => choose(a)}
@@ -67,10 +71,6 @@ export default function PickActivityScreen() {
             alignItems: 'center',
             gap: spacing.sm,
             minHeight: 48,
-            maxWidth: '100%',
-            // Each line of tiles is filled edge to edge, so the block reads as a set, not a ragged cloud with a
-            // short line (or one tile) left at the end.
-            flexGrow: 1,
             paddingVertical: 8,
             paddingLeft: 12,
             paddingRight: 14,
@@ -84,9 +84,43 @@ export default function PickActivityScreen() {
             {a.name}
           </Text>
         </PressableScale>
+        </View>
       ))}
     </View>
   );
+
+  const shortcuts = showShortcuts ? (
+    <View style={{ gap: spacing.lg, paddingBottom: spacing.sm }}>
+      {recents.length > 0 ? (
+        <View style={{ gap: spacing.lg }}>
+          <SectionTitle title="Recent" />
+          {grid(recents, 'recent')}
+        </View>
+      ) : null}
+      <SectionTitle title={recents.length ? 'Popular' : 'Popular activities'} />
+      {grid(popular, 'popular')}
+      <SectionTitle title="All activities" />
+    </View>
+  ) : null;
+  const empty = (
+    <EmptyState
+      emoji="🔎"
+      title="No activity matches"
+      message={`Nothing found for "${query.trim()}"${category === 'all' ? '' : ` in ${CATEGORY_LABEL[category].toLowerCase()}`}. Try a broader word like "ball", "swim" or "dance".`}
+      action={category === 'all' ? 'Clear search' : 'Search all categories'}
+      onAction={() => (category === 'all' ? setQuery('') : setCategory('all'))}
+    />
+  );
+  const row = (a: ActivityDef) => (
+    <ListRow
+      testID={`activity-${a.id}`}
+      title={a.name}
+      subtitle={`${CATEGORY_LABEL[a.category]} · ${effortSpan(a.met.light, a.met.vigorous)}${a.tracksDistance ? ' · distance' : ''}`}
+      left={<View style={{ width: 24, alignItems: 'center' }}><Text style={{ fontSize: 17, lineHeight: 24 }}>{a.emoji}</Text></View>}
+      onPress={() => choose(a)}
+    />
+  );
+  const contentStyle = { paddingTop: spacing.sm, paddingBottom: spacing.xxl + insets.bottom };
 
   return (
     <Screen
@@ -112,52 +146,43 @@ export default function PickActivityScreen() {
           </ChipRow>
         </View>
       }>
-      {/* 108 rows: a virtualised list so the fastest-logging path opens without mounting them all. */}
-      <FlatList
-        testID="activity-list"
-        data={list}
-        keyExtractor={(a) => a.id}
-        initialNumToRender={12}
-        maxToRenderPerBatch={16}
-        windowSize={7}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: spacing.xxl + insets.bottom }}
-        ItemSeparatorComponent={ActivitySeparator}
-        ListHeaderComponent={
-          showShortcuts ? (
-            <View style={{ gap: spacing.lg, paddingBottom: spacing.sm }}>
-              {recents.length > 0 ? (
-                <View style={{ gap: spacing.lg }}>
-                  <SectionTitle title="Recent" />
-                  {grid(recents, 'recent')}
+      {web ? (
+        // The web reads the rows as one list (role="list", each row a listitem), so a screen reader says how many there
+        // are and moves through them as a list. A FlatList would put its header (Recent, Popular) inside that list, so
+        // the web draws the rows itself: 108 at most, about what the FlatList's own window draws there once settled.
+        <ScrollView testID="activity-list" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={contentStyle}>
+          {shortcuts}
+          {list.length ? (
+            <View role="list">
+              {list.map((a, i) => (
+                <View key={a.id} role="listitem">
+                  {i > 0 ? <ActivitySeparator /> : null}
+                  {row(a)}
                 </View>
-              ) : null}
-              <SectionTitle title={recents.length ? 'Popular' : 'Popular activities'} />
-              {grid(popular, 'popular')}
-              <SectionTitle title="All activities" />
+              ))}
             </View>
-          ) : undefined
-        }
-        ListEmptyComponent={
-          <EmptyState
-            emoji="🔎"
-            title="No activity matches"
-            message={`Nothing found for "${query.trim()}"${category === 'all' ? '' : ` in ${CATEGORY_LABEL[category].toLowerCase()}`}. Try a broader word like "ball", "swim" or "dance".`}
-            action={category === 'all' ? 'Clear search' : 'Search all categories'}
-            onAction={() => (category === 'all' ? setQuery('') : setCategory('all'))}
-          />
-        }
-        renderItem={({ item: a }) => (
-          <ListRow
-            testID={`activity-${a.id}`}
-            title={a.name}
-            subtitle={`${CATEGORY_LABEL[a.category]} · ${effortSpan(a.met.light, a.met.vigorous)}${a.tracksDistance ? ' · distance' : ''}`}
-            left={<View style={{ width: 24, alignItems: 'center' }}><Text style={{ fontSize: 17, lineHeight: 24 }}>{a.emoji}</Text></View>}
-            onPress={() => choose(a)}
-          />
-        )}
-      />
+          ) : (
+            empty
+          )}
+        </ScrollView>
+      ) : (
+        // 108 rows: a virtualised list so the fastest-logging path opens without mounting them all.
+        <FlatList
+          testID="activity-list"
+          data={list}
+          keyExtractor={(a) => a.id}
+          initialNumToRender={12}
+          maxToRenderPerBatch={16}
+          windowSize={7}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={contentStyle}
+          ItemSeparatorComponent={ActivitySeparator}
+          ListHeaderComponent={shortcuts ?? undefined}
+          ListEmptyComponent={empty}
+          renderItem={({ item: a }) => row(a)}
+        />
+      )}
 
       <Sheet visible={strengthChoice} onClose={() => setStrengthChoice(false)} title="Strength training">
         <Text variant="body" color="textSecondary">

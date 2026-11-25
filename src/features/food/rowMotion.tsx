@@ -106,6 +106,15 @@ export function FadeRow({ children, leaving, back = false, testID }: { children:
   const fold = useSharedValue(opening ? 0 : 1);
   const height = useSharedValue(0);
   const wasLeaving = useRef(false);
+  // A row that came back opens once its height is known (its first layout, a frame or two after it mounts):
+  // started earlier, the first frames would pass while the height is still 0 and the space would open in one step.
+  const opened = useRef(!opening);
+  // The reverse of the fold: the space opens first, from wherever the fold had reached, then the row fades in.
+  const open = () => {
+    opened.current = true;
+    fold.set(withTiming(1, { duration: ROW_FOLD_MS, easing: ease.move }));
+    fade.set(withDelay(ROW_FOLD_MS, withTiming(1, { duration: D.rowExit, easing: ease.enter })));
+  };
   useEffect(() => {
     if (reduce) {
       fade.set(1);
@@ -116,13 +125,17 @@ export function FadeRow({ children, leaving, back = false, testID }: { children:
       wasLeaving.current = true;
       fade.set(withTiming(0, { duration: D.rowExit, easing: ease.exit }));
       fold.set(withDelay(D.rowExit, withTiming(0, { duration: ROW_FOLD_MS, easing: ease.move })));
-    } else if (wasLeaving.current || opening) {
-      // The reverse of the fold: the space opens first, from wherever the fold had reached, then the row fades in.
+    } else if (wasLeaving.current) {
+      // Back before its fold ended: its height is known, so it opens at once.
       wasLeaving.current = false;
-      fold.set(withTiming(1, { duration: ROW_FOLD_MS, easing: ease.move }));
-      fade.set(withDelay(ROW_FOLD_MS, withTiming(1, { duration: D.rowExit, easing: ease.enter })));
+      open();
+    } else if (!opened.current) {
+      // Should no layout ever come (a row that is not drawn), it is opened all the same.
+      const timer = setTimeout(() => !opened.current && open(), 250);
+      return () => clearTimeout(timer);
     }
-  }, [leaving, reduce, opening, fade, fold]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leaving, reduce, fade, fold]);
   const style = useAnimatedStyle(() => ({ opacity: fade.get(), transform: [{ scale: 0.98 + 0.02 * fade.get() }] }));
   const folding = useAnimatedStyle(() => {
     const f = fold.get();
@@ -142,7 +155,13 @@ export function FadeRow({ children, leaving, back = false, testID }: { children:
       {/* The fold and the fades on views of their own: on the web the entrance animates the outer view's opacity.
           The height is the content's own, measured on the inner view, which keeps it while the outer one clips. */}
       <Animated.View style={folding}>
-        <Animated.View style={style} onLayout={(e) => height.set(e.nativeEvent.layout.height)}>
+        <Animated.View
+          style={style}
+          onLayout={(e) => {
+            const h = e.nativeEvent.layout.height;
+            height.set(h);
+            if (!opened.current && h > 0) open();
+          }}>
           {children}
         </Animated.View>
       </Animated.View>
@@ -164,8 +183,20 @@ export function Unfold({ children, animate, delay = D.rowExit, open = true }: { 
   const v = useSharedValue(run && open ? 0 : 1);
   const height = useSharedValue(0);
   const lastOpen = useRef(open);
+  // A row that unfolds as it mounts starts once its height is known (its first layout), `delay` after it mounted.
+  const pending = useRef<number | null>(null);
+  const unfold = () => {
+    if (pending.current === null) return;
+    const left = Math.max(0, delay - (Date.now() - pending.current));
+    pending.current = null;
+    v.set(withDelay(left, withTiming(1, { duration: ROW_FOLD_MS, easing: ease.move })));
+  };
   useEffect(() => {
-    if (run && open) v.set(withDelay(delay, withTiming(1, { duration: ROW_FOLD_MS, easing: ease.move })));
+    if (!(run && open)) return;
+    pending.current = Date.now();
+    // Should no layout ever come, it opens all the same.
+    const timer = setTimeout(unfold, delay + 100);
+    return () => clearTimeout(timer);
     // Run once, on mount: a row that is already open stays open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -182,7 +213,14 @@ export function Unfold({ children, animate, delay = D.rowExit, open = true }: { 
   });
   return (
     <Animated.View style={style} pointerEvents={open ? 'auto' : 'none'} accessibilityElementsHidden={!open} importantForAccessibility={open ? 'auto' : 'no-hide-descendants'}>
-      <Animated.View onLayout={(e) => height.set(e.nativeEvent.layout.height)}>{children}</Animated.View>
+      <Animated.View
+        onLayout={(e) => {
+          const h = e.nativeEvent.layout.height;
+          height.set(h);
+          if (h > 0) unfold();
+        }}>
+        {children}
+      </Animated.View>
     </Animated.View>
   );
 }
