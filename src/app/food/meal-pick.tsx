@@ -17,6 +17,7 @@ import { RequireProfile } from '@/features/food/RequireProfile';
 import { ItemAmountSheet } from '@/features/food/SavedMealParts';
 import { isolateRtl } from '@/lib/bidi';
 import { searchLocal, searchOnlineWithStatus } from '@/services/foodSearch';
+import { onlineSearchAvailable } from '@/services/openFoodFacts';
 import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
@@ -75,14 +76,15 @@ function MealPick() {
   const latest = useRef('');
   useEffect(() => {
     latest.current = q;
-    if (q.length < 2) return;
+    if (q.length < 2 || !onlineSearchAvailable) return;
     const t = setTimeout(async () => {
       const result = await searchOnlineWithStatus(q);
       if (latest.current === q) setOnline({ query: q, items: result.items });
     }, 450);
     return () => clearTimeout(t);
   }, [q]);
-  const loading = q.length >= 2 && online.query !== q;
+  // Where online search cannot run (a browser without the backend) nothing is asked, so no wait shows between keystrokes.
+  const loading = onlineSearchAvailable && q.length >= 2 && online.query !== q;
   const localIds = new Set(local.map((h) => h.food.id));
   const onlineItems = q.length >= 2 && online.query && q.startsWith(online.query) ? online.items.filter((f) => !localIds.has(f.id)).slice(0, 15) : [];
 

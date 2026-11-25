@@ -134,6 +134,15 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
     );
   });
 
+  // The + is an action, not a tab, so it is never inside the tablist: the row of tabs keeps an empty slot for it and
+  // the + is drawn over that slot from outside the row (after it, so a screen reader hears the four tabs as one list,
+  // then "Log something"). Where the slot is follows the row's own layout: four tabs at flex 1 round a 1.1 slot at the
+  // designed size (known before layout), the slot as measured with large text (the + shows once it is measured).
+  const [slot, setSlot] = useState<{ x: number; width: number } | null>(null);
+  const pad = large ? PAD_LARGE : 10;
+  const inner = Math.min(winW, MAX_CONTENT_WIDTH) - 2 * pad;
+  const slotAt = slot ?? { x: pad + (inner * 2) / 5.1, width: (inner * 1.1) / 5.1 };
+
   const plus = (
     <PressableScale
       testID="tab-add"
@@ -170,7 +179,13 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
           paddingBottom: insets.bottom,
         }}>
         {band ? <View style={{ height: PLUS_BAND, alignItems: 'center' }}>{plus}</View> : null}
-        <View style={{ width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', flexDirection: 'row', paddingHorizontal: large ? PAD_LARGE : 10, height: TAB_BAR_HEIGHT }}>
+        <View style={{ width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', height: TAB_BAR_HEIGHT }}>
+        {/* The four tabs are one tablist (WCAG 1.3.1: a tab's context is its list), named for a screen reader; the + is not in it. */}
+        <View
+          accessibilityRole="tablist"
+          accessibilityLabel="Main"
+          testID="tab-list"
+          style={{ flexDirection: 'row', paddingHorizontal: pad, height: TAB_BAR_HEIGHT }}>
           <Animated.View
             pointerEvents="none"
             testID="tab-pill"
@@ -188,8 +203,29 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
             }}
           />
           {tabs.slice(0, 2)}
-          {band ? null : <View style={large ? { width: PLUS_W_LARGE, flexShrink: 0, alignItems: 'center' } : { flex: 1.1, alignItems: 'center' }}>{plus}</View>}
+          {/* The + cup's slot: empty, so the list holds only tabs. */}
+          {band ? null : (
+            <View
+              pointerEvents="none"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              {...(Platform.OS === 'web' ? ({ 'aria-hidden': true } as object) : null)}
+              onLayout={(e) => {
+                const { x, width } = e.nativeEvent.layout;
+                setSlot((cur) => (cur && cur.x === x && cur.width === width ? cur : { x, width }));
+              }}
+              style={large ? { width: PLUS_W_LARGE, flexShrink: 0 } : { flex: 1.1 }}
+            />
+          )}
           {tabs.slice(2)}
+        </View>
+        {band ? null : (
+          <View
+            pointerEvents="box-none"
+            style={{ position: 'absolute', top: 0, left: slotAt.x, width: slotAt.width, height: TAB_BAR_HEIGHT, alignItems: 'center', opacity: slot || !large ? 1 : 0 }}>
+            {plus}
+          </View>
+        )}
         </View>
       </View>
       <QuickLogSheet visible={open} onClose={() => setOpen(false)} />

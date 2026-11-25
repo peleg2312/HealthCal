@@ -29,6 +29,7 @@ import { isolateRtl } from '@/lib/bidi';
 import { formatDayLabel } from '@/lib/dates';
 import { MEAL_LABEL, entriesTotal } from '@/lib/nutrition';
 import { searchLocal, searchOnlineWithStatus } from '@/services/foodSearch';
+import { onlineSearchAvailable } from '@/services/openFoodFacts';
 import { useToday } from '@/store/clock';
 import { favoriteRecordId, useStore } from '@/store';
 import { useDay, useLive } from '@/store/selectors';
@@ -142,11 +143,13 @@ export default function FoodSearchScreen() {
   // Clearing the field shows the tabs at once.
   const listQ = q ? localQ : '';
 
-  // Online products arrive after a pause in typing; stale answers are dropped.
+  // Online products arrive after a pause in typing; stale answers are dropped. Where online search cannot run
+  // (a browser without the backend), nothing is asked and the line says so at once and holds while typing
+  // goes on: no "Searching" frame between keystrokes for a search that will not run (rubric D3-07).
   const latest = useRef('');
   useEffect(() => {
     latest.current = q;
-    if (q.length < 2) return;
+    if (q.length < 2 || !onlineSearchAvailable) return;
     const t = setTimeout(async () => {
       const result = await searchOnlineWithStatus(q);
       if (latest.current === q) setOnlineResult({ query: q, ...result });
@@ -155,7 +158,7 @@ export default function FoodSearchScreen() {
   }, [q]);
   const online: Online = {
     query: q,
-    status: q.length < 2 ? 'idle' : onlineResult.query === q ? 'done' : 'loading',
+    status: q.length < 2 ? 'idle' : !onlineSearchAvailable || onlineResult.query === q ? 'done' : 'loading',
     // While a refined query loads, keep showing the previous answer.
     items: q.length < 2 ? [] : onlineResult.query && q.startsWith(onlineResult.query) ? onlineResult.items : [],
   };
@@ -517,7 +520,7 @@ export default function FoodSearchScreen() {
               ) : online.status === 'done' ? (
                 // Reading text: textSecondary, 7:1 on every page (WCAG 1.4.6); textTertiary is for captions.
                 <Text variant="body" color="textSecondary" testID="search-online-empty" style={{ paddingVertical: spacing.sm }}>
-                  {onlineResult.unavailable
+                  {!onlineSearchAvailable || onlineResult.unavailable
                     ? 'Search them by name in the phone app.'
                     : onlineResult.failed
                       ? 'Could not reach the online products. Your own and bundled foods still work.'
@@ -645,6 +648,9 @@ function ActionTile({ icon, label, a11y, onPress, testID }: { icon: React.ReactN
 function BestMatchAdd({ name, kcalValue, added, spoken, onPress }: { name: string; kcalValue: number; added: boolean; spoken: string; onPress: () => void }) {
   const { colors, radius, spacing } = useTheme();
   const lang = useLangName(added ? `${name} added` : spoken);
+  // As soon as text grows at all, a reader's own text spacing included (`useGrownText`, WCAG 1.4.12), the name
+  // takes a second line and the button grows, rather than being cut after a few letters; at the designed size, one line.
+  const grown = useGrownText();
   return (
     <PressableScale
       testID="search-add-top"
@@ -662,6 +668,7 @@ function BestMatchAdd({ name, kcalValue, added, spoken, onPress }: { name: strin
         gap: spacing.md,
         minHeight: 50,
         paddingHorizontal: 14,
+        paddingVertical: grown ? spacing.sm : 0,
         ...cup(radius.button),
         backgroundColor: colors.surface,
         borderWidth: 1.5,
@@ -675,7 +682,7 @@ function BestMatchAdd({ name, kcalValue, added, spoken, onPress }: { name: strin
       ) : (
         <Plus size={20} color={colors.text} strokeWidth={2.2} />
       )}
-      <Text variant="bodyStrong" numberOfLines={1} style={{ flex: 1, minWidth: 0 }}>
+      <Text variant="bodyStrong" numberOfLines={grown ? 2 : 1} style={{ flex: 1, minWidth: 0 }}>
         {added ? `${isolateRtl(name)} added` : `Add ${isolateRtl(name)}`}
       </Text>
       <Text variant="numM" style={{ fontSize: 17, lineHeight: 22 }}>

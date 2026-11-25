@@ -1674,6 +1674,70 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     await lctx.close();
   }
 
+  // ------------------------------------------- Water's Other amount and Glass sizes (src/app/water.tsx, drinkAmountCheck in src/features/drinks/rules.ts)
+  // The Add button's box is its field's cup (not the field's label); an amount above 2 L is asked about once, under the
+  // field and tied to it, and a second press adds it; above 5 L the field says the limit and Add waits; typed glass
+  // sizes are not dropped by Escape without "Discard these sizes?".
+  {
+    const { buildSeed } = await import(require('url').pathToFileURL(require('path').join(__dirname, 'seed.mjs')).href);
+    const seed = JSON.stringify(buildSeed({ onboarded: true, theme: 'blossom' }));
+    const wctx = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+    await wctx.addInitScript((value) => {
+      if (!window.sessionStorage.getItem('__seeded')) {
+        window.localStorage.setItem('healthcal-v1', value);
+        window.sessionStorage.setItem('__seeded', '1');
+      }
+    }, seed);
+    const wp = await wctx.newPage();
+    wp.on('pageerror', (e) => errors.push(e.message));
+    await wp.goto(`${BASE}/water`, { waitUntil: 'networkidle' });
+    await wp.getByTestId('water-custom-add').first().waitFor({ timeout: 15000 });
+    await wp.getByTestId('water-custom-input').first().scrollIntoViewIfNeeded();
+    await wp.waitForTimeout(400);
+    const rows = async () => Object.values((await wp.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())))).water).filter((w) => !w.deleted);
+    const boxes = await wp.evaluate(() => {
+      const add = document.querySelector('[data-testid="water-custom-add"]').getBoundingClientRect();
+      const cup = document.querySelector('input[data-testid="water-custom-input"]').parentElement.getBoundingClientRect();
+      return { add: [Math.round(add.top), Math.round(add.bottom)], cup: [Math.round(cup.top), Math.round(cup.bottom)] };
+    });
+    check("Water: Other amount's Add lines up with its field's cup", Math.abs(boxes.add[0] - boxes.cup[0]) <= 1 && Math.abs(boxes.add[1] - boxes.cup[1]) <= 1, `Add ${boxes.add.join('-')}, cup ${boxes.cup.join('-')}`);
+    const input = wp.locator('input[data-testid="water-custom-input"]');
+    const n0 = (await rows()).length;
+    await input.fill('2500');
+    await wp.waitForTimeout(200);
+    await wp.getByTestId('water-custom-add').first().click();
+    await wp.waitForTimeout(400);
+    const asked = ((await wp.getByTestId('water-custom-check').first().textContent().catch(() => '')) || '').replace(/\u00A0/g, ' ');
+    const tied = (await input.getAttribute('aria-describedby')) === (await wp.getByTestId('water-custom-check').first().getAttribute('id').catch(() => null));
+    const n1 = (await rows()).length;
+    check('Water: 2.5 L typed is asked about once, tied to the field, and nothing is stored', /^Is 2\.5 L right for one drink\? Tap Add again to add it\.$/.test(asked) && tied && n1 === n0, `"${asked}", tied ${tied}, ${n1 - n0} stored`);
+    await wp.waitForTimeout(500);
+    await wp.getByTestId('water-custom-add').first().click();
+    await wp.waitForTimeout(500);
+    const after = await rows();
+    check('Water: the second press of Add stores the 2.5 L', after.length === n0 + 1 && after.some((w) => w.ml === 2500), `${after.length - n0} stored`);
+    await input.fill('6000');
+    await wp.waitForTimeout(300);
+    const over = ((await wp.getByTestId('water-custom-check').first().textContent().catch(() => '')) || '').replace(/\u00A0/g, ' ');
+    const waits = (await wp.getByTestId('water-custom-add').first().getAttribute('aria-disabled')) === 'true';
+    check('Water: above 5 L the field says the limit and Add waits', over === 'Up to 5 L at a time.' && waits && (await input.getAttribute('aria-invalid')) === 'true', `"${over}", Add waits ${waits}`);
+    await input.fill('');
+    await wp.getByTestId('section-add-a-drink-action').first().click();
+    await wp.getByTestId('water-preset-0').first().waitFor({ timeout: 8000 });
+    await wp.waitForTimeout(400);
+    await wp.locator('input[data-testid="water-preset-0"]').fill('180');
+    await wp.keyboard.press('Escape');
+    await wp.waitForTimeout(400);
+    const question = await wp.getByTestId('sheet-discard-title').first().textContent().catch(() => null);
+    const still = (await wp.getByTestId('water-preset-0').count()) === 1;
+    check('Water: Glass sizes with a size typed asks "Discard these sizes?" before closing', question === 'Discard these sizes?' && still, `${question}, sheet open ${still}`);
+    await wp.getByTestId('sheet-discard-yes').first().click();
+    await wp.waitForTimeout(600);
+    const presets = (await wp.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState().settings.waterPresets)))).join(',');
+    check('Water: Discard closes Glass sizes and keeps the saved sizes', (await wp.getByTestId('water-preset-0').count()) === 0 && presets === '150,250,330,500', presets);
+    await wctx.close();
+  }
+
   // ------------------------------------------- saving meals: from the AI review and from the diary (builder one)
   // (src/features/ai/SaveMealRow.tsx, logAndSaveMeal in src/features/food/log.ts, src/features/food/saveHint.ts,
   // SaveMealSheet.tsx.) Each part in a fresh seeded demo context at 360 x 740, so no step leans on another's data.

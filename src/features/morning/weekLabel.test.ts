@@ -43,6 +43,21 @@ describe('weekLabel', () => {
     expect(weekLabel(cells([], c('2026-11-18', { workout: true })))).toContain('A workout on 1 day.');
   });
 
+  it('names the days before yesterday that went above their budget, as the amber caps show them', () => {
+    // 2026-11-14 is a Saturday, 2026-11-15 a Sunday, 2026-11-12 a Thursday.
+    const two = six.map((x) => (x.date === '2026-11-14' || x.date === '2026-11-15' ? { ...x, kcal: 2600, over: true } : x));
+    expect(weekLabel(cells(two, c('2026-11-18')))).toBe(
+      'Your week: 7 of 7 days logged. Saturday and Sunday above the budget. Yesterday 2,062 of 2,170 kilocalories, within the budget. Today so far, nothing logged.',
+    );
+    const one = six.map((x) => (x.date === '2026-11-15' ? { ...x, kcal: 2600, over: true } : x));
+    expect(weekLabel(cells(one, c('2026-11-18')))).toContain('Your week: 7 of 7 days logged. Sunday above the budget. Yesterday');
+    const three = six.map((x) => (['2026-11-12', '2026-11-14', '2026-11-15'].includes(x.date) ? { ...x, kcal: 2600, over: true } : x));
+    expect(weekLabel(cells(three, c('2026-11-18')))).toContain('Thursday, Saturday and Sunday above the budget.');
+    // A partly logged day is never named above its budget (the picture draws it pale, with no cap).
+    const pale = six.map((x) => (x.date === '2026-11-14' ? { ...x, kcal: 2600, partial: true } : x));
+    expect(weekLabel(cells(pale, c('2026-11-18')))).not.toContain('above the budget');
+  });
+
   it('has no exclamation mark and no blame word', () => {
     const label = weekLabel(cells(six, c('2026-11-18', { kcal: 4000, over: true })));
     expect(label).not.toMatch(/!|\bover\b|bad|fail|cheat/i);

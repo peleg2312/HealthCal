@@ -136,8 +136,16 @@ export function WeekCups({ cells, testID }: { cells: WeekCells; testID?: string 
   // A size down at six characters ("11,480", "~2,062").
   const numVariant = shown(Math.round(y.kcal)).length >= 6 ? 'numM' : 'numL';
 
+  // One image to a screen reader, named by `weekLabel` (the days, yesterday's figure and the days above their
+  // budget), as the kit's charts are: on the web a name on a role-less div is dropped, so the role carries it,
+  // and what the picture draws (the figure, the weekday letters) is not read a second time.
   const week = (
-    <View accessible accessibilityLabel={weekLabel(cells)} style={r > 1 ? { flexGrow: 1 } : undefined}>
+    <View
+      testID="morning-week-cups"
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={weekLabel(cells)}
+      style={r > 1 ? { flexGrow: 1 } : undefined}>
       {/* Yesterday's number, centred over the large cup; a wider one reaches left over the small cups. */}
       <View
         style={{

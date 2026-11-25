@@ -295,7 +295,8 @@ export function TrendMark({ trend, period }: { trend?: Direction | null; period?
 export function TrendLegend({ period }: { period: string }) {
   const { colors, spacing } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: 2 }}>
+    // Two entries: when they wrap onto two lines, 4 px between the line boxes keeps their letters 8 px apart or more (Room).
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.md, rowGap: spacing.xs }}>
       {/* Never wider than the card: at large text the words wrap beside their marks. */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, maxWidth: '100%' }}>
         {/* The marks themselves are decorative here: the words beside them say what they mean. */}
