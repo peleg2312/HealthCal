@@ -9,7 +9,7 @@
  * three in all, then never again (./spreadHintRule). Unreadable or missing storage means "show".
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useId, useSyncExternalStore } from 'react';
 
 import { exerciseRuleOf } from '@/lib/exerciseBudget';
 import { useProfile } from '@/store/selectors';
@@ -26,6 +26,8 @@ export const SPREAD_HINT_TEXT = 'Workouts can raise your budget over 7 days inst
 let done: boolean | null = null;
 /** Visits that showed it; null until read. */
 let shown: number | null = null;
+/** The visits (one per mounted hint, by `useId`) that have counted their showing: each counts once. */
+let countedVisits: ReadonlySet<string> = new Set();
 let loading: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
@@ -74,7 +76,9 @@ export function markSpreadHintDone(): void {
 }
 
 /** One more visit showed the hint: counted in memory at once and kept on this device. */
-function noteShown(): void {
+function noteShown(visit: string): void {
+  if (countedVisits.has(visit)) return;
+  countedVisits = new Set([...countedVisits, visit]);
   shown = (shown ?? 0) + 1;
   emit();
   try {
@@ -94,16 +98,15 @@ export function useSpreadHint(): boolean {
   const profile = useProfile();
   const isDone = useSyncExternalStore(subscribe, () => done, () => done);
   const count = useSyncExternalStore(subscribe, () => shown, () => shown);
-  const [countedHere, setCountedHere] = useState(false);
-  const state = { done: isDone, shown: count, sameDay: exerciseRuleOf(profile) === 'day', countedHere };
+  const visit = useId();
+  const counted = useSyncExternalStore(subscribe, () => countedVisits, () => countedVisits);
+  const state = { done: isDone, shown: count, sameDay: exerciseRuleOf(profile) === 'day', countedHere: counted.has(visit) };
   const counts = spreadHintCounts(state);
   useEffect(() => {
     void load();
   }, []);
   useEffect(() => {
-    if (!counts) return;
-    noteShown();
-    setCountedHere(true);
-  }, [counts]);
+    if (counts) noteShown(visit);
+  }, [counts, visit]);
   return spreadHintVisible(state);
 }
