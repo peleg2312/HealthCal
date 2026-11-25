@@ -170,7 +170,10 @@ describe('the words', () => {
   });
   it('Repeat says its calories, and its name starts with its words', () => {
     expect(repeatTitle('744')).toBe('Repeat · 744 kcal');
-    expect(repeatSpoken('744', 'yesterday', 'dinner')).toBe("Repeat, 744 kilocalories: yesterday's dinner");
+    expect(repeatSpoken('744', 'yesterday', 'dinner')).toBe("Repeat, 744 kcal: yesterday's dinner");
+    // Label in name: the drawn words, unit included, are whole words of the name, in order.
+    const words = (s: string) => ` ${s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()} `;
+    expect(words(repeatSpoken('1,170', 'Nov 22', 'lunch'))).toContain(words(repeatTitle('1,170')));
     expect(repeatFoodsLine('yesterday', ['Pasta', 'Chicken breast'])).toBe('Yesterday: Pasta, Chicken breast');
     expect(repeatFoodsLine('Nov 22', ['Banana'])).toBe('Nov 22: Banana');
   });

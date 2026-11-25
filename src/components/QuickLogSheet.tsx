@@ -434,12 +434,14 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
           accessibilityLabel={QUICK_WAYS[id].spoken}
           scaleTo={0.96}
           style={[tile, { flex: 1, minWidth: 0, minHeight: narrow ? 56 : 64, alignItems: 'center', justifyContent: 'center', gap: 4, paddingTop: narrow ? 8 : 10, paddingBottom: narrow ? 6 : 8, paddingHorizontal: 2 }]}>
-          {ways[id].glyph ? <AiTag narrow={narrow} /> : null}
           {wayIcon(id, narrow ? 20 : 22)}
           {/* Two lines at most: one word per line under wider text spacing (WCAG 1.4.12), never cut. */}
           <Text variant="label" align="center" numberOfLines={2}>
             {QUICK_WAYS[id].label}
           </Text>
+          {/* After the word in the page's order, so the tile's text reads "Photo AI", as its name does ("Photo, AI
+              estimate"; label in name); drawn in the top corner all the same (absolute). */}
+          {ways[id].glyph ? <AiTag narrow={narrow} /> : null}
         </PressableScale>
       ))}
     </View>
@@ -617,7 +619,8 @@ function RepeatRow({ label, entries, big, narrow, done, onPress }: { label: stri
   // What the tap stores: a bundled food at today's values for its grams (currentKcal, the rule copyEntries logs by).
   const kcal = currentKcal(entries);
   // Each food by its name's head ("Israeli salad", "Pasta"), so the list's commas part foods only.
-  const names = entries.map((e) => isolateRtl(foodNameHead(displayFoodName(e)))).join(', ');
+  const heads = entries.map((e) => foodNameHead(displayFoodName(e)));
+  const names = heads.map(isolateRtl).join(', ');
   return (
     <PressableScale
       testID="quick-repeat"
@@ -626,8 +629,9 @@ function RepeatRow({ label, entries, big, narrow, done, onPress }: { label: stri
       // Added, not unavailable: the success edge and the done mark say so, so the row is not dimmed.
       dimDisabled={false}
       onPress={onPress}
-      // Its words as drawn (label in name), then every food in full.
-      accessibilityLabel={`${label}, ${formatNumber(kcal)} kcal: ${entries.map((e) => displayFoodName(e)).join(', ')}${done ? '. Added' : ''}`}
+      // Its words as drawn, the foods by the same heads (label in name; the raw names, no direction marks); every food
+      // in full is in the toast and the diary, as for Today's Repeat.
+      accessibilityLabel={`${label}, ${formatNumber(kcal)} kcal: ${heads.join(', ')}${done ? '. Added' : ''}`}
       style={{
         flexDirection: 'row',
         alignItems: 'center',

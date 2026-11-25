@@ -110,9 +110,12 @@ export function repeatTitle(kcal: string): string {
   return `Repeat · ${kcal} kcal`;
 }
 
-/** The Repeat button's name: its words first, then the meal and the day it copies. */
+/**
+ * The Repeat button's name: its words as drawn first, unit included ("744 kcal", label in name: a control that shows
+ * words is named with them), then the meal and the day it copies.
+ */
 export function repeatSpoken(kcal: string, when: string, meal: MealType): string {
-  return `Repeat, ${kcal} kilocalories: ${when}'s ${MEAL_LABEL[meal].toLowerCase()}`;
+  return `Repeat, ${kcal} kcal: ${when}'s ${MEAL_LABEL[meal].toLowerCase()}`;
 }
 
 /** The line under the sentence while Repeat is offered: what it adds ("Yesterday: Pasta, Chicken breast"). */

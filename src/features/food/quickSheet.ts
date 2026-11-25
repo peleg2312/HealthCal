@@ -66,11 +66,13 @@ export type QuickWayId = 'photo' | 'describe' | 'activity' | 'weight' | 'scan';
 /**
  * The ways in: one word under an icon on the sheet (Scan at the end of the Search row), the full name for a screen
  * reader, which starts with the drawn word (label in name), and the hint drawn under the name where every way in is a
- * whole row (large text). The two AI ways say "AI estimate", as their small "AI" tag does.
+ * whole row (large text). The two AI ways say "AI estimate", as their small "AI" tag does, with "AI" right after the
+ * word: the tile's text reads "Photo AI" (the tag follows the word in the page's order), so the name holds the drawn
+ * words in order (label in name).
  */
 export const QUICK_WAYS: Record<QuickWayId, { label: string; wide: string; hint: string; spoken: string }> = {
   photo: { label: 'Photo', wide: 'Snap a meal', hint: AI_TILE_HINT.photo, spoken: 'Photo, AI estimate' },
-  describe: { label: 'Describe', wide: 'Describe it', hint: AI_TILE_HINT.describe, spoken: 'Describe, type it for an AI estimate' },
+  describe: { label: 'Describe', wide: 'Describe it', hint: AI_TILE_HINT.describe, spoken: 'Describe, AI estimate from what you type' },
   activity: { label: 'Activity', wide: 'Log activity', hint: 'Sport, gym, walk', spoken: 'Activity, log sport, gym or a walk' },
   weight: { label: 'Weigh in', wide: 'Weigh in', hint: 'Weight and body fat', spoken: 'Weigh in, weight and body fat' },
   scan: { label: 'Scan', wide: 'Scan barcode', hint: 'Packaged products', spoken: 'Scan barcode, packaged products' },

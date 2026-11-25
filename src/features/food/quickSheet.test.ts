@@ -45,6 +45,9 @@ describe('the + sheet in one view', () => {
     expect(QUICK_WAYS.describe.spoken).toContain('AI estimate');
     expect(QUICK_WAYS.scan.spoken).toBe('Scan barcode, packaged products');
     expect(AI_TAG).toBe('AI');
+    // The AI tiles' text reads "<word> AI" (the tag follows the word in the page): the name holds both in that order.
+    const words = (s: string) => ` ${s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()} `;
+    for (const id of ['photo', 'describe'] as const) expect(words(QUICK_WAYS[id].spoken)).toContain(words(`${QUICK_WAYS[id].label} ${AI_TAG}`));
   });
   it('every fixed string: sentence case, no exclamation mark, no banned word', () => {
     const fixed = [
