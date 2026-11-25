@@ -117,10 +117,9 @@ export function DayRingStrip({
   note?: { text: string; delay: number; testID?: string } | null;
   /**
    * The slim strip: small cups (16 x 20) and tighter gaps, the same letters, dates, caption row, chip, note, accessory
-   * and week controls, 102 px in all at every width (the full one is 132) at the designed text size. With text grown
-   * through the phone's common steps it stays slim and its rows grow with their text (the date's box, the caption's
-   * lines); ignored with very large text (`VERY_LARGE_TEXT`), where the dates need the full strip's room. Today and
-   * the diary pass it, 12 px over their first card.
+   * and week controls, 102 px in all at every width (the full one is 132) at the designed text size. With text grown it
+   * stays slim and its rows grow with their text (the date's box, the caption's lines), so the day's content keeps its
+   * place in the first view. Today and the diary pass it, 12 px over their first card.
    */
   slim?: boolean;
   /**
@@ -243,17 +242,27 @@ export function DayRingStrip({
     return b === 0 ? 'This week' : b === 1 ? 'Last week' : b === -1 ? 'Next week' : `Week of ${formatShortDate(dates[0])}`;
   };
   const narrow = windowW < 360;
-  // Very large text (`VERY_LARGE_TEXT`): the caption takes the whole width and the strip its full size. Up to there
-  // (the phone's common steps) the slim strip and the caption row keep their shape and grow with their text (`grown`).
+  // Very large text (`VERY_LARGE_TEXT`): the caption row wraps, the caption first and the chip, the streak and the week
+  // cup beside it where they fit, else on a line under it. Up to there (the phone's common steps) the caption row keeps
+  // its shape and grows with its text (`grown`); the slim strip stays slim at every size, its date boxes growing.
   const large = useVeryLargeText();
   const grown = useGrownText();
-  // Slim up to very large text: there the dates need the full strip's room.
-  const thin = slim && !large;
-  // "Your week is ready" or its short form: the short one under 360 px, and with text grown wherever the whole label,
-  // measured as drawn, is wider than the room beside its chevron and X (`fitsRoom`), so it keeps one line.
+  const thin = slim;
+  // With text grown, the caption row's room as measured: the row, and the chip or streak beside the caption as drawn.
+  const [rowW, setRowW] = useState(0);
+  const [sideW, setSideW] = useState(0);
   const [linkW, setLinkW] = useState(0);
-  const [linkRoom, setLinkRoom] = useState(0);
-  const linkShort = !!link?.short && (narrow || (grown && !large && !fitsRoom(linkW, linkRoom)));
+  const [shortW, setShortW] = useState(0);
+  const pickW = arrows ? 2 * PICK_CUP + spacing.md + spacing.xs : maxBack + ahead > 0 ? PICK_CUP + spacing.xs : 0;
+  // The room for the link's words: the row less what sits beside them (the chip or streak, the week cup or arrows, its
+  // X and its chevron, with the gaps between), the same whichever way the row is laid out, so a choice never flips it.
+  const linkRoom = rowW ? rowW - (sideW ? sideW + spacing.sm : 0) - (pickW ? pickW + spacing.sm : 0) - (link?.hide ? PICK_CUP + spacing.sm : 0) - LINK_MARK : 0;
+  // "Your week is ready" or its short form: the short one under 360 px, and with text grown wherever the whole label,
+  // measured as drawn, is wider than its room (`fitsRoom`), so it keeps one line.
+  const linkShort = !!link?.short && (narrow || (grown && !fitsRoom(linkW, linkRoom)));
+  // Where even the words shown do not fit beside the streak and the week cup (a 320 px phone at 130%), the row wraps as
+  // with very large text, rather than split "Your week" from its chevron.
+  const wraps = large || (grown && showLink && !fitsRoom(linkShort ? shortW : linkW, linkRoom));
   // Natively and on touch the arrows are not drawn: every day offers the same as actions.
   const weekActions = [
     ...(back < maxBack ? [{ name: 'previousWeek', label: 'Previous week' }] : []),
@@ -385,19 +394,28 @@ export function DayRingStrip({
         )}
       </DaySwipeGuard>
       {/* One height on both screens: two caption lines or the chip. A note that wraps moves nothing. */}
-      {/* Very large text (150% and up): the caption takes the whole width and the chip, the streak and the week cup a
-          line under it, so neither squeezes the other's words. */}
-      <View style={{ flexDirection: 'row', flexWrap: large ? 'wrap' : 'nowrap', alignItems: 'center', gap: spacing.sm, minHeight: CAPTION_ROW_H }}>
+      {/* Very large text (150% and up), or a link that does not fit beside them: the row wraps, the chip, the streak and
+          the week cup going to a line under the caption where they do not fit beside it, so neither squeezes the other's words. */}
+      <View
+        onLayout={grown ? (e) => setRowW(Math.floor(e.nativeEvent.layout.width)) : undefined}
+        style={{ flexDirection: 'row', flexWrap: wraps ? 'wrap' : 'nowrap', alignItems: 'center', gap: spacing.sm, minHeight: CAPTION_ROW_H }}>
         {showLink && link ? (
-          <View
-            onLayout={grown && !large ? (e) => setLinkRoom(Math.floor(e.nativeEvent.layout.width) - LINK_MARK - (link.hide ? PICK_CUP + spacing.sm : 0)) : undefined}
-            style={large ? { flexBasis: '100%', flexDirection: 'row', alignItems: 'center', gap: spacing.sm } : { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            {grown && !large && link.short ? (
-              <MeasureWidth onWidth={setLinkW}>
-                <Text variant="label" style={{ fontSize: 13, lineHeight: 17 }}>
-                  {link.label}
-                </Text>
-              </MeasureWidth>
+          <View style={wraps ? { flexGrow: 1, flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm } : { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            {grown ? (
+              <>
+                <MeasureWidth onWidth={setLinkW}>
+                  <Text variant="label" style={{ fontSize: 13, lineHeight: 17 }}>
+                    {link.label}
+                  </Text>
+                </MeasureWidth>
+                {link.short ? (
+                  <MeasureWidth onWidth={setShortW}>
+                    <Text variant="label" style={{ fontSize: 13, lineHeight: 17 }}>
+                      {link.short}
+                    </Text>
+                  </MeasureWidth>
+                ) : null}
+              </>
             ) : null}
             {/* Its touch area reaches 44 px tall; sideways it stops at its own edge, so the X beside it keeps its own. */}
             <PressableScale
@@ -419,7 +437,7 @@ export function DayRingStrip({
             ) : null}
           </View>
         ) : showNote ? (
-          <FadeUp key={noteText} style={large ? { flexBasis: '100%' } : { flex: 1 }}>
+          <FadeUp key={noteText} style={wraps ? { flexGrow: 1, flexShrink: 1 } : { flex: 1 }}>
             <Text variant="caption" color="text" numberOfLines={large || grown ? undefined : 2} testID={note?.testID} accessibilityLiveRegion="polite">
               {noteText}
             </Text>
@@ -427,11 +445,20 @@ export function DayRingStrip({
         ) : (
           // Never clamped: a long week ("1,060 kcal a day over budget, 4 full days") fits two lines beside the chip
           // or the streak mark on a 320 px phone, and takes a third rather than lose its end.
-          <Text variant="caption" color="textSecondary" style={large ? { flexBasis: '100%' } : { flex: 1 }} testID={`${testIDPrefix}-week-caption`}>
+          <Text variant="caption" color="textSecondary" style={wraps ? { flexGrow: 1, flexShrink: 1 } : { flex: 1 }} testID={`${testIDPrefix}-week-caption`}>
             {caption}
           </Text>
         )}
-        {selected !== today ? (
+        {grown ? (
+          // Measured as drawn while text is grown, for the room left to the caption's link.
+          <View onLayout={(e) => setSideW(Math.ceil(e.nativeEvent.layout.width))}>
+            {selected !== today ? (
+              <Chip testID={jumpTestID ?? `${testIDPrefix}-jump-today`} label={narrow ? 'Today' : 'Back to today'} selected onPress={() => onSelect(today)} />
+            ) : (
+              accessory
+            )}
+          </View>
+        ) : selected !== today ? (
           // "Today" on a narrow phone, so the caption keeps two lines.
           <Chip testID={jumpTestID ?? `${testIDPrefix}-jump-today`} label={narrow ? 'Today' : 'Back to today'} selected onPress={() => onSelect(today)} />
         ) : (
