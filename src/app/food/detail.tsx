@@ -16,7 +16,9 @@ import { toggleFoodFavorite } from '@/features/food/favoriteActions';
 import { dayPhrase, href, portionLabel, kcal, labelAmount, lastPortions, matchServing, param, parseDate, parseMeal, portionFor, sourceInfo, sourceKindOf, valuesUpdated, type SourceKind } from '@/features/food/helpers';
 import { deleteEntry, logFood } from '@/features/food/log';
 import { mealPickAdvice, pickMovesAtOnce } from '@/features/food/mealMove';
+import { AskLine, askTie } from '@/features/food/AskLine';
 import { editedKcalAsks, kcalAsk, kcalSaveTitle, portionAsk, portionAsks, portionTitle, pressFor, waitsFor } from '@/features/food/softCheck';
+import { spokenUnits } from '@/lib/spokenUnits';
 import { RequireProfile } from '@/features/food/RequireProfile';
 import { isolateRtl } from '@/lib/bidi';
 import { MEAL_LABEL, atwaterKcal, formatMacro, scaleNutrients } from '@/lib/nutrition';
@@ -42,10 +44,11 @@ function useSecondPress() {
     if (pressFor(asks, amount, askedFor) === 'add') return store();
     setAskedFor(amount);
     haptic.warn();
-    if (Platform.OS !== 'web') return AccessibilityInfo.announceForAccessibility(line);
+    const said = spokenUnits(line);
+    if (Platform.OS !== 'web') return AccessibilityInfo.announceForAccessibility(said);
     // Emptied first, so the same words after a second question are still a change the region reads out.
     setSpoken('');
-    setTimeout(() => setSpoken(line), 150);
+    setTimeout(() => setSpoken(said), 150);
   };
   const region =
     Platform.OS === 'web' ? (
@@ -418,7 +421,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
   const asks = portionAsks(food, totalGrams, n.kcal, entry?.grams);
   const waiting = waitsFor(asks, gramsKey, second.askedFor);
   const save = () =>
-    second.press(asks, gramsKey, portionAsk(!!entry), () => {
+    second.press(asks, gramsKey, portionAsk(totalGrams, !!entry), () => {
       logFood({ food, serving, quantity, meal, date, entryId: entry?.id });
       goBack(href('/diary', { date }));
     });
@@ -485,7 +488,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
       <Card style={{ gap: spacing.lg }} testID="detail-portion">
         <MacroSummary range={range} n={n} updated={updated} kcalNote={`${portionLabel(serving.label, quantity)}${perGram || labelAmount(serving.label) !== null || (quantity === 1 && /\d\s?g\)*$/.test(serving.label)) ? '' : ` · ${Math.round(totalGrams)} g`}`} />
         <Divider />
-        <AmountEditor food={food} value={portion} onChange={setPortion} onPendingChange={setGramsInvalid} testIDPrefix="detail" ask={waiting ? portionAsk(!!entry) : null} />
+        <AmountEditor food={food} value={portion} onChange={setPortion} onPendingChange={setGramsInvalid} testIDPrefix="detail" ask={waiting ? portionAsk(totalGrams, !!entry) : null} />
       </Card>
       <DrinkNote water={paired.water} problem={paired.problem} hasAmount shown={{ food, serving, quantity }} />
       {entry ? null : <WaterAdds food={food} serving={serving} quantity={quantity} />}
@@ -550,7 +553,7 @@ function ManualEditor({ entry }: { entry: FoodEntry }) {
             title={waiting && kcalV !== null ? kcalSaveTitle(kcalV) : 'Save changes'}
             disabled={kcalV === null || kcalV < 0 || !!paired.problem}
             onPress={() =>
-              second.press(kcalAsks, kcalV ?? 0, kcalAsk(true), () => {
+              second.press(kcalAsks, kcalV ?? 0, kcalAsk(kcalV ?? 0, true), () => {
                 updateEntryDirect(entry, { name, nutrients: n, meal, date });
                 goBack(href('/diary', { date }));
               })
@@ -579,17 +582,9 @@ function ManualEditor({ entry }: { entry: FoodEntry }) {
           onChange={setKcal}
           decimals={0}
           hint={entry.grams > 0 ? `About ${Math.round(entry.grams)} g` : undefined}
-          {...(waiting ? (Platform.OS === 'web' ? ({ 'aria-describedby': askId } as object) : { accessibilityHint: kcalAsk(true) }) : null)}
+          {...(waiting ? askTie(askId, kcalAsk(kcalV ?? 0, true)) : null)}
         />
-        {waiting ? (
-          // Held up and waiting on the person: the amber key, with neutral words.
-          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
-            <CupKey color={colors.warning} style={{ marginTop: 4 }} />
-            <Text testID="manual-kcal-ask" nativeID={askId} variant="caption" color="text" style={{ flex: 1 }}>
-              {kcalAsk(true)}
-            </Text>
-          </View>
-        ) : null}
+        {waiting ? <AskLine id={askId} line={kcalAsk(kcalV ?? 0, true)} testID="manual-kcal-ask" /> : null}
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
           <NumberField testID="manual-protein" label="Protein" suffix="g" value={protein} onChange={setProtein} style={{ flex: 1 }} />
           <NumberField testID="manual-carbs" label="Carbs" suffix="g" value={carbs} onChange={setCarbs} style={{ flex: 1 }} />

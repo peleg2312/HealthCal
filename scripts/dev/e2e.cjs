@@ -9,6 +9,8 @@
  *      "Repeat yesterday's <meal>" (bundled foods at today's values, an own food and an online product as stored)
  *   -> one tap that closes a sheet and opens another (Friends, its store set directly): the second stays open, the
  *      browser's Back closes it on the same address, and no sheet leaves a history entry behind
+ *   -> a sheet's row that opens a screen (the + sheet's Search food), from fresh loads with the processor slowed: search
+ *      opens every time and one Back returns to Today
  *   -> Appearance in Profile: Java (kept through a reload), Honey, Butter, Blossom, then back to System
  *
  * The expected numbers are recomputed here from the published formulas, not

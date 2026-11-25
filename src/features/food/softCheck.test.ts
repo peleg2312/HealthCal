@@ -9,7 +9,6 @@ import {
   kcalAsk,
   kcalSaveTitle,
   PORTION_CHECK_FLOOR,
-  QUICK_KCAL_ASK,
   portionAsk,
   portionAsks,
   portionCheckGrams,
@@ -59,8 +58,9 @@ describe("quick add's calories", () => {
   it('name the amount on the button while they wait, and say why in one neutral sentence', () => {
     expect(quickAddTitle('lunch', null)).toBe('Add to lunch');
     expect(quickAddTitle('breakfast', 5000)).toBe('Add 5,000 kcal to breakfast');
-    expect(QUICK_KCAL_ASK).toMatch(/^[A-Z][^.!]*\.$/);
-    expect(QUICK_KCAL_ASK).not.toMatch(BANNED);
+    // Water's shape, for one voice: "Is 2.5 L right for one drink? Tap Add again to add it."
+    expect(kcalAsk(5000, false)).toBe('Is 5,000 kcal right for one entry? Tap Add again to add it.');
+    expect(kcalAsk(5000, false)).not.toMatch(BANNED);
   });
 });
 
@@ -91,12 +91,12 @@ describe("food detail's portion", () => {
   });
 
   it('names the action it waits for and the amount it will store', () => {
-    expect(portionAsk(false)).toBe('More than most portions: press Add again if the amount is right.');
-    expect(portionAsk(true)).toBe('More than most portions: press Save again if the amount is right.');
+    expect(portionAsk(1500, false)).toBe('Is 1,500 g right for one entry? Tap Add again to add it.');
+    expect(portionAsk(1499.6, true)).toBe('Is 1,500 g right for one entry? Tap Save again to save it.');
     expect(portionTitle(false, 'snack', 1500)).toBe('Add 1,500 g to snacks');
     expect(portionTitle(true, 'lunch', 1499.6)).toBe('Save 1,500 g');
-    for (const line of [portionAsk(false), portionAsk(true)]) {
-      expect(line).toMatch(/^[A-Z][^.!]*\.$/);
+    for (const line of [portionAsk(1500, false), portionAsk(1500, true)]) {
+      expect(line).toMatch(/^Is [^!]*\? Tap [^!]*\.$/);
       expect(line).not.toMatch(BANNED);
     }
   });
@@ -108,8 +108,7 @@ describe("an entry's own calories, edited", () => {
     expect(editedKcalAsks(5000, 5000)).toBe(false);
     expect(editedKcalAsks(2900, 500)).toBe(false);
     expect(editedKcalAsks(null, 500)).toBe(false);
-    expect(kcalAsk(true)).toBe('More than most meals: press Save again if the number is right.');
-    expect(kcalAsk(false)).toBe(QUICK_KCAL_ASK);
+    expect(kcalAsk(5000, true)).toBe('Is 5,000 kcal right for one entry? Tap Save again to save it.');
     expect(kcalSaveTitle(5000)).toBe('Save 5,000 kcal');
   });
 });

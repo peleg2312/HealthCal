@@ -41,6 +41,8 @@ export interface SaveMealStep {
    * shows the step passes it on (`<Sheet unsaved={step.unsaved}>`).
    */
   unsaved: string | null;
+  /** Whether a name is typed over the one offered (the same test as `unsaved`, for a sheet that words its own question). */
+  changed: boolean;
 }
 
 /** The save step as parts, for a sheet that shows it in place (the meal menu). */
@@ -88,6 +90,7 @@ export function useSaveMealStep({ open, meal, date, entries, onClose }: SaveMeal
     ),
     footer: <Button testID="save-meal-confirm" title="Save meal" disabled={!name.trim() || food.length === 0} onPress={save} />,
     unsaved: open && saveNameTyped(name, offered) ? SAVE_NAME_DISCARD : null,
+    changed: open && saveNameTyped(name, offered),
   };
 }
 

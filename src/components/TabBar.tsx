@@ -139,9 +139,12 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
   // then "Log something"). Where the slot is follows the row's own layout: four tabs at flex 1 round a 1.1 slot at the
   // designed size (known before layout), the slot as measured with large text (the + shows once it is measured).
   const [slot, setSlot] = useState<{ x: number; width: number } | null>(null);
+  const [rowW, setRowW] = useState<number | null>(null);
   const pad = large ? PAD_LARGE : 10;
-  const inner = Math.min(winW, MAX_CONTENT_WIDTH) - 2 * pad;
-  const slotAt = slot ?? { x: pad + (inner * 2) / 5.1, width: (inner * 1.1) / 5.1 };
+  const inner = (rowW ?? Math.min(winW, MAX_CONTENT_WIDTH)) - 2 * pad;
+  // At the designed size the slot's place is the flex row's own arithmetic (exact to the fraction, as the row draws it);
+  // with large text the tabs are as wide as their labels, so it is the slot as measured.
+  const slotAt = large && slot ? slot : { x: pad + (inner * 2) / 5.1, width: (inner * 1.1) / 5.1 };
 
   const plus = (
     <PressableScale
@@ -185,6 +188,10 @@ export function TabBar({ state, descriptors, navigateToTab }: BottomTabBarProps)
           accessibilityRole="tablist"
           accessibilityLabel="Main"
           testID="tab-list"
+          onLayout={(e) => {
+            const w = e.nativeEvent.layout.width;
+            setRowW((cur) => (cur === w ? cur : w));
+          }}
           style={{ flexDirection: 'row', paddingHorizontal: pad, height: TAB_BAR_HEIGHT }}>
           <Animated.View
             pointerEvents="none"
