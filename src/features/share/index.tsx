@@ -8,6 +8,8 @@ import { Button, IconButton } from '@/ui';
 import type { ISODate } from '@/types';
 
 import { dayCardContent, weekCardContent } from './content';
+import { periodCardContent, type SharePeriodInput } from './periodContent';
+import { periodScene } from './periodScene';
 import { dayScene, weekScene } from './scene';
 import { ShareSheet } from './ShareSheet';
 import { useShareDayInput, useShareWeekInput } from './useShareData';
@@ -121,6 +123,50 @@ export function ShareWeekButton({ recap }: { recap: WeeklyRecap }): React.ReactE
         <Share size={20} color={colors.text} strokeWidth={1.9} />
       </IconButton>
       {used ? <WeekSheet recap={recap} visible={open} onClose={() => setOpen(false)} /> : null}
+    </>
+  );
+}
+
+function PeriodSheet({ input, visible, onClose }: { input: SharePeriodInput; visible: boolean; onClose: () => void }) {
+  const { colors } = useTheme();
+  const kind = input.period.kind;
+  return (
+    <ShareSheet
+      visible={visible}
+      onClose={onClose}
+      kind={kind}
+      title={kind === 'month' ? 'Share your month' : 'Share your year'}
+      testID="share-period-sheet"
+      plan={(choices) => {
+        const content = periodCardContent(input, choices);
+        return { scene: periodScene(content, colors), summary: content.summary, fileName: `healthcal-${input.period.key}`, title: content.title };
+      }}
+    />
+  );
+}
+
+/**
+ * The month's or the year's share button (/recap/month, /recap/year): the period in cups as a portrait card,
+ * with the same privacy rules as the day and week cards (no weight, ever; calorie figures and food names only
+ * when the person adds them). The screen passes the facts it already computed.
+ */
+export function SharePeriodButton({ input }: { input: SharePeriodInput }): React.ReactElement {
+  const { colors } = useTheme();
+  const [open, setOpen] = useState(false);
+  // Mounted on first use only, then kept so it can slide away.
+  const [used, setUsed] = useState(false);
+  return (
+    <>
+      <IconButton
+        testID="recap-period-share"
+        accessibilityLabel={`Share your ${input.period.kind} as an image`}
+        onPress={() => {
+          setUsed(true);
+          setOpen(true);
+        }}>
+        <Share size={20} color={colors.text} strokeWidth={1.9} />
+      </IconButton>
+      {used ? <PeriodSheet input={input} visible={open} onClose={() => setOpen(false)} /> : null}
     </>
   );
 }

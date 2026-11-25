@@ -1,5 +1,5 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { ChevronRight, PenLine, Plus, Pointer, ScanBarcode, Search, Utensils, X, Zap } from 'lucide-react-native';
+import { ChevronRight, ChevronUp, PenLine, Plus, Pointer, ScanBarcode, Search, Utensils, X, Zap } from 'lucide-react-native';
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, type TextInput, useWindowDimensions, View } from 'react-native';
 
@@ -25,6 +25,8 @@ import { LogSavedMealSheet } from '@/features/food/SavedMealParts';
 import { SaveCurrentMealRow, SavedMealRow, useVisitOrder } from '@/features/food/SavedMealRow';
 import { loadSearchTab, openingTab, parseSearchTab, rememberSearchTab, SEARCH_CHIPS, usualEmpty, useSearchTab, type SearchTab } from '@/features/food/searchTab';
 import { resolveFood, usualFoods } from '@/features/food/usuals';
+import { refocusAfterAdd, visitAdds } from '@/features/food/visitAdds';
+import { VisitAddsSheet } from '@/features/food/VisitAddsSheet';
 import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { formatDayLabel } from '@/lib/dates';
 import { MEAL_LABEL, entriesTotal } from '@/lib/nutrition';
@@ -71,8 +73,17 @@ export default function FoodSearchScreen() {
   // Entries that already existed when the screen opened. Compared by id, not by time: a clock
   // that was wrong when an entry was logged must not make old entries count as added here.
   const [existing] = useState(() => new Set(Object.keys(useStore.getState().foodEntries)));
+  // "Added in this search": the sheet that lists this visit's adds, each with its own Undo.
+  const [showAdds, setShowAdds] = useState(false);
+  const allEntries = useStore((s) => s.foodEntries);
 
-  const recentFoods = useStore((s) => s.recentFoods);
+  // The lists keep their order while this screen is in front, so a row never moves under the finger: an add
+  // makes its food the most recent and adds to its usual count, which would otherwise move it (and the done mark
+  // of the row under the finger) up the list before the next tap. Read again each time the screen comes into view.
+  const [visitRecentFoods, setVisitRecentFoods] = useState(() => useStore.getState().recentFoods);
+  const [visitEntryIds, setVisitEntryIds] = useState(() => new Set(Object.keys(useStore.getState().foodEntries)));
+  // Where the search field's focus is, for putting it back after a one-tap add (`refocusAfterAdd`).
+  const fieldFocus = useRef({ focused: false, blurredAt: 0 });
   // Declared here: the header's short line shows it.
   const left = Math.round(useDay(date).remaining);
   const favoriteIds = useStore((s) => s.favoriteFoodIds);
@@ -82,7 +93,10 @@ export default function FoodSearchScreen() {
   const [visitFoodIds, setVisitFoodIds] = useState<string[] | null>(null);
   useFocusEffect(
     useCallback(() => {
-      setVisitFoodIds(useStore.getState().favoriteFoodIds);
+      const now = useStore.getState();
+      setVisitFoodIds(now.favoriteFoodIds);
+      setVisitRecentFoods(now.recentFoods);
+      setVisitEntryIds(new Set(Object.keys(now.foodEntries)));
     }, []),
   );
   const customFoods = useLive('customFoods');
@@ -92,8 +106,8 @@ export default function FoodSearchScreen() {
   const lastMap = useMemo(() => lastPortions(entries), [entries]);
   const customById = useMemo(() => new Map(customFoods.map((f) => [f.id, f as Food])), [customFoods]);
   const recents = useMemo(
-    () => recentFoods.map((f) => resolveFood(f, customById)).filter((f): f is Food => !!f).slice(0, 30),
-    [recentFoods, customById],
+    () => visitRecentFoods.map((f) => resolveFood(f, customById)).filter((f): f is Food => !!f).slice(0, 30),
+    [visitRecentFoods, customById],
   );
   const favorites = useMemo(() => {
     // Each favourite carries its own definition; favoriteFoodIds gives the newest-first order, and the order
@@ -108,10 +122,15 @@ export default function FoodSearchScreen() {
   }, [favoriteRecords, favoriteIds, visitFoodIds, customById]);
   const usuals = useMemo(
     () =>
-      usualFoods(entries, meal, todayDate, { limit: 12, withFood: true })
+      usualFoods(
+        entries.filter((e) => visitEntryIds.has(e.id)),
+        meal,
+        todayDate,
+        { limit: 12, withFood: true },
+      )
         .map((u) => (u.food ? resolveFood(u.food, customById) : null))
         .filter((f): f is Food => !!f),
-    [entries, meal, todayDate, customById],
+    [entries, visitEntryIds, meal, todayDate, customById],
   );
   // Saved meals in the order fixed when the screen came into view (favourites first): a star changes only
   // its icon until the next visit. The Favourites tab keeps a meal unstarred on this visit, so it can be starred again.
@@ -182,9 +201,25 @@ export default function FoodSearchScreen() {
     setFoodDraft(food);
     router.push(href('/food/detail', { meal, date }) as never);
   };
+  // After a one-tap add the focus goes back to the search field with its words selected, so the next letter typed
+  // starts the next search and the phone's keyboard stays up (`refocusAfterAdd` says when, and why the words stay).
+  const focusSearchWords = () => {
+    const node = inputRef.current as unknown as { focus?: () => void; select?: () => void; setSelection?: (start: number, end: number) => void } | null;
+    if (!node) return;
+    node.focus?.();
+    if (typeof node.select === 'function') node.select();
+    else node.setSelection?.(0, query.length);
+  };
   const quickAdd = (food: Food) => {
+    const back = refocusAfterAdd({
+      typed: q.length > 0,
+      fieldFocused: fieldFocus.current.focused,
+      blurredMsAgo: Date.now() - fieldFocus.current.blurredAt,
+      byKeyboard: pressedWithKeyboard(),
+    });
     const p = portionFor(food, lastMap);
     logFood({ food, serving: p.serving, quantity: p.quantity, meal, date });
+    if (back) focusSearchWords();
   };
   const go = (path: string, extra: Record<string, string> = {}) => router.push(href(path, { meal, date, ...extra }) as never);
 
@@ -259,6 +294,12 @@ export default function FoodSearchScreen() {
         placeholder={big || grown ? 'Search foods' : narrow ? 'Search foods and brands' : 'Search foods, brands, your foods'}
         value={query}
         onChangeText={setQuery}
+        onFocus={() => {
+          fieldFocus.current = { focused: true, blurredAt: 0 };
+        }}
+        onBlur={() => {
+          fieldFocus.current = { focused: false, blurredAt: Date.now() };
+        }}
         autoFocus
         autoCorrect={false}
         autoCapitalize="none"
@@ -296,16 +337,28 @@ export default function FoodSearchScreen() {
       />
     ) : null;
   // Once something is added: the running count and Done, above the best match's Add (so that one never moves).
-  // The budget is in the header's short line.
+  // The budget is in the header's short line. The count opens what this visit added, each with its own Undo.
+  const adds = visitAdds(allEntries, existing, date);
+  const closeSearch = () => (router.canGoBack() ? router.back() : router.replace(href('/diary', { date }) as never));
   const countRow =
     added.length > 0 ? (
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 44 }}>
-        <Text variant="title" testID="search-added-count" tabular style={{ flex: 1 }}>
-          {`${added.length} added · `}
-          <AnimatedNumber variant="title" value={addedKcal} format={kcal} duration={motion.duration.pourSmall} />
-          {' kcal'}
-        </Text>
-        <Button testID="search-done" title="Close search" size="md" full={false} onPress={() => (router.canGoBack() ? router.back() : router.replace(href('/diary', { date }) as never))} />
+        <PressableScale
+          testID="search-added-open"
+          onPress={() => setShowAdds(true)}
+          scaleTo={0.98}
+          accessibilityRole="button"
+          // Its words as drawn, then what it opens (label in name).
+          accessibilityLabel={`${added.length} added, ${kcal(addedKcal)} kcal. Show what was added, to undo any`}
+          style={{ flex: 1, minWidth: 0, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text variant="title" testID="search-added-count" tabular style={{ flexShrink: 1 }}>
+            {`${added.length} added · `}
+            <AnimatedNumber variant="title" value={addedKcal} format={kcal} duration={motion.duration.pourSmall} />
+            {' kcal'}
+          </Text>
+          <ChevronUp size={18} color={colors.text} strokeWidth={2.2} />
+        </PressableScale>
+        <Button testID="search-done" title="Close search" size="md" full={false} onPress={closeSearch} />
       </View>
     ) : null;
   const footer =
@@ -547,6 +600,17 @@ export default function FoodSearchScreen() {
         </>
       )}
       <LogSavedMealSheet key={logging?.id ?? 'none'} meal={logging} mealType={meal} date={date} onClose={() => setLogging(null)} />
+      <VisitAddsSheet
+        visible={showAdds && adds.length > 0}
+        adds={adds}
+        meal={meal}
+        today={todayDate}
+        onClose={() => setShowAdds(false)}
+        onCloseSearch={() => {
+          setShowAdds(false);
+          closeSearch();
+        }}
+      />
       <Sheet
         visible={!!amountEntry}
         onClose={() => setAmountEntryId(null)}
@@ -588,6 +652,20 @@ export default function FoodSearchScreen() {
       </Sheet>
     </Screen>
   );
+}
+
+/**
+ * Web: whether the press now being handled came from a keyboard (the control it is on shows the focus ring,
+ * `:focus-visible`, which a tap or a click never sets). Always false on a phone.
+ */
+function pressedWithKeyboard(): boolean {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return false;
+  const el = document.activeElement as (Element & { matches?: (selector: string) => boolean }) | null;
+  try {
+    return !!el && el.tagName !== 'INPUT' && !!el.matches?.(':focus-visible');
+  } catch {
+    return false;
+  }
 }
 
 /** Search's rows as a list on the web (`role="list"`, each row a `listitem`), so a screen reader says how many there are. */

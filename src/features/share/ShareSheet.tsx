@@ -10,7 +10,7 @@ import { Button, haptic, PressableScale, Sheet, Text, toast } from '@/ui';
 
 import { canShareImage, saveCard, SAVE_AVAILABLE, shareCard, type ExportResult } from './capture';
 import { CardArt } from './CardArt';
-import { CHOICE_LABEL, CHOICES_FOR, DEFAULT_SHARE_CHOICES, type ShareChoices } from './content';
+import { CHOICE_LABEL, CHOICES_FOR, DEFAULT_SHARE_CHOICES, type ShareChoices, type ShareKind } from './content';
 import type { Scene } from './scene';
 
 /**
@@ -18,11 +18,13 @@ import type { Scene } from './scene';
  * share of a day starts where the first left off, and turning calorie numbers
  * on for a day card never turns them on for a week card.
  */
-const remembered: Record<'day' | 'week', ShareChoices> = {
+const remembered: Record<ShareKind, ShareChoices> = {
   day: DEFAULT_SHARE_CHOICES,
   week: DEFAULT_SHARE_CHOICES,
+  month: DEFAULT_SHARE_CHOICES,
+  year: DEFAULT_SHARE_CHOICES,
 };
-function remember(kind: 'day' | 'week', next: ShareChoices) {
+function remember(kind: ShareKind, next: ShareChoices) {
   remembered[kind] = next;
 }
 
@@ -93,7 +95,7 @@ export function ShareSheet({
 }: {
   visible: boolean;
   onClose: () => void;
-  kind: 'day' | 'week';
+  kind: ShareKind;
   title: string;
   plan: (choices: ShareChoices) => SharePlan;
   testID?: string;
@@ -140,7 +142,9 @@ export function ShareSheet({
   const maxH = winH * 0.88 - chrome - spacing.lg - choicesH - 4;
   // At 150% text and more the words no longer fit beside a preview sized to the sheet: the preview keeps its
   // size and the sheet's body scrolls, clearly (the choices one to a line), rather than shrink the card to nothing.
-  const previewW = large ? Math.min(kind === 'day' ? 230 : 300, maxW) : Math.max(120, Math.min(kind === 'day' ? 230 : 300, maxW, (maxH * p.scene.width) / p.scene.height));
+  // A portrait card (a day, a month, a year: 9 x 16) is drawn narrower than the week's.
+  const cardW = p.scene.height > p.scene.width * 1.4 ? 230 : 300;
+  const previewW = large ? Math.min(cardW, maxW) : Math.max(120, Math.min(cardW, maxW, (maxH * p.scene.width) / p.scene.height));
 
   const toggle = (k: keyof ShareChoices) => {
     const next = { ...choices, [k]: !choices[k] };
@@ -224,7 +228,7 @@ export function ShareSheet({
             ))}
           </View>
           <Text variant="caption" color="textSecondary">
-            {kind === 'day' ? 'Weight is never on a card. Calorie numbers and food names only when you add them.' : 'Weight is never on a card. Calorie numbers only when you add them.'}
+            {CHOICES_FOR[kind].includes('foods') ? 'Weight is never on a card. Calorie numbers and food names only when you add them.' : 'Weight is never on a card. Calorie numbers only when you add them.'}
           </Text>
         </View>
       </View>

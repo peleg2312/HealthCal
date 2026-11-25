@@ -61,3 +61,16 @@ export function CardArt({ scene, width }: { scene: Scene; width: number }) {
     </Svg>
   );
 }
+
+/**
+ * Primitives drawn at their own units (one unit, one px), with no background: one layer of a picture on screen
+ * built from the share cards' primitives (the month's and year's cups, which pour a row at a time).
+ */
+export function PrimSvg({ prims, width, height }: { prims: Prim[]; width: number; height: number }) {
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
+  return (
+    <Svg width={width} height={height} pointerEvents="none">
+      {prims.map((p, i) => draw(p, `p${i}`, `layer${uid}`))}
+    </Svg>
+  );
+}

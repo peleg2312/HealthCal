@@ -192,7 +192,7 @@ export function wrap(text: string, width: number, size: number, font: FontRole, 
 }
 
 /** The HealthCal mark: a small cup in the primary with its level line, and the wordmark. */
-function mark(c: CardColors, x: number, baseline: number): Prim[] {
+export function mark(c: CardColors, x: number, baseline: number): Prim[] {
   return [
     ...cup(c, { x, y: baseline - 17, w: 14, h: 18, base: 5, level: 0.62, color: c.primary, rim: 2, edge: 1.3 }),
     { k: 'text', x: x + 22, y: baseline, runs: [{ text: 'HealthCal', font: 'display', size: 17, fill: c.text, letterSpacing: -0.2 }] },
@@ -206,7 +206,7 @@ function statColor(c: CardColors, s: ShareStat): string {
 /** Rows of stats: a small key and a number with its unit, the label under it (up to two lines). */
 export const STAT_ROW_H = 64;
 
-function statRow(c: CardColors, stats: ShareStat[], x: number, y: number, width: number): { prims: Prim[]; height: number } {
+export function statRow(c: CardColors, stats: ShareStat[], x: number, y: number, width: number): { prims: Prim[]; height: number } {
   const prims: Prim[] = [];
   const perRow = stats.length === 4 ? 2 : 3;
   const rows = Math.ceil(stats.length / perRow);

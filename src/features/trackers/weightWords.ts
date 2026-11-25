@@ -17,7 +17,7 @@ export function rangeSpanWords(summary: Pick<WeightRangeSummary, 'from' | 'since
 
 /**
  * The range's two figures under the chips, each with its caption: the weigh-ins' average ("79.3" kg,
- * "Average, last 3 months") and their lowest to highest ("78.3–80.6" kg, "Lowest to highest, 24 weigh-ins"),
+ * "Average, last 3 months") and their lowest to highest ("78.3–80.6" kg, "Lowest to highest"; said with the count),
  * so how far a day's reading swings is seen beside the average. Every weight with one decimal (`weightText`).
  */
 export function rangeFigures(
@@ -29,14 +29,15 @@ export function rangeFigures(
   const n = summary.weighIns;
   const figure = (kg: number) => weightText(kg, units).split(' ')[0];
   const unit = weightText(0, units).split(' ')[1];
-  const spreadLabel = n > 1 ? `Lowest to highest, ${n} weigh-ins` : '1 weigh-in';
+  // The count is said, not drawn: the caption keeps to one line at 360 px.
+  const spreadLabel = 'Lowest to highest';
   return {
     unit,
     average: figure(summary.averageKg),
     averageLabel: `Average, ${rangeSpanWords(summary, range)}`,
     spread: n > 1 ? `${figure(summary.lowKg)}–${figure(summary.highKg)}` : null,
     spreadLabel,
-    spreadSpoken: n > 1 ? `${figure(summary.lowKg)} to ${figure(summary.highKg)} ${unit}, ${spreadLabel}` : null,
+    spreadSpoken: n > 1 ? `${figure(summary.lowKg)} to ${figure(summary.highKg)} ${unit}, ${spreadLabel.toLowerCase()} of ${n} weigh-ins` : null,
   };
 }
 

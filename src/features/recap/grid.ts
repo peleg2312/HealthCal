@@ -49,11 +49,15 @@ export interface GridGeometry {
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
-/** Sizes for `rows` drawn `width` wide, at most `maxHeight` tall when given (the share card). */
-export function gridGeometry(kind: PeriodKind, rowCount: number, width: number, maxHeight?: number): GridGeometry {
+/**
+ * Sizes for `rowCount` rows drawn `width` wide: at most `maxHeight` tall when given (the share card); `labelW`
+ * (a year's month names) and `headerH` (a month's weekday letters) grow on screen with the text size.
+ */
+export function gridGeometry(kind: PeriodKind, rowCount: number, width: number, o: { maxHeight?: number; labelW?: number; headerH?: number } = {}): GridGeometry {
   const n = Math.max(1, rowCount);
+  const { maxHeight } = o;
   if (kind === 'month') {
-    const headerH = 18;
+    const headerH = o.headerH ?? 18;
     const top = 14;
     const rowGap = 4;
     const slot = width / 7;
@@ -68,7 +72,7 @@ export function gridGeometry(kind: PeriodKind, rowCount: number, width: number, 
     const rowH = top + cupH;
     return { kind, width, labelW: 0, headerH, slot, cupW, cupH, top, rowH, rowGap, base: Math.min(9, cupW / 3), rim: 2.5, edge: 1.3, height: headerH + n * rowH + (n - 1) * rowGap };
   }
-  const labelW = 30;
+  const labelW = o.labelW ?? 30;
   const slot = (width - labelW) / YEAR_SLOTS;
   const cupW = Math.max(3, slot - Math.max(1.5, slot * 0.24));
   let cupH = clamp(Math.round(cupW * 2.1), 10, 26);

@@ -30,10 +30,15 @@ export interface ShareChoices {
 
 export const DEFAULT_SHARE_CHOICES: ShareChoices = { kcal: false, water: true, activity: true, streak: true, week: true, foods: false };
 
-/** The choices a card kind offers, in the order the sheet lists them. A week card has no food names. */
-export const CHOICES_FOR: Record<'day' | 'week', (keyof ShareChoices)[]> = {
+/** The kinds of card: a day, a week, and a month or a year in cups (./periodContent.ts). */
+export type ShareKind = 'day' | 'week' | 'month' | 'year';
+
+/** The choices a card kind offers, in the order the sheet lists them. A week card has no food names; a month or a year no streak. */
+export const CHOICES_FOR: Record<ShareKind, (keyof ShareChoices)[]> = {
   day: ['kcal', 'water', 'activity', 'streak', 'week', 'foods'],
   week: ['kcal', 'water', 'activity', 'streak'],
+  month: ['kcal', 'water', 'activity', 'foods'],
+  year: ['kcal', 'water', 'activity', 'foods'],
 };
 
 export const CHOICE_LABEL: Record<keyof ShareChoices, string> = {

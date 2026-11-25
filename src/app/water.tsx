@@ -424,7 +424,7 @@ function WaterScreen() {
   const keyLineCount = keyShown ? keyLines(keyItems, units, keyRoom, growth).length : 0;
   // Under 360 px the cup gives up the room of every key line past the first, so the glasses stay in the first view
   // at 320 x 640 whatever the day holds (the first line fits in the room the screen already has).
-  const vesselH = narrow ? Math.max(120, 168 - Math.max(0, keyLineCount - 1) * (KEY_LINE + 4)) : 220;
+  const vesselH = narrow ? Math.max(136, 168 - Math.max(0, keyLineCount - 1) * (KEY_LINE + 4)) : 220;
   const cupA11y = spokenUnits(`${formatVolume(consumed, units)} of ${formatVolume(goal, units)}`);
   const key = keyShown ? <DrinkKey testID="water-key" items={keyItems} units={units} room={keyRoom} /> : null;
 
@@ -468,8 +468,31 @@ function WaterScreen() {
     <Screen header={<Header title="Water" subtitle={isToday ? 'Today' : dayTitle(date)} />} backdrop={colors.water} testID="water-screen">
       <Card padding={18} style={{ gap: spacing.lg }} testID="water-hero">
         {big ? (
-          // The cup, and its three words in a column of their own beside it (under it when they need the width).
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: spacing.lg }}>
+          <>
+            {/* The cup, and its three words in a column of their own beside it (under it when they need the width). */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: spacing.lg }}>
+              <LayeredVessel
+                testID="water-cup"
+                value={consumed}
+                max={goal}
+                layers={layers}
+                onReached={onReached}
+                memoryKey={`water-${date}`}
+                width={narrow ? 76 : 96}
+                height={narrow ? 168 : 220}
+                accessibilityLabel={cupA11y}
+              />
+              <View style={{ flexGrow: 1, flexBasis: 140, minWidth: 0, gap: spacing.sm }}>
+                {goalWords}
+                {percentWords}
+                {drunkWords(false)}
+              </View>
+            </View>
+            {key}
+          </>
+        ) : (
+          // The cup and, right under it, the key to its layers (with two kinds or more).
+          <View style={{ gap: 10 }}>
             <LayeredVessel
               testID="water-cup"
               value={consumed}
@@ -478,57 +501,36 @@ function WaterScreen() {
               onReached={onReached}
               memoryKey={`water-${date}`}
               width={narrow ? 76 : 96}
-              height={narrow ? 168 : 220}
+              // Under 360 px the cup is shorter (and shorter still for a key of two lines or more), so all four
+              // glasses stay in the first view at 320 x 640.
+              height={vesselH}
+              labelGap={narrow ? 14 : 18}
+              // Labels that meet at some level keep 8 px between them, at every value.
+              labelSpacing={8}
               accessibilityLabel={cupA11y}
+              labels={[
+                {
+                  key: 'goal',
+                  at: goal,
+                  height: 20,
+                  content: goalWords,
+                },
+                {
+                  key: 'percent',
+                  at: (Math.min(consumed, goal) + goal) / 2,
+                  height: 72,
+                  content: percentWords,
+                },
+                {
+                  key: 'drunk',
+                  at: Math.min(consumed, goal),
+                  height: 24,
+                  tick: consumed > 0 ? colors.rim : undefined,
+                  content: drunkWords(true),
+                },
+              ]}
             />
-            <View style={{ flexGrow: 1, flexBasis: 140, minWidth: 0, gap: spacing.sm }}>
-              {goalWords}
-              {percentWords}
-              {drunkWords(false)}
-            </View>
-          </View>
-        ) : null}
-        {big ? key : (
-          // The cup and, right under it, the key to its layers (with two kinds or more).
-          <View style={{ gap: 10 }}>
-          <LayeredVessel
-            testID="water-cup"
-            value={consumed}
-            max={goal}
-            layers={layers}
-            onReached={onReached}
-            memoryKey={`water-${date}`}
-            width={narrow ? 76 : 96}
-            // Under 360 px the cup is shorter (and shorter still for a key of two lines or more), so all four
-            // glasses stay in the first view at 320 x 640.
-            height={vesselH}
-            labelGap={narrow ? 14 : 18}
-            // Labels that meet at some level keep 8 px between them, at every value.
-            labelSpacing={8}
-            accessibilityLabel={cupA11y}
-            labels={[
-              {
-                key: 'goal',
-                at: goal,
-                height: 20,
-                content: goalWords,
-              },
-              {
-                key: 'percent',
-                at: (Math.min(consumed, goal) + goal) / 2,
-                height: 72,
-                content: percentWords,
-              },
-              {
-                key: 'drunk',
-                at: Math.min(consumed, goal),
-                height: 24,
-                tick: consumed > 0 ? colors.rim : undefined,
-                content: drunkWords(true),
-              },
-            ]}
-          />
-          {key}
+            {key}
           </View>
         )}
 

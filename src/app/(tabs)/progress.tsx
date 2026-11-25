@@ -17,6 +17,7 @@ import { MilestonesCard } from '@/features/progress/MilestonesCard';
 import { OverviewGrid, type ProgressSegment } from '@/features/progress/OverviewGrid';
 import { RangeSwitch, SegmentSwitch } from '@/features/progress/parts';
 import { RecapCard } from '@/features/progress/RecapCard';
+import { PeriodOfferRow, PeriodsCard } from '@/features/recap/PeriodsCard';
 import { useRecapReady } from '@/features/progress/recapReady';
 import { useProgressData, type RangeDays } from '@/features/progress/useProgressData';
 import { WeightCard } from '@/features/progress/WeightCard';
@@ -42,6 +43,7 @@ export default function ProgressScreen() {
     const loggedThisWeek = d.weekDays.filter((x) => x.date >= weekStart && hasFoodLogged(x.entries)).length;
     return (
       <Screen tabs testID="progress-screen" header={<TabHeader tab="progress" overline="Trends and insights" overlineShort="Trends" title="Progress" />}>
+        <PeriodOfferRow />
         <EarlyState
           completeDays={d.completeEver}
           weighIns={d.series.entries.length}
@@ -52,6 +54,7 @@ export default function ProgressScreen() {
         <WeightCard series={d.series} start={start} end={d.today} profile={d.profile} />
         <EnergyCard model={d.model} useAdaptiveSetting={d.profile.useAdaptiveTdee} />
         <ConsistencyCard consistency={d.consistency} weekDays={d.weekDays} today={d.today} />
+        <PeriodsCard />
         <MilestonesCard milestones={d.milestones} />
       </Screen>
     );
@@ -66,6 +69,8 @@ export default function ProgressScreen() {
         <>
           {/* The period overview leads (its first two rows in the first view at 360 x 740, its first row at 320 x
               640): its tiles fade up in reading order (1 to 8), then the cards under it carry on the sequence. */}
+          {/* Once, as a month or a year ends: "Your October in cups" (src/features/recap/offer.ts). */}
+          <PeriodOfferRow />
           <OverviewGrid d={d} range={range} onOpen={setSegment} />
           <FadeUp index={9}>
             <CaloriesADay days={d.days} summary={d.summary} today={d.today} onOpen={() => setSegment('nutrition')} />
@@ -79,6 +84,9 @@ export default function ProgressScreen() {
             </FadeUp>
           ) : null}
           <FadeUp index={12}>
+            <PeriodsCard />
+          </FadeUp>
+          <FadeUp index={13}>
             <MilestonesCard milestones={d.milestones} />
           </FadeUp>
         </>

@@ -374,7 +374,8 @@ export function FoodRow({
 
 function AmountStepper({ amount, name, testID }: { amount: RowAmount; name: string; testID?: string }) {
   const { colors, radius } = useTheme();
-  const lang = useLangName(`${name}, ${withoutMarks(amount.label)}. Change amount`);
+  // The row's food is added (the stepper takes the "+"'s place only then): said, and marked with the done mark.
+  const lang = useLangName(`${name}, added, ${withoutMarks(amount.label)}. Change amount`);
   return (
     <View
       testID={testID ? `${testID}-stepper` : undefined}
@@ -388,8 +389,10 @@ function AmountStepper({ amount, name, testID }: { amount: RowAmount; name: stri
         feedback="select"
         accessibilityLabel={lang.label}
         {...lang.props}
-        style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
+        style={{ minWidth: 44, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
         {lang.hidden}
+        {/* The done mark, the small filled ink cup (never a check, which means only a day on budget): this food is added. */}
+        <CupKey color={colors.text} size={8} />
         <Text variant="numM" tabular numberOfLines={1} style={{ fontSize: 14.5, lineHeight: 18 }}>
           {amount.label}
         </Text>

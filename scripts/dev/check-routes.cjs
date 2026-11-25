@@ -21,12 +21,12 @@ const base = flags.url || 'http://localhost:8081';
 const ROUTES = [
   '/', '/diary', '/train', '/progress', '/welcome', '/auth?mode=signin', '/auth?mode=signup', '/onboarding',
   '/food/search?meal=lunch', '/food/detail?meal=lunch', '/food/scan?meal=lunch', '/food/photo?meal=lunch&mode=text', '/food/quick?meal=lunch',
-  '/food/custom', '/food/meals?meal=lunch', '/food/meal-edit', '/food/meal-pick',
+  '/food/custom', '/food/meals?meal=lunch', '/food/meal-edit', '/food/meal-pick', '/food/journal',
   '/activity/pick', '/activity/log?activityId=running', '/activity/strength', '/activity/import',
   '/water', '/weight', '/body', '/sleep', '/fasting',
   '/profile', '/settings/goals', '/settings/reminders', '/settings/account', '/settings/data', '/settings/about', '/settings/health-sync', '/settings/plan', '/legal/terms', '/legal/privacy',
   '/morning', '/morning?first=1', '/coach', '/coach?ask=training', '/coach?ask=ideas',
-  '/recap', '/consistency', '/friends', '/friends/add?invite=ABCD2345', '/friends/add?code=ABCD2345', '/no-such-page',
+  '/recap', '/recap/month', '/recap/month?month=2026-10', '/recap/year', '/consistency', '/friends', '/friends/add?invite=ABCD2345', '/friends/add?code=ABCD2345', '/no-such-page',
 ];
 
 /** Without a profile only these may stay where they are; everything else must end on /welcome. */

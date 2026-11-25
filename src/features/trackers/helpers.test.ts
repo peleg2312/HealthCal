@@ -20,7 +20,11 @@ import {
   normalizePresets,
   relativeDayTime,
   sleepSummary,
+  WEIGHT_RANGES,
+  weightAxisLabels,
   weightChartData,
+  weightRangeFrom,
+  weightRangeSummary,
   weightStats,
 } from './helpers';
 
@@ -87,6 +91,28 @@ describe('weight', () => {
     expect(month.line).toHaveLength(31);
     expect(month.dots).toHaveLength(2);
     expect(month.labels).toEqual(['Oct 14', 'Oct 29', 'Nov 13']);
+  });
+
+  it('draws 6 months and a year, and labels a long span by month with its year', () => {
+    const long = weightTrend([
+      { date: '2025-09-01', kg: 84 },
+      { date: '2026-11-13', kg: 77 },
+    ]);
+    expect(weightRangeFrom(long[0].date, '6m', '2026-11-13')).toBe('2026-05-15');
+    expect(weightRangeFrom(long[0].date, '1y', '2026-11-13')).toBe('2025-11-13');
+    expect(weightRangeFrom(long[0].date, 'all', '2026-11-13')).toBe('2025-09-01');
+    expect(weightChartData(long, '1y', '2026-11-13').line).toHaveLength(366);
+    expect(weightChartData(long, '1y', '2026-11-13').labels).toEqual(['Nov 2025', 'May', 'Nov 2026']);
+    expect(weightAxisLabels('2026-10-01', '2026-11-13')).toEqual(['Oct 1', 'Oct 23', 'Nov 13']);
+    expect(WEIGHT_RANGES.map((r) => r.label)).toEqual(['1M', '3M', '6M', '1Y', 'All']);
+  });
+
+  it("sums up a range's weigh-ins and the trend's change", () => {
+    const s = weightRangeSummary(trend, '1m', '2026-11-13')!;
+    expect(s).toMatchObject({ from: '2026-10-14', to: '2026-11-13', sinceFirst: false, weighIns: 2, averageKg: 77.5, lowKg: 77, highKg: 78 });
+    expect(s.changeKg).toBeLessThan(0);
+    expect(weightRangeSummary(trend, 'all', '2026-11-13')!.sinceFirst).toBe(true);
+    expect(weightRangeSummary([], 'all', '2026-11-13')).toBeNull();
   });
 
   it('converts for display', () => {
