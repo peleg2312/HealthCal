@@ -384,9 +384,12 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
     </View>
   );
   const spoken = `Daily target ${formatNumber(target)} kilocalories${showBurn ? `, against about ${formatNumber(burn)} kilocalories you burn` : ', matched to what you burn'}`;
+  // The figure keeps its unit. Under 360 px the label column holds about 110 px, so the line breaks after the
+  // figure ("−550 kcal" / "for your goal") rather than leave "goal" alone, and the label is placed as two lines.
+  const gapWords = `${gap > 0 ? '−' : '+'}${formatNumber(Math.abs(gap))} kcal${narrow ? '\n' : ' '}for your goal`;
   const gapLabel = (
     <Text variant="label" color="textSecondary" testID="plan-gap">
-      {`${gap > 0 ? '−' : '+'}${formatNumber(Math.abs(gap))} kcal for your goal`}
+      {gapWords}
     </Text>
   );
   const matched = (
@@ -480,7 +483,7 @@ function BudgetVessel({ target, tdee, goal, note }: { target: number; tdee: numb
                 {
                   key: 'gap',
                   at: (target + burn) / 2,
-                  height: 22,
+                  height: narrow ? 38 : 22,
                   content: gapLabel,
                 },
               ]
