@@ -72,17 +72,20 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
 
   // Through the common text steps (text grown, under very large text) each tile measures its words as drawn two a
   // row and says whether they fit; one tile that does not puts every tile one a row. With very large text, one a row.
+  // The verdicts are kept here, not in the probes, which mount again with nothing measured each time the screen comes
+  // into focus or leaves it: a probe reports only a measured verdict, so the last one stays and Progress comes back
+  // drawn as it left, never two a row for a few frames where its words do not fit.
   const grown = useGrownText();
   const veryLarge = useVeryLargeText();
   const measuring = grown && !veryLarge;
   const measureKey = useMeasureKey();
   const [cardInner, setCardInner] = useState(0);
-  const [fits, setFits] = useState<Record<string, boolean | null>>({});
+  const [fits, setFits] = useState<Record<string, boolean>>({});
   const room = tileRoom(cardInner, spacing.lg);
   const oneColumn = veryLarge || (measuring && !keepsShape(Object.values(fits)));
   const fitFor = (id: string) => ({
     oneColumn,
-    probe: measuring ? { room, key: measureKey, onFit: (f: boolean | null) => setFits((was) => (was[id] === f ? was : { ...was, [id]: f })) } : undefined,
+    probe: measuring ? { room, key: measureKey, onFit: (f: boolean) => setFits((was) => (was[id] === f ? was : { ...was, [id]: f })) } : undefined,
   });
 
   return (

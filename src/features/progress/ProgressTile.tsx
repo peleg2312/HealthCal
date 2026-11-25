@@ -8,7 +8,7 @@ import { CupKey, FadeUp, PressableScale, Text, useGrownText } from '@/ui';
 
 import { allFit, lineFits, wrapFits } from './grownFit';
 import { TrendMark } from './parts';
-import { WrapProbe } from './Probe';
+import { WidestRun, WrapProbe } from './Probe';
 
 /**
  * One cell of the overview card: a cup key and title, one large value with
@@ -72,10 +72,10 @@ export function ProgressTile({
   oneColumn?: boolean;
   /**
    * With text grown, under very large text: the tile's words are measured as drawn two a row, in `room` (the
-   * room inside a tile two a row), and whether they fit is reported to `onFit` (`TileProbe`). `key` mounts the
-   * probe again when the screen comes back into focus (`useMeasureKey`).
+   * room inside a tile two a row), and whether they fit is reported to `onFit` (`TileProbe`) once they are measured,
+   * never before. `key` mounts the probe again when the screen comes back into focus (`useMeasureKey`).
    */
-  probe?: { room: number; key: string; onFit: (fits: boolean | null) => void };
+  probe?: { room: number; key: string; onFit: (fits: boolean) => void };
 }) {
   const { colors, spacing } = useTheme();
   // At 320 px a tile is about 108 px wide: the number steps down instead of being cut.
@@ -156,7 +156,10 @@ const CAPTION_LINES_GROWN = 3;
 /**
  * A tile's words drawn unseen as they would be two a row, in `room`: the title line (its key, the title on one line),
  * the number line (the number with its unit and the mark beside it, on one line) and the caption wrapped in the room
- * (no word wider than it, three lines at most). Whether all of them fit goes to `onFit` (null until measured).
+ * (no word wider than it, measured on one line as well, since a phone splits such a word rather than widen the box;
+ * three lines at most). Whether all of them fit goes to `onFit` once all are measured, and only then: this probe is
+ * mounted again, with nothing measured, each time the screen comes into focus or leaves it, and the grid keeps the
+ * last verdict it was given, so the screen comes back drawn as it left (as `MeasureWidth`'s last good width does).
  */
 function TileProbe({
   room,
@@ -183,19 +186,21 @@ function TileProbe({
   trend?: Direction | null;
   period?: string;
   line?: string;
-  onFit: (fits: boolean | null) => void;
+  onFit: (fits: boolean) => void;
 }) {
   const [titleW, setTitleW] = useState(0);
   const [valueW, setValueW] = useState(0);
   const [cap, setCap] = useState({ width: 0, height: 0 });
   const [lineH, setLineH] = useState(0);
+  const [wordW, setWordW] = useState(0);
   const fits = allFit([
     lineFits(titleW, room),
     lineFits(valueW, room),
-    line ? wrapFits({ ...cap, lineHeight: lineH, room, maxLines: CAPTION_LINES_GROWN }) : true,
+    line ? wrapFits({ ...cap, lineHeight: lineH, room, maxLines: CAPTION_LINES_GROWN, word: wordW }) : true,
   ]);
+  // Null is "not measured yet" (a probe just mounted again): never passed on, so the last verdict stays.
   useEffect(() => {
-    onFit(fits);
+    if (fits !== null) onFit(fits);
   }, [fits, onFit]);
   return (
     <>
@@ -230,6 +235,15 @@ function TileProbe({
               x
             </Text>
           </WrapProbe>
+          <WidestRun
+            text={line}
+            onWidth={setWordW}
+            draw={(run) => (
+              <Text variant="caption" color="textSecondary">
+                {run}
+              </Text>
+            )}
+          />
         </>
       ) : null}
     </>

@@ -10,7 +10,7 @@ import { figure, MiniCup, Text, useGrownText } from '@/ui';
 import { spokenUnits } from './chartWords';
 import { besideRoom, keepsShape, milestoneRoom, wrapFits } from './grownFit';
 import { SectionCard } from './parts';
-import { WrapProbe } from './Probe';
+import { WidestRun, WrapProbe } from './Probe';
 
 /** A milestone's cup, and the room between it and its words. */
 const CUP_W = 22;
@@ -53,13 +53,15 @@ export function MilestonesCard({ milestones }: { milestones: Milestone[] }) {
   const wide = useWindowDimensions().width >= 360;
   const [doneRow, setDoneRow] = useState(0);
   const [nextRow, setNextRow] = useState(0);
-  const [doneFits, setDoneFits] = useState<Record<string, boolean | null>>({});
-  const [nextFits, setNextFits] = useState<Record<string, boolean | null>>({});
+  // The verdicts are kept here: a probe mounts again with nothing measured each time the screen comes into focus or
+  // leaves it, and reports only a measured verdict, so the last one stays and the card comes back drawn as it left.
+  const [doneFits, setDoneFits] = useState<Record<string, boolean>>({});
+  const [nextFits, setNextFits] = useState<Record<string, boolean>>({});
   const two = wide && (measuring ? keepsShape(Object.values(doneFits)) : grow <= LARGE_TEXT);
   // The share beside its title; under it with very large text, or where a title measured beside it does not fit.
   const beside = measuring ? keepsShape(Object.values(nextFits)) : grow <= LARGE_TEXT;
   const doneRoom = milestoneRoom(doneRow, CUP_W, spacing.md);
-  const putFit = (set: typeof setDoneFits, id: string) => (f: boolean | null) => set((was) => (was[id] === f ? was : { ...was, [id]: f }));
+  const putFit = (set: typeof setDoneFits, id: string) => (f: boolean) => set((was) => (was[id] === f ? was : { ...was, [id]: f }));
   const doneAll = milestones.filter((m) => m.achieved).sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
   const done = doneAll.slice(0, 4);
   const next = milestones
@@ -152,14 +154,17 @@ export function MilestonesCard({ milestones }: { milestones: Milestone[] }) {
 
 /**
  * A milestone's title laid out unseen in `room`, as it wraps there: whether it fits in `maxLines` with no word wider
- * than the room goes to `onFit` (null until measured).
+ * than the room (measured on one line as well, since a phone splits such a word rather than widen the box) goes to
+ * `onFit` once it is measured, and only then, so the card keeps the last verdict while the probe mounts again.
  */
-function TitleProbe({ title, room, maxLines, onFit }: { title: string; room: number; maxLines: number; onFit: (fits: boolean | null) => void }) {
+function TitleProbe({ title, room, maxLines, onFit }: { title: string; room: number; maxLines: number; onFit: (fits: boolean) => void }) {
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [lineH, setLineH] = useState(0);
-  const fits = wrapFits({ ...size, lineHeight: lineH, room, maxLines });
+  const [wordW, setWordW] = useState(0);
+  const fits = wrapFits({ ...size, lineHeight: lineH, room, maxLines, word: wordW });
+  // Null is "not measured yet": never passed on.
   useEffect(() => {
-    onFit(fits);
+    if (fits !== null) onFit(fits);
   }, [fits, onFit]);
   return (
     <>
@@ -169,12 +174,13 @@ function TitleProbe({ title, room, maxLines, onFit }: { title: string; room: num
       <WrapProbe room={room} onSize={(_w, h) => setLineH(h)}>
         <Text variant="label">x</Text>
       </WrapProbe>
+      <WidestRun text={title} onWidth={setWordW} draw={(run) => <Text variant="label">{run}</Text>} />
     </>
   );
 }
 
 /** An "Up next" row's share drawn unseen, and its title measured in the room left beside it (`TitleProbe`). */
-function NextProbe({ title, pct, row, gap, onFit }: { title: string; pct: number; row: number; gap: number; onFit: (fits: boolean | null) => void }) {
+function NextProbe({ title, pct, row, gap, onFit }: { title: string; pct: number; row: number; gap: number; onFit: (fits: boolean) => void }) {
   const [pctW, setPctW] = useState(0);
   const room = besideRoom(row, CUP_W, pctW, gap);
   return (

@@ -550,7 +550,7 @@ src/features/progress/InsightsCard.tsx	src/features/progress/insightMark.ts	src/
 src/features/progress/MacrosCard.tsx	src/features/progress/chartWords.ts	src/features/progress/parts.tsx	src/lib/dates.ts	src/lib/insights.ts	src/lib/nutrition.ts	src/theme/index.tsx	src/ui/Charts.tsx	src/ui/Chip.tsx	src/ui/ProgressBar.tsx	src/ui/Text.tsx	src/ui/index.ts
 src/features/progress/MilestonesCard.tsx	src/features/progress/Probe.tsx	src/features/progress/chartWords.ts	src/features/progress/grownFit.ts	src/features/progress/parts.tsx	src/features/today/MeasureWidth.tsx	src/lib/dates.ts	src/lib/insights.ts	src/theme/index.tsx	src/theme/textSize.ts	src/ui/Text.tsx	src/ui/Vessel.tsx	src/ui/decorative.ts	src/ui/index.ts
 src/features/progress/OverviewGrid.tsx	src/features/progress/ProgressTile.tsx	src/features/progress/change.ts	src/features/progress/goalDate.ts	src/features/progress/grownFit.ts	src/features/progress/parts.tsx	src/features/progress/useProgressData.ts	src/features/today/MeasureWidth.tsx	src/features/trackers/helpers.ts	src/lib/insights.ts	src/lib/trend.ts	src/lib/units.ts	src/theme/index.tsx	src/theme/textSize.ts	src/ui/Card.tsx	src/ui/Text.tsx	src/ui/index.ts
-src/features/progress/Probe.tsx
+src/features/progress/Probe.tsx	src/features/progress/grownFit.ts	src/features/today/MeasureWidth.tsx	src/features/today/measured.ts
 src/features/progress/ProgressTile.tsx	src/features/progress/Probe.tsx	src/features/progress/grownFit.ts	src/features/progress/parts.tsx	src/features/today/MeasureWidth.tsx	src/lib/insights.ts	src/theme/index.tsx	src/theme/textSize.ts	src/ui/Chip.tsx	src/ui/Pressable.tsx	src/ui/Text.tsx	src/ui/index.ts	src/ui/motion.tsx
 src/features/progress/RecapCard.tsx	src/features/progress/parts.tsx	src/lib/dates.ts	src/lib/insights.ts	src/theme/index.tsx	src/ui/Card.tsx	src/ui/Chip.tsx	src/ui/Pressable.tsx	src/ui/Text.tsx	src/ui/index.ts
 src/features/progress/RecapCups.tsx	src/features/progress/chartWords.ts	src/features/progress/recapDays.ts	src/lib/dates.ts	src/theme/index.tsx	src/theme/textSize.ts	src/theme/tokens.ts	src/ui/Pressable.tsx	src/ui/Text.tsx	src/ui/Vessel.tsx	src/ui/index.ts
@@ -567,8 +567,8 @@ src/features/progress/consistency.test.ts	src/features/progress/consistency.ts	s
 src/features/progress/consistency.ts	src/lib/dates.ts	src/lib/insights.ts	src/types/index.ts
 src/features/progress/goalDate.test.ts	src/features/progress/goalDate.ts
 src/features/progress/goalDate.ts	src/features/onboarding/projection.ts	src/features/trackers/helpers.ts	src/lib/units.ts	src/types/index.ts
-src/features/progress/grownFit.test.ts	src/features/drinks/grownFit.ts	src/features/progress/grownFit.ts
-src/features/progress/grownFit.ts	src/features/drinks/grownFit.ts
+src/features/progress/grownFit.test.ts	src/features/drinks/grownFit.ts	src/features/progress/grownFit.ts	src/lib/text.ts
+src/features/progress/grownFit.ts	src/features/drinks/grownFit.ts	src/lib/text.ts
 src/features/progress/insightMark.test.ts	src/features/progress/insightMark.ts
 src/features/progress/insightMark.ts	src/lib/insights.ts
 src/features/progress/parts.tsx	src/features/progress/useProgressData.ts	src/lib/insights.ts	src/theme/index.tsx	src/theme/textSize.ts	src/theme/tokens.ts	src/ui/Button.tsx	src/ui/Card.tsx	src/ui/Chip.tsx	src/ui/Pressable.tsx	src/ui/Sheet.tsx	src/ui/Text.tsx	src/ui/index.ts

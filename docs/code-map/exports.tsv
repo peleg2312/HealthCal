@@ -216,9 +216,12 @@ src/features/activity/trainFit.ts	ACTION_PAD_TIGHT	const
 src/features/activity/trainFit.ts	STRIP_BOX_CHROME	const
 src/features/activity/trainFit.ts	STRIP_BOX_MIN	const
 src/features/activity/trainFit.ts	STRIP_NUMBER_ROOM	const
+src/features/activity/trainFit.ts	STRIP_PEEK_MAX	const
+src/features/activity/trainFit.ts	STRIP_PEEK_MIN	const
 src/features/activity/trainFit.ts	actionChrome	function
 src/features/activity/trainFit.ts	actionsLayout	function
 src/features/activity/trainFit.ts	stripColumnMin	function
+src/features/activity/trainFit.ts	stripScrollTo	function
 src/features/activity/trainFit.ts	weekRangeShort	function
 src/features/ai/AddMissingItem.tsx	AddMissingItem	component
 src/features/ai/AiConsentAbout.tsx	AiConsentAbout	component
@@ -2647,6 +2650,7 @@ src/features/progress/MilestonesCard.tsx	MilestonesCard	component
 src/features/progress/MilestonesCard.tsx	milestoneDomain	function
 src/features/progress/OverviewGrid.tsx	OverviewGrid	component
 src/features/progress/OverviewGrid.tsx	ProgressSegment	type
+src/features/progress/Probe.tsx	WidestRun	component
 src/features/progress/Probe.tsx	WrapProbe	component
 src/features/progress/ProgressTile.tsx	ProgressTile	component
 src/features/progress/RecapCard.tsx	RecapCard	component
@@ -2700,6 +2704,7 @@ src/features/progress/goalDate.ts	trendMonthParts	function
 src/features/progress/goalDate.ts	weeklyRateText	function
 src/features/progress/grownFit.ts	allFit	function
 src/features/progress/grownFit.ts	besideRoom	function
+src/features/progress/grownFit.ts	breakRuns	function
 src/features/progress/grownFit.ts	keepsShape	function
 src/features/progress/grownFit.ts	lineFits	function
 src/features/progress/grownFit.ts	milestoneRoom	function

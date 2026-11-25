@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { actionChrome, actionsLayout, stripColumnMin, weekRangeShort } from './trainFit';
+import { actionChrome, actionsLayout, STRIP_PEEK_MAX, STRIP_PEEK_MIN, stripColumnMin, stripScrollTo, weekRangeShort } from './trainFit';
 
 describe("Train's two actions with text grown", () => {
   it('counts the large kit button around its label', () => {
@@ -43,6 +43,38 @@ describe("the week card's strip with text grown", () => {
     expect(stripColumnMin(29, 244)).toBe(38);
     // Two figures keep sharing the narrow row: a 32 px column holds "75" with room to spare.
     expect(stripColumnMin(20, 244)).toBe(0);
+  });
+  it('widens a scrolling strip\'s columns so the last one in view shows about half of itself, never none of it', () => {
+    // The review's case, 320 px at 130%: "240" about 31 px needs 40 px columns, and 244 / 40 = 6.1 left 4 px of
+    // Sunday and nothing of its letter. 44 px columns show five whole and 0.55 of Saturday.
+    expect(stripColumnMin(31, 244)).toBe(44);
+    // Almost seven whole (35 px columns: 6.97): the last would look whole with nothing after it; 38 px show 6.42.
+    expect(stripColumnMin(26, 244)).toBe(38);
+    // Already about half in view: the least width stays (38 px: 6.42).
+    expect(stripColumnMin(29, 244)).toBe(38);
+    const cases: [number, number][] = [];
+    for (let rowW = 200; rowW <= 520; rowW += 1) for (let numberW = 20; numberW <= 60; numberW += 1) cases.push([numberW, rowW]);
+    for (const [numberW, rowW] of cases) {
+      const column = stripColumnMin(numberW, rowW);
+      if (column === 0) continue;
+      // Never narrower than the room the numbers need.
+      expect(column).toBeGreaterThanOrEqual(Math.ceil(numberW + 1 + 8));
+      const peek = rowW / column - Math.floor(rowW / column);
+      expect(peek).toBeGreaterThanOrEqual(STRIP_PEEK_MIN);
+      expect(peek).toBeLessThanOrEqual(STRIP_PEEK_MAX);
+    }
+  });
+  it('opens a scrolling strip where today\'s column is whole in view', () => {
+    // 44 px columns in a 244 px row: 308 px of strip, 64 px to scroll.
+    expect(stripScrollTo(2, 44, 244)).toBe(0); // Wednesday is whole at the start.
+    expect(stripScrollTo(4, 44, 244)).toBe(0); // Friday ends at 220.
+    expect(stripScrollTo(5, 44, 244)).toBe(64); // Saturday is cut at the start: open at the end.
+    expect(stripScrollTo(6, 44, 244)).toBe(64); // Sunday was out of view altogether.
+    expect(stripScrollTo(-1, 44, 244)).toBe(0); // A past week: today is not in it.
+    expect(stripScrollTo(6, 0, 244)).toBe(0); // Not scrolling.
+    expect(stripScrollTo(6, 34, 244)).toBe(0); // Seven fit.
+    // A row too narrow for today at either end: centred on it.
+    expect(stripScrollTo(3, 45, 100)).toBe(108);
   });
 });
 

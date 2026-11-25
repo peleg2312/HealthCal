@@ -1,6 +1,6 @@
 import { ChevronRight, Info } from 'lucide-react-native';
-import React, { useState } from 'react';
-import { Platform, ScrollView, useWindowDimensions, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Platform, ScrollView, type ScrollViewInstance, useWindowDimensions, View } from 'react-native';
 
 import { formatDuration, weekdayShort } from '@/lib/dates';
 import { OVERVIEW_ABOUT, type TrainingOverview } from '@/lib/trainingLoad';
@@ -18,7 +18,7 @@ import { weekStripLabel } from './history';
 import { LoadMark } from './LoadMark';
 import { MeasureEach } from './MeasureEach';
 import { TrainingLoadSheet } from './TrainingLoadSheet';
-import { stripColumnMin } from './trainFit';
+import { stripColumnMin, stripScrollTo } from './trainFit';
 
 const VESSEL_H = 168;
 /**
@@ -118,16 +118,27 @@ export function WeekCard({
   const cupH = fit ? cupHeightFor(vesselH, [guideH, doneH, statusH], 2) : vesselH;
   // The week strip: a column per day, with very large text at least 22 px per 100% of text; it scrolls when seven do
   // not fit. Through the common steps the seven columns share the row, as designed, while the widest day number as
-  // drawn keeps its room from the next (`stripColumnMin`); else each column is that wide and the strip scrolls.
+  // drawn keeps its room from the next (`stripColumnMin`); else each column is at least that wide, wide enough that
+  // the last one in view shows about half of itself at the card's edge, and the strip scrolls, opening where today's
+  // column is whole in view (`stripScrollTo`: at its end on a Saturday or a Sunday at 320 px and 130%).
   const [stripNumbers, setStripNumbers] = useState<Record<string, number>>({});
   const [stripW, setStripW] = useState(0);
+  const stripRef = useRef<ScrollViewInstance>(null);
   const dayWords = (d: ISODate) => (d > today ? '' : week.byDate[d].minutes ? `${week.byDate[d].minutes}` : '–');
-  const fitColumn = fit ? stripColumnMin(Math.max(0, ...dates.filter((d) => dayWords(d)).map((d) => stripNumbers[d] ?? 0)), stripW) : 0;
+  const fitColumn = fit ? stripColumnMin(Math.max(0, ...dates.filter((d) => dayWords(d)).map((d) => stripNumbers[d] ?? 0)), stripW, dates.length) : 0;
   const colMin = stacked ? 22 * grow : fitColumn;
   const scrollStrip = stacked ? colMin > (Math.min(screenW, 560) - 40 - 36) / 7 : fitColumn > 0;
+  const openAt = fit && scrollStrip ? stripScrollTo(dates.indexOf(today), colMin, stripW, dates.length) : 0;
   const wrapStrip = (columns: React.ReactNode) =>
     scrollStrip ? (
-      <ScrollView horizontal testID="train-week-strip" contentContainerStyle={{ flexDirection: 'row' }}>
+      <ScrollView
+        // With text grown it opens again for each week and column width, where today's column is whole in view.
+        key={fit ? `strip-${dates[0]}-${colMin}` : undefined}
+        ref={fit ? stripRef : undefined}
+        onContentSizeChange={fit ? () => (openAt > 0 ? stripRef.current?.scrollTo({ x: openAt, animated: false }) : undefined) : undefined}
+        horizontal
+        testID="train-week-strip"
+        contentContainerStyle={{ flexDirection: 'row' }}>
         {columns}
       </ScrollView>
     ) : (
@@ -245,7 +256,8 @@ export function WeekCard({
 
       {/* Seven columns across the card; at large text on a narrow phone a column would be narrower than its
           number (two days' "75" ran into each other at 320 px and 200%), so the strip keeps 22 px a column per
-          100% of text and scrolls sideways, its last column cut at the card's edge to show there is more.
+          100% of text and scrolls sideways, its last column cut at the card's edge to show there is more (with
+          text grown through the common steps, about half of it, `stripColumnMin`).
           To a screen reader the strip and its caption are one image, as the kit charts are: its name holds the
           seven values (`weekStripLabel`), and what it draws is hidden. */}
       <View testID="train-week-minutes" accessible accessibilityRole="image" accessibilityLabel={weekStripLabel(dates, week.byDate, today)}>

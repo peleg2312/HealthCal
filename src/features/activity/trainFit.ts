@@ -44,16 +44,49 @@ export const STRIP_BOX_MIN = 32;
 export const STRIP_BOX_CHROME = 2 * 2 + 2 * 1.5;
 
 /**
- * The week card's strip with text grown: the least width of a day's column so the widest day number as drawn
- * (`numberW`, measured) keeps `STRIP_NUMBER_ROOM` from the next and its box (today's outline) fits the column. 0
- * while seven such columns fit the row (they share it, as designed); else that width, and the strip scrolls
- * sideways. 0 until measured.
+ * How much of the last column a scrolling strip shows at its edge, as a share of a column: enough that its day
+ * letter and its cup are seen cut (so the strip plainly goes on), never so little that the column looks absent.
+ */
+export const STRIP_PEEK_MIN = 0.35;
+export const STRIP_PEEK_MAX = 0.65;
+
+/**
+ * The week card's strip with text grown: the width of a day's column. At least the width at which the widest day
+ * number as drawn (`numberW`, measured) keeps `STRIP_NUMBER_ROOM` from the next and its box (today's outline) fits
+ * the column. 0 while seven such columns fit the row (they share it, as designed); else the strip scrolls sideways,
+ * and its columns are widened, where needed, until the last one in view shows between `STRIP_PEEK_MIN` and
+ * `STRIP_PEEK_MAX` of itself (about half), so no column is hidden whole behind the card's edge with nothing of it
+ * seen (320 px at 130%: 40 px columns left 4 px of Sunday in a 244 px row; 44 px columns show Saturday cut in
+ * half). Never narrower than the least width: the numbers keep their room. 0 until measured.
  */
 export function stripColumnMin(numberW: number, rowW: number, days = 7): number {
   if (!(numberW > 0 && rowW > 0)) return 0;
   const drawn = numberW + MEASURE_SLACK;
   const column = Math.ceil(Math.max(STRIP_BOX_MIN, drawn + STRIP_BOX_CHROME, drawn + STRIP_NUMBER_ROOM));
-  return fitsRoom(column * days, rowW) ? 0 : column;
+  if (fitsRoom(column * days, rowW)) return 0;
+  const inView = rowW / column;
+  const whole = Math.floor(inView);
+  const peek = inView - whole;
+  if (peek >= STRIP_PEEK_MIN && peek <= STRIP_PEEK_MAX) return column;
+  // Too little of the last column shows: one whole column fewer and half of the next; too much: half of the next.
+  const target = Math.max(1, peek < STRIP_PEEK_MIN ? whole - 1 : whole) + 0.5;
+  return Math.max(column, Math.round(rowW / target));
+}
+
+/**
+ * Where a scrolling strip opens (its scroll offset, px), so today's column is whole in view: at the start while it
+ * is whole there, else at the end (the last columns whole, the first in view cut), else, on a row too narrow for
+ * either, centred. 0 when today is not in the strip (a past week) or the strip does not scroll.
+ */
+export function stripScrollTo(todayIndex: number, column: number, rowW: number, days = 7): number {
+  if (todayIndex < 0 || !(column > 0 && rowW > 0)) return 0;
+  const end = Math.max(0, column * days - rowW);
+  if (end === 0) return 0;
+  const left = todayIndex * column;
+  const right = left + column;
+  if (right <= rowW) return 0;
+  if (left >= end) return end;
+  return Math.min(end, Math.max(0, Math.round(left + column / 2 - rowW / 2)));
 }
 
 /**

@@ -7,6 +7,7 @@
  * (grownFit.test.ts); the cards only measure (`./Probe`) and place.
  */
 import { MEASURE_SLACK } from '@/features/drinks/grownFit';
+import { keepTogether, WJ } from '@/lib/text';
 
 /** A line drawn unseen at its natural width fits its room (whole pixels on the web: one more). Null until measured. */
 export function lineFits(width: number, room: number): boolean | null {
@@ -16,12 +17,28 @@ export function lineFits(width: number, room: number): boolean | null {
 
 /**
  * Words laid out unseen in a box `room` wide, as they would wrap there (`WrapProbe`): they fit when no word is wider
- * than the room (the box then reports the room or less) and they take at most `maxLines` lines of `lineHeight`.
- * Null until measured.
+ * than the room and they take at most `maxLines` lines of `lineHeight`. A word wider than the room is read twice: from
+ * the box, which a browser lets such a word widen, and from `word`, the widest of the words' unbreakable runs
+ * (`breakRuns`) measured on one line, because a phone breaks such a word inside the box instead ("kc / al") and the box
+ * then reports the room. Null until measured.
  */
-export function wrapFits(m: { width: number; height: number; lineHeight: number; room: number; maxLines: number }): boolean | null {
-  if (!(m.width > 0 && m.height > 0 && m.lineHeight > 0 && m.room > 0)) return null;
-  return m.width <= m.room && Math.round(m.height / m.lineHeight) <= m.maxLines;
+export function wrapFits(m: { width: number; height: number; lineHeight: number; room: number; maxLines: number; word: number }): boolean | null {
+  if (!(m.width > 0 && m.height > 0 && m.lineHeight > 0 && m.room > 0 && m.word > 0)) return null;
+  return m.width <= m.room && m.word <= m.room && Math.round(m.height / m.lineHeight) <= m.maxLines;
+}
+
+/**
+ * The runs of words a line can only break between, as the kit `Text` draws them (`keepTogether`: a number with its
+ * unit, a range, and words joined by no-break spaces stay one run): split at each space and after a hyphen that has no
+ * word joiner beside it ("weigh-" and "in"). Measured one by one on one line (`wrapFits`' `word`), the widest says
+ * whether a word could be split inside itself.
+ */
+export function breakRuns(text: string): string[] {
+  const free = (h: string, i: number, all: string) => (all[i - 1] === WJ || all[i + 1] === WJ ? h : `${h}\n`);
+  return keepTogether(text)
+    .split(/[ \t\n]+/)
+    .flatMap((w) => w.replace(/-/g, free).split('\n'))
+    .filter((w) => w.length > 0);
 }
 
 /** All of a part's verdicts: false as soon as one does not fit, null while one is still to be measured, else true. */

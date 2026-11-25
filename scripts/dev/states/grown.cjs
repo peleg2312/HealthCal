@@ -145,4 +145,19 @@ for (const [steps, tag] of [
     { id: `text${tag}-morning-kept-yesterday`, route: '/', now: morningAt(2), taps: [...onProfile, 'profile-morning-open'], waitFor: 'morning-week-kept-key', note: `the morning page at ${tag}% text: yesterday kept while today is open, the large cup with the kept line` },
   );
 }
+// Train's week strip on the last day of the week (GTRAIN-FIX): where three-figure days make the strip scroll (320 px
+// at 130%), its columns leave about half of the last one in view at the card's edge, and it opens at its end so
+// Sunday, today, is whole in view (`stripColumnMin`, `stripScrollTo` in src/features/activity/trainFit.ts).
+function thisSundayAt(h, m = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + ((7 - d.getDay()) % 7));
+  d.setHours(h, m, 0, 0);
+  return d.getTime();
+}
+for (const [steps, tag] of [
+  [1, '115'],
+  [2, '130'],
+]) {
+  states.push({ id: `text${tag}-train-stress-sunday`, route: '/train', data: 'stress', now: thisSundayAt(14, 15), taps: sized('train', steps), waitFor: 'train-week-card', note: `Train at ${tag}% text on a Sunday with three-figure days: the strip opens with today whole in view` });
+}
 module.exports = states;
