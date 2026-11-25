@@ -174,13 +174,16 @@ describe('both documents', () => {
         ],
       },
       friends: {
-        // Friends are opt-in, and what they see is a training summary: never food or weight.
-        says: [/Friends are off until you turn them on/, /a friend sees your workouts and streak/, /never your food or weight/],
+        // Friends are opt-in, and what they see is a training summary; a meal when the person chooses to show it.
+        says: [/Friends are off until you turn them on/, /a friend sees your workouts and streak/, /a meal when you choose to show it/],
         held: [
-          ['short', /Friends, if you turn them on, see your workouts and streak/],
+          ['short', /Friends, if you turn them on, see your workouts and streak, and a meal when you choose to show it/],
           ['friends', /off until you turn them on/],
           ['friends', /A friend sees your display name, your active minutes, sessions and streak, and your recent workouts/],
-          ['friends', /Friends never see your calories, weight, food/],
+          ['friends', /You choose each meal a friend sees/],
+          ['friends', /and the friends who see it/],
+          ['friends', /kept on HealthCal’s server for 7 days from when you first showed it and is then deleted/],
+          ['friends', /Friends never see your weight/],
         ],
       },
       ads: {

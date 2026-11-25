@@ -1081,6 +1081,7 @@ src/features/friends/words.ts	MENU_SHOW_LINE	1	src/features/friends/ShowMeal.tsx
 src/features/friends/words.ts	MENU_SHOW_NONE	1	src/features/friends/ShowMeal.tsx
 src/features/friends/words.ts	NEVER_SHARED	1	src/app/friends/settings.tsx
 src/features/friends/words.ts	NEVER_SHOWN	1	src/features/friends/ShowMeal.tsx
+src/features/friends/words.ts	NOBODY_TO_PICK	1	src/features/friends/ShowMeal.tsx
 src/features/friends/words.ts	NOTHING_SHOWN	1	src/app/friends/settings.tsx
 src/features/friends/words.ts	NOT_IN_LIST	1	src/features/friends/FriendMealSheet.tsx
 src/features/friends/words.ts	PRIVACY	1	src/features/friends/FeedParts.tsx

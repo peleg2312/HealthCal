@@ -39,7 +39,6 @@ export function isCalendarDay(v: unknown): v is ISODate {
  */
 export function cleanWireText(v: unknown, max: number): string | undefined {
   if (typeof v !== 'string') return undefined;
-  // eslint-disable-next-line no-control-regex
   const flat = v.replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ');
   const cut = Array.from(flat).slice(0, max).join('').replace(/^ +| +$/g, '');
   return cut === '' ? undefined : cut;

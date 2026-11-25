@@ -23,7 +23,9 @@
  * the coach chat stays on the phone (as the coach section does), and the profile is said to hold the goal
  * weight and the calorie target. Later on 2026-11-25: meal photos (src/features/journal) are said to stay on the phone,
  * never uploaded, synced or exported (the device and export sections, the AI estimate section and the short
- * layer's export line). A section's `jump` label is navigation, not text of the page: adding or
+ * layer's export line). Later on 2026-11-25: a meal can be shown to friends (supabase/migrations/20261201000000_friends_meals.sql):
+ * what a friend sees of it, for how long, how it stops, and its 18 and over rule (the privacy page's short layer, short,
+ * account, friends and age sections; the terms' who and content sections). A section's `jump` label is navigation, not text of the page: adding or
  * changing one does not move the date.
  */
 export const LEGAL_UPDATED = '2026-11-25';
@@ -118,7 +120,7 @@ export const TERMS: LegalDocument = {
     {
       id: 'who',
       heading: 'Who can use it',
-      paragraphs: ['HealthCal is for people aged 16 and over. The AI coach is for people aged 18 and over.'],
+      paragraphs: ['HealthCal is for people aged 16 and over. The AI coach is for people aged 18 and over, and so is showing or seeing meals in Friends.'],
     },
     {
       id: 'account',
@@ -178,7 +180,7 @@ export const TERMS: LegalDocument = {
       id: 'content',
       heading: 'Your content',
       paragraphs: [
-        'What you log, the foods and meals you create, and the photos and words you send for an estimate are yours. You give HealthCal permission to store, copy and process them to run the app for you: to keep them on your devices and in your account, and to send them to the AI when you ask. They are not used for anything else.',
+        'What you log, the foods and meals you create, and the photos and words you send for an estimate are yours. You give HealthCal permission to store, copy and process them to run the app for you: to keep them on your devices and in your account, to send them to the AI when you ask, and to show a meal to the friends you pick when you show it. They are not used for anything else.',
         'Do not send photos or words that belong to someone else without their permission, or that break the law.',
       ],
     },
@@ -216,7 +218,7 @@ export const PRIVACY: LegalDocument = {
   summary: [
     { id: 'device', text: 'Without an account, everything you log stays on this device.' },
     { id: 'account', text: 'With an account, it is kept in your private space so it can back up and sync. No other account can read it.' },
-    { id: 'friends', text: 'Friends are off until you turn them on; then a friend sees your workouts and streak, never your food or weight.' },
+    { id: 'friends', text: 'Friends are off until you turn them on; a friend sees your workouts and streak, and a meal when you choose to show it.' },
     { id: 'ads', text: 'No ads, no tracking, no analytics and no selling of data.' },
     { id: 'ai', text: 'The AI gets what you give it once you agree; the coach adds your last few questions and answers and, if shared, a week summary.' },
     { id: 'yours', text: 'You can export everything you log or delete it at any time; the coach chat and meal photos stay on this phone.' },
@@ -227,7 +229,7 @@ export const PRIVACY: LegalDocument = {
       id: 'short',
       heading: 'In short',
       paragraphs: [
-        'Everything you log stays on this device unless you create an account. With an account it is kept in your private space on HealthCal’s server so it can back up and sync, and no other account can read it. Friends, if you turn them on, see your workouts and streak.',
+        'Everything you log stays on this device unless you create an account. With an account it is kept in your private space on HealthCal’s server so it can back up and sync, and no other account can read it. Friends, if you turn them on, see your workouts and streak, and a meal when you choose to show it to them.',
         'No ads, no tracking, no analytics and no selling of data. You can export everything you log or delete it at any time.',
       ],
     },
@@ -245,7 +247,7 @@ export const PRIVACY: LegalDocument = {
       heading: 'With an account',
       paragraphs: [
         'An account is free and optional. It holds your email address and a password, or a sign-in with Google. What you log is copied to your private space on HealthCal’s server so it can back up and sync between your devices: your profile (name, date of birth, sex, height, weight, goal weight and calorie target), your diary, own foods, saved meals and favourites, water, workouts, weights, body measurements, sleep, fasting, goals and settings.',
-        'Each account can read and change its own data and nothing else. The server checks this on every request. The server reads your date of birth for one thing: the age rule of the AI coach.',
+        'Each account can read and change its own data and nothing else. The server checks this on every request. The server reads your date of birth for one thing: the age rule of the AI coach and of meals in Friends.',
         'If you sign in with Google, Google tells HealthCal’s sign-in service your email address and the name and picture on your Google account. HealthCal uses the email address to know your account. The sign-in service keeps the name and picture with your account, and they are deleted with it; the app does not show or use them.',
       ],
     },
@@ -300,7 +302,9 @@ export const PRIVACY: LegalDocument = {
       id: 'friends',
       heading: 'Friends',
       paragraphs: [
-        'Friends need an account and are off until you turn them on. A friend sees your display name, your active minutes, sessions and streak, and your recent workouts with their name, length, distance and date. Friends never see your calories, weight, food, notes, heart rate or the time of day.',
+        'Friends need an account and are off until you turn them on. A friend sees your display name, your active minutes, sessions and streak, and your recent workouts with their name, length, distance and date. Friends never see your weight, body measurements, notes, heart rate, the time of day, your day’s total or your budget.',
+        'You choose each meal a friend sees: one meal at a time from the diary, or each meal of a type you chose under "Always show these meals", and the friends who see it. They see your display name, which meal it is and its day, and each food’s name, portion and where its numbers come from; its calories when you switch them on for that meal. Never its macros, the time you ate, a photo, or who else sees it.',
+        'A shown meal is kept on HealthCal’s server for 7 days from when you first showed it and is then deleted. It stops at once when you stop showing it, delete all its foods, remove that friend, turn off their seeing your meals, or turn friends off. Showing and seeing meals is for people aged 18 and over, by the date of birth in your profile.',
       ],
     },
     {
@@ -324,7 +328,7 @@ export const PRIVACY: LegalDocument = {
       id: 'children',
       heading: 'Age',
       paragraphs: [
-        'HealthCal is for people aged 16 and over: setup asks for your date of birth, and its equations are designed for adults. The AI coach is for people aged 18 and over. HealthCal does not knowingly keep data about anyone younger.',
+        'HealthCal is for people aged 16 and over: setup asks for your date of birth, and its equations are designed for adults. The AI coach is for people aged 18 and over, and so is showing or seeing meals in Friends. HealthCal does not knowingly keep data about anyone younger.',
       ],
     },
     {

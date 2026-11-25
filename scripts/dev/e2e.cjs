@@ -3196,12 +3196,17 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     await p.waitForTimeout(300);
     const withFoods = (await p.getByTestId('share-card-preview').first().getAttribute('aria-label')) || '';
     check('Months in cups: food names join the card when chosen', /Logged most: /.test(withFoods), withFoods);
-    await p.keyboard.press('Escape');
-    await p.waitForTimeout(600);
+    // Closed by its backdrop (a tap in the sheet's first moments is ignored, so it is tapped again until it has gone).
+    for (let i = 0; i < 3 && (await p.locator('[data-testid="sheet-backdrop"] >> visible=true').count()); i++) {
+      await p.getByTestId('sheet-backdrop').first().click({ timeout: 5000, position: { x: 20, y: 20 } }).catch(() => {});
+      await p.waitForTimeout(500);
+    }
     await p.locator('[data-testid^="recap-period-year-"]').first().tap();
-    await p.getByTestId('recap-period-grid').first().waitFor({ timeout: 15000 });
-    await p.waitForTimeout(400);
-    const yearName = (await p.getByTestId('recap-period-grid').first().getAttribute('aria-label')) || '';
+    // The month page stays mounted under the year's: read the grid that shows.
+    const shown = p.locator('[data-testid="recap-period-grid"] >> visible=true').first();
+    await p.waitForFunction(() => document.title === 'Year in cups · HealthCal', null, { timeout: 15000 }).catch(() => {});
+    await shown.waitFor({ timeout: 15000 });
+    const yearName = (await shown.getAttribute('aria-label')) || '';
     check('Months in cups: the month page leads to its year, said month by month', (await p.title()) === 'Year in cups · HealthCal' && /[A-Z][a-z]+, \d+ of \d+/.test(yearName), `${await p.title()} | ${yearName}`);
     await ctx.close();
   }

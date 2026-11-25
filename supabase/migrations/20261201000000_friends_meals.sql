@@ -307,8 +307,12 @@ as $$
 declare
   v_count integer;
 begin
+  -- Rows another call is already removing are skipped, so two reads never wait on each other.
   with gone as (
-    delete from public.shared_meals where expires_at <= now() returning owner, ref
+    delete from public.shared_meals m
+    using (select owner, ref from public.shared_meals where expires_at <= now() for update skip locked) x
+    where m.owner = x.owner and m.ref = x.ref
+    returning m.owner, m.ref
   ),
   cheers_gone as (
     delete from public.cheers c using gone g where c.to_user = g.owner and c.ref = 'meal:' || g.ref returning 1

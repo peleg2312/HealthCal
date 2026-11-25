@@ -28,6 +28,7 @@ import {
   MENU_SHOW_LINE,
   MENU_SHOW_NONE,
   NEVER_SHOWN,
+  NOBODY_TO_PICK,
   SHOW_FAILED,
   SHOW_KCAL,
   SHOW_KCAL_OFF,
@@ -188,8 +189,8 @@ export function useShowMealStep({ open, meal, date, entries, onClose }: { open: 
             />
           ))}
         </ChipWrap>
-        <Text variant="caption" color="textSecondary">
-          {WHO_NOTE}
+        <Text variant="caption" color="textSecondary" testID="show-meal-who-note">
+          {pickable.length ? WHO_NOTE : NOBODY_TO_PICK}
         </Text>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56 }}>

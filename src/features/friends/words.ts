@@ -40,6 +40,7 @@ export const MENU_SHOW_NONE = 'Add a friend first';
 export const WHAT_THEY_SEE = 'What they see';
 export const WHO_SEES = 'Who sees it';
 export const WHO_NOTE = 'The friends you pick, remembered for next time.';
+export const NOBODY_TO_PICK = 'Each friend is switched off for your meals. Turn one on from their page, in Between you.';
 export const SHOW_KCAL = 'Show calories';
 export const SHOW_KCAL_OFF = 'Off: foods and portions, no calories';
 export const SHOW_KCAL_ON = 'Each food with its calories';

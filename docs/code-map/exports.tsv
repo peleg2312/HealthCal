@@ -1336,6 +1336,7 @@ src/features/friends/words.ts	MENU_SHOW_LINE	const
 src/features/friends/words.ts	MENU_SHOW_NONE	const
 src/features/friends/words.ts	NEVER_SHARED	const
 src/features/friends/words.ts	NEVER_SHOWN	const
+src/features/friends/words.ts	NOBODY_TO_PICK	const
 src/features/friends/words.ts	NOTHING_SHOWN	const
 src/features/friends/words.ts	NOT_IN_LIST	const
 src/features/friends/words.ts	PICK_FIRST	const

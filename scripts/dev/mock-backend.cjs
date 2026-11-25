@@ -278,7 +278,8 @@ function insertMeal(owner, ref, day, meal, items, showKcal) {
   state.mealStops.delete(mealKey(owner, ref));
   return row;
 }
-const mealItemsValid = (items) => Array.isArray(items) && Buffer.byteLength(JSON.stringify(items)) <= 16384;
+// Near the database's 16 KB check on the list as sent.
+const mealItemsValid = (items) => Array.isArray(items) && JSON.stringify(items).length <= 16384;
 /** Removes everything meals hold between two people (friend_remove). */
 function forgetMealsBetween(a, b) {
   for (const m of state.meals.values()) if ((m.owner === a && m.viewers.has(b)) || (m.owner === b && m.viewers.has(a))) m.viewers.delete(m.owner === a ? b : a);
