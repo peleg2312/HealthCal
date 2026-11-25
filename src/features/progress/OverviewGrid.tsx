@@ -147,7 +147,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         color={colors.water}
         value={w ? `${w.daysAtGoal}` : null}
         unit={w ? `of ${w.daysTracked} days` : undefined}
-        caption={w ? `goal reached · ${formatVolume(w.avgMl, units)} a day` : 'No drinks logged yet'}
+        caption={w ? `goal reached · ${together(`${formatVolume(w.avgMl, units)} a day`)}` : 'No drinks logged yet'}
         captionShort={w ? 'goal reached' : 'No drinks yet'}
         // The mark and its words compare the number shown: the share of tracked days the goal was reached.
         compare={changeWords('share', waterShare(w), waterShare(p?.water ?? null), { period, subject: 'Days the water goal was reached' })}

@@ -653,8 +653,9 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
         tint={colors.water}
         icon={<Plus size={18} color={colors.water} strokeWidth={2.2} />}
         title={`Add ${formatVolume(glass, profile.units)}`}
-        // Its words as drawn ("Add 250 ml"; label in name), then what it adds to.
-        accessibilityLabel={`Add ${formatVolume(glass, profile.units)} of water`}
+        // Its words as drawn ("Add 250 ml"; label in name), then what it adds to and whose tip it is, so it is never
+        // named as the water row's glass above it is.
+        accessibilityLabel={`Add ${formatVolume(glass, profile.units)} of water, as the coach suggests`}
         onPress={oneTap(() => addWater(day.date, glass, profile.units, day.waterGoalMl))}
       />
     );

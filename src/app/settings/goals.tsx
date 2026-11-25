@@ -445,6 +445,8 @@ function GoalsForm() {
                 <NumberField
                   testID="goals-height-in"
                   label=" "
+                  // No label of its own (the row's "Height" is the feet field's): named by the unit it shows, in words.
+                  accessibilityLabel="Height in inches"
                   suffix="in"
                   decimals={0}
                   style={{ flex: 1 }}

@@ -12,6 +12,7 @@
  *   -> a sheet's row that opens a screen (the + sheet's Search food), from fresh loads with the processor slowed: search
  *      opens every time and one Back returns to Today
  *   -> Appearance in Profile: Java (kept through a reload), Honey, Butter, Blossom, then back to System
+ *   -> reflow at 400% zoom (320 x 180): the plan page and the weigh-in sheet pin nothing, every control is reached
  *
  * The expected numbers are recomputed here from the published formulas, not
  * read back from the app's own calculation code, so a mistake in the engine
@@ -24,7 +25,8 @@
  * above it and the focused field must be in view above the footer, and all of it must go back
  * when the keyboard closes. No real keyboard is raised: a phone still has to confirm that part.
  * With the keyboard faked open, a toast must rest 12 px above the footer riding on it (food search) or above
- * the keyboard itself (Water's "Other amount"), its Undo must work, and with the keyboard down it stays where it was.
+ * the keyboard itself (Water's "Other amount"), with no control showing under it, its Undo must work, and with the
+ * keyboard down it stays where it was. While the + sheet is open the page behind it must be inert.
  *
  * The run uses reduced motion, so every animation is instant (the app also treats an
  * automated browser as reduced motion). The last section turns motion on and acts while
@@ -992,6 +994,16 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(1500);
   await tap('tab-add');
+  {
+    // An open sheet makes the page behind it inert and hidden from assistive technology (Sheet.tsx, `useInertBehind`),
+    // so the page's controls are not in the tree a second time beside the sheet's own.
+    const behind = await page.evaluate(() => {
+      const root = document.getElementById('root');
+      const controls = [...root.querySelectorAll('[role="button"],[role="tab"],button,input')];
+      return { inert: root.hasAttribute('inert') && root.getAttribute('aria-hidden') === 'true', controls: controls.length };
+    });
+    check('+ sheet open: the page behind it is inert and hidden from assistive technology', behind.inert && behind.controls > 0, JSON.stringify(behind));
+  }
   const tile = (await text('quick-usual-b_bourekas_cheese')).replace(/\s*\n\s*/g, ' / ');
   const repeatRow = (await text('quick-repeat')).replace(/\s*\n\s*/g, ' / ');
   before = await stored();
@@ -1150,6 +1162,34 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     fmt(tb),
   );
   check('keyboard up, food search: the toast carries Undo, a 44 px target', !!tb?.action && tb.action.h >= 44 && tb.action.w >= 44, fmt(tb));
+  {
+    // Never over a control, with the keyboard up too: a result row under the toast's place leaves the list's view (the
+    // scroll area ends 8 px above the toast, `toastBand`), so what shows of every control is clear of the toast.
+    const under = await page.evaluate(() => {
+      const t = [...document.querySelectorAll('[data-testid="toast"]')].find((e) => e.getBoundingClientRect().height > 0);
+      if (!t) return null;
+      const r = t.getBoundingClientRect();
+      const shown = (e) => {
+        let { top, bottom, left, right } = e.getBoundingClientRect();
+        for (let a = e.parentElement; a; a = a.parentElement) {
+          const cs = getComputedStyle(a);
+          if (cs.overflowX === 'visible' && cs.overflowY === 'visible') continue;
+          const c = a.getBoundingClientRect();
+          top = Math.max(top, c.top);
+          bottom = Math.min(bottom, c.bottom);
+          left = Math.max(left, c.left);
+          right = Math.min(right, c.right);
+        }
+        return { top, bottom, left, right };
+      };
+      return [...document.querySelectorAll('[role="button"],button,input')]
+        .filter((e) => !t.contains(e))
+        .map((e) => ({ id: e.getAttribute('data-testid'), b: shown(e) }))
+        .filter(({ b }) => b.bottom - b.top > 1 && b.right - b.left > 1 && b.bottom > r.top && b.top < r.bottom && b.right > r.left && b.left < r.right)
+        .map(({ id }) => id);
+    });
+    check('keyboard up, food search: no control shows under the toast', Array.isArray(under) && under.length === 0, under ? under.join(', ') || 'none' : 'no toast');
+  }
   if (tb?.action) await toastActionReady(page);
   if (tb?.action) await page.touchscreen.tap(tb.action.x, tb.action.y);
   await page.waitForTimeout(400);
@@ -1724,6 +1764,20 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     const over = ((await wp.getByTestId('water-custom-check').first().textContent().catch(() => '')) || '').replace(/\u00A0/g, ' ');
     const waits = (await wp.getByTestId('water-custom-add').first().getAttribute('aria-disabled')) === 'true';
     check('Water: above 5 L the field says the limit and Add waits', over === 'Up to 5 L at a time.' && waits && (await input.getAttribute('aria-invalid')) === 'true', `"${over}", Add waits ${waits}`);
+    // A typed minus: the field keeps it and says why under its cup; Add stays level with the cup (never with those words) and waits.
+    await input.fill('-100');
+    await wp.waitForTimeout(300);
+    const minusBoxes = await wp.evaluate(() => {
+      const add = document.querySelector('[data-testid="water-custom-add"]').getBoundingClientRect();
+      const cup = document.querySelector('input[data-testid="water-custom-input"]').parentElement.getBoundingClientRect();
+      return { add: [Math.round(add.top), Math.round(add.bottom)], cup: [Math.round(cup.top), Math.round(cup.bottom)] };
+    });
+    const minusWaits = (await wp.getByTestId('water-custom-add').first().getAttribute('aria-disabled')) === 'true';
+    check(
+      "Water: with the field's minus words under it, Add still lines up with the cup and waits",
+      Math.abs(minusBoxes.add[0] - minusBoxes.cup[0]) <= 1 && Math.abs(minusBoxes.add[1] - minusBoxes.cup[1]) <= 1 && minusWaits && (await input.getAttribute('aria-invalid')) === 'true',
+      `Add ${minusBoxes.add.join('-')}, cup ${minusBoxes.cup.join('-')}, waits ${minusWaits}`,
+    );
     await input.fill('');
     await wp.getByTestId('section-add-a-drink-action').first().click();
     await wp.getByTestId('water-preset-0').first().waitFor({ timeout: 8000 });
@@ -2565,6 +2619,55 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     // The run's phone is dark, so "Match my phone" draws Dark again, as the first-day flow left it.
     await tap('profile-theme-system');
     await look('system', 'system', null, 'dark');
+  }
+
+  // ------------------------------------------- reflow at 400% zoom (SHORT_WINDOW in src/ui/controlRules.ts, Screen, Sheet)
+  // A window 320 x 180 CSS px (1280 x 720 zoomed to 400%) pins nothing: the plan page's header and footer scroll with its
+  // prices, and the weigh-in sheet's title and footer with its fields, so every control can be scrolled to and pressed.
+  // Back at 390 x 844 the footers are pinned again.
+  {
+    const reachable = (ids) =>
+      page.evaluate(async (list) => {
+        const out = {};
+        for (const id of list) {
+          const e = document.querySelector(`[data-testid="${id}"]`);
+          if (!e) {
+            out[id] = 'absent';
+            continue;
+          }
+          e.scrollIntoView({ block: 'center' });
+          await new Promise((r) => setTimeout(r, 120));
+          const r = e.getBoundingClientRect();
+          const hit = document.elementFromPoint(r.left + Math.min(r.width / 2, 20), r.top + r.height / 2);
+          out[id] = hit && (hit === e || e.contains(hit)) ? 'ok' : `covered by ${hit?.getAttribute('data-testid') || hit?.tagName}`;
+        }
+        return out;
+      }, ids);
+    const pinned = () => page.evaluate(() => {
+      const f = [...document.querySelectorAll('[data-testid="screen-footer"]')].find((e) => e.getBoundingClientRect().height > 0);
+      if (!f) return null;
+      for (let p = f.parentElement; p; p = p.parentElement) if (/(auto|scroll)/.test(getComputedStyle(p).overflowY)) return false;
+      return true;
+    });
+    await page.setViewportSize({ width: 320, height: 180 });
+    await page.goto(`${BASE}/settings/plan?planDemo=free`, { waitUntil: 'networkidle' });
+    await page.getByTestId('plan-period-year').first().waitFor({ timeout: 15000 }).catch(() => {});
+    let got = await reachable(['plan-period-month', 'plan-period-year', 'plan-subscribe']);
+    check('reflow at 400% zoom (320 x 180): the plan page pins nothing and its prices and Subscribe can be reached', (await pinned()) === false && Object.values(got).every((v) => v === 'ok'), JSON.stringify(got));
+    await page.goto(`${BASE}/weight`, { waitUntil: 'networkidle' });
+    await page.getByTestId('weight-log').first().waitFor({ timeout: 15000 });
+    await page.getByTestId('weight-log').first().evaluate((e) => e.scrollIntoView({ block: 'center' }));
+    await page.getByTestId('weight-log').first().click();
+    await page.getByTestId('weight-input').first().waitFor({ timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(500);
+    got = await reachable(['weight-input', 'weight-bodyfat-input', 'weight-save']);
+    check('reflow at 400% zoom (320 x 180): the weigh-in sheet scrolls, and its fields and Save can be reached', Object.values(got).every((v) => v === 'ok'), JSON.stringify(got));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${BASE}/settings/plan?planDemo=free`, { waitUntil: 'networkidle' });
+    await page.getByTestId('plan-period-year').first().waitFor({ timeout: 15000 }).catch(() => {});
+    check('back at 390 x 844: the plan page pins its footer again', (await pinned()) === true);
   }
 
   const real = errors.filter((e) => !/favicon|DevTools|useNativeDriver|pointerEvents is deprecated|shadow\*/i.test(e));

@@ -238,7 +238,7 @@ function returnFocus() {
 /** The controls a toast keeps clear of: everything a person can press, type in or pick. */
 const CONTROLS = 'button,a[href],input,textarea,select,[role="button"],[role="link"],[role="switch"],[role="checkbox"],[role="radio"],[role="tab"],[role="slider"],[role="adjustable"],[tabindex="0"]';
 
-function controlBoxes(scope: Element, skip: Element): ControlBox[] {
+function controlBoxes(scope: Element, skip: Element, skipFields = false): ControlBox[] {
   const out: ControlBox[] = [];
   // What shows of a control: its box cut by every box above it that clips (a scroll area, a card that hides its
   // overflow), up to the screen. A row scrolled out of the scroll area's view is not under the toast.
@@ -252,6 +252,7 @@ function controlBoxes(scope: Element, skip: Element): ControlBox[] {
   };
   for (const el of Array.from(scope.querySelectorAll(CONTROLS))) {
     if (skip.contains(el) || el.getAttribute('data-testid') === 'sheet-backdrop') continue;
+    if (skipFields && el.matches('input, textarea')) continue;
     const r = el.getBoundingClientRect();
     if (r.width < 2 || r.height < 2) continue;
     let { top, bottom, left, right } = r;
@@ -493,9 +494,12 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
         const box = scope?.getBoundingClientRect();
         if (!scope || !box || box.height < 1 || box.width < 1) return 'wait';
         if (keyboardUp) {
-          // Only where it rests, just above the footer riding on the keyboard: clear, or the screen gives way under it.
+          // Only where it rests, just above the footer riding on the keyboard: clear, or the screen gives way under it
+          // (food search's result rows). With no footer (Water's "Other amount") it rests over the keyboard beside
+          // the field being typed in, which it keeps clear of by itself, and a field is never put out of view.
+          if (!placed.ridesKeyboard) return null;
           const at = H - resting - h;
-          return toastSpot({ lowest: at, highest: at, height: h, left: r.left, right: r.right, controls: controlBoxes(scope, host) }) === null ? 'none' : null;
+          return toastSpot({ lowest: at, highest: at, height: h, left: r.left, right: r.right, controls: controlBoxes(scope, host, true) }) === null ? 'none' : null;
         }
         // With no clear band in thumb reach, any clear band under the screen's header, rather than over a control.
         const head = scope.querySelector('[data-testid="screen-header"], [data-testid="tab-header"]')?.getBoundingClientRect();
@@ -556,7 +560,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
       cancelAnimationFrame(frame);
       clearTimeout(timer);
     };
-  }, [placing, placeKey, toastH, resting, inSheet, scopeId, insets.bottom, insets.top, keyboardUp]);
+  }, [placing, placeKey, toastH, resting, inSheet, scopeId, insets.bottom, insets.top, keyboardUp, placed.ridesKeyboard]);
   const spotNow = spot && spot.key === placeKey ? spot : null;
   const hidden = placing && !spotNow;
   const bottom = !inSheet && spotNow?.bottom != null ? spotNow.bottom : resting;

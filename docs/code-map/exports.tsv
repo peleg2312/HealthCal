@@ -3585,6 +3585,11 @@ src/ui/decorative.ts	FigureProps	type
 src/ui/decorative.ts	decorative	function
 src/ui/decorative.ts	figure	function
 src/ui/haptics.ts	haptic	const
+src/ui/hitTrim.ts	Box	type
+src/ui/hitTrim.ts	Slop	type
+src/ui/hitTrim.ts	scheduleHitTrim	function
+src/ui/hitTrim.ts	trackHitArea	function
+src/ui/hitTrim.ts	trimSlop	function
 src/ui/index.ts	*	re-export-all	src/ui/Button.tsx
 src/ui/index.ts	*	re-export-all	src/ui/Card.tsx
 src/ui/index.ts	*	re-export-all	src/ui/Charts.tsx
