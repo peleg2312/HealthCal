@@ -1,9 +1,9 @@
-import { BellOff, BellRing, Droplets, Footprints, MoonStar, Scale, Sunset, Utensils } from 'lucide-react-native';
+import { BellOff, BellRing, Droplets, Footprints, MoonStar, Scale, Sunset, Timer, Utensils } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Linking, Platform, View } from 'react-native';
 
 import { Group, IconTile, prefers12h, TimeRow } from '@/features/settings/components';
-import { reminderTimeLabel, waterCategory, type PlannedReminder, type ReminderKind } from '@/features/settings/reminderPlanner';
+import { fastGoalOn, fastGoalPatch, reminderTimeLabel, waterCategory, type PlannedReminder, type ReminderKind } from '@/features/settings/reminderPlanner';
 import { usePlannedReminders } from '@/features/settings/usePlannedReminders';
 import { getReminderPermission, remindersSupported, requestReminderPermission, type ReminderPermission } from '@/services/notifications';
 import { useStore } from '@/store';
@@ -240,7 +240,22 @@ export default function RemindersScreen() {
         ) : null}
       </Group>
 
-      <Group title="Quiet hours" footer="Nothing is sent then. At most 6 a day, 45 min apart.">
+      {/* The fast's own moment, like a timer: one notification per fast, held back by quiet hours, never spaced or capped. */}
+      <Group title="Fasting" footer="Once a running fast reaches its goal. In quiet hours it waits until they end.">
+        <ToggleRow
+          testID="reminders-fast"
+          title="Fast goal reached"
+          value={fastGoalOn(r)}
+          onChange={(on) => setReminders(fastGoalPatch(on))}
+          left={
+            <IconTile color={colors.exercise}>
+              <Timer size={20} color={colors.exercise} />
+            </IconTile>
+          }
+        />
+      </Group>
+
+      <Group title="Quiet hours" footer="Nothing is sent then. At most 6 a day, 45 min apart, plus a fast's goal.">
         <TimeRow testID="reminders-quiet-start" title="From" subtitle="Bedtime" value={r.quietStart} hour12={hour12} onChange={(quietStart) => setReminders({ quietStart })} />
         <TimeRow testID="reminders-quiet-end" title="Until" subtitle="Wake up" value={r.quietEnd} hour12={hour12} onChange={(quietEnd) => setReminders({ quietEnd })} />
       </Group>
@@ -256,6 +271,7 @@ const KIND_ICON: Record<ReminderKind, (c: string) => React.ReactNode> = {
   checkin: (c) => <Sunset size={18} color={c} />,
   weighin: (c) => <Scale size={18} color={c} />,
   movement: (c) => <Footprints size={18} color={c} />,
+  fast: (c) => <Timer size={18} color={c} />,
 };
 
 function Preview({ plan, now, hour12, off }: { plan: PlannedReminder[]; now: Date; hour12: boolean; off: boolean }) {
@@ -266,6 +282,7 @@ function Preview({ plan, now, hour12, off }: { plan: PlannedReminder[]; now: Dat
     checkin: colors.primary,
     weighin: colors.weight,
     movement: colors.exercise,
+    fast: colors.exercise,
   };
   return (
     <View style={{ gap: spacing.sm }} testID="reminders-preview">

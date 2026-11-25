@@ -8,7 +8,7 @@ import type { Store } from '@/store';
 import { computeDayFromStore, live } from '@/store/selectors';
 import type { ISODate, ReminderSettings } from '@/types';
 
-import { planReminders, repeatableMeals, type PlannedReminder, type PlannerDay } from './reminderPlanner';
+import { planReminders, repeatableMeals, runningFast, type PlannedReminder, type PlannerDay } from './reminderPlanner';
 
 function plannerDay(s: Store, date: ISODate): PlannerDay | null {
   const summary = computeDayFromStore(s, date);
@@ -31,6 +31,7 @@ export function planFromStore(s: Store, now: Date = new Date(), overrides?: Part
       weightKg: s.profile.weightKg,
       baselineKcalPerDay: formulaTdee(s.profile),
       waterPresetsMl: s.settings.waterPresets,
+      fast: runningFast(live(s.fasting)),
     },
     now,
   );

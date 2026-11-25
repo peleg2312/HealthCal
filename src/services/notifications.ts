@@ -2,7 +2,7 @@
  * Reminder scheduling with expo-notifications.
  *
  * Reminders are one-off local notifications for the rest of today and
- * tomorrow morning. Their text is computed when they are scheduled, so the
+ * tomorrow morning, plus the running fast's goal whenever it falls. Their text is computed when they are scheduled, so the
  * root layout calls `refreshReminders()` on launch, on foreground and after
  * every data change: the plan is rebuilt from the current numbers and only
  * replaces what is scheduled when it actually changed.
@@ -55,7 +55,7 @@ async function ensureChannel(): Promise<void> {
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     name: 'Reminders',
-    description: 'Water, meal and evening check-in reminders with your current numbers',
+    description: 'Water, meal, evening check-in and fast goal reminders with your current numbers',
     importance: AndroidImportance.DEFAULT,
     showBadge: false,
   });

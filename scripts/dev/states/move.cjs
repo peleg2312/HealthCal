@@ -339,6 +339,11 @@ const fasting = [
   { id: 'fasting-custom', route: '/fasting', taps: ['fasting-target-custom', { type: 'fasting-custom-input', text: '36.5' }], waitFor: 'fasting-custom-input', note: 'a custom goal being typed' },
   { id: 'fasting-long-target', route: '/fasting', taps: ['fasting-target-custom', { type: 'fasting-custom-input', text: '72' }, 'fasting-custom-set', 'fasting-start'], waitFor: 'fasting-end', note: 'a 72 h fast running' },
   { id: 'fasting-history', route: '/fasting', taps: ['fasting-start', 'fasting-adjust', 'fasting-shift--60', 'fasting-shift--60', 'fasting-adjust-save', settle, 'fasting-end', settle, 'fasting-start', settle, 'fasting-end', settle, toastGone], waitFor: 'fasting-row-1', note: 'two finished fasts in the history' },
+  // The goal's notification, as a phone with notifications allowed draws it (`?notifyDemo=`, test builds only; a browser
+  // sends none and shows no line). A fixed clock decides whether the 16 h goal falls in the default quiet hours (22:00-07:30).
+  { id: 'fasting-notify', route: '/fasting?notifyDemo=on', now: todayAt(19, 0), taps: ['fasting-start'], waitFor: 'fasting-notify', note: 'a fast started at 19:00: "A notification comes at the goal." under Goal at' },
+  { id: 'fasting-notify-quiet', route: '/fasting?notifyDemo=on', now: todayAt(15, 0), taps: ['fasting-start'], waitFor: 'fasting-notify', note: 'a fast started at 15:00 reaches 16 h at 07:00, in quiet hours: the notification comes tomorrow at 07:30' },
+  { id: 'fasting-notify-off', route: '/fasting?notifyDemo=off', taps: ['fasting-start'], waitFor: 'fasting-notify-on', note: 'reminders off on a phone: "Notify me at the goal" opens Reminders' },
 ];
 
 // ------------------------------------------------------------------ friends, no account here

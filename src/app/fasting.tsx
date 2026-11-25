@@ -1,8 +1,12 @@
-import { Info, Pencil, Play, Square, Trash2 } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { Bell, Info, Pencil, Play, Square, Trash2 } from 'lucide-react-native';
+import React, { useCallback, useEffect, useState } from 'react';
 import { AppState, useWindowDimensions, View } from 'react-native';
 
+import { notifyDemo } from '@/features/fasting/notifyDemo';
+import { fastGoalReminder, fastGoalTiming, fastNotifyLine } from '@/features/settings/reminderPlanner';
 import { formatDuration } from '@/lib/dates';
+import { getReminderPermission, remindersSupported, type ReminderPermission } from '@/services/notifications';
 import { deleteFast, endFast, startFast, updateFast } from '@/features/trackers/actions';
 import { Figure, Note, RequireProfile } from '@/features/trackers/components';
 import {
@@ -19,7 +23,7 @@ import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { FastingSession } from '@/types';
-import { Button, Card, CupKey, Divider, Header, IconButton, NumberField, Screen, SectionTitle, Segmented, Sheet, Text, toast, Vessel } from '@/ui';
+import { Button, Card, CupKey, decorative, Divider, haptic, Header, IconButton, NumberField, Screen, SectionTitle, Segmented, Sheet, Text, toast, Vessel } from '@/ui';
 
 /** Current time, ticking every second while `active`. Elapsed time is always derived from stored timestamps. */
 function useNow(active: boolean): number {
@@ -104,6 +108,9 @@ function FastingScreen() {
           // A goal to reach: at it the level line becomes the brim line, never amber. "Target" is the calorie
           // number only, so the fast's length is its goal everywhere on this screen.
           goalKind="reach"
+          // Reaching the goal with the screen open: the brim line flashes once and this adds the haptic. A phone
+          // also gets the goal's notification (FastNotify); a browser has only this.
+          onReached={() => haptic.success()}
           color={colors.primary}
           width={narrow ? 72 : 88}
           height={210}
@@ -162,6 +169,7 @@ function FastingScreen() {
                 </IconButton>
               </View>
               <TimeBlock label="Goal at" value={relativeDayTime(p.endsAt, new Date(now))} />
+              {p.reached ? null : <FastNotify fast={active} now={now} />}
             </View>
           </>
         ) : (
@@ -264,6 +272,53 @@ function FastingScreen() {
 
       {active ? <AdjustStartSheet visible={adjusting} session={active} onClose={() => setAdjusting(false)} /> : null}
     </Screen>
+  );
+}
+
+/**
+ * Phones only (a browser sends no notifications; there the cup's reached state is the news). While a fast runs
+ * toward its goal: when its notification comes, from the rule the scheduler plans with (`fastGoalReminder`), or,
+ * when none will come (reminders or the fast's switch off, notifications not allowed), the way to Reminders.
+ */
+function FastNotify({ fast, now }: { fast: FastingSession; now: number }) {
+  const { colors } = useTheme();
+  const r = useStore((s) => s.settings.reminders);
+  const units = useStore((s) => s.profile?.units ?? 'metric');
+  const demo = notifyDemo();
+  const [permission, setPermission] = useState<ReminderPermission | null>(demo ? 'granted' : null);
+  // Asked again on every return, so notifications allowed in Reminders or the phone's settings show at once.
+  useFocusEffect(
+    useCallback(() => {
+      if (remindersSupported && !demo) void getReminderPermission().then(setPermission);
+    }, [demo]),
+  );
+  if (!(remindersSupported || demo) || permission === null) return null;
+  const reminders = demo ? { ...r, enabled: demo === 'on' } : r;
+  const planned = permission === 'granted' ? fastGoalReminder({ reminders, units, fast }, new Date(now)) : null;
+  const timing = planned ? fastGoalTiming(fast, r.quietStart, r.quietEnd) : null;
+  if (timing) {
+    return (
+      <View testID="fasting-notify" style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 4 }}>
+        {decorative(<Bell size={16} color={colors.textSecondary} strokeWidth={1.9} style={{ marginTop: 1 }} />)}
+        {/* The screen's clock is 24-hour, as its Started and Goal at are. */}
+        <Text variant="caption" color="textSecondary" style={{ flex: 1, minWidth: 0 }}>
+          {fastNotifyLine(timing, new Date(now))}
+        </Text>
+      </View>
+    );
+  }
+  return (
+    <Button
+      testID="fasting-notify-on"
+      title="Notify me at the goal"
+      variant="ghost"
+      size="sm"
+      full={false}
+      icon={<Bell size={18} color={colors.actionInk} />}
+      // Pulled out by the small button's own side room, so the bell stands in the column of Started and Goal at.
+      style={{ marginTop: 4, marginLeft: -12 }}
+      onPress={() => router.push('/settings/reminders')}
+    />
   );
 }
 

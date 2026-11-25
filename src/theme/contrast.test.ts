@@ -375,6 +375,49 @@ describe('dark, the over mark', () => {
   });
 });
 
+/**
+ * The water cup poured in layers, one colour per kind of drink (src/features/drinks/LayeredVessel.tsx): water in
+ * `water`, the other six kinds in their own tokens. Each layer is a data fill on the card, so 3:1 there; the level
+ * line rides on whichever layer is on top, so it is 3:1 on each where the look can hold that for its data fills
+ * (Light, Butter, Honey, Java) and 14 apart in Dark and Blossom, as for their data fills (above). Any two kinds can
+ * meet, so all seven keep 15 apart; a layer is never the amber (which means over, and a water cup is never over)
+ * and keeps 12 from the calorie fill, so a juice layer is not read as calories.
+ */
+describe('the drink layers in the water cup', () => {
+  const DRINKS = ['water', 'drinkTea', 'drinkCoffee', 'drinkMilk', 'drinkJuice', 'drinkSports', 'drinkOther'] as const;
+  const LINE_ON_FILL = ['light', 'butter', 'honey', 'java'] as const satisfies readonly Name[];
+
+  it.each(NAMES)('%s: every layer 3:1 on the card, apart from the amber and the calorie fill', (name) => {
+    const c = PALETTES[name];
+    expect(failures(pairs(name, [...DRINKS], ['surface', 'vesselEmpty'], 3))).toEqual([]);
+    for (const k of DRINKS) expect(deltaE(c.warning, c[k]), `${name} warning vs ${k}`).toBeGreaterThanOrEqual(15);
+    for (const k of DRINKS.slice(1)) expect(deltaE(c.calories, c[k]), `${name} calories vs ${k}`).toBeGreaterThanOrEqual(12);
+  });
+
+  it.each(NAMES)('%s: the seven kinds at least 15 apart, so two layers that meet are told apart', (name) => {
+    const c = PALETTES[name];
+    const close: string[] = [];
+    for (let i = 0; i < DRINKS.length; i++) {
+      for (let j = i + 1; j < DRINKS.length; j++) {
+        const d = deltaE(c[DRINKS[i]], c[DRINKS[j]]);
+        if (d < 15) close.push(`${name} ${DRINKS[i]} and ${DRINKS[j]}: ${d.toFixed(1)}`);
+      }
+    }
+    expect(close).toEqual([]);
+  });
+
+  it.each(LINE_ON_FILL)('%s: the level line 3:1 on every layer', (name) => {
+    const c = PALETTES[name];
+    expect(failures(DRINKS.map((k) => ({ what: `${name} rim on ${k}`, ratio: contrast(c.rim, c[k]), min: 3 })))).toEqual([]);
+  });
+
+  it.each(['dark', 'blossom'] as const)('%s: the level line at least 14 apart from every layer (CIEDE2000)', (name) => {
+    const c = PALETTES[name];
+    const merged = DRINKS.map((k) => ({ k, d: deltaE(c.rim, c[k]) })).filter((r) => r.d < 14);
+    expect(merged.map((r) => `${name} rim and ${r.k}: ${r.d.toFixed(1)}`)).toEqual([]);
+  });
+});
+
 describe("Google's sign-in button", () => {
   // Its colours are Google's (tokens.ts, GOOGLE_LIGHT and GOOGLE_DARK), chosen by the paper's darkness, never by a branch in code.
   it("uses Google's Light button on the light papers and its Dark button on Dark and Java", () => {

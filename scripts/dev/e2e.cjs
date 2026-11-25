@@ -3097,6 +3097,29 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     }
   }
 
+  // ------------------------------------------- a fast's goal notification (fastGoalReminder in src/features/settings/reminderPlanner.ts)
+  // A browser sends no notifications, so Fasting shows no line about one; Reminders has the switch (on when never set) and
+  // Coming up lists the running fast's goal, gone with the switch off, back with it on.
+  {
+    await page.goto(`${BASE}/fasting`, { waitUntil: 'networkidle' });
+    await page.getByTestId('fasting-screen').first().waitFor({ timeout: 15000 });
+    if (await page.getByTestId('fasting-end').count()) await tap('fasting-end');
+    await tap('fasting-start');
+    await page.getByTestId('fasting-end').first().waitFor({ timeout: 8000 });
+    check('Fast goal: a browser shows no notification line on Fasting', (await page.getByTestId('fasting-notify').count()) === 0 && (await page.getByTestId('fasting-notify-on').count()) === 0);
+    const goal = (await stored()).settings.fastingTargetHours;
+    const listed = async () => (await page.getByTestId('reminders-preview').first().innerText()).includes(`${goal} h fast reached`);
+    await page.goto(`${BASE}/settings/reminders`, { waitUntil: 'networkidle' });
+    await page.getByTestId('reminders-fast').first().waitFor({ timeout: 15000 });
+    check('Fast goal: the switch is on when never set, and Coming up lists the running fast\'s goal', (await page.getByTestId('reminders-fast').first().getAttribute('aria-checked')) === 'true' && (await listed()), `goal ${goal} h`);
+    await tap('reminders-fast');
+    check('Fast goal: off is stored and leaves Coming up', (await stored()).settings.reminders.fastGoal === false && !(await listed()));
+    await tap('reminders-fast');
+    check('Fast goal: on again', (await stored()).settings.reminders.fastGoal === true && (await listed()));
+    await page.goto(`${BASE}/fasting`, { waitUntil: 'networkidle' });
+    await tap('fasting-end');
+  }
+
   const real = errors.filter((e) => !/favicon|DevTools|useNativeDriver|pointerEvents is deprecated|shadow\*/i.test(e));
   check('no runtime or console errors during the whole run', real.length === 0, real.slice(0, 3).join(' || '));
 

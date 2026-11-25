@@ -105,7 +105,46 @@ export function crossedGoal(prevMl: number, nextMl: number, goalMl: number): boo
 
 // ------------------------------------------------------------------ weight
 
-export type WeightRange = '1m' | '3m' | 'all';
+export type WeightRange = '1m' | '3m' | '6m' | '1y' | 'all';
+
+/**
+ * The weight chart's range chips, in order: drawn short ("3M"), said in full ("3 months"), as a unit is
+ * ("250 ml" drawn, "250 millilitres" said). `days` is how far before the day shown the range starts.
+ */
+export const WEIGHT_RANGES: readonly { value: WeightRange; label: string; spoken: string; span: string; days: number | null }[] = [
+  { value: '1m', label: '1M', spoken: '1 month', span: 'last 30 days', days: 30 },
+  { value: '3m', label: '3M', spoken: '3 months', span: 'last 3 months', days: 91 },
+  { value: '6m', label: '6M', spoken: '6 months', span: 'last 6 months', days: 182 },
+  { value: '1y', label: '1Y', spoken: '1 year', span: 'last 12 months', days: 365 },
+  { value: 'all', label: 'All', spoken: 'All weigh-ins', span: 'all weigh-ins', days: null },
+];
+
+/** The first day a range draws: `end` less the range's days, never before the trend's first day. */
+export function weightRangeFrom(firstDate: ISODate, range: WeightRange, end: ISODate): ISODate {
+  const days = WEIGHT_RANGES.find((r) => r.value === range)?.days ?? null;
+  const start = days === null ? firstDate : addDays(end, -days);
+  return start > firstDate ? start : firstDate;
+}
+
+/** The trend's days a range draws (each day from its first to `end`, weigh-in or not). */
+export function weightRangePoints(trend: readonly TrendPoint[], range: WeightRange, end: ISODate): TrendPoint[] {
+  if (trend.length === 0) return [];
+  const from = weightRangeFrom(trend[0].date, range, end);
+  return trend.filter((p) => p.date >= from && p.date <= end);
+}
+
+/**
+ * The date labels under the chart, at its start, middle and end: "Oct 21", "Nov 8", "Nov 25"; over a span of
+ * more than 5 months a month with its year at the ends ("Dec 2025", "Jun", "Nov 2026"), so a year ago and
+ * today never read alike.
+ */
+export function weightAxisLabels(from: ISODate, last: ISODate): string[] {
+  if (from === last) return [formatShortDate(from)];
+  const mid = addDays(from, Math.round(diffDays(from, last) / 2));
+  if (diffDays(from, last) <= 150) return [formatShortDate(from), formatShortDate(mid), formatShortDate(last)];
+  const month = (d: ISODate) => formatShortDate(d).split(' ')[0];
+  return [`${month(from)} ${from.slice(0, 4)}`, month(mid), `${month(last)} ${last.slice(0, 4)}`];
+}
 
 export interface ChartData {
   line: { x: number; y: number }[];
@@ -115,18 +154,43 @@ export interface ChartData {
 
 /** Trend line and raw weigh-ins for a range ending at `end`, x in days from the range start. */
 export function weightChartData(trend: TrendPoint[], range: WeightRange, end: ISODate, toDisplay: (kg: number) => number = (k) => k): ChartData {
-  if (trend.length === 0) return { line: [], dots: [], labels: [] };
-  const first = trend[0].date;
-  const start = range === 'all' ? first : addDays(end, range === '1m' ? -30 : -91);
-  const from = start > first ? start : first;
-  const pts = trend.filter((p) => p.date >= from && p.date <= end);
+  const pts = weightRangePoints(trend, range, end);
   if (pts.length === 0) return { line: [], dots: [], labels: [] };
+  const from = pts[0].date;
   const line = pts.map((p) => ({ x: diffDays(from, p.date), y: toDisplay(p.trend) }));
   const dots = pts.filter((p) => !p.interpolated).map((p) => ({ x: diffDays(from, p.date), y: toDisplay(p.kg) }));
-  const last = pts[pts.length - 1].date;
-  const mid = addDays(from, Math.round(diffDays(from, last) / 2));
-  const labels = from === last ? [formatShortDate(from)] : [formatShortDate(from), formatShortDate(mid), formatShortDate(last)];
-  return { line, dots, labels };
+  return { line, dots, labels: weightAxisLabels(from, pts[pts.length - 1].date) };
+}
+
+/** What a range holds, for the line under the chips: its weigh-ins' average, lowest and highest, and the trend's change. */
+export interface WeightRangeSummary {
+  from: ISODate;
+  to: ISODate;
+  /** The range reaches back to the first weigh-in (or is 'all'): it is said as "since Oct 21". */
+  sinceFirst: boolean;
+  weighIns: number;
+  /** The average of the weigh-ins in the range (the scale, not the trend); null with none. */
+  averageKg: number | null;
+  lowKg: number | null;
+  highKg: number | null;
+  /** The trend on the range's last day less the trend on its first. */
+  changeKg: number;
+}
+
+export function weightRangeSummary(trend: readonly TrendPoint[], range: WeightRange, end: ISODate): WeightRangeSummary | null {
+  const pts = weightRangePoints(trend, range, end);
+  if (pts.length === 0) return null;
+  const kgs = pts.filter((p) => !p.interpolated).map((p) => p.kg);
+  return {
+    from: pts[0].date,
+    to: pts[pts.length - 1].date,
+    sinceFirst: range === 'all' || pts[0].date === trend[0].date,
+    weighIns: kgs.length,
+    averageKg: kgs.length ? kgs.reduce((a, b) => a + b, 0) / kgs.length : null,
+    lowKg: kgs.length ? Math.min(...kgs) : null,
+    highKg: kgs.length ? Math.max(...kgs) : null,
+    changeKg: pts[pts.length - 1].trend - pts[0].trend,
+  };
 }
 
 export interface WeightStats {

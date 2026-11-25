@@ -441,7 +441,8 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   const waysTwoUp = grown && !fitsRoom(wayWordW, waysW ? (waysW - 3 * spacing.sm) / 4 - 2 * WAY_PAD - 2 : 0);
   const waysRow = (
     <View
-      onLayout={grown ? (e) => setWaysW(Math.floor(e.nativeEvent.layout.width)) : undefined}
+      // Always observed: react-native-web watches a view's layout only when it mounts with a handler.
+      onLayout={(e) => setWaysW(Math.floor(e.nativeEvent.layout.width))}
       style={waysTwoUp ? { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm } : { flexDirection: 'row', gap: spacing.sm }}
       testID="quick-ways">
       {grown ? (

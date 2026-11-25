@@ -129,6 +129,7 @@ const settings = [
   { id: 'reminders-on-imperial', route: '/settings/reminders', imperial: true, taps: ['reminders-master', 'reminders-weighin', 'reminders-movement'], waitFor: 'reminders-movement-time', note: 'the same with the 12-hour clock and fl oz' },
   { id: 'reminders-time-sheet', route: '/settings/reminders', imperial: true, taps: ['reminders-master', 'reminders-breakfast'], sheet: true, note: 'a time picker sheet, 12-hour' },
   { id: 'reminders-quiet-sheet', route: '/settings/reminders', taps: ['reminders-quiet-start'], sheet: true, note: 'the quiet hours time sheet, 24-hour' },
+  { id: 'reminders-fast', route: '/settings/reminders', values: { fasting: 0.5 }, waitFor: 'reminders-fast', note: 'a 16 h fast 8 h in: the Fasting switch, and "16 h fast reached" in Coming up' },
   { id: 'data-import-newer', route: '/settings/data', taps: [{ choose: 'data-import', files: ['scripts/dev/states/files/start-newer-backup.json'] }], note: 'importing a backup from a newer version: the error toast' },
   { id: 'data-import-profile', route: '/settings/data', taps: [{ choose: 'data-import', files: ['scripts/dev/states/files/start-older-profile.json'] }], sheet: true, note: 'the confirm sheet: use the backup profile or keep mine' },
   { id: 'about-imperial', route: '/settings/about', imperial: true, note: 'about, imperial' },

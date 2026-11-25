@@ -97,6 +97,19 @@ export interface ThemeColors {
   /** @deprecated No gradients in Pour. Equals `calories`. */
   ringEnd: string;
   /**
+   * The drinks poured as layers in the water cup (src/features/drinks/LayeredVessel.tsx), one colour per kind;
+   * plain water is `water`. Fills and key marks only, never text. Held in contrast.test.ts ("the drink layers"):
+   * each 3:1 on the card, the level line 3:1 on each in Light, Butter, Honey and Java (14 apart in Dark and
+   * Blossom, as for the data fills), the seven at least 15 apart (CIEDE2000) so two layers that meet are told
+   * apart, and each 15 from the amber (amber means over) and 12 from the calorie fill.
+   */
+  drinkTea: string;
+  drinkCoffee: string;
+  drinkMilk: string;
+  drinkJuice: string;
+  drinkSports: string;
+  drinkOther: string;
+  /**
    * "Continue with Google" only (src/features/auth/GoogleButton.tsx). Google's sign-in button rules fix
    * its colours, so these three are Google's own values, the one sanctioned exception to the palette:
    * its Light button (white fill, #747775 edge, #1F1F1F label) on the light papers and its Dark button
@@ -159,6 +172,13 @@ export const darkColors: ThemeColors = {
   heroStart: '#1F1E1C',
   heroEnd: '#1F1E1C',
   ringEnd: '#FF9466',
+  // The drink layers: pastels like the data fills, all well off the cream line.
+  drinkTea: '#A8C47A',
+  drinkCoffee: '#B88A6A',
+  drinkMilk: '#A39E99',
+  drinkJuice: '#FF6B6B',
+  drinkSports: '#A58AE6',
+  drinkOther: '#E0AECF',
   ...GOOGLE_DARK,
 };
 
@@ -208,6 +228,13 @@ export const lightColors: ThemeColors = {
   heroStart: '#FFFCF8',
   heroEnd: '#FFFCF8',
   ringEnd: '#E2683F',
+  // The drink layers: mid tones the ink line is 3:1 on; juice a red, apart from the persimmon calorie fill.
+  drinkTea: '#6E8B3D',
+  drinkCoffee: '#8C6236',
+  drinkMilk: '#8B857E',
+  drinkJuice: '#C8343C',
+  drinkSports: '#8A63C9',
+  drinkOther: '#B96A93',
   ...GOOGLE_LIGHT,
 };
 
@@ -269,6 +296,14 @@ export const blossomColors: ThemeColors = {
   heroStart: '#FFFDFA',
   heroEnd: '#FFFDFA',
   ringEnd: blossom.ticklePink,
+  // The drink layers: Light's tea, coffee, milk and sports; an orange juice and a sea grey for other drinks, since
+  // a red and a mauve would meet the raspberry line.
+  drinkTea: '#6E8B3D',
+  drinkCoffee: '#8C6236',
+  drinkMilk: '#8B857E',
+  drinkJuice: '#D45A2A',
+  drinkSports: '#8A63C9',
+  drinkOther: '#5F8A8B',
   ...GOOGLE_LIGHT,
 };
 
@@ -340,6 +375,13 @@ export const butterColors: ThemeColors = {
   heroStart: '#FCF9E6',
   heroEnd: '#FCF9E6',
   ringEnd: '#C4475E',
+  // The drink layers: in the band where the Sceptre Red line is 3:1 on each and each is 3:1 on the butter card.
+  drinkTea: '#6E8B3D',
+  drinkCoffee: '#986C5D',
+  drinkMilk: '#8B857E',
+  drinkJuice: '#D45A2A',
+  drinkSports: '#8A63C9',
+  drinkOther: '#B96A93',
   ...GOOGLE_LIGHT,
 };
 
@@ -359,6 +401,10 @@ export const honeyColors: ThemeColors = {
   caloriesInk: '#7A5512',
   caloriesBar: '#B48820',
   ringEnd: '#B48820',
+  // Coffee, milk and juice of their own: the burnt-amber over mark sits where Butter's orange juice and brown coffee are.
+  drinkCoffee: '#926F63',
+  drinkMilk: '#8B8A7E',
+  drinkJuice: '#D2344F',
 };
 
 /**
@@ -413,6 +459,13 @@ export const javaColors: ThemeColors = {
   heroStart: '#31221D',
   heroEnd: '#31221D',
   ringEnd: '#CC4F66',
+  // The drink layers: in the band where the butter line is 3:1 on each and each is 3:1 on the brown card.
+  drinkTea: '#6E8B3D',
+  drinkCoffee: '#95695B',
+  drinkMilk: '#88857C',
+  drinkJuice: '#D9541E',
+  drinkSports: '#8A63C9',
+  drinkOther: '#B96A93',
   ...GOOGLE_DARK,
 };
 

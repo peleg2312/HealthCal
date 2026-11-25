@@ -9,7 +9,7 @@ import { useStore } from '@/store';
 import { computeDayFromStore } from '@/store/selectors';
 import type { Profile } from '@/types';
 
-import { widgetModel, type WidgetDay } from './model';
+import { widgetModel, widgetTexts, type WidgetDay } from './model';
 
 const DAY = '2026-11-25';
 
@@ -159,5 +159,23 @@ describe('widgetModel', () => {
     const g = drink(500);
     useStore.getState().remove('water', g.id);
     expect(day().water.line).toBe('0 ml of 3.3 L');
+  });
+
+  it('hands the layout the words exactly as the drawing draws them', () => {
+    eat(1219);
+    const g = drink(213);
+    expect(widgetTexts(day())).toEqual({
+      date: 'WED, NOV 25',
+      figure: '941',
+      word: 'left',
+      eaten: '1,219 eaten of 2,160',
+      water: '213 ml of 3.3 L',
+      caption: 'Water',
+      glass: '+ 250 ml',
+      undo: null,
+    });
+    const f = widgetModel(useStore.getState(), DAY, { id: g.id, ml: 250, date: DAY, at: 0 });
+    if (f.kind !== 'day') throw new Error('expected the day');
+    expect(widgetTexts(f)).toMatchObject({ caption: '250 ml added', undo: 'Undo' });
   });
 });

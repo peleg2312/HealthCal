@@ -5,14 +5,16 @@ import { Platform, View, type TextInput } from 'react-native';
 
 import { clockTime } from '@/features/import/ui/format';
 import { resolveDateParam } from '@/features/trackers/dateParam';
-import { diffDays, formatDayLabel, formatShortDate } from '@/lib/dates';
+import { addDays, diffDays, formatDayLabel, formatShortDate } from '@/lib/dates';
 import { isPlausibleBodyFat, projectedGoalDate } from '@/lib/energy';
 import { weightChartLabel } from '@/features/progress/chartWords';
 import { trendMonthParts, weeklyRateText } from '@/features/progress/goalDate';
 import { formatWeight, weightToKg, weightUnit, weightValue } from '@/lib/units';
 import { applyWeighInToTargets, deleteWeightRecord, saveWeightRecord } from '@/features/trackers/actions';
 import { DayStepper, Explain, ExplainText, Figure, HistoryItem, HistoryList, HistoryRow, RequireProfile } from '@/features/trackers/components';
-import { bodyFatText, findByDate, keepOrConvert, targetsBehind, weightChartData, weightStats, weightText, type WeightRange } from '@/features/trackers/helpers';
+import { bodyFatText, findByDate, keepOrConvert, targetsBehind, weightChartData, weightRangePoints, weightRangeSummary, weightStats, weightText, type WeightRange } from '@/features/trackers/helpers';
+import { RangeChips } from '@/features/trackers/RangeChips';
+import { heldDayWords, heldReadout, heldShortDay, rangeFigures, risingWeekNote } from '@/features/trackers/weightWords';
 import { isSyncedWeighIn, weighInFromLine } from '@/features/trackers/weighInSource';
 import { useToday } from '@/store/clock';
 import { useProfile, useWeightSeries } from '@/store/selectors';
@@ -30,16 +32,9 @@ import {
   numberTextProblem,
   Screen,
   SectionTitle,
-  Segmented,
   Sheet,
   Text,
 } from '@/ui';
-
-const RANGES: { value: WeightRange; label: string }[] = [
-  { value: '1m', label: '1 month' },
-  { value: '3m', label: '3 months' },
-  { value: 'all', label: 'All' },
-];
 
 function signed(kg: number, units: UnitSystem, digits = 1): string {
   const v = weightValue(kg, units);
@@ -57,6 +52,8 @@ function WeightScreen() {
   const units = profile.units;
   const series = useWeightSeries();
   const [range, setRange] = useState<WeightRange>('3m');
+  // The point held on the chart (a finger, or the arrow keys on the web): its index in the range's days.
+  const [held, setHeld] = useState<number | null>(null);
   const end = useToday();
   // Opened for a past day (?date=): the weigh-in sheet starts on that day.
   const params = useLocalSearchParams<{ date?: string; log?: string }>();
@@ -77,11 +74,22 @@ function WeightScreen() {
   const empty = series.entries.length === 0;
   const stats = empty ? null : weightStats(series.trend, series.startKg ?? 0, series.weeklyRateKg, profile.targetWeightKg);
   const chart = weightChartData(series.trend, range, end, (kg) => weightValue(kg, units));
+  // The range's days (the chart's line, one point a day) and what they hold, for the line under the chips.
+  const rangeDays = weightRangePoints(series.trend, range, end);
+  const figures = (() => {
+    const summary = weightRangeSummary(series.trend, range, end);
+    return summary ? rangeFigures(summary, range, units) : null;
+  })();
+  const heldPoint = held !== null ? rangeDays[held] : undefined;
+  const readout = heldPoint ? heldReadout(heldPoint, end, units) : null;
+  const dayAt = (x: number) => rangeDays.find((p) => p.date === addDays(rangeDays[0]?.date ?? end, x));
   const target = profile.targetWeightKg;
   // The trend's date, from today's date (never the clock in a render), said as a month: the plan's date is in Goals.
   const projected = stats && target && stats.weeklyKg !== null ? projectedGoalDate(stats.trendKg, target, stats.weeklyKg, new Date(`${end}T12:00:00`)) : null;
   const projectedParts = projected ? trendMonthParts(projected) : null;
   const latest = series.latest;
+  // A rising week gets context and a next step (never a verdict, never amber).
+  const rising = risingWeekNote(series.trend, end, units, target);
 
   // The newest weigh-in came from a health store and the targets do not use it yet: one tap applies it (a sync never does).
   const behind = targetsBehind(profile, series.entries);
@@ -109,39 +117,75 @@ function WeightScreen() {
               <View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <CupKey color={colors.weight} />
-                  <Text variant="overline">Trend weight</Text>
+                  {/* While a point is held, the figures are that day's: its trend here, its weigh-in at the right. */}
+                  <Text variant="overline" testID="weight-trend-label">
+                    {heldPoint ? `Trend, ${heldShortDay(heldPoint.date, end)}` : 'Trend weight'}
+                  </Text>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
                   <Text testID="weight-trend" variant="numXL" tabular>
-                    {weightValue(stats.trendKg, units).toFixed(1)}
+                    {weightValue(heldPoint ? heldPoint.trend : stats.trendKg, units).toFixed(1)}
                   </Text>
                   <Text variant="unit" style={{ fontSize: 15 }}>
                     {unit}
                   </Text>
                 </View>
               </View>
-              {latest ? (
+              {heldPoint && readout ? (
                 <View style={{ alignItems: 'flex-end', marginLeft: 'auto' }}>
-                  <Text variant="caption" color="textSecondary">
+                  <Text variant="caption" color="textSecondary" testID="weight-scale-label">
+                    {readout.scale ? `Scale, ${heldShortDay(heldPoint.date, end)}` : `No weigh-in, ${heldShortDay(heldPoint.date, end)}`}
+                  </Text>
+                  <Text variant="numM" tabular testID="weight-scale">
+                    {readout.scale ?? '–'}
+                  </Text>
+                </View>
+              ) : latest ? (
+                <View style={{ alignItems: 'flex-end', marginLeft: 'auto' }}>
+                  <Text variant="caption" color="textSecondary" testID="weight-scale-label">
                     Scale, {latest.date === end ? 'today' : formatShortDate(latest.date)}
                   </Text>
-                  <Text variant="numM" tabular>
+                  <Text variant="numM" tabular testID="weight-scale">
                     {fixedWeight(latest.kg, units)}
                   </Text>
                 </View>
               ) : null}
             </View>
-            <Segmented testID="weight-range" options={RANGES} value={range} onChange={setRange} />
+            {/* Press and hold (or drag) on the chart, or its arrow keys on the web: the figures above read that day. */}
             <LineChart
+              key={range}
               accessibilityLabel={weightChartLabel(series.trend, range, end, units, target)}
               line={chart.line}
               dots={chart.dots}
+              ringDots
               color={colors.weight}
               goal={target ? weightValue(target, units) : undefined}
               height={200}
               xLabels={chart.labels}
               formatY={(n) => (Number.isInteger(n) ? String(n) : n.toFixed(1))}
+              formatPoint={(p) => heldDayWords(dayAt(p.x)?.date ?? end, end)}
+              pointSpoken={(p) => {
+                const day = dayAt(p.x);
+                return day ? heldReadout(day, end, units).spoken : '';
+              }}
+              onActiveChange={setHeld}
             />
+            {/* The range, under the chart where the thumb is; the figures under it follow it. */}
+            <RangeChips
+              value={range}
+              onChange={(r) => {
+                setHeld(null);
+                setRange(r);
+              }}
+            />
+            {figures ? (
+              <View testID="weight-range-figures" style={{ flexDirection: 'row', gap: spacing.md }}>
+                <Figure testID="weight-range-average" value={figures.average} unit={figures.unit} label={figures.averageLabel} />
+                {figures.spread ? (
+                  <Figure testID="weight-range-spread" value={figures.spread} unit={figures.unit} label={figures.spreadLabel} spoken={figures.spreadSpoken ?? undefined} />
+                ) : null}
+              </View>
+            ) : null}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg }}>
               <Legend swatch={<View style={{ width: 16, height: 2, borderRadius: 1, backgroundColor: colors.weight }} />} label="Trend" />
               <Legend swatch={<CupKey color={colors.textTertiary} size={7} />} label="Weigh-ins" />
@@ -204,6 +248,19 @@ function WeightScreen() {
                 label={projected && target ? 'Goal, at your current trend' : target ? 'Not toward your goal at this trend' : 'Set a goal weight to see a date'}
               />
             </View>
+            {rising ? (
+              <>
+                <Divider />
+                <View testID="weight-rising-note" style={{ gap: spacing.xs }}>
+                  <Text variant="body" color="textSecondary">
+                    {rising.line}
+                  </Text>
+                  <Text variant="body" color="textSecondary" testID="weight-rising-step">
+                    {rising.step}
+                  </Text>
+                </View>
+              </>
+            ) : null}
           </Card>
 
           <SectionTitle title="History" />

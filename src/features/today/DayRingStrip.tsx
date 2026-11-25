@@ -25,6 +25,8 @@ const ARROWS_MIN_W = 400;
 const PICK_CUP = 32;
 /** The link's chevron and the 2 px before it, beside its words. */
 const LINK_MARK = 18;
+/** How far a 32 px cup's touch area reaches past it on each side (44 to touch). */
+const TOUCH_REACH = (44 - PICK_CUP) / 2;
 /** The chosen day's level line under its date. */
 const SELECTED_MARK_W = 18;
 /**
@@ -260,7 +262,8 @@ export function DayRingStrip({
   // The room for the link's words: the row less what sits beside them (the chip or streak with the week controls, as
   // drawn; its X and its chevron, with the gaps between), the same whichever way the row is laid out, so a choice never
   // flips it.
-  const linkRoom = rowW ? rowW - (groupW ? groupW + spacing.sm : 0) - (link?.hide ? PICK_CUP + spacing.sm : 0) - LINK_MARK : 0;
+  // The X's and the streak's touch areas reach past their cups (`TOUCH_REACH` each), so the two keep that much more apart.
+  const linkRoom = rowW ? rowW - (groupW ? groupW + spacing.sm + (link?.hide ? 2 * TOUCH_REACH : 0) : 0) - (link?.hide ? PICK_CUP + spacing.sm : 0) - LINK_MARK : 0;
   // "Your week is ready" or its short form: the short one under 360 px, and with text grown wherever the whole label,
   // measured as drawn, is wider than its room (`fitsRoom`), so it keeps one line.
   const linkShort = !!link?.short && (narrow || (grown && !fitsRoom(linkW, linkRoom)));
@@ -431,7 +434,8 @@ export function DayRingStrip({
       {/* Very large text (150% and up), or a link that does not fit beside them: the row wraps, the chip, the streak and
           the week cup going to a line under the caption where they do not fit beside it, so neither squeezes the other's words. */}
       <View
-        onLayout={grown ? (e) => setRowW(Math.floor(e.nativeEvent.layout.width)) : undefined}
+        // Always observed: react-native-web watches a view's layout only when it mounts with a handler.
+        onLayout={(e) => setRowW(Math.floor(e.nativeEvent.layout.width))}
         style={{ flexDirection: 'row', flexWrap: wraps ? 'wrap' : 'nowrap', alignItems: 'center', gap: spacing.sm, minHeight: CAPTION_ROW_H }}>
         {showLink && link ? (
           <View style={wraps ? { flexGrow: 1, flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm } : { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>

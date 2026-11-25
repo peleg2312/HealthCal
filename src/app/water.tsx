@@ -26,12 +26,15 @@ import { DrinkKindRow } from '@/features/drinks/DrinkKindRow';
 import { DrinkPickSheet } from '@/features/drinks/DrinkPickSheet';
 import { DrinkRecentChips } from '@/features/drinks/DrinkRecentChips';
 import { DrinkTitleRow } from '@/features/drinks/DrinkTitleRow';
+import { DrinkKey, KEY_LINE, keyLines } from '@/features/drinks/DrinkKey';
+import { drinkKey, drinkLayers, showDrinkKey } from '@/features/drinks/layers';
+import { LayeredVessel } from '@/features/drinks/LayeredVessel';
 import { pickToast, placePick, yourDrinks } from '@/features/drinks/pick';
 import { loadDrinkMemory, rememberDrinkChoice, useDrinkMemory } from '@/features/drinks/memory';
 import { diaryWaterCaption, diaryWaterOpenLabel, waterDeleteLabel } from '@/features/drinks/diary';
 import { DRINK_MAX_ML, drinkAmountCheck, drinkMeal, enteredDrinkKind, entryFor, noticeLine, pickedFood, planDrink, rememberedChoice, sameDrinkFoodIds, sameDrinkInDiary, selectChoice, selectFood, waterAfter, waterFromEntry, waterOnlyOffered, waterRowCaption, waterRowTitle, type WaterAfter } from '@/features/drinks/rules';
 import { leftLitreDecimals, shownMl, volumeNumber, volumeUnitFor, waterLeftMl } from '@/features/today/volume';
-import { cup, useLargeText, useTheme } from '@/theme';
+import { cup, useLargeText, useTextGrowth, useTheme } from '@/theme';
 import { pourLandsAt } from '@/theme/motion';
 import type { Beverage, Food, WaterEntry } from '@/types';
 import { spokenUnits } from '@/lib/spokenUnits';
@@ -59,7 +62,6 @@ import {
   toast,
   useGrownText,
   useReducedMotion,
-  Vessel,
 } from '@/ui';
 
 const BEVERAGES = Object.keys(BEVERAGE_LABELS) as Beverage[];
@@ -225,6 +227,7 @@ function WaterScreen() {
   // their own and the glasses go two a row, so nothing is cut or overlaps.
   const big = useLargeText();
   const grown = useGrownText();
+  const growth = useTextGrowth();
   const profile = useProfile();
   const settings = useStore((s) => s.settings);
   const units = profile.units;
@@ -411,6 +414,20 @@ function WaterScreen() {
   }));
   const daysMet = week.filter((d) => d.waterMl >= d.waterGoalMl && d.waterGoalMl > 0).length;
 
+  // The day's drinks poured in layers, one colour per kind, oldest at the base and the newest under the level line,
+  // counted as the total is (coffee at 90%); with two kinds or more a small key under the cup names each.
+  const layers = drinkLayers(day.waterEntries, goal);
+  const keyItems = drinkKey(day.waterEntries);
+  const keyShown = showDrinkKey(keyItems);
+  // The key's width: the card's inside (the screen's 20 px sides and the card's 18 px padding).
+  const keyRoom = Math.min(screenW, 560) - 40 - 36;
+  const keyLineCount = keyShown ? keyLines(keyItems, units, keyRoom, growth).length : 0;
+  // Under 360 px the cup gives up the room of every key line past the first, so the glasses stay in the first view
+  // at 320 x 640 whatever the day holds (the first line fits in the room the screen already has).
+  const vesselH = narrow ? Math.max(120, 168 - Math.max(0, keyLineCount - 1) * (KEY_LINE + 4)) : 220;
+  const cupA11y = spokenUnits(`${formatVolume(consumed, units)} of ${formatVolume(goal, units)}`);
+  const key = keyShown ? <DrinkKey testID="water-key" items={keyItems} units={units} room={keyRoom} /> : null;
+
   // The cup's three words: placed at their levels beside the cup, or with large text in a column of their own.
   const goalWords = (
     <Text variant="caption" color="textSecondary" numberOfLines={1}>
@@ -453,16 +470,16 @@ function WaterScreen() {
         {big ? (
           // The cup, and its three words in a column of their own beside it (under it when they need the width).
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: spacing.lg }}>
-            <Vessel
+            <LayeredVessel
+              testID="water-cup"
               value={consumed}
               max={goal}
-              goalKind="reach"
+              layers={layers}
               onReached={onReached}
               memoryKey={`water-${date}`}
-              color={colors.water}
               width={narrow ? 76 : 96}
               height={narrow ? 168 : 220}
-              accessibilityLabel={spokenUnits(`${formatVolume(consumed, units)} of ${formatVolume(goal, units)}`)}
+              accessibilityLabel={cupA11y}
             />
             <View style={{ flexGrow: 1, flexBasis: 140, minWidth: 0, gap: spacing.sm }}>
               {goalWords}
@@ -470,21 +487,25 @@ function WaterScreen() {
               {drunkWords(false)}
             </View>
           </View>
-        ) : (
-          <Vessel
+        ) : null}
+        {big ? key : (
+          // The cup and, right under it, the key to its layers (with two kinds or more).
+          <View style={{ gap: 10 }}>
+          <LayeredVessel
+            testID="water-cup"
             value={consumed}
             max={goal}
-            goalKind="reach"
+            layers={layers}
             onReached={onReached}
             memoryKey={`water-${date}`}
-            color={colors.water}
             width={narrow ? 76 : 96}
-            // Under 360 px the cup is shorter, so all four glasses stay in the first view at 320 x 640.
-            height={narrow ? 168 : 220}
+            // Under 360 px the cup is shorter (and shorter still for a key of two lines or more), so all four
+            // glasses stay in the first view at 320 x 640.
+            height={vesselH}
             labelGap={narrow ? 14 : 18}
             // Labels that meet at some level keep 8 px between them, at every value.
             labelSpacing={8}
-            accessibilityLabel={spokenUnits(`${formatVolume(consumed, units)} of ${formatVolume(goal, units)}`)}
+            accessibilityLabel={cupA11y}
             labels={[
               {
                 key: 'goal',
@@ -507,6 +528,8 @@ function WaterScreen() {
               },
             ]}
           />
+          {key}
+          </View>
         )}
 
         {/* The goal is the cup's top label; under the cup only what is left, or, once the goal is reached, one

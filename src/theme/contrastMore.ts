@@ -125,6 +125,13 @@ export function forcedColorsPalette(s: SystemColors, base: ThemeColors): ThemeCo
     tabBar: page,
     rim: ink,
     headroom: fill,
+    // The water cup's drink layers become one colour too: the seams between them and the key's words tell them apart.
+    drinkTea: fill,
+    drinkCoffee: fill,
+    drinkMilk: fill,
+    drinkJuice: fill,
+    drinkSports: fill,
+    drinkOther: fill,
     vesselEdge: ink,
     caloriesInk: ink,
     // On the overlay (CanvasText): the page colour reads on it in a light or a dark system theme.

@@ -249,7 +249,8 @@ export function PillarsCard({ day, isToday }: { day: DaySummary; isToday: boolea
   return (
     <Card testID="today-rail" padding={0}>
       <View
-        onLayout={measuring ? (e) => setRowW(Math.floor(e.nativeEvent.layout.width)) : undefined}
+        // Always observed: react-native-web watches a view's layout only when it mounts with a handler.
+        onLayout={(e) => setRowW(Math.floor(e.nativeEvent.layout.width))}
         style={{ flexDirection: large ? 'column' : 'row', paddingHorizontal: pad, paddingTop: 12, paddingBottom: 14, gap }}>
         {measuring ? (
           // Each cell's label and value at their natural widths as drawn, to know whether the three share one row.

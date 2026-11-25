@@ -746,6 +746,14 @@ src/features/drinks/diary.ts	notADrinkByName	function
 src/features/drinks/diary.ts	waterDeleteLabel	function
 src/features/drinks/diary.ts	waterIdFromEntry	re-export	src/features/drinks/via.ts:waterIdFromEntry
 src/features/drinks/diary.ts	withWater	function
+src/features/drinks/layers.ts	DRINK_LAYER_COLOR	const
+src/features/drinks/layers.ts	DrinkKeyItem	interface
+src/features/drinks/layers.ts	DrinkLayer	interface
+src/features/drinks/layers.ts	drinkKey	function
+src/features/drinks/layers.ts	drinkKeySpoken	function
+src/features/drinks/layers.ts	drinkKeyText	function
+src/features/drinks/layers.ts	drinkLayers	function
+src/features/drinks/layers.ts	showDrinkKey	function
 src/features/drinks/memory.ts	DRINK_CHOICE_KEY	const
 src/features/drinks/memory.ts	loadDrinkMemory	function
 src/features/drinks/memory.ts	parseDrinkMemory	function
@@ -863,6 +871,8 @@ src/features/drinks/via.ts	hasWaterTracked	re-export	src/lib/hydration.ts:hasWat
 src/features/drinks/via.ts	isTrackedWater	re-export	src/lib/hydration.ts:isTrackedWater
 src/features/drinks/via.ts	isWaterDrinkEntry	function
 src/features/drinks/via.ts	waterIdFromEntry	function
+src/features/fasting/notifyDemo.ts	NotifyDemo	type
+src/features/fasting/notifyDemo.ts	notifyDemo	function
 src/features/food/AmountEditor.tsx	AmountEditor	component
 src/features/food/AmountEditor.tsx	AmountValue	interface
 src/features/food/AskLine.tsx	AskLine	component
@@ -2461,6 +2471,72 @@ src/features/progress/useProgressData.ts	ProgressData	type
 src/features/progress/useProgressData.ts	RangeDays	type
 src/features/progress/useProgressData.ts	useProgressData	function
 src/features/progress/useRecap.ts	useRecap	function
+src/features/recap/facts.ts	ActivityFacts	interface
+src/features/recap/facts.ts	FactDay	interface
+src/features/recap/facts.ts	FoodCount	interface
+src/features/recap/facts.ts	TOP_FOOD_MIN_DAYS	const
+src/features/recap/facts.ts	WaterFacts	interface
+src/features/recap/facts.ts	activityFacts	function
+src/features/recap/facts.ts	topFoods	function
+src/features/recap/facts.ts	waterFacts	function
+src/features/recap/offer.ts	OFFER_KEY	const
+src/features/recap/offer.ts	OFFER_MONTH_DAYS	const
+src/features/recap/offer.ts	OFFER_MONTH_MIN_DAYS	const
+src/features/recap/offer.ts	OFFER_YEAR_FROM	const
+src/features/recap/offer.ts	OFFER_YEAR_MIN_DAYS	const
+src/features/recap/offer.ts	OFFER_YEAR_UNTIL	const
+src/features/recap/offer.ts	markPeriodDealt	function
+src/features/recap/offer.ts	offerAllowed	function
+src/features/recap/offer.ts	parseDealt	function
+src/features/recap/offer.ts	periodOffer	function
+src/features/recap/offer.ts	unmarkPeriodDealt	function
+src/features/recap/offer.ts	useDealtPeriods	function
+src/features/recap/offer.ts	withDealt	function
+src/features/recap/period.ts	CupCell	interface
+src/features/recap/period.ts	CupRow	interface
+src/features/recap/period.ts	DayFacts	interface
+src/features/recap/period.ts	Period	interface
+src/features/recap/period.ts	PeriodKind	type
+src/features/recap/period.ts	PeriodTally	interface
+src/features/recap/period.ts	YEAR_SLOTS	const
+src/features/recap/period.ts	countedSpan	function
+src/features/recap/period.ts	cupCell	function
+src/features/recap/period.ts	defaultMonth	function
+src/features/recap/period.ts	defaultYear	function
+src/features/recap/period.ts	inProgress	const
+src/features/recap/period.ts	loggedBetween	function
+src/features/recap/period.ts	monthKeyOf	const
+src/features/recap/period.ts	monthPeriod	function
+src/features/recap/period.ts	monthRows	function
+src/features/recap/period.ts	monthTallies	function
+src/features/recap/period.ts	monthsSince	function
+src/features/recap/period.ts	parseMonthKey	function
+src/features/recap/period.ts	parseYearKey	function
+src/features/recap/period.ts	periodRows	function
+src/features/recap/period.ts	periodTally	function
+src/features/recap/period.ts	yearKeyOf	const
+src/features/recap/period.ts	yearPeriod	function
+src/features/recap/period.ts	yearRows	function
+src/features/recap/period.ts	yearsSince	function
+src/features/recap/words.ts	MONTH_LONG	const
+src/features/recap/words.ts	OFFER_HIDDEN	const
+src/features/recap/words.ts	activityCaption	function
+src/features/recap/words.ts	cardOverline	function
+src/features/recap/words.ts	cardTitle	function
+src/features/recap/words.ts	closingLine	function
+src/features/recap/words.ts	daysFigure	function
+src/features/recap/words.ts	emptyWords	function
+src/features/recap/words.ts	gridLabel	function
+src/features/recap/words.ts	helpParagraphs	function
+src/features/recap/words.ts	monthRowWords	function
+src/features/recap/words.ts	offerLine	function
+src/features/recap/words.ts	periodName	function
+src/features/recap/words.ts	periodSubtitle	function
+src/features/recap/words.ts	periodTitle	function
+src/features/recap/words.ts	totalVolume	function
+src/features/recap/words.ts	waterCaption	function
+src/features/recap/words.ts	weightWords	function
+src/features/recap/words.ts	yearRowWords	function
 src/features/settings/ThemeSwatches.tsx	THEME_HINTS	const
 src/features/settings/ThemeSwatches.tsx	ThemeSwatches	component
 src/features/settings/ThemeSwatches.tsx	swatchesPerRow	function
@@ -2519,12 +2595,15 @@ src/features/settings/goalsValidation.ts	targetWeightError	function
 src/features/settings/noteText.ts	isReadingNote	function
 src/features/settings/noteText.ts	noteVariant	function
 src/features/settings/planFromStore.ts	planFromStore	function
+src/features/settings/reminderPlanner.ts	FAST_GOAL_DEFAULT	const
+src/features/settings/reminderPlanner.ts	FastGoalTiming	interface
 src/features/settings/reminderPlanner.ts	MAX_PER_DAY	const
 src/features/settings/reminderPlanner.ts	MIN_GAP_MINUTES	const
 src/features/settings/reminderPlanner.ts	PRIORITY	const
 src/features/settings/reminderPlanner.ts	ParsedAction	type
 src/features/settings/reminderPlanner.ts	PlannedReminder	interface
 src/features/settings/reminderPlanner.ts	PlannerDay	interface
+src/features/settings/reminderPlanner.ts	PlannerFast	interface
 src/features/settings/reminderPlanner.ts	PlannerInput	interface
 src/features/settings/reminderPlanner.ts	REMINDER_ROUTES	const
 src/features/settings/reminderPlanner.ts	ReminderAction	interface
@@ -2536,6 +2615,13 @@ src/features/settings/reminderPlanner.ts	WEIGHIN_CATEGORY	const
 src/features/settings/reminderPlanner.ts	atLocal	function
 src/features/settings/reminderPlanner.ts	checkInBody	function
 src/features/settings/reminderPlanner.ts	dayOnTrack	function
+src/features/settings/reminderPlanner.ts	fastGoalOn	function
+src/features/settings/reminderPlanner.ts	fastGoalPatch	function
+src/features/settings/reminderPlanner.ts	fastGoalReminder	function
+src/features/settings/reminderPlanner.ts	fastGoalTiming	function
+src/features/settings/reminderPlanner.ts	fastGoalWords	function
+src/features/settings/reminderPlanner.ts	fastHours	function
+src/features/settings/reminderPlanner.ts	fastNotifyLine	function
 src/features/settings/reminderPlanner.ts	inQuietHours	function
 src/features/settings/reminderPlanner.ts	mealBody	function
 src/features/settings/reminderPlanner.ts	mealRepeat	function
@@ -2545,6 +2631,7 @@ src/features/settings/reminderPlanner.ts	parseReminderAction	function
 src/features/settings/reminderPlanner.ts	planReminders	function
 src/features/settings/reminderPlanner.ts	reminderTimeLabel	function
 src/features/settings/reminderPlanner.ts	repeatableMeals	function
+src/features/settings/reminderPlanner.ts	runningFast	function
 src/features/settings/reminderPlanner.ts	snoozeTime	function
 src/features/settings/reminderPlanner.ts	volumeText	function
 src/features/settings/reminderPlanner.ts	walkNetKcal	function
@@ -2645,6 +2732,7 @@ src/features/today/DayRingStrip.tsx	useFinePointer	function
 src/features/today/FirstLogInvite.tsx	FirstLogInvite	component
 src/features/today/FitsSheet.tsx	FitsSheet	component
 src/features/today/FitsSheet.tsx	useMealIdeas	function
+src/features/today/MeasureWidth.tsx	MeasureWidth	component
 src/features/today/NowCard.tsx	NowCard	component
 src/features/today/NowCard.tsx	NowState	interface
 src/features/today/NowCard.tsx	relativeTo	function
@@ -2693,15 +2781,19 @@ src/features/today/daySwipe.ts	claimsTouch	function
 src/features/today/daySwipe.ts	stepDay	function
 src/features/today/daySwipe.ts	swipeDayLabel	function
 src/features/today/daySwipe.ts	swipeStep	function
+src/features/today/fit.ts	cupHeightFor	function
+src/features/today/fit.ts	fitsRoom	function
 src/features/today/fits.ts	Fit	interface
 src/features/today/fits.ts	FitSource	type
 src/features/today/fits.ts	FitSources	interface
 src/features/today/fits.ts	fitCandidates	function
 src/features/today/fits.ts	rankFits	function
 src/features/today/glass.ts	logPlainGlass	function
+src/features/today/greetingTitle.ts	TITLE_FLOOR	const
 src/features/today/greetingTitle.ts	TITLE_STEP	const
 src/features/today/greetingTitle.ts	greetingTitle	function
 src/features/today/greetingTitle.ts	shortGreeting	function
+src/features/today/greetingTitle.ts	tabTitleFit	function
 src/features/today/greetingTitle.ts	titleWidth	function
 src/features/today/greetingTitle.ts	todayTitle	function
 src/features/today/ideas.ts	IDEAS_FROM_KCAL	const
@@ -2769,6 +2861,7 @@ src/features/today/week.ts	weekCaption	function
 src/features/today/week.ts	weekDates	function
 src/features/today/weightCell.ts	WeightCellValue	interface
 src/features/today/weightCell.ts	weightCell	function
+src/features/trackers/RangeChips.tsx	RangeChips	component
 src/features/trackers/actions.ts	applyWeighInToTargets	function
 src/features/trackers/actions.ts	deleteFast	function
 src/features/trackers/actions.ts	deleteSleep	function
@@ -2807,9 +2900,11 @@ src/features/trackers/helpers.ts	QUALITY_LABELS	const
 src/features/trackers/helpers.ts	SLEEP_RANGE	const
 src/features/trackers/helpers.ts	SleepSummary	interface
 src/features/trackers/helpers.ts	TargetsBehind	interface
+src/features/trackers/helpers.ts	WEIGHT_RANGES	const
 src/features/trackers/helpers.ts	WHTR_GUIDELINE	const
 src/features/trackers/helpers.ts	WeighInPatch	type
 src/features/trackers/helpers.ts	WeightRange	type
+src/features/trackers/helpers.ts	WeightRangeSummary	interface
 src/features/trackers/helpers.ts	WeightStats	interface
 src/features/trackers/helpers.ts	bodyFatFollowsDelete	function
 src/features/trackers/helpers.ts	bodyFatText	function
@@ -2836,7 +2931,11 @@ src/features/trackers/helpers.ts	sleepSummary	function
 src/features/trackers/helpers.ts	splitUnit	function
 src/features/trackers/helpers.ts	targetsBehind	function
 src/features/trackers/helpers.ts	weighInAfterEdit	function
+src/features/trackers/helpers.ts	weightAxisLabels	function
 src/features/trackers/helpers.ts	weightChartData	function
+src/features/trackers/helpers.ts	weightRangeFrom	function
+src/features/trackers/helpers.ts	weightRangePoints	function
+src/features/trackers/helpers.ts	weightRangeSummary	function
 src/features/trackers/helpers.ts	weightStats	function
 src/features/trackers/helpers.ts	weightText	function
 src/features/trackers/sleepSource.ts	sleepFrom	function
@@ -2850,6 +2949,12 @@ src/features/trackers/weighInSource.ts	sameFat	function
 src/features/trackers/weighInSource.ts	sameKg	const
 src/features/trackers/weighInSource.ts	weighInFromLine	function
 src/features/trackers/weighInSource.ts	withoutSyncFields	function
+src/features/trackers/weightWords.ts	heldDayWords	function
+src/features/trackers/weightWords.ts	heldReadout	function
+src/features/trackers/weightWords.ts	heldShortDay	function
+src/features/trackers/weightWords.ts	rangeFigures	function
+src/features/trackers/weightWords.ts	rangeSpanWords	function
+src/features/trackers/weightWords.ts	risingWeekNote	function
 src/features/updates/AboutVersion.tsx	AboutVersion	component
 src/features/updates/fake.ts	DEMO_PRESETS	const
 src/features/updates/fake.ts	FakePort	interface
@@ -2919,6 +3024,20 @@ src/features/widget/cup.ts	CupSpec	interface
 src/features/widget/cup.ts	cupBox	function
 src/features/widget/cup.ts	cupSide	function
 src/features/widget/cup.ts	cupSvg	function
+src/features/widget/fontScale.ts	cleanScale	function
+src/features/widget/fontScale.ts	scaleSteps	function
+src/features/widget/fontScale.ts	spToDp	function
+src/features/widget/fonts.ts	FONT_FACES	const
+src/features/widget/fonts.ts	HEIGHT_PAD	const
+src/features/widget/fonts.ts	WIDTH_PAD	const
+src/features/widget/fonts.ts	WIDTH_SLACK	const
+src/features/widget/fonts.ts	WidgetFont	type
+src/features/widget/fonts.ts	advance	function
+src/features/widget/fonts.ts	baselineOf	function
+src/features/widget/fonts.ts	extentOf	function
+src/features/widget/fonts.ts	lineHeight	function
+src/features/widget/fonts.ts	textWidth	function
+src/features/widget/fonts.ts	wrapWords	function
 src/features/widget/glass.ts	RecentGlass	interface
 src/features/widget/glass.ts	UNDO_WINDOW_MS	const
 src/features/widget/glass.ts	acceptGlassTap	function
@@ -2927,9 +3046,17 @@ src/features/widget/glass.ts	logWidgetGlass	function
 src/features/widget/glass.ts	recentWidgetGlass	function
 src/features/widget/glass.ts	resetWidgetGlassForTests	function
 src/features/widget/glass.ts	undoWidgetGlass	function
+src/features/widget/layout.ts	DATE_TRACKING	const
+src/features/widget/layout.ts	FIGURE_SIZES	const
+src/features/widget/layout.ts	FIGURE_TRACKING	const
+src/features/widget/layout.ts	LineBox	interface
+src/features/widget/layout.ts	MessageLayout	interface
+src/features/widget/layout.ts	ROOM	const
 src/features/widget/layout.ts	TYPE	const
 src/features/widget/layout.ts	WidgetLayout	interface
-src/features/widget/layout.ts	textWidth	function
+src/features/widget/layout.ts	WidgetTexts	interface
+src/features/widget/layout.ts	gapFor	function
+src/features/widget/layout.ts	messageLayout	function
 src/features/widget/layout.ts	widgetLayout	function
 src/features/widget/midnight.ts	untilMidnight	function
 src/features/widget/model.ts	WidgetDay	interface
@@ -2938,6 +3065,7 @@ src/features/widget/model.ts	WidgetMessage	interface
 src/features/widget/model.ts	WidgetThemes	interface
 src/features/widget/model.ts	widgetMessage	function
 src/features/widget/model.ts	widgetModel	function
+src/features/widget/model.ts	widgetTexts	function
 src/features/widget/model.ts	widgetThemes	function
 src/features/widget/name.ts	ADD_GLASS	const
 src/features/widget/name.ts	TODAY_URI	const
@@ -3468,7 +3596,9 @@ src/theme/index.tsx	TEXT_SIZE_KEY	re-export	src/theme/textSize.ts:TEXT_SIZE_KEY
 src/theme/index.tsx	TextSize	re-export	src/theme/textSize.ts:TextSize
 src/theme/index.tsx	Theme	interface
 src/theme/index.tsx	ThemeProvider	component
+src/theme/index.tsx	VERY_LARGE_TEXT	re-export	src/theme/textSize.ts:VERY_LARGE_TEXT
 src/theme/index.tsx	bolder	re-export	src/theme/textSize.ts:bolder
+src/theme/index.tsx	drawnFontSize	re-export	src/theme/textSize.ts:drawnFontSize
 src/theme/index.tsx	isReducedMotion	re-export	src/theme/motion.ts:isReducedMotion
 src/theme/index.tsx	legibility	re-export	src/theme/legibility.ts:legibility
 src/theme/index.tsx	motion	re-export	src/theme/motion.ts:motion
@@ -3480,12 +3610,14 @@ src/theme/index.tsx	setTextSize	re-export	src/theme/textSize.ts:setTextSize
 src/theme/index.tsx	textGrowth	re-export	src/theme/textSize.ts:textGrowth
 src/theme/index.tsx	textSize	re-export	src/theme/textSize.ts:textSize
 src/theme/index.tsx	textSizeLabel	re-export	src/theme/textSize.ts:textSizeLabel
+src/theme/index.tsx	useDrawnFontSize	re-export	src/theme/textSize.ts:useDrawnFontSize
 src/theme/index.tsx	useLargeText	re-export	src/theme/textSize.ts:useLargeText
 src/theme/index.tsx	useLegibility	re-export	src/theme/legibility.ts:useLegibility
 src/theme/index.tsx	useReducedMotion	re-export	src/theme/motion.ts:useReducedMotion
 src/theme/index.tsx	useTextGrowth	re-export	src/theme/textSize.ts:useTextGrowth
 src/theme/index.tsx	useTextSize	re-export	src/theme/textSize.ts:useTextSize
 src/theme/index.tsx	useTheme	function
+src/theme/index.tsx	useVeryLargeText	re-export	src/theme/textSize.ts:useVeryLargeText
 src/theme/legibility.ts	Legibility	interface
 src/theme/legibility.ts	legibility	function
 src/theme/legibility.ts	useLegibility	function
@@ -3521,7 +3653,9 @@ src/theme/textSize.ts	MAX_TEXT_GROWTH	const
 src/theme/textSize.ts	TEXT_SIZES	const
 src/theme/textSize.ts	TEXT_SIZE_KEY	const
 src/theme/textSize.ts	TextSize	type
+src/theme/textSize.ts	VERY_LARGE_TEXT	const
 src/theme/textSize.ts	bolder	function
+src/theme/textSize.ts	drawnFontSize	function
 src/theme/textSize.ts	normaliseTextSize	function
 src/theme/textSize.ts	phoneCapFor	function
 src/theme/textSize.ts	scaleTextStyle	function
@@ -3530,9 +3664,11 @@ src/theme/textSize.ts	setTextSize	function
 src/theme/textSize.ts	textGrowth	function
 src/theme/textSize.ts	textSize	function
 src/theme/textSize.ts	textSizeLabel	function
+src/theme/textSize.ts	useDrawnFontSize	function
 src/theme/textSize.ts	useLargeText	function
 src/theme/textSize.ts	useTextGrowth	function
 src/theme/textSize.ts	useTextSize	function
+src/theme/textSize.ts	useVeryLargeText	function
 src/theme/tokens.ts	CupCorners	interface
 src/theme/tokens.ts	MAX_CONTENT_WIDTH	const
 src/theme/tokens.ts	PALETTES	const

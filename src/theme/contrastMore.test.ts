@@ -27,7 +27,7 @@ describe.each(NAMES)('%s with more contrast', (name) => {
 
   it('changes something the person can see, and keeps the data colours and the level line', () => {
     expect(c.textSecondary).not.toBe(base.textSecondary);
-    for (const k of ['calories', 'protein', 'carbs', 'fat', 'water', 'exercise', 'sleep', 'weight', 'rim', 'bg', 'surface'] as const) expect(c[k], k).toBe(base[k]);
+    for (const k of ['calories', 'protein', 'carbs', 'fat', 'water', 'exercise', 'sleep', 'weight', 'drinkTea', 'drinkCoffee', 'drinkMilk', 'drinkJuice', 'drinkSports', 'drinkOther', 'rim', 'bg', 'surface'] as const) expect(c[k], k).toBe(base[k]);
   });
 });
 
@@ -47,7 +47,7 @@ describe('forced colours', () => {
       const c = forcedColorsPalette(sys, PALETTES[name]);
       expect([c.bg, c.surface, c.vesselEmpty, c.track, c.tabBar]).toEqual(Array(5).fill(sys.Canvas));
       expect([c.text, c.textSecondary, c.textTertiary, c.rim, c.vesselEdge, c.fieldEdge, c.dashEdge]).toEqual(Array(7).fill(sys.CanvasText));
-      for (const k of ['calories', 'caloriesBar', 'water', 'protein', 'primary'] as const) expect(c[k], k).toBe(sys.Highlight);
+      for (const k of ['calories', 'caloriesBar', 'water', 'protein', 'primary', 'drinkTea', 'drinkCoffee', 'drinkMilk', 'drinkJuice', 'drinkSports', 'drinkOther'] as const) expect(c[k], k).toBe(sys.Highlight);
       expect(c.actionInk).toBe(sys.LinkText);
       // The over mark differs from the fill under it and from the page.
       expect(c.warning).not.toBe(c.calories);

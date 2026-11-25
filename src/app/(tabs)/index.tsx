@@ -271,6 +271,12 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
 
   // The big figure and its unit ("941" "kcal / left"), with the switch's mark (two arrows, the action ink) at its end
   // where a tap switches it. Keyed by the choice, so a switch draws the other figure at once and only a change ticks.
+  const unit = (
+    <Text variant="unit" style={{ fontSize: 14, lineHeight: 17, marginBottom: numSize * 0.08 }}>
+      {`kcal\n${words.big.word}`}
+    </Text>
+  );
+  const mark = toggle ? <ArrowRightLeft size={18} color={colors.actionInk} strokeWidth={2.2} style={{ marginBottom: numSize * 0.08 }} /> : null;
   const bigFigure = (wrap: boolean) => (
     <View style={{ flexDirection: 'row', flexWrap: wrap ? 'wrap' : 'nowrap', alignItems: 'flex-end', columnGap: 6 }}>
       <AnimatedNumber
@@ -285,10 +291,18 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
         accessibilityLabel={words.bigSpoken}
         style={{ fontSize: numSize, lineHeight: numSize - 2, letterSpacing: -numSize * 0.035 }}
       />
-      <Text variant="unit" style={{ fontSize: 14, lineHeight: 17, marginBottom: numSize * 0.08 }}>
-        {`kcal\n${words.big.word}`}
-      </Text>
-      {toggle ? <ArrowRightLeft size={18} color={colors.actionInk} strokeWidth={2.2} style={{ marginBottom: numSize * 0.08 }} /> : null}
+      {wrap ? (
+        // Where the row wraps (text grown), the unit and the switch's mark go under the number together.
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', columnGap: 6 }}>
+          {unit}
+          {mark}
+        </View>
+      ) : (
+        <>
+          {unit}
+          {mark}
+        </>
+      )}
     </View>
   );
   // One control: its name is the words it shows, then what a tap does ("941 kcal left. Switch to calories eaten").
@@ -543,7 +557,8 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
           the cup's own labels, each at the height it describes, whatever the day's numbers are. */}
       {firstDay || notLogged ? null : (
         <View
-          onLayout={fit ? (e) => setMacrosW(Math.floor(e.nativeEvent.layout.width)) : undefined}
+          // Always observed: react-native-web watches a view's layout only when it mounts with a handler.
+          onLayout={(e) => setMacrosW(Math.floor(e.nativeEvent.layout.width))}
           style={macrosStacked ? { gap: spacing.md, marginTop: macrosTop } : { flexDirection: 'row', gap: macroGap, marginTop: macrosTop }}
           testID="today-macros">
           {fit ? (

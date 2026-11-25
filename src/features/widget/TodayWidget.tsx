@@ -15,8 +15,8 @@
  * the calorie cup and the water cup drawn as SVG (`cupSvg`), numbers in Bricolage, words in Hanken
  * (the fonts the app.json plugin bundles). Three tap areas, side by side and never nested: the
  * calorie half opens Today, the water figures open Water, the glass logs one glass; while a glass
- * can be undone an Undo sits beside the calorie half (or above it, where the figure needs the
- * width). A drawing with no figures opens the app.
+ * can be undone an Undo sits beside the calorie half, or beside the glass when the glass is on a
+ * row of its own. A drawing with no figures opens the app.
  */
 import { FlexWidget, SvgWidget, TextWidget, type WidgetInfo, type WidgetRepresentation } from 'react-native-android-widget';
 
@@ -34,7 +34,7 @@ type Hex = `#${string}`;
 const hex = (c: string) => c as Hex;
 
 /** The margins a part is placed with. */
-type Margins = { marginLeft?: number; marginTop?: number; marginBottom?: number };
+type Margins = { marginLeft?: number; marginRight?: number; marginTop?: number; marginBottom?: number };
 
 /** The card: the surface with its 1 px line and cup corners. */
 function card(c: ThemeColors, pad: number) {
@@ -103,7 +103,6 @@ function dayDrawing(f: WidgetDay, d: WidgetDrawing, c: ThemeColors, L: WidgetLay
   const cupColors = { empty: c.vesselEmpty, edge: c.vesselEdge, rim: c.rim, headroom: c.headroom, warning: c.warning };
   const T = L.lines;
   const figureInk = f.kcal.over ? c.warningInk : c.caloriesInk;
-  const calCupBox = cupBox(L.calCup.width, L.calCup.height);
 
   const figureRow = (
     // Bottom-aligned: Android lines the figure and "kcal left" up on their baselines.
@@ -129,7 +128,7 @@ function dayDrawing(f: WidgetDay, d: WidgetDrawing, c: ThemeColors, L: WidgetLay
         style={{ flex: 1, width: 0, height: L.calH, flexDirection: 'row', alignItems: 'flex-end' }}>
         {svgFor(L.calCup.width, L.calCup.height, density, { value: f.kcal.eaten, max: f.kcal.budget, headroom: f.kcal.headroom, kind: 'limit', colors: { ...cupColors, fill: c.calories } })}
         <FlexWidget style={{ flex: 1, width: 0, height: L.calH, flexDirection: 'column', justifyContent: 'flex-end', marginLeft: ROOM.cupGap }}>
-          {L.date && L.undo !== 'top' ? line(T.date, c.textSecondary, 'match_parent') : null}
+          {L.date ? line(T.date, c.textSecondary, 'match_parent') : null}
           {figureRow}
           {L.eaten ? line(T.eaten, c.textSecondary, 'match_parent') : null}
         </FlexWidget>
@@ -137,17 +136,6 @@ function dayDrawing(f: WidgetDay, d: WidgetDrawing, c: ThemeColors, L: WidgetLay
       {L.undo === 'beside' ? undoButton(f, c, L, { marginLeft: ROOM.buttonGap }) : null}
     </FlexWidget>
   );
-
-  // Where the figure's line needs the whole width, the Undo has a row of its own above the calorie half, the date beside it.
-  const undoRow =
-    L.undo === 'top' ? (
-      <FlexWidget style={{ width: 'match_parent', height: L.topH, flexDirection: 'row', alignItems: 'center' }}>
-        <FlexWidget style={{ flex: 1, width: 0, flexDirection: 'row', alignItems: 'center', marginLeft: calCupBox.width + ROOM.cupGap }}>
-          {L.date ? line(T.date, c.textSecondary, 'match_parent') : null}
-        </FlexWidget>
-        {undoButton(f, c, L, { marginLeft: ROOM.buttonGap })}
-      </FlexWidget>
-    ) : null;
 
   const waterFigures = (
     <FlexWidget
@@ -192,17 +180,18 @@ function dayDrawing(f: WidgetDay, d: WidgetDrawing, c: ThemeColors, L: WidgetLay
     ) : (
       <FlexWidget style={{ width: 'match_parent', height: L.waterH, marginTop: L.gap, flexDirection: 'column' }}>
         {waterFigures}
-        <FlexWidget style={{ width: 'match_parent', flexDirection: 'row', justifyContent: 'flex-end', marginTop: ROOM.underGap }}>{glassButton({})}</FlexWidget>
+        {/* The glass on a row of its own, at the right; the Undo beside it while it shows. */}
+        <FlexWidget style={{ width: 'match_parent', flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: ROOM.underGap }}>
+          {L.undo === 'glass' ? undoButton(f, c, L, { marginRight: ROOM.buttonGap }) : null}
+          {glassButton({})}
+        </FlexWidget>
       </FlexWidget>
     );
 
   return (
     // Height to spare goes between the halves, so the calorie half stays at the top and the glass at the foot.
     <FlexWidget style={{ ...card(c, L.pad), flexDirection: 'column', justifyContent: 'space-between' }} accessibilityLabel={f.spoken}>
-      <FlexWidget style={{ width: 'match_parent', flexDirection: 'column' }}>
-        {undoRow}
-        {calorieHalf}
-      </FlexWidget>
+      {calorieHalf}
       {L.divider ? <FlexWidget style={{ width: 'match_parent', height: 1, marginTop: L.gap, backgroundColor: hex(c.border) }} /> : null}
       {waterBlock}
     </FlexWidget>

@@ -5,9 +5,9 @@
  * ("2.1 litres", "2,050 kilocalories"), so the chart says what a sighted person reads off it. A line with
  * many points names evenly spaced values and where the full list is. Pure: no React, no clock.
  */
-import { addDays, formatShortDate, fromISODate } from '@/lib/dates';
+import { formatShortDate, fromISODate } from '@/lib/dates';
 import type { TrendPoint } from '@/lib/trend';
-import { weightText } from '@/features/trackers/helpers';
+import { weightRangePoints, weightText, type WeightRange } from '@/features/trackers/helpers';
 import { formatNumber, formatVolume } from '@/lib/units';
 import type { ISODate, UnitSystem } from '@/types';
 
@@ -83,12 +83,9 @@ export function evenly<T>(items: readonly T[], max: number): T[] {
  * the goal, the weigh-ins' low and high, then the trend at up to 12 evenly spaced days, and where every
  * weigh-in is listed (History, under the chart).
  */
-export function weightChartLabel(trend: readonly TrendPoint[], range: '1m' | '3m' | 'all', end: ISODate, units: UnitSystem, goalKg?: number): string {
+export function weightChartLabel(trend: readonly TrendPoint[], range: WeightRange, end: ISODate, units: UnitSystem, goalKg?: number): string {
   if (trend.length === 0) return 'Weight chart, no weigh-ins yet.';
-  const first = trend[0].date;
-  const start = range === 'all' ? first : addDays(end, range === '1m' ? -30 : -91);
-  const from = start > first ? start : first;
-  const pts = trend.filter((p) => p.date >= from && p.date <= end);
+  const pts = weightRangePoints(trend, range, end);
   if (pts.length === 0) return 'Weight chart, no weigh-ins in this range.';
   const a = pts[0];
   const z = pts[pts.length - 1];

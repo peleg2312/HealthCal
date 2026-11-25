@@ -426,6 +426,9 @@ export function LineChart({
   formatY,
   xLabels,
   formatPoint,
+  pointSpoken,
+  onActiveChange,
+  ringDots,
   accessibilityLabel,
 }: {
   line: LinePoint[];
@@ -442,13 +445,27 @@ export function LineChart({
   band?: ChartBand;
   /** When set, press and drag scrubs along the line and shows this text for the point. */
   formatPoint?: (p: LinePoint) => string;
+  /** What the arrow keys say for a point on the web (`keyScrub`); `formatPoint` by default. Optional, added for the weight chart. */
+  pointSpoken?: (p: LinePoint) => string;
+  /**
+   * Told each time the held point changes (a finger or the arrow keys): its index in `line`, null when let go.
+   * The screen can then show the point's values in its own large figures. Optional, added for the weight chart.
+   */
+  onActiveChange?: (index: number | null) => void;
+  /** While a point is held, ring the raw dot (`dots`) on the same x, so the day's own reading is marked too. Optional. */
+  ringDots?: boolean;
   /** The chart's name for assistive technology: its summary and its values per point, with units. See `chartA11y`. */
   accessibilityLabel?: string;
 }) {
   const { colors } = useTheme();
   useFocusRing();
   const [width, onLayout] = useWidth();
-  const [active, setActive] = useState<number | null>(null);
+  const [active, setHeld] = useState<number | null>(null);
+  // Every change of the held point goes through here, so the screen hears of it once (`onActiveChange`).
+  const setActive = (i: number | null) => {
+    setHeld(i);
+    if (i !== active) onActiveChange?.(i);
+  };
   const all = [...line, ...(dots ?? [])];
   const padL = 40;
   const padR = 10;
@@ -499,8 +516,14 @@ export function LineChart({
         }
       : {};
   const ap = active !== null ? pts[active] : null;
+  // The day's own reading under the held point, ringed (`ringDots`).
+  const heldDot = ringDots && active !== null && line[active] ? (dots ?? []).find((d) => d.x === line[active].x) : undefined;
   return (
-    <View onLayout={onLayout} style={{ height }} {...chartA11y(accessibilityLabel)} {...keyScrub(!!formatPoint, pts.length, active, setActive, (i) => formatPoint?.(line[i]) ?? '')}>
+    <View
+      onLayout={onLayout}
+      style={{ height }}
+      {...chartA11y(accessibilityLabel)}
+      {...keyScrub(!!formatPoint, pts.length, active, setActive, (i) => (pointSpoken ?? formatPoint)?.(line[i]) ?? '')}>
       <ChartInside hidden={!!accessibilityLabel}>
       {width > 0 ? (
         <Svg width={width} height={height}>
@@ -548,6 +571,7 @@ export function LineChart({
       {ap ? (
         <Svg width={width} height={height} style={{ position: 'absolute', left: 0, top: 0 }} pointerEvents="none">
           <Line x1={ap.px} x2={ap.px} y1={padT} y2={padT + h} stroke={colors.textSecondary} strokeWidth={1} />
+          {heldDot ? <Circle cx={sx(heldDot.x)} cy={sy(heldDot.y)} r={5} fill="none" stroke={colors.text} strokeWidth={1.5} /> : null}
           <Circle cx={ap.px} cy={ap.py} r={4} fill={colors.rim} stroke={colors.surface} strokeWidth={2} />
         </Svg>
       ) : null}

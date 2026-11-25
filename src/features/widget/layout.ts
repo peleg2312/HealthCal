@@ -6,22 +6,27 @@
  * the drawing passes these dp sizes with font scaling off, so what is measured is what is drawn),
  * and each line gets a box it fits in.
  *
- * Plans are tried richest first and the first that fits is drawn:
+ * Plans are tried richest first and the first that fits is drawn (`widgetLayout`'s loops, outermost
+ * first: font scale, figure size, `TIERS`, `ARRANGEMENTS`, the Undo's place):
  *
  * 1. At the phone's font scale, with the 30 dp figure, the parts are given up in this order: the
- *    hairline between the halves, room in the card's padding, the "eaten of" line, then the date
- *    line. A line also goes, whole, where it is wider than its column. The figure with its "kcal
- *    left", the water figures with their "Water" label and the glass always stay.
- * 2. Width is found before anything else goes: "kcal left" stands on the figure's line and moves
- *    under "kcal" only when the line is too narrow; the glass's side padding narrows, then the small
- *    water cup goes, then the glass moves under the water figures. "213 ml of 2.9 L" is always one
- *    line, never split from its number.
- * 3. A short widget (one row) takes the figure down a size (27, 24, 22 dp) and a tighter frame.
+ *    hairline between the halves, then the "eaten of" line, then the date line; at each step the
+ *    card's padding is tried from roomy (14) to tight before the next part goes. A line also goes,
+ *    whole, where it is wider than its column. The figure with its "kcal left", the water figures
+ *    with their "Water" label and the glass always stay.
+ * 2. Width is found without giving anything up where it can be: "kcal left" stands on the figure's
+ *    line and moves under "kcal" only when the line is too narrow; the glass's side padding narrows,
+ *    then the small water cup goes, then the glass moves under the water figures (which costs
+ *    height, so it is tried after the roomy cards with the glass beside). "213 ml of 2.9 L" is always
+ *    one line, never split from its number.
+ * 3. Where even the sparest tier does not fit (one row), the figure steps down (27, 24, 22 dp).
  * 4. Only where none of that fits is the text drawn one of Android's font size steps smaller, down
  *    to the designed size (never smaller than that, unless the phone's own size is).
  *
  * The Undo, while a glass can be undone, sits beside the calorie half when the figure's line still
- * fits beside it, else on a row of its own above it.
+ * fits beside it, else beside the glass when the glass is under the water figures. Only below the
+ * widget's least size, where nothing else would fit, is it left out (the glass can be removed on
+ * Water).
  */
 import { CUP_TOP, cupBox } from './cup';
 import { cleanScale, scaleSteps, spToDp } from './fontScale';
@@ -152,7 +157,8 @@ export interface WidgetLayout {
   date: boolean;
   eaten: boolean;
   units: 'inline' | 'stacked';
-  undo: 'beside' | 'top' | null;
+  /** Beside the calorie half, or beside the glass in the glass's row under the water figures. */
+  undo: 'beside' | 'glass' | null;
   glass: 'beside' | 'under';
   glassPad: number;
   waterCup: boolean;
@@ -163,8 +169,6 @@ export interface WidgetLayout {
   figureH: number;
   /** For stacked units: how far their column stands above the row's foot, so "left" sits on the figure's baseline. */
   unitsDrop: number;
-  /** The Undo's own row above the calorie half (undo 'top'), else 0. */
-  topH: number;
   /** The water figures with their label, and the whole water block (with the glass under it, when it is). */
   waterTextH: number;
   waterTextW: number;
@@ -219,7 +223,7 @@ interface Attempt {
   tier: { divider: boolean; eaten: boolean; date: boolean };
   pad: number;
   glass: 'beside' | 'under';
-  undoAt: 'beside' | 'top' | null;
+  undoAt: 'beside' | 'glass' | null;
   texts: WidgetTexts;
   /** Measure it even where a line that must stay is too wide (the last resort below the widget's least size): it then does not fit. */
   force?: boolean;
@@ -231,6 +235,7 @@ function plan(a: Attempt): WidgetLayout | null {
   const frame = { ...a.tier, pad: a.pad, gap: gapFor(a.pad) };
   const s = sizesAt(a.scale);
   const inner = a.width - 2 * (frame.pad + ROOM.border);
+  // The cup's box is as wide whatever its height (the cup and the brim's room at each side).
   const calCupBox = cupBox(ROOM.calCup, 40).width;
   const calTextFull = inner - calCupBox - ROOM.cupGap;
 
@@ -259,12 +264,10 @@ function plan(a: Attempt): WidgetLayout | null {
   const unitsDrop = unitsAt === 'stacked' ? Math.max(0, figDesc - unitDesc) : 0;
   const figureH = unitsAt === 'inline' ? Math.max(figBase, unitBase) + Math.max(figDesc, unitDesc) : Math.max(figure.height, kcal.height + word.height + unitsDrop);
 
-  // The date stands in the column (or beside the Undo on the Undo's own row), the "eaten of" line under the figure.
-  const dateFits = a.undoAt === 'top' ? date.width + ROOM.buttonGap + undoW <= calTextFull : date.width <= calTextW;
-  const showDate = frame.date && dateFits;
+  // The date stands above the figure, the "eaten of" line under it, each only where it is whole.
+  const showDate = frame.date && date.width <= calTextW;
   const showEaten = frame.eaten && eaten.width <= calTextW;
-  const topH = a.undoAt === 'top' ? Math.max(undoH, showDate ? date.height : 0) : 0;
-  const calH = (showDate && a.undoAt !== 'top' ? date.height : 0) + figureH + (showEaten ? eaten.height : 0);
+  const calH = (showDate ? date.height : 0) + figureH + (showEaten ? eaten.height : 0);
   const calRowH = a.undoAt === 'beside' ? Math.max(calH, undoH) : calH;
 
   // The water figures with their label, and the glass beside or under them.
@@ -288,12 +291,12 @@ function plan(a: Attempt): WidgetLayout | null {
           { cup: true, pad: GLASS_PADS[0] },
           { cup: false, pad: GLASS_PADS[0] },
           { cup: false, pad: GLASS_PADS[1] },
-        ].filter((o) => (o.cup ? cupRoom : 0) + waterTextW <= inner && glassWith(o.pad) <= inner);
+        ].filter((o) => (o.cup ? cupRoom : 0) + waterTextW <= inner && (a.undoAt === 'glass' ? undoW + ROOM.buttonGap : 0) + glassWith(o.pad) <= inner);
   if (!options[0] && !a.force) return null;
   const pick = options[0] ?? { cup: false, pad: GLASS_PADS[1] };
   const waterH = a.glass === 'beside' ? Math.max(waterTextH, glassH) : waterTextH + ROOM.underGap + glassH;
 
-  const used = 2 * (frame.pad + ROOM.border) + topH + calRowH + (frame.divider ? 2 * frame.gap + 1 : frame.gap) + waterH + ROOM.slack;
+  const used = 2 * (frame.pad + ROOM.border) + calRowH + (frame.divider ? 2 * frame.gap + 1 : frame.gap) + waterH + ROOM.slack;
   return {
     fits: used <= a.height && !!unitsFit && !!options[0],
     scale: a.scale,
@@ -311,7 +314,6 @@ function plan(a: Attempt): WidgetLayout | null {
     calTextW,
     figureH,
     unitsDrop,
-    topH,
     waterTextH,
     waterTextW: inner - (pick.cup ? cupRoom : 0) - (a.glass === 'beside' ? ROOM.buttonGap + glassWith(pick.pad) : 0),
     waterH,
@@ -335,25 +337,30 @@ function plan(a: Attempt): WidgetLayout | null {
 export function widgetLayout(width: number, height: number, fontScale: number, texts: WidgetTexts): WidgetLayout {
   const w = Math.max(1, width || 0);
   const h = Math.max(1, height || 0);
-  const undoPlaces: ('beside' | 'top' | null)[] = texts.undo ? ['beside', 'top'] : [null];
   const steps = scaleSteps(fontScale);
-  for (const scale of steps) {
-    for (const figure of FIGURE_SIZES) {
-      for (const tier of TIERS) {
-        for (const { pad, glass } of ARRANGEMENTS) {
-          if (!(tier.pads as readonly number[]).includes(pad)) continue;
-          for (const undoAt of undoPlaces) {
-            const p = plan({ width: w, height: h, scale, figure, tier, pad, glass, undoAt, texts });
-            if (p?.fits) return p;
+  const search = (t: WidgetTexts): WidgetLayout | null => {
+    for (const scale of steps) {
+      for (const figure of FIGURE_SIZES) {
+        for (const tier of TIERS) {
+          for (const { pad, glass } of ARRANGEMENTS) {
+            if (!(tier.pads as readonly number[]).includes(pad)) continue;
+            const undoPlaces: ('beside' | 'glass' | null)[] = !t.undo ? [null] : glass === 'under' ? ['beside', 'glass'] : ['beside'];
+            for (const undoAt of undoPlaces) {
+              const p = plan({ width: w, height: h, scale, figure, tier, pad, glass, undoAt, texts: t });
+              if (p?.fits) return p;
+            }
           }
         }
       }
     }
-  }
+    return null;
+  };
+  // Only where nothing fits with the Undo is it left out, before anything would be cut.
+  const found = search(texts) ?? (texts.undo ? search({ ...texts, undo: null }) : null);
+  if (found) return found;
   // Below the widget's least size nothing fits: the sparest plan at the smallest step, marked as not fitting.
-  const sparest = { width: w, height: h, scale: steps[steps.length - 1] ?? cleanScale(fontScale), figure: FIGURE_SIZES[FIGURE_SIZES.length - 1], tier: TIERS[TIERS.length - 1], pad: 5 };
-  const beside = plan({ ...sparest, glass: 'beside', undoAt: texts.undo ? 'top' : null, texts });
-  return beside ?? plan({ ...sparest, glass: 'under', undoAt: texts.undo ? 'top' : null, texts, force: true })!;
+  const sparest = { width: w, height: h, scale: steps[steps.length - 1] ?? cleanScale(fontScale), figure: FIGURE_SIZES[FIGURE_SIZES.length - 1], tier: TIERS[TIERS.length - 1], pad: 5, undoAt: null, texts: { ...texts, undo: null } };
+  return plan({ ...sparest, glass: 'beside' }) ?? plan({ ...sparest, glass: 'under', force: true })!;
 }
 
 /** The message drawing ("Set up HealthCal", "Not saved"): its title and line broken into lines, each line drawn as its own one-line text. */

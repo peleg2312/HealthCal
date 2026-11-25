@@ -15,7 +15,7 @@ import { formatNumber, formatVolume, mlToFlOz } from '@/lib/units';
 import type { DaySummary } from '@/store/selectors';
 import type { FoodEntry, ISODate, MealType, ReminderSettings, UnitSystem } from '@/types';
 
-export type ReminderKind = 'water' | 'meal' | 'checkin' | 'weighin' | 'movement';
+export type ReminderKind = 'water' | 'meal' | 'checkin' | 'weighin' | 'movement' | 'fast';
 
 export interface PlannedReminder {
   id: string;
@@ -66,6 +66,8 @@ export interface PlannerInput {
   baselineKcalPerDay?: number;
   /** Quick-add glass sizes in ml; the first two become water reminder buttons. */
   waterPresetsMl?: number[];
+  /** The fast running now, if any: its goal's notification (`fastGoalReminder`). */
+  fast?: PlannerFast | null;
 }
 
 /** Minimum gap between any two reminders. */
@@ -77,6 +79,8 @@ export const TOMORROW_UNTIL_MINUTES = 12 * 60;
 
 /** Higher wins when two reminders are too close or the day is over the cap. */
 export const PRIORITY: Record<ReminderKind, number> = {
+  // Never compared: a fast's goal is planned beside the others, never dropped for them (`planReminders`).
+  fast: 6,
   checkin: 5,
   meal: 4,
   weighin: 3,
@@ -90,6 +94,7 @@ export const REMINDER_ROUTES: Record<ReminderKind, string> = {
   checkin: '/',
   weighin: '/weight',
   movement: '/activity/pick',
+  fast: '/fasting',
 };
 
 /** How long "Later today" on a weigh-in reminder waits. */
@@ -390,13 +395,138 @@ export function planReminders(input: PlannerInput, now: Date): PlannedReminder[]
     perDay[c.date] = (perDay[c.date] ?? 0) + 1;
   }
 
-  return kept
-    .sort((a, b) => a.at.getTime() - b.at.getTime())
-    .map(({ date: _date, minutes: _minutes, ...reminder }) => reminder);
+  const planned: PlannedReminder[] = kept.map(({ date: _date, minutes: _minutes, ...reminder }) => reminder);
+  // A fast's goal is a moment the person set, like a timer: it keeps out of quiet hours (it waits for their end)
+  // but takes no part in the spacing and the day's cap, so it never drops another reminder nor is dropped.
+  const fast = fastGoalReminder(input, now);
+  if (fast) planned.push(fast);
+  return planned.sort((a, b) => a.at.getTime() - b.at.getTime());
 }
 
-/** Label for a planned time, relative to `now`: "14:30" or "Tomorrow 08:30". */
+const clockOf = (d: Date, hour12: boolean) => formatClock(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`, hour12);
+const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WEEKDAY_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+/** Whole calendar days from `a`'s day to `b`'s (local). */
+const daysBetween = (a: Date, b: Date) => Math.round((fromISODate(toISODate(b)).getTime() - fromISODate(toISODate(a)).getTime()) / 86_400_000);
+
+/** Label for a planned time, relative to `now`: "14:30", "Tomorrow 08:30", or "Fri 12:00" further on (a long fast's goal). */
 export function reminderTimeLabel(at: Date, now: Date, hour12 = false): string {
-  const clock = formatClock(`${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`, hour12);
-  return toISODate(at) === toISODate(now) ? clock : `Tomorrow ${clock}`;
+  const clock = clockOf(at, hour12);
+  const days = daysBetween(now, at);
+  if (days === 0) return clock;
+  if (days === 1) return `Tomorrow ${clock}`;
+  return `${WEEKDAY_SHORT[at.getDay()]} ${clock}`;
+}
+
+// ------------------------------------------------------------- a fast's goal
+
+/** What the fast's goal notification reads of a running fast (a live `FastingSession` with no end). */
+export interface PlannerFast {
+  id: string;
+  /** ISO time the fast started. */
+  start: string;
+  targetHours: number;
+}
+
+/**
+ * The fast's switch is `fastGoal` in the synced reminders, read only through `fastGoalOn` and written only
+ * through `fastGoalPatch`. Absent means `FAST_GOAL_DEFAULT`: on, so everyone who turned Reminders on gets it
+ * (nothing is sent with the master switch off). Settings sync as one object and every writer spreads the
+ * stored reminders, so an older copy of the app keeps the field.
+ */
+export const FAST_GOAL_DEFAULT = true;
+type WithFastGoal = ReminderSettings & { fastGoal?: boolean };
+
+export function fastGoalOn(r: ReminderSettings): boolean {
+  const v = (r as WithFastGoal).fastGoal;
+  return typeof v === 'boolean' ? v : FAST_GOAL_DEFAULT;
+}
+
+/** The `setReminders` patch that turns the fast's goal notification on or off. */
+export function fastGoalPatch(on: boolean): Partial<ReminderSettings> {
+  const patch: Partial<WithFastGoal> = { fastGoal: on };
+  return patch;
+}
+
+/** The fast running now: the latest started of the fasts with no end (`fasts` are live records). */
+export function runningFast<T extends PlannerFast & { end?: string }>(fasts: readonly T[]): T | null {
+  let best: T | null = null;
+  for (const f of fasts) if (!f.end && (!best || f.start > best.start)) best = f;
+  return best;
+}
+
+/** A fast's goal as a number of hours: "16", "13.5". */
+export function fastHours(hours: number): string {
+  return String(Math.round(hours * 10) / 10);
+}
+
+export interface FastGoalTiming {
+  /** When the fast reaches its goal. */
+  goalAt: Date;
+  /** When its notification comes: at the goal, or as quiet hours end when the goal falls inside them. */
+  at: Date;
+  /** The goal is in quiet hours, so the notification waits for their end. */
+  deferred: boolean;
+}
+
+/** When a fast reaches its goal and when its notification comes. Null for a fast with no valid start or goal. */
+export function fastGoalTiming(fast: PlannerFast, quietStart: string, quietEnd: string): FastGoalTiming | null {
+  const start = Date.parse(fast.start);
+  if (!Number.isFinite(start) || !(fast.targetHours > 0)) return null;
+  const goalAt = new Date(start + fast.targetHours * 3_600_000);
+  if (!inQuietHours(goalAt.getHours() * 60 + goalAt.getMinutes(), quietStart, quietEnd)) return { goalAt, at: goalAt, deferred: false };
+  // The first end of quiet hours after the goal: the same day, or the next when the window crosses midnight.
+  const end = parseHHmm(quietEnd);
+  const day = toISODate(goalAt);
+  let at = atLocal(day, end);
+  if (at.getTime() <= goalAt.getTime()) at = atLocal(addDays(day, 1), end);
+  return { goalAt, at, deferred: true };
+}
+
+/** "at 06:00", "yesterday at 20:00", "on Monday at 20:00", said on the day of `from`. */
+function dayAndClock(d: Date, from: Date, hour12: boolean): string {
+  const clock = clockOf(d, hour12);
+  const days = daysBetween(d, from);
+  if (days === 0) return `at ${clock}`;
+  if (days === 1) return `yesterday at ${clock}`;
+  if (days === -1) return `tomorrow at ${clock}`;
+  return `on ${WEEKDAY_LONG[d.getDay()]} at ${clock}`;
+}
+
+/**
+ * The notification's words, true whenever it is read: the goal in the title ("16 h fast reached"), when the
+ * fast started and, when quiet hours held it back, when the goal was reached. Neutral: a fact and how the
+ * timer works, never praise or a verdict.
+ */
+export function fastGoalWords(fast: PlannerFast, timing: FastGoalTiming, hour12 = false): { title: string; body: string } {
+  const started = `Started ${dayAndClock(new Date(Date.parse(fast.start)), timing.at, hour12)}.`;
+  const reached = timing.deferred ? `Reached ${dayAndClock(timing.goalAt, timing.at, hour12)}, in your quiet hours. ` : '';
+  return {
+    title: `${fastHours(fast.targetHours)} h fast reached`,
+    body: `${reached}${started} The timer runs until you end it.`,
+  };
+}
+
+/**
+ * The notification for the running fast's goal, or null: reminders off, the fast's switch off, no fast running,
+ * or its moment past. Planned again whenever the data changes, so a fast ended early, deleted, or given another
+ * goal or start time cancels or moves it.
+ */
+export function fastGoalReminder(input: Pick<PlannerInput, 'reminders' | 'units' | 'fast'>, now: Date): PlannedReminder | null {
+  const r = input.reminders;
+  const fast = input.fast;
+  if (!r.enabled || !fastGoalOn(r) || !fast) return null;
+  const timing = fastGoalTiming(fast, r.quietStart, r.quietEnd);
+  if (!timing || timing.at.getTime() <= now.getTime()) return null;
+  const { title, body } = fastGoalWords(fast, timing, input.units === 'imperial');
+  return { id: `fast-goal-${fast.id}`, at: timing.at, title, body, kind: 'fast', url: REMINDER_ROUTES.fast, data: { date: toISODate(timing.at) } };
+}
+
+/**
+ * The fasting screen's line while a fast runs and its notification is planned: "A notification comes at the
+ * goal." or, held back by quiet hours, "The goal falls in quiet hours. The notification comes tomorrow at 07:30."
+ */
+export function fastNotifyLine(timing: FastGoalTiming, now: Date, hour12 = false): string {
+  if (!timing.deferred) return 'A notification comes at the goal.';
+  return `The goal falls in quiet hours. The notification comes ${dayAndClock(timing.at, now, hour12)}.`;
 }
