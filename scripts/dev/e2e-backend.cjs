@@ -204,7 +204,7 @@ async function device(browser, seedJson) {
 
   // ------------------------------------- a live estimate saved as a meal, then logged again (src/features/food/log.ts)
   // "Also save as a meal" on a live estimate logs and saves in one act; the saved meal syncs like any saved meal. Logging
-  // it again, from /food/meals and from the + sheet's tile, runs on the phone: no request reaches analyze-food, and the
+  // it again, from /food/meals and from the + sheet's row, runs on the phone: no request reaches analyze-food, and the
   // next estimate's allowance is exactly one below the one before (the stand-in counts every use).
   {
     const leftOf = async () => Number(((await A.has('ai-remaining')) ? await A.text('ai-remaining') : '').match(/^(\d+)/)?.[1] ?? NaN);
@@ -243,15 +243,25 @@ async function device(browser, seedJson) {
     }
     const fromMeals = Object.values((await A.state()).foodEntries).filter((e) => !e.deleted && !entriesBefore.has(e.id));
     check('save live: logged again from /food/meals, still an estimate', i >= 0 && fromMeals.length === meal?.items.length && fromMeals.every((e) => Array.isArray(e.kcalRange)), `${fromMeals.length} entries`);
-    // From the + sheet's tile (the saved meal changed last).
+    // From the + sheet's row. The sheet shows only the three most likely rows (the meal's first usual food, then the
+    // favourite meals, the favourite foods, the other usual foods, the meal changed last), and device A's history puts
+    // the meal changed last under "See all", so the meal is starred first: a favourite meal follows the first usual food.
+    await A.go('/food/meals?meal=snack');
+    const starAt = (await A.page.locator('[data-testid^="saved-meal-card-"]').allInnerTexts()).findIndex((t) => t.includes('Saved live estimate'));
+    if (starAt >= 0) await A.tap(`saved-meal-favorite-${starAt}`);
     await A.go('/');
     await A.tap('tab-add');
-    const tile = (await A.has('quick-usual-saved')) ? await A.text('quick-usual-saved') : '';
+    const rowIds = await A.page
+      .locator('[data-testid^="quick-fav-meal-"], [data-testid="quick-usual-saved"]')
+      .evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')).filter((id) => !id.endsWith('-caption')));
+    let rowId = null;
+    for (const id of rowIds) if ((await A.text(id)).includes('Saved live estimate')) rowId = rowId ?? id;
+    const tile = rowId ? await A.text(rowId) : '';
     const before2 = new Set(Object.keys((await A.state()).foodEntries));
-    if (tile.includes('Saved live estimate')) await A.tap('quick-usual-saved');
+    if (rowId) await A.tap(rowId);
     await A.page.waitForTimeout(800);
     const fromTile = Object.values((await A.state()).foodEntries).filter((e) => !e.deleted && !before2.has(e.id));
-    check('save live: the + sheet tile names it with "~" and one tap logs it as an estimate', tile.includes('Saved live estimate') && /~\s?[\d,]+/.test(tile) && fromTile.length === meal?.items.length && fromTile.every((e) => Array.isArray(e.kcalRange)), tile.replace(/\n/g, ' | '));
+    check('save live: the + sheet row names it with "~" and one tap logs it as an estimate', tile.includes('Saved live estimate') && /~\s?[\d,]+/.test(tile) && fromTile.length === meal?.items.length && fromTile.every((e) => Array.isArray(e.kcalRange)), tile.replace(/\n/g, ' | '));
     A.page.off('request', watch);
     check('save live: no request reached analyze-food while saving and logging the saved meal', sent.length === 0 && (await server()).aiRequests.length === requestsBefore, `${sent.length} sent, server ${(await server()).aiRequests.length - requestsBefore} new`);
     // The next estimate is exactly one use later: the stand-in's count did not move in between.
