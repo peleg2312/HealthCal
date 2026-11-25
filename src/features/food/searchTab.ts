@@ -32,12 +32,13 @@ export const SEARCH_CHIPS: readonly SearchTab[] = TABS;
 
 /**
  * The tab search opens on: the one picked on this visit (any of the five, an empty one shows its empty state);
- * else Favourites when that was the tab chosen last on this device and it lists something (`has.favorites`: a
- * favourite food or meal); else Usual when the meal has history and Recent when not. Any other remembered
- * tab, or Favourites with nothing in it, opens the default.
+ * else the one the address asks for (`asked`, search's `?tab=`, read with `parseSearchTab`: the + sheet's "See all N"
+ * opens the tab that holds the rest), on this visit only and never remembered; else Favourites when that was the tab
+ * chosen last on this device and it lists something (`has.favorites`: a favourite food or meal); else Usual when the
+ * meal has history and Recent when not. Any other remembered tab, or Favourites with nothing in it, opens the default.
  */
-export function openingTab(picked: SearchTab | null, remembered: SearchTab | null, has: { usual: boolean; favorites: boolean }): SearchTab {
-  return picked ?? (remembered === 'favorites' && has.favorites ? 'favorites' : has.usual ? 'usual' : 'recent');
+export function openingTab(picked: SearchTab | null, remembered: SearchTab | null, has: { usual: boolean; favorites: boolean }, asked: SearchTab | null = null): SearchTab {
+  return picked ?? asked ?? (remembered === 'favorites' && has.favorites ? 'favorites' : has.usual ? 'usual' : 'recent');
 }
 
 /** The Usual chip with no history for this meal yet: what will be there (`meal` as the tabs say it, lower case: "lunch", "snacks"). */

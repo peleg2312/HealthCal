@@ -35,6 +35,20 @@ describe('the search tab chosen last (on this device)', () => {
     expect(openingTab(null, 'recent', both)).toBe('usual');
     expect(openingTab(null, 'usual', { usual: false, favorites: false })).toBe('recent');
   });
+  it("the address's ?tab= opens that tab on this visit, below a tap and above the memory", () => {
+    // The + sheet's "See all N": Saved meals, Usual or Favourites, even an empty one (the person asked for it).
+    expect(openingTab(null, null, both, 'meals')).toBe('meals');
+    expect(openingTab(null, 'favorites', both, 'usual')).toBe('usual');
+    expect(openingTab(null, null, { usual: false, favorites: false }, 'favorites')).toBe('favorites');
+    // A tap on this visit still wins.
+    expect(openingTab('recent', null, both, 'meals')).toBe('recent');
+    // Read only when it names a tab; anything else opens as before.
+    expect(openingTab(null, null, both, parseSearchTab('drinks'))).toBe('usual');
+    expect(openingTab(null, 'favorites', both, parseSearchTab(undefined))).toBe('favorites');
+    // Never remembered: the next visit without it opens from what a tap stored, as before.
+    expect(openingTab(null, 'favorites', both, null)).toBe('favorites');
+    expect(openingTab(null, null, both)).toBe('usual');
+  });
   it('shows one fixed set of chips in one fixed order', () => {
     expect(SEARCH_CHIPS).toEqual(['usual', 'recent', 'favorites', 'mine', 'meals']);
   });

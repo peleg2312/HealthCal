@@ -238,7 +238,7 @@ src/features/food/mealMove.test.ts	src/features/food/mealMove.ts
 src/features/food/mealMove.ts	src/types/index.ts
 src/features/food/oneTap.ts
 src/features/food/quickSheet.test.ts	src/features/food/quickSheet.ts
-src/features/food/quickSheet.ts	src/features/ai/words.ts	src/features/food/favoriteWords.ts	src/lib/units.ts	src/types/index.ts
+src/features/food/quickSheet.ts	src/features/ai/words.ts	src/features/food/favoriteWords.ts	src/features/food/searchTab.ts	src/lib/units.ts	src/types/index.ts
 src/features/food/recents.test.ts	src/features/food/log.ts	src/ui/index.ts
 src/features/food/restore.test.ts	src/features/food/restore.ts	src/types/index.ts
 src/features/food/restore.ts	src/features/drinks/via.ts	src/lib/dates.ts	src/types/index.ts

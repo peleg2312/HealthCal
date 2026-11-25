@@ -851,6 +851,7 @@ src/features/food/oneTap.ts	ONE_TAP_GUARD_MS	2	src/components/QuickLogSheet.tsx	
 src/features/food/oneTap.ts	tooSoon	2	src/components/QuickLogSheet.tsx	src/features/widget/glass.ts
 src/features/food/oneTap.ts	useOneTap	3	src/app/food/search.tsx	src/app/water.tsx	src/features/today/StatusRail.tsx
 src/features/food/quickSheet.ts	AI_TAG	2	src/components/QuickLogSheet.tsx	src/features/food/quickSheet.test.ts
+src/features/food/quickSheet.ts	LikelyKind	1	src/components/QuickLogSheet.tsx
 src/features/food/quickSheet.ts	QUICK_ROWS	1	src/features/food/quickSheet.test.ts
 src/features/food/quickSheet.ts	QUICK_WAYS	2	src/components/QuickLogSheet.tsx	src/features/food/quickSheet.test.ts
 src/features/food/quickSheet.ts	QuickWayId	1	src/components/QuickLogSheet.tsx
@@ -860,6 +861,7 @@ src/features/food/quickSheet.ts	quickSheetLine	2	src/components/QuickLogSheet.ts
 src/features/food/quickSheet.ts	quickSheetTitle	2	src/components/QuickLogSheet.tsx	src/features/food/quickSheet.test.ts
 src/features/food/quickSheet.ts	seeAllLabel	2	src/components/QuickLogSheet.tsx	src/features/food/quickSheet.test.ts
 src/features/food/quickSheet.ts	seeAllSpoken	2	src/components/QuickLogSheet.tsx	src/features/food/quickSheet.test.ts
+src/features/food/quickSheet.ts	seeAllTab	2	src/components/QuickLogSheet.tsx	src/features/food/quickSheet.test.ts
 src/features/food/quickSheet.ts	wideWaySpoken	2	src/components/QuickLogSheet.tsx	src/features/food/quickSheet.test.ts
 src/features/food/restore.ts	RESTORE_MAX	1	src/features/food/restore.test.ts
 src/features/food/restore.ts	removedToday	2	src/features/food/DiaryParts.tsx	src/features/food/restore.test.ts
@@ -898,10 +900,10 @@ src/features/food/saveWords.ts	savedToastBudget	1	src/features/food/saveWords.te
 src/features/food/saveWords.ts	shortName	1	src/features/food/saveWords.test.ts
 src/features/food/saveWords.ts	showSaveSheetFoods	2	src/features/food/SaveMealSheet.tsx	src/features/food/saveWords.test.ts
 src/features/food/searchTab.ts	SEARCH_CHIPS	2	src/app/food/search.tsx	src/features/food/searchTab.test.ts
-src/features/food/searchTab.ts	SearchTab	1	src/app/food/search.tsx
+src/features/food/searchTab.ts	SearchTab	2	src/app/food/search.tsx	src/features/food/quickSheet.ts
 src/features/food/searchTab.ts	loadSearchTab	2	src/app/food/search.tsx	src/components/QuickLogSheet.tsx
 src/features/food/searchTab.ts	openingTab	2	src/app/food/search.tsx	src/features/food/searchTab.test.ts
-src/features/food/searchTab.ts	parseSearchTab	1	src/features/food/searchTab.test.ts
+src/features/food/searchTab.ts	parseSearchTab	2	src/app/food/search.tsx	src/features/food/searchTab.test.ts
 src/features/food/searchTab.ts	rememberSearchTab	1	src/app/food/search.tsx
 src/features/food/searchTab.ts	useSearchTab	1	src/app/food/search.tsx
 src/features/food/searchTab.ts	usualEmpty	2	src/app/food/search.tsx	src/features/food/searchTab.test.ts

@@ -23,7 +23,7 @@ import { FAVOURITES_EMPTY_WITH_HINT, HOLD_HINT, markHoldHintDone, useHoldHint } 
 import { LangIconButton, useLangName } from '@/features/food/langName';
 import { LogSavedMealSheet } from '@/features/food/SavedMealParts';
 import { SaveCurrentMealRow, SavedMealRow, useVisitOrder } from '@/features/food/SavedMealRow';
-import { loadSearchTab, openingTab, rememberSearchTab, SEARCH_CHIPS, usualEmpty, useSearchTab, type SearchTab } from '@/features/food/searchTab';
+import { loadSearchTab, openingTab, parseSearchTab, rememberSearchTab, SEARCH_CHIPS, usualEmpty, useSearchTab, type SearchTab } from '@/features/food/searchTab';
 import { resolveFood, usualFoods } from '@/features/food/usuals';
 import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { formatDayLabel } from '@/lib/dates';
@@ -46,14 +46,16 @@ export default function FoodSearchScreen() {
   const narrow = useWindowDimensions().width < 360;
   const big = useLargeText();
   const grown = useGrownText();
-  const params = useLocalSearchParams<{ meal?: string; date?: string }>();
+  const params = useLocalSearchParams<{ meal?: string; date?: string; tab?: string }>();
   const todayDate = useToday();
   const date = parseDate(params.date, todayDate);
   const [meal, setMeal] = useState<MealType>(() => parseMeal(params.meal));
   const [query, setQuery] = useState('');
-  // null until the user picks a tab: then the tab chosen last on this device, else Usual when there is
-  // history for this meal (`openingTab`). A tap is remembered on the device (`healthcal.searchTab`).
+  // null until the user picks a tab: then the tab the address asks for (`?tab=`, the + sheet's "See all N": this visit
+  // only, never remembered), else the tab chosen last on this device, else Usual when there is history for this meal
+  // (`openingTab`). A tap is remembered on the device (`healthcal.searchTab`).
   const [pickedTab, setPickedTab] = useState<Tab | null>(null);
+  const askedTab = parseSearchTab(params.tab);
   const rememberedTab = useSearchTab((s) => s.tab);
   useEffect(() => {
     void loadSearchTab();
@@ -117,7 +119,7 @@ export default function FoodSearchScreen() {
   const favMeals = ordered.filter((m) => isFavoriteMeal(m) || starredAtVisit.has(m.id));
   // Favourites opens from memory only while it lists something (what this visit lists, so an unstar there never
   // moves the tab); Usual opens by itself only for a meal with history (a tap opens it empty too).
-  const tab: Tab = openingTab(pickedTab, rememberedTab, { usual: usuals.length > 0, favorites: favMeals.length + favorites.length > 0 });
+  const tab: Tab = openingTab(pickedTab, rememberedTab, { usual: usuals.length > 0, favorites: favMeals.length + favorites.length > 0 }, askedTab);
   // What is starred now (a food unstarred on this visit keeps its row, not its count).
   const favCount = favorites.filter((f) => favoriteIds.includes(f.id)).length + savedMeals.filter(isFavoriteMeal).length;
   // The empty Favourites tab's one-line tip about the long press, until it is dealt with on this device.

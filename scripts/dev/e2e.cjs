@@ -2634,10 +2634,12 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
       const usualShown = lefts.filter((l) => l.id.startsWith('quick-usual-')).map((l) => l.id.slice('quick-usual-'.length));
       const favTiles = lefts.filter((l) => l.id.startsWith('quick-fav-food-')).length;
       // The first usual food may be a favourite too: it is then the usual row only, and the favourite rows are the others,
-      // as many as the three rows leave beside it.
+      // as many as the three rows leave beside it (the demo's "Usual breakfast", the saved meal changed last, takes the
+      // third row when the order holds more than three).
+      const savedShown = lefts.some((l) => l.id === 'quick-usual-saved');
       check(
         'favourites: a favourite food is shown once, never again as a usual row',
-        usualShown.length > 0 && usualShown.slice(1).every((k) => !favIds.includes(k)) && favTiles === Math.min(2, favIds.filter((id) => id !== usualShown[0]).length),
+        usualShown.length > 0 && usualShown.slice(1).every((k) => k === 'saved' || !favIds.includes(k)) && favTiles === Math.min(savedShown ? 1 : 2, favIds.filter((id) => id !== usualShown[0]).length),
         `${usualShown.join(', ')} | ${favTiles} favourite tiles`,
       );
       // An AI food starred (as a long press on its diary row does): its tile reads "~" and "about".
@@ -2805,13 +2807,16 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   // At dinner, with the demo's data (Repeat shown, three likely rows and "See all 7") and on a first day with nothing
   // logged, at 360 x 740, 390 x 844 and 320 x 640: the sheet's body does not scroll and every control of it is wholly
   // in the window; the title names the meal and the line under it the day and what is left; Scan is at the end of the
-  // Search row; "See all N" opens food search.
+  // Search row; the saved meal changed last (the demo's "Usual breakfast") takes the third row although usual foods and
+  // favourites lead; "See all N" opens food search on the tab that holds the rest (Usual here, `?tab=usual`).
   {
     const { buildSeed } = await import(require('url').pathToFileURL(require.resolve('./seed.mjs')).href);
     const at = new Date();
     at.setHours(19, 0, 0, 0);
     const looks = [];
     let seeAll = null;
+    let savedRow = null;
+    let seeAllTab = null;
     for (const [w, h] of [[360, 740], [390, 844], [320, 640]]) {
       for (const empty of [false, true]) {
         const ctx = await browser.newContext({ viewport: { width: w, height: h }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
@@ -2839,12 +2844,18 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
             title: sheet.querySelector('[id^="sheet-title"]')?.textContent ?? '', line: t('quick-day-line'), see: t('quick-see-all'),
             ways: ['quick-photo', 'quick-describe', 'quick-activity', 'quick-weight', 'quick-search', 'quick-scan'].every((id) => !!sheet.querySelector(`[data-testid="${id}"]`)),
             repeat: !!sheet.querySelector('[data-testid="quick-repeat"]'), barcodeTile: !!sheet.querySelector('[data-testid="quick-pinned"]'),
+            // The likely rows in the order drawn (the row controls, not their captions or the overline).
+            rows: [...sheet.querySelectorAll('[data-testid="quick-usual"] [data-testid^="quick-"]')].filter((e) => e.matches('[role="button"],button') && e.getAttribute('data-testid') !== 'quick-see-all').map((e) => ({ id: e.getAttribute('data-testid'), text: t(e.getAttribute('data-testid')) })),
           };
         });
         looks.push({ w, empty, ...m });
         if (!empty && w === 360 && m.see) {
+          savedRow = m.rows;
           await p.getByTestId('quick-see-all').first().tap();
           seeAll = await p.getByTestId('food-search-input').first().waitFor({ state: 'visible', timeout: 8000 }).then(() => new URL(p.url()).pathname, () => 'not opened');
+          await p.waitForTimeout(400);
+          const u = new URL(p.url());
+          seeAllTab = { tab: u.searchParams.get('tab'), usual: await p.getByTestId('search-tab-usual').first().getAttribute('aria-pressed'), stored: await p.evaluate(() => localStorage.getItem('healthcal.searchTab')) };
         }
         await ctx.close();
       }
@@ -2852,6 +2863,12 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     const bad = looks.filter((l) => l.scrolls > 0 || l.outside.length || !l.ways || l.barcodeTile || l.title !== 'Add to dinner' || !/^Today · [\d,]+ kcal (left|above budget)$/.test(l.line) || (!l.empty && (!l.repeat || l.see !== 'See all 7')));
     check('+ sheet in one view: nothing scrolls and every control is in the window at 360 x 740, 390 x 844 and 320 x 640, demo data and a first day', bad.length === 0, JSON.stringify(bad.length ? bad[0] : looks.map((l) => `${l.w}${l.empty ? ' empty' : ''}: ${l.count} controls`)));
     check('+ sheet in one view: "See all 7" opens food search', seeAll === '/food/search', String(seeAll));
+    check(
+      '+ sheet in one view: the saved meal changed last takes the third row behind usual foods and favourites, and "See all 7" opens search on Usual, the tab that holds the rest, without remembering it',
+      savedRow?.length === 3 && savedRow[2].id === 'quick-usual-saved' && savedRow[2].text.includes('Usual breakfast') && savedRow[0].id.startsWith('quick-usual-b_') &&
+        seeAllTab?.tab === 'usual' && seeAllTab.usual === 'true' && seeAllTab.stored === null,
+      JSON.stringify({ rows: savedRow?.map((r) => r.id), seeAllTab }),
+    );
   }
 
   // ------------------------------------------- Appearance: the newer looks (src/theme/resolve.ts)

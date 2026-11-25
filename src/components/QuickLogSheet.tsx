@@ -14,7 +14,7 @@ import { lastPortions, matchServing, portionFor, portionKcal, portionLabel, serv
 import { formatPortion, mealServings, planSavedMeal } from '@/features/food/build';
 import { logFood, logItems, logSavedMeal } from '@/features/food/log';
 import { ONE_TAP_GUARD_MS, tooSoon } from '@/features/food/oneTap';
-import { AI_TAG, likelyRows, QUICK_WAYS, quickRowTitle, quickSheetLine, quickSheetTitle, seeAllLabel, seeAllSpoken, wideWaySpoken, type QuickWayId } from '@/features/food/quickSheet';
+import { AI_TAG, likelyRows, QUICK_WAYS, quickRowTitle, quickSheetLine, quickSheetTitle, seeAllLabel, seeAllSpoken, seeAllTab, wideWaySpoken, type LikelyKind, type QuickWayId } from '@/features/food/quickSheet';
 import { loadSearchTab } from '@/features/food/searchTab';
 import { addWater } from '@/features/today/StatusRail';
 import { quickLogDate, quickLogPastDate, useViewedDay } from '@/features/today/viewedDay';
@@ -73,11 +73,11 @@ type Likely =
  * The sheet behind the centre + button, in one view at 360 x 740, 390 x 844 and 320 x 640 at the designed text size:
  * the title says where the food goes ("Add to dinner") and the line under it the day and what is left of its budget;
  * then four small ways in (Photo and Describe with the AI's glyph and tag, Activity, Weigh in), Search food with Scan
- * at its end, Repeat with its calories, the three most likely foods or meals as rows with "See all N", and Water's
- * glasses. Nothing is pinned: everything is in view. With large text every way in is a whole row with its hint and
- * the likely next log leads the body, which scrolls (as on a short window, where the kit's sheet scrolls whole).
- * It stays mounted for the whole session, so the meal and date come from the clock hooks while rendering and
- * from the wall clock again at the moment of each tap.
+ * at its end, Repeat with its calories, the three most likely foods or meals as rows (the saved meal changed last
+ * always among them) with "See all N", and Water's glasses. Nothing is pinned: everything is in view. With large text
+ * every way in is a whole row with its hint and the likely next log leads the body, which scrolls (as on a short
+ * window, where the kit's sheet scrolls whole). It stays mounted for the whole session, so the meal and date come
+ * from the clock hooks while rendering and from the wall clock again at the moment of each tap.
  */
 export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { colors, radius, spacing } = useTheme();
@@ -105,7 +105,8 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   // favourites, so a starred meal or food is in view too: up to three favourite meals, newest star first; then up to
   // three favourite foods, newest first; then the other usual foods not already shown; then the meal changed last
   // when it is not already shown. A food is shown once: the first usual food is never also a favourite. The first
-  // three are rows; "See all N" opens food search for the rest.
+  // three are rows, and the meal changed last takes the third when it would be left out, so a saved meal is two taps
+  // from + too; "See all N" opens food search on the tab that holds the rest (`seeAllTab`).
   const favMeals = favoriteMeals(saved).slice(0, 3);
   const savedMeal = quickLogMeal(saved, favMeals.map((m) => m.id));
   const favoriteIds = useStore((s) => s.favoriteFoodIds);
@@ -129,7 +130,9 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
     ...usualRest.map((u) => ({ kind: 'usual' as const, u })),
     ...(savedMeal ? [{ kind: 'meal' as const, meal: savedMeal, key: 'saved', testID: 'quick-usual-saved', favourite: false }] : []),
   ];
-  const likely = likelyRows(likelyAll);
+  const likely = likelyRows(likelyAll, { keep: (l) => l.kind === 'meal' && !l.favourite });
+  const kindOf = (l: Likely): LikelyKind => (l.kind === 'usual' ? 'usual' : l.kind === 'food' ? 'favourite-food' : l.favourite ? 'favourite-meal' : 'saved-meal');
+  const seeAll = seeAllTab(likely.hidden.map(kindOf));
   const lastMap = lastPortions(entries);
   // Started here because this sheet is mounted for the whole session: search's first frame is then on the tab chosen last.
   useEffect(() => {
@@ -305,12 +308,13 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
             <Button
               testID="quick-see-all"
               title={seeAllLabel(likely.total)}
-              accessibilityLabel={seeAllSpoken(likely.total, mealName)}
+              accessibilityLabel={seeAllSpoken(likely.total, mealName, seeAll)}
               variant="ghost"
               size="sm"
               full={false}
               iconRight={<ChevronRight size={18} color={colors.actionInk} strokeWidth={2.2} />}
-              onPress={() => go(`/food/search?${food}`)}
+              // On the tab that holds the rest, on this visit only (search never remembers an asked tab).
+              onPress={() => go(`/food/search?${food}&tab=${seeAll}`)}
               style={{ marginVertical: -6, marginLeft: 8, paddingHorizontal: 6 }}
             />
           ) : null}

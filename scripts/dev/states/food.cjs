@@ -332,9 +332,9 @@ module.exports = [
   // every place shows and logs "80 g" at today's values, never the stale label (lead's decisions D1 and H1). Before
   // H1 the + sheet showed "1 piece, 268 kcal" here and a tap stored 298 kcal. The clock is at snack time. Each state
   // first reloads the page ({ reload: true }), so what it looks at is what the app saved and loaded again.
-  // The + sheet shows three likely rows (the demo's snack leads with whey, then its two favourite foods): the bourekas is
-  // under "See all", in food search's Usual tab (search-old-portion). e2e.cjs's "old portion" check logs it from the
-  // sheet, where it leads.
+  // The + sheet shows three likely rows (the demo's snack leads with whey, then a favourite food, then the saved meal
+  // changed last, "Usual breakfast", which keeps the third row): the bourekas is under "See all", which opens food search's
+  // Usual tab (search-old-portion). e2e.cjs's "old portion" check logs it from the sheet, where it leads.
   { id: 'quick-sheet-old-portion', route: '/', values: { oldBourekas: 1 }, now: todayAt(16, 30), taps: [{ reload: true }, 'tab-add'], sheet: true, waitFor: 'quick-see-all', note: 'the + sheet at snack time: three likely rows and "See all", which holds the usual bourekas' },
   { id: 'search-old-portion', route: '/food/search?meal=snack', values: { oldBourekas: 1 }, now: todayAt(16, 30), taps: [{ reload: true }, 'search-tab-usual'], note: 'food search, Usual: the bourekas row at 80 g' },
   { id: 'today-fits-old-portion', route: '/', values: { oldBourekas: 1 }, now: todayAt(16, 30), taps: [{ reload: true }, 'today-ideas'], sheet: true, note: 'What fits: the usual bourekas at 80 g' },
@@ -430,10 +430,10 @@ module.exports = [
   // ---------------------------------------------------------------- the + sheet in one view (src/components/QuickLogSheet.tsx)
   // "Add to <meal>" with the day and what is left under it, four small ways in, Search food with Scan, Repeat, three
   // likely rows with "See all N" and Water's glasses: nothing scrolls at 360 x 740, 390 x 844 and 320 x 640.
-  { id: 'quick-sheet-dinner', route: '/', now: todayAt(19, 0), taps: ['tab-add'], sheet: true, waitFor: 'quick-repeat', note: 'the + sheet at dinner: Repeat with its calories, three likely rows and "See all 7", all in one view' },
+  { id: 'quick-sheet-dinner', route: '/', now: todayAt(19, 0), taps: ['tab-add'], sheet: true, waitFor: 'quick-repeat', note: 'the + sheet at dinner: Repeat with its calories, three likely rows (the saved meal changed last third) and "See all 7", all in one view' },
   { id: 'quick-sheet-breakfast', route: '/', now: todayAt(8, 0), taps: ['tab-add'], sheet: true, waitFor: 'quick-see-all', note: 'the + sheet at breakfast (already logged): no Repeat' },
   { id: 'quick-sheet-first-day', route: '/', data: 'empty', now: todayAt(19, 0), taps: ['tab-add'], sheet: true, waitFor: 'quick-water-tile', absent: ['quick-usual', 'quick-repeat'], note: 'the + sheet on a first day: the ways in, Search with Scan and Water, nothing likely yet' },
   { id: 'quick-sheet-dinner-imperial', route: '/', imperial: true, now: todayAt(19, 0), taps: ['tab-add'], sheet: true, waitFor: 'quick-repeat', note: 'the + sheet at dinner in fluid ounces: the glasses on Water\'s line' },
   { id: 'quick-sheet-repeat-done', route: '/', now: todayAt(19, 0), taps: ['tab-add', 'quick-repeat', { wait: 300 }], sheet: true, waitFor: 'toast-action', note: 'Repeat tapped: the row stays with its done mark, the sheet open, its toast above it' },
-  { id: 'quick-sheet-see-all', route: '/', now: todayAt(19, 0), taps: ['tab-add', 'quick-see-all'], waitFor: 'food-search-input', note: '"See all 7" opens food search for dinner' },
+  { id: 'quick-sheet-see-all', route: '/', now: todayAt(19, 0), taps: ['tab-add', 'quick-see-all'], waitFor: 'food-search-input', note: '"See all 7" opens food search for dinner on Usual, the tab that holds the rest (?tab=usual)' },
 ];

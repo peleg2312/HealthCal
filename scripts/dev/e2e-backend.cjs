@@ -244,8 +244,8 @@ async function device(browser, seedJson) {
     const fromMeals = Object.values((await A.state()).foodEntries).filter((e) => !e.deleted && !entriesBefore.has(e.id));
     check('save live: logged again from /food/meals, still an estimate', i >= 0 && fromMeals.length === meal?.items.length && fromMeals.every((e) => Array.isArray(e.kcalRange)), `${fromMeals.length} entries`);
     // From the + sheet's row. The sheet shows only the three most likely rows (the meal's first usual food, then the
-    // favourite meals, the favourite foods, the other usual foods, the meal changed last), and device A's history puts
-    // the meal changed last under "See all", so the meal is starred first: a favourite meal follows the first usual food.
+    // favourite meals, the favourite foods, the other usual foods, the meal changed last, which keeps the third row);
+    // the meal is starred first, so its row is a favourite meal's, after the first usual food.
     await A.go('/food/meals?meal=snack');
     const starAt = (await A.page.locator('[data-testid^="saved-meal-card-"]').allInnerTexts()).findIndex((t) => t.includes('Saved live estimate'));
     if (starAt >= 0) await A.tap(`saved-meal-favorite-${starAt}`);

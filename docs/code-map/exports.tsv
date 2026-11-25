@@ -1058,6 +1058,7 @@ src/features/food/oneTap.ts	ONE_TAP_GUARD_MS	const
 src/features/food/oneTap.ts	tooSoon	function
 src/features/food/oneTap.ts	useOneTap	function
 src/features/food/quickSheet.ts	AI_TAG	const
+src/features/food/quickSheet.ts	LikelyKind	type
 src/features/food/quickSheet.ts	QUICK_ROWS	const
 src/features/food/quickSheet.ts	QUICK_WAYS	const
 src/features/food/quickSheet.ts	QuickWayId	type
@@ -1067,6 +1068,7 @@ src/features/food/quickSheet.ts	quickSheetLine	function
 src/features/food/quickSheet.ts	quickSheetTitle	function
 src/features/food/quickSheet.ts	seeAllLabel	function
 src/features/food/quickSheet.ts	seeAllSpoken	function
+src/features/food/quickSheet.ts	seeAllTab	function
 src/features/food/quickSheet.ts	wideWaySpoken	function
 src/features/food/restore.ts	RESTORE_MAX	const
 src/features/food/restore.ts	removedToday	function
