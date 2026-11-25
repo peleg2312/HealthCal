@@ -2,7 +2,7 @@ import React from 'react';
 import { View } from 'react-native';
 
 import { WEEKLY_ACTIVE_MINUTES, type PeriodSummary } from '@/lib/insights';
-import { hoursFigure, hoursSpoken } from '@/features/trackers/helpers';
+import { hoursFigure } from '@/features/trackers/helpers';
 import { formatNumber, formatVolume, weightUnit, weightValue } from '@/lib/units';
 import { useTheme } from '@/theme';
 import type { TrendPoint } from '@/lib/trend';
@@ -127,7 +127,6 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         unit="kcal"
         caption="a day, an estimate"
         captionShort="an estimate"
-        spoken={`about ${formatNumber(Math.round(d.model.tdee))} kcal a day, an estimate`}
         compare={
           adaptive
             ? d.model.adaptive.confidence >= 0.75
@@ -167,7 +166,7 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         // Active minutes: the minutes that count toward the guideline (hard ones double), said in full once, aloud.
         caption={a.minutes ? `active a week · ${together(`of ${WEEKLY_ACTIVE_MINUTES} min`)}` : 'No workouts yet'}
         captionShort={a.minutes ? `active, ${together(`of ${WEEKLY_ACTIVE_MINUTES} min`)}` : 'No workouts yet'}
-        spoken={a.minutes ? `${weekly} active minutes a week, toward the ${WEEKLY_ACTIVE_MINUTES} minutes a week guideline` : undefined}
+        spoken={a.minutes ? `Active minutes toward the ${WEEKLY_ACTIVE_MINUTES} minutes a week guideline` : undefined}
         compare={
           a.minutes || (p && p.activity.minutes)
             ? [`${a.sessions} ${a.sessions === 1 ? 'session' : 'sessions'}`, changeWords('minutes', weekly, p ? Math.round(p.activity.weeklyMinutes) : null, { period })].filter(Boolean).join('. ')
@@ -188,7 +187,6 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         value={sl ? hoursFigure(sl.avgHours).value : null}
         unit={sl ? hoursFigure(sl.avgHours).unit : undefined}
         caption={sl ? `a night · ${sl.nights} ${sl.nights === 1 ? 'night' : 'nights'}` : 'No sleep logged yet'}
-        spoken={sl ? `${hoursSpoken(sl.avgHours)} a night, ${sl.nights} ${sl.nights === 1 ? 'night' : 'nights'}` : undefined}
         captionShort={sl ? `a night · ${sl.nights} logged` : 'No sleep yet'}
         compare={changeWords('sleep', sl?.avgHours, p?.sleep?.avgHours, { period })}
         trend={changeDirection('sleep', sl?.avgHours, p?.sleep?.avgHours)}

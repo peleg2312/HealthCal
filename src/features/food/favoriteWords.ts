@@ -84,13 +84,12 @@ export function isEstimateFood(food: { source?: string }, last?: { kcalRange?: u
 
 /**
  * The + sheet's favourite food tile: its caption ("150 g, ~248 kcal" for an estimate, "1 medium, 105 kcal"
- * otherwise) and its label ("Add favourite Grilled chicken, 150 g, about 248 kilocalories, to lunch").
+ * otherwise) and its label, which holds the tile's words as drawn (WCAG 2.5.3, label in name: "Add favourite
+ * Grilled chicken, 150 g, ~248 kcal, to lunch").
  */
 export function favoriteFoodTile(o: { name: string; portion: string; kcal: number; estimate: boolean; meal: string }): { caption: string; label: string } {
-  return {
-    caption: `${o.portion}, ${approxKcal(o.kcal, o.estimate)} kcal`,
-    label: `Add favourite ${o.name}, ${o.portion}, ${approxKcalSpoken(o.kcal, o.estimate)}, to ${o.meal}`,
-  };
+  const caption = `${o.portion}, ${approxKcal(o.kcal, o.estimate)} kcal`;
+  return { caption, label: `Add favourite ${o.name}, ${caption}, to ${o.meal}` };
 }
 
 /**

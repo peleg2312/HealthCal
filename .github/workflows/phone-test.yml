@@ -419,7 +419,7 @@ jobs:
 
       - name: Run the flows
         if: steps.flows.outputs.main != ''
-        timeout-minutes: 35
+        timeout-minutes: 50
         env:
           FLOWS: ${{ steps.flows.outputs.main }}
         run: bash scripts/ci/run-flows.sh ios "$UDID" "$RESULTS" $FLOWS

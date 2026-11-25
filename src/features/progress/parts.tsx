@@ -153,7 +153,8 @@ export function LegendDot({ color, label, dashed, level }: { color: string; labe
 
 export function Note({ children }: { children: React.ReactNode }) {
   return (
-    <Text variant="caption" color="textTertiary">
+    // Sentences: reading text is textSecondary (7:1, WCAG 1.4.6), never textTertiary.
+    <Text variant="caption" color="textSecondary">
       {children}
     </Text>
   );

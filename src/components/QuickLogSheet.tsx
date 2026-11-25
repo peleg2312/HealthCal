@@ -9,7 +9,7 @@ import { hasFoodLogged } from '@/features/drinks/via';
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
 import { displayFoodName } from '@/features/food/displayName';
 import { favoriteMeals, quickLogMeal } from '@/features/food/favorites';
-import { approxKcalSpoken, favoriteFoodTile, isEstimateFood, quickRowTitle, savedTileCaption } from '@/features/food/favoriteWords';
+import { favoriteFoodTile, isEstimateFood, quickRowTitle, savedTileCaption } from '@/features/food/favoriteWords';
 import { lastPortions, matchServing, portionFor, portionKcal, portionLabel, servingText, sourceInfo, sourceKindOf, type SourceKind } from '@/features/food/helpers';
 import { formatPortion, mealServings, planSavedMeal } from '@/features/food/build';
 import { logFood, logItems, logSavedMeal } from '@/features/food/log';
@@ -28,7 +28,6 @@ import { computeDayFromStore, live, useLive, useProfile } from '@/store/selector
 import { cup, useLargeText, useTheme } from '@/theme';
 import type { Food, FoodEntry, ISODate, SavedMeal } from '@/types';
 import { Button, CupKey, PressableScale, Sheet, Text, toastToScreen } from '@/ui';
-import { spokenUnits } from '@/lib/spokenUnits';
 
 /** Re-log a usual food in its last portion. Entries with a food definition go through logFood so recents stay fresh. */
 function logUsual(u: UsualFood, date: ISODate) {
@@ -222,7 +221,8 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
             mark(u.key);
           })
         }
-        accessibilityLabel={spokenUnits(isDone ? `${displayFoodName(u.last)} added` : `Add ${displayFoodName(u.last)}, ${usualLabel(u)}, ${sourceInfo(src).label}, to ${mealName}`)}
+        // The tile's words as drawn (WCAG 2.5.3, label in name), then its source in words and the meal.
+        accessibilityLabel={isDone ? `${displayFoodName(u.last)}, ${usualLabel(u)}, added` : `Add ${displayFoodName(u.last)}, ${usualLabel(u)}, ${sourceInfo(src).label}, to ${mealName}`}
         style={[tile, { width: tileW, padding: spacing.md, gap: 4, borderColor: isDone ? colors.success : colors.border }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text style={{ fontSize: 17, lineHeight: 24 }}>{u.last.emoji || '🍽️'}</Text>
@@ -275,7 +275,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
                 })
               }
               // The source in words (principle 3): the mark alone says nothing to a screen reader.
-              accessibilityLabel={spokenUnits(isDone ? `${displayFoodName(f)} added` : `${label}. ${sourceInfo(src).label}`)}
+              accessibilityLabel={isDone ? `${displayFoodName(f)}, ${caption}, added` : `${label}. ${sourceInfo(src).label}`}
               style={[tile, { width: tileW, padding: spacing.md, gap: 4, borderColor: isDone ? colors.success : colors.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ fontSize: 17, lineHeight: 24 }}>{f.emoji || '🍽️'}</Text>
@@ -356,7 +356,8 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
             key={ml}
             testID={`quick-water-${ml}`}
             title={formatVolume(ml, profile.units)}
-            accessibilityLabel={spokenUnits(`Add ${formatVolume(ml, profile.units)} of water`)}
+            // The glass's words as drawn ("250 ml"; label in name), then what it does.
+            accessibilityLabel={`Add ${formatVolume(ml, profile.units)} of water`}
             variant="secondary"
             tint={colors.water}
             size="sm"
@@ -413,7 +414,8 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
               key={a.id}
               testID={`quick-${a.id}`}
               onPress={() => go(a.href)}
-              accessibilityLabel={wide || !narrow ? a.label : `${a.label}. ${a.hint}`}
+              // The name and its hint, as drawn (under 360 px the hint is read out only).
+              accessibilityLabel={`${a.label}, ${a.hint}`}
               style={[
                 tile,
                 wide
@@ -484,7 +486,8 @@ function RepeatRow({ label, entries, done, onPress }: { label: string; entries: 
       // Added, not unavailable: the success edge and the done mark say so, so the row is not dimmed.
       dimDisabled={false}
       onPress={onPress}
-      accessibilityLabel={done ? `${label}, added` : `${label}, ${Math.round(kcal)} kilocalories`}
+      // Its line as drawn (label in name), then the foods under it.
+      accessibilityLabel={`${label}, ${formatNumber(kcal)} kcal: ${entries.map((e) => displayFoodName(e)).join(', ')}${done ? '. Added' : ''}`}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -527,7 +530,8 @@ function MealTile({ meal, width, testID, favourite, mealName, done, onPress }: {
       dimDisabled={false}
       onPress={onPress}
       accessibilityLabel={
-        done ? `${meal.name} added` : `Add ${favourite ? 'favourite' : 'saved'} meal ${meal.name}, ${approxKcalSpoken(plan.kcal, estimate)}, to ${mealName}`
+        // The tile's words as drawn (label in name: "Chicken and rice bowl, 3 items, ~592 kcal").
+        done ? `${meal.name}, ${caption}, added` : `Add ${favourite ? 'favourite' : 'saved'} meal ${meal.name}, ${caption}, to ${mealName}`
       }
       style={{
         width,

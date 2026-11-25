@@ -7,7 +7,6 @@ import { weekRangeLabel, type WeeklyRecap } from '@/lib/insights';
 import { useTheme } from '@/theme';
 import { Badge, Card, Chip, PressableScale, Text } from '@/ui';
 
-import { spokenUnits } from './chartWords';
 import { go } from './parts';
 
 /**
@@ -33,7 +32,7 @@ export function RecapCard({ recap, earlier, unseen }: { recap: WeeklyRecap; earl
         testID="progress-recap-open"
         onPress={() => go(`/recap?week=${recap.weekStart}`)}
         // The words it shows first (WCAG 2.5.3), then where it leads.
-        accessibilityLabel={spokenUnits(`${recap.label}, ${range}. ${recap.win} Open the weekly check-in`)}
+        accessibilityLabel={`${recap.label}, ${range}. ${recap.win} Open the weekly check-in`}
         scaleTo={0.985}
         style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 44 }}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>

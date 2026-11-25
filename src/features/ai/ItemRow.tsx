@@ -197,7 +197,7 @@ export function ItemRow({
             })}
           </View>
           {row.food && row.estimate ? (
-            <Text variant="caption" color="textTertiary">
+            <Text variant="caption" color="textSecondary">
               Tap the selected food again to go back to the AI estimate.
             </Text>
           ) : null}

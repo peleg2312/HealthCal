@@ -131,7 +131,7 @@ export function ErrorView({
         {link ? <Button testID={link.testID} title={link.label} size="md" variant="ghost" onPress={link.onPress} /> : null}
       </View>
       {footnote ? (
-        <Text variant="caption" color="textTertiary">
+        <Text variant="caption" color="textSecondary">
           {footnote}
         </Text>
       ) : null}

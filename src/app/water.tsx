@@ -598,8 +598,9 @@ function WaterScreen() {
             decimals={0}
             value={custom}
             onChange={setCustom}
-            // The input fills the field's cup: its height (plus the cup's 1.5 px edges) is the height Add takes.
-            onLayout={(e) => setCupH(Math.round(e.nativeEvent.layout.height + 3))}
+            // The input fills the field's cup: its height plus the cup's two edges (1.5 px, drawn 1 px on a 1x web screen)
+            // is the height Add takes; at the designed size both are 50.
+            onLayout={(e) => setCupH(Math.round(e.nativeEvent.layout.height + 2))}
             accessibilityHint={amountLine ?? undefined}
             {...((Platform.OS === 'web' && amountLine ? { 'aria-describedby': checkId, ...(amountCheck?.state === 'over' ? { 'aria-invalid': true } : null) } : {}) as object)}
           />

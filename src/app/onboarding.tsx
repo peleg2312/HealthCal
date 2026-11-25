@@ -160,7 +160,10 @@ function Flow({ onFinished }: { onFinished: () => void }) {
     if (!focusArrival.current) return;
     focusArrival.current = false;
     if (Platform.OS === 'web') focusStepHeading();
-    else {
+    // On a phone the call moves only a screen reader's focus (VoiceOver, TalkBack; the hardware keyboard's focus is
+    // the platform's own), so it is made only while one is running: without one it would post an accessibility
+    // event nobody receives, 300 ms into every question, in the middle of a test driver's taps.
+    else if (reader.current) {
       const t = setTimeout(focusStepHeading, 300);
       return () => clearTimeout(t);
     }

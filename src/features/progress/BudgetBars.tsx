@@ -70,9 +70,15 @@ export function BudgetBars({
  * marks, and "Above that day's budget" a small bar passing through its mark with the amber over it, the
  * same shape as in the chart, so the key is read without its colour too.
  */
+/** The two keys' words, as `BudgetKeys` draws them (a control that holds the keys names them as drawn). */
+export function budgetKeyWords(weekly: boolean): [string, string] {
+  const word = weekly ? "week's" : "day's";
+  return [`That ${word} budget`, `Above that ${word} budget`];
+}
+
 export function BudgetKeys({ weekly }: { weekly: boolean }) {
   const { colors } = useTheme();
-  const word = weekly ? "week's" : "day's";
+  const [budgetWords, aboveWords] = budgetKeyWords(weekly);
   return (
     <>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -83,7 +89,7 @@ export function BudgetKeys({ weekly }: { weekly: boolean }) {
           </Svg>
         </View>
         <Text variant="caption" color="textSecondary">
-          {weekly ? "That week's budget" : "That day's budget"}
+          {budgetWords}
         </Text>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -96,7 +102,7 @@ export function BudgetKeys({ weekly }: { weekly: boolean }) {
           </Svg>
         </View>
         <Text variant="caption" color="textSecondary">
-          {`Above that ${word} budget`}
+          {aboveWords}
         </Text>
       </View>
     </>

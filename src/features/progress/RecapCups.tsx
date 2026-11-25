@@ -57,7 +57,9 @@ export function RecapCups({ cups, week }: { cups: RecapDayCup[]; week: string })
                 feedback="select"
                 scaleTo={0.96}
                 accessibilityRole="button"
-                accessibilityLabel={spokenUnits(`${weekdayShort(c.date)}, ${c.detail.replace(/ · /g, ', ')}`)}
+                // What it shows first ("Mon", "M" with large text; WCAG 2.5.3, label in name), as the week strip's days,
+                // then the day in words and its numbers.
+                accessibilityLabel={`${oneLetter ? weekdayShort(c.date).slice(0, 1) : weekdayShort(c.date)}, ${spokenUnits(weekdayShort(c.date))}, ${c.detail.replace(/ · /g, ', ')}`}
                 accessibilityState={{ selected: active }}
                 // react-native-web reads the aria prop: the day whose numbers show under the cups is pressed.
                 {...({ 'aria-pressed': active } as object)}

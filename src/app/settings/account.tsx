@@ -172,7 +172,7 @@ function SignedOut() {
             ) : null}
             {/* One name for one action: "Sign in", as welcome and the form say it. */}
             <Button testID="account-signin" title={SIGN_IN} variant="secondary" onPress={() => router.push('/auth?mode=signin' as never)} />
-            <Text variant="caption" color="textTertiary" align="center" accessibilityLabel={ACCOUNT_UPLOAD_LINE}>
+            <Text variant="caption" color="textSecondary" align="center" accessibilityLabel={ACCOUNT_UPLOAD_LINE}>
               {lastWordsTogether(ACCOUNT_UPLOAD_LINE)}
             </Text>
           </View>

@@ -92,29 +92,19 @@ export function moveLine(activities: MoveActivity[], exerciseNet: number, added 
 }
 
 /**
- * What a screen reader says for the movement row, for example "Running, 42 minutes, about
- * 380 kilocalories added to the budget. 9,210 steps. Opens Train". `stepsNote` is added after the
- * steps when they came from a Health export file (fileStepsNote).
+ * What a screen reader says for the movement row: the line as drawn (WCAG 2.5.3, label in name), then the steps,
+ * then what the row leaves out, for example "Running, 42 min · about 380 kcal added. 9,210 steps. Opens Train".
+ * `stepsNote` is added after the steps when they came from a Health export file (fileStepsNote).
  */
 export function moveAccessibilityLabel(activities: MoveActivity[], exerciseNet: number, steps: number | null | undefined, stepsNote?: string, added = true): string {
-  const parts: string[] = [];
-  if (activities.length === 0) parts.push(`${NO_WORKOUT}.`);
-  else {
-    const measured = activities.every((a) => a.measured === true);
-    const where = added ? 'added to the budget' : 'not added to the budget';
-    const kcal = measured
-      ? `about ${formatNumber(Math.round(exerciseNet))} kilocalories ${where}, from a measured burn`
-      : `about ${formatNumber(round10(exerciseNet))} kilocalories ${where}`;
-    const what =
-      activities.length === 1
-        ? `${activities[0].name.trim()}, ${Math.round(activities[0].durationMin)} minutes`
-        : `${activities.length} sessions, ${Math.round(activities.reduce((s, a) => s + a.durationMin, 0))} minutes`;
-    parts.push(`${what}, ${kcal}.`);
-  }
+  const emoji = activities.length === 1 ? activities[0].emoji.trim() : '';
+  const line = moveLine(activities, exerciseNet, added).replace(/\u00A0/g, ' ');
+  const parts = [`${emoji && line.startsWith(`${emoji} `) ? line.slice(emoji.length + 1) : line}.`];
   if (steps && steps > 0) {
     parts.push(`${formatNumber(steps)} steps.`);
     if (stepsNote) parts.push(`${stepsNote.replace(/\.$/, '')}.`);
   }
+  if (activities.length > 0 && activities.every((a) => a.measured === true)) parts.push('From a measured burn.');
   parts.push('Opens Train');
   return parts.join(' ');
 }

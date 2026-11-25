@@ -71,7 +71,7 @@ export function AboutVersion() {
             ? [
                 status,
                 state.restartNote ? (
-                  <Text key="note" variant="caption" color="textTertiary" testID="about-restart-note" style={{ textAlign: 'center' }}>
+                  <Text key="note" variant="caption" color="textSecondary" testID="about-restart-note" style={{ textAlign: 'center' }}>
                     {state.restartNote}
                   </Text>
                 ) : null,

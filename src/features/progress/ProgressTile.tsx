@@ -5,7 +5,6 @@ import type { Direction } from '@/lib/insights';
 import { useLargeText, useTheme } from '@/theme';
 import { CupKey, FadeUp, PressableScale, Text, useGrownText } from '@/ui';
 
-import { spokenUnits } from './chartWords';
 import { TrendMark } from './parts';
 
 /**
@@ -47,7 +46,7 @@ export function ProgressTile({
   caption?: string;
   /** The same line for a phone under 360 px, where a cell is about 108 px wide. */
   captionShort?: string;
-  /** What a screen reader says for the number and its line, when the short caption needs more words ("218 active minutes a week, toward ..."). */
+  /** What a screen reader hears after the tile's own words, for what they leave out ("Active minutes toward the 150 minutes a week guideline"). */
   spoken?: string;
   /** Neutral comparison sentence, read out with the cell; null when there is nothing to compare with. */
   compare: string | null;
@@ -80,7 +79,9 @@ export function ProgressTile({
       testID={testID}
       onPress={onPress}
       scaleTo={0.98}
-      accessibilityLabel={spokenUnits(`${title}: ${spoken ?? `${value === null ? 'no data' : `${value} ${unit ?? ''}`}${caption ? `, ${caption}` : ''}`}.${compare ? ` ${compare}.` : ''} Open details.`).replace(/\u00A0/g, ' ')}
+      // What it shows, as drawn and in its order (WCAG 2.5.3, label in name: "Calories, 2,103 kcal, a day · budget
+      // 2,171 kcal"), then what it leaves out, the comparison in words and where it leads.
+      accessibilityLabel={`${value === null ? title : `${title}, ${value}${unit ? ` ${unit}` : ''}`}${line ? `, ${line}` : ''}.${spoken ? ` ${spoken}.` : ''}${compare ? ` ${compare}.` : ''} Open details.`.replace(/\u00A0/g, ' ')}
       style={{
         flexGrow: 1,
         paddingHorizontal: spacing.lg,

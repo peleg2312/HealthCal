@@ -7,7 +7,7 @@ import { formatNumber } from '@/lib/units';
 import { useTheme, withOpacity } from '@/theme';
 import { Card, PressableScale, Text } from '@/ui';
 
-import { BudgetBars, BudgetKeys } from './BudgetBars';
+import { BudgetBars, BudgetKeys, budgetKeyWords } from './BudgetBars';
 import { buildBars, daysVerdict } from './calorieBars';
 import { barsLabel } from './chartWords';
 import { LegendDot } from './parts';
@@ -33,6 +33,9 @@ export function CaloriesADay({ days, summary, today, onOpen }: { days: InsightDa
   const end = shown[shown.length - 1]?.date;
   const verdict = daysVerdict(shown, today);
   const title = weekly ? 'Calories a day, by week' : 'Calories a day';
+  // The words drawn under the chart: its dates (start, middle, end) and its keys.
+  const axis = shown.length > 1 ? [formatShortDate(shown[0].date), ...(shown.length > 4 && mid ? [formatShortDate(mid)] : []), end === today ? 'Today' : end ? formatShortDate(end) : ''].filter(Boolean) : [];
+  const keys = [...budgetKeyWords(weekly), ...(data.some((b) => b.color) ? ['Partly logged'] : [])];
   return (
     // The title is the card's heading (level 2, as SectionTitle's), so it sits outside the one control that
     // opens Nutrition: a heading inside a button is not a heading to a screen reader. Everything under it
@@ -46,9 +49,10 @@ export function CaloriesADay({ days, summary, today, onOpen }: { days: InsightDa
         testID="progress-calories-a-day-open"
         onPress={onOpen}
         scaleTo={0.985}
-        // The summary first, then every bar's value (its day or week, kcal against its budget), then where it leads.
-        accessibilityLabel={`${barsLabel(
-          `${title}, average ${formatNumber(Math.round(c.avgKcal))} kcal against an average budget of ${formatNumber(Math.round(c.avgBudget))} kcal. ${verdict.line}.${verdict.note ? ` ${verdict.note}.` : ''} ${weekly ? 'Week by week' : 'Day by day'}`,
+        // What it shows, as drawn and in its order (WCAG 2.5.3, label in name): the verdict, its note, the chart's
+        // dates and its keys; then the average, every bar's value (its day or week, kcal against its budget) and where it leads.
+        accessibilityLabel={`${verdict.line}.${verdict.note ? ` ${verdict.note}.` : ''}${axis.length ? ` ${axis.join(', ')}.` : ''} ${keys.join(', ')}. ${barsLabel(
+          `${title}, average ${formatNumber(Math.round(c.avgKcal))} kcal against an average budget of ${formatNumber(Math.round(c.avgBudget))} kcal. ${weekly ? 'Week by week' : 'Day by day'}`,
           data.map((d) => d.detail),
         )} Open nutrition`}
         style={{ gap: spacing.md }}>

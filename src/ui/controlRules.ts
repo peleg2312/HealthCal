@@ -261,3 +261,11 @@ export function scrubKey(key: string, active: number | null, count: number): num
   if (key === 'ArrowRight') return active === null ? 0 : Math.min(count - 1, active + 1);
   return undefined;
 }
+
+/**
+ * Under this window height nothing is pinned (WCAG 1.4.10 Reflow): a browser zoomed to 400% (320 x 180 to 200 CSS
+ * px) or a window held sideways, where a pinned header and footer would leave the content no room at all. A
+ * `Screen` then scrolls its header and footer with its content, and a `Sheet` its title and footer with its body,
+ * as the + sheet does. At 640 px and taller (every phone held upright) nothing changes.
+ */
+export const SHORT_WINDOW = 600;

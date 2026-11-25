@@ -43,18 +43,18 @@ describe('favourite words', () => {
     expect(quickRowTitle({ meal: 'lunch', favourites: true, usual: false, saved: true })).toBe('Favourites and saved meals');
     expect(quickRowTitle({ meal: 'lunch', favourites: true, usual: false, saved: false })).toBe('Favourites');
   });
-  it("the + sheet's favourite food tile: an AI food, or one last logged with a range, reads \"~\" and \"about\"", () => {
+  it("the + sheet's favourite food tile: an AI food, or one last logged with a range, reads \"~\", its label as drawn", () => {
     expect(isEstimateFood({ source: 'ai' }, null)).toBe(true);
     expect(isEstimateFood({ source: 'builtin' }, { kcalRange: [200, 295] })).toBe(true);
     expect(isEstimateFood({ source: 'builtin' }, {})).toBe(false);
     expect(isEstimateFood({ source: 'custom' }, undefined)).toBe(false);
     expect(favoriteFoodTile({ name: 'Grilled chicken breast', portion: '150 g', kcal: 247.6, estimate: true, meal: 'lunch' })).toEqual({
       caption: '150 g, ~248 kcal',
-      label: 'Add favourite Grilled chicken breast, 150 g, about 248 kilocalories, to lunch',
+      label: 'Add favourite Grilled chicken breast, 150 g, ~248 kcal, to lunch',
     });
     expect(favoriteFoodTile({ name: 'Banana, raw', portion: '1 medium', kcal: 105, estimate: false, meal: 'breakfast' })).toEqual({
       caption: '1 medium, 105 kcal',
-      label: 'Add favourite Banana, raw, 1 medium, 105 kilocalories, to breakfast',
+      label: 'Add favourite Banana, raw, 1 medium, 105 kcal, to breakfast',
     });
   });
   it('the save row names its day from the day the screen holds, never the clock', () => {

@@ -5,7 +5,7 @@ import { useWindowDimensions, View } from 'react-native';
 
 import { waterAddedShort, waterAddedToast } from '@/features/food/addedTo';
 import { useOneTap } from '@/features/food/oneTap';
-import { hoursFigure, hoursParts, hoursSpoken } from '@/features/trackers/helpers';
+import { hoursFigure, hoursParts } from '@/features/trackers/helpers';
 import { startOfWeek, today } from '@/lib/dates';
 import { guidelineMinutes } from '@/lib/exercise';
 import { effectiveMl } from '@/lib/hydration';
@@ -135,16 +135,22 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
   const week = weekMinutes > 0;
   const thisWeek = isToday ? 'this week' : 'that week';
   const dayWord = isToday ? 'today' : 'that day';
+  // Every cell is named by what it shows, as drawn and in its order (WCAG 2.5.3, label in name: "Activity, 195 min
+  // this week, 75 today"), then what it leaves out: the guideline its minutes count toward, whose cheers, where it leads.
+  const activityShown = week
+    ? `Activity, ${formatNumber(weekMinutes)} min ${thisWeek}${day.activities.length ? `, ${formatNumber(day.activeMinutes)} ${dayWord}` : ''}`
+    : day.activities.length
+      ? `Activity, ${day.activeMinutes} min`
+      : 'Activity, Add';
   const activityLabel = [
-    week
-      ? `Activity ${thisWeek}, ${weekMinutes} active minutes, of the ${WEEKLY_ACTIVE_MINUTES} minutes a week guideline${day.activities.length ? `. ${day.activeMinutes} minutes ${dayWord}` : ''}`
-      : day.activities.length
-        ? `Activity, ${day.activeMinutes} minutes`
-        : 'Activity, nothing logged',
-    cheers ? `${cheersLabel(cheers)} from friends. Open friends` : day.activities.length ? '' : 'Log a session',
+    cheers ? `${activityShown}, ${cheersLabel(cheers)}` : activityShown,
+    week ? `Active minutes toward the ${WEEKLY_ACTIVE_MINUTES} minutes a week guideline` : '',
+    cheers ? 'From friends. Open friends' : day.activities.length ? '' : 'Nothing logged. Log a session',
   ]
     .filter(Boolean)
     .join('. ');
+  // The water figure as drawn: "1.23 of 3.3 L", "250 ml of 2.55 L".
+  const waterShown = `${volumeNumber(day.waterMl, day.waterMl, units)}${!sameUnit ? ` ${waterUnit}` : ''} of ${goalValue} ${goalUnit}`;
 
   return (
     <Card testID="today-rail" padding={0}>
@@ -155,7 +161,7 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
           <PressableScale
             testID="today-water"
             onPress={() => router.push(`/water${dateQuery}` as never)}
-            accessibilityLabel={spokenUnits(`Water, ${formatVolume(day.waterMl, units)} of ${goal}`)}
+            accessibilityLabel={`Water, ${waterShown}`}
             scaleTo={0.98}
             style={{ flex: 1, minWidth: large ? 150 : 0, minHeight: 44 }}>
             <KeyLabel color={colors.water} label="Water" />
@@ -172,7 +178,8 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
           <Button
             testID={`today-water-${glass}`}
             title={formatVolume(glass, units)}
-            accessibilityLabel={spokenUnits(`Add ${formatVolume(glass, units)} of water`)}
+            // The glass's words as drawn ("250 ml"; label in name), then what it does.
+            accessibilityLabel={`Add ${formatVolume(glass, units)} of water`}
             variant={quiet ? 'ghost' : 'secondary'}
             tint={quiet ? undefined : colors.water}
             size="sm"
@@ -232,7 +239,7 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
           flex={narrow ? SLEEP_FLEX_NARROW : 0.8}
           label="Sleep"
           color={colors.sleep}
-          accessibilityLabel={night ? `Sleep, ${hoursSpoken(night.hours)}` : 'Sleep, not logged. Add a night'}
+          accessibilityLabel={night ? `Sleep, ${nightTwoLines ? `${nightHm!.h} h ${nightHm!.m} min` : `${hoursFigure(night.hours).value} ${hoursFigure(night.hours).unit}`}` : 'Sleep, Add a night: not logged'}
           onPress={() => router.push(`/sleep${dateQuery}` as never)}
           // Hours and minutes, as Sleep, the morning page and Progress draw a night, never decimal hours. The
           // cell is too narrow for "7 h 45 min" on one line at 320 to 390 px, so the minutes go under the hours
@@ -257,7 +264,7 @@ export function StatusRail({ day, isToday, quiet = false }: { day: DaySummary; i
             flex={narrow ? LAST_FLEX_NARROW : 1.2}
             label={weight?.label ?? 'Weight trend'}
             color={colors.weight}
-            accessibilityLabel={weight ? spokenUnits(`${weight.label}, ${weightValue(weight.kg, units).toFixed(1)} ${weightUnit(units)}`) : 'Weight, no weigh-ins. Add your weight'}
+            accessibilityLabel={weight ? `${weight.label}, ${weightValue(weight.kg, units).toFixed(1)} ${weightUnit(units)}` : 'Weight trend, Add your weight: no weigh-ins'}
             onPress={() => router.push(`/weight${dateQuery}` as never)}
             value={weight ? weightValue(weight.kg, units).toFixed(1) : null}
             unit={weightUnit(units)}
@@ -371,7 +378,7 @@ function FastCell({ start, targetHours, narrow, large }: { start: string; target
       flex={narrow ? LAST_FLEX_NARROW : 1.2}
       label={`Fast of ${targetHours} h`}
       color={colors.fat}
-      accessibilityLabel={`Fasting, ${h} hours ${m} minutes of ${targetHours} hours`}
+      accessibilityLabel={`Fast of ${targetHours} h, ${h}:${String(m).padStart(2, '0')} h: ${h} hours ${m} minutes of ${targetHours} hours`}
       onPress={() => router.push('/fasting')}
       value={`${h}:${String(m).padStart(2, '0')}`}
       unit="h"

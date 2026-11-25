@@ -1,12 +1,13 @@
 import { router, useIsFocused, usePreventRemove } from 'expo-router';
 import { ChevronLeft, X } from 'lucide-react-native';
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View, type ScrollViewProps, type StyleProp, type ViewStyle } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, useWindowDimensions, View, type ScrollViewProps, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MAX_CONTENT_WIDTH, useTheme } from '@/theme';
 
 import { IconButton } from './Button';
+import { SHORT_WINDOW } from './controlRules';
 import { keyboardCover, revealDelta, scrollGivesUp } from './keyboardInset';
 import { FadeUp } from './motion';
 import { PressableScale } from './Pressable';
@@ -19,6 +20,11 @@ import { ToastScope } from './toastControls';
 export const TAB_BAR_HEIGHT = 58;
 /** Height reserved at the bottom of tab screens for the docked tab bar, plus breathing room. */
 export const TAB_BAR_SPACE = TAB_BAR_HEIGHT + 28;
+
+/** Whether the window is too short for pinned parts (`SHORT_WINDOW` in ./controlRules), live. */
+export function useShortWindow(): boolean {
+  return useWindowDimensions().height < SHORT_WINDOW;
+}
 
 /**
  * What the tab bar adds to its height now: 0, or with large text on a window too narrow for its four labels whole
@@ -80,7 +86,13 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
     paddingHorizontal: padded ? spacing.xl : 0,
   };
   const barExtra = useTabBarExtra();
-  const bottomPad = (tabs ? TAB_BAR_SPACE + barExtra : spacing.xxl) + (footer ? 0 : insets.bottom);
+  // A short window pins nothing: the header and the footer scroll with the content (see `SHORT_WINDOW`). A screen
+  // that manages its own list (`scroll={false}`) keeps them pinned.
+  const short = useShortWindow();
+  const unpinned = scroll && short;
+  const pinnedFooter = unpinned ? null : footer;
+  // Above a footer that scrolls with the content, the content ends as the cards' own gap does.
+  const bottomPad = (tabs ? TAB_BAR_SPACE + barExtra : footer && unpinned ? spacing.lg : spacing.xxl) + (footer ? 0 : insets.bottom);
   // The toast rests 12 px above whatever this screen has at the bottom: the pinned footer,
   // the tab bar with its + cup (14 px proud of the bar), or just the home indicator; with the
   // keyboard up, the footer riding on it or the keyboard itself (see `cover` below).
@@ -97,21 +109,53 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
   const [outerH, setOuterH] = useState(0);
   const [innerH, setInnerH] = useState(0);
   const cover = Platform.OS === 'web' ? webKeyboard : outerH > 0 && innerH > 0 ? Math.max(0, outerH - innerH) : 0;
-  const dock = footer ? footerH : insets.bottom + (tabs ? TAB_BAR_HEIGHT + 14 + barExtra : 0);
-  useToastDock(dock, focused, { cover, rides: !!footer }, domId);
+  const dock = pinnedFooter ? footerH : insets.bottom + (tabs ? TAB_BAR_HEIGHT + 14 + barExtra : 0);
+  useToastDock(dock, focused, { cover, rides: !!pinnedFooter }, domId);
   // A toast that found no band clear of controls on this screen rests where it always rests, and the scroll area
   // ends 8 px above it while it shows, so nothing a person can press is under it (`useToastBand`). Nothing on
   // screen moves: the rows under the band leave the scroll area's view and are a scroll away.
   const band = useToastBand(domId);
-  const givesUp = focused ? scrollGivesUp(band, footer ? footerH : 0) : 0;
+  const givesUp = focused ? scrollGivesUp(band, pinnedFooter ? footerH : 0) : 0;
   // Keyboard focus is never left under the tab bar (WCAG 2.4.11), which lies over the scroll area, nor with its ring
   // cut at the edge of the scroll area, under a pinned footer or at the window's bottom (2.4.12).
-  useFocusClear(domId, focused, tabs && !footer ? dock : 0);
+  useFocusClear(domId, focused, tabs && !pinnedFooter ? dock : 0);
+  const footerView = footer ? (
+    <View
+      testID="screen-footer"
+      onLayout={(e) => setFooterH(Math.round(e.nativeEvent.layout.height))}
+      style={{
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
+        backgroundColor: colors.bg,
+      }}>
+      <View
+        style={[
+          inner,
+          {
+            paddingTop: spacing.md,
+            paddingBottom: Math.max(insets.bottom, spacing.lg),
+          },
+        ]}>
+        {footer}
+      </View>
+    </View>
+  ) : null;
+  const headerView = header ? <View style={inner}>{header}</View> : null;
   const body = (
     <FadeUp disabled={!enter} style={{ flex: 1 }}>
       <View style={{ paddingTop: noTopInset ? 0 : insets.top }} />
-      {header ? <View style={inner}>{header}</View> : null}
-      {scroll ? (
+      {unpinned ? null : headerView}
+      {unpinned ? (
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          {...scrollProps}
+          style={[scrollProps?.style, givesUp ? { marginBottom: givesUp } : null]}>
+          {headerView}
+          <View style={[inner, { paddingTop: spacing.sm, paddingBottom: bottomPad, gap: spacing.lg }, contentStyle]}>{children}</View>
+          {footerView}
+        </ScrollView>
+      ) : scroll ? (
         <ScrollView
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -142,27 +186,7 @@ export function Screen({ children, scroll = true, header, footer, tabs, padded =
           {children}
         </View>
       )}
-      {footer ? (
-        <View
-          testID="screen-footer"
-          onLayout={(e) => setFooterH(Math.round(e.nativeEvent.layout.height))}
-          style={{
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-            backgroundColor: colors.bg,
-          }}>
-          <View
-            style={[
-              inner,
-              {
-                paddingTop: spacing.md,
-                paddingBottom: Math.max(insets.bottom, spacing.lg),
-              },
-            ]}>
-            {footer}
-          </View>
-        </View>
-      ) : null}
+      {unpinned ? null : footerView}
     </FadeUp>
   );
   return (

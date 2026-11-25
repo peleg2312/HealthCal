@@ -360,12 +360,13 @@ export function UnitsToggle({ draft, set, idPrefix = 'onb-units' }: { draft: Dra
     {
       value: 'metric',
       label: 'kg · cm',
-      a11y: 'Metric units: kilograms and centimetres',
+      // Its words as drawn first (label in name), then what they stand for.
+      a11y: 'kg · cm, metric units: kilograms and centimetres',
     },
     {
       value: 'imperial',
       label: 'lb · ft',
-      a11y: 'Imperial units: pounds, feet and inches',
+      a11y: 'lb · ft, imperial units: pounds, feet and inches',
     },
   ];
   return (

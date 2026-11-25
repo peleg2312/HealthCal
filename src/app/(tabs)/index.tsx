@@ -303,7 +303,7 @@ function EnergyCard({
           testID="today-remaining-open"
           scaleTo={0.97}
           onPress={onFits}
-          accessibilityLabel={`${left} kilocalories ${over ? 'above the budget' : unitWord}. See which of your foods fit`}
+          accessibilityLabel={`${left} kcal ${over ? 'above the budget' : unitWord}. See which of your foods fit`}
           hitSlop={numH < 44 ? Math.ceil((44 - numH) / 2) : undefined}
           style={{ alignSelf: 'flex-start', minHeight: numH, justifyContent: 'center' }}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
@@ -409,7 +409,7 @@ function EnergyCard({
         testID="today-remaining-open"
         scaleTo={0.97}
         onPress={onFits}
-        accessibilityLabel={`${left} kilocalories ${over ? 'above the budget' : unitWord}. See which of your foods fit`}
+        accessibilityLabel={`${left} kcal ${over ? 'above the budget' : unitWord}. See which of your foods fit`}
         style={{ alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', maxWidth: '100%' }}>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', columnGap: 6 }}>
           <AnimatedNumber
@@ -653,7 +653,8 @@ function CoachLine({ day, yesterday, onFits }: { day: DaySummary; yesterday: Clo
         tint={colors.water}
         icon={<Plus size={18} color={colors.water} strokeWidth={2.2} />}
         title={`Add ${formatVolume(glass, profile.units)}`}
-        accessibilityLabel={spokenUnits(`Add ${formatVolume(glass, profile.units)} of water`)}
+        // Its words as drawn ("Add 250 ml"; label in name), then what it adds to.
+        accessibilityLabel={`Add ${formatVolume(glass, profile.units)} of water`}
         onPress={oneTap(() => addWater(day.date, glass, profile.units, day.waterGoalMl))}
       />
     );
@@ -735,6 +736,11 @@ function MealsSection({ day }: { day: DaySummary }) {
           const entries = day.byMeal[m.id];
           const line = mealLine(entries);
           const prev = entries.length ? null : findPreviousMeal(all, day.date, m.id, 7);
+          const caption = entries.length
+            ? line.detail
+            : prev
+              ? `${sentence(relativeTo(prev.date, day.date))}: ${formatNumber(currentKcal(prev.entries))} kcal`
+              : `Around ${formatNumber(Math.round((day.budget * MEAL_SHARE[m.id]) / 10) * 10)} kcal suggested`;
           return (
             <View key={m.id} {...(web ? { role: 'listitem' as const } : null)}>
               {i > 0 ? <View style={{ height: 1, backgroundColor: colors.border, marginLeft: spacing.lg }} /> : null}
@@ -743,7 +749,8 @@ function MealsSection({ day }: { day: DaySummary }) {
                   testID={`today-meal-${m.id}`}
                   scaleTo={0.99}
                   onPress={() => (entries.length ? router.push(`/diary?date=${day.date}&meal=${m.id}` as never) : open(m.id))}
-                  accessibilityLabel={spokenUnits(`${m.label}, ${entries.length ? `${line.approx ? 'about ' : ''}${Math.round(line.kcal)} kilocalories, ${line.detail}` : 'not logged yet'}`)}
+                  // What the row shows, as drawn and in its order (WCAG 2.5.3, label in name), then what it leaves out.
+                  accessibilityLabel={entries.length ? `${m.label}, ${line.approx ? '~' : ''}${formatNumber(line.kcal)} kcal, ${caption}` : `${m.label}, ${caption}, not logged yet`}
                   style={{ flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' }}>
                   <View style={large ? { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', columnGap: spacing.sm } : { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm }}>
                     <Text variant="title" style={large ? undefined : { flex: 1 }} numberOfLines={large ? undefined : 1}>
@@ -757,11 +764,7 @@ function MealsSection({ day }: { day: DaySummary }) {
                     ) : null}
                   </View>
                   <Text variant="caption" color="textSecondary" numberOfLines={large ? undefined : 2}>
-                    {entries.length
-                      ? line.detail
-                      : prev
-                        ? `${sentence(relativeTo(prev.date, day.date))}: ${formatNumber(currentKcal(prev.entries))} kcal`
-                        : `Around ${formatNumber(Math.round((day.budget * MEAL_SHARE[m.id]) / 10) * 10)} kcal suggested`}
+                    {caption}
                   </Text>
                 </PressableScale>
                 {prev && !large ? <RepeatButton meal={m.id} date={day.date} prev={prev} /> : null}

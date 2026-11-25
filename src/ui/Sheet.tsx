@@ -8,6 +8,7 @@ import { spokenUnits } from '@/lib/spokenUnits';
 import { MAX_CONTENT_WIDTH, motion, sheetShadow, useReducedMotion, useTheme } from '@/theme';
 
 import { Button } from './Button';
+import { SHORT_WINDOW } from './controlRules';
 import { keyboardCover, revealDelta } from './keyboardInset';
 import { ease } from './motion';
 import { backClosesSheet, heldWrites, OWN_BACK_MS, ownBacks } from './sheetHistory';
@@ -274,6 +275,57 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
   );
 }
 
+/**
+ * Web: while a sheet is open, the page behind it (the app's root) and any sheet under it are `inert` and
+ * `aria-hidden`, so a screen reader, the keyboard and a pointer meet only the sheet on top (a dialog's
+ * `aria-modal` alone is not honoured by every reader, and the page's controls were in the tree twice: a glass
+ * behind the + sheet beside the sheet's own). React Native Web puts each modal in a layer of its own, a child
+ * of the body; the top one is the last of them. It is set after the modal's own focus trap has noted the
+ * opener, and taken off as the sheet starts to close, before the focus goes back to the opener.
+ */
+const shownSheets = new Set<string>();
+const madeInert = new Set<HTMLElement>();
+/** The modal layer (a child of the body) that holds the element with this id. */
+function layerOf(id: string): HTMLElement | null {
+  let el = document.getElementById(id);
+  while (el && el.parentElement && el.parentElement !== document.body) el = el.parentElement;
+  return el && el.parentElement === document.body ? el : null;
+}
+function applyInert() {
+  const layers = [...shownSheets].map(layerOf).filter((l): l is HTMLElement => !!l);
+  layers.sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+  const top = layers.at(-1);
+  const want = new Set<HTMLElement>();
+  if (top) {
+    const root = document.getElementById('root');
+    if (root && !root.contains(top)) want.add(root);
+    for (const l of layers) if (l !== top) want.add(l);
+  }
+  for (const el of [...madeInert]) {
+    if (want.has(el)) continue;
+    el.removeAttribute('inert');
+    el.removeAttribute('aria-hidden');
+    madeInert.delete(el);
+  }
+  for (const el of want) {
+    if (madeInert.has(el)) continue;
+    el.setAttribute('inert', '');
+    el.setAttribute('aria-hidden', 'true');
+    madeInert.add(el);
+  }
+}
+function useInertBehind(visible: boolean, layerId: string) {
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined' || !visible) return;
+    shownSheets.add(layerId);
+    applyInert();
+    return () => {
+      shownSheets.delete(layerId);
+      applyInert();
+    };
+  }, [visible, layerId]);
+}
+
 function useOpenerFocus(visible: boolean, mounted: boolean) {
   const opener = useRef<HTMLElement | null>(null);
   useLayoutEffect(() => {
@@ -358,6 +410,7 @@ export function Sheet({
     onClose();
   };
   const [titleId] = useState(() => `sheet-title-${++sheetSeq}`);
+  const layerId = `${titleId}-layer`;
   const latestOpen = useRef(visible);
   useEffect(() => {
     latestOpen.current = visible;
@@ -366,12 +419,16 @@ export function Sheet({
   const insets = useSafeAreaInsets();
   const reduce = useReducedMotion();
   const { height: winH } = useWindowDimensions();
+  // A short window (a browser zoomed to 400%, a window held sideways) pins nothing but the handle: the title, the
+  // body and the footer scroll together, so the body never has 0 px between them (WCAG 1.4.10; `SHORT_WINDOW`).
+  const short = winH < SHORT_WINDOW;
   // Stays true through the exit animation, then the modal unmounts.
   const [mounted, setMounted] = useState(visible);
   if (visible && !mounted) setMounted(true);
   // Reduced motion: no exit animation to wait for.
   if (!visible && mounted && reduce) setMounted(false);
   useOpenerFocus(visible, mounted);
+  useInertBehind(visible, layerId);
   const body = useRef<ScrollViewInstance>(null);
   const keyboard = useSheetKeyboard(visible, body);
   useEffect(() => {
@@ -467,6 +524,34 @@ export function Sheet({
   const backdropStyle = useAnimatedStyle(() => ({ opacity: open.get() * (1 - Math.min(0.6, Math.max(0, drag.get()) / (travel + 24))) }));
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - open.get()) * (travel + 24) + drag.get() }] }));
   const toastStyle = useAnimatedStyle(() => ({ opacity: open.get() }));
+  const titleView = title ? (
+    <Text variant="h2" nativeID={titleId} style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.md }}>
+      {title}
+    </Text>
+  ) : null;
+  const footerView =
+    asking && unsaved ? (
+      // Asked in the sheet itself, in place of its footer: one sheet on screen at a time.
+      <View testID="sheet-discard" style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.sm, gap: 10 }}>
+        <Text variant="bodyStrong" testID="sheet-discard-title" accessibilityLiveRegion="polite">
+          {unsaved}
+        </Text>
+        <Button
+          testID="sheet-discard-yes"
+          title="Discard"
+          variant="danger"
+          onPress={() => {
+            setAsking(false);
+            onClose();
+          }}
+        />
+        <Button testID="sheet-discard-keep" title="Keep editing" variant="secondary" onPress={() => setAsking(false)} />
+      </View>
+    ) : footer ? (
+      <View testID="sheet-footer" style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.sm }}>
+        {footer}
+      </View>
+    ) : null;
   return (
     // A sheet's controls count for no screen: the sheet shows its own toast, and a closing sheet's controls
     // must not move the screen's toast (./toastControls).
@@ -480,6 +565,7 @@ export function Sheet({
       // Web: the dialog is named by its title (or the label given), as a screen reader expects of a dialog.
       {...((title ? { 'aria-labelledby': titleId } : accessibilityLabel ? { 'aria-label': spokenUnits(accessibilityLabel) } : {}) as object)}>
       <KeyboardAvoidingView
+        nativeID={layerId}
         pointerEvents={visible ? 'auto' : 'none'}
         behavior={Platform.OS === 'web' ? undefined : 'padding'}
         // Web: rests on a phone browser's keyboard (natively KeyboardAvoidingView pads for it).
@@ -522,48 +608,32 @@ export function Sheet({
             },
             sheetStyle,
           ]}>
-          {/* The drag zone: the handle and the title. */}
+          {/* The drag zone: the handle and the title (on a short window the handle only). */}
           <View testID="sheet-drag" {...pan?.panHandlers} style={DRAG_ZONE_WEB}>
             <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 8 }}>
               <View testID="sheet-handle" style={{ width: 36, height: 4, borderRadius: 1, backgroundColor: colors.borderStrong }} />
             </View>
-            {title ? (
-              <Text variant="h2" nativeID={titleId} style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.md }}>
-                {title}
-              </Text>
-            ) : null}
+            {short ? null : titleView}
           </View>
-          <ScrollView ref={body} testID="sheet-body" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.md }}>
-            {children}
-          </ScrollView>
-          {asking && unsaved ? (
-            // Asked in the sheet itself, in place of its footer: one sheet on screen at a time.
-            <View testID="sheet-discard" style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.sm, gap: 10 }}>
-              <Text variant="bodyStrong" testID="sheet-discard-title" accessibilityLiveRegion="polite">
-                {unsaved}
-              </Text>
-              <Button
-                testID="sheet-discard-yes"
-                title="Discard"
-                variant="danger"
-                onPress={() => {
-                  setAsking(false);
-                  onClose();
-                }}
-              />
-              <Button testID="sheet-discard-keep" title="Keep editing" variant="secondary" onPress={() => setAsking(false)} />
-            </View>
-          ) : footer ? (
-            <View testID="sheet-footer" style={{ paddingHorizontal: spacing.xl, paddingTop: spacing.sm }}>
-              {footer}
-            </View>
-          ) : null}
+          {short ? (
+            <ScrollView ref={body} testID="sheet-body" keyboardShouldPersistTaps="handled">
+              {titleView}
+              <View style={{ paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.md }}>{children}</View>
+              {footerView}
+            </ScrollView>
+          ) : (
+            <ScrollView ref={body} testID="sheet-body" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: spacing.md, paddingBottom: spacing.md }}>
+              {children}
+            </ScrollView>
+          )}
+          {short ? null : footerView}
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
     </ToastScope.Provider>
   );
 }
+
 
 /**
  * Confirmation for destructive or irreversible actions. Use this instead of

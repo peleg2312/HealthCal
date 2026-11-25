@@ -264,7 +264,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
               {source.note}
             </Text>
             {isMeasured ? null : (
-              <Text variant="caption" color="textTertiary">
+              <Text variant="caption" color="textSecondary">
                 Source: {MET_SOURCES[activity.id] ?? 'Compendium of Physical Activities.'}
               </Text>
             )}
@@ -372,7 +372,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
                 );
               })}
             </View>
-            <Text variant="caption" color="textTertiary">
+            <Text variant="caption" color="textSecondary">
               Talk test for {INTENSITY_LABELS[intensity].title.toLowerCase()}: {INTENSITY_LABELS[intensity].hint.toLowerCase()}.
             </Text>
           </>

@@ -113,11 +113,19 @@ describe('moveLine', () => {
 });
 
 describe('moveAccessibilityLabel', () => {
-  it('reads the activity, the net calories, the steps and where it leads', () => {
-    expect(moveAccessibilityLabel([run], 384, 9210)).toBe('Running, 42 minutes, about 380 kilocalories added to the budget. 9,210 steps. Opens Train');
-    expect(moveAccessibilityLabel([swim, ride], 437, 0)).toBe('2 sessions, 53 minutes, about 437 kilocalories added to the budget, from a measured burn. Opens Train');
-    expect(moveAccessibilityLabel([run], 384, null, undefined, false)).toBe('Running, 42 minutes, about 380 kilocalories not added to the budget. Opens Train');
+  it('reads the line as drawn (label in name), the steps and where it leads', () => {
+    expect(moveAccessibilityLabel([run], 384, 9210)).toBe('Running, 42 min · about 380 kcal added. 9,210 steps. Opens Train');
+    expect(moveAccessibilityLabel([swim, ride], 437, 0)).toBe('2 sessions, 53 min · about 437 kcal added. From a measured burn. Opens Train');
+    expect(moveAccessibilityLabel([run], 384, null, undefined, false)).toBe('Running, 42 min · about 380 kcal not added. Opens Train');
     expect(moveAccessibilityLabel([], 0, null)).toBe('No workout logged. Opens Train');
     expect(moveAccessibilityLabel([], 0, 4120, 'From your Health export, Nov 16')).toBe('No workout logged. 4,120 steps. From your Health export, Nov 16. Opens Train');
+  });
+  it('holds the drawn line, emoji aside, then the steps as drawn', () => {
+    const plain = (s: string) => s.replace(/\u00A0/g, ' ').replace(/^\S*\p{Extended_Pictographic}\S*\s/u, '');
+    for (const [acts, steps] of [[[run], 9210], [[swim, ride], 0], [[], 4120]] as const) {
+      const label = moveAccessibilityLabel([...acts], 384, steps);
+      expect(label.startsWith(plain(moveLine([...acts], 384)))).toBe(true);
+      if (steps) expect(label).toContain(`${steps.toLocaleString('en-US')} steps`);
+    }
   });
 });

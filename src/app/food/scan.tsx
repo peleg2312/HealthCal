@@ -244,7 +244,7 @@ export default function ScanScreen() {
               <Button testID="scan-use-camera" title={web ? 'Scan with your camera' : 'Back to the camera'} variant="ghost" icon={<Camera size={18} color={colors.primary} strokeWidth={2.2} />} onPress={() => void startCamera()} />
             ) : null}
             {web && !hasCamera ? (
-              <Text variant="caption" color="textTertiary" align="center">
+              <Text variant="caption" color="textSecondary" align="center">
                 No camera found in this browser. On a phone, the HealthCal app scans barcodes with the camera.
               </Text>
             ) : null}

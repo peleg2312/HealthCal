@@ -895,7 +895,7 @@ export default function PhotoScreen() {
                 </Text>
               ) : null}
               {allowance ? (
-                <Text variant="caption" color="textTertiary" testID="ai-remaining">
+                <Text variant="caption" color="textSecondary" testID="ai-remaining">
                   {allowance}
                 </Text>
               ) : null}

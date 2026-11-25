@@ -384,7 +384,7 @@ function Logger({ draftKey, draft, entry, onFinished }: { draftKey: string; draf
           onChange={(v: Intensity) => update((d) => ({ ...d, intensity: v }))}
           options={(['light', 'moderate', 'vigorous'] as Intensity[]).map((i) => ({ value: i, label: INTENSITY_LABELS[i].title }))}
         />
-        <Text variant="caption" color="textTertiary">
+        <Text variant="caption" color="textSecondary">
           {STRENGTH.intensityHint?.[draft.intensity]} · talk test: {INTENSITY_LABELS[draft.intensity].hint.toLowerCase()}
         </Text>
       </View>
