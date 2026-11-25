@@ -5,7 +5,9 @@ import { AccessibilityInfo, Platform, View } from 'react-native';
 import { DayStepper, MealPicker } from '@/features/food/components';
 import { QUICK_KCAL_LIMIT, href, kcal, parseDate, parseMeal, quickKcalError, quickKcalValue } from '@/features/food/helpers';
 import { logQuickAdd } from '@/features/food/log';
-import { QUICK_KCAL_ASK, pressFor, quickAddTitle, quickKcalAsks, waitsFor } from '@/features/food/softCheck';
+import { AskLine, askTie } from '@/features/food/AskLine';
+import { kcalAsk, pressFor, quickAddTitle, quickKcalAsks, waitsFor } from '@/features/food/softCheck';
+import { spokenUnits } from '@/lib/spokenUnits';
 import { atwaterKcal } from '@/lib/nutrition';
 import { useLargeText, useTheme } from '@/theme';
 import { Button, Card, CupKey, Header, NumberField, Screen, Text, TextField, goBack, haptic, useLeaveGuard } from '@/ui';
@@ -43,7 +45,7 @@ export default function QuickAddScreen() {
   const typed = kcalText.trim().length > 0 || hasMacros || name.trim().length > 0;
   const leave = useLeaveGuard(typed ? 'Discard this quick add?' : null);
   // More than one plausible entry holds (`quickKcalAsks`) is added on a second press of Add (`pressFor`): the
-  // first adds nothing, ties a line to the field and names the amount on the button. Another amount asks again.
+  // first adds nothing, ties its question to the field and names the amount on the button. Another amount asks again.
   const [askedFor, setAskedFor] = useState<number | null>(null);
   const asks = quickKcalAsks(calories);
   const waiting = waitsFor(asks, calories, askedFor);
@@ -56,10 +58,11 @@ export default function QuickAddScreen() {
     if (pressFor(asks, calories!, askedFor) === 'ask') {
       setAskedFor(calories);
       haptic.warn();
-      if (Platform.OS !== 'web') AccessibilityInfo.announceForAccessibility(QUICK_KCAL_ASK);
+      const said = spokenUnits(kcalAsk(calories!, false));
+      if (Platform.OS !== 'web') AccessibilityInfo.announceForAccessibility(said);
       else {
         setSpoken('');
-        setTimeout(() => setSpoken(QUICK_KCAL_ASK), 150);
+        setTimeout(() => setSpoken(said), 150);
       }
       return;
     }
@@ -86,19 +89,11 @@ export default function QuickAddScreen() {
           placeholder={hasMacros ? String(implied) : 'e.g. 350'}
           error={kcalError}
           hint={!kcalText.trim() && hasMacros && !waiting ? `Worked out from the macros: ${kcal(implied)} kcal` : undefined}
-          // While Add waits for its second press, the line under the field is tied to it (the hint natively).
-          {...(waiting ? (Platform.OS === 'web' ? ({ 'aria-describedby': askId } as object) : { accessibilityHint: QUICK_KCAL_ASK }) : null)}
+          // While Add waits for its second press, the question under the field is tied to it (the hint natively).
+          {...(waiting ? askTie(askId, kcalAsk(calories!, false)) : null)}
           onSubmitEditing={save}
         />
-        {waiting ? (
-          // Held up and waiting on the person: the amber key, with neutral words, as the macros' note.
-          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
-            <CupKey color={colors.warning} style={{ marginTop: 4 }} />
-            <Text testID="quick-ask" nativeID={askId} variant="caption" color="text" style={{ flex: 1 }}>
-              {QUICK_KCAL_ASK}
-            </Text>
-          </View>
-        ) : null}
+        {waiting ? <AskLine id={askId} line={kcalAsk(calories!, false)} testID="quick-ask" /> : null}
         <TextField testID="quick-name" label="Name (optional)" placeholder={big ? 'e.g. Cake' : 'e.g. Office birthday cake'} value={name} onChangeText={setName} maxLength={80} />
       </Card>
 

@@ -1,11 +1,12 @@
 /**
  * The soft check of an amount for one entry (rubric D8-04, error prevention): an amount above what one plausible
  * entry holds is stored only on a second press of the screen's Add (or Save). The first press stores nothing: a
- * line tied to the field (an amber key, neutral words) says why it waits, the button names the amount it will
- * store, and the line is spoken, units in full, without moving the focus. Any other amount asks again; an amount below the
- * check, or one already stored, never asks. The hard limits are unchanged (quick add's `QUICK_KCAL_LIMIT`, the
- * grams field's 20,000 g). Pure, so the screens only place the words: quick add (src/app/food/quick.tsx) and
- * food detail (src/app/food/detail.tsx, its line drawn by `AmountEditor`).
+ * question tied to the field, in Water's words ("Is 5,000 kcal right for one entry? Tap Add again to add it."),
+ * drawn as reading text by `AskLine` (./AskLine.tsx), the button names the amount it will store, and the question
+ * is spoken, units in full, without moving the focus. Any other amount asks again; an amount below the check, or
+ * one already stored, never asks. The hard limits are unchanged (quick add's `QUICK_KCAL_LIMIT`, the grams
+ * field's 20,000 g). Pure, so the screens only place the words: quick add (src/app/food/quick.tsx) and food detail
+ * (src/app/food/detail.tsx, its portion's question drawn by `AmountEditor`).
  */
 import { formatNumber } from '@/lib/units';
 import { MEAL_LABEL } from '@/lib/nutrition';

@@ -45,7 +45,8 @@ describe('logMealTitle', () => {
 describe('budgetShare and hoursAndMinutes', () => {
   it('the share of the day\'s own budget, whole percent', () => {
     expect(budgetShare(2062, 2170)).toBe(95);
-    expect(budgetShare(2850, 2190)).toBe(130);
+    // Above the budget the shared share rounds up, so it never reads as on budget (130.1% is 131).
+    expect(budgetShare(2850, 2190)).toBe(131);
     expect(budgetShare(0, 2190)).toBe(0);
     expect(budgetShare(2000, 0)).toBeNull();
     // One share for one day on every screen: 89.6% is 89 (no on-budget mark), never 90; just above is 101.
