@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { InsightDay } from '@/lib/insights';
 
-import { dayRing, startDate, weekCaption, weekDates } from './week';
+import { dayCellLabel, dayRing, startDate, weekCaption, weekDates } from './week';
 
 const TODAY = '2026-11-13'; // a Friday
 
@@ -56,6 +56,37 @@ describe('dayRing', () => {
   });
   it('does not divide by a zero budget', () => {
     expect(dayRing(d('2026-11-12', 500, 0), TODAY).state).toBe('empty');
+  });
+});
+
+describe('dayCellLabel', () => {
+  const label = (date: string, kcal: number | null, budget = 2000, start?: string) => {
+    const day = d(date, kcal, budget);
+    return dayCellLabel(dayRing(day, TODAY, start), TODAY, day);
+  };
+  const future = (date: string) => dayCellLabel({ date, state: 'future', progress: 0, close: false }, TODAY);
+
+  it('says the eaten figure grouped, with its unit and the word eaten, never as a year after the date', () => {
+    // Monday Nov 9: a 4-digit figure straight after "Nov 9," must not read as a year.
+    expect(label('2026-11-09', 2024, 2082)).toBe('M 9, Monday, Nov 9, 2,024 kilocalories eaten of 2,082');
+    expect(label('2026-11-09', 2024, 2082)).not.toMatch(/Nov 9, 20\d\d\b/);
+    expect(label('2026-11-11', 11480, 2160)).toBe('W 11, Wednesday, Nov 11, 11,480 kilocalories eaten of 2,160, above budget');
+  });
+  it('names today, yesterday and tomorrow from the day given, never the clock', () => {
+    expect(label(TODAY, 1219.4, 2160)).toBe('F 13, Today, 1,219 kilocalories eaten of 2,160');
+    expect(label('2026-11-12', 1850)).toBe('T 12, Yesterday, 1,850 kilocalories eaten of 2,000');
+    expect(future('2026-11-14')).toBe('S 14, Tomorrow');
+    expect(future('2026-11-15')).toBe('S 15, Sunday, Nov 15');
+  });
+  it('says each state of the cup: on budget, above, nothing logged, before the start', () => {
+    expect(label('2026-11-10', 1900)).toBe('T 10, Tuesday, Nov 10, 1,900 kilocalories eaten of 2,000');
+    expect(label('2026-11-10', 2100)).toBe('T 10, Tuesday, Nov 10, 2,100 kilocalories eaten of 2,000, above budget');
+    expect(label('2026-11-10', null)).toBe('T 10, Tuesday, Nov 10, nothing logged');
+    expect(label('2026-11-10', null, 2000, '2026-11-12')).toBe('T 10, Tuesday, Nov 10, before you started');
+  });
+  it('carries the year only for a day in another year', () => {
+    const day = d('2025-12-29', 1500, 2000);
+    expect(dayCellLabel(dayRing(day, '2026-01-02'), '2026-01-02', day)).toBe('M 29, Monday, Dec 29, 2025, 1,500 kilocalories eaten of 2,000');
   });
 });
 

@@ -1,5 +1,5 @@
 import { CalendarDays, ChevronLeft, ChevronRight, Minus, Plus } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { Platform, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { SourceMark, sourceMarkTop } from '@/features/ai/mark';
@@ -88,20 +88,27 @@ export function KcalTrail({ value, range, approx, testID }: { value: number; ran
 /** A flex cell's floor on the web: its content's width (react-native-web sets 0). Yoga has no 'auto' minimum. */
 const WEB_CELL = (Platform.OS === 'web' ? { minWidth: 'auto' } : null) as ViewStyle | null;
 
-/** Meal selector as an underline tab row with stable test ids (`meal-breakfast`, ...). */
-export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: MealType; onChange: (m: MealType) => void; testIDPrefix?: string }) {
-  const { colors } = useTheme();
+/**
+ * Meal selector as an underline tab row with stable test ids (`meal-breakfast`, ...). `advice`: one line drawn
+ * under the choice and tied to it (`aria-describedby` on the radiogroup on the web, each radio's
+ * `accessibilityHint` natively), for a pick that does more than choose (Edit entry's one-tap move, WCAG 3.2.2);
+ * testID `<prefix>-advice`.
+ */
+export function MealPicker({ value, onChange, testIDPrefix = 'meal', advice }: { value: MealType; onChange: (m: MealType) => void; testIDPrefix?: string; advice?: string }) {
+  const { colors, spacing } = useTheme();
   // Four equal cells leave about 60 px each on a 320 px phone: 'Breakfast' fits there one size down.
   const narrow = useWindowDimensions().width < 340;
   // With large text the four take two lines of two, so no word reaches past the screen (never smaller text).
   const big = useLargeText();
   const web = Platform.OS === 'web';
-  return (
+  const adviceId = `${testIDPrefix}-advice-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+  const group = (
     // One choice of a form, read as radios (drawn as underline tabs, as the kit's Segmented with `role="radiogroup"`):
     // the meal is a field, not a view switch, so it is a radiogroup named "Meal", never tabs with no panel.
     <View
       accessibilityRole="radiogroup"
       accessibilityLabel="Meal"
+      {...(advice && web ? ({ 'aria-describedby': adviceId } as object) : null)}
       style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', borderBottomWidth: 1, borderBottomColor: colors.border }}>
       {MEALS.map((m, i) => {
         const active = m.id === value;
@@ -114,6 +121,7 @@ export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: 
             onPress={() => onChange(m.id)}
             accessibilityRole="radio"
             accessibilityLabel={m.label}
+            accessibilityHint={advice && !web ? advice : undefined}
             accessibilityState={{ checked: active }}
             // react-native-web reads the aria prop, not accessibilityState.
             aria-checked={active}
@@ -141,6 +149,15 @@ export function MealPicker({ value, onChange, testIDPrefix = 'meal' }: { value: 
           </PressableScale>
         );
       })}
+    </View>
+  );
+  if (!advice) return group;
+  return (
+    <View style={{ gap: spacing.sm }}>
+      {group}
+      <Text testID={`${testIDPrefix}-advice`} nativeID={adviceId} variant="caption" color="textSecondary">
+        {advice}
+      </Text>
     </View>
   );
 }

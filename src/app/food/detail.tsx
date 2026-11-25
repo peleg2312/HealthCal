@@ -15,6 +15,7 @@ import { FavoriteStar } from '@/features/food/FavoriteStar';
 import { toggleFoodFavorite } from '@/features/food/favoriteActions';
 import { dayPhrase, href, portionLabel, kcal, labelAmount, lastPortions, matchServing, param, parseDate, parseMeal, portionFor, sourceInfo, sourceKindOf, valuesUpdated, type SourceKind } from '@/features/food/helpers';
 import { deleteEntry, logFood } from '@/features/food/log';
+import { mealPickAdvice, pickMovesAtOnce } from '@/features/food/mealMove';
 import { RequireProfile } from '@/features/food/RequireProfile';
 import { isolateRtl } from '@/lib/bidi';
 import { MEAL_LABEL, atwaterKcal, formatMacro, scaleNutrients } from '@/lib/nutrition';
@@ -376,11 +377,12 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
   };
   // Moving an entry is one tap (D3-08: diary, the row, the meal = 3 from Today): in Edit entry, another meal
   // picked while nothing else has changed saves at once and goes back, with the save's toast and Undo. With
-  // the amount or the day changed too, the meal is only chosen, and Save writes everything together.
+  // the amount or the day changed too, the meal is only chosen, and Save writes everything together. The line
+  // under the meal choice says which of the two a pick does now, before it is made (`mealPickAdvice`, WCAG 3.2.2).
+  const moves = pickMovesAtOnce(entry, { date, quantity, servingLabel: serving.label, savable: totalGrams > 0 && !gramsInvalid && !paired.problem });
   const pickMeal = (m: MealType) => {
     setMeal(m);
-    const untouched = !!entry && m !== entry.meal && date === entry.date && quantity === entry.quantity && serving.label === entry.servingLabel;
-    if (!untouched || !(totalGrams > 0) || gramsInvalid || !!paired.problem) return;
+    if (!moves || !entry || m === entry.meal) return;
     logFood({ food, serving, quantity, meal: m, date, entryId: entry.id });
     goBack(href('/diary', { date }));
   };
@@ -445,7 +447,7 @@ function FoodEditor({ food, entry, initialMeal, initialDate }: { food: Food; ent
 
       <Card style={{ gap: spacing.md }}>
         <Text variant="h3">Meal and day</Text>
-        <MealPicker value={meal} onChange={pickMeal} testIDPrefix="detail-meal" />
+        <MealPicker value={meal} onChange={pickMeal} testIDPrefix="detail-meal" advice={entry ? mealPickAdvice(moves) : undefined} />
         <DayStepper value={date} onChange={setDate} testIDPrefix="detail-day" />
         {paired.problem?.field === 'day' ? <PairProblem text={paired.problem.text} /> : null}
       </Card>

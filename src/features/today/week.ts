@@ -64,7 +64,7 @@ export function dayCellLabel(ring: DayRing, today: ISODate, day?: Pick<InsightDa
           : `${DAY_NAMES[d.getDay()]}, ${formatShortDate(date)}${d.getFullYear() === fromISODate(today).getFullYear() ? '' : `, ${d.getFullYear()}`}`;
   const kcal =
     day && day.entries.length && ring.state !== 'future'
-      ? `, ${formatNumber(Math.round(day.eaten.kcal))} kilocalories eaten of ${formatNumber(Math.round(day.budget))}${ring.state === 'over' ? ', above budget' : ''}`
+      ? `, ${formatNumber(Math.round(day.eaten.kcal))} kilocalories eaten${day.budget > 0 ? ` of ${formatNumber(Math.round(day.budget))}` : ''}${ring.state === 'over' ? ', above budget' : ''}`
       : ring.state === 'future'
         ? ''
         : ring.state === 'before'

@@ -2,15 +2,14 @@ import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import React, { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Platform, ScrollView, useWindowDimensions, View, type AccessibilityActionEvent, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, type StyleProp, type ViewStyle } from 'react-native';
 
-import { spokenUnits } from '@/features/progress/chartWords';
-import { diffDays, formatDayLabel, formatShortDate, fromISODate, startOfWeek } from '@/lib/dates';
+import { diffDays, formatShortDate, fromISODate, startOfWeek } from '@/lib/dates';
 import { useDays } from '@/store/selectors';
 import { cup, fonts, MAX_CONTENT_WIDTH, useLargeText, useTheme } from '@/theme';
 import type { ISODate } from '@/types';
 import { Chip, FadeUp, IconButton, ListRow, MiniCup, PressableScale, Sheet, Text, useReducedMotion } from '@/ui';
 
 import { DaySwipeGuard } from './useDaySwipe';
-import { dayRing, weekCaption, weekDates } from './week';
+import { dayCellLabel, dayRing, weekCaption, weekDates } from './week';
 
 const LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 export const STRIP_WEEKS = 8;
@@ -262,14 +261,6 @@ export function DayRingStrip({
                   const before = ring.state === 'before';
                   // A day still to come is drawn dashed; the diary can still open it, up to its last day.
                   const locked = before || d > last;
-                  const kcal =
-                    summary && summary.entries.length
-                      ? `, ${Math.round(summary.eaten.kcal)} of ${summary.budget} kilocalories${ring.state === 'over' ? ', above budget' : ''}`
-                      : future
-                        ? ''
-                        : before
-                          ? ', before you started'
-                          : ', nothing logged';
                   return (
                     <PressableScale
                       key={d}
@@ -290,11 +281,14 @@ export function DayRingStrip({
                       aria-selected={isSelected}
                       accessibilityActions={weekActions}
                       onAccessibilityAction={onWeekAction}
-                      // Starts with the words drawn on it ("M 23"), then the day in full: label in name.
-                      accessibilityLabel={`${LETTERS[i]} ${fromISODate(d).getDate()}, ${spokenUnits(`${formatDayLabel(d)}${kcal}`)}`}
+                      // Starts with the words drawn on it ("M 23"), then the day in full and its figures as drawn: label in name.
+                      accessibilityLabel={dayCellLabel(ring, today, summary)}
                       // A future day is drawn dashed; fading it as well would make its date unreadable.
                       dimDisabled={false}
-                      style={{ flex: 1, minHeight: 44, alignItems: 'center', gap: 6, paddingBottom: 2 }}>
+                      // A width in numbers (a seventh of the page, as flex: 1 drew it), so on Android the kit's touch rule
+                      // sees it and widens the touch area to 48 (2 px into each neighbour's; seven 48 px days need 336 px,
+                      // and the strip has 320 at 360): nothing is drawn or laid out differently.
+                      style={{ width: width / 7, minHeight: 44, alignItems: 'center', gap: 6, paddingBottom: 2 }}>
                       <Text variant="label" color={isSelected ? 'text' : 'textSecondary'} style={{ fontSize: 12, lineHeight: 16, fontFamily: isSelected ? fonts.bold : fonts.semibold }}>
                         {LETTERS[i]}
                       </Text>
