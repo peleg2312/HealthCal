@@ -6,7 +6,7 @@
  */
 import { Plus, Utensils } from 'lucide-react-native';
 import React from 'react';
-import { Platform, View } from 'react-native';
+import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { SourceMark, sourceMarkTop } from '@/features/ai/mark';
 import { RowEmoji } from '@/features/food/components';
@@ -20,7 +20,7 @@ import { Button, Card, decorative, Divider, PressableScale, Text } from '@/ui';
 
 import { CheerButton, PersonMark } from './components';
 import type { SharedFoodSource, SharedMealItem } from './contract';
-import { ADD_TO_DIARY, friendSourceLabel, itemCaption, mealMeta } from './words';
+import { ADD_TO_DIARY, ADD_TO_DIARY_SHORT, friendSourceLabel, itemCaption, mealMeta } from './words';
 
 /** A food's name as drawn: a bundled name's database capitals in lower case, any other as written. */
 export function sharedName(item: Pick<SharedMealItem, 'name' | 'source'>): string {
@@ -127,6 +127,8 @@ export function FeedMealCard({
 }) {
   const { colors, spacing } = useTheme();
   const large = useLargeText();
+  // Under 360 px "Add to my diary" does not fit beside Cheer: the button says "Add to diary" there.
+  const narrow = useWindowDimensions().width < 360;
   return (
     <Card padding={spacing.lg} testID={testID}>
       <PressableScale testID={`${testID}-open`} onPress={onOpen} scaleTo={0.99} accessibilityLabel={`${mealSpoken({ name, meal, day, today, items, showKcal })}. Open`}>
@@ -142,10 +144,10 @@ export function FeedMealCard({
         <View style={large ? undefined : { flex: 3 }}>
           <Button
             testID={`${testID}-add`}
-            title={ADD_TO_DIARY}
+            title={narrow && !large ? ADD_TO_DIARY_SHORT : ADD_TO_DIARY}
             variant="secondary"
             size="sm"
-            accessibilityLabel={`${ADD_TO_DIARY}: ${withoutMarks(name)}'s ${meal === 'snack' ? 'snacks' : meal}`}
+            accessibilityLabel={`${narrow && !large ? ADD_TO_DIARY_SHORT : ADD_TO_DIARY}: ${withoutMarks(name)}'s ${meal === 'snack' ? 'snacks' : meal}`}
             icon={<Plus size={18} color={colors.text} strokeWidth={2.2} />}
             onPress={onAdd}
           />

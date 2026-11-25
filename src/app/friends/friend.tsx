@@ -118,7 +118,7 @@ export default function FriendScreen() {
           {typeof s.minutes === 'number' || typeof s.streak === 'number' ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
               {/* Figures, not Stat: their labels take a second line in a third of a narrow card instead of ending in "…". */}
-              {typeof s.minutes === 'number' ? <Figure label={current ? 'This week' : 'Last shared week'} value={String(s.minutes)} unit="min" basis={90} /> : null}
+              {typeof s.minutes === 'number' ? <Figure testID="friend-minutes" label={current ? 'This week' : 'Last shared week'} value={String(s.minutes)} unit="min" basis={90} /> : null}
               {typeof s.sessions === 'number' ? <Figure label="Sessions" value={String(s.sessions)} basis={80} /> : null}
               {typeof s.streak === 'number' ? <Figure label="Logging streak" value={String(s.streak)} unit={s.streak === 1 ? 'day' : 'days'} basis={90} /> : null}
             </View>

@@ -28,6 +28,8 @@ export const FEED_EMPTY = 'When a friend shows a meal or logs a workout, it appe
 export const CHEER = 'Cheer';
 export const CHEERED = 'Cheered';
 export const ADD_TO_DIARY = 'Add to my diary';
+/** The same button under 360 px, where the longer words do not fit beside Cheer. */
+export const ADD_TO_DIARY_SHORT = 'Add to diary';
 export const YOU_CHEERED = 'You cheered this';
 export const ABOUT_YOU = 'What friends see of you';
 export const PRIVACY = 'Privacy';

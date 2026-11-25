@@ -289,6 +289,7 @@ src/features/friends/link.ts	src/features/friends/summary.ts
 src/features/friends/meals.test.ts	src/data/foods.ts	src/features/friends/meals.ts	src/services/friendsWire.ts	src/types/index.ts
 src/features/friends/meals.ts	src/features/drinks/via.ts	src/features/food/helpers.ts	src/features/friends/contract.ts	src/lib/dates.ts	src/services/friendsWire.ts	src/types/index.ts
 src/features/friends/mockBackend.test.ts	src/features/friends/summary.ts
+src/features/friends/overview.test.ts	src/features/friends/overview.ts	src/services/friends.ts
 src/features/friends/overview.ts	src/features/friends/contract.ts	src/services/friends.ts	src/services/friendsWire.ts	src/types/index.ts
 src/features/friends/pendingInvite.test.ts	src/features/friends/pendingInvite.ts
 src/features/friends/pendingInvite.ts	src/features/friends/summary.ts

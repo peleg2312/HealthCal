@@ -1191,6 +1191,7 @@ src/features/friends/MealCard.tsx	mealSpoken	function
 src/features/friends/MealCard.tsx	sharedName	function
 src/features/friends/MealCard.tsx	sharedSourceWords	function
 src/features/friends/SetupForm.tsx	SetupForm	component
+src/features/friends/ShowMeal.tsx	MealShownCaption	component
 src/features/friends/ShowMeal.tsx	ShowToFriendsRow	component
 src/features/friends/ShowMeal.tsx	useShowMealStep	function
 src/features/friends/attention.ts	FRIENDS_SEEN_KEY	const
@@ -1314,6 +1315,7 @@ src/features/friends/words.ts	ADD	const
 src/features/friends/words.ts	ADD_FRIEND	const
 src/features/friends/words.ts	ADD_TITLE	const
 src/features/friends/words.ts	ADD_TO_DIARY	const
+src/features/friends/words.ts	ADD_TO_DIARY_SHORT	const
 src/features/friends/words.ts	ALWAYS_SHOW	const
 src/features/friends/words.ts	AUDIENCE_NOTE	const
 src/features/friends/words.ts	AUDIENCE_SAVE	const

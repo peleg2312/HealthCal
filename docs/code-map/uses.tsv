@@ -1012,7 +1012,7 @@ src/features/friends/meals.ts	buildSharedMeal	4	src/features/friends/ShowMeal.ts
 src/features/friends/meals.ts	entryPortion	1	src/features/friends/meals.test.ts
 src/features/friends/meals.ts	ownMealsByRef	2	src/app/friends/index.tsx	src/features/friends/meals.test.ts
 src/features/friends/meals.ts	sameItems	1	src/features/friends/meals.test.ts
-src/features/friends/overview.ts	mealsOverview	4	src/app/friends/friend.tsx	src/app/friends/index.tsx	src/app/friends/settings.tsx	src/features/friends/ShowMeal.tsx
+src/features/friends/overview.ts	mealsOverview	5	src/app/friends/friend.tsx	src/app/friends/index.tsx	src/app/friends/settings.tsx	src/features/friends/ShowMeal.tsx	src/features/friends/overview.test.ts
 src/features/friends/pendingInvite.ts	PENDING_INVITE_KEY	1	src/features/friends/pendingInvite.test.ts
 src/features/friends/pendingInvite.ts	PENDING_INVITE_MAX_AGE_MS	1	src/features/friends/pendingInvite.test.ts
 src/features/friends/pendingInvite.ts	clearPendingInvite	3	src/app/friends/add.tsx	src/features/friends/usePendingInvite.ts	src/features/friends/pendingInvite.test.ts
@@ -1061,6 +1061,7 @@ src/features/friends/words.ts	ADD	1	src/features/friends/FeedParts.tsx
 src/features/friends/words.ts	ADD_FRIEND	1	src/features/friends/FeedParts.tsx
 src/features/friends/words.ts	ADD_TITLE	1	src/features/friends/FriendMealSheet.tsx
 src/features/friends/words.ts	ADD_TO_DIARY	2	src/features/friends/FriendMealSheet.tsx	src/features/friends/MealCard.tsx
+src/features/friends/words.ts	ADD_TO_DIARY_SHORT	1	src/features/friends/MealCard.tsx
 src/features/friends/words.ts	ALWAYS_SHOW	1	src/app/friends/settings.tsx
 src/features/friends/words.ts	AUDIENCE_NOTE	1	src/app/friends/settings.tsx
 src/features/friends/words.ts	AUDIENCE_SAVE	1	src/app/friends/settings.tsx
@@ -2941,7 +2942,7 @@ src/services/friends.ts	*	1	src/services/friends.test.ts
 src/services/friends.ts	CheerReceived	1	src/features/friends/components.tsx
 src/services/friends.ts	Friend	2	src/features/friends/components.tsx	src/features/friends/overview.ts
 src/services/friends.ts	FriendRequest	2	src/app/friends/index.tsx	src/features/friends/components.tsx
-src/services/friends.ts	FriendsOverview	5	src/features/friends/attention.ts	src/features/friends/overview.ts	src/features/today/cheers.ts	src/features/friends/attention.test.ts	src/features/today/cheers.test.ts
+src/services/friends.ts	FriendsOverview	6	src/features/friends/attention.ts	src/features/friends/overview.ts	src/features/today/cheers.ts	src/features/friends/attention.test.ts	src/features/friends/overview.test.ts	src/features/today/cheers.test.ts
 src/services/friends.ts	FriendsStatus	2	src/features/friends/attention.ts	src/features/today/cheers.ts
 src/services/friends.ts	SocialMe	1	src/features/friends/overview.ts
 src/services/friends.ts	cheerFriend	2	src/app/friends/friend.tsx	src/app/friends/index.tsx

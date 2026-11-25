@@ -543,7 +543,7 @@ async function device(browser, seedJson) {
   check('the request reaches the other person', await waitFor(A, `friends-accept-${tid(user2.id)}`));
   await A.shot('friends-request-received');
   await A.tap(`friends-accept-${tid(user2.id)}`);
-  check('accepting makes them friends on the server', await waitFor(A, `friends-card-${tid(user2.id)}`) && (await server()).friendships.some((f) => f.status === 'accepted' && [f.requester, f.addressee].sort().join() === [user.id, user2.id].sort().join()));
+  check('accepting makes them friends on the server', await waitFor(A, `friends-person-${tid(user2.id)}`) && (await server()).friendships.some((f) => f.status === 'accepted' && [f.requester, f.addressee].sort().join() === [user.id, user2.id].sort().join()));
   await A.page.waitForTimeout(800);
   await A.shot('friends-full');
 
@@ -554,14 +554,17 @@ async function device(browser, seedJson) {
   };
   const minutesA = await ownMinutes(A);
   const minutesD = await ownMinutes(D);
-  await A.go('/friends');
-  await waitFor(A, `friends-minutes-${tid(user2.id)}`);
-  const samSeenByAlex = (await A.text(`friends-minutes-${tid(user2.id)}`)).replace(/\D+/g, '');
-  await D.go('/friends');
-  await waitFor(D, `friends-minutes-${tid(user.id)}`);
-  const alexSeenBySam = (await D.text(`friends-minutes-${tid(user.id)}`)).replace(/\D+/g, '');
+  // A friend's week is on their page (/friends/friend?id=): the Friends screen itself lines up no figures side by side.
+  await A.go(`/friends/friend?id=${user2.id}`);
+  await waitFor(A, 'friend-minutes');
+  const samSeenByAlex = (await A.text('friend-minutes')).replace(/\D+/g, '');
+  await D.go(`/friends/friend?id=${user.id}`);
+  await waitFor(D, 'friend-minutes');
+  const alexSeenBySam = (await D.text('friend-minutes')).replace(/\D+/g, '');
   check("each sees the other's weekly minutes, equal to that person's own", samSeenByAlex === minutesD && alexSeenBySam === minutesA && minutesA !== minutesD, `Alex sees Sam ${samSeenByAlex} (own ${minutesD}), Sam sees Alex ${alexSeenBySam} (own ${minutesA})`);
-  const card = await A.text(`friends-friend-${tid(user2.id)}`);
+  await A.go(`/friends/friend?id=${user2.id}`);
+  await waitFor(A, 'friend-week');
+  const card = await A.text('friend-week');
   srv = await server();
   const shared = srv.social[user2.id]?.summary || {};
   const allowed = ['week', 'minutes', 'sessions', 'streak', 'workouts'];
@@ -581,33 +584,37 @@ async function device(browser, seedJson) {
 
   // A cheer on one device appears on the other, matched to the workout it was for.
   const latest = [...(shared.workouts || [])].sort((x, y) => String(y.date).localeCompare(String(x.date)))[0];
-  await A.go('/friends');
+  await A.go(`/friends/friend?id=${user2.id}`);
   await waitFor(A, `friends-cheer-${latest?.id}`);
   await A.tap(`friends-cheer-${latest?.id}`);
   await A.page.waitForTimeout(1200);
   srv = await server();
   check('cheering shows at once and is stored', (await A.text(`friends-cheer-${latest?.id}`)) === 'Cheered' && srv.cheers.some((c) => c.from_user === user.id && c.to_user === user2.id && c.ref === latest?.id));
+  // One line on the Friends screen ("1 cheer for you"); its list opens in a sheet.
   await D.go('/friends');
   await waitFor(D, 'friends-cheers');
-  const cheersText = (await D.has('friends-cheers')) ? await D.text('friends-cheers') : '';
+  await D.tap('friends-cheers-open');
+  await waitFor(D, 'friends-cheers-list');
+  const cheersText = (await D.has('friends-cheers-list')) ? await D.text('friends-cheers-list') : '';
   check('the cheer appears on the other device, naming the workout', /Alex\s+cheered your (?!day)/.test(cheersText) && !/workout of yours/.test(cheersText), cheersText.replace(/\s+/g, ' ').slice(0, 80));
   await D.shot('friends-cheer-received');
 
   // Removing the friend clears both sides.
-  await A.go('/friends');
-  await A.tap(`friends-card-${tid(user2.id)}`);
+  await A.go(`/friends/friend?id=${user2.id}`);
+  await waitFor(A, 'friends-remove');
   await A.tap('friends-remove');
   await A.tap('confirm-yes');
   await A.page.waitForTimeout(1500);
   srv = await server();
   const between = (x) => [x.requester ?? x.from_user, x.addressee ?? x.to_user].sort().join() === [user.id, user2.id].sort().join();
-  check('removing a friend clears the friendship and cheers on the server', !srv.friendships.some(between) && !srv.cheers.some(between) && !(await A.has(`friends-card-${tid(user2.id)}`)));
+  check('removing a friend clears the friendship and cheers on the server', !srv.friendships.some(between) && !srv.cheers.some(between) && !(await A.has(`friends-person-${tid(user2.id)}`)));
   await D.go('/friends');
   await waitFor(D, 'friends-empty');
-  check('the other side no longer shows them either', (await D.has('friends-empty')) && !(await D.has(`friends-card-${tid(user.id)}`)));
+  check('the other side no longer shows them either', (await D.has('friends-empty')) && !(await D.has(`friends-person-${tid(user.id)}`)));
 
-  // Turning friends off removes the card.
+  // Turning friends off removes the card (Friends settings is a screen of its own, behind the header's one button).
   await D.tap('friends-settings-open');
+  await waitFor(D, 'friends-leave');
   await D.tap('friends-leave');
   await D.tap('confirm-yes');
   await D.page.waitForTimeout(1500);

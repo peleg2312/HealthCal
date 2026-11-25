@@ -87,6 +87,7 @@ export function PeopleRow({ people, newIds, onOpen, onAdd }: { people: { userId:
 /** One row for the cheers received: how many, and who cheered what; a tap opens the list. */
 export function CheersLine({ count, summary, onPress }: { count: number; summary: string; onPress: () => void }) {
   const { colors, spacing } = useTheme();
+  const large = useLargeText();
   return (
     <Card padding={0} testID="friends-cheers">
       <PressableScale
@@ -100,7 +101,7 @@ export function CheersLine({ count, summary, onPress }: { count: number; summary
           <Text variant="bodyStrong" style={{ fontFamily: fonts.semibold }}>
             {cheersTitle(count)}
           </Text>
-          <Text variant="caption" color="textSecondary" numberOfLines={2}>
+          <Text variant="caption" color="textSecondary" numberOfLines={large ? 5 : 2}>
             {summary}
           </Text>
         </View>
@@ -115,33 +116,35 @@ export function FeedWorkoutCard({ item, today, units, onCheer, testID }: { item:
   const { spacing } = useTheme();
   const large = useLargeText();
   const w = { id: item.ref, name: item.name, emoji: item.emoji, minutes: item.minutes, date: item.day, ...(item.distanceKm ? { distanceKm: item.distanceKm } : null) };
+  const cheer = <CheerButton testID={`${testID}-cheer`} cheered={item.cheered} label={`${withoutMarks(item.displayName)}'s ${item.name.toLowerCase()}`} onPress={onCheer} />;
   return (
     <Card padding={spacing.lg} testID={testID}>
-      <View style={{ flexDirection: large ? 'column' : 'row', alignItems: large ? 'stretch' : 'center', gap: spacing.sm }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: large ? undefined : 1, minWidth: 0 }}>
-          <PersonMark name={item.displayName} avatar={item.avatar} size={40} />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold }}>
+      {/* Cheer sits on the name's line, so the activity and its day take the card's whole width under it, and a
+          distance never parts from its activity on a 320 px phone. With large text Cheer takes a line of its own. */}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
+        <PersonMark name={item.displayName} avatar={item.avatar} size={40} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: large ? undefined : 36 }}>
+            <Text variant="bodyStrong" numberOfLines={2} style={{ fontFamily: fonts.semibold, flex: 1, minWidth: 0 }}>
               {isolateRtl(item.displayName)}
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}>
-              {item.emoji ? (
-                // A content mark: the activity's emoji, small and silent (its name follows in words).
-                <View {...DECORATIVE}>
-                  <Text style={{ fontSize: 15, lineHeight: 22 }}>{item.emoji}</Text>
-                </View>
-              ) : null}
-              <Text variant="body" style={{ flexShrink: 1 }}>
-                {workoutTitle(w, units)}
-              </Text>
-            </View>
-            <Text variant="caption" color="textSecondary">
-              {workoutMeta(w, today)}
+            {large ? null : cheer}
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4 }}>
+            {item.emoji ? (
+              // A content mark: the activity's emoji, small and silent (its name follows in words).
+              <View {...DECORATIVE}>
+                <Text style={{ fontSize: 15, lineHeight: 22 }}>{item.emoji}</Text>
+              </View>
+            ) : null}
+            <Text variant="body" style={{ flexShrink: 1 }}>
+              {workoutTitle(w, units)}
             </Text>
           </View>
-        </View>
-        <View style={{ alignSelf: large ? 'flex-end' : 'center' }}>
-          <CheerButton testID={`${testID}-cheer`} cheered={item.cheered} label={`${withoutMarks(item.displayName)}'s ${item.name.toLowerCase()}`} onPress={onCheer} />
+          <Text variant="caption" color="textSecondary">
+            {workoutMeta(w, today)}
+          </Text>
+          {large ? <View style={{ alignSelf: 'flex-end', marginTop: spacing.sm }}>{cheer}</View> : null}
         </View>
       </View>
     </Card>

@@ -220,3 +220,23 @@ export function useShowMealStep({ open, meal, date, entries, onClose }: { open: 
 
   return { title: showTitle(meal), subtitle: showLine(date, todayDate, built.length), body, footer };
 }
+
+/**
+ * The line a shown meal carries in the diary under its name ("Shown to Maya and Sam"), for the diary's meal
+ * card to place (`meal-shown-<meal>`). Nothing when the meal is not shown now or meals are not allowed.
+ */
+export function MealShownCaption({ meal, date }: { meal: MealType; date: ISODate }) {
+  const { colors } = useTheme();
+  const overview = useFriends((s) => s.overview);
+  const { me, myMeals } = mealsOverview(overview);
+  const shown = me?.mealsAllowed ? shownNow(myMeals, date, meal) : null;
+  if (!shown) return null;
+  return (
+    <View testID={`meal-shown-${meal}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      {decorative(<Users size={14} color={colors.textSecondary} strokeWidth={1.9} />)}
+      <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
+        {shownTo(shown.viewers.map((v) => v.displayName))}
+      </Text>
+    </View>
+  );
+}
