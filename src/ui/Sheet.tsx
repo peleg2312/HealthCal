@@ -10,7 +10,7 @@ import { MAX_CONTENT_WIDTH, motion, sheetShadow, useReducedMotion, useTheme } fr
 import { Button } from './Button';
 import { keyboardCover, revealDelta } from './keyboardInset';
 import { ease } from './motion';
-import { backClosesSheet, ownBacks } from './sheetHistory';
+import { backClosesSheet, heldWrites, OWN_BACK_MS, ownBacks } from './sheetHistory';
 import { Text } from './Text';
 import { ToastHost } from './Toast';
 import { ToastScope } from './toastControls';
@@ -64,42 +64,70 @@ const appBacks = ownBacks();
 /** The popstate events that were the app's own steps back (marked by the first listener, before any sheet's). */
 const ownPops = new WeakSet<Event>();
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+/** History writes made while the app's own step back is on its way: they run once it has come (`heldWrites`). */
+const held = heldWrites();
+let heldTimer: ReturnType<typeof setTimeout> | undefined;
+function releaseHeld() {
+  clearTimeout(heldTimer);
+  held.release();
+}
+function hold(write: () => void) {
+  if (held.write(write, appBacks.pending(now()))) return;
+  // Should the step's popstate never come, the writes run once the step is forgotten.
+  clearTimeout(heldTimer);
+  heldTimer = setTimeout(releaseHeld, OWN_BACK_MS + 10);
+}
 /** A closed sheet takes its entry off: one history.back(), noted as the app's own. */
 function ownBack() {
   appBacks.made(now());
   window.history.back();
 }
 /**
- * Web, once: the router's own history moves step over an entry a closed sheet left on top. A screen the
- * sheet opened takes that entry's place (pushState becomes replaceState), and a step back from it counts
- * the entry too (go(-1) becomes go(-2)). Without this, a sheet closed in the same tap that navigates (a
- * row that opens a screen, Delete that goes back) leaves the address and the screen out of step, because
- * the sheet's own clean-up (one history.back()) cannot run before the router's move.
+ * Web, once, as this file loads (before the router listens to the history): the browser history and the
+ * steps back closing sheets make are kept in step with the router's own moves.
+ * - The app's own step back is heard by no one else: its popstate is stopped where it arrives (a capture
+ *   listener on the window, which runs before every other). The router would take it for the person's
+ *   Back and undo a move the same tap began: the + sheet's "Search food" closed the sheet and left Today
+ *   on screen, at random, whenever the router's move to search was still under way when the step landed.
+ * - The router's writes made while such a step is on its way wait for it, then run in order on the entry it
+ *   lands on (`heldWrites`), so a new screen never lands on the entry the step is taking away.
+ * - The router's moves step over an entry a closed sheet left on top. A screen the sheet opened takes that
+ *   entry's place (pushState becomes replaceState), and a step back from it counts the entry too (go(-1)
+ *   becomes go(-2)): a sheet closed in the same tap that navigates (a row that opens a screen, Delete that
+ *   goes back) may have no time to take its entry off before the router moves.
  */
 function patchHistory() {
   if (historyPatched || typeof window === 'undefined') return;
   historyPatched = true;
-  // Added before any sheet's own listener, so it marks the app's own step before a sheet reads it.
-  window.addEventListener('popstate', (e) => {
-    if (appBacks.arrived(now())) ownPops.add(e);
-  });
+  window.addEventListener(
+    'popstate',
+    (e) => {
+      if (!appBacks.arrived(now())) return;
+      ownPops.add(e);
+      e.stopImmediatePropagation();
+      if (!appBacks.pending(now())) releaseHeld();
+    },
+    true,
+  );
   const h = window.history;
   const push = h.pushState.bind(h);
-  const go = h.go.bind(h);
-  h.pushState = (state: unknown, unused: string, url?: string | URL | null) => {
-    const ours = !!state && typeof state === 'object' && SHEET_ENTRY in (state as object);
-    if (!ours && onLeftEntry()) return h.replaceState(state, unused, url);
-    return push(state, unused, url);
-  };
-  h.go = (delta?: number) => go(delta && delta < 0 && onLeftEntry() ? delta - 1 : delta);
   const replace = h.replaceState.bind(h);
+  const go = h.go.bind(h);
+  const isOurs = (state: unknown) => !!state && typeof state === 'object' && SHEET_ENTRY in (state as object);
+  h.pushState = (state: unknown, unused: string, url?: string | URL | null) =>
+    hold(() => {
+      if (!isOurs(state) && onLeftEntry()) replace(state, unused, url);
+      else push(state, unused, url);
+    });
+  h.go = (delta?: number) => hold(() => go(delta && delta < 0 && onLeftEntry() ? delta - 1 : delta));
   // Replacing a closed sheet's entry leaves the entry under it as it was: noted, so it is not taken off.
-  h.replaceState = (state: unknown, unused: string, url?: string | URL | null) => {
-    const ours = !!state && typeof state === 'object' && SHEET_ENTRY in (state as object);
-    if (!ours) onLeftEntry();
-    return replace(state, unused, url);
-  };
+  h.replaceState = (state: unknown, unused: string, url?: string | URL | null) =>
+    hold(() => {
+      if (!isOurs(state)) onLeftEntry();
+      replace(state, unused, url);
+    });
 }
+if (Platform.OS === 'web') patchHistory();
 
 /**
  * Web: the browser's back closes an open sheet first, as Android's back does (Modal's onRequestClose).

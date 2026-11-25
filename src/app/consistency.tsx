@@ -5,6 +5,7 @@ import { useWindowDimensions, View } from 'react-native';
 import { formatDayLabel, formatShortDate, startOfWeek } from '@/lib/dates';
 import { formatNumber } from '@/lib/units';
 import { RHYTHM_KINDS, monthGrid, monthLabel, monthOf, monthTally, rhythmWeeks, shiftMonth, weeksOnRhythm, type CalendarCell, type RhythmKind } from '@/features/progress/consistency';
+import { budgetSharePct } from '@/features/progress/budgetShare';
 import { solidBar } from '@/features/progress/calorieBars';
 import { spokenUnits } from '@/features/progress/chartWords';
 import { go } from '@/features/progress/parts';
@@ -41,10 +42,10 @@ const PARTIAL = 0.45;
 
 /** What a day of the calendar says, in words, for a screen reader. */
 function cellLabel(cell: CalendarCell): string {
-  // Above the budget says by how much (the amber lip), never a rounded share that could read as on it. A share
-  // is rounded as the morning page and the recap round it, so one day reads one figure everywhere.
+  // Above the budget says by how much (the amber lip), never a rounded share that could read as on it. A share is
+  // the check-in's (`budgetSharePct`), so one day reads one figure on both, and 90% only on a day on budget.
   const above = Math.round(cell.kcal - cell.budget);
-  const share = cell.ratio > 1 ? `${formatNumber(Math.max(1, above))} kcal above the budget` : `${Math.round(cell.ratio * 100)}% of the budget`;
+  const share = cell.ratio > 1 ? `${formatNumber(Math.max(1, above))} kcal above the budget` : `${budgetSharePct(cell.kcal, cell.budget) ?? 0}% of the budget`;
   const food = cell.future ? 'upcoming' : !cell.logged ? 'not logged' : cell.isToday ? `${share} so far` : cell.partial ? `partly logged, ${share}` : `${share}${cell.onBudget ? ', on budget' : ''}`;
   return spokenUnits([formatDayLabel(cell.date), food, cell.waterMet ? 'water goal met' : '', cell.trained ? 'workout logged' : ''].filter(Boolean).join(', '));
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { backClosesSheet, OWN_BACK_MS, ownBacks } from './sheetHistory';
+import { backClosesSheet, heldWrites, OWN_BACK_MS, ownBacks } from './sheetHistory';
 
 describe('ownBacks (the app\'s own steps back)', () => {
   it('a step back is pending until its popstate arrives, and that popstate is counted once', () => {
@@ -118,5 +118,66 @@ describe('one tap closes sheet A and opens sheet B', () => {
     expect(run.b.pushed).toBe(true);
     run.back(3000);
     expect(run.b.open).toBe(false);
+  });
+});
+
+describe('heldWrites (history writes wait for the app\'s own step back)', () => {
+  it('runs a write at once when no step back is on its way', () => {
+    const held = heldWrites();
+    const done: string[] = [];
+    expect(held.write(() => done.push('push /food/search'), false)).toBe(true);
+    expect(done).toEqual(['push /food/search']);
+    expect(held.waiting()).toBe(0);
+  });
+  it('holds writes while a step is on its way, then runs them in their order', () => {
+    const held = heldWrites();
+    const done: string[] = [];
+    expect(held.write(() => done.push('push'), true)).toBe(false);
+    // Made after the step has come but before the first ran: it waits behind it, so the order is kept.
+    expect(held.write(() => done.push('replace'), false)).toBe(false);
+    expect(done).toEqual([]);
+    expect(held.waiting()).toBe(2);
+    held.release();
+    expect(done).toEqual(['push', 'replace']);
+    expect(held.waiting()).toBe(0);
+    expect(held.write(() => done.push('go'), false)).toBe(true);
+    expect(done).toEqual(['push', 'replace', 'go']);
+  });
+});
+
+/**
+ * The tap on a sheet's row that opens a screen (the + sheet's "Search food"): the sheet's clean-up steps back
+ * from its entry, and the router's move to the new screen comes some time after it, before or after the
+ * step's popstate. The router never hears the step (Sheet.tsx stops it before anyone else does), and its move
+ * waits while the step is on its way, so the screen's entry always lands on top of the screen it left.
+ */
+describe("a sheet's row that opens a screen", () => {
+  function play(moveAt: number, popAt: number) {
+    const backs = ownBacks();
+    const held = heldWrites();
+    // The screen's entry and the sheet's (on the same address), which is current.
+    const entries = ['/', '/ sheet'];
+    let at = 1;
+    let routerHeard = 0;
+    backs.made(0);
+    for (let t = 0; t <= 1200; t++) {
+      if (t === moveAt) held.write(() => {
+        entries.splice(at + 1, entries.length, '/food/search');
+        at += 1;
+      }, backs.pending(t));
+      if (t === popAt) {
+        at -= 1;
+        if (!backs.arrived(t)) routerHeard += 1;
+        if (!backs.pending(t)) held.release();
+      }
+    }
+    return { entries: entries.slice(0, at + 1), routerHeard };
+  }
+  it('the new screen lands on top of the one the sheet was over, whenever the move comes', () => {
+    for (const [moveAt, popAt] of [[60, 5], [60, 59], [1, 5], [5, 300], [200, 900]]) {
+      const run = play(moveAt, popAt);
+      expect(run.entries).toEqual(['/', '/food/search']);
+      expect(run.routerHeard).toBe(0);
+    }
   });
 });

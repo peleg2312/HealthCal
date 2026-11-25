@@ -11,6 +11,8 @@ import { budgetMark, isCompleteDay, type InsightDay } from '@/lib/insights';
 import { formatNumber } from '@/lib/units';
 import type { ISODate } from '@/types';
 
+import { budgetSharePct } from './budgetShare';
+
 export interface RecapDayCup {
   date: ISODate;
   /** eaten / that day's own budget. */
@@ -66,9 +68,9 @@ function standing(kcal: number, budget: number, over: boolean, check: boolean): 
     const above = Math.max(1, Math.round(kcal - budget));
     return `${formatNumber(above)} kcal above that day’s budget`;
   }
-  // Under the budget the share is floored, so 99.6% never reads as 100%.
-  const pct = Math.floor((kcal / budget) * 100);
-  return `${pct}% of that day’s budget${check ? ', on budget' : ''}`;
+  // The one share every screen says for a day (`budgetSharePct`): floored, and in step with `budgetMark`, so 99.6%
+  // never reads as 100% and 89.6% never as 90%.
+  return `${budgetSharePct(kcal, budget)}% of that day’s budget${check ? ', on budget' : ''}`;
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => (n === 1 ? one : many);

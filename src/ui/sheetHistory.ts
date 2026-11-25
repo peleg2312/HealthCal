@@ -4,7 +4,8 @@
  *
  * A sheet adds an entry for the same address a beat after it opens, so the browser's Back closes it.
  * A sheet closed any other way takes its entry off again with one history.back(): the app's own step,
- * whose popstate reaches every listener a few milliseconds later. When one tap closes sheet A and opens
+ * whose popstate comes a few milliseconds later and is stopped before the router or any sheet hears it
+ * (Sheet.tsx). When one tap closes sheet A and opens
  * sheet B (a sheet's row that opens a confirmation), that popstate arrives while B is open: B must not
  * take it for the person's Back, and B must not add its entry before A's is off, or A's step back would
  * take B's entry instead.
@@ -52,4 +53,37 @@ export function ownBacks(forgetAfter = OWN_BACK_MS): OwnBacks {
 export function backClosesSheet(p: { own: boolean; pushed: boolean; closing: boolean; at: unknown; token: number }): boolean {
   if (p.own || !p.pushed || p.closing) return false;
   return !(typeof p.at === 'number' && p.at >= p.token);
+}
+
+/**
+ * History writes (the router's moves, a sheet's own entry) made while a step back of the app's own is on its way.
+ * Written at once, a move would land on the entry the step is leaving and the step would then take it away (the
+ * address and the screen out of step). So they wait, and run in the order they were made once the step's popstate
+ * has come (or the step is forgotten). A write made while others wait waits too, so the order is kept.
+ */
+export interface HeldWrites {
+  /** Runs `run` now, unless a step back is on its way (`busy`) or earlier writes still wait. Returns whether it ran. */
+  write(run: () => void, busy: boolean): boolean;
+  /** The step back has come: runs every waiting write, in order. */
+  release(): void;
+  /** How many writes wait. */
+  waiting(): number;
+}
+
+export function heldWrites(): HeldWrites {
+  const queue: (() => void)[] = [];
+  return {
+    write: (run, busy) => {
+      if (busy || queue.length) {
+        queue.push(run);
+        return false;
+      }
+      run();
+      return true;
+    },
+    release: () => {
+      while (queue.length) queue.shift()!();
+    },
+    waiting: () => queue.length,
+  };
 }

@@ -6,8 +6,8 @@ import { View } from 'react-native';
 import { formatDayLabel, fromISODate, weekdayShort } from '@/lib/dates';
 import { deleteSleep, saveSleep } from '@/features/trackers/actions';
 import { dayTitle, resolveDateParam } from '@/features/trackers/dateParam';
-import { DayStepper, Explain, ExplainText, Figure, HistoryRow, RequireProfile } from '@/features/trackers/components';
-import { findByDate, formatHours, hoursFigure, QUALITY_LABELS, SLEEP_RANGE, sleepSummary } from '@/features/trackers/helpers';
+import { DayStepper, Explain, ExplainText, Figure, HistoryRow, RequireProfile, spokenFigure } from '@/features/trackers/components';
+import { findByDate, formatHours, hoursFigure, hoursSpoken, QUALITY_LABELS, SLEEP_RANGE, sleepSummary } from '@/features/trackers/helpers';
 import { sleepChartLabel } from '@/features/progress/chartWords';
 import { sleepFromLine, stagesLine } from '@/features/trackers/sleepSource';
 import { useToday } from '@/store/clock';
@@ -50,9 +50,12 @@ function SyncedNight({ night }: { night: SleepEntry }) {
         {from}
       </Text>
       {stages ? (
-        <Text variant="caption" color="textSecondary" testID="sleep-last-night-stages">
-          {stages}
-        </Text>
+        // One element, its units in full ("Deep 1 hour 10 minutes"), as the figures above it.
+        <View {...spokenFigure(stages)}>
+          <Text variant="caption" color="textSecondary" testID="sleep-last-night-stages">
+            {stages}
+          </Text>
+        </View>
       ) : null}
       <Text variant="caption" color="textSecondary">
         Time awake and time in bed are not counted as sleep.
@@ -66,7 +69,8 @@ function HoursBig({ hours, testID }: { hours: number; testID?: string }) {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   return (
-    <View testID={testID} style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+    // One element to a screen reader, its units in full ("7 hours 15 minutes"), never "7 h 15 min".
+    <View testID={testID} {...spokenFigure(hoursSpoken(hours))} style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
       <Text variant="numXL" tabular>
         {h}
       </Text>
@@ -116,6 +120,13 @@ function SleepScreen() {
     value: d.hours,
     color: colors.sleep,
   }));
+
+  // Under the chart: what the shading is, then what is missing and the average rating, each a sentence of its own.
+  const chartNote = [
+    'Shaded: 7 to 9 hours.',
+    summary.nights < days ? `${days - summary.nights} of ${days} nights not logged.` : null,
+    summary.avgQuality !== null ? `Average quality ${QUALITY_LABELS[Math.round(summary.avgQuality) as SleepQuality].toLowerCase()}.` : null,
+  ].filter((x): x is string => !!x);
 
   const footer = <Button testID="sleep-log" title={lastNight ? (isToday ? 'Log sleep' : 'Edit this night') : isToday ? 'Log last night' : 'Log this night'} icon={<Plus size={20} color={colors.onPrimary} />} onPress={() => setSheetDate(end)} />;
 
@@ -172,7 +183,14 @@ function SleepScreen() {
             {/* Three in a row; on a narrow phone the third goes under the first, so "6 h 56 min" keeps its unit beside it. */}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: spacing.md }}>
               <Figure basis={92} testID="sleep-average" value={summary.avgHours !== null ? hm(summary.avgHours).value : '–'} unit={summary.avgHours !== null ? hm(summary.avgHours).unit : undefined} label="Average a night" />
-              <Figure basis={92} testID="sleep-in-range" value={`${summary.inRange}/${summary.nights}`} unit="nights" label="Within 7–9 h" />
+              <Figure
+                basis={92}
+                testID="sleep-in-range"
+                value={`${summary.inRange}/${summary.nights}`}
+                unit="nights"
+                label="Within 7–9 h"
+                spoken={`${summary.inRange} of ${summary.nights} ${summary.nights === 1 ? 'night' : 'nights'} within 7 to 9 hours`}
+              />
               <Figure
                 basis={92}
                 value={summary.spreadHours !== null ? (summary.spreadHours < 1 ? `±${Math.round(summary.spreadHours * 60)}` : `±${hm(summary.spreadHours).value}`) : '–'}
@@ -188,14 +206,9 @@ function SleepScreen() {
               height={160}
               formatValue={(n) => `${n.toFixed(1)}`}
             />
-            <Text variant="caption" color="textSecondary" testID="sleep-chart-note">
-              {[
-                'Shaded: 7 to 9 h.',
-                summary.nights < days ? `${days - summary.nights} of ${days} nights not logged.` : null,
-                summary.avgQuality !== null ? `Average quality ${QUALITY_LABELS[Math.round(summary.avgQuality) as SleepQuality].toLowerCase()}.` : null,
-              ]
-                .filter(Boolean)
-                .join(' ')}
+            {/* The unit in words ("7 to 9 hours"); a note of more than one sentence is reading text, at the body size. */}
+            <Text variant={chartNote.length > 1 ? 'body' : 'caption'} color="textSecondary" testID="sleep-chart-note">
+              {chartNote.join(' ')}
             </Text>
             <Explain label="Why 7 to 9 hours" testID="sleep-help" style={{ marginTop: -spacing.xs, marginBottom: -spacing.sm }}>
               <ExplainText>
@@ -288,7 +301,8 @@ function SleepSheet({ date, onDate, onClose, entries }: { date: ISODate | null; 
         </View>
       }>
       {existing && from ? (
-        <Text variant="caption" color="textSecondary" testID="sleep-sheet-from">
+        // Two sentences: reading text, at the body size.
+        <Text variant="body" color="textSecondary" testID="sleep-sheet-from">
           {`${from}. A rating keeps it synced; a new time makes it yours.`}
         </Text>
       ) : null}

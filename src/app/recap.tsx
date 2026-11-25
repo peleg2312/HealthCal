@@ -214,7 +214,8 @@ export default function RecapScreen() {
                   <Text variant="title" testID="recap-days-verdict">
                     {verdict.line}
                   </Text>
-                  <Text variant="caption" color="textSecondary" testID="recap-days-note">
+                  {/* Two sentences (what the headline counts, then the week's balance): reading text, at the body size. */}
+                  <Text variant="body" color="textSecondary" testID="recap-days-note">
                     {[verdict.note, budgetBalanceText(r.budgetBalance)].filter(Boolean).join('. ')}
                   </Text>
                 </View>
@@ -291,7 +292,8 @@ export default function RecapScreen() {
                   </Text>
                 </View>
               </View>
-              <Text variant="caption" color="textSecondary">
+              {/* Why the target moved, in a sentence or two: reading text, at the body size. */}
+              <Text variant="body" color="textSecondary" testID="recap-plan-reason">
                 {d.plan.reason}
               </Text>
             </Card>
