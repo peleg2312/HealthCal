@@ -9,6 +9,9 @@
  *   added to the budget as `headroom`, and `workout` when anything was logged under Train.
  * - The picture is left out (`show` false) when only Today would be drawn (yesterday is before
  *   setup) or when no drawn day before today has food: seven blank cups say nothing.
+ * - A quiet day the logging streak kept (`keptDays`, @/features/streak/kept: the one rule, as
+ *   Today's week strip draws it) is marked `kept` by `withKept`, so it reads as kept, never as a
+ *   break: WeekCups draws the strip's dashed kept line across its cup and weekLabel says it.
  */
 import { addDays } from '@/lib/dates';
 import type { ISODate } from '@/types';
@@ -40,6 +43,8 @@ export interface WeekCell {
   over: boolean;
   approx: boolean;
   workout: boolean;
+  /** A quiet day the streak kept (`withKept`): drawn with the dashed kept line, never as a break. */
+  kept: boolean;
 }
 
 export interface WeekCells {
@@ -67,6 +72,7 @@ function cell(d: WeekDayIn): WeekCell {
     over: d.foodLogged && d.complete && d.budget > 0 && d.kcal > d.budget,
     approx: d.foodLogged && d.approx,
     workout: d.workout,
+    kept: false,
   };
 }
 
@@ -90,4 +96,18 @@ export function weekCells({ days, todayDay, setupDay, yesterday, today }: { days
   const before = y ? drawn.slice(0, -1) : drawn;
   const show = y !== null && drawn.some((c) => c.foodLogged);
   return { before, yesterday: y, today: t, show, anyWorkout: show && (drawn.some((c) => c.workout) || t.workout) };
+}
+
+/**
+ * The cells with the streak's kept days marked (`kept`: the days `keptDays` returns, from the food
+ * logged on the phone). Only a drawn day before today with no food can be kept, as the rule says:
+ * today is never one, and a day the cells read as logged is left as it is. `anyKept` is whether the
+ * picture's legend names the kept line.
+ */
+export function withKept(cells: WeekCells, kept: ReadonlySet<ISODate>): WeekCells & { anyKept: boolean } {
+  const mark = (c: WeekCell): WeekCell => (c.date < cells.today.date && !c.foodLogged && kept.has(c.date) ? { ...c, kept: true } : c);
+  const before = cells.before.map(mark);
+  const yesterday = cells.yesterday ? mark(cells.yesterday) : null;
+  const anyKept = cells.show && (before.some((c) => c.kept) || !!yesterday?.kept);
+  return { ...cells, before, yesterday, anyKept };
 }

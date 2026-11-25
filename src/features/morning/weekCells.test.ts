@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import { addDays } from '@/lib/dates';
 
-import { weekCells, type WeekDayIn } from './weekCells';
+import { keptDays } from '@/features/streak/kept';
+
+import { weekCells, withKept, type WeekDayIn } from './weekCells';
 
 const today = '2026-11-19';
 const yesterday = '2026-11-18';
@@ -86,5 +88,55 @@ describe('weekCells', () => {
   it('counts a workout logged today in the legend', () => {
     const w = weekCells({ days: week, todayDay: day(today, { kcal: 0, foodLogged: false, complete: false, workout: true }), setupDay: null, yesterday, today });
     expect(w.anyWorkout).toBe(true);
+  });
+
+  it('starts every cell unkept', () => {
+    const w = weekCells({ days: week, todayDay: null, setupDay: null, yesterday, today });
+    expect([...w.before, w.yesterday!, w.today].every((c) => c.kept === false)).toBe(true);
+  });
+});
+
+describe('withKept', () => {
+  /** The days with food, as the phone's entries give them to `keptDays`. */
+  const loggedOf = (days: WeekDayIn[]) => new Set(days.filter((d) => d.foodLogged).map((d) => d.date));
+  const quiet = (d: WeekDayIn) => ({ ...d, kcal: 0, foodLogged: false, complete: false });
+
+  it('marks a quiet day between logged days as kept, as the week strip draws it', () => {
+    const days = week.map((d) => (d.date === '2026-11-15' ? quiet(d) : d));
+    const w = withKept(weekCells({ days, todayDay: null, setupDay: null, yesterday, today }), keptDays(loggedOf(days), today));
+    expect(w.before.filter((c) => c.kept).map((c) => c.date)).toEqual(['2026-11-15']);
+    expect(w.yesterday?.kept).toBe(false);
+    expect(w.anyKept).toBe(true);
+  });
+
+  it('marks yesterday kept while today is still open in a run of two logged days or more', () => {
+    const days = week.map((d) => (d.date === yesterday ? quiet(d) : d));
+    const w = withKept(weekCells({ days, todayDay: null, setupDay: null, yesterday, today }), keptDays(loggedOf(days), today));
+    expect(w.yesterday?.kept).toBe(true);
+    expect(w.before.some((c) => c.kept)).toBe(false);
+    expect(w.anyKept).toBe(true);
+  });
+
+  it('never marks two quiet days in a row, which end the streak', () => {
+    const days = week.map((d) => (d.date === '2026-11-14' || d.date === '2026-11-15' ? quiet(d) : d));
+    const w = withKept(weekCells({ days, todayDay: null, setupDay: null, yesterday, today }), keptDays(loggedOf(days), today));
+    expect([...w.before, w.yesterday!].some((c) => c.kept)).toBe(false);
+    expect(w.anyKept).toBe(false);
+  });
+
+  it('marks only a drawn day before today with no food', () => {
+    const w0 = weekCells({ days: week, todayDay: null, setupDay: null, yesterday, today });
+    // A set that names a logged day and today (never the rule's answer) changes nothing.
+    const w = withKept(w0, new Set(['2026-11-15', today]));
+    expect([...w.before, w.yesterday!, w.today].some((c) => c.kept)).toBe(false);
+    expect(w.anyKept).toBe(false);
+  });
+
+  it('names no kept day while the picture is left out', () => {
+    const none = week.map(quiet);
+    const w0 = weekCells({ days: none, todayDay: null, setupDay: null, yesterday, today });
+    const w = withKept(w0, new Set(['2026-11-15']));
+    expect(w.show).toBe(false);
+    expect(w.anyKept).toBe(false);
   });
 });

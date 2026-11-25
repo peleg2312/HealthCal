@@ -3,11 +3,13 @@ import React, { useEffect, useId, useState } from 'react';
 import { Platform, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { SourceMark, sourceMarkTop } from '@/features/ai/mark';
+import { cellsFit, ownCellsFit } from '@/features/layout/grownFit';
+import { MeasureWidth, SizeProbe, useMeasureKey } from '@/features/today/MeasureWidth';
 import { useToday } from '@/store/clock';
 import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { addDays } from '@/lib/dates';
 import { MEALS } from '@/lib/nutrition';
-import { cup, fonts, useLargeText, useTheme } from '@/theme';
+import { cup, fonts, useTextGrowth, useTheme, useVeryLargeText } from '@/theme';
 import type { Food, ISODate, MealType } from '@/types';
 import { CupKey, IconButton, PressableScale, Text } from '@/ui';
 import { rovingIndex } from '@/ui/controlRules';
@@ -87,6 +89,9 @@ export function KcalTrail({ value, range, approx, testID }: { value: number; ran
   );
 }
 
+/** The meal choice's least room each side of a word with text grown, so two words are 8 px apart at least. */
+const FIT_CELL_PAD = 4;
+
 /** A flex cell's floor on the web: its content's width (react-native-web sets 0). Yoga has no 'auto' minimum. */
 const WEB_CELL = (Platform.OS === 'web' ? { minWidth: 'auto' } : null) as ViewStyle | null;
 
@@ -100,8 +105,23 @@ export function MealPicker({ value, onChange, testIDPrefix = 'meal', advice }: {
   const { colors, spacing } = useTheme();
   // Four equal cells leave about 60 px each on a 320 px phone: 'Breakfast' fits there one size down.
   const narrow = useWindowDimensions().width < 340;
-  // With large text the four take two lines of two, so no word reaches past the screen (never smaller text).
-  const big = useLargeText();
+  // With very large text the four take two lines of two, so no word reaches past the screen (never smaller text).
+  // Through the common steps (text grown in size, under VERY_LARGE_TEXT) they keep one line while their words fit,
+  // measured as drawn in bold (the chosen one's weight), 8 px apart at least (the room two texts keep): in four equal
+  // cells while the widest fits a quarter of the row with 4 px each side (`cellsFit`), else each cell as wide as its
+  // word with 4 px each side and the rest shared out (`ownCellsFit`, as a cell on the web never shrinks below its word
+  // at the designed size), and two lines of two only where even that does not fit. At the designed size nothing is
+  // measured.
+  const veryLarge = useVeryLargeText();
+  const fit = useTextGrowth() > 1 && !veryLarge;
+  const measureKey = useMeasureKey();
+  const [rowW, setRowW] = useState(0);
+  const [wordW, setWordW] = useState(0);
+  const [wordsW, setWordsW] = useState(0);
+  const cellPad = narrow ? 0 : 2;
+  const wordStyle = { fontSize: narrow ? 13 : 14.5, lineHeight: 20 };
+  const equalCells = !fit || cellsFit(wordW, MEALS.length, rowW, 0, 2 * FIT_CELL_PAD) !== false;
+  const big = veryLarge || (!equalCells && ownCellsFit(wordsW, MEALS.length, rowW) === false);
   const web = Platform.OS === 'web';
   const adviceId = `${testIDPrefix}-advice-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const group = (
@@ -143,14 +163,47 @@ export function MealPicker({ value, onChange, testIDPrefix = 'meal', advice }: {
               : null)}
             // On the web a cell never shrinks below its word, so wider letter spacing (WCAG 1.4.12) widens
             // "Breakfast" at its neighbours' expense instead of cutting it; natively the word stays one line.
-            style={[big ? { width: '50%', minHeight: 44, alignItems: 'center', justifyContent: 'center' } : [{ flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: narrow ? 0 : 2 }, WEB_CELL]]}>
-            <Text variant="label" color={active ? 'text' : 'textSecondary'} numberOfLines={Platform.OS === 'web' ? undefined : 1} style={{ fontSize: narrow ? 13 : 14.5, lineHeight: 20, fontFamily: active ? fonts.bold : fonts.semibold }}>
+            style={[
+              big
+                ? { width: '50%', minHeight: 44, alignItems: 'center', justifyContent: 'center' }
+                : [
+                    equalCells ? { flex: 1 } : { flexGrow: 1, flexShrink: 0, flexBasis: 'auto' },
+                    { minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: equalCells ? cellPad : FIT_CELL_PAD },
+                    WEB_CELL,
+                  ],
+            ]}>
+            <Text variant="label" color={active ? 'text' : 'textSecondary'} numberOfLines={Platform.OS === 'web' ? undefined : 1} style={{ ...wordStyle, fontFamily: active ? fonts.bold : fonts.semibold }}>
               {m.label}
             </Text>
             {active ? <View pointerEvents="none" style={{ position: 'absolute', left: '18%', right: '18%', bottom: -2, height: 3, borderRadius: 1, backgroundColor: colors.rim }} /> : null}
           </PressableScale>
         );
       })}
+      {/* After the four meals, so the arrow keys' sibling order is unchanged; unseen, and only while measuring. */}
+      {fit ? <SizeProbe key={`${measureKey}-row`} onSize={(w) => setRowW(Math.floor(w))} /> : null}
+      {fit ? (
+        <MeasureWidth key={`${measureKey}-words`} onWidth={setWordW}>
+          <View style={{ alignItems: 'flex-start' }}>
+            {MEALS.map((m) => (
+              <Text key={m.id} variant="label" style={{ ...wordStyle, fontFamily: fonts.bold }}>
+                {m.label}
+              </Text>
+            ))}
+          </View>
+        </MeasureWidth>
+      ) : null}
+      {fit ? (
+        // The four cells each as wide as its word with its padding, side by side: their width together.
+        <MeasureWidth key={`${measureKey}-cells`} onWidth={setWordsW}>
+          {MEALS.map((m) => (
+            <View key={m.id} style={{ paddingHorizontal: FIT_CELL_PAD }}>
+              <Text variant="label" style={{ ...wordStyle, fontFamily: fonts.bold }}>
+                {m.label}
+              </Text>
+            </View>
+          ))}
+        </MeasureWidth>
+      ) : null}
     </View>
   );
   if (!advice) return group;
@@ -405,23 +458,37 @@ function AmountStepper({ amount, name, testID }: { amount: RowAmount; name: stri
 }
 
 /** Small labelled number used in macro rows: a cup key, the label, then "32 / 150 g". */
-export function MacroStat({ label, value, target, color }: { label: string; value: number; target?: number; color: string }) {
-  // With large text a parent row that wraps gives each figure at least 120 px, so "Protein" is never cut.
-  const big = useLargeText();
+export function MacroStat({ label, value, target, color, wrap }: { label: string; value: number; target?: number; color: string; wrap: boolean }) {
+  // `wrap` (very large text, or a row whose words as drawn do not fit a third each): a parent row that wraps gives
+  // each figure at least 120 px, so "Protein" is never cut.
   return (
-    <View style={[big ? { flexGrow: 1, flexBasis: 120 } : { flex: 1 }, { minWidth: 0, gap: 4 }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <CupKey color={color} />
-        <Text variant="label" numberOfLines={1} style={{ flexShrink: 1 }}>
-          {label}
-        </Text>
-      </View>
-      <Text variant="numM" tabular numberOfLines={1} style={{ fontSize: 17, lineHeight: 22 }}>
-        {Math.round(value)}
-        <Text variant="caption" color="textSecondary">
-          {target !== undefined ? ` / ${Math.round(target)} g` : ' g'}
-        </Text>
+    <View style={[wrap ? { flexGrow: 1, flexBasis: 120 } : { flex: 1 }, { minWidth: 0, gap: 4 }]}>
+      <MacroStatName label={label} color={color} />
+      <MacroStatAmount value={value} target={target} />
+    </View>
+  );
+}
+
+/** A macro's key and name as `MacroStat` draws them (also drawn unseen, to measure them). */
+export function MacroStatName({ label, color }: { label: string; color: string }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <CupKey color={color} />
+      <Text variant="label" numberOfLines={1} style={{ flexShrink: 1 }}>
+        {label}
       </Text>
     </View>
+  );
+}
+
+/** A macro's grams as `MacroStat` draws them (also drawn unseen, to measure them). */
+export function MacroStatAmount({ value, target }: { value: number; target?: number }) {
+  return (
+    <Text variant="numM" tabular numberOfLines={1} style={{ fontSize: 17, lineHeight: 22 }}>
+      {Math.round(value)}
+      <Text variant="caption" color="textSecondary">
+        {target !== undefined ? ` / ${Math.round(target)} g` : ' g'}
+      </Text>
+    </Text>
   );
 }

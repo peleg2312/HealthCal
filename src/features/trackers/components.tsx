@@ -251,14 +251,16 @@ export function HistoryItem({ children }: { children: React.ReactNode }) {
  * A history row of Weight and Sleep: the kit's `ListRow` as drawn (the day, its line, the value at the end and a
  * chevron), with its units spoken in full ("78.8 kilograms", "6 hours 15 minutes") and, above 115% text, the value
  * on a line of its own under the day and the line unclamped, so the day and its words keep the row's whole width
- * and no word is split.
+ * and no word is split. `valueBeside`, when given, decides where the value goes instead (Weight measures its rows'
+ * words as drawn: beside while they fit, with large text too); the lines stay unclamped with large text either way.
  */
-export function HistoryRow({ testID, title, subtitle, value, onPress }: { testID: string; title: string; subtitle?: string; value: string; onPress: () => void }) {
+export function HistoryRow({ testID, title, subtitle, value, onPress, valueBeside }: { testID: string; title: string; subtitle?: string; value: string; onPress: () => void; valueBeside?: boolean }) {
   const { colors, spacing } = useTheme();
   const big = useLargeText();
+  const under = valueBeside === undefined ? big : !valueBeside;
   // Named by what it shows, in the order drawn (the value under the title with large text), units as drawn (WCAG
   // 2.5.3, label in name): "Today, −0.1 kg vs previous · 18% body fat, 78.8 kg".
-  const said = (big ? [title, value, subtitle] : [title, subtitle, value]).filter(Boolean).map((p) => p!.replace(/\u00A0/g, ' ')).join(', ');
+  const said = (under ? [title, value, subtitle] : [title, subtitle, value]).filter(Boolean).map((p) => p!.replace(/\u00A0/g, ' ')).join(', ');
   return (
     <PressableScale
       testID={testID}
@@ -271,7 +273,7 @@ export function HistoryRow({ testID, title, subtitle, value, onPress }: { testID
         <Text variant="bodyStrong" numberOfLines={big ? undefined : 2} style={{ fontFamily: fonts.semibold }}>
           {title}
         </Text>
-        {big ? (
+        {under ? (
           <Text variant="label" color="text">
             {value}
           </Text>
@@ -282,7 +284,7 @@ export function HistoryRow({ testID, title, subtitle, value, onPress }: { testID
           </Text>
         ) : null}
       </View>
-      {big ? null : (
+      {under ? null : (
         <Text variant="label" color="textSecondary" numberOfLines={1}>
           {value}
         </Text>

@@ -8,7 +8,7 @@ import { detailDrinkNote, pairEditProblem, waterFor, waterPointingAt, type PairE
 import { updateEntryDirect } from '@/features/food/actions';
 import { AmountEditor } from '@/features/food/AmountEditor';
 import { UNKNOWN_AI_CONFIDENCE, bandSpread, estimateRange, scaleRange, spreadRange } from '@/features/food/build';
-import { DayStepper, KcalValue, MacroStat, MealPicker, SourceBadge } from '@/features/food/components';
+import { DayStepper, KcalValue, MacroStat, MacroStatAmount, MacroStatName, MealPicker, SourceBadge } from '@/features/food/components';
 import { displayFoodName } from '@/features/food/displayName';
 import { useFoodDraft } from '@/features/food/draft';
 import { FavoriteStar } from '@/features/food/FavoriteStar';
@@ -20,12 +20,14 @@ import { AskLine, askTie } from '@/features/food/AskLine';
 import { editedKcalAsks, kcalAsk, kcalSaveTitle, portionAsk, portionAsks, portionTitle, pressFor, waitsFor } from '@/features/food/softCheck';
 import { spokenUnits } from '@/lib/spokenUnits';
 import { RequireProfile } from '@/features/food/RequireProfile';
+import { besideFits, cellsFit, factColumn, keepsDesign } from '@/features/layout/grownFit';
+import { MeasureWidth, SizeProbe, useMeasureKey } from '@/features/today/MeasureWidth';
 import { isolateRtl } from '@/lib/bidi';
 import { MEAL_LABEL, atwaterKcal, formatMacro, scaleNutrients } from '@/lib/nutrition';
 import { useStore } from '@/store';
 import { useToday } from '@/store/clock';
 import { useDay, useLive } from '@/store/selectors';
-import { cup, useLargeText, useTheme } from '@/theme';
+import { cup, useTextGrowth, useTheme, useVeryLargeText } from '@/theme';
 import type { Food, FoodEntry, ISODate, MealType, Nutrients, Serving, WaterEntry } from '@/types';
 import { Button, Card, CupKey, Divider, EmptyState, Header, MacroBar, NumberField, numberTextProblem, PressableScale, Screen, Text, TextField, goBack, haptic } from '@/ui';
 
@@ -222,11 +224,27 @@ function NutritionFacts({
   asStats?: boolean;
 }) {
   const { spacing } = useTheme();
-  // With large text each row's name has a line of its own and its values share the line under it in two equal
-  // columns, so a figure never runs into the next one nor parts from its unit.
-  const big = useLargeText();
-  const portionCol = big ? { flex: 1 } : { width: 84 };
-  const per100Col = big ? { flex: 1 } : { width: 76 };
+  // With very large text each row's name has a line of its own and its values share the line under it in two equal
+  // columns, so a figure never runs into the next one nor parts from its unit. Through the common steps (text grown in
+  // size, under VERY_LARGE_TEXT) every row keeps its name beside its two values while the widest name, measured as
+  // drawn, fits beside the value columns, each as wide as designed or as its widest words as drawn need with 8 px at
+  // their left (`factColumn`); the title takes a line of its own over the column heads only where it does not fit
+  // beside them. At the designed size nothing is measured.
+  const veryLarge = useVeryLargeText();
+  const fit = useTextGrowth() > 1 && !veryLarge;
+  const measureKey = useMeasureKey();
+  const [rowW, setRowW] = useState(0);
+  const [titleW, setTitleW] = useState(0);
+  const [nameW, setNameW] = useState(0);
+  const [portionW, setPortionW] = useState(0);
+  const [per100W, setPer100W] = useState(0);
+  const colA = fit ? factColumn(84, portionW, spacing.sm) : 84;
+  const colB = fit ? factColumn(76, per100W, spacing.sm) : 76;
+  const cols = colA + (showPer100 ? colB : 0);
+  const big = veryLarge || (fit && !keepsDesign(besideFits([nameW, cols], rowW)));
+  const titleOwnLine = big || (fit && !keepsDesign(besideFits([titleW, cols], rowW)));
+  const portionCol = big ? { flex: 1 } : { width: colA };
+  const per100Col = big ? { flex: 1 } : { width: colB };
   // [label, key, unit, a line under a macro]
   const rows: [string, keyof Nutrients, string, boolean][] = [
     ['Calories', 'kcal', 'kcal', false],
@@ -240,10 +258,60 @@ function NutritionFacts({
   ];
   const fmt = (v: number | undefined, unit: string) =>
     v === undefined ? '–' : unit === 'kcal' || unit === 'mg' ? `${kcal(v)} ${unit}` : `${whole || asStats ? Math.round(v) : formatMacro(v)} ${unit}`;
+  const shown = rows.filter(([, key]) => portion[key] !== undefined || per100g?.[key] !== undefined);
+  // Unseen, and only while measuring: the card's width, the title, the widest name and each column's widest words.
+  const measures = fit ? (
+    <>
+      <SizeProbe key={`${measureKey}-row`} onSize={(w) => setRowW(Math.floor(w))} />
+      <MeasureWidth key={`${measureKey}-title`} onWidth={setTitleW}>
+        <Text variant="h3">Nutrition facts</Text>
+      </MeasureWidth>
+      <MeasureWidth key={`${measureKey}-names`} onWidth={setNameW}>
+        <View style={{ alignItems: 'flex-start' }}>
+          {shown.map(([label, key, , sub]) => (
+            <Text key={key} variant={sub ? 'body' : 'bodyStrong'} style={{ paddingLeft: sub ? spacing.md : 0 }}>
+              {label}
+            </Text>
+          ))}
+        </View>
+      </MeasureWidth>
+      <MeasureWidth key={`${measureKey}-portion`} onWidth={setPortionW}>
+        <View style={{ alignItems: 'flex-start' }}>
+          <Text variant="caption">This portion</Text>
+          {shown.map(([, key, unit]) => (
+            <Text key={key} variant="body" tabular>
+              {fmt(portion[key], unit)}
+            </Text>
+          ))}
+        </View>
+      </MeasureWidth>
+      {showPer100 ? (
+        <MeasureWidth key={`${measureKey}-per100`} onWidth={setPer100W}>
+          <View style={{ alignItems: 'flex-start' }}>
+            <Text variant="caption">Per 100 g</Text>
+            {shown.map(([, key, unit]) => (
+              <Text key={key} variant="body" tabular>
+                {fmt(per100g?.[key], unit)}
+              </Text>
+            ))}
+          </View>
+        </MeasureWidth>
+      ) : null}
+    </>
+  ) : null;
   return (
     <Card testID="detail-facts">
-      <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', paddingBottom: spacing.sm, columnGap: big ? spacing.md : 0 }}>
-        <Text variant="h3" style={big ? { flexBasis: '100%', marginBottom: spacing.xs } : { flex: 1 }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          flexWrap: titleOwnLine ? 'wrap' : 'nowrap',
+          // The column heads stay over their columns when the title takes a line of its own above them.
+          ...(titleOwnLine && !big ? { justifyContent: 'flex-end' as const } : null),
+          paddingBottom: spacing.sm,
+          columnGap: big ? spacing.md : 0,
+        }}>
+        {measures}
+        <Text variant="h3" style={titleOwnLine ? { flexBasis: '100%', marginBottom: spacing.xs } : { flex: 1 }}>
           Nutrition facts
         </Text>
         <Text variant="caption" color="textSecondary" style={[portionCol, { textAlign: 'right' }]}>
@@ -255,26 +323,24 @@ function NutritionFacts({
           </Text>
         ) : null}
       </View>
-      {rows
-        .filter(([, key]) => portion[key] !== undefined || per100g?.[key] !== undefined)
-        .map(([label, key, unit, sub]) => (
-          <View key={key}>
-            <Divider />
-            <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', alignItems: 'center', minHeight: 36, columnGap: big ? spacing.md : 0, paddingVertical: big ? spacing.xs : 0 }}>
-              <Text variant={sub ? 'body' : 'bodyStrong'} color={sub ? 'textSecondary' : 'text'} style={[big ? { flexBasis: '100%' } : { flex: 1 }, { paddingLeft: sub ? spacing.md : 0 }]}>
-                {label}
+      {shown.map(([label, key, unit, sub]) => (
+        <View key={key}>
+          <Divider />
+          <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', alignItems: 'center', minHeight: 36, columnGap: big ? spacing.md : 0, paddingVertical: big ? spacing.xs : 0 }}>
+            <Text variant={sub ? 'body' : 'bodyStrong'} color={sub ? 'textSecondary' : 'text'} style={[big ? { flexBasis: '100%' } : { flex: 1 }, { paddingLeft: sub ? spacing.md : 0 }]}>
+              {label}
+            </Text>
+            <Text variant="body" tabular style={[portionCol, { textAlign: 'right' }]}>
+              {fmt(portion[key], unit)}
+            </Text>
+            {showPer100 ? (
+              <Text variant="body" color="textSecondary" tabular style={[per100Col, { textAlign: 'right' }]}>
+                {fmt(per100g?.[key], unit)}
               </Text>
-              <Text variant="body" tabular style={[portionCol, { textAlign: 'right' }]}>
-                {fmt(portion[key], unit)}
-              </Text>
-              {showPer100 ? (
-                <Text variant="body" color="textSecondary" tabular style={[per100Col, { textAlign: 'right' }]}>
-                  {fmt(per100g?.[key], unit)}
-                </Text>
-              ) : null}
-            </View>
+            ) : null}
           </View>
-        ))}
+        </View>
+      ))}
     </Card>
   );
 }
@@ -343,19 +409,38 @@ const NOTE_ROOM = 104;
 /** Calories (large) with the portion beside them, the macro bar and the three macros: the top of the portion card. */
 function MacroSummary({ n, kcalNote, range, updated }: { n: Nutrients; kcalNote: string; range?: [number, number] | null; updated?: boolean }) {
   const { colors, spacing } = useTheme();
-  // With large text the portion's words go under the figure on a line of their own, and the macros wrap. So do
+  // With very large text the portion's words go under the figure on a line of their own, and the macros wrap. So do
   // they when the figure leaves them less than `NOTE_ROOM` beside it (a four-figure portion at 320 px), so the
-  // words are never cut at the card's edge.
-  const big = useLargeText();
+  // words are never cut at the card's edge. Through the common steps (text grown in size, under VERY_LARGE_TEXT) the
+  // portion stays beside the figure while its one line, measured as drawn, fits there (else it goes under the figure,
+  // where it has the card's width), and the three macros stay side by side while their names and grams, measured as
+  // drawn, fit a third each (`cellsFit`). At the designed size nothing more is measured.
+  const veryLarge = useVeryLargeText();
+  const fit = useTextGrowth() > 1 && !veryLarge;
+  const measureKey = useMeasureKey();
   const [rowW, setRowW] = useState(0);
   const [figureW, setFigureW] = useState(0);
-  const stack = big || (rowW > 0 && figureW > 0 && rowW - figureW - spacing.md < NOTE_ROOM);
+  // Measured by probes while fitting (they measure again when the screen comes back into focus).
+  const [rowFitW, setRowFitW] = useState(0);
+  const [figureFitW, setFigureFitW] = useState(0);
+  const [noteW, setNoteW] = useState(0);
+  const [macrosW, setMacrosW] = useState(0);
+  const [macroW, setMacroW] = useState(0);
+  const stack = veryLarge || (fit ? !keepsDesign(besideFits([figureFitW, noteW], rowFitW, spacing.md)) : rowW > 0 && figureW > 0 && rowW - figureW - spacing.md < NOTE_ROOM);
+  const macrosWrap = veryLarge || (fit && !keepsDesign(cellsFit(macroW, 3, macrosW, spacing.lg)));
   return (
     <View>
       <View
         onLayout={(e) => setRowW(Math.round(e.nativeEvent.layout.width))}
         style={{ flexDirection: stack ? 'column' : 'row', alignItems: stack ? 'flex-start' : 'flex-end', justifyContent: 'space-between', gap: stack ? spacing.xs : spacing.md }}>
+        {fit ? <SizeProbe key={`${measureKey}-row`} onSize={(w) => setRowFitW(Math.floor(w))} /> : null}
+        {fit ? (
+          <MeasureWidth key={`${measureKey}-note`} onWidth={setNoteW}>
+            <Text variant="caption">{kcalNote}</Text>
+          </MeasureWidth>
+        ) : null}
         <View testID="detail-kcal" onLayout={(e) => setFigureW(Math.round(e.nativeEvent.layout.width))}>
+          {fit ? <SizeProbe key={`${measureKey}-figure`} onSize={(w) => setFigureFitW(Math.ceil(w))} /> : null}
           <KcalValue value={n.kcal} variant="numXL" color="caloriesInk" />
         </View>
         <Text variant="caption" color="textSecondary" align={stack ? 'left' : 'right'} style={{ flexShrink: 1, paddingBottom: stack ? 0 : 6 }} numberOfLines={stack ? undefined : 2}>
@@ -377,9 +462,22 @@ function MacroSummary({ n, kcalNote, range, updated }: { n: Nutrients; kcalNote:
         <MacroBar protein={n.protein * 4} carbs={n.carbs * 4} fat={n.fat * 9} />
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.lg, rowGap: spacing.sm, marginTop: spacing.md }}>
-        <MacroStat label="Protein" value={n.protein} color={colors.protein} />
-        <MacroStat label="Carbs" value={n.carbs} color={colors.carbs} />
-        <MacroStat label="Fat" value={n.fat} color={colors.fat} />
+        {fit ? <SizeProbe key={`${measureKey}-macros`} onSize={(w) => setMacrosW(Math.floor(w))} /> : null}
+        {fit ? (
+          <MeasureWidth key={`${measureKey}-macro-words`} onWidth={setMacroW}>
+            <View style={{ alignItems: 'flex-start' }}>
+              <MacroStatName label="Protein" color={colors.protein} />
+              <MacroStatName label="Carbs" color={colors.carbs} />
+              <MacroStatName label="Fat" color={colors.fat} />
+              <MacroStatAmount value={n.protein} />
+              <MacroStatAmount value={n.carbs} />
+              <MacroStatAmount value={n.fat} />
+            </View>
+          </MeasureWidth>
+        ) : null}
+        <MacroStat label="Protein" value={n.protein} color={colors.protein} wrap={macrosWrap} />
+        <MacroStat label="Carbs" value={n.carbs} color={colors.carbs} wrap={macrosWrap} />
+        <MacroStat label="Fat" value={n.fat} color={colors.fat} wrap={macrosWrap} />
       </View>
     </View>
   );

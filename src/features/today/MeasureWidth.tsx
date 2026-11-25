@@ -5,11 +5,15 @@
  *
  * On the web a view's layout is watched by react-native-web's ResizeObserver, which stops reporting a view laid out
  * while its screen was hidden (the text size changed on Profile, over Today), so every measuring part is keyed by
- * `useMeasureKey`: it mounts again, and measures again, each time its screen comes back into focus.
+ * `useMeasureKey`: it mounts again, and measures again, each time its screen comes back into focus. While the screen
+ * is hidden its parts report a width and a height of 0, which is no measurement (`isMeasured`): it is never passed on,
+ * so the last good value stays and the screen comes back drawn as it left, not in its designed layout for a frame.
  */
 import { useIsFocused } from 'expo-router';
 import React from 'react';
 import { Platform, View, type LayoutChangeEvent } from 'react-native';
+
+import { isMeasured } from './measured';
 
 const HIDDEN = {
   accessibilityElementsHidden: true,
@@ -24,11 +28,15 @@ export function useMeasureKey(): string {
 
 /**
  * `children` drawn unseen on one line at their natural width, reported to `onWidth` (whole pixels, rounded up)
- * whenever it changes. Placed anywhere inside a box: it is absolutely positioned and takes no room. Draw it only while
- * the answer is needed (text grown), so the designed layout draws nothing more.
+ * whenever it changes, never as 0. Placed anywhere inside a box: it is absolutely positioned and takes no room. Draw it
+ * only while the answer is needed (text grown), so the designed layout draws nothing more.
  */
 export function MeasureWidth({ children, onWidth }: { children: React.ReactNode; onWidth: (width: number) => void }) {
-  const onLayout = (e: LayoutChangeEvent) => onWidth(Math.ceil(e.nativeEvent.layout.width));
+  // A width of 0 is a hidden screen's (`isMeasured`): the last good width stays.
+  const onLayout = (e: LayoutChangeEvent) => {
+    const { width } = e.nativeEvent.layout;
+    if (isMeasured(width)) onWidth(Math.ceil(width));
+  };
   return (
     <View pointerEvents="none" {...HIDDEN} style={{ position: 'absolute', left: 0, top: 0, width: 0, height: 0, overflow: 'hidden', opacity: 0 }}>
       <View style={{ width: 4000, flexDirection: 'row', alignItems: 'flex-start' }}>
@@ -42,9 +50,14 @@ export function MeasureWidth({ children, onWidth }: { children: React.ReactNode;
 
 /**
  * Reports the size of the box it is placed in (its padding box: it fills it, absolutely positioned, and draws
- * nothing), so the box itself needs no handler of its own and the probe can be mounted again to measure again.
+ * nothing), so the box itself needs no handler of its own and the probe can be mounted again to measure again. A
+ * width or height of 0 is never reported.
  */
 export function SizeProbe({ onSize }: { onSize: (width: number, height: number) => void }) {
-  const onLayout = (e: LayoutChangeEvent) => onSize(e.nativeEvent.layout.width, e.nativeEvent.layout.height);
+  // A width or height of 0 is a hidden screen's (`isMeasured`): the last good size stays.
+  const onLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    if (isMeasured(width, height)) onSize(width, height);
+  };
   return <View pointerEvents="none" {...HIDDEN} onLayout={onLayout} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }} />;
 }

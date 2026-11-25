@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { Bell, Cloud, CloudOff, Database, History, Info, Moon, PartyPopper, RefreshCw, Ruler, Smartphone, Sunrise, SunMoon, Target, Timer, Users, Vibrate, Weight } from 'lucide-react-native';
-import React from 'react';
+import React, { useState } from 'react';
 import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { syncReach } from '@/features/health-sync/reach';
@@ -8,12 +8,14 @@ import { useHealthSync } from '@/features/health-sync/store';
 import { healthAdapter, useHealthStatus } from '@/features/health-sync/sync';
 import { profileSubtitle } from '@/features/health-sync/ui/format';
 import { ProfileJournalRow } from '@/features/journal/JournalRows';
+import { besideFits, cellsFit, keepsDesign } from '@/features/layout/grownFit';
 import { usePlan } from '@/features/plan/cache';
 import { PlanRow } from '@/features/plan/PlanRow';
 import { planVisible } from '@/features/plan/view';
 import { Group, IconTile, InitialsAvatar } from '@/features/settings/components';
 import { THEME_HINTS, ThemeSwatches } from '@/features/settings/ThemeSwatches';
 import { TextSizeRow } from '@/features/textSize/TextSizeRow';
+import { MeasureWidth, SizeProbe, useMeasureKey } from '@/features/today/MeasureWidth';
 import { timeAgo } from '@/features/settings/format';
 import { weightText } from '@/features/trackers/helpers';
 import { WidgetRow } from '@/features/widget/WidgetRow';
@@ -27,7 +29,7 @@ import { useSyncState } from '@/services/sync';
 import { useNow, useToday } from '@/store/clock';
 import { pendingChanges, useStore } from '@/store';
 import { useEnergyModel, useProfile, useWeightSeries } from '@/store/selectors';
-import { themeChoiceOf, themeChoicePatch, useTextSize, useTheme } from '@/theme';
+import { themeChoiceOf, themeChoicePatch, useTextGrowth, useTheme, useVeryLargeText } from '@/theme';
 import type { UnitSystem } from '@/types';
 import { Card, CupKey, EmptyState, Header, ListRow, Screen, Segmented, Text, ToggleRow } from '@/ui';
 
@@ -54,12 +56,13 @@ export default function ProfileScreen() {
   return <ProfileHub />;
 }
 
+/** The avatar's side in the card's head (InitialsAvatar's own default). */
+const AVATAR_SIZE = 64;
+
 function ProfileHub() {
   const { colors, spacing } = useTheme();
   // Under 360 px the three header stats have about 70 px each: one-word labels keep them on one line.
   const narrow = useWindowDimensions().width < 360;
-  // Larger text: the three figures in the card's foot stack, one row each (`HeaderStat`).
-  const stacked = useTextSize() >= 1.3;
   const profile = useProfile();
   // Shown while plans are on, or while the person holds a plan (ruling R14).
   const showPlan = planVisible(usePlan());
@@ -78,6 +81,31 @@ function ProfileHub() {
   const leftToday = plan.filter((p) => toISODate(p.at) === toISODate(now)).length;
   const remindersSubtitle = r.enabled ? (leftToday === 0 ? 'On, nothing more today' : `On, ${leftToday} more today`) : remindersSupported ? 'Off' : 'Arrive in the phone app';
 
+  // Larger text: the three figures in the card's foot stack, one row each (`HeaderStat`): with very large text, and
+  // through the common steps (text grown in size, under VERY_LARGE_TEXT) only where a figure or its label, measured
+  // as drawn, does not fit its third of the card beside the hairline and its room (`cellsFit`). At the designed size
+  // they stand side by side and nothing is measured.
+  const veryLarge = useVeryLargeText();
+  const fit = useTextGrowth() > 1 && !veryLarge;
+  const measureKey = useMeasureKey();
+  const [statsW, setStatsW] = useState(0);
+  const [statW, setStatW] = useState(0);
+  const goalShown = !(profile.goal === 'maintain' || !profile.targetWeightKg);
+  const stats: { label: string; value: string; color?: string }[] = [
+    { label: 'Weight', value: weightText(currentKg, u), color: colors.weight },
+    ...(goalShown ? [{ label: 'Goal', value: goalLine.replace('Goal ', '') }] : []),
+    { label: narrow ? 'Target' : 'Daily target', value: `${formatNumber(model.target.target)} kcal`, color: colors.calories },
+  ];
+  // The cells share the row's width with equal room for their words; a hairline and its room before the figure
+  // (`HeaderStat`'s divider) stand between them as a gap would.
+  const stacked = veryLarge || (fit && !keepsDesign(cellsFit(statW, stats.length, statsW, (narrow ? spacing.sm : spacing.md) + 1)));
+  // The name beside the avatar as designed; through the common steps under it where the name's longest word (a
+  // hyphen ends a word), measured as drawn, is wider than the room beside the avatar, so no word is split.
+  const [nameRowW, setNameRowW] = useState(0);
+  const [nameWordW, setNameWordW] = useState(0);
+  const nameWords = (profile.name || 'You').replace(/-/g, '-\n').split(/\s+/).filter(Boolean);
+  const nameUnder = fit && !keepsDesign(besideFits([AVATAR_SIZE, nameWordW], nameRowW, spacing.lg));
+
   // The daily target is in the card above; the row says what else is inside.
   const paceText =
     profile.goal === 'maintain' ? 'Pace, protein, carbs, fat, water' : `${profile.goal === 'lose' ? 'Lose' : 'Gain'} ${weightText(profile.weeklyRateKg, u)} a week, protein, carbs, fat, water`;
@@ -87,12 +115,24 @@ function ProfileHub() {
       <Card>
         <View
           style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: spacing.lg,
+            flexDirection: nameUnder ? 'column' : 'row',
+            alignItems: nameUnder ? 'flex-start' : 'center',
+            gap: nameUnder ? spacing.md : spacing.lg,
           }}>
-          <InitialsAvatar name={profile.name} />
-          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          {fit ? <SizeProbe key={`${measureKey}-name-row`} onSize={(w) => setNameRowW(Math.floor(w))} /> : null}
+          {fit ? (
+            <MeasureWidth key={`${measureKey}-name-words`} onWidth={setNameWordW}>
+              <View style={{ alignItems: 'flex-start' }}>
+                {nameWords.map((word, i) => (
+                  <Text key={i} variant="h2">
+                    {word}
+                  </Text>
+                ))}
+              </View>
+            </MeasureWidth>
+          ) : null}
+          <InitialsAvatar name={profile.name} size={AVATAR_SIZE} />
+          <View style={[{ flex: 1, minWidth: 0, gap: 2 }, nameUnder ? { alignSelf: 'stretch' } : null]}>
             {/* A long name wraps to a second line (at its hyphen, say) rather than lose its end. */}
             <Text variant="h2" numberOfLines={2}>
               {profile.name || 'You'}
@@ -110,6 +150,20 @@ function ProfileHub() {
             borderTopWidth: 1,
             borderTopColor: colors.border,
           }}>
+          {/* Unseen, and only while measuring: the row's width and the widest label or figure as drawn side by side. */}
+          {fit ? <SizeProbe key={`${measureKey}-row`} onSize={(w) => setStatsW(Math.floor(w))} /> : null}
+          {fit ? (
+            <MeasureWidth key={`${measureKey}-stats`} onWidth={setStatW}>
+              <View style={{ alignItems: 'flex-start' }}>
+                {stats.map((st) => (
+                  <React.Fragment key={st.label}>
+                    <StatKey label={st.label} color={st.color} />
+                    <StatFigure value={st.value} />
+                  </React.Fragment>
+                ))}
+              </View>
+            </MeasureWidth>
+          ) : null}
           <HeaderStat label="Weight" value={weightText(currentKg, u)} color={colors.weight} stacked={stacked} />
           {/* Keeping weight has no goal weight; the line under the name already says so. */}
           {profile.goal === 'maintain' || !profile.targetWeightKg ? null : <HeaderStat divider label="Goal" value={goalLine.replace('Goal ', '')} stacked={stacked} />}
@@ -332,38 +386,16 @@ function ProfileHub() {
  * Nothing is cut: under 360 px the number steps down a size, and the label or the unit wraps to a second line.
  */
 /**
- * The three figures stand side by side at the designed text size. With the app's text size at 130% or
- * more a third of the card is too narrow for "1,870 kcal", so they stack: one row each, the label on the
- * left and the figure on the right, a hairline between them (`stacked`).
+ * The three figures stand side by side at the designed text size. With very large text, or where a figure or its
+ * label as drawn is wider than its third of the card (measured in `ProfileHub`: "1,870 kcal" at 130% on a narrow
+ * phone), they stack: one row each, the label on the left and the figure on the right, a hairline between them
+ * (`stacked`).
  */
 function HeaderStat({ label, value, color, divider, stacked }: { label: string; value: string; color?: string; divider?: boolean; stacked?: boolean }) {
   const { colors, spacing } = useTheme();
   const narrow = useWindowDimensions().width < 360;
-  const i = value.lastIndexOf(' ');
-  const numeric = /^[−\-+]?[\d.,]/.test(value) && i > 0;
-  const num = numeric ? value.slice(0, i) : value;
-  const unit = numeric ? value.slice(i + 1) : '';
-  const size = narrow ? { fontSize: numeric ? 17 : 15, lineHeight: 21 } : numeric ? undefined : { fontSize: 17 };
-  const key = (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        ...(stacked ? { flex: 1, minWidth: 0 } : null),
-      }}>
-      {color ? <CupKey color={color} /> : null}
-      <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
-        {label}
-      </Text>
-    </View>
-  );
-  const figure = (
-    <Text variant="numM" style={size} align={stacked ? 'right' : undefined}>
-      {num}
-      {unit ? <Text variant="unit">{` ${unit}`}</Text> : null}
-    </Text>
-  );
+  const key = <StatKey label={label} color={color} stacked={stacked} />;
+  const figure = <StatFigure value={value} stacked={stacked} />;
   if (stacked) {
     return (
       <View
@@ -393,6 +425,40 @@ function HeaderStat({ label, value, color, divider, stacked }: { label: string; 
       {key}
       {figure}
     </View>
+  );
+}
+
+/** A header stat's key and label as drawn (also drawn unseen, to measure them). */
+function StatKey({ label, color, stacked }: { label: string; color?: string; stacked?: boolean }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        ...(stacked ? { flex: 1, minWidth: 0 } : null),
+      }}>
+      {color ? <CupKey color={color} /> : null}
+      <Text variant="caption" color="textSecondary" style={{ flexShrink: 1 }}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+/** A header stat's figure as drawn: the number with its unit small inside it (also drawn unseen, to measure it). */
+function StatFigure({ value, stacked }: { value: string; stacked?: boolean }) {
+  const narrow = useWindowDimensions().width < 360;
+  const i = value.lastIndexOf(' ');
+  const numeric = /^[−\-+]?[\d.,]/.test(value) && i > 0;
+  const num = numeric ? value.slice(0, i) : value;
+  const unit = numeric ? value.slice(i + 1) : '';
+  const size = narrow ? { fontSize: numeric ? 17 : 15, lineHeight: 21 } : numeric ? undefined : { fontSize: 17 };
+  return (
+    <Text variant="numM" style={size} align={stacked ? 'right' : undefined}>
+      {num}
+      {unit ? <Text variant="unit">{` ${unit}`}</Text> : null}
+    </Text>
   );
 }
 

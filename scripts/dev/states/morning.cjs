@@ -185,6 +185,13 @@ module.exports = [
   // ... and without it an automated browser stays on Today.
   { id: 'morning-not-auto', route: '/', now, waitFor: 'today-friends', absent: ['morning-card', 'morning-screen'], note: 'the same morning without the flag: Today, no page' },
 
+  // The streak's kept days in the week cups (GSHARED; src/features/streak/kept.ts): a quiet day between logged days is
+  // its cup with the dashed kept line, as on Today's week strip, named so, with the legend's key. The seed's quiet days
+  // are 21 and 24 days back: with the page's today 19 days back both are small cups. Two days on, the seed's day after
+  // is quiet: yesterday kept while today is open.
+  { id: 'morning-kept', route: '/morning', now: morningOf(19), waitFor: 'morning-week-kept-key', note: 'two quiet days the streak kept: their small cups with the dashed kept line, the legend names it' },
+  { id: 'morning-kept-yesterday', route: '/morning', now: morningOf(-2), waitFor: 'morning-week-kept-key', note: 'yesterday kept while today is open: the large cup with the kept line under "Not logged"' },
+
   // Profile's two rows (the switch and "See yesterday"): below the first view, so look at the __full.png.
   { id: 'profile-morning', route: '/profile', waitFor: 'profile-morning', note: "Profile's Morning summary switch and See yesterday row (in the __full.png)" },
 ];

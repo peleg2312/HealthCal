@@ -4,7 +4,7 @@ import type { WeekCell, WeekCells } from './weekCells';
 import { weekLabel } from './weekLabel';
 
 function c(date: string, over: Partial<WeekCell> = {}): WeekCell {
-  return { date, kcal: 2062, budget: 2170, headroom: 0, foodLogged: true, partial: false, over: false, approx: false, workout: false, ...over };
+  return { date, kcal: 2062, budget: 2170, headroom: 0, foodLogged: true, partial: false, over: false, approx: false, workout: false, kept: false, ...over };
 }
 const nothing = { kcal: 0, foodLogged: false };
 const todayEmpty = c('2026-11-19', nothing);
@@ -56,6 +56,20 @@ describe('weekLabel', () => {
     // A partly logged day is never named above its budget (the picture draws it pale, with no cap).
     const pale = six.map((x) => (x.date === '2026-11-14' ? { ...x, kcal: 2600, partial: true } : x));
     expect(weekLabel(cells(pale, c('2026-11-18')))).not.toContain('above the budget');
+  });
+
+  it('names a kept day in the words the week strip ends its name with', () => {
+    // 2026-11-12 is a Thursday, 2026-11-14 a Saturday.
+    const one = six.map((x) => (x.date === '2026-11-14' ? { ...x, ...nothing, kept: true } : x));
+    expect(weekLabel(cells(one, c('2026-11-18')))).toBe(
+      'Your week: 6 of 7 days logged. Saturday, nothing logged, kept: one quiet day does not break your streak. Yesterday 2,062 of 2,170 kilocalories, within the budget. Today so far, nothing logged.',
+    );
+    const two = six.map((x) => (x.date === '2026-11-12' || x.date === '2026-11-14' ? { ...x, ...nothing, kept: true } : x));
+    expect(weekLabel(cells(two, c('2026-11-18')))).toContain('Thursday and Saturday, nothing logged, kept: one quiet day does not break your streak.');
+    expect(weekLabel(cells(six, c('2026-11-18', { ...nothing, kept: true })))).toContain('Yesterday, nothing logged, kept: one quiet day does not break your streak.');
+    // A quiet day the streak did not keep is said as before.
+    const plain = six.map((x) => (x.date === '2026-11-14' ? { ...x, ...nothing } : x));
+    expect(weekLabel(cells(plain, c('2026-11-18', nothing)))).not.toContain('kept');
   });
 
   it('has no exclamation mark and no blame word', () => {

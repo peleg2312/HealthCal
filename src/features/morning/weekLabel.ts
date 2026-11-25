@@ -8,8 +8,11 @@
  *
  * Every day the picture marks above its budget (the amber cap, `WeekCell.over`) is named, so the label
  * holds what the cups show: "Saturday and Sunday above the budget." for the small cups, and yesterday's
- * own standing in its sentence.
+ * own standing in its sentence. So is every quiet day the streak kept (the dashed kept line,
+ * `WeekCell.kept`), in the words the week strip ends such a day's name with (`KEPT_SPOKEN`):
+ * "Thursday, nothing logged, kept: one quiet day does not break your streak."
  */
+import { KEPT_SPOKEN } from '@/features/streak/kept';
 import { fromISODate } from '@/lib/dates';
 import { formatNumber } from '@/lib/units';
 
@@ -41,12 +44,15 @@ export function weekLabel(w: WeekCells): string {
   const past = w.yesterday ? [...w.before, w.yesterday] : w.before;
   const logged = past.filter((c) => c.foodLogged).length;
   const parts: string[] = [`Your week: ${logged} of ${past.length} ${past.length === 1 ? 'day' : 'days'} logged.`];
+  // The small cups wearing the kept line: a quiet day the streak kept, never a break (yesterday says its own below).
+  const kept = w.before.filter((c) => c.kept);
+  if (kept.length > 0) parts.push(`${dayList(kept)}, nothing logged, ${KEPT_SPOKEN}.`);
   // The small cups wearing the amber cap: named by their weekday (yesterday says its own below).
   const above = w.before.filter((c) => c.over);
   if (above.length > 0) parts.push(`${dayList(above)} above the budget.`);
   if (w.yesterday) {
     const y = w.yesterday;
-    parts.push(y.foodLogged ? `Yesterday ${kcalOf(y)}${standing(y)}.` : 'Yesterday, nothing logged.');
+    parts.push(y.foodLogged ? `Yesterday ${kcalOf(y)}${standing(y)}.` : y.kept ? `Yesterday, nothing logged, ${KEPT_SPOKEN}.` : 'Yesterday, nothing logged.');
   }
   const workouts = [...past, w.today].filter((c) => c.workout).length;
   if (workouts > 0) parts.push(workouts === 1 ? 'A workout on 1 day.' : `A workout on ${workouts} days.`);

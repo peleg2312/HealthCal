@@ -27,6 +27,8 @@ import { loadSearchTab, openingTab, parseSearchTab, rememberSearchTab, SEARCH_CH
 import { resolveFood, usualFoods } from '@/features/food/usuals';
 import { refocusAfterAdd, visitAdds } from '@/features/food/visitAdds';
 import { VisitAddsSheet } from '@/features/food/VisitAddsSheet';
+import { cellsFit, keepsDesign } from '@/features/layout/grownFit';
+import { MeasureWidth, SizeProbe, useMeasureKey } from '@/features/today/MeasureWidth';
 import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { formatDayLabel } from '@/lib/dates';
 import { MEAL_LABEL, entriesTotal } from '@/lib/nutrition';
@@ -35,7 +37,7 @@ import { onlineSearchAvailable } from '@/services/openFoodFacts';
 import { useToday } from '@/store/clock';
 import { favoriteRecordId, useStore } from '@/store';
 import { useDay, useLive } from '@/store/selectors';
-import { cup, motion, useLargeText, useTheme } from '@/theme';
+import { cup, motion, useLargeText, useTextGrowth, useTheme, useVeryLargeText } from '@/theme';
 import type { Food, FoodEntry, MealType, SavedMeal } from '@/types';
 import { AnimatedNumber, Button, Chip, ChipRow, CupKey, decorative, Divider, EmptyState, Header, IconButton, PressableScale, Screen, Sheet, Text, TextField, useGrownText } from '@/ui';
 
@@ -275,15 +277,16 @@ export default function FoodSearchScreen() {
 
   // One compact row of four (a short word under each icon, the full name for a screen reader), so the list starts higher.
   const aiTile = searchAiTile(q);
-  // With large text, two tiles a line, so no word is split inside a quarter of the screen.
   const escapes = (
-    <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', gap: spacing.sm }}>
-      <ActionTile testID="search-scan" icon={<ScanBarcode size={18} color={colors.text} strokeWidth={1.9} />} label="Barcode" a11y="Scan barcode" onPress={() => go('/food/scan')} />
-      {/* "Estimate" under the AI's estimate cup with nothing typed (Photo and Describe are both behind it); "Describe" once words are typed, carrying them. */}
-      <ActionTile testID="search-photo" icon={<AiGlyph name={aiTile.glyph} size={18} color={colors.text} />} label={aiTile.label} a11y={aiTile.a11y} onPress={() => go('/food/photo', aiTile.params)} />
-      <ActionTile testID="search-quick" icon={<Zap size={18} color={colors.text} strokeWidth={1.9} />} label="Quick add" a11y="Quick add" onPress={() => go('/food/quick')} />
-      <ActionTile testID="search-create" icon={<PenLine size={18} color={colors.text} strokeWidth={1.9} />} label="Create" a11y="Create food" onPress={() => go('/food/custom', q ? { name: q } : {})} />
-    </View>
+    <ActionTileRow
+      tiles={[
+        { testID: 'search-scan', icon: <ScanBarcode size={18} color={colors.text} strokeWidth={1.9} />, label: 'Barcode', a11y: 'Scan barcode', onPress: () => go('/food/scan') },
+        // "Estimate" under the AI's estimate cup with nothing typed (Photo and Describe are both behind it); "Describe" once words are typed, carrying them.
+        { testID: 'search-photo', icon: <AiGlyph name={aiTile.glyph} size={18} color={colors.text} />, label: aiTile.label, a11y: aiTile.a11y, onPress: () => go('/food/photo', aiTile.params) },
+        { testID: 'search-quick', icon: <Zap size={18} color={colors.text} strokeWidth={1.9} />, label: 'Quick add', a11y: 'Quick add', onPress: () => go('/food/quick') },
+        { testID: 'search-create', icon: <PenLine size={18} color={colors.text} strokeWidth={1.9} />, label: 'Create', a11y: 'Create food', onPress: () => go('/food/custom', q ? { name: q } : {}) },
+      ]}
+    />
   );
 
 
@@ -714,10 +717,66 @@ function Hint({ title, message }: { title: string; message: string; icon?: React
   return <EmptyState title={title} message={message} />;
 }
 
+type ActionTileProps = { icon: React.ReactNode; label: string; a11y: string; onPress: () => void; testID: string };
+
+/** The tile's word as drawn (also drawn unseen, to measure it). */
+const TILE_WORD = { fontSize: 12.5, lineHeight: 16 } as const;
+
+/**
+ * The four tiles in one row. With very large text two a line, so no word is split inside a quarter of the screen.
+ * Through the common steps (text grown in size, under VERY_LARGE_TEXT) four a row while every tile's words, measured
+ * as drawn, fit a quarter of the row inside the tile's side padding and edge (`cellsFit`): on one line as designed,
+ * else each word on a line of its own ("Quick" over "add", the two lines a tile allows), and two a line only where
+ * a word does not fit. At the designed size nothing is measured.
+ */
+function ActionTileRow({ tiles }: { tiles: ActionTileProps[] }) {
+  const { spacing } = useTheme();
+  const veryLarge = useVeryLargeText();
+  const fit = useTextGrowth() > 1 && !veryLarge;
+  const measureKey = useMeasureKey();
+  const [rowW, setRowW] = useState(0);
+  const [labelW, setLabelW] = useState(0);
+  const [wordW, setWordW] = useState(0);
+  // 2 px side padding and a 1 px edge on each side of the words.
+  const quarter = (w: number) => keepsDesign(cellsFit(w, tiles.length, rowW, spacing.sm, 6));
+  const twoUp = veryLarge || (fit && !quarter(labelW) && !quarter(wordW));
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: twoUp ? 'wrap' : 'nowrap', gap: spacing.sm }}>
+      {fit ? <SizeProbe key={`${measureKey}-row`} onSize={(w) => setRowW(Math.floor(w))} /> : null}
+      {fit ? (
+        <MeasureWidth key={`${measureKey}-labels`} onWidth={setLabelW}>
+          <View style={{ alignItems: 'flex-start' }}>
+            {tiles.map((t) => (
+              <Text key={t.testID} variant="label" style={TILE_WORD}>
+                {t.label}
+              </Text>
+            ))}
+          </View>
+        </MeasureWidth>
+      ) : null}
+      {fit ? (
+        <MeasureWidth key={`${measureKey}-words`} onWidth={setWordW}>
+          <View style={{ alignItems: 'flex-start' }}>
+            {tiles.flatMap((t) =>
+              t.label.split(' ').map((word, i) => (
+                <Text key={`${t.testID}-${i}`} variant="label" style={TILE_WORD}>
+                  {word}
+                </Text>
+              )),
+            )}
+          </View>
+        </MeasureWidth>
+      ) : null}
+      {tiles.map((t) => (
+        <ActionTile key={t.testID} {...t} twoUp={twoUp} />
+      ))}
+    </View>
+  );
+}
+
 /** A compact action tile: the icon over one short word, 52 px tall; `a11y` is its full name ("Scan barcode"). */
-function ActionTile({ icon, label, a11y, onPress, testID }: { icon: React.ReactNode; label: string; a11y: string; onPress: () => void; testID: string }) {
+function ActionTile({ icon, label, a11y, onPress, testID, twoUp }: ActionTileProps & { twoUp: boolean }) {
   const { colors, radius } = useTheme();
-  const big = useLargeText();
   return (
     <PressableScale
       testID={testID}
@@ -726,8 +785,8 @@ function ActionTile({ icon, label, a11y, onPress, testID }: { icon: React.ReactN
       accessibilityRole="button"
       accessibilityLabel={a11y}
       style={{
-        // Two a line with large text (the row wraps), four otherwise.
-        ...(big ? { flexBasis: '45%', flexGrow: 1 } : { flex: 1 }),
+        // Two a line where the row wraps (`ActionTileRow`), four otherwise.
+        ...(twoUp ? { flexBasis: '45%', flexGrow: 1 } : { flex: 1 }),
         minHeight: 52,
         ...cup(radius.tile, 5),
         backgroundColor: colors.surface,
@@ -742,7 +801,7 @@ function ActionTile({ icon, label, a11y, onPress, testID }: { icon: React.ReactN
       }}>
       {icon}
       {/* Two lines at most: one word per line under wider text spacing (WCAG 1.4.12), never cut ("Quick add"). */}
-      <Text variant="label" align="center" numberOfLines={2} style={{ fontSize: 12.5, lineHeight: 16 }}>
+      <Text variant="label" align="center" numberOfLines={2} style={TILE_WORD}>
         {label}
       </Text>
     </PressableScale>

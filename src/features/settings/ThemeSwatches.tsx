@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
-import { cup, fonts, LOOK_HINTS, paletteFor, radius, THEME_CHOICES, THEME_LABELS, themeNameOfChoice, useTextSize, useTheme, vesselBase, type ThemeChoice, type ThemeColors } from '@/theme';
+import { mostCells, tileRows } from '@/features/layout/grownFit';
+import { MeasureWidth, SizeProbe, useMeasureKey } from '@/features/today/MeasureWidth';
+import { cup, fonts, LOOK_HINTS, paletteFor, radius, THEME_CHOICES, THEME_LABELS, themeNameOfChoice, useTextGrowth, useTextSize, useTheme, useVeryLargeText, vesselBase, type ThemeChoice, type ThemeColors } from '@/theme';
 import { PressableScale, Text } from '@/ui';
 
 /** The name on each tile. "Match my phone" is too long for a tile a quarter of a 320 px phone wide, so it is "System" here. */
@@ -20,9 +22,10 @@ export const THEME_HINTS: Record<ThemeChoice, string> = {
 };
 
 /**
- * Four tiles a row at the designed text size: the four first looks, then the three newer ones. With the
- * app's text size raised the names need more room, so a row holds three (from 115%) or two (from 150%),
- * and no name is cut short.
+ * Four tiles a row at the designed text size: the four first looks, then the three newer ones. With very large text
+ * (`VERY_LARGE_TEXT`) the names need more room, so a row holds three (the app's size under 150% with the phone's own
+ * size on top) or two (from 150%), and no name is cut short. Through the common steps a row holds as many as the
+ * names, measured as drawn, fit (`ThemeSwatches`).
  */
 export function swatchesPerRow(textSize: number): number {
   return textSize >= 1.5 ? 2 : textSize >= 1.15 ? 3 : 4;
@@ -139,8 +142,10 @@ function Mini({ c, half }: { c: ThemeColors; half?: 'left' | 'right' }) {
 
 /**
  * Appearance picker: one cup per choice that previews it, four a row (the seven choices take two
- * rows, the second with an empty last place so every tile has the same width; fewer a row with
- * larger text, `swatchesPerRow`). The chosen one has a
+ * rows, the second with an empty last place so every tile has the same width). Through the common text steps (text
+ * grown in size, under VERY_LARGE_TEXT) a row holds as many as the widest name, measured as drawn in bold (the chosen
+ * one's weight), fits (`mostCells`), four at most, in rows as even as they can be (`tileRows`: 3, 2, 2, never a look
+ * alone on the last row); with very large text, `swatchesPerRow`. The chosen one has a
  * 2 px ink edge and its name in bold ink. The name stays inside its tile's width (a check beside
  * "Blossom" ran past the tile). The value is a `ThemeChoice`: the caller reads it with
  * `themeChoiceOf(settings)` and writes a pick with `setSettings(themeChoicePatch(choice))`.
@@ -148,10 +153,31 @@ function Mini({ c, half }: { c: ThemeColors; half?: 'left' | 'right' }) {
 export function ThemeSwatches({ value, onChange }: { value: ThemeChoice; onChange: (v: ThemeChoice) => void }) {
   const { colors, spacing } = useTheme();
   const narrow = useWindowDimensions().width < 360;
-  const perRow = swatchesPerRow(useTextSize());
+  const size = useTextSize();
+  const veryLarge = useVeryLargeText();
+  const fit = useTextGrowth() > 1 && !veryLarge;
+  const measureKey = useMeasureKey();
+  const [rowW, setRowW] = useState(0);
+  const [nameW, setNameW] = useState(0);
+  const perRow = fit ? (mostCells(nameW, rowW, 4, spacing.sm) ?? 4) : swatchesPerRow(size);
+  const rows = fit ? tileRows(THEME_CHOICES.length, perRow).map((row) => row.map((i) => THEME_CHOICES[i])) : rowsOf(perRow);
+  const nameStyle = { fontFamily: fonts.bold, ...(narrow ? { fontSize: 13 } : null) };
   return (
     <View accessibilityRole="radiogroup" accessibilityLabel="Appearance" style={{ gap: spacing.md }}>
-      {rowsOf(perRow).map((row, r) => (
+      {/* Unseen, and only while measuring: the row's width and the widest name as drawn in bold. */}
+      {fit ? <SizeProbe key={`${measureKey}-row`} onSize={(w) => setRowW(Math.floor(w))} /> : null}
+      {fit ? (
+        <MeasureWidth key={`${measureKey}-names`} onWidth={setNameW}>
+          <View style={{ alignItems: 'flex-start' }}>
+            {THEME_CHOICES.map((choice) => (
+              <Text key={choice} variant="label" style={nameStyle}>
+                {TILE_LABELS[choice]}
+              </Text>
+            ))}
+          </View>
+        </MeasureWidth>
+      ) : null}
+      {rows.map((row, r) => (
         <View key={r} style={{ flexDirection: 'row', gap: spacing.sm }}>
           {row.map((choice) => {
             const selected = value === choice;

@@ -11,6 +11,7 @@ import { Chip, FadeUp, IconButton, ListRow, MiniCup, PressableScale, Sheet, Text
 
 import { fitsRoom } from './fit';
 import { MeasureWidth, SizeProbe, useMeasureKey } from './MeasureWidth';
+import { isMeasured } from './measured';
 import { DaySwipeGuard } from './useDaySwipe';
 import { dayCellLabel, dayRing, weekCaption, weekDates } from './week';
 
@@ -196,6 +197,9 @@ export function DayRingStrip({
   }, [selected, selectedBack, width, maxBack]);
 
   const onLayout = (e: LayoutChangeEvent) => {
+    // A width of 0 is the screen hidden under another one (`isMeasured`): the strip keeps its pages, so it is not drawn
+    // empty for a frame when the screen is back in front.
+    if (!isMeasured(e.nativeEvent.layout.width)) return;
     const w = Math.round(e.nativeEvent.layout.width);
     if (w !== width) setWidth(w);
   };
@@ -244,6 +248,8 @@ export function DayRingStrip({
   // The notice's whole line, its short words and one line, drawn unseen at the room the row leaves it (`noticeRoom`).
   const [noticeH, setNoticeH] = useState<{ long: number; short: number; one: number }>({ long: 0, short: 0, one: 0 });
   const onNoticeH = (key: 'long' | 'short' | 'one') => (e: LayoutChangeEvent) => {
+    // 0 while the screen is hidden (`isMeasured`): the last good height stays.
+    if (!isMeasured(e.nativeEvent.layout.width, e.nativeEvent.layout.height)) return;
     const h = e.nativeEvent.layout.height;
     setNoticeH((v) => (v[key] === h ? v : { ...v, [key]: h }));
   };

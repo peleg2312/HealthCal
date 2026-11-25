@@ -36,6 +36,7 @@ import { DRINK_MAX_ML, drinkAmountCheck, drinkMeal, enteredDrinkKind, entryFor, 
 import { amountRowWraps, glassTileMin } from '@/features/drinks/grownFit';
 import { cupHeightFor } from '@/features/today/fit';
 import { MeasureWidth, SizeProbe, useMeasureKey } from '@/features/today/MeasureWidth';
+import { isMeasured } from '@/features/today/measured';
 import { leftLitreDecimals, shownMl, volumeNumber, volumeUnitFor, waterLeftMl } from '@/features/today/volume';
 import { keepTogether } from '@/lib/text';
 import { cup, useDrawnFontSize, useTextGrowth, useTheme, useVeryLargeText } from '@/theme';
@@ -518,7 +519,7 @@ function WaterScreen() {
       {...figure(spokenUnits(`${formatVolume(consumed, units)} drunk`))}>
       <Text variant="unit">{` ${volumeUnitFor(consumed, units)}`}</Text>
       <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
-        {'  drunk'}
+        {' drunk'}
       </Text>
     </AnimatedNumber>
   );
@@ -716,7 +717,9 @@ function WaterScreen() {
             onChange={setCustom}
             // The input fills the field's cup: its height plus the cup's two edges (1.5 px, drawn 1 px on a 1x web screen)
             // is the height Add takes; at the designed size both are 50.
-            onLayout={(e) => setCupH(Math.round(e.nativeEvent.layout.height + 2))}
+            // A height of 0 is Water hidden under another screen (`isMeasured`): the last good one stays, so Add keeps its
+            // height when Water is back in front.
+            onLayout={(e) => isMeasured(e.nativeEvent.layout.height) && setCupH(Math.round(e.nativeEvent.layout.height + 2))}
             accessibilityHint={amountLine ?? undefined}
             {...((Platform.OS === 'web' && amountLine ? { 'aria-describedby': checkId, ...(amountCheck?.state === 'over' ? { 'aria-invalid': true } : null) } : {}) as object)}
           />
@@ -729,6 +732,8 @@ function WaterScreen() {
             onLayout={
               grown
                 ? (e) => {
+                    // All 0 while Water is hidden under another screen (`isMeasured`): the last good answer stays.
+                    if (!isMeasured(e.nativeEvent.layout.width, e.nativeEvent.layout.height)) return;
                     setAddWrapped(e.nativeEvent.layout.y > 1);
                     setAddW(Math.ceil(e.nativeEvent.layout.width));
                   }

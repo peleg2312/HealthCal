@@ -96,4 +96,53 @@ for (const [steps, tag] of [
     { id: `text${tag}-sleep`, route: '/progress', taps: [...onProfile, 'profile-sleep'], note: `Sleep at ${tag}% text: the range (Segmented)` },
   );
 }
+// Food detail, food search, Profile and Weight at the same steps (GFOOD): food detail's portion beside the calories
+// while its one line fits there, the macros three a row and the nutrition facts' names beside their values while
+// their words fit; the meal choice on one line and search's four tiles four a row while their words fit a quarter;
+// Profile's three figures in a row and the looks as many a row as their names fit (3, 2, 2, never one alone); Weight's
+// history with each weight beside its day while the words fit (src/features/layout/grownFit.ts). The size is set on
+// Profile over Today (or the diary), then the screen is opened the way a person does.
+for (const [steps, tag] of [
+  [1, '115'],
+  [2, '130'],
+]) {
+  const up = sized('today', steps);
+  const toSearch = [...up, 'tab-add', 'quick-search', { wait: 600 }];
+  const onProfile = ['today-profile', ...Array(steps).fill('profile-text-size-larger')];
+  states.push(
+    { id: `text${tag}-food-search`, route: '/', now: todayAt(12, 30), taps: toSearch, waitFor: 'search-scan', note: `Food search at ${tag}% text: the meal choice and the four tiles` },
+    { id: `text${tag}-food-search-typed`, route: '/', now: todayAt(12, 30), taps: [...toSearch, { type: 'food-search-input', text: 'yogurt' }, { wait: 1200 }], waitFor: 'search-photo', note: `Food search at ${tag}% text with words typed ("Describe")` },
+    { id: `text${tag}-food-detail`, route: '/', now: todayAt(12, 30), taps: [...toSearch, 'search-tab-recent', 'recent-0'], waitFor: 'food-detail-screen', note: `Food detail at ${tag}% text: the portion, the macros, the meal choice, the nutrition facts` },
+    { id: `text${tag}-food-detail-long`, route: '/', data: 'stress', now: todayAt(12, 30), taps: [...toSearch, 'search-tab-recent', 'recent-0'], waitFor: 'food-detail-screen', note: `Food detail at ${tag}% text, a long-named reference food` },
+    { id: `text${tag}-food-edit`, route: '/diary', taps: [...sized('diary', steps), '^entry-'], waitFor: 'detail-delete', note: `Edit entry at ${tag}% text: the meal choice with its advice` },
+    { id: `text${tag}-profile`, route: '/', taps: onProfile, waitFor: 'profile-theme-system', note: `Profile at ${tag}% text: the three figures and the looks` },
+    { id: `text${tag}-profile-imperial`, route: '/', imperial: true, taps: onProfile, waitFor: 'profile-theme-system', note: `Profile at ${tag}% text in pounds` },
+    { id: `text${tag}-profile-stress`, route: '/', data: 'stress', taps: onProfile, waitFor: 'profile-theme-system', note: `Profile at ${tag}% text with long content: a 22-letter name, 142.6 kg` },
+    { id: `text${tag}-weight`, route: '/', taps: [...up, 'today-weight'], waitFor: 'weight-history-list', note: `Weight at ${tag}% text: History with each weight beside its day` },
+    { id: `text${tag}-weight-stress`, route: '/', data: 'stress', taps: [...up, 'today-weight'], waitFor: 'weight-history-list', note: `Weight at ${tag}% text with long content` },
+  );
+}
+// The morning page's week cups at the same steps with the streak's kept days (GSHARED; src/features/streak/kept.ts):
+// the seed's quiet days (21 and 24 days back) as small cups when the page's today is 19 days back, and yesterday kept
+// two days on. The size is set on Profile, then "See yesterday" opens the page as a person does. (Every state above
+// already comes back to its tab from Profile, where a measurement read while the tab was hidden is now ignored,
+// src/features/today/measured.ts; a return to a pushed screen such as Water needs the browser's back, which these
+// steps do not have, so its frames are recorded by hand: report GSHARED.)
+/** A day n days from today at 08:10, the morning page's hour. */
+function morningAt(n) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  d.setHours(8, 10, 0, 0);
+  return d.getTime();
+}
+for (const [steps, tag] of [
+  [1, '115'],
+  [2, '130'],
+]) {
+  const onProfile = ['today-profile', ...Array(steps).fill('profile-text-size-larger')];
+  states.push(
+    { id: `text${tag}-morning-kept`, route: '/', now: morningAt(-19), taps: [...onProfile, 'profile-morning-open'], waitFor: 'morning-week-kept-key', note: `the morning page at ${tag}% text: two quiet days the streak kept, their cups with the dashed kept line and the legend's key` },
+    { id: `text${tag}-morning-kept-yesterday`, route: '/', now: morningAt(2), taps: [...onProfile, 'profile-morning-open'], waitFor: 'morning-week-kept-key', note: `the morning page at ${tag}% text: yesterday kept while today is open, the large cup with the kept line` },
+  );
+}
 module.exports = states;

@@ -979,6 +979,8 @@ src/features/food/components.tsx	FoodRow	component
 src/features/food/components.tsx	KcalTrail	component
 src/features/food/components.tsx	KcalValue	component
 src/features/food/components.tsx	MacroStat	component
+src/features/food/components.tsx	MacroStatAmount	component
+src/features/food/components.tsx	MacroStatName	component
 src/features/food/components.tsx	MealPicker	component
 src/features/food/components.tsx	RowAmount	interface
 src/features/food/components.tsx	RowEmoji	component
@@ -2125,6 +2127,13 @@ src/features/journal/store.ts	pruneJournal	function
 src/features/journal/store.ts	setKeepPhotos	function
 src/features/journal/store.ts	useJournal	const
 src/features/layout/RouteTitle.tsx	RouteTitle	component
+src/features/layout/grownFit.ts	besideFits	function
+src/features/layout/grownFit.ts	cellsFit	function
+src/features/layout/grownFit.ts	factColumn	function
+src/features/layout/grownFit.ts	keepsDesign	function
+src/features/layout/grownFit.ts	mostCells	function
+src/features/layout/grownFit.ts	ownCellsFit	function
+src/features/layout/grownFit.ts	tileRows	function
 src/features/layout/routeTitle.ts	APP_TITLE	const
 src/features/layout/routeTitle.ts	NOT_FOUND_TITLE	const
 src/features/layout/routeTitle.ts	documentTitle	function
@@ -2316,6 +2325,7 @@ src/features/morning/weekCells.ts	WeekCell	interface
 src/features/morning/weekCells.ts	WeekCells	interface
 src/features/morning/weekCells.ts	WeekDayIn	interface
 src/features/morning/weekCells.ts	weekCells	function
+src/features/morning/weekCells.ts	withKept	function
 src/features/morning/weekLabel.ts	weekLabel	function
 src/features/onboarding/PlanReveal.tsx	PlanReveal	component
 src/features/onboarding/ProjectionChart.tsx	ProjectionChart	component
@@ -3134,6 +3144,7 @@ src/features/today/ideas.ts	usualMealKcal	function
 src/features/today/meals.ts	MealLine	interface
 src/features/today/meals.ts	isEstimate	const
 src/features/today/meals.ts	mealLine	function
+src/features/today/measured.ts	isMeasured	function
 src/features/today/now.ts	NOW_WORDS	const
 src/features/today/now.ts	NowAction	type
 src/features/today/now.ts	NowInput	interface

@@ -4,6 +4,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Platform, View, type TextInput } from 'react-native';
 
 import { clockTime } from '@/features/import/ui/format';
+import { besideFits, keepsDesign } from '@/features/layout/grownFit';
+import { MeasureWidth, SizeProbe, useMeasureKey } from '@/features/today/MeasureWidth';
 import { resolveDateParam } from '@/features/trackers/dateParam';
 import { addDays, diffDays, formatDayLabel, formatShortDate } from '@/lib/dates';
 import { isPlausibleBodyFat, projectedGoalDate } from '@/lib/energy';
@@ -18,7 +20,7 @@ import { heldDayWords, heldReadout, heldShortDay, rangeFigures, risingWeekNote }
 import { isSyncedWeighIn, weighInFromLine } from '@/features/trackers/weighInSource';
 import { useToday } from '@/store/clock';
 import { useProfile, useWeightSeries } from '@/store/selectors';
-import { useLargeText, useTheme } from '@/theme';
+import { fonts, useLargeText, useTextGrowth, useTheme, useVeryLargeText } from '@/theme';
 import type { ISODate, UnitSystem, WeightEntry } from '@/types';
 import {
   Button,
@@ -48,6 +50,16 @@ const fixedWeight = weightText;
 function WeightScreen() {
   const { colors, spacing } = useTheme();
   const bigText = useLargeText();
+  // History: each weight beside its day as designed, under it with very large text; through the common steps (text
+  // grown in size, under VERY_LARGE_TEXT) beside while the widest day or part of a row's line and the widest weight,
+  // measured as drawn, fit the row with the chevron (`besideFits`), under it only where they do not. At the designed
+  // size nothing is measured.
+  const veryLarge = useVeryLargeText();
+  const fit = useTextGrowth() > 1 && !veryLarge;
+  const measureKey = useMeasureKey();
+  const [historyW, setHistoryW] = useState(0);
+  const [historyWordsW, setHistoryWordsW] = useState(0);
+  const [historyValueW, setHistoryValueW] = useState(0);
   const profile = useProfile();
   const units = profile.units;
   const series = useWeightSeries();
@@ -96,6 +108,21 @@ function WeightScreen() {
 
   const history = [...series.entries].reverse();
   const shown = showAll ? history : history.slice(0, 14);
+  // Each shown weigh-in as its row draws it: the day, its line's parts and the weight.
+  const historyRows = shown.map((e) => {
+    const prev = history[history.indexOf(e) + 1];
+    // From the rounded weights on screen, so the difference matches what the two rows show.
+    const rounded = (kg: number) => Math.round(weightValue(kg, units) * 10) / 10;
+    const delta = prev ? rounded(e.kg) - rounded(prev.kg) : null;
+    const parts = [
+      delta !== null ? `${Math.abs(delta) < 0.05 ? '0' : `${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(1)}`} ${unit} vs previous` : null,
+      isPlausibleBodyFat(e.bodyFatPct) ? `${bodyFatText(e.bodyFatPct)} body fat` : null,
+      weighInFromLine(e)?.replace(/^From /, 'from ') ?? null,
+    ].filter((part): part is string => !!part);
+    return { e, title: formatDayLabel(e.date), parts, value: fixedWeight(e.kg, units) };
+  });
+  // The Card's 12 px padding each side; the value and the chevron 12 apart, the chevron 18 wide.
+  const valueBeside = fit ? keepsDesign(besideFits([historyWordsW, historyValueW, 18], historyW - 2 * spacing.md, spacing.md)) : undefined;
 
   const footer = <Button testID="weight-log" title="Log weigh-in" icon={<Plus size={20} color={colors.onPrimary} />} onPress={() => setSheetDate(end)} />;
 
@@ -267,36 +294,60 @@ function WeightScreen() {
 
           <SectionTitle title="History" />
           <Card padding={spacing.md}>
+            {/* Unseen, and only while measuring: the card's width, the widest day or line part, the widest weight. */}
+            {fit ? <SizeProbe key={`${measureKey}-history`} onSize={(w) => setHistoryW(Math.floor(w))} /> : null}
+            {fit ? (
+              <MeasureWidth key={`${measureKey}-history-words`} onWidth={setHistoryWordsW}>
+                <View style={{ alignItems: 'flex-start' }}>
+                  {historyRows.map((r) => (
+                    <React.Fragment key={r.e.id}>
+                      <Text variant="bodyStrong" style={{ fontFamily: fonts.semibold }}>
+                        {r.title}
+                      </Text>
+                      {r.parts.map((part) => (
+                        <Text key={part} variant="caption">
+                          {part}
+                        </Text>
+                      ))}
+                    </React.Fragment>
+                  ))}
+                </View>
+              </MeasureWidth>
+            ) : null}
+            {fit ? (
+              <MeasureWidth key={`${measureKey}-history-values`} onWidth={setHistoryValueW}>
+                <View style={{ alignItems: 'flex-start' }}>
+                  {historyRows.map((r) => (
+                    <Text key={r.e.id} variant="label">
+                      {r.value}
+                    </Text>
+                  ))}
+                </View>
+              </MeasureWidth>
+            ) : null}
             {/* A list on the web (a ul of li), each weigh-in one item with its divider. */}
             <HistoryList testID="weight-history-list">
-            {shown.map((e, i) => {
-              const prev = history[history.indexOf(e) + 1];
-              // From the rounded weights on screen, so the difference matches what the two rows show.
-              const shown = (kg: number) => Math.round(weightValue(kg, units) * 10) / 10;
-              const delta = prev ? shown(e.kg) - shown(prev.kg) : null;
-              return (
+              {historyRows.map(({ e, title, parts, value }, i) => (
                 <HistoryItem key={e.id}>
                   {i > 0 ? <Divider /> : null}
                   <HistoryRow
                     testID={`weight-row-${i}`}
-                    title={formatDayLabel(e.date)}
-                    subtitle={[
-                      delta !== null ? `${Math.abs(delta) < 0.05 ? '0' : `${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(1)}`} ${unit} vs previous` : null,
-                      isPlausibleBodyFat(e.bodyFatPct) ? `${bodyFatText(e.bodyFatPct)} body fat` : null,
-                      weighInFromLine(e)?.replace(/^From /, 'from ') ?? null,
-                    ]
-                      .filter(Boolean)
-                      // The change first and where it came from last: at 320 px a long line is shortened at the source, never the change.
-                      // Each part stays whole ("21% body fat"), so a long line breaks only between them; at large
-                      // text a part may break between its words, never inside one.
-                      .map((part) => (bigText ? (part as string) : (part as string).replace(/ /g, '\u00A0')))
-                      .join(' · ') || undefined}
-                    value={fixedWeight(e.kg, units)}
+                    title={title}
+                    subtitle={
+                      parts
+                        // The change first and where it came from last: at 320 px a long line is shortened at the source, never the change.
+                        // Each part stays whole ("21% body fat"), so a long line breaks only between them; at large
+                        // text with the weight under the day a part may break between its words, never inside one
+                        // (beside it, every part was measured to fit whole).
+                        .map((part) => (bigText && valueBeside !== true ? part : part.replace(/ /g, '\u00A0')))
+                        .join(' · ') || undefined
+                    }
+                    value={value}
+                    valueBeside={valueBeside}
                     onPress={() => setSheetDate(e.date)}
                   />
                 </HistoryItem>
-              );
-            })}
+              ))}
             </HistoryList>
           </Card>
           {/* More than 14 weigh-ins: the rest open under the list, where it ends (the testID is the one SectionTitle gave it). */}

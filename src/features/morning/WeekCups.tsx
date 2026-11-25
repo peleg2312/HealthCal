@@ -1,12 +1,14 @@
 import React from 'react';
 import { ScrollView, useWindowDimensions, View, type ScrollViewInstance } from 'react-native';
 
+import { KEPT_LEGEND } from '@/features/streak/kept';
+import { KeptKey, KeptMark, useKeptDays } from '@/features/streak/KeptMark';
 import { weekdayShort } from '@/lib/dates';
 import { formatNumber } from '@/lib/units';
 import { fonts, motion, scaledFontSize, useTextSize, useTheme, withOpacity } from '@/theme';
 import { AnimatedNumber, CupKey, Text, Vessel } from '@/ui';
 
-import type { WeekCell, WeekCells } from './weekCells';
+import { withKept, type WeekCell, type WeekCells } from './weekCells';
 import { weekLabel } from './weekLabel';
 
 /**
@@ -40,6 +42,9 @@ const SIZES = {
   },
 } as const;
 
+/** The legend's kept key: an empty mini cup with the kept line, as on Consistency's legend. */
+const KEPT_KEY = { width: 12, height: 15 } as const;
+
 /** The number ticks up from this share of its value, so a frame caught at load never reads "0 kcal". */
 const TICK_FROM = 0.6;
 
@@ -70,19 +75,25 @@ export function weekCupColumns(r: number, s: { bigCol: number; todayCol: number 
  * it, and today at the end, poured with what is logged so far. Every cup is calories against that
  * day's own budget (a limit: hatched exercise headroom, the amber lip when above it, a heavier cap
  * inside the cup's width on the small cups, pale while partly logged). A workout that day is a small exercise key under the day's letter.
+ * A quiet day the streak kept (`useKeptDays`, the one answer Today's week strip draws from; `withKept`) is its cup
+ * with the strip's dashed kept line across it (`KeptMark`), never an empty cup that reads as a break; the legend
+ * under the cups then names it (`KeptKey`, "Kept: a quiet day in a streak"), and weekLabel says it.
  *
  * Only draws: which days and how each reads come from weekCells (pure, tested). The cups are not
  * pressable; the whole row is one accessible element read as weekLabel. They pour left to right,
  * the large cup after the last small one and today last, once a day (memoryKey by day), and the
  * number ticks up from 60% of its value (never a readable 0); under reduced motion all of it is simply there.
  */
-export function WeekCups({ cells, testID }: { cells: WeekCells; testID?: string }) {
+export function WeekCups({ cells: given, testID }: { cells: WeekCells; testID?: string }) {
   const { colors, spacing, chartFill } = useTheme();
   const narrow = useWindowDimensions().width < 360;
   const textSize = useTextSize();
   const scroller = React.useRef<ScrollViewInstance>(null);
   const s = narrow ? SIZES.narrow : SIZES.wide;
-  const { before, yesterday: y, today: t, anyWorkout } = cells;
+  // The quiet days the streak kept, as Today's week strip draws them (the same rule, from the food on the phone).
+  const keptSet = useKeptDays(given.today.date);
+  const cells = withKept(given, keptSet);
+  const { before, yesterday: y, today: t, anyWorkout, anyKept } = cells;
   if (!y) return null;
   const n = before.length;
   const r = textSize > 1 ? scaledFontSize(13, textSize) / 13 : 1;
@@ -90,6 +101,16 @@ export function WeekCups({ cells, testID }: { cells: WeekCells; testID?: string 
   const bigCol = cols.bigCol;
   const fill = (c: WeekCell) => (c.partial ? withOpacity(colors.calories, chartFill) : colors.calories);
   const mark = (c: WeekCell) => (anyWorkout ? <View style={{ height: MARK_SLOT, justifyContent: 'flex-end' }}>{c.workout ? <CupKey color={colors.exercise} size={8} /> : null}</View> : null);
+  // A kept day: its cup with the dashed kept line across it, as on Today's week strip.
+  const withKeptLine = (c: WeekCell, w: number, h: number, node: React.ReactNode) =>
+    c.kept ? (
+      <View style={{ width: w, height: h }}>
+        {node}
+        <KeptMark width={w} height={h} />
+      </View>
+    ) : (
+      node
+    );
 
   const cup = (c: WeekCell, w: number, h: number, index: number, rim: number) => (
     <Vessel
@@ -129,7 +150,7 @@ export function WeekCups({ cells, testID }: { cells: WeekCells; testID?: string 
         />
       </View>
     ) : (
-      cup(c, s.smallW, s.smallH, index, 2.5)
+      withKeptLine(c, s.smallW, s.smallH, cup(c, s.smallW, s.smallH, index, 2.5))
     );
 
   const shown = (v: number) => `${y.approx ? '~' : ''}${formatNumber(v)}`;
@@ -196,7 +217,7 @@ export function WeekCups({ cells, testID }: { cells: WeekCells; testID?: string 
         ))}
 
         <View testID="morning-week-yesterday" style={{ width: bigCol, alignItems: 'center' }}>
-          {cup(y, s.bigW, s.bigH, n, 3)}
+          {withKeptLine(y, s.bigW, s.bigH, cup(y, s.bigW, s.bigH, n, 3))}
           <Text
             variant="caption"
             color="text"
@@ -246,9 +267,31 @@ export function WeekCups({ cells, testID }: { cells: WeekCells; testID?: string 
             gap: spacing.sm,
             marginTop: spacing.xs,
           }}>
-          <CupKey color={colors.exercise} size={8} />
+          {/* Beside the kept key's line the workout key stands in a slot as wide as that key, so the two lines' words align. */}
+          {anyKept ? (
+            <View style={{ width: KEPT_KEY.width, alignItems: 'center' }}>
+              <CupKey color={colors.exercise} size={8} />
+            </View>
+          ) : (
+            <CupKey color={colors.exercise} size={8} />
+          )}
           <Text variant="caption" color="textSecondary">
             A workout that day
+          </Text>
+        </View>
+      ) : null}
+      {anyKept ? (
+        <View
+          testID="morning-week-kept-key"
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.sm,
+            marginTop: spacing.xs,
+          }}>
+          <KeptKey width={KEPT_KEY.width} height={KEPT_KEY.height} />
+          <Text variant="caption" color="textSecondary">
+            {KEPT_LEGEND}
           </Text>
         </View>
       ) : null}
