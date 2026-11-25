@@ -19,7 +19,7 @@ import { formatNumber } from '@/lib/units';
 import { useStore } from '@/store';
 import { useNow } from '@/store/clock';
 import { useLive, useProfile, type DaySummary } from '@/store/selectors';
-import { useLargeText, useTheme } from '@/theme';
+import { useTheme, useVeryLargeText } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
 import { Button, Card, figure, Text } from '@/ui';
 
@@ -88,8 +88,9 @@ export function NowCard({
   onFits: (proteinFirst: boolean) => void;
 }) {
   const { colors, spacing } = useTheme();
-  // Large text: the heading row and the actions wrap at their words (never smaller text).
-  const large = useLargeText();
+  // Very large text (150% and up): the heading row and the actions wrap at their words (never smaller text). Through the
+  // phone's common steps the card keeps its shape: the heading wraps beside the corner where it must.
+  const large = useVeryLargeText();
   // Under 360 px the actions leave their glyphs out, so the two keep one row (as the + sheet's Repeat drops its arrows).
   const bare = useWindowDimensions().width < 360;
   const now = useNow();

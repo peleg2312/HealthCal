@@ -1,13 +1,16 @@
 import { router } from 'expo-router';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { CoachEntry } from '@/features/coach/CoachEntry';
 import { useCoachMovedToast } from '@/features/coach/movedToast';
 import { FriendsEntry } from '@/features/friends/FriendsEntry';
+import { fitsRoom } from '@/features/today/fit';
+import { tabTitleFit } from '@/features/today/greetingTitle';
+import { MeasureWidth } from '@/features/today/MeasureWidth';
 import { formatShortDate, fromISODate } from '@/lib/dates';
 import { useProfile } from '@/store/selectors';
-import { cupFor, MAX_CONTENT_WIDTH, spacing as SPACING, useLargeText, useTheme } from '@/theme';
+import { cupFor, MAX_CONTENT_WIDTH, spacing as SPACING, useDrawnFontSize, useTheme, useVeryLargeText } from '@/theme';
 import { ANDROID_TOUCH, PressableScale, Text, useGrownText } from '@/ui';
 
 export type TabName = 'today' | 'diary' | 'train' | 'progress';
@@ -94,15 +97,20 @@ function preloadCoach(): () => void {
  * the same three cups in the same order, Coach, Friends, then the profile tile (which opens
  * Profile, where the settings live). Anything that belongs to one screen (a share button,
  * day arrows, a range picker) goes in that screen's content, under this header.
- * `overlineShort`, when given, is used on a window under 360 px. `titleSize`, when given, draws the
- * title smaller than the tab's size (Today steps from 26 to 24 px to keep a name, `todayTitle`); the
- * line height stays 32 px at every width, so the header is 68 px on every tab and starts 8 px down.
+ * `overlineShort`, when given, is used on a window under 360 px; `overlineTight`, when given, while text is
+ * grown and the overline, measured as drawn, does not fit its line (Today's and the diary's 'Wed, Nov 25').
+ * `titleSize`, when given, draws the title smaller than the tab's size (Today steps from 26 to 24 px to
+ * keep a name, `todayTitle`); the line height stays 32 px at every width, so the header is 68 px on every
+ * tab and starts 8 px down. With text grown through the phone's common steps the header keeps this shape:
+ * the title steps down to stay on one line beside the cups (`todayTitle`, `tabTitleFit`, never drawn under
+ * 22 px) and its line keeps its proportions; only very large text (`VERY_LARGE_TEXT`) stacks it.
  * The title is the screen's one level-1 heading.
  */
 export function TabHeader({
   tab,
   overline,
   overlineShort,
+  overlineTight,
   title,
   titleSize,
   titleTestID,
@@ -110,6 +118,7 @@ export function TabHeader({
   tab: TabName;
   overline: string;
   overlineShort?: string;
+  overlineTight?: string;
   title: string;
   titleSize?: number;
   titleTestID?: string;
@@ -120,13 +129,23 @@ export function TabHeader({
   useCoachMovedToast();
   useEffect(preloadCoach, []);
   const width = useWindowDimensions().width;
-  const large = useLargeText();
+  // Very large text (150% and up, `VERY_LARGE_TEXT`): the stacked header below. Through the phone's common steps the
+  // header keeps its shape with grown text.
+  const large = useVeryLargeText();
   // Text grown at all (the app's or the phone's size, or a reader's own text spacing, WCAG 1.4.12): the overline wraps
   // at its words rather than lose its end to an ellipsis ("WEDNESDAY, NOV …"). At the designed size it is one line.
   const grown = useGrownText();
-  const size = titleSize ?? tabTitleSize(width);
+  const drawn = useDrawnFontSize();
+  // A fixed title ("Food diary") steps down as drawn to keep one line beside the cups; Today chooses its own (`todayTitle`).
+  const size = titleSize ?? (grown && !large ? tabTitleFit(title, tabTitleRoom(width), tabTitleSize(width), drawn) : tabTitleSize(width));
+  // The line keeps the title's proportions as drawn: 32 px at the designed size, never shorter, and no taller than
+  // the drawn title needs (a title stepped down does not keep a tall empty line).
+  const lineHeight = grown ? Math.max(TITLE_LINE * (size / drawn(size)), (size * TITLE_LINE) / 26) : TITLE_LINE;
   const initial = ((profile.name ?? '').trim() || 'Me').slice(0, 1).toUpperCase();
-  const overlineText = overlineShort && width < 360 ? overlineShort : overline;
+  // The overline's short form while text is grown and the whole one, measured as drawn, is wider than its line.
+  const [overlineW, setOverlineW] = useState(0);
+  const measureOverline = grown && !large && !!overlineTight;
+  const overlineText = overlineShort && width < 360 ? overlineShort : measureOverline && !fitsRoom(overlineW, tabTitleRoom(width)) ? overlineTight : overline;
   const cups = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: CUP_GAP }}>
       <CoachEntry testID={`${tab}-coach-open`} size={HEADER_CUP} hitSlop={HEADER_SLOP} />
@@ -151,12 +170,12 @@ export function TabHeader({
       testID={titleTestID}
       accessibilityRole="header"
       {...({ 'aria-level': 1 } as object)}
-      style={{ fontSize: size, lineHeight: TITLE_LINE, letterSpacing: -size * 0.025 }}>
+      style={{ fontSize: size, lineHeight, letterSpacing: -size * 0.025 }}>
       {title}
     </Text>
   );
   if (large) {
-    // Large text (130% and up): the overline shares its row with the three cups and the title has the whole width
+    // Very large text (150% and up): the overline shares its row with the three cups and the title has the whole width
     // under them, so a one-word title ("Progress" at 320 px) is never split and a greeting wraps at its words. The
     // overline wraps at its words too, its last two kept together ("TUESDAY," over "NOV 24").
     return (
@@ -174,6 +193,11 @@ export function TabHeader({
   return (
     <View testID="tab-header" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 68, paddingVertical: spacing.sm }}>
       <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
+        {measureOverline ? (
+          <MeasureWidth onWidth={setOverlineW}>
+            <Text variant="overline">{overline}</Text>
+          </MeasureWidth>
+        ) : null}
         <Text variant="overline" numberOfLines={grown ? undefined : 1}>
           {grown ? keepLastTwo(overlineText) : overlineText}
         </Text>

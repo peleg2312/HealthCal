@@ -105,6 +105,7 @@ export { isReducedMotion, motion, useReducedMotion } from './motion';
 export { legibility, useLegibility, type Legibility } from './legibility';
 export {
   bolder,
+  drawnFontSize,
   LARGE_TEXT,
   MAX_TEXT_GROWTH,
   normaliseTextSize,
@@ -117,8 +118,11 @@ export {
   textGrowth,
   textSize,
   textSizeLabel,
+  useDrawnFontSize,
   useLargeText,
   useTextGrowth,
   useTextSize,
+  useVeryLargeText,
+  VERY_LARGE_TEXT,
   type TextSize,
 } from './textSize';

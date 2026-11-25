@@ -56,22 +56,58 @@ export function greetingTitle(greeting: string, name: string, maxWidth: number, 
 export const TITLE_STEP = 2;
 
 /**
+ * With text grown (the app's or the phone's size), a tab title may give back its growth to stay on one line beside
+ * the header's cups, a step of 2 px at a time, but is never drawn smaller than this: the tab title's own size on a
+ * 320 px phone. At the designed text size nothing steps past `TITLE_STEP`.
+ */
+export const TITLE_FLOOR = 22;
+
+/** The size a designed size is drawn at (`useDrawnFontSize` from @/theme); the designed size itself by default. */
+type Drawn = (size: number) => number;
+const asDesigned: Drawn = (s) => s;
+
+/**
+ * The designed sizes a tab title may be passed at, largest first: `first`, then (only while text is grown, so that
+ * `drawn` grows them) a step of 2 px at a time while the drawn size stays at `TITLE_FLOOR` or more.
+ */
+function grownSteps(first: number[], drawn: Drawn): number[] {
+  const out = [...first];
+  const last = out[out.length - 1];
+  if (drawn(last) <= last) return out;
+  for (let s = last - TITLE_STEP; s > 0 && drawn(s) >= TITLE_FLOOR; s -= TITLE_STEP) out.push(s);
+  return out;
+}
+
+/**
+ * A tab title that is one fixed word or two ("Food diary", "Progress") at grown text: the designed size to pass so its
+ * drawn line fits `maxWidth` (stepping down from `size` as `grownSteps` allows), else `size` (it then wraps at its
+ * words). At the designed text size always `size`.
+ */
+export function tabTitleFit(text: string, maxWidth: number, size: number, drawn: Drawn = asDesigned): number {
+  return grownSteps([size], drawn).find((s) => titleWidth(text, drawn(s)) <= maxWidth - 4) ?? size;
+}
+
+/**
  * Today's tab title and the size it is drawn at. The name is kept first: the full and the short
  * greeting with the name at `size`, then (when `size` is the 26 px of a window 360 px or wider) the
  * same two at `size - TITLE_STEP`, and only then the greeting without the name at `size`. At 360 px
- * every greeting keeps a 4-letter name ("Good night, Alex" at 24 px).
+ * every greeting keeps a 4-letter name ("Good night, Alex" at 24 px). `drawn` is the device's text
+ * growth (`useDrawnFontSize`): with text grown each line is measured as drawn, and the title may step
+ * on down (`grownSteps`, never drawn under `TITLE_FLOOR`) to keep the name on one line. The size
+ * returned is the designed one, which the kit's Text then grows.
  */
-export function todayTitle(greeting: string, name: string, maxWidth: number, size: number): { text: string; size: number } {
+export function todayTitle(greeting: string, name: string, maxWidth: number, size: number, drawn: Drawn = asDesigned): { text: string; size: number } {
   const trimmed = name.trim();
   const room = maxWidth - 4;
   if (trimmed) {
     const short = shortGreeting(greeting);
     const named = short !== greeting ? [`${greeting}, ${trimmed}`, `${short}, ${trimmed}`] : [`${greeting}, ${trimmed}`];
-    const sizes = size >= 26 ? [size, size - TITLE_STEP] : [size];
+    const sizes = grownSteps(size >= 26 ? [size, size - TITLE_STEP] : [size], drawn);
     for (const s of sizes) {
-      const hit = named.find((t) => titleWidth(t, s) <= room);
+      const hit = named.find((t) => titleWidth(t, drawn(s)) <= room);
       if (hit) return { text: hit, size: s };
     }
   }
-  return { text: greetingTitle(greeting, '', maxWidth, size, true), size };
+  const text = greetingTitle(greeting, '', maxWidth, drawn(size), true);
+  return { text, size: tabTitleFit(text, maxWidth, size, drawn) };
 }

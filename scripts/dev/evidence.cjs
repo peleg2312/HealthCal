@@ -63,7 +63,8 @@
  *               a control is measured by what of it shows, its box cut by every ancestor that clips
  *               (overflow not visible), so a tile scrolled out of a sheet's body, or a row its screen's
  *               scroll area no longer shows (the band a screen makes when no band is clear), is not
- *               under the toast
+ *               under the toast; a toast not drawn yet (its host at opacity 0 while the kit places
+ *               it) is not judged
  * Text cut with no ellipsis is `cut`, and so are a field's placeholder wider than the field, a number
  * field's value wider than the field (a long name in a text field scrolls as fields do), and a clamped
  * name whose box is taller than its clamp (the lines after the ellipsis show under it). A name
@@ -1020,7 +1021,7 @@ function headerScan() {
  * overflow is not visible (a scroll area, a sheet's scrolling body), so a row scrolled out of the
  * scroll area's view (a screen that ended its scroll area above the toast, as the kit does when
  * no band is clear) or a tile scrolled up out of a sheet's body, under its title, is not
- * "covered" by a toast resting over it.
+ * "covered" by a toast resting over it. A toast not drawn yet (opacity 0 while it is placed) covers nothing.
  */
 function toastScan() {
   const t = document.querySelector('[data-testid="toast"]');

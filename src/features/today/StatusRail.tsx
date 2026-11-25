@@ -16,9 +16,9 @@ import { useFriends } from '@/services/friends';
 import { useStore } from '@/store';
 import { useNow } from '@/store/clock';
 import { live, useLive, useProfile, useWeightSeries, type DaySummary } from '@/store/selectors';
-import { isReducedMotion, motion, useLargeText, useTheme } from '@/theme';
+import { isReducedMotion, motion, useLargeText, useTheme, useVeryLargeText } from '@/theme';
 import type { ISODate } from '@/types';
-import { AnimatedNumber, Button, Card, CupKey, haptic, PressableScale, ProgressBar, Text, toast } from '@/ui';
+import { AnimatedNumber, Button, Card, CupKey, haptic, PressableScale, ProgressBar, Text, toast, useGrownText } from '@/ui';
 
 import { cheersLabel, recentCheerCount } from './cheers';
 import { logPlainGlass } from './glass';
@@ -101,8 +101,11 @@ function ReachedNote({ text, testID }: { text: string | null; testID: string }) 
  */
 export function WaterRow({ day, isToday, quiet = false }: { day: DaySummary; isToday: boolean; /** First day: the glass is a ghost button so the first-log button is the only filled one. */ quiet?: boolean }) {
   const { colors, spacing } = useTheme();
-  // Large text (130% and up): the glass may go under the amount, and every word stays whole (`useLargeText`, `@/theme`).
-  const large = useLargeText();
+  // Very large text (150% and up): the glass may go under the amount, and every word stays whole (`useVeryLargeText`,
+  // `@/theme`). Through the phone's common steps the row keeps its shape: the amount goes under "Water" where the two do
+  // not fit beside the glass, and wraps at its words rather than be cut (`grown`).
+  const large = useVeryLargeText();
+  const grown = useGrownText();
   const profile = useProfile();
   const units = profile.units;
   const presets = useStore((s) => s.settings.waterPresets);
@@ -135,7 +138,7 @@ export function WaterRow({ day, isToday, quiet = false }: { day: DaySummary; isT
           <KeyLabel color={colors.water} label="Water" />
           <AnimatedNumber
             variant="numM"
-            numberOfLines={large ? undefined : 1}
+            numberOfLines={large || grown ? undefined : 1}
             value={day.waterMl}
             format={(ml) => volumeNumber(ml, day.waterMl, units)}
             accessibilityLabel={spokenUnits(`${formatVolume(day.waterMl, units)} of ${goal}`)}>

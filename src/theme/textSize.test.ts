@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   bolder,
+  drawnFontSize,
   LARGE_TEXT,
   MAX_TEXT_GROWTH,
   normaliseTextSize,
@@ -11,6 +12,7 @@ import {
   TEXT_SIZES,
   textGrowth,
   textSizeLabel,
+  VERY_LARGE_TEXT,
 } from './textSize';
 import { fonts } from './tokens';
 
@@ -91,5 +93,33 @@ describe('large text (textGrowth, LARGE_TEXT)', () => {
     expect(textGrowth(1.15)).toBeLessThanOrEqual(LARGE_TEXT);
     for (const s of TEXT_SIZES.filter((x) => x >= 1.3)) expect(textGrowth(s)).toBeGreaterThan(LARGE_TEXT);
     expect(textGrowth(1, 1.3)).toBeGreaterThan(LARGE_TEXT);
+  });
+});
+
+describe('very large text (VERY_LARGE_TEXT) and the drawn size', () => {
+  it("keeps the phone's common steps under it: Android's 1.15 and 1.3, iOS up to xxxLarge, the app's 115% and 130%", () => {
+    for (const phone of [1.15, 1.3, 1.353]) expect(textGrowth(1, phone)).toBeLessThanOrEqual(VERY_LARGE_TEXT);
+    for (const app of [1.15, 1.3]) expect(textGrowth(app)).toBeLessThanOrEqual(VERY_LARGE_TEXT);
+    // Both a step up together: 115% here on a phone at 1.15.
+    expect(textGrowth(1.15, 1.15)).toBeLessThanOrEqual(VERY_LARGE_TEXT);
+  });
+
+  it("is past it from Android's 1.5, iOS's first accessibility size and the app's 150%", () => {
+    for (const phone of [1.5, 1.65, 1.8, 2]) expect(textGrowth(1, phone)).toBeGreaterThan(VERY_LARGE_TEXT);
+    for (const s of TEXT_SIZES.filter((x) => x >= 1.5)) expect(textGrowth(s)).toBeGreaterThan(VERY_LARGE_TEXT);
+    expect(VERY_LARGE_TEXT).toBeGreaterThan(LARGE_TEXT);
+  });
+
+  it('draws a size as designed at 100% with no phone scale', () => {
+    for (const s of [12, 15, 17, 26, 60]) expect(drawnFontSize(s, 1, 1)).toBe(s);
+  });
+
+  it("grows by the app's nonlinear size, then by the phone's scale as far as the two stay at 2x", () => {
+    expect(drawnFontSize(15, 1.3)).toBe(19.5);
+    expect(drawnFontSize(26, 1.3)).toBe(scaledFontSize(26, 1.3));
+    expect(drawnFontSize(26, 1, 1.3)).toBe(33.8);
+    expect(drawnFontSize(15, 2, 1.5)).toBe(30);
+    expect(drawnFontSize(15, 1, 3)).toBe(30);
+    expect(drawnFontSize(15, 1.15, Number.NaN)).toBe(scaledFontSize(15, 1.15));
   });
 });

@@ -4,10 +4,12 @@ import { Platform, ScrollView, useWindowDimensions, View, type AccessibilityActi
 
 import { diffDays, formatShortDate, fromISODate, startOfWeek } from '@/lib/dates';
 import { useDays } from '@/store/selectors';
-import { cup, fonts, MAX_CONTENT_WIDTH, useLargeText, useTheme } from '@/theme';
+import { cup, fonts, MAX_CONTENT_WIDTH, useTheme, useVeryLargeText } from '@/theme';
 import type { ISODate } from '@/types';
-import { Chip, FadeUp, IconButton, ListRow, MiniCup, PressableScale, Sheet, Text, useReducedMotion } from '@/ui';
+import { Chip, FadeUp, IconButton, ListRow, MiniCup, PressableScale, Sheet, Text, useGrownText, useReducedMotion } from '@/ui';
 
+import { fitsRoom } from './fit';
+import { MeasureWidth } from './MeasureWidth';
 import { DaySwipeGuard } from './useDaySwipe';
 import { dayCellLabel, dayRing, weekCaption, weekDates } from './week';
 
@@ -21,6 +23,8 @@ export const CAPTION_ROW_H = 36;
 const ARROWS_MIN_W = 400;
 /** The week-picker cup: 32 px visible, 44 px to touch, 12 px from what is before it so the two touch areas never overlap. */
 const PICK_CUP = 32;
+/** The link's chevron and the 2 px before it, beside its words. */
+const LINK_MARK = 18;
 /** The chosen day's level line under its date. */
 const SELECTED_MARK_W = 18;
 /**
@@ -113,8 +117,10 @@ export function DayRingStrip({
   note?: { text: string; delay: number; testID?: string } | null;
   /**
    * The slim strip: small cups (16 x 20) and tighter gaps, the same letters, dates, caption row, chip, note, accessory
-   * and week controls, 102 px in all at every width (the full one is 132). Ignored with large text, where the dates need
-   * the full strip's room. Today and the diary pass it, 12 px over their first card.
+   * and week controls, 102 px in all at every width (the full one is 132) at the designed text size. With text grown
+   * through the phone's common steps it stays slim and its rows grow with their text (the date's box, the caption's
+   * lines); ignored with very large text (`VERY_LARGE_TEXT`), where the dates need the full strip's room. Today and
+   * the diary pass it, 12 px over their first card.
    */
   slim?: boolean;
   /**
@@ -237,9 +243,17 @@ export function DayRingStrip({
     return b === 0 ? 'This week' : b === 1 ? 'Last week' : b === -1 ? 'Next week' : `Week of ${formatShortDate(dates[0])}`;
   };
   const narrow = windowW < 360;
-  const large = useLargeText();
-  // Slim only at the designed text size: with large text the dates need the full strip's room.
+  // Very large text (`VERY_LARGE_TEXT`): the caption takes the whole width and the strip its full size. Up to there
+  // (the phone's common steps) the slim strip and the caption row keep their shape and grow with their text (`grown`).
+  const large = useVeryLargeText();
+  const grown = useGrownText();
+  // Slim up to very large text: there the dates need the full strip's room.
   const thin = slim && !large;
+  // "Your week is ready" or its short form: the short one under 360 px, and with text grown wherever the whole label,
+  // measured as drawn, is wider than the room beside its chevron and X (`fitsRoom`), so it keeps one line.
+  const [linkW, setLinkW] = useState(0);
+  const [linkRoom, setLinkRoom] = useState(0);
+  const linkShort = !!link?.short && (narrow || (grown && !large && !fitsRoom(linkW, linkRoom)));
   // Natively and on touch the arrows are not drawn: every day offers the same as actions.
   const weekActions = [
     ...(back < maxBack ? [{ name: 'previousWeek', label: 'Previous week' }] : []),
@@ -337,8 +351,8 @@ export function DayRingStrip({
                       )}
                       <View
                         style={{
-                          width: 32,
-                          height: thin ? 22 : 24,
+                          // With text grown, at least the designed box, and as big as its date.
+                          ...(grown ? { minWidth: 32, minHeight: thin ? 22 : 24, paddingHorizontal: 2 } : { width: 32, height: thin ? 22 : 24 }),
                           ...cup(9, 4),
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -371,11 +385,20 @@ export function DayRingStrip({
         )}
       </DaySwipeGuard>
       {/* One height on both screens: two caption lines or the chip. A note that wraps moves nothing. */}
-      {/* Large text (130% and up): the caption takes the whole width and the chip, the streak and the week cup a line
-          under it, so neither squeezes the other's words. */}
+      {/* Very large text (150% and up): the caption takes the whole width and the chip, the streak and the week cup a
+          line under it, so neither squeezes the other's words. */}
       <View style={{ flexDirection: 'row', flexWrap: large ? 'wrap' : 'nowrap', alignItems: 'center', gap: spacing.sm, minHeight: CAPTION_ROW_H }}>
         {showLink && link ? (
-          <View style={large ? { flexBasis: '100%', flexDirection: 'row', alignItems: 'center', gap: spacing.sm } : { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <View
+            onLayout={grown && !large ? (e) => setLinkRoom(Math.floor(e.nativeEvent.layout.width) - LINK_MARK - (link.hide ? PICK_CUP + spacing.sm : 0)) : undefined}
+            style={large ? { flexBasis: '100%', flexDirection: 'row', alignItems: 'center', gap: spacing.sm } : { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            {grown && !large && link.short ? (
+              <MeasureWidth onWidth={setLinkW}>
+                <Text variant="label" style={{ fontSize: 13, lineHeight: 17 }}>
+                  {link.label}
+                </Text>
+              </MeasureWidth>
+            ) : null}
             {/* Its touch area reaches 44 px tall; sideways it stops at its own edge, so the X beside it keeps its own. */}
             <PressableScale
               testID={link.testID}
@@ -385,7 +408,7 @@ export function DayRingStrip({
               hitSlop={{ top: 6, bottom: 6, left: 0, right: 0 }}
               style={{ flexShrink: 1, minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
               <Text variant="label" color="actionInk" style={{ flexShrink: 1, fontSize: 13, lineHeight: 17 }}>
-                {narrow && link.short ? link.short : link.label}
+                {linkShort ? link.short : link.label}
               </Text>
               <ChevronRight size={16} color={colors.actionInk} strokeWidth={2.2} />
             </PressableScale>
@@ -397,7 +420,7 @@ export function DayRingStrip({
           </View>
         ) : showNote ? (
           <FadeUp key={noteText} style={large ? { flexBasis: '100%' } : { flex: 1 }}>
-            <Text variant="caption" color="text" numberOfLines={large ? undefined : 2} testID={note?.testID} accessibilityLiveRegion="polite">
+            <Text variant="caption" color="text" numberOfLines={large || grown ? undefined : 2} testID={note?.testID} accessibilityLiveRegion="polite">
               {noteText}
             </Text>
           </FadeUp>

@@ -196,6 +196,40 @@ export function useLargeText(): boolean {
   return useTextGrowth() > LARGE_TEXT;
 }
 
+/**
+ * Very large text: past the phone's common text steps. A layout drawn to grow with its text, whose boxes are
+ * measured from the text drawn in them rather than fixed at the designed size (Today and its tab header, the diary,
+ * the + sheet), keeps its designed shape, with larger text and no room wasted, through Android's 1.15 and 1.3, iOS's
+ * sizes up to xxxLarge (1.35) and the app's 115% and 130%; only a part whose words, measured as drawn, are wider than
+ * its room gives way before then (a 320 px phone). Past `VERY_LARGE_TEXT` (Android's 1.5 and up, iOS's accessibility
+ * sizes, the app's 150% and up) such a layout gives way as a `LARGE_TEXT` one does. Every other screen keeps
+ * `LARGE_TEXT`.
+ */
+export const VERY_LARGE_TEXT = 1.4;
+
+/** True while text is very large (`VERY_LARGE_TEXT`), live. */
+export function useVeryLargeText(): boolean {
+  return useTextGrowth() > VERY_LARGE_TEXT;
+}
+
+/**
+ * The size a designed font size is drawn at, for the app's text size and the phone's font scale (on the web pass 1:
+ * the browser's zoom is its own). Pure. The phone's part is counted in full, as iOS draws it (Android 14 grows large
+ * text less), so a line chosen to fit by it fits on either phone.
+ */
+export function drawnFontSize(size: number, appSize: number, phoneScale = 1): number {
+  const phone = Number.isFinite(phoneScale) && phoneScale > 0 ? Math.max(1, phoneScale) : 1;
+  return Math.round(scaledFontSize(size, appSize) * Math.min(phone, phoneCapFor(appSize)) * 10) / 10;
+}
+
+/** `drawnFontSize` on this device, live: from a designed size to the size it is drawn at. */
+export function useDrawnFontSize(): (size: number) => number {
+  const size = useTextSize();
+  const { fontScale } = useWindowDimensions();
+  const phone = Platform.OS === 'web' ? 1 : fontScale;
+  return (designed: number) => drawnFontSize(designed, size, phone);
+}
+
 /** Choose a text size: drawn at once and kept on this device. */
 export function setTextSize(next: number): void {
   const v = normaliseTextSize(next);

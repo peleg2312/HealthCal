@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { greetingTitle, shortGreeting, titleWidth, todayTitle } from './greetingTitle';
+import { drawnFontSize } from '@/theme/textSize';
+
+import { greetingTitle, shortGreeting, tabTitleFit, TITLE_FLOOR, titleWidth, todayTitle } from './greetingTitle';
 
 describe('greetingTitle', () => {
   it('measures close to the browser (Good morning, Alex is 245 px at 27 px)', () => {
@@ -161,5 +163,55 @@ describe("Today's title with the step (todayTitle)", () => {
         ],
       ]
     `);
+  });
+});
+
+describe("Today's title with text grown (the drawn size)", () => {
+  const GREETINGS = ['Good morning', 'Good afternoon', 'Good evening', 'Good night'];
+  // The room beside three cups 8 px apart (web, iOS) and 12 apart (Android), and the tab size, as TabHeader has them.
+  const room = (width: number, gap = 8) => Math.min(width, 560) - 2 * 20 - 12 - (3 * 36 + 2 * gap);
+  const size = (width: number) => (width < 360 ? 22 : 26);
+  // The app's 115% and 130% (the web) and a phone at 1.15 and 1.3 (Android's steps; counted in full, as iOS draws).
+  const growths: [string, (s: number) => number][] = [
+    ['app 115%', (s) => drawnFontSize(s, 1.15)],
+    ['app 130%', (s) => drawnFontSize(s, 1.3)],
+    ['phone 1.15', (s) => drawnFontSize(s, 1, 1.15)],
+    ['phone 1.3', (s) => drawnFontSize(s, 1, 1.3)],
+  ];
+
+  it('is the same as at the designed size when nothing is grown', () => {
+    for (const width of [412, 390, 360, 320])
+      for (const g of GREETINGS)
+        for (const name of ['', 'Alex', 'Peleg', 'Christina'])
+          expect(todayTitle(g, name, room(width), size(width), (s) => s)).toEqual(todayTitle(g, name, room(width), size(width)));
+  });
+
+  it('keeps one line as drawn, never under the floor, at every width and common step', () => {
+    for (const [label, drawn] of growths)
+      for (const [width, gap] of [[412, 12], [381, 12], [390, 8], [360, 8], [320, 8]] as const)
+        for (const g of GREETINGS)
+          for (const name of ['', 'Al', 'Alex', 'Peleg', 'Christina', 'Maximilian-Alexander']) {
+            const t = todayTitle(g, name, room(width, gap), size(width), drawn);
+            const why = `${label} ${width} ${g} ${name}: ${t.text} @${t.size}`;
+            expect(titleWidth(t.text, drawn(t.size)), why).toBeLessThanOrEqual(room(width, gap) - 4);
+            expect(drawn(t.size), why).toBeGreaterThanOrEqual(t.size === size(width) ? t.size : TITLE_FLOOR);
+          }
+  });
+
+  it("keeps a 5-letter name on the owner's phone (381 px, cups 12 apart) at 1.15 and 1.3", () => {
+    for (const p of [1.15, 1.3]) {
+      const t = todayTitle('Good afternoon', 'Peleg', room(381, 12), 26, (s) => drawnFontSize(s, 1, p));
+      expect(t.text).toBe('Afternoon, Peleg');
+      expect(t.size).toBeLessThan(26);
+    }
+  });
+
+  it('steps a fixed tab title only while it does not fit as drawn (tabTitleFit)', () => {
+    expect(tabTitleFit('Food diary', room(390), 26)).toBe(26);
+    expect(tabTitleFit('Food diary', room(390), 26, (s) => drawnFontSize(s, 1.3))).toBe(26);
+    const narrow = (s: number) => drawnFontSize(s, 1, 1.35);
+    const fit = tabTitleFit('Food diary', room(320), 22, narrow);
+    expect(titleWidth('Food diary', narrow(fit))).toBeLessThanOrEqual(room(320) - 4);
+    expect(narrow(fit)).toBeGreaterThanOrEqual(TITLE_FLOOR);
   });
 });

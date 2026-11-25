@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { ArrowRightLeft, ChevronRight, Plus, Repeat2 } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { Platform, useWindowDimensions, View } from 'react-native';
+import { Platform, useWindowDimensions, View, type LayoutChangeEvent } from 'react-native';
 
 import { hasFoodLogged } from '@/features/drinks/via';
 import { copyEntries, findPreviousMeal } from '@/features/food/actions';
@@ -9,7 +9,9 @@ import { currentKcal } from '@/features/food/usuals';
 import { useRecapReady } from '@/features/progress/recapReady';
 import { figureWords, otherFigure, setCalorieFigure, useCalorieFigure } from '@/features/today/calorieFigure';
 import { DayRingStrip } from '@/features/today/DayRingStrip';
+import { cupHeightFor, fitsRoom } from '@/features/today/fit';
 import { FitsSheet } from '@/features/today/FitsSheet';
+import { MeasureWidth } from '@/features/today/MeasureWidth';
 import { mealLine } from '@/features/today/meals';
 import { NOW_WORDS } from '@/features/today/now';
 import { NowCard, relativeTo, useNowState } from '@/features/today/NowCard';
@@ -32,7 +34,7 @@ import { formatNumber } from '@/lib/units';
 import { useStore } from '@/store';
 import { useNow, useToday } from '@/store/clock';
 import { useConsistency, useDay, useDays, useLive, useProfile, type DaySummary } from '@/store/selectors';
-import { motion, useLargeText, useTheme } from '@/theme';
+import { motion, useDrawnFontSize, useTheme, useVeryLargeText } from '@/theme';
 import type { FoodEntry, ISODate, MealType } from '@/types';
 import { AnimatedNumber, Badge, Button, Card, CupKey, figure, IconButton, PressableScale, ProgressBar, Screen, Text, toast, useGrownText, Vessel, type VesselLabel } from '@/ui';
 
@@ -62,7 +64,9 @@ export default function TodayScreen() {
   const [fits, setFits] = useState<{ proteinFirst: boolean } | null>(null);
 
   const { width } = useWindowDimensions();
-  const title = todayTitle(greeting(now), profile.name ?? '', tabTitleRoom(width), tabTitleSize(width));
+  // Measured as drawn: with text grown the title steps down to keep the name on one line beside the header's cups.
+  const drawn = useDrawnFontSize();
+  const title = todayTitle(greeting(now), profile.name ?? '', tabTitleRoom(width), tabTitleSize(width), drawn);
   const select = (d: ISODate) => setPicked(d === todayDate ? null : d);
   // The day changes only from the week strip: no page swipe here, so scrolling or reaching for a
   // row never moves Today to another day. Back in front after five minutes or more away, or on
@@ -73,7 +77,7 @@ export default function TodayScreen() {
     <Screen
       tabs
       testID="today-screen"
-      header={<TabHeader tab="today" overline={tabDay(date)} title={title.text} titleSize={title.size} />}>
+      header={<TabHeader tab="today" overline={tabDay(date)} overlineTight={tabDay(date, true)} title={title.text} titleSize={title.size} />}>
       {/* Cards 16 px apart, as on Progress and the check-in. */}
       <View testID="today-swipe" style={{ gap: spacing.lg }}>
       {/* The first visit on a new morning opens yesterday's summary (rule in @/features/morning/rule). Draws nothing. */}
@@ -175,12 +179,25 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
   const { colors, spacing } = useTheme();
   const { width: screenW } = useWindowDimensions();
   const narrow = screenW < 360;
-  // Large text, or text grown at all (the app's or the phone's size above the designed one, or a reader's own text
-  // spacing, WCAG 1.4.12): the labels leave the cup's side column for rows (the `large` layout below). The column places
-  // each label at the level it describes in boxes measured at the designed size, so grown letters would run into the
-  // labels beside them; the rows wrap at their words instead. At the designed size nothing changes.
+  // Very large text (150% and up, `VERY_LARGE_TEXT`): the labels leave the cup's side column for rows (the `large`
+  // layout below). Through the phone's common steps (Android's 1.15 and 1.3, iOS to xxxLarge, the app's 115% and 130%)
+  // and under a reader's own text spacing (WCAG 1.4.12) the card keeps its designed shape with larger text (`fit`):
+  // each label's box is measured from the text drawn in it (`boxes`), a label wraps at its words where its line is
+  // wider than the column, the cup grows to hold the boxes (`cupHeightFor`), and the macros stay side by side unless
+  // their names, measured as drawn, are wider than a third of the card (`fitsRoom`). At the designed size nothing changes.
   const grown = useGrownText();
-  const large = useLargeText() || grown;
+  const large = useVeryLargeText();
+  const fit = grown && !large;
+  const drawn = useDrawnFontSize();
+  // Each label's box as measured (fit only), by key; until measured, the designed box grown as its text is drawn.
+  const [boxes, setBoxes] = useState<Record<string, number>>({});
+  const measureBox = (key: string) => (e: LayoutChangeEvent) => {
+    const h = Math.ceil(e.nativeEvent.layout.height);
+    if (Math.abs((boxes[key] ?? 0) - h) >= 1) setBoxes((b) => ({ ...b, [key]: h }));
+  };
+  // The widest macro name with its key as drawn, and the macros' row, to know whether three fit side by side.
+  const [macroNameW, setMacroNameW] = useState(0);
+  const [macrosW, setMacrosW] = useState(0);
   const over = day.remaining < 0;
   const eaten = day.eaten.kcal;
   const budget = Math.max(0, day.budget);
@@ -217,6 +234,11 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
   const lineH = narrow ? NARROW.labelH : 22;
   const numH = narrow ? 42 : Math.max(44, boxSize - 4);
   const macrosTop = narrow ? NARROW.macrosTop : 14;
+  // Text grown (`fit`): a label's box is its measured height, at first the designed one grown as its text is drawn.
+  const lineBox = (key: string) => (fit ? (boxes[key] ?? Math.ceil((lineH * drawn(17)) / 17)) : lineH);
+  const numBox = fit ? Math.max(44, boxes.left ?? Math.ceil((numH * drawn(boxSize)) / boxSize)) : numH;
+  // With text grown each label's content reports its height (its box), and wraps at its words in the column.
+  const boxed = (key: string, node: React.ReactNode) => (fit ? <View onLayout={measureBox(key)}>{node}</View> : node);
   const vesselW = narrow ? 66 : 84;
   // Burned in activity but left out of the budget (exercise is not added in Goals).
   const notAdded = day.exerciseRule === 'off' ? Math.max(0, day.exerciseNet) : 0;
@@ -283,9 +305,10 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
       // Beside its hatched band: mid-band, or the very top once eaten has risen into the band,
       // so it always reads above the eaten line.
       at: inBand ? budget : budget - headroom / 2,
-      height: lineH,
+      height: lineBox('burned'),
       tick: colors.exercise,
-      content: (
+      content: boxed(
+        'burned',
         // Never clipped (no numberOfLines): under a reader's own text spacing the label wraps rather than lose its end.
         <Text variant="numM" style={{ fontSize: 17, lineHeight: lineH }} testID="today-added" {...figure(addedLabel)}>
           {`~${formatNumber(headroom)}`}
@@ -293,7 +316,7 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
           <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
             {'  added'}
           </Text>
-        </Text>
+        </Text>,
       ),
     });
   } else if (notAdded > 0) {
@@ -302,8 +325,9 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
     labels.push({
       key: 'not-added',
       at: budget,
-      height: lineH,
-      content: (
+      height: lineBox('not-added'),
+      content: boxed(
+        'not-added',
         <Text
           variant="numM"
           style={{ fontSize: 17, lineHeight: lineH }}
@@ -314,7 +338,7 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
           <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
             {'  not added'}
           </Text>
-        </Text>
+        </Text>,
       ),
     });
   }
@@ -322,8 +346,9 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
     labels.push({
       key: 'left',
       at: budget / 2,
-      height: 52,
-      content: (
+      height: fit ? Math.max(44, boxes.left ?? Math.ceil((52 * drawn(22)) / 22)) : 52,
+      content: boxed(
+        'left',
         <PressableScale
           testID="today-not-logged"
           scaleTo={0.97}
@@ -336,24 +361,26 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
           <Text variant="label" color="primaryInk">
             Add what you ate
           </Text>
-        </PressableScale>
+        </PressableScale>,
       ),
     });
   } else {
     labels.push({
       key: 'left',
       at: (Math.min(eaten, budget) + emptyTop) / 2,
-      // At least 44 tall to touch: as tall as the number on a narrow phone, its touch area reaching 44 past it.
-      height: numH,
-      content: bigControl(false, { minHeight: numH }),
+      // At least 44 tall to touch: as tall as the number on a narrow phone, its touch area reaching 44 past it. With text
+      // grown, as tall as the number is drawn, its unit going under it where the two do not fit the column.
+      height: numBox,
+      content: fit ? boxed('left', bigControl(true, { minHeight: 44, maxWidth: '100%' })) : bigControl(false, { minHeight: numH }),
     });
     if (!firstDay) {
       labels.push({
         key: 'eaten',
         at: Math.min(eaten, budget),
-        height: lineH,
+        height: lineBox('eaten'),
         tick: colors.rim,
-        content: (
+        content: boxed(
+          'eaten',
           // Text only: it never takes a tap meant for the big number above it. The budget is said here, once, as the
           // diary's summary says it ("1,219 eaten of 2,160" under "941 kcal left", or "941 left of 2,160" under "1,219 kcal
           // eaten", whose unit it shares: " kcal" would not fit its column at 320 px); the whole sum (target plus exercise)
@@ -367,11 +394,16 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
                 {formatNumber(day.budget)}
               </Text>
             </AnimatedNumber>
-          </View>
+          </View>,
         ),
       });
     }
   }
+  // The cup holds its labels' boxes beside it: the designed height, taller only when grown text needs it.
+  const cupH = fit ? cupHeightFor(height, labels.map((l) => l.height), labelSpacing) : height;
+  // The macros side by side while their names fit a third of the row as drawn; else one row each (as with very large text).
+  const macroGap = narrow ? spacing.md : spacing.lg;
+  const macrosStacked = fit && !fitsRoom(macroNameW, (macrosW - 2 * macroGap) / 3);
 
   // The line at the eaten level (the other figure of the choice and the budget): not on day one, nor on a past day with
   // nothing logged.
@@ -385,9 +417,8 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
   );
 
   if (large) {
-    // Large text (130% and up, the app's size or the phone's), or text grown at all: the side column beside the cup has
-    // no room for its labels at the heights they describe (the eaten line alone is wider than it at 130%, and a reader's
-    // text spacing widens every label), so nothing here is placed by value. The number leads the card, whole; the cup's other labels are rows beside the cup, each with its key
+    // Very large text (150% and up, the app's size or the phone's): the side column beside the cup has no room for its
+    // labels at the heights they describe (the eaten line alone would take three lines of it), so nothing here is placed by value. The number leads the card, whole; the cup's other labels are rows beside the cup, each with its key
     // (the hatch for workouts, the calorie fill for eaten); the macros and water are rows under it. Every line
     // wraps at its words.
     const remaining = notLogged ? (
@@ -486,7 +517,7 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
           headroom={headroom}
           color={colors.calories}
           width={vesselW}
-          height={height}
+          height={cupH}
           labels={labels}
           labelGap={narrow ? 14 : 16}
           labelSpacing={labelSpacing}
@@ -498,10 +529,22 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
       {/* The macros sit under the cup, not in its side column: beside the cup there is room only for
           the cup's own labels, each at the height it describes, whatever the day's numbers are. */}
       {firstDay || notLogged ? null : (
-        <View style={{ flexDirection: 'row', gap: narrow ? spacing.md : spacing.lg, marginTop: macrosTop }} testID="today-macros">
-          <MacroColumn label="Protein" value={day.eaten.protein} target={day.macros.proteinG} color={colors.protein} narrow={narrow} reach />
-          <MacroColumn label="Carbs" value={day.eaten.carbs} target={day.macros.carbsG} color={colors.carbs} narrow={narrow} />
-          <MacroColumn label="Fat" value={day.eaten.fat} target={day.macros.fatG} color={colors.fat} narrow={narrow} />
+        <View
+          onLayout={fit ? (e) => setMacrosW(Math.floor(e.nativeEvent.layout.width)) : undefined}
+          style={macrosStacked ? { gap: spacing.md, marginTop: macrosTop } : { flexDirection: 'row', gap: macroGap, marginTop: macrosTop }}
+          testID="today-macros">
+          {fit ? (
+            <MeasureWidth onWidth={setMacroNameW}>
+              <View style={{ alignItems: 'flex-start' }}>
+                {['Protein', 'Carbs', 'Fat'].map((label) => (
+                  <MacroName key={label} label={label} color={colors.text} />
+                ))}
+              </View>
+            </MeasureWidth>
+          ) : null}
+          <MacroColumn label="Protein" value={day.eaten.protein} target={day.macros.proteinG} color={colors.protein} narrow={narrow} reach stacked={macrosStacked} />
+          <MacroColumn label="Carbs" value={day.eaten.carbs} target={day.macros.carbsG} color={colors.carbs} narrow={narrow} stacked={macrosStacked} />
+          <MacroColumn label="Fat" value={day.eaten.fat} target={day.macros.fatG} color={colors.fat} narrow={narrow} stacked={macrosStacked} />
         </View>
       )}
       {water}
@@ -515,14 +558,7 @@ function EnergyCard({ day, isToday, firstDay }: { day: DaySummary; isToday: bool
  * wraps under the name when both do not fit), the bar under them.
  */
 function MacroColumn({ label, value, target, color, reach, narrow, stacked }: { label: string; value: number; target: number; color: string; reach?: boolean; narrow: boolean; stacked?: boolean }) {
-  const name = (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-      <CupKey color={color} />
-      <Text variant="label" numberOfLines={stacked ? undefined : 1}>
-        {label}
-      </Text>
-    </View>
-  );
+  const name = <MacroName label={label} color={color} lines={stacked ? undefined : 1} />;
   const bar = <ProgressBar progress={target > 0 ? value / target : 0} color={color} height={6} goalKind={reach ? 'reach' : 'limit'} />;
   // The target may wrap under the number on a narrow phone, whole ("/ 493 g"); it is never cut.
   const amount = (
@@ -550,6 +586,18 @@ function MacroColumn({ label, value, target, color, reach, narrow, stacked }: { 
   );
 }
 
+/** A macro's key and name, as its column draws it (and as the card measures it while text is grown). */
+function MacroName({ label, color, lines }: { label: string; color: string; lines?: number }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <CupKey color={color} />
+      <Text variant="label" numberOfLines={lines}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 const sentence = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 // ------------------------------------------------------------------ meals
@@ -562,9 +610,11 @@ const sentence = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 function MealsSection({ day, nowMeal, cardRepeat }: { day: DaySummary; nowMeal: MealType | null; cardRepeat: MealType | null }) {
   const { colors, spacing } = useTheme();
   const all = useLive('foodEntries');
-  // Large text: a meal's name and its calories wrap as two lines when both do not fit, and "Repeat" goes on a row of
-  // its own under the meal, so the caption keeps the room it needs and never splits a word.
-  const large = useLargeText();
+  // Very large text (150% and up): a meal's name and its calories wrap as two lines when both do not fit, and "Repeat"
+  // goes on a row of its own under the meal, so the caption keeps the room it needs and never splits a word. Through the
+  // phone's common steps the rows keep their shape with larger text: the caption takes its lines rather than be cut.
+  const large = useVeryLargeText();
+  const grown = useGrownText();
   const open = (meal: MealType) => router.push(`/food/search?meal=${meal}&date=${day.date}`);
   const web = Platform.OS === 'web';
   return (
@@ -631,7 +681,7 @@ function MealsSection({ day, nowMeal, cardRepeat }: { day: DaySummary; nowMeal: 
                       </Text>
                     ) : null}
                   </View>
-                  <Text variant="caption" color="textSecondary" numberOfLines={large ? undefined : 2}>
+                  <Text variant="caption" color="textSecondary" numberOfLines={large || grown ? undefined : 2}>
                     {caption}
                   </Text>
                 </PressableScale>
