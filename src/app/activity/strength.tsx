@@ -515,8 +515,9 @@ function RestBar({ draft, now, update }: { draft: StrengthDraft; now: number; up
             {formatClock(Math.ceil(left / 1000) * 1000)}
           </Text>
         </View>
-        {small('−15 s', 'Rest 15 seconds less', 'strength-rest-minus', () => adjust(-15))}
-        {small('+15 s', 'Rest 15 seconds more', 'strength-rest-plus', () => adjust(15))}
+        {/* Named with the words they show first, then what a press does (label in name). */}
+        {small('−15 s', '−15 s, rest 15 seconds less', 'strength-rest-minus', () => adjust(-15))}
+        {small('+15 s', '+15 s, rest 15 seconds more', 'strength-rest-plus', () => adjust(15))}
         {small('Skip', 'Skip rest', 'strength-rest-skip', () => update(edits.skipRest))}
       </View>
       {/* The rest drains like a trough emptying toward the next set. */}

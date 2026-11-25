@@ -62,6 +62,8 @@ export function ActivitySheet({
       chevron={false}
       accessibilityRole="button"
       accessibilityState={{ selected: row?.activityId === a.id }}
+      // The row's words as drawn, "Current" included (label in name).
+      accessibilityLabel={row?.activityId === a.id ? `${a.name}, Current` : a.name}
       right={row?.activityId === a.id ? <Text variant="label" color="textSecondary">Current</Text> : undefined}
     />
   );
