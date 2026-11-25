@@ -35,9 +35,17 @@ const allText = (prims: Prim[]): string =>
 describe('day card content', () => {
   it('shows how full the day is, not kcal, by default', () => {
     const c = dayCardContent(day(), DEFAULT_SHARE_CHOICES);
-    expect(c.headline).toEqual({ value: '86%', unit: 'of the day’s budget' });
+    // 1,850 of 2,160 is 85.6%: floored, as the check-in and the calendar say it (`budgetSharePct`).
+    expect(c.headline).toEqual({ value: '85%', unit: 'of the day’s budget' });
     expect(c.summary).not.toMatch(/kcal/);
     expect(allText(dayScene(c, darkColors).prims)).not.toMatch(/kcal|1,850|2,160/);
+  });
+
+  it('says a day’s share of its budget as every screen does: never 90% under the on-budget band, never 100% above it', () => {
+    // 89.6% has no check (`budgetMark`), so it never reads 90%; 100.4% is above the budget, so it never reads 100%.
+    expect(dayCardContent(day({ kcal: 1935.4 }), DEFAULT_SHARE_CHOICES).headline.value).toBe('89%');
+    expect(dayCardContent(day({ kcal: 2168.6 }), DEFAULT_SHARE_CHOICES).headline.value).toBe('101%');
+    expect(dayCardContent(day({ kcal: 2160 }), DEFAULT_SHARE_CHOICES).headline.value).toBe('100%');
   });
 
   it('shows the kcal figures only when chosen', () => {
