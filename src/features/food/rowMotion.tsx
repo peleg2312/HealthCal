@@ -141,8 +141,10 @@ export function FadeRow({ children, leaving, back = false, testID }: { children:
       fold.set(withDelay(D.rowExit, withTiming(0, { duration: ROW_FOLD_MS, easing: ease.move })));
     } else if (wasLeaving.current) {
       // Back before its fold ended: its height is known, so it opens from the next frame (`onNextFrame`).
-      wasLeaving.current = false;
-      return onNextFrame(open);
+      return onNextFrame(() => {
+        wasLeaving.current = false;
+        open();
+      });
     } else if (!opened.current) {
       // Should no layout ever come (a row that is not drawn), it is opened all the same.
       const timer = setTimeout(() => !opened.current && open(), 250);
@@ -217,14 +219,17 @@ export function Unfold({ children, animate, delay = D.rowExit, open = true }: { 
   useEffect(() => {
     // The mount's own run is above; from then on a change of `open` folds the row out or back in.
     if (lastOpen.current === open) return;
-    lastOpen.current = open;
     if (reduce) {
+      lastOpen.current = open;
       v.set(open ? 1 : 0);
       return;
     }
     // Two frames on, as the row that came back opens on its first layout (a frame after it is drawn): in step with
     // it, so the card around them neither dips nor jumps (`onNextFrame`).
-    return onNextFrame(() => v.set(withTiming(open ? 1 : 0, { duration: ROW_FOLD_MS, easing: ease.move })), 2);
+    return onNextFrame(() => {
+      lastOpen.current = open;
+      v.set(withTiming(open ? 1 : 0, { duration: ROW_FOLD_MS, easing: ease.move }));
+    }, 2);
   }, [open, reduce, v]);
   const style = useAnimatedStyle(() => {
     const k = v.get();
