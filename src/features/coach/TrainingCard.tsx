@@ -1,7 +1,8 @@
 import React from 'react';
 import { View } from 'react-native';
 
-import { trainingOverview, type LoadSession } from '@/lib/trainingLoad';
+import { barsLabel } from '@/features/progress/chartWords';
+import { CHART_CAPTION, trainingOverview, type LoadSession } from '@/lib/trainingLoad';
 import { useTheme } from '@/theme';
 import type { ISODate } from '@/types';
 import { BarChart, Text } from '@/ui';
@@ -35,6 +36,7 @@ export function TrainingCard({ activities, today }: { activities: readonly LoadS
       <View style={{ paddingHorizontal: 24, marginTop: spacing.xs }}>
         <BarChart
           testID="coach-training-chart"
+          accessibilityLabel={barsLabel(`Active minutes by week, the 150 to 300 minute range shaded. ${CHART_CAPTION}`, o.blocks.map((b) => b.detail ?? `${b.label}: ${b.minutes} min`))}
           data={o.blocks.map((b) => ({ label: b.label, value: b.minutes, detail: b.detail }))}
           color={colors.exercise}
           band={BAND}

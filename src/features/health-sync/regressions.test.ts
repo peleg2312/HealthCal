@@ -190,7 +190,7 @@ describe('regressions', () => {
 describe('a sync never writes the profile', () => {
   // A profile write from inside a sync, before this visit's pull, would put this phone's whole profile over a
   // goal changed on another device (settings and the profile sync as one object). profile.weightKg follows a
-  // synced weigh-in only by the person's own save or "Use it for targets" on /weight (trackers/actions.ts).
+  // synced weigh-in only by the person's own save or "Use it for my target" on /weight (trackers/actions.ts).
   it('no file under src/features/health-sync calls setProfile, syncProfileToLatest, saveWeightRecord or deleteWeightRecord', () => {
     const root = join(__dirname);
     const files: string[] = [];

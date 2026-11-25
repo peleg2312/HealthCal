@@ -5,7 +5,7 @@ import Svg, { Line, Path, Polygon, Rect } from 'react-native-svg';
 import { weightText } from '@/features/trackers/helpers';
 import { useTextGrowth, useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
-import { DrawReveal, Text } from '@/ui';
+import { DECORATIVE, DrawReveal, Text } from '@/ui';
 
 import { rangeShort, shortDate, type Projection } from './projection';
 
@@ -63,7 +63,7 @@ export function ProjectionChart({ projection: p, units, delay = 0, now }: { proj
   const goalCup = `M${gx},${gy} L${gx + gw},${gy} L${gx + gw},${gy + gh - 4} Q${gx + gw},${gy + gh} ${gx + gw - 4},${gy + gh} L${gx + 4},${gy + gh} Q${gx},${gy + gh} ${gx},${gy + gh - 4} Z`;
 
   return (
-    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} {...DECORATIVE}>
       <View style={{ height: PLOT_H }}>
         {width > 0 ? (
           <>

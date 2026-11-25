@@ -6,7 +6,7 @@ import { INTENSITY_LABELS } from '@/lib/exercise';
 import { formatNumber } from '@/lib/units';
 import { useTheme } from '@/theme';
 import type { Intensity } from '@/types';
-import { Card, Chip, CupKey, Divider, PressableScale, Text } from '@/ui';
+import { Card, Chip, CupKey, decorative, Divider, PressableScale, Text } from '@/ui';
 
 import type { FileNote, RowCounts, RowFilter } from './format';
 import { workouts } from './format';
@@ -102,12 +102,12 @@ export function FileNotes({ notes }: { notes: FileNote[] }) {
         <View key={n.file} style={{ gap: spacing.xs, paddingVertical: spacing.sm, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: colors.border }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
             {n.errors.length ? (
-              <FileWarning size={18} color={colors.warningInk} strokeWidth={1.9} />
+              decorative(<FileWarning size={18} color={colors.warningInk} strokeWidth={1.9} />)
             ) : n.warnings.every((w) => w.code.startsWith('apple-')) ? (
               // A Health export's notes are information (steps saved, a session listed once), not a problem.
-              <FileText size={18} color={colors.textSecondary} strokeWidth={1.9} />
+              decorative(<FileText size={18} color={colors.textSecondary} strokeWidth={1.9} />)
             ) : (
-              <AlertTriangle size={18} color={colors.textSecondary} strokeWidth={1.9} />
+              decorative(<AlertTriangle size={18} color={colors.textSecondary} strokeWidth={1.9} />)
             )}
             <Text variant="bodyStrong" numberOfLines={1} style={{ flex: 1 }}>
               {n.file}

@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Platform, View } from 'react-native';
 
 import { fonts, useTheme } from '@/theme';
-import { Card, Divider, PressableScale, Text } from '@/ui';
+import { Card, DECORATIVE, decorative, Divider, PressableScale, Text } from '@/ui';
 
 import { HEALTH_EXPORT_BRINGS, HEALTH_EXPORT_SKIPS } from './format';
 
@@ -58,8 +58,8 @@ function AppleHealthGuide() {
   return (
     <Card testID="import-apple-guide" style={{ gap: spacing.sm }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-        <HeartPulse size={20} color={colors.text} strokeWidth={1.9} />
-        <Text variant="title" style={{ flex: 1 }}>
+        {decorative(<HeartPulse size={20} color={colors.text} strokeWidth={1.9} />)}
+        <Text variant="title" accessibilityRole="header" {...({ 'aria-level': 2 } as object)} style={{ flex: 1 }}>
           From an iPhone’s Health app
         </Text>
       </View>
@@ -87,7 +87,9 @@ function FormatsList() {
     <View testID="import-formats" style={{ gap: spacing.md }}>
       {rows.map((r) => (
         <View key={r.name} style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
-          <View style={{ paddingTop: 1 }}>{r.icon}</View>
+          <View style={{ paddingTop: 1 }} {...DECORATIVE}>
+            {r.icon}
+          </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text variant="bodyStrong">{r.name}</Text>
             <Text variant="caption" color="textSecondary">
@@ -138,7 +140,7 @@ function Guide() {
             Garmin Connect’s account settings.
           </Text>
           <Divider />
-          <Text variant="title">Which files work</Text>
+          <Text variant="title" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>Which files work</Text>
           <FormatsList />
         </View>
       ) : null}

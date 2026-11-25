@@ -17,7 +17,7 @@ import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
 import type { Food, MealType, Serving } from '@/types';
-import { Button, Card, goBack, haptic, Header, IconButton, Screen, Text, TextField } from '@/ui';
+import { Button, Card, decorative, goBack, haptic, Header, IconButton, Screen, Text, TextField } from '@/ui';
 
 type Phase =
   | { kind: 'scan' }
@@ -366,7 +366,7 @@ function ManualEntry({ onLookup, autoFocus }: { onLookup: (code: string) => void
   return (
     <Card style={{ gap: spacing.md }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-        <Keyboard size={18} color={colors.textSecondary} />
+        {decorative(<Keyboard size={18} color={colors.textSecondary} />)}
         <Text variant="title">Type the barcode number</Text>
       </View>
       <Text variant="body" color="textSecondary">

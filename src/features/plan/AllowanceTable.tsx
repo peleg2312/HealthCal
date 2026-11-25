@@ -26,7 +26,7 @@ import { useWindowDimensions, View, type LayoutChangeEvent } from 'react-native'
 import { AiGlyph } from '@/features/ai/mark';
 import { NBSP } from '@/lib/text';
 import { useTextSize, useTheme } from '@/theme';
-import { Card, Text } from '@/ui';
+import { Card, DECORATIVE, Text } from '@/ui';
 
 import { shareOfPlus } from './allowance';
 import { PlanCup } from './PlanCup';
@@ -234,7 +234,7 @@ export function AllowanceTable({ free, plus, current, testID = 'plan-compare' }:
 
   return (
     <Card padding={m.pad} testID={testID} style={{ flexDirection: 'row' }}>
-      <View style={{ flex: 1, minWidth: 0 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <View style={{ flex: 1, minWidth: 0 }} {...DECORATIVE}>
         <View style={{ height: HEAD_H }} />
         <View style={{ height: RULE_H, justifyContent: 'center' }}>
           <View style={{ height: 1, backgroundColor: colors.border }} />

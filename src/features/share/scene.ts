@@ -56,6 +56,7 @@ export type CardColors = Pick<
   | 'vesselEdge'
   | 'vesselEmpty'
   | 'borderStrong'
+  | 'dashEdge'
 >;
 
 export const DAY_SIZE = { width: 360, height: 640 };
@@ -122,7 +123,8 @@ function cup(
   const { x, y, w, h, base } = o;
   const rim = o.rim ?? 3;
   const edge = o.edge ?? 1.5;
-  if (o.future) return [{ k: 'path', d: cupOutline(x, y, w, h, base), stroke: c.borderStrong, sw: edge, dash: [3, 3] }];
+  // A day still to come: a dashed outline that carries meaning, so it is `dashEdge` (3:1), as the app's cups draw it.
+  if (o.future) return [{ k: 'path', d: cupOutline(x, y, w, h, base), stroke: c.dashEdge, sw: edge, dash: [3, 3] }];
   const shape = cupShape(x, y, w, h, base);
   const level = Math.max(0, o.level);
   const shown = Math.min(1, level);

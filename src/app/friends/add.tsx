@@ -1,5 +1,5 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { CircleCheck, ClipboardPaste, Info } from 'lucide-react-native';
+import { ClipboardPaste, Info } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import { View } from 'react-native';
 
@@ -11,7 +11,7 @@ import { formatCode, isCompleteCode, normalizeCode } from '@/features/friends/su
 import { outcomeMessage } from '@/features/friends/week';
 import { refreshFriends, requestFriend, useFriends } from '@/services/friends';
 import { useTheme } from '@/theme';
-import { Button, Card, EmptyState, goBack, Header, IconButton, Screen, Text, TextField, toast } from '@/ui';
+import { Button, Card, CupKey, DECORATIVE, EmptyState, goBack, Header, IconButton, Screen, Text, TextField, toast } from '@/ui';
 
 type Result = { title: string; message: string; good: boolean; outcome: string } | null;
 
@@ -161,7 +161,10 @@ export default function AddFriendScreen() {
       {result ? (
         <Card testID="friends-add-result" accessibilityLiveRegion="polite">
           <View style={{ flexDirection: 'row', gap: spacing.md }}>
-            {result.good ? <CircleCheck size={22} color={colors.success} strokeWidth={2} /> : <Info size={22} color={colors.warningInk} strokeWidth={2} />}
+            {/* The title says the outcome; the mark only decorates it: the done mark (a small filled ink cup, never a check, which means only a day on budget) or the ink info mark. */}
+            <View style={{ width: 22, alignItems: 'center', paddingTop: result.good ? 5 : 0 }} {...DECORATIVE}>
+              {result.good ? <CupKey color={colors.text} size={12} /> : <Info size={22} color={colors.warningInk} strokeWidth={1.9} />}
+            </View>
             <View style={{ flex: 1, gap: 4 }}>
               <Text variant="h3" testID={`friends-add-outcome-${result.outcome.replace(/_/g, '-')}`}>
                 {result.title}

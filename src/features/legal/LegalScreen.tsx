@@ -6,7 +6,7 @@ import { AccessibilityInfo, findNodeHandle, Platform, useWindowDimensions, View,
 import { AiMark, aiMarkHeadroom } from '@/features/ai/mark';
 import { lastWordsTogether } from '@/features/auth/lines';
 import { MAX_CONTENT_WIDTH, useReducedMotion, useTheme } from '@/theme';
-import { Button, Card, Divider, Header, ListRow, PressableScale, Screen, Text } from '@/ui';
+import { Button, Card, DECORATIVE, Divider, Header, ListRow, PressableScale, Screen, Text } from '@/ui';
 
 import { contactLine, jumpLabel, LEGAL_DOCUMENTS, updatedLine, type LegalDocument } from './content';
 import { jumpLines, jumpWidth } from './jumpLines';
@@ -105,7 +105,7 @@ export function LegalScreen({ doc }: { doc: LegalDocument }) {
           const Icon = SUMMARY_ICONS[doc.id][item.id];
           return (
             <View key={item.id} testID={`legal-${doc.id}-summary-${item.id}`} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
-              <View style={{ width: MARK, alignItems: 'center' }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              <View style={{ width: MARK, alignItems: 'center' }} {...DECORATIVE}>
                 {Icon === 'ai' ? (
                   // The cup stands where an icon would; its drop rises above the line.
                   <AiMark size="row" style={{ marginTop: -aiMarkHeadroom('row') }} />

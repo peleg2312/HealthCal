@@ -81,7 +81,7 @@ export function CaloriesADay({ days, summary, today, onOpen }: { days: InsightDa
           ) : null}
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.lg, rowGap: spacing.xs }}>
-          <LegendDot color={colors.borderStrong} label="Average budget" dashed />
+          <LegendDot color={colors.dashEdge} label="Average budget" dashed />
           <LegendDot color={colors.warning} label={weekly ? "Above that week's budget" : "Above that day's budget"} />
           {data.some((b) => b.color) ? <LegendDot color={partial} label="Partly logged" /> : null}
         </View>

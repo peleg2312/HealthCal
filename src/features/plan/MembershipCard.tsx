@@ -22,7 +22,7 @@ import { View } from 'react-native';
 
 import { useNow } from '@/store/clock';
 import { useTheme } from '@/theme';
-import { brimOverhang, Card, Divider, FadeUp, haptic, motion, Text } from '@/ui';
+import { brimOverhang, Card, decorative, Divider, FadeUp, haptic, motion, Text } from '@/ui';
 
 import { shareOfPlus } from './allowance';
 import { PLAN_FULL_NAME } from './channel';
@@ -102,7 +102,7 @@ export function MembershipCard({ view, arriving, outside }: { view: PlanView; /*
         {late ? (
           <View testID="plan-payment-line" style={{ gap: spacing.xs }}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
-              <CreditCard size={18} strokeWidth={1.9} color={colors.warningInk} style={{ marginTop: 2 }} />
+              {decorative(<CreditCard size={18} strokeWidth={1.9} color={colors.warningInk} style={{ marginTop: 2 }} />)}
               <Text variant="bodyStrong" color="warningInk" style={{ flex: 1 }}>
                 {PAST_DUE_HEAD}
               </Text>

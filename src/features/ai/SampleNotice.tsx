@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { cup, useTheme } from '@/theme';
-import { Button, IconButton, Text } from '@/ui';
+import { Button, decorative, IconButton, Text } from '@/ui';
 
 import type { AiAvailability } from './demo';
 
@@ -42,7 +42,7 @@ export function SampleNotice({ reason, variant }: { reason: Reason; variant: 'be
         gap: spacing.sm,
       }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-        <FlaskConical size={18} color={colors.text} strokeWidth={1.9} />
+        {decorative(<FlaskConical size={18} color={colors.text} strokeWidth={1.9} />)}
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text variant="title">{title}</Text>
           <Text variant="caption" color="textSecondary">

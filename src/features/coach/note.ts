@@ -26,7 +26,7 @@
  * remains, and the budget and the protein and water shares are left out when health data may have
  * fed them (`appleNote` then asks the preview to say so): a health-sourced workout or weigh-in of
  * the last 35 days (the budgets of the 7 days before today each look 28 days behind themselves), or a
- * profile weight equal to the latest health-sourced weigh-in (taken over with "Use it for targets").
+ * profile weight equal to the latest health-sourced weigh-in (taken over with "Use it for my target").
  * `APPLE_HEALTH_PROMISE` holds the sentence's words; note.test.ts reads app.json and fails when the
  * two disagree, so the rule changes only with the next iPhone build's sentence.
  */

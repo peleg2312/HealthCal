@@ -12,6 +12,8 @@
 import React from 'react';
 import Svg, { Path } from 'react-native-svg';
 
+import { DECORATIVE } from '@/ui/decorative';
+
 import { useTheme } from '@/theme';
 
 /** The walls (x 5 to 19, as wide as lucide's phone), the open top (y 2.5), the base (y 21.5, its corners 4 round) and the level (y 10.1: 60% of the way up). */
@@ -23,7 +25,7 @@ export function PlanGlyph({ size = 20, color, strokeWidth = 1.9 }: { size?: numb
   const { colors } = useTheme();
   const ink = color ?? colors.textSecondary;
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" accessibilityElementsHidden importantForAccessibility="no" pointerEvents="none">
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" {...DECORATIVE} pointerEvents="none">
       {/* The liquid: a flat tint up to the level. */}
       <Path d={LIQUID} fill={ink} fillOpacity={0.24} />
       {/* The level line: across the top of the fill, ending in the walls (butt ends, so nothing shows past them). */}

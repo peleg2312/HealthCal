@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Check, Plus, Search } from 'lucide-react-native';
+import { Plus, Search } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
@@ -249,11 +249,12 @@ export function FitsSheet({
                         ? `${idea.name} added`
                         : `Add ${idea.name}: ${idea.items.map(displayFoodName).join('; ')}, ${approxKcalSpoken(idea.kcal, hasEstimate(idea.items))}, to ${mealName}${dim ? `. ${row.caption}` : ''}`
                     }
-                    tone={row.kind === 'added' ? 'primary' : 'surface'}
+                    tone="surface"
                     size={44}
                     disabled={row.kind === 'added'}
                     onPress={() => addIdea(idea)}>
-                    {row.kind === 'added' ? <Check size={20} color={colors.onPrimary} strokeWidth={2.2} /> : <Plus size={20} color={colors.text} strokeWidth={2.2} />}
+                    {/* Added: the done mark, the small filled ink cup (never a check, which means only a day on budget), as search's rows. */}
+                    {row.kind === 'added' ? <CupKey color={colors.text} size={12} /> : <Plus size={20} color={colors.text} strokeWidth={2.2} />}
                   </IconButton>
                 </View>
               </React.Fragment>
@@ -308,11 +309,12 @@ export function FitsSheet({
                   <IconButton
                     testID={`fits-add-${i}`}
                     accessibilityLabel={row.kind === 'added' ? `${displayFoodName(f.food)} added` : `Add ${displayFoodName(f.food)}, ${spokenUnits(portionLabel(f))}, ${Math.round(f.kcal)} kilocalories, to ${mealName}`}
-                    tone={row.kind === 'added' ? 'primary' : 'surface'}
+                    tone="surface"
                     size={44}
                     disabled={row.kind === 'added'}
                     onPress={() => add(f)}>
-                    {row.kind === 'added' ? <Check size={20} color={colors.onPrimary} strokeWidth={2.2} /> : <Plus size={20} color={colors.text} strokeWidth={2.2} />}
+                    {/* Added: the done mark, the small filled ink cup (never a check, which means only a day on budget), as search's rows. */}
+                    {row.kind === 'added' ? <CupKey color={colors.text} size={12} /> : <Plus size={20} color={colors.text} strokeWidth={2.2} />}
                   </IconButton>
                 </View>
               </React.Fragment>

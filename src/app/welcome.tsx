@@ -1,5 +1,5 @@
 import { Redirect, router } from 'expo-router';
-import { FileUp, HeartHandshake, Info, ShieldCheck, TriangleAlert, Zap } from 'lucide-react-native';
+import { FileUp, HeartHandshake, Info, Shield, TriangleAlert, Zap } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { useWindowDimensions, View, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
 
@@ -15,7 +15,7 @@ import { VIEWER_BLOCKED } from '@/services/viewer';
 import { isBackendConfigured } from '@/services/supabase';
 import { useStore } from '@/store';
 import { useReducedMotion, useTextSize, useTheme } from '@/theme';
-import { AnimatedNumber, Button, FadeUp, Screen, Text, Vessel } from '@/ui';
+import { AnimatedNumber, Button, decorative, FadeUp, Screen, Text, Vessel } from '@/ui';
 
 /** The cup starts pouring as the screen opens; everything else follows it. */
 const POUR_DELAY = 120;
@@ -29,7 +29,7 @@ const EATEN = 1219;
 const BURNED = 290;
 
 const PROMISES = [
-  { key: 'honest', Icon: ShieldCheck, title: 'Honest numbers' },
+  { key: 'honest', Icon: Shield, title: 'Honest numbers' },
   { key: 'fast', Icon: Zap, title: 'Fast logging' },
   { key: 'free', Icon: HeartHandshake, title: 'Free to log, no ads' },
 ];
@@ -169,7 +169,7 @@ function HeroCup({ height, narrow, small, tiny }: { height: number; narrow: bool
                   alignItems: 'center',
                   gap: spacing.sm,
                 }}>
-                <p.Icon size={18} color={colors.text} strokeWidth={1.9} />
+                {decorative(<p.Icon size={18} color={colors.text} strokeWidth={1.9} />)}
                 <Text variant={small ? 'label' : 'bodyStrong'} style={{ flex: 1 }}>
                   {p.title}
                 </Text>
@@ -234,7 +234,7 @@ function LargeTextHero() {
               alignItems: 'center',
               gap: spacing.sm,
             }}>
-            <p.Icon size={18} color={colors.text} strokeWidth={1.9} />
+            {decorative(<p.Icon size={18} color={colors.text} strokeWidth={1.9} />)}
             <Text variant="bodyStrong" style={{ flex: 1 }}>
               {p.title}
             </Text>

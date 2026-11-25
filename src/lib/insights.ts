@@ -948,8 +948,8 @@ function adaptiveInsight({ energy }: InsightContext): Insight | null {
       id: 'adaptive-pending',
       tone: 'neutral',
       title: 'Learning what you burn',
-      step: `Until then targets use about ${kcalText(formula)} a day, from your body.`,
-      body: `Working out what you burn from your own logs needs ${a.needs ?? 'a little more data'}. Until then targets use the estimate from your body, about ${kcalText(formula)} a day.`,
+      step: `Until then your target uses about ${kcalText(formula)} a day, from your body.`,
+      body: `Working out what you burn from your own logs needs ${a.needs ?? 'a little more data'}. Until then your target uses the estimate from your body, about ${kcalText(formula)} a day.`,
       action: needsWeight ? { label: 'Log weight', route: '/weight' } : { label: 'Open diary', route: '/diary' },
       score: 26,
     };
@@ -962,7 +962,7 @@ function adaptiveInsight({ energy }: InsightContext): Insight | null {
       id: 'adaptive-available',
       tone: 'neutral',
       title: 'What you burn, from your logs',
-      step: 'Turn on "Learn from my data" in Goals to base your targets on it.',
+      step: 'Turn on "Learn from my data" in Goals to base your target on it.',
       body: `Your food and weigh-ins show you burn about ${kcalText(a.observed)} a day before logged workouts, ${rel} the body's estimate of about ${kcalText(formula)}.`,
       action: { label: 'Review goals', route: '/settings/goals' },
       score: 45,
@@ -972,8 +972,8 @@ function adaptiveInsight({ energy }: InsightContext): Insight | null {
     id: 'adaptive-active',
     tone: 'positive',
     title: 'What you burn, from your logs',
-    step: `Your targets now use about ${kcalText(energy.tdee)} a day.`,
-    body: `Your food and weigh-ins show you burn about ${kcalText(a.observed)} a day before logged workouts, ${rel} the body's estimate of about ${kcalText(formula)}. At ${confidenceWord(a.confidence)} confidence (${pct}%) your targets now use a blend of the two, about ${kcalText(energy.tdee)} a day.`,
+    step: `Your target now uses about ${kcalText(energy.tdee)} a day.`,
+    body: `Your food and weigh-ins show you burn about ${kcalText(a.observed)} a day before logged workouts, ${rel} the body's estimate of about ${kcalText(formula)}. At ${confidenceWord(a.confidence)} confidence (${pct}%) your target now uses a blend of the two, about ${kcalText(energy.tdee)} a day.`,
     score: Math.abs(diff) >= 150 ? 42 : 27,
   };
 }

@@ -6,7 +6,7 @@
  * Everything here is pure: no storage, no clock read (`now` and the calendar
  * come in as arguments, as in sleep.ts and steps.ts), no React, and no profile.
  * A sync never writes the profile: `profile.weightKg` follows a synced weigh-in
- * only by the person's own save or "Use it for targets" on /weight
+ * only by the person's own save or "Use it for my target" on /weight
  * (src/features/trackers/actions.ts).
  *
  * A synced weigh-in is an ordinary `weights` record with `source: 'health'`,

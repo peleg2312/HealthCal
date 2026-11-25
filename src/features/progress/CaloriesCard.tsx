@@ -85,7 +85,7 @@ export function CaloriesCard({
             scrub
           />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.lg, rowGap: spacing.xs }}>
-            <LegendDot color={colors.borderStrong} label="Average budget" dashed />
+            <LegendDot color={colors.dashEdge} label="Average budget" dashed />
             <LegendDot color={colors.rim} label="Day's level" level />
             <LegendDot color={colors.warning} label={weekly ? "Above that week's budget" : "Above that day's budget"} />
             {data.some((b) => b.color) ? <LegendDot color={withOpacity(colors.calories, 0.45)} label="Partly logged" /> : null}

@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, View, type StyleProp, type ViewStyle } f
 
 import { cup, cupFor, fonts, useTheme } from '@/theme';
 
+import { CupKey } from './Chip';
 import { DECORATIVE } from './decorative';
 import { PressableScale } from './Pressable';
 import { Text, useGrownText } from './Text';
@@ -31,6 +32,8 @@ export function iconButtonGlyph(size: number, tone: 'surface' | 'alt' | 'primary
  */
 function kitIcon(node: React.ReactNode, glyph: { size: number; strokeWidth: number }, recolour?: { from: string[]; to: string }): React.ReactNode {
   if (!React.isValidElement(node) || typeof node.type === 'string') return node;
+  // A cup key (the done mark, the small filled ink cup) is a key, not an icon: it keeps the size it was given.
+  if (node.type === CupKey) return node;
   const props = node.props as Record<string, unknown>;
   if (!('size' in props) && !('strokeWidth' in props)) return node;
   // A ghost button's icon drawn in the accent takes the button's own ink (`actionInk`), so icon and label match.

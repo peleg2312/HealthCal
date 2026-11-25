@@ -44,7 +44,7 @@ export function RecapCups({ cups, week }: { cups: RecapDayCup[]; week: string })
         {/* The tops of the cups: each day's own budget. */}
         <View
           pointerEvents="none"
-          style={{ position: 'absolute', left: CARD_PAD / 2, right: CARD_PAD / 2, top: CHECK_H, height: 0, borderTopWidth: 1.5, borderStyle: 'dashed', borderColor: colors.borderStrong }}
+          style={{ position: 'absolute', left: CARD_PAD / 2, right: CARD_PAD / 2, top: CHECK_H, height: 0, borderTopWidth: 1.5, borderStyle: 'dashed', borderColor: colors.dashEdge }}
         />
         <View style={{ flexDirection: 'row' }}>
           {cups.map((c, i) => {

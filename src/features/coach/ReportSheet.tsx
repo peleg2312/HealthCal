@@ -1,10 +1,9 @@
-import { Check } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { balancedLines, chipWidth } from '@/features/food/chipLines';
 import { useTheme } from '@/theme';
-import { Button, Chip, haptic, PressableScale, Sheet, Text, toast } from '@/ui';
+import { Button, Chip, CupKey, haptic, PressableScale, Sheet, Text, toast } from '@/ui';
 
 import { buildReportRow, REPORT_REASON_IDS, type ReportReason } from './report';
 import type { CoachMessage } from './request';
@@ -31,7 +30,7 @@ export function ReportSheet({
   question: string | null;
   onClose: () => void;
 }) {
-  const { colors, radius, spacing } = useTheme();
+  const { colors, spacing } = useTheme();
   const width = useWindowDimensions().width;
   const [reason, setReason] = useState<ReportReason | null>(null);
   const [withQuestion, setWithQuestion] = useState(false);
@@ -98,18 +97,23 @@ export function ReportSheet({
             aria-checked={withQuestion}
             accessibilityLabel={REPORT_WITH_QUESTION}
             style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 44, alignSelf: 'flex-start' }}>
+            {/* A cup-cornered tick box, as the import's: ticked, it holds the done mark (the small filled ink cup in an
+                ink outline), never a check, which means only a day on budget. */}
             <View
               style={{
                 width: 22,
                 height: 22,
-                borderRadius: radius.chip,
+                borderTopLeftRadius: 3,
+                borderTopRightRadius: 3,
+                borderBottomLeftRadius: 7,
+                borderBottomRightRadius: 7,
                 borderWidth: 1.5,
-                borderColor: withQuestion ? colors.primary : colors.borderStrong,
-                backgroundColor: withQuestion ? colors.primary : colors.surface,
+                borderColor: withQuestion ? colors.text : colors.fieldEdge,
+                backgroundColor: colors.surface,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
-              {withQuestion ? <Check size={16} color={colors.onPrimary} strokeWidth={2.6} /> : null}
+              {withQuestion ? <CupKey color={colors.text} size={12} /> : null}
             </View>
             <Text variant="body">{REPORT_WITH_QUESTION}</Text>
           </PressableScale>

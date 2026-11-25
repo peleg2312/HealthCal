@@ -183,7 +183,8 @@ function TickBox({ checked, locked, imported }: { checked: boolean; locked: bool
         borderBottomRightRadius: 7,
         borderWidth: 1.5,
         borderStyle: locked ? 'dashed' : 'solid',
-        borderColor: checked ? colors.text : colors.borderStrong,
+        // The box's edge is a control's edge (3:1, `fieldEdge`); a locked row's dashes say it cannot be ticked (`dashEdge`).
+        borderColor: checked ? colors.text : locked ? colors.dashEdge : colors.fieldEdge,
         backgroundColor: 'transparent',
         alignItems: 'center',
         justifyContent: 'center',

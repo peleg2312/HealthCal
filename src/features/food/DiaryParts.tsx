@@ -326,13 +326,15 @@ export function MealCard({
   const filled = rows.length > 0;
   // With large text the meal's name keeps its whole word: the "..." and "+" cups go under it when both do not fit.
   const big = useLargeText();
-  // Under 360 px a filled meal is tighter (8 px above its header, 36 px cups that still take 44 px of touch, 2 px to
-  // its rows), so at 320 x 640 the diary's first view holds Breakfast whole and Lunch's add.
+  // Under 360 px a filled meal is tighter (6 px above its header, 36 px cups that still take 44 px of touch, 4 px to
+  // its rows), so at 320 x 640 the diary's first view holds Breakfast whole and Lunch's add. Each cup's touch reaches
+  // 4 px past it (the kit's hitSlop), so the two cups stand 8 px apart and the rows 4 px under them: the touch areas
+  // meet and never overlap, and a tap meant for one never lands on the other or on the first row.
   const tight = useWindowDimensions().width < 360 && !big;
   const cupSize = tight ? 36 : 44;
   return (
-    <Card testID={`meal-card-${meal}`} padding={0} style={{ paddingTop: filled ? (tight ? 8 : 12) : 16, paddingBottom: filled ? 4 : ROW_PAD }}>
-      <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', justifyContent: 'flex-end', alignItems: 'center', gap: spacing.xs, paddingLeft: ROW_PAD, paddingRight: 14 }}>
+    <Card testID={`meal-card-${meal}`} padding={0} style={{ paddingTop: filled ? (tight ? 6 : 12) : 16, paddingBottom: filled ? 4 : ROW_PAD }}>
+      <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', justifyContent: 'flex-end', alignItems: 'center', gap: tight ? spacing.sm : spacing.xs, paddingLeft: ROW_PAD, paddingRight: 14 }}>
         {/* A big total ("1,450 kcal") goes under the meal's name on a narrow phone rather than cutting it. */}
         <View style={[big ? { flexGrow: 1, flexShrink: 1, flexBasis: 'auto' } : { flex: 1 }, { minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10 }]}>
           {/* The meal's name is a heading at level 2, as a SectionTitle is (WCAG 1.3.1): the diary reads Breakfast, Lunch, ... by heading. */}
@@ -357,7 +359,7 @@ export function MealCard({
         ) : null}
       </View>
       {/* Always mounted (keyed by the day), so a meal's first row slides in too; Undo brings a row back the same way. */}
-      <View style={{ marginTop: rows.length ? (tight ? 2 : 6) : 0 }}>
+      <View style={{ marginTop: rows.length ? (tight ? 4 : 6) : 0 }}>
         <AnimatedList key={date}>
           {rows.map(({ item: e, leaving }, i) => (
             <FadeRow key={e.id} leaving={leaving}>

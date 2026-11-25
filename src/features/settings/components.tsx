@@ -5,7 +5,7 @@ import { View } from 'react-native';
 import { spokenUnits } from '@/lib/spokenUnits';
 import { formatClock, formatHHmm, parseHHmm } from '@/lib/dates';
 import { cup, cupFor, useTheme } from '@/theme';
-import { Button, Card, Chip, CupKey, Divider, IconButton, ListRow, PressableScale, Sheet, Text } from '@/ui';
+import { Button, Card, Chip, CupKey, DECORATIVE, Divider, IconButton, ListRow, PressableScale, Sheet, Text } from '@/ui';
 
 /**
  * A titled card of rows separated by hairlines. Its title is a level-2 heading. `radiogroup` marks a card
@@ -70,7 +70,9 @@ export function overlineWords(title: string): string {
  * The leading mark of a settings row. Pour has no tinted icon tiles: the
  * Lucide icon stands alone, 20 px with stroke 1.9, in textSecondary. A
  * warning or danger `color` (or `keep`) leaves the icon's own colour, since
- * there the colour is a status; any other colour is ignored.
+ * there the colour is a status; any other colour is ignored. It only decorates
+ * (the row's words say what it is), so it is hidden from assistive technology
+ * (`DECORATIVE`), in a kit row or standing bare beside its words.
  */
 export function IconTile({ color, keep, children }: { color?: string; keep?: boolean; children: React.ReactNode }) {
   const { colors } = useTheme();
@@ -89,6 +91,7 @@ export function IconTile({ color, keep, children }: { color?: string; keep?: boo
     : children;
   return (
     <View
+      {...DECORATIVE}
       style={{
         width: 24,
         height: 36,

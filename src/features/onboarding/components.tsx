@@ -5,7 +5,7 @@ import Animated from 'react-native-reanimated';
 
 import { cup, fonts, motion, phoneCapFor, scaledFontSize, useLargeText, useReducedMotion, useTextSize, useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
-import { cssBezier, FadeUp, FOCUS_CUP, MiniCup, parseNumber, PressableScale, ProgressBar, Text, useFocusRing } from '@/ui';
+import { cssBezier, DECORATIVE, FadeUp, FOCUS_CUP, MiniCup, parseNumber, PressableScale, ProgressBar, Text, useFocusRing } from '@/ui';
 
 import { choiceInput, type ChoiceInput } from './choiceInput';
 import { inHand, nextEmptyField } from './fieldChain';
@@ -289,7 +289,12 @@ export function Note({
           }}
         />
       ) : null}
-      {icon ? <View style={{ paddingTop: 1 }}>{icon}</View> : null}
+      {/* The words say it; the mark only decorates them. */}
+      {icon ? (
+        <View style={{ paddingTop: 1 }} {...DECORATIVE}>
+          {icon}
+        </View>
+      ) : null}
       <View style={{ flex: 1, minWidth: 0, gap: 4 }}>{children}</View>
     </View>
   );

@@ -145,7 +145,7 @@ function WeightScreen() {
               <Legend swatch={<View style={{ width: 16, height: 2, borderRadius: 1, backgroundColor: colors.weight }} />} label="Trend" />
               <Legend swatch={<CupKey color={colors.textTertiary} size={7} />} label="Weigh-ins" />
               {target ? (
-                <Legend swatch={<View style={{ width: 16, borderTopWidth: 2, borderStyle: 'dashed', borderColor: colors.borderStrong }} />} label="Goal" />
+                <Legend swatch={<View style={{ width: 16, borderTopWidth: 2, borderStyle: 'dashed', borderColor: colors.dashEdge }} />} label="Goal" />
               ) : null}
             </View>
             <Explain label="Why the trend differs from the scale" testID="weight-trend-help" style={{ marginTop: -spacing.xs, marginBottom: -spacing.sm }}>
@@ -322,10 +322,10 @@ function WeighInSheet({
     setError(null);
   }
   const unit = weightUnit(units);
-  // The weight field takes the focus as the sheet opens. On the web it is focused after the sheet has
-  // noted what had the focus before ("Log weigh-in", or the row tapped), so closing it by Escape or the
-  // backdrop gives the focus back there instead of to the page: an autoFocus would focus the field
-  // first, and the sheet would note the field. Natively the field keeps its autoFocus.
+  // The weight field takes the focus as the sheet opens. On the web it is focused from this effect, once
+  // the sheet is open; the kit `Sheet` notes what had the focus before ("Log weigh-in", or the row tapped)
+  // before its children mount, so closing it by Escape or the backdrop gives the focus back there (an
+  // autoFocus would do the same now; this effect predates that). Natively the field keeps its autoFocus.
   const weightRef = useRef<React.ComponentRef<typeof TextInput>>(null);
   const open = date !== null;
   useEffect(() => {

@@ -9,7 +9,7 @@ import { getReminderPermission, remindersSupported, requestReminderPermission, t
 import { useStore } from '@/store';
 import { balancedLines, chipWidth } from '@/features/food/chipLines';
 import { scaledFontSize, useTextSize, useTheme } from '@/theme';
-import { Button, Card, Chip, ChipWrap, Header, Screen, Segmented, Text, ToggleRow, toast } from '@/ui';
+import { Button, Card, Chip, ChipWrap, decorative, Header, Screen, Segmented, Text, ToggleRow, toast } from '@/ui';
 
 const INTERVALS = [60, 90, 120, 180, 240];
 /** "1 h", "1.5 h": short enough for five in one row on a 320 px phone. */
@@ -285,7 +285,7 @@ function Preview({ plan, now, hour12, off }: { plan: PlannedReminder[]; now: Dat
               paddingVertical: spacing.md,
               gap: 6,
             }}>
-            <MoonStar size={24} color={colors.textTertiary} />
+            {decorative(<MoonStar size={24} color={colors.textTertiary} />)}
             <Text variant="bodyStrong" align="center">
               Nothing more to send
             </Text>

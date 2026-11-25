@@ -84,7 +84,8 @@ export interface ThemeColors {
    */
   caloriesBar: string;
   /**
-   * A dashed line that carries meaning: a chart's goal line and the dashed slot of an empty meal. 3:1 on the
+   * A dashed line that carries meaning: a chart's goal line and its legend key, the dashed slot of an empty meal,
+   * a day still to come (a mini cup, the share card), the check-in's budget line and a locked tick box. 3:1 on the
    * page and the card (bg, bgElevated, surface) in every look. `borderStrong` stays the hairline for dashes
    * that only divide.
    */

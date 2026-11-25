@@ -55,6 +55,7 @@ import {
   Text,
   motion,
   toast,
+  useGrownText,
   useReducedMotion,
   Vessel,
 } from '@/ui';
@@ -130,6 +131,11 @@ function reachedNote(extra: string | null): string | null {
  */
 /** A glass tile's least width with large text: "500 ml" whole at 200%, two tiles a row at 320 px. */
 const BIG_TILE = 128;
+/**
+ * A glass tile's least width once text grows at all, a reader's own text spacing included (`useGrownText`):
+ * "500 ml" never parts from its unit, so the tile makes room for it whole (two a row at 360) rather than cut it.
+ */
+const GROWN_TILE = 96;
 
 function tileRows(count: number, screenW: number, minTile = 72): number[][] {
   const content = Math.min(screenW, 560) - 40;
@@ -152,11 +158,13 @@ function tileRows(count: number, screenW: number, minTile = 72): number[][] {
  */
 function GlassTile({ title, subtitle, icon, onPress, testID, accessibilityLabel }: { title: string; subtitle?: string; icon: React.ReactNode; onPress: () => void; testID: string; accessibilityLabel: string }) {
   const { colors, radius } = useTheme();
+  // Grown text or a reader's own text spacing (`useGrownText`): the amount and its caption wrap rather than be cut,
+  // as the kit's labels do; at the designed size each holds one line.
+  const lines = useGrownText() ? undefined : 1;
   return (
     <PressableScale
       testID={testID}
       onPress={onPress}
-      feedback="press"
       scaleTo={0.94}
       accessibilityLabel={accessibilityLabel}
       style={{
@@ -174,11 +182,11 @@ function GlassTile({ title, subtitle, icon, onPress, testID, accessibilityLabel 
         paddingVertical: 10,
       }}>
       {icon}
-      <Text variant="numM" tabular numberOfLines={1} style={{ fontSize: 17, lineHeight: 22 }}>
+      <Text variant="numM" tabular numberOfLines={lines} style={{ fontSize: 17, lineHeight: 22, textAlign: 'center' }}>
         {title}
       </Text>
       {subtitle ? (
-        <Text variant="caption" color="textSecondary" numberOfLines={1}>
+        <Text variant="caption" color="textSecondary" numberOfLines={lines} style={{ textAlign: 'center' }}>
           {subtitle}
         </Text>
       ) : null}
@@ -193,6 +201,7 @@ function WaterScreen() {
   // Large text (Profile's text size, or the phone's): the cup's words leave the cup's side for a column of
   // their own and the glasses go two a row, so nothing is cut or overlaps.
   const big = useLargeText();
+  const grown = useGrownText();
   const profile = useProfile();
   const settings = useStore((s) => s.settings);
   const units = profile.units;
@@ -515,7 +524,7 @@ function WaterScreen() {
         />
       )}
       <View style={{ gap: spacing.sm }}>
-        {tileRows(settings.waterPresets.length, screenW, big ? BIG_TILE : 72).map((row, r) => (
+        {tileRows(settings.waterPresets.length, screenW, big ? BIG_TILE : grown ? GROWN_TILE : 72).map((row, r) => (
           <View key={r} style={{ flexDirection: 'row', gap: spacing.sm }}>
             {row.map((i) => {
               if (i < 0) return <View key={`pad-${r}-${i}`} style={{ flex: 1 }} />;

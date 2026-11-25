@@ -31,7 +31,7 @@ import { sendPasswordReset, signIn, signUp, updatePassword, useAuth, validateEma
 import { isBackendConfigured } from '@/services/supabase';
 import { useStore } from '@/store';
 import { useTextSize, useTheme } from '@/theme';
-import { Avatar, Button, goBack, haptic, Header, IconButton, PressableScale, Screen, Text, TextField, toast } from '@/ui';
+import { Avatar, Button, decorative, goBack, haptic, Header, IconButton, PressableScale, Screen, Text, TextField, toast } from '@/ui';
 
 type Mode = 'signin' | 'signup' | 'forgot';
 
@@ -423,7 +423,7 @@ function Inbox({ confirm, email, googleHint, onBack }: { confirm: boolean; email
       footer={<Button title={confirm ? 'I confirmed, sign in' : 'Back to sign in'} testID="auth-done-continue" onPress={onBack} />}>
       <FadeIn style={{ alignItems: 'center', gap: spacing.lg }}>
         <Avatar size={72}>
-          <MailCheck size={30} color={colors.text} strokeWidth={1.9} />
+          {decorative(<MailCheck size={30} color={colors.text} strokeWidth={1.9} />)}
         </Avatar>
         {/* Two lines: where the link went, and what to do with it. */}
         <View style={{ gap: spacing.xs }}>
@@ -712,7 +712,7 @@ function NotConfigured() {
       footer={<Button title={onboarded ? 'Back to today' : 'Set up on this device'} testID="auth-continue-local" onPress={() => router.replace(onboarded ? '/' : '/onboarding')} />}>
       <FadeIn style={{ alignItems: 'center', gap: spacing.lg }}>
         <Avatar size={72}>
-          <Smartphone size={30} color={colors.text} strokeWidth={1.9} />
+          {decorative(<Smartphone size={30} color={colors.text} strokeWidth={1.9} />)}
         </Avatar>
         <Text variant="body" color="textSecondary" align="center">
           HealthCal works fully on this device: logging, targets, trends and export. Your data is saved here and never leaves it.

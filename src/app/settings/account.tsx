@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Cloud, CloudOff, CreditCard, Info, KeyRound, LogOut, RefreshCw, ShieldCheck, Smartphone, Trash2 } from 'lucide-react-native';
+import { Cloud, CloudOff, CreditCard, Info, KeyRound, LogOut, RefreshCw, Shield, Smartphone, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
@@ -29,7 +29,7 @@ import { syncNow, useSyncState } from '@/services/sync';
 import { pendingChanges, useStore } from '@/store';
 import { useNow } from '@/store/clock';
 import { fonts, MAX_CONTENT_WIDTH, useTheme } from '@/theme';
-import { Button, Card, ConfirmSheet, CupKey, Divider, Header, ListRow, Screen, Sheet, Text, toast } from '@/ui';
+import { Button, Card, ConfirmSheet, CupKey, DECORATIVE, Divider, Header, ListRow, Screen, Sheet, Text, toast } from '@/ui';
 
 /** The words of the delete confirmation: what is erased. With a plan held, the plan's line stands over them, set apart. */
 const DELETE_ERASES =
@@ -60,7 +60,7 @@ function Benefit({ icon, title, text }: { icon: React.ReactNode; title: string; 
         gap: spacing.md,
         alignItems: 'flex-start',
       }}>
-      {icon}
+      <View {...DECORATIVE}>{icon}</View>
       <View style={{ flex: 1 }}>
         <Text variant="bodyStrong">{title}</Text>
         <Text variant="caption" color="textSecondary">
@@ -142,7 +142,7 @@ function SignedOut() {
             text="Log on your phone, review on the web. Changes merge automatically."
           />
           <Benefit
-            icon={<ShieldCheck size={20} color={colors.textSecondary} strokeWidth={1.9} />}
+            icon={<Shield size={20} color={colors.textSecondary} strokeWidth={1.9} />}
             title="Yours to take or delete"
             text="Export everything any time, and delete the account with one confirmation."
           />

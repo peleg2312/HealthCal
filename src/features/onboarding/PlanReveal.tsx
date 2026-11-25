@@ -3,11 +3,11 @@ import React, { useEffect, useState } from 'react';
 import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { TARGET_CARE_NOTE } from '@/features/settings/careNote';
-import { weightText } from '@/features/trackers/helpers';
-import { formatNumber, formatVolume, round } from '@/lib/units';
+import { bodyFatText, weightText } from '@/features/trackers/helpers';
+import { formatNumber, formatVolume } from '@/lib/units';
 import { spokenUnits } from '@/lib/spokenUnits';
 import { useTextSize, useTheme } from '@/theme';
-import { AnimatedNumber, Button, Card, CupKey, Divider, FadeUp, haptic, levelY, MacroBar, PressableScale, Text, useReducedMotion, Vessel } from '@/ui';
+import { AnimatedNumber, Button, Card, CupKey, decorative, Divider, FadeUp, haptic, levelY, MacroBar, PressableScale, Text, useReducedMotion, Vessel } from '@/ui';
 
 import { ARRIVAL_POUR, stepHeadingRef } from './components';
 import { METHOD_LABEL, type Plan } from './model';
@@ -65,7 +65,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
   const range = projection ? rangeText(projection, now) : '';
   const methodWhy =
     plan.bmrMethod === 'katch-mcardle' && plan.leanMassKg !== null
-      ? `From your lean mass of ${weightText(plan.leanMassKg, units)} (body fat ${round(p.bodyFatPct ?? 0, 1)}%)`
+      ? `From your lean mass of ${weightText(plan.leanMassKg, units)} (body fat ${bodyFatText(p.bodyFatPct ?? 0)})`
       : 'From your height, weight, age and sex';
   const name = p.name;
   // A long name goes to the overline, so the headline stays three or four lines on a small phone.
@@ -289,7 +289,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
           gap: spacing.sm,
           paddingHorizontal: spacing.xs,
         }}>
-        <Info size={16} color={colors.textSecondary} strokeWidth={1.9} />
+        {decorative(<Info size={16} color={colors.textSecondary} strokeWidth={1.9} />)}
         <Text variant="caption" color="textSecondary" style={{ flex: 1 }} testID="plan-estimates-note">
           Starting estimates: they adapt to what you really burn as you log. Change any number in Goals.
         </Text>

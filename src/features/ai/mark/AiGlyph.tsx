@@ -1,6 +1,8 @@
 import React from 'react';
 import Svg, { Path } from 'react-native-svg';
 
+import { DECORATIVE } from '@/ui/decorative';
+
 /**
  * The AI's line glyphs, for a button or a tile where the AI's cup (./AiMark.tsx) would be too much
  * and a stock icon says nothing: the same cup with its drop, drawn as lines on lucide's 24 grid with
@@ -42,7 +44,7 @@ const GLYPHS: Record<AiGlyphName, { strokes: string[]; drop: string }> = {
 export function AiGlyph({ name, size = 20, color = 'currentColor', strokeWidth = 1.9 }: { name: AiGlyphName; size?: number; color?: string; strokeWidth?: number }) {
   const g = GLYPHS[name];
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" accessibilityElementsHidden importantForAccessibility="no" pointerEvents="none">
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" {...DECORATIVE} pointerEvents="none">
       {g.strokes.map((d) => (
         <Path key={d} d={d} stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" fill="none" />
       ))}

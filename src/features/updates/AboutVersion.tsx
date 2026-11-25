@@ -16,7 +16,7 @@ import { AccessibilityInfo, Platform, View } from 'react-native';
 
 import { useToday } from '@/store/clock';
 import { useTheme } from '@/theme';
-import { Button, Text } from '@/ui';
+import { Button, decorative, Text } from '@/ui';
 
 import { aboutState, runningLine } from './rules';
 import { checkForUpdatesNow, forgetCheckResult, restartToUpdate, useUpdatesStatus } from './updates';
@@ -56,7 +56,7 @@ export function AboutVersion() {
 
   return (
     <View style={{ alignItems: 'center', gap: 4, paddingVertical: spacing.md }}>
-      <Info size={18} color={colors.textTertiary} />
+      {decorative(<Info size={18} color={colors.textTertiary} />)}
       <Text variant="caption" color="textTertiary" testID="about-version">
         HealthCal {version}
       </Text>

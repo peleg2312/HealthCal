@@ -32,7 +32,7 @@ import { favoriteRecordId, useStore } from '@/store';
 import { useDay, useLive } from '@/store/selectors';
 import { cup, motion, useLargeText, useTheme } from '@/theme';
 import type { Food, FoodEntry, MealType, SavedMeal } from '@/types';
-import { AnimatedNumber, Button, Chip, ChipRow, CupKey, Divider, EmptyState, Header, IconButton, PressableScale, Screen, Sheet, Text, TextField } from '@/ui';
+import { AnimatedNumber, Button, Chip, ChipRow, CupKey, decorative, Divider, EmptyState, Header, IconButton, PressableScale, Screen, Sheet, Text, TextField } from '@/ui';
 import { spokenUnits } from '@/lib/spokenUnits';
 
 type Tab = SearchTab;
@@ -386,7 +386,7 @@ export default function FoodSearchScreen() {
                   <View
                     testID="search-fav-hint"
                     style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 48, paddingLeft: 14, paddingRight: 4, ...cup(radius.tile, 5), backgroundColor: colors.surfaceAlt }}>
-                    <Pointer size={17} color={colors.text} strokeWidth={1.9} />
+                    {decorative(<Pointer size={17} color={colors.text} strokeWidth={1.9} />)}
                     <Text variant="label" style={{ flex: 1, minWidth: 0 }} testID="search-fav-hint-text">
                       {narrow || big ? HOLD_HINT.short : HOLD_HINT.text}
                     </Text>

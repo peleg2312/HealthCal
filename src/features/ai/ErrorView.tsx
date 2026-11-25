@@ -6,7 +6,7 @@ import { usedAllowance } from '@/features/plan/allowance';
 import { AllowanceUsed } from '@/features/plan/AllowanceUsed';
 import { tieEnd } from '@/features/plan/words';
 import { useTheme } from '@/theme';
-import { Button, Card, Text } from '@/ui';
+import { Button, Card, DECORATIVE, Text } from '@/ui';
 
 import { aiError, type AiErrorCode } from './api';
 import type { LimitInfo } from './limit';
@@ -49,7 +49,8 @@ function bodyFor(code: ScreenErrorCode, message: string): string {
 }
 
 function Icon({ code, color }: { code: ScreenErrorCode; color: string }) {
-  const p = { size: 28, color, strokeWidth: 1.9 };
+  // The title says what went wrong; the mark only decorates it (hidden from assistive technology).
+  const p = { size: 28, color, strokeWidth: 1.9, ...DECORATIVE };
   switch (code) {
     case 'daily_limit':
       return <CalendarClock {...p} />;

@@ -10,7 +10,7 @@ import { formatNumber, kgToLb, lbToKg, round, weightUnit } from '@/lib/units';
 import { useNow, useToday } from '@/store/clock';
 import { cup, useLargeText, useTheme } from '@/theme';
 import type { ActivityLevel, GoalType } from '@/types';
-import { Card, Divider, MiniCup, PressableScale, ProgressBar, Stepper, Text, ToggleRow } from '@/ui';
+import { Card, DECORATIVE, Divider, MiniCup, PressableScale, ProgressBar, Stepper, Text, ToggleRow } from '@/ui';
 
 import type { ChoiceInput } from './choiceInput';
 import { BigNumberField, BigTextField, ChoiceCard, ErrorText, FieldRow, GoalCup, Note, StepTitle, unitSpoken, UnitsToggle, useFieldChain, WhyWeAsk } from './components';
@@ -681,8 +681,7 @@ export function TargetStep({ draft, set, errors, submit }: StepProps) {
               alignItems: 'flex-end',
               gap: spacing.sm,
             }}
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants">
+            {...DECORATIVE}>
             <WeightCup label={fmtW(draft.weight!)} level={goal === 'lose' ? 0.8 : 0.55} />
             <View style={{ paddingBottom: 26 }}>
               <ArrowRight size={16} color={colors.textSecondary} strokeWidth={2.2} />

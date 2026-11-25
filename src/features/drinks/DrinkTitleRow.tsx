@@ -14,16 +14,18 @@ import React from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { useLargeText, useTheme } from '@/theme';
-import { Button, Text } from '@/ui';
+import { Button, Text, useGrownText } from '@/ui';
 
 export function DrinkTitleRow({ onSearch, onEditSizes }: { onSearch: () => void; onEditSizes: () => void }) {
   const { colors } = useTheme();
   const narrow = useWindowDimensions().width < 360;
   // With large text the title has the line to itself and the two buttons go under it, so it is never cut.
   const big = useLargeText();
+  // Grown text or a reader's own text spacing (`useGrownText`): the title wraps rather than be cut, as kit labels do.
+  const grown = useGrownText();
   return (
     <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', alignItems: 'center', marginTop: 4, rowGap: big ? 12 : 0 }}>
-      <Text variant="h3" style={big ? { flexBasis: '100%' } : { flex: 1, minWidth: 0, marginRight: 8 }} numberOfLines={big ? undefined : 1}>
+      <Text variant="h3" style={big ? { flexBasis: '100%' } : { flex: 1, minWidth: 0, marginRight: 8 }} numberOfLines={big || grown ? undefined : 1}>
         Add a drink
       </Text>
       {/* The kit's small buttons are 36 px tall (44 to the finger); the -6 margins lay them out 24 px tall, the h3's line. */}

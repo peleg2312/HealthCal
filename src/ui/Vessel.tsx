@@ -193,7 +193,8 @@ export function Vessel({
         borderWidth: EDGE,
         borderTopWidth: 0,
         borderStyle: 'dashed',
-        borderColor: colors.borderStrong,
+        // The dashes say "a day still to come": a dash that carries meaning, 3:1 on the card (`dashEdge`).
+        borderColor: colors.dashEdge,
         borderBottomLeftRadius: base,
         borderBottomRightRadius: base,
       }}

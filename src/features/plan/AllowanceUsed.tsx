@@ -13,6 +13,7 @@ import React from 'react';
 import { View } from 'react-native';
 
 import { useToday } from '@/store/clock';
+import { DECORATIVE } from '@/ui';
 
 import type { UsedAllowance } from './allowance';
 import { PlanCup } from './PlanCup';
@@ -20,7 +21,7 @@ import { PlanCup } from './PlanCup';
 export function AllowanceUsed({ used, limit, testID = 'ai-limit-cup' }: UsedAllowance & { testID?: string }) {
   const today = useToday();
   return (
-    <View testID={testID} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ alignSelf: 'flex-start' }}>
+    <View testID={testID} {...DECORATIVE} style={{ alignSelf: 'flex-start' }}>
       <PlanCup size="row" level={limit > 0 ? used / limit : 0} goalKind="limit" memoryKey={`ai-limit-${today}`} />
     </View>
   );

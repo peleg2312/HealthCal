@@ -24,7 +24,7 @@ import { View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { aiMarkFill } from '@/features/ai/mark';
 import { useTheme } from '@/theme';
-import { MiniCup, Vessel, type GoalKind } from '@/ui';
+import { DECORATIVE, MiniCup, Vessel, type GoalKind } from '@/ui';
 
 export type PlanCupSize = 'hero' | 'row' | 'small';
 
@@ -80,7 +80,7 @@ export function PlanCup({
   // A used-up allowance is a full limit cup: its level line shows inside the walls.
   const shown = goalKind === 'limit' && level >= 1 ? fullLevel(size) : level;
   return (
-    <View testID={testID} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" pointerEvents="none" style={style}>
+    <View testID={testID} {...DECORATIVE} pointerEvents="none" style={style}>
       {size === 'hero' ? (
         <Vessel value={shown} max={1} goalKind={goalKind} color={fill} width={s.width} height={s.height} animate={animate} memoryKey={memoryKey} onReached={onReached} />
       ) : (

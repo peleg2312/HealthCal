@@ -61,7 +61,7 @@ import { useStore } from '@/store';
 import { useLive } from '@/store/selectors';
 import { cup, useLargeText, useTheme } from '@/theme';
 import type { AiFoodResult, Food, MealType } from '@/types';
-import { AnimatedNumber, Button, Card, Chip, CupKey, Divider, FadeUp, goBack, haptic, Header, MacroBar, PressableScale, Screen, Segmented, Text, TextField, toast } from '@/ui';
+import { AnimatedNumber, Button, Card, Chip, CupKey, decorative, Divider, FadeUp, goBack, haptic, Header, MacroBar, PressableScale, Screen, Segmented, Text, TextField, toast } from '@/ui';
 
 type InputMode = 'photo' | 'text';
 type Step = 'capture' | 'analysing' | 'review' | 'error';
@@ -676,7 +676,7 @@ export default function PhotoScreen() {
                 <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
                   {/* The AI's cup says "the AI made this, check it". The sample is not the AI and does not wear its mark. */}
                   {isDemo ? (
-                    <FlaskConical size={24} color={colors.text} strokeWidth={1.9} />
+                    decorative(<FlaskConical size={24} color={colors.text} strokeWidth={1.9} />)
                   ) : (
                     <View style={{ width: 24, alignItems: 'center' }}>
                       <AiMark size="row" testID="ai-result-mark" />
@@ -785,7 +785,7 @@ export default function PhotoScreen() {
           <FadeUp key={`a1-${arrival.at}`} disabled={!replay} delay={2 * ARRIVE_STEP}>
             <Card style={{ gap: spacing.md, borderColor: result.hiddenFatQuestion ? colors.borderStrong : colors.border }}>
               <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
-                <Droplet size={18} color={colors.fat} style={{ marginTop: 2 }} />
+                {decorative(<Droplet size={18} color={colors.fat} style={{ marginTop: 2 }} />)}
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text variant="title">{result.hiddenFatQuestion ?? 'Cooked or dressed with fat?'}</Text>
                   <Text variant="caption" color="textSecondary">
@@ -812,7 +812,7 @@ export default function PhotoScreen() {
 
           {result.note ? (
             <FadeUp key={`a3-${arrival.at}`} disabled={!replay} delay={3 * ARRIVE_STEP} style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }} testID="ai-note">
-              <Info size={16} color={colors.textSecondary} style={{ marginTop: 2 }} />
+              {decorative(<Info size={16} color={colors.textSecondary} style={{ marginTop: 2 }} />)}
               <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
                 {result.note}
               </Text>
@@ -829,7 +829,7 @@ export default function PhotoScreen() {
           <FadeUp key={`a5-${arrival.at}`} disabled={!replay} delay={5 * ARRIVE_STEP}>
             <Card style={{ gap: spacing.md }} testID="ai-correction">
               <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
-                <MessageSquareText size={18} color={colors.text} strokeWidth={1.9} style={{ marginTop: 2 }} />
+                {decorative(<MessageSquareText size={18} color={colors.text} strokeWidth={1.9} style={{ marginTop: 2 }} />)}
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text variant="title">Not quite right?</Text>
                   <Text variant="caption" color="textSecondary">

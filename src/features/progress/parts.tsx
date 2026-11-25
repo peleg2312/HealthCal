@@ -278,10 +278,11 @@ export function TrendMark({ trend, period }: { trend?: Direction | null; period?
   const { colors } = useTheme();
   if (!trend) return null;
   const label = `${TREND_WORD[trend]} the previous ${period ?? 'period'}`;
+  // One named image (`accessibilityRole="image"`): the words name it, and the drawn triangle inside is no second image.
   if (trend === 'same')
-    return <View accessible accessibilityLabel={label} style={{ width: 8, height: 2, borderRadius: 1, backgroundColor: colors.textTertiary, alignSelf: 'center' }} />;
+    return <View accessible accessibilityRole="image" accessibilityLabel={label} style={{ width: 8, height: 2, borderRadius: 1, backgroundColor: colors.textTertiary, alignSelf: 'center' }} />;
   return (
-    <View accessible accessibilityLabel={label} style={{ alignSelf: 'center', transform: [{ rotate: trend === 'down' ? '180deg' : '0deg' }] }}>
+    <View accessible accessibilityRole="image" accessibilityLabel={label} style={{ alignSelf: 'center', transform: [{ rotate: trend === 'down' ? '180deg' : '0deg' }] }}>
       <Triangle size={9} color={colors.textSecondary} fill={colors.textSecondary} />
     </View>
   );

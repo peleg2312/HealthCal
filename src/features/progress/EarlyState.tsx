@@ -4,7 +4,7 @@ import { View } from 'react-native';
 
 import { MIN_INSIGHT_DAYS } from '@/lib/insights';
 import { useTheme } from '@/theme';
-import { Button, Card, CupKey, ProgressBar, Text } from '@/ui';
+import { Button, Card, CupKey, decorative, ProgressBar, Text } from '@/ui';
 
 import { go } from './parts';
 
@@ -85,7 +85,8 @@ export function EarlyState({
                 <Text variant="bodyStrong" style={{ flex: 1 }}>
                   {it.title}
                 </Text>
-                {ready ? <Unlock size={14} color={colors.text} /> : <Lock size={14} color={colors.textTertiary} />}
+                {/* The count beside it says how far along each part is; the lock only decorates it. */}
+                {decorative(ready ? <Unlock size={14} color={colors.text} /> : <Lock size={14} color={colors.textTertiary} />)}
                 <Text variant="caption" color={ready ? 'text' : 'textSecondary'} tabular>
                   {Math.min(it.have, it.need)} of {it.need}
                 </Text>

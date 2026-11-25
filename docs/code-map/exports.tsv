@@ -130,12 +130,14 @@ src/features/activity/history.ts	historyMetaLines	function
 src/features/activity/history.ts	historyWeekLabel	function
 src/features/activity/history.ts	historyWeekTitle	function
 src/features/activity/history.ts	historyWeeks	function
+src/features/activity/history.ts	weekStripLabel	function
 src/features/activity/logWords.ts	BURN_UNIT	const
 src/features/activity/logWords.ts	NEXT_DAY_HINT	const
 src/features/activity/logWords.ts	budgetAdds	function
 src/features/activity/logWords.ts	budgetAddsShort	function
 src/features/activity/logWords.ts	burnCaption	function
 src/features/activity/logWords.ts	burnSource	function
+src/features/activity/logWords.ts	sourceWords	function
 src/features/activity/routines.ts	Routine	re-export	src/types/index.ts:Routine
 src/features/activity/routines.ts	RoutineExercise	interface
 src/features/activity/routines.ts	RoutineTemplate	interface
@@ -365,6 +367,7 @@ src/features/ai/words.ts	analysingLabel	function
 src/features/ai/words.ts	analysingNote	function
 src/features/ai/words.ts	analysingSteps	function
 src/features/ai/words.ts	estimateReadyLine	function
+src/features/ai/words.ts	itemKcalSpoken	function
 src/features/ai/words.ts	itemNameLabel	function
 src/features/ai/words.ts	prefilledDescription	function
 src/features/ai/words.ts	searchAiTile	function
@@ -875,6 +878,8 @@ src/features/food/actions.ts	saveMeal	function
 src/features/food/actions.ts	storeSavedMeal	function
 src/features/food/actions.ts	updateEntryDirect	function
 src/features/food/addedTo.ts	TOAST_NAME_MAX	const
+src/features/food/addedTo.ts	WATER_TOAST_LINE	const
+src/features/food/addedTo.ts	entryRemovedToast	function
 src/features/food/addedTo.ts	entryUpdatedToast	function
 src/features/food/addedTo.ts	foodAddedToast	function
 src/features/food/addedTo.ts	foodNameHead	function
@@ -954,6 +959,7 @@ src/features/food/favorites.ts	withFavorite	function
 src/features/food/helpers.ts	Portion	interface
 src/features/food/helpers.ts	QUICK_KCAL_LIMIT	const
 src/features/food/helpers.ts	SourceInfo	interface
+src/features/food/helpers.ts	SourceKind	type
 src/features/food/helpers.ts	amountLabel	function
 src/features/food/helpers.ts	amountStep	function
 src/features/food/helpers.ts	amountTotal	function
@@ -973,10 +979,13 @@ src/features/food/helpers.ts	parseMeal	function
 src/features/food/helpers.ts	portionFor	function
 src/features/food/helpers.ts	portionKcal	function
 src/features/food/helpers.ts	portionLabel	function
+src/features/food/helpers.ts	quickKcalError	function
+src/features/food/helpers.ts	quickKcalValue	function
 src/features/food/helpers.ts	referenceExplain	function
 src/features/food/helpers.ts	rowSourceWord	function
 src/features/food/helpers.ts	servingText	function
 src/features/food/helpers.ts	sourceInfo	function
+src/features/food/helpers.ts	sourceKindOf	function
 src/features/food/helpers.ts	stepAmount	function
 src/features/food/helpers.ts	toPer100	function
 src/features/food/helpers.ts	valuesUpdated	function
@@ -990,6 +999,10 @@ src/features/food/holdHint.ts	showHoldHint	function
 src/features/food/holdHint.ts	useHoldHint	function
 src/features/food/itemLine.ts	itemLine	function
 src/features/food/itemLine.ts	itemStepText	function
+src/features/food/langName.tsx	LangButton	component
+src/features/food/langName.tsx	LangIconButton	component
+src/features/food/langName.tsx	LangName	interface
+src/features/food/langName.tsx	useLangName	function
 src/features/food/log.ts	LogFoodInput	interface
 src/features/food/log.ts	addItems	function
 src/features/food/log.ts	buildEntry	re-export	src/features/food/build.ts:buildEntry
@@ -1703,6 +1716,8 @@ src/features/import/ui/TimeZoneSheet.tsx	TimeZoneSheet	component
 src/features/import/ui/WorkoutRow.tsx	WorkoutRow	component
 src/features/import/ui/format.ts	CalorieView	interface
 src/features/import/ui/format.ts	FileNote	interface
+src/features/import/ui/format.ts	HEALTH_EXPORT_BRINGS	const
+src/features/import/ui/format.ts	HEALTH_EXPORT_SKIPS	const
 src/features/import/ui/format.ts	RowCounts	interface
 src/features/import/ui/format.ts	RowFilter	type
 src/features/import/ui/format.ts	calorieView	function
@@ -1986,6 +2001,8 @@ src/features/onboarding/SignInGate.tsx	SignInGate	component
 src/features/onboarding/afterSignIn.ts	currentSignInOutcome	function
 src/features/onboarding/afterSignIn.ts	destinationAfterSignIn	function
 src/features/onboarding/afterSignIn.ts	waitForRestore	function
+src/features/onboarding/choiceInput.ts	ChoiceInput	type
+src/features/onboarding/choiceInput.ts	choiceInput	function
 src/features/onboarding/components.tsx	ARRIVAL_POUR	const
 src/features/onboarding/components.tsx	BigNumberField	component
 src/features/onboarding/components.tsx	BigTextField	component
@@ -2002,6 +2019,8 @@ src/features/onboarding/components.tsx	StepTitle	component
 src/features/onboarding/components.tsx	UnitsToggle	component
 src/features/onboarding/components.tsx	WhyWeAsk	component
 src/features/onboarding/components.tsx	focusNextEmptyField	function
+src/features/onboarding/components.tsx	focusStepHeading	function
+src/features/onboarding/components.tsx	stepHeadingRef	function
 src/features/onboarding/components.tsx	unitSpoken	function
 src/features/onboarding/components.tsx	useFieldChain	function
 src/features/onboarding/deviceUnits.ts	deviceUnits	function
@@ -2359,6 +2378,7 @@ src/features/progress/recapReady.ts	MIN_LOGGED_DAYS_FOR_RECAP	re-export	src/lib/
 src/features/progress/recapReady.ts	RecapReady	interface
 src/features/progress/recapReady.ts	recapStatus	function
 src/features/progress/recapReady.ts	useRecapReady	function
+src/features/progress/recapWin.ts	winTile	function
 src/features/progress/sleepDetail.ts	sleepDetail	function
 src/features/progress/useConsistencyData.ts	setRhythmTarget	function
 src/features/progress/useConsistencyData.ts	useConsistencyData	function
@@ -2603,6 +2623,8 @@ src/features/today/ideas.ts	MealIdeas	type
 src/features/today/ideas.ts	MealIdeasInput	interface
 src/features/today/ideas.ts	PLATE_NOTE	const
 src/features/today/ideas.ts	PLATE_SHARE	const
+src/features/today/ideas.ts	ideaAddedToast	function
+src/features/today/ideas.ts	ideaFoodsPhrase	function
 src/features/today/ideas.ts	ideaLine	function
 src/features/today/ideas.ts	ideaRow	function
 src/features/today/ideas.ts	mealIdeas	function
@@ -2683,6 +2705,7 @@ src/features/trackers/helpers.ts	WeighInPatch	type
 src/features/trackers/helpers.ts	WeightRange	type
 src/features/trackers/helpers.ts	WeightStats	interface
 src/features/trackers/helpers.ts	bodyFatFollowsDelete	function
+src/features/trackers/helpers.ts	bodyFatText	function
 src/features/trackers/helpers.ts	clampFastStart	function
 src/features/trackers/helpers.ts	crossedGoal	function
 src/features/trackers/helpers.ts	fastProgress	function
@@ -2691,6 +2714,9 @@ src/features/trackers/helpers.ts	findByDate	function
 src/features/trackers/helpers.ts	formatClockDuration	function
 src/features/trackers/helpers.ts	formatHours	function
 src/features/trackers/helpers.ts	hasMeasurements	function
+src/features/trackers/helpers.ts	hoursFigure	function
+src/features/trackers/helpers.ts	hoursParts	function
+src/features/trackers/helpers.ts	hoursSpoken	function
 src/features/trackers/helpers.ts	isMostRecentDate	function
 src/features/trackers/helpers.ts	keepOrConvert	function
 src/features/trackers/helpers.ts	latestBodyFat	function
@@ -2705,6 +2731,7 @@ src/features/trackers/helpers.ts	targetsBehind	function
 src/features/trackers/helpers.ts	weighInAfterEdit	function
 src/features/trackers/helpers.ts	weightChartData	function
 src/features/trackers/helpers.ts	weightStats	function
+src/features/trackers/helpers.ts	weightText	function
 src/features/trackers/sleepSource.ts	sleepFrom	function
 src/features/trackers/sleepSource.ts	sleepFromLine	function
 src/features/trackers/sleepSource.ts	stagesLine	function
@@ -3386,9 +3413,13 @@ src/types/index.ts	ThemePreference	type
 src/types/index.ts	UnitSystem	type
 src/types/index.ts	WaterEntry	interface
 src/types/index.ts	WeightEntry	interface
+src/ui/Button.tsx	BARE_ICON	const
+src/ui/Button.tsx	BUTTON_ICON	const
+src/ui/Button.tsx	BUTTON_STROKE	const
 src/ui/Button.tsx	Button	component
 src/ui/Button.tsx	ButtonProps	interface
 src/ui/Button.tsx	IconButton	component
+src/ui/Button.tsx	iconButtonGlyph	function
 src/ui/Card.tsx	Card	component
 src/ui/Card.tsx	CardProps	interface
 src/ui/Charts.tsx	BarChart	component
@@ -3417,6 +3448,7 @@ src/ui/List.tsx	ListRow	component
 src/ui/List.tsx	Stat	component
 src/ui/List.tsx	Toggle	component
 src/ui/List.tsx	ToggleRow	component
+src/ui/Pressable.tsx	ANDROID_TOUCH	const
 src/ui/Pressable.tsx	FOCUS_CUP	const
 src/ui/Pressable.tsx	PressableScale	component
 src/ui/Pressable.tsx	PressableScaleProps	interface
@@ -3471,7 +3503,10 @@ src/ui/controlRules.ts	rowStacks	function
 src/ui/controlRules.ts	slopToReach	function
 src/ui/controlRules.ts	spokenFieldName	function
 src/ui/controlRules.ts	stepperKey	function
+src/ui/controlRules.ts	wantsAndroidTarget	function
 src/ui/controlRules.ts	webAutoComplete	function
+src/ui/decorative.ts	DECORATIVE	const
+src/ui/decorative.ts	decorative	function
 src/ui/haptics.ts	haptic	const
 src/ui/index.ts	*	re-export-all	src/ui/Button.tsx
 src/ui/index.ts	*	re-export-all	src/ui/Card.tsx
@@ -3492,6 +3527,7 @@ src/ui/index.ts	AnimatedItem	re-export	src/ui/motion.tsx:AnimatedItem
 src/ui/index.ts	AnimatedList	re-export	src/ui/motion.tsx:AnimatedList
 src/ui/index.ts	AnimatedNumber	re-export	src/ui/motion.tsx:AnimatedNumber
 src/ui/index.ts	AnimatedNumberProps	re-export	src/ui/motion.tsx:AnimatedNumberProps
+src/ui/index.ts	DECORATIVE	re-export	src/ui/decorative.ts:DECORATIVE
 src/ui/index.ts	DrawReveal	re-export	src/ui/motion.tsx:DrawReveal
 src/ui/index.ts	FadeUp	re-export	src/ui/motion.tsx:FadeUp
 src/ui/index.ts	GoalKind	re-export	src/ui/vesselLayout.ts:GoalKind
@@ -3500,6 +3536,7 @@ src/ui/index.ts	PourOptions	re-export	src/ui/motion.tsx:PourOptions
 src/ui/index.ts	ReachOptions	re-export	src/ui/motion.tsx:ReachOptions
 src/ui/index.ts	brimOverhang	re-export	src/ui/vesselLayout.ts:brimOverhang
 src/ui/index.ts	cssBezier	re-export	src/ui/motion.tsx:cssBezier
+src/ui/index.ts	decorative	re-export	src/ui/decorative.ts:decorative
 src/ui/index.ts	ease	re-export	src/ui/motion.tsx:ease
 src/ui/index.ts	fillRatio	re-export	src/ui/vesselLayout.ts:fillRatio
 src/ui/index.ts	goalState	re-export	src/ui/vesselLayout.ts:goalState
@@ -3549,6 +3586,9 @@ src/ui/textLang.ts	LangPart	interface
 src/ui/textLang.ts	langParts	function
 src/ui/textLang.ts	scriptLang	function
 src/ui/textLang.ts	wholeLang	function
+src/ui/textSpacing.ts	spacingIsTheReaders	function
+src/ui/textSpacing.ts	subscribeTextSpacing	function
+src/ui/textSpacing.ts	textSpacingSet	function
 src/ui/toastControls.ts	ToastScope	const
 src/ui/toastControls.ts	controlsIn	function
 src/ui/toastControls.ts	passRef	function

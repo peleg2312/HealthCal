@@ -42,7 +42,7 @@ export function QuestionsView({ todayDate, hour12, onChangeZone }: { todayDate: 
             {csvFiles.join(', ')}
           </Text>
           <View style={{ gap: spacing.sm }}>
-            <Text variant="title">Distances in {csvFiles.length > 1 ? 'these files' : 'this file'} are in</Text>
+            <Text variant="title" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>Distances in {csvFiles.length > 1 ? 'these files' : 'this file'} are in</Text>
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
               <Chip label="Kilometres" selected={answers.distanceUnit === 'km'} onPress={() => setAnswers({ distanceUnit: 'km' })} testID="import-unit-km" />
               <Chip label="Miles" selected={answers.distanceUnit === 'mi'} onPress={() => setAnswers({ distanceUnit: 'mi' })} testID="import-unit-mi" />
@@ -69,7 +69,7 @@ function ZoneLine({ title, value, onChange, testID }: { title: string; value: st
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text variant="title">{title}</Text>
+        <Text variant="title" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>{title}</Text>
         <Text variant="body" color="textSecondary" testID={`${testID}-value`}>
           {value}
         </Text>
@@ -91,7 +91,7 @@ function SystemTimeCard({ files, todayDate, hour12, zone, onChangeZone }: { file
   const all = shiftedWorkouts(batches, shifts);
   return (
     <Card style={{ gap: spacing.md }} testID="import-fit-questions">
-      <Text variant="title">When was this recorded?</Text>
+      <Text variant="title" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>When was this recorded?</Text>
       <Text variant="body" color="textSecondary">
         The watch’s clock was not set, so the start comes from its own time. Check the day before importing.
       </Text>

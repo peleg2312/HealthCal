@@ -6,7 +6,7 @@ import { isolateRtl } from '@/lib/bidi';
 import { formatShortDate } from '@/lib/dates';
 import { useLive } from '@/store/selectors';
 import { cup, useTheme } from '@/theme';
-import { IconButton, PressableScale, Text, toast } from '@/ui';
+import { decorative, IconButton, PressableScale, Text, toast } from '@/ui';
 
 import { lastWorkoutTemplate, removeRoutine, restoreRoutine, routineSetCount, routineSummary, useRoutineList, type RoutineTemplate } from './routines';
 
@@ -54,7 +54,7 @@ function RoutineCard({ template, id, onStart, testID }: { template: RoutineTempl
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-            {id ? null : <Repeat size={16} color={colors.exercise} />}
+            {id ? null : decorative(<Repeat size={16} color={colors.exercise} />)}
             <Text variant="bodyStrong" numberOfLines={1} style={{ flexShrink: 1 }}>
               {/* A routine named in Hebrew stays at the left and keeps its date after it (display only). */}
               {id ? isolateRtl(template.name) : `${isolateRtl(template.name)}${template.date ? `, ${formatShortDate(template.date)}` : ''}`}

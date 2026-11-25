@@ -21,7 +21,7 @@ import { useStore } from '@/store';
 import { useDay, useLive, useProfile } from '@/store/selectors';
 import { cup, LARGE_TEXT, useTextGrowth, useTheme } from '@/theme';
 import type { Intensity } from '@/types';
-import { Button, Card, Chip, CupKey, EmptyState, Header, IconButton, NumberField, PressableScale, Screen, Text, TextField } from '@/ui';
+import { Button, Card, Chip, CupKey, decorative, EmptyState, Header, IconButton, NumberField, PressableScale, Screen, Text, TextField } from '@/ui';
 
 const INTENSITIES: Intensity[] = ['light', 'moderate', 'vigorous'];
 const PRESETS = [15, 30, 45, 60, 90];
@@ -229,7 +229,7 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
           </Text>
         ) : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-          <Droplets size={16} color={colors.water} />
+          {decorative(<Droplets size={16} color={colors.water} />)}
           <Text variant="label" color="textSecondary" style={{ flex: 1 }}>
             {water > 0
               ? profile.waterGoalMlOverride

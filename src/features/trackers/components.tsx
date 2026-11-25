@@ -9,7 +9,7 @@ import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
 import { cup, fonts, useLargeText, useTextGrowth, useTheme } from '@/theme';
 import type { ISODate } from '@/types';
-import { CupKey, PressableScale, Text } from '@/ui';
+import { CupKey, DECORATIVE, PressableScale, Text } from '@/ui';
 
 /** Renders children only once a profile exists; otherwise sends the user to the welcome flow. */
 export function RequireProfile({ children }: { children: React.ReactNode }) {
@@ -137,7 +137,11 @@ export function ExplainText({ children }: { children: React.ReactNode }) {
 export function Note({ icon, children, style }: { icon?: React.ReactNode; children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   return (
     <View style={[{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }, style]}>
-      {icon ? <View style={{ paddingTop: 2 }}>{icon}</View> : null}
+      {icon ? (
+        <View style={{ paddingTop: 2 }} {...DECORATIVE}>
+          {icon}
+        </View>
+      ) : null}
       <Text variant="caption" color="textSecondary" style={{ flex: 1, fontSize: 13, lineHeight: 19 }}>
         {children}
       </Text>
