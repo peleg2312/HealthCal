@@ -133,7 +133,7 @@ export default function DiaryScreen() {
               size="sm"
               variant="secondary"
               full={false}
-              icon={<Copy size={16} color={colors.text} strokeWidth={2.2} />}
+              icon={<Copy size={18} color={colors.text} strokeWidth={2.2} />}
               title={`Copy ${dayPhrase(previousDay.date)} · ${kcal(currentKcal(previousDay.entries))} kcal`}
               accessibilityLabel={`Copy everything from ${dayPhrase(previousDay.date)} to this day, ${kcal(currentKcal(previousDay.entries))} kilocalories`}
               onPress={() => copyPreviousDay(date)}

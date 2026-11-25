@@ -36,7 +36,7 @@ export function DrinkTitleRow({ onSearch, onEditSizes }: { onSearch: () => void;
         variant="secondary"
         size="sm"
         full={false}
-        icon={<Search size={16} color={colors.text} strokeWidth={2.2} />}
+        icon={<Search size={18} color={colors.text} strokeWidth={2.2} />}
         onPress={onSearch}
         style={{ marginVertical: big ? 0 : -6, paddingHorizontal: 10 }}
       />
@@ -47,7 +47,7 @@ export function DrinkTitleRow({ onSearch, onEditSizes }: { onSearch: () => void;
         variant="ghost"
         size="sm"
         full={false}
-        icon={<Pencil size={15} color={colors.primaryInk} strokeWidth={2.2} />}
+        icon={<Pencil size={18} color={colors.primaryInk} strokeWidth={2.2} />}
         onPress={onEditSizes}
         style={{ marginVertical: big ? 0 : -6, marginLeft: 4, paddingHorizontal: 8 }}
       />

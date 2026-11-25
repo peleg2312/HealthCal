@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
+import { Platform, View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
 import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, ClipPath, Defs, G, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
@@ -7,8 +7,11 @@ import { niceTicks } from '@/lib/chart';
 import { spokenUnits } from '@/lib/spokenUnits';
 import { cup, fonts, motion, useReducedMotion, useTheme } from '@/theme';
 
+import { sayOnWeb } from './announce';
+import { scrubKey } from './controlRules';
 import { haptic } from './haptics';
 import { DrawReveal, ease } from './motion';
+import { useFocusRing } from './Pressable';
 import { Text } from './Text';
 
 function useWidth(): [number, (e: LayoutChangeEvent) => void] {
@@ -28,6 +31,27 @@ const CHART_TEXT = 12;
  */
 function chartA11y(label: string | undefined) {
   return label ? { accessible: true, accessibilityRole: 'image' as const, accessibilityLabel: spokenUnits(label) } : {};
+}
+
+/**
+ * Web: a chart whose values a finger reads by pressing and dragging is also one keyboard stop (WCAG 2.1.1). Its arrow
+ * keys move the same point the finger does (`scrubKey`: Left and Right, Home and End, Escape lets go), the value shows
+ * in the same ink label and is said once (`sayOnWeb`), and leaving the chart lets go. The kit's focus ring marks it.
+ * The chart keeps its name (its summary and every value), so a screen reader hears them all as before.
+ */
+function keyScrub(on: boolean, count: number, active: number | null, setActive: (i: number | null) => void, words: (i: number) => string): object {
+  if (!on || Platform.OS !== 'web' || count <= 0) return {};
+  return {
+    focusable: true,
+    onKeyDown: (e: { key: string; preventDefault: () => void }) => {
+      const next = scrubKey(e.key, active, count);
+      if (next === undefined) return;
+      e.preventDefault();
+      setActive(next);
+      if (next !== null && next !== active) sayOnWeb(spokenUnits(words(next)));
+    },
+    onBlur: () => setActive(null),
+  };
 }
 
 /** Hides a labelled chart's drawing from assistive technology (it has said what it shows in its name). */
@@ -187,6 +211,7 @@ export function BarChart({
   accessibilityLabel?: string;
 }) {
   const { colors, chartFill } = useTheme();
+  useFocusRing();
   const [width, onLayout] = useWidth();
   const [active, setActive] = useState<number | null>(null);
   const [uid] = useState(() => `bars-${seq++}`);
@@ -302,7 +327,12 @@ export function BarChart({
   const perColumn = data.length <= 14;
   const stagger = Math.min(motion.duration.stagger, 360 / Math.max(1, data.length));
   return (
-    <View onLayout={onLayout} style={{ height }} testID={testID} {...chartA11y(accessibilityLabel)}>
+    <View
+      onLayout={onLayout}
+      style={{ height }}
+      testID={testID}
+      {...chartA11y(accessibilityLabel)}
+      {...keyScrub(!!scrub, data.length, active, setActive, (i) => data[i].detail ?? `${data[i].label} · ${fmt(data[i].value)}`)}>
       <ChartInside hidden={!!accessibilityLabel}>
       {width > 0 ? (
         <>
@@ -416,6 +446,7 @@ export function LineChart({
   accessibilityLabel?: string;
 }) {
   const { colors } = useTheme();
+  useFocusRing();
   const [width, onLayout] = useWidth();
   const [active, setActive] = useState<number | null>(null);
   const all = [...line, ...(dots ?? [])];
@@ -469,7 +500,7 @@ export function LineChart({
       : {};
   const ap = active !== null ? pts[active] : null;
   return (
-    <View onLayout={onLayout} style={{ height }} {...chartA11y(accessibilityLabel)}>
+    <View onLayout={onLayout} style={{ height }} {...chartA11y(accessibilityLabel)} {...keyScrub(!!formatPoint, pts.length, active, setActive, (i) => formatPoint?.(line[i]) ?? '')}>
       <ChartInside hidden={!!accessibilityLabel}>
       {width > 0 ? (
         <Svg width={width} height={height}>

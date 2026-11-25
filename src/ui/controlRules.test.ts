@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ANDROID_TARGET, ariaFromState, fixedSize, NO_MINUS, numberTextProblem, numberTextValue, pressesOnSpace, rovingIndex, rowStacks, slopToReach, spokenFieldName, stepperKey, wantsAndroidTarget, webAutoComplete } from './controlRules';
+import { ANDROID_TARGET, ariaFromState, fixedSize, NO_MINUS, numberTextProblem, numberTextValue, pressesOnSpace, rovingIndex, rowStacks, scrubKey, slopToReach, spokenFieldName, stepperKey, wantsAndroidTarget, webAutoComplete } from './controlRules';
 
 describe('slopToReach (48 dp on Android)', () => {
   it('grows a 44 px cup to 48 on both axes', () => {
@@ -166,5 +166,27 @@ describe('number fields: a typed minus is kept and named', () => {
   it('a field that takes negatives reads the minus', () => {
     expect(numberTextProblem('-3', true)).toBeNull();
     expect(numberTextValue('-3', true)).toBe(-3);
+  });
+});
+
+describe('scrubKey (a chart read with the keyboard)', () => {
+  it('Right and Left move one point and stop at the ends', () => {
+    expect(scrubKey('ArrowRight', null, 7)).toBe(0);
+    expect(scrubKey('ArrowRight', 2, 7)).toBe(3);
+    expect(scrubKey('ArrowRight', 6, 7)).toBe(6);
+    expect(scrubKey('ArrowLeft', null, 7)).toBe(6);
+    expect(scrubKey('ArrowLeft', 3, 7)).toBe(2);
+    expect(scrubKey('ArrowLeft', 0, 7)).toBe(0);
+  });
+  it('Home and End go to the ends, Escape lets go', () => {
+    expect(scrubKey('Home', 4, 7)).toBe(0);
+    expect(scrubKey('End', null, 7)).toBe(6);
+    expect(scrubKey('Escape', 3, 7)).toBeNull();
+  });
+  it('leaves every other key alone, and Escape with nothing chosen (a sheet above may want it)', () => {
+    expect(scrubKey('Tab', 3, 7)).toBeUndefined();
+    expect(scrubKey('ArrowUp', 3, 7)).toBeUndefined();
+    expect(scrubKey('Escape', null, 7)).toBeUndefined();
+    expect(scrubKey('ArrowRight', null, 0)).toBeUndefined();
   });
 });

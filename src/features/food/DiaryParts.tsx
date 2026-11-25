@@ -507,7 +507,7 @@ function RepeatRow({ meal, label, previous, onRepeat }: { meal: MealType; label:
         variant="secondary"
         size="sm"
         full={false}
-        icon={<Repeat2 size={16} color={colors.text} strokeWidth={2.2} />}
+        icon={<Repeat2 size={18} color={colors.text} strokeWidth={2.2} />}
         onPress={onRepeat}
         style={{ paddingHorizontal: 10, alignSelf: 'center' }}
       />

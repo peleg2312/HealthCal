@@ -751,7 +751,7 @@ function WaterScreen() {
           variant="ghost"
           size="sm"
           full={false}
-          icon={showAllLog ? <ChevronUp size={16} color={colors.primaryInk} strokeWidth={2.2} /> : <ChevronDown size={16} color={colors.primaryInk} strokeWidth={2.2} />}
+          icon={showAllLog ? <ChevronUp size={18} color={colors.primaryInk} strokeWidth={2.2} /> : <ChevronDown size={18} color={colors.primaryInk} strokeWidth={2.2} />}
           onPress={() => setShowAllLog((v) => !v)}
           style={{ alignSelf: 'center', marginTop: -spacing.xs }}
         />

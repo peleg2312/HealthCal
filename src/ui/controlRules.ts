@@ -245,3 +245,19 @@ export function numberTextValue(text: string, allowNegative = false): number | n
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
 }
+
+/**
+ * A chart whose values a finger reads by pressing and dragging (`BarChart` with `scrub`, `LineChart` with
+ * `formatPoint`) is one keyboard stop on the web, whose keys move the same point the finger does (WCAG 2.1.1): Left
+ * and Right one point (from none, Right starts at the first and Left at the last), Home and End the ends, Escape lets
+ * go. The new point (null: none), or undefined for a key that is not the chart's, which is left alone.
+ */
+export function scrubKey(key: string, active: number | null, count: number): number | null | undefined {
+  if (count <= 0) return undefined;
+  if (key === 'Escape') return active === null ? undefined : null;
+  if (key === 'Home') return 0;
+  if (key === 'End') return count - 1;
+  if (key === 'ArrowLeft') return active === null ? count - 1 : Math.max(0, active - 1);
+  if (key === 'ArrowRight') return active === null ? 0 : Math.min(count - 1, active + 1);
+  return undefined;
+}

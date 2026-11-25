@@ -170,7 +170,7 @@ export function DrinkPickSheet({
           right={
             query ? (
               <IconButton testID="water-pick-clear" accessibilityLabel="Clear search" tone="clear" size={32} onPress={() => changeQuery('')}>
-                <X size={16} color={colors.textSecondary} />
+                <X size={18} color={colors.textSecondary} />
               </IconButton>
             ) : null
           }

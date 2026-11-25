@@ -146,6 +146,7 @@ export function WeekCups({ cells, testID }: { cells: WeekCells; testID?: string 
       accessibilityRole="image"
       accessibilityLabel={weekLabel(cells)}
       style={r > 1 ? { flexGrow: 1 } : undefined}>
+      <View aria-hidden importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
       {/* Yesterday's number, centred over the large cup; a wider one reaches left over the small cups. */}
       <View
         style={{
@@ -217,6 +218,7 @@ export function WeekCups({ cells, testID }: { cells: WeekCells; testID?: string 
           </Text>
           {mark(t)}
         </View>
+      </View>
       </View>
     </View>
   );
