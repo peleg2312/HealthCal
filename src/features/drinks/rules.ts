@@ -392,6 +392,15 @@ export function pickedToast(food: Pick<Food, 'name'>): string {
 
 // ---------------------------------------------------------------- the meal
 
+/**
+ * The kind calories typed into the drink sheet ("Or enter calories") are logged under: the kind on screen, or Other
+ * while Water is showing (the sheet opened from Water's own "Search"). Plain water holds no calories (`planDrink` logs
+ * the Water kind as water alone), and the sheet's button promised "Add 140 kcal to lunch".
+ */
+export function enteredDrinkKind(onScreen: Beverage): Beverage {
+  return onScreen === 'water' ? 'other' : onScreen;
+}
+
 /** The meal a drink's calories go to: the meal of the clock at the log (mealForTime), whatever the day. */
 export function drinkMeal(now: Date): MealType {
   return mealForTime(now);

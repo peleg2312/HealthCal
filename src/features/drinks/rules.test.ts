@@ -15,6 +15,7 @@ import {
   drinkGrams,
   drinkKcal,
   drinkMeal,
+  enteredDrinkKind,
   enteredKcalError,
   gramsPerMl,
   isAlcohol,
@@ -380,6 +381,18 @@ describe('calories typed in, a pick, a row title', () => {
     expect(enteredKcalError(10000)).toBe('Up to 9,999 kcal');
     expect(enteredKcalError(15000)).toBe('Up to 9,999 kcal');
     expect(enteredKcalError(0)).toBe('Enter the calories');
+  });
+  it('calories typed while Water is showing go to Other, where planDrink writes them with the drink', () => {
+    expect(enteredDrinkKind('water')).toBe('other');
+    for (const k of ['tea', 'coffee', 'juice', 'milk', 'sports', 'other'] as const) expect(enteredDrinkKind(k)).toBe(k);
+    const now = new Date(2026, 10, 18, 16, 0);
+    const day = '2026-11-18';
+    const typed = { drink: { id: 'kcal', food: null }, ml: 250, kcal: 140, date: day, now, today: day, units: 'metric', amount: 'custom' } as const;
+    // On the Water kind itself the calories would be dropped: the reason for the rule.
+    expect(planDrink({ ...typed, kind: 'water' }).entry).toBeNull();
+    const plan = planDrink({ ...typed, kind: enteredDrinkKind('water') });
+    expect(plan.entry?.nutrients.kcal).toBe(140);
+    expect(plan.water.beverage).toBe('other');
   });
   it('a pick logs nothing and says so', () => {
     expect(pickedToast(B('b_apple_juice'))).toBe(`${B('b_apple_juice').name} chosen. Tap a glass to add it.`);

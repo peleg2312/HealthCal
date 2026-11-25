@@ -56,11 +56,14 @@
  *               a pushed screen's header without a back cup or X, a title and one short line, a
  *               tab header without its overline, or a second screen title under either (text of
  *               21 px or more with words, outside a card, in the first 160 px under the header)
- *   toast       a toast that covers a control in an open sheet, a pinned footer or the tab bar, or
+ *   toast       a toast that covers a control in an open sheet, or with no sheet open a control of
+ *               the focused screen (its scroll area, pinned header and footer) or of the tab bar, or
  *               that starts above the top of the screen: judged after each tap and at the capture,
  *               always at the real window height (never against the page grown to its full height);
  *               a control is measured by what of it shows, its box cut by every ancestor that clips
- *               (overflow not visible), so a tile scrolled out of a sheet's body is not under the toast
+ *               (overflow not visible), so a tile scrolled out of a sheet's body, or a row its screen's
+ *               scroll area no longer shows (the band a screen makes when no band is clear), is not
+ *               under the toast
  * Text cut with no ellipsis is `cut`, and so are a field's placeholder wider than the field, a number
  * field's value wider than the field (a long name in a text field scrolls as fields do), and a clamped
  * name whose box is taller than its clamp (the lines after the ellipsis show under it). A name
@@ -129,6 +132,8 @@
  *                                    tap a control that opens the file picker and pick these files
  *                                    (paths from the repository root)
  *       { wait: 800 },               wait this many milliseconds
+ *       { key: 'Escape' },           press a key (Escape closes a sheet, as the browser's back would; a sheet
+ *                                    holding something typed then asks in place of its footer)
  *       { reload: true },            save what the app holds and load the page again, as after a restart
  *                                    (saved entries of bundled foods come back with today's food attached)
  *     ],
@@ -1166,8 +1171,8 @@ function stateProblems(s, where) {
     }
   }
   for (const t of s.taps || []) {
-    const ok = typeof t === 'string' || (t && typeof t === 'object' && ((typeof t.type === 'string' && typeof t.text === 'string') || typeof t.wait === 'number' || t.reload === true || (typeof t.choose === 'string' && Array.isArray(t.files))));
-    if (!ok) problems.push(`${where}: a step is a testID, { type, text }, { wait }, { reload: true } or { choose, files }; got ${JSON.stringify(t)}`);
+    const ok = typeof t === 'string' || (t && typeof t === 'object' && ((typeof t.type === 'string' && typeof t.text === 'string') || typeof t.wait === 'number' || (typeof t.key === 'string' && !!t.key) || t.reload === true || (typeof t.choose === 'string' && Array.isArray(t.files))));
+    if (!ok) problems.push(`${where}: a step is a testID, { type, text }, { wait }, { key }, { reload: true } or { choose, files }; got ${JSON.stringify(t)}`);
     if (t && t.files) for (const f of t.files) if (!fs.existsSync(path.resolve(ROOT, f))) problems.push(`${where}: no file ${f}`);
   }
   return problems;
@@ -1276,6 +1281,9 @@ async function open(context, job, seed) {
       await page.waitForTimeout(300);
     } else if (t.wait) {
       await page.waitForTimeout(t.wait);
+    } else if (t.key) {
+      problem = await step(`press ${t.key}`, () => page.keyboard.press(t.key));
+      if (!problem) await page.waitForTimeout(500);
     } else if (t.reload) {
       // The seed is written only on the first load of this tab, so what the app saved is what comes back.
       problem = await step('reload', async () => {

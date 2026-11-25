@@ -390,4 +390,19 @@ module.exports = [
   { id: 'quick-sheet-favourite-stress', route: '/', data: 'stress', values: { favoriteMeal: 1 }, taps: ['tab-add'], sheet: true, waitFor: 'quick-fav-meal-0', note: 'the + sheet with a favourite meal named in Hebrew' },
   { id: 'quick-sheet-favourite-logged', route: '/', values: { favoriteMeal: 1 }, taps: ['tab-add', 'quick-fav-meal-0', { wait: 900 }], waitFor: 'toast-action', note: 'a favourite meal logged from its tile: the sheet closes after its tick and the toast with Undo rests over Today' },
   { id: 'fits-saved-estimate', route: '/', values: { savedEstimate: 1, eaten: 0.3 }, now: todayAt(19, 0), taps: ['today-ideas'], sheet: true, waitFor: 'fits-ideas', note: 'What fits: a saved estimate as an idea reads "~"' },
+
+  // ---------------------------------------------------------------- loop 3: the soft checks, the leave guards, a typed minus
+  // Edit entry with the amount changed: the line under the meal choice says a pick now only chooses (`mealPickAdvice`).
+  { id: 'detail-edit-touched', route: '/diary', taps: ['^entry-', { type: 'detail-grams', text: '40' }], waitFor: 'detail-meal-advice', note: 'Edit entry with the grams changed: "The meal you pick is saved with your other changes."' },
+  // The soft check (`@/features/food/softCheck`): the first press stores nothing and asks under the field.
+  { id: 'quick-ask', route: '/food/quick', type: { 'quick-kcal': '5000' }, taps: ['quick-save'], waitFor: 'quick-ask', note: 'quick add above 3,000 kcal: asked once under the field, the button names the amount' },
+  { id: 'detail-portion-ask', route: '/food/search?meal=snack', type: { 'food-search-input': 'banana' }, taps: [{ wait: 1200 }, 'result-0', { type: 'detail-grams', text: '1500' }, 'detail-save'], waitFor: 'detail-ask', note: 'a portion above five times its largest measure: asked once under the grams' },
+  // The leave guards: typed words are not dropped without asking.
+  { id: 'describe-discard', route: '/food/photo?mode=text', type: { 'ai-description': 'Lentil soup with bread' }, taps: ['header-close'], sheet: true, waitFor: 'confirm-yes', note: 'words typed to describe, then X: "Discard this description?"' },
+  { id: 'custom-discard', route: '/food/custom', type: { 'custom-name': 'Grandma lentil stew' }, taps: ['header-back'], sheet: true, waitFor: 'confirm-yes', note: 'an own food half typed, then back: "Discard this food?"' },
+  { id: 'diary-menu-save-typed', route: '/diary', taps: ['meal-menu-breakfast', 'meal-menu-save', { type: 'save-meal-name', text: 'My work lunch' }, { key: 'Escape' }], sheet: true, waitFor: 'sheet-discard-title', note: 'the meal menu\'s save step with a name typed, closed: "Discard this meal name?" in the sheet' },
+  // A typed minus kept as typed and named under its field; Add or Save waits (the kit's `numberTextProblem`).
+  { id: 'quick-macro-minus', route: '/food/quick', type: { 'quick-kcal': '300', 'quick-protein': '-20' }, note: 'a minus in Protein: named under the field, Add waits' },
+  { id: 'custom-minus', route: '/food/custom', type: { 'custom-name': 'Test bar', 'custom-kcal': '-200' }, taps: ['custom-save'], note: 'a minus in Calories: the minus words, Save waits' },
+  { id: 'photo-review-grams-minus', route: '/food/photo?mode=text&demoLive=1', taps: [{ type: 'ai-description', text: 'Chicken, rice and salad' }, 'ai-analyse', { wait: 2600 }, { type: 'ai-item-0-grams', text: '-100' }], waitFor: 'ai-item-0-grams-error', note: 'the AI review with a minus in a row\'s grams: named under the row, Add waits' },
 ];

@@ -22,7 +22,7 @@ import { useStore } from '@/store';
 import { useDay, useLive, useProfile } from '@/store/selectors';
 import { cup, LARGE_TEXT, useTextGrowth, useTheme } from '@/theme';
 import type { Intensity } from '@/types';
-import { Button, Card, Chip, CupKey, decorative, EmptyState, figure, Header, IconButton, NumberField, PressableScale, Screen, Text, TextField } from '@/ui';
+import { Button, Card, Chip, CupKey, decorative, EmptyState, figure, Header, IconButton, NumberField, numberTextProblem, PressableScale, Screen, Text, TextField } from '@/ui';
 
 const INTENSITIES: Intensity[] = ['light', 'moderate', 'vigorous'];
 const PRESETS = [15, 30, 45, 60, 90];
@@ -67,6 +67,9 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
   const [intensity, setIntensity] = useState<Intensity>(entry?.intensity ?? (singleMet ? 'moderate' : last?.intensity ?? 'moderate'));
   const [initialDistance] = useState<number | null>(entry?.distanceKm ? round(distanceValue(entry.distanceKm, units), 2) : null);
   const [distance, setDistance] = useState<number | null>(initialDistance);
+  // The distance as typed: a refused minus (`numberTextProblem`) leaves the value empty, and Save waits on it rather
+  // than save the session without the distance the field is still showing.
+  const [distanceTyped, setDistanceTyped] = useState('');
   const [date, setDate] = useState(entry?.date ?? (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) && dateParam <= today() ? dateParam : today()));
   const [notes, setNotes] = useState(entry?.notes ?? '');
   const [showSource, setShowSource] = useState(false);
@@ -116,7 +119,8 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
     } else paceText = `${formatPace(minutes / distance)} per ${unit}`;
   }
 
-  const canSave = minutes > 0 && minutes <= 24 * 60;
+  const distanceRefused = distance === null && !!numberTextProblem(distanceTyped);
+  const canSave = minutes > 0 && minutes <= 24 * 60 && !distanceRefused;
   const save = () => {
     if (!canSave) return;
     saveActivity({
@@ -386,7 +390,10 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
             testID="distance-input"
             label="Distance (optional)"
             value={distance}
-            onChange={setDistance}
+            onChange={(v, t) => {
+              setDistance(v);
+              setDistanceTyped(t);
+            }}
             decimals={2}
             suffix={unit}
           />

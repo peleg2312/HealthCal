@@ -158,6 +158,8 @@ const progress = [
   { id: 'progress-stress-body', route: '/progress', data: 'stress', imperial: true, taps: ['progress-segment-body'], waitFor: 'progress-weight', note: 'Body at 142.6 kg, in lb' },
   { id: 'progress-stress-habits', route: '/progress', data: 'stress', taps: ['progress-segment-habits'], waitFor: 'progress-habits', note: 'Habits with 12.5 L and 1,240 minutes' },
   { id: 'progress-early', route: '/progress', data: 'empty', waitFor: 'progress-early', note: 'early days: nothing logged yet' },
+  { id: 'progress-insight-numbers', route: '/progress', taps: ['insight-water-low-numbers'], waitFor: 'insight-water-low-body', note: 'the top insight\'s "The numbers" open: the kit\'s opener, the numbers as body text' },
+  { id: 'progress-body-details', route: '/progress', taps: ['progress-segment-body'], waitFor: 'progress-weight-link', note: 'Body: the Weight card\'s "Details" as the kit\'s ghost button with its chevron' },
 ];
 
 // ------------------------------------------------------------------ recap, consistency

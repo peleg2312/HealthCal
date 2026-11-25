@@ -5,7 +5,11 @@
  *
  *   welcome -> onboarding -> plan -> Today -> log food -> log a run -> add water -> reload
  *   -> the next morning: the morning page opens by itself once (greeting, quote, plan), closes onto Today, not again
- *   -> ... -> drinks -> a search for any drink on Water -> drinks logged in the diary count in Water -> an old portion after a reload: the + sheet's tile shows what its tap stores, and so does
+ *   -> ... -> drinks -> a search for any drink on Water -> drinks logged in the diary count in Water
+ *   -> Water's Other amount and Glass sizes -> the soft check of one entry (quick add, the drink sheet's calories) -> what
+ *      was typed is not dropped without asking (describe, an own food) -> a typed minus waits (quick add, the weigh-in)
+ *   -> the morning page never follows a log made at a morning cold start
+ *   -> ... -> an old portion after a reload: the + sheet's tile shows what its tap stores, and so does
  *      "Repeat yesterday's <meal>" (bundled foods at today's values, an own food and an online product as stored)
  *   -> one tap that closes a sheet and opens another (Friends, its store set directly): the second stays open, the
  *      browser's Back closes it on the same address, and no sheet leaves a history entry behind
@@ -1793,6 +1797,176 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     const presets = (await wp.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState().settings.waterPresets)))).join(',');
     check('Water: Discard closes Glass sizes and keeps the saved sizes', (await wp.getByTestId('water-preset-0').count()) === 0 && presets === '150,250,330,500', presets);
     await wctx.close();
+  }
+
+  // ------------------------------------------- the soft check of one entry (src/features/food/softCheck.ts)
+  // An amount above what one plausible entry holds is stored only on a second press: the first stores nothing and asks
+  // under the field, the button naming the amount. Quick add's calories above 3,000 kcal, and the drink sheet's entered
+  // calories held to the same rule.
+  {
+    const { buildSeed } = await import(require('url').pathToFileURL(require.resolve('./seed.mjs')).href);
+    const seed = JSON.stringify(buildSeed({ onboarded: true, theme: 'blossom' }));
+    const sctx = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+    await sctx.addInitScript((value) => {
+      if (!window.sessionStorage.getItem('__seeded')) {
+        window.localStorage.setItem('healthcal-v1', value);
+        window.sessionStorage.setItem('__seeded', '1');
+      }
+    }, seed);
+    const sp = await sctx.newPage();
+    sp.on('pageerror', (e) => errors.push(e.message));
+    const words = async (id) => ((await sp.getByTestId(id).first().textContent({ timeout: 4000 }).catch(() => '')) || '').replace(/ /g, ' ').replace(/[⁠‎⁨⁩]/g, '').trim();
+    const entriesWith = async (kcal) => Object.values((await sp.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())))).foodEntries).filter((e) => !e.deleted && Math.round(e.nutrients.kcal) === kcal).length;
+    await sp.goto(`${BASE}/food/quick?meal=lunch`, { waitUntil: 'networkidle' });
+    await sp.locator('input[data-testid="quick-kcal"]').first().fill('5000', { timeout: 15000 });
+    await sp.waitForTimeout(200);
+    await sp.getByTestId('quick-save').first().click();
+    await sp.waitForTimeout(500);
+    const asked = await words('quick-ask');
+    const named = await words('quick-save');
+    check('soft check: quick add at 5,000 kcal stores nothing on the first press and asks under the field', asked === 'Is 5,000 kcal right for one entry? Tap Add again to add it.' && named === 'Add 5,000 kcal to lunch' && (await entriesWith(5000)) === 0, `"${asked}", button "${named}"`);
+    await sp.getByTestId('quick-save').first().click();
+    await sp.waitForURL((u) => new URL(u).pathname === '/diary', { timeout: 8000 }).catch(() => {});
+    check('soft check: the second press of Add stores the 5,000 kcal', (await entriesWith(5000)) === 1 && new URL(sp.url()).pathname === '/diary', sp.url());
+    await sp.goto(`${BASE}/water`, { waitUntil: 'networkidle' });
+    await sp.getByTestId('water-search').first().click({ timeout: 15000 });
+    await sp.getByTestId('water-pick-kcal-open').first().click({ timeout: 8000 });
+    await sp.locator('input[data-testid="water-pick-kcal"]').first().fill('4000');
+    await sp.waitForTimeout(200);
+    await sp.getByTestId('water-pick-kcal-add').first().click();
+    await sp.waitForTimeout(500);
+    const drinkAsked = await words('water-pick-kcal-ask');
+    check('soft check: the drink sheet\'s 4,000 kcal stores nothing on the first press and asks, as quick add does', drinkAsked === 'Is 4,000 kcal right for one entry? Tap Add again to add it.' && (await entriesWith(4000)) === 0, `"${drinkAsked}"`);
+    await sp.waitForTimeout(600);
+    await sp.getByTestId('water-pick-kcal-add').first().click();
+    await sp.waitForTimeout(800);
+    check('soft check: the drink sheet\'s second press adds it', (await entriesWith(4000)) === 1, `${await entriesWith(4000)} stored`);
+    await sctx.close();
+  }
+
+  // ------------------------------------------- what was typed is not dropped without asking (useLeaveGuard, the Sheet's unsaved)
+  // Words typed to describe a meal, a half-typed own food and a typed minus each hold the screen: its X or back asks
+  // "Discard …?", and Keep editing keeps what was typed.
+  {
+    const { buildSeed } = await import(require('url').pathToFileURL(require.resolve('./seed.mjs')).href);
+    const seed = JSON.stringify(buildSeed({ onboarded: true, theme: 'blossom' }));
+    const gctx = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+    await gctx.addInitScript((value) => {
+      if (!window.sessionStorage.getItem('__seeded')) {
+        window.localStorage.setItem('healthcal-v1', value);
+        window.sessionStorage.setItem('__seeded', '1');
+      }
+    }, seed);
+    const gp = await gctx.newPage();
+    gp.on('pageerror', (e) => errors.push(e.message));
+    // useLeaveGuard asks with the kit's ConfirmSheet: its title in the drag zone, Discard (confirm-yes) and Keep editing (confirm-no).
+    const question = async () => ((await gp.getByTestId('sheet-drag').last().innerText({ timeout: 4000 }).catch(() => '')) || '').replace(/\u00A0/g, ' ').trim();
+    await gp.goto(`${BASE}/food/search`, { waitUntil: 'networkidle' });
+    await gp.goto(`${BASE}/food/photo?mode=text`, { waitUntil: 'networkidle' });
+    await gp.getByTestId('ai-description').first().fill('Lentil soup with bread', { timeout: 15000 });
+    await gp.waitForTimeout(300);
+    await gp.getByTestId('header-close').first().click();
+    await gp.waitForTimeout(500);
+    const asksWords = await question();
+    await gp.getByTestId('confirm-no').first().click().catch(() => {});
+    await gp.waitForTimeout(400);
+    const kept = await gp.getByTestId('ai-description').first().inputValue().catch(() => '');
+    check('leave guard: words typed to describe a meal ask "Discard this description?", and Keep editing keeps them', asksWords === 'Discard this description?' && kept === 'Lentil soup with bread' && new URL(gp.url()).pathname === '/food/photo', `"${asksWords}", kept "${kept}"`);
+    await gp.goto(`${BASE}/food/custom`, { waitUntil: 'networkidle' });
+    await gp.getByTestId('custom-name').first().fill('Grandma lentil stew', { timeout: 15000 });
+    await gp.waitForTimeout(300);
+    await gp.getByTestId('header-back').first().click();
+    await gp.waitForTimeout(500);
+    const asksFood = await question();
+    await gp.getByTestId('confirm-yes').first().click().catch(() => {});
+    await gp.waitForTimeout(800);
+    const foods = Object.values((await gp.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())))).customFoods).filter((f) => !f.deleted && f.name === 'Grandma lentil stew').length;
+    check('leave guard: a half-typed own food asks "Discard this food?", and Discard leaves without storing it', asksFood === 'Discard this food?' && new URL(gp.url()).pathname !== '/food/custom' && foods === 0, `"${asksFood}", ${gp.url()}, ${foods} stored`);
+    await gctx.close();
+  }
+
+  // ------------------------------------------- a typed minus waits (NumberField, numberTextProblem in src/ui/controlRules.ts)
+  // A minus in a field that takes none is kept as typed and named under the field; the form's Add or Save waits on it and
+  // never stores over it (quick add's macros, the weigh-in's body fat).
+  {
+    const { buildSeed } = await import(require('url').pathToFileURL(require.resolve('./seed.mjs')).href);
+    const seed = JSON.stringify(buildSeed({ onboarded: true, theme: 'blossom' }));
+    const mctx = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+    await mctx.addInitScript((value) => {
+      if (!window.sessionStorage.getItem('__seeded')) {
+        window.localStorage.setItem('healthcal-v1', value);
+        window.sessionStorage.setItem('__seeded', '1');
+      }
+    }, seed);
+    const mp = await mctx.newPage();
+    mp.on('pageerror', (e) => errors.push(e.message));
+    const state = async () => mp.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())));
+    const MINUS = 'Enter 0 or more, without a minus.';
+    await mp.goto(`${BASE}/food/quick?meal=lunch`, { waitUntil: 'networkidle' });
+    const before = Object.values((await state()).foodEntries).filter((e) => !e.deleted).length;
+    await mp.locator('input[data-testid="quick-kcal"]').first().fill('300', { timeout: 15000 });
+    await mp.locator('input[data-testid="quick-protein"]').first().fill('-20');
+    await mp.waitForTimeout(300);
+    const shown = await mp.locator('input[data-testid="quick-protein"]').first().inputValue();
+    const waits = (await mp.getByTestId('quick-save').first().getAttribute('aria-disabled')) === 'true';
+    await mp.getByTestId('quick-save').first().click({ force: true }).catch(() => {});
+    await mp.waitForTimeout(400);
+    const said = (await mp.getByTestId('food-quick-screen').first().innerText()).replace(/ /g, ' ').includes(MINUS);
+    const after = Object.values((await state()).foodEntries).filter((e) => !e.deleted).length;
+    check('typed minus: quick add keeps "-20" in Protein, names it under the field and Add waits', shown === '-20' && waits && said && after === before, `shown "${shown}", waits ${waits}, words ${said}, ${after - before} stored`);
+    await mp.goto(`${BASE}/weight`, { waitUntil: 'networkidle' });
+    const weights = Object.values((await state()).weights).filter((w) => !w.deleted).length;
+    await mp.getByTestId('weight-log').first().click({ timeout: 15000 });
+    await mp.locator('input[data-testid="weight-bodyfat-input"]').first().fill('-20', { timeout: 8000 });
+    await mp.waitForTimeout(300);
+    await mp.getByTestId('weight-save').first().click();
+    await mp.waitForTimeout(600);
+    const open = (await mp.getByTestId('weight-save').count()) > 0;
+    const sheetWords = open ? (await mp.getByTestId('sheet').last().innerText()).replace(/ /g, ' ') : '';
+    const weightsAfter = Object.values((await state()).weights).filter((w) => !w.deleted).length;
+    check('typed minus: the weigh-in with "-20" in body fat stays open with the field\'s words and stores nothing', open && sheetWords.includes(MINUS) && weightsAfter === weights, `open ${open}, words ${sheetWords.includes(MINUS)}, ${weightsAfter - weights} stored`);
+    await mctx.close();
+  }
+
+  // ------------------------------------------- the morning page never follows a log (morningVerdict's 'acted', src/features/morning/acted.ts)
+  // At a morning cold start (tomorrow 08:10, so the seed's today is yesterday) the page opens by itself 900 ms after the
+  // app settles, unless the person has already acted: a tile tapped in the + sheet in the first moment leaves Today on
+  // screen, with the food logged. Without that tap it opens, so the block proves the rule, not a quiet day.
+  {
+    const { buildSeed } = await import(require('url').pathToFileURL(require.resolve('./seed.mjs')).href);
+    const seed = JSON.stringify(buildSeed({ onboarded: true, theme: 'blossom' }));
+    const at = new Date();
+    at.setDate(at.getDate() + 1);
+    at.setHours(8, 10, 0, 0);
+    const run = async (act) => {
+      const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+      await ctx.clock.setFixedTime(at);
+      await ctx.addInitScript((value) => {
+        window.__healthcalMorning = true;
+        if (!window.sessionStorage.getItem('__seeded')) {
+          window.localStorage.setItem('healthcal-v1', value);
+          window.sessionStorage.setItem('__seeded', '1');
+        }
+      }, seed);
+      const p = await ctx.newPage();
+      p.on('pageerror', (e) => errors.push(e.message));
+      await p.goto(`${BASE}/`);
+      await p.getByTestId('tab-add').first().waitFor({ timeout: 15000 });
+      if (act) {
+        await p.getByTestId('tab-add').first().tap();
+        await p.locator('[data-testid^="quick-usual-b_"]').first().tap({ timeout: 8000 });
+      }
+      await p.waitForTimeout(4000);
+      const st = await p.evaluate(() => JSON.parse(JSON.stringify(window.__healthcal.getState())));
+      const day = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
+      const r = { path: new URL(p.url()).pathname, card: await p.getByTestId('morning-card').count(), logged: Object.values(st.foodEntries).filter((e) => !e.deleted && e.date === day).length };
+      await ctx.close();
+      return r;
+    };
+    const quiet = await run(false);
+    check('morning after a log: with nothing done the page opens by itself', quiet.path === '/morning' && quiet.card > 0, JSON.stringify(quiet));
+    const acted = await run(true);
+    check('morning after a log: a + sheet tile tapped at once logs the food and Today stays on screen', acted.path === '/' && acted.card === 0 && acted.logged === 1, JSON.stringify(acted));
   }
 
   // ------------------------------------------- saving meals: from the AI review and from the diary (builder one)

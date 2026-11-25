@@ -106,6 +106,7 @@ const log = [
   { id: 'log-edit-note', route: '/train', data: 'stress', taps: ['^session-running'], waitFor: 'log-activity-delete', note: 'the run with a two-sentence note, 95 minutes, 142.6 kg' },
   { id: 'log-edit-imperial', route: '/train', data: 'stress', imperial: true, taps: ['^session-running', 'log-activity-source'], waitFor: 'log-activity-delete', note: 'editing in miles and lb, the source open' },
   { id: 'log-not-found', route: '/activity/log?entryId=no-such-session', note: 'a session that is no longer there' },
+  { id: 'log-new-imperial-source', route: '/activity/log?activityId=running', imperial: true, taps: ['log-activity-source'], waitFor: 'log-activity-adds', note: 'a new run on an imperial profile, the source open: the weight in kg with lb beside it' },
 ];
 
 // ------------------------------------------------------------------ Garmin import
@@ -262,6 +263,14 @@ const water = [
   { id: 'water-recent-chips', route: '/water', now: todayAt(13, 30), taps: [...pickAndLog('mocha', 'b_mocha'), ...pickAndLog('energy', 'b_energy_drink'), 'water-beverage-water'], waitFor: '^water-recent-', note: 'the Water kind with the drinks picked before as chips: the glasses still in the first view' },
   { id: 'water-recent-chips-stress', route: '/water', data: 'stress', now: todayAt(13, 30), taps: [...pickAndLog('mocha', 'b_mocha'), ...pickAndLog('hot chocolate', 'b_hot_chocolate'), ...pickAndLog('coconut', 'b_coconut_water'), 'water-beverage-water'], waitFor: '^water-recent-', note: 'three recent chips with long names: what does not fit on the line is left out' },
   { id: 'water-sizes-error',route: '/water', taps: ['section-add-a-drink-action', ...[0, 1, 2, 3].map((i) => ({ type: `water-preset-${i}`, text: '' })), 'water-presets-save'], sheet: true, waitFor: 'water-presets-error', note: 'every size cleared: the error' },
+  // Loop 3: an amount asked about once (`drinkAmountCheck`), the limit, a typed minus, and typed sizes not dropped.
+  { id: 'water-custom-ask', route: '/water', type: { 'water-custom-input': '2500' }, taps: ['water-custom-add'], waitFor: 'water-custom-check', note: 'above 2 L: asked once under the field, Add level with the cup' },
+  { id: 'water-custom-over', route: '/water', type: { 'water-custom-input': '6000' }, waitFor: 'water-custom-check', note: 'above 5 L: "Up to 5 L at a time.", Add waits' },
+  { id: 'water-custom-ask-imperial', route: '/water', imperial: true, type: { 'water-custom-input': '80' }, taps: ['water-custom-add'], waitFor: 'water-custom-check', note: 'above 2 L in fl oz: asked once' },
+  { id: 'water-minus', route: '/water', type: { 'water-custom-input': '-100' }, note: 'a typed minus: kept, named under the cup, Add level with the cup and waiting' },
+  { id: 'water-sizes-discard', route: '/water', taps: ['section-add-a-drink-action', { type: 'water-preset-0', text: '180' }, { key: 'Escape' }], sheet: true, waitFor: 'sheet-discard-title', note: 'a size typed, the sheet closed: "Discard these sizes?" in place of its footer' },
+  { id: 'water-pick-ask', route: '/water', taps: ['water-search', 'water-pick-kcal-open', { type: 'water-pick-ml', text: '2500' }, { type: 'water-pick-kcal', text: '120' }, 'water-pick-kcal-add'], sheet: true, waitFor: 'water-pick-ask', note: 'the drink sheet\'s entered amount above 2 L: asked once under the fields' },
+  { id: 'water-pick-kcal-ask', route: '/water', taps: ['water-search', 'water-pick-kcal-open', { type: 'water-pick-kcal', text: '4000' }, 'water-pick-kcal-add'], sheet: true, waitFor: 'water-pick-kcal-ask', note: 'the drink sheet\'s calories above 3,000 kcal: asked once, as quick add asks' },
 ];
 
 // ------------------------------------------------------------------ weight
@@ -281,6 +290,8 @@ const weight = [
   { id: 'weight-sheet-edit', route: '/weight', taps: ['weight-row-0'], sheet: true, note: 'an existing weigh-in: update and delete' },
   { id: 'weight-help-open', route: '/weight', taps: ['weight-trend-help'], waitFor: 'weight-trend-help-body', note: 'why the trend differs from the scale, open' },
   { id: 'weight-sheet-error', route: '/weight', taps: ['weight-log', { type: 'weight-input', text: '900' }, 'weight-save'], sheet: true, note: 'a weight out of range' },
+  { id: 'weight-minus', route: '/weight', taps: ['weight-log', { type: 'weight-input', text: '-70' }], sheet: true, note: 'a typed minus in the weight: kept and named under the field' },
+  { id: 'weight-sheet-minus', route: '/weight', taps: ['weight-log', { type: 'weight-bodyfat-input', text: '-20' }, 'weight-save'], sheet: true, note: 'a minus in body fat: Save waits with the field\'s own words' },
 ];
 
 // ------------------------------------------------------------------ body
@@ -293,6 +304,7 @@ const body = [
   { id: 'body-filled-imperial', route: '/body', data: 'empty', imperial: true, type: { 'body-neck-input': '15', 'body-waist-input': '33', 'body-hip-input': '39' }, waitFor: 'body-estimate', note: 'measurements in inches' },
   { id: 'body-help-open', route: '/body', data: 'stress', taps: ['body-bmi-help', 'body-measure-help', 'body-lean-help'], waitFor: 'body-lean-help-body', note: 'every explanation open, long content' },
   { id: 'body-weight-error', route: '/body', data: 'empty', type: { 'body-neck-input': '38', 'body-waist-input': '84', 'body-weight-input': '900' }, taps: ['body-save'], note: 'no weigh-in today, and a weight out of range' },
+  { id: 'body-minus', route: '/body', type: { 'body-neck-input': '38', 'body-waist-input': '-80' }, note: 'a minus in Waist: named under the field, Save measurements waits' },
 ];
 
 // ------------------------------------------------------------------ sleep

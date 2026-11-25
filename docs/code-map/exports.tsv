@@ -820,6 +820,7 @@ src/features/drinks/rules.ts	drinkGrams	function
 src/features/drinks/rules.ts	drinkKcal	function
 src/features/drinks/rules.ts	drinkMeal	function
 src/features/drinks/rules.ts	drinkName	function
+src/features/drinks/rules.ts	enteredDrinkKind	function
 src/features/drinks/rules.ts	enteredKcalError	function
 src/features/drinks/rules.ts	entryFor	function
 src/features/drinks/rules.ts	gramsPerMl	function

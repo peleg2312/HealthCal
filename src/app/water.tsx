@@ -29,7 +29,7 @@ import { DrinkTitleRow } from '@/features/drinks/DrinkTitleRow';
 import { pickToast, placePick, yourDrinks } from '@/features/drinks/pick';
 import { loadDrinkMemory, rememberDrinkChoice, useDrinkMemory } from '@/features/drinks/memory';
 import { diaryWaterCaption, diaryWaterOpenLabel, waterDeleteLabel } from '@/features/drinks/diary';
-import { DRINK_MAX_ML, drinkAmountCheck, drinkMeal, entryFor, noticeLine, pickedFood, planDrink, rememberedChoice, sameDrinkFoodIds, sameDrinkInDiary, selectChoice, selectFood, waterAfter, waterFromEntry, waterOnlyOffered, waterRowCaption, waterRowTitle, type WaterAfter } from '@/features/drinks/rules';
+import { DRINK_MAX_ML, drinkAmountCheck, drinkMeal, enteredDrinkKind, entryFor, noticeLine, pickedFood, planDrink, rememberedChoice, sameDrinkFoodIds, sameDrinkInDiary, selectChoice, selectFood, waterAfter, waterFromEntry, waterOnlyOffered, waterRowCaption, waterRowTitle, type WaterAfter } from '@/features/drinks/rules';
 import { leftLitreDecimals, shownMl, volumeNumber, volumeUnitFor, waterLeftMl } from '@/features/today/volume';
 import { cup, useLargeText, useTheme } from '@/theme';
 import { pourLandsAt } from '@/theme/motion';
@@ -371,7 +371,10 @@ function WaterScreen() {
     // The sheet keeps its Add waiting above the limit (`drinkAmountCheck`); this only guards the write.
     if (ml > DRINK_MAX_ML) return;
     setPickQuery(null);
-    logDrink(planDrink({ kind: beverage, drink: { id: ENTERED, food: null }, ml, kcal, date, now: new Date(), today: today(), units, amount: 'custom', after: after(ml, beverage) }));
+    // Calories entered while Water is showing (the sheet opened from its Search) go to Other (`enteredDrinkKind`):
+    // the button said "Add 140 kcal to lunch", and the 140 kcal are written with the drink.
+    const kind = enteredDrinkKind(beverage);
+    logDrink(planDrink({ kind, drink: { id: ENTERED, food: null }, ml, kcal, date, now: new Date(), today: today(), units, amount: 'custom', after: after(ml, kind) }));
     setWaterOnly(false);
   };
 

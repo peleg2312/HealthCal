@@ -58,6 +58,27 @@ const SCROLLED_SHEET = ({ scrolled = false, toastTop = null } = {}) => `
 </body>`;
 
 /**
+ * A screen (the kit's `Screen`, `id="screen-<n>"`) with a scroll area and a toast resting over a row of it: the
+ * diary after a delete, its Undo toast over Lunch's "Log lunch" (KIT3, P3-I2-C1: the scan once judged only a
+ * sheet, a pinned footer and the tab bar, so it called this clean). With `band` the scroll area ends 8 px above
+ * the toast, as the kit's screen does when no band is clear (`toastBand`): the row leaves the scroll area's view
+ * and nothing that shows is under the toast. With `covered` a second screen is pushed over the first (a pushed
+ * screen over a tab that stays mounted): only the screen under the toast is judged.
+ */
+const SCREEN_TOAST = ({ band = false, covered = false } = {}) => `
+<body style="margin:0;font:15px/20px sans-serif;background:#fff;color:#111">
+  <div id="screen-1" style="position:fixed;left:0;right:0;top:0;bottom:0;display:flex;flex-direction:column">
+    <div style="${band ? 'height:572px' : 'flex:1 1 auto;min-height:0'};overflow-y:auto">
+      <div style="height:570px">Breakfast</div>
+      <button data-testid="meal-add-lunch" style="display:block;width:100%;height:48px">Log lunch</button>
+      <div style="height:800px">Dinner</div>
+    </div>
+  </div>
+  ${covered ? '<div id="screen-2" style="position:fixed;left:0;right:0;top:0;bottom:0;background:#fff"><p>Water</p></div>' : ''}
+  <div data-testid="toast" style="position:fixed;left:20px;right:20px;top:580px;height:44px;background:#111;color:#fff">Almonds removed from lunch <span role="button">Undo</span></div>
+</body>`;
+
+/**
  * The save sheet's foods (SaveMealSheet: numberOfLines={2}) in a sheet pinned with its top at `top` on the 844 px
  * window, its body not scrolling: sixteen lines of names clamped to two, a Hebrew name (its own span, as Text
  * marks one) near the end. The lines after the clamp are laid out under its box, below the bottom of the screen,
@@ -111,6 +132,10 @@ const cases = [
   { name: 'toast over a tile scrolled out of the sheet body is fine (the body clips it)', html: SCROLLED_SHEET({ scrolled: true }), run: 'toast', expect: '' },
   // The same tile in view, with the toast moved onto it: the clip still leaves what shows to be judged.
   { name: 'toast over a tile showing in the sheet body is still found', html: SCROLLED_SHEET({ toastTop: 480 }), run: 'toast', expect: 'covers quick-fav-food-0' },
+  // A toast over the focused screen's own control (the diary's Undo over Lunch's add), judged by what its scroll area shows.
+  { name: "toast over the focused screen's own control", html: SCREEN_TOAST(), run: 'toast', expect: 'covers meal-add-lunch' },
+  { name: 'toast over a row its scroll area no longer shows is fine (the band the screen makes)', html: SCREEN_TOAST({ band: true }), run: 'toast', expect: '' },
+  { name: 'a screen covered by the focused one is not judged under the toast', html: SCREEN_TOAST({ covered: true }), run: 'toast', expect: '' },
   { name: 'the page behind a sheet is not judged', html: sheetPage(), run: 'layoutSheet', expect: '' },
   { name: 'the page alone is judged', html: sheetPage().replace(/<div style="position:fixed;left:0;right:0;bottom:0[\s\S]*$/, '</body>'), run: 'layoutPage', expect: 'over' },
   {
@@ -520,6 +545,8 @@ async function runCase(page, c) {
   judge('absent: a list of testIDs is a well-formed state', form({ absent: ['morning-card'] }), '');
   judge('absent: a single string is refused', form({ absent: 'morning-card' }), 'absent is');
   judge('an unknown field is still refused', form({ flag: { __healthcalMorning: true } }), 'unknown field flag');
+  judge("taps: { key: 'Escape' } is a well-formed step", form({ taps: ['tab-add', { key: 'Escape' }] }), '');
+  judge('taps: an empty key is refused', form({ taps: [{ key: '' }] }), 'a step is');
   // Through evidence.cjs's own open(), as a state runs: a stub page under the build's address draws
   // "morning-card" only when the app's first script sees the flag. With the flag and absent: ['morning-card'],
   // open() must report it (proving open() applies the flags and checks absent); without the flag, nothing.
@@ -560,9 +587,8 @@ async function runCase(page, c) {
   await real.addStyleTag({ content: '[data-testid="sheet"] { padding-bottom: 0 !important } [data-testid="sheet-body"] > div { padding-bottom: 0 !important }' });
   await real.waitForTimeout(100);
   judge('real + sheet: no space under the last control', await real.evaluate(sheetScan), 'from the bottom of the screen');
-  // Log water from the sheet: a one-tap log closes the sheet, so its toast (Undo, 12 s in a browser) rests over
-  // the screen below. Opened again while that toast shows, the sheet takes the toast just above its top edge,
-  // and it must not be over anything there.
+  // Log water from the sheet: a one-tap log closes the sheet and hands its toast (Undo, 12 s in a browser) to the
+  // screen below (`toastToScreen`), so the sheet opened again while that toast shows draws none of it.
   await real.reload({ waitUntil: 'networkidle' });
   await real.getByTestId('tab-add').first().click({ timeout: 15000 });
   await real.waitForSelector(SHEET, { timeout: 10000 });
@@ -574,13 +600,51 @@ async function runCase(page, c) {
     await real.getByTestId('tab-add').first().click({ timeout: 15000 });
     await real.waitForSelector(SHEET, { timeout: 10000 });
     await real.waitForTimeout(500);
-    judge('real toast from the + sheet sits clear', await real.evaluate(toastScan), '');
-    await real.addStyleTag({ content: '[data-testid="toast"] { transform: translateY(420px) !important }' });
-    await real.waitForTimeout(100);
-    judge('real toast pushed onto the sheet', await real.evaluate(toastScan), 'covers');
+    const shownToasts = await real.evaluate(() => [...document.querySelectorAll('[data-testid="toast"]')].filter((t) => t.getBoundingClientRect().height > 0).length);
+    judge('real one-tap toast from the + sheet is the screen\'s: the sheet opened again shows none', shownToasts ? ['a toast is shown over the sheet'] : [], '');
   } else {
     judge('real + sheet has a 250 ml water button', [], 'a button');
   }
+  // A toast the + sheet keeps (Repeat leaves the sheet open, its toast with it): at 19:00 the demo's dinner is empty and
+  // yesterday's is there, so "Repeat yesterday's dinner" shows. The sheet takes the toast just above its top edge, over
+  // nothing; pushed onto the sheet it covers the sheet's controls.
+  const evening = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', isMobile: true, hasTouch: true });
+  const dinnerTime = new Date();
+  dinnerTime.setHours(19, 0, 0, 0);
+  await evening.clock.setFixedTime(dinnerTime);
+  await evening.addInitScript((value) => { if (!sessionStorage.getItem('seeded')) { localStorage.clear(); localStorage.setItem('healthcal-v1', value); sessionStorage.setItem('seeded', '1'); } }, JSON.stringify(buildSeed({ theme: 'dark' })));
+  const kept = await evening.newPage();
+  await kept.goto(`${base}/`, { waitUntil: 'networkidle', timeout: 120000 });
+  await kept.getByTestId('tab-add').first().click({ timeout: 15000 });
+  await kept.waitForSelector(SHEET, { timeout: 10000 });
+  const repeat = kept.getByTestId('quick-repeat').first();
+  if (await repeat.count()) {
+    await repeat.click();
+    await kept.getByTestId('toast').first().waitFor({ timeout: 10000 }).catch(() => {});
+    await kept.waitForTimeout(500);
+    judge('real toast the + sheet keeps (Repeat) sits clear', await kept.evaluate(toastScan), '');
+    await kept.addStyleTag({ content: '[data-testid="toast"] { transform: translateY(420px) !important }' });
+    await kept.waitForTimeout(100);
+    judge('real toast pushed onto the sheet', await kept.evaluate(toastScan), 'covers');
+  } else {
+    judge('real + sheet offers Repeat at 19:00', [], 'quick-repeat');
+  }
+  await evening.close();
+  // The real diary after a delete (KIT3, P3-I2-C1), 360 x 740: its rows are each a control, so no band is clear;
+  // the Undo toast rests where it always rests and the screen ends its scroll area 8 px above it, so no row that
+  // shows is under it. Pushed up onto the rows that do show, it covers the screen's own controls.
+  const diaryCtx = await browser.newContext({ viewport: { width: 360, height: 740 }, reducedMotion: 'reduce', isMobile: true, hasTouch: true });
+  await diaryCtx.addInitScript((value) => { if (!sessionStorage.getItem('seeded')) { localStorage.clear(); localStorage.setItem('healthcal-v1', value); sessionStorage.setItem('seeded', '1'); } }, JSON.stringify(buildSeed({ theme: 'blossom' })));
+  const diary = await diaryCtx.newPage();
+  await diary.goto(`${base}/diary`, { waitUntil: 'networkidle', timeout: 120000 });
+  await diary.locator('[data-testid^="entry-delete-"]').first().click({ timeout: 15000 });
+  await diary.getByTestId('toast').first().waitFor({ timeout: 10000 });
+  await diary.waitForTimeout(800);
+  judge("real diary's Undo toast after a delete: no control of the screen under it", await diary.evaluate(toastScan), '');
+  await diary.addStyleTag({ content: '[data-testid="toast"] { transform: translateY(-220px) !important }' });
+  await diary.waitForTimeout(100);
+  judge("real diary's toast pushed up onto its rows", await diary.evaluate(toastScan), 'covers');
+  await diaryCtx.close();
   // The real Today at 360 px (the owner's phone), demo data. The calorie cup places its labels at the levels
   // they describe (absolutely positioned); the kit keeps them 8 px apart (Vessel's labelSpacing). Real
   // faults come and go as screens are fixed, so the positive is made by hand on the real page: the eaten
