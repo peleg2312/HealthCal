@@ -167,9 +167,13 @@ export function shownRowName(row: Pick<ReviewRow, 'item' | 'food'>): string {
   return row.food && row.item.name === row.food.name ? displayFoodName(row.food) : row.item.name;
 }
 
-/** An estimate's grams are drawn whole: the AI's tenths are not that precise (principle 2). */
+/**
+ * An estimate's grams as drawn: whole, since the AI's tenths are not that precise, and marked as an estimate,
+ * as its calories are ("~53", the unit after it: "~53 g"; principle 2). Heard as `estimateGramsSpoken`
+ * ("about 53 grams", `@/features/ai/words`).
+ */
 export function estimateGrams(g: number): string {
-  return String(Math.round(g));
+  return `~${Math.round(g)}`;
 }
 
 let seq = 0;

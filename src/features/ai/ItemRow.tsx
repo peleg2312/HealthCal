@@ -115,7 +115,7 @@ export function ItemRow({
             </Text>
           ) : null}
         </View>
-        {/* Drawn as "P 47 C 0 F 5", heard in full ("Protein 47 grams, ..."): natively as the group's label, on the web as hidden words beside the hidden letters. */}
+        {/* Drawn as "P ~47 g C ~0 g F ~5 g", heard in full and as estimates ("Protein about 47 grams, ..."): natively as the group's label, on the web as hidden words beside the hidden letters. */}
         <View
           style={{ flexDirection: 'row', gap: 8 }}
           {...(Platform.OS === 'web' ? {} : { accessible: true, accessibilityLabel: spokenMacros(item.protein, item.carbs, item.fat) })}>
@@ -214,7 +214,7 @@ function SwapChip({ name, kcal, selected, onPress, testID }: { name: string; kca
   );
 }
 
-/** One macro of an estimated row, in whole grams with its unit ("P 47 g", never "P 46.5": the estimate is not that precise). */
+/** One macro of an estimated row, in whole grams with its unit and as an estimate ("P ~47 g", never "P 46.5" nor a bare "P 47 g"). */
 function Macro({ letter, value, color }: { letter: string; value: number; color: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>

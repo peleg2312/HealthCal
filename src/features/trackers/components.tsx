@@ -1,7 +1,7 @@
 import { Redirect } from 'expo-router';
 import { ChevronDown, ChevronRight, ChevronUp, Info } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { AccessibilityInfo, View, type StyleProp, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, Platform, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { DayStepper as FoodDayStepper } from '@/features/food/components';
 import { spokenUnits } from '@/lib/spokenUnits';
@@ -9,7 +9,7 @@ import { useToday } from '@/store/clock';
 import { useStore } from '@/store';
 import { cup, fonts, useLargeText, useTextGrowth, useTheme } from '@/theme';
 import type { ISODate } from '@/types';
-import { CupKey, DECORATIVE, PressableScale, Text } from '@/ui';
+import { Button, CupKey, DECORATIVE, PressableScale, Text } from '@/ui';
 
 /** Renders children only once a profile exists; otherwise sends the user to the welcome flow. */
 export function RequireProfile({ children }: { children: React.ReactNode }) {
@@ -45,9 +45,19 @@ export function DayStepper({ date, onChange, testID }: { date: ISODate; onChange
 }
 
 /**
+ * Static figures read as one element, their units in full (WCAG 3.1.4): "6 h 51 min" over "Average a night" is
+ * heard as "6 hours 51 minutes, Average a night". Natively the group is one text element; on the web, where a
+ * name on a plain box is not read, it is a named image, as a chart is (its drawn words are then not read twice).
+ */
+export function spokenFigure(label: string): { accessible: true; accessibilityRole: 'image' | 'text'; accessibilityLabel: string } {
+  return { accessible: true, accessibilityRole: Platform.OS === 'web' ? 'image' : 'text', accessibilityLabel: spokenUnits(label.replace(/\u00A0/g, ' ')) };
+}
+
+/**
  * A number with a small unit beside it and a label underneath. With `color`
  * (a theme colour name), the label carries a cup key in that colour; the
  * number stays in the text colour (data colours are fills, never text).
+ * It is one element to a screen reader, said with its units in full (`spokenFigure`), or as `spoken` when given.
  */
 export function Figure({
   value,
@@ -58,6 +68,7 @@ export function Figure({
   align = 'left',
   testID,
   basis,
+  spoken,
 }: {
   value: string;
   unit?: string;
@@ -68,13 +79,18 @@ export function Figure({
   testID?: string;
   /** In a row that wraps: the narrowest the figure may be before it moves to the next line, so its unit stays beside the number. */
   basis?: number;
+  /** What a screen reader says for the figure when its drawn words need more ("3 of 7 nights within 7 to 9 hours" for "3/7 nights"). */
+  spoken?: string;
 }) {
   const { colors } = useTheme();
   const key = color ? ((colors as unknown as Record<string, string>)[color] ?? color) : undefined;
   // The narrowest width grows with the text (the app's size and the phone's), so at 200% a figure takes its own line.
   const grow = useTextGrowth();
+  const said = spoken ?? (value === '–' ? `${label}, none yet` : `${value}${unit ? ` ${unit}` : ''}, ${label}`);
   return (
-    <View style={{ ...(basis ? { flexGrow: 1, flexBasis: basis * grow } : { flex: 1 }), minWidth: 0, alignItems: align === 'center' ? 'center' : 'flex-start' }}>
+    <View
+      {...spokenFigure(said)}
+      style={{ ...(basis ? { flexGrow: 1, flexBasis: basis * grow } : { flex: 1 }), minWidth: 0, alignItems: align === 'center' ? 'center' : 'flex-start' }}>
       {/* The figure itself never breaks (non-breaking spaces); on a narrow phone its unit may drop to a second line rather than be cut. */}
       <Text testID={testID} variant={size} tabular numberOfLines={2}>
         {value.replace(/ /g, '\u00A0')}
@@ -94,6 +110,9 @@ export function Figure({
 /**
  * Help behind an info control: one line that says what it explains, with the paragraph(s)
  * folded under it until asked for. The screen says one thing first; the "why" waits here.
+ * The control is the kit's opener, a small ghost `Button` with the info mark, its chevron and
+ * `expanded` (as every list's "Show all"), drawn without side padding so its words line up
+ * with the card's text.
  */
 export function Explain({ label, children, testID, style }: { label: string; children: React.ReactNode; testID: string; style?: StyleProp<ViewStyle> }) {
   const { colors, spacing } = useTheme();
@@ -101,20 +120,18 @@ export function Explain({ label, children, testID, style }: { label: string; chi
   const Chevron = open ? ChevronUp : ChevronDown;
   return (
     <View style={style}>
-      <PressableScale
+      <Button
         testID={testID}
-        onPress={() => setOpen((v) => !v)}
-        feedback="select"
-        accessibilityRole="button"
+        title={label}
+        variant="ghost"
+        size="sm"
+        full={false}
         expanded={open}
-        accessibilityLabel={label}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 }}>
-        <Info size={16} color={colors.textSecondary} strokeWidth={1.9} />
-        <Text variant="label" color="textSecondary" style={{ flex: 1 }}>
-          {label}
-        </Text>
-        <Chevron size={16} color={colors.textSecondary} strokeWidth={1.9} />
-      </PressableScale>
+        icon={<Info size={18} color={colors.actionInk} strokeWidth={2.2} />}
+        iconRight={<Chevron size={18} color={colors.actionInk} strokeWidth={2.2} />}
+        onPress={() => setOpen((v) => !v)}
+        style={{ paddingHorizontal: 0, marginVertical: 4 }}
+      />
       {open ? (
         <View testID={`${testID}-body`} style={{ gap: spacing.sm, paddingBottom: spacing.xs }}>
           {children}
@@ -124,25 +141,25 @@ export function Explain({ label, children, testID, style }: { label: string; chi
   );
 }
 
-/** A paragraph inside `Explain`. */
+/** A paragraph inside `Explain`: reading text, at the body size in the secondary ink. */
 export function ExplainText({ children }: { children: React.ReactNode }) {
   return (
-    <Text variant="caption" color="textSecondary" style={{ fontSize: 13, lineHeight: 19 }}>
+    <Text variant="body" color="textSecondary">
       {children}
     </Text>
   );
 }
 
-/** Small info paragraph with an icon, used for "why" explanations. */
+/** An info paragraph with an icon, used for "why" explanations: reading text, at the body size in the secondary ink. */
 export function Note({ icon, children, style }: { icon?: React.ReactNode; children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   return (
     <View style={[{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }, style]}>
       {icon ? (
-        <View style={{ paddingTop: 2 }} {...DECORATIVE}>
+        <View style={{ paddingTop: 4 }} {...DECORATIVE}>
           {icon}
         </View>
       ) : null}
-      <Text variant="caption" color="textSecondary" style={{ flex: 1, fontSize: 13, lineHeight: 19 }}>
+      <Text variant="body" color="textSecondary" style={{ flex: 1 }}>
         {children}
       </Text>
     </View>

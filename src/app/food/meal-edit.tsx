@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Plus, X } from 'lucide-react-native';
+import { Plus, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
@@ -181,8 +181,9 @@ function MealEdit() {
                     </Text>
                   </View>
                 </PressableScale>
-                <IconButton testID={`meal-edit-item-${i}-remove`} accessibilityLabel={`Remove ${displayFoodName(r.item)}`} tone="clear" size={44} onPress={() => remove(r.key)}>
-                  <X size={16} color={colors.textSecondary} strokeWidth={1.9} />
+                {/* A row's delete is the trash can named "Delete …", as in the diary, Water, Train and the AI review; an X only closes. */}
+                <IconButton testID={`meal-edit-item-${i}-remove`} accessibilityLabel={`Delete ${displayFoodName(r.item)}`} tone="clear" size={44} onPress={() => remove(r.key)}>
+                  <Trash2 size={18} color={colors.textSecondary} strokeWidth={1.9} />
                 </IconButton>
               </View>
             </View>

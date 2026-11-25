@@ -12,7 +12,7 @@ import { barsLabel } from './chartWords';
 import { LegendDot } from './parts';
 
 /**
- * The overview's lead chart (the designer's "Calories a day"): a row of slim
+ * The overview's chart (the designer's "Calories a day"), under the period overview: a row of slim
  * cups in the calorie colour, one per day (one per week past six weeks), each
  * capped by its level line. A bar is amber only above its own budget; the
  * dashed line is the average budget, a reference. Today is hatched and a
@@ -37,7 +37,7 @@ export function CaloriesADay({ days, summary, today, onOpen }: { days: InsightDa
     // opens Nutrition: a heading inside a button is not a heading to a screen reader. Everything under it
     // is that control, so a tap anywhere below the title still opens Nutrition.
     <Card testID="progress-calories-a-day" style={{ gap: 2 }}>
-      {/* The average is the Calories tile's number just below, so it is said once there (and read out here). */}
+      {/* The average is the Calories tile's number just above, so it is said once there (and read out here). */}
       <Text variant="h3" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>
         {title}
       </Text>

@@ -64,11 +64,12 @@ export default function ProgressScreen() {
       <SegmentSwitch options={SEGMENTS} value={segment} onChange={setSegment} testIDPrefix="progress-segment" />
       {segment === 'overview' ? (
         <>
-          {/* Cards fade up in reading order; the overview grid's tiles carry on the sequence inside it. */}
-          <FadeUp index={0}>
+          {/* The period overview leads (its first two rows in the first view at 360 x 740, its first row at 320 x
+              640): its tiles fade up in reading order (1 to 8), then the cards under it carry on the sequence. */}
+          <OverviewGrid d={d} range={range} onOpen={setSegment} />
+          <FadeUp index={9}>
             <CaloriesADay days={d.days} summary={d.summary} today={d.today} onOpen={() => setSegment('nutrition')} />
           </FadeUp>
-          <OverviewGrid d={d} range={range} onOpen={setSegment} />
           <FadeUp index={10}>
             <InsightsCard insights={d.insights} rangeDays={range} />
           </FadeUp>

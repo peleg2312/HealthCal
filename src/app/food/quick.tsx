@@ -1,13 +1,17 @@
 import { useLocalSearchParams } from 'expo-router';
-import React, { useState } from 'react';
-import { View } from 'react-native';
+import React, { useId, useState } from 'react';
+import { AccessibilityInfo, Platform, View } from 'react-native';
 
 import { DayStepper, MealPicker } from '@/features/food/components';
 import { QUICK_KCAL_LIMIT, href, kcal, parseDate, parseMeal, quickKcalError, quickKcalValue } from '@/features/food/helpers';
 import { logQuickAdd } from '@/features/food/log';
-import { atwaterKcal, MEAL_LABEL } from '@/lib/nutrition';
+import { QUICK_KCAL_ASK, quickAddPress, quickAddTitle, quickAddWaiting } from '@/features/food/quickCheck';
+import { atwaterKcal } from '@/lib/nutrition';
 import { useLargeText, useTheme } from '@/theme';
-import { Button, Card, CupKey, Header, NumberField, Screen, Text, TextField, goBack, useLeaveGuard } from '@/ui';
+import { Button, Card, CupKey, Header, NumberField, Screen, Text, TextField, goBack, haptic, useLeaveGuard } from '@/ui';
+
+/** Hidden from sight, kept for screen readers: the live region that says why Add waited. */
+const SPOKEN_ONLY = { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 } as const;
 
 export default function QuickAddScreen() {
   const { colors, spacing } = useTheme();
@@ -38,9 +42,26 @@ export default function QuickAddScreen() {
   // Typed numbers or a name are not dropped without asking (the X, back, a swipe back).
   const typed = kcalText.trim().length > 0 || hasMacros || name.trim().length > 0;
   const leave = useLeaveGuard(typed ? 'Discard this quick add?' : null);
+  // More than one plausible entry holds (`quickKcalAsks`) is added on a second press of Add (`quickAddPress`): the
+  // first adds nothing, ties a line to the field and names the amount on the button. Another amount asks again.
+  const [askedFor, setAskedFor] = useState<number | null>(null);
+  const waiting = quickAddWaiting(calories, askedFor);
+  const askId = `quick-ask-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+  // The web's polite live region, mounted empty, so the line is heard as it appears without moving focus.
+  const [spoken, setSpoken] = useState('');
 
   const save = () => {
     if (!valid) return;
+    if (quickAddPress(calories!, askedFor) === 'ask') {
+      setAskedFor(calories);
+      haptic.warn();
+      if (Platform.OS !== 'web') AccessibilityInfo.announceForAccessibility(QUICK_KCAL_ASK);
+      else {
+        setSpoken('');
+        setTimeout(() => setSpoken(QUICK_KCAL_ASK), 150);
+      }
+      return;
+    }
     logQuickAdd({ name, meal, date, nutrients: { kcal: calories!, protein: protein ?? 0, carbs: carbs ?? 0, fat: fat ?? 0 } });
     leave.allowLeave();
     goBack(href('/diary', { date }));
@@ -50,7 +71,7 @@ export default function QuickAddScreen() {
     <Screen
       testID="food-quick-screen"
       header={<Header title="Quick add" subtitle="When you just know the numbers" close />}
-      footer={<Button testID="quick-save" title={`Add to ${MEAL_LABEL[meal].toLowerCase()}`} disabled={!valid} onPress={save} />}>
+      footer={<Button testID="quick-save" title={quickAddTitle(meal, waiting ? calories : null)} disabled={!valid} onPress={save} />}>
       <Card style={{ gap: spacing.md }}>
         <TextField
           testID="quick-kcal"
@@ -63,9 +84,20 @@ export default function QuickAddScreen() {
           autoFocus
           placeholder={hasMacros ? String(implied) : 'e.g. 350'}
           error={kcalError}
-          hint={!kcalText.trim() && hasMacros ? `Worked out from the macros: ${kcal(implied)} kcal` : undefined}
+          hint={!kcalText.trim() && hasMacros && !waiting ? `Worked out from the macros: ${kcal(implied)} kcal` : undefined}
+          // While Add waits for its second press, the line under the field is tied to it (the hint natively).
+          {...(waiting ? (Platform.OS === 'web' ? ({ 'aria-describedby': askId } as object) : { accessibilityHint: QUICK_KCAL_ASK }) : null)}
           onSubmitEditing={save}
         />
+        {waiting ? (
+          // Held up and waiting on the person: the amber key, with neutral words, as the macros' note.
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+            <CupKey color={colors.warning} style={{ marginTop: 4 }} />
+            <Text testID="quick-ask" nativeID={askId} variant="caption" color="text" style={{ flex: 1 }}>
+              {QUICK_KCAL_ASK}
+            </Text>
+          </View>
+        ) : null}
         <TextField testID="quick-name" label="Name (optional)" placeholder={big ? 'e.g. Cake' : 'e.g. Office birthday cake'} value={name} onChangeText={setName} maxLength={80} />
       </Card>
 
@@ -97,6 +129,11 @@ export default function QuickAddScreen() {
         <MealPicker value={meal} onChange={setMeal} testIDPrefix="quick-meal" />
         <DayStepper value={date} onChange={setDate} testIDPrefix="quick-day" />
       </Card>
+      {Platform.OS === 'web' ? (
+        <Text testID="quick-announce" style={SPOKEN_ONLY} {...({ 'aria-live': 'polite', 'aria-atomic': true } as object)}>
+          {spoken}
+        </Text>
+      ) : null}
       {leave.guard}
     </Screen>
   );

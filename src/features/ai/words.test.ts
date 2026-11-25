@@ -13,15 +13,18 @@ import {
   analysingNote,
   analysingSteps,
   DESCRIPTION_MAX,
+  estimateGramsSpoken,
   estimateReadyLine,
   itemKcalSpoken,
   itemNameLabel,
+  macroStatSpoken,
   prefilledDescription,
   searchAiTile,
   slowAfterMs,
   spokenMacros,
   swapChipLabel,
 } from './words';
+import { estimateGrams } from './estimate';
 
 const BANNED =
   /\b(bad|fail|failed|failure|cheat|cheated|should|guilty|lazy|great|amazing|well done|keep it up|too much|missed your|goal missed|over budget|make up|only|unfortunately|oops|sorry)\b/i;
@@ -100,6 +103,7 @@ describe('the review, spoken', () => {
     estimateReadyLine({ kcal: 90, range: [90, 90], items: 1, sample: false }),
     estimateReadyLine({ kcal: 507, range: [390, 620], items: 4, sample: true }),
     spokenMacros(46.6, 0, 5.2),
+    macroStatSpoken('Protein', 52.6),
     itemNameLabel(2),
     alternativesLabel(3, 'White rice, cooked'),
     swapChipLabel('White rice, cooked', 190),
@@ -113,7 +117,15 @@ describe('the review, spoken', () => {
 
   it('speaks no abbreviation: no kcal, no lone g, no macro letter', () => {
     expect(lines().filter((s) => /\bkcal\b|\b\d+ ?g\b|\b[PCF] \d/.test(s))).toEqual([]);
-    expect(spokenMacros(46.6, 0, 1)).toBe('Protein 47 grams, carbs 0 grams, fat 1 gram');
+    expect(spokenMacros(46.6, 0, 1)).toBe('Protein about 47 grams, carbs about 0 grams, fat about 1 gram');
+  });
+
+  it("says an estimate's grams as an estimate, whole: drawn \"~53 g\", heard \"about 53 grams\"", () => {
+    expect(estimateGrams(52.6)).toBe('~53');
+    expect(estimateGrams(0.4)).toBe('~0');
+    expect(estimateGramsSpoken(52.6)).toBe('about 53 grams');
+    expect(estimateGramsSpoken(1.2)).toBe('about 1 gram');
+    expect(macroStatSpoken('Carbs', 56.2)).toBe('Carbs, about 56 grams');
   });
 
   it('names each row apart, with the visible words first (label in name)', () => {

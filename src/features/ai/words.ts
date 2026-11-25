@@ -81,13 +81,23 @@ export function estimateReadyLine({ kcal, range, items, sample }: { kcal: number
   return `Estimate ready: about ${total} kilocalories${band}, ${count} to check.`;
 }
 
-/** One item's macros as a screen reader hears them, in whole grams: "Protein 47 grams, carbs 0 grams, fat 5 grams" (the row shows "P 47 C 0 F 5"). */
+/** An estimate's grams as heard: whole and as an estimate, "about 53 grams" (drawn "~53 g", `estimateGrams`). */
+export function estimateGramsSpoken(grams: number): string {
+  const r = Math.round(grams);
+  return `about ${r} ${r === 1 ? 'gram' : 'grams'}`;
+}
+
+/** One macro of the estimate's total as heard, with its name: "Protein, about 53 grams" (drawn "Protein" over "~53 g"). */
+export function macroStatSpoken(name: string, grams: number): string {
+  return `${name}, ${estimateGramsSpoken(grams)}`;
+}
+
+/**
+ * One item's macros as a screen reader hears them, whole and as estimates: "Protein about 47 grams, carbs about
+ * 0 grams, fat about 5 grams" (the row shows "P ~47 g C ~0 g F ~5 g").
+ */
 export function spokenMacros(protein: number, carbs: number, fat: number): string {
-  const g = (n: number) => {
-    const r = Math.round(n);
-    return `${r} ${r === 1 ? 'gram' : 'grams'}`;
-  };
-  return `Protein ${g(protein)}, carbs ${g(carbs)}, fat ${g(fat)}`;
+  return `Protein ${estimateGramsSpoken(protein)}, carbs ${estimateGramsSpoken(carbs)}, fat ${estimateGramsSpoken(fat)}`;
 }
 
 /** The name field of the review's item n (from 1): one name per row, starting with the field's own words. */

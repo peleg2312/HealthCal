@@ -43,7 +43,7 @@ import { AiGlyph, AiMark } from '@/features/ai/mark';
 import { PhotoHero } from '@/features/ai/PhotoHero';
 import { SampleNotice } from '@/features/ai/SampleNotice';
 import { photoText, readWeight } from '@/features/ai/weight';
-import { DESCRIPTION_MAX, estimateReadyLine, prefilledDescription } from '@/features/ai/words';
+import { DESCRIPTION_MAX, estimateReadyLine, macroStatSpoken, prefilledDescription } from '@/features/ai/words';
 import { SaveMealRow } from '@/features/ai/SaveMealRow';
 import { MealPicker } from '@/features/food/components';
 import { checkoutShown, PLAN_ROUTE, planVisible, refreshPlanAfterLimit, usePlan } from '@/features/plan';
@@ -952,20 +952,30 @@ export default function PhotoScreen() {
   }
 }
 
-/** One macro of the estimate's total, in whole grams ("53 g", never "52.9 g": principle 2). */
+/**
+ * One macro of the estimate's total, in whole grams and as an estimate, as its calories are: drawn "~53 g"
+ * (never "52.9 g" nor a bare "53 g": principle 2), heard as one element, "Protein, about 53 grams"
+ * (natively as its label, on the web as hidden words beside the hidden drawing, as an item row's macros are).
+ */
 function MacroStat({ label, value, color }: { label: string; value: number; color: string }) {
   // Three a line; with large text the row wraps (each at least 120 wide), so "Protein" never runs into "Carbs".
   const big = useLargeText();
+  const web = Platform.OS === 'web';
+  const spoken = macroStatSpoken(label, value);
   return (
-    <View style={[big ? { flexGrow: 1, flexBasis: 120 } : { flex: 1 }, { gap: 2 }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+    <View
+      style={[big ? { flexGrow: 1, flexBasis: 120 } : { flex: 1 }, { gap: 2 }]}
+      testID={`ai-macro-${label.toLowerCase()}`}
+      {...(web ? {} : { accessible: true, accessibilityLabel: spoken })}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} {...(web ? ({ 'aria-hidden': true } as object) : {})}>
         <CupKey color={color} />
         <Text variant="label">{label}</Text>
       </View>
-      <Text variant="numM" tabular style={{ fontSize: 17, lineHeight: 22 }}>
+      <Text variant="numM" tabular style={{ fontSize: 17, lineHeight: 22 }} {...(web ? ({ 'aria-hidden': true } as object) : {})}>
         {estimateGrams(value)}
         <Text variant="unit">{' g'}</Text>
       </Text>
+      {web ? <Text style={SPOKEN_ONLY}>{spoken}</Text> : null}
     </View>
   );
 }

@@ -4,8 +4,9 @@ import { View } from 'react-native';
 
 import type { Insight } from '@/lib/insights';
 import { useTheme } from '@/theme';
-import { Button, Divider, PressableScale, Text } from '@/ui';
+import { Button, Divider, Text } from '@/ui';
 
+import { insightMark } from './insightMark';
 import { go, SectionCard } from './parts';
 
 /** The last two words of a short line share a line, so a narrow phone never leaves one word alone ("gap."). */
@@ -56,13 +57,17 @@ export function InsightsCard({ insights, rangeDays }: { insights: Insight[]; ran
 function InsightRow({ insight }: { insight: Insight }) {
   const { colors, spacing } = useTheme();
   const [open, setOpen] = useState(false);
-  // A positive finding wears a sprout, never a check: in this app a check means only a day on budget.
+  // One meaning per mark (`insightMark`): a positive finding wears a sprout, never a check (a check means only a
+  // day on budget); the amber ink only for a value above its limit; a finding below a goal is an ink lightbulb.
+  const mark = insightMark(insight);
   const tone =
-    insight.tone === 'positive'
+    mark === 'sprout'
       ? { color: colors.text, Icon: Sprout }
-      : insight.tone === 'attention'
+      : mark === 'above'
         ? { color: colors.warningInk, Icon: Lightbulb }
-        : { color: colors.textSecondary, Icon: Info };
+        : mark === 'act'
+          ? { color: colors.text, Icon: Lightbulb }
+          : { color: colors.textSecondary, Icon: Info };
   const Chevron = open ? ChevronUp : ChevronDown;
   return (
     <View testID={`insight-${insight.id}`} style={{ flexDirection: 'row', gap: spacing.md }}>
@@ -76,8 +81,8 @@ function InsightRow({ insight }: { insight: Insight }) {
           {noWidow(insight.step)}
         </Text>
         {open ? (
-          // The numbers behind the finding, as a quieter paragraph under the step.
-          <Text variant="caption" color="textSecondary" testID={`insight-${insight.id}-body`} style={{ marginTop: spacing.sm, fontSize: 13, lineHeight: 19 }}>
+          // The numbers behind the finding, under the step: reading text, so the body size in the secondary ink.
+          <Text variant="body" color="textSecondary" testID={`insight-${insight.id}-body`} style={{ marginTop: spacing.sm }}>
             {insight.body}
           </Text>
         ) : null}
@@ -98,21 +103,20 @@ function InsightRow({ insight }: { insight: Insight }) {
               style={{ paddingHorizontal: 0 }}
             />
           ) : null}
-          <PressableScale
+          {/* The kit's opener (a small ghost Button with its chevron and `expanded`), as every other one that
+              opens more in place; drawn without side padding, so its words end at the card's text edge. */}
+          <Button
             testID={`insight-${insight.id}-numbers`}
-            onPress={() => setOpen((o) => !o)}
-            scaleTo={0.97}
-            accessibilityRole="button"
+            title={open ? 'Hide the numbers' : 'The numbers'}
             accessibilityLabel={open ? `Hide the numbers: ${insight.title}` : `The numbers: ${insight.title}`}
+            variant="ghost"
+            size="sm"
+            full={false}
             expanded={open}
-            hitSlop={6}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36, paddingHorizontal: insight.action ? spacing.xs : 0 }}>
-            <Text variant="label" color="textSecondary">
-              {open ? 'Hide the numbers' : 'The numbers'}
-            </Text>
-            {/* The icon rule for a mark on a button: 18 px at 2.2. */}
-            <Chevron size={18} color={colors.textSecondary} strokeWidth={2.2} />
-          </PressableScale>
+            iconRight={<Chevron size={18} color={colors.actionInk} strokeWidth={2.2} />}
+            onPress={() => setOpen((o) => !o)}
+            style={{ paddingHorizontal: 0 }}
+          />
         </View>
       </View>
     </View>

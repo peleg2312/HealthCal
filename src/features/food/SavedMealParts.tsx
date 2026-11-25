@@ -203,7 +203,7 @@ export function ItemAmountSheet({
       title={isolateRtl(displayFoodName(item))}
       footer={
         <View style={{ flexDirection: 'row', gap: spacing.md }}>
-          <Button testID="meal-item-remove" variant="secondary" full={false} title="Remove" onPress={onRemove} />
+          <Button testID="meal-item-remove" variant="secondary" full={false} title="Delete" accessibilityLabel={`Delete ${withoutMarks(displayFoodName(item))}`} onPress={onRemove} />
           <Button testID="meal-item-done" style={{ flex: 1 }} disabled={invalid} title={`Done · ${item.kcalRange ? '~' : ''}${kcal(item.nutrients.kcal)} kcal`} onPress={onClose} />
         </View>
       }>

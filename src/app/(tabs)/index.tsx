@@ -155,7 +155,7 @@ const NARROW = { padding: 12, paddingV: 10, labelSpacing: 4, labelH: 20, macrosT
  * day's share cup, as tall as the chip, at the column's right end; on today, "Ask the coach" (a chip with the coach's
  * glyph) on a row of its own under them, ACTION_GAP lower, so the 44 px touch areas of the two rows meet and never
  * overlap. The coach's worded way in is then in the first view's lower part at 320, 360 and 390 px. The card has no
- * footer row: the budget is said in the "eaten" line ("1,219 eaten of 2,160", as the diary's summary says it), so the
+ * footer row: the budget is said in the "eaten" line ("1,219 eaten of 2,160 kcal", as the diary's summary says it), so the
  * water row under the card sits higher and the toast a glass raises rests clear of its "+ 250 ml".
  */
 const ACTION_H = Math.max(32, SHARE_CUP);
@@ -230,6 +230,7 @@ function EnergyCard({
         // Never clipped (no numberOfLines): under a reader's own text spacing the label wraps rather than lose its end.
         <Text variant="numM" style={{ fontSize: 17, lineHeight: lineH }}>
           {`~${formatNumber(headroom)}`}
+          <Text variant="unit">{' kcal'}</Text>
           <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
             {'  added'}
           </Text>
@@ -237,7 +238,7 @@ function EnergyCard({
       ),
     });
   } else if (notAdded > 0) {
-    // Exercise left out of the budget (Goals): said at the brim, where "~290 added" would be. No tick:
+    // Exercise left out of the budget (Goals): said at the brim, where "~290 kcal added" would be. No tick:
     // nothing is poured or hatched for it.
     labels.push({
       key: 'not-added',
@@ -250,6 +251,7 @@ function EnergyCard({
           testID="today-not-added"
           accessibilityLabel={`Workouts: about ${formatNumber(notAdded)} kilocalories, not added to the budget`}>
           {`~${formatNumber(notAdded)}`}
+          <Text variant="unit">{' kcal'}</Text>
           <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
             {'  not added'}
           </Text>
@@ -319,7 +321,7 @@ function EnergyCard({
         tick: colors.rim,
         content: (
           // Text only: it never takes a tap meant for the big number above it. The budget is said here, once, as the
-          // diary's summary says it ("1,219 eaten of 2,160"); the whole sum (target plus exercise) is read out.
+          // diary's summary says it ("1,219 eaten of 2,160 kcal"); the whole sum (target plus exercise) is read out.
           <View pointerEvents="none" accessible accessibilityLabel={`${formatNumber(eaten)} kilocalories eaten. ${budgetLabel}`}>
             <AnimatedNumber variant="numM" value={eaten} format={(n) => formatNumber(Math.round(n))} style={{ fontSize: 17, lineHeight: lineH }} testID="today-eaten">
               <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
@@ -328,6 +330,7 @@ function EnergyCard({
               <Text variant="numM" style={{ fontSize: 17, lineHeight: lineH }} testID="today-budget">
                 {formatNumber(day.budget)}
               </Text>
+              <Text variant="unit">{' kcal'}</Text>
             </AnimatedNumber>
           </View>
         ),
@@ -428,6 +431,7 @@ function EnergyCard({
                 <CupKey color={colors.headroom} variant="hatched" size={11} style={{ marginTop: 8 }} />
                 <Text variant="numM" style={{ flexShrink: 1, fontSize: 17, lineHeight: 22 }}>
                   {`~${formatNumber(headroom)}`}
+                  <Text variant="unit">{' kcal'}</Text>
                   <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
                     {' added'}
                   </Text>
@@ -440,6 +444,7 @@ function EnergyCard({
                 testID="today-not-added"
                 accessibilityLabel={`Workouts: about ${formatNumber(notAdded)} kilocalories, not added to the budget`}>
                 {`~${formatNumber(notAdded)}`}
+                <Text variant="unit">{' kcal'}</Text>
                 <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
                   {' not added'}
                 </Text>
@@ -456,6 +461,7 @@ function EnergyCard({
                     <Text variant="numM" style={{ fontSize: 17, lineHeight: 22 }} testID="today-budget">
                       {formatNumber(day.budget)}
                     </Text>
+                    <Text variant="unit">{' kcal'}</Text>
                   </AnimatedNumber>
                 </View>
               </View>
@@ -689,7 +695,9 @@ function MealsSection({ day }: { day: DaySummary }) {
   const large = useLargeText();
   const open = (meal: MealType) => router.push(`/food/search?meal=${meal}&date=${day.date}`);
   return (
-    <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
+    // 4 px over the page's 16 px gap, as SectionTitle's own top margin: 20 px from the card above to the title, as on
+    // Train, Water and every other screen.
+    <View style={{ gap: spacing.sm, marginTop: spacing.xs }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Text variant="h3" accessibilityRole="header" {...({ 'aria-level': 2 } as object)}>
           Meals
