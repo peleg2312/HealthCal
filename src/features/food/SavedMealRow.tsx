@@ -12,20 +12,19 @@ import React, { useCallback, useState } from 'react';
 import { View } from 'react-native';
 
 import { isWaterDrinkEntry } from '@/features/drinks/via';
-import { isolateRtl } from '@/lib/bidi';
+import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { sumNutrients } from '@/lib/nutrition';
 import { useStore } from '@/store';
 import { live } from '@/store/selectors';
 import { cup, fonts, useTheme } from '@/theme';
 import type { FoodEntry, ISODate, MealType, SavedMeal } from '@/types';
 import { PressableScale, Text } from '@/ui';
-import { spokenUnits } from '@/lib/spokenUnits';
 
 import { formatPortion, itemsRange, mealServings } from './build';
 import { FavoriteStar } from './FavoriteStar';
 import { toggleMealFavorite } from './favoriteActions';
 import { favoriteMeals, inVisitOrder, isFavoriteMeal, orderSavedMeals } from './favorites';
-import { approxKcalSpoken, favoriteActionLabel, FAVOURITE_ACTION, logMealLabel, saveRowDay, savedRowCaption } from './favoriteWords';
+import { favoriteActionLabel, FAVOURITE_ACTION, logMealLabel, saveRowDay, savedRowCaption } from './favoriteWords';
 import { LangIconButton, useLangName } from './langName';
 import { SaveMealSheet } from './SaveMealSheet';
 import { itemCount, saveHintLabel } from './saveWords';
@@ -65,8 +64,9 @@ export function SavedMealRow({ meal, testID, onReview, onLog, onHold }: { meal: 
   const { count, total, estimate } = rowFigures(meal);
   const caption = savedRowCaption({ items: meal.items.length, servings: count, servingsText: formatPortion(count), kcal: total, estimate });
   const star = () => toggleMealFavorite(meal);
-  // A meal named in Hebrew or Arabic is spoken in its own language (./langName).
-  const lang = useLangName(`${meal.name}, ${meal.items.length} items, ${approxKcalSpoken(total, estimate)}${on ? ', favourite' : ''}. Choose servings and items before logging`);
+  // Named by what it shows, as drawn (WCAG 2.5.3, label in name: "Usual breakfast, 2 items · 332 kcal"), then what the
+  // row leaves out; a meal named in Hebrew or Arabic is spoken in its own language (./langName).
+  const lang = useLangName(`${meal.name}, ${withoutMarks(caption)}${on ? ', favourite' : ''}. Choose servings and items before logging`);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
       <PressableScale
@@ -127,7 +127,7 @@ export function SaveCurrentMealRow({ meal, date, today, entries }: { meal: MealT
         testID="save-current-meal"
         onPress={() => setOpen(true)}
         scaleTo={0.985}
-        accessibilityLabel={spokenUnits(`${saveHintLabel(meal)}, ${caption}`)}
+        accessibilityLabel={`${saveHintLabel(meal)}, ${caption}`}
         style={{
           flexDirection: 'row',
           alignItems: 'center',

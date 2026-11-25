@@ -111,7 +111,7 @@ function Guide() {
     <Card padding={0} testID="import-guide">
       <PressableScale
         testID="import-guide-toggle"
-        accessibilityLabel="How to get your files from Garmin Connect"
+        accessibilityLabel="How to export from Garmin: getting your files from Garmin Connect"
         expanded={open}
         onPress={() => setOpen((o) => !o)}
         scaleTo={0.99}

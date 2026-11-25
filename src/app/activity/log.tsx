@@ -339,7 +339,8 @@ function LogForm({ activityId, entryId, dateParam }: { activityId: string; entry
                     accessibilityRole="radio"
                     accessibilityState={{ checked: active, selected: active }}
                     aria-checked={active}
-                    accessibilityLabel={`${INTENSITY_LABELS[i].title} effort`}
+                    // Its words as drawn (label in name): "Easy, Jog, about 8 km/h"; the group is named "Effort".
+                    accessibilityLabel={`${INTENSITY_LABELS[i].title}, ${hint}`}
                     onPress={() => setIntensity(i)}
                     style={{
                       overflow: 'hidden',
