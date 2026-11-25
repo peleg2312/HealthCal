@@ -17,6 +17,8 @@ import {
   SAVED_TOAST_BUDGET,
   saveHintA11y,
   saveHintLabel,
+  SAVE_NAME_DISCARD,
+  saveNameTyped,
   saveSheetFoods,
   saveSheetLine,
   saveSheetTitle,

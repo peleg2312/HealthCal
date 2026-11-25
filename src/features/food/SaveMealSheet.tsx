@@ -18,7 +18,7 @@ import { Button, Sheet, Text, TextField } from '@/ui';
 
 import { saveMeal } from './actions';
 import { kcal } from './helpers';
-import { defaultMealName, SAVE_NAME_MAX, saveSheetFoods, saveSheetLine, saveSheetTitle, showSaveSheetFoods } from './saveWords';
+import { defaultMealName, SAVE_NAME_DISCARD, SAVE_NAME_MAX, saveNameTyped, saveSheetFoods, saveSheetLine, saveSheetTitle, showSaveSheetFoods } from './saveWords';
 import { currentKcal } from './usuals';
 
 export interface SaveMealStepProps {
@@ -35,17 +35,29 @@ export interface SaveMealStep {
   title: string;
   body: React.ReactNode;
   footer: React.ReactNode;
+  /**
+   * The Sheet's `unsaved` question while a name is typed over the one offered (`saveNameTyped`), else null: a close
+   * that is not Save (Escape, the scrim, a drag, back) then asks "Discard this meal name?" in the sheet. A sheet that
+   * shows the step passes it on (`<Sheet unsaved={step.unsaved}>`).
+   */
+  unsaved: string | null;
 }
 
 /** The save step as parts, for a sheet that shows it in place (the meal menu). */
 export function useSaveMealStep({ open, meal, date, entries, onClose }: SaveMealStepProps): SaveMealStep {
   const [name, setName] = useState('');
+  // The name offered when the step opened: closing with it (or with the field emptied) drops nothing typed.
+  const [offered, setOffered] = useState('');
   const [openFor, setOpenFor] = useState<string | null>(null);
   // Prefill the name each time the step opens for a meal on a day (the render-time reset the menu uses).
   const key = open && meal ? `${meal}|${date}` : null;
   if (key !== openFor) {
     setOpenFor(key);
-    if (key && meal) setName(defaultMealName(entries, meal));
+    if (key && meal) {
+      const first = defaultMealName(entries, meal);
+      setName(first);
+      setOffered(first);
+    }
   }
   // What the save stores: never a drink paired with Water (saveMeal leaves it out), at today's values.
   const food = entries.filter((e) => !isWaterDrinkEntry(e));
@@ -75,6 +87,7 @@ export function useSaveMealStep({ open, meal, date, entries, onClose }: SaveMeal
       </>
     ),
     footer: <Button testID="save-meal-confirm" title="Save meal" disabled={!name.trim() || food.length === 0} onPress={save} />,
+    unsaved: open && saveNameTyped(name, offered) ? SAVE_NAME_DISCARD : null,
   };
 }
 
@@ -85,7 +98,7 @@ export function useSaveMealStep({ open, meal, date, entries, onClose }: SaveMeal
 export function SaveMealSheet({ visible, meal, date, entries, onClose }: { visible: boolean; meal: MealType; date: ISODate; entries: FoodEntry[]; onClose(): void }) {
   const step = useSaveMealStep({ open: visible, meal, date, entries, onClose });
   return (
-    <Sheet visible={visible} onClose={onClose} title={step.title} footer={step.footer}>
+    <Sheet visible={visible} onClose={onClose} title={step.title} footer={step.footer} unsaved={step.unsaved}>
       {step.body}
     </Sheet>
   );
