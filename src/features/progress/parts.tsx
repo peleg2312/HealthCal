@@ -235,10 +235,11 @@ export function SegmentSwitch<T extends string>({
   // At 320 px four tabs get about 70 px each: the labels step down so the selected (bold) one is never cut.
   const narrow = useWindowDimensions().width < 360;
   // Above 115% text four labels no longer fit on one line: the tabs go two to a row, so none is cut.
-  const twoRows = useLargeText() && options.length > 2;
   // As soon as text grows at all, the app's size, the phone's or a reader's own text spacing (`useGrownText`),
-  // a label wraps rather than be cut; at the designed size and spacing it stays one line, as before.
+  // the tabs also go two to a row and a label wraps rather than be cut; at the designed size and spacing
+  // they stay one row of one-line labels, as before.
   const grown = useGrownText();
+  const twoRows = (useLargeText() || grown) && options.length > 2;
   return (
     <View accessibilityRole="tablist" style={{ flexDirection: 'row', flexWrap: twoRows ? 'wrap' : 'nowrap', borderBottomWidth: 1, borderBottomColor: colors.border }}>
       {options.map((o) => {

@@ -37,7 +37,7 @@ export function CaloriesCard({
   // Skip leading days from before the user started, so the chart is not half empty.
   const first = days.findIndex((d) => d.entries.length > 0);
   const shown = first > 0 ? days.slice(first) : days;
-  const { data, weekly, openIndex } = buildBars(shown, today, { full: colors.calories, partial: withOpacity(colors.calories, 0.45), over: colors.warning });
+  const { data, weekly, openIndex } = buildBars(shown, today, { full: colors.caloriesBar, partial: withOpacity(colors.calories, 0.45), over: colors.warning });
   const verdict = daysVerdict(shown, today);
   const diff = c ? Math.round(c.avgDiff) : 0;
   const diffText = !c ? '' : Math.abs(diff) < 10 ? 'At budget on average' : `${formatNumber(Math.abs(diff))} kcal ${diff > 0 ? 'above' : 'under'} budget on average`;

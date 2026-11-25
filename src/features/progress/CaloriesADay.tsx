@@ -25,7 +25,7 @@ export function CaloriesADay({ days, summary, today, onOpen }: { days: InsightDa
   const first = days.findIndex((d) => d.entries.length > 0);
   const shown = first > 0 ? days.slice(first) : days;
   const partial = withOpacity(colors.calories, 0.45);
-  const { data, weekly, openIndex } = buildBars(shown, today, { full: colors.calories, partial: partial, over: colors.warning });
+  const { data, weekly, openIndex } = buildBars(shown, today, { full: colors.caloriesBar, partial: partial, over: colors.warning });
   // The chart's own labels sit under every slot; the overview reads better with three: start, middle, end.
   const bars = data.map((d) => ({ ...d, label: '' }));
   const mid = shown[Math.floor((shown.length - 1) / 2)]?.date;
