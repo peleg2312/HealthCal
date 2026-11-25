@@ -293,9 +293,10 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   };
   const likelyBlock =
     likely.shown.length > 0 ? (
-      <View style={{ gap: spacing.sm }} testID="quick-usual">
+      <View style={{ gap: 10 }} testID="quick-usual">
         {/* The overline and, when there are more than three, "See all N" at its end, laid out at 24 px (the small
-            button's 36 px with -6 margins), so the rows under it never move. */}
+            button's 36 px with -6 margins), so the rows under it never move; 10 px down to the rows, so the button's
+            44 px touch area ends above the first row's. */}
         <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 24 }}>
           <Text variant="overline" color="textSecondary" testID="quick-usual-title" style={{ flex: 1, minWidth: 0 }}>
             {quickRowTitle({ meal: mealName, ...shownKinds })}
@@ -310,7 +311,7 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
               full={false}
               iconRight={<ChevronRight size={18} color={colors.actionInk} strokeWidth={2.2} />}
               onPress={() => go(`/food/search?${food}`)}
-              style={{ marginVertical: -6, marginLeft: 8, marginRight: -6, paddingHorizontal: 6 }}
+              style={{ marginVertical: -6, marginLeft: 8, paddingHorizontal: 6 }}
             />
           ) : null}
         </View>

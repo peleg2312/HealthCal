@@ -115,8 +115,9 @@ export default function DiaryScreen() {
       {/* The diary shows more of the day: the strip and the cards sit 12 apart at the designed text size (16 with large
           text), so at 360 x 740 Breakfast and Lunch are whole in the first view, and at 320 x 640 Lunch's add is in it. */}
       <View testID="diary-swipe" {...swipe} style={{ gap: big ? spacing.lg : spacing.md }}>
-      {/* The one date control, Today's drawn slim (small cups): the header's overline names the day, the strip picks one. */}
-      <DayRingStrip today={t} selected={date} onSelect={setDate} testIDPrefix="diary" latest={latest} jumpTestID="diary-today" slim />
+      {/* The one date control, Today's drawn slim (small cups) at the designed text size and whole with large text, where
+          the dates need their room: the header's overline names the day, the strip picks one. */}
+      <DayRingStrip today={t} selected={date} onSelect={setDate} testIDPrefix="diary" latest={latest} jumpTestID="diary-today" slim={!big} />
 
       {/* A day with nothing logged has no panel of its own: each meal's dashed slot is its add (the first one says what
           the search offers), and the whole of the last logged day can be copied from the summary card's last row. */}

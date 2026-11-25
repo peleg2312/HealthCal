@@ -2948,6 +2948,41 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     check('back at 390 x 844: the plan page pins its footer again', (await pinned()) === true);
   }
 
+  // ------------------------------------------- the diary shows more of the day (DayRingStrip's slim, MealCard, src/features/food/mealMacros.ts)
+  // The diary draws the week strip slim (102 px; Today keeps its 132), its rows tight and each filled meal's protein,
+  // carbs and fat under its name, so at 360 x 740 Breakfast and Lunch are whole above the tab bar, and at 320 x 640
+  // Lunch's add is in the first view; "Choose a week" is still a tap away.
+  {
+    const { buildSeed } = await import(require('url').pathToFileURL(require.resolve('./seed.mjs')).href);
+    const box = (p, id) => p.getByTestId(id).first().boundingBox({ timeout: 15000 }).catch(() => null);
+    for (const [w, h] of [[360, 740], [320, 640]]) {
+      const ctx = await browser.newContext({ viewport: { width: w, height: h }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+      await ctx.addInitScript((value) => {
+        if (!window.sessionStorage.getItem('__seeded')) {
+          window.localStorage.setItem('healthcal-v1', value);
+          window.sessionStorage.setItem('__seeded', '1');
+        }
+      }, JSON.stringify(buildSeed({ onboarded: true, theme: 'blossom' })));
+      const p = await ctx.newPage();
+      p.on('pageerror', (e) => errors.push(e.message));
+      await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+      const todayWeek = await box(p, 'today-week');
+      await p.goto(`${BASE}/diary`, { waitUntil: 'networkidle' });
+      await p.getByTestId('meal-macros-lunch').first().waitFor({ timeout: 20000 });
+      const [week, bar, breakfast, lunch, add] = [await box(p, 'diary-week'), await box(p, 'tab-bar'), await box(p, 'meal-card-breakfast'), await box(p, 'meal-card-lunch'), await box(p, 'meal-add-lunch')];
+      check(`slim diary (${w}): the diary's strip is 102 px, Today's stays 132`, Math.round(week?.height) === 102 && Math.round(todayWeek?.height) === 132, `${week?.height} / ${todayWeek?.height}`);
+      if (w === 360) check('slim diary (360 x 740): Breakfast and Lunch are whole above the tab bar', breakfast && lunch && bar && lunch.y + lunch.height <= bar.y, `lunch ends ${lunch && lunch.y + lunch.height}, tab bar ${bar?.y}`);
+      else check("slim diary (320 x 640): Lunch's add is in the first view", add && bar && add.y + add.height <= bar.y, `add ends ${add && add.y + add.height}, tab bar ${bar?.y}`);
+      const macros = await p.getByTestId('meal-macros-breakfast').first().evaluate((e) => [e.textContent.replace(/[\u00a0]/g, ' ').replace(/[\u2060\u200e\u2068\u2069]/g, ''), e.getAttribute('aria-label')]);
+      check(`slim diary (${w}): a meal shows its macros, heard in full`, /^P \d+ g · C \d+ g · F \d+ g$/.test(macros[0]) && /^protein \d+ grams, carbs \d+ grams, fat \d+ grams$/.test(macros[1] || ''), macros.join(' | '));
+      if (w === 360) {
+        await p.getByTestId('diary-week-pick').first().tap();
+        check('slim diary: "Choose a week" still opens from the strip', await p.getByTestId('diary-week-pick-sheet').first().waitFor({ timeout: 5000 }).then(() => true, () => false));
+      }
+      await ctx.close();
+    }
+  }
+
   const real = errors.filter((e) => !/favicon|DevTools|useNativeDriver|pointerEvents is deprecated|shadow\*/i.test(e));
   check('no runtime or console errors during the whole run', real.length === 0, real.slice(0, 3).join(' || '));
 

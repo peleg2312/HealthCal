@@ -320,7 +320,7 @@ module.exports = [
   { id: 'detail-hebrew', route: '/food/search', data: 'stress', type: { 'food-search-input': 'קוטג 5' }, taps: [{ wait: 1200 }, 'result-0'], waitFor: 'food-detail-screen', note: 'food detail of the Hebrew own food' },
   { id: 'meals-hebrew', route: '/food/meals', data: 'stress', note: 'a saved meal named in Hebrew with a Hebrew item' },
   { id: 'today-hebrew-usual', route: '/', data: 'stress', now: todayAt(12, 30), taps: ['today-ideas'], sheet: true, note: 'What fits at lunch time: the usual food named in Hebrew' },
-  { id: 'quick-sheet-hebrew', route: '/', data: 'stress', now: todayAt(12, 30), taps: ['tab-add'], sheet: true, note: 'the + sheet at lunch time: the usual food and the saved meal named in Hebrew' },
+  { id: 'quick-sheet-hebrew', route: '/', data: 'stress', now: todayAt(12, 30), taps: ['tab-add'], sheet: true, note: 'the + sheet at lunch time with long names (the Hebrew-named usual food and saved meal are under "See all"; quick-sheet-favourite-stress has a Hebrew name in a row)' },
   { id: 'meal-pick-hebrew', route: '/food/meal-edit', taps: ['meal-edit-add', { type: 'meal-pick-input', text: 'חומוס' }, { wait: 800 }], waitFor: 'meal-pick-screen', note: 'the meal builder searched in Hebrew: the matched line' },
 
   // ---------------------------------------------------------------- a remembered portion whose food changed
@@ -330,8 +330,10 @@ module.exports = [
   // every place shows and logs "80 g" at today's values, never the stale label (lead's decisions D1 and H1). Before
   // H1 the + sheet showed "1 piece, 268 kcal" here and a tap stored 298 kcal. The clock is at snack time. Each state
   // first reloads the page ({ reload: true }), so what it looks at is what the app saved and loaded again.
-  { id: 'quick-sheet-old-portion', route: '/', values: { oldBourekas: 1 }, now: todayAt(16, 30), taps: [{ reload: true }, 'tab-add'], sheet: true, waitFor: 'quick-usual-b_bourekas_cheese', note: 'the + sheet: the usual bourekas as "80 g, 298 kcal"' },
-  { id: 'quick-sheet-old-portion-logged', route: '/', values: { oldBourekas: 1 }, now: todayAt(16, 30), taps: [{ reload: true }, 'tab-add', 'quick-usual-b_bourekas_cheese', { wait: 900 }], waitFor: 'toast-action', note: 'the usual bourekas added from the + sheet: the sheet closes after its tick and the toast with Undo rests over Today' },
+  // The + sheet shows three likely rows (the demo's snack leads with whey, then its two favourite foods): the bourekas is
+  // under "See all", in food search's Usual tab (search-old-portion). e2e.cjs's "old portion" check logs it from the
+  // sheet, where it leads.
+  { id: 'quick-sheet-old-portion', route: '/', values: { oldBourekas: 1 }, now: todayAt(16, 30), taps: [{ reload: true }, 'tab-add'], sheet: true, waitFor: 'quick-see-all', note: 'the + sheet at snack time: three likely rows and "See all", which holds the usual bourekas' },
   { id: 'search-old-portion', route: '/food/search?meal=snack', values: { oldBourekas: 1 }, now: todayAt(16, 30), taps: [{ reload: true }, 'search-tab-usual'], note: 'food search, Usual: the bourekas row at 80 g' },
   { id: 'today-fits-old-portion', route: '/', values: { oldBourekas: 1 }, now: todayAt(16, 30), taps: [{ reload: true }, 'today-ideas'], sheet: true, note: 'What fits: the usual bourekas at 80 g' },
   // Food detail of such an entry, opened from the diary: the row says 268 kcal, the detail 298 kcal at the same 80 g,
@@ -343,8 +345,8 @@ module.exports = [
   // saved meal "Lunch plate" holds the old bourekas and halloumi lines. Every row that offers a copy shows what a tap
   // stores: the bundled foods at today's values for their grams ("Repeat yesterday's lunch, 1,170 kcal", not 1,137),
   // the own food and the online product as logged. The clock is at lunch; each state reloads first.
-  { id: 'quick-sheet-repeat-old', route: '/', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }, 'tab-add'], sheet: true, waitFor: 'quick-repeat', note: 'the + sheet: "Repeat yesterday\'s lunch, 1,170 kcal" and the saved meal tile at today\'s values' },
-  { id: 'quick-sheet-repeat-old-done', route: '/', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }, 'tab-add', 'quick-repeat', { wait: 300 }], sheet: true, note: 'Repeat tapped: its tick and the toast' },
+  { id: 'quick-sheet-repeat-old', route: '/', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }, 'tab-add'], sheet: true, waitFor: 'quick-repeat', note: 'the + sheet: "Repeat yesterday\'s lunch" with 1,170 kcal, and the likely rows' },
+  { id: 'quick-sheet-repeat-old-done', route: '/', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }, 'tab-add', 'quick-repeat', { wait: 300 }], sheet: true, note: 'Repeat tapped: its done mark and the toast' },
   { id: 'diary-repeat-old', route: '/diary', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }], waitFor: 'meal-repeat-lunch', note: 'the diary\'s lunch card: "Yesterday, 1,170 kcal: ..." and Repeat' },
   // An empty meal has no menu (its copy of the last same meal is the Repeat under the slot), so the copy is tapped there.
   { id: 'diary-repeat-old-done', route: '/diary', values: { oldBourekas: 2 }, now: todayAt(12, 30), taps: [{ reload: true }, 'meal-repeat-lunch'], waitFor: 'meal-total-lunch', note: 'Repeat tapped on the empty lunch: yesterday\'s five foods at today\'s values, 1,170 kcal' },
@@ -395,10 +397,10 @@ module.exports = [
   { id: 'search-favourites-remembered', route: '/food/search?meal=lunch', values: { favoriteMeal: 1 }, taps: ['search-tab-favorites', { reload: true }, { wait: 800 }], waitFor: 'favorite-meal-0', note: 'Favourites chosen last on this device: search opens on it again after a restart, its chip in view' },
   { id: 'search-meals-not-remembered', route: '/food/search?meal=lunch', taps: ['search-tab-meals', { reload: true }, { wait: 800 }], waitFor: 'search-usual-note', note: 'Saved meals chosen last: search opens on Usual again (only Favourites is remembered)' },
   { id: 'search-favourites-food-unstarred', route: '/food/search?meal=lunch', taps: ['search-tab-favorites', 'favorite-0-favorite'], waitFor: 'toast-action', note: 'Favourites: a food unstarred by its own star stays listed with an outline star until the next visit; "Removed from favourites: …" with Undo' },
-  { id: 'quick-sheet-favourite-food', route: '/', taps: ['tab-add'], sheet: true, waitFor: 'quick-fav-food-0', note: 'the + sheet with favourite foods only (the demo): they lead the row, ahead of the usual foods, inside the first view' },
-  { id: 'quick-sheet-favourite-meal', route: '/', values: { favoriteMeal: 1, savedEstimate: 2 }, taps: ['tab-add'], sheet: true, waitFor: 'quick-fav-meal-0', note: 'the + sheet: the meal\'s first usual food leads the row, then the favourite meals (the estimate "~"), "Usual for ... and favourites"' },
+  { id: 'quick-sheet-favourite-food', route: '/', taps: ['tab-add'], sheet: true, waitFor: 'quick-fav-food-0', note: 'the + sheet with favourite foods only (the demo): the meal\'s first usual food, then two favourites, as rows in the first view' },
+  { id: 'quick-sheet-favourite-meal', route: '/', values: { favoriteMeal: 1, savedEstimate: 2 }, taps: ['tab-add'], sheet: true, waitFor: 'quick-fav-meal-0', note: 'the + sheet: the meal\'s first usual food leads the rows, then the favourite meals (the estimate "~"), "Usual and favourites"' },
   { id: 'quick-sheet-favourite-stress', route: '/', data: 'stress', values: { favoriteMeal: 1 }, taps: ['tab-add'], sheet: true, waitFor: 'quick-fav-meal-0', note: 'the + sheet with a favourite meal named in Hebrew' },
-  { id: 'quick-sheet-favourite-logged', route: '/', values: { favoriteMeal: 1 }, taps: ['tab-add', 'quick-fav-meal-0', { wait: 900 }], waitFor: 'toast-action', note: 'a favourite meal logged from its tile: the sheet closes after its tick and the toast with Undo rests over Today' },
+  { id: 'quick-sheet-favourite-logged', route: '/', values: { favoriteMeal: 1 }, taps: ['tab-add', 'quick-fav-meal-0', { wait: 900 }], waitFor: 'toast-action', note: 'a favourite meal logged from its row: the sheet closes after its done mark and the toast with Undo rests over Today' },
   { id: 'fits-saved-estimate', route: '/', values: { savedEstimate: 1, eaten: 0.3 }, now: todayAt(19, 0), taps: ['today-ideas'], sheet: true, waitFor: 'fits-ideas', note: 'What fits: a saved estimate as an idea reads "~"' },
 
   // ---------------------------------------------------------------- loop 3: the soft checks, the leave guards, a typed minus

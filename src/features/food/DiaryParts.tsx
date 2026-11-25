@@ -408,14 +408,15 @@ export function MealCard({
           ) : null}
         </View>
         {filled ? (
-          <>
+          // The two cups move together: with large text they go under the name and its macros as a pair, never split.
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: compact ? spacing.sm : spacing.xs }}>
             <IconButton testID={`meal-menu-${meal}`} accessibilityLabel={`${label} options`} tone="clear" size={cupSize} onPress={onMenu}>
               <MoreHorizontal size={20} color={colors.textSecondary} strokeWidth={1.9} />
             </IconButton>
             <IconButton testID={`meal-add-${meal}`} accessibilityLabel={`Add food to ${label.toLowerCase()}`} tone="surface" size={cupSize} onPress={add} style={{ borderColor: colors.borderStrong }}>
               <Plus size={20} color={colors.text} strokeWidth={2.2} />
             </IconButton>
-          </>
+          </View>
         ) : null}
       </View>
       {/* A hairline under the header, so its macros are never read as the first row's portion. */}
