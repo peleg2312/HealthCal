@@ -123,6 +123,9 @@ export function ListRow({
         testID={testID}
         onPress={onPress}
         scaleTo={0.985}
+        // Rows fill their card edge to edge and a card clips: a ring drawn outside would lose its top on the
+        // card's first row and its bottom on its last, so it is drawn just inside the row's edge.
+        focusRing="inside"
         style={[rowStyle, style]}
         onLayout={measureRow}
         accessibilityRole={accessibilityRole}

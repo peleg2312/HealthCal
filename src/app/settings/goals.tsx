@@ -22,7 +22,7 @@ import { useToday } from '@/store/clock';
 import { computeEnergyModel, useLive, useProfile } from '@/store/selectors';
 import { useTextSize, useTheme } from '@/theme';
 import type { ActivityLevel, ExerciseSpread, GoalType, MacroSplit, Profile, Sex } from '@/types';
-import { Button, Card, Chip, ChipWrap, CupKey, goBack, Header, MacroBar, NumberField, Screen, Segmented, Stepper, Text, ToggleRow, toast } from '@/ui';
+import { Button, Card, Chip, ChipWrap, CupKey, goBack, Header, MacroBar, NumberField, numberTextProblem, Screen, Segmented, Stepper, Text, ToggleRow, toast } from '@/ui';
 
 /** The nativeID of the words under the three birth-date fields. */
 const BIRTH_ERROR_ID = 'goals-birth-error-words';
@@ -31,6 +31,10 @@ const BIRTH_ERROR_ID = 'goals-birth-error-words';
 const BIRTH_LABEL = { day: 'Day', month: 'Month', year: 'Year' } as const;
 
 type MacroMode = 'auto' | 'balanced' | 'protein' | 'lowcarb' | 'custom';
+
+/** What a number field holds as typed: a number, nothing, or a refused minus (the kit field says why under itself). */
+type Entry = 'ok' | 'blank' | 'minus';
+type EntryKey = 'target' | 'height' | 'heightFt' | 'heightIn' | 'bodyFat' | 'calories' | 'water' | 'protein' | 'carbs' | 'fat';
 
 const PRESETS: Record<Exclude<MacroMode, 'auto' | 'custom'>, { label: string; split: MacroSplit }> = {
   balanced: {
@@ -107,11 +111,19 @@ function GoalsForm() {
   const [birth, setBirth] = useState<BirthParts>(() => birthParts(saved.birthDate));
   const [macroMode, setMacroMode] = useState<MacroMode>(modeOf(saved.macroSplitOverride));
   const initialCustom = saved.macroSplitOverride ?? PRESETS.balanced.split;
-  const [custom, setCustom] = useState({
+  // A field emptied or holding a refused minus keeps null (never 0), so the split's own line says why Save waits.
+  const [custom, setCustom] = useState<{ protein: number | null; carbs: number | null; fat: number | null }>({
     protein: pct(initialCustom.protein),
     carbs: pct(initialCustom.carbs),
     fat: pct(initialCustom.fat),
   });
+  // What each number field holds as typed. A field whose stored value stays (the heights) or whose empty value means
+  // "none" (body fat) would otherwise let Save pass over a typed minus or an emptied height while the field shows it.
+  const [entries, setEntries] = useState<Partial<Record<EntryKey, Entry>>>({});
+  const track = (key: EntryKey, v: number | null, text: string) => {
+    const e: Entry = v !== null ? 'ok' : numberTextProblem(text) ? 'minus' : 'blank';
+    setEntries((m) => (m[key] === e ? m : { ...m, [key]: e }));
+  };
   const [manualCalories, setManualCalories] = useState(!!saved.calorieTargetOverride);
   const [manualWater, setManualWater] = useState(!!saved.waterGoalMlOverride);
   // Under 360 px the preview is compact, so the goal and its first field are in the first view at 320 x 640
@@ -134,9 +146,23 @@ function GoalsForm() {
         ...(Platform.OS === 'web' ? { 'aria-invalid': true, 'aria-describedby': BIRTH_ERROR_ID } : null),
       };
   const splitError = customSplitError(custom);
+  // Only the fields on screen count: a minus left in a field the person then hid (a preset chosen) holds nothing up.
+  const shownKeys: EntryKey[] = [
+    ...(draft.goal !== 'maintain' ? (['target'] as const) : []),
+    ...(u === 'imperial' ? (['heightFt', 'heightIn'] as const) : (['height'] as const)),
+    'bodyFat',
+    ...(manualCalories ? (['calories'] as const) : []),
+    ...(manualWater ? (['water'] as const) : []),
+    ...(macroMode === 'custom' ? (['protein', 'carbs', 'fat'] as const) : []),
+  ];
+  const refused = shownKeys.some((k) => entries[k] === 'minus');
+  const heightKeys: EntryKey[] = u === 'imperial' ? ['heightFt', 'heightIn'] : ['height'];
+  const heightBlank = heightKeys.some((k) => entries[k] === 'blank');
+  const heightMinus = heightKeys.some((k) => entries[k] === 'minus');
   const macroValid = macroMode !== 'custom' || splitError === null;
-  const heightMessage = heightError(draft.heightCm, u);
-  const heightValid = heightMessage === null;
+  // An emptied height field: the stored height stays, so it is said here and Save waits (a minus says itself).
+  const heightMessage = heightBlank ? (u === 'imperial' ? 'Enter your height in feet and inches.' : 'Enter your height.') : heightError(draft.heightCm, u);
+  const heightValid = heightMessage === null && !heightMinus;
   const bodyFatValid = draft.bodyFatPct === undefined || (draft.bodyFatPct >= 3 && draft.bodyFatPct <= 60);
   const caloriesValid = !manualCalories || (!!draft.calorieTargetOverride && draft.calorieTargetOverride >= 800 && draft.calorieTargetOverride <= 6000);
   const waterValid = !manualWater || (!!draft.waterGoalMlOverride && draft.waterGoalMlOverride >= 500 && draft.waterGoalMlOverride <= 8000);
@@ -158,9 +184,9 @@ function GoalsForm() {
         ? undefined
         : macroMode === 'custom'
           ? {
-              protein: custom.protein / 100,
-              carbs: custom.carbs / 100,
-              fat: custom.fat / 100,
+              protein: (custom.protein ?? 0) / 100,
+              carbs: (custom.carbs ?? 0) / 100,
+              fat: (custom.fat ?? 0) / 100,
             }
           : PRESETS[macroMode].split,
   };
@@ -176,7 +202,7 @@ function GoalsForm() {
   const maxRate = maxWeeklyRateKg(draft.goal, draft.weightKg);
   const floor = model.target.floor;
 
-  const valid = birthValid && macroValid && heightValid && bodyFatValid && caloriesValid && waterValid && targetValid;
+  const valid = birthValid && macroValid && heightValid && bodyFatValid && caloriesValid && waterValid && targetValid && !refused;
   const dirty = JSON.stringify(effective) !== JSON.stringify(saved);
 
   // How workout calories reach the budget: the saved rule and the one on screen.
@@ -336,8 +362,12 @@ function GoalsForm() {
                 label="Goal weight"
                 suffix={weightUnit(u)}
                 value={draft.targetWeightKg ? Math.round(weightValue(draft.targetWeightKg, u) * 10) / 10 : null}
-                onChange={(v) => patch({ targetWeightKg: v ? weightToKg(v, u) : undefined })}
-                error={targetMessage}
+                onChange={(v, text) => {
+                  track('target', v, text);
+                  patch({ targetWeightKg: v ? weightToKg(v, u) : undefined });
+                }}
+                // A refused minus is said by the field itself ("Enter 0 or more, without a minus.").
+                error={entries.target === 'minus' ? null : targetMessage}
                 hint={`Now ${weightText(draft.weightKg, u)}`}
               />
               <View style={{ gap: spacing.sm }}>
@@ -407,7 +437,10 @@ function GoalsForm() {
                   decimals={0}
                   style={{ flex: 1 }}
                   value={ft}
-                  onChange={(v) => v !== null && patch({ heightCm: ftInToCm(Math.round(v), inch) })}
+                  onChange={(v, text) => {
+                    track('heightFt', v, text);
+                    if (v !== null) patch({ heightCm: ftInToCm(Math.round(v), inch) });
+                  }}
                 />
                 <NumberField
                   testID="goals-height-in"
@@ -416,12 +449,13 @@ function GoalsForm() {
                   decimals={0}
                   style={{ flex: 1 }}
                   value={inch}
-                  onChange={(v) =>
-                    v !== null &&
-                    patch({
-                      heightCm: ftInToCm(ft, Math.min(11, Math.max(0, Math.round(v)))),
-                    })
-                  }
+                  onChange={(v, text) => {
+                    track('heightIn', v, text);
+                    if (v !== null)
+                      patch({
+                        heightCm: ftInToCm(ft, Math.min(11, Math.max(0, Math.round(v)))),
+                      });
+                  }}
                 />
               </View>
               {/* One message under both fields, so it is not squeezed into the narrow ft column. */}
@@ -438,7 +472,10 @@ function GoalsForm() {
               suffix="cm"
               decimals={0}
               value={Math.round(draft.heightCm)}
-              onChange={(v) => v !== null && patch({ heightCm: v })}
+              onChange={(v, text) => {
+                track('height', v, text);
+                if (v !== null) patch({ heightCm: v });
+              }}
               error={heightMessage}
             />
           )}
@@ -482,7 +519,10 @@ function GoalsForm() {
             label="Body fat (optional)"
             suffix="%"
             value={draft.bodyFatPct ?? null}
-            onChange={(v) => patch({ bodyFatPct: v ?? undefined })}
+            onChange={(v, text) => {
+              track('bodyFat', v, text);
+              patch({ bodyFatPct: v ?? undefined });
+            }}
             error={bodyFatValid ? null : 'Enter a value between 3 and 60 %, or leave it empty.'}
             hint="A rough figure is fine"
           />
@@ -512,8 +552,11 @@ function GoalsForm() {
               suffix="kcal"
               decimals={0}
               value={draft.calorieTargetOverride ?? null}
-              onChange={(v) => patch({ calorieTargetOverride: v ?? undefined })}
-              error={caloriesValid ? null : 'Enter a value between 800 and 6,000 kcal.'}
+              onChange={(v, text) => {
+                track('calories', v, text);
+                patch({ calorieTargetOverride: v ?? undefined });
+              }}
+              error={caloriesValid || entries.calories === 'minus' ? null : 'Enter a value between 800 and 6,000 kcal.'}
             />
           ) : null}
           {manualCalories && draft.calorieTargetOverride && draft.calorieTargetOverride < floor && caloriesValid ? (
@@ -550,7 +593,10 @@ function GoalsForm() {
                   decimals={0}
                   style={bigText ? undefined : { flex: 1 }}
                   value={custom.protein}
-                  onChange={(v) => setCustom((c) => ({ ...c, protein: v ?? 0 }))}
+                  onChange={(v, text) => {
+                    track('protein', v, text);
+                    setCustom((c) => ({ ...c, protein: v }));
+                  }}
                 />
                 <NumberField
                   testID="goals-pct-carbs"
@@ -559,7 +605,10 @@ function GoalsForm() {
                   decimals={0}
                   style={bigText ? undefined : { flex: 1 }}
                   value={custom.carbs}
-                  onChange={(v) => setCustom((c) => ({ ...c, carbs: v ?? 0 }))}
+                  onChange={(v, text) => {
+                    track('carbs', v, text);
+                    setCustom((c) => ({ ...c, carbs: v }));
+                  }}
                 />
                 <NumberField
                   testID="goals-pct-fat"
@@ -568,7 +617,10 @@ function GoalsForm() {
                   decimals={0}
                   style={bigText ? undefined : { flex: 1 }}
                   value={custom.fat}
-                  onChange={(v) => setCustom((c) => ({ ...c, fat: v ?? 0 }))}
+                  onChange={(v, text) => {
+                    track('fat', v, text);
+                    setCustom((c) => ({ ...c, fat: v }));
+                  }}
                 />
               </View>
               <Text variant="caption" color={splitError ? 'warningInk' : 'textSecondary'} testID="goals-pct-total">
@@ -613,12 +665,13 @@ function GoalsForm() {
               suffix={volumeUnit(u)}
               decimals={0}
               value={draft.waterGoalMlOverride ? Math.round(volumeValue(draft.waterGoalMlOverride, u)) : null}
-              onChange={(v) =>
+              onChange={(v, text) => {
+                track('water', v, text);
                 patch({
                   waterGoalMlOverride: v ? Math.round(volumeToMl(v, u)) : undefined,
-                })
-              }
-              error={waterValid ? null : `Enter between ${formatVolume(500, u)} and ${formatVolume(8000, u)}.`}
+                });
+              }}
+              error={waterValid || entries.water === 'minus' ? null : `Enter between ${formatVolume(500, u)} and ${formatVolume(8000, u)}.`}
             />
           ) : null}
           <Hint>{manualWater ? 'A fixed goal; workouts no longer add to it.' : `From your body weight. More on days you log exercise.`}</Hint>

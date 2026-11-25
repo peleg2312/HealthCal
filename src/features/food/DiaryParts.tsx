@@ -586,7 +586,7 @@ export function MealMenuSheet({
 
   if (step === 'save') {
     return (
-      <Sheet visible onClose={onClose} title={save.title} footer={save.footer}>
+      <Sheet visible onClose={onClose} title={save.title} footer={save.footer} unsaved={save.unsaved}>
         {save.body}
       </Sheet>
     );

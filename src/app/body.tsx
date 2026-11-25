@@ -11,7 +11,7 @@ import { bodyFatText, findByDate, hasMeasurements, keepOrConvert, NAVY_ERROR_PCT
 import { useLive, useProfile } from '@/store/selectors';
 import { cup, useTheme, withOpacity } from '@/theme';
 import type { UnitSystem } from '@/types';
-import { Badge, Button, Card, Divider, EmptyState, haptic, Header, ListRow, NumberField, Screen, SectionTitle, Text, ToggleRow } from '@/ui';
+import { Badge, Button, Card, Divider, EmptyState, haptic, Header, ListRow, NumberField, numberTextProblem, Screen, SectionTitle, Text, ToggleRow } from '@/ui';
 
 function w1(kg: number, units: UnitSystem) {
   return `${weightValue(kg, units).toFixed(1)} ${weightUnit(units)}`;
@@ -87,6 +87,12 @@ function BodyScreen() {
   const [weightIn, setWeightIn] = useState<number | null>(() => toWeightInput(todays?.kg ?? profile.weightKg));
   const [weightError, setWeightError] = useState<string | null>(null);
   const [useEstimate, setUseEstimate] = useState(true);
+  // What was typed in each field: a refused minus leaves the value empty while the field shows it with its words,
+  // so Save waits rather than save the other fields over it (`numberTextProblem`).
+  const [typed, setTyped] = useState<{ neck?: string; waist?: string; hip?: string; weight?: string }>({});
+  const typedProblem = (value: number | null, text: string | undefined) => (value === null ? numberTextProblem(text ?? '') : null);
+  const weightProblem = todays ? null : typedProblem(weightIn, typed.weight);
+  const tapeProblem = !!(typedProblem(neck, typed.neck) || typedProblem(waist, typed.waist) || typedProblem(hip, typed.hip));
 
   // Untouched prefilled fields keep the stored cm, so re-saving in inches does not drift them.
   const toCm = (v: number) => lengthToCm(v, units);
@@ -106,8 +112,17 @@ function BodyScreen() {
   const whtrWaist = waistCm || lastMeasured?.waistCm || 0;
   const whtr = whtrWaist ? waistToHeight(whtrWaist, profile.heightCm) : null;
 
-  const canSave = !!(neck || waist || hip);
+  const canSave = !!(neck || waist || hip) && !tapeProblem;
   const save = () => {
+    if (tapeProblem) {
+      haptic.warn();
+      return;
+    }
+    if (weightProblem) {
+      setWeightError(weightProblem);
+      haptic.warn();
+      return;
+    }
     const kg = todays?.kg ?? keepOrConvert(weightIn, profile.weightKg, toWeightInput, (v) => weightToKg(v, units)) ?? 0;
     if (!(kg >= 20 && kg <= 400)) {
       const message =
@@ -173,9 +188,39 @@ function BodyScreen() {
       <SectionTitle title="Tape measure estimate" />
       <Card style={{ gap: spacing.md }} testID="body-tape">
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <NumberField testID="body-neck-input" style={{ flex: 1 }} label="Neck" suffix={unit} value={neck} onChange={setNeck} />
-          <NumberField testID="body-waist-input" style={{ flex: 1 }} label="Waist" suffix={unit} value={waist} onChange={setWaist} />
-          <NumberField testID="body-hip-input" style={{ flex: 1 }} label={female ? 'Hips' : 'Hips (opt.)'} suffix={unit} value={hip} onChange={setHip} />
+          <NumberField
+            testID="body-neck-input"
+            style={{ flex: 1 }}
+            label="Neck"
+            suffix={unit}
+            value={neck}
+            onChange={(n, t) => {
+              setNeck(n);
+              setTyped((x) => ({ ...x, neck: t }));
+            }}
+          />
+          <NumberField
+            testID="body-waist-input"
+            style={{ flex: 1 }}
+            label="Waist"
+            suffix={unit}
+            value={waist}
+            onChange={(n, t) => {
+              setWaist(n);
+              setTyped((x) => ({ ...x, waist: t }));
+            }}
+          />
+          <NumberField
+            testID="body-hip-input"
+            style={{ flex: 1 }}
+            label={female ? 'Hips' : 'Hips (opt.)'}
+            suffix={unit}
+            value={hip}
+            onChange={(n, t) => {
+              setHip(n);
+              setTyped((x) => ({ ...x, hip: t }));
+            }}
+          />
         </View>
         <Explain label="How to measure" testID="body-measure-help" style={{ marginTop: -spacing.xs, marginBottom: -spacing.xs }}>
           <ExplainText>
@@ -189,8 +234,9 @@ function BodyScreen() {
             label="Today’s weight"
             suffix={weightUnit(units)}
             value={weightIn}
-            onChange={(n) => {
+            onChange={(n, t) => {
               setWeightIn(n);
+              setTyped((x) => ({ ...x, weight: t }));
               setWeightError(null);
             }}
             error={weightError}
@@ -278,7 +324,8 @@ function BodyScreen() {
             <ScaleLabels min={0.35} max={0.7} ticks={[0.4, 0.5, 0.6]} />
           </>
         ) : null}
-        <Text variant="caption" color="textSecondary">
+        {/* Two sentences or more: reading text, body in textSecondary. */}
+        <Text variant="body" color="textSecondary">
           A simple guideline: keep your waist under half your height (a ratio under 0.5). It reflects fat around the middle, which BMI misses.
           {whtr === null ? ' Enter a waist measurement above to see yours.' : ''}
         </Text>

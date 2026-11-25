@@ -27,6 +27,7 @@ import {
   Header,
   LineChart,
   NumberField,
+  numberTextProblem,
   Screen,
   SectionTitle,
   Segmented,
@@ -313,6 +314,12 @@ function WeighInSheet({
   const display = (kg: number) => Math.round(weightValue(kg, units) * 10) / 10;
   const [weight, setWeight] = useState<number | null>(null);
   const [fat, setFat] = useState<number | null>(null);
+  // What was typed in each field: a refused minus leaves the value empty while the field still shows it, so Save
+  // waits with the field's own words rather than pass over it (an empty body fat would save without it).
+  const [weightTyped, setWeightTyped] = useState('');
+  const [fatTyped, setFatTyped] = useState('');
+  const weightProblem = weight === null ? numberTextProblem(weightTyped) : null;
+  const fatProblem = fat === null ? numberTextProblem(fatTyped) : null;
   // Each error shows under the field it is about.
   const [error, setError] = useState<{ field: 'weight' | 'fat'; message: string } | null>(null);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
@@ -335,11 +342,13 @@ function WeighInSheet({
     if (open && Platform.OS === 'web') weightRef.current?.focus();
   }, [open]);
   // A changed value is not dropped without asking (the backdrop, a drag, Escape, back).
-  const changed = date !== null && (weight !== (existing ? display(existing.kg) : display(fallbackKg)) || fat !== (existing?.bodyFatPct ?? null));
+  const changed = date !== null && (weight !== (existing ? display(existing.kg) : display(fallbackKg)) || fat !== (existing?.bodyFatPct ?? null) || !!weightProblem || !!fatProblem);
 
   const save = () => {
     if (!date) return;
+    if (weightProblem) return setError({ field: 'weight', message: weightProblem });
     if (weight === null || weight <= 0) return setError({ field: 'weight', message: 'Enter your weight' });
+    if (fatProblem) return setError({ field: 'fat', message: fatProblem });
     // An untouched prefilled field keeps the stored kg instead of a value rounded through lb.
     const kg = keepOrConvert(weight, existing ? existing.kg : fallbackKg, display, (v) => weightToKg(v, units)) ?? 0;
     if (kg < 20 || kg > 400) return setError({ field: 'weight', message: `That looks off. Enter a weight between ${formatWeight(20, units, 0)} and ${formatWeight(400, units, 0)}.` });
@@ -383,8 +392,9 @@ function WeighInSheet({
         label="Weight"
         suffix={unit}
         value={weight}
-        onChange={(n) => {
+        onChange={(n, t) => {
           setWeight(n);
+          setWeightTyped(t);
           setError(null);
         }}
         error={error?.field === 'weight' ? error.message : null}
@@ -398,8 +408,9 @@ function WeighInSheet({
         suffix="%"
         placeholder="From a smart scale or tape estimate"
         value={fat}
-        onChange={(n) => {
+        onChange={(n, t) => {
           setFat(n);
+          setFatTyped(t);
           setError(null);
         }}
         error={error?.field === 'fat' ? error.message : null}

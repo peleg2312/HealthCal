@@ -35,14 +35,16 @@ export function targetWeightError(goal: GoalType, weightKg: number, targetKg: nu
   return null;
 }
 
+/** A field emptied, or holding a minus the field refused, is null: never read as 0. */
 export interface CustomSplit {
-  protein: number;
-  carbs: number;
-  fat: number;
+  protein: number | null;
+  carbs: number | null;
+  fat: number | null;
 }
 
 /** Null when each part is a whole percentage from 0 to 100, protein at least 10, and the three add up to 100. */
 export function customSplitError(s: CustomSplit): string | null {
+  if (s.protein === null || s.carbs === null || s.fat === null) return 'Enter all three, each from 0 to 100%.';
   const parts = [s.protein, s.carbs, s.fat];
   if (parts.some((p) => !Number.isFinite(p) || p < 0 || p > 100)) return 'Each value needs to be between 0 and 100%.';
   if (s.protein < 10) return 'Keep protein at 10% or more.';

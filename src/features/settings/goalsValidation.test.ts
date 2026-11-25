@@ -52,6 +52,9 @@ describe('customSplitError', () => {
   });
   it('reports the total when it is off', () => {
     expect(customSplitError({ protein: 30, carbs: 40, fat: 20 })).toBe('Total 90%, add 10 to reach 100%.');
+    // An emptied field, or one holding a refused minus, is null: Save waits and the line says why (never read as 0).
+    expect(customSplitError({ protein: null, carbs: 40, fat: 30 })).toBe('Enter all three, each from 0 to 100%.');
+    expect(customSplitError({ protein: 30, carbs: 40, fat: null })).toBe('Enter all three, each from 0 to 100%.');
     expect(customSplitError({ protein: 30, carbs: 40, fat: 30 })).toBeNull();
   });
 });

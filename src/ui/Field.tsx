@@ -166,7 +166,8 @@ export function TextField({ label, suffix, error, hint, left, right, style, line
           {error}
         </Text>
       ) : hint ? (
-        <Text variant="caption" color="textTertiary" nativeID={noteId}>
+        // Reading text (7:1, WCAG 1.4.6): textSecondary, never textTertiary.
+        <Text variant="caption" color="textSecondary" nativeID={noteId}>
           {hint}
         </Text>
       ) : null}
