@@ -31,7 +31,7 @@ const MEAL_LOOKS = 20;
 
 export default function DiaryScreen() {
   const { colors, spacing } = useTheme();
-  // Under 360 px (at the designed text size) the diary is compact, so at 320 x 640 Lunch's add is in the first view.
+  // Under 360 px (at the designed text size) the summary's cups are smaller, so at 320 x 640 Lunch's add is in the first view.
   const screenW = useWindowDimensions().width;
   const big = useLargeText();
   const narrow = screenW < 360 && !big;
@@ -112,12 +112,11 @@ export default function DiaryScreen() {
 
   return (
     <Screen tabs testID="diary-screen" scrollProps={{ ref: scrollRef } as ScrollViewProps} header={<TabHeader tab="diary" overline={tabDay(date)} title="Food diary" />}>
-      {/* Under 360 px the cards sit 12 apart (16 under the strip, as on Today), so at 320 x 640 Lunch's add is in the first view. */}
-      <View testID="diary-swipe" {...swipe} style={{ gap: narrow ? spacing.md : spacing.lg }}>
-      {/* The one date control, the same as Today's: the header's overline names the day, the strip picks one. */}
-      <View style={narrow ? { marginBottom: spacing.lg - spacing.md } : undefined}>
-        <DayRingStrip today={t} selected={date} onSelect={setDate} testIDPrefix="diary" latest={latest} jumpTestID="diary-today" />
-      </View>
+      {/* The diary shows more of the day: the strip and the cards sit 12 apart at the designed text size (16 with large
+          text), so at 360 x 740 Breakfast and Lunch are whole in the first view, and at 320 x 640 Lunch's add is in it. */}
+      <View testID="diary-swipe" {...swipe} style={{ gap: big ? spacing.lg : spacing.md }}>
+      {/* The one date control, Today's drawn slim (small cups): the header's overline names the day, the strip picks one. */}
+      <DayRingStrip today={t} selected={date} onSelect={setDate} testIDPrefix="diary" latest={latest} jumpTestID="diary-today" slim />
 
       {/* A day with nothing logged has no panel of its own: each meal's dashed slot is its add (the first one says what
           the search offers), and the whole of the last logged day can be copied from the summary card's last row. */}

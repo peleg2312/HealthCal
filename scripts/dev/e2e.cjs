@@ -1042,7 +1042,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
   // The demo's five weeks at dinner time, 60% of the budget eaten, in a context of its own: Today's "Ideas that fit" chip
   // opens What fits with "Meals that fit" above the single foods; one tap logs an idea's foods to dinner with one Undo,
   // its row turns into a tick and every row stays where it was; Undo takes the foods away. Over the budget the chip is
-  // not there, and the number opens one neutral line and "Search all foods", with no list at all.
+  // not there, and What fits (from the coach's ideas answer) shows one neutral line and "Search all foods", with no list at all.
   {
     // This file's folder from the command line (the lint setup does not define __dirname).
     const here = require('path').dirname(require('path').resolve(process.argv[1]));
@@ -1115,7 +1115,9 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
 
     const over = await openIdeas(1.1);
     check('ideas: over the budget Today shows no ideas chip', (await over.p.getByTestId('today-ideas').count()) === 0);
-    await over.p.getByTestId('today-remaining-open').first().click({ timeout: 15000 });
+    // The big number switches between left and eaten; over the budget What fits is reached from the coach's ideas answer.
+    await over.p.goto(`${BASE}/coach?ask=ideas`, { waitUntil: 'networkidle' });
+    await over.p.getByTestId('coach-local-fits').first().click({ timeout: 15000 });
     await over.p.waitForTimeout(500);
     const line = await over.p.getByTestId('fits-over').first().waitFor({ timeout: 10000 }).then(() => itext(over.p, 'fits-over'), () => '');
     check(
@@ -1127,6 +1129,54 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
       line,
     );
     await over.ctx.close();
+  }
+
+  // ------------------------------------------- the big number: left or eaten (src/features/today/calorieFigure.ts)
+  // One tap on Today's big number switches it between what is left and what was eaten; the line at the cup's level then
+  // holds the other figure, so each is said once. The choice is kept on this device only (its own key, never the store)
+  // and a reload draws it from the first frame: the number never flips once shown. A second tap goes back.
+  {
+    const here = require('path').dirname(require('path').resolve(process.argv[1]));
+    const { buildSeed } = await import(require('url').pathToFileURL(require('path').join(here, 'seed.mjs')).href);
+    const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, colorScheme: 'dark', reducedMotion: 'reduce' });
+    await ctx.addInitScript((value) => {
+      if (!window.sessionStorage.getItem('__seeded')) {
+        window.localStorage.setItem('healthcal-v1', value);
+        window.sessionStorage.setItem('__seeded', '1');
+      }
+      // Every name the big number has carried on this load, in order.
+      window.__figureNames = [];
+      new MutationObserver(() => {
+        const l = document.querySelector('[data-testid="today-figure"]')?.getAttribute('aria-label');
+        if (l && window.__figureNames[window.__figureNames.length - 1] !== l) window.__figureNames.push(l);
+      }).observe(document, { subtree: true, childList: true, attributes: true });
+    }, JSON.stringify(buildSeed({ onboarded: true, theme: 'dark', values: { eaten: 0.6 } })));
+    const p = await ctx.newPage();
+    p.on('pageerror', (e) => errors.push(e.message));
+    const ft = async (id) => (await p.getByTestId(id).first().innerText({ timeout: 15000 })).replace(/ /g, ' ').replace(/[⁠‎⁨⁩]/g, '').replace(/\s+/g, ' ').trim();
+    const fname = async () => (await p.getByTestId('today-figure').first().getAttribute('aria-label')) || '';
+    await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+    await p.getByTestId('today-figure').first().waitFor({ timeout: 20000 });
+    const left = await ft('today-remaining');
+    const [eaten, , , budget] = (await ft('today-eaten')).split(' ');
+    check('figure: Today opens on what is left, named with its words and what a tap does', (await fname()) === `${left} kcal left. Switch to calories eaten` && /kcal left$/.test(await ft('today-figure')), `${await fname()} | ${await ft('today-figure')}`);
+    await p.getByTestId('today-figure').first().click();
+    await p.waitForTimeout(300);
+    const stored = await p.evaluate(() => ({ key: window.localStorage.getItem('healthcal.calorieFigure'), inStore: JSON.stringify(window.__healthcal.getState()).includes('calorieFigure') }));
+    check(
+      'figure: a tap makes eaten the big number and the line says what is left of the budget, each figure once',
+      (await fname()) === `${eaten} kcal eaten. Switch to calories left` && (await ft('today-eaten')) === eaten && (await ft('today-remaining')) === `${left} left of ${budget}` && (await p.getByTestId('today-eaten').count()) === 1 && (await p.getByTestId('today-remaining').count()) === 1,
+      `${await fname()} | ${await ft('today-remaining')}`,
+    );
+    check('figure: the choice is kept on this device under its own key, never in the store', stored.key === 'eaten' && !stored.inStore, JSON.stringify(stored));
+    await p.reload({ waitUntil: 'networkidle' });
+    await p.getByTestId('today-figure').first().waitFor({ timeout: 20000 });
+    const names = await p.evaluate(() => window.__figureNames);
+    check('figure: after a reload eaten is drawn from the first frame, never "left" first', names.length > 0 && names.every((n) => n.includes('kcal eaten')), names.join(' / '));
+    await p.getByTestId('today-figure').first().click();
+    await p.waitForTimeout(300);
+    check('figure: a second tap goes back to what is left', (await fname()).startsWith(`${left} kcal left`) && (await p.evaluate(() => window.localStorage.getItem('healthcal.calorieFigure'))) === 'left', await fname());
+    await ctx.close();
   }
 
   // ------------------------------------------- the toast with the keyboard up (src/ui/Toast.tsx, toastBottom in src/ui/keyboardInset.ts)

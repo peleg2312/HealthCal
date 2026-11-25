@@ -13,7 +13,6 @@ import {
   hasEstimate,
   isEstimateFood,
   logMealLabel,
-  quickRowTitle,
   saveRowDay,
   savedRowCaption,
   savedTileCaption,
@@ -34,14 +33,6 @@ describe('favourite words', () => {
     expect(favoriteActionLabel(true)).toBe('Remove from favourites');
     // A saved-meal row's "+" names the meal it logs.
     expect(logMealLabel('Usual breakfast')).toBe('Log Usual breakfast');
-  });
-  it("the + sheet's overline names favourites only when one is in the row, and never 'usual' without usual foods", () => {
-    expect(quickRowTitle({ meal: 'lunch', favourites: false, usual: true, saved: true })).toBe('Usual for lunch');
-    expect(quickRowTitle({ meal: 'lunch', favourites: false, usual: false, saved: true })).toBe('Saved meal');
-    expect(quickRowTitle({ meal: 'lunch', favourites: true, usual: true, saved: false })).toBe('Usual for lunch and favourites');
-    expect(quickRowTitle({ meal: 'lunch', favourites: true, usual: true, saved: true })).toBe('Usual for lunch and favourites');
-    expect(quickRowTitle({ meal: 'lunch', favourites: true, usual: false, saved: true })).toBe('Favourites and saved meals');
-    expect(quickRowTitle({ meal: 'lunch', favourites: true, usual: false, saved: false })).toBe('Favourites');
   });
   it("the + sheet's favourite food tile: an AI food, or one last logged with a range, reads \"~\", its label as drawn", () => {
     expect(isEstimateFood({ source: 'ai' }, null)).toBe(true);
@@ -89,7 +80,6 @@ describe('favourite words', () => {
       favoriteToast('X', true, 'meal'),
       favoriteToast('X', false, 'food'),
       favoriteFoodTile({ name: 'X', portion: '1 g', kcal: 1, estimate: true, meal: 'lunch' }).caption,
-      quickRowTitle({ meal: 'lunch', favourites: true, usual: true, saved: true }),
     ];
     for (const s of fixed) {
       expect(s).not.toContain('!');

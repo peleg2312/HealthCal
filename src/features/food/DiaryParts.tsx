@@ -25,6 +25,7 @@ import { toggleFoodFavorite } from './favoriteActions';
 import { FAVOURITE_ACTION, favoriteActionLabel } from './favoriteWords';
 import { dayPhrase, href, kcal, portionLabel, rowSourceWord, sourceInfo, sourceKindOf, withSourceWord } from './helpers';
 import { deleteEntry } from './log';
+import { mealMacroLine, mealMacroSpoken } from './mealMacros';
 import { useSaveMealStep } from './SaveMealSheet';
 import { SAVE_HINT_NOT_NOW, SAVE_HINT_NOT_NOW_A11Y, saveHintA11y, saveHintLabel } from './saveWords';
 import { currentKcal } from './usuals';
@@ -62,8 +63,9 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; /** Th
   // The run log's words for what workouts add (`budgetAdds`, @/features/activity/logWords), always "~": an estimate.
   const addedLine = day.exerciseRule === 'week' ? `~${kcal(headroom)} kcal added over 7 days` : `~${kcal(headroom)} kcal added`;
   return (
-    // Under 360 px the card is slimmer (6 px above and below, a 24 px figure), so at 320 x 640 Lunch's add is in the first view.
-    <Card testID="diary-summary" padding={0} style={{ paddingHorizontal: 16, paddingVertical: narrow && !big ? 6 : 14 }}>
+    // At the designed text size the card pads 10 above and below, so at 360 x 740 Breakfast and Lunch are whole in the
+    // first view; under 360 px it is slimmer still (6, a 24 px figure), so at 320 x 640 Lunch's add is in it.
+    <Card testID="diary-summary" padding={0} style={{ paddingHorizontal: 16, paddingVertical: big ? 14 : narrow ? 6 : 10 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
         {/* One element for a screen reader, the units in full: "941 kilocalories left, 1,219 kilocalories eaten of 2,160 kilocalories". */}
         <View
@@ -171,9 +173,12 @@ const SUMMARY_CUP_GAP = ANDROID_TOUCH ? 12 : 8;
 /** On a day with nothing logged, the first meal's slot says what the search it opens offers (one line at 320 px). */
 export const EMPTY_DAY_NOTE = 'Search, scan or snap a photo';
 
-const ROW_PAD = 18;
+/** A meal card's side padding, the summary card's, so the meals' names stand under its figure. */
+const ROW_PAD = 16;
+/** The room between a row's emoji, its words and its calories: at 360 px "Greek yogurt, plain, 2%" keeps one line. */
+const ROW_GAP = 8;
 /** Where the text column starts in a meal card: the padding, the 24 px emoji column and the gap. */
-const TEXT_INSET = ROW_PAD + 24 + 12;
+const TEXT_INSET = ROW_PAD + 24 + ROW_GAP;
 /** A press and hold on a row that has nothing to star: taken, so it never ends as a tap. */
 const holdNothing = () => {};
 
@@ -218,8 +223,9 @@ function EntryRow({ entry, inWater }: { entry: FoodEntry; inWater?: WaterEntry |
         // label in name), then its source in words where the row has no word for it ("Almonds, 1 oz · 28 g, 162 kcal,
         // Reference data. Edit"): text inside a named button is not read.
         accessibilityLabel={`${withoutMarks(name)}, ${withoutMarks(caption)}, ${ai ? '~' : ''}${kcal(entry.nutrients.kcal)} kcal${entry.kcalRange ? `, ${kcal(entry.kcalRange[0])}–${kcal(entry.kcalRange[1])} kcal` : ''}${rowSourceWord(kind) === source.label ? '' : `, ${source.label}`}. Edit`}
-        // Under 360 px the rows pad 6 instead of 11 (still 56 px at least), so the next meal's add reaches the first view.
-        style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingVertical: narrow && !big ? 6 : 11 }}>
+        // Tight at the designed text size, 46 px for a one-line name (48 on Android, the kit's reach), so a meal of three
+        // foods and the next whole meal share the first view at 360 x 740; with large text the rows keep their room.
+        style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: ROW_GAP, minHeight: big ? 56 : 46, paddingVertical: big ? 11 : 3 }}>
         <RowEmoji emoji={entry.emoji} />
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text variant="bodyStrong" numberOfLines={3} style={{ fontFamily: fonts.semibold }}>
@@ -328,7 +334,10 @@ export function MealCard({
   slotNote?: string | null;
 }) {
   const { colors, spacing, radius } = useTheme();
-  const total = entriesTotal(entries).kcal;
+  const sum = entriesTotal(entries);
+  const total = sum.kcal;
+  // Its protein, carbs and fat under its name ("P 31 g · C 52 g · F 18 g"), none for calories typed in alone.
+  const macros = mealMacroLine(sum);
   const add = () => router.push(href('/food/search', { meal, date }) as never);
   // A removed row fades where it is, then folds away while the rows below close the space.
   const rows = useLeavingRows(entries);
@@ -361,33 +370,41 @@ export function MealCard({
   const filled = rows.length > 0;
   // With large text the meal's name keeps its whole word: the "..." and "+" cups go under it when both do not fit.
   const big = useLargeText();
-  // Under 360 px a filled meal is tighter (6 px above its header, 36 px cups that still take 44 px of touch, 4 px to
-  // its rows), so at 320 x 640 the diary's first view holds Breakfast whole and Lunch's add. Each cup's touch reaches
-  // 4 px past it (the kit's hitSlop), so the two cups stand 8 px apart and the rows 4 px under them: the touch areas
-  // meet and never overlap, and a tap meant for one never lands on the other or on the first row.
-  const tight = useWindowDimensions().width < 360 && !big;
-  const cupSize = tight ? 36 : 44;
+  // At the designed text size a filled meal is tight (10 px above its header, 36 px cups that still take 44 px of touch,
+  // its macros under its name, a hairline and then its rows), so at 360 x 740 Breakfast and Lunch are whole in the first
+  // view and at 320 x 640 Lunch's add is in it. Each cup's touch reaches 4 px past it (the kit's hitSlop), so the two
+  // cups stand 8 px apart: their touch areas meet and never overlap, and never reach the hairline or the first row.
+  const compact = !big;
+  const cupSize = compact ? 36 : 44;
   return (
-    <Card testID={`meal-card-${meal}`} padding={0} style={{ paddingTop: filled ? (tight ? 6 : 12) : 16, paddingBottom: filled ? 4 : ROW_PAD }}>
-      <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', justifyContent: 'flex-end', alignItems: 'center', gap: tight ? spacing.sm : spacing.xs, paddingLeft: ROW_PAD, paddingRight: 14 }}>
-        {/* A big total ("1,450 kcal") goes under the meal's name on a narrow phone rather than cutting it. */}
-        <View style={[big ? { flexGrow: 1, flexShrink: 1, flexBasis: 'auto' } : { flex: 1 }, { minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10 }]}>
-          {/* The meal's name is a heading at level 2, as a SectionTitle is (WCAG 1.3.1): the diary reads Breakfast, Lunch, ... by heading. */}
-          <Text variant="h3" numberOfLines={1} accessibilityRole="header" {...({ 'aria-level': 2 } as object)} style={{ flexShrink: big ? 0 : 1 }}>
-            {label}
-          </Text>
-          {entries.length > 0 ? (
-            <AnimatedNumber
-              variant="numM"
-              color="textSecondary"
-              testID={`meal-total-${meal}`}
-              value={total}
-              format={kcal}
-              style={{ fontSize: 15, lineHeight: 20 }}
-              // Read as one element with its unit in full ("446 kilocalories"), never as drawn.
-              {...figure(`${kcal(total)} kilocalories`)}>
-              <Text variant="unit">{' kcal'}</Text>
-            </AnimatedNumber>
+    <Card testID={`meal-card-${meal}`} padding={0} style={{ paddingTop: filled ? (compact ? 10 : 12) : compact ? 12 : 16, paddingBottom: filled ? 4 : ROW_PAD }}>
+      <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', justifyContent: 'flex-end', alignItems: 'center', gap: compact ? spacing.sm : spacing.xs, paddingLeft: ROW_PAD, paddingRight: 14 }}>
+        <View style={[big ? { flexGrow: 1, flexShrink: 1, flexBasis: 'auto' } : { flex: 1 }, { minWidth: 0 }]}>
+          {/* A big total ("1,450 kcal") goes under the meal's name on a narrow phone rather than cutting it. */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10 }}>
+            {/* The meal's name is a heading at level 2, as a SectionTitle is (WCAG 1.3.1): the diary reads Breakfast, Lunch, ... by heading. */}
+            <Text variant="h3" numberOfLines={1} accessibilityRole="header" {...({ 'aria-level': 2 } as object)} style={{ flexShrink: big ? 0 : 1 }}>
+              {label}
+            </Text>
+            {entries.length > 0 ? (
+              <AnimatedNumber
+                variant="numM"
+                color="textSecondary"
+                testID={`meal-total-${meal}`}
+                value={total}
+                format={kcal}
+                style={{ fontSize: 15, lineHeight: 20 }}
+                // Read as one element with its unit in full ("446 kilocalories"), never as drawn.
+                {...figure(`${kcal(total)} kilocalories`)}>
+                <Text variant="unit">{' kcal'}</Text>
+              </AnimatedNumber>
+            ) : null}
+          </View>
+          {entries.length > 0 && macros ? (
+            // Plain words, never in the macros' colours (data colours are fills and keys only); heard in full.
+            <Text variant="caption" color="textSecondary" testID={`meal-macros-${meal}`} {...figure(mealMacroSpoken(sum))}>
+              {macros}
+            </Text>
           ) : null}
         </View>
         {filled ? (
@@ -401,8 +418,14 @@ export function MealCard({
           </>
         ) : null}
       </View>
+      {/* A hairline under the header, so its macros are never read as the first row's portion. */}
+      {filled ? (
+        <View style={{ marginTop: 6 }}>
+          <Divider inset={ROW_PAD} />
+        </View>
+      ) : null}
       {/* Always mounted (keyed by the day), so a meal's first row slides in too; Undo brings a row back the same way. */}
-      <View style={{ marginTop: rows.length ? (tight ? 4 : 6) : 0 }}>
+      <View>
         <AnimatedList key={date}>
           {rows.map(({ item: e, leaving }, i) => (
             <FadeRow key={e.id} leaving={leaving} back={back.has(e.id)}>

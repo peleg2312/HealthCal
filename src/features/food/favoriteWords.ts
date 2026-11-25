@@ -48,18 +48,6 @@ export const FAVOURITES_EMPTY = {
 export const FAVOURITE_GROUPS = { meals: 'Meals', foods: 'Foods' } as const;
 
 /**
- * The + sheet's overline over its row of one-tap tiles, naming the groups in the order they are drawn. The
- * meal's first usual food leads the row (so it is whole in the first view at every width), then the
- * favourites (meals, then foods), then the other usual foods: a row with both reads "Usual for lunch and
- * favourites"; "Usual for lunch" when no favourite is in the row; never "usual" for a row without usual foods.
- */
-export function quickRowTitle(o: { meal: string; favourites: boolean; usual: boolean; saved: boolean }): string {
-  if (o.usual) return o.favourites ? `Usual for ${o.meal} and favourites` : `Usual for ${o.meal}`;
-  if (o.favourites) return o.saved ? 'Favourites and saved meals' : 'Favourites';
-  return 'Saved meal';
-}
-
-/**
  * A calorie figure that is an estimate (a saved AI meal, an idea whose items carry a range) never shows
  * an exact number: "~473". Exact figures are unchanged: "473".
  */

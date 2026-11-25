@@ -23,6 +23,13 @@ const ARROWS_MIN_W = 400;
 const PICK_CUP = 32;
 /** The chosen day's level line under its date. */
 const SELECTED_MARK_W = 18;
+/**
+ * The diary's slim strip (`slim`): the same days, letters, dates and caption row with smaller cups and tighter
+ * gaps, so the day's meals lead its first view. Its days are 62 px tall (16 letter, 2, the 20 px cup, 2, the
+ * 22 px date), the whole block 102 (Today's 132).
+ */
+const SLIM_CUP = { width: 16, height: 20 };
+const SLIM_DAYS_H = 62;
 
 /** A mouse or trackpad on web: where the week arrows show. Everywhere else the week-picker cup does the same with a tap. */
 function subscribePointer(cb: () => void) {
@@ -68,6 +75,7 @@ function stripBleed(windowW: number, gutter: number): number {
  * calendar cup at the row's end (`<prefix>-week-pick`), which opens "Choose a week"
  * with every week the strip holds. Each day also offers "Previous week" and "Next
  * week" as accessibility actions. A swipe that starts on the strip pages weeks, never days.
+ * The diary draws it `slim` (small cups, tighter gaps, the same caption row), so its meals lead.
  */
 export function DayRingStrip({
   today,
@@ -79,6 +87,7 @@ export function DayRingStrip({
   note,
   latest,
   jumpTestID,
+  slim = false,
   style,
 }: {
   today: ISODate;
@@ -99,6 +108,8 @@ export function DayRingStrip({
    * it never pushes the page down. It fades in after `delay` ms (at once under reduced motion).
    */
   note?: { text: string; delay: number; testID?: string } | null;
+  /** The diary's slimmer strip: small cups (16 x 20) and tighter gaps, 102 px in all; Today keeps the full one. */
+  slim?: boolean;
   /** Placement only (a margin): the block's own height never changes. */
   style?: StyleProp<ViewStyle>;
 }) {
@@ -285,21 +296,30 @@ export function DayRingStrip({
                       accessibilityLabel={dayCellLabel(ring, today, summary)}
                       // A future day is drawn dashed; fading it as well would make its date unreadable.
                       dimDisabled={false}
-                      style={{ flex: 1, minHeight: 44, alignItems: 'center', gap: 6, paddingBottom: 2 }}>
+                      style={{ flex: 1, minHeight: 44, alignItems: 'center', gap: slim ? 2 : 6, paddingBottom: slim ? 0 : 2 }}>
                       <Text variant="label" color={isSelected ? 'text' : 'textSecondary'} style={{ fontSize: 12, lineHeight: 16, fontFamily: isSelected ? fonts.bold : fonts.semibold }}>
                         {LETTERS[i]}
                       </Text>
                       {before ? (
-                        <View style={{ width: 30, height: 38, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 4 }}>
+                        <View style={{ width: slim ? SLIM_CUP.width : 30, height: slim ? SLIM_CUP.height : 38, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: slim ? 2 : 4 }}>
                           <View style={{ width: 3, height: 3, borderRadius: 1, backgroundColor: colors.textTertiary }} />
                         </View>
                       ) : (
-                        <MiniCup index={i} memoryKey={`cal-${d}`} progress={ring.progress} over={ring.state === 'over'} future={future} color={colors.calories} />
+                        <MiniCup
+                          index={i}
+                          memoryKey={`cal-${d}`}
+                          progress={ring.progress}
+                          over={ring.state === 'over'}
+                          future={future}
+                          color={colors.calories}
+                          width={slim ? SLIM_CUP.width : undefined}
+                          height={slim ? SLIM_CUP.height : undefined}
+                        />
                       )}
                       <View
                         style={{
                           width: 32,
-                          height: 24,
+                          height: slim ? 22 : 24,
                           ...cup(9, 4),
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -309,7 +329,7 @@ export function DayRingStrip({
                         <Text
                           variant="numM"
                           color={locked || future ? 'textTertiary' : 'text'}
-                          style={{ fontSize: 14, lineHeight: 20, letterSpacing: 0 }}>
+                          style={{ fontSize: 14, lineHeight: slim ? 18 : 20, letterSpacing: 0 }}>
                           {fromISODate(d).getDate()}
                         </Text>
                         {/* The day shown wears the level line under its date, as the active tab and the chosen segment do:
@@ -328,7 +348,7 @@ export function DayRingStrip({
             ))}
           </ScrollView>
         ) : (
-          <View style={{ height: 92 }} />
+          <View style={{ height: slim ? SLIM_DAYS_H : 92 }} />
         )}
       </DaySwipeGuard>
       {/* One height on both screens: two caption lines or the chip. A note that wraps moves nothing. */}

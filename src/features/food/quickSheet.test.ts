@@ -1,0 +1,64 @@
+import { describe, expect, it } from 'vitest';
+
+import { AI_TAG, likelyRows, QUICK_ROWS, QUICK_WAYS, quickRowTitle, quickSheetLine, quickSheetTitle, seeAllLabel, seeAllSpoken, wideWaySpoken } from './quickSheet';
+
+const BANNED = ['bad', 'failed', 'missed your', 'should', 'cheat', 'great', 'over', 'upgrade', 'unlock', 'premium'];
+const today = '2026-11-25';
+
+describe('the + sheet in one view', () => {
+  it('the title names the meal, and the day only when it is not today', () => {
+    expect(quickSheetTitle('dinner', today, today)).toBe('Add to dinner');
+    expect(quickSheetTitle('dinner', '2026-11-24', today)).toBe('Add to dinner, yesterday');
+    expect(quickSheetTitle('lunch', '2026-11-26', today)).toBe('Add to lunch, tomorrow');
+    expect(quickSheetTitle('lunch', '2026-11-14', today)).toBe('Add to lunch, Sat, Nov 14');
+  });
+  it('the line under it: the day (today only, else the title says it) and what is left, in search header words', () => {
+    expect(quickSheetLine(today, today, 941.4)).toBe('Today · 941 kcal left');
+    expect(quickSheetLine(today, today, 0)).toBe('Today · 0 kcal left');
+    expect(quickSheetLine(today, today, -1234)).toBe('Today · 1,234 kcal above budget');
+    expect(quickSheetLine('2026-11-24', today, 230)).toBe('230 kcal left');
+  });
+  it('three likely rows, and "See all N" only when there are more', () => {
+    expect(QUICK_ROWS).toBe(3);
+    expect(likelyRows(['a', 'b'])).toEqual({ shown: ['a', 'b'], total: 2, more: false });
+    expect(likelyRows(['a', 'b', 'c'])).toEqual({ shown: ['a', 'b', 'c'], total: 3, more: false });
+    expect(likelyRows(['a', 'b', 'c', 'd', 'e', 'f', 'g'])).toEqual({ shown: ['a', 'b', 'c'], total: 7, more: true });
+    expect(likelyRows([])).toEqual({ shown: [], total: 0, more: false });
+    expect(seeAllLabel(7)).toBe('See all 7');
+    // The drawn words lead its spoken name (WCAG 2.5.3).
+    expect(seeAllSpoken(7, 'dinner').startsWith(seeAllLabel(7))).toBe(true);
+  });
+  it("the overline names the groups among the rows shown, and the meal only when it fits beside 'See all'", () => {
+    expect(quickRowTitle({ meal: 'lunch', favourites: false, usual: true, saved: true })).toBe('Usual for lunch');
+    expect(quickRowTitle({ meal: 'lunch', favourites: false, usual: false, saved: true })).toBe('Saved meal');
+    expect(quickRowTitle({ meal: 'lunch', favourites: true, usual: true, saved: false })).toBe('Usual and favourites');
+    expect(quickRowTitle({ meal: 'lunch', favourites: true, usual: true, saved: true })).toBe('Usual and favourites');
+    expect(quickRowTitle({ meal: 'lunch', favourites: true, usual: false, saved: true })).toBe('Favourites and saved meals');
+    expect(quickRowTitle({ meal: 'lunch', favourites: true, usual: false, saved: false })).toBe('Favourites');
+  });
+  it('every way in: one drawn word that its spoken name starts with; the AI ways say so', () => {
+    for (const [id, w] of Object.entries(QUICK_WAYS)) {
+      expect(w.spoken.startsWith(w.label)).toBe(true);
+      expect(wideWaySpoken(id as keyof typeof QUICK_WAYS).startsWith(w.wide)).toBe(true);
+    }
+    expect(QUICK_WAYS.photo.spoken).toContain('AI estimate');
+    expect(QUICK_WAYS.describe.spoken).toContain('AI estimate');
+    expect(QUICK_WAYS.scan.spoken).toBe('Scan barcode, packaged products');
+    expect(AI_TAG).toBe('AI');
+  });
+  it('every fixed string: sentence case, no exclamation mark, no banned word', () => {
+    const fixed = [
+      quickSheetTitle('dinner', today, today),
+      quickSheetLine(today, today, -5),
+      seeAllLabel(4),
+      seeAllSpoken(4, 'lunch'),
+      ...Object.values(QUICK_WAYS).flatMap((w) => [w.label, w.wide, w.hint, w.spoken]),
+      quickRowTitle({ meal: 'lunch', favourites: true, usual: true, saved: true }),
+    ];
+    for (const s of fixed) {
+      expect(s).not.toContain('!');
+      expect(s[0]).toBe(s[0].toUpperCase());
+      for (const w of BANNED) expect(s.toLowerCase()).not.toMatch(new RegExp(`\\b${w}\\b`));
+    }
+  });
+});

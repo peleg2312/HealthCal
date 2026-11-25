@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ChevronRight, CookingPot, Plus, Repeat2 } from 'lucide-react-native';
+import { ArrowRightLeft, ChevronRight, CookingPot, Plus, Repeat2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Platform, useWindowDimensions, View } from 'react-native';
 
@@ -9,6 +9,7 @@ import { copyEntries, findPreviousMeal } from '@/features/food/actions';
 import { useOneTap } from '@/features/food/oneTap';
 import { currentKcal } from '@/features/food/usuals';
 import { useRecapReady } from '@/features/progress/recapReady';
+import { figureWords, otherFigure, setCalorieFigure, useCalorieFigure } from '@/features/today/calorieFigure';
 import { coachTip, rhythmFromReminders, type ClosedDay } from '@/features/today/coach';
 import { DayRingStrip } from '@/features/today/DayRingStrip';
 import { FitsSheet } from '@/features/today/FitsSheet';
@@ -196,18 +197,29 @@ function EnergyCard({
   const headroom = Math.max(0, day.exerciseAdded);
   // Today's old case: all of it is this day's own workouts. Otherwise it holds carried shares (said in the spoken sum).
   const pure = day.exerciseRule === 'day' && day.exerciseCarry === 0;
-  const left = formatNumber(Math.abs(day.remaining));
+  // The big figure: what is left (the default) or what was eaten, switched by a tap on it and kept on this device
+  // (@/features/today/calorieFigure); the other figure is said once, in the line at the level. Day one shows what is
+  // left, the whole budget, and is no switch: there is no line for the other figure, and the invite is the one thing to do.
+  const choice = useCalorieFigure();
+  const toggle = !firstDay;
+  const shown = toggle ? choice.figure : 'left';
+  const words = figureWords(shown, { remaining: day.remaining, eaten, isToday });
+  // On a phone the number waits for the stored choice (read as the app starts), so it never flips once drawn.
+  const hidden = toggle && !choice.ready ? { opacity: 0 } : null;
   // The big number sits in the empty space between the level and the base budget (or the brim).
   const inBand = eaten > budget - headroom;
   const emptyTop = inBand ? budget : budget - headroom;
-  const numSize = narrow ? (left.length >= 5 ? 40 : 44) : left.length >= 5 ? 50 : 60;
-  const unitWord = over ? 'above' : isToday ? 'left' : 'under';
+  // A 6-character figure ("11,480" eaten) steps down once more, so it stays whole beside its unit and the switch's mark.
+  const sizeFor = (text: string) => (narrow ? (text.length >= 6 ? 34 : text.length >= 5 ? 40 : 44) : text.length >= 6 ? 42 : text.length >= 5 ? 50 : 60);
+  const numSize = sizeFor(words.big.text);
+  // The number's box is as tall for either figure, so a tap never moves the labels around it.
+  const boxSize = toggle ? Math.max(sizeFor(formatNumber(Math.abs(Math.round(day.remaining)))), sizeFor(formatNumber(Math.round(eaten)))) : numSize;
   const height = firstDay ? (narrow ? VESSEL_H_FIRST_NARROW : VESSEL_H_FIRST) : narrow ? VESSEL_H_NARROW : VESSEL_H;
   const labelSpacing = narrow ? NARROW.labelSpacing : 8;
   // The label boxes: 22 px round the 17 px numbers (20 on a narrow phone), the big number as tall as it is drawn
   // on a narrow phone (its line height) and at least 44 otherwise.
   const lineH = narrow ? NARROW.labelH : 22;
-  const numH = narrow ? 42 : Math.max(44, numSize - 4);
+  const numH = narrow ? 42 : Math.max(44, boxSize - 4);
   const macrosTop = narrow ? NARROW.macrosTop : spacing.lg;
   const vesselW = narrow ? 66 : 84;
   // Burned in activity but left out of the budget (exercise is not added in Goals).
@@ -228,6 +240,45 @@ function EnergyCard({
     : day.exerciseRule === 'week'
       ? `About ${formatNumber(headroom)} kilocalories added, a seventh of each workout in the last 7 days`
       : `About ${formatNumber(headroom)} kilocalories added by workouts`;
+
+  // The big figure and its unit ("941" "kcal / left"), with the switch's mark (two arrows, the action ink) at its end
+  // where a tap switches it. Keyed by the choice, so a switch draws the other figure at once and only a change ticks.
+  const bigFigure = (wrap: boolean) => (
+    <View style={{ flexDirection: 'row', flexWrap: wrap ? 'wrap' : 'nowrap', alignItems: 'flex-end', columnGap: 6 }}>
+      <AnimatedNumber
+        key={shown}
+        variant="numXL"
+        color={words.big.tone}
+        testID={words.big.testID}
+        numberOfLines={1}
+        value={words.big.value}
+        format={(n) => formatNumber(Math.abs(Math.round(n)))}
+        duration={motion.duration.pour}
+        accessibilityLabel={words.bigSpoken}
+        style={{ fontSize: numSize, lineHeight: numSize - 2, letterSpacing: -numSize * 0.035 }}
+      />
+      <Text variant="unit" style={{ fontSize: 14, lineHeight: 17, marginBottom: numSize * 0.08 }}>
+        {`kcal\n${words.big.word}`}
+      </Text>
+      {toggle ? <ArrowRightLeft size={18} color={colors.actionInk} strokeWidth={2.2} style={{ marginBottom: numSize * 0.08 }} /> : null}
+    </View>
+  );
+  // One control: its name is the words it shows, then what a tap does ("941 kcal left. Switch to calories eaten").
+  const bigControl = (wrap: boolean, style: object) =>
+    toggle ? (
+      <PressableScale
+        testID="today-figure"
+        scaleTo={0.97}
+        feedback="select"
+        onPress={() => setCalorieFigure(otherFigure(shown))}
+        accessibilityLabel={words.name}
+        hitSlop={!wrap && numH < 44 ? Math.ceil((44 - numH) / 2) : undefined}
+        style={[{ alignSelf: 'flex-start', justifyContent: 'center' }, style, hidden]}>
+        {bigFigure(wrap)}
+      </PressableScale>
+    ) : (
+      <View style={[{ alignSelf: 'flex-start', justifyContent: 'center' }, style]}>{bigFigure(wrap)}</View>
+    );
 
   const labels: VesselLabel[] = [];
   if (headroom > 0) {
@@ -298,32 +349,7 @@ function EnergyCard({
       at: (Math.min(eaten, budget) + emptyTop) / 2,
       // At least 44 tall to touch: as tall as the number on a narrow phone, its touch area reaching 44 past it.
       height: numH,
-      content: (
-        <PressableScale
-          testID="today-remaining-open"
-          scaleTo={0.97}
-          onPress={onFits}
-          accessibilityLabel={`${left} kcal ${over ? 'above the budget' : unitWord}. See which of your foods fit`}
-          hitSlop={numH < 44 ? Math.ceil((44 - numH) / 2) : undefined}
-          style={{ alignSelf: 'flex-start', minHeight: numH, justifyContent: 'center' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6 }}>
-            <AnimatedNumber
-              variant="numXL"
-              color={over ? 'warningInk' : 'caloriesInk'}
-              testID="today-remaining"
-              numberOfLines={1}
-              value={day.remaining}
-              format={(n) => formatNumber(Math.abs(Math.round(n)))}
-              duration={motion.duration.pour}
-              accessibilityLabel={`${left} kilocalories ${over ? 'above the budget' : unitWord}`}
-              style={{ fontSize: numSize, lineHeight: numSize - 2, letterSpacing: -numSize * 0.035 }}
-            />
-            <Text variant="unit" style={{ fontSize: 14, lineHeight: 17, marginBottom: numSize * 0.08 }}>
-              {`kcal\n${unitWord}`}
-            </Text>
-          </View>
-        </PressableScale>
-      ),
+      content: bigControl(false, { minHeight: numH }),
     });
     if (!firstDay) {
       labels.push({
@@ -333,12 +359,13 @@ function EnergyCard({
         tick: colors.rim,
         content: (
           // Text only: it never takes a tap meant for the big number above it. The budget is said here, once, as the
-          // diary's summary says it ("1,219 eaten of 2,160", under "941 kcal left", whose unit it shares: " kcal" would not
-          // fit its column at 320 px); the whole sum (target plus exercise) is read out.
-          <View pointerEvents="none" {...figure(`${formatNumber(eaten)} kilocalories eaten. ${budgetLabel}`)}>
-            <AnimatedNumber variant="numM" value={eaten} format={(n) => formatNumber(Math.round(n))} style={{ fontSize: 17, lineHeight: lineH }} testID="today-eaten">
+          // diary's summary says it ("1,219 eaten of 2,160" under "941 kcal left", or "941 left of 2,160" under "1,219 kcal
+          // eaten", whose unit it shares: " kcal" would not fit its column at 320 px); the whole sum (target plus exercise)
+          // is read out. The other figure of the choice, so each figure is said once.
+          <View pointerEvents="none" style={hidden} {...figure(`${words.line.spoken}. ${budgetLabel}`)}>
+            <AnimatedNumber key={shown} variant="numM" value={words.line.value} format={(n) => formatNumber(Math.abs(Math.round(n)))} style={{ fontSize: 17, lineHeight: lineH }} testID={words.line.testID}>
               <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
-                {'  eaten of '}
+                {`  ${words.line.words} `}
               </Text>
               <Text variant="numM" style={{ fontSize: 17, lineHeight: lineH }} testID="today-budget">
                 {formatNumber(day.budget)}
@@ -405,29 +432,7 @@ function EnergyCard({
         </Text>
       </PressableScale>
     ) : (
-      <PressableScale
-        testID="today-remaining-open"
-        scaleTo={0.97}
-        onPress={onFits}
-        accessibilityLabel={`${left} kcal ${over ? 'above the budget' : unitWord}. See which of your foods fit`}
-        style={{ alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', maxWidth: '100%' }}>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', columnGap: 6 }}>
-          <AnimatedNumber
-            variant="numXL"
-            color={over ? 'warningInk' : 'caloriesInk'}
-            testID="today-remaining"
-            numberOfLines={1}
-            value={day.remaining}
-            format={(n) => formatNumber(Math.abs(Math.round(n)))}
-            duration={motion.duration.pour}
-            accessibilityLabel={`${left} kilocalories ${over ? 'above the budget' : unitWord}`}
-            style={{ fontSize: numSize, lineHeight: numSize - 2, letterSpacing: -numSize * 0.035 }}
-          />
-          <Text variant="unit" style={{ fontSize: 14, lineHeight: 17, marginBottom: numSize * 0.08 }}>
-            {`kcal\n${unitWord}`}
-          </Text>
-        </View>
-      </PressableScale>
+      bigControl(true, { minHeight: 44, maxWidth: '100%' })
     );
     return (
       <Card testID="today-energy" padding={narrow ? NARROW.padding : 18}>
@@ -463,12 +468,20 @@ function EnergyCard({
               </Text>
             ) : null}
             {actions ? (
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
-                <CupKey color={colors.calories} size={11} style={{ marginTop: 8 }} />
-                <View pointerEvents="none" {...figure(`${formatNumber(eaten)} kilocalories eaten. ${budgetLabel}`)} style={{ flexShrink: 1 }}>
-                  <AnimatedNumber variant="numM" value={eaten} format={(n) => formatNumber(Math.round(n))} style={{ fontSize: 17, lineHeight: 22 }} testID="today-eaten">
+              <View style={[{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }, hidden]}>
+                {/* The line's key is what its figure is in the cup: the calorie fill for eaten, the empty cup for what is
+                    left, the amber cap for what is above. */}
+                {shown === 'left' ? (
+                  <CupKey color={colors.calories} size={11} style={{ marginTop: 8 }} />
+                ) : over ? (
+                  <CupKey color={colors.warning} size={11} style={{ marginTop: 8 }} />
+                ) : (
+                  <CupKey color={colors.vesselEdge} variant="outline" size={11} style={{ marginTop: 8 }} />
+                )}
+                <View pointerEvents="none" {...figure(`${words.line.spoken}. ${budgetLabel}`)} style={{ flexShrink: 1 }}>
+                  <AnimatedNumber key={shown} variant="numM" value={words.line.value} format={(n) => formatNumber(Math.abs(Math.round(n)))} style={{ fontSize: 17, lineHeight: 22 }} testID={words.line.testID}>
                     <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
-                      {' eaten of '}
+                      {` ${words.line.words} `}
                     </Text>
                     <Text variant="numM" style={{ fontSize: 17, lineHeight: 22 }} testID="today-budget">
                       {formatNumber(day.budget)}

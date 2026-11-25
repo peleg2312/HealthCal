@@ -53,7 +53,7 @@ module.exports = [
   { id: 'text200-today-past', route: '/', taps: [`today-day-${isoDay(-1)}`], waitFor: 'today-jump-today', flags: big, note: 'Today on yesterday at 200% text' },
   { id: 'text200-today-off', route: '/', values: { eatBack: 0 }, flags: big, note: 'Today with workouts not added, at 200% text' },
   { id: 'text200-today-over', route: '/', values: { eaten: 1.15 }, flags: big, note: 'Today over the budget at 200% text' },
-  { id: 'text200-today-fits', route: '/', taps: ['today-remaining-open'], sheet: true, flags: big, note: 'What fits at 200% text' },
+  { id: 'text200-today-fits', route: '/', taps: ['today-ideas'], sheet: true, flags: big, note: 'What fits at 200% text' },
   { id: 'text200-diary-empty', route: '/diary', data: 'empty', flags: big, note: 'an empty diary day at 200% text' },
   { id: 'text200-coach', route: '/coach', flags: big, note: 'the coach at 200% text' },
   { id: 'text200-coach-ideas', route: '/coach', values: { eaten: 0.5 }, taps: ['coach-local-ideas'], waitFor: 'coach-local-answer', flags: big, note: "the coach's ideas answer at 200% text" },

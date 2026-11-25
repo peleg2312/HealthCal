@@ -642,7 +642,7 @@ async function gestureChecks(browser, seeds) {
     });
   }
   // A sideways swipe inside a sheet opened from Today or the diary leaves the day behind it alone.
-  for (const [route, taps] of [['/', ['today-remaining-open']], ['/', ['today-share']], ['/diary', ['meal-menu-breakfast']]]) {
+  for (const [route, taps] of [['/', ['today-ideas']], ['/', ['today-share']], ['/diary', ['meal-menu-breakfast']]]) {
     await guard(`swipe in the sheet from ${taps[0]}`, async () => {
       const r = await open(ctx, route, taps);
       const d0 = await overline(r.frame);
