@@ -41,6 +41,7 @@ import {
   BarChart,
   Button,
   Card,
+  DECORATIVE,
   Divider,
   EmptyState,
   haptic,
@@ -240,6 +241,9 @@ function WaterScreen() {
   // with this same amount adds it; any other amount is asked about afresh.
   const [askedMl, setAskedMl] = useState<number | null>(null);
   const checkId = `water-custom-check-${useId().replace(/[^A-Za-z0-9_-]/g, '')}`;
+  // "Other amount"'s cup height as drawn (Add takes it) and whether large text has sent Add under the field.
+  const [cupH, setCupH] = useState(50);
+  const [addWrapped, setAddWrapped] = useState(false);
   const [editing, setEditing] = useState(false);
   const [showAllLog, setShowAllLog] = useState(false);
   // Drinks removed on this visit: each keeps a Restore row in the log (the second way back after the toast's Undo)
@@ -581,7 +585,7 @@ function WaterScreen() {
       </View>
       <View>
         {/* With large text the field keeps at least 200 px and Add goes under it when both do not fit one line. */}
-        <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', gap: spacing.sm, alignItems: 'flex-end' }}>
+        <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', gap: spacing.sm, alignItems: 'flex-start' }}>
           {/* A visible label that lasts (WCAG 3.3.2), with the unit as its suffix: its spoken name is the kit's
               ("Other amount, millilitres"), and an empty field shows no placeholder that could pass for a value.
               What the amount needs is said under the row, tied to the field (`aria-describedby` on the web, the
@@ -594,18 +598,28 @@ function WaterScreen() {
             decimals={0}
             value={custom}
             onChange={setCustom}
+            // The input fills the field's cup: its height (plus the cup's 1.5 px edges) is the height Add takes.
+            onLayout={(e) => setCupH(Math.round(e.nativeEvent.layout.height + 3))}
             accessibilityHint={amountLine ?? undefined}
             {...((Platform.OS === 'web' && amountLine ? { 'aria-describedby': checkId, ...(amountCheck?.state === 'over' ? { 'aria-invalid': true } : null) } : {}) as object)}
           />
+          {/* Add stands level with the field's cup in every state, whatever the field draws under its cup (the kit's
+              words about a typed minus): above it a blank line as tall as the field's label, with the field's own 6 px,
+              so its top is the cup's top at every text size, and it is as tall as the cup. Once large text has sent it
+              under the field it needs no such line. */}
+          <View style={{ gap: 6 }} onLayout={big ? (e) => setAddWrapped(e.nativeEvent.layout.y > 1) : undefined}>
+            {big && addWrapped ? null : (
+              <Text variant="label" {...DECORATIVE}>
+                {'\u00A0'}
+              </Text>
+            )}
           <Button
             testID="water-custom-add"
             title="Add"
             size="lg"
             variant="secondary"
             full={false}
-            // As tall as the field's cup beside it (50) and set at the row's end, so its box is the cup's: a button
-            // that does not fill the row stands at the row's start by default (the kit's), level with the label.
-            style={{ height: 50, alignSelf: 'flex-end' }}
+            style={{ height: Math.max(50, cupH) }}
             disabled={!(custom && custom > 0) || amountCheck?.state === 'over'}
             onPress={addTap(() => {
               if (!custom) return;
@@ -624,6 +638,7 @@ function WaterScreen() {
               setAskedMl(null);
             })}
           />
+          </View>
         </View>
         {/* Kept mounted (a polite live region), so the question is read as it appears; empty, it takes no room. */}
         <View accessibilityLiveRegion="polite" {...(Platform.OS === 'web' ? { 'aria-live': 'polite' } : null)}>

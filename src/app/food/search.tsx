@@ -36,7 +36,6 @@ import { useDay, useLive } from '@/store/selectors';
 import { cup, motion, useLargeText, useTheme } from '@/theme';
 import type { Food, FoodEntry, MealType, SavedMeal } from '@/types';
 import { AnimatedNumber, Button, Chip, ChipRow, CupKey, decorative, Divider, EmptyState, Header, IconButton, PressableScale, Screen, Sheet, Text, TextField, useGrownText } from '@/ui';
-import { spokenUnits } from '@/lib/spokenUnits';
 
 type Tab = SearchTab;
 type Online = { query: string; status: 'idle' | 'loading' | 'done'; items: Food[] };
@@ -288,7 +287,9 @@ export default function FoodSearchScreen() {
         name={foodNameHead(displayFoodName(top))}
         kcalValue={topAdded ? topAdded.nutrients.kcal : portionKcal(top, topPortion)}
         added={!!topAdded}
-        spoken={spokenUnits(`Add ${displayFoodName(top)}, ${portionLabel(topPortion.serving.label, topPortion.quantity)}, ${kcal(portionKcal(top, topPortion))} kilocalories, ${sourceInfo(sourceKindOf(top)).label}, to ${MEAL_LABEL[meal].toLowerCase()}`)}
+        // What it shows first, as drawn ("Add Chicken breast, 227 kcal"; WCAG 2.5.3, label in name), then the whole
+        // name where the button shows its head, the portion, the source in words and the meal.
+        spoken={`Add ${foodNameHead(displayFoodName(top))}, ${kcal(portionKcal(top, topPortion))} kcal: ${foodNameHead(displayFoodName(top)) === displayFoodName(top) ? '' : `${displayFoodName(top)}, `}${portionLabel(topPortion.serving.label, topPortion.quantity)}, ${sourceInfo(sourceKindOf(top)).label}, to ${MEAL_LABEL[meal].toLowerCase()}`}
         onPress={oneTap(() => quickAdd(top))}
       />
     ) : null;
@@ -496,7 +497,8 @@ export default function FoodSearchScreen() {
                 variant="secondary"
                 size="md"
                 title={narrow || big ? 'Get an AI estimate' : 'Describe it for an AI estimate'}
-                accessibilityLabel={aiTile.a11y}
+                // Its words as drawn, then the words it takes along (label in name; apart from the tile's "Describe …").
+                accessibilityLabel={`${narrow || big ? 'Get an AI estimate' : 'Describe it for an AI estimate'}: ${q.trim()}`}
                 icon={<AiGlyph name="describe" size={20} color={colors.text} />}
                 onPress={() => go('/food/photo', aiTile.params)}
                 style={{ marginTop: spacing.sm }}
@@ -649,7 +651,7 @@ function ActionTile({ icon, label, a11y, onPress, testID }: { icon: React.ReactN
  */
 function BestMatchAdd({ name, kcalValue, added, spoken, onPress }: { name: string; kcalValue: number; added: boolean; spoken: string; onPress: () => void }) {
   const { colors, radius, spacing } = useTheme();
-  const lang = useLangName(added ? `${name} added` : spoken);
+  const lang = useLangName(added ? `${name} added, ${kcal(kcalValue)} kcal` : spoken);
   // As soon as text grows at all, a reader's own text spacing included (`useGrownText`, WCAG 1.4.12), the name
   // takes a second line and the button grows, rather than being cut after a few letters; at the designed size, one line.
   const grown = useGrownText();
