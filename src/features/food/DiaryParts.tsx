@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
-import { CalendarPlus, ChevronDown, ChevronUp, Copy, MoreHorizontal, Plus, Repeat2, Save, Trash2 } from 'lucide-react-native';
+import { ArrowRightLeft, CalendarPlus, ChevronDown, ChevronUp, Copy, MoreHorizontal, Plus, Repeat2, Save, Trash2 } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { SourceMark, sourceMarkTop } from '@/features/ai/mark';
 import { ALSO_IN_WATER, waterFor } from '@/features/drinks/rules';
 import { isWaterDrinkEntry } from '@/features/drinks/via';
+import { figureWords, otherFigure, setCalorieFigure, useCalorieFigure } from '@/features/today/calorieFigure';
 import { isolateRtl, withoutMarks } from '@/lib/bidi';
 import { addDays, formatDayLabel } from '@/lib/dates';
 import { MEAL_LABEL, entriesTotal } from '@/lib/nutrition';
@@ -54,8 +55,14 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; /** Th
     summaryOpen = v;
     setOpenState(v);
   };
-  const over = day.remaining < 0;
   const budget = Math.max(0, day.budget);
+  // The big figure is the one chosen on Today (what is left, or what was eaten; kept on this device), and a tap on it
+  // switches both screens; the line under it holds the other figure. The diary keeps its own words on every day
+  // ("left", "above"), as `isToday` gives them.
+  const choice = useCalorieFigure();
+  const words = figureWords(choice.figure, { remaining: day.remaining, eaten: day.eaten.kcal, isToday: true });
+  const idFor = (id: 'today-remaining' | 'today-eaten') => (id === 'today-remaining' ? 'diary-remaining' : 'diary-eaten');
+  const figureH = narrow && !big ? 28 : 36;
   // Calories workouts add to this day (its own and shares carried from the six days before), drawn as
   // hatched headroom at the right end. Read from the day's rule, never from budget minus target.
   const headroom = Math.max(0, day.exerciseAdded);
@@ -67,33 +74,52 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; /** Th
     // first view; under 360 px it is slimmer still (6, a 24 px figure), so at 320 x 640 Lunch's add is in it.
     <Card testID="diary-summary" padding={0} style={{ paddingHorizontal: 16, paddingVertical: big ? 14 : narrow ? 6 : 10 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-        {/* One element for a screen reader, the units in full: "941 kilocalories left, 1,219 kilocalories eaten of 2,160 kilocalories". */}
-        <View
-          testID="diary-summary-figures"
-          style={{ flex: 1, minWidth: 0 }}
-          {...figure(spokenUnits(`${kcal(Math.abs(day.remaining))} kcal ${over ? 'above the budget' : 'left'}, ${kcal(day.eaten.kcal)} kcal eaten of ${kcal(budget)} kcal`))}>
-          <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', alignItems: 'baseline', columnGap: 6 }}>
-            <AnimatedNumber
-              variant="numXL"
-              color={over ? 'warningInk' : 'caloriesInk'}
-              testID="diary-remaining"
-              numberOfLines={1}
-              value={day.remaining}
-              format={(n) => kcal(Math.abs(n))}
-              accessibilityLabel={`${kcal(Math.abs(day.remaining))} kilocalories ${over ? 'above the budget' : 'left'}`}
-              style={narrow && !big ? { fontSize: 24, lineHeight: 28, letterSpacing: -0.6 } : { fontSize: narrow ? 30 : 32, lineHeight: 36, letterSpacing: -1 }}
-            />
-            <Text variant="unit" style={{ fontSize: 15 }}>{over ? 'kcal above' : 'kcal left'}</Text>
-          </View>
-          <Text variant="caption" color="textSecondary">
-            <AnimatedNumber variant="numM" style={{ fontSize: 14, lineHeight: 18 }} testID="diary-eaten" value={day.eaten.kcal} format={kcal} />
-            {' eaten of '}
-            <Text variant="numM" style={{ fontSize: 14, lineHeight: 18 }}>
-              {kcal(budget)}
+        <View testID="diary-summary-figures" style={{ flex: 1, minWidth: 0 }}>
+          {/* The switch, Today's (`diary-figure`): its name is its words, then what a tap does ("941 kcal left. Switch to
+              calories eaten"). A sibling of the line under it, never inside a figure: a button inside an image is no button.
+              On a phone it waits for the stored choice, so the figure never flips once drawn. */}
+          <PressableScale
+            testID="diary-figure"
+            scaleTo={0.97}
+            feedback="select"
+            onPress={() => setCalorieFigure(otherFigure(choice.figure))}
+            accessibilityLabel={words.name}
+            hitSlop={figureH < 44 ? Math.ceil((44 - figureH) / 2) : undefined}
+            style={[{ alignSelf: 'flex-start', maxWidth: '100%' }, choice.ready ? null : { opacity: 0 }]}>
+            {/* The unit stands on two lines beside the number ("kcal" over "eaten"), as on Today, so "11,480 kcal eaten" and the
+                switch's mark keep one row beside the share and chevron cups at 320 px. */}
+            <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', alignItems: 'flex-end', columnGap: 6 }}>
+              <AnimatedNumber
+                // Keyed by the choice: a switch draws the other figure at once; only a change of the day ticks.
+                key={choice.figure}
+                variant="numXL"
+                color={words.big.tone}
+                testID={idFor(words.big.testID)}
+                numberOfLines={1}
+                value={words.big.value}
+                format={(n) => kcal(Math.abs(n))}
+                accessibilityLabel={words.bigSpoken}
+                style={[{ flexShrink: 0 }, narrow && !big ? { fontSize: 24, lineHeight: 28, letterSpacing: -0.6 } : { fontSize: narrow ? 30 : 32, lineHeight: 36, letterSpacing: -1 }]}
+              />
+              <Text variant="unit" style={narrow && !big ? { fontSize: 12.5, lineHeight: 14, marginBottom: 1 } : { fontSize: 14, lineHeight: 17, marginBottom: 2 }}>
+                {`kcal\n${words.big.word}`}
+              </Text>
+              <ArrowRightLeft size={18} color={colors.actionInk} strokeWidth={2.2} style={{ marginBottom: narrow && !big ? 5 : 8 }} />
+            </View>
+          </PressableScale>
+          {/* The other figure and the budget, one element with its units in full ("1,219 kilocalories eaten of 2,160 kilocalories").
+              It takes no touch, so the switch's 44 px reach (4 px past its 36 px figure) is the switch's to its edge. */}
+          <View pointerEvents="none">
+            <Text variant="caption" color="textSecondary" {...figure(spokenUnits(`${words.line.text} kcal ${words.line.words} ${kcal(budget)} kcal`))}>
+              <AnimatedNumber key={choice.figure} variant="numM" style={{ fontSize: 14, lineHeight: 18 }} testID={idFor(words.line.testID)} value={words.line.value} format={(n) => kcal(Math.abs(n))} />
+              {` ${words.line.words} `}
+              <Text variant="numM" style={{ fontSize: 14, lineHeight: 18 }}>
+                {kcal(budget)}
+              </Text>
+              {/* Units always shown: the budget is kilocalories too (its leading space holds it to the number). */}
+              {' kcal'}
             </Text>
-            {/* Units always shown: the budget is kilocalories too (its leading space holds it to the number). */}
-            {' kcal'}
-          </Text>
+          </View>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: narrow && !big ? SUMMARY_CUP_GAP : spacing.sm }}>
           {share}

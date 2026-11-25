@@ -2976,6 +2976,10 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
       const macros = await p.getByTestId('meal-macros-breakfast').first().evaluate((e) => [e.textContent.replace(/[\u00a0]/g, ' ').replace(/[\u2060\u200e\u2068\u2069]/g, ''), e.getAttribute('aria-label')]);
       check(`slim diary (${w}): a meal shows its macros, heard in full`, /^P \d+ g · C \d+ g · F \d+ g$/.test(macros[0]) && /^protein \d+ grams, carbs \d+ grams, fat \d+ grams$/.test(macros[1] || ''), macros.join(' | '));
       if (w === 360) {
+        await p.getByTestId('diary-figure').first().tap();
+        await p.waitForTimeout(300);
+        const fig = await p.evaluate(() => ({ name: document.querySelector('[data-testid="diary-figure"]')?.getAttribute('aria-label') || '', key: window.localStorage.getItem('healthcal.calorieFigure') }));
+        check("slim diary: the summary's number is Today's switch (eaten, kept on this device)", /kcal eaten\. Switch to calories left$/.test(fig.name) && fig.key === 'eaten', JSON.stringify(fig));
         await p.getByTestId('diary-week-pick').first().tap();
         check('slim diary: "Choose a week" still opens from the strip', await p.getByTestId('diary-week-pick-sheet').first().waitFor({ timeout: 5000 }).then(() => true, () => false));
       }

@@ -422,6 +422,9 @@ module.exports = [
   // filled meal says its protein, carbs and fat under its name (`meal-macros-<meal>`, `mealMacroLine`).
   { id: 'diary-slim-week-pick', route: '/diary', taps: ['diary-week-pick'], sheet: true, waitFor: 'diary-week-pick-sheet', note: 'the slim strip\'s "Choose a week" sheet' },
   { id: 'diary-slim-macros', route: '/diary', waitFor: 'meal-macros-lunch', note: 'Breakfast and Lunch whole in the first view at 360 x 740, each with "P · C · F" under its name' },
+  // The summary's big figure follows Today's choice (left or eaten, `@/features/today/calorieFigure`), with the same switch.
+  { id: 'diary-figure-eaten', route: '/diary', taps: ['diary-figure'], waitFor: 'diary-eaten', note: 'the summary switched to "1,219 kcal eaten", the line "941 left of 2,160 kcal"' },
+  { id: 'diary-figure-eaten-feast', route: '/diary?date={day}', day: -2, data: 'stress', taps: ['diary-figure'], waitFor: 'diary-eaten', note: 'the 11,480 kcal day as "eaten": the line says how far above the budget' },
   // ---------------------------------------------------------------- the + sheet in one view (src/components/QuickLogSheet.tsx)
   // "Add to <meal>" with the day and what is left under it, four small ways in, Search food with Scan, Repeat, three
   // likely rows with "See all N" and Water's glasses: nothing scrolls at 360 x 740, 390 x 844 and 320 x 640.

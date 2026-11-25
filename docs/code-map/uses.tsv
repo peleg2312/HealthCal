@@ -2067,13 +2067,13 @@ src/features/today/backToToday.ts	Away	5	src/features/morning/rule.ts	src/featur
 src/features/today/backToToday.ts	backToTodayOnReturn	3	src/features/morning/useMorningPage.ts	src/features/today/useBackToToday.ts	src/features/today/backToToday.test.ts
 src/features/today/calorieFigure.ts	CALORIE_FIGURE_KEY	1	src/features/today/calorieFigure.test.ts
 src/features/today/calorieFigure.ts	calorieFigureNow	1	src/features/today/calorieFigure.test.ts
-src/features/today/calorieFigure.ts	figureWords	2	src/app/(tabs)/index.tsx	src/features/today/calorieFigure.test.ts
+src/features/today/calorieFigure.ts	figureWords	3	src/app/(tabs)/index.tsx	src/features/food/DiaryParts.tsx	src/features/today/calorieFigure.test.ts
 src/features/today/calorieFigure.ts	loadCalorieFigure	1	src/features/today/calorieFigure.test.ts
-src/features/today/calorieFigure.ts	otherFigure	2	src/app/(tabs)/index.tsx	src/features/today/calorieFigure.test.ts
+src/features/today/calorieFigure.ts	otherFigure	3	src/app/(tabs)/index.tsx	src/features/food/DiaryParts.tsx	src/features/today/calorieFigure.test.ts
 src/features/today/calorieFigure.ts	parseCalorieFigure	1	src/features/today/calorieFigure.test.ts
 src/features/today/calorieFigure.ts	resetCalorieFigureForTests	1	src/features/today/calorieFigure.test.ts
-src/features/today/calorieFigure.ts	setCalorieFigure	2	src/app/(tabs)/index.tsx	src/features/today/calorieFigure.test.ts
-src/features/today/calorieFigure.ts	useCalorieFigure	1	src/app/(tabs)/index.tsx
+src/features/today/calorieFigure.ts	setCalorieFigure	3	src/app/(tabs)/index.tsx	src/features/food/DiaryParts.tsx	src/features/today/calorieFigure.test.ts
+src/features/today/calorieFigure.ts	useCalorieFigure	2	src/app/(tabs)/index.tsx	src/features/food/DiaryParts.tsx
 src/features/today/cheers.ts	cheersLabel	2	src/features/today/StatusRail.tsx	src/features/today/cheers.test.ts
 src/features/today/cheers.ts	recentCheerCount	2	src/features/today/StatusRail.tsx	src/features/today/cheers.test.ts
 src/features/today/coach.ts	ClosedDay	1	src/app/(tabs)/index.tsx
