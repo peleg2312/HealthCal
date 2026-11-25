@@ -5,7 +5,7 @@ import Animated from 'react-native-reanimated';
 
 import { cup, fonts, motion, phoneCapFor, scaledFontSize, useLargeText, useReducedMotion, useTextSize, useTheme } from '@/theme';
 import type { UnitSystem } from '@/types';
-import { cssBezier, DECORATIVE, FadeUp, FOCUS_CUP, MiniCup, parseNumber, PressableScale, ProgressBar, Text, useFocusRing } from '@/ui';
+import { cssBezier, DECORATIVE, FadeUp, FOCUS_CUP, MiniCup, numberTextProblem, numberTextValue, PressableScale, ProgressBar, Text, useFocusRing } from '@/ui';
 
 import { choiceInput, type ChoiceInput } from './choiceInput';
 import { inHand, nextEmptyField } from './fieldChain';
@@ -597,8 +597,6 @@ export function BigNumberField({
   const { colors, radius, spacing } = useTheme();
   useFocusRing();
   const ownErrorId = `onb-error-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
-  const ownError = typeof error === 'string' && error.trim() ? error : null;
-  const errorAria = invalidAria(!!error, ownError ? ownErrorId : errorId);
   const [text, setText] = useState(fieldFormat(value, decimals));
   const [lastValue, setLastValue] = useState(value);
   const [focused, setFocused] = useState(false);
@@ -606,8 +604,13 @@ export function BigNumberField({
   const [unitW, setUnitW] = useState(0);
   if (value !== lastValue) {
     setLastValue(value);
-    if (parseNumber(text) !== value) setText(fieldFormat(value, decimals));
+    if (numberTextValue(text) !== value) setText(fieldFormat(value, decimals));
   }
+  // A typed minus is kept as typed (never dropped in silence), its value is none, and the field says why under
+  // itself, as the kit's NumberField does (`numberTextProblem`), so Continue's wait is explained where it was typed.
+  const minus = numberTextProblem(text);
+  const ownError = typeof error === 'string' && error.trim() ? error : minus;
+  const errorAria = invalidAria(!!error || !!minus, ownError ? ownErrorId : errorId);
   // The figure grows with the app's text size as the kit's type does (`scaledFontSize`; not drawn by the kit's
   // Text), and the cup with it; the phone's own setting adds only up to 2x in all (`phoneCapFor`).
   const scale = useTextSize();
@@ -642,7 +645,7 @@ export function BigNumberField({
           ...cup(radius.tile, 5),
           backgroundColor: colors.surface,
           borderWidth: 1.5,
-          borderColor: error ? colors.danger : focused ? colors.rim : colors.fieldEdge,
+          borderColor: error || minus ? colors.danger : focused ? colors.rim : colors.fieldEdge,
           overflow: 'hidden',
         }}>
         {/* The sizer: the same text in the same type, unseen. With the unit it sets where the number is drawn. */}
@@ -692,10 +695,9 @@ export function BigNumberField({
             setFocused(false);
             rest.onBlur?.(e);
           }}
-          onChangeText={(raw) => {
-            const t = raw.replace(/-/g, '');
+          onChangeText={(t) => {
             setText(t);
-            const n = parseNumber(t);
+            const n = numberTextValue(t);
             setLastValue(n);
             onChange(n);
           }}
