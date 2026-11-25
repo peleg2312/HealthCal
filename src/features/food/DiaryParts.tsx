@@ -350,9 +350,11 @@ export function MealCard({
     removed,
   );
   // Restore rows already there when the card first drew this day are drawn at once; one that a delete brings
-  // unfolds with the fold. Kept per day, so paging to another day draws its Restore rows at once too.
+  // unfolds with the fold. Kept per day, so paging to another day draws its Restore rows at once too; a row that
+  // comes back leaves the set, so deleting it again unfolds its Restore row like any other.
   const [drawn, setDrawn] = useState(() => ({ date, ids: new Set(removed.map((e) => e.id)) }));
   if (drawn.date !== date) setDrawn({ date, ids: new Set(removed.map((e) => e.id)) });
+  else if ([...drawn.ids].some((id) => !removed.some((e) => e.id === id))) setDrawn({ date, ids: new Set([...drawn.ids].filter((id) => removed.some((e) => e.id === id))) });
   const atOnce = (id: string) => drawn.date === date && drawn.ids.has(id);
   // The Restore rows' frame (its divider and padding) opens and closes as a whole, with the first row that comes
   // and the last that goes; a row that joins or leaves a frame already drawn unfolds or folds on its own. The ids

@@ -175,5 +175,16 @@ export function showSaveSheetFoods(entries: readonly Pick<FoodEntry, 'name' | 'v
   return foods.length > 0 && foods.join(', ') !== defaultMealName(entries, meal);
 }
 
+/** The save sheet's question when it is closed (Escape, the scrim, a drag, back) with a name typed over the one offered. */
+export const SAVE_NAME_DISCARD = 'Discard this meal name?';
+
+/**
+ * Whether closing the save step would drop a name the person typed (the Sheet's `unsaved`): the name holds
+ * words and they are not the ones offered when the step opened. The offered name, or an emptied field, drops nothing.
+ */
+export function saveNameTyped(name: string, offered: string): boolean {
+  return name.trim().length > 0 && name.trim() !== offered.trim();
+}
+
 /** Every fixed string above, for the test that holds them to the house rules. */
-export const SAVE_FIXED_WORDS = [SAVE_TOGGLE, SAVE_NAME_PLACEHOLDER, SAVE_HINT_NOT_NOW, SAVE_HINT_NOT_NOW_A11Y];
+export const SAVE_FIXED_WORDS = [SAVE_TOGGLE, SAVE_NAME_PLACEHOLDER, SAVE_HINT_NOT_NOW, SAVE_HINT_NOT_NOW_A11Y, SAVE_NAME_DISCARD];

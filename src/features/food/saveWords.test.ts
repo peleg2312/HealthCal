@@ -207,6 +207,16 @@ describe('the hint and the sheet', () => {
   });
 });
 
+describe('closing the save sheet', () => {
+  it('asks only when a name was typed over the one offered', () => {
+    expect(saveNameTyped('Almonds, Greek yogurt, Banana', 'Almonds, Greek yogurt, Banana')).toBe(false);
+    expect(saveNameTyped(' Almonds, Greek yogurt, Banana ', 'Almonds, Greek yogurt, Banana')).toBe(false);
+    expect(saveNameTyped('', 'My lunch')).toBe(false);
+    expect(saveNameTyped('My work breakfast', 'Almonds, Greek yogurt, Banana')).toBe(true);
+    expect(SAVE_NAME_DISCARD).toBe('Discard this meal name?');
+  });
+});
+
 describe('house rules', () => {
   it('no "!", no banned word, sentence case, in every string', () => {
     const meals: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
