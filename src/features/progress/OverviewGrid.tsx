@@ -17,6 +17,9 @@ import type { ProgressData } from './useProgressData';
 
 export type ProgressSegment = 'overview' | 'nutrition' | 'body' | 'habits';
 
+/** Words that stay on one line (no-break spaces), so a caption that needs a second line breaks before them. */
+const together = (words: string) => words.replace(/ /g, '\u00A0');
+
 function avgTrend(trend: TrendPoint[], start: string, end: string): number | null {
   const pts = trend.filter((t) => t.date >= start && t.date <= end);
   return pts.length ? pts.reduce((s, t) => s + t.trend, 0) / pts.length : null;
@@ -73,8 +76,9 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         valueColor="caloriesInk"
         value={c ? formatNumber(Math.round(c.avgKcal)) : null}
         unit="kcal"
-        caption={c ? `a day · budget ${formatNumber(Math.round(c.avgBudget))}` : 'No full days yet'}
-        captionShort={c ? `budget ${formatNumber(Math.round(c.avgBudget))}` : 'No full days yet'}
+        // The budget with its unit; held together, so where the line needs two lines it breaks after "a day ·".
+        caption={c ? `a day · ${together(`budget ${formatNumber(Math.round(c.avgBudget))} kcal`)}` : 'No full days yet'}
+        captionShort={c ? together(`budget ${formatNumber(Math.round(c.avgBudget))} kcal`) : 'No full days yet'}
         compare={changeWords('kcal', c?.avgKcal, p?.calories?.avgKcal, { period })}
         trend={changeDirection('kcal', c?.avgKcal, p?.calories?.avgKcal)}
         period={period}
@@ -161,8 +165,8 @@ export function OverviewGrid({ d, range, onOpen }: { d: ProgressData; range: num
         value={a.minutes ? `${weekly}` : null}
         unit="min"
         // Active minutes: the minutes that count toward the guideline (hard ones double), said in full once, aloud.
-        caption={a.minutes ? `active a week · of ${WEEKLY_ACTIVE_MINUTES}` : 'No workouts yet'}
-        captionShort={a.minutes ? `active, of ${WEEKLY_ACTIVE_MINUTES}` : 'No workouts yet'}
+        caption={a.minutes ? `active a week · ${together(`of ${WEEKLY_ACTIVE_MINUTES} min`)}` : 'No workouts yet'}
+        captionShort={a.minutes ? `active, ${together(`of ${WEEKLY_ACTIVE_MINUTES} min`)}` : 'No workouts yet'}
         spoken={a.minutes ? `${weekly} active minutes a week, toward the ${WEEKLY_ACTIVE_MINUTES} minutes a week guideline` : undefined}
         compare={
           a.minutes || (p && p.activity.minutes)

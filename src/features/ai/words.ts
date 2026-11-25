@@ -66,6 +66,35 @@ export function prefilledDescription(raw: unknown): string {
   return typeof v === 'string' ? v.trim().slice(0, DESCRIPTION_MAX) : '';
 }
 
+// ------------------------------------------------------------ leaving the screen
+
+/** What the photo or describe screen holds that its X, back or a swipe back would drop (`photoLeaveQuestion`). */
+export interface PhotoScreenHeld {
+  mode: 'photo' | 'text';
+  /** A live estimate is on screen with at least one item (the sample is not one: its words or photo are asked about). */
+  estimate: boolean;
+  description: string;
+  /** The words the screen opened with (search's "Describe"): still in search behind it, so not lost. */
+  prefilled: string;
+  photo: boolean;
+  note: string;
+  weight: string;
+}
+
+/**
+ * The question the photo or describe screen asks before it is left with something not added (rubric D5-01,
+ * `useLeaveGuard`): a live estimate, else what the shown tab holds, else what the other tab holds, else null
+ * (nothing typed, nothing asked). The screen's own Add and its ways to search or quick add never ask.
+ */
+export function photoLeaveQuestion(h: PhotoScreenHeld): string | null {
+  if (h.estimate) return 'Discard this estimate?';
+  const words = h.description.trim().length > 0 && h.description.trim() !== h.prefilled.trim();
+  const typed = h.note.trim().length > 0 || h.weight.trim().length > 0;
+  const photoAsk = h.photo ? 'Discard this photo?' : typed ? 'Discard what you typed?' : null;
+  const textAsk = words ? 'Discard this description?' : null;
+  return h.mode === 'photo' ? (photoAsk ?? textAsk) : (textAsk ?? photoAsk);
+}
+
 // ------------------------------------------------------------ the review, spoken
 
 /**

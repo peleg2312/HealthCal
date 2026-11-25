@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { CalendarPlus, ChevronDown, ChevronUp, Copy, MoreHorizontal, Plus, Repeat2, Save, Trash2 } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { Platform, useWindowDimensions, View } from 'react-native';
 
 import { SourceMark, sourceMarkTop } from '@/features/ai/mark';
 import { ALSO_IN_WATER, waterFor } from '@/features/drinks/rules';
@@ -35,6 +35,13 @@ import { FadeRow, Unfold, useComeBack, useLeavingRows } from './rowMotion';
 let summaryOpen = false;
 
 /**
+ * A block of figures read as one element with its units in full (D6-39, WCAG 3.1.4): natively an accessible
+ * view named by its label; on the web an image named by it (`role="img"`), since a plain block's name is not
+ * read there and its drawn words would be ("941 kcal left").
+ */
+const FIGURES = Platform.OS === 'web' ? ({ role: 'img' } as const) : null;
+
+/**
  * The day's numbers at the top of the diary, compact so the meals lead the first view (Lunch's add is in it at
  * 360 x 740): calories left as the figure and "eaten of" the budget under it, the day's share button and a chevron
  * cup that opens the rest in place (`diary-summary-details`, `aria-expanded`): the day as a trough (eaten poured in
@@ -65,7 +72,13 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?
     // Under 360 px the card is slimmer (6 px above and below, a 24 px figure), so at 320 x 640 Lunch's add is in the first view.
     <Card testID="diary-summary" padding={0} style={{ paddingHorizontal: 16, paddingVertical: narrow && !big ? 6 : 14 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-        <View style={{ flex: 1, minWidth: 0 }}>
+        {/* One element for a screen reader, the units in full: "941 kilocalories left, 1,219 kilocalories eaten of 2,160 kilocalories". */}
+        <View
+          testID="diary-summary-figures"
+          style={{ flex: 1, minWidth: 0 }}
+          accessible
+          {...FIGURES}
+          accessibilityLabel={spokenUnits(`${kcal(Math.abs(day.remaining))} kcal ${over ? 'above the budget' : 'left'}, ${kcal(day.eaten.kcal)} kcal eaten of ${kcal(budget)} kcal`)}>
           <View style={{ flexDirection: 'row', flexWrap: big ? 'wrap' : 'nowrap', alignItems: 'baseline', columnGap: 6 }}>
             <AnimatedNumber
               variant="numXL"
@@ -85,6 +98,8 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?
             <Text variant="numM" style={{ fontSize: 14, lineHeight: 18 }}>
               {kcal(budget)}
             </Text>
+            {/* Units always shown: the budget is kilocalories too (its leading space holds it to the number). */}
+            {' kcal'}
           </Text>
         </View>
         {share}
@@ -104,7 +119,7 @@ export function DaySummaryCard({ day, share, action }: { day: DaySummary; share?
           {/* On a narrow phone a long exercise line moves under the target, whole, rather than squeezing both. */}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: spacing.md, rowGap: 4, marginTop: 10 }}>
             <Text variant="caption" color="textSecondary" tabular numberOfLines={1}>
-              {`Target ${kcal(day.target)}`}
+              {`Target ${kcal(day.target)} kcal`}
             </Text>
             {headroom > 0 || notAdded ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
@@ -252,9 +267,9 @@ function SaveHintRow({ meal, onSave, onClose }: { meal: MealType; onSave(): void
           scaleTo={0.985}
           accessibilityLabel={saveHintA11y(meal)}
           style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}>
-          {/* A fixed box, so a two-line label never squeezes the icon. */}
-          <View style={{ width: 16, height: 16 }}>
-            <Save size={16} color={colors.text} strokeWidth={2.2} />
+          {/* A fixed box, so a two-line label never squeezes the icon (18 px, the icons' least size). */}
+          <View style={{ width: 18, height: 18 }}>
+            <Save size={18} color={colors.text} strokeWidth={2.2} />
           </View>
           <Text variant="label" color="text" numberOfLines={2} style={{ flexShrink: 1, textDecorationLine: 'underline' }}>
             {saveHintLabel(meal)}
@@ -357,7 +372,16 @@ export function MealCard({
             {label}
           </Text>
           {entries.length > 0 ? (
-            <AnimatedNumber variant="numM" color="textSecondary" testID={`meal-total-${meal}`} value={total} format={kcal} style={{ fontSize: 15, lineHeight: 20 }}>
+            <AnimatedNumber
+              variant="numM"
+              color="textSecondary"
+              testID={`meal-total-${meal}`}
+              value={total}
+              format={kcal}
+              style={{ fontSize: 15, lineHeight: 20 }}
+              // Read as one element with its unit in full ("446 kilocalories"), never as drawn.
+              accessibilityLabel={`${kcal(total)} kilocalories`}
+              {...FIGURES}>
               <Text variant="unit">{' kcal'}</Text>
             </AnimatedNumber>
           ) : null}
@@ -427,7 +451,7 @@ export function MealCard({
               gap: 2,
             }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Plus size={16} color={colors.textSecondary} strokeWidth={2.2} />
+              <Plus size={18} color={colors.textSecondary} strokeWidth={2.2} />
               <Text variant="label" color="textSecondary">
                 Log {label.toLowerCase()}
               </Text>

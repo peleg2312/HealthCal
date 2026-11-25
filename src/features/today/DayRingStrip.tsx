@@ -6,7 +6,7 @@ import { diffDays, formatShortDate, fromISODate, startOfWeek } from '@/lib/dates
 import { useDays } from '@/store/selectors';
 import { cup, fonts, MAX_CONTENT_WIDTH, useLargeText, useTheme } from '@/theme';
 import type { ISODate } from '@/types';
-import { Chip, FadeUp, IconButton, ListRow, MiniCup, PressableScale, Sheet, Text, useReducedMotion } from '@/ui';
+import { ANDROID_TARGET, ANDROID_TOUCH, Chip, FadeUp, IconButton, ListRow, MiniCup, PressableScale, Sheet, Text, useReducedMotion } from '@/ui';
 
 import { DaySwipeGuard } from './useDaySwipe';
 import { dayCellLabel, dayRing, weekCaption, weekDates } from './week';
@@ -210,6 +210,7 @@ export function DayRingStrip({
   };
   const narrow = windowW < 360;
   const large = useLargeText();
+  const dayReach = dayTouchReach(width / 7);
   // Natively and on touch the arrows are not drawn: every day offers the same as actions.
   const weekActions = [
     ...(back < maxBack ? [{ name: 'previousWeek', label: 'Previous week' }] : []),
@@ -285,10 +286,9 @@ export function DayRingStrip({
                       accessibilityLabel={dayCellLabel(ring, today, summary)}
                       // A future day is drawn dashed; fading it as well would make its date unreadable.
                       dimDisabled={false}
-                      // A width in numbers (a seventh of the page, as flex: 1 drew it), so on Android the kit's touch rule
-                      // sees it and widens the touch area to 48 (2 px into each neighbour's; seven 48 px days need 336 px,
-                      // and the strip has 320 at 360): nothing is drawn or laid out differently.
-                      style={{ width: width / 7, minHeight: 44, alignItems: 'center', gap: 6, paddingBottom: 2 }}>
+                      // Android asks for 48: the day's touch area reaches 48 on the side of the day after it (DAY_REACH).
+                      hitSlop={dayReach}
+                      style={{ flex: 1, minHeight: 44, alignItems: 'center', gap: 6, paddingBottom: 2 }}>
                       <Text variant="label" color={isSelected ? 'text' : 'textSecondary'} style={{ fontSize: 12, lineHeight: 16, fontFamily: isSelected ? fonts.bold : fonts.semibold }}>
                         {LETTERS[i]}
                       </Text>
@@ -411,6 +411,18 @@ export function DayRingStrip({
 }
 
 const sentenceCase = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
+/**
+ * Android asks for 48 dp touch targets, and seven days have a seventh of the strip each: 45.7 px at 360, 44 at 320
+ * (seven 48 px days need 336 px, more than the strip has at 360 without spreading it into the margins). So on Android,
+ * and in an Android phone's browser used by touch, a day's touch area reaches past its right edge to 48 (with the kit's
+ * 2 px above and below its 44 px least height). It reaches into the next day's box, which comes later in the row and
+ * so keeps every tap inside it: no tap inside a day's drawn box ever goes to its neighbour, and nothing is drawn or
+ * laid out differently. Elsewhere, or where a day is 48 wide already (390 and wider), it adds nothing.
+ */
+function dayTouchReach(dayW: number): { right: number } | undefined {
+  return ANDROID_TOUCH && dayW > 0 && dayW < ANDROID_TARGET ? { right: Math.ceil(ANDROID_TARGET - dayW) } : undefined;
+}
 
 /** Whole weeks from the week holding `date` back to the week holding `today` (negative for a later week, down to -ahead). */
 function weeksBetween(date: ISODate, today: ISODate, ahead = 0): number {

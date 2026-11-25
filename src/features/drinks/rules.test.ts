@@ -9,6 +9,9 @@ import {
   builtinFood,
   choiceA11y,
   detailDrinkNote,
+  DRINK_ASK_ML,
+  DRINK_MAX_ML,
+  drinkAmountCheck,
   drinkGrams,
   drinkKcal,
   drinkMeal,
@@ -563,5 +566,34 @@ describe('a drink named in Hebrew in the drawn lines (lead\'s decision D3)', () 
     expect(p.label).not.toMatch(/[‎⁨⁩]/);
     expect(pickedToast(own())).toBe('Homemade lemonade chosen. Tap a glass to add it.');
     expect(planDrink(base()).line).not.toMatch(/[‎⁨⁩]/);
+  });
+});
+
+describe('an amount typed for one drink (D8-04: asked above 2 L, refused above 5 L)', () => {
+  it('a glass or a bottle up to 2 L goes in at once', () => {
+    expect(drinkAmountCheck(250, 'metric')).toEqual({ state: 'ok' });
+    expect(drinkAmountCheck(DRINK_ASK_ML, 'metric')).toEqual({ state: 'ok' });
+  });
+
+  it('more than 2 L is asked about once, in the person\'s units', () => {
+    expect(drinkAmountCheck(2500, 'metric')).toEqual({ state: 'ask', line: 'Is 2.5 L right for one drink? Tap Add again to add it.' });
+    expect(drinkAmountCheck(DRINK_MAX_ML, 'metric')).toEqual({ state: 'ask', line: 'Is 5 L right for one drink? Tap Add again to add it.' });
+    // 80 fl oz typed is about 2.37 L.
+    expect(drinkAmountCheck(volumeToMl(80, 'imperial'), 'imperial')).toEqual({ state: 'ask', line: 'Is 80 fl oz right for one drink? Tap Add again to add it.' });
+    // 67 fl oz is under 2 L: no question.
+    expect(drinkAmountCheck(volumeToMl(67, 'imperial'), 'imperial')).toEqual({ state: 'ok' });
+  });
+
+  it('more than 5 L is refused with the limit, as before', () => {
+    expect(drinkAmountCheck(5001, 'metric')).toEqual({ state: 'over', line: 'Up to 5 L at a time.' });
+    expect(drinkAmountCheck(volumeToMl(200, 'imperial'), 'imperial')).toEqual({ state: 'over', line: 'Up to 169 fl oz at a time.' });
+  });
+
+  it('the words name the number, never the person', () => {
+    for (const ml of [2500, 4000, 6000]) {
+      const c = drinkAmountCheck(ml, 'metric');
+      const line = c.state === 'ok' ? '' : c.line;
+      expect(line).not.toMatch(/\b(you drank|too much|wrong|bad|should|failed)\b|!/i);
+    }
   });
 });

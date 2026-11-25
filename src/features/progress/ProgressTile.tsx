@@ -43,7 +43,7 @@ export function ProgressTile({
   /** Null shows a dash. */
   value: string | null;
   unit?: string;
-  /** One line of context under the value, e.g. 'a day · budget 2,171'. */
+  /** One line of context under the value, e.g. 'a day · budget 2,171 kcal' (two at most). */
   caption?: string;
   /** The same line for a phone under 360 px, where a cell is about 108 px wide. */
   captionShort?: string;
@@ -105,8 +105,9 @@ export function ProgressTile({
         {value !== null ? <TrendMark trend={trend} period={period} /> : null}
       </View>
       {line ? (
-        // One line: what the number counts. The comparison is the triangle, and in full one tap away.
-        <Text variant="caption" color="textSecondary" numberOfLines={oneColumn || grown ? 3 : 1}>
+        // What the number counts, with its unit: one line, or two where the unit needs the room (the Calories
+        // tile's "budget 2,171 kcal" at 360 px). The comparison is the triangle, and in full one tap away.
+        <Text variant="caption" color="textSecondary" numberOfLines={oneColumn || grown ? 3 : 2}>
           {line}
         </Text>
       ) : null}

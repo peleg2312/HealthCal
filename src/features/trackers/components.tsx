@@ -1,7 +1,7 @@
 import { Redirect } from 'expo-router';
-import { ChevronDown, ChevronRight, ChevronUp, Info } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, ChevronUp } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { AccessibilityInfo, Platform, View, type StyleProp, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, Platform, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { DayStepper as FoodDayStepper } from '@/features/food/components';
 import { spokenUnits } from '@/lib/spokenUnits';
@@ -110,24 +110,28 @@ export function Figure({
 /**
  * Help behind an info control: one line that says what it explains, with the paragraph(s)
  * folded under it until asked for. The screen says one thing first; the "why" waits here.
- * The control is the kit's opener, a small ghost `Button` with the info mark, its chevron and
- * `expanded` (as every list's "Show all"), drawn without side padding so its words line up
- * with the card's text.
+ * The control is the kit's opener, a small ghost `Button` with its chevron and `expanded` (as
+ * every "Show all" and Progress's "The numbers"), drawn without side padding so its words line
+ * up with the card's text. A kit button keeps its label on one line, so a label too long for a
+ * 320 px card passes `labelShort`, its words under 360 px (as a tile's `captionShort`).
  */
-export function Explain({ label, children, testID, style }: { label: string; children: React.ReactNode; testID: string; style?: StyleProp<ViewStyle> }) {
+export function Explain({ label, labelShort, children, testID, style }: { label: string; labelShort?: string; children: React.ReactNode; testID: string; style?: StyleProp<ViewStyle> }) {
   const { colors, spacing } = useTheme();
   const [open, setOpen] = useState(false);
+  const narrow = useWindowDimensions().width < 360;
   const Chevron = open ? ChevronUp : ChevronDown;
+  const words = narrow && labelShort ? labelShort : label;
   return (
     <View style={style}>
+      {/* 36 px tall with 4 px above and below: the 44 px row it always was, its touch area 44 px too. */}
       <Button
         testID={testID}
-        title={label}
+        title={words}
+        accessibilityLabel={words}
         variant="ghost"
         size="sm"
         full={false}
         expanded={open}
-        icon={<Info size={18} color={colors.actionInk} strokeWidth={2.2} />}
         iconRight={<Chevron size={18} color={colors.actionInk} strokeWidth={2.2} />}
         onPress={() => setOpen((v) => !v)}
         style={{ paddingHorizontal: 0, marginVertical: 4 }}

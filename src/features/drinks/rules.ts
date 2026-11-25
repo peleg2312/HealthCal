@@ -357,6 +357,34 @@ export function enteredKcalError(kcal: number | null): string | null {
   return null;
 }
 
+// ---------------------------------------------------------------- an amount typed in
+
+/** The most one drink adds at a time (Water's "Other amount" and the sheet's entered calories): a hard limit. */
+export const DRINK_MAX_ML = 5000;
+/**
+ * Above this a typed amount is asked about once before it is added (D8-04, forgiving input): a slip of a nought
+ * (2500 for 250) is caught before it is stored, and a real two-litre bottle still goes in with a second press.
+ * 2 L is eight 250 ml glasses, more than any one drink the app offers.
+ */
+export const DRINK_ASK_ML = 2000;
+
+/** What a typed amount needs before it is added: nothing, one more press (`ask`), or a smaller amount (`over`). */
+export type DrinkAmountCheck = { state: 'ok' } | { state: 'ask'; line: string } | { state: 'over'; line: string };
+
+/**
+ * The check on an amount typed for one drink, in ml, with its words in the person's units:
+ * - more than `DRINK_MAX_ML`: refused, the limit said ("Up to 5 L at a time."), and Add waits;
+ * - more than `DRINK_ASK_ML`: asked once ("Is 2.5 L right for one drink? Tap Add again to add it."), drawn
+ *   under the field and tied to it, and a second press of Add with the same amount adds it;
+ * - else nothing to say.
+ * Neutral words: a question about the number typed, never about the person.
+ */
+export function drinkAmountCheck(ml: number, units: UnitSystem): DrinkAmountCheck {
+  if (ml > DRINK_MAX_ML) return { state: 'over', line: `Up to ${formatVolume(DRINK_MAX_ML, units)} at a time.` };
+  if (ml > DRINK_ASK_ML) return { state: 'ask', line: `Is ${formatVolume(ml, units)} right for one drink? Tap Add again to add it.` };
+  return { state: 'ok' };
+}
+
 /** The toast after a drink is picked in the sheet: nothing is logged until a glass is tapped. A Hebrew or Arabic name is isolated (drawn text; the toast announces it without the marks). */
 export function pickedToast(food: Pick<Food, 'name'>): string {
   return `${isolateRtl(food.name)} chosen. Tap a glass to add it.`;
