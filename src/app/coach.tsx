@@ -69,7 +69,7 @@ import { useNow, useToday } from '@/store/clock';
 import { useDay, useLive } from '@/store/selectors';
 import { useTheme } from '@/theme';
 import type { ISODate } from '@/types';
-import { AnimatedItem, AnimatedList, Chip, FadeUp, haptic, Header, IconButton, isReducedMotion, Screen, Text, TextField, toast, useReducedMotion } from '@/ui';
+import { AnimatedItem, AnimatedList, Chip, FadeUp, figure, haptic, Header, IconButton, isReducedMotion, Screen, Text, TextField, toast, useReducedMotion } from '@/ui';
 
 /**
  * The coach (`/coach`, a task screen that rises from the bottom; spec r14): a greeting from the coach's
@@ -555,7 +555,7 @@ export default function CoachScreen() {
               </Text>
               {showLine ? (
                 // The week and today on a line each, centred (one sentence for a screen reader).
-                <Text variant="body" color="textSecondary" align="center" numberOfLines={2} testID="coach-hello-line" accessibilityLabel={spokenUnits(line)} style={{ maxWidth: 320 }}>
+                <Text variant="body" color="textSecondary" align="center" numberOfLines={2} testID="coach-hello-line" {...figure(spokenUnits(line))} style={{ maxWidth: 320 }}>
                   {line.split(' · ').join('\n')}
                 </Text>
               ) : null}

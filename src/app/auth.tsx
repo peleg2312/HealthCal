@@ -31,7 +31,7 @@ import { sendPasswordReset, signIn, signUp, updatePassword, useAuth, validateEma
 import { isBackendConfigured } from '@/services/supabase';
 import { useStore } from '@/store';
 import { useTextSize, useTheme } from '@/theme';
-import { Avatar, Button, decorative, goBack, haptic, Header, IconButton, PressableScale, Screen, Text, TextField, toast } from '@/ui';
+import { Avatar, Button, decorative, figure, goBack, haptic, Header, IconButton, PressableScale, Screen, Text, TextField, toast } from '@/ui';
 
 type Mode = 'signin' | 'signup' | 'forgot';
 
@@ -437,7 +437,7 @@ function Inbox({ confirm, email, googleHint, onBack }: { confirm: boolean; email
         {/* An address used only with Google gets no mail (a sign-up link or a reset link): the same line for everyone, so it says nothing about the address. */}
         {googleHint ? (
           // The button's name stays on one line, so the hint never ends on "Google." alone.
-          <Text variant="caption" color="textSecondary" align="center" testID="auth-done-google" accessibilityLabel={googleHint}>
+          <Text variant="caption" color="textSecondary" align="center" testID="auth-done-google" {...figure(googleHint)}>
             {nameTogether(googleHint, GOOGLE_LABEL)}
           </Text>
         ) : null}

@@ -19,14 +19,19 @@
  * logDrink). The pinned button is there only while those fields are open, and says what it will do
  * before the tap ("Add 140 kcal to lunch"); the sheet never opens on a disabled button. The amount is held to
  * Water's "Other amount" rule (`drinkAmountCheck`): above 5 L the field says so and Add waits; above 2 L the
- * first press asks, under the fields, and a second press adds. Typed calories or a changed amount are not
- * dropped without asking ("Discard this drink?", the Sheet's `unsaved`).
+ * first press asks, under the fields, and a second press adds. The calories are held to quick add's soft check
+ * (`quickKcalAsks`, above `ENTRY_KCAL_CHECK`): the first press asks under the fields in its words ("Is 5,000 kcal
+ * right for one entry? Tap Add again to add it."), tied to the Calories field, and a second press adds. Typed
+ * calories or a changed amount are not dropped without asking ("Discard this drink?", the Sheet's `unsaved`).
  */
 import { ChevronDown, ChevronUp, Search, X } from 'lucide-react-native';
 import React, { useDeferredValue, useEffect, useId, useMemo, useState } from 'react';
 import { AccessibilityInfo, Platform, useWindowDimensions, View } from 'react-native';
 
+import { AskLine, askTie } from '@/features/food/AskLine';
+import { kcalAsk, pressFor, quickKcalAsks, waitsFor } from '@/features/food/softCheck';
 import { resolveFood } from '@/features/food/usuals';
+import { spokenUnits } from '@/lib/spokenUnits';
 import { searchLocal, searchOnlineWithStatus } from '@/services/foodSearch';
 import { onlineSearchAvailable } from '@/services/openFoodFacts';
 import { useStore } from '@/store';
@@ -74,6 +79,9 @@ export function DrinkPickSheet({
   // The amount (ml) asked about with "Tap Add again" (`drinkAmountCheck`); another amount is asked afresh.
   const [askedMl, setAskedMl] = useState<number | null>(null);
   const askId = `water-pick-ask-${useId().replace(/[^A-Za-z0-9_-]/g, '')}`;
+  // The calories asked about with "Tap Add again" (`quickKcalAsks`, quick add's soft check); other calories ask afresh.
+  const [askedKcal, setAskedKcal] = useState<number | null>(null);
+  const kcalAskId = `water-pick-kcal-ask-${useId().replace(/[^A-Za-z0-9_-]/g, '')}`;
   const [showAll, setShowAll] = useState(false);
   const [online, setOnline] = useState<OnlineAnswer | null>(null);
   const [wasVisible, setWasVisible] = useState(visible);
@@ -87,6 +95,7 @@ export function DrinkPickSheet({
       setKcalTyped(null);
       setEntering(false);
       setAskedMl(null);
+      setAskedKcal(null);
     }
   }
 
@@ -126,6 +135,8 @@ export function DrinkPickSheet({
   const amountCheck = amountMl > 0 ? drinkAmountCheck(amountMl, units) : null;
   const askLine = amountCheck?.state === 'ask' && askedMl === amountMl ? amountCheck.line : null;
   const canAdd = !!(amount && amount > 0 && kcalTyped && kcalTyped > 0 && !kcalError && amountCheck?.state !== 'over');
+  const kcalAsks = quickKcalAsks(kcalTyped);
+  const kcalAskLine = kcalTyped !== null && waitsFor(kcalAsks, kcalTyped, askedKcal) ? kcalAsk(kcalTyped, false) : null;
   // Something typed and not added: closing by the backdrop, a drag, Escape or back asks first.
   const unsaved = entering && (kcalTyped !== null || amount !== glassShown);
 
@@ -148,6 +159,13 @@ export function DrinkPickSheet({
                 setAskedMl(amountMl);
                 haptic.warn();
                 if (Platform.OS !== 'web') AccessibilityInfo.announceForAccessibility(amountCheck.line);
+                return;
+              }
+              // More than one plausible entry's calories: asked once, as quick add asks; the same calories again go in.
+              if (pressFor(kcalAsks, kcalTyped, askedKcal) === 'ask') {
+                setAskedKcal(kcalTyped);
+                haptic.warn();
+                if (Platform.OS !== 'web') AccessibilityInfo.announceForAccessibility(spokenUnits(kcalAsk(kcalTyped, false)));
                 return;
               }
               onEntered(amount, kcalTyped);
@@ -216,6 +234,7 @@ export function DrinkPickSheet({
                 error={kcalError}
                 style={{ flex: 1 }}
                 accessibilityLabel="Calories in kcal"
+                {...(kcalAskLine ? askTie(kcalAskId, kcalAskLine) : null)}
               />
             </View>
             {/* Kept mounted while the fields are open (a polite live region), so the question is read as it appears. */}
@@ -224,6 +243,11 @@ export function DrinkPickSheet({
                 <Text testID="water-pick-ask" nativeID={askId} variant="body" color="textSecondary" style={{ marginTop: 6 }}>
                   {askLine}
                 </Text>
+              ) : null}
+              {kcalAskLine ? (
+                <View style={{ marginTop: 6 }}>
+                  <AskLine id={kcalAskId} line={kcalAskLine} testID="water-pick-kcal-ask" />
+                </View>
               ) : null}
             </View>
           </View>

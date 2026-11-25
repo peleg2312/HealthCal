@@ -30,9 +30,18 @@ import { builtinFood, planDrink, selectChoice, waterFromEntry, type PlanDrinkInp
 import { buildEntry } from '@/features/food/build';
 
 const TODAY = today();
+/**
+ * The clock a drink is logged at: today at 16:00, a snack hour, fixed so the drink's meal (`drinkMeal`, mealForTime
+ * at the log) is "snacks" whatever hour the tests run at. Stamps (`updatedAt`) still come from the real clock.
+ */
+const AT_SNACK_TIME = (() => {
+  const d = new Date();
+  d.setHours(16, 0, 0, 0);
+  return d;
+})();
 const sel = (id: string): SelectedDrink => selectChoice(choiceById(id)!);
 const plan = (over: Partial<PlanDrinkInput> = {}) =>
-  planDrink({ kind: 'milk', drink: sel('milk_semi'), ml: 250, date: TODAY, now: new Date(), today: TODAY, units: 'metric', ...over });
+  planDrink({ kind: 'milk', drink: sel('milk_semi'), ml: 250, date: TODAY, now: AT_SNACK_TIME, today: TODAY, units: 'metric', ...over });
 const last = () => toasts[toasts.length - 1];
 const undo = () => last().opts!.onPress!();
 const S = () => useStore.getState();

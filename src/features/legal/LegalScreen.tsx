@@ -6,7 +6,7 @@ import { AccessibilityInfo, findNodeHandle, Platform, useWindowDimensions, View,
 import { AiMark, aiMarkHeadroom } from '@/features/ai/mark';
 import { lastWordsTogether } from '@/features/auth/lines';
 import { MAX_CONTENT_WIDTH, useReducedMotion, useTheme } from '@/theme';
-import { Button, Card, DECORATIVE, Divider, Header, ListRow, PressableScale, Screen, Text } from '@/ui';
+import { Button, Card, DECORATIVE, Divider, figure, Header, ListRow, PressableScale, Screen, Text } from '@/ui';
 
 import { contactLine, jumpLabel, LEGAL_DOCUMENTS, updatedLine, type LegalDocument } from './content';
 import { jumpLines, jumpWidth } from './jumpLines';
@@ -115,7 +115,7 @@ export function LegalScreen({ doc }: { doc: LegalDocument }) {
                 ) : null}
               </View>
               {/* The last two words stay together, so a line never ends on one word alone at any width. */}
-              <Text variant="body" style={{ flex: 1 }} accessibilityLabel={item.text}>
+              <Text variant="body" style={{ flex: 1 }} {...figure(item.text)}>
                 {lastWordsTogether(item.text)}
               </Text>
             </View>

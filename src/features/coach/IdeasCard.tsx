@@ -8,7 +8,7 @@ import { spokenUnits } from '@/lib/spokenUnits';
 import { formatNumber } from '@/lib/units';
 import { useLargeText, useTheme } from '@/theme';
 import type { MealType } from '@/types';
-import { Button, Divider, IconButton, Text } from '@/ui';
+import { Button, Divider, figure, IconButton, Text } from '@/ui';
 
 import { FEW_LEFT_ANSWER, IDEA_ADDED, ideaAddLabel, ideasHead, SEE_ALL_FITS } from './words';
 
@@ -55,7 +55,7 @@ export function IdeasCard({
                   <Text variant="bodyStrong" numberOfLines={1}>
                     {isolateRtl(idea.name)}
                   </Text>
-                  <Text variant="caption" color="textSecondary" accessibilityLabel={spokenUnits(`${formatNumber(Math.round(idea.kcal))} kcal · P ${Math.round(idea.protein)} g`)}>
+                  <Text variant="caption" color="textSecondary" {...figure(spokenUnits(`${formatNumber(Math.round(idea.kcal))} kcal · P ${Math.round(idea.protein)} g`))}>
                     {`${formatNumber(Math.round(idea.kcal))} kcal · P ${Math.round(idea.protein)} g`}
                   </Text>
                   {row.kind === 'dim' ? (

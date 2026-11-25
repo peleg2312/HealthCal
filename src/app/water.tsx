@@ -44,6 +44,7 @@ import {
   DECORATIVE,
   Divider,
   EmptyState,
+  figure,
   haptic,
   Header,
   IconButton,
@@ -435,7 +436,7 @@ function WaterScreen() {
       testID="water-consumed"
       value={consumed}
       format={(ml) => volumeNumber(ml, consumed, units)}
-      accessibilityLabel={spokenUnits(`${formatVolume(consumed, units)} drunk`)}>
+      {...figure(spokenUnits(`${formatVolume(consumed, units)} drunk`))}>
       <Text variant="unit">{` ${volumeUnitFor(consumed, units)}`}</Text>
       <Text variant="body" color="textSecondary" style={{ fontSize: 14 }}>
         {'  drunk'}
@@ -525,7 +526,7 @@ function WaterScreen() {
               variant="numL"
               value={left}
               format={(ml) => volumeNumber(ml, left, units, leftLitreDecimals(left))}
-              accessibilityLabel={spokenUnits(`${formatVolume(left, units)} left to drink, about ${glassesLeft(landing?.left ?? left, glassMl)} × ${formatVolume(glassMl, units)}`)}
+              {...figure(spokenUnits(`${formatVolume(left, units)} left to drink, about ${glassesLeft(landing?.left ?? left, glassMl)} × ${formatVolume(glassMl, units)}`))}
             />
             <Text variant="unit" style={{ fontSize: 15, flexShrink: 1 }}>
               {`${volumeUnitFor(left, units)} left, `}

@@ -7,6 +7,7 @@ import { withoutMarks } from '@/lib/bidi';
 import { spokenUnits } from '@/lib/spokenUnits';
 import { cup, isReducedMotion, MAX_CONTENT_WIDTH, motion, useLargeText, useTheme, type ThemeColors } from '@/theme';
 
+import { figure } from './decorative';
 import { type ControlBox, TOAST_CLEAR, TOAST_GAP, toastBand, toastBottom, toastPlaceAmong, toastReachTop, toastSpot, type WindowBox } from './keyboardInset';
 import { PressableScale } from './Pressable';
 import { Text } from './Text';
@@ -624,7 +625,7 @@ export function ToastHost({ placement = 'screen' }: { placement?: 'screen' | 'sh
           style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 3, borderTopLeftRadius: radius.shoulder, borderTopRightRadius: radius.shoulder, backgroundColor: tint ? ((colors as unknown as Record<string, string>)[tint] ?? tint) : colors.primary }}
         />
         <View pointerEvents="none" style={{ flexShrink: 1 }}>
-          <Text variant="label" color={colors.bg} accessibilityLabel={spokenUnits(withoutMarks(message))}>
+          <Text variant="label" color={colors.bg} {...figure(spokenUnits(withoutMarks(message)))}>
             {drawn}
           </Text>
         </View>

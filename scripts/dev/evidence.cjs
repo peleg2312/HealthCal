@@ -1009,11 +1009,13 @@ function headerScan() {
 
 /**
  * Runs in the page: whether a toast now on screen covers a control. With a sheet open the
- * sheet's controls are judged; otherwise those in a pinned footer and the tab bar (content
- * that scrolls under a toast is not, it moves). A control is measured by the part of it that
- * shows: its box cut by every ancestor whose overflow is not visible (a sheet's scrolling body),
- * so a tile scrolled up out of the body, under the sheet's title, is not "covered" by a toast
- * resting just above the sheet.
+ * sheet's controls are judged; otherwise every control of the focused screen (the screen whose
+ * content lies under the toast: its scroll area, its pinned header and footer) and the tab bar.
+ * A control is measured by the part of it that shows: its box cut by every ancestor whose
+ * overflow is not visible (a scroll area, a sheet's scrolling body), so a row scrolled out of the
+ * scroll area's view (a screen that ended its scroll area above the toast, as the kit does when
+ * no band is clear) or a tile scrolled up out of a sheet's body, under its title, is not
+ * "covered" by a toast resting over it.
  */
 function toastScan() {
   const t = document.querySelector('[data-testid="toast"]');
@@ -1024,7 +1026,24 @@ function toastScan() {
   const out = [];
   if (tr.top < -0.5) out.push(`toast "${msg}" ${Math.round(-tr.top)}px above the screen`);
   const sheet = [...document.querySelectorAll('[data-testid="sheet"]')].pop();
-  const roots = sheet ? [sheet] : [...document.querySelectorAll('[data-testid="screen-footer"], [data-testid="tab-bar"]')];
+  const visibleBox = (el) => {
+    const b = el.getBoundingClientRect();
+    return b.width > 0 && b.height > 0 && (!el.checkVisibility || el.checkVisibility({ opacityProperty: true, visibilityProperty: true }));
+  };
+  // The focused screen: the one whose content is under the toast (tab screens stay mounted, a pushed screen covers
+  // the one under it), else the last one drawn.
+  const focusedScreen = () => {
+    const screens = [...document.querySelectorAll('[id^="screen-"]')].filter((el) => visibleBox(el) && !el.closest('[data-testid="sheet"]'));
+    const x = (tr.left + tr.right) / 2;
+    for (const y of [(tr.top + tr.bottom) / 2, tr.top - 2, tr.bottom + 2]) {
+      const under = document.elementsFromPoint(x, y).find((el) => !t.contains(el));
+      const own = under && screens.find((sc) => sc.contains(under));
+      if (own) return own;
+    }
+    return screens.pop() || null;
+  };
+  const screen = sheet ? null : focusedScreen();
+  const roots = sheet ? [sheet] : [...(screen ? [screen] : document.querySelectorAll('[data-testid="screen-footer"]')), ...document.querySelectorAll('[data-testid="tab-bar"]')];
   const isControl = (el) => el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || ['button', 'link', 'switch', 'tab', 'checkbox', 'radio', 'slider'].includes(el.getAttribute('role'));
   // What of a control shows: its box cut by every ancestor that clips its content (overflow not visible,
   // per axis), up to a fixed box, which no ancestor above it clips. Measured inside the ancestor's border.
@@ -1049,8 +1068,11 @@ function toastScan() {
     }
     return r;
   };
+  const judged = new Set();
   for (const root of roots) {
     for (const el of root.querySelectorAll('*')) {
+      if (judged.has(el)) continue;
+      judged.add(el);
       if (!isControl(el) || t.contains(el) || el.contains(t)) continue;
       if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
       const r = shown(el);

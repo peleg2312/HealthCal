@@ -192,7 +192,7 @@ export function PlanReveal({ plan, now, onChangeAnswers }: { plan: Plan; now: Da
                   {String(m.grams)}
                   <Text variant="unit"> g</Text>
                 </Text>
-                <Text variant="caption" color="textSecondary" numberOfLines={1} accessibilityLabel={`${Math.round(m.share * 100)}% of calories`}>
+                <Text variant="caption" color="textSecondary" numberOfLines={1} {...figure(`${Math.round(m.share * 100)}% of calories`)}>
                   {/* Three columns on a small phone have no room for the words; the bar above them says what the share is of. */}
                   {narrow ? `${Math.round(m.share * 100)}%` : `${Math.round(m.share * 100)}% of calories`}
                 </Text>

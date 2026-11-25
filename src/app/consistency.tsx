@@ -11,7 +11,7 @@ import { spokenUnits } from '@/features/progress/chartWords';
 import { go } from '@/features/progress/parts';
 import { setRhythmTarget, useConsistencyData } from '@/features/progress/useConsistencyData';
 import { useLargeText, useTheme, withOpacity } from '@/theme';
-import { AnimatedNumber, BarChart, Button, Card, CupKey, EmptyState, Header, IconButton, MiniCup, Screen, Sheet, Stepper, Text } from '@/ui';
+import { AnimatedNumber, BarChart, Button, Card, CupKey, EmptyState, figure, Header, IconButton, MiniCup, Screen, Sheet, Stepper, Text } from '@/ui';
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const RHYTHM_WEEKS = 8;
@@ -185,7 +185,7 @@ export default function ConsistencyScreen() {
               marginTop: spacing.xs,
             }}>
             {/* Ticks up from zero the first time the page opens this session. It reads as "33 days", so the word beside it is hidden from screen readers. */}
-            <AnimatedNumber variant="display" value={streak} from={0} memoryKey="consistency-streak" testID="consistency-streak" accessibilityLabel={`${streak} ${word(streak, 'day')}`} />
+            <AnimatedNumber variant="display" value={streak} from={0} memoryKey="consistency-streak" testID="consistency-streak" {...figure(`${streak} ${word(streak, 'day')}`)} />
             <Text variant="h3" aria-hidden>
               {word(streak, 'day')}
             </Text>

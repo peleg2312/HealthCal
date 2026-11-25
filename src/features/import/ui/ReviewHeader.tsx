@@ -6,7 +6,7 @@ import { INTENSITY_LABELS } from '@/lib/exercise';
 import { formatNumber } from '@/lib/units';
 import { useTheme } from '@/theme';
 import type { Intensity } from '@/types';
-import { Card, Chip, CupKey, decorative, Divider, PressableScale, Text } from '@/ui';
+import { Card, Chip, CupKey, decorative, Divider, figure, PressableScale, Text } from '@/ui';
 
 import type { FileNote, RowCounts, RowFilter } from './format';
 import { workouts } from './format';
@@ -68,7 +68,7 @@ export function SummaryCard({ counts, addedKcal, csvLine, onChangeCsv }: { count
           variant="caption"
           color="textSecondary"
           testID="import-net-note"
-          accessibilityLabel="Garmin’s calories include what your body burns at rest anyway. Only the part above resting counts, so nothing is counted twice.">
+          {...figure("Garmin’s calories include what your body burns at rest anyway. Only the part above resting counts, so nothing is counted twice.")}>
           Only the part above resting counts, so nothing counts twice.
         </Text>
       )}

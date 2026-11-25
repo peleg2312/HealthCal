@@ -29,7 +29,7 @@ import { syncNow, useSyncState } from '@/services/sync';
 import { pendingChanges, useStore } from '@/store';
 import { useNow } from '@/store/clock';
 import { fonts, MAX_CONTENT_WIDTH, useTheme } from '@/theme';
-import { Button, Card, ConfirmSheet, CupKey, DECORATIVE, Divider, Header, ListRow, Screen, Sheet, Text, toast } from '@/ui';
+import { Button, Card, ConfirmSheet, CupKey, DECORATIVE, Divider, figure, Header, ListRow, Screen, Sheet, Text, toast } from '@/ui';
 
 /** The words of the delete confirmation: what is erased. With a plan held, the plan's line stands over them, set apart. */
 const DELETE_ERASES =
@@ -172,7 +172,7 @@ function SignedOut() {
             ) : null}
             {/* One name for one action: "Sign in", as welcome and the form say it. */}
             <Button testID="account-signin" title={SIGN_IN} variant="secondary" onPress={() => router.push('/auth?mode=signin' as never)} />
-            <Text variant="caption" color="textSecondary" align="center" accessibilityLabel={ACCOUNT_UPLOAD_LINE}>
+            <Text variant="caption" color="textSecondary" align="center" {...figure(ACCOUNT_UPLOAD_LINE)}>
               {lastWordsTogether(ACCOUNT_UPLOAD_LINE)}
             </Text>
           </View>
@@ -283,7 +283,7 @@ function SignedIn({ email }: { email: string }) {
             alignItems: 'center',
           }}>
           <InitialsAvatar name={name} size={48} />
-          <Text variant="body" numberOfLines={3} testID="account-email" accessibilityLabel={email} style={{ flex: 1, minWidth: 0, fontFamily: fonts.semibold }}>
+          <Text variant="body" numberOfLines={3} testID="account-email" {...figure(email)} style={{ flex: 1, minWidth: 0, fontFamily: fonts.semibold }}>
             {breakableEmail(email)}
           </Text>
         </View>
@@ -317,7 +317,7 @@ function SignedIn({ email }: { email: string }) {
               <Text variant="caption" color={sync.status === 'error' ? 'warningInk' : 'text'} testID="account-sync-status" accessibilityLiveRegion="polite" accessibilityLabel={status}>
                 {lastWordsTogether(status)}
               </Text>
-              <Text variant="caption" color="textSecondary" testID="account-sync-pending" accessibilityLabel={syncPendingLine(pending)}>
+              <Text variant="caption" color="textSecondary" testID="account-sync-pending" {...figure(syncPendingLine(pending))}>
                 {lastWordsTogether(syncPendingLine(pending))}
               </Text>
             </View>

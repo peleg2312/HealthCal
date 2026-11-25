@@ -27,7 +27,7 @@ import { useNow, useToday } from '@/store/clock';
 import { computeDayFromStore, live, useLive, useProfile } from '@/store/selectors';
 import { cup, useLargeText, useTheme } from '@/theme';
 import type { Food, FoodEntry, ISODate, SavedMeal } from '@/types';
-import { Button, CupKey, PressableScale, Sheet, Text, toastToScreen } from '@/ui';
+import { Button, CupKey, PressableScale, Sheet, Text, toastToScreen, useShortWindow } from '@/ui';
 
 /** Re-log a usual food in its last portion. Entries with a food definition go through logFood so recents stay fresh. */
 function logUsual(u: UsualFood, date: ISODate) {
@@ -55,8 +55,6 @@ function oneTapThenClose(log: () => void, close: () => void) {
 }
 
 /** A food or meal tile's width in the row of likely next logs; wider with large text, so a word fits a line. */
-/** Under this window height the + sheet pins nothing: its footer (about 380 px) would leave the ways in no room. */
-const SHORT_WINDOW = 600;
 const TILE_W = 136;
 const TILE_W_BIG = 216;
 
@@ -124,16 +122,18 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
     void loadSearchTab();
   }, []);
   // Under 360 px a half tile has no room for the icon beside its name ("Snap a" / "meal"): the icon goes above it.
-  const { width: winW, height: winH } = useWindowDimensions();
+  const { width: winW } = useWindowDimensions();
   const narrow = winW < 360;
   // Large text (Profile's text size, or the phone's): the food tiles grow wider, every way in is a whole row,
   // and nothing is pinned (the likely next log leads the body instead), so no word is split and nothing is cut
   // by the bottom of the screen.
   const big = useLargeText();
   const tileW = big ? TILE_W_BIG : TILE_W;
-  // A window too short for the pinned footer and some body (a phone held sideways, a browser zoomed to 400%):
-  // nothing is pinned, as with large text, so every way in scrolls into reach (WCAG 1.4.10).
-  const unpinned = big || winH < SHORT_WINDOW;
+  // A window too short for the pinned footer (about 380 px) and some body (`useShortWindow`, the kit's
+  // `SHORT_WINDOW`: a phone held sideways, a browser zoomed to 400%): nothing is pinned, as with large text, so
+  // every way in scrolls into reach (WCAG 1.4.10).
+  const short = useShortWindow();
+  const unpinned = big || short;
   const glasses = [...presets]
     .filter((p) => p > 0)
     .sort((a, b) => a - b)

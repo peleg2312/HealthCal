@@ -215,7 +215,7 @@ export function InviteCard({ code, sharing, onShare, onCopy, onSettings }: { cod
         selectable
         numberOfLines={1}
         adjustsFontSizeToFit
-        accessibilityLabel={`Your invite code: ${c.split('').join(' ')}`}
+        {...figure(`Your invite code: ${c.split('').join(' ')}`)}
         style={{ fontFamily: fonts.extrabold, fontSize: size, lineHeight: size + 8, letterSpacing: size / 30, marginTop: spacing.xs, fontVariant: ['tabular-nums'] }}>
         {c.slice(0, 4)}
         <Text color="textSecondary" style={{ fontFamily: fonts.extrabold, fontSize: size }}>

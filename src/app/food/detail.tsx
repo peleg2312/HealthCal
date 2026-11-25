@@ -363,7 +363,8 @@ function MacroSummary({ n, kcalNote, range, updated }: { n: Nutrients; kcalNote:
         </Text>
       </View>
       {range ? (
-        <Text variant="caption" color="textSecondary" tabular testID="detail-kcal-range">
+        // Stacked, the portion's words sit right above this line: the room two blocks keep (8 px between letters).
+        <Text variant="caption" color="textSecondary" tabular testID="detail-kcal-range" style={stack ? { marginTop: spacing.xs } : undefined}>
           {estimateBandText(range)}
         </Text>
       ) : null}
