@@ -787,7 +787,7 @@ export function RoutineStep({ draft, set, errors }: StepProps) {
 
   return (
     <Group gap={spacing.xl}>
-      <StepTitle title="Nudges that help" subtitle="Optional. Silent once the goal is met." />
+      <StepTitle title="Nudges that help" subtitle="Optional. Silent once the goal is reached." />
       <Group gap={spacing.sm}>
         {NUDGES.map((n) => (
           <NudgeCard

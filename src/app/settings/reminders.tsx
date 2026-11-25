@@ -112,7 +112,7 @@ export default function RemindersScreen() {
         </Card>
       ) : null}
 
-      <Group title="Water" footer={`Says what is left, with ${waterButtons} buttons. None once the goal is met.`}>
+      <Group title="Water" footer={`Says what is left, with ${waterButtons} buttons. None once the goal is reached.`}>
         <ToggleRow
           testID="reminders-water"
           title="Water reminders"
