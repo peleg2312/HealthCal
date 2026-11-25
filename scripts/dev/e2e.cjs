@@ -2535,8 +2535,8 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
       await ctx.close();
     }
 
-    // 3. The + sheet: the meal's first usual food leads, then the favourite meals, both inside the first view; a saved
-    // estimate reads "~" and logs with its ranges.
+    // 3. The + sheet: the meal's first usual food leads its three likely rows, then the favourite meals, all inside the
+    // first view; a saved estimate reads "~" and logs with its ranges.
     {
       const { ctx, p } = await favOpen({ favoriteMeal: 1, savedEstimate: 2 });
       await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
@@ -2546,7 +2546,7 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
       const box = await p.getByTestId('quick-fav-meal-0').first().boundingBox();
       check('favourites: the + sheet\'s newest favourite meal follows the first usual food, wholly inside the first view at 360 x 740', box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 360 && box.y + box.height <= 740 && (await ftext(p, 'quick-fav-meal-0')).includes('Chicken and rice bowl'), box ? `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)}` : 'no tile');
       const title = await ftext(p, 'quick-usual-title');
-      check('favourites: the row is titled "Usual for … and favourites" and the second favourite follows', /^Usual for (breakfast|lunch|dinner|a snack|snacks?) and favourites$/i.test(title) && (await ftext(p, 'quick-fav-meal-1')).includes('Usual breakfast') && (await p.getByTestId('quick-usual-saved').count()) === 0, title);
+      check('favourites: the rows are titled "Usual and favourites" (the meal is in the sheet\'s title) and the second favourite follows', /^Usual and favourites$/i.test(title) && (await ftext(p, 'quick-fav-meal-1')).includes('Usual breakfast') && (await p.getByTestId('quick-usual-saved').count()) === 0, title);
       const cap = await ftext(p, 'quick-fav-meal-0-caption');
       check('favourites: the saved estimate\'s tile reads "~" before its calories ("3 items, ~592 kcal")', /^3 items, ~[\d,]+ kcal$/.test(cap), cap);
       const before = new Set(Object.keys((await fstate(p)).foodEntries));
@@ -2610,8 +2610,8 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
       await ctx.close();
     }
 
-    // 6. The + sheet with favourite foods only (the demo stars two): the meal's first usual food leads the row, then the
-    // favourite foods, both inside the first view; an AI food starred reads "~" and "about" (fixer two, T2 and T3).
+    // 6. The + sheet with favourite foods only (the demo stars two): the meal's first usual food leads the three likely
+    // rows, then the favourite foods, all inside the first view; an AI food starred reads "~" and "about" (fixer two, T2 and T3).
     {
       const { ctx, p } = await favOpen();
       await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
@@ -2622,23 +2622,24 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
       const lefts = await p.evaluate(() =>
         [...document.querySelectorAll('[data-testid^="quick-fav-"], [data-testid^="quick-usual-"]')]
           .filter((e) => !/-caption$/.test(e.getAttribute('data-testid')) && e.getAttribute('data-testid') !== 'quick-usual-title' && e.getBoundingClientRect().width > 100)
-          .map((e) => ({ id: e.getAttribute('data-testid'), x: Math.round(e.getBoundingClientRect().left) }))
-          .sort((a, b) => a.x - b.x),
+          .map((e) => ({ id: e.getAttribute('data-testid'), y: Math.round(e.getBoundingClientRect().top) }))
+          .sort((a, b) => a.y - b.y),
       );
       check(
         'favourites: with favourite foods only, the + sheet leads with the first usual food and then a favourite food, both wholly inside 360 x 740',
-        !!box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 360 && box.y + box.height <= 740 && lefts[0]?.id.startsWith('quick-usual-') && lefts[0].x >= 0 && lefts[1]?.id === 'quick-fav-food-0',
+        !!box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 360 && box.y + box.height <= 740 && lefts[0]?.id.startsWith('quick-usual-') && lefts[0].y >= 0 && lefts[1]?.id === 'quick-fav-food-0' && lefts.length <= 3,
         `${box ? `${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)}x${Math.round(box.height)}` : 'no tile'} | ${lefts.map((l) => l.id).join(', ')}`,
       );
       const title = await ftext(p, 'quick-usual-title');
-      check('favourites: the row is titled "Usual for … and favourites" (the groups in the order drawn)', /^Usual for (breakfast|lunch|dinner|a snack|snacks?) and favourites$/i.test(title), title);
+      check('favourites: the rows are titled "Usual and favourites" (the groups in the order drawn)', /^Usual and favourites$/i.test(title), title);
       const favIds = (await fstate(p)).favoriteFoodIds;
       const usualShown = lefts.filter((l) => l.id.startsWith('quick-usual-')).map((l) => l.id.slice('quick-usual-'.length));
       const favTiles = lefts.filter((l) => l.id.startsWith('quick-fav-food-')).length;
-      // The first usual food may be a favourite too: it is then the usual tile only, and the favourite tiles are the others.
+      // The first usual food may be a favourite too: it is then the usual row only, and the favourite rows are the others,
+      // as many as the three rows leave beside it.
       check(
-        'favourites: a favourite food is shown once, never again as a usual tile',
-        usualShown.length > 0 && usualShown.slice(1).every((k) => !favIds.includes(k)) && favTiles === Math.min(3, favIds.filter((id) => id !== usualShown[0]).length),
+        'favourites: a favourite food is shown once, never again as a usual row',
+        usualShown.length > 0 && usualShown.slice(1).every((k) => !favIds.includes(k)) && favTiles === Math.min(2, favIds.filter((id) => id !== usualShown[0]).length),
         `${usualShown.join(', ')} | ${favTiles} favourite tiles`,
       );
       // An AI food starred (as a long press on its diary row does): its tile reads "~" and "about".
@@ -2800,6 +2801,59 @@ const num = (text) => Number(String(text).replace(/[^0-9.\-]/g, ''));
     const bad = tries.filter((t) => !t.ok);
     check("a sheet's row that opens a screen: + then Search food opens search every time, and one Back returns to Today", bad.length === 0, `${tries.length - bad.length} of ${tries.length}${bad.length ? `; ${JSON.stringify(bad[0])}` : ''}`);
     await nctx.close();
+  }
+
+  // ------------------------------------------- the + sheet in one view (src/components/QuickLogSheet.tsx, src/features/food/quickSheet.ts)
+  // At dinner, with the demo's data (Repeat shown, three likely rows and "See all 7") and on a first day with nothing
+  // logged, at 360 x 740, 390 x 844 and 320 x 640: the sheet's body does not scroll and every control of it is wholly
+  // in the window; the title names the meal and the line under it the day and what is left; Scan is at the end of the
+  // Search row; "See all N" opens food search.
+  {
+    const { buildSeed } = await import(require('url').pathToFileURL(require.resolve('./seed.mjs')).href);
+    const at = new Date();
+    at.setHours(19, 0, 0, 0);
+    const looks = [];
+    let seeAll = null;
+    for (const [w, h] of [[360, 740], [390, 844], [320, 640]]) {
+      for (const empty of [false, true]) {
+        const ctx = await browser.newContext({ viewport: { width: w, height: h }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+        await ctx.clock.setFixedTime(at);
+        await ctx.addInitScript((value) => {
+          if (!window.sessionStorage.getItem('__seeded')) {
+            window.localStorage.setItem('healthcal-v1', value);
+            window.sessionStorage.setItem('__seeded', '1');
+          }
+        }, JSON.stringify(buildSeed({ onboarded: true, empty, theme: 'blossom' })));
+        const p = await ctx.newPage();
+        p.on('pageerror', (e) => errors.push(e.message));
+        await p.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+        await p.getByTestId('tab-add').first().tap({ timeout: 20000 });
+        await p.getByTestId('quick-water-tile').first().waitFor({ timeout: 10000 });
+        await p.waitForTimeout(500);
+        const m = await p.evaluate(() => {
+          const sheet = document.querySelector('[data-testid="sheet"]');
+          const body = sheet.querySelector('[data-testid="sheet-body"]');
+          const controls = [...sheet.querySelectorAll('[data-testid^="quick-"]')].filter((e) => e.matches('[role="button"],button'));
+          const outside = controls.filter((e) => { const r = e.getBoundingClientRect(); return r.top < 0 || r.bottom > innerHeight || r.left < 0 || r.right > innerWidth; }).map((e) => e.getAttribute('data-testid'));
+          const t = (id) => (sheet.querySelector(`[data-testid="${id}"]`)?.textContent ?? '').replace(/[ ]/g, ' ').replace(/[⁠‎⁨⁩]/g, '');
+          return {
+            scrolls: body.scrollHeight - body.clientHeight, outside, count: controls.length,
+            title: sheet.querySelector('[id^="sheet-title"]')?.textContent ?? '', line: t('quick-day-line'), see: t('quick-see-all'),
+            ways: ['quick-photo', 'quick-describe', 'quick-activity', 'quick-weight', 'quick-search', 'quick-scan'].every((id) => !!sheet.querySelector(`[data-testid="${id}"]`)),
+            repeat: !!sheet.querySelector('[data-testid="quick-repeat"]'), barcodeTile: !!sheet.querySelector('[data-testid="quick-pinned"]'),
+          };
+        });
+        looks.push({ w, empty, ...m });
+        if (!empty && w === 360 && m.see) {
+          await p.getByTestId('quick-see-all').first().tap();
+          seeAll = await p.getByTestId('food-search-input').first().waitFor({ state: 'visible', timeout: 8000 }).then(() => new URL(p.url()).pathname, () => 'not opened');
+        }
+        await ctx.close();
+      }
+    }
+    const bad = looks.filter((l) => l.scrolls > 0 || l.outside.length || !l.ways || l.barcodeTile || l.title !== 'Add to dinner' || !/^Today · [\d,]+ kcal (left|above budget)$/.test(l.line) || (!l.empty && (!l.repeat || l.see !== 'See all 7')));
+    check('+ sheet in one view: nothing scrolls and every control is in the window at 360 x 740, 390 x 844 and 320 x 640, demo data and a first day', bad.length === 0, JSON.stringify(bad.length ? bad[0] : looks.map((l) => `${l.w}${l.empty ? ' empty' : ''}: ${l.count} controls`)));
+    check('+ sheet in one view: "See all 7" opens food search', seeAll === '/food/search', String(seeAll));
   }
 
   // ------------------------------------------- Appearance: the newer looks (src/theme/resolve.ts)

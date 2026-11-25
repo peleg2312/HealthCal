@@ -415,4 +415,18 @@ module.exports = [
   { id: 'quick-macro-minus', route: '/food/quick', type: { 'quick-kcal': '300', 'quick-protein': '-20' }, note: 'a minus in Protein: named under the field, Add waits' },
   { id: 'custom-minus', route: '/food/custom', type: { 'custom-name': 'Test bar', 'custom-kcal': '-200' }, taps: ['custom-save'], note: 'a minus in Calories: the minus words, Save waits' },
   { id: 'photo-review-grams-minus', route: '/food/photo?mode=text&demoLive=1', taps: [{ type: 'ai-description', text: 'Chicken, rice and salad' }, 'ai-analyse', { wait: 2600 }, { type: 'ai-item-0-grams', text: '-100' }], waitFor: 'ai-item-0-grams-error', note: 'the AI review with a minus in a row\'s grams: named under the row, Add waits' },
+  // ---------------------------------------------------------------- the diary shows more of the day (visible changes)
+  // The diary's slim strip (`DayRingStrip slim`): small cups, the same caption row, "Choose a week" a tap away; each
+  // filled meal says its protein, carbs and fat under its name (`meal-macros-<meal>`, `mealMacroLine`).
+  { id: 'diary-slim-week-pick', route: '/diary', taps: ['diary-week-pick'], sheet: true, waitFor: 'diary-week-pick-sheet', note: 'the slim strip\'s "Choose a week" sheet' },
+  { id: 'diary-slim-macros', route: '/diary', waitFor: 'meal-macros-lunch', note: 'Breakfast and Lunch whole in the first view at 360 x 740, each with "P · C · F" under its name' },
+  // ---------------------------------------------------------------- the + sheet in one view (src/components/QuickLogSheet.tsx)
+  // "Add to <meal>" with the day and what is left under it, four small ways in, Search food with Scan, Repeat, three
+  // likely rows with "See all N" and Water's glasses: nothing scrolls at 360 x 740, 390 x 844 and 320 x 640.
+  { id: 'quick-sheet-dinner', route: '/', now: todayAt(19, 0), taps: ['tab-add'], sheet: true, waitFor: 'quick-repeat', note: 'the + sheet at dinner: Repeat with its calories, three likely rows and "See all 7", all in one view' },
+  { id: 'quick-sheet-breakfast', route: '/', now: todayAt(8, 0), taps: ['tab-add'], sheet: true, waitFor: 'quick-see-all', note: 'the + sheet at breakfast (already logged): no Repeat' },
+  { id: 'quick-sheet-first-day', route: '/', data: 'empty', now: todayAt(19, 0), taps: ['tab-add'], sheet: true, waitFor: 'quick-water-tile', absent: ['quick-usual', 'quick-repeat'], note: 'the + sheet on a first day: the ways in, Search with Scan and Water, nothing likely yet' },
+  { id: 'quick-sheet-dinner-imperial', route: '/', imperial: true, now: todayAt(19, 0), taps: ['tab-add'], sheet: true, waitFor: 'quick-repeat', note: 'the + sheet at dinner in fluid ounces: the glasses on Water\'s line' },
+  { id: 'quick-sheet-repeat-done', route: '/', now: todayAt(19, 0), taps: ['tab-add', 'quick-repeat', { wait: 300 }], sheet: true, waitFor: 'toast-action', note: 'Repeat tapped: the row stays with its done mark, the sheet open, its toast above it' },
+  { id: 'quick-sheet-see-all', route: '/', now: todayAt(19, 0), taps: ['tab-add', 'quick-see-all'], waitFor: 'food-search-input', note: '"See all 7" opens food search for dinner' },
 ];

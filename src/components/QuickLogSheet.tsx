@@ -318,7 +318,9 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
       </View>
     ) : null;
 
-  const showRepeat = !!prev && !alreadyLogged;
+  // Shown while the meal is empty, and kept with its done mark once tapped (the sheet stays open), so nothing
+  // under the finger moves and the sheet's top does not drop.
+  const showRepeat = !!prev && (!alreadyLogged || done.includes('repeat'));
   const repeatRow =
     showRepeat && prev ? (
       <RepeatRow
@@ -326,7 +328,8 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
         entries={prev.entries}
         big={big}
         narrow={narrow}
-        done={done.includes('repeat')}
+        // Done while what it copied is there: its toast's Undo makes it a Repeat again.
+        done={done.includes('repeat') && alreadyLogged}
         onPress={() => {
           const m = mealForTime();
           const date = quickLogDate();
@@ -370,18 +373,20 @@ export function QuickLogSheet({ visible, onClose }: { visible: boolean; onClose:
   );
 
   // Water is a whole row: its name on the left (opens the water screen), the one-tap glasses on the right, the
-  // kit's small secondary Button with the water edge, as Today's glass is. Under 360 px the row pads 12, the
-  // name and the glasses sit 8 apart and the name's drop goes, so name and glasses stay on one line at 320 px.
+  // kit's small secondary Button with the water edge, as Today's glass is. Under 360 px, and under 390 px for the
+  // longer glasses in fluid ounces ("16 fl oz"), the row pads 12, the name and the glasses sit 8 apart and the
+  // name's drop goes, so name and glasses stay on one line and the sheet keeps to one view.
+  const compactWater = narrow || (profile.units === 'imperial' && winW < 390);
   const waterRow = (
     <View
-      style={[tile, { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', paddingHorizontal: narrow ? 12 : 14, paddingVertical: big ? 10 : narrow ? 2 : 4, gap: narrow ? 8 : 12 }]}
+      style={[tile, { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', paddingHorizontal: compactWater ? 12 : 14, paddingVertical: big ? 10 : narrow ? 2 : 4, gap: compactWater ? 8 : 12 }]}
       testID="quick-water-tile">
       <PressableScale
         testID="quick-water"
         onPress={() => go('/water')}
         accessibilityLabel="Water, open hydration"
-        style={{ flexDirection: 'row', alignItems: 'center', gap: narrow ? 10 : 14, minHeight: 44, flexGrow: 1 }}>
-        {narrow ? null : (
+        style={{ flexDirection: 'row', alignItems: 'center', gap: compactWater ? 10 : 14, minHeight: 44, flexGrow: 1 }}>
+        {compactWater ? null : (
           <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
             <Droplets size={22} color={colors.water} strokeWidth={1.9} />
           </View>
@@ -561,7 +566,7 @@ function LikelyRow({
       accessibilityLabel={accessibilityLabel}
       scaleTo={0.98}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: narrow ? 46 : 48, paddingVertical: 5, borderTopWidth: first ? 0 : 1, borderTopColor: colors.border }}>
-      <Text style={{ fontSize: 17, lineHeight: 22, width: 22 }}>{emoji || '🍽️'}</Text>
+      <Text style={{ fontSize: 17, lineHeight: 22, minWidth: 22 }}>{emoji || '🍽️'}</Text>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text variant="label" numberOfLines={big ? 3 : 1}>
           {isolateRtl(name)}
